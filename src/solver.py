@@ -32,6 +32,32 @@ from .settings import Settings
 from .tree import ChromosomeTree
 
 
+def _rescale_to_arc(pos: torch.Tensor,
+                    arc_starts: torch.Tensor,
+                    arc_ends: torch.Tensor,
+                    arc_exp: torch.Tensor,
+                    min_ratio: float = 2.0) -> float:
+    """
+    Return a scale factor S such that pos/S has typical inter-arc distances
+    matching arc expected distances.  Returns 1.0 if already compatible.
+
+    The heatmap phase leaves positions at freq_dist_scale (~100 units) while
+    count_to_distance gives arc targets ~1-10 units.  Dividing positions by S
+    before arc MC and multiplying back after preserves the heatmap structure
+    while letting arc MC converge.
+    """
+    mask = arc_exp > 0
+    if not mask.any():
+        return 1.0
+    with torch.no_grad():
+        actual = (pos[arc_starts[mask]] - pos[arc_ends[mask]]).norm(dim=1).median().item()
+        expected = arc_exp[mask].median().item()
+    if expected <= 0:
+        return 1.0
+    ratio = actual / expected
+    return ratio if ratio >= min_ratio else 1.0
+
+
 class LooperSolver:
     """Reconstruct 3D chromatin structure from ChIA-PET data."""
 
@@ -253,8 +279,8 @@ class LooperSolver:
             [tree.clusters[i].genomic_pos for i in tree.anchors_idx],
             dtype=torch.float32, device=self.device,
         )
-        diff = (gpos.unsqueeze(1) - gpos.unsqueeze(0)).abs()
-        exp = s.genomic_dist_base + s.genomic_dist_scale * diff.clamp(min=1) ** s.genomic_dist_power
+        diff_kb = (gpos.unsqueeze(1) - gpos.unsqueeze(0)).abs() / 1000.0  # bp → kb
+        exp = s.genomic_dist_base + s.genomic_dist_scale * diff_kb.clamp(min=1e-3) ** s.genomic_dist_power
         # zero out diagonal
         exp.fill_diagonal_(0.0)
         return exp
@@ -288,6 +314,22 @@ class LooperSolver:
                     self.settings.genomic_dist_base,
                 )
 
+            # Compute chain lengths (kb-scale after the bp→kb fix in distances.py)
+            chain_lengths = tree.chain_lengths_tensor(device=str(self.device))
+            orientations = [
+                tree.clusters[tree.anchors_idx[i]].orientation
+                for i in range(n)
+            ]
+
+            # Heatmap MC leaves positions at freq_dist_scale (~100 units) while
+            # arc expected distances are count_to_distance scale (~1-10 units) and
+            # chain_lengths are genomic-kb scale (~2-20 units) — both compatible.
+            # Rescale only positions into arc/chain units, then scale back for output.
+            arc_scale = _rescale_to_arc(pos, arc_starts, arc_ends, arc_exp)
+            if arc_scale != 1.0:
+                print(f"  Rescaling positions ÷{arc_scale:.1f} to match arc/chain distance scale")
+                pos = pos / arc_scale
+
             # Phase 2 - arc spring MC
             if arc_starts.shape[0] > 0:
                 pos = monte_carlo_arcs(
@@ -297,17 +339,15 @@ class LooperSolver:
 
             # Phase 3 - smooth MC
             print(f"[Smooth MC] {chrom}")
-            chain_lengths = tree.chain_lengths_tensor(device=str(self.device))
-            orientations = [
-                tree.clusters[tree.anchors_idx[i]].orientation
-                for i in range(n)
-            ]
-
             pos = monte_carlo_arcs_smooth(
                 pos, arc_starts, arc_ends, arc_exp,
                 chain_lengths, orientations, fixed,
                 self.settings, verbose=True,
             )
+
+            # Scale positions back to heatmap-phase coordinate system
+            if arc_scale != 1.0:
+                pos = pos * arc_scale
 
             tree.set_anchor_positions_from_tensor(pos)
             tree._propagate_positions_up()

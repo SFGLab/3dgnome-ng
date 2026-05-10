@@ -133,10 +133,17 @@ def monte_carlo_heatmap(
     milestone_fails = 0
     outer_step = 0
 
+    # Auto-scale inner steps so each outer step stays under ~1 second on GPU.
+    # For N=26603 and mc_inner_steps=512 an outer step takes ~26 s; cap at 512²/N.
+    effective_inner = min(s.mc_inner_steps, max(1, (512 * 512) // max(N, 1)))
+    if verbose and effective_inner < s.mc_inner_steps:
+        print(f"  [heatmap MC] auto-scaling mc_inner_steps "
+              f"{s.mc_inner_steps} → {effective_inner} (N={N})")
+
     while milestone_fails < s.milestone_fails_threshold:
         outer_step += 1
 
-        for _ in range(s.mc_inner_steps):
+        for _ in range(effective_inner):
             # propose one displacement for every free bead
             disp = torch.zeros(N, 3, device=device)
             if s.use_2d:
@@ -225,9 +232,11 @@ def monte_carlo_arcs(
                                            arc_expected, s.k_spring,
                                            s.k_spring_repulsion).item()
             delta = local_curr - local_prev
-            if delta <= 0:
+            if delta < -1e-7:
                 total_score += delta
                 successes += 1
+            elif delta <= 0:
+                total_score += delta
             elif _with_chance(s.temp_jump_scale_arcs,
                               T * s.temp_jump_coef_arcs, delta, rng):
                 total_score += delta
@@ -318,9 +327,11 @@ def monte_carlo_arcs_smooth(
                      + 2.0 * (arc_a - arc_b)
                      + 2.0 * (ori_a - ori_b))
 
-            if delta <= 0:
+            if delta < -1e-7:
                 ts += delta
                 successes += 1
+            elif delta <= 0:
+                ts += delta
             elif _with_chance(s.temp_jump_scale_smooth,
                               T * s.temp_jump_coef_smooth, delta, rng):
                 ts += delta

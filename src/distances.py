@@ -8,10 +8,15 @@ import torch
 
 def genomic_length_to_distance(length: int, scale: float = 0.5,
                                 power: float = 0.75, base: float = 1.0) -> float:
-    """Map genomic span (bp) to an initial spatial distance estimate."""
+    """Map genomic span (bp) to a spatial distance estimate.
+
+    Original cudaMMC uses length in kilobases: dist = base + scale * (length_kb)^power.
+    Using raw bp would give values ~1000× too large.
+    """
     if length <= 0:
         return base
-    return base + scale * (length ** power)
+    length_kb = length / 1000.0
+    return base + scale * (length_kb ** power)
 
 
 def freq_to_distance_heatmap(freq: float, scale: float = 100.0,
@@ -52,8 +57,8 @@ def count_to_distance(count: int, a: float = 0.5, scale: float = 20.0,
 def genomic_length_to_distance_t(lengths: torch.Tensor, scale: float = 0.5,
                                   power: float = 0.75, base: float = 1.0
                                   ) -> torch.Tensor:
-    lengths = lengths.float().clamp(min=0)
-    return base + scale * (lengths.clamp(min=1) ** power)
+    lengths_kb = lengths.float().clamp(min=0) / 1000.0
+    return base + scale * (lengths_kb.clamp(min=1e-3) ** power)
 
 
 def freq_to_distance_heatmap_t(freqs: torch.Tensor, scale: float = 100.0,
