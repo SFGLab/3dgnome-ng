@@ -8,12 +8,14 @@ Usage:
         [--singletons singletons.bedpe] \\
         [--config config.ini] \\
         [--output output/prefix] \\
-        [--device cuda|mlp|cpu]
+        [--device cuda|mps|cpu] \\
+        [--chromosomes 'chr1-chr22,chrX']
 """
 
 import argparse
 import sys
 
+from src.regions import default_regions, parse_region_spec
 from src.settings import Settings
 from src.solver import LooperSolver
 
@@ -36,6 +38,12 @@ def parse_args():
                    help="Compute device (default: cuda or mps if available, otherwise cpu)")
     p.add_argument("--factor", type=int, default=0,
                    help="Factor index for multi-factor ChIA-PET (default: 0)")
+    p.add_argument("--chromosomes", default="chr1-chr22,chrX",
+                   metavar="SPEC",
+                   help=("Chromosomes or regions to include, comma-separated. "
+                         "Supports ranges (chr1-chr22), individual names (chrX), "
+                         "and coordinate windows (chr14:1:2500000). "
+                         "Default: 'chr1-chr22,chrX'"))
     p.add_argument("--hcm", action="store_true",
                    help="Also save anchor positions in HCM format")
     return p.parse_args()
@@ -52,18 +60,26 @@ def main():
     if args.device:
         settings.device = args.device
 
+    try:
+        regions = parse_region_spec(args.chromosomes)
+    except ValueError as e:
+        print(f"Error in --chromosomes: {e}", file=sys.stderr)
+        sys.exit(1)
+
     print(f"Device: {settings.device}")
     print(f"Anchors: {args.anchors}")
     print(f"Clusters: {args.clusters}")
     if args.singletons:
         print(f"Singletons: {args.singletons}")
+    print(f"Regions: {', '.join(str(r) for r in regions)}")
 
-    solver = LooperSolver(settings)
+    solver = LooperSolver(settings, regions=regions)
     solver.run(
         anchors_bed=args.anchors,
         pet_clusters_bedpe=args.clusters,
         singletons_bedpe=args.singletons,
         output_prefix=args.output,
+        factor=args.factor,
     )
 
     if args.hcm:

@@ -27,6 +27,7 @@ from .distances import (
 from .heatmap import build_singleton_heatmap, normalize_heatmap, heatmap_to_expected_distances
 from .mc import monte_carlo_heatmap, monte_carlo_arcs, monte_carlo_arcs_smooth
 from .scores import score_heatmap, score_arcs, score_structure_smooth, score_orientation
+from .regions import Region, build_filter, chrom_included, filter_anchors, default_regions
 from .settings import Settings
 from .tree import ChromosomeTree
 
@@ -34,9 +35,13 @@ from .tree import ChromosomeTree
 class LooperSolver:
     """Reconstruct 3D chromatin structure from ChIA-PET data."""
 
-    def __init__(self, settings: Optional[Settings] = None):
+    def __init__(self, settings: Optional[Settings] = None,
+                 regions: Optional[List[Region]] = None):
         self.settings = settings or Settings()
         self.device = torch.device(self.settings.device)
+
+        # region filter – None means all chromosomes
+        self._region_filter = build_filter(regions) if regions is not None else None
 
         # populated by set_contact_data()
         self.anchors_by_chr: Dict[str, List[Anchor]] = {}
@@ -57,7 +62,22 @@ class LooperSolver:
     ):
         """Load all input files and map arcs to anchor indices."""
         print("Loading anchors...")
-        self.anchors_by_chr = load_anchors(anchors_bed)
+        all_anchors = load_anchors(anchors_bed)
+
+        # apply chromosome / region filter
+        flt = self._region_filter
+        if flt is not None:
+            self.anchors_by_chr = {
+                chrom: filter_anchors(ancs, flt)
+                for chrom, ancs in all_anchors.items()
+                if chrom_included(chrom, flt) and filter_anchors(ancs, flt)
+            }
+            skipped = set(all_anchors) - set(self.anchors_by_chr)
+            if skipped:
+                print(f"  Skipping chromosomes not in region filter: "
+                      f"{', '.join(sorted(skipped))}")
+        else:
+            self.anchors_by_chr = all_anchors
 
         print("Loading PET clusters...")
         raw_arcs = load_pet_clusters(pet_clusters_bedpe, factor)
@@ -65,6 +85,13 @@ class LooperSolver:
         if singletons_bedpe and os.path.exists(singletons_bedpe):
             print("Loading singletons...")
             raw_arcs += load_singletons(singletons_bedpe, factor)
+
+        # drop arcs that reference chromosomes we're not modelling
+        if flt is not None:
+            raw_arcs = [
+                a for a in raw_arcs
+                if a.chrom1 in self.anchors_by_chr and a.chrom2 in self.anchors_by_chr
+            ]
 
         print("Marking arcs...")
         self.arcs_by_chr, _ = mark_arcs(raw_arcs, self.anchors_by_chr)
@@ -278,9 +305,11 @@ class LooperSolver:
         pet_clusters_bedpe: str,
         singletons_bedpe: Optional[str] = None,
         output_prefix: str = "output",
+        factor: int = 0,
     ):
         """End-to-end pipeline: load → build → optimise → save."""
-        self.set_contact_data(anchors_bed, pet_clusters_bedpe, singletons_bedpe)
+        self.set_contact_data(anchors_bed, pet_clusters_bedpe, singletons_bedpe,
+                              factor=factor)
 
         if singletons_bedpe and os.path.exists(singletons_bedpe):
             self.load_heatmap(singletons_bedpe)
