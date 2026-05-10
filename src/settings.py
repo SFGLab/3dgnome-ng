@@ -9,8 +9,6 @@ from typing import Optional
 @dataclass
 class Settings:
     # ── CUDA / MC runtime ────────────────────────────────────────────────────
-    cuda_threads_per_block: int = 256
-    cuda_blocks_multiplier: int = 4
     milestone_fails_threshold: int = 3
 
     # ── Distance conversions ─────────────────────────────────────────────────
@@ -113,8 +111,6 @@ class Settings:
                 return default
 
         return cls(
-            cuda_threads_per_block=g_int("cuda", "num_threads", 256),
-            cuda_blocks_multiplier=g_int("cuda", "blocks_multiplier", 4),
             milestone_fails_threshold=g_int("cuda", "milestone_fails", 3),
 
             genomic_dist_power=g_float("distance", "genomic_dist_power", 0.75),
