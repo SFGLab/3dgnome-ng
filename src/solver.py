@@ -1,0 +1,319 @@
+"""
+LooperSolver – main orchestrator.
+
+Reproduces the runLooper() pipeline from cudaMMC main.cpp:
+    1. setContactData()           → load anchors + arcs
+    2. createTreeGenome()         → build hierarchical model
+    3. reconstructClustersHeatmap()  → Phase 1 GPU heatmap MC per level
+    4. reconstructClustersArcsDistances() → Phase 2+3 CPU arc MC
+    5. save()                     → write output
+
+All four reconstruction phases are run level by level, top → bottom.
+"""
+
+import os
+from typing import Dict, List, Optional, Tuple
+
+import torch
+
+from .data_loading import load_anchors, load_pet_clusters, load_singletons, mark_arcs
+from .data_structures import Anchor, Cluster, InteractionArc
+from .distances import (
+    count_to_distance,
+    freq_to_distance_intra,
+    freq_to_distance_inter,
+    genomic_length_to_distance,
+)
+from .heatmap import build_singleton_heatmap, normalize_heatmap, heatmap_to_expected_distances
+from .mc import monte_carlo_heatmap, monte_carlo_arcs, monte_carlo_arcs_smooth
+from .scores import score_heatmap, score_arcs, score_structure_smooth, score_orientation
+from .settings import Settings
+from .tree import ChromosomeTree
+
+
+class LooperSolver:
+    """Reconstruct 3D chromatin structure from ChIA-PET data."""
+
+    def __init__(self, settings: Optional[Settings] = None):
+        self.settings = settings or Settings()
+        self.device = torch.device(
+            self.settings.device
+            if torch.cuda.is_available() or self.settings.device == "cpu"
+            else "cpu"
+        )
+
+        # populated by set_contact_data()
+        self.anchors_by_chr: Dict[str, List[Anchor]] = {}
+        self.arcs_by_chr: Dict[str, List[InteractionArc]] = {}
+        self.trees: Dict[str, ChromosomeTree] = {}
+
+        # heatmap expected-distance matrices (one per chromosome)
+        self.heatmap_expected: Dict[str, torch.Tensor] = {}
+
+    # ── Data loading ──────────────────────────────────────────────────────────
+
+    def set_contact_data(
+        self,
+        anchors_bed: str,
+        pet_clusters_bedpe: str,
+        singletons_bedpe: Optional[str] = None,
+        factor: int = 0,
+    ):
+        """Load all input files and map arcs to anchor indices."""
+        print("Loading anchors...")
+        self.anchors_by_chr = load_anchors(anchors_bed)
+
+        print("Loading PET clusters...")
+        raw_arcs = load_pet_clusters(pet_clusters_bedpe, factor)
+
+        if singletons_bedpe and os.path.exists(singletons_bedpe):
+            print("Loading singletons...")
+            raw_arcs += load_singletons(singletons_bedpe, factor)
+
+        print("Marking arcs...")
+        self.arcs_by_chr, _ = mark_arcs(raw_arcs, self.anchors_by_chr)
+        print(f"  {sum(len(v) for v in self.arcs_by_chr.values())} arcs mapped.")
+
+    def load_heatmap(self, singletons_bedpe: str):
+        """Build and normalise singleton heatmaps for all chromosomes."""
+        for chrom, anchors in self.anchors_by_chr.items():
+            print(f"  Building heatmap for {chrom}...")
+            raw = build_singleton_heatmap(singletons_bedpe, anchors,
+                                          device=str(self.device))
+            norm = normalize_heatmap(raw, anchors, self.settings.diagonal_size)
+            self.heatmap_expected[chrom] = heatmap_to_expected_distances(
+                norm,
+                self.settings.freq_dist_scale,
+                self.settings.freq_dist_power,
+            )
+
+    # ── Tree construction ─────────────────────────────────────────────────────
+
+    def create_tree_genome(self):
+        """Build hierarchical bead-spring models for every chromosome."""
+        print("Building hierarchical models...")
+        for chrom, anchors in self.anchors_by_chr.items():
+            arcs = self.arcs_by_chr.get(chrom, [])
+            tree = ChromosomeTree(chrom, anchors, arcs, self.settings)
+            tree.init_positions_linear()
+            self.trees[chrom] = tree
+            print(f"  {chrom}: {len(tree.clusters)} clusters, "
+                  f"{len(tree.anchors_idx)} anchors")
+
+    # ── Arc expected distances ────────────────────────────────────────────────
+
+    def _calc_arc_expected_distances(self, chrom: str,
+                                      indices: List[int]) -> torch.Tensor:
+        """
+        Build arc expected-distance tensor for a set of cluster indices.
+
+        Mirrors calcAnchorExpectedDistancesHeatmap + calcAnchorExpectedDistances:
+          - initialise all pairs to -1 (repulsion)
+          - for each arc set expected = countToDistance(arc.score)
+          - multi-factor arcs: summary arc (factor=-1) gets score=0 → large distance
+        """
+        tree = self.trees[chrom]
+        arcs = self.arcs_by_chr.get(chrom, [])
+        s = self.settings
+
+        n = len(indices)
+        idx_map = {ci: li for li, ci in enumerate(indices)}
+
+        expected = torch.full((n, n), -1.0, dtype=torch.float32,
+                               device=self.device)
+
+        for arc in arcs:
+            # map global anchor indices to local indices
+            ai = tree.anchors_idx[arc.start] if arc.start < len(tree.anchors_idx) else -1
+            bi = tree.anchors_idx[arc.end] if arc.end < len(tree.anchors_idx) else -1
+            li = idx_map.get(ai, -1)
+            lj = idx_map.get(bi, -1)
+            if li < 0 or lj < 0:
+                continue
+
+            dist = count_to_distance(
+                arc.score,
+                s.count_dist_a, s.count_dist_scale,
+                s.count_dist_shift, s.count_dist_base_level,
+            )
+            expected[li, lj] = dist
+            expected[lj, li] = dist
+
+        return expected
+
+    def _arc_tensors(self, chrom: str
+                     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Return (arc_starts, arc_ends, arc_expected) tensors for CPU MC phases."""
+        tree = self.trees[chrom]
+        arcs = self.arcs_by_chr.get(chrom, [])
+        s = self.settings
+        n = len(tree.anchors_idx)
+
+        starts, ends, expected = [], [], []
+        for arc in arcs:
+            ai = arc.start
+            bi = arc.end
+            if ai >= n or bi >= n:
+                continue
+            dist = count_to_distance(
+                arc.score,
+                s.count_dist_a, s.count_dist_scale,
+                s.count_dist_shift, s.count_dist_base_level,
+            )
+            starts.append(ai)
+            ends.append(bi)
+            expected.append(dist)
+
+        if not starts:
+            empty = torch.zeros(0, dtype=torch.long, device=self.device)
+            return empty, empty, torch.zeros(0, dtype=torch.float32, device=self.device)
+
+        arc_starts = torch.tensor(starts, dtype=torch.long, device=self.device)
+        arc_ends = torch.tensor(ends, dtype=torch.long, device=self.device)
+        arc_exp = torch.tensor(expected, dtype=torch.float32, device=self.device)
+        return arc_starts, arc_ends, arc_exp
+
+    # ── Phase 1: heatmap MC ───────────────────────────────────────────────────
+
+    def reconstruct_clusters_heatmap(self):
+        """
+        Run GPU heatmap Monte Carlo for each chromosome.
+
+        Works on the anchor-level positions (level-4 clusters).
+        After convergence the parent clusters are updated by propagation.
+        """
+        for chrom, tree in self.trees.items():
+            print(f"\n[Heatmap MC] {chrom}")
+            n = len(tree.anchors_idx)
+            if n == 0:
+                continue
+
+            pos = tree.anchor_positions_tensor(device=str(self.device))
+
+            if chrom in self.heatmap_expected:
+                exp = self.heatmap_expected[chrom]
+            else:
+                # no heatmap provided — use genomic distance as proxy
+                exp = self._genomic_expected_matrix(chrom, tree)
+
+            fixed = torch.zeros(n, dtype=torch.bool, device=self.device)
+
+            pos = monte_carlo_heatmap(
+                pos, exp, fixed, self.settings,
+                verbose=True,
+            )
+
+            tree.set_anchor_positions_from_tensor(pos)
+            tree._propagate_positions_up()
+
+    def _genomic_expected_matrix(self, chrom: str,
+                                   tree: ChromosomeTree) -> torch.Tensor:
+        """Fallback: build expected-distance matrix from genomic positions."""
+        s = self.settings
+        n = len(tree.anchors_idx)
+        gpos = torch.tensor(
+            [tree.clusters[i].genomic_pos for i in tree.anchors_idx],
+            dtype=torch.float32, device=self.device,
+        )
+        diff = (gpos.unsqueeze(1) - gpos.unsqueeze(0)).abs()
+        exp = s.genomic_dist_base + s.genomic_dist_scale * diff.clamp(min=1) ** s.genomic_dist_power
+        # zero out diagonal
+        exp.fill_diagonal_(0.0)
+        return exp
+
+    # ── Phase 2+3: arc / smooth MC ────────────────────────────────────────────
+
+    def reconstruct_clusters_arcs_distances(self):
+        """Run arc-spring MC and smooth MC for each chromosome."""
+        for chrom, tree in self.trees.items():
+            n = len(tree.anchors_idx)
+            if n == 0:
+                continue
+
+            print(f"\n[Arcs MC] {chrom}")
+            pos = tree.anchor_positions_tensor(device=str(self.device))
+            arc_starts, arc_ends, arc_exp = self._arc_tensors(chrom)
+            fixed = torch.zeros(n, dtype=torch.bool, device=self.device)
+
+            # add small noise to break symmetry
+            pos = pos + self.settings.noise_size_small * torch.randn_like(pos)
+
+            # set dist_to_next from genomic spans
+            for i in range(n - 1):
+                c1 = tree.clusters[tree.anchors_idx[i]]
+                c2 = tree.clusters[tree.anchors_idx[i + 1]]
+                gap = max(0, c2.start - c1.end)
+                c1.dist_to_next = genomic_length_to_distance(
+                    gap,
+                    self.settings.genomic_dist_scale,
+                    self.settings.genomic_dist_power,
+                    self.settings.genomic_dist_base,
+                )
+
+            # Phase 2 – arc spring MC
+            if arc_starts.shape[0] > 0:
+                pos = monte_carlo_arcs(
+                    pos, arc_starts, arc_ends, arc_exp, fixed,
+                    self.settings, verbose=True,
+                )
+
+            # Phase 3 – smooth MC
+            print(f"[Smooth MC] {chrom}")
+            chain_lengths = tree.chain_lengths_tensor(device=str(self.device))
+            orientations = [
+                tree.clusters[tree.anchors_idx[i]].orientation
+                for i in range(n)
+            ]
+
+            pos = monte_carlo_arcs_smooth(
+                pos, arc_starts, arc_ends, arc_exp,
+                chain_lengths, orientations, fixed,
+                self.settings, verbose=True,
+            )
+
+            tree.set_anchor_positions_from_tensor(pos)
+            tree._propagate_positions_up()
+
+    # ── Full pipeline ─────────────────────────────────────────────────────────
+
+    def run(
+        self,
+        anchors_bed: str,
+        pet_clusters_bedpe: str,
+        singletons_bedpe: Optional[str] = None,
+        output_prefix: str = "output",
+    ):
+        """End-to-end pipeline: load → build → optimise → save."""
+        self.set_contact_data(anchors_bed, pet_clusters_bedpe, singletons_bedpe)
+
+        if singletons_bedpe and os.path.exists(singletons_bedpe):
+            self.load_heatmap(singletons_bedpe)
+
+        self.create_tree_genome()
+        self.reconstruct_clusters_heatmap()
+        self.reconstruct_clusters_arcs_distances()
+        self.save(output_prefix)
+
+    # ── Output ────────────────────────────────────────────────────────────────
+
+    def save(self, prefix: str = "output"):
+        """Write per-chromosome 3D coordinate files in BED4-like format."""
+        os.makedirs(os.path.dirname(prefix) if os.path.dirname(prefix) else ".", exist_ok=True)
+        for chrom, tree in self.trees.items():
+            path = f"{prefix}_{chrom}.3d"
+            with open(path, "w") as fh:
+                fh.write("chrom\tstart\tend\tx\ty\tz\tlevel\n")
+                for c in tree.clusters:
+                    fh.write(f"{c.chrom}\t{c.start}\t{c.end}\t"
+                             f"{c.x:.6f}\t{c.y:.6f}\t{c.z:.6f}\t{c.level}\n")
+            print(f"Saved {path}")
+
+    def save_hcm(self, prefix: str = "output"):
+        """Write anchor positions in HCM format (matching cudaMMC output)."""
+        for chrom, tree in self.trees.items():
+            path = f"{prefix}_{chrom}.hcm"
+            with open(path, "w") as fh:
+                for idx in tree.anchors_idx:
+                    c = tree.clusters[idx]
+                    fh.write(f"{c.genomic_pos}\t{c.x:.6f}\t{c.y:.6f}\t{c.z:.6f}\n")
+            print(f"Saved {path}")
