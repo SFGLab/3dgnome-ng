@@ -397,3 +397,52 @@ class LooperSolver:
                     c = tree.clusters[idx]
                     fh.write(f"{c.genomic_pos}\t{c.x:.6f}\t{c.y:.6f}\t{c.z:.6f}\n")
             print(f"Saved {path}")
+
+    def save_cif(self, prefix: str = "output", anchors_only: bool = False):
+        """Write per-chromosome mmCIF files suitable for 3D structure viewers.
+
+        anchors_only: if True write only anchor (level-4) beads; otherwise all beads.
+        """
+        _CIF_HEADER = """\
+data_3dnome
+#
+_entry.id 3dgnome
+#
+_audit_conform.dict_name       mmcif_pdbx.dic
+_audit_conform.dict_version    5.296
+_audit_conform.dict_location   http://mmcif.pdb.org/dictionaries/ascii/mmcif_pdbx.dic
+#
+loop_
+_atom_site.group_PDB
+_atom_site.id
+_atom_site.type_symbol
+_atom_site.label_atom_id
+_atom_site.label_alt_id
+_atom_site.label_comp_id
+_atom_site.label_asym_id
+_atom_site.label_entity_id
+_atom_site.label_seq_id
+_atom_site.pdbx_PDB_ins_code
+_atom_site.Cartn_x
+_atom_site.Cartn_y
+_atom_site.Cartn_z
+_atom_site.occupancy
+_atom_site.B_iso_or_equiv
+_atom_site.auth_asym_id
+"""
+        os.makedirs(os.path.dirname(prefix) if os.path.dirname(prefix) else ".", exist_ok=True)
+        for chrom, tree in self.trees.items():
+            path = f"{prefix}_{chrom}.cif"
+            clusters = (
+                [tree.clusters[i] for i in tree.anchors_idx]
+                if anchors_only
+                else tree.clusters
+            )
+            with open(path, "w") as fh:
+                fh.write(_CIF_HEADER)
+                for i, c in enumerate(clusters, start=1):
+                    fh.write(
+                        f"ATOM {i} C CA . ALA A 1 {i} ? "
+                        f"{c.x:.4f} {c.y:.4f} {c.z:.4f} 1.00 99.99 A\n"
+                    )
+            print(f"Saved {path}")

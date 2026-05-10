@@ -46,6 +46,10 @@ def parse_args():
                          "Default: 'chr1-chr22,chrX'"))
     p.add_argument("--hcm", action="store_true",
                    help="Also save anchor positions in HCM format")
+    p.add_argument("--cif", action="store_true",
+                   help="Also save positions in mmCIF format for 3D viewers")
+    p.add_argument("--cif-anchors-only", action="store_true",
+                   help="When writing CIF, include only anchor beads (not linkers)")
     return p.parse_args()
 
 
@@ -84,6 +88,9 @@ def main():
 
     if args.hcm:
         solver.save_hcm(args.output)
+
+    if args.cif:
+        solver.save_cif(args.output, anchors_only=args.cif_anchors_only)
 
     print("Done.")
 
