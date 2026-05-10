@@ -8,7 +8,7 @@ Usage:
         [--singletons singletons.bedpe] \\
         [--config config.ini] \\
         [--output output/prefix] \\
-        [--device cuda|cpu]
+        [--device cuda|mlp|cpu]
 """
 
 import argparse
@@ -32,8 +32,8 @@ def parse_args():
                    help="INI configuration file (optional)")
     p.add_argument("--output", default="output/structure",
                    help="Output prefix (default: output/structure)")
-    p.add_argument("--device", default=None, choices=["cuda", "cpu"],
-                   help="Compute device (default: cuda if available, else cpu)")
+    p.add_argument("--device", default=None, choices=["cuda", "mps", "cpu"],
+                   help="Compute device (default: cuda or mps if available, otherwise cpu)")
     p.add_argument("--factor", type=int, default=0,
                    help="Factor index for multi-factor ChIA-PET (default: 0)")
     p.add_argument("--hcm", action="store_true",

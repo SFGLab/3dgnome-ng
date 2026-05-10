@@ -49,7 +49,7 @@ class Settings:
     k_orient: float = 1.0            # CTCF orientation penalty weight
     noise_size_small: float = 0.05    # initial displacement noise for anchors
 
-    # ── Monte Carlo – Heatmap phase ──────────────────────────────────────────
+    # ── Monte Carlo - Heatmap phase ──────────────────────────────────────────
     max_temp_heatmap: float = 20.0
     dt_temp_heatmap: float = 0.99995  # per outer-step multiplicative cooling
     temp_jump_scale_heatmap: float = 50.0
@@ -58,7 +58,7 @@ class Settings:
     step_size_decay_heatmap: float = 0.95  # per outer-step
     mc_inner_steps: int = 512         # N inner steps per warp/outer-step
 
-    # ── Monte Carlo – Arcs phase ─────────────────────────────────────────────
+    # ── Monte Carlo - Arcs phase ─────────────────────────────────────────────
     max_temp_arcs: float = 10.0
     dt_temp_arcs: float = 0.9999
     temp_jump_scale_arcs: float = 20.0
@@ -68,7 +68,7 @@ class Settings:
     min_successes_arcs: int = 10
     improvement_threshold_arcs: float = 1e-4
 
-    # ── Monte Carlo – Smooth phase ────────────────────────────────────────────
+    # ── Monte Carlo - Smooth phase ────────────────────────────────────────────
     max_temp_smooth: float = 5.0
     dt_temp_smooth: float = 0.9999
     temp_jump_scale_smooth: float = 10.0

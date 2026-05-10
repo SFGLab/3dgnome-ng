@@ -1,5 +1,5 @@
 """
-Energy / score functions – vectorised PyTorch.
+Energy / score functions - vectorised PyTorch.
 
 All functions return a scalar float tensor (the lower the better).
 Position tensors have shape (N, 3) and dtype float32.

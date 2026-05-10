@@ -1,5 +1,5 @@
 """
-LooperSolver – main orchestrator.
+LooperSolver - main orchestrator.
 
 Reproduces the runLooper() pipeline from cudaMMC main.cpp:
     1. setContactData()           → load anchors + arcs
@@ -36,11 +36,7 @@ class LooperSolver:
 
     def __init__(self, settings: Optional[Settings] = None):
         self.settings = settings or Settings()
-        self.device = torch.device(
-            self.settings.device
-            if torch.cuda.is_available() or self.settings.device == "cpu"
-            else "cpu"
-        )
+        self.device = torch.device(self.settings.device)
 
         # populated by set_contact_data()
         self.anchors_by_chr: Dict[str, List[Anchor]] = {}
@@ -250,14 +246,14 @@ class LooperSolver:
                     self.settings.genomic_dist_base,
                 )
 
-            # Phase 2 – arc spring MC
+            # Phase 2 - arc spring MC
             if arc_starts.shape[0] > 0:
                 pos = monte_carlo_arcs(
                     pos, arc_starts, arc_ends, arc_exp, fixed,
                     self.settings, verbose=True,
                 )
 
-            # Phase 3 – smooth MC
+            # Phase 3 - smooth MC
             print(f"[Smooth MC] {chrom}")
             chain_lengths = tree.chain_lengths_tensor(device=str(self.device))
             orientations = [

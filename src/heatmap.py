@@ -65,7 +65,7 @@ def normalize_heatmap(raw: torch.Tensor,
     mat = raw.clone().float()
     N = mat.shape[0]
 
-    # Step 1 – bin-length normalisation
+    # Step 1 - bin-length normalisation
     lengths = torch.tensor([a.length for a in anchors],
                            dtype=torch.float32, device=mat.device)
     # divide each cell by geometric mean of the two anchor lengths
@@ -73,11 +73,11 @@ def normalize_heatmap(raw: torch.Tensor,
     geom_mean = torch.sqrt(len_outer)
     mat = mat / geom_mean.clamp(min=1.0)
 
-    # Step 2 – row normalisation (divide each row by its sum)
+    # Step 2 - row normalisation (divide each row by its sum)
     row_sums = mat.sum(dim=1, keepdim=True).clamp(min=1e-9)
     mat = mat / row_sums
 
-    # Step 3 – diagonal normalisation
+    # Step 3 - diagonal normalisation
     # For each diagonal d, divide by the mean of that diagonal
     for d in range(diagonal_size, N):
         diag = torch.diagonal(mat, offset=d)

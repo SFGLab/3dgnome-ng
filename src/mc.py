@@ -1,9 +1,9 @@
 """
 Monte Carlo optimisation phases.
 
-Phase 1 – GPU heatmap MC  (ParallelMonteCarloHeatmap equivalent)
-Phase 2 – CPU arcs MC     (MonteCarloArcs equivalent)
-Phase 3 – CPU smooth MC   (MonteCarloArcsSmooth equivalent)
+Phase 1 - GPU heatmap MC  (ParallelMonteCarloHeatmap equivalent)
+Phase 2 - CPU arcs MC     (MonteCarloArcs equivalent)
+Phase 3 - CPU smooth MC   (MonteCarloArcsSmooth equivalent)
 """
 
 import math
