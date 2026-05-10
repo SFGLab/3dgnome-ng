@@ -8,13 +8,12 @@ Phase 3 - CPU smooth MC   (MonteCarloArcsSmooth equivalent)
 
 import math
 import random
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import torch
 
 from .scores import (
     score_heatmap_chunked,
-    score_heatmap_single,
     score_arcs,
     score_arcs_single,
     score_structure_smooth,
@@ -24,103 +23,151 @@ from .scores import (
 from .settings import Settings
 
 
-# ── Random displacement helpers ───────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _random_displacement(step_size: float, use_2d: bool,
                           device: torch.device) -> torch.Tensor:
-    """Sample a random unit vector scaled by step_size."""
     v = torch.randn(3, device=device)
     if use_2d:
         v[2] = 0.0
-    norm = v.norm().clamp(min=1e-9)
-    return (v / norm) * step_size
+    return v * (step_size / v.norm().clamp(min=1e-9))
 
 
 def _with_chance(jump_scale: float, temp: float, delta: float,
                   rng: random.Random) -> bool:
-    """Metropolis acceptance: accept worse moves with probability jump_scale * exp(-delta/T)."""
     prob = jump_scale * math.exp(-delta / max(temp, 1e-10))
     return rng.random() < prob
 
 
-# ── Phase 1: GPU heatmap MC ───────────────────────────────────────────────────
+# ── Per-bead score delta (vectorised over all beads simultaneously) ───────────
+
+def _bead_score_delta(
+    pos: torch.Tensor,       # (N, 3) current positions
+    new_pos: torch.Tensor,   # (N, 3) proposed positions
+    expected: torch.Tensor,  # (N, N) fp16 or fp32
+    diagonal_size: int,
+    same_chr_mask: Optional[torch.Tensor],
+    chunk_size: int = 512,
+) -> torch.Tensor:
+    """
+    Return (N,) tensor: delta[i] = S_new[i] - S_old[i]
+
+    S[i] = sum_{j: j≠i, |i-j|>=diag, exp>1e-3} (dist(pos_i, pos_j)/exp[i,j] - 1)^2
+
+    Jacobi: S_new[i] uses new_pos[i] vs the CURRENT pos[j] for all j.
+    Uses the squared-norm matmul trick: largest intermediate is (chunk, N) ~ 50 MB.
+    """
+    N = pos.shape[0]
+    device = pos.device
+    delta = torch.zeros(N, device=device)
+
+    pos_sq = (pos ** 2).sum(dim=1)       # (N,) precomputed
+    new_sq = (new_pos ** 2).sum(dim=1)   # (N,) precomputed
+
+    for i0 in range(0, N, chunk_size):
+        i1 = min(i0 + chunk_size, N)
+
+        p_old = pos[i0:i1]             # (C, 3)
+        p_new = new_pos[i0:i1]         # (C, 3)
+        sq_o = pos_sq[i0:i1]           # (C,)
+        sq_n = new_sq[i0:i1]           # (C,)
+
+        dot_o = p_old @ pos.t()        # (C, N)
+        d_old = (sq_o[:, None] + pos_sq[None, :] - 2 * dot_o).clamp(0).sqrt()
+
+        dot_n = p_new @ pos.t()        # (C, N)
+        d_new = (sq_n[:, None] + pos_sq[None, :] - 2 * dot_n).clamp(0).sqrt()
+
+        exp_c = expected[i0:i1].float()   # (C, N)
+
+        i_idx = torch.arange(i0, i1, device=device)[:, None]   # (C, 1)
+        j_idx = torch.arange(N, device=device)[None, :]         # (1, N)
+
+        valid = ((i_idx != j_idx)
+                 & ((i_idx - j_idx).abs() >= diagonal_size)
+                 & (exp_c > 1e-3))
+        if same_chr_mask is not None:
+            valid = valid & same_chr_mask[i0:i1]
+
+        safe_e = exp_c.clamp(min=1e-9)
+        r_old = torch.where(valid, d_old / safe_e - 1.0, torch.zeros_like(d_old))
+        r_new = torch.where(valid, d_new / safe_e - 1.0, torch.zeros_like(d_new))
+
+        delta[i0:i1] = (r_new ** 2 - r_old ** 2).sum(dim=1)
+
+    return delta
+
+
+# ── Phase 1: vectorised GPU heatmap MC ───────────────────────────────────────
 
 def monte_carlo_heatmap(
     pos: torch.Tensor,          # (N, 3) float32, on GPU
     expected: torch.Tensor,     # (N, N) expected distances (float16 ok), on GPU
-    fixed_mask: torch.Tensor,   # (N,) bool, True = don't move
+    fixed_mask: torch.Tensor,   # (N,) bool
     settings: Settings,
     same_chr_mask: Optional[torch.Tensor] = None,
     verbose: bool = True,
 ) -> torch.Tensor:
     """
-    Heatmap Monte Carlo – memory-safe for large N.
+    Vectorised Jacobi heatmap MC – mirrors the CUDA warp-parallel kernel.
 
-    Mirrors the CUDA kernel logic: each bead makes `mc_inner_steps` proposals,
-    accepting via Metropolis.  Score is tracked **incrementally** (O(N) per
-    move via score_heatmap_single) so we never allocate an N×N tensor after
-    initialization.  The initial total score is computed once with the chunked
-    O(N*chunk) version.
+    Each inner step proposes a displacement for ALL beads simultaneously,
+    computes per-bead score deltas in one chunked GPU pass (no Python loop
+    over beads, no N×N allocation), and accepts/rejects per-bead with a
+    vectorised Metropolis criterion.
 
-    Returns updated pos tensor.
+    Outer step = mc_inner_steps Jacobi rounds, followed by temperature
+    cooling and a milestone check.
     """
     s = settings
     device = pos.device
     N = pos.shape[0]
-    rng = random.Random()
 
     T = s.max_temp_heatmap
     step = s.step_size_heatmap
+    free = ~fixed_mask                  # (N,) mask of movable beads
 
-    # Compute initial total score once (chunked, no N×N allocation)
-    total_score = score_heatmap_chunked(
-        pos, expected, s.diagonal_size, same_chr_mask
-    ).item()
+    total_score = score_heatmap_chunked(pos, expected,
+                                         s.diagonal_size, same_chr_mask).item()
     best_score = total_score
-
     milestone_fails = 0
     outer_step = 0
 
     while milestone_fails < s.milestone_fails_threshold:
         outer_step += 1
 
-        for bead_idx in range(N):
-            if fixed_mask[bead_idx]:
-                continue
+        for _ in range(s.mc_inner_steps):
+            # propose one displacement for every free bead
+            disp = torch.zeros(N, 3, device=device)
+            if s.use_2d:
+                disp[free, :2] = torch.randn(free.sum(), 2, device=device) * step
+            else:
+                raw = torch.randn(free.sum(), 3, device=device)
+                disp[free] = raw * (step / raw.norm(dim=1, keepdim=True).clamp(min=1e-9))
 
-            # local score before move (O(N) – safe for large N)
-            local_prev = score_heatmap_single(
-                pos, bead_idx, expected, s.diagonal_size, same_chr_mask
-            ).item()
+            new_pos = pos + disp   # (N, 3); zeros for fixed beads → no change
 
-            # mc_inner_steps proposals for this bead
-            score_prev = local_prev
-            for _ in range(s.mc_inner_steps):
-                disp = _random_displacement(step, s.use_2d, device)
-                pos[bead_idx] += disp
+            # per-bead score delta, chunked to avoid N×N
+            delta = _bead_score_delta(pos, new_pos, expected,
+                                       s.diagonal_size, same_chr_mask)
 
-                score_curr = score_heatmap_single(
-                    pos, bead_idx, expected, s.diagonal_size, same_chr_mask
-                ).item()
-                delta = score_curr - score_prev
-                if delta <= 0:
-                    score_prev = score_curr
-                elif not _with_chance(s.temp_jump_scale_heatmap,
-                                      T * s.temp_jump_coef_heatmap,
-                                      delta, rng):
-                    pos[bead_idx] -= disp
-                else:
-                    score_prev = score_curr
+            # vectorised Metropolis
+            T_eff = max(T * s.temp_jump_coef_heatmap, 1e-10)
+            log_thresh = (math.log(max(s.temp_jump_scale_heatmap, 1e-30))
+                          - delta / T_eff)
+            rand_log = torch.rand(N, device=device).log()
+            accept = free & ((delta <= 0) | (rand_log < log_thresh))
 
-            # update running total incrementally (no N×N recompute)
-            total_score += score_prev - local_prev
+            # in-place update (accepted beads only)
+            pos[accept] = new_pos[accept]
+            total_score += delta[accept].sum().item()
 
         T *= s.dt_temp_heatmap
         step *= s.step_size_decay_heatmap
 
         if verbose and outer_step % 10 == 0:
-            print(f"  [heatmap MC] step={outer_step:6d}  T={T:.4f}  "
-                  f"score={total_score:.6f}  milestone_fails={milestone_fails}")
+            print(f"  [heatmap MC] step={outer_step:5d}  T={T:.4f}  "
+                  f"score={total_score:.4f}  fails={milestone_fails}")
 
         if total_score < best_score - 1e-4:
             best_score = total_score
@@ -137,19 +184,15 @@ def monte_carlo_heatmap(
 # ── Phase 2: CPU arcs MC ──────────────────────────────────────────────────────
 
 def monte_carlo_arcs(
-    pos: torch.Tensor,           # (N, 3) float32
-    arc_starts: torch.Tensor,    # (M,) long
-    arc_ends: torch.Tensor,      # (M,) long
-    arc_expected: torch.Tensor,  # (M,) float  (>0 spring, <0 repulsion)
-    fixed_mask: torch.Tensor,    # (N,) bool
+    pos: torch.Tensor,
+    arc_starts: torch.Tensor,
+    arc_ends: torch.Tensor,
+    arc_expected: torch.Tensor,
+    fixed_mask: torch.Tensor,
     settings: Settings,
     verbose: bool = True,
 ) -> torch.Tensor:
-    """
-    Incremental single-bead MC for arc spring energy.
-    Uses Metropolis criterion.  Stops when improvement per outer step
-    drops below threshold AND successes < min_successes.
-    """
+    """Incremental single-bead MC for arc spring energy."""
     s = settings
     device = pos.device
     N = pos.shape[0]
@@ -166,7 +209,6 @@ def monte_carlo_arcs(
     while True:
         outer_step += 1
         successes = 0
-        improvement = 0.0
 
         for bead_idx in range(N):
             if fixed_mask[bead_idx]:
@@ -186,10 +228,8 @@ def monte_carlo_arcs(
             if delta <= 0:
                 total_score += delta
                 successes += 1
-                improvement -= delta
             elif _with_chance(s.temp_jump_scale_arcs,
-                              T * s.temp_jump_coef_arcs,
-                              delta, rng):
+                              T * s.temp_jump_coef_arcs, delta, rng):
                 total_score += delta
             else:
                 pos[bead_idx] -= disp
@@ -204,8 +244,8 @@ def monte_carlo_arcs(
             print(f"  [arcs MC] step={outer_step:6d}  T={T:.5f}  "
                   f"score={total_score:.6f}  imp={milestone_improvement:.6f}")
 
-        if milestone_improvement < s.improvement_threshold_arcs and \
-                successes < s.min_successes_arcs:
+        if (milestone_improvement < s.improvement_threshold_arcs
+                and successes < s.min_successes_arcs):
             break
 
     return pos
@@ -218,19 +258,13 @@ def monte_carlo_arcs_smooth(
     arc_starts: torch.Tensor,
     arc_ends: torch.Tensor,
     arc_expected: torch.Tensor,
-    chain_lengths: torch.Tensor,    # (N-1,) expected linker lengths
+    chain_lengths: torch.Tensor,
     orientations: List[str],
     fixed_mask: torch.Tensor,
     settings: Settings,
     verbose: bool = True,
 ) -> torch.Tensor:
-    """
-    Combined smooth MC: structure (chain+angle) + orientation + heatmap-style arcs.
-
-    Mimics MonteCarloArcsSmooth.  The pairwise arc and orientation terms
-    contribute with a factor-2 scale in the incremental update (matching the
-    C++ implementation that counts pairs from both endpoints).
-    """
+    """Combined smooth MC: structure (chain+angle) + orientation + arc springs."""
     s = settings
     device = pos.device
     N = pos.shape[0]
@@ -240,13 +274,11 @@ def monte_carlo_arcs_smooth(
     step = s.step_size_smooth
 
     def total_score():
-        sc = score_structure_smooth(pos, chain_lengths,
-                                    s.k_chain, s.angular_k)
-        sc = sc + score_arcs(pos, arc_starts, arc_ends, arc_expected,
+        return (score_structure_smooth(pos, chain_lengths, s.k_chain, s.angular_k)
+                + score_arcs(pos, arc_starts, arc_ends, arc_expected,
                               s.k_spring, s.k_spring_repulsion)
-        sc = sc + score_orientation(pos, orientations, arc_starts, arc_ends,
-                                    s.k_orient)
-        return sc.item()
+                + score_orientation(pos, orientations, arc_starts, arc_ends,
+                                    s.k_orient)).item()
 
     ts = total_score()
     prev_milestone = ts
@@ -255,46 +287,42 @@ def monte_carlo_arcs_smooth(
     while True:
         outer_step += 1
         successes = 0
-        improvement = 0.0
 
         for bead_idx in range(N):
             if fixed_mask[bead_idx]:
                 continue
 
-            # structural score is computed globally (chain terms span neighbours)
-            struct_before = score_structure_smooth(pos, chain_lengths,
-                                                   s.k_chain, s.angular_k).item()
-            arc_before = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
-                                           arc_expected, s.k_spring,
-                                           s.k_spring_repulsion).item()
-            ori_before = score_orientation_single(pos, bead_idx, orientations,
-                                                  arc_starts, arc_ends,
-                                                  s.k_orient).item()
+            struct_b = score_structure_smooth(pos, chain_lengths,
+                                              s.k_chain, s.angular_k).item()
+            arc_b = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
+                                      arc_expected, s.k_spring,
+                                      s.k_spring_repulsion).item()
+            ori_b = score_orientation_single(pos, bead_idx, orientations,
+                                             arc_starts, arc_ends,
+                                             s.k_orient).item()
 
             disp = _random_displacement(step, s.use_2d, device)
             pos[bead_idx] += disp
 
-            struct_after = score_structure_smooth(pos, chain_lengths,
-                                                  s.k_chain, s.angular_k).item()
-            arc_after = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
-                                          arc_expected, s.k_spring,
-                                          s.k_spring_repulsion).item()
-            ori_after = score_orientation_single(pos, bead_idx, orientations,
-                                                 arc_starts, arc_ends,
-                                                 s.k_orient).item()
+            struct_a = score_structure_smooth(pos, chain_lengths,
+                                              s.k_chain, s.angular_k).item()
+            arc_a = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
+                                      arc_expected, s.k_spring,
+                                      s.k_spring_repulsion).item()
+            ori_a = score_orientation_single(pos, bead_idx, orientations,
+                                             arc_starts, arc_ends,
+                                             s.k_orient).item()
 
-            # pairwise terms are counted from both endpoints → factor 2
-            delta = ((struct_after - struct_before)
-                     + 2.0 * (arc_after - arc_before)
-                     + 2.0 * (ori_after - ori_before))
+            # pairwise terms counted from both endpoints → factor 2
+            delta = ((struct_a - struct_b)
+                     + 2.0 * (arc_a - arc_b)
+                     + 2.0 * (ori_a - ori_b))
 
             if delta <= 0:
                 ts += delta
                 successes += 1
-                improvement -= delta
             elif _with_chance(s.temp_jump_scale_smooth,
-                              T * s.temp_jump_coef_smooth,
-                              delta, rng):
+                              T * s.temp_jump_coef_smooth, delta, rng):
                 ts += delta
             else:
                 pos[bead_idx] -= disp
@@ -309,8 +337,8 @@ def monte_carlo_arcs_smooth(
             print(f"  [smooth MC] step={outer_step:6d}  T={T:.5f}  "
                   f"score={ts:.6f}  imp={milestone_improvement:.6f}")
 
-        if milestone_improvement < s.improvement_threshold_smooth and \
-                successes < s.min_successes_smooth:
+        if (milestone_improvement < s.improvement_threshold_smooth
+                and successes < s.min_successes_smooth):
             break
 
     return pos

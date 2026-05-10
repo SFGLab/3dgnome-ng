@@ -112,6 +112,7 @@ class Settings:
 
         return cls(
             milestone_fails_threshold=g_int("cuda", "milestone_fails", 3),
+            mc_inner_steps=g_int("cuda", "mc_inner_steps", 512),
 
             genomic_dist_power=g_float("distance", "genomic_dist_power", 0.75),
             genomic_dist_scale=g_float("distance", "genomic_dist_scale", 0.5),

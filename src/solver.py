@@ -207,23 +207,31 @@ class LooperSolver:
 
     def reconstruct_clusters_heatmap(self):
         """
-        Run GPU heatmap Monte Carlo for each chromosome.
+        Run vectorised GPU heatmap Monte Carlo for each chromosome.
 
-        Works on the anchor-level positions (level-4 clusters).
-        After convergence the parent clusters are updated by propagation.
+        Each outer step proposes displacements for ALL anchors simultaneously
+        (Jacobi), computes per-bead score deltas in chunked GPU matmuls, and
+        accepts/rejects per-bead — no Python loop over beads.
         """
         for chrom, tree in self.trees.items():
-            print(f"\n[Heatmap MC] {chrom}")
             n = len(tree.anchors_idx)
             if n == 0:
                 continue
+
+            # Warn if mc_inner_steps is large and the device is CPU — it will be slow.
+            s = self.settings
+            if str(self.device) == "cpu" and n > 1000 and s.mc_inner_steps > 4:
+                print(f"  Warning: {chrom} has {n} anchors and device=cpu; "
+                      f"consider --device cuda or set mc_inner_steps<=4 in config.")
+
+            print(f"\n[Heatmap MC] {chrom}  ({n} anchors, "
+                  f"mc_inner_steps={s.mc_inner_steps})")
 
             pos = tree.anchor_positions_tensor(device=str(self.device))
 
             if chrom in self.heatmap_expected:
                 exp = self.heatmap_expected[chrom]
             else:
-                # no heatmap provided — use genomic distance as proxy
                 exp = self._genomic_expected_matrix(chrom, tree)
 
             fixed = torch.zeros(n, dtype=torch.bool, device=self.device)
