@@ -26,7 +26,7 @@ from .distances import (
 )
 from .heatmap import build_singleton_heatmap, normalize_heatmap, heatmap_to_expected_distances
 from .mc import monte_carlo_heatmap, monte_carlo_arcs, monte_carlo_arcs_smooth
-from .scores import score_heatmap, score_arcs, score_structure_smooth, score_orientation
+from .scores import score_arcs, score_structure_smooth, score_orientation
 from .regions import Region, build_filter, chrom_included, filter_anchors, default_regions
 from .settings import Settings
 from .tree import ChromosomeTree
@@ -98,17 +98,24 @@ class LooperSolver:
         print(f"  {sum(len(v) for v in self.arcs_by_chr.values())} arcs mapped.")
 
     def load_heatmap(self, singletons_bedpe: str):
-        """Build and normalise singleton heatmaps for all chromosomes."""
+        """Build and normalise singleton heatmaps for all chromosomes.
+
+        All heavy matrix work runs on CPU (avoids GPU OOM for large N).
+        The final expected-distance matrix is stored as float16 on the compute device.
+        """
         for chrom, anchors in self.anchors_by_chr.items():
-            print(f"  Building heatmap for {chrom}...")
-            raw = build_singleton_heatmap(singletons_bedpe, anchors,
-                                          device=str(self.device))
+            print(f"  Building heatmap for {chrom} ({len(anchors)} anchors)...")
+            raw = build_singleton_heatmap(singletons_bedpe, anchors)  # CPU float32
             norm = normalize_heatmap(raw, anchors, self.settings.diagonal_size)
-            self.heatmap_expected[chrom] = heatmap_to_expected_distances(
+            del raw
+            exp = heatmap_to_expected_distances(
                 norm,
                 self.settings.freq_dist_scale,
                 self.settings.freq_dist_power,
-            )
+            )  # CPU float16
+            del norm
+            self.heatmap_expected[chrom] = exp.to(self.device)  # GPU float16 (~1.4 GB for N=26603)
+            del exp
 
     # ── Tree construction ─────────────────────────────────────────────────────
 

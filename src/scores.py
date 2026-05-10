@@ -67,7 +67,7 @@ def score_heatmap_single(pos: torch.Tensor,
                           ) -> torch.Tensor:
     """
     Heatmap score contribution of a single moved bead `idx`.
-    (Only pairs involving `idx` are evaluated, for incremental MC updates.)
+    O(N) memory – safe for large N.  Handles float16 expected.
     """
     N = pos.shape[0]
     dist = single_bead_distances(pos, idx)  # (N,)
@@ -76,13 +76,58 @@ def score_heatmap_single(pos: torch.Tensor,
     diff_idx = (j - idx).abs()
     diag_mask = diff_idx >= diagonal_size
 
-    exp_row = expected[idx]  # (N,)
+    exp_row = expected[idx].float()  # cast fp16→fp32 if needed; (N,)
     valid = (exp_row > 1e-3) & diag_mask
     if same_chr_mask is not None:
         valid = valid & same_chr_mask[idx]
 
     ratio = dist[valid] / exp_row[valid] - 1.0
     return (ratio ** 2).sum()
+
+
+def score_heatmap_chunked(pos: torch.Tensor,
+                           expected: torch.Tensor,
+                           diagonal_size: int = 3,
+                           same_chr_mask: Optional[torch.Tensor] = None,
+                           chunk_size: int = 512) -> torch.Tensor:
+    """
+    Full heatmap score without ever allocating an N×N tensor.
+
+    Processes `chunk_size` rows at a time using the squared-norm dot-product
+    trick so the largest intermediate is (chunk_size, N) ~ 50 MB for chunk=512.
+    Counts only i < j pairs (upper triangle).
+    """
+    N = pos.shape[0]
+    device = pos.device
+    total = torch.zeros(1, device=device)
+    pos_sq = (pos ** 2).sum(dim=1)   # (N,) – precomputed once
+
+    for i_start in range(0, N, chunk_size):
+        i_end = min(i_start + chunk_size, N)
+        chunk = pos[i_start:i_end]                        # (C, 3)
+        chunk_sq = (chunk ** 2).sum(dim=1)                # (C,)
+
+        # squared distances via matmul (no (C,N,3) intermediate)
+        dot = chunk @ pos.t()                             # (C, N)
+        sq_dist = (chunk_sq[:, None] + pos_sq[None, :] - 2.0 * dot).clamp(min=0)
+        dist = sq_dist.sqrt()                             # (C, N)
+
+        exp_chunk = expected[i_start:i_end].float()       # (C, N) fp32
+
+        i_idx = torch.arange(i_start, i_end, device=device)[:, None]   # (C, 1)
+        j_idx = torch.arange(N, device=device)[None, :]                 # (1, N)
+
+        valid = ((j_idx > i_idx)
+                 & ((i_idx - j_idx).abs() >= diagonal_size)
+                 & (exp_chunk > 1e-3))
+        if same_chr_mask is not None:
+            valid = valid & same_chr_mask[i_start:i_end]
+
+        if valid.any():
+            ratio = dist[valid] / exp_chunk[valid] - 1.0
+            total = total + (ratio ** 2).sum()
+
+    return total.squeeze()
 
 
 # ── Arc / distance score ──────────────────────────────────────────────────────

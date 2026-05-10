@@ -13,7 +13,7 @@ from typing import List, Optional, Tuple
 import torch
 
 from .scores import (
-    score_heatmap,
+    score_heatmap_chunked,
     score_heatmap_single,
     score_arcs,
     score_arcs_single,
@@ -47,32 +47,40 @@ def _with_chance(jump_scale: float, temp: float, delta: float,
 
 def monte_carlo_heatmap(
     pos: torch.Tensor,          # (N, 3) float32, on GPU
-    expected: torch.Tensor,     # (N, N) expected distances, on GPU
+    expected: torch.Tensor,     # (N, N) expected distances (float16 ok), on GPU
     fixed_mask: torch.Tensor,   # (N,) bool, True = don't move
     settings: Settings,
     same_chr_mask: Optional[torch.Tensor] = None,
     verbose: bool = True,
 ) -> torch.Tensor:
     """
-    GPU-accelerated heatmap Monte Carlo.
+    Heatmap Monte Carlo – memory-safe for large N.
 
-    Mimics the CUDA kernel: each bead is moved in turn (serial over beads,
-    but position storage stays on GPU for vectorised score computation).
+    Mirrors the CUDA kernel logic: each bead makes `mc_inner_steps` proposals,
+    accepting via Metropolis.  Score is tracked **incrementally** (O(N) per
+    move via score_heatmap_single) so we never allocate an N×N tensor after
+    initialization.  The initial total score is computed once with the chunked
+    O(N*chunk) version.
 
     Returns updated pos tensor.
     """
     s = settings
     device = pos.device
-
-    T = s.max_temp_heatmap
-    step = s.step_size_heatmap
     N = pos.shape[0]
     rng = random.Random()
 
-    milestone_fails = 0
-    best_score = score_heatmap(pos, expected, s.diagonal_size, same_chr_mask).item()
+    T = s.max_temp_heatmap
+    step = s.step_size_heatmap
 
+    # Compute initial total score once (chunked, no N×N allocation)
+    total_score = score_heatmap_chunked(
+        pos, expected, s.diagonal_size, same_chr_mask
+    ).item()
+    best_score = total_score
+
+    milestone_fails = 0
     outer_step = 0
+
     while milestone_fails < s.milestone_fails_threshold:
         outer_step += 1
 
@@ -80,16 +88,20 @@ def monte_carlo_heatmap(
             if fixed_mask[bead_idx]:
                 continue
 
-            # N inner steps per bead (mirrors CUDA N=512 inner loop)
-            score_prev = score_heatmap_single(pos, bead_idx, expected,
-                                              s.diagonal_size, same_chr_mask).item()
+            # local score before move (O(N) – safe for large N)
+            local_prev = score_heatmap_single(
+                pos, bead_idx, expected, s.diagonal_size, same_chr_mask
+            ).item()
 
+            # mc_inner_steps proposals for this bead
+            score_prev = local_prev
             for _ in range(s.mc_inner_steps):
                 disp = _random_displacement(step, s.use_2d, device)
                 pos[bead_idx] += disp
 
-                score_curr = score_heatmap_single(pos, bead_idx, expected,
-                                                   s.diagonal_size, same_chr_mask).item()
+                score_curr = score_heatmap_single(
+                    pos, bead_idx, expected, s.diagonal_size, same_chr_mask
+                ).item()
                 delta = score_curr - score_prev
                 if delta <= 0:
                     score_prev = score_curr
@@ -100,22 +112,23 @@ def monte_carlo_heatmap(
                 else:
                     score_prev = score_curr
 
-        # milestone check
+            # update running total incrementally (no N×N recompute)
+            total_score += score_prev - local_prev
+
         T *= s.dt_temp_heatmap
         step *= s.step_size_decay_heatmap
 
-        total = score_heatmap(pos, expected, s.diagonal_size, same_chr_mask).item()
-        if verbose and outer_step % 100 == 0:
+        if verbose and outer_step % 10 == 0:
             print(f"  [heatmap MC] step={outer_step:6d}  T={T:.4f}  "
-                  f"score={total:.6f}  milestone_fails={milestone_fails}")
+                  f"score={total_score:.6f}  milestone_fails={milestone_fails}")
 
-        if total < best_score - 1e-4:
-            best_score = total
+        if total_score < best_score - 1e-4:
+            best_score = total_score
             milestone_fails = 0
         else:
             milestone_fails += 1
 
-        if total < 1e-4:
+        if total_score < 1e-4:
             break
 
     return pos

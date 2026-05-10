@@ -1,10 +1,14 @@
 """
 Singleton heatmap construction and the 5-step normalisation pipeline.
 
-Mirrors cudaMMC HeatmapNormalization + LooperSolver heatmap building logic.
+Memory strategy for large N:
+- Build and normalise entirely on CPU (avoids GPU OOM during N×N ops).
+- Never create an N×N outer-product intermediate; use broadcast row/col divides.
+- Return float16 so the GPU copy is ~half the size (~1.4 GB for N=26603).
 """
 
-from typing import Dict, List, Optional, Tuple
+import math
+from typing import List, Optional
 
 import torch
 
@@ -14,16 +18,16 @@ from .data_structures import Anchor
 # ── Heatmap construction ─────────────────────────────────────────────────────
 
 def build_singleton_heatmap(singletons_path: str,
-                             anchors: List[Anchor],
-                             device: str = "cpu") -> torch.Tensor:
+                             anchors: List[Anchor]) -> torch.Tensor:
     """
-    Build a raw singleton count matrix from a BEDPE singletons file.
+    Build a raw singleton count matrix on CPU.
 
-    Returns a float32 tensor of shape (N, N) where N = len(anchors).
+    Returns a float32 CPU tensor of shape (N, N).
+    Caller should normalise on CPU, then move the float16 result to GPU.
     """
     from .data_loading import _find_anchor
     N = len(anchors)
-    mat = torch.zeros(N, N, dtype=torch.float32)
+    mat = torch.zeros(N, N, dtype=torch.float32)   # CPU, no device arg
 
     with open(singletons_path) as fh:
         for line in fh:
@@ -43,58 +47,51 @@ def build_singleton_heatmap(singletons_path: str,
             if ai != bi:
                 mat[bi, ai] += 1
 
-    return mat.to(device)
+    return mat   # CPU float32
 
 
 # ── Normalisation pipeline ───────────────────────────────────────────────────
 
 def normalize_heatmap(raw: torch.Tensor,
                       anchors: List[Anchor],
-                      diagonal_size: int = 3
-                      ) -> torch.Tensor:
+                      diagonal_size: int = 3) -> torch.Tensor:
     """
-    Full 5-step normalisation:
-      1. Bin-length normalisation
-      2. Row normalisation
-      3. Diagonal normalisation
-      4. (Inter-chr scaling — N/A for single-chr heatmap; included for completeness)
-      5. Frequency → distance conversion handled externally via distances.py
+    Full normalisation pipeline – operates entirely on CPU in float32.
 
-    Returns a normalised float32 tensor of shape (N, N).
+    Avoids any N×N intermediate allocation (uses broadcast row/col ops).
+    Returns a CPU float32 tensor of shape (N, N).
     """
-    mat = raw.clone().float()
+    mat = raw.float().cpu()
     N = mat.shape[0]
 
-    # Step 1 - bin-length normalisation
-    lengths = torch.tensor([a.length for a in anchors],
-                           dtype=torch.float32, device=mat.device)
-    # divide each cell by geometric mean of the two anchor lengths
-    len_outer = torch.outer(lengths, lengths)  # (N, N)
-    geom_mean = torch.sqrt(len_outer)
-    mat = mat / geom_mean.clamp(min=1.0)
+    # Step 1 – bin-length normalisation
+    # Equivalent to dividing by sqrt(len_i * len_j) without an outer product:
+    #   mat / (sqrt_len_i * sqrt_len_j)  = (mat / sqrt_len_i[:, None]) / sqrt_len_j[None, :]
+    sqrt_len = torch.tensor([math.sqrt(max(a.length, 1)) for a in anchors],
+                             dtype=torch.float32)
+    mat = mat / sqrt_len[:, None]
+    mat = mat / sqrt_len[None, :]
 
-    # Step 2 - row normalisation (divide each row by its sum)
+    # Step 2 – row normalisation
     row_sums = mat.sum(dim=1, keepdim=True).clamp(min=1e-9)
-    mat = mat / row_sums
+    mat /= row_sums
 
-    # Step 3 - diagonal normalisation
-    # For each diagonal d, divide by the mean of that diagonal
+    # Step 3 – diagonal normalisation (iterative, O(N) memory per diagonal)
     for d in range(diagonal_size, N):
-        diag = torch.diagonal(mat, offset=d)
-        diag_mean = diag.mean()
+        diag = mat.diagonal(offset=d)          # view into mat
+        diag_mean = diag.mean().item()
         if diag_mean > 1e-9:
-            diag_val = diag / diag_mean
-            # write back (torch.diagonal returns a view for square tensors)
-            mat.diagonal(offset=d).copy_(diag_val)
-            mat.diagonal(offset=-d).copy_(diag_val)
+            normed = diag / diag_mean
+            mat.diagonal(offset=d).copy_(normed)
+            mat.diagonal(offset=-d).copy_(normed)
 
-    return mat
+    return mat   # CPU float32
 
 
 def heatmap_to_expected_distances(mat: torch.Tensor,
                                    scale: float = 100.0,
                                    power: float = -0.333,
                                    min_freq: float = 1e-9) -> torch.Tensor:
-    """Convert normalised frequency matrix to expected distance matrix."""
-    safe = mat.clamp(min=min_freq)
-    return scale * (safe ** power)
+    """Convert normalised frequency matrix to expected distance matrix (float16)."""
+    safe = mat.float().clamp(min=min_freq)
+    return (scale * (safe ** power)).half()   # float16 halves GPU footprint
