@@ -82,6 +82,7 @@ def monte_carlo_heatmap(
     s = settings
     device = pos.device
     N = pos.shape[0]
+    N_free = int((~fixed_mask).sum().item())
     rng = random.Random()
 
     # cudaMMC cpp:423: step_size *= 0.5
@@ -100,14 +101,19 @@ def monte_carlo_heatmap(
     milestone_success = 0
     # cudaMMC cpp:455: i = 1
     individual_steps = 0
+    # sweep counter: T cools once per N_free attempts (one pass through all free beads),
+    # matching cudaMMC's intent for small active regions scaled to this system size.
+    sweep_attempts = 0
 
     if verbose:
-        print(f"  [heatmap MC] N={N}  T_initial={T:.1f}  step={step:.4f}  score={total_score:.4f}")
+        print(f"  [heatmap MC] N={N}  N_free={N_free}  T_initial={T:.1f}  "
+              f"step={step:.4f}  score={total_score:.4f}")
 
     # cudaMMC cpp:456: while (true) {
     while True:
         # cudaMMC cpp:459: p = random(size)
         bead_idx = rng.randrange(N)
+        sweep_attempts += 1
         # cudaMMC cpp:462-463: if (clusters[ind].is_fixed) continue
         if fixed_mask[bead_idx]:
             continue
@@ -141,8 +147,11 @@ def monte_carlo_heatmap(
             pos[bead_idx] -= disp             # cudaMMC cpp:482: clusters[ind].pos -= displacement
             score_curr = score_prev           # cudaMMC cpp:483
 
-        # cudaMMC cpp:486: T *= Settings::dtTempHeatmap  ← cooling every individual bead move
-        T *= s.dt_temp_heatmap
+        # cudaMMC cpp:486: T *= Settings::dtTempHeatmap
+        # Applied once per sweep (every N_free attempts) rather than every move, so the
+        # per-sweep cooling rate matches cudaMMC's design regardless of active-region size.
+        if sweep_attempts % max(N_free, 1) == 0:
+            T *= s.dt_temp_heatmap
 
         individual_steps += 1  # cudaMMC cpp:514: i++
 
@@ -155,9 +164,12 @@ def monte_carlo_heatmap(
             # cudaMMC cpp:501-504:
             #   if (score_curr > MCstopConditionImprovementHeatmap * milestone_score
             #       && milestone_success < MCstopConditionMinSuccessesHeatmap) || score < 1e-6
+            # Extra: ratio > 0.9999 stops when improvement < 0.01% per milestone even if
+            # milestone_success is high (pure greedy descent at T≈0 on large systems).
             if ((total_score > s.milestone_improvement_ratio * milestone_score
                     and milestone_success < s.min_successes_heatmap)
-                    or total_score < 1e-6):
+                    or total_score < 1e-6
+                    or ratio > 0.9999):
                 break
             # cudaMMC cpp:507-508: milestone_score = score_curr; milestone_success = 0
             milestone_score = total_score
