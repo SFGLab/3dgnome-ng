@@ -214,11 +214,15 @@ def score_structure_smooth(pos: torch.Tensor,
     if pos.shape[0] < 2:
         return torch.tensor(0.0, device=pos.device)
 
-    # linker spring
+    # linker spring — skip zero-length links (overlapping anchors have no spring)
     diffs = pos[1:] - pos[:-1]             # (N-1, 3)
     dist = diffs.norm(dim=1)               # (N-1,)
-    L = chain_lengths.clamp(min=1e-6)
-    chain_score = k_chain * (((dist - L) / L) ** 2).sum()
+    valid_link = chain_lengths >= 1e-9
+    if valid_link.any():
+        L = chain_lengths[valid_link].clamp(min=1e-6)
+        chain_score = k_chain * (((dist[valid_link] - L) / L) ** 2).sum()
+    else:
+        chain_score = torch.tensor(0.0, device=pos.device)
 
     # angular penalty
     if pos.shape[0] < 3:
@@ -248,12 +252,12 @@ def score_chain_single(pos: torch.Tensor,
     device = pos.device
     score = torch.zeros(1, device=device)
 
-    # Chain springs
-    if idx > 0:
+    # Chain springs — skip zero-length links
+    if idx > 0 and chain_lengths[idx - 1] >= 1e-9:
         L = chain_lengths[idx - 1].clamp(min=1e-6)
         d = (pos[idx] - pos[idx - 1]).norm()
         score = score + k_chain * ((d - L) / L) ** 2
-    if idx < N - 1:
+    if idx < N - 1 and chain_lengths[idx] >= 1e-9:
         L = chain_lengths[idx].clamp(min=1e-6)
         d = (pos[idx + 1] - pos[idx]).norm()
         score = score + k_chain * ((d - L) / L) ** 2

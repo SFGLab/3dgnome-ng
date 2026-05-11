@@ -274,7 +274,7 @@ def monte_carlo_arcs(
             if ((total_score > s.milestone_improvement_ratio * milestone_score
                     and milestone_success < s.min_successes_arcs)
                     or total_score < 1e-5
-                    or ratio > 0.9999):
+                    or (ratio > 0.9999 and total_score <= milestone_score)):
                 return pos
             # cudaMMC cpp:3149-3150: milestone_score = score_curr; milestone_success = 0
             milestone_score = total_score
@@ -393,7 +393,7 @@ def monte_carlo_arcs_smooth(
             if ((ts > s.milestone_improvement_ratio * milestone_score
                     and milestone_success < s.min_successes_smooth)
                     or ts < 1e-6
-                    or ratio > 0.9999):
+                    or (ratio > 0.9999 and ts <= milestone_score)):
                 return pos
             # cudaMMC cpp:3378-3379: milestone_score = score_curr; milestone_success = 0
             milestone_score = ts
