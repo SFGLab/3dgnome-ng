@@ -141,6 +141,10 @@ def monte_carlo_heatmap(
         print(f"  [heatmap MC] auto-scaling mc_inner_steps "
               f"{s.mc_inner_steps} → {effective_inner} (N={N})")
 
+    # Don't check milestones until T drops to ≤10% of initial — at high T,
+    # score fluctuates randomly and milestone_fails would trigger after ~3 steps.
+    milestone_temp_threshold = T * 0.1
+
     while milestone_fails < s.milestone_fails_threshold:
         outer_step += 1
 
@@ -177,11 +181,16 @@ def monte_carlo_heatmap(
             print(f"  [heatmap MC] step={outer_step:5d}  T={T:.4f}  "
                   f"score={total_score:.4f}  fails={milestone_fails}")
 
-        if total_score < best_score - 1e-4:
-            best_score = total_score
-            milestone_fails = 0
+        # Only track milestones once temperature is low enough for convergence
+        # to be meaningful — at high T, score fluctuates randomly.
+        if T <= milestone_temp_threshold:
+            if total_score < best_score - 1e-4:
+                best_score = total_score
+                milestone_fails = 0
+            else:
+                milestone_fails += 1
         else:
-            milestone_fails += 1
+            best_score = min(best_score, total_score)
 
         if total_score < 1e-4:
             break

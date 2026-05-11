@@ -55,7 +55,7 @@ class Settings:
     temp_jump_scale_heatmap: float = 50.0
     temp_jump_coef_heatmap: float = 20.0
     step_size_heatmap: float = 1.5
-    step_size_decay_heatmap: float = 0.95  # per outer-step
+    step_size_decay_heatmap: float = 0.9999  # per outer-step; matches ~dt_temp_heatmap
     mc_inner_steps: int = 512         # N inner steps per warp/outer-step
 
     # ── Monte Carlo - Arcs phase ─────────────────────────────────────────────

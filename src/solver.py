@@ -29,33 +29,46 @@ from .mc import monte_carlo_heatmap, monte_carlo_arcs, monte_carlo_arcs_smooth
 from .scores import score_arcs, score_structure_smooth, score_orientation
 from .regions import Region, build_filter, chrom_included, filter_anchors, default_regions
 from .settings import Settings
-from .tree import ChromosomeTree
+from .tree import ChromosomeTree, interpolate_children_spline
 
 
-def _rescale_to_arc(pos: torch.Tensor,
-                    arc_starts: torch.Tensor,
-                    arc_ends: torch.Tensor,
-                    arc_exp: torch.Tensor,
-                    min_ratio: float = 2.0) -> float:
+def _rescale_positions(pos: torch.Tensor,
+                       chain_lengths: torch.Tensor,
+                       arc_starts: torch.Tensor,
+                       arc_ends: torch.Tensor,
+                       arc_exp: torch.Tensor,
+                       min_ratio: float = 2.0) -> float:
     """
-    Return a scale factor S such that pos/S has typical inter-arc distances
-    matching arc expected distances.  Returns 1.0 if already compatible.
+    Return a scale factor S such that pos/S has typical inter-bead distances
+    matching chain/arc expected distances.  Returns 1.0 if already compatible.
 
-    The heatmap phase leaves positions at freq_dist_scale (~100 units) while
-    count_to_distance gives arc targets ~1-10 units.  Dividing positions by S
-    before arc MC and multiplying back after preserves the heatmap structure
-    while letting arc MC converge.
+    Uses consecutive chain distances as the primary reference (always present),
+    with arc distances as fallback.  pos/S is passed to arc+smooth MC and
+    the output stays at that scale (not multiplied back) — the final coordinates
+    are in arc/chain distance units, matching the reference cudaMMC output scale.
     """
+    # Primary: compare median consecutive distance to median chain length
+    if pos.shape[0] > 1 and chain_lengths.numel() > 0:
+        with torch.no_grad():
+            actual = (pos[1:] - pos[:-1]).norm(dim=1).median().item()
+            target = chain_lengths.median().item()
+        if target > 0:
+            ratio = actual / target
+            if ratio >= min_ratio:
+                return ratio
+
+    # Fallback: arc distances
     mask = arc_exp > 0
-    if not mask.any():
-        return 1.0
-    with torch.no_grad():
-        actual = (pos[arc_starts[mask]] - pos[arc_ends[mask]]).norm(dim=1).median().item()
-        expected = arc_exp[mask].median().item()
-    if expected <= 0:
-        return 1.0
-    ratio = actual / expected
-    return ratio if ratio >= min_ratio else 1.0
+    if mask.any():
+        with torch.no_grad():
+            actual = (pos[arc_starts[mask]] - pos[arc_ends[mask]]).norm(dim=1).median().item()
+            expected = arc_exp[mask].median().item()
+        if expected > 0:
+            ratio = actual / expected
+            if ratio >= min_ratio:
+                return ratio
+
+    return 1.0
 
 
 class LooperSolver:
@@ -321,11 +334,12 @@ class LooperSolver:
                 for i in range(n)
             ]
 
-            # Heatmap MC leaves positions at freq_dist_scale (~100 units) while
-            # arc expected distances are count_to_distance scale (~1-10 units) and
-            # chain_lengths are genomic-kb scale (~2-20 units) — both compatible.
-            # Rescale only positions into arc/chain units, then scale back for output.
-            arc_scale = _rescale_to_arc(pos, arc_starts, arc_ends, arc_exp)
+            # Heatmap MC leaves positions at a large scale (heatmap expected units)
+            # while arc/chain spring targets are much smaller.  Rescale positions
+            # into arc/chain distance units before MC.  The output stays at that
+            # scale — this is the correct final coordinate unit matching reference.
+            arc_scale = _rescale_positions(pos, chain_lengths,
+                                           arc_starts, arc_ends, arc_exp)
             if arc_scale != 1.0:
                 print(f"  Rescaling positions ÷{arc_scale:.1f} to match arc/chain distance scale")
                 pos = pos / arc_scale
@@ -344,10 +358,6 @@ class LooperSolver:
                 chain_lengths, orientations, fixed,
                 self.settings, verbose=True,
             )
-
-            # Scale positions back to heatmap-phase coordinate system
-            if arc_scale != 1.0:
-                pos = pos * arc_scale
 
             tree.set_anchor_positions_from_tensor(pos)
             tree._propagate_positions_up()
@@ -398,10 +408,15 @@ class LooperSolver:
                     fh.write(f"{c.genomic_pos}\t{c.x:.6f}\t{c.y:.6f}\t{c.z:.6f}\n")
             print(f"Saved {path}")
 
-    def save_cif(self, prefix: str = "output", anchors_only: bool = True):
+    def save_cif(self, prefix: str = "output", anchors_only: bool = True,
+                 smooth: bool = True, smooth_sample_kb: float = 1.0):
         """Write per-chromosome mmCIF files suitable for 3D structure viewers.
 
         anchors_only: if True write only anchor (level-4) beads; otherwise all beads.
+        smooth: if True and anchors_only, interpolate a Catmull-Rom spline
+            through anchor positions and sample at smooth_sample_kb kb intervals,
+            producing a smooth backbone like cudaMMC's smooth phase output.
+        smooth_sample_kb: genomic sampling interval in kb for spline output.
         """
         _CIF_HEADER = """\
 data_3dnome
@@ -433,16 +448,40 @@ _atom_site.auth_asym_id
         os.makedirs(os.path.dirname(prefix) if os.path.dirname(prefix) else ".", exist_ok=True)
         for chrom, tree in self.trees.items():
             path = f"{prefix}_{chrom}.cif"
-            clusters = (
-                [tree.clusters[i] for i in tree.anchors_idx]
-                if anchors_only
-                else tree.clusters
-            )
+
+            if anchors_only and smooth and len(tree.anchors_idx) >= 2:
+                coords = self._smooth_cif_coords(tree, smooth_sample_kb)
+            elif anchors_only:
+                coords = [(tree.clusters[i].x,
+                           tree.clusters[i].y,
+                           tree.clusters[i].z)
+                          for i in tree.anchors_idx]
+            else:
+                coords = [(c.x, c.y, c.z) for c in tree.clusters]
+
             with open(path, "w") as fh:
                 fh.write(_CIF_HEADER)
-                for i, c in enumerate(clusters, start=1):
+                for i, (x, y, z) in enumerate(coords, start=1):
                     fh.write(
                         f"ATOM {i} C CA . ALA A 1 {i} ? "
-                        f"{c.x:.4f} {c.y:.4f} {c.z:.4f} 1.00 99.99 A\n"
+                        f"{x:.4f} {y:.4f} {z:.4f} 1.00 99.99 A\n"
                     )
-            print(f"Saved {path}")
+            print(f"Saved {path} ({len(coords)} atoms)")
+
+    def _smooth_cif_coords(self, tree: "ChromosomeTree",
+                           sample_kb: float = 1.0
+                           ) -> list:
+        """
+        Sample a Catmull-Rom spline through anchor positions at genomic
+        intervals of `sample_kb` kb, matching cudaMMC smooth output density.
+        """
+        anchors = [tree.clusters[i] for i in tree.anchors_idx]
+        pts = [(c.x, c.y, c.z) for c in anchors]
+
+        # Total genomic span → number of output samples
+        g_start = anchors[0].genomic_pos
+        g_end = anchors[-1].genomic_pos
+        span_kb = max(g_end - g_start, 1) / 1000.0
+        n_out = max(len(pts), int(round(span_kb / sample_kb)) + 1)
+
+        return interpolate_children_spline(pts, n_out)
