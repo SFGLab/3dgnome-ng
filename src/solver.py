@@ -259,14 +259,9 @@ class LooperSolver:
             if n == 0:
                 continue
 
-            # Warn if mc_inner_steps is large and the device is CPU — it will be slow.
             s = self.settings
-            if str(self.device) == "cpu" and n > 1000 and s.mc_inner_steps > 4:
-                print(f"  Warning: {chrom} has {n} anchors and device=cpu; "
-                      f"consider --device cuda or set mc_inner_steps<=4 in config.")
-
             print(f"\n[Heatmap MC] {chrom}  ({n} anchors, "
-                  f"mc_inner_steps={s.mc_inner_steps})")
+                  f"milestone_steps={s.milestone_steps_heatmap})")
 
             pos = tree.anchor_positions_tensor(device=str(self.device))
 
