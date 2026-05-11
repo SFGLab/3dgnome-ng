@@ -339,15 +339,15 @@ class LooperSolver:
                 for i in range(n)
             ]
 
-            # Heatmap MC leaves positions at a large scale (heatmap expected units)
-            # while arc/chain spring targets are much smaller.  Rescale positions
-            # into arc/chain distance units before MC.  The output stays at that
-            # scale — this is the correct final coordinate unit matching reference.
-            arc_scale = _rescale_positions(pos, chain_lengths,
-                                           arc_starts, arc_ends, arc_exp)
-            if arc_scale != 1.0:
-                print(f"  Rescaling positions ÷{arc_scale:.1f} to match arc/chain distance scale")
-                pos = pos / arc_scale
+            # # Heatmap MC leaves positions at a large scale (heatmap expected units)
+            # # while arc/chain spring targets are much smaller.  Rescale positions
+            # # into arc/chain distance units before MC.  The output stays at that
+            # # scale — this is the correct final coordinate unit matching reference.
+            # arc_scale = _rescale_positions(pos, chain_lengths,
+            #                                arc_starts, arc_ends, arc_exp)
+            # if arc_scale != 1.0:
+            #     print(f"  Rescaling positions ÷{arc_scale:.1f} to match arc/chain distance scale")
+            #     pos = pos / arc_scale
 
             # Phase 2 - arc spring MC
             # NOTE: original cudaMMC runs arcs MC on CPU (sequential per-bead
