@@ -55,13 +55,14 @@ class Settings:
     noise_size_small: float = 0.05    # initial displacement noise for anchors
 
     # ── Monte Carlo - Heatmap phase ──────────────────────────────────────────
+    # cudaMMC Settings.cpp:216-222 (MonteCarloHeatmap CPU sequential)
     max_temp_heatmap: float = 20.0
-    dt_temp_heatmap: float = 0.999   # per outer-step; reaches T=2 in ~2300 steps
+    dt_temp_heatmap: float = 0.99995  # applied PER BEAD MOVE (Settings.cpp:217 dtTempHeatmap)
     temp_jump_scale_heatmap: float = 50.0
     temp_jump_coef_heatmap: float = 20.0
-    step_size_heatmap: float = 1.5
-    step_size_decay_heatmap: float = 0.95    # cudaMMC ParallelMonteCarloHeatmap.cu:253: step_size *= 0.95 (hardcoded per 512-iter block)
-    mc_inner_steps: int = 512         # N inner steps per warp/outer-step
+    step_size_heatmap: float = 1.5    # halved at start: LooperSolver.cpp:423 step_size *= 0.5
+    min_successes_heatmap: int = 5    # Settings.cpp:221 MCstopConditionMinSuccessesHeatmap
+    milestone_steps_heatmap: int = 10000  # Settings.cpp:222 MCstopConditionStepsHeatmap
 
     # ── Monte Carlo - Arcs phase ─────────────────────────────────────────────
     # cudaMMC Settings.cpp: maxTemp=20, dtTemp=0.99995, jumpCoef=20, jumpScale=50

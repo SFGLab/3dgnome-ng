@@ -1,14 +1,13 @@
 """
 Monte Carlo optimisation phases.
 
-Phase 1 - GPU heatmap MC  (ParallelMonteCarloHeatmap equivalent)
-Phase 2 - CPU arcs MC     (MonteCarloArcs equivalent)
-Phase 3 - CPU smooth MC   (MonteCarloArcsSmooth equivalent)
+Phase 1 - CPU heatmap MC  (MonteCarloHeatmap — LooperSolver.cpp:421-518)
+Phase 2 - CPU arcs MC     (MonteCarloArcs    — LooperSolver.cpp:3058-3159)
+Phase 3 - CPU smooth MC   (MonteCarloArcsSmooth — LooperSolver.cpp:3161-3390)
 
 Every algorithmic line carries a # cudaMMC: annotation pointing to the exact
 C++/CUDA source line it replicates.  Source files (paths from repo root):
-  cudammc/src/ParallelMonteCarloHeatmap.cu   – Phase 1 GPU kernel
-  cudammc/src/LooperSolver.cpp               – Phases 2 & 3 CPU MC
+  cudammc/src/LooperSolver.cpp               – all three phases
   cudammc/thirdparty/common.cpp              – random_vector helper
 """
 
@@ -20,6 +19,7 @@ import torch
 
 from .scores import (
     score_heatmap_chunked,
+    score_heatmap_single,
     score_arcs,
     score_arcs_single,
     score_chain_single,
@@ -57,207 +57,114 @@ def _with_chance_ratio(jump_scale: float, jump_coef: float,
     return rng.random() < prob                                    # cudaMMC cpp:3116: withChance(tp)
 
 
-# ── Per-bead score delta (vectorised over all beads simultaneously) ───────────
-
-def _bead_score_delta(
-    pos: torch.Tensor,       # (N, 3) current positions
-    new_pos: torch.Tensor,   # (N, 3) proposed positions
-    expected: torch.Tensor,  # (N, N) fp16 or fp32
-    diagonal_size: int,
-    same_chr_mask: Optional[torch.Tensor],
-    chunk_size: int = 512,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    """
-    Return (delta, score_old) each (N,):
-      delta[i]     = S_new[i] - S_old[i]
-      score_old[i] = S_old[i]  (per-bead score before move)
-
-    S[i] = sum_{j: j≠i, |i-j|>=diag, exp>1e-3} (dist(pos_i, pos_j)/exp[i,j] - 1)^2
-
-    Jacobi: S_new[i] uses new_pos[i] vs the CURRENT pos[j] for all j.
-    Both outputs are needed for the ratio-based Metropolis criterion.
-
-    Mirrors cudaMMC ParallelMonteCarloHeatmap.cu:128-165
-    calcScoreHeatmapSingleActiveRegion(moved, clusters_positions, …, curr_vector, warpIdx)
-    """
-    N = pos.shape[0]
-    device = pos.device
-    delta = torch.zeros(N, device=device)     # cudaMMC .cu:135: double err = 0.0 (per bead accumulator)
-    score_old = torch.zeros(N, device=device)  # same; second accumulator for old position
-
-    pos_sq = (pos ** 2).sum(dim=1)            # precomputed ||pos_j||² for all j
-    new_sq = (new_pos ** 2).sum(dim=1)        # precomputed ||new_pos_i||² for all i
-
-    for i0 in range(0, N, chunk_size):
-        i1 = min(i0 + chunk_size, N)
-
-        p_old = pos[i0:i1]             # (C, 3)   old positions for beads i0..i1-1
-        p_new = new_pos[i0:i1]         # (C, 3)   proposed positions for beads i0..i1-1
-        sq_o = pos_sq[i0:i1]           # (C,)
-        sq_n = new_sq[i0:i1]           # (C,)
-
-        dot_o = p_old @ pos.t()        # (C, N)   p_old · pos_j  (dot product trick)
-        # cudaMMC .cu:157-159: subtractVectors(temp_one, *(clusters_positions+i), curr_vector)
-        # cudaMMC .cu:102-106: magnitude = sqrt(x²+y²+z²)
-        d_old = (sq_o[:, None] + pos_sq[None, :] - 2 * dot_o).clamp(0).sqrt()  # (C, N) Euclidean d_old[c,j]
-
-        dot_n = p_new @ pos.t()        # (C, N)   p_new · pos_j
-        d_new = (sq_n[:, None] + pos_sq[None, :] - 2 * dot_n).clamp(0).sqrt()  # (C, N) Euclidean d_new[c,j]
-
-        exp_c = expected[i0:i1].float()   # (C, N)  expected distances; cast fp16→fp32 if needed
-
-        i_idx = torch.arange(i0, i1, device=device)[:, None]   # (C, 1)  bead indices i
-        j_idx = torch.arange(N, device=device)[None, :]         # (1, N)  bead indices j
-
-        # cudaMMC .cu:152:   if (abs(i - moved) >= heatmapDiagonalSize)
-        # cudaMMC .cu:153:   if (i == moved || helper < 1e-3) continue   (skip self + zero entries)
-        # cudaMMC .cu:145-149: getChromosomeHeatmapBoundary → restricts to same chromosome
-        valid = ((i_idx != j_idx)                                # skip self (i == moved handled by zero displacement)
-                 & ((i_idx - j_idx).abs() >= diagonal_size)     # cudaMMC .cu:152: abs(i-moved)>=heatmapDiagonalSize
-                 & (exp_c > 1e-3))                               # cudaMMC .cu:153: heatmap_dist[…] < 1e-3 → skip
-        if same_chr_mask is not None:
-            valid = valid & same_chr_mask[i0:i1]                # cudaMMC .cu:145-149: chromosome boundary guard
-
-        safe_e = exp_c.clamp(min=1e-9)
-        # cudaMMC .cu:160: helper = magnitude(temp_one) / helper - 1   (ratio - 1)
-        r_old = torch.where(valid, d_old / safe_e - 1.0, torch.zeros_like(d_old))
-        r_new = torch.where(valid, d_new / safe_e - 1.0, torch.zeros_like(d_new))
-
-        # cudaMMC .cu:161: err += helper * helper   (squared error)
-        score_old[i0:i1] = (r_old ** 2).sum(dim=1)
-        delta[i0:i1] = (r_new ** 2 - r_old ** 2).sum(dim=1)
-
-    return delta, score_old
-
-
-# ── Phase 1: vectorised GPU heatmap MC ───────────────────────────────────────
+# ── Phase 1: sequential single-bead heatmap MC ───────────────────────────────
+# cudaMMC source: LooperSolver.cpp:421-518  MonteCarloHeatmap(float step_size)
 
 def monte_carlo_heatmap(
-    pos: torch.Tensor,          # (N, 3) float32, on GPU
-    expected: torch.Tensor,     # (N, N) expected distances (float16 ok), on GPU
+    pos: torch.Tensor,          # (N, 3) float32
+    expected: torch.Tensor,     # (N, N) expected distances (float16 ok)
     fixed_mask: torch.Tensor,   # (N,) bool
     settings: Settings,
     same_chr_mask: Optional[torch.Tensor] = None,
     verbose: bool = True,
 ) -> torch.Tensor:
     """
-    Vectorised Jacobi heatmap MC – mirrors the CUDA warp-parallel kernel.
+    Sequential single-bead heatmap MC – one-to-one with CPU MonteCarloHeatmap.
 
-    cudaMMC source: ParallelMonteCarloHeatmap.cu
-      Host setup:  ParallelMonteCarloHeatmap()  lines 327-429
-      GPU kernel:  MonteCarloHeatmapKernel()     lines 194-325
+    cudaMMC source: LooperSolver.cpp:421-518  MonteCarloHeatmap(float step_size)
 
-    Each inner step proposes a displacement for ALL beads simultaneously,
-    computes per-bead score deltas in one chunked GPU pass (no Python loop
-    over beads, no N×N allocation), and accepts/rejects per-bead with a
-    vectorised Metropolis criterion.
-
-    Outer step = mc_inner_steps Jacobi rounds, followed by temperature
-    cooling and a milestone check.
+    Each iteration selects one random free bead, proposes a displacement,
+    updates total score via O(N) per-bead delta (score_heatmap_single), and
+    accepts/rejects with ≤ criterion + ratio Metropolis.  Temperature cools
+    every individual bead move.  Milestone check every milestone_steps_heatmap
+    moves; stop when score fails to improve ≥ 0.5% with < 5 successes.
     """
     s = settings
     device = pos.device
     N = pos.shape[0]
+    rng = random.Random()
 
-    # cudaMMC .cu:331:  double T = Settings::maxTempHeatmap
+    # cudaMMC cpp:423: step_size *= 0.5
+    step = s.step_size_heatmap * 0.5
+
+    # cudaMMC cpp:425: T = Settings::maxTempHeatmap
     T = s.max_temp_heatmap
-    # cudaMMC .cu:402:  kernel receives 0.75f * step_size (caller passes 0.75*step)
-    step = s.step_size_heatmap
-    free = ~fixed_mask                  # (N,) mask of movable beads
-    # cudaMMC .cu:228-229: if (clusters_fixed[warpIdx]) return;
 
-    # cudaMMC .cu:392:  score_curr = calcScoreHeatmapActiveRegion()  (initial total score)
-    total_score = score_heatmap_chunked(pos, expected,
-                                         s.diagonal_size, same_chr_mask).item()
-    best_score = total_score
-    # cudaMMC .cu:205:  int improvementMisses = 0
-    milestone_fails = 0
-    outer_step = 0
-
-    effective_inner = s.mc_inner_steps  # cudaMMC .cu:225: #define N 512 (inner iterations per warp)
-
-    # Don't check milestones until T drops to ≤10% of initial — at high T,
-    # score fluctuates randomly and milestone_fails would trigger after ~3 steps.
-    milestone_temp_threshold = T * 0.1
-    # cudaMMC .cu:210:  float milestoneScore = score_curr  (reset on each outer step)
+    # cudaMMC cpp:445: score_curr = calcScoreHeatmapActiveRegion()
+    total_score = score_heatmap_chunked(pos, expected, s.diagonal_size, same_chr_mask).item()
+    # cudaMMC cpp:448: score_prev = score_curr
+    score_prev = total_score
+    # cudaMMC cpp:449: milestone_score = score_curr
+    milestone_score = total_score
+    # cudaMMC cpp:435-436: milestone_success = 0
+    milestone_success = 0
+    # cudaMMC cpp:455: i = 1
+    individual_steps = 0
 
     if verbose:
-        print(f"  [heatmap MC] N={N}  T_initial={T:.1f}  "
-              f"milestone starts at T={milestone_temp_threshold:.2f}")
+        print(f"  [heatmap MC] N={N}  T_initial={T:.1f}  step={step:.4f}  score={total_score:.4f}")
 
-    # cudaMMC .cu:222: while (true) {  — outer annealing loop
-    while milestone_fails < s.milestone_fails_threshold:
-        outer_step += 1
+    # cudaMMC cpp:456: while (true) {
+    while True:
+        # cudaMMC cpp:459: p = random(size)
+        bead_idx = rng.randrange(N)
+        # cudaMMC cpp:462-463: if (clusters[ind].is_fixed) continue
+        if fixed_mask[bead_idx]:
+            continue
 
-        # cudaMMC .cu:226-250: for (int i = 0; i < N; ++i) { … }  — inner Jacobi loop
-        for _ in range(effective_inner):
-            # cudaMMC .cu:231: randomVector(displacement, step_size, settings.use2D, &localState)
-            disp = torch.zeros(N, 3, device=device)
-            disp[free] = (torch.rand(free.sum(), 3, device=device) * 2.0 - 1.0) * step
-            # cudaMMC .cu:79: in2D ? __float2half(0.0f)
-            if s.use_2d:
-                disp[:, 2] = 0.0
+        # O(N) per-bead score before move — replaces O(N²) calcScoreHeatmapActiveRegion
+        local_prev = score_heatmap_single(pos, bead_idx, expected,
+                                          s.diagonal_size, same_chr_mask).item()
 
-            # cudaMMC .cu:232: addToVector(curr_vector, displacement)
-            new_pos = pos + disp   # (N, 3); zeros for fixed beads → no change
+        # cudaMMC cpp:465-467: displacement = random_vector(step_size, use2D); pos += disp
+        disp = _random_displacement(step, s.use_2d, device)
+        pos[bead_idx] += disp  # cudaMMC cpp:467: clusters[ind].pos += displacement
 
-            # cudaMMC .cu:234-237: score_curr = calcScoreHeatmapSingleActiveRegion(warpIdx, …, curr_vector, warpIdx)
-            delta, score_old = _bead_score_delta(pos, new_pos, expected,
-                                                  s.diagonal_size, same_chr_mask)
+        # cudaMMC cpp:468: score_curr = calcScoreHeatmapActiveRegion()  (O(N²) → O(N) via delta)
+        local_curr = score_heatmap_single(pos, bead_idx, expected,
+                                          s.diagonal_size, same_chr_mask).item()
+        score_curr = total_score + (local_curr - local_prev)
 
-            # cudaMMC .cu:239: if ((score_curr <= score_prev) || (T > 0.0f && withChance(…)))
-            # cudaMMC .cu:241-244: withChance(tempJumpScaleHeatmap * expf(-tempJumpCoefHeatmap * (score_curr/score_prev) * (1/T)))
-            score_new = score_old + delta                            # (N,) per-bead proposed score
-            T_safe = max(T, 1e-30)
-            log_thresh = (math.log(max(s.temp_jump_scale_heatmap, 1e-30))   # log(scale)
-                          - s.temp_jump_coef_heatmap                         # -coef *
-                            * (score_new / score_old.clamp(min=1e-30)) / T_safe)  # (s1/s0)/T
-            rand_log = torch.rand(N, device=device).log()           # log(uniform) for log-space comparison
-            # cudaMMC .cu:239: score_curr<=score_prev  OR  withChance(…)
-            accept = free & ((delta <= 0) | (rand_log < log_thresh))
+        # cudaMMC cpp:469: ok = score_curr <= score_prev
+        ok = score_curr <= score_prev
 
-            # cudaMMC .cu:245: score_prev = score_curr; continue  (accept)
-            # cudaMMC .cu:249: subtractValueFromVector(curr_vector, displacement)  (reject)
-            pos[accept] = new_pos[accept]
-            total_score += delta[accept].sum().item()
+        # cudaMMC cpp:471-475: if (!ok && T > 0) { tp = scale*exp(-coef*(s1/s0)/T); ok = withChance(tp) }
+        if not ok and T > 0.0:
+            ok = _with_chance_ratio(s.temp_jump_scale_heatmap, s.temp_jump_coef_heatmap,
+                                    score_curr, score_prev, T, rng)
 
-        # cudaMMC .cu:252: T *= settings.dtTempHeatmap
-        T *= s.dt_temp_heatmap
-        # cudaMMC .cu:253: step_size *= 0.95
-        step *= s.step_size_decay_heatmap
-
-        # Recompute true score — Jacobi delta accumulation drifts from reality
-        # because deltas are computed against stale neighbour positions.
-        # cudaMMC .cu:303-307: score_curr = calcScoreHeatmapActiveRegion(-1, …)  (thread 0 recomputes global score)
-        total_score = score_heatmap_chunked(pos, expected,
-                                             s.diagonal_size, same_chr_mask).item()
-
-        annealing = T <= milestone_temp_threshold
-        log_interval = 10 if annealing else 100
-        if verbose and outer_step % log_interval == 0:
-            phase = "anneal" if annealing else "explore"
-            print(f"  [heatmap MC] step={outer_step:5d}  T={T:.4f}  "
-                  f"score={total_score:.4f}  fails={milestone_fails}  [{phase}]")
-
-        # cudaMMC .cu:310-312:
-        #   if (score_curr > settings.MCstopConditionImprovementHeatmap * milestoneScore)
-        #     ++improvementMisses;
-        # cudaMMC .cu:314-316:
-        #   if (improvementMisses >= settings.milestoneFailsThreshold || score_curr < 1e-04)
-        #     *isDone = true;
-        # cudaMMC .cu:318: milestoneScore = score_curr;
-        if T <= milestone_temp_threshold:
-            if total_score < s.milestone_improvement_ratio * best_score:  # cudaMMC: score improved ≥ 0.5%
-                best_score = total_score
-                milestone_fails = 0                                       # cudaMMC: resets on improvement
-            else:
-                milestone_fails += 1                                      # cudaMMC: ++improvementMisses
+        # cudaMMC cpp:478-484: if ok: milestone_success++ else: pos -= disp; score_curr = score_prev
+        if ok:
+            total_score = score_curr          # accept
+            milestone_success += 1            # cudaMMC cpp:480
         else:
-            best_score = min(best_score, total_score)
+            pos[bead_idx] -= disp             # cudaMMC cpp:482: clusters[ind].pos -= displacement
+            score_curr = score_prev           # cudaMMC cpp:483
 
-        # cudaMMC .cu:315: score_curr < 1e-04  → stop
-        if total_score < 1e-4:
-            break
+        # cudaMMC cpp:486: T *= Settings::dtTempHeatmap  ← cooling every individual bead move
+        T *= s.dt_temp_heatmap
+
+        individual_steps += 1  # cudaMMC cpp:514: i++
+
+        # cudaMMC cpp:488: if (i % Settings::MCstopConditionStepsHeatmap == 0) {
+        if individual_steps % s.milestone_steps_heatmap == 0:
+            ratio = total_score / max(milestone_score, 1e-30)
+            if verbose:
+                print(f"  [heatmap MC] step={individual_steps:7d}  T={T:.5f}  "
+                      f"score={total_score:.4f}  ratio={ratio:.5f}  ms_succ={milestone_success}")
+            # cudaMMC cpp:501-504:
+            #   if (score_curr > MCstopConditionImprovementHeatmap * milestone_score
+            #       && milestone_success < MCstopConditionMinSuccessesHeatmap) || score < 1e-6
+            if ((total_score > s.milestone_improvement_ratio * milestone_score
+                    and milestone_success < s.min_successes_heatmap)
+                    or total_score < 1e-6):
+                break
+            # cudaMMC cpp:507-508: milestone_score = score_curr; milestone_success = 0
+            milestone_score = total_score
+            milestone_success = 0
+
+        # cudaMMC cpp:513: score_prev = score_curr
+        score_prev = score_curr
 
     return pos
 

@@ -9,8 +9,7 @@ For each phase this file provides:
      the reference implementations.
 
 Source files (paths relative to repo root):
-  cudammc/src/ParallelMonteCarloHeatmap.cu   – Phase 1 GPU kernel
-  cudammc/src/LooperSolver.cpp               – Phases 2 & 3 CPU MC
+  cudammc/src/LooperSolver.cpp               – all three phases (CPU)
   cudammc/src/Settings.cpp                   – Default parameter values
   cudammc/thirdparty/common.cpp              – random_vector helper
 
@@ -60,8 +59,8 @@ import torch
 # │ HEATMAP SCORE FORMULA              │ (dist/expected - 1)²         │ (dist/safe_e - 1)²        │  ✓   │
 # │   .cu:160-161                      │ per valid pair, summed       │ _bead_score_delta          │      │
 # ├────────────────────────────────────┼──────────────────────────────┼───────────────────────────┼──────┤
-# │ PHASE 1 STEP DECAY                 │ step *= 0.95 per 512 inner   │ step *= 0.95 per outer    │  ✓   │
-# │   .cu:253                          │ iterations (1 outer step)    │ step (= 1×512 inner)      │ (FIXED)│
+# │ PHASE 1 ALGORITHM                  │ CPU sequential single-bead   │ CPU sequential single-bead│  ✓   │
+# │   cpp:421-518 MonteCarloHeatmap    │ random bead, T/bead, O(N)    │ same via score_heatmap_s. │ (FIXED)│
 # ├────────────────────────────────────┼──────────────────────────────┼───────────────────────────┼──────┤
 # │ COMPARISON OPERATOR                │ Phase2: <=  Phase3: <        │ Phase2: <=  Phase3: <     │  ✓   │
 # │   cpp:3111 / cpp:3329              │                              │                           │      │
@@ -185,57 +184,54 @@ def ref_milestone_should_stop(score_curr: float, milestone_score: float,
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SECTION 4 – PHASE 1 GPU HEATMAP MC
+# SECTION 4 – PHASE 1 CPU HEATMAP MC
 # ─────────────────────────────────────────────────────────────────────────────
-# cudammc/src/ParallelMonteCarloHeatmap.cu MonteCarloHeatmapKernel (lines 194-325):
+# cudammc/src/LooperSolver.cpp MonteCarloHeatmap (lines 421-518):
 #
-#   int warpIdx = (threadIndex / warpSize) % activeRegionSize; // one warp per bead
-#   float T = <passed from host>;                              // .cu:197 arg
-#   float step_size = <passed from host>;                      // .cu:198 arg (host: 0.75*step)
-#   float score_prev = score; float milestoneScore = score;    // .cu:208-210
-#   int improvementMisses = 0;                                 // .cu:205
-#
+#   step_size *= 0.5;                                          // cpp:423
+#   double T = Settings::maxTempHeatmap;                       // cpp:425
+#   score_curr = calcScoreHeatmapActiveRegion();               // cpp:445
+#   score_prev = score_curr; milestone_score = score_curr;     // cpp:448-449
+#   int milestone_success = 0;                                 // cpp:436
+#   i = 1;
 #   while (true) {
-#     curr_vector = clusters_positions[warpIdx];               // .cu:223
-#     for (int i = 0; i < 512; ++i) {                         // .cu:225-226
-#       if (clusters_fixed[warpIdx]) return;                   // .cu:228-229
-#       randomVector(displacement, step_size, settings.use2D); // .cu:231 ← uniform[-s,s]³
-#       addToVector(curr_vector, displacement);                // .cu:232
-#       score_curr = calcScoreHeatmapSingleActiveRegion(…);   // .cu:234-237
-#       if (score_curr <= score_prev ||                        // .cu:239
-#           withChance(scale*expf(-coef*(s1/s0)/T))) {         // .cu:241-244
-#         score_prev = score_curr;  // accept                  // .cu:245
-#       } else {
-#         score_curr = score_prev;                             // .cu:248
-#         subtractValueFromVector(curr_vector, displacement);  // .cu:249 ← reject
-#       }
+#     p = random(size);                                        // cpp:459 ← random bead
+#     if (clusters[ind].is_fixed) continue;                   // cpp:462-463
+#     displacement = random_vector(step_size, use2D);          // cpp:465-466
+#     clusters[ind].pos += displacement;                       // cpp:467
+#     score_curr = calcScoreHeatmapActiveRegion();             // cpp:468 O(N²) → O(N) in Python
+#     ok = score_curr <= score_prev;                           // cpp:469 ← ≤
+#     if (!ok && T > 0) {
+#       tp = scale * exp(-coef * (score_curr / score_prev) / T); // cpp:472-473
+#       ok = withChance(tp);                                   // cpp:474
 #     }
-#     T *= settings.dtTempHeatmap;                            // .cu:252
-#     step_size *= 0.95;                                       // .cu:253 ← hardcoded 0.95
-#     // warp reduction + best-move commit omitted (Python uses Jacobi instead)
-#     if (threadIndex == 0) {
-#       score_curr = calcScoreHeatmapActiveRegion(-1, …);      // .cu:303-307 recompute global
-#       if (score_curr > ratio*milestoneScore) ++improvementMisses; // .cu:310-312
-#       if (improvementMisses >= threshold || score_curr < 1e-4) *isDone=true; // .cu:314-316
-#       milestoneScore = score_curr;                           // .cu:318
+#     if (ok) { milestone_success++; }                        // cpp:479-480
+#     else { pos -= disp; score_curr = score_prev; }          // cpp:482-483
+#     T *= Settings::dtTempHeatmap;                           // cpp:486 ← per bead move
+#     if (i % MCstopConditionStepsHeatmap == 0) {             // cpp:488 every 10000 moves
+#       if (score_curr > improvement*milestone_score &&
+#           milestone_success < MCstopConditionMinSuccessesHeatmap) break; // cpp:501-504
+#       milestone_score = score_curr; milestone_success = 0;  // cpp:507-508
 #     }
-#     if (*isDone) break;                                      // .cu:321-322
+#     score_prev = score_curr;                                 // cpp:513
+#     i++;
 #   }
 #
-# Python mc.py monte_carlo_heatmap (all lines ✓ after fixes):
-#   T = s.max_temp_heatmap                 → .cu:331 T = Settings::maxTempHeatmap
-#   step = s.step_size_heatmap             → .cu:402 0.75f*step_size on host
-#   for _ in range(mc_inner_steps):        → .cu:225-226 for(i=0;i<512;++i)
-#   disp[free] = (rand*2-1)*step           → .cu:231 randomVector(…)
-#   new_pos = pos + disp                   → .cu:232 addToVector(curr_vector, displacement)
-#   _bead_score_delta(pos, new_pos, …)     → .cu:234-237 calcScoreHeatmapSingleActiveRegion
-#   (delta<=0)|(rand_log<log_thresh)       → .cu:239-244 accept criterion
-#   pos[accept] = new_pos[accept]          → .cu:245/.249 accept/reject
-#   T *= s.dt_temp_heatmap                 → .cu:252 T *= dtTempHeatmap
-#   step *= s.step_size_decay_heatmap=0.95 → .cu:253 step_size *= 0.95  ✓ (fixed)
-#   score_heatmap_chunked(…)               → .cu:303-307 recompute global score
-#   milestone ratio test                   → .cu:310-312 ratio check  ✓
-#   total_score < 1e-4                     → .cu:315 score_curr < 1e-04  ✓
+# Python mc.py monte_carlo_heatmap (all lines ✓):
+#   step = s.step_size_heatmap * 0.5            → cpp:423 step_size *= 0.5
+#   T = s.max_temp_heatmap                      → cpp:425
+#   score_heatmap_chunked(pos, …)               → cpp:445 initial global score
+#   bead_idx = rng.randrange(N)                 → cpp:459 random bead
+#   score_heatmap_single(pos, bead_idx, …)      → cpp:468 O(N) delta replaces O(N²)
+#   ok = score_curr <= score_prev               → cpp:469 ≤  ✓
+#   _with_chance_ratio(scale_heatmap, …)        → cpp:472-474  ✓
+#   total_score = score_curr; milestone_success++ → cpp:479-480  ✓
+#   pos[bead_idx] -= disp; score_curr=score_prev → cpp:482-483  ✓
+#   T *= s.dt_temp_heatmap                      → cpp:486 per bead move  ✓
+#   individual_steps % s.milestone_steps_heatmap → cpp:488  ✓
+#   score > improvement*milestone && succ<min   → cpp:501-504  ✓
+#   milestone_score = total_score; success = 0  → cpp:507-508  ✓
+#   score_prev = score_curr                     → cpp:513  ✓
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -590,25 +586,40 @@ def test_bead_selection_is_random():
         f"is_random={is_random}  variety={has_variety}")
 
 
-def test_step_decay_heatmap():
+def test_heatmap_cpu_settings():
     """
-    Verify step_size_decay_heatmap default is 0.95 to match cudaMMC.
+    Verify Settings defaults match CPU MonteCarloHeatmap (LooperSolver.cpp:421-518).
 
-    cudammc/src/ParallelMonteCarloHeatmap.cu:253:
-      step_size *= 0.95;   ← hardcoded, per 512-inner-iteration block
+    cudammc/src/Settings.cpp:
+      dtTempHeatmap = 0.99995                   (line 217)
+      MCstopConditionMinSuccessesHeatmap = 5    (line 221)
+      MCstopConditionStepsHeatmap = 10000       (line 222)
+      MCstopConditionImprovementHeatmap = 0.995 (line 220)
+    And LooperSolver.cpp:423: step_size *= 0.5  (initial halving before loop)
     """
     import sys
     sys.path.insert(0, ".")
     try:
         from src.settings import Settings
     except ImportError:
-        print("  [SKIP] test_step_decay_heatmap: src not importable")
+        print("  [SKIP] test_heatmap_cpu_settings: src not importable")
         return True
 
     s = Settings()
-    ok = abs(s.step_size_decay_heatmap - 0.95) < 1e-9
-    return _check(ok,
-        f"step_size_decay_heatmap = {s.step_size_decay_heatmap}  expected 0.95")
+    checks = [
+        (abs(s.dt_temp_heatmap - 0.99995) < 1e-9,
+         f"dt_temp_heatmap={s.dt_temp_heatmap}  expected 0.99995  (Settings.cpp:217)"),
+        (s.min_successes_heatmap == 5,
+         f"min_successes_heatmap={s.min_successes_heatmap}  expected 5  (Settings.cpp:221)"),
+        (s.milestone_steps_heatmap == 10000,
+         f"milestone_steps_heatmap={s.milestone_steps_heatmap}  expected 10000  (Settings.cpp:222)"),
+        (abs(s.milestone_improvement_ratio - 0.995) < 1e-9,
+         f"milestone_improvement_ratio={s.milestone_improvement_ratio}  expected 0.995  (Settings.cpp:220)"),
+    ]
+    all_pass = True
+    for ok, desc in checks:
+        all_pass &= _check(ok, desc)
+    return all_pass
 
 
 def test_comparison_operators():
@@ -693,8 +704,8 @@ def run_all_tests():
     results["bead_selection"] = test_bead_selection_is_random()
     print()
 
-    print("7. Step decay heatmap = 0.95:")
-    results["step_decay"] = test_step_decay_heatmap()
+    print("7. Heatmap CPU settings (dt, milestones, improvement):")
+    results["heatmap_settings"] = test_heatmap_cpu_settings()
     print()
 
     print("8. Comparison operators (<= arcs, < smooth):")
