@@ -18,57 +18,12 @@ import torch
 
 from .data_loading import load_anchors, load_pet_clusters, mark_arcs
 from .data_structures import Anchor, Cluster, InteractionArc
-from .distances import (
-    count_to_distance,
-    freq_to_distance_intra,
-    freq_to_distance_inter,
-    genomic_length_to_distance,
-)
+from .distances import count_to_distance, genomic_length_to_distance
 from .heatmap import build_singleton_heatmap, normalize_heatmap, heatmap_to_expected_distances
 from .mc import monte_carlo_heatmap, monte_carlo_arcs, monte_carlo_arcs_smooth
-from .scores import score_arcs, score_structure_smooth, score_orientation
 from .regions import Region, build_filter, chrom_included, filter_anchors, default_regions
 from .settings import Settings
 from .tree import ChromosomeTree, interpolate_children_spline
-
-
-def _rescale_positions(pos: torch.Tensor,
-                       chain_lengths: torch.Tensor,
-                       arc_starts: torch.Tensor,
-                       arc_ends: torch.Tensor,
-                       arc_exp: torch.Tensor,
-                       min_ratio: float = 2.0) -> float:
-    """
-    Return a scale factor S such that pos/S has typical inter-bead distances
-    matching chain/arc expected distances.  Returns 1.0 if already compatible.
-
-    Uses consecutive chain distances as the primary reference (always present),
-    with arc distances as fallback.  pos/S is passed to arc+smooth MC and
-    the output stays at that scale (not multiplied back) — the final coordinates
-    are in arc/chain distance units, matching the reference cudaMMC output scale.
-    """
-    # Primary: compare median consecutive distance to median chain length
-    if pos.shape[0] > 1 and chain_lengths.numel() > 0:
-        with torch.no_grad():
-            actual = (pos[1:] - pos[:-1]).norm(dim=1).median().item()
-            target = chain_lengths.median().item()
-        if target > 0:
-            ratio = actual / target
-            if ratio >= min_ratio:
-                return ratio
-
-    # Fallback: arc distances
-    mask = arc_exp > 0
-    if mask.any():
-        with torch.no_grad():
-            actual = (pos[arc_starts[mask]] - pos[arc_ends[mask]]).norm(dim=1).median().item()
-            expected = arc_exp[mask].median().item()
-        if expected > 0:
-            ratio = actual / expected
-            if ratio >= min_ratio:
-                return ratio
-
-    return 1.0
 
 
 class LooperSolver:
@@ -172,76 +127,74 @@ class LooperSolver:
 
     # ── Arc expected distances ────────────────────────────────────────────────
 
-    def _calc_arc_expected_distances(self, chrom: str,
-                                      indices: List[int]) -> torch.Tensor:
+    def _arc_tensors_ib(self, chrom: str, anchor_cidxs: List[int]
+                        ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Build arc expected-distance tensor for a set of cluster indices.
+        Build (arc_starts, arc_ends, arc_expected) for all pairs within one IB.
 
-        Mirrors calcAnchorExpectedDistancesHeatmap + calcAnchorExpectedDistances:
-          - initialise all pairs to -1 (repulsion)
-          - for each arc set expected = countToDistance(arc.score)
-          - multi-factor arcs: summary arc (factor=-1) gets score=0 → large distance
+        Non-arc pairs: expected = -1 (repulsion 1/d).
+        Arc pairs: expected = count_to_distance(arc.score) > 0.
+
+        Mirrors cudaMMC calcAnchorExpectedDistancesHeatmap (LooperSolver.cpp:2629):
+          initialise all pairs to -1, then overwrite arc pairs with positive dist.
+
+        Returns upper-triangle pairs (i < j); score_arcs_single checks both
+        arc_starts==idx and arc_ends==idx, so upper-triangle is sufficient.
         """
-        tree = self.trees[chrom]
-        arcs = self.arcs_by_chr.get(chrom, [])
+        n = len(anchor_cidxs)
+        if n < 2:
+            empty = torch.zeros(0, dtype=torch.long, device=self.device)
+            return empty, empty, torch.zeros(0, dtype=torch.float32, device=self.device)
+
+        idx_map = {ci: li for li, ci in enumerate(anchor_cidxs)}
         s = self.settings
+        tree = self.trees[chrom]
 
-        n = len(indices)
-        idx_map = {ci: li for li, ci in enumerate(indices)}
+        # cudaMMC LooperSolver.cpp:2629: calcAnchorExpectedDistancesHeatmap
+        #   all pairs → -1 (repulsion); arc pairs → positive target distance
+        exp_matrix = torch.full((n, n), -1.0, dtype=torch.float32)
+        exp_matrix.fill_diagonal_(0.0)
 
-        expected = torch.full((n, n), -1.0, dtype=torch.float32,
-                               device=self.device)
-
-        for arc in arcs:
-            # map global anchor indices to local indices
+        for arc in self.arcs_by_chr.get(chrom, []):
             ai = tree.anchors_idx[arc.start] if arc.start < len(tree.anchors_idx) else -1
-            bi = tree.anchors_idx[arc.end] if arc.end < len(tree.anchors_idx) else -1
+            bi = tree.anchors_idx[arc.end]   if arc.end   < len(tree.anchors_idx) else -1
             li = idx_map.get(ai, -1)
             lj = idx_map.get(bi, -1)
             if li < 0 or lj < 0:
                 continue
-
             dist = count_to_distance(
                 arc.score,
                 s.count_dist_a, s.count_dist_scale,
                 s.count_dist_shift, s.count_dist_base_level,
             )
-            expected[li, lj] = dist
-            expected[lj, li] = dist
+            exp_matrix[li, lj] = dist
+            exp_matrix[lj, li] = dist
 
-        return expected
+        rows, cols = torch.triu_indices(n, n, offset=1)
+        starts = rows.to(self.device)
+        ends   = cols.to(self.device)
+        exp    = exp_matrix[rows, cols].to(self.device)
+        return starts, ends, exp
 
-    def _arc_tensors(self, chrom: str
-                     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Return (arc_starts, arc_ends, arc_expected) tensors for CPU MC phases."""
+    def _chain_lengths_ib(self, chrom: str, anchor_cidxs: List[int]
+                           ) -> torch.Tensor:
+        """
+        Expected linker lengths for consecutive anchors within one IB.
+        Uses center-to-center genomic distance (matching tree.chain_lengths_tensor).
+        """
         tree = self.trees[chrom]
-        arcs = self.arcs_by_chr.get(chrom, [])
         s = self.settings
-        n = len(tree.anchors_idx)
-
-        starts, ends, expected = [], [], []
-        for arc in arcs:
-            ai = arc.start
-            bi = arc.end
-            if ai >= n or bi >= n:
-                continue
-            dist = count_to_distance(
-                arc.score,
-                s.count_dist_a, s.count_dist_scale,
-                s.count_dist_shift, s.count_dist_base_level,
-            )
-            starts.append(ai)
-            ends.append(bi)
-            expected.append(dist)
-
-        if not starts:
-            empty = torch.zeros(0, dtype=torch.long, device=self.device)
-            return empty, empty, torch.zeros(0, dtype=torch.float32, device=self.device)
-
-        arc_starts = torch.tensor(starts, dtype=torch.long, device=self.device)
-        arc_ends = torch.tensor(ends, dtype=torch.long, device=self.device)
-        arc_exp = torch.tensor(expected, dtype=torch.float32, device=self.device)
-        return arc_starts, arc_ends, arc_exp
+        lengths = []
+        for i in range(len(anchor_cidxs) - 1):
+            c1 = tree.clusters[anchor_cidxs[i]]
+            c2 = tree.clusters[anchor_cidxs[i + 1]]
+            d = abs(c2.genomic_pos - c1.genomic_pos)
+            lengths.append(genomic_length_to_distance(
+                d, s.genomic_dist_scale, s.genomic_dist_power, s.genomic_dist_base,
+            ))
+        if not lengths:
+            return torch.zeros(0, dtype=torch.float32, device=self.device)
+        return torch.tensor(lengths, dtype=torch.float32, device=self.device)
 
     # ── Phase 1: heatmap MC ───────────────────────────────────────────────────
 
@@ -303,74 +256,88 @@ class LooperSolver:
         exp.fill_diagonal_(0.0)
         return exp
 
-    # ── Phase 2+3: arc / smooth MC ────────────────────────────────────────────
+    # ── Phase 2+3: per-IB arc / smooth MC ────────────────────────────────────
 
     def reconstruct_clusters_arcs_distances(self):
-        """Run arc-spring MC and smooth MC for each chromosome."""
+        """
+        Run per-IB arc MC + smooth MC for each chromosome.
+
+        Mirrors cudaMMC reconstructClustersArcsDistances (LooperSolver.cpp:2579-2702):
+          - For each IB: initialise all anchors to the IB's position + tiny noise
+          - Run arc MC with arc springs for connected pairs AND repulsion (1/d)
+            for all non-arc pairs within the IB
+          - Run smooth MC (chain + angular) on the same IB anchors
+        This per-IB isolation with all-pair repulsion is what prevents the
+        global collapse into a single ball seen when running on all N anchors
+        at once with no repulsion.
+        """
         for chrom, tree in self.trees.items():
-            n = len(tree.anchors_idx)
-            if n == 0:
+            n_total = len(tree.anchors_idx)
+            if n_total == 0:
                 continue
 
-            print(f"\n[Arcs MC] {chrom}")
-            pos = tree.anchor_positions_tensor(device=str(self.device))
-            arc_starts, arc_ends, arc_exp = self._arc_tensors(chrom)
-            fixed = torch.zeros(n, dtype=torch.bool, device=self.device)
+            print(f"\n[Arcs+Smooth MC] {chrom}  ({n_total} total anchors)")
 
-            # add small noise to break symmetry
-            pos = pos + self.settings.noise_size_small * torch.randn_like(pos)
-
-            # set dist_to_next from genomic spans
-            for i in range(n - 1):
-                c1 = tree.clusters[tree.anchors_idx[i]]
-                c2 = tree.clusters[tree.anchors_idx[i + 1]]
-                gap = max(0, c2.start - c1.end)
-                c1.dist_to_next = genomic_length_to_distance(
-                    gap,
-                    self.settings.genomic_dist_scale,
-                    self.settings.genomic_dist_power,
-                    self.settings.genomic_dist_base,
-                )
-
-            # Compute chain lengths (kb-scale after the bp→kb fix in distances.py)
-            chain_lengths = tree.chain_lengths_tensor(device=str(self.device))
-            orientations = [
-                tree.clusters[tree.anchors_idx[i]].orientation
-                for i in range(n)
-            ]
-
-            # # Heatmap MC leaves positions at a large scale (heatmap expected units)
-            # # while arc/chain spring targets are much smaller.  Rescale positions
-            # # into arc/chain distance units before MC.  The output stays at that
-            # # scale — this is the correct final coordinate unit matching reference.
-            # arc_scale = _rescale_positions(pos, chain_lengths,
-            #                                arc_starts, arc_ends, arc_exp)
-            # if arc_scale != 1.0:
-            #     print(f"  Rescaling positions ÷{arc_scale:.1f} to match arc/chain distance scale")
-            #     pos = pos / arc_scale
-
-            # Phase 2 - arc spring MC
-            # NOTE: original cudaMMC runs arcs MC on CPU (sequential per-bead
-            # Gauss-Seidel).  All tensors here live on self.device (GPU) so the
-            # tensor math runs on GPU; the Python `for bead_idx` control loop
-            # is unavoidably CPU.  A full GPU kernel would require atomic ops or
-            # graph colouring — not implemented.
-            if arc_starts.shape[0] > 0:
-                pos = monte_carlo_arcs(
-                    pos, arc_starts, arc_ends, arc_exp, chain_lengths, fixed,
-                    self.settings, verbose=True,
-                )
-
-            # Phase 3 - smooth MC  (same GPU-tensor / CPU-loop note as above)
-            print(f"[Smooth MC] {chrom}")
-            pos = monte_carlo_arcs_smooth(
-                pos, arc_starts, arc_ends, arc_exp,
-                chain_lengths, orientations, fixed,
-                self.settings, verbose=True,
-            )
-
-            tree.set_anchor_positions_from_tensor(pos)
+            # After heatmap MC on all anchors, propagate means up to IBs / segments.
+            # IB positions then serve as starting points for per-IB MC.
             tree._propagate_positions_up()
+
+            n_ibs_done = 0
+            for root_ci in (i for i, c in enumerate(tree.clusters) if c.level == 1):
+                for seg_ci in tree.clusters[root_ci].children:
+                    seg_c = tree.clusters[seg_ci]
+                    for ib_ci in seg_c.children:
+                        ib_c = tree.clusters[ib_ci]
+                        anchor_cidxs = ib_c.children  # level-4 cluster indices
+                        n_ib = len(anchor_cidxs)
+
+                        if n_ib < 2:
+                            continue  # single anchor — no internal MC needed
+
+                        # cudaMMC LooperSolver.cpp:2624-2625:
+                        #   clusters[active_region[j]].pos = clusters[ib].pos
+                        ib_pos = torch.tensor(
+                            [ib_c.x, ib_c.y, ib_c.z],
+                            dtype=torch.float32, device=self.device,
+                        )
+                        pos = ib_pos.unsqueeze(0).expand(n_ib, 3).clone()
+                        pos = pos + self.settings.noise_size_small * torch.randn_like(pos)
+
+                        fixed = torch.zeros(n_ib, dtype=torch.bool, device=self.device)
+
+                        # cudaMMC LooperSolver.cpp:2629: calcAnchorExpectedDistancesHeatmap
+                        #   builds all-pair matrix: -1 (repulsion) for non-arc pairs,
+                        #   positive target distance for arc pairs
+                        arc_s, arc_e, arc_exp = self._arc_tensors_ib(chrom, anchor_cidxs)
+                        chain_lengths = self._chain_lengths_ib(chrom, anchor_cidxs)
+                        orientations = [
+                            tree.clusters[ci].orientation for ci in anchor_cidxs
+                        ]
+
+                        n_arc = int((arc_exp > 0).sum().item())
+                        n_rep = int((arc_exp < 0).sum().item())
+                        print(f"  IB {n_ibs_done}: {n_ib} anchors, "
+                              f"{n_arc} arc pairs, {n_rep} repulsion pairs")
+
+                        # Phase 2: arc MC — arc springs + repulsion for all pairs
+                        pos = monte_carlo_arcs(
+                            pos, arc_s, arc_e, arc_exp, chain_lengths, fixed,
+                            self.settings, verbose=False,
+                        )
+
+                        # Phase 3: smooth MC — chain + angular (arc tensors passed
+                        # for orientation scoring only; chain springs dominate)
+                        pos = monte_carlo_arcs_smooth(
+                            pos, arc_s, arc_e, arc_exp,
+                            chain_lengths, orientations, fixed,
+                            self.settings, verbose=False,
+                        )
+
+                        tree.set_positions_from_tensor(pos, anchor_cidxs)
+                        n_ibs_done += 1
+
+            tree._propagate_positions_up()
+            print(f"  Done: {n_ibs_done} IBs processed")
 
     # ── Full pipeline ─────────────────────────────────────────────────────────
 

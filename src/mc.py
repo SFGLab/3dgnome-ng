@@ -52,8 +52,15 @@ def _with_chance_ratio(jump_scale: float, jump_coef: float,
     #   tp = Settings::tempJumpScale *
     #        exp(-Settings::tempJumpCoef * (score_curr / score_prev) / T);
     #   ok = withChance(tp);
-    prob = jump_scale * math.exp(                                 # cudaMMC cpp:3114: tempJumpScale *
-        -jump_coef * (score_curr / max(score_prev, 1e-30)) / max(T, 1e-30))  # cudaMMC cpp:3115: exp(-coef*(s1/s0)/T)
+    # Guard: if scores drifted non-positive due to floating-point accumulation,
+    # fall back to greedy comparison (accept iff improvement) to avoid division
+    # by near-zero or sign inversion that would cause exp() overflow.
+    if score_prev <= 0.0 or score_curr <= 0.0:
+        return score_curr <= score_prev
+    exp_arg = -jump_coef * (score_curr / score_prev) / max(T, 1e-30)  # cudaMMC cpp:3115
+    if exp_arg < -700:                                            # underflow → prob ≈ 0
+        return False
+    prob = jump_scale * math.exp(exp_arg)                        # cudaMMC cpp:3114
     return rng.random() < prob                                    # cudaMMC cpp:3116: withChance(tp)
 
 
@@ -273,6 +280,11 @@ def monte_carlo_arcs(
 
         # cudaMMC cpp:3133: if (i % Settings::MCstopConditionSteps == 0) {
         if individual_steps % s.milestone_steps_arcs == 0:
+            # Resync total_score from scratch each milestone to prevent floating-point
+            # drift in the per-bead delta accumulation from making total_score go negative.
+            # Negative total_score inverts the Metropolis ratio sign → exp() overflow.
+            total_score = score_arcs(pos, arc_starts, arc_ends, arc_expected,
+                                     s.k_spring, s.k_spring_repulsion).item()
             ratio = total_score / max(milestone_score, 1e-30)
             if verbose:
                 print(f"  [arcs MC] step={individual_steps:7d}  T={T:.5f}  "
