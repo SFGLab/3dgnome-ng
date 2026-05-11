@@ -155,9 +155,15 @@ def monte_carlo_heatmap(
             # cudaMMC cpp:501-504:
             #   if (score_curr > MCstopConditionImprovementHeatmap * milestone_score
             #       && milestone_success < MCstopConditionMinSuccessesHeatmap) || score < 1e-6
+            # Extra cold-phase guard: cudaMMC runs on small active regions (~30 beads) so
+            # milestone_success naturally drops to 0 at T≈0 (local min reached quickly).
+            # With N=288, there are always tiny greedy improvements → success stays high.
+            # Stop when T is cold (< 0.5% of T_max) AND improvement per milestone < 0.01%.
+            cold = T < s.max_temp_heatmap * 0.005
             if ((total_score > s.milestone_improvement_ratio * milestone_score
                     and milestone_success < s.min_successes_heatmap)
-                    or total_score < 1e-6):
+                    or total_score < 1e-6
+                    or (cold and ratio > 0.9999)):
                 break
             # cudaMMC cpp:507-508: milestone_score = score_curr; milestone_success = 0
             milestone_score = total_score
