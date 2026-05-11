@@ -139,21 +139,23 @@ class LooperSolver:
     def load_heatmap(self, singletons_bedpe: str):
         """Build and normalise singleton heatmaps for all chromosomes.
 
-        All heavy matrix work runs on CPU (avoids GPU OOM for large N).
-        The final expected-distance matrix is stored as float16 on the compute device.
+        build_singleton_heatmap runs on CPU (file I/O + Python loop).
+        Normalisation and freq→distance conversion run on GPU:
+          N=26603 float32 ≈ 2.83 GB; float16 result ≈ 1.41 GB.
         """
         for chrom, anchors in self.anchors_by_chr.items():
             print(f"  Building heatmap for {chrom} ({len(anchors)} anchors)...")
             raw = build_singleton_heatmap(singletons_bedpe, anchors)  # CPU float32
-            norm = normalize_heatmap(raw, anchors, self.settings.diagonal_size)
+            raw = raw.to(self.device)   # → GPU before heavy matrix ops
+            norm = normalize_heatmap(raw, anchors, self.settings.diagonal_size)  # GPU float32
             del raw
             exp = heatmap_to_expected_distances(
                 norm,
                 self.settings.freq_dist_scale,
                 self.settings.freq_dist_power,
-            )  # CPU float16
+            )  # GPU float16 (~1.41 GB for N=26603)
             del norm
-            self.heatmap_expected[chrom] = exp.to(self.device)  # GPU float16 (~1.4 GB for N=26603)
+            self.heatmap_expected[chrom] = exp
             del exp
 
     # ── Tree construction ─────────────────────────────────────────────────────
@@ -345,13 +347,18 @@ class LooperSolver:
                 pos = pos / arc_scale
 
             # Phase 2 - arc spring MC
+            # NOTE: original cudaMMC runs arcs MC on CPU (sequential per-bead
+            # Gauss-Seidel).  All tensors here live on self.device (GPU) so the
+            # tensor math runs on GPU; the Python `for bead_idx` control loop
+            # is unavoidably CPU.  A full GPU kernel would require atomic ops or
+            # graph colouring — not implemented.
             if arc_starts.shape[0] > 0:
                 pos = monte_carlo_arcs(
                     pos, arc_starts, arc_ends, arc_exp, chain_lengths, fixed,
                     self.settings, verbose=True,
                 )
 
-            # Phase 3 - smooth MC
+            # Phase 3 - smooth MC  (same GPU-tensor / CPU-loop note as above)
             print(f"[Smooth MC] {chrom}")
             pos = monte_carlo_arcs_smooth(
                 pos, arc_starts, arc_ends, arc_exp,

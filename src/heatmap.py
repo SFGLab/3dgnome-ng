@@ -1,14 +1,16 @@
 """
-Singleton heatmap construction and the 5-step normalisation pipeline.
+Singleton heatmap construction and the normalisation pipeline.
 
-Memory strategy for large N:
-- Build and normalise entirely on CPU (avoids GPU OOM during N×N ops).
-- Never create an N×N outer-product intermediate; use broadcast row/col divides.
-- Return float16 so the GPU copy is ~half the size (~1.4 GB for N=26603).
+Device strategy:
+- build_singleton_heatmap: always CPU (file I/O + Python loop, can't vectorise).
+- normalize_heatmap / heatmap_to_expected_distances: run on whatever device the
+  input tensor lives on.
+
+NOTE original cudaMMC normalises on CPU then copies to GPU; we match the
+  normalisation maths but run it on GPU for speed.
 """
 
-import math
-from typing import List, Optional
+from typing import List
 
 import torch
 
@@ -20,14 +22,15 @@ from .data_structures import Anchor
 def build_singleton_heatmap(singletons_path: str,
                              anchors: List[Anchor]) -> torch.Tensor:
     """
-    Build a raw singleton count matrix on CPU.
+    Build a raw singleton count matrix.
 
-    Returns a float32 CPU tensor of shape (N, N).
-    Caller should normalise on CPU, then move the float16 result to GPU.
+    Always runs on CPU — file I/O and Python indexing loop can't be
+    parallelised on GPU.  Returns a CPU float32 tensor of shape (N, N).
+    Transfer to GPU before calling normalize_heatmap.
     """
     from .data_loading import _find_anchor
     N = len(anchors)
-    mat = torch.zeros(N, N, dtype=torch.float32)   # CPU, no device arg
+    mat = torch.zeros(N, N, dtype=torch.float32)   # CPU
 
     with open(singletons_path) as fh:
         for line in fh:
@@ -50,43 +53,48 @@ def build_singleton_heatmap(singletons_path: str,
     return mat   # CPU float32
 
 
-# ── Normalisation pipeline ───────────────────────────────────────────────────
+# ── Normalisation pipeline ────────────────────────────────────────────────────
 
 def normalize_heatmap(raw: torch.Tensor,
                       anchors: List[Anchor],
                       diagonal_size: int = 3) -> torch.Tensor:
     """
-    Full normalisation pipeline – operates entirely on CPU in float32.
+    Full normalisation pipeline.  Runs on whatever device `raw` lives on
+    (pass a GPU tensor for GPU execution).
 
-    Avoids any N×N intermediate allocation (uses broadcast row/col ops).
-    Returns a CPU float32 tensor of shape (N, N).
+    Returns a float32 tensor on the same device as `raw`, shape (N, N).
     """
-    mat = raw.float().cpu()
+    mat = raw.float()   # keep on raw's device; no forced .cpu()
+    device = mat.device
     N = mat.shape[0]
 
     # Step 1 – bin-length normalisation in Mb (matching original cudaMMC)
     len_mb = torch.tensor([max(a.length, 1) / 1_000_000.0 for a in anchors],
-                           dtype=torch.float32)
+                           dtype=torch.float32, device=device)
     mat = mat / len_mb[:, None]
     mat = mat / len_mb[None, :]
 
     # Step 2 – row normalisation
     row_sums = mat.sum(dim=1, keepdim=True).clamp(min=1e-9)
-    mat /= row_sums
+    mat = mat / row_sums
 
     # Step 3 – single global scale so first non-zero diagonal averages 1.0
     first_diag = mat.diagonal(offset=diagonal_size)
     diag_mean = first_diag[first_diag > 1e-9].mean().item()
     if diag_mean > 1e-9:
-        mat /= diag_mean
+        mat = mat / diag_mean
 
-    return mat   # CPU float32
+    return mat   # float32, same device as input
 
 
 def heatmap_to_expected_distances(mat: torch.Tensor,
                                    scale: float = 100.0,
                                    power: float = -0.333,
                                    min_freq: float = 1e-9) -> torch.Tensor:
-    """Convert normalised frequency matrix to expected distance matrix (float16)."""
+    """
+    Convert normalised frequency matrix → expected distance matrix (float16).
+    Runs on whatever device `mat` lives on.
+    Returns float16 on the same device (~half the memory of float32).
+    """
     safe = mat.float().clamp(min=min_freq)
-    return (scale * (safe ** power)).half()   # float16 halves GPU footprint
+    return (scale * (safe ** power)).half()

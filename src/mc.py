@@ -210,7 +210,10 @@ def monte_carlo_heatmap(
     return pos
 
 
-# ── Phase 2: CPU arcs MC ──────────────────────────────────────────────────────
+# ── Phase 2: arcs MC (GPU tensors, CPU control loop) ─────────────────────────
+# Original cudaMMC: fully CPU.  We keep the same sequential Gauss-Seidel design
+# but tensor math runs on pos.device (GPU).  The per-bead Python loop and
+# .item() syncs are unavoidable without a full GPU kernel rewrite.
 
 def monte_carlo_arcs(
     pos: torch.Tensor,
@@ -286,7 +289,7 @@ def monte_carlo_arcs(
     return pos
 
 
-# ── Phase 3: CPU smooth MC ────────────────────────────────────────────────────
+# ── Phase 3: smooth MC (GPU tensors, CPU control loop — same as Phase 2) ─────
 
 def monte_carlo_arcs_smooth(
     pos: torch.Tensor,

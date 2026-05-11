@@ -226,3 +226,19 @@ data/
 # CudaMMC
 cudaMMC/
 docs/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.com.apple.timemachine.supported
+.com.apple.timemachine.snapshots
+.com.apple.timemachine.localsnapshots
+.com.apple.timemachine.mobilesync
