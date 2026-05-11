@@ -94,27 +94,34 @@ def find_ibs(anchors: List[Anchor],
              seg_start: int, seg_end: int) -> List[int]:
     """
     Within a segment [seg_start, seg_end) return IB boundary anchor indices.
-    An IB boundary is defined by an arc whose start < boundary <= end within
-    the segment.  Index seg_start is always a boundary.
+    Uses the same arc-sweep as find_gaps: position i is an IB boundary only if
+    NO arc spans it (i.e., no arc (a,b) with a < i <= b within the segment).
+    Index seg_start is always a boundary.
 
-    cudaMMC equivalent: IB clusters are built from consecutive (gaps[i-1], gaps[i])
-    pairs (LooperSolver.cpp:1082-1138) where gaps come from findGaps arc-sweep,
-    not from arc endpoint geometry as done here.
+    cudaMMC equivalent: LooperSolver.cpp:1082-1138 — IB boundaries come from
+    the same findGaps arc-sweep applied within each segment.
+
+    This groups all arc-connected anchors into the same IB, which is essential
+    for the per-IB arc MC to see the arc springs between its anchors.
     """
     if seg_end <= seg_start:
         return [seg_start]
 
-    boundaries = {seg_start}
-    for arc in arcs:
-        lo = min(arc.start, arc.end)
-        hi = max(arc.start, arc.end)
-        if lo >= seg_start and hi < seg_end:
-            boundaries.add(lo)
-            # IB split at the arc endpoint
-            if hi + 1 < seg_end:
-                boundaries.add(hi + 1)
+    # Only consider arcs whose both endpoints are within this segment
+    arc_pairs = {
+        (min(a.start, a.end), max(a.start, a.end))
+        for a in arcs
+        if seg_start <= min(a.start, a.end) and max(a.start, a.end) < seg_end
+    }
 
-    return sorted(boundaries)
+    boundaries = [seg_start]
+    for i in range(seg_start + 1, seg_end):
+        # cudaMMC: position i is a gap (IB boundary) when arcs_cnt == 0
+        bridged = any(p[0] < i <= p[1] for p in arc_pairs)
+        if not bridged:
+            boundaries.append(i)
+
+    return boundaries
 
 
 # ── Catmull-Rom spline interpolation ─────────────────────────────────────────

@@ -294,13 +294,10 @@ class LooperSolver:
                         if n_ib < 2:
                             continue  # single anchor — no internal MC needed
 
-                        # cudaMMC LooperSolver.cpp:2624-2625:
-                        #   clusters[active_region[j]].pos = clusters[ib].pos
-                        ib_pos = torch.tensor(
-                            [ib_c.x, ib_c.y, ib_c.z],
-                            dtype=torch.float32, device=self.device,
-                        )
-                        pos = ib_pos.unsqueeze(0).expand(n_ib, 3).clone()
+                        # Use actual heatmap-MC positions so arc springs start near targets.
+                        # cudaMMC LooperSolver.cpp:2624-2625 copies IB centroid; we keep
+                        # per-anchor positions from the heatmap phase instead (better init).
+                        pos = tree.positions_tensor(anchor_cidxs, device=str(self.device))
                         pos = pos + self.settings.noise_size_small * torch.randn_like(pos)
 
                         fixed = torch.zeros(n_ib, dtype=torch.bool, device=self.device)

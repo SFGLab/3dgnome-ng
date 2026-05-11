@@ -294,10 +294,12 @@ def monte_carlo_arcs(
             #   if ((score_curr > MCstopConditionImprovement * milestone_score &&
             #        milestone_success < MCstopConditionMinSuccesses) ||
             #       score_curr < 1e-5 || score_curr / milestone_score > 0.9999)
+            cold = T < s.max_temp_arcs * 1e-4  # T effectively zero
             if ((total_score > s.milestone_improvement_ratio * milestone_score
                     and milestone_success < s.min_successes_arcs)
                     or total_score < 1e-5
-                    or (ratio > 0.9999 and total_score <= milestone_score)):
+                    or (ratio > 0.9999 and total_score <= milestone_score)
+                    or (cold and ratio > 0.999)):  # frozen: < 0.1% improvement per milestone
                 return pos
             # cudaMMC cpp:3149-3150: milestone_score = score_curr; milestone_success = 0
             milestone_score = total_score
@@ -404,6 +406,10 @@ def monte_carlo_arcs_smooth(
 
         # cudaMMC cpp:3361: if (i % Settings::MCstopConditionStepsSmooth == 0) {
         if individual_steps % s.milestone_steps_smooth == 0:
+            # Resync to prevent floating-point drift from making ts go negative.
+            ts = (score_structure_smooth(pos, chain_lengths, s.k_chain, s.angular_k)
+                  + score_orientation(pos, orientations, arc_starts, arc_ends,
+                                      s.k_orient)).item()
             ratio = ts / max(milestone_score, 1e-30)
             if verbose:
                 print(f"  [smooth MC] step={individual_steps:7d}  T={T:.5f}  "
@@ -413,10 +419,12 @@ def monte_carlo_arcs_smooth(
             #   if ((score_curr > MCstopConditionImprovementSmooth * milestone_score &&
             #        milestone_success < MCstopConditionMinSuccessesSmooth) ||
             #       score_curr < 1e-6)
+            cold = T < s.max_temp_smooth * 1e-4
             if ((ts > s.milestone_improvement_ratio * milestone_score
                     and milestone_success < s.min_successes_smooth)
                     or ts < 1e-6
-                    or (ratio > 0.9999 and ts <= milestone_score)):
+                    or (ratio > 0.9999 and ts <= milestone_score)
+                    or (cold and ratio > 0.999)):  # frozen: < 0.1% improvement per milestone
                 return pos
             # cudaMMC cpp:3378-3379: milestone_score = score_curr; milestone_success = 0
             milestone_score = ts
