@@ -134,12 +134,11 @@ def monte_carlo_heatmap(
     milestone_fails = 0
     outer_step = 0
 
-    # Auto-scale inner steps so each outer step stays under ~1 second on GPU.
-    # For N=26603 and mc_inner_steps=512 an outer step takes ~26 s; cap at 512²/N.
-    effective_inner = min(s.mc_inner_steps, max(1, (512 * 512) // max(N, 1)))
-    if verbose and effective_inner < s.mc_inner_steps:
-        print(f"  [heatmap MC] auto-scaling mc_inner_steps "
-              f"{s.mc_inner_steps} → {effective_inner} (N={N})")
+    # effective_inner = min(s.mc_inner_steps, max(1, (512 * 512) // max(N, 1)))
+    # if verbose and effective_inner < s.mc_inner_steps:
+    #     print(f"  [heatmap MC] auto-scaling mc_inner_steps "
+    #           f"{s.mc_inner_steps} → {effective_inner} (N={N})")
+    effective_inner = s.mc_inner_steps
 
     # Don't check milestones until T drops to ≤10% of initial — at high T,
     # score fluctuates randomly and milestone_fails would trigger after ~3 steps.
