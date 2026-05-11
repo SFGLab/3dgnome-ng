@@ -145,6 +145,10 @@ def monte_carlo_heatmap(
     # score fluctuates randomly and milestone_fails would trigger after ~3 steps.
     milestone_temp_threshold = T * 0.1
 
+    if verbose:
+        print(f"  [heatmap MC] N={N}  T_initial={T:.1f}  "
+              f"milestone starts at T={milestone_temp_threshold:.2f}")
+
     while milestone_fails < s.milestone_fails_threshold:
         outer_step += 1
 
@@ -177,9 +181,17 @@ def monte_carlo_heatmap(
         T *= s.dt_temp_heatmap
         step *= s.step_size_decay_heatmap
 
-        if verbose and outer_step % 10 == 0:
+        # Recompute true score — Jacobi delta accumulation drifts from reality
+        # because deltas are computed against stale neighbour positions.
+        total_score = score_heatmap_chunked(pos, expected,
+                                             s.diagonal_size, same_chr_mask).item()
+
+        annealing = T <= milestone_temp_threshold
+        log_interval = 10 if annealing else 100
+        if verbose and outer_step % log_interval == 0:
+            phase = "anneal" if annealing else "explore"
             print(f"  [heatmap MC] step={outer_step:5d}  T={T:.4f}  "
-                  f"score={total_score:.4f}  fails={milestone_fails}")
+                  f"score={total_score:.4f}  fails={milestone_fails}  [{phase}]")
 
         # Only track milestones once temperature is low enough for convergence
         # to be meaningful — at high T, score fluctuates randomly.
