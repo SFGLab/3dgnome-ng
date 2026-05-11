@@ -233,6 +233,43 @@ def score_structure_smooth(pos: torch.Tensor,
     return chain_score + angular_score
 
 
+def score_chain_single(pos: torch.Tensor,
+                       idx: int,
+                       chain_lengths: torch.Tensor,
+                       k_chain: float = 1.0,
+                       angular_k: float = 0.1) -> torch.Tensor:
+    """
+    Chain + angular score contribution of bead `idx` only.
+    O(1) — only evaluates springs and angles touching bead idx.
+    Moving idx affects springs (idx-1,idx) and (idx,idx+1),
+    and angles at idx-1, idx, and idx+1.
+    """
+    N = pos.shape[0]
+    device = pos.device
+    score = torch.zeros(1, device=device)
+
+    # Chain springs
+    if idx > 0:
+        L = chain_lengths[idx - 1].clamp(min=1e-6)
+        d = (pos[idx] - pos[idx - 1]).norm()
+        score = score + k_chain * ((d - L) / L) ** 2
+    if idx < N - 1:
+        L = chain_lengths[idx].clamp(min=1e-6)
+        d = (pos[idx + 1] - pos[idx]).norm()
+        score = score + k_chain * ((d - L) / L) ** 2
+
+    # Angular penalty at positions idx-1, idx, idx+1
+    for j in (idx - 1, idx, idx + 1):
+        if 0 < j < N - 1:
+            v1 = pos[j] - pos[j - 1]
+            v2 = pos[j + 1] - pos[j]
+            cos_a = F.cosine_similarity(v1.unsqueeze(0), v2.unsqueeze(0)).clamp(-1.0, 1.0)
+            angle = torch.acos(cos_a)
+            score = score + angular_k * (angle ** 3)
+
+    return score.squeeze()
+
+
 # ── CTCF orientation score ────────────────────────────────────────────────────
 
 def _angle_between_orientations(o1: str, o2: str, flip: bool = False) -> float:

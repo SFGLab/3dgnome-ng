@@ -18,8 +18,8 @@ class Settings:
     genomic_dist_base: float = 1.0
 
     # Hi-C freq → distance (heatmap phase)  d = scale * freq^power
-    freq_dist_scale: float = 100.0
-    freq_dist_power: float = -0.333
+    freq_dist_scale: float = 25.0
+    freq_dist_power: float = -0.6
 
     # Hi-C freq → distance (per-contact intra)
     freq_dist_scale_per_contact: float = 25.0
@@ -29,11 +29,11 @@ class Settings:
     freq_dist_scale_inter: float = 120.0
     freq_dist_power_inter: float = -1.0
 
-    # PET count → distance  d = base_level + a * scale / (count + shift)
-    count_dist_a: float = 0.5
-    count_dist_scale: float = 20.0
-    count_dist_shift: float = 1.0
-    count_dist_base_level: float = 0.01
+    # PET count → distance  d = base_level + scale / exp(a * (count + shift))
+    count_dist_a: float = 0.2
+    count_dist_scale: float = 1.8
+    count_dist_shift: float = 8.0
+    count_dist_base_level: float = 0.2
 
     # ── Heatmap spring constants ─────────────────────────────────────────────
     k_heatmap: float = 1.0
@@ -118,8 +118,8 @@ class Settings:
             genomic_dist_scale=g_float("distance", "genomic_dist_scale", 0.5),
             genomic_dist_base=g_float("distance", "genomic_dist_base", 1.0),
 
-            freq_dist_scale=g_float("distance", "freq_dist_heatmap_scale", 100.0),
-            freq_dist_power=g_float("distance", "freq_dist_heatmap_power", -0.333),
+            freq_dist_scale=g_float("distance", "freq_dist_heatmap_scale", 25.0),
+            freq_dist_power=g_float("distance", "freq_dist_heatmap_power", -0.6),
 
             freq_dist_scale_per_contact=g_float("distance", "freq_dist_scale", 25.0),
             freq_dist_power_per_contact=g_float("distance", "freq_dist_power", -0.6),
@@ -127,10 +127,10 @@ class Settings:
             freq_dist_scale_inter=g_float("distance", "freq_dist_scale_inter", 120.0),
             freq_dist_power_inter=g_float("distance", "freq_dist_power_inter", -1.0),
 
-            count_dist_a=g_float("distance", "count_dist_a", 0.5),
-            count_dist_scale=g_float("distance", "count_dist_scale", 20.0),
-            count_dist_shift=g_float("distance", "count_dist_shift", 1.0),
-            count_dist_base_level=g_float("distance", "count_dist_base_level", 0.01),
+            count_dist_a=g_float("distance", "count_dist_a", 0.2),
+            count_dist_scale=g_float("distance", "count_dist_scale", 1.8),
+            count_dist_shift=g_float("distance", "count_dist_shift", 8.0),
+            count_dist_base_level=g_float("distance", "count_dist_base_level", 0.2),
 
             use_2d=g_bool("misc", "use_2d", False),
             device=cfg.get("misc", "device", fallback="cuda"),

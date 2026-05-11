@@ -333,7 +333,7 @@ class LooperSolver:
             # Phase 2 - arc spring MC
             if arc_starts.shape[0] > 0:
                 pos = monte_carlo_arcs(
-                    pos, arc_starts, arc_ends, arc_exp, fixed,
+                    pos, arc_starts, arc_ends, arc_exp, chain_lengths, fixed,
                     self.settings, verbose=True,
                 )
 
@@ -398,7 +398,7 @@ class LooperSolver:
                     fh.write(f"{c.genomic_pos}\t{c.x:.6f}\t{c.y:.6f}\t{c.z:.6f}\n")
             print(f"Saved {path}")
 
-    def save_cif(self, prefix: str = "output", anchors_only: bool = False):
+    def save_cif(self, prefix: str = "output", anchors_only: bool = True):
         """Write per-chromosome mmCIF files suitable for 3D structure viewers.
 
         anchors_only: if True write only anchor (level-4) beads; otherwise all beads.

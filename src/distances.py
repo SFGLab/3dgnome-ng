@@ -43,13 +43,14 @@ def freq_to_distance_inter(freq: float, scale: float = 120.0,
     return scale * (freq ** power)
 
 
-def count_to_distance(count: int, a: float = 0.5, scale: float = 20.0,
-                      shift: float = 1.0, base_level: float = 0.01) -> float:
+def count_to_distance(count: int, a: float = 0.2, scale: float = 1.8,
+                      shift: float = 8.0, base_level: float = 0.2) -> float:
     """PET count → spatial distance for arc spring targets.
 
-    d = base_level + a * scale / (count + shift)
+    d = base_level + scale / exp(a * (count + shift))
+    Matches the original cudaMMC exponential formula.
     """
-    return base_level + a * scale / (count + shift)
+    return base_level + scale / math.exp(a * (count + shift))
 
 
 # ── Tensor versions (used in score functions) ────────────────────────────────
@@ -79,7 +80,11 @@ def freq_to_distance_inter_t(freqs: torch.Tensor, scale: float = 120.0,
     return scale * (safe ** power)
 
 
-def count_to_distance_t(counts: torch.Tensor, a: float = 0.5,
-                         scale: float = 20.0, shift: float = 1.0,
-                         base_level: float = 0.01) -> torch.Tensor:
-    return base_level + a * scale / (counts.float() + shift)
+def count_to_distance_t(counts: torch.Tensor, a: float = 0.2,
+                         scale: float = 1.8, shift: float = 8.0,
+                         base_level: float = 0.2) -> torch.Tensor:
+    """PET count → spatial distance (tensor version).
+
+    d = base_level + scale / exp(a * (count + shift))
+    """
+    return base_level + scale / torch.exp(a * (counts.float() + shift))

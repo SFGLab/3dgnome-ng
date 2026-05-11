@@ -48,8 +48,8 @@ def parse_args():
                    help="Also save anchor positions in HCM format")
     p.add_argument("--cif", action="store_true",
                    help="Also save positions in mmCIF format for 3D viewers")
-    p.add_argument("--cif-anchors-only", action="store_true",
-                   help="When writing CIF, include only anchor beads (not linkers)")
+    p.add_argument("--cif-all-beads", action="store_true",
+                   help="When writing CIF, include all beads (not just anchors)")
     return p.parse_args()
 
 
@@ -90,7 +90,7 @@ def main():
         solver.save_hcm(args.output)
 
     if args.cif:
-        solver.save_cif(args.output, anchors_only=args.cif_anchors_only)
+        solver.save_cif(args.output, anchors_only=not args.cif_all_beads)
 
     print("Done.")
 

@@ -64,26 +64,21 @@ def normalize_heatmap(raw: torch.Tensor,
     mat = raw.float().cpu()
     N = mat.shape[0]
 
-    # Step 1 – bin-length normalisation
-    # Equivalent to dividing by sqrt(len_i * len_j) without an outer product:
-    #   mat / (sqrt_len_i * sqrt_len_j)  = (mat / sqrt_len_i[:, None]) / sqrt_len_j[None, :]
-    sqrt_len = torch.tensor([math.sqrt(max(a.length, 1)) for a in anchors],
-                             dtype=torch.float32)
-    mat = mat / sqrt_len[:, None]
-    mat = mat / sqrt_len[None, :]
+    # Step 1 – bin-length normalisation in Mb (matching original cudaMMC)
+    len_mb = torch.tensor([max(a.length, 1) / 1_000_000.0 for a in anchors],
+                           dtype=torch.float32)
+    mat = mat / len_mb[:, None]
+    mat = mat / len_mb[None, :]
 
     # Step 2 – row normalisation
     row_sums = mat.sum(dim=1, keepdim=True).clamp(min=1e-9)
     mat /= row_sums
 
-    # Step 3 – diagonal normalisation (iterative, O(N) memory per diagonal)
-    for d in range(diagonal_size, N):
-        diag = mat.diagonal(offset=d)          # view into mat
-        diag_mean = diag.mean().item()
-        if diag_mean > 1e-9:
-            normed = diag / diag_mean
-            mat.diagonal(offset=d).copy_(normed)
-            mat.diagonal(offset=-d).copy_(normed)
+    # Step 3 – single global scale so first non-zero diagonal averages 1.0
+    first_diag = mat.diagonal(offset=diagonal_size)
+    diag_mean = first_diag[first_diag > 1e-9].mean().item()
+    if diag_mean > 1e-9:
+        mat /= diag_mean
 
     return mat   # CPU float32
 

@@ -16,6 +16,7 @@ from .scores import (
     score_heatmap_chunked,
     score_arcs,
     score_arcs_single,
+    score_chain_single,
     score_structure_smooth,
     score_orientation,
     score_orientation_single,
@@ -195,11 +196,12 @@ def monte_carlo_arcs(
     arc_starts: torch.Tensor,
     arc_ends: torch.Tensor,
     arc_expected: torch.Tensor,
+    chain_lengths: torch.Tensor,
     fixed_mask: torch.Tensor,
     settings: Settings,
     verbose: bool = True,
 ) -> torch.Tensor:
-    """Incremental single-bead MC for arc spring energy."""
+    """Incremental single-bead MC for arc spring energy + chain springs."""
     s = settings
     device = pos.device
     N = pos.shape[0]
@@ -208,8 +210,9 @@ def monte_carlo_arcs(
     T = s.max_temp_arcs
     step = s.step_size_arcs
 
-    total_score = score_arcs(pos, arc_starts, arc_ends, arc_expected,
-                              s.k_spring, s.k_spring_repulsion).item()
+    total_score = (score_arcs(pos, arc_starts, arc_ends, arc_expected,
+                               s.k_spring, s.k_spring_repulsion)
+                   + score_structure_smooth(pos, chain_lengths, s.k_chain, s.angular_k)).item()
     prev_milestone = total_score
     outer_step = 0
 
@@ -221,16 +224,18 @@ def monte_carlo_arcs(
             if fixed_mask[bead_idx]:
                 continue
 
-            local_prev = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
-                                           arc_expected, s.k_spring,
-                                           s.k_spring_repulsion).item()
+            local_prev = (score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
+                                            arc_expected, s.k_spring, s.k_spring_repulsion)
+                          + score_chain_single(pos, bead_idx, chain_lengths,
+                                               s.k_chain, s.angular_k)).item()
 
             disp = _random_displacement(step, s.use_2d, device)
             pos[bead_idx] += disp
 
-            local_curr = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
-                                           arc_expected, s.k_spring,
-                                           s.k_spring_repulsion).item()
+            local_curr = (score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
+                                            arc_expected, s.k_spring, s.k_spring_repulsion)
+                          + score_chain_single(pos, bead_idx, chain_lengths,
+                                               s.k_chain, s.angular_k)).item()
             delta = local_curr - local_prev
             if delta < -1e-7:
                 total_score += delta
@@ -301,8 +306,8 @@ def monte_carlo_arcs_smooth(
             if fixed_mask[bead_idx]:
                 continue
 
-            struct_b = score_structure_smooth(pos, chain_lengths,
-                                              s.k_chain, s.angular_k).item()
+            struct_b = score_chain_single(pos, bead_idx, chain_lengths,
+                                          s.k_chain, s.angular_k).item()
             arc_b = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
                                       arc_expected, s.k_spring,
                                       s.k_spring_repulsion).item()
@@ -313,8 +318,8 @@ def monte_carlo_arcs_smooth(
             disp = _random_displacement(step, s.use_2d, device)
             pos[bead_idx] += disp
 
-            struct_a = score_structure_smooth(pos, chain_lengths,
-                                              s.k_chain, s.angular_k).item()
+            struct_a = score_chain_single(pos, bead_idx, chain_lengths,
+                                          s.k_chain, s.angular_k).item()
             arc_a = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
                                       arc_expected, s.k_spring,
                                       s.k_spring_repulsion).item()
