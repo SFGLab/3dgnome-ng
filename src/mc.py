@@ -28,15 +28,20 @@ from .settings import Settings
 
 def _random_displacement(step_size: float, use_2d: bool,
                           device: torch.device) -> torch.Tensor:
-    v = torch.randn(3, device=device)
+    # cudaMMC common.cpp random_vector: uniform[-step, step] per component
+    v = (torch.rand(3, device=device) * 2.0 - 1.0) * step_size
     if use_2d:
         v[2] = 0.0
-    return v * (step_size / v.norm().clamp(min=1e-9))
+    return v
 
 
-def _with_chance(jump_scale: float, temp: float, delta: float,
-                  rng: random.Random) -> bool:
-    prob = jump_scale * math.exp(-delta / max(temp, 1e-10))
+def _with_chance_ratio(jump_scale: float, jump_coef: float,
+                        score_curr: float, score_prev: float,
+                        T: float, rng: random.Random) -> bool:
+    # cudaMMC LooperSolver.cpp line 3114:
+    # tp = tempJumpScale * exp(-tempJumpCoef * (score_curr/score_prev) / T)
+    prob = jump_scale * math.exp(
+        -jump_coef * (score_curr / max(score_prev, 1e-30)) / max(T, 1e-30))
     return rng.random() < prob
 
 
@@ -49,18 +54,21 @@ def _bead_score_delta(
     diagonal_size: int,
     same_chr_mask: Optional[torch.Tensor],
     chunk_size: int = 512,
-) -> torch.Tensor:
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
-    Return (N,) tensor: delta[i] = S_new[i] - S_old[i]
+    Return (delta, score_old) each (N,):
+      delta[i]     = S_new[i] - S_old[i]
+      score_old[i] = S_old[i]  (per-bead score before move)
 
     S[i] = sum_{j: j≠i, |i-j|>=diag, exp>1e-3} (dist(pos_i, pos_j)/exp[i,j] - 1)^2
 
     Jacobi: S_new[i] uses new_pos[i] vs the CURRENT pos[j] for all j.
-    Uses the squared-norm matmul trick: largest intermediate is (chunk, N) ~ 50 MB.
+    Both outputs are needed for the ratio-based Metropolis criterion.
     """
     N = pos.shape[0]
     device = pos.device
     delta = torch.zeros(N, device=device)
+    score_old = torch.zeros(N, device=device)
 
     pos_sq = (pos ** 2).sum(dim=1)       # (N,) precomputed
     new_sq = (new_pos ** 2).sum(dim=1)   # (N,) precomputed
@@ -94,9 +102,10 @@ def _bead_score_delta(
         r_old = torch.where(valid, d_old / safe_e - 1.0, torch.zeros_like(d_old))
         r_new = torch.where(valid, d_new / safe_e - 1.0, torch.zeros_like(d_new))
 
+        score_old[i0:i1] = (r_old ** 2).sum(dim=1)
         delta[i0:i1] = (r_new ** 2 - r_old ** 2).sum(dim=1)
 
-    return delta
+    return delta, score_old
 
 
 # ── Phase 1: vectorised GPU heatmap MC ───────────────────────────────────────
@@ -152,24 +161,25 @@ def monte_carlo_heatmap(
         outer_step += 1
 
         for _ in range(effective_inner):
-            # propose one displacement for every free bead
+            # cudaMMC: uniform[-step, step] per component (common.cpp random_vector)
             disp = torch.zeros(N, 3, device=device)
+            disp[free] = (torch.rand(free.sum(), 3, device=device) * 2.0 - 1.0) * step
             if s.use_2d:
-                disp[free, :2] = torch.randn(free.sum(), 2, device=device) * step
-            else:
-                raw = torch.randn(free.sum(), 3, device=device)
-                disp[free] = raw * (step / raw.norm(dim=1, keepdim=True).clamp(min=1e-9))
+                disp[:, 2] = 0.0
 
             new_pos = pos + disp   # (N, 3); zeros for fixed beads → no change
 
-            # per-bead score delta, chunked to avoid N×N
-            delta = _bead_score_delta(pos, new_pos, expected,
-                                       s.diagonal_size, same_chr_mask)
+            # per-bead score delta and per-bead old score, chunked to avoid N×N
+            delta, score_old = _bead_score_delta(pos, new_pos, expected,
+                                                  s.diagonal_size, same_chr_mask)
 
-            # vectorised Metropolis
-            T_eff = max(T * s.temp_jump_coef_heatmap, 1e-10)
+            # ratio-based Metropolis (cudaMMC ParallelMonteCarloHeatmap.cu):
+            # withChance(scale * expf(-coef * score_new/score_old / T))
+            score_new = score_old + delta                            # (N,) per-bead
+            T_safe = max(T, 1e-30)
             log_thresh = (math.log(max(s.temp_jump_scale_heatmap, 1e-30))
-                          - delta / T_eff)
+                          - s.temp_jump_coef_heatmap
+                            * (score_new / score_old.clamp(min=1e-30)) / T_safe)
             rand_log = torch.rand(N, device=device).log()
             accept = free & ((delta <= 0) | (rand_log < log_thresh))
 
@@ -192,10 +202,10 @@ def monte_carlo_heatmap(
             print(f"  [heatmap MC] step={outer_step:5d}  T={T:.4f}  "
                   f"score={total_score:.4f}  fails={milestone_fails}  [{phase}]")
 
-        # Only track milestones once temperature is low enough for convergence
-        # to be meaningful — at high T, score fluctuates randomly.
+        # Milestone: ratio-based criterion matching cudaMMC
+        # (LooperSolver.cpp line 3143: score_curr > 0.995*milestone_score)
         if T <= milestone_temp_threshold:
-            if total_score < best_score - 1e-4:
+            if total_score < s.milestone_improvement_ratio * best_score:
                 best_score = total_score
                 milestone_fails = 0
             else:
@@ -233,11 +243,14 @@ def monte_carlo_arcs(
     T = s.max_temp_arcs
     step = s.step_size_arcs
 
-    total_score = (score_arcs(pos, arc_starts, arc_ends, arc_expected,
-                               s.k_spring, s.k_spring_repulsion)
-                   + score_structure_smooth(pos, chain_lengths, s.k_chain, s.angular_k)).item()
-    prev_milestone = total_score
+    # cudaMMC MonteCarloArcs: arc springs ONLY (LooperSolver.cpp:3086)
+    # calcScoreDistancesActiveRegion() — no chain springs in arcs phase
+    total_score = score_arcs(pos, arc_starts, arc_ends, arc_expected,
+                              s.k_spring, s.k_spring_repulsion).item()
+    milestone_score = total_score
     outer_step = 0
+    milestone_success = 0
+    individual_steps = 0
 
     while True:
         outer_step += 1
@@ -247,43 +260,56 @@ def monte_carlo_arcs(
             if fixed_mask[bead_idx]:
                 continue
 
-            local_prev = (score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
-                                            arc_expected, s.k_spring, s.k_spring_repulsion)
-                          + score_chain_single(pos, bead_idx, chain_lengths,
-                                               s.k_chain, s.angular_k)).item()
+            # cudaMMC: calcScoreDistancesActiveRegion(p) — arc springs only
+            local_prev = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
+                                           arc_expected, s.k_spring,
+                                           s.k_spring_repulsion).item()
+            score_prev = total_score
 
             disp = _random_displacement(step, s.use_2d, device)
             pos[bead_idx] += disp
 
-            local_curr = (score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
-                                            arc_expected, s.k_spring, s.k_spring_repulsion)
-                          + score_chain_single(pos, bead_idx, chain_lengths,
-                                               s.k_chain, s.angular_k)).item()
+            local_curr = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
+                                           arc_expected, s.k_spring,
+                                           s.k_spring_repulsion).item()
+
+            # cudaMMC: score_curr = score_curr - local_prev + local_curr
             delta = local_curr - local_prev
-            if delta < -1e-7:
-                total_score += delta
+            score_curr = total_score + delta
+
+            # ratio-based Metropolis (LooperSolver.cpp line 3111–3118)
+            if score_curr <= score_prev:
+                total_score = score_curr
                 successes += 1
-            elif delta <= 0:
-                total_score += delta
-            elif _with_chance(s.temp_jump_scale_arcs,
-                              T * s.temp_jump_coef_arcs, delta, rng):
-                total_score += delta
+                milestone_success += 1
+            elif _with_chance_ratio(s.temp_jump_scale_arcs, s.temp_jump_coef_arcs,
+                                    score_curr, score_prev, T, rng):
+                total_score = score_curr
+                milestone_success += 1
             else:
                 pos[bead_idx] -= disp
+                # total_score unchanged
 
-        T *= s.dt_temp_arcs
+            # cudaMMC: T *= dt every individual bead move (line 3130)
+            T *= s.dt_temp_arcs
+            individual_steps += 1
+
+            # milestone check every MCstopConditionSteps individual moves
+            if individual_steps % s.milestone_steps_arcs == 0:
+                ratio = total_score / max(milestone_score, 1e-30)
+                if verbose:
+                    print(f"  [arcs MC] step={individual_steps:7d}  T={T:.5f}  "
+                          f"score={total_score:.6f}  ratio={ratio:.5f}  "
+                          f"ms_succ={milestone_success}")
+                if ((total_score > s.milestone_improvement_ratio * milestone_score
+                        and milestone_success < s.min_successes_arcs)
+                        or total_score < 1e-5
+                        or ratio > 0.9999):
+                    return pos
+                milestone_score = total_score
+                milestone_success = 0
+
         step *= s.step_size_decay_arcs
-
-        milestone_improvement = prev_milestone - total_score
-        prev_milestone = total_score
-
-        if verbose and outer_step % 200 == 0:
-            print(f"  [arcs MC] step={outer_step:6d}  T={T:.5f}  "
-                  f"score={total_score:.6f}  imp={milestone_improvement:.6f}")
-
-        if (milestone_improvement < s.improvement_threshold_arcs
-                and successes < s.min_successes_arcs):
-            break
 
     return pos
 
@@ -301,7 +327,9 @@ def monte_carlo_arcs_smooth(
     settings: Settings,
     verbose: bool = True,
 ) -> torch.Tensor:
-    """Combined smooth MC: structure (chain+angle) + orientation + arc springs."""
+    # cudaMMC MonteCarloArcsSmooth: chain+angular+orientation (NO arc springs)
+    # score = calcScoreStructureSmooth + calcScoreOrientation
+    """Combined smooth MC: structure (chain+angle) + orientation."""
     s = settings
     device = pos.device
     N = pos.shape[0]
@@ -310,16 +338,14 @@ def monte_carlo_arcs_smooth(
     T = s.max_temp_smooth
     step = s.step_size_smooth
 
-    def total_score():
-        return (score_structure_smooth(pos, chain_lengths, s.k_chain, s.angular_k)
-                + score_arcs(pos, arc_starts, arc_ends, arc_expected,
-                              s.k_spring, s.k_spring_repulsion)
-                + score_orientation(pos, orientations, arc_starts, arc_ends,
-                                    s.k_orient)).item()
-
-    ts = total_score()
-    prev_milestone = ts
+    # cudaMMC: curr_score_structure + curr_score_orientation (LooperSolver.cpp:3249)
+    ts = (score_structure_smooth(pos, chain_lengths, s.k_chain, s.angular_k)
+          + score_orientation(pos, orientations, arc_starts, arc_ends,
+                              s.k_orient)).item()
+    milestone_score = ts
     outer_step = 0
+    milestone_success = 0
+    individual_steps = 0
 
     while True:
         outer_step += 1
@@ -329,55 +355,60 @@ def monte_carlo_arcs_smooth(
             if fixed_mask[bead_idx]:
                 continue
 
+            # cudaMMC: calcScoreStructureSmooth(p) + calcScoreOrientation(orn, idx)
             struct_b = score_chain_single(pos, bead_idx, chain_lengths,
                                           s.k_chain, s.angular_k).item()
-            arc_b = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
-                                      arc_expected, s.k_spring,
-                                      s.k_spring_repulsion).item()
             ori_b = score_orientation_single(pos, bead_idx, orientations,
                                              arc_starts, arc_ends,
                                              s.k_orient).item()
+            score_prev = ts
 
             disp = _random_displacement(step, s.use_2d, device)
             pos[bead_idx] += disp
 
             struct_a = score_chain_single(pos, bead_idx, chain_lengths,
                                           s.k_chain, s.angular_k).item()
-            arc_a = score_arcs_single(pos, bead_idx, arc_starts, arc_ends,
-                                      arc_expected, s.k_spring,
-                                      s.k_spring_repulsion).item()
             ori_a = score_orientation_single(pos, bead_idx, orientations,
                                              arc_starts, arc_ends,
                                              s.k_orient).item()
 
-            # pairwise terms counted from both endpoints → factor 2
-            delta = ((struct_a - struct_b)
-                     + 2.0 * (arc_a - arc_b)
-                     + 2.0 * (ori_a - ori_b))
+            # cudaMMC: structure delta factor 1, orientation factor 2 (pairwise)
+            # LooperSolver.cpp line 3322–3313: curr_structure += (new-old);
+            #   curr_orientation += 2*(new_orient - old_orient)
+            delta = (struct_a - struct_b) + 2.0 * (ori_a - ori_b)
+            score_curr = ts + delta
 
-            if delta < -1e-7:
-                ts += delta
+            # ratio-based Metropolis (LooperSolver.cpp line 3332–3334)
+            if score_curr < score_prev:
+                ts = score_curr
                 successes += 1
-            elif delta <= 0:
-                ts += delta
-            elif _with_chance(s.temp_jump_scale_smooth,
-                              T * s.temp_jump_coef_smooth, delta, rng):
-                ts += delta
+                milestone_success += 1
+            elif _with_chance_ratio(s.temp_jump_scale_smooth, s.temp_jump_coef_smooth,
+                                    score_curr, score_prev, T, rng):
+                ts = score_curr
+                milestone_success += 1
             else:
                 pos[bead_idx] -= disp
 
-        T *= s.dt_temp_smooth
+            # cudaMMC: T *= dt every individual bead move (line 3382)
+            T *= s.dt_temp_smooth
+            individual_steps += 1
+
+            # milestone check every MCstopConditionStepsSmooth individual moves
+            if individual_steps % s.milestone_steps_smooth == 0:
+                ratio = ts / max(milestone_score, 1e-30)
+                if verbose:
+                    print(f"  [smooth MC] step={individual_steps:7d}  T={T:.5f}  "
+                          f"score={ts:.6f}  ratio={ratio:.5f}  "
+                          f"ms_succ={milestone_success}")
+                if ((ts > s.milestone_improvement_ratio * milestone_score
+                        and milestone_success < s.min_successes_smooth)
+                        or ts < 1e-6
+                        or ratio > 0.9999):
+                    return pos
+                milestone_score = ts
+                milestone_success = 0
+
         step *= s.step_size_decay_smooth
-
-        milestone_improvement = prev_milestone - ts
-        prev_milestone = ts
-
-        if verbose and outer_step % 200 == 0:
-            print(f"  [smooth MC] step={outer_step:6d}  T={T:.5f}  "
-                  f"score={ts:.6f}  imp={milestone_improvement:.6f}")
-
-        if (milestone_improvement < s.improvement_threshold_smooth
-                and successes < s.min_successes_smooth):
-            break
 
     return pos
