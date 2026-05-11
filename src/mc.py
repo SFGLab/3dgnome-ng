@@ -91,7 +91,10 @@ def monte_carlo_heatmap(
     T = s.max_temp_heatmap
 
     # cudaMMC cpp:445: score_curr = calcScoreHeatmapActiveRegion()
-    total_score = score_heatmap_chunked(pos, expected, s.diagonal_size, same_chr_mask).item()
+    # score_heatmap_single counts ALL j≠idx (full row), giving delta = 2×upper-triangle change.
+    # Initialise with 2×upper-triangle so total_score stays consistent with per-bead deltas
+    # and never drifts negative (which would flip the Metropolis ratio sign → overflow).
+    total_score = 2.0 * score_heatmap_chunked(pos, expected, s.diagonal_size, same_chr_mask).item()
     # cudaMMC cpp:448: score_prev = score_curr
     score_prev = total_score
     # cudaMMC cpp:449: milestone_score = score_curr
@@ -133,10 +136,11 @@ def monte_carlo_heatmap(
             ok = _with_chance_ratio(s.temp_jump_scale_heatmap, s.temp_jump_coef_heatmap,
                                     score_curr, score_prev, T, rng)
 
-        # cudaMMC cpp:478-484: if ok: milestone_success++ else: pos -= disp; score_curr = score_prev
+        # cudaMMC cpp:478-484: if ok: score_prev=score_curr; milestone_success++ else: pos -= disp
         if ok:
             total_score = score_curr          # accept
-            milestone_success += 1            # cudaMMC cpp:480
+            score_prev = total_score          # cudaMMC cpp:480: score_prev = score_curr
+            milestone_success += 1
         else:
             pos[bead_idx] -= disp             # cudaMMC cpp:482: clusters[ind].pos -= displacement
             score_curr = score_prev           # cudaMMC cpp:483
@@ -148,6 +152,13 @@ def monte_carlo_heatmap(
 
         # cudaMMC cpp:488: if (i % Settings::MCstopConditionStepsHeatmap == 0) {
         if individual_steps % s.milestone_steps_heatmap == 0:
+            # Resync from scratch every milestone: score_heatmap_single uses only row k of the
+            # (asymmetric) expected matrix, so delta accumulates O(N) drift per move.
+            # A full recompute every 10k steps keeps the tracked score non-negative and avoids
+            # sign flips in the Metropolis ratio that cause math.exp overflow.
+            total_score = 2.0 * score_heatmap_chunked(pos, expected,
+                                                       s.diagonal_size, same_chr_mask).item()
+            score_prev = total_score
             ratio = total_score / max(milestone_score, 1e-30)
             if verbose:
                 print(f"  [heatmap MC] step={individual_steps:7d}  T={T:.5f}  "
@@ -162,7 +173,7 @@ def monte_carlo_heatmap(
             cold = T < s.max_temp_heatmap * 0.005
             if ((total_score > s.milestone_improvement_ratio * milestone_score
                     and milestone_success < s.min_successes_heatmap)
-                    or total_score < 1e-6
+                    or total_score < 2e-6   # 2× because total_score = 2×upper-triangle
                     or (cold and ratio > 0.9999)):
                 break
             # cudaMMC cpp:507-508: milestone_score = score_curr; milestone_success = 0

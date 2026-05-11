@@ -96,5 +96,13 @@ def heatmap_to_expected_distances(mat: torch.Tensor,
     Runs on whatever device `mat` lives on.
     Returns float16 on the same device (~half the memory of float32).
     """
-    safe = mat.float().clamp(min=min_freq)
-    return (scale * (safe ** power)).half()
+    # Only convert entries that have actual contact data (freq > 0).
+    # Zero-count pairs keep expected = 0 so they are excluded from scoring
+    # (score functions filter by exp > 1e-3).  Clamping zeros to min_freq and
+    # then converting would produce ~100,000 → Inf in float16, corrupting scoring.
+    mat_f = mat.float()
+    has_data = mat_f > 0
+    result = torch.zeros_like(mat_f)
+    if has_data.any():
+        result[has_data] = scale * (mat_f[has_data].clamp(min=min_freq) ** power)
+    return result.half()

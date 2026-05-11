@@ -263,12 +263,21 @@ class LooperSolver:
             print(f"\n[Heatmap MC] {chrom}  ({n} anchors, "
                   f"milestone_steps={s.milestone_steps_heatmap})")
 
-            pos = tree.anchor_positions_tensor(device=str(self.device))
-
             if chrom in self.heatmap_expected:
                 exp = self.heatmap_expected[chrom]
             else:
                 exp = self._genomic_expected_matrix(chrom, tree)
+
+            # Initial placement: uniform random in a sphere scaled to heatmap units.
+            # cudaMMC inherits good positions from hierarchical placement; we start
+            # from scratch, so beads must begin at the right scale (~median expected
+            # distance) otherwise step_size=0.75 can never reach the 100-500 unit targets.
+            valid_mask = (exp > 1e-3) & exp.isfinite()
+            R = exp[valid_mask].float().median().item() if valid_mask.any() else 100.0
+            dirs = torch.randn(n, 3, device=self.device)
+            dirs = dirs / dirs.norm(dim=1, keepdim=True).clamp(min=1e-8)
+            radii = torch.rand(n, device=self.device).pow(1.0 / 3.0) * R
+            pos = (dirs * radii.unsqueeze(1)).float()
 
             fixed = torch.zeros(n, dtype=torch.bool, device=self.device)
 
