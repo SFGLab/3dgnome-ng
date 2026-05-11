@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Tuple
 
 import torch
 
-from .data_loading import load_anchors, load_pet_clusters, load_singletons, mark_arcs
+from .data_loading import load_anchors, load_pet_clusters, mark_arcs
 from .data_structures import Anchor, Cluster, InteractionArc
 from .distances import (
     count_to_distance,
@@ -120,10 +120,9 @@ class LooperSolver:
 
         print("Loading PET clusters...")
         raw_arcs = load_pet_clusters(pet_clusters_bedpe, factor)
-
-        if singletons_bedpe and os.path.exists(singletons_bedpe):
-            print("Loading singletons...")
-            raw_arcs += load_singletons(singletons_bedpe, factor)
+        # Singletons are used ONLY for the heatmap expected-distance matrix (heatmap MC phase).
+        # cudaMMC never adds singletons to the arc-spring list — individual PET reads are too
+        # noisy to be structural constraints; only statistically significant clusters are.
 
         # drop arcs that reference chromosomes we're not modelling
         if flt is not None:
