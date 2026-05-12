@@ -307,7 +307,10 @@ class LooperSolver:
                         ]
 
                         n_arc = len(arc_exp)
-                        print(f"  IB {n_ibs_done}: {n_ib} anchors, {n_arc} arc pairs")
+                        _avg_chain_pre = (chain_lengths.mean().item()
+                                          if len(chain_lengths) > 0 else float("nan"))
+                        print(f"  IB {n_ibs_done}: {n_ib} anchors, {n_arc} arc pairs, "
+                              f"avg_chain={_avg_chain_pre:.3f}")
 
                         # cudaMMC reconstructClusterArcsDistances (cpp:2836):
                         #   for (int k = 0; k < steps; ++k) — multiple restarts, keep best.
@@ -320,6 +323,15 @@ class LooperSolver:
                         from .scores import score_arcs as _score_arcs
                         from .scores import score_structure_smooth as _score_smooth
 
+                        # cudaMMC LooperSolver.cpp:2764-2782:
+                        #   noise_size = sum(genomicLengthToDistance(d)) / active_size
+                        #   noise_size *= noiseCoefficientLevelAnchor (0.5, arc) or Subanchor (0.5, smooth)
+                        _avg_chain = chain_lengths.mean().item() if len(chain_lengths) > 0 else s.step_size_arcs
+                        _noise_coef_anchor = 0.5     # Settings.cpp:196 noiseCoefficientLevelAnchor
+                        _noise_coef_subanchor = 0.5  # Settings.cpp:197 noiseCoefficientLevelSubanchor
+                        _step_arcs = _avg_chain * _noise_coef_anchor
+                        _step_smooth = _avg_chain * _noise_coef_subanchor
+
                         best_pos_arcs: Optional[torch.Tensor] = None
                         best_score_arcs = float("inf")
 
@@ -330,7 +342,7 @@ class LooperSolver:
 
                             pos = monte_carlo_arcs(
                                 pos, arc_s, arc_e, arc_exp, chain_lengths, fixed,
-                                s, verbose=False,
+                                s, verbose=False, step_size=_step_arcs,
                             )
 
                             # cudaMMC cpp:2860: output(3, "score = %lf, best = %lf\n", ...)
@@ -356,7 +368,7 @@ class LooperSolver:
                             pos_out = monte_carlo_arcs_smooth(
                                 pos_in, arc_s, arc_e, arc_exp,
                                 chain_lengths, orientations, fixed,
-                                s, verbose=False,
+                                s, verbose=False, step_size=_step_smooth,
                             )
 
                             sc = _score_smooth(pos_out, chain_lengths,

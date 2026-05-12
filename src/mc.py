@@ -209,6 +209,7 @@ def monte_carlo_arcs(
     fixed_mask: torch.Tensor,
     settings: Settings,
     verbose: bool = True,
+    step_size: Optional[float] = None,
 ) -> torch.Tensor:
     """Incremental single-bead MC for arc spring energy (no chain springs)."""
     s = settings
@@ -218,7 +219,9 @@ def monte_carlo_arcs(
 
     # cudaMMC cpp:3062-3064: maxT = Settings::maxTemp; dt = Settings::dtTemp; T = maxT
     T = s.max_temp_arcs
-    step = s.step_size_arcs
+    # cudaMMC LooperSolver.cpp:2764-2782: step_size = avg(chain_lengths) * noiseCoefficientLevelAnchor
+    # Passed as noise_size from reconstructClusterArcsDistances; fall back to settings default.
+    step = step_size if step_size is not None else s.step_size_arcs
     # Safety cap: prevent infinite loops on large IBs with pure-repulsion score drift.
     # cudaMMC GPU avoids this via natural T=0 frozen-state convergence; Python needs a budget.
     # Safety cap: T decays to ~0 in ~ln(max_T/1e-4)/ln(1/dt) steps ≈ 200K for dt=0.99995.
@@ -331,6 +334,7 @@ def monte_carlo_arcs_smooth(
     fixed_mask: torch.Tensor,
     settings: Settings,
     verbose: bool = True,
+    step_size: Optional[float] = None,
 ) -> torch.Tensor:
     # cudaMMC cpp:3161: MonteCarloArcsSmooth(float step_size, bool use_subanchor_heatmap)
     # score = calcScoreStructureSmooth (chain+angular) + calcScoreOrientation — NO arc springs
@@ -342,7 +346,8 @@ def monte_carlo_arcs_smooth(
 
     # cudaMMC cpp:3166-3168: maxT = Settings::maxTempSmooth; dt = Settings::dtTempSmooth; T = maxT
     T = s.max_temp_smooth
-    step = s.step_size_smooth
+    # cudaMMC LooperSolver.cpp:2781: noise_size *= noiseCoefficientLevelSubanchor (0.5)
+    step = step_size if step_size is not None else s.step_size_smooth
     import math as _math
     _cooling_steps = int(_math.log(s.max_temp_smooth / 1e-4) / _math.log(1.0 / s.dt_temp_smooth)) + 1
     max_steps = _cooling_steps * 4

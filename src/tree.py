@@ -274,23 +274,26 @@ class ChromosomeTree:
                                          root_idx)
             root.children.append(seg_idx)
 
-            # cudaMMC LooperSolver.cpp:1082-1111: IBs come from all_gaps within segment.
-            # Each consecutive pair (all_gaps[i], all_gaps[i+1]) is one IB.
-            ib_starts = find_ibs(all_gaps, seg_s, seg_e)
-            ib_starts.append(seg_e)  # sentinel
+            # cudaMMC LooperSolver.cpp:1084-1111: IBs come from all_gaps within segment.
+            # cpp:1087-1089: prev_gap = (i==1 ? gaps[i-1] : gaps[i-1]+1)  "boundary gaps (both inclusive)"
+            # cpp:1106:      for k in [prev_gap, curr_gap]  ← inclusive on BOTH ends
+            ib_gaps = find_ibs(all_gaps, seg_s, seg_e)
+            # ib_gaps = [seg_s, (interior gaps...), seg_e-1]
 
-            for ib_i, ib_s in enumerate(ib_starts[:-1]):
-                ib_e = ib_starts[ib_i + 1]  # exclusive
+            for ib_i in range(1, len(ib_gaps)):
+                # Mirror cpp:1087-1089 exactly
+                prev_gap = ib_gaps[0] if ib_i == 1 else ib_gaps[ib_i - 1] + 1
+                curr_gap = ib_gaps[ib_i]
 
                 # cudaMMC LooperSolver.cpp:1098-1111: Cluster c(start_pos, end_pos); c.level=3
                 ib_idx = self._new_cluster(3,
-                                           anchors[ib_s].start,
-                                           anchors[ib_e - 1].end,
+                                           anchors[prev_gap].start,
+                                           anchors[curr_gap].end,
                                            seg_idx)
                 self.clusters[seg_idx].children.append(ib_idx)
 
-                # cudaMMC LooperSolver.cpp:1030-1036: level-4 anchors
-                for ai in range(ib_s, ib_e):
+                # cudaMMC LooperSolver.cpp:1106: for (int k = prev_gap; k <= curr_gap; ++k)
+                for ai in range(prev_gap, curr_gap + 1):  # inclusive
                     a = anchors[ai]
                     anc_idx = self._new_cluster(4, a.start, a.end, ib_idx)
                     anc_c = self.clusters[anc_idx]
