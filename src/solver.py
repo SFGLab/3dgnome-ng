@@ -333,12 +333,16 @@ class LooperSolver:
                                 s, verbose=False,
                             )
 
-                            # cudaMMC cpp:2864: if (score < best_score) save best
+                            # cudaMMC cpp:2860: output(3, "score = %lf, best = %lf\n", ...)
                             sc = _score_arcs(pos, arc_s, arc_e, arc_exp,
                                              s.k_spring, s.k_spring_repulsion).item()
-                            if sc < best_score_arcs:
+                            is_best = sc < best_score_arcs
+                            if is_best:
                                 best_score_arcs = sc
                                 best_pos_arcs = pos.clone()
+                            print(f"    arc   {_k+1}/{n_restarts_arcs}  "
+                                  f"score={sc:.4f}  best={best_score_arcs:.4f}"
+                                  + ("  *" if is_best else ""))
 
                         pos = best_pos_arcs
 
@@ -357,9 +361,13 @@ class LooperSolver:
 
                             sc = _score_smooth(pos_out, chain_lengths,
                                                s.k_chain, s.k_angular).item()
-                            if sc < best_score_smooth:
+                            is_best = sc < best_score_smooth
+                            if is_best:
                                 best_score_smooth = sc
                                 best_pos_smooth = pos_out.clone()
+                            print(f"    smooth {_k+1}/{n_restarts_smooth}  "
+                                  f"score={sc:.4f}  best={best_score_smooth:.4f}"
+                                  + ("  *" if is_best else ""))
 
                         tree.set_positions_from_tensor(best_pos_smooth, anchor_cidxs)
                         n_ibs_done += 1
