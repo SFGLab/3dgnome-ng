@@ -28,100 +28,88 @@ from .settings import Settings
 # cudaMMC source: LooperSolver.cpp:856-894  findGaps(string chr)
 #                 LooperSolver.cpp:900-962  findSplit(vector<int> gaps, int exp_size, string chr)
 #
-# cudaMMC separates two concerns that Python merges into find_gaps:
-#   findGaps  — arc-sweep: arcs_cnt++ when arc starts (other_end>i), -- when ends.
-#               Gap when arcs_cnt==0 (no arc spans this position).
-#               Returns ALL arc-free positions as gap candidates.
-#   findSplit — groups gap candidates into segments of ~segmentSize bp,
-#               or uses a predefined split file.
-#
-# Python find_gaps combines both into a single pass:
-#   - Primary split: gap_bp > segment_size (no arc check needed for large gaps)
-#   - Secondary: no arc bridges anchor[i-1] → anchor[i]  ≈ cudaMMC arcs_cnt==0
-# Result: Python can produce more segments (every zero-arc position becomes
-# a boundary) rather than grouping them into ~segmentSize chunks as findSplit does.
+# Two-step hierarchy matching cudaMMC:
+#   find_all_gaps (findGaps)  — arc-sweep: returns ALL anchor indices where no
+#                               arc spans that position (arcs_cnt == 0).
+#   find_segments (findSplit) — selects a coarse subset of those gaps as segment
+#                               boundaries (~segment_size bp apart).
+#   find_ibs                  — the REMAINING gap positions within each segment
+#                               become IB boundaries (one IB per consecutive pair
+#                               of gaps). This matches cudaMMC LooperSolver.cpp:
+#                               1082-1138 where IBs come directly from gaps[].
 
-def find_gaps(anchors: List[Anchor],
-              arcs: List[InteractionArc],
-              segment_size: int = 2_000_000) -> List[int]:
+def find_all_gaps(anchors: List[Anchor],
+                  arcs: List[InteractionArc]) -> List[int]:
     """
-    Return sorted list of anchor indices that start a new segment.
-    A new segment begins when:
-      - The gap between anchor[i-1].end and anchor[i].start exceeds segment_size, OR
-      - There are no arcs bridging anchor[i-1] and anchor[i].
-    Index 0 is always a segment start.
+    cudaMMC findGaps (LooperSolver.cpp:856-894): arc-sweep returning every anchor
+    index i where arcs_cnt == 0 (no arc is currently active at i).
 
-    cudaMMC equivalent: findGaps (arc-sweep) + findSplit (group by segment_size).
-    See module docstring for the key algorithmic difference.
+    Sweep order matches cudaMMC exactly:
+      1. Decrement arcs_cnt for arcs whose RIGHT endpoint is i (arc finishes).
+      2. If arcs_cnt == 0, record i as a gap.
+      3. Increment arcs_cnt for arcs whose LEFT endpoint is i (arc starts).
+
+    This means arc (lo, hi) is "active" for positions lo .. hi-1 (lo inclusive,
+    hi exclusive).  Position hi is checked AFTER the arc expires, so touching
+    non-overlapping arcs (A ends at X, B starts at X) create a gap at X.
     """
     N = len(anchors)
     if N == 0:
         return []
 
-    # build set of all pairs connected by arcs
-    # cudaMMC LooperSolver.cpp:864-888: uses arcs_cnt sweep counter instead
-    arc_pairs = set()
+    # Precompute arc start/end lists indexed by anchor position
+    # cudaMMC LooperSolver.cpp:864-888: arcs_cnt sweep
+    ends_at: List[int] = [0] * N    # count of arcs whose hi == i
+    starts_at: List[int] = [0] * N  # count of arcs whose lo == i
     for a in arcs:
-        arc_pairs.add((min(a.start, a.end), max(a.start, a.end)))
+        lo, hi = min(a.start, a.end), max(a.start, a.end)
+        if 0 <= lo < N and 0 <= hi < N and lo != hi:
+            starts_at[lo] += 1
+            ends_at[hi] += 1
 
-    gaps = [0]
-    for i in range(1, N):
-        gap_bp = anchors[i].start - anchors[i - 1].end
-        # cudaMMC findSplit groups by segmentSize — Python uses gap_bp as primary cut
-        if gap_bp > segment_size:
+    gaps: List[int] = []
+    arcs_cnt = 0
+    for i in range(N):
+        arcs_cnt -= ends_at[i]      # arcs finishing at i expire first
+        if arcs_cnt == 0:           # cudaMMC cpp:881: if (arcs_cnt == 0) gaps.push_back(i)
             gaps.append(i)
-            continue
-        # cudaMMC LooperSolver.cpp:881: if (arcs_cnt == 0) gaps.push_back(i)
-        # arcs_cnt==0 ↔ no arc spans position i (none starts before i and ends at/after i)
-        bridged = any(p[0] < i <= p[1] for p in arc_pairs)
-        if not bridged:
-            gaps.append(i)
-
+        arcs_cnt += starts_at[i]    # then new arcs begin
     return gaps
 
 
-# cudaMMC source: LooperSolver.cpp:1082-1138  (IB creation in createTreeChromosome)
-#
-# In cudaMMC, IBs are derived directly from the gaps vector:
-#   each consecutive pair (gaps[i-1], gaps[i]) forms one IB.
-#   The same arcs_cnt==0 positions that form segment boundaries also form IB boundaries.
-#
-# Python find_ibs instead uses arc endpoint positions within the segment
-# to define IB boundaries — a different, arc-geometry-based approach.
-
-def find_ibs(anchors: List[Anchor],
-             arcs: List[InteractionArc],
-             seg_start: int, seg_end: int) -> List[int]:
+def find_segments(all_gaps: List[int], anchors: List[Anchor],
+                  segment_size: int = 2_000_000) -> List[int]:
     """
-    Within a segment [seg_start, seg_end) return IB boundary anchor indices.
-    Uses the same arc-sweep as find_gaps: position i is an IB boundary only if
-    NO arc spans it (i.e., no arc (a,b) with a < i <= b within the segment).
-    Index seg_start is always a boundary.
-
-    cudaMMC equivalent: LooperSolver.cpp:1082-1138 — IB boundaries come from
-    the same findGaps arc-sweep applied within each segment.
-
-    This groups all arc-connected anchors into the same IB, which is essential
-    for the per-IB arc MC to see the arc springs between its anchors.
+    cudaMMC findSplit: select segment boundaries from all_gaps.
+    A new segment starts at a gap when:
+      - The genomic gap from the previous anchor to this one exceeds segment_size, OR
+      - The genomic distance from the last segment boundary to this gap ≥ segment_size.
+    Index 0 (= all_gaps[0]) is always a segment boundary.
     """
-    if seg_end <= seg_start:
-        return [seg_start]
+    if not all_gaps:
+        return [0]
 
-    # Only consider arcs whose both endpoints are within this segment
-    arc_pairs = {
-        (min(a.start, a.end), max(a.start, a.end))
-        for a in arcs
-        if seg_start <= min(a.start, a.end) and max(a.start, a.end) < seg_end
-    }
-
-    boundaries = [seg_start]
-    for i in range(seg_start + 1, seg_end):
-        # cudaMMC: position i is a gap (IB boundary) when arcs_cnt == 0
-        bridged = any(p[0] < i <= p[1] for p in arc_pairs)
-        if not bridged:
-            boundaries.append(i)
-
+    boundaries = [all_gaps[0]]
+    for g in all_gaps[1:]:
+        # Always split on a large physical gap between consecutive anchors
+        gap_bp = anchors[g].start - anchors[g - 1].end
+        if gap_bp > segment_size:
+            boundaries.append(g)
+            continue
+        # cudaMMC findSplit: split once the accumulated genomic span hits segment_size
+        last_b = boundaries[-1]
+        if anchors[g].mid - anchors[last_b].mid >= segment_size:
+            boundaries.append(g)
     return boundaries
+
+
+def find_ibs(all_gaps: List[int], seg_start: int, seg_end: int) -> List[int]:
+    """
+    cudaMMC IB creation (LooperSolver.cpp:1082-1138): IB boundaries within
+    [seg_start, seg_end) are exactly the gaps from all_gaps that fall in that range.
+    seg_start is always returned as the first boundary.
+    """
+    return [g for g in all_gaps if seg_start <= g < seg_end]
 
 
 # ── Catmull-Rom spline interpolation ─────────────────────────────────────────
@@ -263,8 +251,10 @@ class ChromosomeTree:
         root_idx = self._new_cluster(1, anchors[0].start, anchors[-1].end)
         root = self.clusters[root_idx]
 
-        # cudaMMC LooperSolver.cpp:1054-1059: findGaps + findSplit
-        seg_starts = find_gaps(anchors, arcs, ss.segment_size)
+        # cudaMMC LooperSolver.cpp:856-962: findGaps → all arc-free positions,
+        # findSplit → coarse segment boundaries from those positions.
+        all_gaps = find_all_gaps(anchors, arcs)
+        seg_starts = find_segments(all_gaps, anchors, ss.segment_size)
         seg_starts.append(N)  # sentinel (cudaMMC: vector_insert_unique(gaps, clusters.size()-1))
 
         for s_i, seg_s in enumerate(seg_starts[:-1]):
@@ -277,8 +267,9 @@ class ChromosomeTree:
                                          root_idx)
             root.children.append(seg_idx)
 
-            # cudaMMC LooperSolver.cpp:1082-1111: create IB clusters (level curr_level = 3)
-            ib_starts = find_ibs(anchors, arcs, seg_s, seg_e)
+            # cudaMMC LooperSolver.cpp:1082-1111: IBs come from all_gaps within segment.
+            # Each consecutive pair (all_gaps[i], all_gaps[i+1]) is one IB.
+            ib_starts = find_ibs(all_gaps, seg_s, seg_e)
             ib_starts.append(seg_e)  # sentinel
 
             for ib_i, ib_s in enumerate(ib_starts[:-1]):

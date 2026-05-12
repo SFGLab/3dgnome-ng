@@ -219,6 +219,13 @@ def monte_carlo_arcs(
     # cudaMMC cpp:3062-3064: maxT = Settings::maxTemp; dt = Settings::dtTemp; T = maxT
     T = s.max_temp_arcs
     step = s.step_size_arcs
+    # Safety cap: prevent infinite loops on large IBs with pure-repulsion score drift.
+    # cudaMMC GPU avoids this via natural T=0 frozen-state convergence; Python needs a budget.
+    # Safety cap: T decays to ~0 in ~ln(max_T/1e-4)/ln(1/dt) steps ≈ 200K for dt=0.99995.
+    # After T=0, allow up to 2× that budget for post-convergence drift to settle.
+    import math as _math
+    _cooling_steps = int(_math.log(s.max_temp_arcs / 1e-4) / _math.log(1.0 / s.dt_temp_arcs)) + 1
+    max_steps = _cooling_steps * 4
 
     # cudaMMC cpp:3086: score_curr = calcScoreDistancesActiveRegion()  ← arc springs ONLY
     total_score = score_arcs(pos, arc_starts, arc_ends, arc_expected,
@@ -299,7 +306,8 @@ def monte_carlo_arcs(
                     and milestone_success < s.min_successes_arcs)
                     or total_score < 1e-5
                     or (ratio > 0.9999 and total_score <= milestone_score)
-                    or (cold and ratio > 0.999)):  # frozen: < 0.1% improvement per milestone
+                    or (cold and ratio > 0.999)  # frozen: < 0.1% improvement per milestone
+                    or individual_steps >= max_steps):  # safety cap for large IBs
                 return pos
             # cudaMMC cpp:3149-3150: milestone_score = score_curr; milestone_success = 0
             milestone_score = total_score
@@ -335,6 +343,9 @@ def monte_carlo_arcs_smooth(
     # cudaMMC cpp:3166-3168: maxT = Settings::maxTempSmooth; dt = Settings::dtTempSmooth; T = maxT
     T = s.max_temp_smooth
     step = s.step_size_smooth
+    import math as _math
+    _cooling_steps = int(_math.log(s.max_temp_smooth / 1e-4) / _math.log(1.0 / s.dt_temp_smooth)) + 1
+    max_steps = _cooling_steps * 4
 
     # cudaMMC cpp:3243: curr_score_structure = calcScoreStructureSmooth(true, true)
     # cudaMMC cpp:3244-3245: curr_score_orientation = calcScoreOrientation(anchor_orientation)
@@ -424,7 +435,8 @@ def monte_carlo_arcs_smooth(
                     and milestone_success < s.min_successes_smooth)
                     or ts < 1e-6
                     or (ratio > 0.9999 and ts <= milestone_score)
-                    or (cold and ratio > 0.999)):  # frozen: < 0.1% improvement per milestone
+                    or (cold and ratio > 0.999)  # frozen: < 0.1% improvement per milestone
+                    or individual_steps >= max_steps):  # safety cap for large IBs
                 return pos
             # cudaMMC cpp:3378-3379: milestone_score = score_curr; milestone_success = 0
             milestone_score = ts
