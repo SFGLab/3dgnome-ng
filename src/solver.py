@@ -360,7 +360,7 @@ class LooperSolver:
                             )
 
                             sc = _score_smooth(pos_out, chain_lengths,
-                                               s.k_chain, s.k_angular).item()
+                                               s.k_chain, s.angular_k).item()
                             is_best = sc < best_score_smooth
                             if is_best:
                                 best_score_smooth = sc
