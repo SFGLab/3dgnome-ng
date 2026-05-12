@@ -348,10 +348,9 @@ def monte_carlo_arcs_smooth(
     T = s.max_temp_smooth
     # cudaMMC LooperSolver.cpp:2781: noise_size *= noiseCoefficientLevelSubanchor (0.5)
     step = step_size if step_size is not None else s.step_size_smooth
-    # cudaMMC has no max_steps cap; we keep one as a Python safety net only.
     import math as _math
     _cooling_steps = int(_math.log(s.max_temp_smooth / 1e-4) / _math.log(1.0 / s.dt_temp_smooth)) + 1
-    max_steps = _cooling_steps * 20  # generous safety cap (20× cooling time)
+    max_steps = _cooling_steps * 4  # safety cap: 4× full cooling cycle
 
     # cudaMMC cpp:3243: curr_score_structure = calcScoreStructureSmooth(true, true)
     # cudaMMC cpp:3244-3245: curr_score_orientation = calcScoreOrientation(anchor_orientation)
