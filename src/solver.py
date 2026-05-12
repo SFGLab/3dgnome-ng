@@ -130,16 +130,13 @@ class LooperSolver:
     def _arc_tensors_ib(self, chrom: str, anchor_cidxs: List[int]
                         ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        Build (arc_starts, arc_ends, arc_expected) for all pairs within one IB.
+        Build (arc_starts, arc_ends, arc_expected) for ARC SPRING PAIRS ONLY within one IB.
 
-        Non-arc pairs: expected = -1 (repulsion 1/d).
-        Arc pairs: expected = count_to_distance(arc.score) > 0.
+        cudaMMC arc MC uses calcScoreDistancesActiveRegion (LooperSolver.cpp:3086),
+        which scores arc spring pairs only — NOT all-pair repulsion.
+        Repulsion was in calcAnchorExpectedDistancesHeatmap (heatmap phase), not arcs phase.
 
-        Mirrors cudaMMC calcAnchorExpectedDistancesHeatmap (LooperSolver.cpp:2629):
-          initialise all pairs to -1, then overwrite arc pairs with positive dist.
-
-        Returns upper-triangle pairs (i < j); score_arcs_single checks both
-        arc_starts==idx and arc_ends==idx, so upper-triangle is sufficient.
+        Local indices (0..n-1) into the anchor_cidxs list.
         """
         n = len(anchor_cidxs)
         if n < 2:
@@ -150,30 +147,32 @@ class LooperSolver:
         s = self.settings
         tree = self.trees[chrom]
 
-        # cudaMMC LooperSolver.cpp:2629: calcAnchorExpectedDistancesHeatmap
-        #   all pairs → -1 (repulsion); arc pairs → positive target distance
-        exp_matrix = torch.full((n, n), -1.0, dtype=torch.float32)
-        exp_matrix.fill_diagonal_(0.0)
-
+        arc_s_list, arc_e_list, arc_exp_list = [], [], []
         for arc in self.arcs_by_chr.get(chrom, []):
             ai = tree.anchors_idx[arc.start] if arc.start < len(tree.anchors_idx) else -1
             bi = tree.anchors_idx[arc.end]   if arc.end   < len(tree.anchors_idx) else -1
             li = idx_map.get(ai, -1)
             lj = idx_map.get(bi, -1)
-            if li < 0 or lj < 0:
+            if li < 0 or lj < 0 or li == lj:
                 continue
             dist = count_to_distance(
                 arc.score,
                 s.count_dist_a, s.count_dist_scale,
                 s.count_dist_shift, s.count_dist_base_level,
             )
-            exp_matrix[li, lj] = dist
-            exp_matrix[lj, li] = dist
+            # Store as (min, max) so score_arcs_single finds both orderings
+            lo, hi = (li, lj) if li < lj else (lj, li)
+            arc_s_list.append(lo)
+            arc_e_list.append(hi)
+            arc_exp_list.append(dist)
 
-        rows, cols = torch.triu_indices(n, n, offset=1)
-        starts = rows.to(self.device)
-        ends   = cols.to(self.device)
-        exp    = exp_matrix[rows, cols].to(self.device)
+        if not arc_s_list:
+            empty = torch.zeros(0, dtype=torch.long, device=self.device)
+            return empty, empty, torch.zeros(0, dtype=torch.float32, device=self.device)
+
+        starts = torch.tensor(arc_s_list, dtype=torch.long, device=self.device)
+        ends   = torch.tensor(arc_e_list, dtype=torch.long, device=self.device)
+        exp    = torch.tensor(arc_exp_list, dtype=torch.float32, device=self.device)
         return starts, ends, exp
 
     def _chain_lengths_ib(self, chrom: str, anchor_cidxs: List[int]
@@ -294,10 +293,16 @@ class LooperSolver:
                         if n_ib < 2:
                             continue  # single anchor — no internal MC needed
 
-                        # Use actual heatmap-MC positions so arc springs start near targets.
-                        # cudaMMC LooperSolver.cpp:2624-2625 copies IB centroid; we keep
-                        # per-anchor positions from the heatmap phase instead (better init).
-                        pos = tree.positions_tensor(anchor_cidxs, device=str(self.device))
+                        # cudaMMC LooperSolver.cpp:2624-2625:
+                        #   clusters[active_region[j]].pos = clusters[ib].pos
+                        # All anchors start at IB centroid. With arc-springs-only MC (no
+                        # repulsion), non-arc beads stay near the centroid while arc pairs
+                        # converge to target distances. Smooth MC then chains them together.
+                        ib_pos = torch.tensor(
+                            [ib_c.x, ib_c.y, ib_c.z],
+                            dtype=torch.float32, device=self.device,
+                        )
+                        pos = ib_pos.unsqueeze(0).expand(n_ib, 3).clone()
                         pos = pos + self.settings.noise_size_small * torch.randn_like(pos)
 
                         fixed = torch.zeros(n_ib, dtype=torch.bool, device=self.device)
@@ -311,12 +316,10 @@ class LooperSolver:
                             tree.clusters[ci].orientation for ci in anchor_cidxs
                         ]
 
-                        n_arc = int((arc_exp > 0).sum().item())
-                        n_rep = int((arc_exp < 0).sum().item())
-                        print(f"  IB {n_ibs_done}: {n_ib} anchors, "
-                              f"{n_arc} arc pairs, {n_rep} repulsion pairs")
+                        n_arc = len(arc_exp)
+                        print(f"  IB {n_ibs_done}: {n_ib} anchors, {n_arc} arc pairs")
 
-                        # Phase 2: arc MC — arc springs + repulsion for all pairs
+                        # Phase 2: arc MC — arc springs only (cudaMMC calcScoreDistancesActiveRegion)
                         pos = monte_carlo_arcs(
                             pos, arc_s, arc_e, arc_exp, chain_lengths, fixed,
                             self.settings, verbose=False,
