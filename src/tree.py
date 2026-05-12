@@ -44,14 +44,15 @@ def find_all_gaps(anchors: List[Anchor],
     cudaMMC findGaps (LooperSolver.cpp:856-894): arc-sweep returning every anchor
     index i where arcs_cnt == 0 (no arc is currently active at i).
 
-    Sweep order matches cudaMMC exactly:
-      1. Decrement arcs_cnt for arcs whose RIGHT endpoint is i (arc finishes).
-      2. If arcs_cnt == 0, record i as a gap.
-      3. Increment arcs_cnt for arcs whose LEFT endpoint is i (arc starts).
+    Sweep order matches cudaMMC exactly (LooperSolver.cpp:866-888):
+      For each position i:
+        1. Process ALL arcs attached to i: if other_end > i → arcs_cnt++,
+           if other_end < i → arcs_cnt--.
+        2. After ALL arcs at i are processed, if arcs_cnt == 0, record gap.
+      Position 0 and N-1 are always gaps (cpp:863, cpp:891).
 
-    This means arc (lo, hi) is "active" for positions lo .. hi-1 (lo inclusive,
-    hi exclusive).  Position hi is checked AFTER the arc expires, so touching
-    non-overlapping arcs (A ends at X, B starts at X) create a gap at X.
+    Consequence: touching non-overlapping arcs (A ends at X, B starts at X)
+    do NOT create a gap at X — the decrement and increment cancel before the check.
     """
     N = len(anchors)
     if N == 0:
@@ -67,13 +68,19 @@ def find_all_gaps(anchors: List[Anchor],
             starts_at[lo] += 1
             ends_at[hi] += 1
 
-    gaps: List[int] = []
+    # cudaMMC LooperSolver.cpp:863: gaps.push_back(start) — first position always a gap
+    gaps: List[int] = [0]
     arcs_cnt = 0
     for i in range(N):
-        arcs_cnt -= ends_at[i]      # arcs finishing at i expire first
-        if arcs_cnt == 0:           # cudaMMC cpp:881: if (arcs_cnt == 0) gaps.push_back(i)
+        # cudaMMC cpp:866-879: process ALL arcs at position i (both ending and starting)
+        # THEN check gap at cpp:881. Both increments and decrements happen before the check,
+        # so touching non-overlapping arcs (A ends at X, B starts at X) do NOT create a gap.
+        arcs_cnt += starts_at[i] - ends_at[i]
+        if arcs_cnt == 0 and i > 0:   # i==0 already added above
             gaps.append(i)
-        arcs_cnt += starts_at[i]    # then new arcs begin
+    # cudaMMC cpp:891: vector_insert_unique(gaps, clusters.size()-1) — last pos always a gap
+    if N - 1 not in gaps:
+        gaps.append(N - 1)
     return gaps
 
 

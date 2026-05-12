@@ -261,14 +261,11 @@ class LooperSolver:
         """
         Run per-IB arc MC + smooth MC for each chromosome.
 
-        Mirrors cudaMMC reconstructClustersArcsDistances (LooperSolver.cpp:2579-2702):
-          - For each IB: initialise all anchors to the IB's position + tiny noise
-          - Run arc MC with arc springs for connected pairs AND repulsion (1/d)
-            for all non-arc pairs within the IB
-          - Run smooth MC (chain + angular) on the same IB anchors
-        This per-IB isolation with all-pair repulsion is what prevents the
-        global collapse into a single ball seen when running on all N anchors
-        at once with no repulsion.
+        Mirrors cudaMMC reconstructClustersArcsDistances (LooperSolver.cpp:2579-2702)
+        and reconstructClusterArcsDistances (cpp:2735-2875):
+          - All anchors in IB reinitialised to IB centroid + small noise each attempt.
+          - MC run simulationStepsLevelAnchor (default 5) times; best score kept.
+            (cudaMMC cpp:2836: for (int k = 0; k < steps; ++k) { ... best_score update })
         """
         for chrom, tree in self.trees.items():
             n_total = len(tree.anchors_idx)
@@ -293,23 +290,16 @@ class LooperSolver:
                         if n_ib < 2:
                             continue  # single anchor — no internal MC needed
 
-                        # cudaMMC LooperSolver.cpp:2624-2625:
+                        # IB centroid: mean of anchor positions after heatmap MC.
+                        # cudaMMC LooperSolver.cpp:2625:
                         #   clusters[active_region[j]].pos = clusters[ib].pos
-                        # All anchors start at IB centroid. With arc-springs-only MC (no
-                        # repulsion), non-arc beads stay near the centroid while arc pairs
-                        # converge to target distances. Smooth MC then chains them together.
                         ib_pos = torch.tensor(
                             [ib_c.x, ib_c.y, ib_c.z],
                             dtype=torch.float32, device=self.device,
                         )
-                        pos = ib_pos.unsqueeze(0).expand(n_ib, 3).clone()
-                        pos = pos + self.settings.noise_size_small * torch.randn_like(pos)
 
                         fixed = torch.zeros(n_ib, dtype=torch.bool, device=self.device)
 
-                        # cudaMMC LooperSolver.cpp:2629: calcAnchorExpectedDistancesHeatmap
-                        #   builds all-pair matrix: -1 (repulsion) for non-arc pairs,
-                        #   positive target distance for arc pairs
                         arc_s, arc_e, arc_exp = self._arc_tensors_ib(chrom, anchor_cidxs)
                         chain_lengths = self._chain_lengths_ib(chrom, anchor_cidxs)
                         orientations = [
@@ -319,21 +309,59 @@ class LooperSolver:
                         n_arc = len(arc_exp)
                         print(f"  IB {n_ibs_done}: {n_ib} anchors, {n_arc} arc pairs")
 
-                        # Phase 2: arc MC — arc springs only (cudaMMC calcScoreDistancesActiveRegion)
-                        pos = monte_carlo_arcs(
-                            pos, arc_s, arc_e, arc_exp, chain_lengths, fixed,
-                            self.settings, verbose=False,
-                        )
+                        # cudaMMC reconstructClusterArcsDistances (cpp:2836):
+                        #   for (int k = 0; k < steps; ++k) — multiple restarts, keep best.
+                        #   steps = simulationStepsLevelAnchor (default 5) for arc phase,
+                        #          simulationStepsLevelSubanchor (default 5) for smooth phase.
+                        s = self.settings
+                        n_restarts_arcs = s.simulation_steps_level_anchor
+                        n_restarts_smooth = s.simulation_steps_level_subanchor
 
-                        # Phase 3: smooth MC — chain + angular (arc tensors passed
-                        # for orientation scoring only; chain springs dominate)
-                        pos = monte_carlo_arcs_smooth(
-                            pos, arc_s, arc_e, arc_exp,
-                            chain_lengths, orientations, fixed,
-                            self.settings, verbose=False,
-                        )
+                        from .scores import score_arcs as _score_arcs
+                        from .scores import score_structure_smooth as _score_smooth
 
-                        tree.set_positions_from_tensor(pos, anchor_cidxs)
+                        best_pos_arcs: Optional[torch.Tensor] = None
+                        best_score_arcs = float("inf")
+
+                        for _k in range(n_restarts_arcs):
+                            # cudaMMC cpp:2844-2848: reset to initial_structure + small noise
+                            pos = ib_pos.unsqueeze(0).expand(n_ib, 3).clone()
+                            pos = pos + s.noise_size_small * torch.randn_like(pos)
+
+                            pos = monte_carlo_arcs(
+                                pos, arc_s, arc_e, arc_exp, chain_lengths, fixed,
+                                s, verbose=False,
+                            )
+
+                            # cudaMMC cpp:2864: if (score < best_score) save best
+                            sc = _score_arcs(pos, arc_s, arc_e, arc_exp,
+                                             s.k_spring, s.k_spring_repulsion).item()
+                            if sc < best_score_arcs:
+                                best_score_arcs = sc
+                                best_pos_arcs = pos.clone()
+
+                        pos = best_pos_arcs
+
+                        best_pos_smooth: Optional[torch.Tensor] = None
+                        best_score_smooth = float("inf")
+
+                        for _k in range(n_restarts_smooth):
+                            # cudaMMC cpp:2844-2848: reset to initial_structure + noise
+                            pos_in = pos + s.noise_size_small * torch.randn_like(pos)
+
+                            pos_out = monte_carlo_arcs_smooth(
+                                pos_in, arc_s, arc_e, arc_exp,
+                                chain_lengths, orientations, fixed,
+                                s, verbose=False,
+                            )
+
+                            sc = _score_smooth(pos_out, chain_lengths,
+                                               s.k_chain, s.k_angular).item()
+                            if sc < best_score_smooth:
+                                best_score_smooth = sc
+                                best_pos_smooth = pos_out.clone()
+
+                        tree.set_positions_from_tensor(best_pos_smooth, anchor_cidxs)
                         n_ibs_done += 1
 
             tree._propagate_positions_up()

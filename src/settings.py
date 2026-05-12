@@ -87,6 +87,12 @@ class Settings:
     min_successes_smooth: int = 5     # cudaMMC MCstopConditionMinSuccessesSmooth=5
     milestone_steps_smooth: int = 10000  # cudaMMC MCstopConditionStepsSmooth=10000
 
+    # ── Multi-restart (cudaMMC reconstructClusterArcsDistances cpp:2824-2869) ──
+    # Run MC multiple times per IB, keep best score.
+    # cudaMMC Settings.cpp:181-182: simulationStepsLevelAnchor=5, Subanchor=5
+    simulation_steps_level_anchor: int = 5    # arc phase restarts per IB
+    simulation_steps_level_subanchor: int = 5 # smooth phase restarts per IB
+
     # ── Misc ──────────────────────────────────────────────────────────────────
     use_2d: bool = False              # confine moves to XY plane (debug)
     device: str = "cuda"             # "cuda" or "cpu"
