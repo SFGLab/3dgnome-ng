@@ -348,9 +348,10 @@ def monte_carlo_arcs_smooth(
     T = s.max_temp_smooth
     # cudaMMC LooperSolver.cpp:2781: noise_size *= noiseCoefficientLevelSubanchor (0.5)
     step = step_size if step_size is not None else s.step_size_smooth
+    # cudaMMC has no max_steps cap; we keep one as a Python safety net only.
     import math as _math
     _cooling_steps = int(_math.log(s.max_temp_smooth / 1e-4) / _math.log(1.0 / s.dt_temp_smooth)) + 1
-    max_steps = _cooling_steps * 4
+    max_steps = _cooling_steps * 20  # generous safety cap (20× cooling time)
 
     # cudaMMC cpp:3243: curr_score_structure = calcScoreStructureSmooth(true, true)
     # cudaMMC cpp:3244-3245: curr_score_orientation = calcScoreOrientation(anchor_orientation)
@@ -431,22 +432,19 @@ def monte_carlo_arcs_smooth(
                 print(f"  [smooth MC] step={individual_steps:7d}  T={T:.5f}  "
                       f"score={ts:.6f}  ratio={ratio:.5f}  "
                       f"ms_succ={milestone_success}")
-            # cudaMMC cpp:3372-3375:
+            # cudaMMC cpp:3372-3376:
             #   if ((score_curr > MCstopConditionImprovementSmooth * milestone_score &&
             #        milestone_success < MCstopConditionMinSuccessesSmooth) ||
             #       score_curr < 1e-6)
-            cold = T < s.max_temp_smooth * 1e-4
+            # NOTE: cudaMMC smooth MC has NO ratio>0.9999 stop and NO step decay.
             if ((ts > s.milestone_improvement_ratio * milestone_score
                     and milestone_success < s.min_successes_smooth)
                     or ts < 1e-6
-                    or (ratio > 0.9999 and ts <= milestone_score)
-                    or (cold and ratio > 0.999)  # frozen: < 0.1% improvement per milestone
-                    or individual_steps >= max_steps):  # safety cap for large IBs
+                    or individual_steps >= max_steps):  # safety cap only
                 return pos
             # cudaMMC cpp:3378-3379: milestone_score = score_curr; milestone_success = 0
             milestone_score = ts
             milestone_success = 0
-
-        step *= s.step_size_decay_smooth
+        # cudaMMC: NO step decay in smooth MC (step_size is constant)
 
     return pos
