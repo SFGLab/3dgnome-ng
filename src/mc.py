@@ -692,17 +692,6 @@ def monte_carlo_arcs_smooth(
                       f"i={i} elapsed={time.time()-_t_start:.1f}s "
                       f"score={score_curr:.4f}")
             break
-                  f"(struct={curr_struct:.2f}, orient={curr_orient:.2f})")
-
-        # Python-only safety cap, see monte_carlo_arcs.
-        if ((s.mc_max_iters_smooth > 0 and i >= s.mc_max_iters_smooth)
-                or (s.mc_max_seconds_smooth > 0.0
-                    and time.time() - _t_start > s.mc_max_seconds_smooth)):
-            if verbose:
-                print(f"  [smooth MC] stopping early (limit reached) "
-                      f"i={i} elapsed={time.time()-_t_start:.1f}s "
-                      f"score={score_curr:.4f}")
-            return pos
 
         # cpp:3361-3380: milestone check
         if i % s.mc_stop_steps_smooth == 0:
