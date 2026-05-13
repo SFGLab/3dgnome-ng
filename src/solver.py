@@ -14,6 +14,7 @@ All four reconstruction phases are run level by level, top → bottom.
 import os
 from typing import Dict, List, Optional, Tuple
 
+import time
 import torch
 
 from .data_loading import load_anchors, load_pet_clusters, load_segments_split, mark_arcs
@@ -578,7 +579,10 @@ class LooperSolver:
 
         best_pos_arcs: Optional[torch.Tensor] = None
         best_score_arcs = float("inf")
+        _t_arc0 = time.time()
         for _k in range(n_restarts_arcs):
+            print(f"    [arc restart {_k+1}/{n_restarts_arcs}] starting "
+                  f"(stop_steps={s.mc_stop_steps_arcs}, T0={s.max_temp_arcs})")
             # cpp:2844-2848: pos = initial_structure[i] + random_vector(
             #     smooth ? noise_size : noise_size_small, use2D)
             # Arc phase uses the LITERAL 0.05 noise_size_small (cpp:2765).
@@ -588,7 +592,7 @@ class LooperSolver:
             )
             pos = monte_carlo_arcs(
                 pos, expected, fixed_arcs, s,
-                step_size=noise_size_arcs, verbose=False,
+                step_size=noise_size_arcs, verbose=True,
             )
             # cpp:2860, 2864: keep best.
             sc = score_full_arcs(
@@ -603,7 +607,8 @@ class LooperSolver:
                 best_pos_arcs = pos.clone()
             print(f"    arc   {_k+1}/{n_restarts_arcs}  "
                   f"score={sc:.4f}  best={best_score_arcs:.4f}"
-                  + ("  *" if is_best else ""))
+                  + ("  *" if is_best else "")
+                  + f"  ({time.time()-_t_arc0:.1f}s elapsed)")
 
         # Write best anchor positions back into the tree BEFORE densify
         # so that densify_active_region reads them when interpolating
@@ -651,7 +656,11 @@ class LooperSolver:
         best_pos_smooth: Optional[torch.Tensor] = None
         best_score_smooth = float("inf")
         initial_smooth = pos_dense.clone()
+        _t_sm0 = time.time()
         for _k in range(n_restarts_smooth):
+            print(f"    [smooth restart {_k+1}/{n_restarts_smooth}] starting "
+                  f"(N={n_dense}, stop_steps={s.mc_stop_steps_smooth}, "
+                  f"T0={s.max_temp_smooth})")
             # cpp:2844-2849: re-noise the structure.  cpp:2846:
             #   if (!smooth || !clusters[active_region[i]].is_fixed)
             # i.e. for smooth phase, ANCHOR beads (is_fixed=True after densify)
@@ -669,7 +678,7 @@ class LooperSolver:
                 chain_lengths_smooth, orientations, fixed_smooth, s,
                 step_size=noise_size_smooth,
                 is_anchor_mask=is_anchor_mask,
-                verbose=False,
+                verbose=True,
             )
 
             sc = score_full_smooth(
@@ -686,7 +695,8 @@ class LooperSolver:
                 best_pos_smooth = pos_out.clone()
             print(f"    smooth {_k+1}/{n_restarts_smooth}  "
                   f"score={sc:.4f}  best={best_score_smooth:.4f}"
-                  + ("  *" if is_best else ""))
+                  + ("  *" if is_best else "")
+                  + f"  ({time.time()-_t_sm0:.1f}s elapsed)")
 
         assert best_pos_smooth is not None
         tree.set_positions_from_tensor(best_pos_smooth, dense_active)

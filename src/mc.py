@@ -29,6 +29,7 @@ Random-displacement helper uses uniform ``(2u-1)*step`` per axis
 
 import math
 import random
+import time
 from typing import List, Optional
 
 import torch
@@ -145,6 +146,8 @@ def monte_carlo_heatmap(
         print(f"  [heatmap MC] N={N}  T={T:.1f}  step={step:.4f}  "
               f"score={score_curr:.6f}")
 
+    _t_start = time.time()
+    _t_last = _t_start
     # cpp:456: while (true)
     while True:
         p = rng.randrange(N)                                 # cpp:459
@@ -175,6 +178,15 @@ def monte_carlo_heatmap(
 
         T *= s.dt_temp_heatmap                               # cpp:486
         i += 1                                               # cpp:514
+
+        # ── heartbeat: print progress every ~5 s wall time even if the
+        # milestone interval is far off.  Helps tell a slow loop from a
+        # truly stuck one; does NOT alter the algorithm.
+        if verbose and (time.time() - _t_last) > 5.0:
+            _t_last = time.time()
+            its = i / max(_t_last - _t_start, 1e-9)
+            print(f"  [heatmap MC] ..i={i:7d}  T={T:.5f}  "
+                  f"score={score_curr:.6f}  {its:.0f} it/s")
 
         # cpp:488-509: milestone check
         if i % s.mc_stop_steps_heatmap == 0:
@@ -265,6 +277,8 @@ def monte_carlo_arcs(
         print(f"  [arcs MC] N={N}  T={T:.1f}  step={step:.4f}  "
               f"score={score_curr:.6f}")
 
+    _t_start = time.time()
+    _t_last = _t_start
     # cpp:3094: while (true)
     while True:
         p = rng.randrange(N)                                 # cpp:3096
@@ -298,6 +312,13 @@ def monte_carlo_arcs(
 
         T *= s.dt_temp_arcs                                     # cpp:3130
         i += 1                                                  # cpp:3155
+
+        # heartbeat: see monte_carlo_heatmap
+        if verbose and (time.time() - _t_last) > 5.0:
+            _t_last = time.time()
+            its = i / max(_t_last - _t_start, 1e-9)
+            print(f"  [arcs MC] ..i={i:7d}  T={T:.5f}  "
+                  f"score={score_curr:.6f}  {its:.0f} it/s")
 
         # cpp:3133-3151: milestone check
         if i % s.mc_stop_steps_arcs == 0:
@@ -539,6 +560,8 @@ def monte_carlo_arcs_smooth(
               f"score={score_curr:.6f} (struct={curr_struct:.4f}, "
               f"orient={curr_orient:.4f})")
 
+    _t_start = time.time()
+    _t_last = _t_start
     # cpp:3264: while (true)
     while True:
         p = rng.randrange(N)                                # cpp:3266
@@ -627,6 +650,14 @@ def monte_carlo_arcs_smooth(
                 # restore in this Python port.
 
         i += 1
+
+        # heartbeat: see monte_carlo_heatmap
+        if verbose and (time.time() - _t_last) > 5.0:
+            _t_last = time.time()
+            its = i / max(_t_last - _t_start, 1e-9)
+            print(f"  [smooth MC] ..i={i:7d}  T={T:.5f}  "
+                  f"score={score_curr:.6f}  {its:.0f} it/s  "
+                  f"(struct={curr_struct:.2f}, orient={curr_orient:.2f})")
 
         # cpp:3361-3380: milestone check
         if i % s.mc_stop_steps_smooth == 0:
