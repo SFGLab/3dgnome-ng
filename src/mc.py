@@ -320,12 +320,37 @@ def monte_carlo_arcs(
             print(f"  [arcs MC] ..i={i:7d}  T={T:.5f}  "
                   f"score={score_curr:.6f}  {its:.0f} it/s")
 
+        # Python-only safety cap (Settings.mc_max_iters_arcs /
+        # mc_max_seconds_arcs).  0 ⇒ disabled, matching cudaMMC exactly.
+        if ((s.mc_max_iters_arcs > 0 and i >= s.mc_max_iters_arcs)
+                or (s.mc_max_seconds_arcs > 0.0
+                    and time.time() - _t_start > s.mc_max_seconds_arcs)):
+            if verbose:
+                print(f"  [arcs MC] stopping early (limit reached) "
+                      f"i={i} elapsed={time.time()-_t_start:.1f}s "
+                      f"score={score_curr:.4f}")
+            return pos
+
         # cpp:3133-3151: milestone check
         if i % s.mc_stop_steps_arcs == 0:
             ratio = score_curr / max(milestone_score, 1e-30)
             if verbose:
-                print(f"  [arcs MC] i={i:7d}  T={T:.5f}  score={score_curr:.6f}  "
-                      f"ratio={ratio:.5f}  ms_succ={milestone_success}")
+                # ``score_curr`` is delta-tracked (cpp:3109) — the single-bead
+                # variant of the score function has its 1/d repulsion branch
+                # commented out (cpp:1966-1969), so any change in repulsion
+                # energy is silently ignored by the delta.  We recompute the
+                # true full score here (cheap, only every stop_steps iters)
+                # so the log isn't dominated by stale initial-packing
+                # repulsion baked into ``score_curr``.
+                true_score = score_distances_active_region(
+                    pos, expected,
+                    k_stretch=k_stretch, k_squeeze=k_squeeze,
+                    k_repulsion=1.0,
+                ).item()
+                print(f"  [arcs MC] i={i:7d}  T={T:.5f}  "
+                      f"score={score_curr:.6f}  ratio={ratio:.5f}  "
+                      f"ms_succ={milestone_success}  "
+                      f"true_full={true_score:.2f}")
             # cpp:3143-3146: three stop clauses (ratio>0.9999 is unconditional)
             if ((score_curr > s.mc_stop_improvement_arcs * milestone_score
                     and milestone_success < s.mc_stop_min_successes_arcs)
@@ -655,9 +680,29 @@ def monte_carlo_arcs_smooth(
         if verbose and (time.time() - _t_last) > 5.0:
             _t_last = time.time()
             its = i / max(_t_last - _t_start, 1e-9)
-            print(f"  [smooth MC] ..i={i:7d}  T={T:.5f}  "
-                  f"score={score_curr:.6f}  {its:.0f} it/s  "
+            print(f"  [smooth MC py] ..i={i:8d}  T={T:.5f}  "
+                  f"score={score_curr:.6f}  {its:.0f} it/s")
+
+        # Python-only safety cap, see monte_carlo_arcs.
+        if ((s.mc_max_iters_smooth > 0 and i >= s.mc_max_iters_smooth)
+                or (s.mc_max_seconds_smooth > 0.0
+                    and time.time() - _t_start > s.mc_max_seconds_smooth)):
+            if verbose:
+                print(f"  [smooth MC py] stopping early (limit reached) "
+                      f"i={i} elapsed={time.time()-_t_start:.1f}s "
+                      f"score={score_curr:.4f}")
+            break
                   f"(struct={curr_struct:.2f}, orient={curr_orient:.2f})")
+
+        # Python-only safety cap, see monte_carlo_arcs.
+        if ((s.mc_max_iters_smooth > 0 and i >= s.mc_max_iters_smooth)
+                or (s.mc_max_seconds_smooth > 0.0
+                    and time.time() - _t_start > s.mc_max_seconds_smooth)):
+            if verbose:
+                print(f"  [smooth MC] stopping early (limit reached) "
+                      f"i={i} elapsed={time.time()-_t_start:.1f}s "
+                      f"score={score_curr:.4f}")
+            return pos
 
         # cpp:3361-3380: milestone check
         if i % s.mc_stop_steps_smooth == 0:

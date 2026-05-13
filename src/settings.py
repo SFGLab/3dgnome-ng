@@ -125,6 +125,18 @@ class Settings:
     mc_stop_min_successes_smooth: int = 5    # cudaMMC Settings.cpp:247
     mc_stop_steps_smooth: int = 10000        # cudaMMC Settings.cpp:248
 
+    # ── Python-only safety caps (not in cudaMMC) ──────────────────────────────
+    # Opt-in upper bound on MC iterations / wall time per restart, mostly
+    # useful when the cudaMMC stop condition (ratio > impr AND succ < min)
+    # is satisfied on the ``ratio`` clause but not on the ``succ`` clause
+    # (very small step sizes can trickle improvements forever).  0 = off,
+    # matching cudaMMC behaviour exactly.  Setting either > 0 makes MC log
+    # ``[<phase>] stopping early (iter/wall limit reached)`` and return.
+    mc_max_iters_arcs: int = 0
+    mc_max_iters_smooth: int = 0
+    mc_max_seconds_arcs: float = 0.0
+    mc_max_seconds_smooth: float = 0.0
+
     # ── [data] file paths ────────────────────────────────────────────────────
     data_directory: str = ""
     data_anchors: str = ""
@@ -422,6 +434,13 @@ class Settings:
         s.mc_stop_steps_smooth = gi("simulation_arcs_smooth", "stop_condition_steps", s.mc_stop_steps_smooth)
         s.mc_stop_improvement_smooth = gf("simulation_arcs_smooth", "stop_condition_improvement_threshold", s.mc_stop_improvement_smooth)
         s.mc_stop_min_successes_smooth = gi("simulation_arcs_smooth", "stop_condition_successes_threshold", s.mc_stop_min_successes_smooth)
+
+        # Python-only safety caps (off by default).  Either [main] or the
+        # phase-specific section is honoured for convenience.
+        s.mc_max_iters_arcs = gi("simulation_arcs", "max_iters", s.mc_max_iters_arcs)
+        s.mc_max_seconds_arcs = gf("simulation_arcs", "max_seconds", s.mc_max_seconds_arcs)
+        s.mc_max_iters_smooth = gi("simulation_arcs_smooth", "max_iters", s.mc_max_iters_smooth)
+        s.mc_max_seconds_smooth = gf("simulation_arcs_smooth", "max_seconds", s.mc_max_seconds_smooth)
 
         # Python-only — accept either [misc] or [main]
         s.device = gs("misc", "device", s.device)
