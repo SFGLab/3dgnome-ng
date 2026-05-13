@@ -677,3 +677,4 @@ def monte_carlo_arcs_smooth(
         T *= s.dt_temp_smooth                                # cpp:3382
 
     return pos
+

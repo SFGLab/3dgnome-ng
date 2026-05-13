@@ -549,14 +549,28 @@ class LooperSolver:
         ib_c = tree.clusters[ib_ci]
         anchor_cidxs = list(ib_c.children)           # level-4 cluster indices
         n_ib = len(anchor_cidxs)
-        if n_ib < 2:
-            return n_ibs_done                         # cpp:2741-2742
 
-        # cpp:2625: every anchor reset to the IB centroid.
-        ib_pos = torch.tensor(
+        # cpp:2624-2625: every anchor in this IB is reset to
+        # ``ib.pos + random_vector(noise_size_small)`` BEFORE any early
+        # skip — including singleton IBs that won't run arc MC.  Without
+        # this, lone anchors keep the default Cluster() position (0,0,0),
+        # which then leaks into the CIF spline as a straight stick from
+        # the ball of arc-MC-placed anchors to the origin (visible in
+        # /Users/nk2/test_chr1.cif).  AUDIT §H10 closed.
+        ib_pos_t = torch.tensor(
             [ib_c.x, ib_c.y, ib_c.z],
             dtype=torch.float32, device=self.device,
         )
+        init_anchor_pos = ib_pos_t.unsqueeze(0).expand(n_ib, 3).clone() \
+                          + _random_displacements(n_ib, s.noise_size_small,
+                                                  s.use_2d, self.device)
+        tree.set_positions_from_tensor(init_anchor_pos, anchor_cidxs)
+
+        if n_ib < 2:                                  # cpp:2741-2742
+            return n_ibs_done
+
+        # cpp:2625: every anchor reset to the IB centroid.
+        ib_pos = ib_pos_t
 
         # ── Phase 2: arc MC on dense expected-distance matrix ───────────────
         expected = self._build_anchor_expected_dist_ib(chrom, anchor_cidxs)
@@ -789,8 +803,24 @@ _atom_site.auth_asym_id
         for chrom, tree in self.trees.items():
             path = f"{prefix}_{chrom}.cif"
 
-            if anchors_only and smooth and len(tree.anchors_idx) >= 2:
-                coords = self._smooth_cif_coords(tree, smooth_sample_kb)
+            if anchors_only and smooth:
+                # cudaMMC's ``.hcm.smooth.txt`` is the **densified active
+                # region** — every level-4 anchor PLUS every level-5
+                # subanchor inserted by ``densifyActiveRegion`` (cpp:2645),
+                # in genomic order, after the smooth MC.  That dense chain
+                # is what carries the actual 3D spread (~√N · L_link units):
+                # anchors are pinned by ``is_fixed = True`` so they keep
+                # their tight post-arc-MC positions, but the freely moving
+                # subanchors relax to the chain target during smooth MC.
+                #
+                # The old anchors-only spline produced only the pinned-anchor
+                # ball (see /Users/nk2/test_chr1.cif diagnosis), missing the
+                # entire smoothed loop structure.  Mirror cudaMMC's output by
+                # emitting the full level-4 + level-5 chain in genomic order.
+                dense_chain = [c for c in tree.clusters
+                               if c.level in (4, 5)]
+                dense_chain.sort(key=lambda c: c.genomic_pos)
+                coords = [(c.x, c.y, c.z) for c in dense_chain]
             elif anchors_only:
                 coords = [(tree.clusters[i].x,
                            tree.clusters[i].y,
