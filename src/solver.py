@@ -202,8 +202,35 @@ class LooperSolver:
             tree = ChromosomeTree(chrom, anchors, arcs, self.settings,
                                   segments_predefined=self.segments_predefined.get(chrom, []))
             self.trees[chrom] = tree
+            n_seg = sum(1 for c in tree.clusters if c.level == 2)
+            n_ib = sum(1 for c in tree.clusters if c.level == 3)
+            n_anc = len(tree.anchors_idx)
             print(f"  {chrom}: {len(tree.clusters)} clusters, "
-                  f"{len(tree.anchors_idx)} anchors")
+                  f"{n_seg} segments, {n_ib} IBs, {n_anc} anchors")
+
+            # Detect the "no breakpoints, dense ChIA-PET" degenerate case:
+            # find_all_gaps returns only [0, N-1] when arcs_cnt never reaches
+            # zero, collapsing the whole chromosome into one IB.  cudaMMC
+            # produces the same useless tree here, but it ALWAYS ships with a
+            # ``segment_split`` BED, so this state never arises in practice.
+            # Fail loud with an actionable message instead of grinding through
+            # an O(N²) arc MC on 20 k anchors.
+            if (n_anc > 500 and n_ib <= 2
+                    and not self.segments_predefined.get(chrom)):
+                raise RuntimeError(
+                    f"\n  {chrom}: {n_anc} anchors collapsed into {n_ib} "
+                    "interaction block(s).\n"
+                    "  This happens when the arc-sweep (cudaMMC findGaps, "
+                    "LooperSolver.cpp:856-894) finds no arc-free positions —\n"
+                    "  expected for full chromosomes with dense ChIA-PET data.\n"
+                    "  cudaMMC handles this via a predefined segment-split "
+                    "BED (Settings::dataSegmentsSplit, cpp:911-962).\n\n"
+                    "  Fix: pass --config pointing to an INI whose [data] "
+                    "section sets `segment_split = <breakpoints.bed>`.\n"
+                    "  The bundled data/<celltype>/config.ini already does "
+                    "this; auto-detection looks for config.ini next to\n"
+                    "  --anchors, so usually `mv` or symlink your config there."
+                )
 
     # ── Arc expected distances (per-IB dense matrix, AUDIT §G1) ──────────────
 

@@ -244,6 +244,27 @@ class Settings:
     def from_ini(cls, path: str) -> "Settings":
         cfg = configparser.ConfigParser()
         cfg.read(path)
+        # cudaMMC resolves data paths against ``data_dir`` (Settings.cpp:438).
+        # The shipped GM12878 config has ``data_dir = /Projects/GM12878/``
+        # which is bogus on most machines, so we also fall back to the INI's
+        # own directory — that's where the bundled BED/BEDPE files live.
+        import os as _os
+        ini_dir = _os.path.dirname(_os.path.abspath(path))
+
+        def _resolve(p: str, data_dir: str) -> str:
+            """Resolve a path that may be bare, relative, or absolute."""
+            if not p:
+                return p
+            if _os.path.isabs(p) and _os.path.exists(p):
+                return p
+            # Try as-given (relative to CWD), then INI dir, then data_dir.
+            for cand in (p,
+                         _os.path.join(ini_dir, p),
+                         _os.path.join(data_dir, p) if data_dir else None,
+                         _os.path.join(ini_dir, _os.path.basename(p))):
+                if cand and _os.path.exists(cand):
+                    return cand
+            return p   # leave unchanged; downstream will warn/skip
 
         s = cls()
 
@@ -313,6 +334,14 @@ class Settings:
         s.data_factors = gs("data", "factors", s.data_factors)
         s.data_centromeres = gs("data", "centromeres", s.data_centromeres)
         s.data_segments_split = gs("data", "segment_split", s.data_segments_split)
+
+        # Resolve all data paths against the INI's directory (see _resolve above).
+        s.data_anchors = _resolve(s.data_anchors, s.data_directory)
+        s.data_pet_clusters = _resolve(s.data_pet_clusters, s.data_directory)
+        s.data_singletons = _resolve(s.data_singletons, s.data_directory)
+        s.data_singletons_inter = _resolve(s.data_singletons_inter, s.data_directory)
+        s.data_centromeres = _resolve(s.data_centromeres, s.data_directory)
+        s.data_segments_split = _resolve(s.data_segments_split, s.data_directory)
 
         # cudaMMC Settings.cpp:450-458  [template]
         s.data_segment_heatmap = gs("template", "segment_heatmap", s.data_segment_heatmap)

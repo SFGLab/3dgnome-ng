@@ -56,10 +56,28 @@ def parse_args():
 def main():
     args = parse_args()
 
-    if args.config:
-        settings = Settings.from_ini(args.config)
+    # Auto-detect ``config.ini`` next to --anchors if --config not provided.
+    # cudaMMC always runs with an INI; without one, ``data_segments_split`` is
+    # empty and ``find_segments`` Branch B (cpp:964-994) returns gaps unchanged
+    # — on dense ChIA-PET data this collapses the entire chromosome into a
+    # single IB (arcs_cnt rarely hits zero), producing 2 segments and a
+    # 20 k-anchor IB.  Match cudaMMC's intended workflow by loading the
+    # adjacent config automatically.
+    import os as _os
+    cfg_path = args.config
+    if cfg_path is None:
+        cand = _os.path.join(_os.path.dirname(_os.path.abspath(args.anchors)),
+                             "config.ini")
+        if _os.path.exists(cand):
+            print(f"Auto-loading config: {cand}")
+            cfg_path = cand
+    if cfg_path:
+        settings = Settings.from_ini(cfg_path)
     else:
         settings = Settings()
+        print("WARNING: no config.ini found — running with built-in defaults. "
+              "Whole-chromosome runs require a `segment_split` breakpoint BED "
+              "(see cudaMMC LooperSolver.cpp:911-962).")
 
     if args.device:
         settings.device = args.device
