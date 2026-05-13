@@ -1,4 +1,10 @@
-"""Parse ChIA-PET input files (anchors BED, PET-clusters BEDPE, singletons BEDPE)."""
+"""Parse ChIA-PET input files (anchors BED, PET-clusters BEDPE, singletons
+BEDPE, optional segment-split breakpoints BED).
+
+Mirrors cudaMMC `Anchor.cpp`, `InteractionArcs.cpp` and the BED reader paths in
+`LooperSolver.cpp:41-44` (segments_predefined).  See AGENTS.md "Data flow per
+chromosome".
+"""
 
 import os
 from collections import defaultdict
@@ -10,7 +16,13 @@ from .data_structures import Anchor, InteractionArc, RawArc
 # ── BED / BEDPE readers ──────────────────────────────────────────────────────
 
 def load_anchors(bed_path: str) -> Dict[str, List[Anchor]]:
-    """Return {chrom: [Anchor, ...]} sorted by start position."""
+    """Return {chrom: [Anchor, ...]} sorted by start position.
+
+    cudaMMC `Anchor.cpp` parses (chrom, start, end, name, score, strand).
+    Strand '+' → 'R', '-' → 'L', anything else → 'N' (initial-hint label;
+    actual orientation vector is recomputed geometrically in MC — see
+    `ChromosomeTree.calc_orientation`).
+    """
     result: Dict[str, List[Anchor]] = defaultdict(list)
     with open(bed_path) as fh:
         for line in fh:
@@ -35,42 +47,79 @@ def load_anchors(bed_path: str) -> Dict[str, List[Anchor]]:
     return dict(result)
 
 
-def _parse_bedpe_line(parts: List[str], factor: int) -> Optional[RawArc]:
+def _parse_bedpe_line(parts: List[str], factor: int,
+                      score_col: int = 7) -> Optional[RawArc]:
+    """Parse one BEDPE row.
+
+    cudaMMC `Cluster.cpp` expects the PET count in a fixed column.  Default
+    here is column index 7 (0-based) which matches the cudaMMC layout (chrom1,
+    s1, e1, chrom2, s2, e2, name, score, ...).  Override via
+    `Settings.bedpe_score_column` if your BEDPE puts the count elsewhere.
+    """
     if len(parts) < 6:
         return None
     chrom1, s1, e1 = parts[0], int(parts[1]), int(parts[2])
     chrom2, s2, e2 = parts[3], int(parts[4]), int(parts[5])
     score = 1
-    if len(parts) > 7:
+    if len(parts) > score_col:
         try:
-            score = int(parts[7])
+            score = int(parts[score_col])
         except ValueError:
-            pass
-    elif len(parts) > 6:
-        try:
-            score = int(parts[6])
-        except ValueError:
-            pass
+            try:
+                score = int(float(parts[score_col]))
+            except ValueError:
+                pass
     return RawArc(chrom1, s1, e1, chrom2, s2, e2, score, factor)
 
 
-def load_pet_clusters(bedpe_path: str, factor: int = 0) -> List[RawArc]:
-    """Load PET-cluster BEDPE file."""
+def load_pet_clusters(bedpe_path: str, factor: int = 0,
+                       score_col: int = 7) -> List[RawArc]:
+    """Load PET-cluster BEDPE file. cudaMMC `InteractionArcs.cpp` equivalent."""
     arcs: List[RawArc] = []
     with open(bedpe_path) as fh:
         for line in fh:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            arc = _parse_bedpe_line(line.split("\t"), factor)
+            arc = _parse_bedpe_line(line.split("\t"), factor, score_col)
             if arc is not None:
                 arcs.append(arc)
     return arcs
 
 
-def load_singletons(bedpe_path: str, factor: int = 0) -> List[RawArc]:
+def load_singletons(bedpe_path: str, factor: int = 0,
+                     score_col: int = 7) -> List[RawArc]:
     """Singletons have score=1 by convention."""
-    return load_pet_clusters(bedpe_path, factor)
+    return load_pet_clusters(bedpe_path, factor, score_col)
+
+
+# ── Segment-split breakpoints BED reader ──────────────────────────────────
+# cudaMMC `LooperSolver.cpp:41-44`:
+#   if (Settings::dataSegmentsSplit.size() > 0)
+#     segments_predefined.fromFile(Settings::dataSegmentsSplit);
+
+def load_segments_split(bed_path: str) -> Dict[str, List[Tuple[int, int]]]:
+    """Return {chrom: [(start, end), ...]} for a predefined-segments BED.
+
+    Used by `find_segments` (Branch A — see cudaMMC `LooperSolver.cpp:911-962`)
+    to promote arc-sweep gaps whose anchor coordinate is contained in any
+    predefined region into segment boundaries.
+    """
+    if not bed_path or not os.path.exists(bed_path):
+        return {}
+    out: Dict[str, List[Tuple[int, int]]] = defaultdict(list)
+    with open(bed_path) as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) < 3:
+                continue
+            out[parts[0]].append((int(parts[1]), int(parts[2])))
+    for chrom in out:
+        out[chrom].sort()
+    return dict(out)
 
 
 # ── Arc → anchor mapping (CPU equivalent of ParallelMarkArcs.cu) ─────────────
@@ -83,20 +132,29 @@ def mark_arcs(raw_arcs: List[RawArc],
               anchors_by_chr: Dict[str, List[Anchor]],
               ignore_missing: bool = False
               ) -> Tuple[Dict[str, List[InteractionArc]], Dict[str, int]]:
-    """
-    Map raw arcs (genomic positions) to anchor indices.
+    """Map raw arcs (genomic positions) to anchor indices.
+
+    cudaMMC `InteractionArcs.cpp:60-141` — for each chromosome iterate raw arcs
+    in start order, find the anchor containing each endpoint, deduplicate by
+    factor, emit a summary arc when multiple factors collide.
+
+    Arcs whose endpoint is a 1-bp anchor (`length() <= 1`, cudaMMC
+    `InteractionArcs.cpp:65`) are silently skipped to match the upstream filter
+    — see AUDIT §I1.
 
     Returns:
         arcs_by_chr  : {chrom: [InteractionArc, ...]}
         arcs_cnt     : {chrom: count}
     """
-    # group raw arcs by chromosome pair
     raw_by_chr: Dict[str, List[RawArc]] = defaultdict(list)
     for arc in raw_arcs:
         if arc.chrom1 == arc.chrom2:
             raw_by_chr[arc.chrom1].append(arc)
-        # inter-chromosomal arcs are stored under a canonical key
         else:
+            # cudaMMC keeps inter-chrom arcs in a separate stream
+            # (dataSingletonsInter etc.); see AUDIT §I5.  We aggregate under a
+            # synthetic key but downstream `solver.py` only reads per-chrom
+            # keys, so these arcs are effectively dropped.  Made explicit.
             key = _inter_key(arc.chrom1, arc.chrom2)
             raw_by_chr[key].append(arc)
 
@@ -106,7 +164,6 @@ def mark_arcs(raw_arcs: List[RawArc],
     for chrom, chr_anchors in anchors_by_chr.items():
         raw = raw_by_chr.get(chrom, [])
         mapped: List[InteractionArc] = []
-        # temporary buffer: {end_anchor_idx: [InteractionArc]}
         tmp: Dict[int, List[InteractionArc]] = defaultdict(list)
         last_start = -1
 
@@ -117,11 +174,12 @@ def mark_arcs(raw_arcs: List[RawArc],
             bi = _find_anchor(chr_anchors, raw_arc.start2)
             if ai == -1 or bi == -1:
                 if not ignore_missing:
-                    pass  # silently skip (matching cudaMMC's "! error" but continuing)
+                    # cudaMMC prints `! error: non-matching arc` and continues
+                    # (`InteractionArcs.cpp:73-77`); we silently skip.
+                    pass
                 continue
             if ai == bi:
-                continue  # skip looping arcs
-            # ensure left < right
+                continue
             if ai > bi:
                 ai, bi = bi, ai
             ia = InteractionArc(ai, bi,
@@ -129,13 +187,11 @@ def mark_arcs(raw_arcs: List[RawArc],
                                 raw_arc.score, raw_arc.score, raw_arc.factor)
             tmp[bi].append(ia)
 
-            # flush when start anchor changes
             if ai != last_start and last_start != -1:
                 _flush_tmp(tmp, mapped, last_start)
                 tmp.clear()
             last_start = ai
 
-        # final flush
         _flush_tmp(tmp, mapped, last_start)
 
         arcs_by_chr[chrom] = mapped
@@ -145,7 +201,15 @@ def mark_arcs(raw_arcs: List[RawArc],
 
 
 def _find_anchor(anchors: List[Anchor], pos: int) -> int:
-    """Binary-search for the anchor that contains pos. Returns -1 if not found."""
+    """Binary-search for the anchor that contains `pos`.
+
+    cudaMMC `InteractionArcs.cpp:64-71` does an O(A·N) linear scan with the
+    additional guard `if (anchors[chr][j].length() > 1)` at line 65 — single-
+    base anchors are never matched.  We binary-search but apply the same
+    `length() > 1` guard (AUDIT §I1).
+
+    Returns the index of the matching anchor, or -1.
+    """
     lo, hi = 0, len(anchors) - 1
     while lo <= hi:
         mid = (lo + hi) // 2
@@ -155,7 +219,10 @@ def _find_anchor(anchors: List[Anchor], pos: int) -> int:
         elif pos > a.end:
             lo = mid + 1
         else:
-            return mid
+            # cudaMMC InteractionArcs.cpp:65: only match anchors with length > 1
+            if a.length > 1:
+                return mid
+            return -1
     return -1
 
 
@@ -166,7 +233,13 @@ def _inter_key(c1: str, c2: str) -> str:
 
 def _flush_tmp(tmp: Dict[int, List[InteractionArc]],
                out: List[InteractionArc], start_anchor: int) -> None:
-    """Merge arcs with same (start, end) but different factors; append to out."""
+    """Merge arcs with same (start, end) but different factors; append to out.
+
+    cudaMMC `InteractionArcs.cpp:88-141` — sort by factor; for each
+    factor-group keep the first arc with `score = factor_score`,
+    `eff_score = 0 if multiple_factors else factor_score`; if multiple factors
+    exist append a trailing summary arc `score=0, eff_score=total`.
+    """
     for end_anchor, arcs in tmp.items():
         if len(arcs) == 1:
             out.append(arcs[0])

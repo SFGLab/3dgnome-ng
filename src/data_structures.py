@@ -1,16 +1,24 @@
-"""Core dataclasses mirroring Cluster / InteractionArc / Anchor from cudaMMC."""
+"""Core dataclasses mirroring `Cluster`, `InteractionArc`, `Anchor` from cudaMMC.
+
+cudaMMC `Cluster.h` stores `vector3 orientation;` and recomputes it from
+neighbour positions during MC via `calcOrientation(cind)` (LooperSolver.cpp:
+3437-3455).  The strand label parsed from BED is only an initial hint that
+flips the sign.  We mirror that: `Cluster.orientation_label` holds 'R'/'L'/'N'
+(strand-derived initial hint) and `Cluster.orientation_vec` holds the current
+3-vector (updated by `ChromosomeTree.calc_orientation`).
+"""
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Tuple
 
 
 @dataclass
 class Anchor:
-    """A CTCF anchor site (one BED entry)."""
+    """A CTCF anchor site (one BED entry).  cudaMMC `Anchor.cpp`."""
     chrom: str
     start: int
     end: int
-    orientation: str = "N"  # 'L', 'R', or 'N'
+    orientation: str = "N"  # 'L', 'R', or 'N'  (initial-hint label from BED strand)
     name: str = ""
 
     @property
@@ -49,10 +57,9 @@ class RawArc:
 
 @dataclass
 class Cluster:
-    """
-    One bead in the hierarchical model.
+    """One bead in the hierarchical model.
 
-    Levels (cluster.level field):
+    cudaMMC `Cluster.h` levels (LooperSolver.cpp:1026-1142):
         4 = anchor (leaf)
         3 = interaction block (IB)
         2 = segment
@@ -63,7 +70,12 @@ class Cluster:
     end: int             # genomic end
     genomic_pos: int     # representative genomic coordinate (midpoint or anchor mid)
     level: int = 4       # 1..4 as above
-    orientation: str = "N"
+
+    # cudaMMC `Cluster.h`: `string orientation_label;` (R/L/N) + `vector3 orientation;`
+    # We keep both: the label is the BED-strand initial hint, the vector is
+    # recomputed during MC by `calc_orientation` (cudaMMC LooperSolver.cpp:3437-3455).
+    orientation: str = "N"           # legacy alias for orientation_label
+    orientation_vec: Tuple[float, float, float] = (0.0, 0.0, 0.0)
 
     # 3-D position  (x, y, z) — initialised to 0
     x: float = 0.0
