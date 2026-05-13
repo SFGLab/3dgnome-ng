@@ -285,56 +285,88 @@ class ChromosomeTree:
 
         ss = self.settings
 
-        # cudaMMC LooperSolver.cpp:1030-1036: create level-4 anchor clusters
-        # level-1: chromosome root (created last in cudaMMC, first here for index clarity)
+        # Chromosome root (level 1).  cudaMMC creates this LAST (cpp:1143) but
+        # we create it first so its parent pointer is well-defined; downstream
+        # consumers iterate by ``level``, not by cluster index, so the order is
+        # irrelevant.
         root_idx = self._new_cluster(1, anchors[0].start, anchors[-1].end)
         root = self.clusters[root_idx]
 
-        # cudaMMC LooperSolver.cpp:856-962: findGaps → all arc-free positions,
-        # findSplit → coarse segment boundaries from those positions.
+        # cudaMMC LooperSolver.cpp:1055-1060: findGaps → all arc-free anchor
+        # positions; findSplit → SUBSET of gaps used as segment boundaries.
+        # Both vectors include the first and last anchor index.
         all_gaps = find_all_gaps(anchors, arcs)
-        seg_starts = find_segments(all_gaps, anchors, ss.segment_size,
-                                   self.segments_predefined)
-        seg_starts.append(N)  # sentinel (cudaMMC: vector_insert_unique(gaps, clusters.size()-1))
+        splits = find_segments(all_gaps, anchors, ss.segment_size,
+                               self.segments_predefined)
+        # cpp:960: vector_insert_unique(splits, gaps.back()) — Branch A only
+        # guarantees the last gap is appended; in Branch B splits == gaps.
+        if not splits or splits[-1] != all_gaps[-1]:
+            splits.append(all_gaps[-1])
 
-        for s_i, seg_s in enumerate(seg_starts[:-1]):
-            seg_e = seg_starts[s_i + 1]  # exclusive
+        # cudaMMC cpp:1082-1138 — iterate ALL gaps creating one IB per
+        # consecutive gap pair; whenever ``gaps[i] == splits[next_split_ind]``
+        # wrap the pending IBs into a segment cluster (cpp:1113-1138).  In
+        # Branch B (splits == gaps) every IB becomes its own segment.
+        next_split_ind = 1
+        pending_ib_idxs: List[int] = []
 
-            # cudaMMC LooperSolver.cpp:1113-1134: create segment cluster (level curr_level-1 = 2)
+        for i in range(1, len(all_gaps)):
+            # cpp:1087-1089: prev_gap = (i==1 ? gaps[i-1] : gaps[i-1]+1)
+            prev_gap = all_gaps[i - 1] if i == 1 else all_gaps[i - 1] + 1
+            curr_gap = all_gaps[i]
+            if prev_gap > curr_gap:
+                # Degenerate (back-to-back gaps with no anchors in between).
+                continue
+
+            # cpp:1098-1111: create IB cluster (level 3).  Parent is patched
+            # to the segment index when the segment is closed below.
+            ib_idx = self._new_cluster(3,
+                                       anchors[prev_gap].start,
+                                       anchors[curr_gap].end,
+                                       -1)
+            ib_c = self.clusters[ib_idx]
+            # cpp:1106: for (int k = prev_gap; k <= curr_gap; ++k) — inclusive.
+            for ai in range(prev_gap, curr_gap + 1):
+                a = anchors[ai]
+                anc_idx = self._new_cluster(4, a.start, a.end, ib_idx)
+                anc_c = self.clusters[anc_idx]
+                # cpp:1032: c.orientation = arcs.anchors[chr][i].orientation
+                anc_c.orientation = a.orientation
+                anc_c.genomic_pos = a.mid
+                ib_c.children.append(anc_idx)
+                self.anchors_idx.append(anc_idx)
+            pending_ib_idxs.append(ib_idx)
+
+            # cpp:1113-1138: close out a segment when gaps[i] hits splits[next_split_ind].
+            if (next_split_ind < len(splits)
+                    and curr_gap == splits[next_split_ind]):
+                first_ib = pending_ib_idxs[0]
+                last_ib = pending_ib_idxs[-1]
+                seg_idx = self._new_cluster(2,
+                                            self.clusters[first_ib].start,
+                                            self.clusters[last_ib].end,
+                                            root_idx)
+                for ib_ix in pending_ib_idxs:
+                    self.clusters[ib_ix].parent = seg_idx
+                    self.clusters[seg_idx].children.append(ib_ix)
+                root.children.append(seg_idx)
+                pending_ib_idxs = []
+                next_split_ind += 1
+
+        # Defensive trailing flush: any IBs not yet wrapped into a segment
+        # (would only happen if the last gap is missing from ``splits``, which
+        # we already guard against above — kept for safety).
+        if pending_ib_idxs:
+            first_ib = pending_ib_idxs[0]
+            last_ib = pending_ib_idxs[-1]
             seg_idx = self._new_cluster(2,
-                                         anchors[seg_s].start,
-                                         anchors[seg_e - 1].end,
-                                         root_idx)
+                                        self.clusters[first_ib].start,
+                                        self.clusters[last_ib].end,
+                                        root_idx)
+            for ib_ix in pending_ib_idxs:
+                self.clusters[ib_ix].parent = seg_idx
+                self.clusters[seg_idx].children.append(ib_ix)
             root.children.append(seg_idx)
-
-            # cudaMMC LooperSolver.cpp:1084-1111: IBs come from all_gaps within segment.
-            # cpp:1087-1089: prev_gap = (i==1 ? gaps[i-1] : gaps[i-1]+1)  "boundary gaps (both inclusive)"
-            # cpp:1106:      for k in [prev_gap, curr_gap]  ← inclusive on BOTH ends
-            ib_gaps = find_ibs(all_gaps, seg_s, seg_e)
-            # ib_gaps = [seg_s, (interior gaps...), seg_e-1]
-
-            for ib_i in range(1, len(ib_gaps)):
-                # Mirror cpp:1087-1089 exactly
-                prev_gap = ib_gaps[0] if ib_i == 1 else ib_gaps[ib_i - 1] + 1
-                curr_gap = ib_gaps[ib_i]
-
-                # cudaMMC LooperSolver.cpp:1098-1111: Cluster c(start_pos, end_pos); c.level=3
-                ib_idx = self._new_cluster(3,
-                                           anchors[prev_gap].start,
-                                           anchors[curr_gap].end,
-                                           seg_idx)
-                self.clusters[seg_idx].children.append(ib_idx)
-
-                # cudaMMC LooperSolver.cpp:1106: for (int k = prev_gap; k <= curr_gap; ++k)
-                for ai in range(prev_gap, curr_gap + 1):  # inclusive
-                    a = anchors[ai]
-                    anc_idx = self._new_cluster(4, a.start, a.end, ib_idx)
-                    anc_c = self.clusters[anc_idx]
-                    # cudaMMC LooperSolver.cpp:1032: c.orientation = arcs.anchors[chr][i].orientation
-                    anc_c.orientation = a.orientation
-                    anc_c.genomic_pos = a.mid
-                    self.clusters[ib_idx].children.append(anc_idx)
-                    self.anchors_idx.append(anc_idx)
 
         # cudaMMC LooperSolver.cpp:1039-1048: wire arcs onto anchor clusters.
         # cudaMMC unconditionally pushes the arc index on BOTH endpoints
