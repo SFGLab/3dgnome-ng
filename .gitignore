@@ -228,6 +228,9 @@ cudaMMC/
 3dnome/
 docs/
 
+# Idea
+.idea/
+
 # macOS
 .DS_Store
 .AppleDouble
