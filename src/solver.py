@@ -523,9 +523,20 @@ class LooperSolver:
             # bottom-up mean over their children.
             tree.position_interaction_blocks(parent_level=2)
 
+            # Diagnostic: dump the IB-centre polymer so we can verify the
+            # backbone is actually extended in 3D and not collapsed near the
+            # origin (the tangled-ball failure mode).
+            self._dump_ib_centers(chrom, tree)
+
             n_ibs_done = 0
+            ib_cap = s.debug_max_ibs
+            stop = False
             for root_ci in (i for i, c in enumerate(tree.clusters) if c.level == 1):
+                if stop:
+                    break
                 for seg_ci in tree.clusters[root_ci].children:
+                    if stop:
+                        break
                     seg_c = tree.clusters[seg_ci]
                     # Iterate over a *snapshot* of IB children: densify mutates
                     # each IB's ``children`` list, but the segment's children
@@ -536,6 +547,11 @@ class LooperSolver:
                             score_full_arcs=_score_arcs_dense,
                             score_full_smooth=_score_smooth,
                         )
+                        if ib_cap > 0 and n_ibs_done >= ib_cap:
+                            print(f"  [debug] reached --debug-max-ibs={ib_cap}, "
+                                  f"stopping IB loop.")
+                            stop = True
+                            break
             print(f"  Done: {n_ibs_done} IBs processed")
 
     def _reconstruct_single_ib(self, chrom: str, tree: ChromosomeTree,
@@ -588,6 +604,50 @@ class LooperSolver:
         print(f"  IB {n_ibs_done}: {n_ib} anchors, {n_arc_pairs} arc pairs, "
               f"avg_chain={avg_chain:.3f}, noise_arcs={noise_size_arcs:.3f}")
 
+        # ── Sanity warning: mega-IB ⇒ algorithm cannot converge ──────────────
+        # cudaMMC's clean loop-rosette output assumes IBs of ~10–50 anchors:
+        # arc-MC's single-bead step (= avg_chain × noiseCoefficientLevelAnchor,
+        # cpp:2767-2782) is small relative to the cluster radius, so spreading
+        # N anchors against the ``-1`` repulsion sentinel scales as O(N² / step²)
+        # iterations.  At ``noise_arcs = 0.01`` and N ≈ 400, this is ~10⁷ iters
+        # — far past the 50 k-iter stop window.  The structure stays a tight
+        # ball, densify stacks subanchors on top of it, and smooth-MC's huge
+        # ``noise_size = avg_chain × noiseCoefficientLevelSubanchor`` step (5×
+        # the median link target) random-walks them into a diffuse cloud
+        # rather than loop arcs.  We diagnosed this in /tmp/3dg_debug/ on
+        # 2026-05-14 (post-arc std 0.04, post-smooth std 4.56, score 9457→13093).
+        # The fix is upstream: provide a finer ``segment_split`` BED so that
+        # ``findGaps``/``findSplit`` carves the chromosome into smaller IBs.
+        if n_ib >= 100:
+            print(f"    WARNING: IB has {n_ib} anchors — algorithm scales poorly "
+                  f"beyond ~50.  Expect a diffuse cloud rather than clean loop\n"
+                  f"             rosettes.  Mitigation: supply a denser "
+                  f"``segment_split`` BED via [data] segment_split = ... in the\n"
+                  f"             INI so findGaps (cudaMMC LooperSolver.cpp:856-894) "
+                  f"breaks this region into smaller interaction blocks.")
+
+        # ── Diagnostic: arc-target vs chain-target distance distribution ────
+        # cudaMMC produces clean loop rosettes because for arc-connected anchor
+        # pairs the spring target (``count_to_distance``) is MUCH smaller than
+        # the chain target (``genomic_length_to_distance``) for the same gap.
+        # Arc springs collapse anchors into the loop "base"; chain springs
+        # then stretch the densified subanchors out into the loop "arch".
+        # If these two targets are comparable, no loops form.  Log the ratio
+        # so we can spot a distances-formula drift quickly.
+        if s.debug_dump_stages and n_arc_pairs > 0:
+            import torch as _torch
+            mask = expected > 1e-6
+            arc_targets = expected[mask].flatten()
+            chain_t = chain_lengths_anc
+            if arc_targets.numel() and chain_t.numel():
+                print(f"    [diag] arc-target  min={arc_targets.min().item():.3f} "
+                      f"med={arc_targets.median().item():.3f} "
+                      f"max={arc_targets.max().item():.3f}  "
+                      f"chain-target med={chain_t.median().item():.3f}  "
+                      f"ratio(arc/chain median)="
+                      f"{(arc_targets.median()/chain_t.median()).item():.3f}")
+                # cudaMMC clean-loop regime: arc_target / chain_target << 1.
+
         fixed_arcs = torch.zeros(n_ib, dtype=torch.bool, device=self.device)
         n_restarts_arcs = s.simulation_steps_level_anchor
 
@@ -630,6 +690,9 @@ class LooperSolver:
         assert best_pos_arcs is not None
         tree.set_positions_from_tensor(best_pos_arcs, anchor_cidxs)
 
+        self._dump_stage_cif(chrom, tree, n_ibs_done, "01_post_arc",
+                             anchor_cidxs)
+
         # ── Densify (cpp:2645 → 2448-2510, AUDIT §G5) ───────────────────────
         # Inserts loopDensity subanchor beads between each consecutive anchor
         # pair via linear interpolation; anchors are marked is_fixed = True.
@@ -664,6 +727,20 @@ class LooperSolver:
         print(f"    densified to {n_dense} beads "
               f"(+{n_dense - n_ib} subanchors, "
               f"noise_smooth={noise_size_smooth:.3f})")
+
+        if s.debug_dump_stages and len(chain_lengths_smooth) > 0:
+            cl = chain_lengths_smooth
+            # cudaMMC clean-loop regime: smooth-phase chain targets should be
+            # well-separated from the anchor-anchor arc target so that
+            # subanchors stretch out into loop arcs between fixed anchor
+            # bases.  Log both for visual diff vs. cudaMMC's output.
+            print(f"    [diag] chain-target-smooth  min={cl.min().item():.3f} "
+                  f"med={cl.median().item():.3f} max={cl.max().item():.3f}  "
+                  f"step/link median ratio="
+                  f"{(noise_size_smooth / cl.median().item()):.2f}")
+
+        self._dump_stage_cif(chrom, tree, n_ibs_done, "02_post_densify",
+                             dense_active)
 
         # ── Phase 3: smooth MC on (anchors + subanchors) ────────────────────
         n_restarts_smooth = s.simulation_steps_level_subanchor
@@ -714,7 +791,84 @@ class LooperSolver:
 
         assert best_pos_smooth is not None
         tree.set_positions_from_tensor(best_pos_smooth, dense_active)
+        self._dump_stage_cif(chrom, tree, n_ibs_done, "03_post_smooth",
+                             dense_active)
         return n_ibs_done + 1
+
+    # ── Diagnostic dumps (Python-only) ────────────────────────────────────────
+
+    _CIF_DEBUG_HEADER = (
+        "data_3dnome_debug\n#\nloop_\n"
+        "_atom_site.group_PDB\n_atom_site.id\n_atom_site.type_symbol\n"
+        "_atom_site.label_atom_id\n_atom_site.label_alt_id\n"
+        "_atom_site.label_comp_id\n_atom_site.label_asym_id\n"
+        "_atom_site.label_entity_id\n_atom_site.label_seq_id\n"
+        "_atom_site.pdbx_PDB_ins_code\n_atom_site.Cartn_x\n"
+        "_atom_site.Cartn_y\n_atom_site.Cartn_z\n_atom_site.occupancy\n"
+        "_atom_site.B_iso_or_equiv\n_atom_site.auth_asym_id\n"
+    )
+
+    def _dump_stage_cif(self, chrom: str, tree: "ChromosomeTree",
+                         ib_idx: int, stage: str,
+                         cidxs: List[int]) -> None:
+        """Write the (anchors+subanchors) chain for one IB at one stage.
+
+        Off when ``settings.debug_dump_stages`` is empty.  Atoms are written
+        in chain order; the B-factor column encodes ``level`` so a viewer
+        can distinguish anchors (4) from inserted subanchors (5).
+        """
+        out_dir = self.settings.debug_dump_stages
+        if not out_dir:
+            return
+        path = os.path.join(out_dir,
+                             f"{chrom}_ib{ib_idx:04d}_{stage}.cif")
+        with open(path, "w") as fh:
+            fh.write(self._CIF_DEBUG_HEADER)
+            for i, ci in enumerate(cidxs, start=1):
+                c = tree.clusters[ci]
+                fh.write(
+                    f"ATOM {i} C CA . ALA A 1 {i} ? "
+                    f"{c.x:.4f} {c.y:.4f} {c.z:.4f} 1.00 {float(c.level):.2f} A\n"
+                )
+        print(f"    [debug] wrote {path} ({len(cidxs)} beads)")
+
+    def _dump_ib_centers(self, chrom: str, tree: "ChromosomeTree") -> None:
+        """Write the per-IB centroid polymer to diagnose backbone collapse.
+
+        cudaMMC's clean-loop output requires IBs to be spread along an
+        extended polymer (spline along segments for multi-segment chroms,
+        random walk from origin for single-segment chroms).  If every IB
+        sits on top of every other (~0 spread), the per-IB loop rosettes
+        will overlap into a tangled ball regardless of arc/smooth MC.
+        """
+        out_dir = self.settings.debug_dump_stages
+        if not out_dir:
+            return
+        ib_cidxs = [i for i, c in enumerate(tree.clusters) if c.level == 3]
+        ib_cidxs.sort(key=lambda i: tree.clusters[i].genomic_pos)
+        if not ib_cidxs:
+            return
+        path = os.path.join(out_dir, f"{chrom}_00_ib_centers.cif")
+        with open(path, "w") as fh:
+            fh.write(self._CIF_DEBUG_HEADER)
+            for i, ci in enumerate(ib_cidxs, start=1):
+                c = tree.clusters[ci]
+                fh.write(
+                    f"ATOM {i} C CA . ALA A 1 {i} ? "
+                    f"{c.x:.4f} {c.y:.4f} {c.z:.4f} 1.00 3.00 A\n"
+                )
+        # Quick numerical summary: max pairwise centroid distance.
+        import math as _math
+        max_d = 0.0
+        for i in range(len(ib_cidxs)):
+            ci = tree.clusters[ib_cidxs[i]]
+            for j in range(i + 1, len(ib_cidxs)):
+                cj = tree.clusters[ib_cidxs[j]]
+                d = _math.sqrt((ci.x-cj.x)**2 + (ci.y-cj.y)**2 + (ci.z-cj.z)**2)
+                if d > max_d:
+                    max_d = d
+        print(f"  [debug] wrote {path} ({len(ib_cidxs)} IB centres, "
+              f"max pairwise distance = {max_d:.2f})")
 
     # ── Full pipeline ─────────────────────────────────────────────────────────
 

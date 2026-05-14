@@ -438,9 +438,16 @@ class ChromosomeTree:
                 # cpp:2712: interpolateChildrenPositionSpline(segments, true)
                 self._interp_children_spline_region(sibs, use_genomic_dist=True)
             else:
-                # cpp:2716-2722: random walk inside the lone segment
+                # cpp:2716-2722: random walk inside the lone segment.
+                # cudaMMC starts ``rw_pos`` at ``(0,0,0)`` (cpp:2718
+                # ``rw_pos.set(0.0f, 0.0f, 0.0f);``) — NOT at the segment's
+                # current position.  Seeding from ``seg.{x,y,z}`` collapses
+                # every IB centroid near the segment bead, which (for the
+                # common single-segment slice) means every IB sits on top
+                # of every other and the per-IB loop rosettes overlap into
+                # a tangled ball.  Mirror upstream byte-for-byte.
                 seg = self.clusters[sibs[0]]
-                x, y, z = seg.x, seg.y, seg.z
+                x, y, z = 0.0, 0.0, 0.0
                 for ch in seg.children:
                     x += (2.0 * random.random() - 1.0) * step
                     y += (2.0 * random.random() - 1.0) * step

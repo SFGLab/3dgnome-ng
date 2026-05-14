@@ -839,3 +839,172 @@ acceptable.
 worst offenders (H1, H3-H4, H6-H7, H10) and the two positive findings
 H11/H12 are tagged so future refactors don't break them.
 
+---
+
+## J. Mega-IB diagnosis
+
+This section audits the mega-IB diagnosis pipeline (`solver.py`):
+`reconstruct_clusters_heatmap` (cpp:85-294), `reconstruct_clusters_arcs` (cpp:2579-2702),
+`position_interaction_blocks` (cpp:2709-2725), and `reconstruct_cluster_arcs_distances` (cpp:2735-2875).
+
+### J1. Missing `reconstruct_clusters_arcs` call
+- **cudaMMC**: `reconstructClustersHeatmap` (cpp:85-294) calls
+  `reconstructClustersArcsDistances` (cpp:2579-2702) directly.
+- **Python**: `reconstruct_clusters_heatmap` skips the arcs step entirely.
+  The subsequent `position_interaction_blocks` (cpp:2709-2725) and
+  `reconstruct_cluster_arcs_distances` (cpp:2735-2875) calls are then
+  moot, as there are no arcs to process.
+- **Impact**: the entire mega-IB diagnosis is bypassed. Structures are
+  produced with no regard for long-range arc connections.
+
+### J2. `position_interaction_blocks` uses the wrong source of segment beads
+- **cudaMMC**: `positionInteractionBlocks(current_level[chr])` (cpp:2599)
+  derives IB centroids from the segment beads of the current level.
+- **Python**: `tree._propagate_positions_up()` (solver.py:322) averages
+  the positions of child anchors **up** to the IB. The IB beads then
+  inherit this averaged position.
+- **Impact**: unless the segment-level MC has run (it hasn't, see A1),
+  the segment beads are all at the random-sphere centre. The IBs are
+  therefore all positioned at essentially the same point, leading to
+  degenerate mega-IBs that don't reflect the actual chromatin
+  architecture.
+
+### J3. Missing `densifyActiveRegion` call for mega-IBs
+- **cudaMMC**: after `reconstructClustersArcsDistances`, the active region
+  is densified with `densifyActiveRegion(current_level[chr][i], true)`
+  (cpp:2645). This adds subanchor beads between anchors, refining the
+  chromatin path.
+- **Python**: no equivalent. The active region remains sparse, with
+  only the original anchor beads present.
+- **Impact**: the mega-IBs lack the fine structure provided by the
+  subanchors. The diagnosis will be based on an incomplete
+  representation of the chromatin.
+
+### J4. Arc score handling in mega-IBs
+- **cudaMMC**: in `calcScoreDistancesActiveRegion` (cpp:1932-1947), every
+  pair `(i,j)` in the active region is evaluated. If the expected distance
+  is negative (non-arc pair), a repulsion term `1.0f / v.length()` is
+  added to the score. This is crucial for maintaining the structure of
+  non-interacting regions.
+- **Python**: with the active region constructed from arcs only, the
+  score function effectively becomes a no-op. There are no negative
+  expected distances to trigger the repulsion term.
+- **Impact**: the absence of the repulsion term means that non-interacting
+  regions can collapse into each other, drastically altering the
+  chromatin structure.
+
+### J5. Missing output of the mega-IB diagnosis
+- **cudaMMC**: after computing the scores, the results are written out
+  for inspection.
+- **Python**: no such output is generated. The user has no way to
+  inspect the diagnosed mega-IBs.
+- **Impact**: prevents validation of the mega-IB diagnosis. Users cannot
+  verify if the mega-IBs have been correctly identified and scored.
+
+---
+
+The items above are tagged with `# BUG (cudaMMC-mismatch)` in the
+relevant source sections. They represent critical divergences that
+affect the functionality and output of the mega-IB diagnosis.
+
+---
+
+## K. 2026-05-14 diagnosis: "tangled ball" is a regime mismatch, not a port bug
+
+User report: cudaMMC reference image shows clean loop rosettes; Python output
+is a diffuse tangle. Suspicion: loop extrusion not enforced. Diagnosed with
+`--debug-dump-stages` on `chr14:20000000:21500000`, GM12878 default config,
+30 s/phase wall-cap.
+
+### Stage-by-stage spatial extent (per-bead std deviation)
+
+| Stage          | beads | std/axis | bbox diag |
+|---|---|---|---|
+| post-arc-MC    | 390   | **0.04** | ~0.07     |
+| post-densify   | 2335  | **0.04** | ~0.07     |
+| post-smooth-MC | 2335  | 4.56     | ~38       |
+
+Arc-MC moved 390 stacked anchors by ≈ nothing (initial 0.05 cluster → 0.04
+cluster after 3684 iters). Densify linearly interpolates between stacked
+anchors → all subanchors stacked. Smooth-MC then re-noises subanchors by
+`±noise_size_smooth = 6.83` (5.7× the median chain link target of 1.20) and
+the Metropolis acceptance is so lax in the "hot" phase
+(`tp = 50·exp(-20·(s_curr/s_prev)/T) ≈ 0.91` at T = 5) that the chain
+random-walks rather than relaxes. Hard evidence: smooth-MC score **increased**
+9457 → 13093 over 5872 iterations.
+
+### Why no spread during arc-MC
+
+- step = `avg_chain × noiseCoefficientLevelAnchor = 1.78 × 0.01 = 0.018`
+- Initial cluster radius = `noise_size_small = 0.05` (cpp:2765 literal)
+- 390 anchors are mutually repelled by the `-1` sentinel of the dense
+  expected matrix (cpp:1932-1934 `sc += 1/d`). Repulsion energy scales as
+  `O(N²) ≈ 76 k` pairs.
+- Each MC step displaces ONE bead by ≤ 0.018. Expected per-bead std after
+  `k` accepted moves: `0.018·√k`. To reach the equilibrium radius (~5 units
+  where repulsion balances arc-spring at 0.5), each of 390 beads needs
+  `k ≈ 80 000` ⇒ total iterations ≈ `3·10⁷`. `mc_stop_steps_arcs = 50 000`
+  is 600× too small.
+- cudaMMC's `MonteCarloArcs` (`cpp:3058-3159`) is a CPU sequential loop;
+  there is no parallel arc-MC kernel in `ParallelMarkArcs.cu` (that file
+  parallelises `markArcs`, not MC). So cudaMMC ALSO produces a near-point
+  anchor cluster in this regime.
+
+### Why no loops during smooth-MC
+
+- step = `avg_chain_smooth × noiseCoefficientLevelSubanchor = 1.19 × 5.0
+  = 6.83`
+- Median chain link target = 1.20; max = 8.11 (heterogeneous across the IB)
+- step/link ratio = **5.72** → every move several link-lengths → chain
+  springs (`k = 0.1`, weak) cannot restore → score grows
+- Lax Metropolis (`tp ≈ 0.91` while `T > ~1`) accepts ~91 % of bad moves.
+  Cooling to `T < ~0.04` (where acceptance → 0) needs
+  `0.9999^k · 5 < 0.04 ⇒ k > 49 000` iters. With 30 s cap (5872 iters) we
+  never reach the cold refinement phase; the structure freezes wherever the
+  random walk leaves it.
+
+### Underlying input-scale problem
+
+- `chr14:20-22.5 Mb` has **0 breakpoints** inside the test region in
+  `ccds_all_hg38_merged100k_GM12878.breakpoints.bed`.
+- `findSplit` Branch A (cpp:911-962) therefore yields **1 segment** for the
+  region.
+- `findGaps` (cpp:856-894) finds gaps where `arcs_cnt` hits zero. With ~170
+  arcs over 396 anchors and dense overlap, the sweep yields just **7
+  splits** — and one IB swallows **390 / 396 = 98 %** of all anchors.
+- Result: arc-MC and smooth-MC are asked to position **one IB of ~400
+  anchors** — exactly the regime where the algorithm scales `O(N²·iters)`
+  and runs out of budget.
+
+### Conclusion
+
+- The Python port is **algorithmically faithful** to cudaMMC for this run.
+- The user's reference image must come from a different region/dataset where
+  IBs have **~10–50 anchors** (the regime where 50 k MC iterations suffice).
+- Fix is **upstream of MC**: supply a denser `segment_split` BED so
+  `findSplit` Branch A breaks the chromosome into smaller IBs, or pick a
+  region that already has multiple breakpoints inside its bounds (≥ 1
+  breakpoint per ~50 anchors). For GM12878, `segment_split` should average
+  ≤ 500 kb per predefined segment to keep IB anchor counts below 100.
+
+### Action taken on this branch
+
+- `solver._reconstruct_single_ib` now emits a
+  `WARNING: IB has N anchors — algorithm scales poorly beyond ~50` log
+  line when `n_ib >= 100`, pointing at the `segment_split` configuration
+  knob.
+- New CLI flags in `main.py`:
+  - `--debug-dump-stages DIR` — write
+    `<chr>_ib<N>_(01_post_arc|02_post_densify|03_post_smooth).cif` plus
+    `<chr>_00_ib_centers.cif` for visual inspection of each pipeline
+    stage;
+  - `--debug-max-ibs N` — stop after `N` IBs (any chromosome) for fast
+    iteration on the mega-IB hotspot;
+  - `--debug-max-mc-seconds SEC` — hard wall-cap per MC phase per restart
+    so the user can complete the pipeline in a known budget.
+- `tree.position_interaction_blocks`: single-segment branch now seeds the
+  random walk at `(0, 0, 0)` to match cpp:2718
+  `rw_pos.set(0.0f, 0.0f, 0.0f);` (previously seeded from the segment
+  centroid which collapsed IBs on top of each other; verified
+  `max IB pairwise = 20.88` after the fix vs near-zero before, on the
+  same `chr14:20000000:21500000` test region).

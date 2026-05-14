@@ -50,6 +50,21 @@ def parse_args():
                    help="Also save positions in mmCIF format for 3D viewers")
     p.add_argument("--cif-all-beads", action="store_true",
                    help="When writing CIF, include all beads (not just anchors)")
+    p.add_argument("--debug-dump-stages", default=None, metavar="DIR",
+                   help=("Diagnostic: write per-IB CIFs at each MC stage "
+                         "(arc, densify, smooth) plus arc/chain distance stats "
+                         "into DIR.  Used to localise where the loop-rosette "
+                         "structure fails to form."))
+    p.add_argument("--debug-max-ibs", type=int, default=0, metavar="N",
+                   help=("Diagnostic: stop after processing N interaction "
+                         "blocks (0 = no limit).  Speeds up iteration when "
+                         "debugging per-IB structure issues."))
+    p.add_argument("--debug-max-mc-seconds", type=float, default=0.0,
+                   metavar="SEC",
+                   help=("Diagnostic: hard wall-time cap (seconds) per MC "
+                         "phase per restart (sets mc_max_seconds_arcs and "
+                         "mc_max_seconds_smooth).  Lets the pipeline finish "
+                         "in a known budget for visual inspection."))
     return p.parse_args()
 
 
@@ -81,6 +96,19 @@ def main():
 
     if args.device:
         settings.device = args.device
+
+    if args.debug_dump_stages:
+        settings.debug_dump_stages = args.debug_dump_stages
+        import os as _os2
+        _os2.makedirs(args.debug_dump_stages, exist_ok=True)
+        print(f"Debug stage dumps → {args.debug_dump_stages}")
+    if args.debug_max_ibs:
+        settings.debug_max_ibs = args.debug_max_ibs
+        print(f"Debug: stopping after {args.debug_max_ibs} IB(s)")
+    if args.debug_max_mc_seconds > 0.0:
+        settings.mc_max_seconds_arcs = args.debug_max_mc_seconds
+        settings.mc_max_seconds_smooth = args.debug_max_mc_seconds
+        print(f"Debug: MC wall-time cap = {args.debug_max_mc_seconds}s/phase")
 
     try:
         regions = parse_region_spec(args.chromosomes)

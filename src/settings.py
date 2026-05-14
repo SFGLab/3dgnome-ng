@@ -167,6 +167,19 @@ class Settings:
     # ── Python-only convenience ──────────────────────────────────────────────
     device: str = "cuda"   # No cudaMMC counterpart; CUDA auto-selected upstream.
 
+    # Debug instrumentation — Python-only.  When non-empty, ``LooperSolver``
+    # dumps a CIF per IB after each MC stage (arc, densify, smooth) plus a
+    # summary of arc target vs chain target distances.  Used to diagnose the
+    # "tangled ball" failure mode where cudaMMC produces clean loop rosettes
+    # (per-IB anchors collapse tight, subanchors stretch to chain spring
+    # targets in smooth MC).  Set to a directory path; empty string = off.
+    debug_dump_stages: str = ""
+
+    # Debug: stop after processing this many interaction blocks (across all
+    # chromosomes).  0 = no limit.  Lets us inspect one IB end-to-end in
+    # seconds instead of waiting for the full chromosome to finish.
+    debug_max_ibs: int = 0
+
     # ── back-compat alias properties (legacy modules still reference these) ─
     @property
     def diagonal_size(self) -> int:
