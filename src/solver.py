@@ -98,6 +98,30 @@ class LooperSolver:
                 if a.chrom1 in self.anchors_by_chr and a.chrom2 in self.anchors_by_chr
             ]
 
+        # Optional genomic-span filter (opt-in, NOT in cudaMMC despite the
+        # presence of a ``max_pet_length`` key in config.ini — cudaMMC reads the
+        # value into Settings but never applies it).  We honour the obvious
+        # intent of the config key: drop any cis arc whose genomic span exceeds
+        # ``max_pet_cluster_length``.  This makes the arc-sweep (findGaps) find
+        # arc-free positions on full-chromosome runs where dense long-range
+        # loops would otherwise prevent any segmentation.  Set to 0 to disable
+        # (= cudaMMC parity).  Default 1_000_000 mirrors the value shipped in
+        # cudaMMC config.ini.
+        max_span = self.settings.max_pet_cluster_length
+        if max_span and max_span > 0:
+            before = len(raw_arcs)
+            kept: list = []
+            for a in raw_arcs:
+                if a.chrom1 != a.chrom2:                    # trans — keep
+                    kept.append(a)
+                    continue
+                span = max(a.end1, a.end2) - min(a.start1, a.start2)
+                if span <= max_span:
+                    kept.append(a)
+            raw_arcs = kept
+            print(f"  max_pet_length filter: kept {len(raw_arcs)} / {before} "
+                  f"arcs (span ≤ {max_span:,} bp)")
+
         print("Marking arcs...")
         self.arcs_by_chr, _ = mark_arcs(raw_arcs, self.anchors_by_chr)
         print(f"  {sum(len(v) for v in self.arcs_by_chr.values())} arcs mapped.")
