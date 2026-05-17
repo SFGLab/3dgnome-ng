@@ -58,9 +58,12 @@ make               # builds both
 ```python
 from src.simulate import run_region
 
+region = "chr1:18288319-20307135"  # ~2 Mb region with ~102 anchor beads
+entry_id = f"chr1_{region.replace(':', '_').replace('-', '_')}"
+
 structures = run_region(
     config_path="data/GM12878/config.ini",
-    region="chr1:18288319-20307135",
+    region=region,
     n_structures=5,
     data_dir="data/GM12878",   # override the absolute path baked into config.ini
 )
@@ -72,7 +75,7 @@ for i, s in enumerate(structures):
 
 # Save all structures as a multi-model mmCIF file
 from src.io import write_cif
-write_cif("chr1_structures.cif", structures, entry_id="chr1_18288319_20307135")
+write_cif("chr1_structures.cif", structures, entry_id=entry_id)
 ```
 
 The CIF file can be opened directly in **ChimeraX** or **Chimera**:
