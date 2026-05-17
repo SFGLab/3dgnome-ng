@@ -468,3 +468,54 @@ def create_singleton_heatmap(
 
     print(f"  singleton heatmap: {ok_cnt} arcs binned, size {total_size}x{total_size}")
     return h
+
+
+# ---------------------------------------------------------------------------
+# CIF export
+
+def write_cif(
+    path: str,
+    structures: list,
+    entry_id: str = "3dgnome",
+) -> None:
+    """
+    Write an ensemble of structures to an mmCIF file.
+
+    structures : list of list of (midpoint_bp, x, y, z)
+        As returned by run_region().  Each inner list is one model.
+    entry_id   : data block name written in the 'data_' header line.
+
+    Format notes
+    ------------
+    - Each structure is a separate PDB model (pdbx_PDB_model_num).
+    - Beads are ATOM records with residue name BEA, chain A.
+    - The genomic midpoint (bp) is stored in the B_iso_or_equiv column so
+      viewers such as ChimeraX can color by genomic position.
+    - Coordinates are written as-is (simulation units, not Ångströms).
+    """
+    with open(path, "w") as f:
+        f.write(f"data_{entry_id}\n\n")
+        f.write("loop_\n")
+        f.write("_atom_site.group_PDB\n")
+        f.write("_atom_site.id\n")
+        f.write("_atom_site.type_symbol\n")
+        f.write("_atom_site.label_atom_id\n")
+        f.write("_atom_site.label_comp_id\n")
+        f.write("_atom_site.label_asym_id\n")
+        f.write("_atom_site.label_seq_id\n")
+        f.write("_atom_site.pdbx_PDB_model_num\n")
+        f.write("_atom_site.Cartn_x\n")
+        f.write("_atom_site.Cartn_y\n")
+        f.write("_atom_site.Cartn_z\n")
+        f.write("_atom_site.B_iso_or_equiv\n")
+
+        atom_id = 1
+        for model_num, beads in enumerate(structures, start=1):
+            for seq_id, (mid_bp, x, y, z) in enumerate(beads, start=1):
+                f.write(
+                    f"ATOM  {atom_id:6d}  C  CA  BEA  A  {seq_id:4d}"
+                    f"  {model_num:3d}"
+                    f"  {x:10.4f}  {y:10.4f}  {z:10.4f}"
+                    f"  {mid_bp / 1e6:10.4f}\n"
+                )
+                atom_id += 1

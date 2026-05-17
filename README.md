@@ -69,6 +69,24 @@ structures = run_region(
 for i, s in enumerate(structures):
     print(f"structure {i+1}: {len(s)} beads, "
           f"first bead at bp={s[0][0]}, pos=({s[0][1]:.3f}, {s[0][2]:.3f}, {s[0][3]:.3f})")
+
+# Save all structures as a multi-model mmCIF file
+from src.io import write_cif
+write_cif("chr1_structures.cif", structures, entry_id="chr1_18288319_20307135")
+```
+
+The CIF file can be opened directly in **ChimeraX** or **Chimera**:
+
+```bash
+chimerax chr1_structures.cif
+```
+
+Each structure is stored as a separate model (`pdbx_PDB_model_num`).  
+The B-factor column contains the **genomic midpoint in Mb**, so you can color beads by genomic position:
+
+```
+# in ChimeraX command line:
+color byattribute bfactor palette blue:red
 ```
 
 `data_dir` overrides the `data_dir` key in the config, which is useful because the bundled `config.ini` has it hardcoded to `/Projects/GM12878/`. Pass the actual local path instead.
