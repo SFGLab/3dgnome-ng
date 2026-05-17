@@ -267,6 +267,7 @@ def mc_heatmap(
     step_size: float,
     settings,
     label: str = "",
+    verbose: bool = False,
 ) -> float:
     """
     MonteCarloHeatmap: simulated annealing using heatmap distance energy.
@@ -312,9 +313,10 @@ def mc_heatmap(
             (score > stop_improvement * ms_score and n_ok < stop_successes)
             or score < 1e-6 or ratio > 0.9999
         )
-        print(f"{prefix}step {step_i:>7,}  score={score:.4f}"
-              f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}"
-              + ("  [done]" if converged else ""), flush=True)
+        if verbose:
+            print(f"{prefix}step {step_i:>7,}  score={score:.4f}"
+                  f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}"
+                  + ("  [done]" if converged else ""), flush=True)
         if converged:
             break
         ms_score = score
@@ -329,6 +331,7 @@ def mc_arcs(
     step_size: float,
     settings,
     label: str = "",
+    verbose: bool = False,
 ) -> float:
     """
     MonteCarloArcs: simulated annealing using arc spring energy.
@@ -371,9 +374,10 @@ def mc_arcs(
             (score > stop_improvement * ms_score and n_ok < stop_successes)
             or score < 1e-5 or ratio > 0.9999
         )
-        print(f"{prefix}step {step_i:>7,}  score={score:.4f}"
-              f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}"
-              + ("  [done]" if converged else ""), flush=True)
+        if verbose:
+            print(f"{prefix}step {step_i:>7,}  score={score:.4f}"
+                  f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}"
+                  + ("  [done]" if converged else ""), flush=True)
         if converged:
             break
         ms_score = score
@@ -389,6 +393,7 @@ def mc_smooth(
     step_size: float,
     settings,
     label: str = "",
+    verbose: bool = False,
 ) -> float:
     """
     MonteCarloArcsSmooth: chain connectivity + angle MC.
@@ -438,9 +443,10 @@ def mc_smooth(
             (score > stop_improvement * ms_score and n_ok < stop_successes)
             or score < 1e-6 or ratio > 0.9999
         )
-        print(f"{prefix}step {step_i:>7,}  score={score:.4f}"
-              f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}"
-              + ("  [done]" if converged else ""), flush=True)
+        if verbose:
+            print(f"{prefix}step {step_i:>7,}  score={score:.4f}"
+                  f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}"
+                  + ("  [done]" if converged else ""), flush=True)
         if converged:
             break
         ms_score = score

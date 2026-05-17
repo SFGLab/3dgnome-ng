@@ -98,16 +98,16 @@ class Solver:
         single_seg = (len(self.chrs) == 1 and total_segs <= 1)
 
         if single_seg:
-            print("[solver] single segment → place at origin")
+            if self.s.output_level >= 1:
+                print("[solver] single segment → place at origin")
             chr_ = self.chrs[0]
             if current_level[chr_]:
                 self.clusters[current_level[chr_][0]].pos = np.zeros(3, dtype=np.float32)
-                # Set child IB and anchor positions too
                 self._interpolate_children_linear(current_level[chr_])
             return
 
-        # Multiple segments: build singleton heatmap
-        print("\n[solver] segment level")
+        if self.s.output_level >= 1:
+            print("\n[solver] segment level")
         self._reconstruct_heatmap_single_level(current_level)
 
     def _compute_segment_bins(self, current_level: dict) -> tuple:
@@ -141,7 +141,8 @@ class Solver:
         s = self.s
         bins, start_ind, total_size = self._compute_segment_bins(current_level)
 
-        print("[solver] create segment heatmap")
+        if self.s.output_level >= 1:
+            print("[solver] create segment heatmap")
         h_raw = create_singleton_heatmap_from_contacts(
             self._singletons, bins, start_ind, total_size
         )
@@ -196,15 +197,19 @@ class Solver:
         best_score = -1.0
         best_pos = pos.copy()
 
+        log1 = s.output_level >= 1
+        log2 = s.output_level >= 2
         for run in range(s.steps_lvl2):
-            print(f"[solver] heatmap run {run + 1}/{s.steps_lvl2}  ({n} beads)")
-            # Randomise initial positions
+            if log1:
+                print(f"[solver] heatmap run {run + 1}/{s.steps_lvl2}  ({n} beads)")
             for i in range(n):
                 pos[i] = self.clusters[active_region[i]].pos + random_vector_np(step_size)
 
             score = mc_heatmap(pos, self.heatmap_dist, self.heatmap_dist_diag,
-                               step_size, s, label=f"heatmap run {run + 1}")
-            print(f"  → score={score:.6f}  best={best_score:.6f}")
+                               step_size, s, label=f"heatmap run {run + 1}",
+                               verbose=log2)
+            if log1:
+                print(f"  → score={score:.6f}  best={best_score:.6f}")
 
             if score < best_score or best_score < 0:
                 best_score = score
@@ -285,7 +290,8 @@ class Solver:
             if not segs:
                 continue
 
-            print(f"\n[solver] anchor level: {chr_}")
+            if self.s.output_level >= 1:
+                print(f"\n[solver] anchor level: {chr_}")
             self._position_interaction_blocks(segs)
 
             ibs = []
@@ -301,7 +307,8 @@ class Solver:
                 active_region = list(ib.children)
                 ib_label = f"{chr_} IB {ib_i + 1}/{n_ibs}"
                 if len(active_region) <= 1:
-                    print(f"  {ib_label}  ({len(active_region)} anchors — skip)")
+                    if self.s.output_level >= 1:
+                        print(f"  {ib_label}  ({len(active_region)} anchors — skip)")
                     continue
                 for a_idx in active_region:
                     self.clusters[a_idx].pos = ib.pos.copy()
@@ -347,10 +354,15 @@ class Solver:
         All work for one IB: arc MC + smooth MC.  Safe to call from a thread
         because each IB owns a disjoint subset of cluster indices.
         """
-        print(f"\n[solver] {ib_label}  ({len(active_region)} anchors)")
+        log1 = self.s.output_level >= 1
+        log2 = self.s.output_level >= 2
+        if log1:
+            print(f"\n[solver] {ib_label}  ({len(active_region)} anchors)")
         exp_dist = self._calc_anchor_expected_distances(active_region, chr_)
-        self._reconstruct_cluster_arcs(ib_idx, active_region, exp_dist, ib_label)
-        return self._reconstruct_cluster_smooth(active_region, ib_label)
+        self._reconstruct_cluster_arcs(ib_idx, active_region, exp_dist, ib_label,
+                                       log1=log1, log2=log2)
+        return self._reconstruct_cluster_smooth(active_region, ib_label,
+                                                log1=log1, log2=log2)
 
     def _calc_anchor_expected_distances(self, active_region: list, chr_: str) -> np.ndarray:
         """
@@ -392,6 +404,8 @@ class Solver:
         active_region: list,
         exp_dist: np.ndarray,
         label: str = "",
+        log1: bool = True,
+        log2: bool = True,
     ) -> None:
         """
         MC reconstruction for one interaction block (anchor level).
@@ -418,14 +432,14 @@ class Solver:
 
         for run in range(s.steps_arcs):
             run_label = f"{label} run {run + 1}/{s.steps_arcs}" if label else f"arcs run {run + 1}"
-            print(f"  {run_label}")
-            # Random initial displacement for anchors
+            if log1:
+                print(f"  {run_label}")
             pos = initial_pos.copy()
             for i in range(active_size):
                 pos[i] += random_vector_np(noise_size_small)
 
             score = mc_arcs(pos, exp_dist, noise_size_small, s,
-                            label=run_label)
+                            label=run_label, verbose=log2)
 
             if score < best_score or best_score < 0:
                 best_score = score
@@ -502,7 +516,8 @@ class Solver:
 
         return pos_arr, fixed_arr, bead_gpos, dtn, anchor_map
 
-    def _reconstruct_cluster_smooth(self, active_region: list, label: str = "") -> list:
+    def _reconstruct_cluster_smooth(self, active_region: list, label: str = "",
+                                    log1: bool = True, log2: bool = True) -> list:
         """
         Densify active region, then run smooth MC (chain + angle energy).
         Writes final anchor positions back to self.clusters.
@@ -523,13 +538,15 @@ class Solver:
 
         for run in range(s.steps_smooth):
             run_label = f"{label} smooth {run + 1}/{s.steps_smooth}"
-            print(f"  {run_label}")
+            if log1:
+                print(f"  {run_label}")
             pos_run = best_pos.copy()
             for i in range(n):
                 if not fixed[i]:
                     pos_run[i] += random_vector_np(step_size)
 
-            score = mc_smooth(pos_run, dtn, fixed, step_size, s, label=run_label)
+            score = mc_smooth(pos_run, dtn, fixed, step_size, s, label=run_label,
+                              verbose=log2)
 
             if score < best_score or best_score < 0:
                 best_score = score
