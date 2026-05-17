@@ -121,8 +121,8 @@ class Settings:
         self.mc_stop_improvement_smooth = 0.995
         self.mc_stop_successes_smooth = 5
         self.mc_stop_steps_smooth = 10000
-        self.weight_dist_smooth = 1.0
-        self.weight_angle_smooth = 1.0
+        self.smooth_dist_weight = 1.0
+        self.smooth_angle_weight = 1.0
 
     def load_ini(self, path: str) -> bool:
         cfg = configparser.ConfigParser()
@@ -245,8 +245,8 @@ class Settings:
         self.mc_stop_successes = geti("simulation_arcs", "stop_condition_successes_threshold", self.mc_stop_successes)
 
         # [simulation_arcs_smooth]
-        self.weight_dist_smooth = getf("simulation_arcs_smooth", "dist_weight", self.weight_dist_smooth)
-        self.weight_angle_smooth = getf("simulation_arcs_smooth", "angle_weight", self.weight_angle_smooth)
+        self.smooth_dist_weight = getf("simulation_arcs_smooth", "dist_weight", self.smooth_dist_weight)
+        self.smooth_angle_weight = getf("simulation_arcs_smooth", "angle_weight", self.smooth_angle_weight)
         self.max_temp_smooth = getf("simulation_arcs_smooth", "max_temp", self.max_temp_smooth)
         self.dt_temp_smooth = getf("simulation_arcs_smooth", "delta_temp", self.dt_temp_smooth)
         self.jump_scale_smooth = getf("simulation_arcs_smooth", "jump_temp_scale", self.jump_scale_smooth)
