@@ -317,13 +317,24 @@ class Solver:
             n_workers = min(len(work), os.cpu_count() or 1)
             beads_by_order: dict[int, list] = {}
 
-            with ThreadPoolExecutor(max_workers=n_workers) as pool:
-                futures = {
-                    pool.submit(self._process_ib, ib_idx, ib_label, active_region, chr_): ib_i
-                    for ib_i, ib_idx, ib_label, active_region in work
-                }
+            pool = ThreadPoolExecutor(max_workers=n_workers)
+            futures = {
+                pool.submit(self._process_ib, ib_idx, ib_label, active_region, chr_): ib_i
+                for ib_i, ib_idx, ib_label, active_region in work
+            }
+            # Daemon threads die with the main thread so Ctrl+C exits cleanly.
+            for t in pool._threads:
+                t.daemon = True
+            try:
                 for fut in as_completed(futures):
                     beads_by_order[futures[fut]] = fut.result()
+            except KeyboardInterrupt:
+                for f in futures:
+                    f.cancel()
+                pool.shutdown(wait=False)
+                raise
+            else:
+                pool.shutdown(wait=True)
 
             for ib_i in sorted(beads_by_order):
                 self.dense_active_regions.setdefault(chr_, []).extend(beads_by_order[ib_i])
