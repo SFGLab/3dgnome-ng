@@ -39,7 +39,6 @@ class Solver:
         self.chr_root: dict[str, int] = {}
         self.chr_first_cluster: dict[str, int] = {}
         self.chrs: list[str] = []
-        self.current_chr: str = ""
 
         # Arc data (after mark_arcs / remove_empty_anchors)
         self.anchors: dict = {}   # chr → list[Anchor]
@@ -48,9 +47,6 @@ class Solver:
         # Heatmap structures
         self.heatmap_dist: np.ndarray | None = None   # (N, N) expected distances
         self.heatmap_dist_diag: int = 0
-
-        # Anchor-level expected distances (per IB)
-        self.exp_dist_anchor: np.ndarray | None = None  # (n_active, n_active)
 
         self.selected_region: BedRegion | None = None
         self.dense_active_regions: dict = {}  # chr → list of (gpos, x, y, z)
@@ -269,59 +265,61 @@ class Solver:
         """
         Position anchor beads using arc spring MC.
         Mirrors C++ LooperSolver::reconstructClustersArcsDistances().
+
+        IBs are independent (disjoint cluster subsets) and run in parallel via
+        a thread pool.  Numba releases the GIL during MC, so threads genuinely
+        overlap on multi-core hardware.
         """
-        s = self.s
+        import os
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         self.dense_active_regions = {}
 
-        # Set segment level
         seg_level = set_level(
             LVL_SEGMENT - LVL_CHROMOSOME,
             self.chr_root, self.clusters, self.chrs
         )
 
         for chr_ in self.chrs:
-            self.current_chr = chr_
             segs = seg_level.get(chr_, [])
             if not segs:
                 continue
 
             print(f"\n[solver] anchor level: {chr_}")
-
-            # positionInteractionBlocks: set initial IB positions from segment positions
             self._position_interaction_blocks(segs)
 
-            # Get IB-level cluster indices
-            ib_level = {}
+            ibs = []
             for seg_idx in segs:
-                ib_level.setdefault(chr_, []).extend(self.clusters[seg_idx].children)
-
-            ibs = ib_level.get(chr_, [])
+                ibs.extend(self.clusters[seg_idx].children)
             n_ibs = len(ibs)
 
+            # Set initial anchor positions before submitting (sequential — reads ib.pos
+            # which is only written by _position_interaction_blocks above).
+            work = []
             for ib_i, ib_idx in enumerate(ibs):
-                ib_label = f"{chr_} IB {ib_i + 1}/{n_ibs}"
                 ib = self.clusters[ib_idx]
                 active_region = list(ib.children)
-
+                ib_label = f"{chr_} IB {ib_i + 1}/{n_ibs}"
                 if len(active_region) <= 1:
                     print(f"  {ib_label}  ({len(active_region)} anchors — skip)")
                     continue
-
-                print(f"\n[solver] {ib_label}  ({len(active_region)} anchors)")
-
-                # Place all anchors at IB position initially
                 for a_idx in active_region:
                     self.clusters[a_idx].pos = ib.pos.copy()
+                work.append((ib_i, ib_idx, ib_label, active_region))
 
-                # Compute expected distances from arcs
-                self._calc_anchor_expected_distances(active_region)
+            n_workers = min(len(work), os.cpu_count() or 1)
+            beads_by_order: dict[int, list] = {}
 
-                # Reconstruct anchor positions
-                self._reconstruct_cluster_arcs(ib_idx, active_region, ib_label)
+            with ThreadPoolExecutor(max_workers=n_workers) as pool:
+                futures = {
+                    pool.submit(self._process_ib, ib_idx, ib_label, active_region, chr_): ib_i
+                    for ib_i, ib_idx, ib_label, active_region in work
+                }
+                for fut in as_completed(futures):
+                    beads_by_order[futures[fut]] = fut.result()
 
-                # Densify + smooth MC
-                beads = self._reconstruct_cluster_smooth(active_region, ib_label)
-                self.dense_active_regions.setdefault(chr_, []).extend(beads)
+            for ib_i in sorted(beads_by_order):
+                self.dense_active_regions.setdefault(chr_, []).extend(beads_by_order[ib_i])
 
     def _position_interaction_blocks(self, segs: list) -> None:
         """
@@ -338,24 +336,37 @@ class Solver:
                 pos = pos + random_vector_np(100.0)
                 self.clusters[ib_idx].pos = pos.copy()
 
-    def _calc_anchor_expected_distances(self, active_region: list) -> None:
+    def _process_ib(
+        self,
+        ib_idx: int,
+        ib_label: str,
+        active_region: list,
+        chr_: str,
+    ) -> list:
+        """
+        All work for one IB: arc MC + smooth MC.  Safe to call from a thread
+        because each IB owns a disjoint subset of cluster indices.
+        """
+        print(f"\n[solver] {ib_label}  ({len(active_region)} anchors)")
+        exp_dist = self._calc_anchor_expected_distances(active_region, chr_)
+        self._reconstruct_cluster_arcs(ib_idx, active_region, exp_dist, ib_label)
+        return self._reconstruct_cluster_smooth(active_region, ib_label)
+
+    def _calc_anchor_expected_distances(self, active_region: list, chr_: str) -> np.ndarray:
         """
         Build expected distance matrix for anchor-level active region.
         Mirrors C++ calcAnchorExpectedDistancesHeatmap().
 
-        exp_dist_anchor[i][j]:
-          -1   → pair with no arc (repulsion)
-           0   → diagonal (self)
-          >0   → arc expected distance from freqToDistance(score)
+        Returns mat where:
+          mat[i,j] = -1  → repulsion (no arc)
+          mat[i,j] =  0  → diagonal (self)
+          mat[i,j] > 0   → expected distance from freqToDistance(score)
         """
         n = len(active_region)
         mat = np.full((n, n), -1.0, dtype=np.float64)
         np.fill_diagonal(mat, 0.0)
 
-        # Map global cluster index → active index
         cluster_to_active = {ci: ai for ai, ci in enumerate(active_region)}
-
-        chr_ = self.current_chr
         chr_arcs = self.arcs.get(chr_, [])
 
         for ai, ci in enumerate(active_region):
@@ -365,25 +376,21 @@ class Solver:
                 arc = chr_arcs[arc_local]
                 other = arc.end if arc.start == ci else arc.start
 
-                if other < ci:
-                    continue  # only forward
-
-                if other not in cluster_to_active:
+                if other < ci or other not in cluster_to_active:
                     continue
 
                 bi = cluster_to_active[other]
-                freq = arc.score
-                exp_d = self.s.freq_to_distance(freq)
-
+                exp_d = self.s.freq_to_distance(arc.score)
                 mat[ai, bi] = exp_d
                 mat[bi, ai] = exp_d
 
-        self.exp_dist_anchor = mat
+        return mat
 
     def _reconstruct_cluster_arcs(
         self,
         ib_idx: int,
         active_region: list,
+        exp_dist: np.ndarray,
         label: str = "",
     ) -> None:
         """
@@ -417,7 +424,7 @@ class Solver:
             for i in range(active_size):
                 pos[i] += random_vector_np(noise_size_small)
 
-            score = mc_arcs(pos, self.exp_dist_anchor, noise_size_small, s,
+            score = mc_arcs(pos, exp_dist, noise_size_small, s,
                             label=run_label)
 
             if score < best_score or best_score < 0:

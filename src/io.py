@@ -231,8 +231,6 @@ def mark_arcs(
                 a = chr_anchors[i]
                 if a.length() > 1 and a.start <= pos <= a.end:
                     return i
-                if a.end < pos:
-                    break
                 i -= 1
             return -1
 
