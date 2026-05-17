@@ -3,75 +3,56 @@ src/mc.py  —  Monte Carlo simulation loops for 3dgnome-torch.
 
 Mirrors C++ LooperSolver::MonteCarloHeatmap() and MonteCarloArcs().
 
-Both loops use:
-  - Sequential Metropolis steps (cannot be parallelised within a chain)
-  - Uniform cube displacement: each component in [-step, step]
-  - Temperature cooling: T *= dt each step
-  - Milestone-based convergence: check every mc_stop_steps steps whether
-    the score improved by at least (1 - threshold) and there were enough
-    successful moves
+The sequential MC inner loop runs on CPU with vectorized NumPy operations.
+GPU dispatch overhead (~100–200 µs/kernel) dominates for the small N typical
+in this algorithm (50–200 anchor beads per IB), making MPS/CUDA slower than
+CPU for the per-step O(N) local score computation.  NumPy is 50–200× faster
+here in practice.
+
+The O(N²) initial global score is still computed with a single vectorized
+NumPy call (fast regardless of device).
 
 Acceptance criterion (both loops):
-    ok = (score_curr <= score_prev) OR rand() < jump_scale * exp(-jump_coef * score_curr/score_prev / T)
-
-Local scores are computed with vectorized torch tensor ops (no Python loop
-over beads), enabling GPU/MPS acceleration.  The accept/reject decision and
-temperature schedule remain on CPU (scalar operations).
+    ok = (score_curr <= score_prev)
+      or rand() < jump_scale * exp(-jump_coef * score_curr/score_prev / T)
 """
 
 import math
 import random
 
 import numpy as np
-import torch
-
-from .energy import get_device
 
 
 # ---------------------------------------------------------------------------
-# Vectorized local score helpers
-# Each computes the score contribution of one bead relative to all others
-# using a single set of tensor operations (O(N) kernel, no Python loop).
+# Vectorized local score helpers (NumPy, no Python loop over beads)
 
-def _local_heatmap(
-    pos: torch.Tensor,       # (N, 3)
-    exp: torch.Tensor,       # (N, N)
-    skip: torch.Tensor,      # (N, N) bool — True = exclude
-    p: int,
-) -> torch.Tensor:
-    """Local heatmap score for bead p — column-p slice of the global score."""
-    skip_p = skip[:, p]                          # (N,)
-    d = (pos - pos[p]).norm(dim=1)               # (N,)
-    e = exp[:, p].masked_fill(skip_p, 1.0)       # safe denominator
+def _local_heatmap(pos, exp_safe, skip_col, p):
+    """Local heatmap score for bead p.  skip_col: (N,) bool for column p."""
+    diff = pos - pos[p]                          # (N, 3)
+    d = np.sqrt((diff * diff).sum(axis=1))       # (N,)
+    e = np.where(skip_col, 1.0, exp_safe[:, p])
     err = (d - e) / e
-    return (err * err).masked_fill(skip_p, 0.0).sum()
+    err[skip_col] = 0.0
+    return float(np.dot(err, err))
 
 
-def _local_arcs(
-    pos: torch.Tensor,       # (N, 3)
-    exp: torch.Tensor,       # (N, N)  -1=repulsion, 0=none, >0=spring
-    p: int,
-    stretch_k: float,
-    squeeze_k: float,
-) -> torch.Tensor:
-    """Local arc score for bead p — all other beads, no Python loop."""
-    d = (pos - pos[p]).norm(dim=1)   # (N,)
-    e = exp[:, p]                    # (N,)
-
-    sc = pos.new_zeros(())
+def _local_arcs(pos, exp, p, stretch_k, squeeze_k):
+    """Local arc score for bead p.  exp[i,j]=-1 repulsion, 0 none, >0 spring."""
+    diff = pos - pos[p]
+    d = np.sqrt((diff * diff).sum(axis=1))   # (N,)
+    e = exp[:, p]                             # (N,)
 
     rep = e < 0.0
-    if rep.any():
-        sc = sc + (1.0 / d[rep].clamp(min=1e-10)).sum()
-
     spr = e >= 1e-6
+    sc = 0.0
+    if rep.any():
+        sc += (1.0 / np.maximum(d[rep], 1e-10)).sum()
     if spr.any():
         es, ds = e[spr], d[spr]
         rel = (ds - es) / es
         st = rel >= 0.0
-        sc = sc + (rel[st] ** 2).sum() * stretch_k
-        sc = sc + (rel[~st] ** 2).sum() * squeeze_k
-
+        sc += float((rel[st] * rel[st]).sum()) * stretch_k
+        sc += float((rel[~st] * rel[~st]).sum()) * squeeze_k
     return sc
 
 
@@ -89,27 +70,20 @@ def mc_heatmap(
     """
     MonteCarloHeatmap: simulated annealing using heatmap distance energy.
 
-    Global score is double-counted (Σ_moved Σ_i err), so the update rule is:
+    Global score is double-counted, so the MC update rule is:
         score_curr += 2 * (local_curr - local_prev)
 
-    Uses vectorized torch ops on the best available device (CUDA > MPS > CPU).
-    Mirrors C++ LooperSolver::MonteCarloHeatmap().
-    Returns final score.
+    Mirrors C++ LooperSolver::MonteCarloHeatmap().  Returns final score.
     """
     n = pos.shape[0]
     if n <= 1:
         return 0.0
 
-    device = get_device()
-    dtype = torch.float32 if device.type == "mps" else torch.float64
-
-    pos_t = torch.tensor(pos, dtype=dtype, device=device)
-    exp_t = torch.tensor(exp_dist, dtype=dtype, device=device)
-
-    # Precompute skip mask once — valid for entire run (exp_t never changes)
-    idx = torch.arange(n, device=device, dtype=torch.long)
-    diag_mask = (idx.unsqueeze(0) - idx.unsqueeze(1)).abs() < diag_size
-    skip = diag_mask | (exp_t < 1e-6)   # (N, N)
+    # Precompute static skip mask once — never changes during the run
+    idx = np.arange(n)
+    diag_mask = np.abs(idx[:, None] - idx[None, :]) < diag_size  # (N, N)
+    skip = diag_mask | (exp_dist < 1e-6)                          # (N, N) bool
+    exp_safe = np.where(skip, 1.0, exp_dist)                       # safe denominator
 
     T = settings.max_temp_heatmap
     dt = settings.dt_temp_heatmap
@@ -119,65 +93,67 @@ def mc_heatmap(
     stop_improvement = settings.mc_stop_improvement_heatmap
     stop_successes = settings.mc_stop_successes_heatmap
 
-    with torch.no_grad():
-        # Initial global score: fully vectorized O(N²)
-        e_safe = exp_t.masked_fill(skip, 1.0)
-        diff = pos_t.unsqueeze(1) - pos_t.unsqueeze(0)   # (N, N, 3)
-        d_mat = diff.norm(dim=2)                           # (N, N)
-        cerr = (d_mat - e_safe) / e_safe
-        score_curr = (cerr * cerr).masked_fill(skip, 0.0).sum().item()
+    # Initial global score: vectorized O(N²) — done once
+    diff0 = pos[:, None, :] - pos[None, :, :]       # (N, N, 3)
+    d0 = np.sqrt((diff0 * diff0).sum(axis=2))        # (N, N)
+    cerr0 = (d0 - exp_safe) / exp_safe
+    score_curr = float(np.where(skip, 0.0, cerr0 * cerr0).sum())
+
+    score_prev = score_curr
+    milestone_score = score_curr
+    milestone_success = 0
+    step_i = 1
+    prefix = f"    [{label}] " if label else "    "
+
+    while True:
+        p = random.randrange(n)
+        disp = np.array([
+            random.uniform(-step_size, step_size),
+            random.uniform(-step_size, step_size),
+            random.uniform(-step_size, step_size),
+        ], dtype=pos.dtype)
+
+        local_prev = _local_heatmap(pos, exp_safe, skip[:, p], p)
+        pos[p] += disp
+        local_curr = _local_heatmap(pos, exp_safe, skip[:, p], p)
+
+        score_curr = score_curr + 2.0 * (local_curr - local_prev)
+
+        ok = score_curr <= score_prev
+        if not ok and T > 0.0:
+            tp = jump_scale * math.exp(-jump_coef * (score_curr / score_prev) / T)
+            ok = random.random() < tp
+
+        if ok:
+            milestone_success += 1
+        else:
+            pos[p] -= disp
+            score_curr = score_prev
+
+        T *= dt
+
+        if step_i % stop_steps == 0:
+            ratio = score_curr / milestone_score if milestone_score > 0 else 1.0
+            converged = (
+                (score_curr > stop_improvement * milestone_score
+                 and milestone_success < stop_successes)
+                or score_curr < 1e-6
+                or ratio > 0.9999
+            )
+            print(
+                f"{prefix}step {step_i:>7,}  score={score_curr:.4f}"
+                f"  ratio={ratio:.4f}  ok={milestone_success}/{stop_steps}"
+                + ("  [done]" if converged else ""),
+                flush=True,
+            )
+            if converged:
+                break
+            milestone_score = score_curr
+            milestone_success = 0
 
         score_prev = score_curr
-        milestone_score = score_curr
-        milestone_success = 0
-        step_i = 1
-        prefix = f"    [{label}] " if label else "    "
+        step_i += 1
 
-        while True:
-            p = random.randrange(n)
-            disp = (torch.rand(3, device=device, dtype=dtype) * 2.0 - 1.0) * step_size
-
-            local_prev = _local_heatmap(pos_t, exp_t, skip, p).item()
-            pos_t[p] += disp
-            local_curr = _local_heatmap(pos_t, exp_t, skip, p).item()
-
-            score_curr = score_curr + 2.0 * (local_curr - local_prev)
-
-            ok = score_curr <= score_prev
-            if not ok and T > 0.0:
-                tp = jump_scale * math.exp(-jump_coef * (score_curr / score_prev) / T)
-                ok = random.random() < tp
-
-            if ok:
-                milestone_success += 1
-            else:
-                pos_t[p] -= disp
-                score_curr = score_prev
-
-            T *= dt
-
-            if step_i % stop_steps == 0:
-                ratio = score_curr / milestone_score if milestone_score > 0 else 1.0
-                converged = (
-                    (score_curr > stop_improvement * milestone_score
-                     and milestone_success < stop_successes)
-                    or score_curr < 1e-6
-                )
-                print(
-                    f"{prefix}step {step_i:>7,}  score={score_curr:.4f}"
-                    f"  ratio={ratio:.4f}  ok={milestone_success}/{stop_steps}"
-                    + ("  [done]" if converged else ""),
-                    flush=True,
-                )
-                if converged:
-                    break
-                milestone_score = score_curr
-                milestone_success = 0
-
-            score_prev = score_curr
-            step_i += 1
-
-    pos[:] = pos_t.cpu().to(torch.float32).numpy()
     return score_curr
 
 
@@ -191,23 +167,15 @@ def mc_arcs(
     """
     MonteCarloArcs: simulated annealing using arc spring energy.
 
-    Global score counts i < j pairs once.  Local score for bead p sums ALL
-    other beads (not just i < p), so:
+    Global score counts i < j pairs once.  Local score sums ALL other beads,
+    so the MC update rule is:
         score_curr = score_curr - local_prev + local_curr   (no factor 2)
 
-    Uses vectorized torch ops on the best available device (CUDA > MPS > CPU).
-    Mirrors C++ LooperSolver::MonteCarloArcs().
-    Returns final score.
+    Mirrors C++ LooperSolver::MonteCarloArcs().  Returns final score.
     """
     n = pos.shape[0]
     if n <= 1:
         return 0.0
-
-    device = get_device()
-    dtype = torch.float32 if device.type == "mps" else torch.float64
-
-    pos_t = torch.tensor(pos, dtype=dtype, device=device)
-    exp_t = torch.tensor(exp_dist_mat, dtype=dtype, device=device)
 
     T = settings.max_temp
     dt = settings.dt_temp
@@ -219,75 +187,76 @@ def mc_arcs(
     stretch_k = settings.spring_stretch_arcs
     squeeze_k = settings.spring_squeeze_arcs
 
-    with torch.no_grad():
-        # Initial global score: i < j pairs, fully vectorized
-        i_idx, j_idx = torch.triu_indices(n, n, offset=1, device=device)
-        d_ij = (pos_t[i_idx] - pos_t[j_idx]).norm(dim=1)
-        e_ij = exp_t[i_idx, j_idx]
+    # Initial global score: i < j pairs, vectorized O(N²) — done once
+    i_idx, j_idx = np.triu_indices(n, k=1)
+    diff0 = pos[i_idx] - pos[j_idx]                   # (M, 3)
+    d0 = np.sqrt((diff0 * diff0).sum(axis=1))          # (M,)
+    e0 = exp_dist_mat[i_idx, j_idx]                    # (M,)
+    rep0, spr0 = e0 < 0.0, e0 >= 1e-6
+    score_curr = 0.0
+    if rep0.any():
+        score_curr += (1.0 / np.maximum(d0[rep0], 1e-10)).sum()
+    if spr0.any():
+        es0, ds0 = e0[spr0], d0[spr0]
+        rel0 = (ds0 - es0) / es0
+        st0 = rel0 >= 0.0
+        score_curr += float((rel0[st0] * rel0[st0]).sum()) * stretch_k
+        score_curr += float((rel0[~st0] * rel0[~st0]).sum()) * squeeze_k
 
-        rep = e_ij < 0.0
-        spr = e_ij >= 1e-6
-        score_curr = 0.0
-        if rep.any():
-            score_curr += (1.0 / d_ij[rep].clamp(min=1e-10)).sum().item()
-        if spr.any():
-            es, ds = e_ij[spr], d_ij[spr]
-            rel = (ds - es) / es
-            st = rel >= 0.0
-            score_curr += ((rel[st] ** 2).sum() * stretch_k
-                           + (rel[~st] ** 2).sum() * squeeze_k).item()
+    score_prev = score_curr
+    milestone_score = score_curr
+    milestone_success = 0
+    step_i = 1
+    prefix = f"    [{label}] " if label else "    "
+
+    while True:
+        p = random.randrange(n)
+        disp = np.array([
+            random.uniform(-step_size, step_size),
+            random.uniform(-step_size, step_size),
+            random.uniform(-step_size, step_size),
+        ], dtype=pos.dtype)
+
+        local_prev = _local_arcs(pos, exp_dist_mat, p, stretch_k, squeeze_k)
+        pos[p] += disp
+        local_curr = _local_arcs(pos, exp_dist_mat, p, stretch_k, squeeze_k)
+
+        score_curr = score_curr - local_prev + local_curr
+
+        ok = score_curr <= score_prev
+        if not ok:
+            if score_prev > 0:
+                tp = jump_scale * math.exp(-jump_coef * (score_curr / score_prev) / T)
+                ok = random.random() < tp
+
+        if ok:
+            milestone_success += 1
+        else:
+            pos[p] -= disp
+            score_curr = score_prev
+
+        T *= dt
+
+        if step_i % stop_steps == 0:
+            ratio = score_curr / milestone_score if milestone_score > 0 else 1.0
+            converged = (
+                (score_curr > stop_improvement * milestone_score
+                 and milestone_success < stop_successes)
+                or score_curr < 1e-5
+                or ratio > 0.9999
+            )
+            print(
+                f"{prefix}step {step_i:>7,}  score={score_curr:.4f}"
+                f"  ratio={ratio:.4f}  ok={milestone_success}/{stop_steps}"
+                + ("  [done]" if converged else ""),
+                flush=True,
+            )
+            if converged:
+                break
+            milestone_score = score_curr
+            milestone_success = 0
 
         score_prev = score_curr
-        milestone_score = score_curr
-        milestone_success = 0
-        step_i = 1
-        prefix = f"    [{label}] " if label else "    "
+        step_i += 1
 
-        while True:
-            p = random.randrange(n)
-            disp = (torch.rand(3, device=device, dtype=dtype) * 2.0 - 1.0) * step_size
-
-            local_prev = _local_arcs(pos_t, exp_t, p, stretch_k, squeeze_k).item()
-            pos_t[p] += disp
-            local_curr = _local_arcs(pos_t, exp_t, p, stretch_k, squeeze_k).item()
-
-            score_curr = score_curr - local_prev + local_curr
-
-            ok = score_curr <= score_prev
-            if not ok:
-                if score_prev > 0:
-                    tp = jump_scale * math.exp(-jump_coef * (score_curr / score_prev) / T)
-                    ok = random.random() < tp
-
-            if ok:
-                milestone_success += 1
-            else:
-                pos_t[p] -= disp
-                score_curr = score_prev
-
-            T *= dt
-
-            if step_i % stop_steps == 0:
-                ratio = score_curr / milestone_score if milestone_score > 0 else 1.0
-                converged = (
-                    (score_curr > stop_improvement * milestone_score
-                     and milestone_success < stop_successes)
-                    or score_curr < 1e-5
-                    or ratio > 0.9999
-                )
-                print(
-                    f"{prefix}step {step_i:>7,}  score={score_curr:.4f}"
-                    f"  ratio={ratio:.4f}  ok={milestone_success}/{stop_steps}"
-                    + ("  [done]" if converged else ""),
-                    flush=True,
-                )
-                if converged:
-                    break
-                milestone_score = score_curr
-                milestone_success = 0
-
-            score_prev = score_curr
-            step_i += 1
-
-    pos[:] = pos_t.cpu().to(torch.float32).numpy()
     return score_curr
