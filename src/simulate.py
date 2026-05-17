@@ -1,7 +1,7 @@
 """
 src/simulate.py  —  Public entry point for 3dgnome-torch.
 
-Exposes run_region(), the interface consumed by harness/integration.py.
+Exposes run_region() and run_chromosome(), the main entry points.
 """
 
 from __future__ import annotations
@@ -56,11 +56,17 @@ def run_region(
 
     print(f"[simulate] device: {get_device()}")
 
-    # 1. Parse region string
+    # 1. Parse region string — accept 'chr:start-end' or bare 'chrN' (full chromosome)
     bed_region = parse_region(region)
     if bed_region is None:
-        raise ValueError(f"Cannot parse region: {region!r}")
-    chrs_list = [bed_region.chr]
+        # Accept bare chromosome name with no coordinate range
+        chrom = region.strip()
+        if not chrom:
+            raise ValueError(f"Cannot parse region: {region!r}")
+        bed_region = None
+        chrs_list = [chrom]
+    else:
+        chrs_list = [bed_region.chr]
 
     # 2. Load settings
     s = Settings()
@@ -84,7 +90,7 @@ def run_region(
         solver.reconstruct_heatmap()
         solver.reconstruct_arcs()
 
-        beads = solver.get_leaf_positions(bed_region.chr)
+        beads = solver.get_leaf_positions(chrs_list[0])
         if not beads:
             raise RuntimeError(
                 f"Structure {i + 1}: no leaf beads returned — "
@@ -93,3 +99,31 @@ def run_region(
         structures.append(beads)
 
     return structures
+
+
+def run_chromosome(
+    config_path: str,
+    chrom: str,
+    n_structures: int,
+    data_dir: str | None = None,
+) -> list:
+    """
+    Run MC reconstruction for an entire chromosome (no coordinate range filter).
+
+    Parameters
+    ----------
+    config_path : str
+        Path to the .ini config file.
+    chrom : str
+        Chromosome name, e.g. 'chr1'.
+    n_structures : int
+        Number of independent MC runs.
+    data_dir : str, optional
+        Override data_dir from the config.
+
+    Returns
+    -------
+    list of list of (midpoint_bp, x, y, z)
+        One entry per structure, sorted by genomic midpoint.
+    """
+    return run_region(config_path, chrom, n_structures, data_dir=data_dir)
