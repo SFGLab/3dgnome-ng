@@ -48,7 +48,10 @@ def freq_to_dist_heatmap_inter(freq: float, scale_inter: float, power_inter: flo
 
 def freq_to_distance(freq: int, a: float, scale: float, shift: float, base_level: float) -> float:
     """C++: freqToDistance(freq) = base_level + scale / exp(a * (freq + shift))"""
-    return base_level + scale / math.exp(a * (freq + shift))
+    try:
+        return base_level + scale / math.exp(a * (freq + shift))
+    except OverflowError:  # C++ exp() returns inf → scale/inf = 0
+        return base_level
 
 
 # ---------------------------------------------------------------------------
