@@ -246,3 +246,6 @@ docs/
 .com.apple.timemachine.snapshots
 .com.apple.timemachine.localsnapshots
 .com.apple.timemachine.mobilesync
+
+# scorer
+harness/scorer
