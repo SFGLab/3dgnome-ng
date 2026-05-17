@@ -18,14 +18,10 @@ from pathlib import Path
 import numpy as np
 
 from .settings import Settings
+from .data import ContactData
 from .io import (
     BedRegion,
-    load_anchors,
-    load_arcs,
-    mark_arcs,
-    remove_empty_anchors,
-    load_breakpoints,
-    create_singleton_heatmap,
+    create_singleton_heatmap_from_contacts,
 )
 from .hierarchy import (
     Cluster, LVL_ANCHOR, LVL_SEGMENT, LVL_INTERACTION_BLOCK, LVL_CHROMOSOME,
@@ -58,48 +54,30 @@ class Solver:
 
         self.selected_region: BedRegion | None = None
         self.dense_active_regions: dict = {}  # chr → list of (gpos, x, y, z)
+        self._singletons: list = []
 
     # -----------------------------------------------------------------------
     # Data loading and hierarchy construction
 
-    def set_contact_data(
+    def load(
         self,
+        data: ContactData,
         chrs_list: list,
-        region: BedRegion | None,
-        data_dir: str,
+        region: BedRegion | None = None,
     ) -> None:
         """
-        Load anchors + arcs, build cluster hierarchy.
+        Accept pre-loaded contact data and build the cluster hierarchy.
         Mirrors C++ LooperSolver::setContactData().
         """
-        s = self.s
         self.chrs = chrs_list
         self.selected_region = region
-        chr_set = set(chrs_list)
-
-        anchor_path = s.data_path(s.data_anchors)
-        arc_path = s.data_path(s.data_pet_clusters)
-        seg_split_path = s.data_path(s.data_segment_split)
-
-        print("[solver] load anchors")
-        self.anchors = load_anchors(anchor_path, chr_set, region)
-
-        print("[solver] load arcs")
-        raw_arcs = load_arcs(arc_path, chr_set, region, s.max_pet_length)
-
-        print("[solver] mark arcs")
-        marked = mark_arcs(self.anchors, raw_arcs)
-
-        print("[solver] remove empty anchors")
-        self.anchors = remove_empty_anchors(self.anchors, marked)
-        self.arcs = marked
-
-        print("[solver] load breakpoints")
-        breakpoints = load_breakpoints(seg_split_path, chrs_list)
+        self.anchors = data.anchors
+        self.arcs = data.arcs
+        self._singletons = data.singletons
 
         print("[solver] build cluster hierarchy")
         self.clusters, self.chr_root, self.chr_first_cluster = build_cluster_tree(
-            self.anchors, self.arcs, breakpoints, chrs_list
+            self.anchors, self.arcs, data.breakpoints, chrs_list
         )
         print(f"  total clusters: {len(self.clusters)}")
 
@@ -167,12 +145,9 @@ class Solver:
         s = self.s
         bins, start_ind, total_size = self._compute_segment_bins(current_level)
 
-        # Create singleton heatmap from file
         print("[solver] create segment heatmap")
-        singleton_path = s.data_path(s.data_singletons)
-        h_raw = create_singleton_heatmap(
-            singleton_path, bins, start_ind, total_size,
-            set(self.chrs), self.selected_region
+        h_raw = create_singleton_heatmap_from_contacts(
+            self._singletons, bins, start_ind, total_size
         )
 
         # Normalize heatmap rows to equal expected sum

@@ -471,6 +471,47 @@ def create_singleton_heatmap(
 
 
 # ---------------------------------------------------------------------------
+# Create singleton heatmap from pre-loaded contacts
+
+def create_singleton_heatmap_from_contacts(
+    contacts: list,
+    bins: dict,
+    start_ind: dict,
+    total_size: int,
+) -> list:
+    """
+    Build a contact frequency heatmap from a list of (chr1,pos1,chr2,pos2,score)
+    tuples (as produced by ContactData.from_files / from_dataframes).
+
+    Drop-in replacement for create_singleton_heatmap() when data is already
+    in memory rather than in a file.
+    """
+    import bisect
+
+    h = [[0.0] * total_size for _ in range(total_size)]
+    ok_cnt = 0
+
+    for c1, p1, c2, p2, sc in contacts:
+        br1 = bins.get(c1)
+        br2 = bins.get(c2)
+        if br1 is None or br2 is None:
+            continue
+
+        si = start_ind.get(c1, -1) + bisect.bisect_right(br1, p1) - 1
+        ei = start_ind.get(c2, -1) + bisect.bisect_right(br2, p2) - 1
+
+        if si < 0 or ei < 0 or si >= total_size or ei >= total_size or si == ei:
+            continue
+
+        h[si][ei] += sc
+        h[ei][si] += sc
+        ok_cnt += 1
+
+    print(f"  singleton heatmap: {ok_cnt} contacts binned, size {total_size}x{total_size}")
+    return h
+
+
+# ---------------------------------------------------------------------------
 # CIF export
 
 def write_cif(

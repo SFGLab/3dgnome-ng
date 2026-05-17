@@ -1,7 +1,7 @@
 """
-src/simulate.py  —  Public entry point for 3dgnome-torch.
+src/simulate.py  —  High-level entry point for 3dgnome-torch.
 
-Exposes run_region() and run_chromosome(), the main entry points.
+Thin wrappers around the Settings / ContactData / Solver pipeline.
 """
 
 from __future__ import annotations
@@ -17,80 +17,63 @@ def run_region(
     data_dir: str | None = None,
 ) -> list:
     """
-    Run MC reconstruction for the given genomic region and return n_structures
-    independent conformations.
+    Run MC reconstruction for the given genomic region.
 
     Parameters
     ----------
     config_path : str
-        Path to the .ini config file (same format as the C++ binary uses).
+        Path to the .ini config file.
     region : str
-        Genomic region in 'chr:start-end' format (e.g. 'chr1:18288319-20307135').
+        Genomic region in 'chr:start-end' format, e.g. 'chr1:18288319-20307135'.
     n_structures : int
         Number of independent MC runs to perform.
     data_dir : str, optional
-        Override the data_dir from the config file.  Useful when the config
-        was written for a different machine (e.g. the bundled GM12878/config.ini
-        has data_dir = /Projects/GM12878/).  If None, uses the value in the config.
+        Override data_dir from the config file.
 
     Returns
     -------
     list of list of (midpoint_bp, x, y, z)
-        One entry per structure.  Each entry is a list of tuples sorted by
-        genomic midpoint.  Includes both original anchor beads and the
-        (loop_density) subanchor beads inserted between each anchor pair by
-        the Level-4 smooth MC, matching the C++ binary output at -v 2.
+        One entry per structure, sorted by genomic midpoint.
+        Includes both anchor beads and loop_density subanchor beads.
     """
-    # Resolve the src package — when called from harness/ with sys.path pointing
-    # at src/, the relative imports inside solver.py etc. use the package name
-    # "src".  We need to make sure the parent directory is importable.
     src_dir = Path(__file__).parent
     repo_root = src_dir.parent
     if str(repo_root) not in sys.path:
         sys.path.insert(0, str(repo_root))
 
-    # Local imports after path fix
     from src.settings import Settings
     from src.io import parse_region
+    from src.data import ContactData
     from src.solver import Solver
     from src.energy import get_device
 
     print(f"[simulate] device: {get_device()}")
 
-    # 1. Parse region string — accept 'chr:start-end' or bare 'chrN' (full chromosome)
     bed_region = parse_region(region)
     if bed_region is None:
-        # Accept bare chromosome name with no coordinate range
         chrom = region.strip()
         if not chrom:
             raise ValueError(f"Cannot parse region: {region!r}")
-        bed_region = None
         chrs_list = [chrom]
     else:
         chrs_list = [bed_region.chr]
 
-    # 2. Load settings
     s = Settings()
-    ok = s.load_ini(config_path)
-    if not ok:
+    if not s.load_ini(config_path):
         raise RuntimeError(f"Failed to load config: {config_path!r}")
-
     if data_dir is not None:
         s.data_dir = str(data_dir)
 
-    # 3. Load data and build hierarchy once (shared across runs)
-    solver = Solver(s)
-    solver.set_contact_data(chrs_list, bed_region, s.data_dir)
+    data = ContactData.from_files(s, chrs_list, bed_region)
 
-    # 4. Run n_structures independent MC trajectories
+    solver = Solver(s)
+    solver.load(data, chrs_list, bed_region)
+
     structures = []
     for i in range(n_structures):
         print(f"\n[simulate] structure {i + 1}/{n_structures}")
-
-        # Reset positions to IB-level positions (re-randomised each run)
         solver.reconstruct_heatmap()
         solver.reconstruct_arcs()
-
         beads = solver.get_leaf_positions(chrs_list[0])
         if not beads:
             raise RuntimeError(
@@ -108,23 +91,5 @@ def run_chromosome(
     n_structures: int,
     data_dir: str | None = None,
 ) -> list:
-    """
-    Run MC reconstruction for an entire chromosome (no coordinate range filter).
-
-    Parameters
-    ----------
-    config_path : str
-        Path to the .ini config file.
-    chrom : str
-        Chromosome name, e.g. 'chr1'.
-    n_structures : int
-        Number of independent MC runs.
-    data_dir : str, optional
-        Override data_dir from the config.
-
-    Returns
-    -------
-    list of list of (midpoint_bp, x, y, z)
-        One entry per structure, sorted by genomic midpoint.
-    """
+    """Run MC reconstruction for an entire chromosome."""
     return run_region(config_path, chrom, n_structures, data_dir=data_dir)
