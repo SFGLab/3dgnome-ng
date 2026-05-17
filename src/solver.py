@@ -11,7 +11,6 @@ Mirrors C++ LooperSolver methods:
 from __future__ import annotations
 
 import math
-import os
 import random
 from pathlib import Path
 
@@ -270,14 +269,7 @@ class Solver:
         """
         Position anchor beads using arc spring MC.
         Mirrors C++ LooperSolver::reconstructClustersArcsDistances().
-
-        IBs are independent (disjoint cluster subsets) and run in parallel via
-        a thread pool.  Numba releases the GIL during MC, so threads genuinely
-        overlap on multi-core hardware.
         """
-        import os
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-
         self.dense_active_regions = {}
 
         seg_level = set_level(
@@ -299,8 +291,6 @@ class Solver:
                 ibs.extend(self.clusters[seg_idx].children)
             n_ibs = len(ibs)
 
-            # Set initial anchor positions before submitting (sequential — reads ib.pos
-            # which is only written by _position_interaction_blocks above).
             work = []
             for ib_i, ib_idx in enumerate(ibs):
                 ib = self.clusters[ib_idx]
@@ -314,30 +304,9 @@ class Solver:
                     self.clusters[a_idx].pos = ib.pos.copy()
                 work.append((ib_i, ib_idx, ib_label, active_region))
 
-            n_workers = min(len(work), os.cpu_count() or 1)
-            beads_by_order: dict[int, list] = {}
-
-            pool = ThreadPoolExecutor(max_workers=n_workers)
-            futures = {
-                pool.submit(self._process_ib, ib_idx, ib_label, active_region, chr_): ib_i
-                for ib_i, ib_idx, ib_label, active_region in work
-            }
-            # Daemon threads die with the main thread so Ctrl+C exits cleanly.
-            for t in pool._threads:
-                t.daemon = True
-            try:
-                for fut in as_completed(futures):
-                    beads_by_order[futures[fut]] = fut.result()
-            except KeyboardInterrupt:
-                for f in futures:
-                    f.cancel()
-                pool.shutdown(wait=False)
-                raise
-            else:
-                pool.shutdown(wait=True)
-
-            for ib_i in sorted(beads_by_order):
-                self.dense_active_regions.setdefault(chr_, []).extend(beads_by_order[ib_i])
+            for ib_i, ib_idx, ib_label, active_region in work:
+                beads = self._process_ib(ib_idx, ib_label, active_region, chr_)
+                self.dense_active_regions.setdefault(chr_, []).extend(beads)
 
     def _position_interaction_blocks(self, segs: list) -> None:
         """
