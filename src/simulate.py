@@ -52,6 +52,9 @@ def run_region(
     from src.settings import Settings
     from src.io import parse_region
     from src.solver import Solver
+    from src.energy import get_device
+
+    print(f"[simulate] device: {get_device()}")
 
     # 1. Parse region string
     bed_region = parse_region(region)

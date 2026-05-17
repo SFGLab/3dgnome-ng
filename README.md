@@ -19,6 +19,24 @@ source .venv/bin/activate
 pip install -e .
 ```
 
+## GPU acceleration
+
+The MC loops use vectorized PyTorch tensor operations and automatically select the best available device:
+
+```
+CUDA  →  NVIDIA GPU (fastest)
+MPS   →  Apple Silicon GPU
+CPU   →  fallback (still faster than pure NumPy due to vectorization)
+```
+
+The device is printed once at the start of each run:
+
+```
+[simulate] device: mps
+```
+
+No code changes are needed to enable GPU — PyTorch finds the device automatically.
+
 ---
 
 ## Building the C++ reference
