@@ -211,15 +211,33 @@ def mark_arcs(
 
     Returns dict[chr → list[InteractionArc]].
     """
+    import bisect
+
     arcs: dict[str, list[InteractionArc]] = {}
 
     for chr_ in anchors:
         chr_anchors = anchors[chr_]
         chr_raw = raw_arcs.get(chr_, [])
 
-        # For each raw arc, find the anchor indices
+        # Binary-search index: anchor start positions (anchors assumed sorted by start).
+        # For a query pos, bisect gives the last anchor with start <= pos; we then
+        # verify pos <= anchor.end.  Anchors in ChIA-PET data don't overlap, so at
+        # most one candidate needs checking.
+        anc_starts = [a.start for a in chr_anchors]
+
+        def find_anchor(pos: int) -> int:
+            i = bisect.bisect_right(anc_starts, pos) - 1
+            while i >= 0:
+                a = chr_anchors[i]
+                if a.length() > 1 and a.start <= pos <= a.end:
+                    return i
+                if a.end < pos:
+                    break
+                i -= 1
+            return -1
+
         result = []
-        tmp_arcs: dict[int, list] = {}  # end → list of staged arcs for current start group
+        tmp_arcs: dict[int, list] = {}  # end_idx → staged arcs for current start group
         last_start = -1
 
         def flush(target_list):
@@ -228,7 +246,6 @@ def mark_arcs(
                     target_list.append(arcs_group[0])
                 else:
                     arcs_group.sort(key=lambda a: a.factor)
-                    # Check multiple factors
                     multiple_factors = any(
                         arcs_group[j].factor != arcs_group[j - 1].factor
                         for j in range(1, len(arcs_group))
@@ -263,17 +280,11 @@ def mark_arcs(
             end = -1
             if idx < cnt:
                 raw = chr_raw[idx]
-                # Find anchor indices
-                for j, anchor in enumerate(chr_anchors):
-                    if anchor.length() > 1 and anchor.contains(raw.start):
-                        st = j
-                    if anchor.length() > 1 and anchor.contains(raw.end):
-                        end = j
+                st  = find_anchor(raw.start)
+                end = find_anchor(raw.end)
 
-                if st == -1 or end == -1:
+                if st == -1 or end == -1 or st == end:
                     continue
-                if st == end:
-                    continue  # looping arc, skip
 
             if st != last_start or idx == cnt:
                 flush(result)
