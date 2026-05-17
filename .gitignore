@@ -220,12 +220,11 @@ __marimo__/
 # Claude
 .claude/
 
-# Data
-data/
-
-# CudaMMC
+# 3dgnome
 cudaMMC/
-3dnome/
+3dnome/HcmToHdfConverter
+3dnome/MDS
+3dnome/viewer
 docs/
 
 # Idea
@@ -250,3 +249,6 @@ docs/
 # scorer
 harness/scorer
 out/
+
+# binaries
+3dnome/3dnome
