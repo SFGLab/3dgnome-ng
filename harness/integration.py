@@ -21,6 +21,7 @@ Usage:
     python harness/integration.py -n 5         # ensemble size (default 5)
     python harness/integration.py --keep       # keep temp output files
     python harness/integration.py --fast       # very fast but low-quality MC
+    python harness/integration.py --output-dir ./out  # write CIF files to ./out/
 """
 
 import argparse
@@ -330,10 +331,12 @@ def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int) -> list
     if proc.returncode != 0:
         sys.exit(f"[cpp] 3dnome exited with code {proc.returncode}")
 
-    # Collect output .hcm files
+    # Collect output .hcm files.
+    # C++ names: loops_{label}.hcm for n=1, loops_{label}_{i}.hcm for n>1.
     structures = []
     for i in range(n):
-        hcm = outdir / f"loops_{REGION_LABEL}_{i}.hcm"
+        hcm = (outdir / f"loops_{REGION_LABEL}.hcm") if n == 1 else \
+              (outdir / f"loops_{REGION_LABEL}_{i}.hcm")
         if not hcm.exists():
             sys.exit(f"[cpp] expected output not found: {hcm}")
         beads = parse_hcm(hcm)
@@ -398,6 +401,18 @@ def print_stats(label: str, structures: list) -> dict:
 # ---------------------------------------------------------------------------
 # Main
 
+def save_cif_ensemble(structs: list, label: str, outdir: Path) -> None:
+    """Write each structure in structs as a CIF file under outdir."""
+    sys.path.insert(0, str(ROOT))
+    from src.io import write_cif
+    outdir.mkdir(parents=True, exist_ok=True)
+    for i, beads in enumerate(structs, start=1):
+        path = outdir / f"{REGION_LABEL}_{label}_s{i}.cif"
+        entry_id = f"{REGION_LABEL}_{label}_s{i}"
+        write_cif(str(path), beads, entry_id=entry_id)
+    print(f"[integration] {len(structs)} {label} CIF files written to {outdir}/")
+
+
 def main():
     parser = argparse.ArgumentParser(description="3dgnome-torch integration test")
     parser.add_argument("-n", "--n-structures", type=int, default=5,
@@ -408,6 +423,8 @@ def main():
                         help="keep temp output directory after test")
     parser.add_argument("--fast", action="store_true",
                         help="use very fast (low quality) MC settings (~5s/structure)")
+    parser.add_argument("--output-dir", metavar="PATH",
+                        help="write output CIF files to this directory (created if needed)")
     args = parser.parse_args()
 
     if not CPP_BIN.exists():
@@ -434,6 +451,8 @@ def main():
         cpp_outdir.mkdir()
         cpp_structs = run_cpp_ensemble(cpp_outdir, config, args.n_structures, MAX_LEVEL)
         cpp_stats = print_stats("C++", cpp_structs)
+        if args.output_dir:
+            save_cif_ensemble(cpp_structs, "cpp", Path(args.output_dir))
 
         # -- Python ensemble -----------------------------------------------
         py_structs = None
@@ -447,6 +466,8 @@ def main():
             return
 
         py_stats = print_stats("Python", py_structs)
+        if args.output_dir:
+            save_cif_ensemble(py_structs, "python", Path(args.output_dir))
 
         # -- Compare distributions -----------------------------------------
         print("\n  [comparison]")
