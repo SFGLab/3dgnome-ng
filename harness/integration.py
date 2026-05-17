@@ -25,12 +25,15 @@ Usage:
 """
 
 import argparse
+import io
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -47,6 +50,168 @@ KS_D_THRESHOLD = 0.3
 PASS_STR = "\033[32mPASS\033[0m"
 FAIL_STR = "\033[31mFAIL\033[0m"
 SKIP_STR = "\033[33mSKIP\033[0m"
+
+
+# ---------------------------------------------------------------------------
+# Milestone capture
+
+# Matches both C++ and Python milestone lines:
+#   "    step   13000  score=11.6605  ratio=1.0000  ok=9/1000  [done]"
+_MS_RE    = re.compile(r'step\s+([\d,]+)\s+score=([^\s]+)\s+ratio=([^\s]+)\s+ok=(\d+)/(\d+)')
+# Matches C++ IB header lines (raw subprocess output, no "[cpp]" prefix):
+#   "  chr1 1/2"
+_IB_RE    = re.compile(r'^\s+\S+\s+(\d+/\d+)\s*$')
+# Matches Python milestone label brackets: "[chr1 IB 1/2 run 1/1]" / "smooth"
+_PY_LBL   = re.compile(r'\[(?:\S+\s+)?IB\s+(\d+/\d+)\s+(run|smooth)')
+
+
+class _TeeOut:
+    """Write to real stdout AND capture to an internal buffer simultaneously."""
+    def __init__(self):
+        self._real = sys.stdout
+        self._buf  = io.StringIO()
+
+    def write(self, s):
+        self._real.write(s)
+        self._buf.write(s)
+
+    def flush(self):
+        self._real.flush()
+
+    def __enter__(self):
+        sys.stdout = self
+        return self
+
+    def __exit__(self, *_):
+        sys.stdout = self._real
+
+    def getvalue(self):
+        return self._buf.getvalue()
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+
+def _parse_cpp_milestones(raw_lines: list) -> dict:
+    """
+    Parse raw C++ subprocess lines (no "[cpp]" prefix) into
+    {(ib, phase): [(step, score, ok, total, done), ...]}.
+    Arc phase milestones come first; after arc [done] the remaining
+    milestones for that IB belong to the smooth phase.
+    """
+    result = defaultdict(list)
+    cur_ib    = None
+    arc_done  = False
+    for line in raw_lines:
+        m_ib = _IB_RE.match(line)
+        if m_ib:
+            cur_ib   = m_ib.group(1)
+            arc_done = False
+            continue
+        m = _MS_RE.search(line)
+        if m and cur_ib is not None:
+            phase = "smooth" if arc_done else "arc"
+            step  = int(m.group(1).replace(',', ''))
+            score = float(m.group(2))
+            ok    = int(m.group(4))
+            total = int(m.group(5))
+            done  = "[done]" in line
+            result[(cur_ib, phase)].append((step, score, ok, total, done))
+            if done and phase == "arc":
+                arc_done = True
+    return dict(result)
+
+
+def _parse_py_milestones(text: str) -> dict:
+    """
+    Parse captured Python stdout into
+    {(ib, phase): [(step, score, ok, total, done), ...]}.
+    """
+    result = defaultdict(list)
+    for line in text.splitlines():
+        lm = _PY_LBL.search(line)
+        m  = _MS_RE.search(line)
+        if lm and m:
+            ib    = lm.group(1)
+            phase = "arc" if lm.group(2) == "run" else "smooth"
+            step  = int(m.group(1).replace(',', ''))
+            score = float(m.group(2))
+            ok    = int(m.group(4))
+            total = int(m.group(5))
+            done  = "[done]" in line
+            result[(ib, phase)].append((step, score, ok, total, done))
+    return dict(result)
+
+
+def _merge_milestones(all_data: list) -> dict:
+    """
+    Average milestone metrics across multiple structures.
+    Input:  list of {(ib, phase): [(step, score, ok, total, done), ...]}
+    Output: {(ib, phase): [(step, avg_score, avg_ok, total, any_done), ...]}
+    """
+    bucket = defaultdict(lambda: defaultdict(list))
+    for data in all_data:
+        for (ib, phase), rows in data.items():
+            for step, score, ok, total, done in rows:
+                bucket[(ib, phase)][step].append((score, ok, total, done))
+    result = {}
+    for (ib, phase), by_step in bucket.items():
+        rows = []
+        for step in sorted(by_step):
+            vals = by_step[step]
+            rows.append((
+                step,
+                sum(v[0] for v in vals) / len(vals),
+                sum(v[1] for v in vals) / len(vals),
+                vals[0][2],
+                any(v[3] for v in vals),
+            ))
+        result[(ib, phase)] = rows
+    return result
+
+
+def print_step_comparison(cpp_ms: dict, py_ms: dict, n_structs: int) -> None:
+    """Print a side-by-side per-milestone convergence table."""
+    all_keys = sorted(set(cpp_ms) | set(py_ms),
+                      key=lambda k: (k[0], 0 if k[1] == "arc" else 1))
+    if not all_keys:
+        return
+
+    avg_note = f"avg over {n_structs} structure{'s' if n_structs > 1 else ''}"
+    print(f"\n{'='*74}")
+    print(f"  Step-by-step convergence  ({avg_note})")
+    print(f"{'='*74}")
+
+    for ib, phase in all_keys:
+        cpp_rows = {r[0]: r for r in cpp_ms.get((ib, phase), [])}
+        py_rows  = {r[0]: r for r in py_ms.get((ib, phase), [])}
+        steps    = sorted(set(cpp_rows) | set(py_rows))
+        if not steps:
+            continue
+
+        print(f"\n  IB {ib} — {phase} MC")
+        print(f"  {'step':>8}  {'C++ score':>11}  {'Py score':>11}  "
+              f"{'Δ%':>7}  {'C++ ok/N':>13}  {'Py ok/N':>13}")
+        print("  " + "─" * 72)
+
+        for step in steps:
+            cr = cpp_rows.get(step)
+            pr = py_rows.get(step)
+
+            cs = f"{cr[1]:11.4f}" if cr else f"{'—':>11}"
+            ps = f"{pr[1]:11.4f}" if pr else f"{'—':>11}"
+
+            if cr and pr and pr[1] > 1e-9:
+                pct = (cr[1] - pr[1]) / pr[1] * 100
+                ds  = f"{pct:+7.1f}%"
+            else:
+                ds = f"{'—':>8}"
+
+            cok = f"{cr[2]:>6.0f}/{cr[3]}" if cr else f"{'—':>13}"
+            pok = f"{pr[2]:>6.0f}/{pr[3]}" if pr else f"{'—':>13}"
+
+            tag = "  [done]" if ((cr and cr[4]) or (pr and pr[4])) else ""
+            print(f"  {step:>8,}  {cs}  {ps}  {ds}  {cok}  {pok}{tag}")
 
 
 # ---------------------------------------------------------------------------
@@ -325,8 +490,10 @@ def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int) -> list
         text=True,
         bufsize=1,
     )
+    raw_lines = []
     for line in proc.stdout:
         print(f"[cpp] {line}", end="", flush=True)
+        raw_lines.append(line.rstrip("\n"))
     proc.wait()
     if proc.returncode != 0:
         sys.exit(f"[cpp] 3dnome exited with code {proc.returncode}")
@@ -344,7 +511,7 @@ def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int) -> list
             sys.exit(f"[cpp] no leaf beads parsed from {hcm}")
         structures.append(beads)
 
-    return structures
+    return structures, raw_lines
 
 
 # ---------------------------------------------------------------------------
@@ -449,15 +616,19 @@ def main():
         # -- C++ ensemble --------------------------------------------------
         cpp_outdir = tmpdir / "cpp"
         cpp_outdir.mkdir()
-        cpp_structs = run_cpp_ensemble(cpp_outdir, config, args.n_structures, MAX_LEVEL)
+        cpp_structs, cpp_raw = run_cpp_ensemble(cpp_outdir, config, args.n_structures, MAX_LEVEL)
         cpp_stats = print_stats("C++", cpp_structs)
         if args.output_dir:
             save_cif_ensemble(cpp_structs, "cpp", Path(args.output_dir))
+        cpp_ms_raw = _parse_cpp_milestones(cpp_raw)
 
         # -- Python ensemble -----------------------------------------------
         py_structs = None
+        py_ms_raw  = {}
         if not args.cpp_only:
-            py_structs = try_python_ensemble(config, args.n_structures)
+            with _TeeOut() as tee:
+                py_structs = try_python_ensemble(config, args.n_structures)
+            py_ms_raw = _parse_py_milestones(tee.getvalue())
 
         if py_structs is None:
             print(f"\n  [{SKIP_STR}] Python src/simulate.run_region not implemented — "
@@ -507,6 +678,12 @@ def main():
         all_ok = all(results)
         overall = PASS_STR if all_ok else FAIL_STR
         print(f"\n[integration] {overall}")
+
+        # -- Per-step convergence comparison --------------------------------
+        cpp_ms = _merge_milestones([cpp_ms_raw])
+        py_ms  = _merge_milestones([py_ms_raw])
+        print_step_comparison(cpp_ms, py_ms, args.n_structures)
+
         if not all_ok:
             sys.exit(1)
 
