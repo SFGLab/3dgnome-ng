@@ -120,7 +120,7 @@ def mc_heatmap(
         score_curr = score_curr + 2.0 * (local_curr - local_prev)
 
         ok = score_curr <= score_prev
-        if not ok and T > 0.0:
+        if not ok and T > 0.0 and score_prev > 0.0:
             tp = jump_scale * math.exp(-jump_coef * (score_curr / score_prev) / T)
             ok = random.random() < tp
 
@@ -195,7 +195,7 @@ def mc_arcs(
     rep0, spr0 = e0 < 0.0, e0 >= 1e-6
     score_curr = 0.0
     if rep0.any():
-        score_curr += (1.0 / np.maximum(d0[rep0], 1e-10)).sum()
+        score_curr += float((1.0 / np.maximum(d0[rep0], 1e-10)).sum())
     if spr0.any():
         es0, ds0 = e0[spr0], d0[spr0]
         rel0 = (ds0 - es0) / es0
@@ -224,10 +224,9 @@ def mc_arcs(
         score_curr = score_curr - local_prev + local_curr
 
         ok = score_curr <= score_prev
-        if not ok:
-            if score_prev > 0:
-                tp = jump_scale * math.exp(-jump_coef * (score_curr / score_prev) / T)
-                ok = random.random() < tp
+        if not ok and score_prev > 0.0 and T > 0.0:
+            tp = jump_scale * math.exp(-jump_coef * (score_curr / score_prev) / T)
+            ok = random.random() < tp
 
         if ok:
             milestone_success += 1

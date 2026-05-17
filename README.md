@@ -64,7 +64,7 @@ entry_id = f"chr1_{region.replace(':', '_').replace('-', '_')}"
 structures = run_region(
     config_path="data/GM12878/config.ini",
     region=region,
-    n_structures=5,
+    n_structures=1,
     data_dir="data/GM12878",   # override the absolute path baked into config.ini
 )
 
@@ -73,24 +73,19 @@ for i, s in enumerate(structures):
     print(f"structure {i+1}: {len(s)} beads, "
           f"first bead at bp={s[0][0]}, pos=({s[0][1]:.3f}, {s[0][2]:.3f}, {s[0][3]:.3f})")
 
-# Save all structures as a multi-model mmCIF file
+# Save each structure as its own mmCIF file
 from src.io import write_cif
-write_cif("chr1_structures.cif", structures, entry_id=entry_id)
+for i, s in enumerate(structures, start=1):
+    write_cif(f"chr1_structure_{i}.cif", s, entry_id=f"{entry_id}_s{i}")
 ```
 
-The CIF file can be opened directly in **ChimeraX** or **Chimera**:
+Each CIF file can be opened directly in **ChimeraX** or **Chimera**:
 
 ```bash
-chimerax chr1_structures.cif
+chimerax chr1_structure_1.cif
 ```
 
-Each structure is stored as a separate model (`pdbx_PDB_model_num`).  
-The B-factor column contains the **genomic midpoint in Mb**, so you can color beads by genomic position:
-
-```
-# in ChimeraX command line:
-color byattribute bfactor palette blue:red
-```
+Beads are written as sequential ALA residues on chain A — ChimeraX connects them as a polymer chain automatically.
 
 `data_dir` overrides the `data_dir` key in the config, which is useful because the bundled `config.ini` has it hardcoded to `/Projects/GM12878/`. Pass the actual local path instead.
 
