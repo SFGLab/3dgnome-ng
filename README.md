@@ -102,53 +102,6 @@ The region string uses `chr:start-end` format (colon + dash):
 chr1:18288319-20307135
 ```
 
----
-
-## Correctness harness
-
-### Unit tests — energy functions
-
-Compares every scoring function in `src/energy.py` against the compiled C++ reference (within 1e-6 tolerance):
-
-```bash
-# Run all unit tests
-python harness/compare.py
-
-# Run a specific group
-python harness/compare.py distfns
-python harness/compare.py heatmap arcs smooth metropolis angle
-
-# Print C++ reference values only (no Python impl needed)
-python harness/compare.py --reference
-
-# Force recompile the scorer binary
-python harness/compare.py --rebuild
-```
-
-Current status: **22/22 tests pass**.
-
----
-
-## Module layout
-
-```
-src/
-├── energy.py      # All scoring functions (heatmap, arc spring, smooth, angle, distance conversions)
-├── settings.py    # INI config parser — mirrors C++ Settings class
-├── io.py          # Load anchors, arcs, singletons, breakpoints from files
-├── hierarchy.py   # Cluster dataclass + coarse-to-fine tree building
-├── mc.py          # Simulated annealing MC loops (heatmap and arc variants)
-├── solver.py      # LooperSolver: orchestrates data loading + MC reconstruction
-└── simulate.py    # Public entry point: run_region()
-
-harness/
-├── scorer.cpp     # C++ mini-binary compiled against real 3dnome sources
-├── compare.py     # Unit-level correctness harness
-└── integration.py # End-to-end distribution comparison
-```
-
----
-
 ## Algorithm overview
 
 3dgnome uses a **coarse-to-fine hierarchical Monte Carlo** approach:
@@ -157,10 +110,10 @@ harness/
 Level 1 (Chromosome root)  — whole chromosome, singleton heatmap energy
 Level 2 (Segment)          — ~100 kb–1 Mb segments, singleton heatmap energy
 Level 3 (Anchor/IB)        — ChIA-PET loop anchors, arc spring energy
-Level 4 (Subanchor)        — fine-resolution loop bases (not yet implemented)
+Level 4 (Subanchor)        — chain + angle MC on loop_density subanchors inserted between each anchor pair
 ```
 
-Each level runs simulated annealing, then passes 3D positions down as starting points for the next level. The `-v 2` pipeline (implemented here) covers levels 1–3 (segment heatmap + anchor arc spring MC).
+Each level runs simulated annealing, then passes 3D positions down as starting points for the next level. The `-v 2` pipeline covers all four levels: Level 4 always runs as the last step inside Level 3's IB reconstruction (`reconstruct_arcs` / C++ `reconstructClustersArcsDistances`). Both C++ and Python produce `n_anchors + (n_anchors−1) × loop_density` beads per IB.
 
 ### Metropolis criterion
 

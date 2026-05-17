@@ -443,6 +443,90 @@ def test_smooth(reference_only=False):
     check_close_enough("smooth_score(5 beads)", cpp_val, py_val)
 
 
+def test_densify(reference_only=False):
+    """
+    Validates _densify_active_region: bead count, fixed positions, dtn sign,
+    and subanchor linear interpolation.  Pure Python — no C++ scorer needed.
+    """
+    print("\n[densify] Subanchor densification (_densify_active_region)")
+
+    if reference_only:
+        print("  (pure Python validation — no C++ reference)")
+        return
+
+    try:
+        import numpy as _np
+        _root = str(ROOT)
+        if _root not in sys.path:
+            sys.path.insert(0, _root)
+        from src.solver import Solver
+        from src.hierarchy import Cluster, LVL_ANCHOR
+    except ImportError as exc:
+        for name in ("densify.bead_count", "densify.n_fixed",
+                     "densify.anchor_pos", "densify.dtn_nonneg", "densify.interp"):
+            print(f"  {SKIP}  {name}  ({exc})")
+            _results.append(("skip", name))
+        return
+
+    LD = 3   # loop_density
+    anchor_starts = [0,    2000, 5000, 8000]
+    anchor_ends   = [1000, 3000, 6000, 9000]
+    pos3d = [
+        _np.array([0.0, 0.0, 0.0], dtype=_np.float32),
+        _np.array([1.0, 0.0, 0.0], dtype=_np.float32),
+        _np.array([2.0, 1.0, 0.0], dtype=_np.float32),
+        _np.array([3.0, 1.0, 0.5], dtype=_np.float32),
+    ]
+
+    class _FakeSettings:
+        loop_density = LD
+        @staticmethod
+        def genomic_length_to_distance(bp):
+            return 1.0 + 0.5 * (max(bp, 0) / 1000.0) ** 0.75
+
+    solver = Solver.__new__(Solver)
+    solver.s = _FakeSettings()
+    solver.clusters = []
+    active_region = []
+    for i, (s, e, p) in enumerate(zip(anchor_starts, anchor_ends, pos3d)):
+        c = Cluster(start=s, end=e, level=LVL_ANCHOR)
+        c.pos = p.copy()
+        solver.clusters.append(c)
+        active_region.append(i)
+
+    pos, fixed, gpos, dtn, anchor_map = solver._densify_active_region(active_region)
+
+    n_anc = len(anchor_starts)
+    exp_n = n_anc + (n_anc - 1) * LD   # 4 + 3*3 = 13
+
+    # 1. Total bead count
+    check("densify.bead_count", float(exp_n), float(len(pos)), atol=0)
+
+    # 2. Number of fixed beads == n_anchors
+    check("densify.n_fixed", float(n_anc), float(int(fixed.sum())), atol=0)
+
+    # 3. Anchor 3-D positions preserved in pos array
+    ok_pos = all(_np.allclose(pos[bi], solver.clusters[ci].pos, atol=1e-5)
+                 for bi, ci in anchor_map)
+    check("densify.anchor_pos", 1.0, 1.0 if ok_pos else 0.0, atol=0)
+
+    # 4. All dtn values are non-negative
+    ok_dtn = bool((dtn >= 0).all())
+    check("densify.dtn_nonneg", 1.0, 1.0 if ok_dtn else 0.0, atol=0)
+
+    # 5. Subanchor positions are linearly interpolated between adjacent anchor beads
+    ok_interp = True
+    for seg in range(n_anc - 1):
+        ca_i = seg * (LD + 1)
+        cb_i = ca_i + (LD + 1)
+        for j in range(LD):
+            t = (j + 1.0) / (LD + 1)
+            exp_pos = (1.0 - t) * pos[ca_i] + t * pos[cb_i]
+            if not _np.allclose(pos[ca_i + 1 + j], exp_pos, atol=1e-5):
+                ok_interp = False
+    check("densify.interp", 1.0, 1.0 if ok_interp else 0.0, atol=0)
+
+
 def test_metropolis(reference_only=False):
     print("\n[metropolis] Metropolis acceptance probability")
 
@@ -509,6 +593,7 @@ ALL_TESTS = {
     "heatmap":    test_heatmap,
     "arcs":       test_arcs,
     "smooth":     test_smooth,
+    "densify":    test_densify,
     "metropolis": test_metropolis,
 }
 

@@ -313,26 +313,28 @@ angle_weight = 1.0
 max_temp = 5.0
 jump_temp_scale = 50.0
 jump_temp_coef = 20.0
-delta_temp = 0.9999
+delta_temp = {delta_smooth}
 stop_condition_improvement_threshold = 0.99
-stop_condition_successes_threshold = 50
-stop_condition_steps = 50000
+stop_condition_successes_threshold = {successes_smooth}
+stop_condition_steps = {steps_smooth}
 """
 
 def write_config(path: Path, fast: bool) -> None:
     if fast:
-        # Very fast: ~5 seconds per structure, low quality
+        # Very fast: ~10 s per structure, low quality
         cfg = BASE_CONFIG.format(
             data_dir=DATA_DIR,
-            delta_heatmap=0.995, successes_heatmap=2, steps_heatmap=1000,
-            delta_arcs=0.995,    successes_arcs=5,    steps_arcs=1000,
+            delta_heatmap=0.995,  successes_heatmap=2,  steps_heatmap=1000,
+            delta_arcs=0.995,     successes_arcs=5,     steps_arcs=1000,
+            delta_smooth=0.995,   successes_smooth=5,   steps_smooth=1000,
         )
     else:
-        # Balanced: ~60 seconds per structure, reasonable quality
+        # Balanced: ~2 min per structure, reasonable quality
         cfg = BASE_CONFIG.format(
             data_dir=DATA_DIR,
-            delta_heatmap=0.999, successes_heatmap=5, steps_heatmap=5000,
-            delta_arcs=0.999,    successes_arcs=20,   steps_arcs=5000,
+            delta_heatmap=0.999,  successes_heatmap=5,  steps_heatmap=5000,
+            delta_arcs=0.999,     successes_arcs=20,    steps_arcs=5000,
+            delta_smooth=0.999,   successes_smooth=20,  steps_smooth=5000,
         )
     path.write_text(cfg)
 
@@ -608,8 +610,8 @@ def main():
     config = tmpdir / "config.ini"
     write_config(config, fast=args.fast)
 
-    # max_level=2 → heatmap + arc reconstruction (anchor-level leaves, no subanchors)
-    # this is the level that both C++ and Python produce in phase 1+2
+    # max_level=2 → heatmap MC + arc MC + smooth MC (Level 4 runs inside arc reconstruction).
+    # Both C++ and Python produce subanchor beads: n_anchors + (n_anchors-1)*loop_density.
     MAX_LEVEL = 2
 
     try:
@@ -651,7 +653,7 @@ def main():
             print(f"  {FAIL_STR}  bead count mismatch: C++={n_cpp}  Python={n_py}")
             results.append(False)
         else:
-            print(f"  {PASS_STR}  bead count matches: {n_cpp}")
+            print(f"  {PASS_STR}  bead count matches: {n_cpp} (anchors + subanchors)")
             results.append(True)
 
         # KS test on Rg distribution

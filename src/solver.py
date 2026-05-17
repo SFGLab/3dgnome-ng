@@ -486,7 +486,7 @@ class Solver:
             bead_fixed.append(True)
             anchor_map.append((k, ai))
 
-            gap_bp = cb.start - ca.end
+            gap_bp = max(cb.start - ca.end, 0)  # clamp: overlapping anchors → place subanchors at boundary
             d_bp = gap_bp // (ld + 1)
             p = ca.end
             for j in range(ld):

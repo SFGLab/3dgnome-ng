@@ -37,8 +37,9 @@ def run_region(
     -------
     list of list of (midpoint_bp, x, y, z)
         One entry per structure.  Each entry is a list of tuples sorted by
-        genomic midpoint, matching the anchor-level leaf beads produced by
-        the C++ binary at -v 2.
+        genomic midpoint.  Includes both original anchor beads and the
+        (loop_density) subanchor beads inserted between each anchor pair by
+        the Level-4 smooth MC, matching the C++ binary output at -v 2.
     """
     # Resolve the src package — when called from harness/ with sys.path pointing
     # at src/, the relative imports inside solver.py etc. use the package name
