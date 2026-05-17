@@ -268,7 +268,7 @@ def mc_arcs(
 def _smooth_len(pos, dtn, i, stretch_k, squeeze_k, dist_w):
     """Length spring energy for consecutive pair (i, i+1)."""
     d = float(np.sqrt(((pos[i] - pos[i + 1]) ** 2).sum()))
-    e = max(dtn[i], 1e-6)
+    e = float(max(dtn[i], 1e-6))
     rel = (d - e) / e
     k = stretch_k if rel >= 0.0 else squeeze_k
     return rel * rel * k * dist_w
