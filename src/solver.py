@@ -225,14 +225,14 @@ class Solver:
         best_pos = pos.copy()
 
         for run in range(s.steps_lvl2):
-            print(f"[solver] MC heatmap, segment level, run {run + 1}/{s.steps_lvl2}")
+            print(f"[solver] heatmap run {run + 1}/{s.steps_lvl2}  ({n} beads)")
             # Randomise initial positions
             for i in range(n):
                 pos[i] = self.clusters[active_region[i]].pos + random_vector_np(step_size)
 
             score = mc_heatmap(pos, self.heatmap_dist, self.heatmap_dist_diag,
-                               step_size, s)
-            print(f"  score = {score:.6f}, best = {best_score:.6f}")
+                               step_size, s, label=f"heatmap run {run + 1}")
+            print(f"  → score={score:.6f}  best={best_score:.6f}")
 
             if score < best_score or best_score < 0:
                 best_score = score
@@ -322,13 +322,15 @@ class Solver:
             n_ibs = len(ibs)
 
             for ib_i, ib_idx in enumerate(ibs):
-                print(f"  {chr_} IB {ib_i + 1}/{n_ibs}")
-
+                ib_label = f"{chr_} IB {ib_i + 1}/{n_ibs}"
                 ib = self.clusters[ib_idx]
                 active_region = list(ib.children)
 
                 if len(active_region) <= 1:
+                    print(f"  {ib_label}  ({len(active_region)} anchors — skip)")
                     continue
+
+                print(f"\n[solver] {ib_label}  ({len(active_region)} anchors)")
 
                 # Place all anchors at IB position initially
                 for a_idx in active_region:
@@ -338,7 +340,7 @@ class Solver:
                 self._calc_anchor_expected_distances(active_region)
 
                 # Reconstruct anchor positions
-                self._reconstruct_cluster_arcs(ib_idx, active_region)
+                self._reconstruct_cluster_arcs(ib_idx, active_region, ib_label)
 
     def _position_interaction_blocks(self, segs: list) -> None:
         """
@@ -401,6 +403,7 @@ class Solver:
         self,
         ib_idx: int,
         active_region: list,
+        label: str = "",
     ) -> None:
         """
         MC reconstruction for one interaction block (anchor level).
@@ -426,12 +429,15 @@ class Solver:
         best_pos = initial_pos.copy()
 
         for run in range(s.steps_arcs):
+            run_label = f"{label} run {run + 1}/{s.steps_arcs}" if label else f"arcs run {run + 1}"
+            print(f"  {run_label}")
             # Random initial displacement for anchors
             pos = initial_pos.copy()
             for i in range(active_size):
                 pos[i] += random_vector_np(noise_size_small)
 
-            score = mc_arcs(pos, self.exp_dist_anchor, noise_size_small, s)
+            score = mc_arcs(pos, self.exp_dist_anchor, noise_size_small, s,
+                            label=run_label)
 
             if score < best_score or best_score < 0:
                 best_score = score

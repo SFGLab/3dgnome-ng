@@ -84,6 +84,7 @@ def mc_heatmap(
     diag_size: int,
     step_size: float,
     settings,
+    label: str = "",
 ) -> float:
     """
     MonteCarloHeatmap: simulated annealing using heatmap distance energy.
@@ -130,6 +131,7 @@ def mc_heatmap(
         milestone_score = score_curr
         milestone_success = 0
         step_i = 1
+        prefix = f"    [{label}] " if label else "    "
 
         while True:
             p = random.randrange(n)
@@ -155,11 +157,19 @@ def mc_heatmap(
             T *= dt
 
             if step_i % stop_steps == 0:
-                if (
+                ratio = score_curr / milestone_score if milestone_score > 0 else 1.0
+                converged = (
                     (score_curr > stop_improvement * milestone_score
                      and milestone_success < stop_successes)
                     or score_curr < 1e-6
-                ):
+                )
+                print(
+                    f"{prefix}step {step_i:>7,}  score={score_curr:.4f}"
+                    f"  ratio={ratio:.4f}  ok={milestone_success}/{stop_steps}"
+                    + ("  [done]" if converged else ""),
+                    flush=True,
+                )
+                if converged:
                     break
                 milestone_score = score_curr
                 milestone_success = 0
@@ -176,6 +186,7 @@ def mc_arcs(
     exp_dist_mat: np.ndarray,  # (N, N) — -1=repulsion, 0=none, >0=spring distance
     step_size: float,
     settings,
+    label: str = "",
 ) -> float:
     """
     MonteCarloArcs: simulated annealing using arc spring energy.
@@ -230,6 +241,7 @@ def mc_arcs(
         milestone_score = score_curr
         milestone_success = 0
         step_i = 1
+        prefix = f"    [{label}] " if label else "    "
 
         while True:
             p = random.randrange(n)
@@ -257,12 +269,19 @@ def mc_arcs(
 
             if step_i % stop_steps == 0:
                 ratio = score_curr / milestone_score if milestone_score > 0 else 1.0
-                if (
+                converged = (
                     (score_curr > stop_improvement * milestone_score
                      and milestone_success < stop_successes)
                     or score_curr < 1e-5
                     or ratio > 0.9999
-                ):
+                )
+                print(
+                    f"{prefix}step {step_i:>7,}  score={score_curr:.4f}"
+                    f"  ratio={ratio:.4f}  ok={milestone_success}/{stop_steps}"
+                    + ("  [done]" if converged else ""),
+                    flush=True,
+                )
+                if converged:
                     break
                 milestone_score = score_curr
                 milestone_success = 0
