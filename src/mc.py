@@ -47,7 +47,7 @@ def _local_arcs(pos, exp, p, stretch_k, squeeze_k):
     spr = e >= 1e-6
     sc = 0.0
     if rep.any():
-        sc += (1.0 / np.maximum(d[rep], 1e-10)).sum()
+        sc += float((1.0 / np.maximum(d[rep], 1e-10)).sum())
     if spr.any():
         es, ds = e[spr], d[spr]
         rel = (ds - es) / es

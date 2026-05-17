@@ -35,8 +35,8 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 CPP_BIN = ROOT / "3dnome" / "3dnome"
 DATA_DIR = ROOT / "data" / "GM12878"
-REGION = "chr1:18288319-20307135"    # colon separates chr from range; dash separates start-end
-REGION_LABEL = "chr1_18288319_20307135"
+REGION = "chr5:5418819-7758469"  # 12 non-overlapping anchors, 10 arcs, 2.34 Mb — no NaN in smooth MC
+REGION_LABEL = "chr5_5418819_7758469"
 
 # KS test threshold: p-value must exceed this to PASS
 KS_P_THRESHOLD = 0.05

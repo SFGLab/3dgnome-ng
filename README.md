@@ -58,8 +58,8 @@ make               # builds both
 ```python
 from src.simulate import run_region
 
-region = "chr1:18288319-20307135"  # ~2 Mb region with ~102 anchor beads
-entry_id = f"chr1_{region.replace(':', '_').replace('-', '_')}"
+region = "chr5:5418819-7758469"  # 2.34 Mb, 12 anchors, 67 beads after densification
+entry_id = f"chr5_{region.replace(':', '_').replace('-', '_')}"
 
 structures = run_region(
     config_path="data/GM12878/config.ini",
@@ -76,13 +76,13 @@ for i, s in enumerate(structures):
 # Save each structure as its own mmCIF file
 from src.io import write_cif
 for i, s in enumerate(structures, start=1):
-    write_cif(f"chr1_structure_{i}.cif", s, entry_id=f"{entry_id}_s{i}")
+    write_cif(f"chr5_structure_{i}.cif", s, entry_id=f"{entry_id}_s{i}")
 ```
 
 Each CIF file can be opened directly in **ChimeraX** or **Chimera**:
 
 ```bash
-chimerax chr1_structure_1.cif
+chimerax chr5_structure_1.cif
 ```
 
 Beads are written as sequential ALA residues on chain A — ChimeraX connects them as a polymer chain automatically.
@@ -147,7 +147,7 @@ Current status: **22/22 tests pass**.
 
 ### Integration test — end-to-end distribution comparison
 
-Runs both C++ and Python on the same small region (`chr1:18288319-20307135`, ~102 anchor beads, ~2 Mb) and compares the bead-position distributions with a 2-sample KS test.
+Runs both C++ and Python on the same region (`chr5:5418819-7758469`, 12 anchors, ~67 beads after densification, 2.34 Mb) and compares the bead-position distributions with a 2-sample KS test.  This region was chosen because all anchor pairs are non-overlapping (min gap 8,336 bp), which avoids NaN in the C++ smooth MC, and `chr5` has predefined segment splits in the breakpoints file.
 
 ```bash
 # Full run (default: 5 structures, balanced quality)
