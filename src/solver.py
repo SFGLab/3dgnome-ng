@@ -491,7 +491,7 @@ class Solver:
 
         dtn = np.zeros(n - 1, dtype=np.float32)
         for i in range(n - 1):
-            gap = max(bead_starts[i + 1] - bead_ends[i], 0)
+            gap = max(bead_gpos[i + 1] - bead_gpos[i], 0)
             dtn[i] = float(self.s.genomic_length_to_distance(gap))
 
         return pos_arr, fixed_arr, bead_gpos, dtn, anchor_map

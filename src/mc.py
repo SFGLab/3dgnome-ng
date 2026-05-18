@@ -311,7 +311,7 @@ def mc_heatmap(
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (
             (score > stop_improvement * ms_score and n_ok < stop_successes)
-            or score < 1e-6 or ratio > 0.9999
+            or score < 1e-6
         )
         if verbose:
             print(f"{prefix}step {step_i:>7,}  score={score:.4f}"
@@ -441,7 +441,7 @@ def mc_smooth(
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (
             (score > stop_improvement * ms_score and n_ok < stop_successes)
-            or score < 1e-6 or ratio > 0.9999
+            or score < 1e-6
         )
         if verbose:
             print(f"{prefix}step {step_i:>7,}  score={score:.4f}"

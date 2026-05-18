@@ -15,17 +15,24 @@ When both C++ and Python ensembles are available, a 2-sample KS test is used
 to decide PASS/FAIL.  When Python is not yet implemented the test prints the
 C++ reference statistics and exits 0 (no failure for unimplemented code).
 
+C++ results are automatically cached to out/cpp_cache/ after each run so that
+subsequent runs with --python-only skip the (slow) C++ step entirely.
+
 Usage:
     python harness/integration.py              # full test (auto-skips Python)
     python harness/integration.py --cpp-only   # force C++ reference only
+    python harness/integration.py --python-only  # skip C++, load cached results
     python harness/integration.py -n 5         # ensemble size (default 5)
     python harness/integration.py --keep       # keep temp output files
     python harness/integration.py --fast       # very fast but low-quality MC
     python harness/integration.py --output-dir ./out  # write CIF files to ./out/
+    python harness/integration.py --cache-dir ./my_cache  # override cache location
+    python harness/integration.py --region-override chr1:...  # override test region
 """
 
 import argparse
 import io
+import json
 import math
 import os
 import re
@@ -469,7 +476,8 @@ def ks_2samp(a, b):
 # ---------------------------------------------------------------------------
 # Run C++ binary
 
-def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int) -> list:
+def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int,
+                     region: str, region_label: str) -> list:
     """
     Run 3dnome on the test region, produce n structures.
     Returns list of bead-position lists (one per structure).
@@ -478,8 +486,8 @@ def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int) -> list
         str(CPP_BIN),
         "-a", "create",
         "-s", str(config),
-        "-n", REGION_LABEL,
-        "-c", REGION,
+        "-n", region_label,
+        "-c", region,
         "-o", str(outdir) + "/",
         "-m", str(n),
         "-v", str(max_level),
@@ -504,8 +512,8 @@ def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int) -> list
     # C++ names: loops_{label}.hcm for n=1, loops_{label}_{i}.hcm for n>1.
     structures = []
     for i in range(n):
-        hcm = (outdir / f"loops_{REGION_LABEL}.hcm") if n == 1 else \
-              (outdir / f"loops_{REGION_LABEL}_{i}.hcm")
+        hcm = (outdir / f"loops_{region_label}.hcm") if n == 1 else \
+              (outdir / f"loops_{region_label}_{i}.hcm")
         if not hcm.exists():
             sys.exit(f"[cpp] expected output not found: {hcm}")
         beads = parse_hcm(hcm)
@@ -519,7 +527,7 @@ def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int) -> list
 # ---------------------------------------------------------------------------
 # Try Python reimplementation
 
-def try_python_ensemble(config: Path, n: int) -> list | None:
+def try_python_ensemble(config: Path, n: int, region: str) -> list | None:
     """
     Call src.simulate.run_region if available.
     Expected signature:
@@ -534,7 +542,7 @@ def try_python_ensemble(config: Path, n: int) -> list | None:
         return None
 
     try:
-        result = run_region(str(config), REGION, n)
+        result = run_region(str(config), region, n)
     except NotImplementedError:
         return None
 
@@ -570,16 +578,42 @@ def print_stats(label: str, structures: list) -> dict:
 # ---------------------------------------------------------------------------
 # Main
 
-def save_cif_ensemble(structs: list, label: str, outdir: Path) -> None:
+def save_cif_ensemble(structs: list, label: str, outdir: Path, region_label: str) -> None:
     """Write each structure in structs as a CIF file under outdir."""
     sys.path.insert(0, str(ROOT))
     from src.io import write_cif
     outdir.mkdir(parents=True, exist_ok=True)
     for i, beads in enumerate(structs, start=1):
-        path = outdir / f"{REGION_LABEL}_{label}_s{i}.cif"
-        entry_id = f"{REGION_LABEL}_{label}_s{i}"
+        path = outdir / f"{region_label}_{label}_s{i}.cif"
+        entry_id = f"{region_label}_{label}_s{i}"
         write_cif(str(path), beads, entry_id=entry_id)
     print(f"[integration] {len(structs)} {label} CIF files written to {outdir}/")
+
+
+def _cache_path(cache_dir: Path, region_label: str, n: int, fast: bool) -> Path:
+    mode = "fast" if fast else "balanced"
+    return cache_dir / f"{region_label}_n{n}_{mode}.json"
+
+
+def _save_cache(path: Path, region: str, n: int, fast: bool,
+                structs: list, raw_lines: list) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump({
+            "region": region,
+            "n_structures": n,
+            "mode": "fast" if fast else "balanced",
+            "structures": [[list(b) for b in s] for s in structs],
+            "raw_lines": raw_lines,
+        }, f)
+    print(f"[integration] C++ results cached to {path}")
+
+
+def _load_cache(path: Path) -> tuple:
+    with open(path) as f:
+        cached = json.load(f)
+    structs = [[(b[0], b[1], b[2], b[3]) for b in s] for s in cached["structures"]]
+    return structs, cached["raw_lines"]
 
 
 def main():
@@ -588,21 +622,41 @@ def main():
                         help="ensemble size (default 5)")
     parser.add_argument("--cpp-only", action="store_true",
                         help="run C++ reference only, skip Python comparison")
+    parser.add_argument("--python-only", action="store_true",
+                        help="skip C++ run; load cached C++ results (requires a prior full run)")
+    parser.add_argument("--cache-dir", metavar="PATH", default=None,
+                        help="directory for C++ result cache (default: out/cpp_cache)")
     parser.add_argument("--keep", action="store_true",
                         help="keep temp output directory after test")
     parser.add_argument("--fast", action="store_true",
                         help="use very fast (low quality) MC settings (~5s/structure)")
     parser.add_argument("--output-dir", metavar="PATH",
                         help="write output CIF files to this directory (created if needed)")
+    parser.add_argument("--region-override", metavar="REGION",
+                        help="override test region (must be in data dir and match config)")
     args = parser.parse_args()
 
-    if not CPP_BIN.exists():
+    if args.python_only and args.cpp_only:
+        sys.exit("[error] --python-only and --cpp-only are mutually exclusive")
+
+    if not args.python_only and not CPP_BIN.exists():
         sys.exit(f"[error] binary not found: {CPP_BIN}\n  run: make 3dnome")
 
     if not DATA_DIR.exists():
         sys.exit(f"[error] data directory not found: {DATA_DIR}")
 
-    print(f"[integration] region: {REGION}")
+    if args.region_override:
+        region = args.region_override
+        region_label = f"integration_test_region_{region.replace(':', '_').replace('-', '_')}"
+        print(f"[integration] overriding test region with: {region}")
+    else:
+        region = REGION
+        region_label = REGION_LABEL
+
+    cache_dir = Path(args.cache_dir) if args.cache_dir else ROOT / "out" / "cpp_cache"
+    cache_file = _cache_path(cache_dir, region_label, args.n_structures, args.fast)
+
+    print(f"[integration] region: {region}")
     print(f"[integration] ensemble size: {args.n_structures}")
     print(f"[integration] mode: {'fast' if args.fast else 'balanced'}")
 
@@ -616,12 +670,23 @@ def main():
 
     try:
         # -- C++ ensemble --------------------------------------------------
-        cpp_outdir = tmpdir / "cpp"
-        cpp_outdir.mkdir()
-        cpp_structs, cpp_raw = run_cpp_ensemble(cpp_outdir, config, args.n_structures, MAX_LEVEL)
-        cpp_stats = print_stats("C++", cpp_structs)
+        if args.python_only:
+            if not cache_file.exists():
+                sys.exit(
+                    f"[error] no cached C++ results found: {cache_file}\n"
+                    f"  run without --python-only first to generate the cache"
+                )
+            cpp_structs, cpp_raw = _load_cache(cache_file)
+            print(f"[integration] loaded {len(cpp_structs)} cached C++ structures from {cache_file}")
+        else:
+            cpp_outdir = tmpdir / "cpp"
+            cpp_outdir.mkdir()
+            cpp_structs, cpp_raw = run_cpp_ensemble(
+                cpp_outdir, config, args.n_structures, MAX_LEVEL, region, region_label)
+            _save_cache(cache_file, region, args.n_structures, args.fast, cpp_structs, cpp_raw)
+
         if args.output_dir:
-            save_cif_ensemble(cpp_structs, "cpp", Path(args.output_dir))
+            save_cif_ensemble(cpp_structs, "cpp", Path(args.output_dir), region_label)
         cpp_ms_raw = _parse_cpp_milestones(cpp_raw)
 
         # -- Python ensemble -----------------------------------------------
@@ -629,7 +694,7 @@ def main():
         py_ms_raw  = {}
         if not args.cpp_only:
             with _TeeOut() as tee:
-                py_structs = try_python_ensemble(config, args.n_structures)
+                py_structs = try_python_ensemble(config, args.n_structures, region)
             py_ms_raw = _parse_py_milestones(tee.getvalue())
 
         if py_structs is None:
@@ -638,9 +703,8 @@ def main():
             print("\n[integration] C++ reference run complete.")
             return
 
-        py_stats = print_stats("Python", py_structs)
         if args.output_dir:
-            save_cif_ensemble(py_structs, "python", Path(args.output_dir))
+            save_cif_ensemble(py_structs, "python", Path(args.output_dir), region_label)
 
         # -- Compare distributions -----------------------------------------
         print("\n  [comparison]")
@@ -655,6 +719,9 @@ def main():
         else:
             print(f"  {PASS_STR}  bead count matches: {n_cpp} (anchors + subanchors)")
             results.append(True)
+
+        cpp_stats = print_stats("C++", cpp_structs)
+        py_stats = print_stats("Python", py_structs)
 
         # KS test on Rg distribution
         d_rg, p_rg = ks_2samp(cpp_stats["rg"], py_stats["rg"])
