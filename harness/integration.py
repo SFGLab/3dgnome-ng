@@ -247,7 +247,7 @@ steps_smooth = 1
 noise_lvl1 = 0.5
 noise_lvl2 = 0.5
 noise_arcs = 0.01
-noise_smooth = 0.5
+noise_smooth = 5.0
 
 [data]
 data_dir = {data_dir}/
