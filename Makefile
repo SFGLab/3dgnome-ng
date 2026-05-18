@@ -1,5 +1,5 @@
 CC      = g++
-CFLAGS  = -std=c++0x -Wno-write-strings -fPIC -O2
+CFLAGS  = -std=c++17 -Wno-write-strings -fPIC -O2
 
 MC_DIR      = 3dnome/MC
 MC_SRCS_CPP = $(wildcard $(MC_DIR)/*.cpp) $(wildcard $(MC_DIR)/lib/*.cpp)
