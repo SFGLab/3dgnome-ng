@@ -536,7 +536,11 @@ class Solver:
         breaks.append(region_end)
         # Number of bins = len(breaks)-1 = 1 + (n_anchors-1)*(ld+1) = N ✓
 
-        # Bin singleton contacts into subanchor heatmap
+        # Bin singleton contacts into subanchor heatmap.
+        # Note: Python filters by chromosome (c1 != chr_ or c2 != chr_). C++'s
+        # createSingletonSubanchorHeatmap does NOT filter by chromosome, so it
+        # bins cross-chromosomal contacts whose midpoints fall in the region.
+        # See [[project-singleton-chr-filter-divergence]] — this is intentional.
         h_sub = np.zeros((N, N), dtype=np.float64)
 
         for c1, p1, c2, p2, sc in self._singletons:
