@@ -1,5 +1,5 @@
 """
-src/io.py  —  File loading for 3dgnome-torch.
+src/io.py  —  File loading for 3dgnome-ng.
 
 Mirrors C++ InteractionArcs loading methods:
   - loadAnchorsData()      → load_anchors()

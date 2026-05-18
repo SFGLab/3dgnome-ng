@@ -1,5 +1,5 @@
 """
-src/mc.py  —  Monte Carlo simulation loops for 3dgnome-torch.
+src/mc.py  —  Monte Carlo simulation loops for 3dgnome-ng.
 
 Mirrors C++ LooperSolver::MonteCarloHeatmap(), MonteCarloArcs(), and
 MonteCarloArcsSmooth().

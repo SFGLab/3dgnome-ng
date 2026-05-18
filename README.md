@@ -1,6 +1,6 @@
-# 3dgnome-torch
+# 3dgnome-ng
 
-Python/PyTorch reimplementation of the [3dgnome](https://bitbucket.org/3dome/3dgnome/src/master/a) Monte Carlo chromosome structure prediction algorithm.
+Python reimplementation of the [3dgnome](https://bitbucket.org/3dome/3dgnome/src/master/a) Monte Carlo chromosome structure prediction algorithm.
 
 The reference C++ implementation lives in `3dnome/` (read-only). The rewrite lives in `src/`.
 

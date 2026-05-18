@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-harness/compare.py  —  3dgnome-torch correctness harness.
+harness/compare.py  —  3dgnome-ng correctness harness.
 
 Compares the C++ reference scorer against the Python (src/) reimplementation.
 Run from the repository root:
@@ -599,7 +599,7 @@ ALL_TESTS = {
 
 
 def main():
-    parser = argparse.ArgumentParser(description="3dgnome-torch correctness harness")
+    parser = argparse.ArgumentParser(description="3dgnome-ng correctness harness")
     parser.add_argument("tests", nargs="*", metavar="TEST",
                         help=f"Test groups to run (default: all). Choices: {', '.join(ALL_TESTS)}")
     parser.add_argument("--build-only", action="store_true")

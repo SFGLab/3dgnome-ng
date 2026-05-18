@@ -673,7 +673,7 @@ def _load_cache(path: Path) -> tuple:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="3dgnome-torch integration test")
+    parser = argparse.ArgumentParser(description="3dgnome-ng integration test")
     parser.add_argument("-n", "--n-structures", type=int, default=5,
                         help="ensemble size (default 5)")
     parser.add_argument("--cpp-only", action="store_true",

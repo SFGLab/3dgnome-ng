@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-main.py  —  Explicit 3dgnome-torch workflow.
+main.py  —  Explicit 3dgnome-ng workflow.
 
 Mirrors exactly what src/simulate.run_region() does, but written out
 step by step so each stage can be inspected or swapped out.
@@ -56,7 +56,7 @@ def _run_structure(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="3dgnome-torch structure prediction")
+    parser = argparse.ArgumentParser(description="3dgnome-ng structure prediction")
     parser.add_argument("--config", required=True, help="Path to config.ini")
     parser.add_argument("--region", required=True,
                         help="Genomic region, e.g. chr1:18288319-20307135")

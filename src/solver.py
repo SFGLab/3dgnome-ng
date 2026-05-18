@@ -1,5 +1,5 @@
 """
-src/solver.py  —  High-level LooperSolver analog for 3dgnome-torch.
+src/solver.py  —  High-level LooperSolver analog for 3dgnome-ng.
 
 Orchestrates data loading, hierarchy building, and MC reconstruction.
 Mirrors C++ LooperSolver methods:

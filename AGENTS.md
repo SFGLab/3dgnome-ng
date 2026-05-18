@@ -1,8 +1,8 @@
-# 3dgnome-torch: Agent Guide
+# 3dgnome-ng: Agent Guide
 
 ## Project Goal
 
-Rewrite the Monte Carlo (MC) core of **3dgnome** in Python using PyTorch. The original implementation is a ~6,400-line C++ simulation (`3dnome/MC/`) that predicts 3D chromosome structure from Hi-C contact frequency data. The rewrite lives in `src/` and must reproduce the same algorithm behavior while leveraging PyTorch for GPU acceleration and batch parallelism.
+Python reimplementation of the Monte Carlo (MC) core of **3dgnome**. The original implementation is a ~6,400-line C++ simulation (`3dnome/MC/`) that predicts 3D chromosome structure from Hi-C contact frequency data. The reimplementation lives in `src/` and must reproduce the same algorithm behavior. MC loops run on CPU via Numba JIT; torch is used only for GPU device detection and the reference scoring functions in `src/energy.py`.
 
 Do **not** modify anything inside `3dnome/`. That directory is the reference implementation — read it, never change it.
 
