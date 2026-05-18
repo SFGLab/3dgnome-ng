@@ -152,26 +152,52 @@ def _calc_orientation_nb(pos, cind, n, is_L):
 @_njit(cache=True)
 def _score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices, nbr_weights,
                                motif_weight, symmetric):
-    """Global orientation score with arc weights; double-counts each arc pair."""
+    """Global orientation score with arc weights; used for initialisation only."""
     n_anchors = anchor_orn.shape[0]
     err = 0.0
     for i in range(n_anchors):
         for ki in range(nbr_offsets[i], nbr_offsets[i + 1]):
             j = nbr_indices[ki]
             w = nbr_weights[ki]
-            ax = anchor_orn[i, 0];
-            ay = anchor_orn[i, 1];
+            ax = anchor_orn[i, 0]
+            ay = anchor_orn[i, 1]
             az = anchor_orn[i, 2]
-            bx = anchor_orn[j, 0];
-            by = anchor_orn[j, 1];
+            bx = anchor_orn[j, 0]
+            by = anchor_orn[j, 1]
             bz = anchor_orn[j, 2]
             if not symmetric:
-                bx = -bx
-                by = -by
+                bx = -bx;
+                by = -by;
                 bz = -bz
             dot = ax * bx + ay * by + az * bz
             ang = 1.0 - (dot + 1.0) * 0.5
             err += ang * ang * w
+    return err * motif_weight
+
+
+@_njit(cache=True)
+def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
+                                motif_weight, symmetric):
+    """Local orientation score for anchor k - NO arc weights.
+    Mirrors C++ calcScoreOrientation(orientation, anchor_index).
+    Used for the incremental update: score_orn += 2*(local_curr - local_prev).
+    """
+    err = 0.0
+    for ki in range(nbr_offsets[k], nbr_offsets[k + 1]):
+        j = nbr_indices[ki]
+        ax = anchor_orn[k, 0]
+        ay = anchor_orn[k, 1]
+        az = anchor_orn[k, 2]
+        bx = anchor_orn[j, 0]
+        by = anchor_orn[j, 1]
+        bz = anchor_orn[j, 2]
+        if not symmetric:
+            bx = -bx;
+            by = -by;
+            bz = -bz
+        dot = ax * bx + ay * by + az * bz
+        ang = 1.0 - (dot + 1.0) * 0.5
+        err += ang * ang
     return err * motif_weight
 
 
@@ -182,12 +208,13 @@ def _batch_smooth_orientation_nb(
     anchor_orn, bead_to_anchor_k,
     step_size, T, dt, jump_scale, jump_coef, n_steps,
     stretch_k, squeeze_k, ang_k, dist_w, ang_w,
-    motif_weight, symmetric, score,
+    motif_weight, symmetric, score, score_orn,
 ):
-    """Smooth MC with CTCF orientation energy.
-    Full structure + orientation score recomputed every step, matching C++.
+    """Smooth MC with CTCF orientation energy, matching C++ update strategy:
+      - structure score: full recompute every step
+      - orientation score: incremental via unweighted local delta (like C++)
     anchor_orn (n_anchors, 3) is updated in-place across calls.
-    Returns (T_out, score_out, n_ok).
+    Returns (T_out, score_out, score_orn_out, n_ok).
     """
     n = pos.shape[0]
     n_mov = movable.shape[0]
@@ -202,35 +229,40 @@ def _batch_smooth_orientation_nb(
         prev_ox = 0.0
         prev_oy = 0.0
         prev_oz = 0.0
+        local_prev_orn = 0.0
         if orn_k >= 0:
             prev_ox = anchor_orn[orn_k, 0]
             prev_oy = anchor_orn[orn_k, 1]
             prev_oz = anchor_orn[orn_k, 2]
+            local_prev_orn = _local_score_orientation_nb(
+                anchor_orn, orn_k, nbr_offsets, nbr_indices, motif_weight, symmetric)
 
         pos[p, 0] += dx
         pos[p, 1] += dy
         pos[p, 2] += dz
 
+        score_orn_new = score_orn
         if orn_k >= 0:
             ar = anchor_ar[orn_k]
             ox, oy, oz = _calc_orientation_nb(pos, ar, n, orn_is_L[ar])
-            anchor_orn[orn_k, 0] = ox
-            anchor_orn[orn_k, 1] = oy
+            anchor_orn[orn_k, 0] = ox;
+            anchor_orn[orn_k, 1] = oy;
             anchor_orn[orn_k, 2] = oz
+            local_curr_orn = _local_score_orientation_nb(
+                anchor_orn, orn_k, nbr_offsets, nbr_indices, motif_weight, symmetric)
+            # incremental update with unweighted local delta - mirrors C++
+            score_orn_new = score_orn + 2.0 * (local_curr_orn - local_prev_orn)
 
-        score_new = (
-            _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
-            + _score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices,
-                                         nbr_weights, motif_weight, symmetric)
-        )
+        score_struct_new = _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
+        score_new = score_struct_new + score_orn_new
 
         ok = score_new <= score
         if not ok and T > 0.0 and score > 0.0:
-            ok = (np.random.random() <
-                  jump_scale * math.exp(-jump_coef * (score_new / score) / T))
+            ok = (np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T))
         if ok:
             n_ok += 1
             score = score_new
+            score_orn = score_orn_new
         else:
             pos[p, 0] -= dx;
             pos[p, 1] -= dy;
@@ -240,7 +272,7 @@ def _batch_smooth_orientation_nb(
                 anchor_orn[orn_k, 1] = prev_oy
                 anchor_orn[orn_k, 2] = prev_oz
         T *= dt
-    return T, score, n_ok
+    return T, score, score_orn, n_ok
 
 
 # ---------------------------------------------------------------------------
@@ -618,9 +650,11 @@ def mc_smooth(
             _ar = int(anchor_ar[_k])
             anchor_orn[_k] = _calc_orn(pw, _ar, n, char_orientations[_ar])
         mov_orn = np.ascontiguousarray(movable, dtype=np.int64)
-        score = (float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
-                 + float(_score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices,
-                                                    nbr_weights_arr, motif_weight, motifs_symmetric)))
+        # Score split: struct (exact) + orientation (exact at init, incremental after)
+        _score_struct0 = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
+        score_orn = float(_score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices,
+                                                     nbr_weights_arr, motif_weight, motifs_symmetric))
+        score = _score_struct0 + score_orn
     else:
         mov64 = np.ascontiguousarray(movable, dtype=np.int64)
         score = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k,
@@ -630,13 +664,13 @@ def mc_smooth(
     step_i = 0
     while True:
         if use_orn:
-            T, score, n_ok = _batch_smooth_orientation_nb(
+            T, score, score_orn, n_ok = _batch_smooth_orientation_nb(
                 pw, dtn64, mov_orn, orn_is_L, anchor_ar,
                 nbr_offsets, nbr_indices, nbr_weights_arr,
                 anchor_orn, bead_to_anchor_k,
                 float(step_size), T, dt, jump_scale, jump_coef, stop_steps,
                 stretch_k, squeeze_k, ang_k, dist_w, ang_w,
-                motif_weight, motifs_symmetric, score)
+                motif_weight, motifs_symmetric, score, score_orn)
         else:
             T, score, n_ok = _batch_smooth_nb(
                 pw, dtn64, mov64, float(step_size), T, dt,
