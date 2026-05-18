@@ -202,6 +202,95 @@ def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
 
 
 @njit(cache=True)
+def _local_heat_nb(pos, heat_dist, p, heat_weight):
+    """Local heat score for bead p vs all others.
+    Mirrors C++ calcScoreSubanchorHeatmap(int moved) — sums all i != p.
+    """
+    n = pos.shape[0]
+    err = 0.0
+    for i in range(n):
+        if i == p:
+            continue
+        exp_d = heat_dist[i, p]
+        if exp_d < 1e-6:
+            continue
+        dx = pos[i, 0] - pos[p, 0]
+        dy = pos[i, 1] - pos[p, 1]
+        dz = pos[i, 2] - pos[p, 2]
+        d = math.sqrt(dx * dx + dy * dy + dz * dz)
+        rel = (d - exp_d) / exp_d
+        err += rel * rel
+    return err * heat_weight
+
+
+@njit(cache=True)
+def _init_heat_nb(pos, heat_dist, heat_weight):
+    """Global heat score (double-counts pairs, matching C++ calcScoreSubanchorHeatmap())."""
+    n = pos.shape[0]
+    err = 0.0
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                continue
+            exp_d = heat_dist[i, j]
+            if exp_d < 1e-6:
+                continue
+            dx = pos[i, 0] - pos[j, 0]
+            dy = pos[i, 1] - pos[j, 1]
+            dz = pos[i, 2] - pos[j, 2]
+            d = math.sqrt(dx * dx + dy * dy + dz * dz)
+            rel = (d - exp_d) / exp_d
+            err += rel * rel
+    return err * heat_weight
+
+
+@njit(cache=True)
+def _batch_smooth_heat_nb(pos, dtn, movable, step_size, T, dt,
+                          jump_scale, jump_coef, n_steps,
+                          stretch_k, squeeze_k, ang_k, dist_w, ang_w,
+                          heat_dist, heat_weight, score, score_heat):
+    """Smooth MC with subanchor heat energy (no orientation).
+    Mirrors C++ MonteCarloArcsSmooth with use_subanchor_heatmap=true.
+    Returns (T_out, score_out, score_heat_out, n_ok).
+    """
+    n = pos.shape[0]
+    n_mov = movable.shape[0]
+    n_ok = 0
+    for _ in range(n_steps):
+        p = movable[np.random.randint(0, n_mov)]
+        dx = np.random.uniform(-step_size, step_size)
+        dy = np.random.uniform(-step_size, step_size)
+        dz = np.random.uniform(-step_size, step_size)
+
+        local_prev_heat = _local_heat_nb(pos, heat_dist, p, heat_weight)
+
+        pos[p, 0] += dx
+        pos[p, 1] += dy
+        pos[p, 2] += dz
+
+        local_curr_heat = _local_heat_nb(pos, heat_dist, p, heat_weight)
+        score_heat_new = score_heat + 2.0 * (local_curr_heat - local_prev_heat)
+
+        score_struct_new = _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
+        score_new = score_struct_new + score_heat_new
+
+        ok = score_new < score
+        if not ok and T > 0.0 and score > 0.0:
+            ok = (np.random.random() <
+                  jump_scale * math.exp(-jump_coef * (score_new / score) / T))
+        if ok:
+            n_ok += 1
+            score = score_new
+            score_heat = score_heat_new
+        else:
+            pos[p, 0] -= dx
+            pos[p, 1] -= dy
+            pos[p, 2] -= dz
+        T *= dt
+    return T, score, score_heat, n_ok
+
+
+@njit(cache=True)
 def _batch_smooth_orientation_nb(
     pos, dtn, movable, orn_is_L, anchor_ar,
     nbr_offsets, nbr_indices, nbr_weights,
@@ -273,6 +362,85 @@ def _batch_smooth_orientation_nb(
                 anchor_orn[orn_k, 2] = prev_oz
         T *= dt
     return T, score, score_orn, n_ok
+
+
+@njit(cache=True)
+def _batch_smooth_orientation_heat_nb(
+    pos, dtn, movable, orn_is_L, anchor_ar,
+    nbr_offsets, nbr_indices, nbr_weights,
+    anchor_orn, bead_to_anchor_k,
+    heat_dist, heat_weight,
+    step_size, T, dt, jump_scale, jump_coef, n_steps,
+    stretch_k, squeeze_k, ang_k, dist_w, ang_w,
+    motif_weight, symmetric, score, score_orn, score_heat,
+):
+    """Smooth MC with both CTCF orientation energy and subanchor heat energy.
+    Mirrors C++ MonteCarloArcsSmooth with useCTCFMotifOrientation and use_subanchor_heatmap.
+    Returns (T_out, score_out, score_orn_out, score_heat_out, n_ok).
+    """
+    n = pos.shape[0]
+    n_mov = movable.shape[0]
+    n_ok = 0
+    for _ in range(n_steps):
+        p = movable[np.random.randint(0, n_mov)]
+        dx = np.random.uniform(-step_size, step_size)
+        dy = np.random.uniform(-step_size, step_size)
+        dz = np.random.uniform(-step_size, step_size)
+
+        orn_k = bead_to_anchor_k[p]
+        prev_ox = 0.0
+        prev_oy = 0.0
+        prev_oz = 0.0
+        local_prev_orn = 0.0
+        if orn_k >= 0:
+            prev_ox = anchor_orn[orn_k, 0]
+            prev_oy = anchor_orn[orn_k, 1]
+            prev_oz = anchor_orn[orn_k, 2]
+            local_prev_orn = _local_score_orientation_nb(
+                anchor_orn, orn_k, nbr_offsets, nbr_indices, motif_weight, symmetric)
+
+        local_prev_heat = _local_heat_nb(pos, heat_dist, p, heat_weight)
+
+        pos[p, 0] += dx
+        pos[p, 1] += dy
+        pos[p, 2] += dz
+
+        score_orn_new = score_orn
+        if orn_k >= 0:
+            ar = anchor_ar[orn_k]
+            ox, oy, oz = _calc_orientation_nb(pos, ar, n, orn_is_L[ar])
+            anchor_orn[orn_k, 0] = ox
+            anchor_orn[orn_k, 1] = oy
+            anchor_orn[orn_k, 2] = oz
+            local_curr_orn = _local_score_orientation_nb(
+                anchor_orn, orn_k, nbr_offsets, nbr_indices, motif_weight, symmetric)
+            score_orn_new = score_orn + 2.0 * (local_curr_orn - local_prev_orn)
+
+        local_curr_heat = _local_heat_nb(pos, heat_dist, p, heat_weight)
+        score_heat_new = score_heat + 2.0 * (local_curr_heat - local_prev_heat)
+
+        score_struct_new = _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
+        score_new = score_struct_new + score_orn_new + score_heat_new
+
+        ok = score_new < score
+        if not ok and T > 0.0 and score > 0.0:
+            ok = (np.random.random() <
+                  jump_scale * math.exp(-jump_coef * (score_new / score) / T))
+        if ok:
+            n_ok += 1
+            score = score_new
+            score_orn = score_orn_new
+            score_heat = score_heat_new
+        else:
+            pos[p, 0] -= dx
+            pos[p, 1] -= dy
+            pos[p, 2] -= dz
+            if orn_k >= 0:
+                anchor_orn[orn_k, 0] = prev_ox
+                anchor_orn[orn_k, 1] = prev_oy
+                anchor_orn[orn_k, 2] = prev_oz
+        T *= dt
+    return T, score, score_orn, score_heat, n_ok
 
 
 # ---------------------------------------------------------------------------
@@ -563,23 +731,24 @@ def mc_arcs(
 
 
 def mc_smooth(
-    pos: np.ndarray,  # (N, 3) float32 - modified in place; anchors are fixed
-    dtn: np.ndarray,  # (N-1,) expected distances between consecutive beads
-    fixed: np.ndarray,  # (N,) bool - True for anchor beads (never moved)
+    pos: np.ndarray,          # (N, 3) float32 - modified in place; anchors are fixed
+    dtn: np.ndarray,          # (N-1,) expected distances between consecutive beads
+    fixed: np.ndarray,        # (N,) bool - True for anchor beads (never moved)
     step_size: float,
     settings,
-    char_orientations: np.ndarray = None,  # (N,) CTCF orientation chars; None = no motif
-    anchor_neighbors: dict = None,  # {anchor_k: [anchor_j, ...]}
-    anchor_neighbor_weights: dict = None,  # {anchor_k: [float, ...]}
+    char_orientations: np.ndarray = None,   # (N,) CTCF orientation chars; None = no motif
+    anchor_neighbors: dict = None,          # {anchor_k: [anchor_j, ...]}
+    anchor_neighbor_weights: dict = None,   # {anchor_k: [float, ...]}
+    heat_dist: np.ndarray = None,           # (N, N) subanchor heat expected distances; None = disabled
     label: str = "",
     verbose: bool = False,
 ) -> float:
     """
     MonteCarloArcsSmooth: chain connectivity + angle MC.
 
-    When char_orientations is provided and settings.use_ctcf_motif is True,
-    also optimises CTCF orientation energy via a pure-Python fallback loop
-    (Mirrors C++ MonteCarloArcsSmooth with useCTCFMotifOrientation=True).
+    Optionally adds CTCF orientation energy (char_orientations) and/or
+    subanchor heat energy (heat_dist).  Mirrors C++ MonteCarloArcsSmooth
+    with useCTCFMotifOrientation and use_subanchor_heatmap flags.
 
     Anchor beads (fixed=True) are never moved.  Returns final score.
     """
@@ -605,8 +774,10 @@ def mc_smooth(
         and anchor_neighbors is not None
         and getattr(settings, "use_ctcf_motif", False)
     )
+    use_heat = heat_dist is not None
     motif_weight = float(getattr(settings, "motif_weight", 1.0))
     motifs_symmetric = bool(getattr(settings, "motifs_symmetric", True))
+    heat_weight = float(getattr(settings, "subanchor_heatmap_dist_weight", 0.01))
 
     movable = np.where(~fixed)[0]
     if len(movable) == 0:
@@ -617,9 +788,14 @@ def mc_smooth(
     pw = _as_f64(pos)
     dtn64 = _as_f64(dtn)
 
+    # Build heat arrays
+    if use_heat:
+        heat64 = _as_f64(heat_dist)
+    else:
+        heat64 = np.empty((0, 0), dtype=np.float64)
+
     if use_orn:
         from .energy import calc_orientation as _calc_orn
-        # Build CSR neighbor arrays (computed once before the MC loop)
         anchor_ar = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
         n_anchors = len(anchor_ar)
         nbr_offsets = np.zeros(n_anchors + 1, dtype=np.int32)
@@ -634,9 +810,7 @@ def mc_smooth(
                 _off = nbr_offsets[_k] + _ki
                 nbr_indices[_off] = _j
                 nbr_weights_arr[_off] = _w
-        # bool flag per bead: True if orientation is 'L'
         orn_is_L = np.array([c == 'L' for c in char_orientations], dtype=np.bool_)
-        # bead_to_anchor_k[i] = k if bead i is adjacent to anchor k, else -1
         bead_to_anchor_k = np.full(n, -1, dtype=np.int32)
         for _k in range(n_anchors):
             _ar = int(anchor_ar[_k])
@@ -644,26 +818,35 @@ def mc_smooth(
                 bead_to_anchor_k[_ar - 1] = _k
             if _ar + 1 < n:
                 bead_to_anchor_k[_ar + 1] = _k
-        # Initial anchor orientation matrix (updated in-place across batches)
         anchor_orn = np.zeros((n_anchors, 3), dtype=np.float64)
         for _k in range(n_anchors):
             _ar = int(anchor_ar[_k])
             anchor_orn[_k] = _calc_orn(pw, _ar, n, char_orientations[_ar])
         mov_orn = np.ascontiguousarray(movable, dtype=np.int64)
-        # Score split: struct (exact) + orientation (exact at init, incremental after)
         _score_struct0 = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
         score_orn = float(_score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices,
                                                      nbr_weights_arr, motif_weight, motifs_symmetric))
-        score = _score_struct0 + score_orn
+        score_heat = float(_init_heat_nb(pw, heat64, heat_weight)) if use_heat else 0.0
+        score = _score_struct0 + score_orn + score_heat
     else:
         mov64 = np.ascontiguousarray(movable, dtype=np.int64)
-        score = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k,
-                                      ang_k, dist_w, ang_w))
+        _score_struct0 = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
+        score_heat = float(_init_heat_nb(pw, heat64, heat_weight)) if use_heat else 0.0
+        score = _score_struct0 + score_heat
 
     ms_score = score
     step_i = 0
     while True:
-        if use_orn:
+        if use_orn and use_heat:
+            T, score, score_orn, score_heat, n_ok = _batch_smooth_orientation_heat_nb(
+                pw, dtn64, mov_orn, orn_is_L, anchor_ar,
+                nbr_offsets, nbr_indices, nbr_weights_arr,
+                anchor_orn, bead_to_anchor_k,
+                heat64, heat_weight,
+                float(step_size), T, dt, jump_scale, jump_coef, stop_steps,
+                stretch_k, squeeze_k, ang_k, dist_w, ang_w,
+                motif_weight, motifs_symmetric, score, score_orn, score_heat)
+        elif use_orn:
             T, score, score_orn, n_ok = _batch_smooth_orientation_nb(
                 pw, dtn64, mov_orn, orn_is_L, anchor_ar,
                 nbr_offsets, nbr_indices, nbr_weights_arr,
@@ -680,6 +863,12 @@ def mc_smooth(
             #     nbr_weights_arr, motif_weight, motifs_symmetric))
             # score = float(_init_smooth_nb(
             #     pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w)) + score_orn
+        elif use_heat:
+            T, score, score_heat, n_ok = _batch_smooth_heat_nb(
+                pw, dtn64, mov64, float(step_size), T, dt,
+                jump_scale, jump_coef, stop_steps,
+                stretch_k, squeeze_k, ang_k, dist_w, ang_w,
+                heat64, heat_weight, score, score_heat)
         else:
             T, score, n_ok = _batch_smooth_nb(
                 pw, dtn64, mov64, float(step_size), T, dt,

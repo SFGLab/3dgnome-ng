@@ -358,16 +358,35 @@ class Solver:
         log2 = self.s.output_level >= 2
         if log1:
             print(f"\n[solver] {ib_label}  ({len(active_region)} anchors)")
-        exp_dist = self._calc_anchor_expected_distances(active_region, chr_)
+
+        # Build singleton contact heatmaps if either feature is enabled.
+        # Both heatmaps are derived from a single singleton-binning pass so
+        # we do it here before any MC and pass results down.
+        anchor_heat = None
+        subanchor_heat_raw = None
+        if (self.s.use_anchor_heatmap or self.s.use_subanchor_heatmap) and self._singletons:
+            anchor_heat, subanchor_heat_raw = self._build_contact_heatmaps(active_region, chr_)
+
+        exp_dist = self._calc_anchor_expected_distances(active_region, chr_, anchor_heat)
         self._reconstruct_cluster_arcs(ib_idx, active_region, exp_dist, ib_label,
                                        log1=log1, log2=log2)
         return self._reconstruct_cluster_smooth(active_region, chr_, ib_label,
+                                               subanchor_heat_raw=subanchor_heat_raw,
                                                log1=log1, log2=log2)
 
-    def _calc_anchor_expected_distances(self, active_region: list, chr_: str) -> np.ndarray:
+    def _calc_anchor_expected_distances(
+        self,
+        active_region: list,
+        chr_: str,
+        anchor_heatmap: np.ndarray = None,
+    ) -> np.ndarray:
         """
         Build expected distance matrix for anchor-level active region.
         Mirrors C++ calcAnchorExpectedDistancesHeatmap().
+
+        If anchor_heatmap (n x n) is provided and use_anchor_heatmap is True,
+        scales down expected distances for high-contact anchor pairs, mirroring
+        C++ calcAnchorExpectedDistancesHeatmap() post-processing.
 
         Returns mat where:
           mat[i,j] = -1  -> repulsion (no arc)
@@ -395,6 +414,22 @@ class Solver:
                 exp_d = self.s.freq_to_distance(arc.score)
                 mat[ai, bi] = exp_d
                 mat[bi, ai] = exp_d
+
+        # Apply anchor heatmap: scale down expected distances for high-contact pairs.
+        # Mirrors C++ post-processing in calcAnchorExpectedDistancesHeatmap().
+        if (anchor_heatmap is not None and self.s.use_anchor_heatmap):
+            max_val = float(anchor_heatmap.max())
+            influence = float(self.s.anchor_heatmap_influence)
+            if max_val > 1e-6:
+                for i in range(n):
+                    for j in range(i + 1, n):
+                        if mat[i, j] <= 0.0:
+                            continue
+                        s = (anchor_heatmap[i, j] / max_val) * influence
+                        if s > 1.0:
+                            s = 1.0
+                        mat[i, j] *= (1.0 - s)
+                        mat[j, i] = mat[i, j]
 
         return mat
 
@@ -448,6 +483,176 @@ class Solver:
         # Restore best anchor positions
         for i, ci in enumerate(active_region):
             self.clusters[ci].pos = best_pos[i].copy()
+
+    def _build_contact_heatmaps(
+        self,
+        active_region: list,
+        chr_: str,
+    ) -> tuple:
+        """
+        Build anchor-level and subanchor-level singleton contact heatmaps.
+        Mirrors C++ createSingletonSubanchorHeatmap().
+
+        Returns (anchor_heatmap, subanchor_heatmap_raw) where:
+          anchor_heatmap:      (n_anchors, n_anchors) float64 — normalized contact
+                               density between anchor pairs; used for expected-distance
+                               scaling in arc MC.
+          subanchor_heatmap_raw: (N, N) float64 where N = n_anchors + (n_anchors-1)*ld
+                               — normalized contact density at densified-bead resolution;
+                               used for heat energy in smooth MC.
+        """
+        import bisect
+
+        n_anchors = len(active_region)
+        ld = self.s.loop_density
+
+        # Total densified beads = n_anchors + (n_anchors-1)*ld = 1 + (n_anchors-1)*(ld+1)
+        N = n_anchors + (n_anchors - 1) * ld
+
+        # Build genomic break boundaries mirroring C++ createSingletonSubanchorHeatmap().
+        # Anchor k occupies bin k*(ld+1).  Subanchor j in span k→k+1 occupies
+        # bin k*(ld+1)+j  (j=1..ld).
+        anchor_lens: list[int] = []
+        gap_lens: list[int] = []
+
+        region_start = self.clusters[active_region[0]].start
+        region_end = self.clusters[active_region[-1]].end
+
+        # breaks[i] is the left boundary of bin i
+        breaks: list[int] = [region_start]
+        anchor_lens.append(
+            self.clusters[active_region[0]].end - self.clusters[active_region[0]].start
+        )
+
+        for i in range(1, n_anchors):
+            ca_end = self.clusters[active_region[i - 1]].end
+            cb_start = self.clusters[active_region[i]].start
+            gap = max(cb_start - ca_end, 0)
+            anchor_len = (self.clusters[active_region[i]].end
+                          - self.clusters[active_region[i]].start)
+            gap_lens.append(gap)
+            anchor_lens.append(anchor_len)
+            # ld+1 new break boundaries: span_start, ld-1 interior, span_end
+            breaks.append(ca_end)
+            for j in range(1, ld):
+                breaks.append(ca_end + int(gap * j / ld))
+            breaks.append(cb_start)
+
+        breaks.append(region_end)
+        # Number of bins = len(breaks)-1 = 1 + (n_anchors-1)*(ld+1) = N ✓
+
+        # Bin singleton contacts into subanchor heatmap
+        h_sub = np.zeros((N, N), dtype=np.float64)
+
+        for c1, p1, c2, p2, sc in self._singletons:
+            if c1 != chr_ or c2 != chr_:
+                continue
+            if p1 < region_start or p1 > region_end:
+                continue
+            if p2 < region_start or p2 > region_end:
+                continue
+
+            si = bisect.bisect_right(breaks, p1) - 1
+            ei = bisect.bisect_right(breaks, p2) - 1
+
+            if si < 0 or ei < 0 or si >= N or ei >= N or si == ei:
+                continue
+
+            h_sub[si, ei] += sc
+            h_sub[ei, si] += sc
+
+        # Extract anchor heatmap from raw subanchor values (BEFORE normalization),
+        # normalized by anchor area in Mbp^2.  Mirrors C++ lines 1267-1273.
+        h_anchor = np.zeros((n_anchors, n_anchors), dtype=np.float64)
+        for i in range(n_anchors):
+            ai = i * (ld + 1)
+            al_i = max(anchor_lens[i], 1)
+            for j in range(i + 1, n_anchors):
+                aj = j * (ld + 1)
+                al_j = max(anchor_lens[j], 1)
+                val = h_sub[ai, aj] / (al_i * al_j / 1e6)
+                h_anchor[i, j] = val
+                h_anchor[j, i] = val
+
+        # Normalize subanchor heatmap: divide by avg count, then by bin areas.
+        # Mirrors C++ lines 1294-1320.
+        avg_count = float(h_sub.mean())
+        if avg_count > 1e-6:
+            h_sub /= avg_count
+
+            # Bin sizes in kb: anchor bins use anchor_len, subanchor bins use gap/ld
+            bin_sizes = np.empty(N, dtype=np.float64)
+            for k in range(N):
+                anchor_idx = k // (ld + 1)
+                if k % (ld + 1) == 0:
+                    bin_sizes[k] = max(anchor_lens[anchor_idx], 1) / 1000.0
+                else:
+                    gap_idx = anchor_idx
+                    gl = gap_lens[gap_idx] if gap_idx < len(gap_lens) else 1
+                    bin_sizes[k] = max(gl / ld, 1) / 1000.0
+
+            for i in range(N):
+                for j in range(i + 1, N):
+                    denom = bin_sizes[i] * bin_sizes[j]
+                    if denom > 0.0:
+                        v = h_sub[i, j] / denom
+                        h_sub[i, j] = v
+                        h_sub[j, i] = v
+
+        return h_anchor, h_sub
+
+    def _build_heat_dist_subanchor(
+        self,
+        pos: np.ndarray,
+        fixed: np.ndarray,
+        dtn: np.ndarray,
+        subanchor_heat_raw: np.ndarray,
+        step_size: float,
+        label: str = "",
+        log2: bool = False,
+    ) -> np.ndarray | None:
+        """
+        Estimate expected pairwise distances for subanchor heat energy.
+        Mirrors C++ pipeline: run N dry smooth MC passes, average pairwise
+        distances between all beads, then create target distance matrix.
+
+        Returns (N, N) float64 target distance matrix or None if heatmap empty.
+        """
+        s = self.s
+        n = len(pos)
+        n_reps = int(s.subanchor_estimate_replicates)
+
+        avg_dist = np.zeros((n, n), dtype=np.float64)
+
+        for rep in range(n_reps):
+            pos_rep = pos.copy()
+            mc_smooth(pos_rep, dtn, fixed, step_size, s,
+                      label=f"{label} dry {rep + 1}/{n_reps}",
+                      verbose=log2)
+            # Accumulate pairwise distances (vectorized)
+            diff = pos_rep[:, np.newaxis, :] - pos_rep[np.newaxis, :, :]
+            avg_dist += np.sqrt((diff * diff).sum(axis=2))
+
+        avg_dist /= n_reps
+
+        # Create expected distance matrix mirroring C++ createExpectedDistSubanchorHeatmap().
+        avg_heat = float(subanchor_heat_raw.mean())
+        if avg_heat < 1e-6:
+            return None
+
+        influence = float(s.subanchor_heatmap_influence)
+        heat_dist = np.zeros((n, n), dtype=np.float64)
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                s_val = (subanchor_heat_raw[i, j] / avg_heat) * influence
+                if s_val > 1.0:
+                    s_val = 1.0
+                target = avg_dist[i, j] * (1.0 - s_val)
+                heat_dist[i, j] = target
+                heat_dist[j, i] = target
+
+        return heat_dist
 
     def _densify_active_region(self, active_region: list) -> tuple:
         """
@@ -516,14 +721,25 @@ class Solver:
 
         return pos_arr, fixed_arr, bead_gpos, dtn, anchor_map
 
-    def _reconstruct_cluster_smooth(self, active_region: list, chr_: str = "",
-                                    label: str = "",
-                                    log1: bool = True, log2: bool = True) -> list:
+    def _reconstruct_cluster_smooth(
+        self,
+        active_region: list,
+        chr_: str = "",
+        label: str = "",
+        subanchor_heat_raw: np.ndarray = None,
+        log1: bool = True,
+        log2: bool = False,
+    ) -> list:
         """
         Densify active region, then run smooth MC (chain + angle energy).
         Writes final anchor positions back to self.clusters.
         Returns list of (genomic_pos, x, y, z) for ALL beads (anchors + subanchors).
         Mirrors C++ MonteCarloArcsSmooth loop in reconstructClustersArcsDistances().
+
+        When subanchor_heat_raw is provided and use_subanchor_heatmap is True:
+          - runs dry smooth MC passes to estimate avg pairwise distances
+          - builds target distance matrix
+          - adds heat energy term to the final smooth MC
         """
         import math as _math
         s = self.s
@@ -540,16 +756,15 @@ class Solver:
         anchor_neighbors = None
         anchor_neighbor_weights = None
         if getattr(s, "use_ctcf_motif", False) and chr_:
-            import numpy as _np
-            char_orn = _np.array(['N'] * n, dtype='<U1')
-            n_anchors = len(anchor_map)
+            char_orn = np.array(['N'] * n, dtype='<U1')
+            n_anchors_orn = len(anchor_map)
             cluster_to_anchor_k = {ci: k for k, (_, ci) in enumerate(anchor_map)}
             for k, (bi, ci) in enumerate(anchor_map):
                 char_orn[bi] = self.clusters[ci].orientation or 'N'
 
             chr_arcs = self.arcs.get(chr_, [])
-            anchor_neighbors = {k: [] for k in range(n_anchors)}
-            anchor_neighbor_weights = {k: [] for k in range(n_anchors)}
+            anchor_neighbors = {k: [] for k in range(n_anchors_orn)}
+            anchor_neighbor_weights = {k: [] for k in range(n_anchors_orn)}
             for k, (bi, ci) in enumerate(anchor_map):
                 for arc_local in self.clusters[ci].arcs:
                     if arc_local >= len(chr_arcs):
@@ -561,6 +776,17 @@ class Solver:
                         anchor_neighbors[k].append(other_k)
                         anchor_neighbor_weights[k].append(
                             _math.sqrt(max(arc.score, 0)))
+
+        # Build subanchor heat distance matrix if enabled.
+        # This runs N dry smooth MC passes without heat to estimate avg pairwise
+        # distances, then scales them down for high-contact pairs.
+        heat_dist = None
+        if subanchor_heat_raw is not None and s.use_subanchor_heatmap:
+            if s.output_level >= 2:
+                print(f"  [{label}] building subanchor heat dist matrix "
+                      f"({s.subanchor_estimate_replicates} dry passes)")
+            heat_dist = self._build_heat_dist_subanchor(
+                pos, fixed, dtn, subanchor_heat_raw, step_size, label=label, log2=False)
 
         best_score = -1.0
         best_pos = pos.copy()
@@ -578,6 +804,7 @@ class Solver:
                               char_orientations=char_orn,
                               anchor_neighbors=anchor_neighbors,
                               anchor_neighbor_weights=anchor_neighbor_weights,
+                              heat_dist=heat_dist,
                               label=run_label, verbose=log2)
 
             if score < best_score or best_score < 0:

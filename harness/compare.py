@@ -759,6 +759,240 @@ def test_angle(reference_only=False):
             check(f"angle_metric{v1}", ref_val, py_val)
 
 
+def test_contact_heatmaps(reference_only=False):
+    """
+    Validates _build_contact_heatmaps and anchor heatmap distance scaling.
+    Pure Python - no C++ scorer needed.
+    """
+    print("\n[contact_heatmaps] Singleton contact heatmap building and anchor distance scaling")
+
+    if reference_only:
+        print("  (pure Python validation - no C++ reference)")
+        return
+
+    _test_names = [
+        "contact_heatmaps.sub_shape", "contact_heatmaps.anc_shape",
+        "contact_heatmaps.no_singletons_anc", "contact_heatmaps.no_singletons_sub",
+        "contact_heatmaps.in_region", "contact_heatmaps.anc_symmetric",
+        "contact_heatmaps.out_of_region", "contact_heatmaps.wrong_chr",
+        "anchor_heatmap.scales_distances", "anchor_heatmap.disabled",
+    ]
+
+    try:
+        import numpy as _np
+        _root = str(ROOT)
+        if _root not in sys.path:
+            sys.path.insert(0, _root)
+        from src.solver import Solver as _Sv
+        from src.io import InteractionArc as _IA
+    except ImportError as exc:
+        for name in _test_names:
+            print(f"  {SKIP}  {name}  ({exc})")
+            _results.append(("skip", name))
+        return
+
+    class _Cl:
+        def __init__(self, start, end):
+            self.start = start; self.end = end
+            self.genomic_pos = (start + end) // 2; self.orientation = "N"
+            self.pos = _np.zeros(3, dtype=_np.float32)
+            self.arcs = []; self.children = []; self.parent = -1
+            self.is_fixed = False; self.dist_to_next = 0.0
+
+        @property
+        def level(self): return 0
+
+    class _St:
+        loop_density = 3
+        use_anchor_heatmap = True; anchor_heatmap_influence = 0.5
+        use_subanchor_heatmap = True; subanchor_heatmap_influence = 0.1
+        subanchor_heatmap_dist_weight = 0.01
+        subanchor_estimate_replicates = 2; subanchor_estimate_steps = 2
+
+        @staticmethod
+        def genomic_length_to_distance(bp):
+            return 1.0 + 0.5 * (max(bp, 0) / 1000.0) ** 0.75
+
+    def _sv(ancs, sins):
+        sv = _Sv.__new__(_Sv)
+        sv.s = _St(); sv.clusters = ancs; sv.arcs = {"chr1": []}
+        sv._singletons = sins; sv.chrs = []
+        return sv
+
+    ld, n_anc = 3, 3
+    N = n_anc + (n_anc - 1) * ld  # 9
+
+    # Bin shape
+    sv = _sv([_Cl(0, 100), _Cl(500, 600), _Cl(1200, 1300)], [])
+    h_anc, h_sub = sv._build_contact_heatmaps([0, 1, 2], "chr1")
+    check("contact_heatmaps.sub_shape", float(N * N), float(h_sub.size), atol=0)
+    check("contact_heatmaps.anc_shape", float(n_anc * n_anc), float(h_anc.size), atol=0)
+
+    # No singletons → all zeros
+    sv2 = _sv([_Cl(0, 100), _Cl(500, 600)], [])
+    h_a2, h_s2 = sv2._build_contact_heatmaps([0, 1], "chr1")
+    check("contact_heatmaps.no_singletons_anc", 0.0, float(h_a2.max()), atol=0)
+    check("contact_heatmaps.no_singletons_sub", 0.0, float(h_s2.max()), atol=0)
+
+    # In-region singleton raises heatmap and is symmetric
+    sv3 = _sv([_Cl(0, 100), _Cl(500, 600)], [("chr1", 50, "chr1", 550, 1)])
+    h_a3, _ = sv3._build_contact_heatmaps([0, 1], "chr1")
+    check("contact_heatmaps.in_region", 1.0, 1.0 if h_a3.max() > 0.0 else 0.0, atol=0)
+    check("contact_heatmaps.anc_symmetric", 1.0, 1.0 if _np.allclose(h_a3, h_a3.T) else 0.0, atol=0)
+
+    # Out-of-region singleton ignored
+    sv4 = _sv([_Cl(1000, 1100), _Cl(1500, 1600)], [("chr1", 50, "chr1", 550, 5)])
+    h_a4, _ = sv4._build_contact_heatmaps([0, 1], "chr1")
+    check("contact_heatmaps.out_of_region", 0.0, float(h_a4.max()), atol=0)
+
+    # Wrong chromosome ignored
+    sv5 = _sv([_Cl(0, 100), _Cl(500, 600)], [("chr2", 50, "chr2", 550, 10)])
+    h_a5, _ = sv5._build_contact_heatmaps([0, 1], "chr1")
+    check("contact_heatmaps.wrong_chr", 0.0, float(h_a5.max()), atol=0)
+
+    # Anchor heatmap scales expected distances: s=(10/10)*0.5=0.5 → 5.0*(1-0.5)=2.5
+    h_m = _np.zeros((2, 2)); h_m[0, 1] = h_m[1, 0] = 10.0
+    sv6 = _Sv.__new__(_Sv); sv6.s = _St()
+    sv6.clusters = [_Cl(0, 100), _Cl(500, 600)]
+    arc = _IA(start=0, end=1, score=10)
+    sv6.clusters[0].arcs = [0]; sv6.clusters[1].arcs = [0]
+    sv6.arcs = {"chr1": [arc]}; sv6.s.freq_to_distance = lambda sc: 5.0
+    mat = sv6._calc_anchor_expected_distances([0, 1], "chr1", h_m)
+    check("anchor_heatmap.scales_distances", 2.5, float(mat[0, 1]))
+
+    # Anchor heatmap disabled → no scaling
+    st7 = _St(); st7.use_anchor_heatmap = False
+    sv7 = _Sv.__new__(_Sv); sv7.s = st7
+    sv7.clusters = [_Cl(0, 100), _Cl(500, 600)]
+    arc7 = _IA(start=0, end=1, score=10)
+    sv7.clusters[0].arcs = [0]; sv7.clusters[1].arcs = [0]
+    sv7.arcs = {"chr1": [arc7]}; sv7.s.freq_to_distance = lambda sc: 5.0
+    mat7 = sv7._calc_anchor_expected_distances([0, 1], "chr1", h_m)
+    check("anchor_heatmap.disabled", 5.0, float(mat7[0, 1]))
+
+
+def test_subanchor_heat(reference_only=False):
+    """
+    Validates _build_heat_dist_subanchor and mc_smooth heat integration.
+    Pure Python - no C++ scorer needed.
+    """
+    print("\n[subanchor_heat] Subanchor heat distance targets and mc_smooth integration")
+
+    if reference_only:
+        print("  (pure Python validation - no C++ reference)")
+        return
+
+    _test_names = [
+        "subanchor_heat.zero_heatmap_none", "subanchor_heat.high_contact_smaller",
+        "subanchor_heat.nonneg_distances", "subanchor_heat.mc_smooth_heat_finite",
+        "subanchor_heat.mc_smooth_orn_heat_finite", "subanchor_heat.local_sum_eq_init",
+    ]
+
+    try:
+        import numpy as _np
+        import math as _m
+        _root = str(ROOT)
+        if _root not in sys.path:
+            sys.path.insert(0, _root)
+        from src.solver import Solver as _Sv
+        from src.mc import mc_smooth, _init_heat_nb, _local_heat_nb, _as_f64
+    except ImportError as exc:
+        for name in _test_names:
+            print(f"  {SKIP}  {name}  ({exc})")
+            _results.append(("skip", name))
+        return
+
+    class _Cl:
+        def __init__(self, start, end):
+            self.start = start; self.end = end
+            self.genomic_pos = (start + end) // 2; self.orientation = "N"
+            self.pos = _np.zeros(3, dtype=_np.float32)
+            self.arcs = []; self.children = []; self.parent = -1
+            self.is_fixed = False; self.dist_to_next = 0.0
+
+        @property
+        def level(self): return 0
+
+    class _St:
+        loop_density = 3; use_anchor_heatmap = True; anchor_heatmap_influence = 0.5
+        use_subanchor_heatmap = True; subanchor_heatmap_influence = 0.5
+        subanchor_heatmap_dist_weight = 0.01
+        subanchor_estimate_replicates = 2; subanchor_estimate_steps = 2
+        max_temp_smooth = 5.0; dt_temp_smooth = 0.99
+        jump_scale_smooth = 50.0; jump_coef_smooth = 20.0
+        mc_stop_steps_smooth = 100; mc_stop_improvement_smooth = 0.995
+        mc_stop_successes_smooth = 3
+        spring_stretch = 0.1; spring_squeeze = 0.1; spring_angular = 0.1
+        smooth_dist_weight = 1.0; smooth_angle_weight = 1.0
+        noise_smooth = 5.0; use_ctcf_motif = False
+
+        @staticmethod
+        def genomic_length_to_distance(bp):
+            return 1.0 + 0.5 * (max(bp, 0) / 1000.0) ** 0.75
+
+    n = 9
+    ancs = [_Cl(0, 100), _Cl(500, 600), _Cl(1200, 1300)]
+    fixed = _np.zeros(n, dtype=bool)
+    fixed[0] = fixed[4] = fixed[8] = True
+    dtn = _np.full(n - 1, 2.0, dtype=_np.float32)
+
+    def _sv():
+        sv = _Sv.__new__(_Sv); sv.s = _St(); sv.clusters = ancs
+        sv.arcs = {}; sv._singletons = []; sv.chrs = []
+        return sv
+
+    # 1. Zero heatmap → None
+    pos1 = _np.random.RandomState(1).rand(n, 3).astype(_np.float32) * 10
+    r1 = _sv()._build_heat_dist_subanchor(pos1, fixed, dtn, _np.zeros((n, n)), step_size=0.5)
+    check("subanchor_heat.zero_heatmap_none", 1.0, 1.0 if r1 is None else 0.0, atol=0)
+
+    # 2. High-contact pair gets smaller target distance than low-contact pair
+    pos2 = _np.zeros((n, 3), dtype=_np.float32)
+    for i in range(n):
+        pos2[i, 0] = float(i) * 2.0
+    h2 = _np.zeros((n, n)); h2[0, 8] = h2[8, 0] = 100.0; h2[0, 4] = h2[4, 0] = 1.0
+    heat2 = _sv()._build_heat_dist_subanchor(pos2, fixed, dtn, h2, step_size=0.5)
+    check("subanchor_heat.high_contact_smaller", 1.0,
+          1.0 if (heat2 is not None and heat2[0, 8] <= heat2[0, 4] + 1e-6) else 0.0, atol=0)
+    check("subanchor_heat.nonneg_distances", 1.0,
+          1.0 if (heat2 is not None and float(heat2.min()) >= 0.0) else 0.0, atol=0)
+
+    # 3. mc_smooth with heat produces finite non-negative score
+    _np.random.seed(42)
+    pos3 = _np.random.rand(n, 3).astype(_np.float32) * 5.0
+    heat3 = _np.full((n, n), 0.1); _np.fill_diagonal(heat3, 0.0)
+    st3 = _St(); st3.mc_stop_steps_smooth = 200; st3.mc_stop_successes_smooth = 2
+    st3.mc_stop_improvement_smooth = 0.5
+    s3 = mc_smooth(pos3, dtn, fixed, step_size=0.5, settings=st3, heat_dist=heat3)
+    check("subanchor_heat.mc_smooth_heat_finite", 1.0,
+          1.0 if _m.isfinite(s3) and s3 >= 0.0 else 0.0, atol=0)
+
+    # 4. mc_smooth with heat + orientation produces finite score
+    n7 = 7; fixed7 = _np.zeros(n7, dtype=bool)
+    fixed7[0] = fixed7[3] = fixed7[6] = True
+    dtn7 = _np.full(n7 - 1, 1.0, dtype=_np.float32)
+    _np.random.seed(0); pos4 = _np.random.rand(n7, 3).astype(_np.float32) * 3.0
+    heat4 = _np.full((n7, n7), 2.0); _np.fill_diagonal(heat4, 0.0)
+    st4 = _St(); st4.use_ctcf_motif = True; st4.mc_stop_steps_smooth = 100
+    st4.mc_stop_successes_smooth = 2; st4.mc_stop_improvement_smooth = 0.5
+    s4 = mc_smooth(pos4, dtn7, fixed7, step_size=0.5, settings=st4,
+                   char_orientations=_np.array(['R', 'N', 'N', 'L', 'N', 'N', 'R'], dtype='<U1'),
+                   anchor_neighbors={0: [1], 1: [0, 2], 2: [1]},
+                   anchor_neighbor_weights={0: [1.0], 1: [1.0, 1.0], 2: [1.0]},
+                   heat_dist=heat4)
+    check("subanchor_heat.mc_smooth_orn_heat_finite", 1.0,
+          1.0 if _m.isfinite(s4) and s4 >= 0.0 else 0.0, atol=0)
+
+    # 5. Numba: sum of _local_heat_nb over all beads == _init_heat_nb (double-count invariant)
+    rng = _np.random.RandomState(7); pos5 = rng.rand(5, 3) * 5.0
+    hd5 = _np.abs(rng.randn(5, 5)) + 0.5; _np.fill_diagonal(hd5, 0.0)
+    hd5 = (hd5 + hd5.T) / 2
+    pw5 = _as_f64(pos5); hd64 = _as_f64(hd5)
+    total_local = sum(float(_local_heat_nb(pw5, hd64, p, 1.0)) for p in range(5))
+    init_val = float(_init_heat_nb(pw5, hd64, 1.0))
+    check("subanchor_heat.local_sum_eq_init", init_val, total_local)
+
+
 # ---------------------------------------------------------------------------
 # Summary
 
@@ -785,6 +1019,8 @@ ALL_TESTS = {
     "densify": test_densify,
     "metropolis": test_metropolis,
     "orientation": test_orientation,
+    "contact_heatmaps": test_contact_heatmaps,
+    "subanchor_heat": test_subanchor_heat,
 }
 
 

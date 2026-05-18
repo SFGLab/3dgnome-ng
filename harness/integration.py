@@ -28,7 +28,9 @@ Usage:
     python harness/integration.py --output-dir ./out  # write CIF files to ./out/
     python harness/integration.py --cache-dir ./my_cache  # override cache location
     python harness/integration.py --region-override chr1:...  # override test region
-    python harness/integration.py --with-orientation  # enable CTCF motif orientation
+    python harness/integration.py --with-orientation       # enable CTCF motif orientation
+    python harness/integration.py --with-anchor-heatmap    # enable anchor singleton heatmap
+    python harness/integration.py --with-subanchor-heatmap # enable subanchor heat energy in smooth MC
 """
 
 import argparse
@@ -334,7 +336,13 @@ stop_condition_steps = {steps_smooth}
 """
 
 
-def write_config(path: Path, fast: bool, use_orientation: bool = False) -> None:
+def write_config(
+    path: Path,
+    fast: bool,
+    use_orientation: bool = False,
+    use_anchor_heatmap: bool = False,
+    use_subanchor_heatmap: bool = False,
+) -> None:
     if fast:
         # Very fast: ~10 s per structure, low quality
         cfg = BASE_CONFIG.format(
@@ -355,6 +363,16 @@ def write_config(path: Path, fast: bool, use_orientation: bool = False) -> None:
         cfg = cfg.replace(
             "use_motif_orientation = no",
             "use_motif_orientation = yes",
+        )
+    if use_anchor_heatmap:
+        cfg = cfg.replace(
+            "use_anchor_heatmap = no",
+            "use_anchor_heatmap = yes",
+        )
+    if use_subanchor_heatmap:
+        cfg = cfg.replace(
+            "use_subanchor_heatmap = no",
+            "use_subanchor_heatmap = yes",
         )
     path.write_text(cfg)
 
@@ -659,7 +677,9 @@ def _cache_path(cache_dir: Path, region_label: str, n: int) -> Path:
 
 def _save_cache(path: Path, region: str, n: int, fast: bool,
                 structs: list, raw_lines: list,
-                use_orientation: bool = False) -> None:
+                use_orientation: bool = False,
+                use_anchor_heatmap: bool = False,
+                use_subanchor_heatmap: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump({
@@ -667,6 +687,8 @@ def _save_cache(path: Path, region: str, n: int, fast: bool,
             "n_structures": n,
             "mode": "fast" if fast else "balanced",
             "use_orientation": use_orientation,
+            "use_anchor_heatmap": use_anchor_heatmap,
+            "use_subanchor_heatmap": use_subanchor_heatmap,
             "structures": [[list(b) for b in s] for s in structs],
             "raw_lines": raw_lines,
         }, f)
@@ -701,6 +723,12 @@ def main():
     parser.add_argument("--with-orientation", action="store_true",
                         help="enable CTCF motif orientation energy (use_motif_orientation=yes); "
                              "uses a separate cache slot from the no-orientation run")
+    parser.add_argument("--with-anchor-heatmap", action="store_true",
+                        help="enable anchor singleton heatmap (use_anchor_heatmap=yes); "
+                             "scales expected anchor distances by singleton contact frequency")
+    parser.add_argument("--with-subanchor-heatmap", action="store_true",
+                        help="enable subanchor heat energy in smooth MC (use_subanchor_heatmap=yes); "
+                             "implies --with-anchor-heatmap (both heatmaps are built together)")
     args = parser.parse_args()
 
     if args.python_only and args.cpp_only:
@@ -721,12 +749,19 @@ def main():
         region_label = REGION_LABEL
 
     use_orn = getattr(args, "with_orientation", False)
+    use_anchor_heatmap = getattr(args, "with_anchor_heatmap", False)
+    use_subanchor_heatmap = getattr(args, "with_subanchor_heatmap", False)
+    # subanchor heatmap always requires the anchor heatmap (both built together)
+    if use_subanchor_heatmap:
+        use_anchor_heatmap = True
 
-    # Parametrize region_label with mode and orientation so cache files, CIF
+    # Parametrize region_label with mode and all flags so cache files, CIF
     # outputs, and any other label-derived paths are automatically distinct.
     _mode_suffix = "fast" if args.fast else "balanced"
     _orn_suffix = "_orientation" if use_orn else ""
-    region_label = f"{region_label}_{_mode_suffix}{_orn_suffix}"
+    _ah_suffix = "_anchor_heatmap" if use_anchor_heatmap else ""
+    _sh_suffix = "_subanchor_heatmap" if use_subanchor_heatmap else ""
+    region_label = f"{region_label}_{_mode_suffix}{_orn_suffix}{_ah_suffix}{_sh_suffix}"
 
     cache_dir = Path(args.cache_dir) if args.cache_dir else ROOT / "out" / "cpp_cache"
     cache_file = _cache_path(cache_dir, region_label, args.n_structures)
@@ -736,10 +771,16 @@ def main():
     print(f"[integration] mode: {'fast' if args.fast else 'balanced'}")
     if use_orn:
         print(f"[integration] CTCF motif orientation: ENABLED")
+    if use_anchor_heatmap:
+        print(f"[integration] anchor heatmap: ENABLED")
+    if use_subanchor_heatmap:
+        print(f"[integration] subanchor heatmap: ENABLED")
 
     tmpdir = Path(tempfile.mkdtemp(prefix="gnome3d_integ_"))
     config = tmpdir / "config.ini"
-    write_config(config, fast=args.fast, use_orientation=use_orn)
+    write_config(config, fast=args.fast, use_orientation=use_orn,
+                 use_anchor_heatmap=use_anchor_heatmap,
+                 use_subanchor_heatmap=use_subanchor_heatmap)
 
     # max_level=2 -> heatmap MC + arc MC + smooth MC (Level 4 runs inside arc reconstruction).
     # Both C++ and Python produce subanchor beads: n_anchors + (n_anchors-1)*loop_density.
@@ -761,7 +802,9 @@ def main():
             cpp_structs, cpp_raw = run_cpp_ensemble(
                 cpp_outdir, config, args.n_structures, MAX_LEVEL, region, region_label)
             _save_cache(cache_file, region, args.n_structures, args.fast,
-                        cpp_structs, cpp_raw, use_orientation=use_orn)
+                        cpp_structs, cpp_raw, use_orientation=use_orn,
+                        use_anchor_heatmap=use_anchor_heatmap,
+                        use_subanchor_heatmap=use_subanchor_heatmap)
 
         if args.output_dir:
             save_cif_ensemble(cpp_structs, "cpp", Path(args.output_dir), region_label)
