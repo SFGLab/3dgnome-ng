@@ -50,12 +50,12 @@ DATA_DIR = ROOT / "data" / "GM12878"
 REGION = "chr1:18288319-20307135"
 REGION_LABEL = f"integration_test_region_{REGION.replace(':', '_').replace('-', '_')}"
 
-# KS test threshold: p-value must exceed this to PASS
-KS_P_THRESHOLD = 0.05
-# Max KS statistic (distribution similarity) to PASS
-KS_D_THRESHOLD = 0.3
+# Max KS d-statistic to PASS (CDF max-difference; sample-size-independent).
+KS_D_THRESHOLD = 0.05
+
 # Cap pairwise distance pool before KS
 KS_PWD_MAX_SAMPLES = 50_000
+
 # Structural distance benchmark (from cudaMMC_benchmark_analysis.ipynb):
 # median inter-model structural distance ratio (Python/C++) must be within this
 # fraction of 1.0.  Mirrors the notebook's median ratio check.
@@ -803,7 +803,7 @@ def main():
 
         # KS test on Rg distribution
         d_rg, p_rg = ks_2samp(cpp_stats["rg"], py_stats["rg"])
-        ok_rg = p_rg >= KS_P_THRESHOLD and d_rg <= KS_D_THRESHOLD
+        ok_rg = d_rg <= KS_D_THRESHOLD
         status = PASS_STR if ok_rg else FAIL_STR
         print(f"  {status}  Rg distribution  KS d={d_rg:.3f}  p={p_rg:.3f}")
         results.append(ok_rg)
@@ -813,7 +813,7 @@ def main():
         cpp_pwd = _subsample(cpp_stats["pwd"], KS_PWD_MAX_SAMPLES)
         py_pwd = _subsample(py_stats["pwd"], KS_PWD_MAX_SAMPLES)
         d_pw, p_pw = ks_2samp(cpp_pwd, py_pwd)
-        ok_pw = p_pw >= KS_P_THRESHOLD and d_pw <= KS_D_THRESHOLD
+        ok_pw = d_pw <= KS_D_THRESHOLD
         status = PASS_STR if ok_pw else FAIL_STR
         print(f"  {status}  pairwise dist KS  d={d_pw:.3f}  p={p_pw:.3f}"
               f"  (subsampled {len(cpp_pwd):,}/{len(cpp_stats['pwd']):,})")
@@ -821,7 +821,7 @@ def main():
 
         # KS test on bond lengths
         d_bd, p_bd = ks_2samp(cpp_stats["bond"], py_stats["bond"])
-        ok_bd = p_bd >= KS_P_THRESHOLD and d_bd <= KS_D_THRESHOLD
+        ok_bd = d_bd <= KS_D_THRESHOLD
         status = PASS_STR if ok_bd else FAIL_STR
         print(f"  {status}  bond lengths KS   d={d_bd:.3f}  p={p_bd:.3f}")
         results.append(ok_bd)
