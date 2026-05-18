@@ -10,24 +10,19 @@ Mirrors C++ LooperSolver methods:
 
 from __future__ import annotations
 
-import math
-import random
-from pathlib import Path
-
 import numpy as np
 
-from .settings import Settings
 from .data import ContactData
+from .energy import random_vector_np
+from .hierarchy import (
+    Cluster, LVL_ANCHOR, LVL_SEGMENT, LVL_CHROMOSOME,
+    build_cluster_tree, set_level, )
 from .io import (
     BedRegion,
     create_singleton_heatmap_from_contacts,
 )
-from .hierarchy import (
-    Cluster, LVL_ANCHOR, LVL_SEGMENT, LVL_INTERACTION_BLOCK, LVL_CHROMOSOME,
-    build_cluster_tree, set_level, set_top_level,
-)
 from .mc import mc_heatmap, mc_arcs, mc_smooth
-from .energy import random_vector_np
+from .settings import Settings
 
 
 class Solver:
@@ -371,8 +366,8 @@ class Solver:
         self._reconstruct_cluster_arcs(ib_idx, active_region, exp_dist, ib_label,
                                        log1=log1, log2=log2)
         return self._reconstruct_cluster_smooth(active_region, chr_, ib_label,
-                                               subanchor_heat_raw=subanchor_heat_raw,
-                                               log1=log1, log2=log2)
+                                                subanchor_heat_raw=subanchor_heat_raw,
+                                                log1=log1, log2=log2)
 
     def _calc_anchor_expected_distances(
         self,
@@ -621,16 +616,27 @@ class Solver:
         s = self.s
         n = len(pos)
         n_reps = int(s.subanchor_estimate_replicates)
+        n_steps = int(s.subanchor_estimate_steps)
 
         avg_dist = np.zeros((n, n), dtype=np.float64)
 
+        # Mirrors C++: for each replicate, run n_steps MC passes from pos+noise,
+        # keep the best structure, then accumulate pairwise distances from it.
         for rep in range(n_reps):
-            pos_rep = pos.copy()
-            mc_smooth(pos_rep, dtn, fixed, step_size, s,
-                      label=f"{label} dry {rep + 1}/{n_reps}",
-                      verbose=log2)
-            # Accumulate pairwise distances (vectorized)
-            diff = pos_rep[:, np.newaxis, :] - pos_rep[np.newaxis, :, :]
+            rep_best_score = -1.0
+            rep_best_pos = None
+            for step in range(n_steps):
+                pos_trial = pos.copy()
+                for i in range(n):
+                    if not fixed[i]:
+                        pos_trial[i] += random_vector_np(step_size)
+                score = mc_smooth(pos_trial, dtn, fixed, step_size, s,
+                                  label=f"{label} est {rep + 1}/{n_reps} step {step + 1}/{n_steps}",
+                                  verbose=log2)
+                if score < rep_best_score or rep_best_score < 0.0:
+                    rep_best_score = score
+                    rep_best_pos = pos_trial.copy()
+            diff = rep_best_pos[:, np.newaxis, :] - rep_best_pos[np.newaxis, :, :]
             avg_dist += np.sqrt((diff * diff).sum(axis=2))
 
         avg_dist /= n_reps
@@ -784,7 +790,8 @@ class Solver:
         if subanchor_heat_raw is not None and s.use_subanchor_heatmap:
             if s.output_level >= 2:
                 print(f"  [{label}] building subanchor heat dist matrix "
-                      f"({s.subanchor_estimate_replicates} dry passes)")
+                      f"({s.subanchor_estimate_replicates} replicates × "
+                      f"{s.subanchor_estimate_steps} steps)")
             heat_dist = self._build_heat_dist_subanchor(
                 pos, fixed, dtn, subanchor_heat_raw, step_size, label=label, log2=False)
 

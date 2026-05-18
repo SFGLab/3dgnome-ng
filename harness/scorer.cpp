@@ -366,6 +366,80 @@ void mode_orientation(int argc, char** argv) {
     delete ls;
 }
 
+// ---------------------------------------------------------------------------
+// heat_score mode
+// Usage: ./scorer heat_score <dist_weight> <positions_file> <heat_dist_file>
+// Output:
+//   global <score>       (calcScoreSubanchorHeatmap(-1) == sum of all locals)
+//   local <i> <score>    (calcScoreSubanchorHeatmap(i) for each bead)
+
+void mode_heat_score(int argc, char** argv) {
+    if (argc < 5) { fprintf(stderr, "heat_score: dist_weight positions heat_dist\n"); exit(1); }
+    Settings::subanchorHeatmapDistWeight = atof(argv[2]);
+    auto pos = read_positions(argv[3]);
+    auto mat = read_matrix(argv[4]);
+    int n = (int)pos.size();
+
+    LooperSolver* ls = make_solver();
+    setup_clusters(ls, pos);
+    ls->heatmap_dist_subanchor.init(n);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            ls->heatmap_dist_subanchor.v[i][j] = (float)mat[i][j];
+
+    printf("global %.15f\n", ls->calcScoreSubanchorHeatmap(-1));
+    for (int i = 0; i < n; i++)
+        printf("local %d %.15f\n", i, ls->calcScoreSubanchorHeatmap(i));
+    delete ls;
+}
+
+// ---------------------------------------------------------------------------
+// anchor_scale mode
+// Usage: ./scorer anchor_scale <influence> <base_dist_file> <heatmap_file>
+// Applies C++ anchor heatmap scaling (LooperSolver.cpp lines 2990-3015).
+// Output: "<i> <j> <scaled_val>" for every (i,j) pair.
+
+void mode_anchor_scale(int argc, char** argv) {
+    if (argc < 5) { fprintf(stderr, "anchor_scale: influence base_dist heatmap\n"); exit(1); }
+    Settings::anchorHeatmapInfluence = atof(argv[2]);
+    Settings::useAnchorHeatmap = true;
+    auto base_dist = read_matrix(argv[3]);
+    auto hm        = read_matrix(argv[4]);
+    int n = (int)base_dist.size();
+
+    LooperSolver* ls = make_solver();
+    ls->heatmap_exp_dist_anchor.init(n);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            ls->heatmap_exp_dist_anchor.v[i][j] = (float)base_dist[i][j];
+
+    ls->heatmap_anchor.init(n);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            ls->heatmap_anchor.v[i][j] = (float)hm[i][j];
+
+    // Mirror LooperSolver.cpp lines 2997-3015
+    float min_val, max_val;
+    ls->heatmap_anchor.getRange(min_val, max_val);
+    if (max_val > 1e-6f) {
+        float s;
+        for (int i = 0; i < n; i++) {
+            for (int j = i + 1; j < n; j++) {
+                if (ls->heatmap_exp_dist_anchor.v[i][j] < 0.0f) continue;
+                s = (ls->heatmap_anchor.v[i][j] / max_val) * Settings::anchorHeatmapInfluence;
+                if (s > 1.0f) s = 1.0f;
+                ls->heatmap_exp_dist_anchor.v[i][j] *= (1.0f - s);
+                ls->heatmap_exp_dist_anchor.v[j][i] = ls->heatmap_exp_dist_anchor.v[i][j];
+            }
+        }
+    }
+
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            printf("%d %d %.15f\n", i, j, (double)ls->heatmap_exp_dist_anchor.v[i][j]);
+    delete ls;
+}
+
 void mode_metropolis(int argc, char** argv) {
     if (argc < 7) {
         fprintf(stderr, "metropolis: jump_scale jump_coef score_curr score_prev T\n");
@@ -382,19 +456,21 @@ void mode_metropolis(int argc, char** argv) {
 int main(int argc, char** argv) {
     if (argc < 2) {
         fprintf(stderr, "Usage: scorer <mode> [args...]\n");
-        fprintf(stderr, "Modes: distfns | heatmap | arcs | smooth | metropolis | orientation\n");
+        fprintf(stderr, "Modes: distfns | heatmap | arcs | smooth | metropolis | orientation | heat_score | anchor_scale\n");
         return 1;
     }
 
     init_settings_defaults();
 
     const char *mode = argv[1];
-    if      (strcmp(mode, "distfns")    == 0) mode_distfns(argc, argv);
-    else if (strcmp(mode, "heatmap")    == 0) mode_heatmap(argc, argv);
-    else if (strcmp(mode, "arcs")       == 0) mode_arcs(argc, argv);
-    else if (strcmp(mode, "smooth")     == 0) mode_smooth(argc, argv);
+    if      (strcmp(mode, "distfns")     == 0) mode_distfns(argc, argv);
+    else if (strcmp(mode, "heatmap")     == 0) mode_heatmap(argc, argv);
+    else if (strcmp(mode, "arcs")        == 0) mode_arcs(argc, argv);
+    else if (strcmp(mode, "smooth")      == 0) mode_smooth(argc, argv);
     else if (strcmp(mode, "metropolis")  == 0) mode_metropolis(argc, argv);
     else if (strcmp(mode, "orientation") == 0) mode_orientation(argc, argv);
+    else if (strcmp(mode, "heat_score")  == 0) mode_heat_score(argc, argv);
+    else if (strcmp(mode, "anchor_scale")== 0) mode_anchor_scale(argc, argv);
     else {
         fprintf(stderr, "Unknown mode: %s\n", mode);
         return 1;

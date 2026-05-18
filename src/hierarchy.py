@@ -3,12 +3,6 @@ src/hierarchy.py - Cluster data structures and hierarchy tree building.
 
 Mirrors C++ LooperSolver::createTreeChromosome(), findGaps(), findSplit().
 
-Level numbering (C++ LVL_* constants):
-    LVL_CHROMOSOME = 0   (root per chromosome)
-    LVL_SEGMENT    = 1
-    LVL_INTERACTION_BLOCK = 2
-    LVL_ANCHOR     = 3   (leaf, originally level 4 in C++)
-
 The C++ code starts anchors at level=4, IBs at 3, segments at 2, chr root at 1.
 We replicate this numbering so that setLevel()/levelDown() work identically.
 """
@@ -16,11 +10,9 @@ We replicate this numbering so that setLevel()/levelDown() work identically.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 import numpy as np
 
-# Level constants matching C++
 LVL_CHROMOSOME = 1
 LVL_SEGMENT = 2
 LVL_INTERACTION_BLOCK = 3
@@ -164,7 +156,6 @@ def build_cluster_tree(
         chr_root:          dict[chr -> int] index of chromosome root cluster
         chr_first_cluster: dict[chr -> int] index of first anchor cluster per chr
     """
-    from .io import InteractionArc  # avoid circular import at module level
 
     clusters: list[Cluster] = []
     chr_root: dict[str, int] = {}

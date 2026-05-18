@@ -4,9 +4,8 @@ src/mc.py - Monte Carlo simulation loops for 3dgnome-ng.
 Mirrors C++ LooperSolver::MonteCarloHeatmap(), MonteCarloArcs(), and
 MonteCarloArcsSmooth().
 
-All three loops run entirely inside Numba @njit batch functions.
 On first import the JIT functions compile (~10–30 s); subsequent runs
-load from __pycache__ (cache=True).
+load from cache
 
 Acceptance criterion (all loops):
     ok = (score_new <= score_curr)
@@ -97,8 +96,8 @@ def _batch_smooth_nb(pos, dtn, movable, step_size, T, dt,
 
         loc_prev = _local_smooth_nb(pos, dtn, p, n,
                                     stretch_k, squeeze_k, ang_k, dist_w, ang_w)
-        pos[p, 0] += dx;
-        pos[p, 1] += dy;
+        pos[p, 0] += dx
+        pos[p, 1] += dy
         pos[p, 2] += dz
         loc_curr = _local_smooth_nb(pos, dtn, p, n,
                                     stretch_k, squeeze_k, ang_k, dist_w, ang_w)
@@ -112,8 +111,8 @@ def _batch_smooth_nb(pos, dtn, movable, step_size, T, dt,
             n_ok += 1
             score = score_new
         else:
-            pos[p, 0] -= dx;
-            pos[p, 1] -= dy;
+            pos[p, 0] -= dx
+            pos[p, 1] -= dy
             pos[p, 2] -= dz
         T *= dt
     return T, score, n_ok
@@ -138,13 +137,13 @@ def _calc_orientation_nb(pos, cind, n, is_L):
         oy = pos[cind + 1, 1] - pos[cind - 1, 1]
         oz = pos[cind + 1, 2] - pos[cind - 1, 2]
     if is_L:
-        ox = -ox;
-        oy = -oy;
+        ox = -ox
+        oy = -oy
         oz = -oz
     nm = math.sqrt(ox * ox + oy * oy + oz * oz)
     if nm > 1e-12:
-        ox /= nm;
-        oy /= nm;
+        ox /= nm
+        oy /= nm
         oz /= nm
     return ox, oy, oz
 
@@ -166,8 +165,8 @@ def _score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices, nbr_weights
             by = anchor_orn[j, 1]
             bz = anchor_orn[j, 2]
             if not symmetric:
-                bx = -bx;
-                by = -by;
+                bx = -bx
+                by = -by
                 bz = -bz
             dot = ax * bx + ay * by + az * bz
             ang = 1.0 - (dot + 1.0) * 0.5
@@ -192,8 +191,8 @@ def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
         by = anchor_orn[j, 1]
         bz = anchor_orn[j, 2]
         if not symmetric:
-            bx = -bx;
-            by = -by;
+            bx = -bx
+            by = -by
             bz = -bz
         dot = ax * bx + ay * by + az * bz
         ang = 1.0 - (dot + 1.0) * 0.5
@@ -334,8 +333,8 @@ def _batch_smooth_orientation_nb(
         if orn_k >= 0:
             ar = anchor_ar[orn_k]
             ox, oy, oz = _calc_orientation_nb(pos, ar, n, orn_is_L[ar])
-            anchor_orn[orn_k, 0] = ox;
-            anchor_orn[orn_k, 1] = oy;
+            anchor_orn[orn_k, 0] = ox
+            anchor_orn[orn_k, 1] = oy
             anchor_orn[orn_k, 2] = oz
             local_curr_orn = _local_score_orientation_nb(
                 anchor_orn, orn_k, nbr_offsets, nbr_indices, motif_weight, symmetric)
@@ -353,8 +352,8 @@ def _batch_smooth_orientation_nb(
             score = score_new
             score_orn = score_orn_new
         else:
-            pos[p, 0] -= dx;
-            pos[p, 1] -= dy;
+            pos[p, 0] -= dx
+            pos[p, 1] -= dy
             pos[p, 2] -= dz
             if orn_k >= 0:
                 anchor_orn[orn_k, 0] = prev_ox
@@ -500,8 +499,8 @@ def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
         dz = np.random.uniform(-step_size, step_size)
 
         loc_prev = _local_arcs_nb(pos, exp, p, stretch_k, squeeze_k)
-        pos[p, 0] += dx;
-        pos[p, 1] += dy;
+        pos[p, 0] += dx
+        pos[p, 1] += dy
         pos[p, 2] += dz
         loc_curr = _local_arcs_nb(pos, exp, p, stretch_k, squeeze_k)
 
@@ -514,8 +513,8 @@ def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
             n_ok += 1
             score = score_new
         else:
-            pos[p, 0] -= dx;
-            pos[p, 1] -= dy;
+            pos[p, 0] -= dx
+            pos[p, 1] -= dy
             pos[p, 2] -= dz
         T *= dt
     return T, score, n_ok
@@ -572,8 +571,8 @@ def _batch_heatmap_nb(pos, exp_safe, skip, step_size, T, dt,
         dz = np.random.uniform(-step_size, step_size)
 
         loc_prev = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
-        pos[p, 0] += dx;
-        pos[p, 1] += dy;
+        pos[p, 0] += dx
+        pos[p, 1] += dy
         pos[p, 2] += dz
         loc_curr = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
 
@@ -587,8 +586,8 @@ def _batch_heatmap_nb(pos, exp_safe, skip, step_size, T, dt,
             n_ok += 1
             score = score_new
         else:
-            pos[p, 0] -= dx;
-            pos[p, 1] -= dy;
+            pos[p, 0] -= dx
+            pos[p, 1] -= dy
             pos[p, 2] -= dz
         T *= dt
     return T, score, n_ok
@@ -731,15 +730,15 @@ def mc_arcs(
 
 
 def mc_smooth(
-    pos: np.ndarray,          # (N, 3) float32 - modified in place; anchors are fixed
-    dtn: np.ndarray,          # (N-1,) expected distances between consecutive beads
-    fixed: np.ndarray,        # (N,) bool - True for anchor beads (never moved)
+    pos: np.ndarray,  # (N, 3) float32 - modified in place; anchors are fixed
+    dtn: np.ndarray,  # (N-1,) expected distances between consecutive beads
+    fixed: np.ndarray,  # (N,) bool - True for anchor beads (never moved)
     step_size: float,
     settings,
-    char_orientations: np.ndarray = None,   # (N,) CTCF orientation chars; None = no motif
-    anchor_neighbors: dict = None,          # {anchor_k: [anchor_j, ...]}
-    anchor_neighbor_weights: dict = None,   # {anchor_k: [float, ...]}
-    heat_dist: np.ndarray = None,           # (N, N) subanchor heat expected distances; None = disabled
+    char_orientations: np.ndarray = None,  # (N,) CTCF orientation chars; None = no motif
+    anchor_neighbors: dict = None,  # {anchor_k: [anchor_j, ...]}
+    anchor_neighbor_weights: dict = None,  # {anchor_k: [float, ...]}
+    heat_dist: np.ndarray = None,  # (N, N) subanchor heat expected distances; None = disabled
     label: str = "",
     verbose: bool = False,
 ) -> float:

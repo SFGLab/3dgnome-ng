@@ -762,12 +762,29 @@ def test_angle(reference_only=False):
 def test_contact_heatmaps(reference_only=False):
     """
     Validates _build_contact_heatmaps and anchor heatmap distance scaling.
-    Pure Python - no C++ scorer needed.
+    anchor_heatmap.scales_distances uses C++ anchor_scale scorer mode.
+    Structural tests (shape, singletons, symmetry) are pure Python.
     """
     print("\n[contact_heatmaps] Singleton contact heatmap building and anchor distance scaling")
 
+    # Get C++ reference for anchor scaling first (needed for reference_only mode too).
+    # base_dist: arc(0,1) → freq_to_distance=5.0; influence=0.5; heatmap[0,1]=10, max=10
+    # Expected: s=(10/10)*0.5=0.5 → 5.0*(1-0.5)=2.5
+    _bd = [[0.0, 5.0], [5.0, 0.0]]
+    _hm = [[0.0, 10.0], [10.0, 0.0]]
+    bd_f = write_tmp(matrix_txt(_bd))
+    hm_f = write_tmp(matrix_txt(_hm))
+    try:
+        _raw = run_scorer_filtered("anchor_scale", "0.5", bd_f, hm_f)
+        cpp_scaled = {(int(p[0]), int(p[1])): float(p[2])
+                      for line in _raw.splitlines()
+                      if len((p := line.split())) == 3}
+    finally:
+        os.unlink(bd_f); os.unlink(hm_f)
+
     if reference_only:
-        print("  (pure Python validation - no C++ reference)")
+        print(f"  anchor_heatmap.scales_distances cpp={cpp_scaled.get((0, 1)):.8g}")
+        print("  (structural heatmap tests: pure Python - no C++ reference)")
         return
 
     _test_names = [
@@ -850,17 +867,17 @@ def test_contact_heatmaps(reference_only=False):
     h_a5, _ = sv5._build_contact_heatmaps([0, 1], "chr1")
     check("contact_heatmaps.wrong_chr", 0.0, float(h_a5.max()), atol=0)
 
-    # Anchor heatmap scales expected distances: s=(10/10)*0.5=0.5 → 5.0*(1-0.5)=2.5
-    h_m = _np.zeros((2, 2)); h_m[0, 1] = h_m[1, 0] = 10.0
+    # Anchor heatmap scales distances: C++ reference from anchor_scale mode
+    h_m = _np.array(_hm)
     sv6 = _Sv.__new__(_Sv); sv6.s = _St()
     sv6.clusters = [_Cl(0, 100), _Cl(500, 600)]
     arc = _IA(start=0, end=1, score=10)
     sv6.clusters[0].arcs = [0]; sv6.clusters[1].arcs = [0]
     sv6.arcs = {"chr1": [arc]}; sv6.s.freq_to_distance = lambda sc: 5.0
     mat = sv6._calc_anchor_expected_distances([0, 1], "chr1", h_m)
-    check("anchor_heatmap.scales_distances", 2.5, float(mat[0, 1]))
+    check("anchor_heatmap.scales_distances", cpp_scaled.get((0, 1), float("nan")), float(mat[0, 1]))
 
-    # Anchor heatmap disabled → no scaling
+    # Anchor heatmap disabled → no scaling (pure Python: expected value is unscaled base=5.0)
     st7 = _St(); st7.use_anchor_heatmap = False
     sv7 = _Sv.__new__(_Sv); sv7.s = st7
     sv7.clusters = [_Cl(0, 100), _Cl(500, 600)]
@@ -868,18 +885,38 @@ def test_contact_heatmaps(reference_only=False):
     sv7.clusters[0].arcs = [0]; sv7.clusters[1].arcs = [0]
     sv7.arcs = {"chr1": [arc7]}; sv7.s.freq_to_distance = lambda sc: 5.0
     mat7 = sv7._calc_anchor_expected_distances([0, 1], "chr1", h_m)
+    # No C++ scorer: disabled path returns unscaled freq_to_distance output (5.0 by construction)
     check("anchor_heatmap.disabled", 5.0, float(mat7[0, 1]))
 
 
 def test_subanchor_heat(reference_only=False):
     """
     Validates _build_heat_dist_subanchor and mc_smooth heat integration.
-    Pure Python - no C++ scorer needed.
+    local_sum_eq_init uses C++ heat_score scorer mode.
+    Remaining checks are pure Python.
     """
     print("\n[subanchor_heat] Subanchor heat distance targets and mc_smooth integration")
 
+    # Get C++ reference for local_sum_eq_init first (needed for reference_only mode).
+    # heat_score mode: dist_weight=1.0, fixed 5-bead random setup (RandomState 7).
+    import numpy as _np_pre
+    _rng = _np_pre.random.RandomState(7)
+    _pos5 = _rng.rand(5, 3) * 5.0
+    _hd5  = _np_pre.abs(_rng.randn(5, 5)) + 0.5
+    _np_pre.fill_diagonal(_hd5, 0.0)
+    _hd5 = (_hd5 + _hd5.T) / 2
+    pos5_f = write_tmp(positions_txt(_pos5.tolist()))
+    hd5_f  = write_tmp(matrix_txt(_hd5.tolist()))
+    try:
+        _raw_hs = run_scorer_filtered("heat_score", "1.0", pos5_f, hd5_f,
+                                      prefixes=("global",))
+        cpp_global_heat = float(_raw_hs.strip().split()[1])
+    finally:
+        os.unlink(pos5_f); os.unlink(hd5_f)
+
     if reference_only:
-        print("  (pure Python validation - no C++ reference)")
+        print(f"  subanchor_heat.local_sum_eq_init cpp={cpp_global_heat:.8g}")
+        print("  (remaining subanchor_heat checks: pure Python - no C++ reference)")
         return
 
     _test_names = [
@@ -895,7 +932,7 @@ def test_subanchor_heat(reference_only=False):
         if _root not in sys.path:
             sys.path.insert(0, _root)
         from src.solver import Solver as _Sv
-        from src.mc import mc_smooth, _init_heat_nb, _local_heat_nb, _as_f64
+        from src.mc import mc_smooth, _init_heat_nb, _as_f64
     except ImportError as exc:
         for name in _test_names:
             print(f"  {SKIP}  {name}  ({exc})")
@@ -983,14 +1020,12 @@ def test_subanchor_heat(reference_only=False):
     check("subanchor_heat.mc_smooth_orn_heat_finite", 1.0,
           1.0 if _m.isfinite(s4) and s4 >= 0.0 else 0.0, atol=0)
 
-    # 5. Numba: sum of _local_heat_nb over all beads == _init_heat_nb (double-count invariant)
-    rng = _np.random.RandomState(7); pos5 = rng.rand(5, 3) * 5.0
-    hd5 = _np.abs(rng.randn(5, 5)) + 0.5; _np.fill_diagonal(hd5, 0.0)
-    hd5 = (hd5 + hd5.T) / 2
+    # 5. C++ global heat score == Python _init_heat_nb (verifies Numba vs C++ formula)
+    # Tolerance is relative: C++ uses float32, Python uses float64, causing ~1e-7 rel diff.
+    pos5 = _np.array(_pos5); hd5 = _np.array(_hd5)
     pw5 = _as_f64(pos5); hd64 = _as_f64(hd5)
-    total_local = sum(float(_local_heat_nb(pw5, hd64, p, 1.0)) for p in range(5))
-    init_val = float(_init_heat_nb(pw5, hd64, 1.0))
-    check("subanchor_heat.local_sum_eq_init", init_val, total_local)
+    py_init = float(_init_heat_nb(pw5, hd64, 1.0))
+    check_close_enough("subanchor_heat.local_sum_eq_init", cpp_global_heat, py_init)
 
 
 # ---------------------------------------------------------------------------

@@ -32,7 +32,6 @@ from .io import (
     Anchor,
     BedRegion,
     RawArc,
-    InteractionArc,
     load_anchors,
     load_arcs,
     mark_arcs,
