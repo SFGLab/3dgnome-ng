@@ -65,25 +65,25 @@ PASS_STR = "\033[32mPASS\033[0m"
 FAIL_STR = "\033[31mFAIL\033[0m"
 SKIP_STR = "\033[33mSKIP\033[0m"
 
-
 # ---------------------------------------------------------------------------
 # Milestone capture
 
 # Matches both C++ and Python milestone lines:
 #   "    step   13000  score=11.6605  ratio=1.0000  ok=9/1000  [done]"
-_MS_RE    = re.compile(r'step\s+([\d,]+)\s+score=([^\s]+)\s+ratio=([^\s]+)\s+ok=(\d+)/(\d+)')
+_MS_RE = re.compile(r'step\s+([\d,]+)\s+score=([^\s]+)\s+ratio=([^\s]+)\s+ok=(\d+)/(\d+)')
 # Matches C++ IB header lines (raw subprocess output, no "[cpp]" prefix):
 #   "  chr1 1/2"
-_IB_RE    = re.compile(r'^\s+\S+\s+(\d+/\d+)\s*$')
+_IB_RE = re.compile(r'^\s+\S+\s+(\d+/\d+)\s*$')
 # Matches Python milestone label brackets: "[chr1 IB 1/2 run 1/1]" / "smooth"
-_PY_LBL   = re.compile(r'\[(?:\S+\s+)?IB\s+(\d+/\d+)\s+(run|smooth)')
+_PY_LBL = re.compile(r'\[(?:\S+\s+)?IB\s+(\d+/\d+)\s+(run|smooth)')
 
 
 class _TeeOut:
     """Write to real stdout AND capture to an internal buffer simultaneously."""
+
     def __init__(self):
         self._real = sys.stdout
-        self._buf  = io.StringIO()
+        self._buf = io.StringIO()
 
     def write(self, s):
         self._real.write(s)
@@ -114,22 +114,22 @@ def _parse_cpp_milestones(raw_lines: list) -> dict:
     milestones for that IB belong to the smooth phase.
     """
     result = defaultdict(list)
-    cur_ib    = None
-    arc_done  = False
+    cur_ib = None
+    arc_done = False
     for line in raw_lines:
         m_ib = _IB_RE.match(line)
         if m_ib:
-            cur_ib   = m_ib.group(1)
+            cur_ib = m_ib.group(1)
             arc_done = False
             continue
         m = _MS_RE.search(line)
         if m and cur_ib is not None:
             phase = "smooth" if arc_done else "arc"
-            step  = int(m.group(1).replace(',', ''))
+            step = int(m.group(1).replace(',', ''))
             score = float(m.group(2))
-            ok    = int(m.group(4))
+            ok = int(m.group(4))
             total = int(m.group(5))
-            done  = "[done]" in line
+            done = "[done]" in line
             result[(cur_ib, phase)].append((step, score, ok, total, done))
             if done and phase == "arc":
                 arc_done = True
@@ -144,15 +144,15 @@ def _parse_py_milestones(text: str) -> dict:
     result = defaultdict(list)
     for line in text.splitlines():
         lm = _PY_LBL.search(line)
-        m  = _MS_RE.search(line)
+        m = _MS_RE.search(line)
         if lm and m:
-            ib    = lm.group(1)
+            ib = lm.group(1)
             phase = "arc" if lm.group(2) == "run" else "smooth"
-            step  = int(m.group(1).replace(',', ''))
+            step = int(m.group(1).replace(',', ''))
             score = float(m.group(2))
-            ok    = int(m.group(4))
+            ok = int(m.group(4))
             total = int(m.group(5))
-            done  = "[done]" in line
+            done = "[done]" in line
             result[(ib, phase)].append((step, score, ok, total, done))
     return dict(result)
 
@@ -192,14 +192,14 @@ def print_step_comparison(cpp_ms: dict, py_ms: dict, n_structs: int) -> None:
         return
 
     avg_note = f"avg over {n_structs} structure{'s' if n_structs > 1 else ''}"
-    print(f"\n{'='*74}")
+    print(f"\n{'=' * 74}")
     print(f"  Step-by-step convergence  ({avg_note})")
-    print(f"{'='*74}")
+    print(f"{'=' * 74}")
 
     for ib, phase in all_keys:
         cpp_rows = {r[0]: r for r in cpp_ms.get((ib, phase), [])}
-        py_rows  = {r[0]: r for r in py_ms.get((ib, phase), [])}
-        steps    = sorted(set(cpp_rows) | set(py_rows))
+        py_rows = {r[0]: r for r in py_ms.get((ib, phase), [])}
+        steps = sorted(set(cpp_rows) | set(py_rows))
         if not steps:
             continue
 
@@ -217,7 +217,7 @@ def print_step_comparison(cpp_ms: dict, py_ms: dict, n_structs: int) -> None:
 
             if cr and pr and pr[1] > 1e-9:
                 pct = (cr[1] - pr[1]) / pr[1] * 100
-                ds  = f"{pct:+7.1f}%"
+                ds = f"{pct:+7.1f}%"
             else:
                 ds = f"{'-':>8}"
 
@@ -333,22 +333,23 @@ stop_condition_successes_threshold = {successes_smooth}
 stop_condition_steps = {steps_smooth}
 """
 
+
 def write_config(path: Path, fast: bool, use_orientation: bool = False) -> None:
     if fast:
         # Very fast: ~10 s per structure, low quality
         cfg = BASE_CONFIG.format(
             data_dir=DATA_DIR,
-            delta_heatmap=0.995,  successes_heatmap=2,  steps_heatmap=1000,
-            delta_arcs=0.995,     successes_arcs=5,     steps_arcs=1000,
-            delta_smooth=0.995,   successes_smooth=5,   steps_smooth=1000,
+            delta_heatmap=0.995, successes_heatmap=2, steps_heatmap=1000,
+            delta_arcs=0.995, successes_arcs=5, steps_arcs=1000,
+            delta_smooth=0.995, successes_smooth=5, steps_smooth=1000,
         )
     else:
         # Balanced: ~2 min per structure, reasonable quality
         cfg = BASE_CONFIG.format(
             data_dir=DATA_DIR,
-            delta_heatmap=0.999,  successes_heatmap=5,  steps_heatmap=5000,
-            delta_arcs=0.999,     successes_arcs=20,    steps_arcs=5000,
-            delta_smooth=0.999,   successes_smooth=20,  steps_smooth=5000,
+            delta_heatmap=0.999, successes_heatmap=5, steps_heatmap=5000,
+            delta_arcs=0.999, successes_arcs=20, steps_arcs=5000,
+            delta_smooth=0.999, successes_smooth=20, steps_smooth=5000,
         )
     if use_orientation:
         cfg = cfg.replace(
@@ -377,9 +378,9 @@ def parse_hcm(hcm_path: Path):
     with open(hcm_path) as f:
         header = f.readline().split()
         n_clusters = int(header[0])
-        _n_arcs    = int(header[1])
-        _root      = int(header[2])
-        n_factors  = int(header[3])
+        _n_arcs = int(header[1])
+        _root = int(header[2])
+        n_factors = int(header[3])
 
         # factor names line
         _ = f.readline()
@@ -387,11 +388,11 @@ def parse_hcm(hcm_path: Path):
         clusters = []
         for _ in range(n_clusters):
             parts = f.readline().split()
-            mid   = int(parts[0])
+            mid = int(parts[0])
             # start = int(parts[1])  # not needed
             # end   = int(parts[2])
             x, y, z = float(parts[3]), float(parts[4]), float(parts[5])
-            n_ch  = int(parts[6])
+            n_ch = int(parts[6])
             clusters.append((mid, x, y, z, n_ch))
 
     # Leaf beads: clusters with no children, sorted by genomic midpoint
@@ -409,7 +410,7 @@ def radius_of_gyration(positions):
     cx = sum(p[0] for p in positions) / n
     cy = sum(p[1] for p in positions) / n
     cz = sum(p[2] for p in positions) / n
-    var = sum((p[0]-cx)**2 + (p[1]-cy)**2 + (p[2]-cz)**2 for p in positions) / n
+    var = sum((p[0] - cx) ** 2 + (p[1] - cy) ** 2 + (p[2] - cz) ** 2 for p in positions) / n
     return math.sqrt(var)
 
 
@@ -418,11 +419,11 @@ def pairwise_distances(positions):
     dists = []
     n = len(positions)
     for i in range(n):
-        for j in range(i+1, n):
+        for j in range(i + 1, n):
             dx = positions[i][0] - positions[j][0]
             dy = positions[i][1] - positions[j][1]
             dz = positions[i][2] - positions[j][2]
-            dists.append(math.sqrt(dx*dx + dy*dy + dz*dz))
+            dists.append(math.sqrt(dx * dx + dy * dy + dz * dz))
     return dists
 
 
@@ -430,10 +431,10 @@ def consecutive_distances(positions):
     """Bond lengths between consecutive beads."""
     dists = []
     for i in range(len(positions) - 1):
-        dx = positions[i][0] - positions[i+1][0]
-        dy = positions[i][1] - positions[i+1][1]
-        dz = positions[i][2] - positions[i+1][2]
-        dists.append(math.sqrt(dx*dx + dy*dy + dz*dz))
+        dx = positions[i][0] - positions[i + 1][0]
+        dy = positions[i][1] - positions[i + 1][1]
+        dz = positions[i][2] - positions[i + 1][2]
+        dists.append(math.sqrt(dx * dx + dy * dy + dz * dz))
     return dists
 
 
@@ -534,7 +535,7 @@ def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int,
     structures = []
     for i in range(n):
         hcm = (outdir / f"loops_{region_label}.hcm") if n == 1 else \
-              (outdir / f"loops_{region_label}_{i}.hcm")
+            (outdir / f"loops_{region_label}_{i}.hcm")
         if not hcm.exists():
             sys.exit(f"[cpp] expected output not found: {hcm}")
         beads = parse_hcm(hcm)
@@ -575,17 +576,17 @@ def try_python_ensemble(config: Path, n: int, region: str) -> list | None:
 
 def print_stats(label: str, structures: list) -> dict:
     """Compute and print summary statistics for an ensemble."""
-    rg_vals   = [radius_of_gyration([(x, y, z) for _, x, y, z in s]) for s in structures]
+    rg_vals = [radius_of_gyration([(x, y, z) for _, x, y, z in s]) for s in structures]
     bond_vals = []
-    pwd_vals  = []
+    pwd_vals = []
     for s in structures:
         pts = [(x, y, z) for _, x, y, z in s]
         bond_vals.extend(consecutive_distances(pts))
         pwd_vals.extend(pairwise_distances(pts))
 
-    rg_m,   rg_s   = mean_std(rg_vals)
+    rg_m, rg_s = mean_std(rg_vals)
     bond_m, bond_s = mean_std(bond_vals)
-    pwd_m,  pwd_s  = mean_std(pwd_vals)
+    pwd_m, pwd_s = mean_std(pwd_vals)
 
     n_beads = len(structures[0])
     print(f"\n  [{label}]  {len(structures)} structures × {n_beads} beads")
@@ -619,21 +620,21 @@ def structural_distance_matrix(structures: list) -> list:
     rows = []
     for s in structures:
         pts = np.array([(x, y, z) for _, x, y, z in s], dtype=np.float64)
-        diff = pts[:, None, :] - pts[None, :, :]   # (M, M, 3)
-        d    = np.sqrt((diff * diff).sum(axis=2))   # (M, M)
-        idx  = np.triu_indices(len(pts), k=1)
+        diff = pts[:, None, :] - pts[None, :, :]  # (M, M, 3)
+        d = np.sqrt((diff * diff).sum(axis=2))  # (M, M)
+        idx = np.triu_indices(len(pts), k=1)
         rows.append(d[idx])
-    mat = np.array(rows)                            # (n, k)
+    mat = np.array(rows)  # (n, k)
 
     # Pearson correlation between every pair of rows
-    m   = mat.mean(axis=1, keepdims=True)
-    s   = mat.std(axis=1, keepdims=True)
+    m = mat.mean(axis=1, keepdims=True)
+    s = mat.std(axis=1, keepdims=True)
     s[s < 1e-12] = 1.0
-    z   = (mat - m) / s                            # z-scored rows
-    k   = mat.shape[1]
-    corr = (z @ z.T) / k                           # (n, n)
+    z = (mat - m) / s  # z-scored rows
+    k = mat.shape[1]
+    corr = (z @ z.T) / k  # (n, n)
 
-    dist = 1.0 - corr                              # structural distance matrix
+    dist = 1.0 - corr  # structural distance matrix
     return [float(dist[i, j]) for i in range(n) for j in range(n) if i != j]
 
 
@@ -652,11 +653,8 @@ def save_cif_ensemble(structs: list, label: str, outdir: Path, region_label: str
     print(f"[integration] {len(structs)} {label} CIF files written to {outdir}/")
 
 
-def _cache_path(cache_dir: Path, region_label: str, n: int, fast: bool,
-                use_orientation: bool = False) -> Path:
-    mode = "fast" if fast else "balanced"
-    orn  = "_orientation" if use_orientation else ""
-    return cache_dir / f"{region_label}_n{n}_{mode}{orn}.json"
+def _cache_path(cache_dir: Path, region_label: str, n: int) -> Path:
+    return cache_dir / f"{region_label}_n{n}.json"
 
 
 def _save_cache(path: Path, region: str, n: int, fast: bool,
@@ -724,9 +722,14 @@ def main():
 
     use_orn = getattr(args, "with_orientation", False)
 
+    # Parametrize region_label with mode and orientation so cache files, CIF
+    # outputs, and any other label-derived paths are automatically distinct.
+    _mode_suffix = "fast" if args.fast else "balanced"
+    _orn_suffix = "_orientation" if use_orn else ""
+    region_label = f"{region_label}_{_mode_suffix}{_orn_suffix}"
+
     cache_dir = Path(args.cache_dir) if args.cache_dir else ROOT / "out" / "cpp_cache"
-    cache_file = _cache_path(cache_dir, region_label, args.n_structures, args.fast,
-                             use_orientation=use_orn)
+    cache_file = _cache_path(cache_dir, region_label, args.n_structures)
 
     print(f"[integration] region: {region}")
     print(f"[integration] ensemble size: {args.n_structures}")
@@ -766,7 +769,7 @@ def main():
 
         # -- Python ensemble -----------------------------------------------
         py_structs = None
-        py_ms_raw  = {}
+        py_ms_raw = {}
         if not args.cpp_only:
             with _TeeOut() as tee:
                 py_structs = try_python_ensemble(config, args.n_structures, region)
@@ -787,7 +790,7 @@ def main():
 
         # Bead count must match
         n_cpp = len(cpp_structs[0])
-        n_py  = len(py_structs[0])
+        n_py = len(py_structs[0])
         if n_cpp != n_py:
             print(f"  {FAIL_STR}  bead count mismatch: C++={n_cpp}  Python={n_py}")
             results.append(False)
@@ -808,7 +811,7 @@ def main():
         # KS test on pooled pairwise distances (subsampled - raw pool is ~18M
         # non-independent values that inflate KS power far beyond physical meaning)
         cpp_pwd = _subsample(cpp_stats["pwd"], KS_PWD_MAX_SAMPLES)
-        py_pwd  = _subsample(py_stats["pwd"],  KS_PWD_MAX_SAMPLES)
+        py_pwd = _subsample(py_stats["pwd"], KS_PWD_MAX_SAMPLES)
         d_pw, p_pw = ks_2samp(cpp_pwd, py_pwd)
         ok_pw = p_pw >= KS_P_THRESHOLD and d_pw <= KS_D_THRESHOLD
         status = PASS_STR if ok_pw else FAIL_STR
@@ -830,11 +833,11 @@ def main():
         # are all correlated (each structure appears in n-1 pairs), so the test
         # would be massively overpowered.
         cpp_sd = structural_distance_matrix(cpp_structs)
-        py_sd  = structural_distance_matrix(py_structs)
+        py_sd = structural_distance_matrix(py_structs)
         if cpp_sd and py_sd:
             cpp_med = sorted(cpp_sd)[len(cpp_sd) // 2]
-            py_med  = sorted(py_sd)[len(py_sd) // 2]
-            ratio   = py_med / cpp_med if cpp_med > 1e-9 else float("nan")
+            py_med = sorted(py_sd)[len(py_sd) // 2]
+            ratio = py_med / cpp_med if cpp_med > 1e-9 else float("nan")
             ok_sd = math.isfinite(ratio) and abs(ratio - 1.0) <= STRUCT_DIST_RATIO_THRESHOLD
             status = PASS_STR if ok_sd else FAIL_STR
             print(f"  {status}  struct diversity  median ratio={ratio:.3f}"
@@ -848,7 +851,7 @@ def main():
 
         # -- Per-step convergence comparison --------------------------------
         cpp_ms = _merge_milestones([cpp_ms_raw])
-        py_ms  = _merge_milestones([py_ms_raw])
+        py_ms = _merge_milestones([py_ms_raw])
         print_step_comparison(cpp_ms, py_ms, args.n_structures)
 
         if not all_ok:

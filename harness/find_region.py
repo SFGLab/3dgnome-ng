@@ -45,8 +45,8 @@ def find_regions(
     s.data_dir = data_dir
 
     anchor_path = s.data_path(s.data_anchors)
-    arc_path    = s.data_path(s.data_pet_clusters)
-    bp_path     = s.data_path(s.data_segment_split)
+    arc_path = s.data_path(s.data_pet_clusters)
+    bp_path = s.data_path(s.data_segment_split)
 
     # Chromosomes that have predefined segment splits (C++ requirement)
     if bp_path:
@@ -73,10 +73,10 @@ def find_regions(
 
         # Load all non-empty anchors for this chromosome (no region filter)
         all_a = load_anchors(anchor_path, {chrom})
-        raw   = load_arcs(arc_path, {chrom}, max_pet_length=s.max_pet_length)
-        mk    = mark_arcs(all_a, raw)
-        cl    = remove_empty_anchors(all_a, mk)
-        anch  = cl.get(chrom, [])
+        raw = load_arcs(arc_path, {chrom}, max_pet_length=s.max_pet_length)
+        mk = mark_arcs(all_a, raw)
+        cl = remove_empty_anchors(all_a, mk)
+        anch = cl.get(chrom, [])
         if len(anch) < min_anchors:
             continue
 
@@ -87,14 +87,14 @@ def find_regions(
         for i in range(len(anch)):
             run = [anch[i]]
             for j in range(i + 1, len(anch)):
-                gap  = anch[j].start - run[-1].end
-                span = anch[j].end   - run[0].start
+                gap = anch[j].start - run[-1].end
+                span = anch[j].end - run[0].start
                 if gap >= 0 and span <= max_span_bp:
                     run.append(anch[j])
                 elif gap < 0:
-                    break   # overlap - stop extending
+                    break  # overlap - stop extending
                 else:
-                    break   # span exceeded
+                    break  # span exceeded
             if len(run) > len(best):
                 best = run[:]
             if len(best) >= len(anch):
@@ -108,11 +108,11 @@ def find_regions(
 
         # Re-check with region filter to get accurate arc count
         all_a2 = load_anchors(anchor_path, {chrom}, bed)
-        raw2   = load_arcs(arc_path, {chrom}, bed, max_pet_length=s.max_pet_length)
-        mk2    = mark_arcs(all_a2, raw2)
-        cl2    = remove_empty_anchors(all_a2, mk2)
+        raw2 = load_arcs(arc_path, {chrom}, bed, max_pet_length=s.max_pet_length)
+        mk2 = mark_arcs(all_a2, raw2)
+        cl2 = remove_empty_anchors(all_a2, mk2)
         anchors2 = cl2.get(chrom, [])
-        arcs2    = mk2.get(chrom, [])
+        arcs2 = mk2.get(chrom, [])
 
         if len(anchors2) < min_anchors:
             continue
@@ -125,14 +125,14 @@ def find_regions(
         min_gap = min(gaps) if gaps else 0
 
         results.append({
-            "region":    region_str,
-            "chrom":     chrom,
-            "start":     best[0].start,
-            "end":       best[-1].end,
+            "region": region_str,
+            "chrom": chrom,
+            "start": best[0].start,
+            "end": best[-1].end,
             "n_anchors": len(anchors2),
-            "n_arcs":    len(arcs2),
-            "min_gap":   min_gap,
-            "span_mb":   span_mb,
+            "n_arcs": len(arcs2),
+            "min_gap": min_gap,
+            "span_mb": span_mb,
         })
 
     # Sort: most anchors first, then fewest arcs-per-anchor (well-connected),

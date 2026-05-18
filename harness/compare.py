@@ -29,7 +29,7 @@ SCORER_SRC = ROOT / "harness" / "scorer.cpp"
 SCORER_BIN = ROOT / "harness" / "scorer"
 HARNESS_DIR = ROOT / "harness"
 
-ATOL = 1e-6   # absolute tolerance for floating-point comparisons
+ATOL = 1e-6  # absolute tolerance for floating-point comparisons
 
 
 # ---------------------------------------------------------------------------
@@ -46,11 +46,11 @@ def build_scorer(force: bool = False) -> None:
     )
     # Exclude main.cpp (it's in tools/, not MC/ directly, so not picked up above)
     cmd = [
-        "g++", "-std=c++0x", "-Wno-write-strings", "-O2",
-        f"-I{mc}",
-        "-o", str(SCORER_BIN),
-        str(SCORER_SRC),
-    ] + [str(s) for s in sources] + ["-lm"]
+              "g++", "-std=c++0x", "-Wno-write-strings", "-O2",
+              f"-I{mc}",
+              "-o", str(SCORER_BIN),
+              str(SCORER_SRC),
+          ] + [str(s) for s in sources] + ["-lm"]
     print(f"[build] {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -133,16 +133,16 @@ def ref_freq_to_dist(freq, a, scale, shift, base_level):
 
 def ref_angle_metric(v1, v2):
     """Matches common.cpp angle() exactly: 1 - (dot(normalized(v1), normalized(v2)) + 1) / 2"""
-    l1 = math.sqrt(sum(x*x for x in v1))
-    l2 = math.sqrt(sum(x*x for x in v2))
+    l1 = math.sqrt(sum(x * x for x in v1))
+    l2 = math.sqrt(sum(x * x for x in v2))
     if l1 < 1e-10 or l2 < 1e-10:
         return 0.0
-    dot = sum(a*b for a, b in zip(v1, v2)) / (l1 * l2)
+    dot = sum(a * b for a, b in zip(v1, v2)) / (l1 * l2)
     return 1.0 - (dot + 1.0) / 2.0
 
 
 def ref_vlen(v):
-    return math.sqrt(sum(x*x for x in v))
+    return math.sqrt(sum(x * x for x in v))
 
 
 def ref_score_heatmap(positions, exp_dist, diag_size):
@@ -179,7 +179,7 @@ def ref_score_smooth(positions, dist_to_next, stretch_k, squeeze_k, angular_k, w
     sca, scb = 0.0, 0.0
     v_prev = None
     for i in range(n - 1):
-        v = [positions[i][k] - positions[i+1][k] for k in range(3)]
+        v = [positions[i][k] - positions[i + 1][k] for k in range(3)]
         vlen = ref_vlen(v)
         dtn = dist_to_next[i] if i < len(dist_to_next) else 1.0
         if dtn < 1e-6:
@@ -220,7 +220,7 @@ def check(name: str, cpp_val: float, py_val, atol: float = ATOL):
     if ok:
         print(f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}")
     else:
-        print(f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}  diff={abs(cpp_val-py_val):.3e}")
+        print(f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}  diff={abs(cpp_val - py_val):.3e}")
     _results.append(("pass" if ok else "fail", name))
 
 
@@ -236,7 +236,7 @@ def check_close_enough(name: str, cpp_val: float, py_val, rtol: float = 1e-5):
     if ok:
         print(f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}")
     else:
-        print(f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}  rel={abs(cpp_val-py_val)/denom:.3e}")
+        print(f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}  rel={abs(cpp_val - py_val) / denom:.3e}")
     _results.append(("pass" if ok else "fail", name))
 
 
@@ -267,6 +267,7 @@ DEFAULT_DIST_PARAMS = dict(
     freq_scale_inter=120.0, freq_power_inter=-1.0,
     count_a=0.2, count_scale=1.8, count_shift=8, count_base=0.2,
 )
+
 
 def test_distfns(reference_only=False):
     print("\n[distfns] Distance conversion functions")
@@ -303,15 +304,15 @@ def test_distfns(reference_only=False):
         return
 
     py_genomic = _try_import("genomic_length_to_distance")
-    py_freq    = _try_import("freq_to_dist_heatmap")
-    py_freq_i  = _try_import("freq_to_dist_heatmap_inter")
-    py_count   = _try_import("freq_to_distance")
+    py_freq = _try_import("freq_to_dist_heatmap")
+    py_freq_i = _try_import("freq_to_dist_heatmap_inter")
+    py_count = _try_import("freq_to_distance")
 
     for line in cpp_out.splitlines():
         parts = line.split()
         if parts[0] == "genomic":
             bp, cpp_val = int(float(parts[1])), float(parts[3])
-            expected = ref_genomic_dist(bp, **{k: p[k] for k in ("base","scale","power")})
+            expected = ref_genomic_dist(bp, **{k: p[k] for k in ("base", "scale", "power")})
             assert abs(cpp_val - expected) < 1e-4, f"scorer/ref mismatch at genomic {bp}"
             py_val = py_genomic(bp, p["base"], p["scale"], p["power"]) if py_genomic else None
             check(f"genomic_dist({bp}bp)", cpp_val, py_val)
@@ -325,7 +326,8 @@ def test_distfns(reference_only=False):
             check(f"freq_to_dist_inter({f_})", cpp_val, py_val)
         elif parts[0] == "count":
             n_, cpp_val = int(float(parts[1])), float(parts[3])
-            py_val = py_count(n_, p["count_a"], p["count_scale"], p["count_shift"], p["count_base"]) if py_count else None
+            py_val = py_count(n_, p["count_a"], p["count_scale"], p["count_shift"],
+                              p["count_base"]) if py_count else None
             check(f"freq_to_distance(count={n_})", cpp_val, py_val)
 
 
@@ -336,6 +338,7 @@ SYNTHETIC_POSITIONS_5 = [
     (0.0, 4.0, 2.0),
     (1.0, 2.0, 5.0),
 ]
+
 
 def _build_exp_dist(positions, expected_fn):
     n = len(positions)
@@ -351,16 +354,17 @@ def test_heatmap(reference_only=False):
 
     # Build a simple expected distance matrix: actual distances * 0.9 (slight mismatch)
     def actual_dist(i, j):
-        return math.sqrt(sum((pos[i][k]-pos[j][k])**2 for k in range(3)))
+        return math.sqrt(sum((pos[i][k] - pos[j][k]) ** 2 for k in range(3)))
 
     exp_dist = [[actual_dist(i, j) * 0.9 if i != j else 0.0 for j in range(n)] for i in range(n)]
 
-    pos_f   = write_tmp(positions_txt(pos))
-    expd_f  = write_tmp(matrix_txt(exp_dist))
+    pos_f = write_tmp(positions_txt(pos))
+    expd_f = write_tmp(matrix_txt(exp_dist))
     try:
         cpp_val = float(run_scorer("heatmap", str(diag), pos_f, expd_f))
     finally:
-        os.unlink(pos_f); os.unlink(expd_f)
+        os.unlink(pos_f);
+        os.unlink(expd_f)
 
     ref_val = ref_score_heatmap(pos, exp_dist, diag)
     assert abs(cpp_val - ref_val) < 1e-4, f"scorer/ref mismatch: {cpp_val} vs {ref_val}"
@@ -374,9 +378,9 @@ def test_heatmap(reference_only=False):
     py_val = None
     if py_fn:
         import torch
-        pos_t    = torch.tensor(pos, dtype=torch.float64)
-        expd_t   = torch.tensor(exp_dist, dtype=torch.float64)
-        py_val   = py_fn(pos_t, expd_t, diag).item()
+        pos_t = torch.tensor(pos, dtype=torch.float64)
+        expd_t = torch.tensor(exp_dist, dtype=torch.float64)
+        py_val = py_fn(pos_t, expd_t, diag).item()
 
     check_close_enough("heatmap_score(5 beads, diag=2)", cpp_val, py_val)
 
@@ -387,12 +391,13 @@ def test_arcs(reference_only=False):
     arcs = [(0, 2, 5.0), (1, 4, 6.0), (2, 3, 3.0), (0, 4, -1.0)]  # last arc: repulsion
     stretch_k, squeeze_k = 1.0, 1.0
 
-    pos_f  = write_tmp(positions_txt(pos))
+    pos_f = write_tmp(positions_txt(pos))
     arcs_f = write_tmp(arcs_txt(arcs))
     try:
         cpp_val = float(run_scorer("arcs", str(stretch_k), str(squeeze_k), pos_f, arcs_f))
     finally:
-        os.unlink(pos_f); os.unlink(arcs_f)
+        os.unlink(pos_f);
+        os.unlink(arcs_f)
 
     ref_val = ref_score_arcs(pos, arcs, stretch_k, squeeze_k)
     assert abs(cpp_val - ref_val) < 1e-4, f"scorer/ref mismatch: {cpp_val} vs {ref_val}"
@@ -405,9 +410,9 @@ def test_arcs(reference_only=False):
     py_val = None
     if py_fn:
         import torch
-        pos_t   = torch.tensor(pos, dtype=torch.float64)
-        arcs_t  = [(i, j, d) for i, j, d in arcs]
-        py_val  = py_fn(pos_t, arcs_t, stretch_k, squeeze_k).item()
+        pos_t = torch.tensor(pos, dtype=torch.float64)
+        arcs_t = [(i, j, d) for i, j, d in arcs]
+        py_val = py_fn(pos_t, arcs_t, stretch_k, squeeze_k).item()
 
     check_close_enough("arc_score(5 beads, 4 arcs)", cpp_val, py_val)
 
@@ -419,14 +424,14 @@ def test_smooth(reference_only=False):
     # dist_to_next: expected bond lengths (slightly off from actual)
     import math as _math
     dist_to_next = [
-        _math.sqrt(sum((pos[i][k]-pos[i+1][k])**2 for k in range(3))) * 0.85
-        for i in range(n-1)
+        _math.sqrt(sum((pos[i][k] - pos[i + 1][k]) ** 2 for k in range(3))) * 0.85
+        for i in range(n - 1)
     ]
     stretch_k, squeeze_k, angular_k = 0.1, 0.1, 0.1
     w_dist, w_angle = 1.0, 1.0
 
-    pos_f  = write_tmp(positions_txt(pos))
-    dtn_f  = write_tmp(dtn_txt(dist_to_next))
+    pos_f = write_tmp(positions_txt(pos))
+    dtn_f = write_tmp(dtn_txt(dist_to_next))
     try:
         cpp_val = float(run_scorer(
             "smooth",
@@ -435,7 +440,8 @@ def test_smooth(reference_only=False):
             pos_f, dtn_f
         ))
     finally:
-        os.unlink(pos_f); os.unlink(dtn_f)
+        os.unlink(pos_f);
+        os.unlink(dtn_f)
 
     ref_val = ref_score_smooth(pos, dist_to_next, stretch_k, squeeze_k, angular_k, w_dist, w_angle)
     assert abs(cpp_val - ref_val) < 1e-4, f"scorer/ref mismatch: {cpp_val} vs {ref_val}"
@@ -480,9 +486,9 @@ def test_densify(reference_only=False):
             _results.append(("skip", name))
         return
 
-    LD = 3   # loop_density
-    anchor_starts = [0,    2000, 5000, 8000]
-    anchor_ends   = [1000, 3000, 6000, 9000]
+    LD = 3  # loop_density
+    anchor_starts = [0, 2000, 5000, 8000]
+    anchor_ends = [1000, 3000, 6000, 9000]
     pos3d = [
         _np.array([0.0, 0.0, 0.0], dtype=_np.float32),
         _np.array([1.0, 0.0, 0.0], dtype=_np.float32),
@@ -492,6 +498,7 @@ def test_densify(reference_only=False):
 
     class _FakeSettings:
         loop_density = LD
+
         @staticmethod
         def genomic_length_to_distance(bp):
             return 1.0 + 0.5 * (max(bp, 0) / 1000.0) ** 0.75
@@ -509,7 +516,7 @@ def test_densify(reference_only=False):
     pos, fixed, gpos, dtn, anchor_map = solver._densify_active_region(active_region)
 
     n_anc = len(anchor_starts)
-    exp_n = n_anc + (n_anc - 1) * LD   # 4 + 3*3 = 13
+    exp_n = n_anc + (n_anc - 1) * LD  # 4 + 3*3 = 13
 
     # 1. Total bead count
     check("densify.bead_count", float(exp_n), float(len(pos)), atol=0)
@@ -556,11 +563,11 @@ def orient_spec_txt(anchors, arcs):
 def ref_calc_orientation(positions, cind, n, char_orientation):
     """Matches C++ calcOrientation(cind)."""
     if cind == 0:
-        orn = [positions[cind+1][k] - positions[cind][k] for k in range(3)]
+        orn = [positions[cind + 1][k] - positions[cind][k] for k in range(3)]
     elif cind == n - 1:
-        orn = [positions[cind][k] - positions[cind-1][k] for k in range(3)]
+        orn = [positions[cind][k] - positions[cind - 1][k] for k in range(3)]
     else:
-        orn = [positions[cind+1][k] - positions[cind-1][k] for k in range(3)]
+        orn = [positions[cind + 1][k] - positions[cind - 1][k] for k in range(3)]
     if char_orientation == 'L':
         orn = [-x for x in orn]
     norm = ref_vlen(orn)
@@ -570,7 +577,7 @@ def ref_calc_orientation(positions, cind, n, char_orientation):
 
 
 def ref_score_orientation_full(anchor_orn, neighbors, neighbor_weights, motif_weight,
-                                motifs_symmetric=True):
+                               motifs_symmetric=True):
     err = 0.0
     sign = 1.0 if motifs_symmetric else -1.0
     for i, nbrs in neighbors.items():
@@ -583,7 +590,7 @@ def ref_score_orientation_full(anchor_orn, neighbors, neighbor_weights, motif_we
 
 
 def ref_score_orientation_local(anchor_orn, anchor_index, neighbors, motif_weight,
-                                 motifs_symmetric=True):
+                                motifs_symmetric=True):
     err = 0.0
     sign = 1.0 if motifs_symmetric else -1.0
     for j in neighbors[anchor_index]:
@@ -618,14 +625,15 @@ def test_orientation(reference_only=False):
     motif_weight = 2.5
     motifs_sym = 1  # True
 
-    pos_f   = write_tmp(positions_txt(pos))
-    spec_f  = write_tmp(orient_spec_txt(anchors_spec, arcs_spec))
+    pos_f = write_tmp(positions_txt(pos))
+    spec_f = write_tmp(orient_spec_txt(anchors_spec, arcs_spec))
     try:
         raw = run_scorer_filtered(
             "orientation", str(motif_weight), str(motifs_sym), pos_f, spec_f,
             prefixes=("orientation", "global", "local"))
     finally:
-        os.unlink(pos_f); os.unlink(spec_f)
+        os.unlink(pos_f);
+        os.unlink(spec_f)
 
     # Parse scorer output
     cpp_orn = {}
@@ -649,7 +657,7 @@ def test_orientation(reference_only=False):
         for k in range(n_anchors)
     ]
     neighbors_py = {0: [1], 1: [0, 2], 2: [1]}
-    weights_py   = {0: [1.5], 1: [1.5, 2.0], 2: [2.0]}
+    weights_py = {0: [1.5], 1: [1.5, 2.0], 2: [2.0]}
 
     # Verify scorer vs reference (sanity check)
     for k in range(n_anchors):
@@ -675,7 +683,7 @@ def test_orientation(reference_only=False):
 
     # Python implementation checks
     import numpy as _np
-    py_calc_orn  = _try_import("calc_orientation")
+    py_calc_orn = _try_import("calc_orientation")
     py_score_orn = _try_import("score_orientation")
     py_local_orn = _try_import("local_score_orientation")
 
@@ -695,7 +703,7 @@ def test_orientation(reference_only=False):
     py_global = None
     if py_score_orn and py_orn is not None:
         nbrs = {0: [1], 1: [0, 2], 2: [1]}
-        wts  = {0: [1.5], 1: [1.5, 2.0], 2: [2.0]}
+        wts = {0: [1.5], 1: [1.5, 2.0], 2: [2.0]}
         py_global = py_score_orn(py_orn, nbrs, wts, motif_weight, bool(motifs_sym))
     check_close_enough("score_orientation_global", cpp_global, py_global)
 
@@ -712,10 +720,10 @@ def test_metropolis(reference_only=False):
     print("\n[metropolis] Metropolis acceptance probability")
 
     cases = [
-        (50.0, 20.0, 1.1, 1.0, 5.0),   # slight worsening, high T
-        (50.0, 20.0, 2.0, 1.0, 1.0),   # large worsening, medium T
+        (50.0, 20.0, 1.1, 1.0, 5.0),  # slight worsening, high T
+        (50.0, 20.0, 2.0, 1.0, 1.0),  # large worsening, medium T
         (50.0, 20.0, 1.0, 1.0, 0.01),  # no change, near-zero T
-        (50.0, 20.0, 0.9, 1.0, 5.0),   # improvement (never reaches stochastic branch)
+        (50.0, 20.0, 0.9, 1.0, 5.0),  # improvement (never reaches stochastic branch)
     ]
 
     py_fn = _try_import("metropolis_prob") if not reference_only else None
@@ -736,9 +744,9 @@ def test_metropolis(reference_only=False):
 def test_angle(reference_only=False):
     print("\n[angle] Custom angle metric  (NOT acos - see common.cpp line 40)")
     cases = [
-        ((1.0, 0.0, 0.0), (1.0, 0.0, 0.0), 0.0),    # parallel
-        ((1.0, 0.0, 0.0), (-1.0, 0.0, 0.0), 1.0),   # anti-parallel
-        ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), 0.5),    # perpendicular
+        ((1.0, 0.0, 0.0), (1.0, 0.0, 0.0), 0.0),  # parallel
+        ((1.0, 0.0, 0.0), (-1.0, 0.0, 0.0), 1.0),  # anti-parallel
+        ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), 0.5),  # perpendicular
     ]
     py_fn = _try_import("angle_metric") if not reference_only else None
     for v1, v2, expected in cases:
@@ -756,9 +764,9 @@ def test_angle(reference_only=False):
 
 def print_summary():
     passes = sum(1 for r, _ in _results if r == "pass")
-    fails  = sum(1 for r, _ in _results if r == "fail")
-    skips  = sum(1 for r, _ in _results if r == "skip")
-    print(f"\n{'='*60}")
+    fails = sum(1 for r, _ in _results if r == "fail")
+    skips = sum(1 for r, _ in _results if r == "skip")
+    print(f"\n{'=' * 60}")
     print(f"Results: {passes} passed, {fails} failed, {skips} skipped")
     if fails:
         print("FAILED tests:")
@@ -769,13 +777,13 @@ def print_summary():
 
 
 ALL_TESTS = {
-    "angle":       test_angle,
-    "distfns":     test_distfns,
-    "heatmap":     test_heatmap,
-    "arcs":        test_arcs,
-    "smooth":      test_smooth,
-    "densify":     test_densify,
-    "metropolis":  test_metropolis,
+    "angle": test_angle,
+    "distfns": test_distfns,
+    "heatmap": test_heatmap,
+    "arcs": test_arcs,
+    "smooth": test_smooth,
+    "densify": test_densify,
+    "metropolis": test_metropolis,
     "orientation": test_orientation,
 }
 
