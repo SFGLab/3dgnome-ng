@@ -5,7 +5,7 @@
 // Access control is compile-time only; object layout is unchanged.
 //
 // Build (from repo root):
-//   g++ -std=c++0x -Wno-write-strings -I3dnome/MC \
+//   g++ -std=c++17 -Wno-write-strings -I3dnome/MC \
 //       harness/scorer.cpp \
 //       3dnome/MC/LooperSolver.cpp 3dnome/MC/Chromosome.cpp \
 //       3dnome/MC/HierarchicalChromosome.cpp 3dnome/MC/Heatmap.cpp \
@@ -27,11 +27,9 @@
 //   ./scorer metropolis <jump_scale> <jump_coef> <score_curr> <score_prev> <T>
 //   ./scorer orientation <motif_weight> <motifs_symmetric 0|1> <positions_file> <orient_spec_file>
 
-#define private public
-#include "LooperSolver.h"
-#include "Settings.h"
-#include "lib/common.h"
-
+// System headers must come before #define private public, otherwise the macro
+// corrupts private: sections inside STL headers (triggers a GCC 13 sstream
+// redeclaration error for basic_stringbuf::__xfer_bufptrs).
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -42,6 +40,11 @@
 #include <stdlib.h>
 #include <string.h>
 using namespace std;
+
+#define private public
+#include "LooperSolver.h"
+#include "Settings.h"
+#include "lib/common.h"
 
 // ---------------------------------------------------------------------------
 // I/O helpers (same as before)
