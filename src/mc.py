@@ -671,15 +671,15 @@ def mc_smooth(
                 float(step_size), T, dt, jump_scale, jump_coef, stop_steps,
                 stretch_k, squeeze_k, ang_k, dist_w, ang_w,
                 motif_weight, motifs_symmetric, score, score_orn)
-            # Recalibrate at batch boundaries: the incremental orientation update
-            # omits per-arc weights (mirrors C++ local scorer), causing drift vs.
-            # the weighted global init over many batches.  Recomputing exactly
-            # every 'stop_steps' steps prevents this from accumulating.
-            score_orn = float(_score_orientation_full_nb(
-                anchor_orn, nbr_offsets, nbr_indices,
-                nbr_weights_arr, motif_weight, motifs_symmetric))
-            score = float(_init_smooth_nb(
-                pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w)) + score_orn
+            # # Recalibrate at batch boundaries: the incremental orientation update
+            # # omits per-arc weights (mirrors C++ local scorer), causing drift vs.
+            # # the weighted global init over many batches.  Recomputing exactly
+            # # every 'stop_steps' steps prevents this from accumulating.
+            # score_orn = float(_score_orientation_full_nb(
+            #     anchor_orn, nbr_offsets, nbr_indices,
+            #     nbr_weights_arr, motif_weight, motifs_symmetric))
+            # score = float(_init_smooth_nb(
+            #     pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w)) + score_orn
         else:
             T, score, n_ok = _batch_smooth_nb(
                 pw, dtn64, mov64, float(step_size), T, dt,
