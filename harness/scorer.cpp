@@ -94,11 +94,11 @@ vector<double> read_dtn(const char *path) {
 // Settings::dataSegmentsSplit must be non-empty to pass the constructor guard.
 
 static void init_settings_defaults() {
-    Settings::dataSegmentsSplit = "/dev/null";  // non-empty → passes constructor check; empty file → 0 predefined segments
+    Settings::dataSegmentsSplit = "/dev/null";  // non-empty -> passes constructor check; empty file -> 0 predefined segments
     Settings::dataCentromeres   = "";
     Settings::outputLevel       = 0;
 
-    // distance conversions — defaults matching data/GM12878/config.ini
+    // distance conversions - defaults matching data/GM12878/config.ini
     Settings::genomicLengthToDistBase  = 1.0f;
     Settings::genomicLengthToDistScale = 0.5f;
     Settings::genomicLengthToDistPower = 0.75f;
@@ -111,7 +111,7 @@ static void init_settings_defaults() {
     Settings::countToDistShift     = 8;
     Settings::countToDistBaseLevel = 0.2f;
 
-    // spring constants — defaults from config.ini
+    // spring constants - defaults from config.ini
     Settings::springConstantStretchArcs = 1.0f;
     Settings::springConstantSqueezeArcs = 1.0f;
     Settings::springConstantStretch     = 0.1f;
@@ -174,7 +174,7 @@ static void setup_arc_heatmap(LooperSolver* ls, int n,
 }
 
 // ---------------------------------------------------------------------------
-// Mode handlers — each calls the REAL LooperSolver method.
+// Mode handlers - each calls the REAL LooperSolver method.
 
 void mode_distfns(int argc, char** argv) {
     if (argc < 13) { fprintf(stderr, "distfns: needs 11 params\n"); exit(1); }
@@ -261,7 +261,7 @@ void mode_smooth(int argc, char** argv) {
     LooperSolver* ls = make_solver();
     setup_clusters(ls, pos, dtn);
 
-    // calcScoreStructureSmooth(lengths=true, angles=true) — the full version
+    // calcScoreStructureSmooth(lengths=true, angles=true) - the full version
     double score = ls->calcScoreStructureSmooth(true, true);
     printf("%.15f\n", score);
     delete ls;

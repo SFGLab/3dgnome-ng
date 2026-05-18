@@ -35,7 +35,7 @@ make               # builds both
 
 ## Running the Python reimplementation
 
-### Quick start — single region
+### Quick start - single region
 
 ```python
 from src.simulate import run_region
@@ -67,7 +67,7 @@ Each CIF file can be opened directly in **ChimeraX** or **Chimera**:
 chimerax chr1_18288319_20307135_structure_1.cif
 ```
 
-Beads are written as sequential ALA residues on chain A — ChimeraX connects them as a polymer chain automatically.
+Beads are written as sequential ALA residues on chain A - ChimeraX connects them as a polymer chain automatically.
 
 `data_dir` overrides the `data_dir` key in the config, which is useful because the bundled `config.ini` has it hardcoded to `/Projects/GM12878/`. Pass the actual local path instead.
 
@@ -107,10 +107,10 @@ chr1:18288319-20307135
 3dgnome uses a **coarse-to-fine hierarchical Monte Carlo** approach:
 
 ```
-Level 1 (Chromosome root)  — whole chromosome, singleton heatmap energy
-Level 2 (Segment)          — ~100 kb–1 Mb segments, singleton heatmap energy
-Level 3 (Anchor/IB)        — ChIA-PET loop anchors, arc spring energy
-Level 4 (Subanchor)        — chain + angle MC on loop_density subanchors inserted between each anchor pair
+Level 1 (Chromosome root)  - whole chromosome, singleton heatmap energy
+Level 2 (Segment)          - ~100 kb–1 Mb segments, singleton heatmap energy
+Level 3 (Anchor/IB)        - ChIA-PET loop anchors, arc spring energy
+Level 4 (Subanchor)        - chain + angle MC on loop_density subanchors inserted between each anchor pair
 ```
 
 Each level runs simulated annealing, then passes 3D positions down as starting points for the next level. The `-v 2` pipeline covers all four levels: Level 4 always runs as the last step inside Level 3's IB reconstruction (`reconstruct_arcs` / C++ `reconstructClustersArcsDistances`). Both C++ and Python produce `n_anchors + (n_anchors−1) × loop_density` beads per IB.

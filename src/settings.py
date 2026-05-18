@@ -1,5 +1,5 @@
 """
-src/settings.py  —  Configuration for 3dgnome-ng.
+src/settings.py  -  Configuration for 3dgnome-ng.
 
 Mirrors C++ Settings class.  All defaults match Settings::init() in Settings.cpp.
 """
@@ -176,7 +176,8 @@ class Settings:
         self.data_singletons = gets("data", "singletons", self.data_singletons)
         self.data_singletons_inter = gets("data", "singletons_inter", self.data_singletons_inter)
         self.data_factors = gets("data", "factors", self.data_factors)
-        self.data_split_singletons_by_chr = getb("data", "split_singleton_files_by_chr", self.data_split_singletons_by_chr)
+        self.data_split_singletons_by_chr = getb("data", "split_singleton_files_by_chr",
+                                                 self.data_split_singletons_by_chr)
         self.data_centromeres = gets("data", "centromeres", self.data_centromeres)
         self.data_segment_split = gets("data", "segment_split", self.data_segment_split)
         self.data_segment_heatmap = gets("data", "segment_heatmap", self.data_segment_heatmap)
@@ -202,7 +203,8 @@ class Settings:
 
         # [heatmaps]
         self.heatmap_inter_scaling = getf("heatmaps", "inter_scaling", self.heatmap_inter_scaling)
-        self.heatmap_distance_stretching = getf("heatmaps", "distance_heatmap_stretching", self.heatmap_distance_stretching)
+        self.heatmap_distance_stretching = getf("heatmaps", "distance_heatmap_stretching",
+                                                self.heatmap_distance_stretching)
 
         # [springs]
         self.spring_stretch = getf("springs", "stretch_constant", self.spring_stretch)
@@ -221,19 +223,26 @@ class Settings:
 
         # [subanchor_heatmap]
         self.use_subanchor_heatmap = getb("subanchor_heatmap", "use_subanchor_heatmap", self.use_subanchor_heatmap)
-        self.subanchor_heatmap_influence = getf("subanchor_heatmap", "heatmap_influence", self.subanchor_heatmap_influence)
-        self.subanchor_heatmap_dist_weight = getf("subanchor_heatmap", "heatmap_dist_weight", self.subanchor_heatmap_dist_weight)
-        self.subanchor_estimate_steps = geti("subanchor_heatmap", "estimate_distances_steps", self.subanchor_estimate_steps)
-        self.subanchor_estimate_replicates = geti("subanchor_heatmap", "estimate_distances_replicates", self.subanchor_estimate_replicates)
+        self.subanchor_heatmap_influence = getf("subanchor_heatmap", "heatmap_influence",
+                                                self.subanchor_heatmap_influence)
+        self.subanchor_heatmap_dist_weight = getf("subanchor_heatmap", "heatmap_dist_weight",
+                                                  self.subanchor_heatmap_dist_weight)
+        self.subanchor_estimate_steps = geti("subanchor_heatmap", "estimate_distances_steps",
+                                             self.subanchor_estimate_steps)
+        self.subanchor_estimate_replicates = geti("subanchor_heatmap", "estimate_distances_replicates",
+                                                  self.subanchor_estimate_replicates)
 
         # [simulation_heatmap]
         self.max_temp_heatmap = getf("simulation_heatmap", "max_temp_heatmap", self.max_temp_heatmap)
         self.dt_temp_heatmap = getf("simulation_heatmap", "delta_temp_heatmap", self.dt_temp_heatmap)
         self.jump_scale_heatmap = getf("simulation_heatmap", "jump_temp_scale_heatmap", self.jump_scale_heatmap)
         self.jump_coef_heatmap = getf("simulation_heatmap", "jump_temp_coef_heatmap", self.jump_coef_heatmap)
-        self.mc_stop_steps_heatmap = geti("simulation_heatmap", "stop_condition_steps_heatmap", self.mc_stop_steps_heatmap)
-        self.mc_stop_improvement_heatmap = getf("simulation_heatmap", "stop_condition_improvement_threshold_heatmap", self.mc_stop_improvement_heatmap)
-        self.mc_stop_successes_heatmap = geti("simulation_heatmap", "stop_condition_successes_threshold_heatmap", self.mc_stop_successes_heatmap)
+        self.mc_stop_steps_heatmap = geti("simulation_heatmap", "stop_condition_steps_heatmap",
+                                          self.mc_stop_steps_heatmap)
+        self.mc_stop_improvement_heatmap = getf("simulation_heatmap", "stop_condition_improvement_threshold_heatmap",
+                                                self.mc_stop_improvement_heatmap)
+        self.mc_stop_successes_heatmap = geti("simulation_heatmap", "stop_condition_successes_threshold_heatmap",
+                                              self.mc_stop_successes_heatmap)
 
         # [simulation_arcs]
         self.max_temp = getf("simulation_arcs", "max_temp", self.max_temp)
@@ -241,7 +250,8 @@ class Settings:
         self.jump_scale = getf("simulation_arcs", "jump_temp_scale", self.jump_scale)
         self.jump_coef = getf("simulation_arcs", "jump_temp_coef", self.jump_coef)
         self.mc_stop_steps = geti("simulation_arcs", "stop_condition_steps", self.mc_stop_steps)
-        self.mc_stop_improvement = getf("simulation_arcs", "stop_condition_improvement_threshold", self.mc_stop_improvement)
+        self.mc_stop_improvement = getf("simulation_arcs", "stop_condition_improvement_threshold",
+                                        self.mc_stop_improvement)
         self.mc_stop_successes = geti("simulation_arcs", "stop_condition_successes_threshold", self.mc_stop_successes)
 
         # [simulation_arcs_smooth]
@@ -252,8 +262,10 @@ class Settings:
         self.jump_scale_smooth = getf("simulation_arcs_smooth", "jump_temp_scale", self.jump_scale_smooth)
         self.jump_coef_smooth = getf("simulation_arcs_smooth", "jump_temp_coef", self.jump_coef_smooth)
         self.mc_stop_steps_smooth = geti("simulation_arcs_smooth", "stop_condition_steps", self.mc_stop_steps_smooth)
-        self.mc_stop_improvement_smooth = getf("simulation_arcs_smooth", "stop_condition_improvement_threshold", self.mc_stop_improvement_smooth)
-        self.mc_stop_successes_smooth = geti("simulation_arcs_smooth", "stop_condition_successes_threshold", self.mc_stop_successes_smooth)
+        self.mc_stop_improvement_smooth = getf("simulation_arcs_smooth", "stop_condition_improvement_threshold",
+                                               self.mc_stop_improvement_smooth)
+        self.mc_stop_successes_smooth = geti("simulation_arcs_smooth", "stop_condition_successes_threshold",
+                                             self.mc_stop_successes_smooth)
 
         return True
 

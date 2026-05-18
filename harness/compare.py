@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-harness/compare.py  —  3dgnome-ng correctness harness.
+harness/compare.py  -  3dgnome-ng correctness harness.
 
 Compares the C++ reference scorer against the Python (src/) reimplementation.
 Run from the repository root:
@@ -11,7 +11,7 @@ Run from the repository root:
     python harness/compare.py --reference  # print C++ reference values only
 
 Exits 0 when all implemented tests pass, 1 on any failure.
-The harness skips tests whose Python counterpart is not yet implemented —
+The harness skips tests whose Python counterpart is not yet implemented -
 it never fails just because src/ is incomplete.
 """
 
@@ -104,7 +104,7 @@ def dtn_txt(dtn) -> str:
 
 # ---------------------------------------------------------------------------
 # Reference C++ computations (as Python, matching scorer.cpp exactly)
-# These are NOT the implementation-under-test — they are ground truth for
+# These are NOT the implementation-under-test - they are ground truth for
 # generating expected values without running the binary.
 
 def ref_genomic_dist(length_bp, base, scale, power):
@@ -446,12 +446,12 @@ def test_smooth(reference_only=False):
 def test_densify(reference_only=False):
     """
     Validates _densify_active_region: bead count, fixed positions, dtn sign,
-    and subanchor linear interpolation.  Pure Python — no C++ scorer needed.
+    and subanchor linear interpolation.  Pure Python - no C++ scorer needed.
     """
     print("\n[densify] Subanchor densification (_densify_active_region)")
 
     if reference_only:
-        print("  (pure Python validation — no C++ reference)")
+        print("  (pure Python validation - no C++ reference)")
         return
 
     try:
@@ -553,7 +553,7 @@ def test_metropolis(reference_only=False):
 
 
 def test_angle(reference_only=False):
-    print("\n[angle] Custom angle metric  (NOT acos — see common.cpp line 40)")
+    print("\n[angle] Custom angle metric  (NOT acos - see common.cpp line 40)")
     cases = [
         ((1.0, 0.0, 0.0), (1.0, 0.0, 0.0), 0.0),    # parallel
         ((1.0, 0.0, 0.0), (-1.0, 0.0, 0.0), 1.0),   # anti-parallel

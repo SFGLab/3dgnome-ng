@@ -1,5 +1,5 @@
 """
-src/data.py  —  ContactData: the engine's input contract.
+src/data.py  -  ContactData: the engine's input contract.
 
 All data the solver needs lives here.  Two factory methods cover the two
 supported input paths:
@@ -40,7 +40,6 @@ from .io import (
     load_breakpoints,
 )
 
-
 # A singleton contact in genomic coordinates.
 # Stored as a plain tuple for memory efficiency.
 # (chr1, pos1, chr2, pos2, score)
@@ -52,16 +51,16 @@ class ContactData:
     """
     Fully-loaded, file-independent input for the 3dgnome engine.
 
-    anchors:     dict[chr → list[Anchor]] — anchor beads (after empty-anchor removal)
-    arcs:        dict[chr → list[InteractionArc]] — mapped arcs (after mark_arcs)
-    breakpoints: dict[chr → list[int]] — segment boundary positions
+    anchors:     dict[chr -> list[Anchor]] - anchor beads (after empty-anchor removal)
+    arcs:        dict[chr -> list[InteractionArc]] - mapped arcs (after mark_arcs)
+    breakpoints: dict[chr -> list[int]] - segment boundary positions
     singletons:  list of (chr1, pos1, chr2, pos2, score) contacts
                  used to build the segment-level heatmap
     """
-    anchors:     dict[str, list] = field(default_factory=dict)
-    arcs:        dict[str, list] = field(default_factory=dict)
+    anchors: dict[str, list] = field(default_factory=dict)
+    arcs: dict[str, list] = field(default_factory=dict)
     breakpoints: dict[str, list] = field(default_factory=dict)
-    singletons:  list            = field(default_factory=list)
+    singletons: list = field(default_factory=list)
 
     # -----------------------------------------------------------------------
     # File-based factory
@@ -165,7 +164,7 @@ class ContactData:
             ori = str(row["orientation"]) if "orientation" in row.index else "N"
             anchors.setdefault(c, []).append(Anchor(c, st, en, ori))
 
-        # -- raw arcs → mark → remove empty ----------------------------------
+        # -- raw arcs -> mark -> remove empty ----------------------------------
         raw_arcs: dict[str, list] = {}
         for _, row in arcs_df.iterrows():
             ca, cb = str(row["chr_a"]), str(row["chr_b"])

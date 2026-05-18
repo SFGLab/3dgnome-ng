@@ -1,11 +1,6 @@
 #!/usr/bin/env python3
 """
-main.py  —  Explicit 3dgnome-ng workflow.
-
-Mirrors exactly what src/simulate.run_region() does, but written out
-step by step so each stage can be inspected or swapped out.
-
-Usage:
+main.py  -  3D structure prediction from contact data using 3dgnome data format.
     python main.py --config data/GM12878/config.ini \
                    --region chr1:18288319-20307135  \
                    --n 1                            \
@@ -121,7 +116,7 @@ def main():
     else:
         pool.shutdown(wait=True)
 
-    print(f"\n[main] done — {n} structure(s) written to {out_dir}/")
+    print(f"\n[main] done - {n} structure(s) written to {out_dir}/")
 
 
 if __name__ == "__main__":

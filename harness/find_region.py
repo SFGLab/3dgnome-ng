@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-harness/find_region.py  —  find good test regions for 3dgnome integration tests.
+harness/find_region.py  -  find good test regions for 3dgnome integration tests.
 
 A "good" region satisfies three constraints:
   1. All consecutive non-empty anchor pairs are non-overlapping (gap >= 0),
@@ -69,7 +69,7 @@ def find_regions(
 
     for chrom in chromosomes:
         if bp_chrs and chrom not in bp_chrs:
-            continue  # C++ will error — no segment splits for this chr
+            continue  # C++ will error - no segment splits for this chr
 
         # Load all non-empty anchors for this chromosome (no region filter)
         all_a = load_anchors(anchor_path, {chrom})
@@ -92,7 +92,7 @@ def find_regions(
                 if gap >= 0 and span <= max_span_bp:
                     run.append(anch[j])
                 elif gap < 0:
-                    break   # overlap — stop extending
+                    break   # overlap - stop extending
                 else:
                     break   # span exceeded
             if len(run) > len(best):

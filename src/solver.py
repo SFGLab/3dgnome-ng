@@ -1,11 +1,11 @@
 """
-src/solver.py  —  High-level LooperSolver analog for 3dgnome-ng.
+src/solver.py  -  High-level LooperSolver analog for 3dgnome-ng.
 
 Orchestrates data loading, hierarchy building, and MC reconstruction.
 Mirrors C++ LooperSolver methods:
-  - setContactData()              → set_contact_data()
-  - reconstructClustersHeatmap()  → reconstruct_heatmap()
-  - reconstructClustersArcsDistances() → reconstruct_arcs()
+  - setContactData()              -> set_contact_data()
+  - reconstructClustersHeatmap()  -> reconstruct_heatmap()
+  - reconstructClustersArcsDistances() -> reconstruct_arcs()
 """
 
 from __future__ import annotations
@@ -40,15 +40,15 @@ class Solver:
         self.chrs: list[str] = []
 
         # Arc data (after mark_arcs / remove_empty_anchors)
-        self.anchors: dict = {}   # chr → list[Anchor]
-        self.arcs: dict = {}      # chr → list[InteractionArc] (global indices)
+        self.anchors: dict = {}  # chr -> list[Anchor]
+        self.arcs: dict = {}  # chr -> list[InteractionArc] (global indices)
 
         # Heatmap structures
-        self.heatmap_dist: np.ndarray | None = None   # (N, N) expected distances
+        self.heatmap_dist: np.ndarray | None = None  # (N, N) expected distances
         self.heatmap_dist_diag: int = 0
 
         self.selected_region: BedRegion | None = None
-        self.dense_active_regions: dict = {}  # chr → list of (gpos, x, y, z)
+        self.dense_active_regions: dict = {}  # chr -> list of (gpos, x, y, z)
         self._singletons: list = []
 
     # -----------------------------------------------------------------------
@@ -86,7 +86,7 @@ class Solver:
         """
         s = self.s
 
-        # setLevel(LVL_SEGMENT) → current_level contains segment cluster indices
+        # setLevel(LVL_SEGMENT) -> current_level contains segment cluster indices
         current_level = set_level(
             LVL_SEGMENT - LVL_CHROMOSOME,  # steps down from root
             self.chr_root, self.clusters, self.chrs
@@ -98,7 +98,7 @@ class Solver:
 
         if single_seg:
             if self.s.output_level >= 1:
-                print("[solver] single segment → place at origin")
+                print("[solver] single segment -> place at origin")
             chr_ = self.chrs[0]
             if current_level[chr_]:
                 self.clusters[current_level[chr_][0]].pos = np.zeros(3, dtype=np.float32)
@@ -156,7 +156,7 @@ class Solver:
         if len(self.chrs) > 1:
             self._normalize_heatmap_inter(h_norm, total_size, current_level, s.heatmap_inter_scaling)
 
-        # Convert freq → distance heatmap
+        # Convert freq -> distance heatmap
         heatmap_dist, avg_dist = self._create_distance_heatmap(
             h_norm, total_size, inter=False
         )
@@ -208,7 +208,7 @@ class Solver:
                                step_size, s, label=f"heatmap run {run + 1}",
                                verbose=log2)
             if log1:
-                print(f"  → score={score:.6f}  best={best_score:.6f}")
+                print(f"  -> score={score:.6f}  best={best_score:.6f}")
 
             if score < best_score or best_score < 0:
                 best_score = score
@@ -298,7 +298,7 @@ class Solver:
                 ib_label = f"{chr_} IB {ib_i + 1}/{n_ibs}"
                 if len(active_region) <= 1:
                     if self.s.output_level >= 1:
-                        print(f"  {ib_label}  ({len(active_region)} anchors — skip)")
+                        print(f"  {ib_label}  ({len(active_region)} anchors - skip)")
                     continue
                 for a_idx in active_region:
                     self.clusters[a_idx].pos = ib.pos.copy()
@@ -350,9 +350,9 @@ class Solver:
         Mirrors C++ calcAnchorExpectedDistancesHeatmap().
 
         Returns mat where:
-          mat[i,j] = -1  → repulsion (no arc)
-          mat[i,j] =  0  → diagonal (self)
-          mat[i,j] > 0   → expected distance from freqToDistance(score)
+          mat[i,j] = -1  -> repulsion (no arc)
+          mat[i,j] =  0  -> diagonal (self)
+          mat[i,j] > 0   -> expected distance from freqToDistance(score)
         """
         n = len(active_region)
         mat = np.full((n, n), -1.0, dtype=np.float64)
@@ -434,7 +434,7 @@ class Solver:
         Insert loop_density subanchor beads between each consecutive anchor pair.
         Returns (pos, fixed, gpos, dtn, anchor_map) where:
           pos        : (N, 3) float32 bead positions
-          fixed      : (N,) bool — True for original anchor beads
+          fixed      : (N,) bool - True for original anchor beads
           gpos       : list[int] genomic midpoints
           dtn        : (N-1,) float32 expected consecutive distances
           anchor_map : list of (pos_index, cluster_index) for anchor beads
@@ -462,7 +462,7 @@ class Solver:
             bead_fixed.append(True)
             anchor_map.append((k, ai))
 
-            gap_bp = max(cb.start - ca.end, 0)  # clamp: overlapping anchors → place subanchors at boundary
+            gap_bp = max(cb.start - ca.end, 0)  # clamp: overlapping anchors -> place subanchors at boundary
             d_bp = gap_bp // (ld + 1)
             p = ca.end
             for j in range(ld):

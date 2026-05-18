@@ -1,12 +1,12 @@
 """
-src/io.py  —  File loading for 3dgnome-ng.
+src/io.py  -  File loading for 3dgnome-ng.
 
 Mirrors C++ InteractionArcs loading methods:
-  - loadAnchorsData()      → load_anchors()
-  - loadPetClustersData()  → load_arcs()
-  - markArcs()             → mark_arcs()
-  - removeEmptyAnchors()   → remove_empty_anchors()
-  - createSingletonHeatmap() → create_singleton_heatmap()
+  - loadAnchorsData()      -> load_anchors()
+  - loadPetClustersData()  -> load_arcs()
+  - markArcs()             -> mark_arcs()
+  - removeEmptyAnchors()   -> remove_empty_anchors()
+  - createSingletonHeatmap() -> create_singleton_heatmap()
 """
 
 from __future__ import annotations
@@ -37,8 +37,8 @@ class Anchor:
 @dataclass
 class RawArc:
     """Arc in genomic coordinates (before anchor-index mapping)."""
-    start: int     # genomic midpoint of left anchor
-    end: int       # genomic midpoint of right anchor
+    start: int  # genomic midpoint of left anchor
+    end: int  # genomic midpoint of right anchor
     score: float
     factor: int = 0
 
@@ -46,8 +46,8 @@ class RawArc:
 @dataclass
 class InteractionArc:
     """Arc after anchor-index mapping."""
-    start: int       # index into anchors list (local, chr-relative)
-    end: int         # index into anchors list (local, chr-relative)
+    start: int  # index into anchors list (local, chr-relative)
+    end: int  # index into anchors list (local, chr-relative)
     score: int
     eff_score: int = 0
     factor: int = 0
@@ -68,7 +68,7 @@ class BedRegion:
 def parse_region(region_str: str) -> Optional[BedRegion]:
     """
     Parse 'chr:start-end' string.  Returns None on failure.
-    C++ BedRegion::tryParse uses sscanf(str, "%30[^:]:%d-%d", ...) — dash separator.
+    C++ BedRegion::tryParse uses sscanf(str, "%30[^:]:%d-%d", ...) - dash separator.
     """
     try:
         chr_part, range_part = region_str.split(":", 1)
@@ -89,7 +89,7 @@ def load_anchors(
     """
     Load anchor BED file.  Format: chr start end [orientation]
 
-    Returns dict[chr → list[Anchor]] (only for chromosomes in chr_set).
+    Returns dict[chr -> list[Anchor]] (only for chromosomes in chr_set).
     Anchors are included only if at least one end falls within `region`
     (if specified).
     """
@@ -139,7 +139,7 @@ def load_arcs(
     """
     Load PET cluster BEDPE file.  Format: chr_a start_a end_a chr_b start_b end_b score
 
-    Returns dict[chr → list[RawArc]], sorted by start, intra only.
+    Returns dict[chr -> list[RawArc]], sorted by start, intra only.
     Arcs longer than max_pet_length are excluded (they go to long_arcs).
     """
     raw: dict[str, list[RawArc]] = {}
@@ -196,7 +196,7 @@ def load_arcs(
 
 
 # ---------------------------------------------------------------------------
-# markArcs: map RawArcs → anchor-indexed InteractionArcs
+# markArcs: map RawArcs -> anchor-indexed InteractionArcs
 
 def mark_arcs(
     anchors: dict,
@@ -206,10 +206,10 @@ def mark_arcs(
     Map genomic-position arcs to anchor-index arcs.
     Mirrors C++ InteractionArcs::markArcs().
 
-    anchors:  dict[chr → list[Anchor]]
-    raw_arcs: dict[chr → list[RawArc]] (sorted by start)
+    anchors:  dict[chr -> list[Anchor]]
+    raw_arcs: dict[chr -> list[RawArc]] (sorted by start)
 
-    Returns dict[chr → list[InteractionArc]].
+    Returns dict[chr -> list[InteractionArc]].
     """
     import bisect
 
@@ -235,7 +235,7 @@ def mark_arcs(
             return -1
 
         result = []
-        tmp_arcs: dict[int, list] = {}  # end_idx → staged arcs for current start group
+        tmp_arcs: dict[int, list] = {}  # end_idx -> staged arcs for current start group
         last_start = -1
 
         def flush(target_list):
@@ -278,7 +278,7 @@ def mark_arcs(
             end = -1
             if idx < cnt:
                 raw = chr_raw[idx]
-                st  = find_anchor(raw.start)
+                st = find_anchor(raw.start)
                 end = find_anchor(raw.end)
 
                 if st == -1 or end == -1 or st == end:
@@ -323,7 +323,7 @@ def remove_empty_anchors(
     Also updates arc start/end indices to reflect removed anchors.
     """
     new_anchors = {}
-    index_maps = {}  # old_index → new_index per chr
+    index_maps = {}  # old_index -> new_index per chr
 
     for chr_ in anchors:
         chr_anchors = anchors[chr_]
@@ -375,7 +375,7 @@ def load_breakpoints(path: str, chrs: list) -> dict:
     """
     Load segment breakpoint BED file.  Format: chr pos pos
 
-    Returns dict[chr → list[int]] of breakpoint positions.
+    Returns dict[chr -> list[int]] of breakpoint positions.
     """
     bp: dict[str, list[int]] = {}
     if not path or not os.path.exists(path):
@@ -401,8 +401,8 @@ def load_breakpoints(path: str, chrs: list) -> dict:
 
 def create_singleton_heatmap(
     path: str,
-    bins: list,             # list of (chr, bin_starts) where bin_starts is a list of boundary positions
-    start_ind: dict,        # chr → starting column index in heatmap
+    bins: list,  # list of (chr, bin_starts) where bin_starts is a list of boundary positions
+    start_ind: dict,  # chr -> starting column index in heatmap
     total_size: int,
     chr_set: set,
     region: Optional[BedRegion] = None,
@@ -411,9 +411,9 @@ def create_singleton_heatmap(
     Read singletons BEDPE, bin into a contact frequency heatmap.
     Mirrors C++ createSingletonHeatmap().
 
-    bins:       dict[chr → list[int]] of bin boundary positions
+    bins:       dict[chr -> list[int]] of bin boundary positions
                 (starts with 0, ends with large value)
-    start_ind:  dict[chr → int] mapping chr to starting heatmap column index
+    start_ind:  dict[chr -> int] mapping chr to starting heatmap column index
     total_size: total number of bins across all chromosomes
     chr_set:    set of chromosomes to include
 

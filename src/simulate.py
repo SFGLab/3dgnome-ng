@@ -1,5 +1,5 @@
 """
-src/simulate.py  —  High-level entry point for 3dgnome-ng.
+src/simulate.py  -  High-level entry point for 3dgnome-ng.
 
 Thin wrappers around the Settings / ContactData / Solver pipeline.
 """
@@ -77,7 +77,7 @@ def run_region(
         beads = solver.get_leaf_positions(chrs_list[0])
         if not beads:
             raise RuntimeError(
-                f"Structure {i + 1}: no leaf beads returned — "
+                f"Structure {i + 1}: no leaf beads returned - "
                 "check hierarchy building or anchor loading."
             )
         structures.append(beads)

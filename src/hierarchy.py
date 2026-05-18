@@ -1,5 +1,5 @@
 """
-src/hierarchy.py  —  Cluster data structures and hierarchy tree building.
+src/hierarchy.py  -  Cluster data structures and hierarchy tree building.
 
 Mirrors C++ LooperSolver::createTreeChromosome(), findGaps(), findSplit().
 
@@ -24,7 +24,7 @@ import numpy as np
 LVL_CHROMOSOME = 1
 LVL_SEGMENT = 2
 LVL_INTERACTION_BLOCK = 3
-LVL_ANCHOR = 4          # leaf level — original anchor clusters
+LVL_ANCHOR = 4  # leaf level - original anchor clusters
 
 
 @dataclass
@@ -33,8 +33,8 @@ class Cluster:
     end: int
     level: int = LVL_ANCHOR
     parent: int = -1
-    children: list = field(default_factory=list)   # indices into global clusters list
-    arcs: list = field(default_factory=list)        # arc indices (local, chr-specific)
+    children: list = field(default_factory=list)  # indices into global clusters list
+    arcs: list = field(default_factory=list)  # arc indices (local, chr-specific)
     orientation: str = "N"
     pos: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=np.float32))
     is_fixed: bool = False
@@ -154,15 +154,15 @@ def build_cluster_tree(
     Build the full cluster hierarchy for all chromosomes.
     Mirrors C++ LooperSolver::createTreeGenome() + createTreeChromosome().
 
-    anchors:     dict[chr → list[Anchor]]
-    arcs:        dict[chr → list[InteractionArc]] (anchor-index based, local per chr)
-    breakpoints: dict[chr → list[int]] of segment split positions
+    anchors:     dict[chr -> list[Anchor]]
+    arcs:        dict[chr -> list[InteractionArc]] (anchor-index based, local per chr)
+    breakpoints: dict[chr -> list[int]] of segment split positions
     chrs:        ordered list of chromosome names
 
     Returns:
         clusters:          list of Cluster objects (global, all chromosomes)
-        chr_root:          dict[chr → int] index of chromosome root cluster
-        chr_first_cluster: dict[chr → int] index of first anchor cluster per chr
+        chr_root:          dict[chr -> int] index of chromosome root cluster
+        chr_first_cluster: dict[chr -> int] index of first anchor cluster per chr
     """
     from .io import InteractionArc  # avoid circular import at module level
 

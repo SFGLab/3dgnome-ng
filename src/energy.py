@@ -1,5 +1,5 @@
 """
-src/energy.py  —  scoring / energy functions for 3dgnome-ng.
+src/energy.py  -  scoring / energy functions for 3dgnome-ng.
 
 All functions must match the C++ reference exactly (within 1e-6 absolute
 tolerance).  The harness in harness/compare.py tests each one independently.
@@ -50,13 +50,13 @@ def freq_to_distance(freq: int, a: float, scale: float, shift: float, base_level
     """C++: freqToDistance(freq) = base_level + scale / exp(a * (freq + shift))"""
     try:
         return base_level + scale / math.exp(a * (freq + shift))
-    except OverflowError:  # C++ exp() returns inf → scale/inf = 0
+    except OverflowError:  # C++ exp() returns inf -> scale/inf = 0
         return base_level
 
 
 # ---------------------------------------------------------------------------
 # Angle metric
-# NOT acos — this is the linear dissimilarity used throughout 3dgnome.
+# NOT acos - this is the linear dissimilarity used throughout 3dgnome.
 
 def angle_metric(v1, v2):
     """
@@ -87,22 +87,22 @@ def score_heatmap(pos: torch.Tensor, exp_dist: torch.Tensor, diag_size: int) -> 
     """
     Full heatmap energy score (double-counted, matching C++ calcScoreHeatmapActiveRegion(-1)).
 
-    pos:      (N, 3) float tensor — bead positions
-    exp_dist: (N, N) float tensor — expected pairwise distances
-    diag_size: int — skip pairs within this diagonal band
+    pos:      (N, 3) float tensor - bead positions
+    exp_dist: (N, N) float tensor - expected pairwise distances
+    diag_size: int - skip pairs within this diagonal band
 
     The C++ implementation calls calcScoreHeatmapActiveRegion(moved) for every
     moved index.  That inner function sums over all i != moved with
     |i - moved| >= diag_size and exp_dist[i][moved] >= 1e-6.
-    Together, every pair (i, j) with i != j is counted twice — once when
+    Together, every pair (i, j) with i != j is counted twice - once when
     moved=i and once when moved=j.
 
     Returns a scalar Tensor.
     """
     n = pos.shape[0]
     # d[i, j] = ||pos[i] - pos[j]||
-    diff = pos.unsqueeze(1) - pos.unsqueeze(0)   # (n, n, 3)
-    d = diff.norm(dim=2)                          # (n, n)
+    diff = pos.unsqueeze(1) - pos.unsqueeze(0)  # (n, n, 3)
+    d = diff.norm(dim=2)  # (n, n)
 
     idx = torch.arange(n, device=pos.device, dtype=torch.long)
     diag_mask = (idx.unsqueeze(0) - idx.unsqueeze(1)).abs() < diag_size
@@ -129,9 +129,9 @@ def score_arcs(
 
     pos:       (N, 3) float tensor
     arcs:      list of (i, j, exp_d) tuples
-               exp_d < 0   → repulsion term  1 / d
-               exp_d < 1e-6 → skip
-               otherwise   → spring term (d - exp_d)^2 / exp_d^2 * k
+               exp_d < 0   -> repulsion term  1 / d
+               exp_d < 1e-6 -> skip
+               otherwise   -> spring term (d - exp_d)^2 / exp_d^2 * k
     stretch_k: spring constant when d > exp_d
     squeeze_k: spring constant when d < exp_d
 
@@ -166,11 +166,11 @@ def score_smooth(
     """
     Chain smoothness energy: bond-length penalty + cubic angle penalty.
 
-    pos:          (N, 3) float tensor — bead positions
-    dist_to_next: (N-1,) float tensor — expected bond lengths
+    pos:          (N, 3) float tensor - bead positions
+    dist_to_next: (N-1,) float tensor - expected bond lengths
 
-    sca = Σ_{i=0..N-2} ((|v_i| - dtn_i) / dtn_i)^2 * k_stretch_or_squeeze
-    scb = Σ_{i=1..N-2} angle(v_{i-1}, v_i)^3 * angular_k
+    sca = sum_{i=0..N-2} ((|v_i| - dtn_i) / dtn_i)^2 * k_stretch_or_squeeze
+    scb = sum_{i=1..N-2} angle(v_{i-1}, v_i)^3 * angular_k
 
     Returns sca * w_dist + scb * w_angle.
 
@@ -308,7 +308,7 @@ def global_score_arcs_np(
     stretch_k: float,
     squeeze_k: float,
 ) -> float:
-    """Full arc spring score — sums i < j pairs once each (not double-counted)."""
+    """Full arc spring score - sums i < j pairs once each (not double-counted)."""
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):

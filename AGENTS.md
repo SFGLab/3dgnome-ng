@@ -4,7 +4,7 @@
 
 Python reimplementation of the Monte Carlo (MC) core of **3dgnome**. The original implementation is a ~6,400-line C++ simulation (`3dnome/MC/`) that predicts 3D chromosome structure from Hi-C contact frequency data. The reimplementation lives in `src/` and must reproduce the same algorithm behavior. MC loops run on CPU via Numba JIT; torch is used only for GPU device detection and the reference scoring functions in `src/energy.py`.
 
-Do **not** modify anything inside `3dnome/`. That directory is the reference implementation — read it, never change it.
+Do **not** modify anything inside `3dnome/`. That directory is the reference implementation - read it, never change it.
 
 ---
 
@@ -13,7 +13,7 @@ Do **not** modify anything inside `3dnome/`. That directory is the reference imp
 ```
 3dgnome-torch/
 ├── 3dnome/MC/                  # Reference C++ implementation (READ ONLY)
-│   ├── LooperSolver.cpp/h      # Main solver — all MC loops live here
+│   ├── LooperSolver.cpp/h      # Main solver - all MC loops live here
 │   ├── Chromosome.cpp/h        # 3D structure (list of bead positions)
 │   ├── HierarchicalChromosome.cpp/h  # Multi-level representation
 │   ├── Heatmap.cpp/h           # 2D contact/frequency matrices
@@ -44,10 +44,10 @@ Python environment: `.venv/bin/python` (Python 3.11, torch >= 2.0, numpy >= 1.24
 3dgnome solves chromosome structure as a **coarse-to-fine hierarchical Monte Carlo** problem. There are four nested levels, each feeding the next:
 
 ```
-Level 1 (Chromosome)  — whole chromosomes as single beads, inter-chr contacts
-Level 2 (Segment)     — ~100kb–1Mb segments within each chromosome
-Level 3 (Anchor)      — ~5–50kb ChIA-PET loop anchor regions
-Level 4 (Subanchor)   — ~1–10kb fine-resolution loop bases
+Level 1 (Chromosome)  - whole chromosomes as single beads, inter-chr contacts
+Level 2 (Segment)     - ~100kb–1Mb segments within each chromosome
+Level 3 (Anchor)      - ~5–50kb ChIA-PET loop anchor regions
+Level 4 (Subanchor)   - ~1–10kb fine-resolution loop bases
 ```
 
 Each level runs a simulated annealing MC loop, then passes the resulting 3D positions down as constraints for the next level.
@@ -82,11 +82,11 @@ Reference: `LooperSolver.cpp` lines 329–405 (`MonteCarloHeatmap`), 2304–2550
 ```python
 @dataclass
 class Cluster:
-    pos: Tensor          # shape (3,), float32 — 3D position
+    pos: Tensor          # shape (3,), float32 - 3D position
     genomic_pos: int
     start: int           # genomic range start
     end: int             # genomic range end
-    orientation: str     # 'L' | 'R' | 'N'  — CTCF motif direction
+    orientation: str     # 'L' | 'R' | 'N'  - CTCF motif direction
     parent: int          # index into parent-level cluster list
     level: int
     arcs: list[int]      # indices into arc list
@@ -123,7 +123,7 @@ All scoring functions return a scalar; lower is better. Each level uses a subset
 Compares pairwise distances against expected distances derived from contact frequency.
 
 ```
-score = Σ_{|i-j| in diagonal band} ((d_actual - d_expected)² / d_expected²)
+score = sum_{|i-j| in diagonal band} ((d_actual - d_expected)² / d_expected²)
 ```
 
 Reference: `calcScoreHeatmapActiveRegion()` line 1752.
@@ -132,7 +132,7 @@ Reference: `calcScoreHeatmapActiveRegion()` line 1752.
 Spring energy for each pairwise arc interaction:
 
 ```
-score = Σ_arcs spring_k * ((d_actual - d_expected)² / d_expected²)
+score = sum_arcs spring_k * ((d_actual - d_expected)² / d_expected²)
 
 spring_k = stretchConstant  if d_actual > d_expected
            squeezeConstant  if d_actual < d_expected
@@ -144,8 +144,8 @@ Reference: `calcScoreDistancesActiveRegion()` line 1548.
 Penalizes sharp bends and length deviations along the bead chain:
 
 ```
-score = w_dist  * Σ |d_actual - d_expected| / d_expected
-      + w_angle * Σ angle(bond_i, bond_{i+1})³
+score = w_dist  * sum |d_actual - d_expected| / d_expected
+      + w_angle * sum angle(bond_i, bond_{i+1})³
 ```
 
 Reference: `calcScoreStructureSmooth()` line 1637.
@@ -154,7 +154,7 @@ Reference: `calcScoreStructureSmooth()` line 1637.
 For adjacent anchors connected by arcs, penalizes non-convergent CTCF orientations:
 
 ```
-score = w_motif * Σ angle(orientation_i, orientation_j)²
+score = w_motif * sum angle(orientation_i, orientation_j)²
 ```
 
 Reference: `calcScoreOrientation()` line 1673.
@@ -207,11 +207,11 @@ src/
 ├── __init__.py
 ├── data_structures.py   # Cluster, Heatmap, InteractionArc dataclasses
 ├── io.py                # Load anchors, singletons, arcs from files
-├── distance.py          # genomicLengthToDistance() and heatmap → expected distance
+├── distance.py          # genomicLengthToDistance() and heatmap -> expected distance
 ├── energy.py            # All five scoring functions as torch operations
 ├── moves.py             # Random displacement sampling
 ├── mc.py                # MC loop (simulated annealing), convergence logic
-├── hierarchy.py         # Multi-level orchestration: chr → seg → anchor → subanchor
+├── hierarchy.py         # Multi-level orchestration: chr -> seg -> anchor -> subanchor
 ├── densify.py           # Bead densification between anchors
 └── main.py              # Entry point (gnome3d CLI)
 ```
@@ -221,7 +221,7 @@ src/
 - Store all bead positions as a `(N, 3)` float32 tensor on the target device.
 - Energy functions should operate on tensor slices for the *active region* only (not all N beads), matching the C++ local-score pattern.
 - The inner MC loop is inherently sequential (each step depends on the previous accept/reject), so do **not** try to batch proposals within a single chain. Batch across independent MC chains instead (ensemble generation).
-- `torch.no_grad()` everywhere in the MC loop — we are doing stochastic search, not gradient descent.
+- `torch.no_grad()` everywhere in the MC loop - we are doing stochastic search, not gradient descent.
 - Use `torch.compile` or keep operations simple to avoid recompilation overhead inside the loop.
 
 ---
@@ -246,7 +246,7 @@ When working on any piece of the rewrite, read the corresponding C++ reference f
 
 ## Correctness Harness
 
-The harness compiles `harness/scorer.cpp` directly against the real 3dnome MC sources (`3dnome/MC/*.cpp`). It uses `#define private public` before including `LooperSolver.h` to expose private methods — access control is compile-time only, so the object layout and compiled method bodies are identical to production. The result is that every comparison runs the actual `calcScoreHeatmapActiveRegion()`, `calcScoreStructureSmooth()`, etc. — not a reimplementation.
+The harness compiles `harness/scorer.cpp` directly against the real 3dnome MC sources (`3dnome/MC/*.cpp`). It uses `#define private public` before including `LooperSolver.h` to expose private methods - access control is compile-time only, so the object layout and compiled method bodies are identical to production. The result is that every comparison runs the actual `calcScoreHeatmapActiveRegion()`, `calcScoreStructureSmooth()`, etc. - not a reimplementation.
 
 ### Quick start
 
@@ -254,7 +254,7 @@ The harness compiles `harness/scorer.cpp` directly against the real 3dnome MC so
 # First build (auto-runs on first comparison too)
 python harness/compare.py --build-only
 
-# Print C++ reference values only — no Python impl needed
+# Print C++ reference values only - no Python impl needed
 python harness/compare.py --reference
 
 # Run all tests (skips anything not yet in src/)
@@ -279,7 +279,7 @@ python harness/compare.py heatmap arcs smooth
 ### Non-obvious details captured in scorer.cpp
 
 - **`angle()` is NOT `acos`**: `3dnome/MC/lib/common.cpp:40` defines it as `1 - (dot(norm(v1), norm(v2)) + 1) / 2`, a linear dissimilarity in [0, 1]. The smooth score's cubic penalty uses this.
-- **Heatmap score double-counts**: the C++ computes `Σ_moved Σ_i err(i, moved)`, which counts every pair (i,j) twice. The Python must match this convention exactly so that the MC delta `2*(local_curr - local_prev)` is consistent.
+- **Heatmap score double-counts**: the C++ computes `sum_moved sum_i err(i, moved)`, which counts every pair (i,j) twice. The Python must match this convention exactly so that the MC delta `2*(local_curr - local_prev)` is consistent.
 - **Global score update**: `score_curr += 2.0 * (local_score_curr - local_score_prev)`. The factor 2 comes from the double-counting above.
 - **Metropolis uses ratio, not difference**: acceptance probability is `jump_scale * exp(-jump_coef * (score_curr / score_prev) / T)`, and `jump_scale` (default 50) can push the probability above 1.
 - **Random displacement is uniform in a cube**: `random_vector(step)` returns `(rand(±step), rand(±step), rand(±step))`, not a sphere or Gaussian.
@@ -328,7 +328,7 @@ python harness/integration.py --fast -n 3
 python harness/integration.py --keep
 ```
 
-The test auto-skips the Python comparison if `src/simulate.py` is missing or raises `NotImplementedError` — it never fails just because Python is not yet implemented.
+The test auto-skips the Python comparison if `src/simulate.py` is missing or raises `NotImplementedError` - it never fails just because Python is not yet implemented.
 
 ---
 

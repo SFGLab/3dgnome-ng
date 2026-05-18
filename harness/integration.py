@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-harness/integration.py  —  integration test for 3dgnome-torch.
+harness/integration.py  -  integration test for 3dgnome-torch.
 
 Runs the C++ 3dnome binary on a small chr1 region (~2 Mb, ~34 anchor beads)
 to produce an ensemble of structures, then runs the Python reimplementation
@@ -202,7 +202,7 @@ def print_step_comparison(cpp_ms: dict, py_ms: dict, n_structs: int) -> None:
         if not steps:
             continue
 
-        print(f"\n  IB {ib} — {phase} MC")
+        print(f"\n  IB {ib} - {phase} MC")
         print(f"  {'step':>8}  {'C++ score':>11}  {'Py score':>11}  "
               f"{'Δ%':>7}  {'C++ ok/N':>13}  {'Py ok/N':>13}")
         print("  " + "─" * 72)
@@ -211,17 +211,17 @@ def print_step_comparison(cpp_ms: dict, py_ms: dict, n_structs: int) -> None:
             cr = cpp_rows.get(step)
             pr = py_rows.get(step)
 
-            cs = f"{cr[1]:11.4f}" if cr else f"{'—':>11}"
-            ps = f"{pr[1]:11.4f}" if pr else f"{'—':>11}"
+            cs = f"{cr[1]:11.4f}" if cr else f"{'-':>11}"
+            ps = f"{pr[1]:11.4f}" if pr else f"{'-':>11}"
 
             if cr and pr and pr[1] > 1e-9:
                 pct = (cr[1] - pr[1]) / pr[1] * 100
                 ds  = f"{pct:+7.1f}%"
             else:
-                ds = f"{'—':>8}"
+                ds = f"{'-':>8}"
 
-            cok = f"{cr[2]:>6.0f}/{cr[3]}" if cr else f"{'—':>13}"
-            pok = f"{pr[2]:>6.0f}/{pr[3]}" if pr else f"{'—':>13}"
+            cok = f"{cr[2]:>6.0f}/{cr[3]}" if cr else f"{'-':>13}"
+            pok = f"{pr[2]:>6.0f}/{pr[3]}" if pr else f"{'-':>13}"
 
             tag = "  [done]" if ((cr and cr[4]) or (pr and pr[4])) else ""
             print(f"  {step:>8,}  {cs}  {ps}  {ds}  {cok}  {pok}{tag}")
@@ -720,7 +720,7 @@ def main():
     config = tmpdir / "config.ini"
     write_config(config, fast=args.fast)
 
-    # max_level=2 → heatmap MC + arc MC + smooth MC (Level 4 runs inside arc reconstruction).
+    # max_level=2 -> heatmap MC + arc MC + smooth MC (Level 4 runs inside arc reconstruction).
     # Both C++ and Python produce subanchor beads: n_anchors + (n_anchors-1)*loop_density.
     MAX_LEVEL = 2
 
@@ -754,7 +754,7 @@ def main():
             py_ms_raw = _parse_py_milestones(tee.getvalue())
 
         if py_structs is None:
-            print(f"\n  [{SKIP_STR}] Python src/simulate.run_region not implemented — "
+            print(f"\n  [{SKIP_STR}] Python src/simulate.run_region not implemented - "
                   "skipping comparison")
             print("\n[integration] C++ reference run complete.")
             return
@@ -786,7 +786,7 @@ def main():
         print(f"  {status}  Rg distribution  KS d={d_rg:.3f}  p={p_rg:.3f}")
         results.append(ok_rg)
 
-        # KS test on pooled pairwise distances (subsampled — raw pool is ~18M
+        # KS test on pooled pairwise distances (subsampled - raw pool is ~18M
         # non-independent values that inflate KS power far beyond physical meaning)
         cpp_pwd = _subsample(cpp_stats["pwd"], KS_PWD_MAX_SAMPLES)
         py_pwd  = _subsample(py_stats["pwd"],  KS_PWD_MAX_SAMPLES)
@@ -807,7 +807,7 @@ def main():
         # Structural distance benchmark (from cudaMMC_benchmark_analysis.ipynb)
         # Mirrors the notebook's median ratio check (cells 50-51): compute the
         # inter-model structural distance matrix for each ensemble and compare
-        # medians.  KS is intentionally not used — the n*(n-1) off-diagonal values
+        # medians.  KS is intentionally not used - the n*(n-1) off-diagonal values
         # are all correlated (each structure appears in n-1 pairs), so the test
         # would be massively overpowered.
         cpp_sd = structural_distance_matrix(cpp_structs)
