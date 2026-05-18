@@ -341,8 +341,8 @@ class Solver:
         exp_dist = self._calc_anchor_expected_distances(active_region, chr_)
         self._reconstruct_cluster_arcs(ib_idx, active_region, exp_dist, ib_label,
                                        log1=log1, log2=log2)
-        return self._reconstruct_cluster_smooth(active_region, ib_label,
-                                                log1=log1, log2=log2)
+        return self._reconstruct_cluster_smooth(active_region, chr_, ib_label,
+                                               log1=log1, log2=log2)
 
     def _calc_anchor_expected_distances(self, active_region: list, chr_: str) -> np.ndarray:
         """
@@ -496,7 +496,8 @@ class Solver:
 
         return pos_arr, fixed_arr, bead_gpos, dtn, anchor_map
 
-    def _reconstruct_cluster_smooth(self, active_region: list, label: str = "",
+    def _reconstruct_cluster_smooth(self, active_region: list, chr_: str = "",
+                                    label: str = "",
                                     log1: bool = True, log2: bool = True) -> list:
         """
         Densify active region, then run smooth MC (chain + angle energy).
@@ -504,6 +505,7 @@ class Solver:
         Returns list of (genomic_pos, x, y, z) for ALL beads (anchors + subanchors).
         Mirrors C++ MonteCarloArcsSmooth loop in reconstructClustersArcsDistances().
         """
+        import math as _math
         s = self.s
         pos, fixed, gpos, dtn, anchor_map = self._densify_active_region(active_region)
         n = len(pos)
@@ -512,6 +514,33 @@ class Solver:
 
         avg_dtn = float(dtn.mean())
         step_size = avg_dtn * s.noise_smooth
+
+        # Build CTCF orientation data if enabled
+        char_orn = None
+        anchor_neighbors = None
+        anchor_neighbor_weights = None
+        if getattr(s, "use_ctcf_motif", False) and chr_:
+            import numpy as _np
+            char_orn = _np.array(['N'] * n, dtype='<U1')
+            n_anchors = len(anchor_map)
+            cluster_to_anchor_k = {ci: k for k, (_, ci) in enumerate(anchor_map)}
+            for k, (bi, ci) in enumerate(anchor_map):
+                char_orn[bi] = self.clusters[ci].orientation or 'N'
+
+            chr_arcs = self.arcs.get(chr_, [])
+            anchor_neighbors = {k: [] for k in range(n_anchors)}
+            anchor_neighbor_weights = {k: [] for k in range(n_anchors)}
+            for k, (bi, ci) in enumerate(anchor_map):
+                for arc_local in self.clusters[ci].arcs:
+                    if arc_local >= len(chr_arcs):
+                        continue
+                    arc = chr_arcs[arc_local]
+                    other_ci = arc.end if arc.start == ci else arc.start
+                    if other_ci in cluster_to_anchor_k:
+                        other_k = cluster_to_anchor_k[other_ci]
+                        anchor_neighbors[k].append(other_k)
+                        anchor_neighbor_weights[k].append(
+                            _math.sqrt(max(arc.score, 0)))
 
         best_score = -1.0
         best_pos = pos.copy()
@@ -525,8 +554,11 @@ class Solver:
                 if not fixed[i]:
                     pos_run[i] += random_vector_np(step_size)
 
-            score = mc_smooth(pos_run, dtn, fixed, step_size, s, label=run_label,
-                              verbose=log2)
+            score = mc_smooth(pos_run, dtn, fixed, step_size, s,
+                              char_orientations=char_orn,
+                              anchor_neighbors=anchor_neighbors,
+                              anchor_neighbor_weights=anchor_neighbor_weights,
+                              label=run_label, verbose=log2)
 
             if score < best_score or best_score < 0:
                 best_score = score

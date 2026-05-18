@@ -25,6 +25,7 @@
 //   ./scorer arcs    <stretch_k> <squeeze_k> <positions_file> <arcs_file>
 //   ./scorer smooth  <stretch_k> <squeeze_k> <angular_k> <w_dist> <w_angle> <positions_file> <dtn_file>
 //   ./scorer metropolis <jump_scale> <jump_coef> <score_curr> <score_prev> <T>
+//   ./scorer orientation <motif_weight> <motifs_symmetric 0|1> <positions_file> <orient_spec_file>
 
 #define private public
 #include "LooperSolver.h"
@@ -267,6 +268,101 @@ void mode_smooth(int argc, char** argv) {
     delete ls;
 }
 
+// ---------------------------------------------------------------------------
+// Orientation mode
+// orient_spec file format:
+//   n_anchors
+//   active_region_idx  orientation_char   (one line per anchor)
+//   n_arcs
+//   anchor_list_i  anchor_list_j  weight  (undirected; scorer adds both directions)
+//
+// Output:
+//   orientation <k> <x> <y> <z>   (unit vector for each anchor)
+//   global <score>                 (calcScoreOrientation full, with arc weights)
+//   local <k> <score>             (calcScoreOrientation local, no arc weights)
+
+void mode_orientation(int argc, char** argv) {
+    if (argc < 6) {
+        fprintf(stderr, "orientation: motif_weight motifs_symmetric positions orient_spec\n");
+        exit(1);
+    }
+    Settings::motifOrientationWeigth = (float)atof(argv[2]);
+    Settings::motifsSymmetric        = (atoi(argv[3]) != 0);
+    Settings::useCTCFMotifOrientation = true;
+
+    auto pos = read_positions(argv[4]);
+
+    FILE* f = fopen(argv[5], "r");
+    if (!f) { fprintf(stderr, "cannot open orient_spec: %s\n", argv[5]); exit(1); }
+
+    int n_anchors;
+    fscanf(f, "%d", &n_anchors);
+
+    vector<int>  anchor_ar(n_anchors);   // active_region index for anchor k
+    vector<char> anchor_ch(n_anchors);   // 'L', 'R', 'N'
+    char buf[8];
+    for (int i = 0; i < n_anchors; i++) {
+        fscanf(f, "%d %7s", &anchor_ar[i], buf);
+        anchor_ch[i] = buf[0];
+    }
+
+    int n_arcs;
+    fscanf(f, "%d", &n_arcs);
+    vector<int>   arc_i(n_arcs), arc_j(n_arcs);
+    vector<float> arc_w(n_arcs);
+    for (int k = 0; k < n_arcs; k++) {
+        fscanf(f, "%d %d %f", &arc_i[k], &arc_j[k], &arc_w[k]);
+    }
+    fclose(f);
+
+    LooperSolver* ls = make_solver();
+    setup_clusters(ls, pos);
+
+    // Mark anchor beads as fixed and set CTCF orientation
+    for (int i = 0; i < n_anchors; i++) {
+        ls->clusters[anchor_ar[i]].is_fixed    = true;
+        ls->clusters[anchor_ar[i]].orientation = anchor_ch[i];
+    }
+
+    // Build active_anchors_neighbors (bidirectional) from arc list
+    ls->active_anchors_neighbors.clear();
+    ls->active_anchors_neighbors_weight.clear();
+    for (int k = 0; k < n_anchors; k++) {
+        ls->active_anchors_neighbors[k]        = {};
+        ls->active_anchors_neighbors_weight[k] = {};
+    }
+    for (int k = 0; k < n_arcs; k++) {
+        int ai = arc_i[k], aj = arc_j[k];
+        float w = arc_w[k];
+        ls->active_anchors_neighbors[ai].push_back(aj);
+        ls->active_anchors_neighbors[aj].push_back(ai);
+        ls->active_anchors_neighbors_weight[ai].push_back(w);
+        ls->active_anchors_neighbors_weight[aj].push_back(w);
+    }
+
+    // Compute anchor orientation vectors (calcOrientation takes active_region index)
+    vector<vector3> anchor_orn;
+    for (int i = 0; i < n_anchors; i++) {
+        anchor_orn.push_back(ls->calcOrientation(anchor_ar[i]));
+        printf("orientation %d %.15f %.15f %.15f\n", i,
+               (double)anchor_orn.back().x,
+               (double)anchor_orn.back().y,
+               (double)anchor_orn.back().z);
+    }
+
+    // Global score
+    double global_score = ls->calcScoreOrientation(anchor_orn);
+    printf("global %.15f\n", global_score);
+
+    // Local score for each anchor
+    for (int i = 0; i < n_anchors; i++) {
+        double local_score = ls->calcScoreOrientation(anchor_orn, i);
+        printf("local %d %.15f\n", i, local_score);
+    }
+
+    delete ls;
+}
+
 void mode_metropolis(int argc, char** argv) {
     if (argc < 7) {
         fprintf(stderr, "metropolis: jump_scale jump_coef score_curr score_prev T\n");
@@ -283,7 +379,7 @@ void mode_metropolis(int argc, char** argv) {
 int main(int argc, char** argv) {
     if (argc < 2) {
         fprintf(stderr, "Usage: scorer <mode> [args...]\n");
-        fprintf(stderr, "Modes: distfns | heatmap | arcs | smooth | metropolis\n");
+        fprintf(stderr, "Modes: distfns | heatmap | arcs | smooth | metropolis | orientation\n");
         return 1;
     }
 
@@ -294,7 +390,8 @@ int main(int argc, char** argv) {
     else if (strcmp(mode, "heatmap")    == 0) mode_heatmap(argc, argv);
     else if (strcmp(mode, "arcs")       == 0) mode_arcs(argc, argv);
     else if (strcmp(mode, "smooth")     == 0) mode_smooth(argc, argv);
-    else if (strcmp(mode, "metropolis") == 0) mode_metropolis(argc, argv);
+    else if (strcmp(mode, "metropolis")  == 0) mode_metropolis(argc, argv);
+    else if (strcmp(mode, "orientation") == 0) mode_orientation(argc, argv);
     else {
         fprintf(stderr, "Unknown mode: %s\n", mode);
         return 1;

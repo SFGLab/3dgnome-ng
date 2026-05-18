@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-harness/integration.py  -  integration test for 3dgnome-torch.
+harness/integration.py  -  integration test for 3dgnome-ng.
 
 Runs the C++ 3dnome binary on a small chr1 region (~2 Mb, ~34 anchor beads)
 to produce an ensemble of structures, then runs the Python reimplementation
@@ -28,6 +28,7 @@ Usage:
     python harness/integration.py --output-dir ./out  # write CIF files to ./out/
     python harness/integration.py --cache-dir ./my_cache  # override cache location
     python harness/integration.py --region-override chr1:...  # override test region
+    python harness/integration.py --with-orientation  # enable CTCF motif orientation
 """
 
 import argparse
@@ -332,7 +333,7 @@ stop_condition_successes_threshold = {successes_smooth}
 stop_condition_steps = {steps_smooth}
 """
 
-def write_config(path: Path, fast: bool) -> None:
+def write_config(path: Path, fast: bool, use_orientation: bool = False) -> None:
     if fast:
         # Very fast: ~10 s per structure, low quality
         cfg = BASE_CONFIG.format(
@@ -348,6 +349,11 @@ def write_config(path: Path, fast: bool) -> None:
             delta_heatmap=0.999,  successes_heatmap=5,  steps_heatmap=5000,
             delta_arcs=0.999,     successes_arcs=20,    steps_arcs=5000,
             delta_smooth=0.999,   successes_smooth=20,  steps_smooth=5000,
+        )
+    if use_orientation:
+        cfg = cfg.replace(
+            "use_motif_orientation = no",
+            "use_motif_orientation = yes",
         )
     path.write_text(cfg)
 
@@ -646,19 +652,23 @@ def save_cif_ensemble(structs: list, label: str, outdir: Path, region_label: str
     print(f"[integration] {len(structs)} {label} CIF files written to {outdir}/")
 
 
-def _cache_path(cache_dir: Path, region_label: str, n: int, fast: bool) -> Path:
+def _cache_path(cache_dir: Path, region_label: str, n: int, fast: bool,
+                use_orientation: bool = False) -> Path:
     mode = "fast" if fast else "balanced"
-    return cache_dir / f"{region_label}_n{n}_{mode}.json"
+    orn  = "_orientation" if use_orientation else ""
+    return cache_dir / f"{region_label}_n{n}_{mode}{orn}.json"
 
 
 def _save_cache(path: Path, region: str, n: int, fast: bool,
-                structs: list, raw_lines: list) -> None:
+                structs: list, raw_lines: list,
+                use_orientation: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump({
             "region": region,
             "n_structures": n,
             "mode": "fast" if fast else "balanced",
+            "use_orientation": use_orientation,
             "structures": [[list(b) for b in s] for s in structs],
             "raw_lines": raw_lines,
         }, f)
@@ -690,6 +700,9 @@ def main():
                         help="write output CIF files to this directory (created if needed)")
     parser.add_argument("--region-override", metavar="REGION",
                         help="override test region (must be in data dir and match config)")
+    parser.add_argument("--with-orientation", action="store_true",
+                        help="enable CTCF motif orientation energy (use_motif_orientation=yes); "
+                             "uses a separate cache slot from the no-orientation run")
     args = parser.parse_args()
 
     if args.python_only and args.cpp_only:
@@ -709,16 +722,21 @@ def main():
         region = REGION
         region_label = REGION_LABEL
 
+    use_orn = getattr(args, "with_orientation", False)
+
     cache_dir = Path(args.cache_dir) if args.cache_dir else ROOT / "out" / "cpp_cache"
-    cache_file = _cache_path(cache_dir, region_label, args.n_structures, args.fast)
+    cache_file = _cache_path(cache_dir, region_label, args.n_structures, args.fast,
+                             use_orientation=use_orn)
 
     print(f"[integration] region: {region}")
     print(f"[integration] ensemble size: {args.n_structures}")
     print(f"[integration] mode: {'fast' if args.fast else 'balanced'}")
+    if use_orn:
+        print(f"[integration] CTCF motif orientation: ENABLED")
 
     tmpdir = Path(tempfile.mkdtemp(prefix="gnome3d_integ_"))
     config = tmpdir / "config.ini"
-    write_config(config, fast=args.fast)
+    write_config(config, fast=args.fast, use_orientation=use_orn)
 
     # max_level=2 -> heatmap MC + arc MC + smooth MC (Level 4 runs inside arc reconstruction).
     # Both C++ and Python produce subanchor beads: n_anchors + (n_anchors-1)*loop_density.
@@ -739,7 +757,8 @@ def main():
             cpp_outdir.mkdir()
             cpp_structs, cpp_raw = run_cpp_ensemble(
                 cpp_outdir, config, args.n_structures, MAX_LEVEL, region, region_label)
-            _save_cache(cache_file, region, args.n_structures, args.fast, cpp_structs, cpp_raw)
+            _save_cache(cache_file, region, args.n_structures, args.fast,
+                        cpp_structs, cpp_raw, use_orientation=use_orn)
 
         if args.output_dir:
             save_cif_ensemble(cpp_structs, "cpp", Path(args.output_dir), region_label)

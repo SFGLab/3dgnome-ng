@@ -216,6 +216,7 @@ class Settings:
         # [motif_orientation]
         self.use_ctcf_motif = getb("motif_orientation", "use_motif_orientation", self.use_ctcf_motif)
         self.motif_weight = getf("motif_orientation", "weight", self.motif_weight)
+        self.motifs_symmetric = getb("motif_orientation", "symmetric_motifs", self.motifs_symmetric)
 
         # [anchor_heatmap]
         self.use_anchor_heatmap = getb("anchor_heatmap", "use_anchor_heatmap", self.use_anchor_heatmap)

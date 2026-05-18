@@ -226,6 +226,82 @@ def metropolis_prob(
 import numpy as np
 
 
+# ---------------------------------------------------------------------------
+# CTCF orientation energy functions
+
+def calc_orientation(pos: np.ndarray, cind: int, n: int, char_orientation: str) -> np.ndarray:
+    """
+    Normalized orientation vector for bead at active-region index cind.
+
+    Matches C++ LooperSolver::calcOrientation(cind):
+      - endpoints: one-sided difference
+      - interior: central difference (pos[cind+1] - pos[cind-1])
+      - 'L' motif: negate
+      - normalize to unit length
+    """
+    if cind == 0:
+        orn = pos[cind + 1] - pos[cind]
+    elif cind == n - 1:
+        orn = pos[cind] - pos[cind - 1]
+    else:
+        orn = pos[cind + 1] - pos[cind - 1]
+    if char_orientation == 'L':
+        orn = -orn
+    norm = float(np.linalg.norm(orn))
+    if norm > 1e-12:
+        orn = orn / norm
+    return orn.copy()
+
+
+def score_orientation(
+    anchor_orientations: list,
+    neighbors: dict,
+    neighbor_weights: dict,
+    motif_weight: float,
+    motifs_symmetric: bool = True,
+) -> float:
+    """
+    Full CTCF orientation score (uses arc weights, double-counts each arc pair).
+    Matches C++ calcScoreOrientation(const vector<vector3>& orientation).
+
+    anchor_orientations: list of (3,) arrays indexed by anchor list position
+    neighbors:  {anchor_i: [anchor_j, ...]}
+    neighbor_weights: {anchor_i: [float, ...]}  (sqrt(arc.score) per arc)
+    """
+    err = 0.0
+    for i, nbrs in neighbors.items():
+        ws = neighbor_weights[i]
+        for k, j in enumerate(nbrs):
+            if motifs_symmetric:
+                ang = angle_metric(anchor_orientations[i], anchor_orientations[j])
+            else:
+                ang = angle_metric(anchor_orientations[i], -anchor_orientations[j])
+            err += ang * ang * ws[k]
+    return err * motif_weight
+
+
+def local_score_orientation(
+    anchor_orientations: list,
+    anchor_index: int,
+    neighbors: dict,
+    motif_weight: float,
+    motifs_symmetric: bool = True,
+) -> float:
+    """
+    Local CTCF orientation score for one anchor (no arc weights).
+    Used for incremental MC update: global += 2 * (local_curr - local_prev).
+    Matches C++ calcScoreOrientation(const vector<vector3>& orientation, int anchor_index).
+    """
+    err = 0.0
+    for j in neighbors[anchor_index]:
+        if motifs_symmetric:
+            ang = angle_metric(anchor_orientations[anchor_index], anchor_orientations[j])
+        else:
+            ang = angle_metric(anchor_orientations[anchor_index], -anchor_orientations[j])
+        err += ang * ang
+    return err * motif_weight
+
+
 def _np_dist(a: np.ndarray, b: np.ndarray) -> float:
     d = a - b
     return float(np.sqrt(d.dot(d)))

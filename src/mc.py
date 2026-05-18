@@ -406,19 +406,140 @@ def mc_arcs(
     return score
 
 
+def _mc_smooth_orientation(
+    pos64: np.ndarray,  # (N,3) float64 - modified in place
+    dtn64: np.ndarray,  # (N-1,) float64
+    fixed: np.ndarray,  # (N,) bool
+    char_orientations: np.ndarray,  # (N,) str - 'L'/'R'/'N' per bead
+    anchor_neighbors: dict,  # {anchor_k: [anchor_j, ...]}
+    anchor_neighbor_weights: dict,  # {anchor_k: [float, ...]}
+    step_size: float,
+    T: float, dt: float,
+    jump_scale: float, jump_coef: float,
+    n_steps: int,
+    stretch_k: float, squeeze_k: float, ang_k: float,
+    dist_w: float, ang_w: float,
+    motif_weight: float, motifs_symmetric: bool,
+    score: float,
+) -> tuple:
+    """
+    Pure-Python smooth MC step-batch with CTCF orientation energy.
+    Mirrors C++ MonteCarloArcsSmooth when useCTCFMotifOrientation=True.
+
+    Uses full structure-score recompute each step (matching C++ behaviour).
+    Returns (T_out, score_out, n_ok).
+    """
+    from .energy import calc_orientation, local_score_orientation
+
+    n = pos64.shape[0]
+
+    # Build cluster_type: mirrors C++ MonteCarloArcsSmooth setup loop
+    # 0 = regular subanchor, 1 = left-of-anchor, 2 = right-of-anchor, 3+k = anchor k
+    cluster_type = np.zeros(n, dtype=np.int32)
+    anchor_region_idx = []  # active-region index of anchor k
+    anchor_to_k = {}  # active-region index -> anchor list index k
+    ak = 0
+    for i in range(n):
+        if fixed[i]:
+            cluster_type[i] = 3 + ak
+            if i > 0:
+                cluster_type[i - 1] = 1
+            if i + 1 < n:
+                cluster_type[i + 1] = 2
+            anchor_to_k[i] = ak
+            anchor_region_idx.append(i)
+            ak += 1
+    n_anchors = ak
+
+    # Initial anchor orientation vectors
+    anchor_orn = [
+        calc_orientation(pos64, anchor_region_idx[k], n,
+                         char_orientations[anchor_region_idx[k]])
+        for k in range(n_anchors)
+    ]
+
+    movable = np.where(~fixed)[0]
+    n_mov = len(movable)
+    n_ok = 0
+
+    for _ in range(n_steps):
+        p = int(movable[np.random.randint(0, n_mov)])
+        dx = np.random.uniform(-step_size, step_size)
+        dy = np.random.uniform(-step_size, step_size)
+        dz = np.random.uniform(-step_size, step_size)
+
+        # Determine affected anchor (type 1 = left-of-anchor, 2 = right-of-anchor)
+        orn_k = -1
+        prev_orn_vec = None
+        loc_orn_prev = 0.0
+        ct = int(cluster_type[p])
+        if 0 < ct < 3:
+            anch_pos = p + 1 if ct == 1 else p - 1
+            orn_k = anchor_to_k[anch_pos]
+            prev_orn_vec = anchor_orn[orn_k].copy()
+            loc_orn_prev = local_score_orientation(
+                anchor_orn, orn_k, anchor_neighbors, motif_weight, motifs_symmetric)
+
+        # Apply move
+        pos64[p, 0] += dx
+        pos64[p, 1] += dy
+        pos64[p, 2] += dz
+
+        # Update orientation for affected anchor
+        loc_orn_curr = 0.0
+        if orn_k >= 0:
+            anchor_orn[orn_k] = calc_orientation(
+                pos64, anchor_region_idx[orn_k], n,
+                char_orientations[anchor_region_idx[orn_k]])
+            loc_orn_curr = local_score_orientation(
+                anchor_orn, orn_k, anchor_neighbors, motif_weight, motifs_symmetric)
+
+        # Full score recompute each step - matches C++ MonteCarloArcsSmooth behaviour
+        score_struct_new = float(_init_smooth_nb(
+            pos64, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
+        from .energy import score_orientation as _score_orn_full
+        score_orn_new = _score_orn_full(
+            anchor_orn, anchor_neighbors, anchor_neighbor_weights,
+            motif_weight, motifs_symmetric)
+        score_new = score_struct_new + score_orn_new
+
+        ok = score_new <= score
+        if not ok and T > 0.0 and score > 0.0:
+            ok = (np.random.random() <
+                  jump_scale * math.exp(-jump_coef * (score_new / score) / T))
+        if ok:
+            n_ok += 1
+            score = score_new
+        else:
+            pos64[p, 0] -= dx
+            pos64[p, 1] -= dy
+            pos64[p, 2] -= dz
+            if orn_k >= 0:
+                anchor_orn[orn_k] = prev_orn_vec
+        T *= dt
+
+    return T, score, n_ok
+
+
 def mc_smooth(
     pos: np.ndarray,  # (N, 3) float32 - modified in place; anchors are fixed
     dtn: np.ndarray,  # (N-1,) expected distances between consecutive beads
     fixed: np.ndarray,  # (N,) bool - True for anchor beads (never moved)
     step_size: float,
     settings,
+    char_orientations: np.ndarray = None,  # (N,) CTCF orientation chars; None = no motif
+    anchor_neighbors: dict = None,  # {anchor_k: [anchor_j, ...]}
+    anchor_neighbor_weights: dict = None,  # {anchor_k: [float, ...]}
     label: str = "",
     verbose: bool = False,
 ) -> float:
     """
     MonteCarloArcsSmooth: chain connectivity + angle MC.
 
-    Mirrors C++ LooperSolver::MonteCarloArcsSmooth() (no CTCF, no subanchor heatmap).
+    When char_orientations is provided and settings.use_ctcf_motif is True,
+    also optimises CTCF orientation energy via a pure-Python fallback loop
+    (Mirrors C++ MonteCarloArcsSmooth with useCTCFMotifOrientation=True).
+
     Anchor beads (fixed=True) are never moved.  Returns final score.
     """
     n = pos.shape[0]
@@ -438,6 +559,14 @@ def mc_smooth(
     dist_w = float(settings.smooth_dist_weight)
     ang_w = float(settings.smooth_angle_weight)
 
+    use_orn = (
+        char_orientations is not None
+        and anchor_neighbors is not None
+        and getattr(settings, "use_ctcf_motif", False)
+    )
+    motif_weight = float(getattr(settings, "motif_weight", 1.0))
+    motifs_symmetric = bool(getattr(settings, "motifs_symmetric", True))
+
     movable = np.where(~fixed)[0]
     if len(movable) == 0:
         return 0.0
@@ -446,17 +575,36 @@ def mc_smooth(
 
     pw = _as_f64(pos)
     dtn64 = _as_f64(dtn)
-    mov64 = np.ascontiguousarray(movable, dtype=np.int64)
-    score = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k,
-                                  ang_k, dist_w, ang_w))
+
+    if use_orn:
+        from .energy import calc_orientation as _calc_orn, score_orientation as _score_orn_full
+        anchor_positions = [int(i) for i in np.where(fixed)[0]]
+        _anchor_orn = [_calc_orn(pw, ar, n, char_orientations[ar]) for ar in anchor_positions]
+        score_struct = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k,
+                                             ang_k, dist_w, ang_w))
+        score = score_struct + _score_orn_full(
+            _anchor_orn, anchor_neighbors, anchor_neighbor_weights,
+            motif_weight, motifs_symmetric)
+    else:
+        mov64 = np.ascontiguousarray(movable, dtype=np.int64)
+        score = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k,
+                                      ang_k, dist_w, ang_w))
 
     ms_score = score
     step_i = 0
     while True:
-        T, score, n_ok = _batch_smooth_nb(
-            pw, dtn64, mov64, float(step_size), T, dt,
-            jump_scale, jump_coef, stop_steps,
-            stretch_k, squeeze_k, ang_k, dist_w, ang_w, score)
+        if use_orn:
+            T, score, n_ok = _mc_smooth_orientation(
+                pw, dtn64, fixed,
+                char_orientations, anchor_neighbors, anchor_neighbor_weights,
+                float(step_size), T, dt, jump_scale, jump_coef, stop_steps,
+                stretch_k, squeeze_k, ang_k, dist_w, ang_w,
+                motif_weight, motifs_symmetric, score)
+        else:
+            T, score, n_ok = _batch_smooth_nb(
+                pw, dtn64, mov64, float(step_size), T, dt,
+                jump_scale, jump_coef, stop_steps,
+                stretch_k, squeeze_k, ang_k, dist_w, ang_w, score)
         step_i += stop_steps
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (

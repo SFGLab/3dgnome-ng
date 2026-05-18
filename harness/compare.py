@@ -76,6 +76,18 @@ def run_scorer(*args: str, stdin_text: str = "") -> str:
     return lines[-1] if lines else ""
 
 
+def run_scorer_filtered(*args: str, prefixes: tuple = (), stdin_text: str = "") -> str:
+    """Like run_scorer but returns all lines whose first token is in `prefixes`."""
+    cmd = [str(SCORER_BIN)] + list(args)
+    result = subprocess.run(cmd, input=stdin_text, capture_output=True, text=True)
+    if result.returncode != 0:
+        sys.exit(f"[scorer] error: {result.stderr.strip()}")
+    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    if prefixes:
+        lines = [l for l in lines if l.split()[0] in prefixes]
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------------------
 # Fixture helpers
 
@@ -527,6 +539,175 @@ def test_densify(reference_only=False):
     check("densify.interp", 1.0, 1.0 if ok_interp else 0.0, atol=0)
 
 
+def orient_spec_txt(anchors, arcs):
+    """
+    anchors: list of (active_region_idx, orientation_char)
+    arcs:    list of (anchor_list_i, anchor_list_j, weight)
+    """
+    lines = [str(len(anchors))]
+    for ar_idx, ch in anchors:
+        lines.append(f"{ar_idx} {ch}")
+    lines.append(str(len(arcs)))
+    for ai, aj, w in arcs:
+        lines.append(f"{ai} {aj} {w:.15f}")
+    return "\n".join(lines)
+
+
+def ref_calc_orientation(positions, cind, n, char_orientation):
+    """Matches C++ calcOrientation(cind)."""
+    if cind == 0:
+        orn = [positions[cind+1][k] - positions[cind][k] for k in range(3)]
+    elif cind == n - 1:
+        orn = [positions[cind][k] - positions[cind-1][k] for k in range(3)]
+    else:
+        orn = [positions[cind+1][k] - positions[cind-1][k] for k in range(3)]
+    if char_orientation == 'L':
+        orn = [-x for x in orn]
+    norm = ref_vlen(orn)
+    if norm > 1e-12:
+        orn = [x / norm for x in orn]
+    return orn
+
+
+def ref_score_orientation_full(anchor_orn, neighbors, neighbor_weights, motif_weight,
+                                motifs_symmetric=True):
+    err = 0.0
+    sign = 1.0 if motifs_symmetric else -1.0
+    for i, nbrs in neighbors.items():
+        ws = neighbor_weights[i]
+        for k, j in enumerate(nbrs):
+            v2 = [sign * x for x in anchor_orn[j]]
+            ang = ref_angle_metric(anchor_orn[i], v2)
+            err += ang * ang * ws[k]
+    return err * motif_weight
+
+
+def ref_score_orientation_local(anchor_orn, anchor_index, neighbors, motif_weight,
+                                 motifs_symmetric=True):
+    err = 0.0
+    sign = 1.0 if motifs_symmetric else -1.0
+    for j in neighbors[anchor_index]:
+        v2 = [sign * x for x in anchor_orn[j]]
+        ang = ref_angle_metric(anchor_orn[anchor_index], v2)
+        err += ang * ang
+    return err * motif_weight
+
+
+def test_orientation(reference_only=False):
+    print("\n[orientation] CTCF orientation energy score")
+
+    # 11-bead chain; anchors at active-region positions 0, 5, 10
+    # (anchor list positions 0, 1, 2)
+    pos = [
+        (0.0, 0.0, 0.0),  # anchor 0  'R'
+        (1.0, 0.0, 0.0),
+        (2.0, 0.0, 0.0),
+        (3.0, 0.0, 0.0),
+        (4.0, 0.0, 0.0),
+        (5.0, 0.0, 0.0),  # anchor 1  'L'
+        (5.0, 1.0, 0.0),
+        (5.0, 2.0, 0.0),
+        (5.0, 3.0, 0.0),
+        (5.0, 4.0, 0.0),
+        (5.0, 5.0, 0.0),  # anchor 2  'R'
+    ]
+    n = len(pos)
+    anchors_spec = [(0, 'R'), (5, 'L'), (10, 'R')]
+    # arcs between anchor-list pairs with weights sqrt(arc_score)
+    arcs_spec = [(0, 1, 1.5), (1, 2, 2.0)]
+    motif_weight = 2.5
+    motifs_sym = 1  # True
+
+    pos_f   = write_tmp(positions_txt(pos))
+    spec_f  = write_tmp(orient_spec_txt(anchors_spec, arcs_spec))
+    try:
+        raw = run_scorer_filtered(
+            "orientation", str(motif_weight), str(motifs_sym), pos_f, spec_f,
+            prefixes=("orientation", "global", "local"))
+    finally:
+        os.unlink(pos_f); os.unlink(spec_f)
+
+    # Parse scorer output
+    cpp_orn = {}
+    cpp_global = None
+    cpp_local = {}
+    for line in raw.splitlines():
+        parts = line.split()
+        if parts[0] == "orientation":
+            k = int(parts[1])
+            cpp_orn[k] = (float(parts[2]), float(parts[3]), float(parts[4]))
+        elif parts[0] == "global":
+            cpp_global = float(parts[1])
+        elif parts[0] == "local":
+            k = int(parts[1])
+            cpp_local[k] = float(parts[2])
+
+    # Build reference values (Python)
+    n_anchors = len(anchors_spec)
+    ref_orn = [
+        ref_calc_orientation(pos, anchors_spec[k][0], n, anchors_spec[k][1])
+        for k in range(n_anchors)
+    ]
+    neighbors_py = {0: [1], 1: [0, 2], 2: [1]}
+    weights_py   = {0: [1.5], 1: [1.5, 2.0], 2: [2.0]}
+
+    # Verify scorer vs reference (sanity check)
+    for k in range(n_anchors):
+        for dim in range(3):
+            assert abs(cpp_orn[k][dim] - ref_orn[k][dim]) < 1e-5, \
+                f"orientation vector mismatch anchor {k} dim {dim}"
+
+    ref_global = ref_score_orientation_full(ref_orn, neighbors_py, weights_py,
+                                            motif_weight, motifs_sym == 1)
+    assert abs(cpp_global - ref_global) < 1e-4, \
+        f"scorer/ref global mismatch: {cpp_global} vs {ref_global}"
+    for k in range(n_anchors):
+        ref_loc = ref_score_orientation_local(ref_orn, k, neighbors_py, motif_weight, motifs_sym == 1)
+        assert abs(cpp_local[k] - ref_loc) < 1e-4, \
+            f"scorer/ref local[{k}] mismatch: {cpp_local[k]} vs {ref_loc}"
+
+    if reference_only:
+        print(f"  global = {cpp_global:.10f}")
+        for k in range(n_anchors):
+            print(f"  local[{k}] = {cpp_local[k]:.10f}")
+            print(f"  orientation[{k}] = {cpp_orn[k]}")
+        return
+
+    # Python implementation checks
+    import numpy as _np
+    py_calc_orn  = _try_import("calc_orientation")
+    py_score_orn = _try_import("score_orientation")
+    py_local_orn = _try_import("local_score_orientation")
+
+    pos_np = _np.array(pos, dtype=_np.float64)
+    py_orn = None
+    if py_calc_orn:
+        py_orn = [
+            py_calc_orn(pos_np, anchors_spec[k][0], n, anchors_spec[k][1])
+            for k in range(n_anchors)
+        ]
+        for k in range(n_anchors):
+            for dim in range(3):
+                check(f"calc_orientation[{k}][{dim}]",
+                      cpp_orn[k][dim], float(py_orn[k][dim]))
+
+    # Global score
+    py_global = None
+    if py_score_orn and py_orn is not None:
+        nbrs = {0: [1], 1: [0, 2], 2: [1]}
+        wts  = {0: [1.5], 1: [1.5, 2.0], 2: [2.0]}
+        py_global = py_score_orn(py_orn, nbrs, wts, motif_weight, bool(motifs_sym))
+    check_close_enough("score_orientation_global", cpp_global, py_global)
+
+    # Local scores
+    for k in range(n_anchors):
+        py_loc = None
+        if py_local_orn and py_orn is not None:
+            nbrs = {0: [1], 1: [0, 2], 2: [1]}
+            py_loc = py_local_orn(py_orn, k, nbrs, motif_weight, bool(motifs_sym))
+        check_close_enough(f"score_orientation_local[{k}]", cpp_local[k], py_loc)
+
+
 def test_metropolis(reference_only=False):
     print("\n[metropolis] Metropolis acceptance probability")
 
@@ -588,13 +769,14 @@ def print_summary():
 
 
 ALL_TESTS = {
-    "angle":      test_angle,
-    "distfns":    test_distfns,
-    "heatmap":    test_heatmap,
-    "arcs":       test_arcs,
-    "smooth":     test_smooth,
-    "densify":    test_densify,
-    "metropolis": test_metropolis,
+    "angle":       test_angle,
+    "distfns":     test_distfns,
+    "heatmap":     test_heatmap,
+    "arcs":        test_arcs,
+    "smooth":      test_smooth,
+    "densify":     test_densify,
+    "metropolis":  test_metropolis,
+    "orientation": test_orientation,
 }
 
 
