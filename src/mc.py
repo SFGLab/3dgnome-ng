@@ -176,14 +176,17 @@ def _score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices, nbr_weights
 
 @njit(cache=True)
 def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
-                                motif_weight, symmetric):
-    """Local orientation score for anchor k - NO arc weights.
-    Mirrors C++ calcScoreOrientation(orientation, anchor_index).
+                                nbr_weights, motif_weight, symmetric):
+    """Local orientation score for anchor k, WEIGHTED by per-arc weights.
     Used for the incremental update: score_orn += 2*(local_curr - local_prev).
+    The weights make this delta exact w.r.t. _score_orientation_full_nb — no drift.
+    Diverges from C++ calcScoreOrientation(orn, anchor_index), which is unweighted
+    and therefore drifts; see [[project-orientation-mc-fix]].
     """
     err = 0.0
     for ki in range(nbr_offsets[k], nbr_offsets[k + 1]):
         j = nbr_indices[ki]
+        w = nbr_weights[ki]
         ax = anchor_orn[k, 0]
         ay = anchor_orn[k, 1]
         az = anchor_orn[k, 2]
@@ -196,7 +199,7 @@ def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
             bz = -bz
         dot = ax * bx + ay * by + az * bz
         ang = 1.0 - (dot + 1.0) * 0.5
-        err += ang * ang
+        err += ang * ang * w
     return err * motif_weight
 
 
@@ -298,9 +301,10 @@ def _batch_smooth_orientation_nb(
     stretch_k, squeeze_k, ang_k, dist_w, ang_w,
     motif_weight, symmetric, score, score_orn,
 ):
-    """Smooth MC with CTCF orientation energy, matching C++ update strategy:
+    """Smooth MC with CTCF orientation energy.
       - structure score: full recompute every step
-      - orientation score: incremental via unweighted local delta (like C++)
+      - orientation score: incremental via weighted local delta (drift-free;
+        diverges from C++ which uses unweighted local — see project-orientation-mc-fix)
     anchor_orn (n_anchors, 3) is updated in-place across calls.
     Returns (T_out, score_out, score_orn_out, n_ok).
     """
@@ -323,7 +327,7 @@ def _batch_smooth_orientation_nb(
             prev_oy = anchor_orn[orn_k, 1]
             prev_oz = anchor_orn[orn_k, 2]
             local_prev_orn = _local_score_orientation_nb(
-                anchor_orn, orn_k, nbr_offsets, nbr_indices, motif_weight, symmetric)
+                anchor_orn, orn_k, nbr_offsets, nbr_indices, nbr_weights, motif_weight, symmetric)
 
         pos[p, 0] += dx
         pos[p, 1] += dy
@@ -337,8 +341,8 @@ def _batch_smooth_orientation_nb(
             anchor_orn[orn_k, 1] = oy
             anchor_orn[orn_k, 2] = oz
             local_curr_orn = _local_score_orientation_nb(
-                anchor_orn, orn_k, nbr_offsets, nbr_indices, motif_weight, symmetric)
-            # incremental update with unweighted local delta - mirrors C++
+                anchor_orn, orn_k, nbr_offsets, nbr_indices, nbr_weights, motif_weight, symmetric)
+            # weighted local delta: exact w.r.t. _score_orientation_full_nb (no drift)
             score_orn_new = score_orn + 2.0 * (local_curr_orn - local_prev_orn)
 
         score_struct_new = _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
@@ -396,7 +400,7 @@ def _batch_smooth_orientation_heat_nb(
             prev_oy = anchor_orn[orn_k, 1]
             prev_oz = anchor_orn[orn_k, 2]
             local_prev_orn = _local_score_orientation_nb(
-                anchor_orn, orn_k, nbr_offsets, nbr_indices, motif_weight, symmetric)
+                anchor_orn, orn_k, nbr_offsets, nbr_indices, nbr_weights, motif_weight, symmetric)
 
         local_prev_heat = _local_heat_nb(pos, heat_dist, p, heat_weight)
 
@@ -412,7 +416,8 @@ def _batch_smooth_orientation_heat_nb(
             anchor_orn[orn_k, 1] = oy
             anchor_orn[orn_k, 2] = oz
             local_curr_orn = _local_score_orientation_nb(
-                anchor_orn, orn_k, nbr_offsets, nbr_indices, motif_weight, symmetric)
+                anchor_orn, orn_k, nbr_offsets, nbr_indices, nbr_weights, motif_weight, symmetric)
+            # weighted local delta: exact w.r.t. _score_orientation_full_nb (no drift)
             score_orn_new = score_orn + 2.0 * (local_curr_orn - local_prev_orn)
 
         local_curr_heat = _local_heat_nb(pos, heat_dist, p, heat_weight)
@@ -853,15 +858,6 @@ def mc_smooth(
                 float(step_size), T, dt, jump_scale, jump_coef, stop_steps,
                 stretch_k, squeeze_k, ang_k, dist_w, ang_w,
                 motif_weight, motifs_symmetric, score, score_orn)
-            # # Recalibrate at batch boundaries: the incremental orientation update
-            # # omits per-arc weights (mirrors C++ local scorer), causing drift vs.
-            # # the weighted global init over many batches.  Recomputing exactly
-            # # every 'stop_steps' steps prevents this from accumulating.
-            # score_orn = float(_score_orientation_full_nb(
-            #     anchor_orn, nbr_offsets, nbr_indices,
-            #     nbr_weights_arr, motif_weight, motifs_symmetric))
-            # score = float(_init_smooth_nb(
-            #     pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w)) + score_orn
         elif use_heat:
             T, score, score_heat, n_ok = _batch_smooth_heat_nb(
                 pw, dtn64, mov64, float(step_size), T, dt,

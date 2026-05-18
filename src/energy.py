@@ -288,9 +288,13 @@ def local_score_orientation(
     motifs_symmetric: bool = True,
 ) -> float:
     """
-    Local CTCF orientation score for one anchor (no arc weights).
-    Used for incremental MC update: global += 2 * (local_curr - local_prev).
-    Matches C++ calcScoreOrientation(const vector<vector3>& orientation, int anchor_index).
+    Local CTCF orientation score for one anchor — UNWEIGHTED.
+    Mirrors C++ calcScoreOrientation(orn, anchor_index), used as the harness
+    reference (test_orientation in compare.py) for bit-equivalence with C++.
+
+    NOT used by the actual MC loop. The MC kernel uses _local_score_orientation_nb
+    in mc.py which is WEIGHTED (drift-free incremental update); see
+    [[project-orientation-mc-fix]].
     """
     err = 0.0
     for j in neighbors[anchor_index]:
