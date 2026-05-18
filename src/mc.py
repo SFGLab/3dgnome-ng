@@ -104,7 +104,7 @@ def _batch_smooth_nb(pos, dtn, movable, step_size, T, dt,
                                     stretch_k, squeeze_k, ang_k, dist_w, ang_w)
 
         score_new = score - loc_prev + loc_curr
-        ok = score_new <= score
+        ok = score_new < score
         if not ok and T > 0.0 and score > 0.0:
             ok = (np.random.random() <
                   jump_scale * math.exp(-jump_coef * (score_new / score) / T))
@@ -256,7 +256,7 @@ def _batch_smooth_orientation_nb(
         score_struct_new = _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
         score_new = score_struct_new + score_orn_new
 
-        ok = score_new <= score
+        ok = score_new < score
         if not ok and T > 0.0 and score > 0.0:
             ok = (np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T))
         if ok:
