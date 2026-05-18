@@ -1,5 +1,5 @@
 """
-src/hierarchy.py  -  Cluster data structures and hierarchy tree building.
+src/hierarchy.py - Cluster data structures and hierarchy tree building.
 
 Mirrors C++ LooperSolver::createTreeChromosome(), findGaps(), findSplit().
 

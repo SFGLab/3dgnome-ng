@@ -1,5 +1,5 @@
 """
-src/data.py  -  ContactData: the engine's input contract.
+src/data.py - ContactData: the engine's input contract.
 
 All data the solver needs lives here.  Two factory methods cover the two
 supported input paths:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-harness/compare.py  -  3dgnome-ng correctness harness.
+harness/compare.py - 3dgnome-ng correctness harness.
 
 Compares the C++ reference scorer against the Python (src/) reimplementation.
 Run from the repository root:

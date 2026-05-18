@@ -1,5 +1,5 @@
 """
-src/mc.py  -  Monte Carlo simulation loops for 3dgnome-ng.
+src/mc.py - Monte Carlo simulation loops for 3dgnome-ng.
 
 Mirrors C++ LooperSolver::MonteCarloHeatmap(), MonteCarloArcs(), and
 MonteCarloArcsSmooth().
@@ -16,13 +16,13 @@ Acceptance criterion (all loops):
 import math
 
 import numpy as np
-from numba import njit as _njit
+from numba import njit
 
 
 # ---------------------------------------------------------------------------
 # Smooth MC helpers
 
-@_njit(cache=True)
+@njit(cache=True)
 def _smooth_len_nb(pos, dtn, i, stretch_k, squeeze_k, dist_w):
     dx = pos[i, 0] - pos[i + 1, 0]
     dy = pos[i, 1] - pos[i + 1, 1]
@@ -36,7 +36,7 @@ def _smooth_len_nb(pos, dtn, i, stretch_k, squeeze_k, dist_w):
     return rel * rel * k * dist_w
 
 
-@_njit(cache=True)
+@njit(cache=True)
 def _smooth_ang_nb(pos, i, ang_k, ang_w):
     v1x = pos[i, 0] - pos[i + 1, 0]
     v1y = pos[i, 1] - pos[i + 1, 1]
@@ -55,7 +55,7 @@ def _smooth_ang_nb(pos, i, ang_k, ang_w):
     return ang * ang * ang * ang_k * ang_w
 
 
-@_njit(cache=True)
+@njit(cache=True)
 def _local_smooth_nb(pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w):
     sc = 0.0
     i = p - 1
@@ -70,7 +70,7 @@ def _local_smooth_nb(pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
     return sc
 
 
-@_njit(cache=True)
+@njit(cache=True)
 def _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w):
     n = pos.shape[0]
     sc = 0.0
@@ -81,7 +81,7 @@ def _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w):
     return sc
 
 
-@_njit(cache=True)
+@njit(cache=True)
 def _batch_smooth_nb(pos, dtn, movable, step_size, T, dt,
                      jump_scale, jump_coef, n_steps,
                      stretch_k, squeeze_k, ang_k, dist_w, ang_w, score):
@@ -120,9 +120,9 @@ def _batch_smooth_nb(pos, dtn, movable, step_size, T, dt,
 
 
 # ---------------------------------------------------------------------------
-# Orientation MC helpers (JIT-compiled)
+# Orientation MC helpers
 
-@_njit(cache=True)
+@njit(cache=True)
 def _calc_orientation_nb(pos, cind, n, is_L):
     """Returns (ox, oy, oz) normalized orientation vector for anchor at cind."""
     if cind == 0:
@@ -149,7 +149,7 @@ def _calc_orientation_nb(pos, cind, n, is_L):
     return ox, oy, oz
 
 
-@_njit(cache=True)
+@njit(cache=True)
 def _score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices, nbr_weights,
                                motif_weight, symmetric):
     """Global orientation score with arc weights; used for initialisation only."""
@@ -175,7 +175,7 @@ def _score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices, nbr_weights
     return err * motif_weight
 
 
-@_njit(cache=True)
+@njit(cache=True)
 def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
                                 motif_weight, symmetric):
     """Local orientation score for anchor k - NO arc weights.
@@ -201,7 +201,7 @@ def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
     return err * motif_weight
 
 
-@_njit(cache=True)
+@njit(cache=True)
 def _batch_smooth_orientation_nb(
     pos, dtn, movable, orn_is_L, anchor_ar,
     nbr_offsets, nbr_indices, nbr_weights,
@@ -278,7 +278,7 @@ def _batch_smooth_orientation_nb(
 # ---------------------------------------------------------------------------
 # Arcs MC helpers
 
-@_njit(cache=True)
+@njit(cache=True)
 def _local_arcs_nb(pos, exp, p, stretch_k, squeeze_k):
     n = pos.shape[0]
     sc = 0.0
@@ -298,7 +298,7 @@ def _local_arcs_nb(pos, exp, p, stretch_k, squeeze_k):
     return sc
 
 
-@_njit(cache=True)
+@njit(cache=True)
 def _init_arcs_nb(pos, exp, stretch_k, squeeze_k):
     n = pos.shape[0]
     sc = 0.0
@@ -319,7 +319,7 @@ def _init_arcs_nb(pos, exp, stretch_k, squeeze_k):
     return sc
 
 
-@_njit(cache=True)
+@njit(cache=True)
 def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
                    n_steps, stretch_k, squeeze_k, score):
     """Run n_steps arc-MC steps.  Returns (T_out, score_out, n_ok)."""
@@ -356,7 +356,7 @@ def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
 # ---------------------------------------------------------------------------
 # Heatmap MC helpers
 
-@_njit(cache=True)
+@njit(cache=True)
 def _local_heatmap_nb(pos, exp_safe, skip_col, p):
     n = pos.shape[0]
     sc = 0.0
@@ -373,7 +373,7 @@ def _local_heatmap_nb(pos, exp_safe, skip_col, p):
     return sc
 
 
-@_njit(cache=True)
+@njit(cache=True)
 def _init_heatmap_nb(pos, exp_safe, skip):
     n = pos.shape[0]
     sc = 0.0
@@ -391,7 +391,7 @@ def _init_heatmap_nb(pos, exp_safe, skip):
     return sc
 
 
-@_njit(cache=True)
+@njit(cache=True)
 def _batch_heatmap_nb(pos, exp_safe, skip, step_size, T, dt,
                       jump_scale, jump_coef, n_steps, score):
     """Run n_steps heatmap-MC steps.  Returns (T_out, score_out, n_ok)."""

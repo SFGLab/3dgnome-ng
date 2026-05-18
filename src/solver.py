@@ -1,5 +1,5 @@
 """
-src/solver.py  -  High-level LooperSolver analog for 3dgnome-ng.
+src/solver.py - High-level LooperSolver analog for 3dgnome-ng.
 
 Orchestrates data loading, hierarchy building, and MC reconstruction.
 Mirrors C++ LooperSolver methods:
@@ -113,11 +113,18 @@ class Solver:
         """
         Compute heatmap bin boundaries for segment-level clusters.
         Mirrors bin calculation in createSingletonHeatmap().
-        Returns (bins, start_ind, total_size).
+        Returns (bins, start_ind, total_size, bin_lengths_mb).
+
+        bin_lengths_mb is a flat list aligned to global bin indices giving
+        the genomic span of each bin in Mb.  The first and last bins of each
+        chromosome use the actual cluster start/end (not the 0/1e9 sentinels)
+        so their lengths are not artificially inflated — mirrors the C++ min/max
+        position update done after reading contacts.
         """
         bins = {}
         start_ind = {}
         curr_idx = 0
+        bin_lengths_mb = []
 
         for chr_ in self.chrs:
             segs = current_level.get(chr_, [])
@@ -128,9 +135,22 @@ class Solver:
             breaks.append(int(1e9))
             bins[chr_] = breaks
             start_ind[chr_] = curr_idx
+
+            n = len(segs)
+            for i in range(n):
+                if n == 1:
+                    bp = self.clusters[segs[0]].end - self.clusters[segs[0]].start
+                elif i == 0:
+                    bp = breaks[1] - self.clusters[segs[0]].start
+                elif i == n - 1:
+                    bp = self.clusters[segs[-1]].end - breaks[-2]
+                else:
+                    bp = breaks[i + 1] - breaks[i]
+                bin_lengths_mb.append(max(bp, 1) / 1e6)
+
             curr_idx += len(breaks) - 1
 
-        return bins, start_ind, curr_idx
+        return bins, start_ind, curr_idx, bin_lengths_mb
 
     def _reconstruct_heatmap_single_level(self, current_level: dict) -> None:
         """
@@ -138,12 +158,12 @@ class Solver:
         Mirrors C++ reconstructClustersHeatmapSingleLevel(1) (segment level).
         """
         s = self.s
-        bins, start_ind, total_size = self._compute_segment_bins(current_level)
+        bins, start_ind, total_size, bin_lengths_mb = self._compute_segment_bins(current_level)
 
         if self.s.output_level >= 1:
             print("[solver] create segment heatmap")
         h_raw = create_singleton_heatmap_from_contacts(
-            self._singletons, bins, start_ind, total_size
+            self._singletons, bins, start_ind, total_size, bin_lengths_mb=bin_lengths_mb
         )
 
         # Normalize heatmap rows to equal expected sum

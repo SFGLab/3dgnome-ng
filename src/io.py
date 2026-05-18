@@ -1,5 +1,5 @@
 """
-src/io.py  -  File loading for 3dgnome-ng.
+src/io.py - File loading for 3dgnome-ng.
 
 Mirrors C++ InteractionArcs loading methods:
   - loadAnchorsData()      -> load_anchors()
@@ -406,16 +406,19 @@ def create_singleton_heatmap(
     total_size: int,
     chr_set: set,
     region: Optional[BedRegion] = None,
+    bin_lengths_mb: Optional[list] = None,
 ) -> list:
     """
     Read singletons BEDPE, bin into a contact frequency heatmap.
     Mirrors C++ createSingletonHeatmap().
 
-    bins:       dict[chr -> list[int]] of bin boundary positions
-                (starts with 0, ends with large value)
-    start_ind:  dict[chr -> int] mapping chr to starting heatmap column index
-    total_size: total number of bins across all chromosomes
-    chr_set:    set of chromosomes to include
+    bins:           dict[chr -> list[int]] of bin boundary positions
+    start_ind:      dict[chr -> int] mapping chr to starting heatmap column index
+    total_size:     total number of bins across all chromosomes
+    chr_set:        set of chromosomes to include
+    bin_lengths_mb: flat list of bin genomic lengths in Mb (global bin index).
+                    When provided, h[i][j] is divided by len_i * len_j after
+                    binning, mirroring C++ createSingletonHeatmap() normalisation.
 
     Returns a 2D list h[i][j] = float contact frequency.
     """
@@ -476,6 +479,16 @@ def create_singleton_heatmap(
                 ok_cnt += 1
 
     print(f"  singleton heatmap: {ok_cnt} arcs binned, size {total_size}x{total_size}")
+
+    if bin_lengths_mb is not None:
+        for i in range(total_size):
+            for j in range(i + 1, total_size):
+                denom = bin_lengths_mb[i] * bin_lengths_mb[j]
+                if denom > 0.0:
+                    v = h[i][j] / denom
+                    h[i][j] = v
+                    h[j][i] = v
+
     return h
 
 
@@ -487,6 +500,7 @@ def create_singleton_heatmap_from_contacts(
     bins: dict,
     start_ind: dict,
     total_size: int,
+    bin_lengths_mb: Optional[list] = None,
 ) -> list:
     """
     Build a contact frequency heatmap from a list of (chr1,pos1,chr2,pos2,score)
@@ -494,6 +508,10 @@ def create_singleton_heatmap_from_contacts(
 
     Drop-in replacement for create_singleton_heatmap() when data is already
     in memory rather than in a file.
+
+    bin_lengths_mb: flat list of bin genomic lengths in Mb (global bin index).
+                    When provided, h[i][j] is divided by len_i * len_j after
+                    binning, mirroring C++ createSingletonHeatmap() normalisation.
     """
     import bisect
 
@@ -517,6 +535,16 @@ def create_singleton_heatmap_from_contacts(
         ok_cnt += 1
 
     print(f"  singleton heatmap: {ok_cnt} contacts binned, size {total_size}x{total_size}")
+
+    if bin_lengths_mb is not None:
+        for i in range(total_size):
+            for j in range(i + 1, total_size):
+                denom = bin_lengths_mb[i] * bin_lengths_mb[j]
+                if denom > 0.0:
+                    v = h[i][j] / denom
+                    h[i][j] = v
+                    h[j][i] = v
+
     return h
 
 

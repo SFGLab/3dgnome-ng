@@ -1,5 +1,5 @@
 """
-src/energy.py  -  scoring / energy functions for 3dgnome-ng.
+src/energy.py - scoring / energy functions for 3dgnome-ng.
 
 All functions must match the C++ reference exactly (within 1e-6 absolute
 tolerance).  The harness in harness/compare.py tests each one independently.

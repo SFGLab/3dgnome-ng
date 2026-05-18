@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-harness/integration.py  -  integration test for 3dgnome-ng.
+harness/integration.py - integration test for 3dgnome-ng.
 
 Runs the C++ 3dnome binary on a small chr1 region (~2 Mb, ~34 anchor beads)
 to produce an ensemble of structures, then runs the Python reimplementation

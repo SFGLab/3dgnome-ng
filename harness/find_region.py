@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-harness/find_region.py  -  find good test regions for 3dgnome integration tests.
+harness/find_region.py - find good test regions for 3dgnome integration tests.
 
 A "good" region satisfies three constraints:
   1. All consecutive non-empty anchor pairs are non-overlapping (gap >= 0),

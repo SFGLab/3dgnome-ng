@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-main.py  -  3D structure prediction from contact data using 3dgnome data format.
+main.py - 3D structure prediction from contact data using 3dgnome data format.
     python main.py --config data/GM12878/config.ini \
                    --region chr1:18288319-20307135  \
                    --n 1                            \
