@@ -532,7 +532,7 @@ class Solver:
         if n <= 2:
             return []
 
-        avg_dtn = float(dtn.mean()) / (len(dtn) + 1)
+        avg_dtn = float(dtn.mean())
         step_size = avg_dtn * s.noise_smooth
 
         # Build CTCF orientation data if enabled
