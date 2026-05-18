@@ -53,6 +53,12 @@ REGION_LABEL = f"integration_test_region_{REGION.replace(':', '_').replace('-', 
 KS_P_THRESHOLD = 0.05
 # Max KS statistic (distribution similarity) to PASS
 KS_D_THRESHOLD = 0.3
+# Cap pairwise distance pool before KS
+KS_PWD_MAX_SAMPLES = 50_000
+# Structural distance benchmark (from cudaMMC_benchmark_analysis.ipynb):
+# median inter-model structural distance ratio (Python/C++) must be within this
+# fraction of 1.0.  Mirrors the notebook's median ratio check.
+STRUCT_DIST_RATIO_THRESHOLD = 0.10
 
 PASS_STR = "\033[32mPASS\033[0m"
 FAIL_STR = "\033[31mFAIL\033[0m"
@@ -473,6 +479,15 @@ def ks_2samp(a, b):
     return d, p
 
 
+def _subsample(values: list, n: int, seed: int = 42) -> list:
+    """Return a random subsample of at most n elements (deterministic)."""
+    import random as _rnd
+    if len(values) <= n:
+        return values
+    rng = _rnd.Random(seed)
+    return rng.sample(values, n)
+
+
 # ---------------------------------------------------------------------------
 # Run C++ binary
 
@@ -573,6 +588,47 @@ def print_stats(label: str, structures: list) -> dict:
     print(f"    mean pairwise d: {pwd_m:8.3f} ± {pwd_s:.3f}  (all bead pairs)")
 
     return {"rg": rg_vals, "pwd": pwd_vals, "bond": bond_vals}
+
+
+def structural_distance_matrix(structures: list) -> list:
+    """
+    Compute off-diagonal inter-model structural distances for an ensemble.
+
+    For each pair (i, j) of structures the structural distance is:
+        1 - Pearson(triu_pairwise_dists_i, triu_pairwise_dists_j)
+
+    This mirrors the similarity matrix comparison in cudaMMC_benchmark_analysis.ipynb
+    (cells 42-51) and the structural_distances_lvl2.heat files produced by
+    `3dnome -a ensemble`.  Values near 0 = highly similar; near 2 = anti-correlated.
+
+    Returns all n*(n-1) off-diagonal values (i != j) as a flat list.
+    """
+    try:
+        import numpy as np
+    except ImportError:
+        return []
+
+    n = len(structures)
+    # Build (n, k) matrix where k = M*(M-1)/2 pairwise distances per structure
+    rows = []
+    for s in structures:
+        pts = np.array([(x, y, z) for _, x, y, z in s], dtype=np.float64)
+        diff = pts[:, None, :] - pts[None, :, :]   # (M, M, 3)
+        d    = np.sqrt((diff * diff).sum(axis=2))   # (M, M)
+        idx  = np.triu_indices(len(pts), k=1)
+        rows.append(d[idx])
+    mat = np.array(rows)                            # (n, k)
+
+    # Pearson correlation between every pair of rows
+    m   = mat.mean(axis=1, keepdims=True)
+    s   = mat.std(axis=1, keepdims=True)
+    s[s < 1e-12] = 1.0
+    z   = (mat - m) / s                            # z-scored rows
+    k   = mat.shape[1]
+    corr = (z @ z.T) / k                           # (n, n)
+
+    dist = 1.0 - corr                              # structural distance matrix
+    return [float(dist[i, j]) for i in range(n) for j in range(n) if i != j]
 
 
 # ---------------------------------------------------------------------------
@@ -730,11 +786,15 @@ def main():
         print(f"  {status}  Rg distribution  KS d={d_rg:.3f}  p={p_rg:.3f}")
         results.append(ok_rg)
 
-        # KS test on pooled pairwise distances
-        d_pw, p_pw = ks_2samp(cpp_stats["pwd"], py_stats["pwd"])
+        # KS test on pooled pairwise distances (subsampled — raw pool is ~18M
+        # non-independent values that inflate KS power far beyond physical meaning)
+        cpp_pwd = _subsample(cpp_stats["pwd"], KS_PWD_MAX_SAMPLES)
+        py_pwd  = _subsample(py_stats["pwd"],  KS_PWD_MAX_SAMPLES)
+        d_pw, p_pw = ks_2samp(cpp_pwd, py_pwd)
         ok_pw = p_pw >= KS_P_THRESHOLD and d_pw <= KS_D_THRESHOLD
         status = PASS_STR if ok_pw else FAIL_STR
-        print(f"  {status}  pairwise dist KS  d={d_pw:.3f}  p={p_pw:.3f}")
+        print(f"  {status}  pairwise dist KS  d={d_pw:.3f}  p={p_pw:.3f}"
+              f"  (subsampled {len(cpp_pwd):,}/{len(cpp_stats['pwd']):,})")
         results.append(ok_pw)
 
         # KS test on bond lengths
@@ -743,6 +803,25 @@ def main():
         status = PASS_STR if ok_bd else FAIL_STR
         print(f"  {status}  bond lengths KS   d={d_bd:.3f}  p={p_bd:.3f}")
         results.append(ok_bd)
+
+        # Structural distance benchmark (from cudaMMC_benchmark_analysis.ipynb)
+        # Mirrors the notebook's median ratio check (cells 50-51): compute the
+        # inter-model structural distance matrix for each ensemble and compare
+        # medians.  KS is intentionally not used — the n*(n-1) off-diagonal values
+        # are all correlated (each structure appears in n-1 pairs), so the test
+        # would be massively overpowered.
+        cpp_sd = structural_distance_matrix(cpp_structs)
+        py_sd  = structural_distance_matrix(py_structs)
+        if cpp_sd and py_sd:
+            cpp_med = sorted(cpp_sd)[len(cpp_sd) // 2]
+            py_med  = sorted(py_sd)[len(py_sd) // 2]
+            ratio   = py_med / cpp_med if cpp_med > 1e-9 else float("nan")
+            ok_sd = math.isfinite(ratio) and abs(ratio - 1.0) <= STRUCT_DIST_RATIO_THRESHOLD
+            status = PASS_STR if ok_sd else FAIL_STR
+            print(f"  {status}  struct diversity  median ratio={ratio:.3f}"
+                  f"  (C++ med={cpp_med:.4f}  Py med={py_med:.4f}"
+                  f"  threshold=±{STRUCT_DIST_RATIO_THRESHOLD:.0%})")
+            results.append(ok_sd)
 
         all_ok = all(results)
         overall = PASS_STR if all_ok else FAIL_STR
