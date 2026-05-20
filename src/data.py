@@ -48,8 +48,6 @@ SingletonContact = tuple  # (str, int, str, int, int)
 @dataclass
 class ContactData:
     """
-    Fully-loaded, file-independent input for the 3dgnome engine.
-
     anchors:     dict[chr -> list[Anchor]] - anchor beads (after empty-anchor removal)
     arcs:        dict[chr -> list[InteractionArc]] - mapped arcs (after mark_arcs)
     breakpoints: dict[chr -> list[int]] - segment boundary positions

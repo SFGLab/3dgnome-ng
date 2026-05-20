@@ -374,13 +374,12 @@ def test_heatmap(reference_only=False):
         return
 
     py_fn = _try_import("score_heatmap")
-    import importlib, sys as _sys
     py_val = None
     if py_fn:
-        import torch
-        pos_t = torch.tensor(pos, dtype=torch.float64)
-        expd_t = torch.tensor(exp_dist, dtype=torch.float64)
-        py_val = py_fn(pos_t, expd_t, diag).item()
+        import numpy as _np
+        pos_a = _np.asarray(pos, dtype=_np.float64)
+        expd_a = _np.asarray(exp_dist, dtype=_np.float64)
+        py_val = float(py_fn(pos_a, expd_a, diag))
 
     check_close_enough("heatmap_score(5 beads, diag=2)", cpp_val, py_val)
 
@@ -409,10 +408,9 @@ def test_arcs(reference_only=False):
     py_fn = _try_import("score_arcs")
     py_val = None
     if py_fn:
-        import torch
-        pos_t = torch.tensor(pos, dtype=torch.float64)
-        arcs_t = [(i, j, d) for i, j, d in arcs]
-        py_val = py_fn(pos_t, arcs_t, stretch_k, squeeze_k).item()
+        import numpy as _np
+        pos_a = _np.asarray(pos, dtype=_np.float64)
+        py_val = float(py_fn(pos_a, list(arcs), stretch_k, squeeze_k))
 
     check_close_enough("arc_score(5 beads, 4 arcs)", cpp_val, py_val)
 
@@ -453,10 +451,10 @@ def test_smooth(reference_only=False):
     py_fn = _try_import("score_smooth")
     py_val = None
     if py_fn:
-        import torch
-        pos_t = torch.tensor(pos, dtype=torch.float64)
-        dtn_t = torch.tensor(dist_to_next, dtype=torch.float64)
-        py_val = py_fn(pos_t, dtn_t, stretch_k, squeeze_k, angular_k, w_dist, w_angle).item()
+        import numpy as _np
+        pos_a = _np.asarray(pos, dtype=_np.float64)
+        dtn_a = _np.asarray(dist_to_next, dtype=_np.float64)
+        py_val = float(py_fn(pos_a, dtn_a, stretch_k, squeeze_k, angular_k, w_dist, w_angle))
 
     check_close_enough("smooth_score(5 beads)", cpp_val, py_val)
 

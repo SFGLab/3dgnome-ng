@@ -45,9 +45,6 @@ def run_region(
     from src.io import parse_region
     from src.data import ContactData
     from src.solver import Solver
-    from src.energy import get_device
-
-    print(f"[simulate] device: {get_device()}")
 
     bed_region = parse_region(region)
     if bed_region is None:

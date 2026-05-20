@@ -48,7 +48,6 @@ from src.settings import Settings
 from src.io import parse_region, write_cif
 from src.data import ContactData
 from src.solver import Solver
-from src.energy import get_device
 
 
 def _run_structure(
@@ -89,8 +88,6 @@ def main():
                         help="Override data_dir from config")
     parser.add_argument("--out", default=".", help="Output directory (default: .)")
     args = parser.parse_args()
-
-    print(f"[main] device: {get_device()}")
 
     # 1. Parse region
     bed_region = parse_region(args.region)

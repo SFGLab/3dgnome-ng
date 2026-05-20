@@ -15,16 +15,7 @@ Non-obvious details (see AGENTS.md):
 import math
 import random
 
-import torch
-
-
-def get_device() -> torch.device:
-    """Return the best available compute device: CUDA > MPS > CPU."""
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
+import numpy as np
 
 
 # ---------------------------------------------------------------------------
@@ -58,20 +49,12 @@ def freq_to_distance(freq: int, a: float, scale: float, shift: float, base_level
 # Angle metric
 # NOT acos - this is the linear dissimilarity used throughout 3dgnome.
 
-def angle_metric(v1, v2):
+def angle_metric(v1, v2) -> float:
     """
     1 - (dot(norm(v1), norm(v2)) + 1) / 2
     Returns value in [0, 1]: 0 = parallel, 1 = anti-parallel, 0.5 = orthogonal.
-    Works with Python sequences (returns float) or torch Tensors (returns Tensor).
+    Accepts Python sequences or numpy arrays.
     """
-    if isinstance(v1, torch.Tensor):
-        l1 = v1.norm()
-        l2 = v2.norm()
-        if l1 < 1e-10 or l2 < 1e-10:
-            return v1.new_zeros(())
-        dot = (v1 / l1).dot(v2 / l2)
-        return 1.0 - (dot + 1.0) / 2.0
-    # Python sequence path
     l1 = math.sqrt(sum(x * x for x in v1))
     l2 = math.sqrt(sum(x * x for x in v2))
     if l1 < 1e-10 or l2 < 1e-10:
@@ -83,12 +66,12 @@ def angle_metric(v1, v2):
 # ---------------------------------------------------------------------------
 # Heatmap score (double-counted)
 
-def score_heatmap(pos: torch.Tensor, exp_dist: torch.Tensor, diag_size: int) -> torch.Tensor:
+def score_heatmap(pos: np.ndarray, exp_dist: np.ndarray, diag_size: int) -> float:
     """
     Full heatmap energy score (double-counted, matching C++ calcScoreHeatmapActiveRegion(-1)).
 
-    pos:      (N, 3) float tensor - bead positions
-    exp_dist: (N, N) float tensor - expected pairwise distances
+    pos:      (N, 3) float array - bead positions
+    exp_dist: (N, N) float array - expected pairwise distances
     diag_size: int - skip pairs within this diagonal band
 
     The C++ implementation calls calcScoreHeatmapActiveRegion(moved) for every
@@ -96,38 +79,39 @@ def score_heatmap(pos: torch.Tensor, exp_dist: torch.Tensor, diag_size: int) -> 
     |i - moved| >= diag_size and exp_dist[i][moved] >= 1e-6.
     Together, every pair (i, j) with i != j is counted twice - once when
     moved=i and once when moved=j.
-
-    Returns a scalar Tensor.
     """
+    pos = np.asarray(pos, dtype=np.float64)
+    exp_dist = np.asarray(exp_dist, dtype=np.float64)
     n = pos.shape[0]
-    # d[i, j] = ||pos[i] - pos[j]||
-    diff = pos.unsqueeze(1) - pos.unsqueeze(0)  # (n, n, 3)
-    d = diff.norm(dim=2)  # (n, n)
 
-    idx = torch.arange(n, device=pos.device, dtype=torch.long)
-    diag_mask = (idx.unsqueeze(0) - idx.unsqueeze(1)).abs() < diag_size
+    diff = pos[:, None, :] - pos[None, :, :]
+    d = np.sqrt((diff * diff).sum(axis=2))
+
+    idx = np.arange(n)
+    diag_mask = np.abs(idx[:, None] - idx[None, :]) < diag_size
     zero_mask = exp_dist < 1e-6
     mask = diag_mask | zero_mask
 
-    safe_exp = exp_dist.clone()
-    safe_exp[mask] = 1.0
+    safe_exp = np.where(mask, 1.0, exp_dist)
     cerr = (d - safe_exp) / safe_exp
-    return (cerr * cerr).masked_fill(mask, 0.0).sum()
+    contrib = cerr * cerr
+    contrib[mask] = 0.0
+    return float(contrib.sum())
 
 
 # ---------------------------------------------------------------------------
 # Arc spring score
 
 def score_arcs(
-    pos: torch.Tensor,
+    pos: np.ndarray,
     arcs: list,
     stretch_k: float,
     squeeze_k: float,
-) -> torch.Tensor:
+) -> float:
     """
     Arc spring energy (global, each arc counted once).
 
-    pos:       (N, 3) float tensor
+    pos:       (N, 3) float array
     arcs:      list of (i, j, exp_d) tuples
                exp_d < 0   -> repulsion term  1 / d
                exp_d < 1e-6 -> skip
@@ -137,17 +121,17 @@ def score_arcs(
 
     Matches C++ calcScoreDistancesActiveRegion() (global, i < j pairs).
     """
-    sc = pos.new_zeros(())
+    pos = np.asarray(pos, dtype=np.float64)
+    sc = 0.0
     for i, j, exp_d in arcs:
-        d = (pos[i] - pos[j]).norm()
+        d = _np_dist(pos[i], pos[j])
         if exp_d < 0.0:
-            sc = sc + 1.0 / d.clamp(min=1e-10)
+            sc += 1.0 / max(d, 1e-10)
             continue
         if exp_d < 1e-6:
             continue
         rel = (d - exp_d) / exp_d
-        k = stretch_k if rel.item() >= 0.0 else squeeze_k
-        sc = sc + rel * rel * k
+        sc += rel * rel * (stretch_k if rel >= 0.0 else squeeze_k)
     return sc
 
 
@@ -155,19 +139,19 @@ def score_arcs(
 # Chain smoothness score
 
 def score_smooth(
-    pos: torch.Tensor,
-    dist_to_next: torch.Tensor,
+    pos: np.ndarray,
+    dist_to_next: np.ndarray,
     stretch_k: float,
     squeeze_k: float,
     angular_k: float,
     w_dist: float,
     w_angle: float,
-) -> torch.Tensor:
+) -> float:
     """
     Chain smoothness energy: bond-length penalty + cubic angle penalty.
 
-    pos:          (N, 3) float tensor - bead positions
-    dist_to_next: (N-1,) float tensor - expected bond lengths
+    pos:          (N, 3) float array - bead positions
+    dist_to_next: (N-1,) float array - expected bond lengths
 
     sca = sum_{i=0..N-2} ((|v_i| - dtn_i) / dtn_i)^2 * k_stretch_or_squeeze
     scb = sum_{i=1..N-2} angle(v_{i-1}, v_i)^3 * angular_k
@@ -176,22 +160,23 @@ def score_smooth(
 
     Matches C++ calcScoreStructureSmooth(true, true) [global].
     """
+    pos = np.asarray(pos, dtype=np.float64)
+    dist_to_next = np.asarray(dist_to_next, dtype=np.float64)
     n = pos.shape[0]
-    sca = pos.new_zeros(())
-    scb = pos.new_zeros(())
+    sca = 0.0
+    scb = 0.0
     v_prev = None
     for i in range(n - 1):
         v = pos[i] - pos[i + 1]
-        vlen = v.norm()
-        dtn = dist_to_next[i].item() if i < len(dist_to_next) else 1.0
+        vlen = float(np.sqrt(v.dot(v)))
+        dtn = float(dist_to_next[i]) if i < dist_to_next.shape[0] else 1.0
         if dtn < 1e-6:
             dtn = 1e-6
         diff = (vlen - dtn) / dtn
-        k = stretch_k if diff.item() >= 0.0 else squeeze_k
-        sca = sca + diff * diff * k
+        sca += diff * diff * (stretch_k if diff >= 0.0 else squeeze_k)
         if v_prev is not None:
             ang = angle_metric(v, v_prev)
-            scb = scb + ang * ang * ang * angular_k
+            scb += ang * ang * ang * angular_k
         v_prev = v
     return sca * w_dist + scb * w_angle
 
@@ -217,13 +202,6 @@ def metropolis_prob(
     if T <= 0.0:
         return 0.0
     return jump_scale * math.exp(-jump_coef * (score_curr / score_prev) / T)
-
-
-# ---------------------------------------------------------------------------
-# Fast NumPy-based scoring for use inside the MC loop
-# These replicate the C++ "local" scoring functions used during MC steps.
-
-import numpy as np
 
 
 # ---------------------------------------------------------------------------
@@ -305,6 +283,10 @@ def local_score_orientation(
         err += ang * ang
     return err * motif_weight
 
+
+# ---------------------------------------------------------------------------
+# Fast NumPy-based scoring for use inside the MC loop
+# These replicate the C++ "local" scoring functions used during MC steps.
 
 def _np_dist(a: np.ndarray, b: np.ndarray) -> float:
     d = a - b
