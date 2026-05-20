@@ -569,15 +569,15 @@ def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int,
 
 def try_python_ensemble(config: Path, n: int, region: str) -> list | None:
     """
-    Call src.simulate.run_region if available.
+    Call gnome3d.simulate.run_region if available.
     Expected signature:
         run_region(config_path: str, region: str, n_structures: int)
             -> list of list[(midpoint_bp, x, y, z)]
     Returns None if not yet implemented.
     """
-    sys.path.insert(0, str(ROOT / "src"))
+    sys.path.insert(0, str(ROOT))
     try:
-        from simulate import run_region
+        from gnome3d.simulate import run_region
     except (ImportError, ModuleNotFoundError):
         return None
 
@@ -662,7 +662,7 @@ def structural_distance_matrix(structures: list) -> list:
 def save_cif_ensemble(structs: list, label: str, outdir: Path, region_label: str) -> None:
     """Write each structure in structs as a CIF file under outdir."""
     sys.path.insert(0, str(ROOT))
-    from src.io import write_cif
+    from gnome3d.io import write_cif
     outdir.mkdir(parents=True, exist_ok=True)
     for i, beads in enumerate(structs, start=1):
         path = outdir / f"{region_label}_{label}_s{i}.cif"

@@ -1,13 +1,15 @@
 """
-src/simulate.py - High-level entry point for 3dgnome-ng.
+gnome3d/simulate.py - High-level entry point for 3dgnome-ng.
 
 Thin wrappers around the Settings / ContactData / Solver pipeline.
 """
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+from gnome3d.settings import Settings
+from gnome3d.io import parse_region
+from gnome3d.data import ContactData
+from gnome3d.solver import Solver
 
 
 def run_region(
@@ -36,16 +38,6 @@ def run_region(
         One entry per structure, sorted by genomic midpoint.
         Includes both anchor beads and loop_density subanchor beads.
     """
-    src_dir = Path(__file__).parent
-    repo_root = src_dir.parent
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
-
-    from src.settings import Settings
-    from src.io import parse_region
-    from src.data import ContactData
-    from src.solver import Solver
-
     bed_region = parse_region(region)
     if bed_region is None:
         chrom = region.strip()

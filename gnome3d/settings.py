@@ -1,7 +1,7 @@
 """
 src/settings.py - Configuration for 3dgnome-ng.
 
-Mirrors C++ Settings class.  All defaults match Settings::init() in Settings.cpp.
+Mirrors Reference Settings class.  All defaults match Settings::init() in Settings.cpp.
 """
 
 import configparser

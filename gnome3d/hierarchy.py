@@ -1,9 +1,7 @@
 """
-src/hierarchy.py - Cluster data structures and hierarchy tree building.
+Mirrors Reference LooperSolver::createTreeChromosome(), findGaps(), findSplit().
 
-Mirrors C++ LooperSolver::createTreeChromosome(), findGaps(), findSplit().
-
-The C++ code starts anchors at level=4, IBs at 3, segments at 2, chr root at 1.
+The Reference code starts anchors at level=4, IBs at 3, segments at 2, chr root at 1.
 We replicate this numbering so that setLevel()/levelDown() work identically.
 """
 
@@ -57,7 +55,7 @@ def find_gaps(
 ) -> list:
     """
     Find gap positions: anchor indices where no arc "covers" position i.
-    Mirrors C++ LooperSolver::findGaps().
+    Mirrors Reference LooperSolver::findGaps().
 
     Sweeps through anchors from chr_first to the end, tracking arc_count.
     arc_count += 1 when an arc starts at i (other_end > i)
@@ -102,7 +100,7 @@ def find_split_predefined(
 ) -> list:
     """
     Use predefined breakpoints to select which gaps are segment boundaries.
-    Mirrors C++ LooperSolver::findSplit() (predefined branch).
+    Mirrors Reference LooperSolver::findSplit() (predefined branch).
 
     gaps:        list of gap indices (global cluster indices)
     clusters:    global cluster list
@@ -144,7 +142,7 @@ def build_cluster_tree(
 ) -> tuple:
     """
     Build the full cluster hierarchy for all chromosomes.
-    Mirrors C++ LooperSolver::createTreeGenome() + createTreeChromosome().
+    Mirrors Reference LooperSolver::createTreeGenome() + createTreeChromosome().
 
     anchors:     dict[chr -> list[Anchor]]
     arcs:        dict[chr -> list[InteractionArc]] (anchor-index based, local per chr)
@@ -257,7 +255,6 @@ def build_cluster_tree(
     return clusters, chr_root, chr_first_cluster
 
 
-# ---------------------------------------------------------------------------
 # Level traversal helpers
 
 def set_top_level(chr_root: dict, chrs: list) -> dict:
@@ -268,7 +265,7 @@ def set_top_level(chr_root: dict, chrs: list) -> dict:
 def level_down(current_level: dict, clusters: list, chrs: list) -> dict:
     """
     Move one level deeper in the hierarchy.
-    Mirrors C++ LooperSolver::levelDown().
+    Mirrors Reference LooperSolver::levelDown().
     """
     new_level: dict[str, list[int]] = {}
     for chr_ in chrs:
@@ -285,7 +282,7 @@ def level_down(current_level: dict, clusters: list, chrs: list) -> dict:
 def set_level(level: int, chr_root: dict, clusters: list, chrs: list) -> dict:
     """
     Set current_level to correspond to the given level number.
-    Mirrors C++ LooperSolver::setLevel(level) which calls setTopLevel() then
+    Mirrors Reference LooperSolver::setLevel(level) which calls setTopLevel() then
     calls levelDown() `level` times.
     """
     current = set_top_level(chr_root, chrs)

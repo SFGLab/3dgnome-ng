@@ -1,10 +1,10 @@
 """
 src/mc.py - Monte Carlo simulation loops for 3dgnome-ng.
 
-Mirrors C++ LooperSolver::MonteCarloHeatmap(), MonteCarloArcs(), and
+Mirrors Reference LooperSolver::MonteCarloHeatmap(), MonteCarloArcs(), and
 MonteCarloArcsSmooth().
 
-On first import the JIT functions compile (~10–30 s); subsequent runs
+On first import the JIT functions compile (~10-30 s); subsequent runs
 load from cache
 
 Acceptance criterion (all loops):
@@ -18,7 +18,6 @@ import numpy as np
 from numba import njit
 
 
-# ---------------------------------------------------------------------------
 # Smooth MC helpers
 
 @njit(cache=True)
@@ -118,7 +117,6 @@ def _batch_smooth_nb(pos, dtn, movable, step_size, T, dt,
     return T, score, n_ok
 
 
-# ---------------------------------------------------------------------------
 # Orientation MC helpers
 
 @njit(cache=True)
@@ -180,7 +178,7 @@ def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
     """Local orientation score for anchor k, WEIGHTED by per-arc weights.
     Used for the incremental update: score_orn += 2*(local_curr - local_prev).
     The weights make this delta exact w.r.t. _score_orientation_full_nb — no drift.
-    Diverges from C++ calcScoreOrientation(orn, anchor_index), which is unweighted
+    Diverges from Reference calcScoreOrientation(orn, anchor_index), which is unweighted
     and therefore drifts; see [[project-orientation-mc-fix]].
     """
     err = 0.0
@@ -206,7 +204,7 @@ def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
 @njit(cache=True)
 def _local_heat_nb(pos, heat_dist, p, heat_weight):
     """Local heat score for bead p vs all others.
-    Mirrors C++ calcScoreSubanchorHeatmap(int moved) — sums all i != p.
+    Mirrors Reference calcScoreSubanchorHeatmap(int moved) — sums all i != p.
     """
     n = pos.shape[0]
     err = 0.0
@@ -227,7 +225,7 @@ def _local_heat_nb(pos, heat_dist, p, heat_weight):
 
 @njit(cache=True)
 def _init_heat_nb(pos, heat_dist, heat_weight):
-    """Global heat score (double-counts pairs, matching C++ calcScoreSubanchorHeatmap())."""
+    """Global heat score (double-counts pairs, matching Reference calcScoreSubanchorHeatmap())."""
     n = pos.shape[0]
     err = 0.0
     for i in range(n):
@@ -252,7 +250,7 @@ def _batch_smooth_heat_nb(pos, dtn, movable, step_size, T, dt,
                           stretch_k, squeeze_k, ang_k, dist_w, ang_w,
                           heat_dist, heat_weight, score, score_heat):
     """Smooth MC with subanchor heat energy (no orientation).
-    Mirrors C++ MonteCarloArcsSmooth with use_subanchor_heatmap=true.
+    Mirrors Reference MonteCarloArcsSmooth with use_subanchor_heatmap=true.
     Returns (T_out, score_out, score_heat_out, n_ok).
     """
     n = pos.shape[0]
@@ -304,7 +302,7 @@ def _batch_smooth_orientation_nb(
     """Smooth MC with CTCF orientation energy.
       - structure score: full recompute every step
       - orientation score: incremental via weighted local delta (drift-free;
-        diverges from C++ which uses unweighted local — see project-orientation-mc-fix)
+        diverges from Reference which uses unweighted local — see project-orientation-mc-fix)
     anchor_orn (n_anchors, 3) is updated in-place across calls.
     Returns (T_out, score_out, score_orn_out, n_ok).
     """
@@ -378,7 +376,7 @@ def _batch_smooth_orientation_heat_nb(
     motif_weight, symmetric, score, score_orn, score_heat,
 ):
     """Smooth MC with both CTCF orientation energy and subanchor heat energy.
-    Mirrors C++ MonteCarloArcsSmooth with useCTCFMotifOrientation and use_subanchor_heatmap.
+    Mirrors Reference MonteCarloArcsSmooth with useCTCFMotifOrientation and use_subanchor_heatmap.
     Returns (T_out, score_out, score_orn_out, score_heat_out, n_ok).
     """
     n = pos.shape[0]
@@ -447,7 +445,6 @@ def _batch_smooth_orientation_heat_nb(
     return T, score, score_orn, score_heat, n_ok
 
 
-# ---------------------------------------------------------------------------
 # Arcs MC helpers
 
 @njit(cache=True)
@@ -525,7 +522,6 @@ def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
     return T, score, n_ok
 
 
-# ---------------------------------------------------------------------------
 # Heatmap MC helpers
 
 @njit(cache=True)
@@ -598,14 +594,12 @@ def _batch_heatmap_nb(pos, exp_safe, skip, step_size, T, dt,
     return T, score, n_ok
 
 
-# ---------------------------------------------------------------------------
 # Shared helper
 
 def _as_f64(arr):
     return np.ascontiguousarray(arr, dtype=np.float64)
 
 
-# ---------------------------------------------------------------------------
 # Public MC loops
 
 def mc_heatmap(
@@ -623,7 +617,7 @@ def mc_heatmap(
     Global score is double-counted, so the MC update rule is:
         score += 2 * (local_curr - local_prev)
 
-    Mirrors C++ LooperSolver::MonteCarloHeatmap().  Returns final score.
+    Mirrors Reference LooperSolver::MonteCarloHeatmap().  Returns final score.
     """
     n = pos.shape[0]
     if n <= 1:
@@ -688,7 +682,7 @@ def mc_arcs(
     so the MC update rule is:
         score = score - local_prev + local_curr   (no factor 2)
 
-    Mirrors C++ LooperSolver::MonteCarloArcs().  Returns final score.
+    Mirrors Reference LooperSolver::MonteCarloArcs().  Returns final score.
     """
     n = pos.shape[0]
     if n <= 1:
@@ -751,7 +745,7 @@ def mc_smooth(
     MonteCarloArcsSmooth: chain connectivity + angle MC.
 
     Optionally adds CTCF orientation energy (char_orientations) and/or
-    subanchor heat energy (heat_dist).  Mirrors C++ MonteCarloArcsSmooth
+    subanchor heat energy (heat_dist).  Mirrors Reference MonteCarloArcsSmooth
     with useCTCFMotifOrientation and use_subanchor_heatmap flags.
 
     Anchor beads (fixed=True) are never moved.  Returns final score.

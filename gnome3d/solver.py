@@ -2,7 +2,7 @@
 src/solver.py - High-level LooperSolver analog for 3dgnome-ng.
 
 Orchestrates data loading, hierarchy building, and MC reconstruction.
-Mirrors C++ LooperSolver methods:
+Mirrors Reference LooperSolver methods:
   - setContactData()              -> set_contact_data()
   - reconstructClustersHeatmap()  -> reconstruct_heatmap()
   - reconstructClustersArcsDistances() -> reconstruct_arcs()
@@ -46,7 +46,6 @@ class Solver:
         self.dense_active_regions: dict = {}  # chr -> list of (gpos, x, y, z)
         self._singletons: list = []
 
-    # -----------------------------------------------------------------------
     # Data loading and hierarchy construction
 
     def load(
@@ -57,7 +56,7 @@ class Solver:
     ) -> None:
         """
         Accept pre-loaded contact data and build the cluster hierarchy.
-        Mirrors C++ LooperSolver::setContactData().
+        Mirrors Reference LooperSolver::setContactData().
         """
         self.chrs = chrs_list
         self.selected_region = region
@@ -71,13 +70,12 @@ class Solver:
         )
         print(f"  total clusters: {len(self.clusters)}")
 
-    # -----------------------------------------------------------------------
     # Segment-level reconstruction (heatmap MC)
 
     def reconstruct_heatmap(self) -> None:
         """
         Position beads at segment level using singleton heatmap MC.
-        Mirrors C++ LooperSolver::reconstructClustersHeatmap().
+        Mirrors Reference LooperSolver::reconstructClustersHeatmap().
         """
         s = self.s
 
@@ -113,7 +111,7 @@ class Solver:
         bin_lengths_mb is a flat list aligned to global bin indices giving
         the genomic span of each bin in Mb.  The first and last bins of each
         chromosome use the actual cluster start/end (not the 0/1e9 sentinels)
-        so their lengths are not artificially inflated — mirrors the C++ min/max
+        so their lengths are not artificially inflated — mirrors the Reference min/max
         position update done after reading contacts.
         """
         bins = {}
@@ -150,7 +148,7 @@ class Solver:
     def _reconstruct_heatmap_single_level(self, current_level: dict) -> None:
         """
         Reconstruct segment-level positions using singleton heatmap MC.
-        Mirrors C++ reconstructClustersHeatmapSingleLevel(1) (segment level).
+        Mirrors Reference reconstructClustersHeatmapSingleLevel(1) (segment level).
         """
         s = self.s
         bins, start_ind, total_size, bin_lengths_mb = self._compute_segment_bins(current_level)
@@ -243,7 +241,7 @@ class Solver:
         """
         Set child cluster positions by linear interpolation between parents.
         Used for IBs between segments, and anchors within IBs.
-        Simplified version of C++ interpolateChildrenPositionSpline().
+        Simplified version of Reference interpolateChildrenPositionSpline().
         """
         clusters = self.clusters
         n = len(parent_indices)
@@ -277,13 +275,12 @@ class Solver:
                 if clusters[child_idx].children:
                     self._interpolate_children_linear([child_idx])
 
-    # -----------------------------------------------------------------------
     # Anchor-level reconstruction (arc spring MC)
 
     def reconstruct_arcs(self) -> None:
         """
         Position anchor beads using arc spring MC.
-        Mirrors C++ LooperSolver::reconstructClustersArcsDistances().
+        Mirrors Reference LooperSolver::reconstructClustersArcsDistances().
         """
         self.dense_active_regions = {}
 
@@ -326,7 +323,7 @@ class Solver:
     def _position_interaction_blocks(self, segs: list) -> None:
         """
         Position IB clusters between segment positions.
-        Mirrors C++ positionInteractionBlocks().
+        Mirrors Reference positionInteractionBlocks().
         """
         if len(segs) > 1:
             self._interpolate_children_linear(segs)
@@ -377,11 +374,11 @@ class Solver:
     ) -> np.ndarray:
         """
         Build expected distance matrix for anchor-level active region.
-        Mirrors C++ calcAnchorExpectedDistancesHeatmap().
+        Mirrors Reference calcAnchorExpectedDistancesHeatmap().
 
         If anchor_heatmap (n x n) is provided and use_anchor_heatmap is True,
         scales down expected distances for high-contact anchor pairs, mirroring
-        C++ calcAnchorExpectedDistancesHeatmap() post-processing.
+        Reference calcAnchorExpectedDistancesHeatmap() post-processing.
 
         Returns mat where:
           mat[i,j] = -1  -> repulsion (no arc)
@@ -411,7 +408,7 @@ class Solver:
                 mat[bi, ai] = exp_d
 
         # Apply anchor heatmap: scale down expected distances for high-contact pairs.
-        # Mirrors C++ post-processing in calcAnchorExpectedDistancesHeatmap().
+        # Mirrors Reference post-processing in calcAnchorExpectedDistancesHeatmap().
         if (anchor_heatmap is not None and self.s.use_anchor_heatmap):
             max_val = float(anchor_heatmap.max())
             influence = float(self.s.anchor_heatmap_influence)
@@ -439,13 +436,13 @@ class Solver:
     ) -> None:
         """
         MC reconstruction for one interaction block (anchor level).
-        Mirrors C++ reconstructClusterArcsDistances().
+        Mirrors Reference reconstructClusterArcsDistances().
         """
         s = self.s
         active_size = len(active_region)
 
         # Compute noise size (avg expected distance between consecutive anchors * noise_arcs)
-        # C++ uses hardcoded noise_size_small = 0.005 for anchor level
+        # Reference uses hardcoded noise_size_small = 0.005 for anchor level
         noise_size_small = 0.005
 
         # Compute dist_to_next for each anchor
@@ -486,7 +483,7 @@ class Solver:
     ) -> tuple:
         """
         Build anchor-level and subanchor-level singleton contact heatmaps.
-        Mirrors C++ createSingletonSubanchorHeatmap().
+        Mirrors Reference createSingletonSubanchorHeatmap().
 
         Returns (anchor_heatmap, subanchor_heatmap_raw) where:
           anchor_heatmap:      (n_anchors, n_anchors) float64 — normalized contact
@@ -504,7 +501,7 @@ class Solver:
         # Total densified beads = n_anchors + (n_anchors-1)*ld = 1 + (n_anchors-1)*(ld+1)
         N = n_anchors + (n_anchors - 1) * ld
 
-        # Build genomic break boundaries mirroring C++ createSingletonSubanchorHeatmap().
+        # Build genomic break boundaries mirroring Reference createSingletonSubanchorHeatmap().
         # Anchor k occupies bin k*(ld+1).  Subanchor j in span k→k+1 occupies
         # bin k*(ld+1)+j  (j=1..ld).
         anchor_lens: list[int] = []
@@ -534,10 +531,9 @@ class Solver:
             breaks.append(cb_start)
 
         breaks.append(region_end)
-        # Number of bins = len(breaks)-1 = 1 + (n_anchors-1)*(ld+1) = N ✓
-
+        # Number of bins = len(breaks)-1 = 1 + (n_anchors-1)*(ld+1) = N
         # Bin singleton contacts into subanchor heatmap.
-        # Note: Python filters by chromosome (c1 != chr_ or c2 != chr_). C++'s
+        # Note: Python filters by chromosome (c1 != chr_ or c2 != chr_). Reference's
         # createSingletonSubanchorHeatmap does NOT filter by chromosome, so it
         # bins cross-chromosomal contacts whose midpoints fall in the region.
         # See [[project-singleton-chr-filter-divergence]] — this is intentional.
@@ -561,7 +557,7 @@ class Solver:
             h_sub[ei, si] += sc
 
         # Extract anchor heatmap from raw subanchor values (BEFORE normalization),
-        # normalized by anchor area in Mbp^2.  Mirrors C++ lines 1267-1273.
+        # normalized by anchor area in Mbp^2.  Mirrors Reference lines 1267-1273.
         h_anchor = np.zeros((n_anchors, n_anchors), dtype=np.float64)
         for i in range(n_anchors):
             ai = i * (ld + 1)
@@ -574,7 +570,7 @@ class Solver:
                 h_anchor[j, i] = val
 
         # Normalize subanchor heatmap: divide by avg count, then by bin areas.
-        # Mirrors C++ lines 1294-1320.
+        # Mirrors Reference lines 1294-1320.
         avg_count = float(h_sub.mean())
         if avg_count > 1e-6:
             h_sub /= avg_count
@@ -612,7 +608,7 @@ class Solver:
     ) -> np.ndarray | None:
         """
         Estimate expected pairwise distances for subanchor heat energy.
-        Mirrors C++ pipeline: run N dry smooth MC passes, average pairwise
+        Mirrors Reference pipeline: run N dry smooth MC passes, average pairwise
         distances between all beads, then create target distance matrix.
 
         Returns (N, N) float64 target distance matrix or None if heatmap empty.
@@ -624,7 +620,7 @@ class Solver:
 
         avg_dist = np.zeros((n, n), dtype=np.float64)
 
-        # Mirrors C++: for each replicate, run n_steps MC passes from pos+noise,
+        # Mirrors Reference: for each replicate, run n_steps MC passes from pos+noise,
         # keep the best structure, then accumulate pairwise distances from it.
         for rep in range(n_reps):
             rep_best_score = -1.0
@@ -645,7 +641,7 @@ class Solver:
 
         avg_dist /= n_reps
 
-        # Create expected distance matrix mirroring C++ createExpectedDistSubanchorHeatmap().
+        # Create expected distance matrix mirroring Reference createExpectedDistSubanchorHeatmap().
         avg_heat = float(subanchor_heat_raw.mean())
         if avg_heat < 1e-6:
             return None
@@ -673,7 +669,7 @@ class Solver:
           gpos       : list[int] genomic midpoints
           dtn        : (N-1,) float32 expected consecutive distances
           anchor_map : list of (pos_index, cluster_index) for anchor beads
-        Mirrors C++ LooperSolver::densifyActiveRegion().
+        Mirrors Reference LooperSolver::densifyActiveRegion().
         """
         ld = self.s.loop_density
         bead_starts: list[int] = []
@@ -744,7 +740,7 @@ class Solver:
         Densify active region, then run smooth MC (chain + angle energy).
         Writes final anchor positions back to self.clusters.
         Returns list of (genomic_pos, x, y, z) for ALL beads (anchors + subanchors).
-        Mirrors C++ MonteCarloArcsSmooth loop in reconstructClustersArcsDistances().
+        Mirrors Reference MonteCarloArcsSmooth loop in reconstructClustersArcsDistances().
 
         When subanchor_heat_raw is provided and use_subanchor_heatmap is True:
           - runs dry smooth MC passes to estimate avg pairwise distances
@@ -830,7 +826,6 @@ class Solver:
             for i in range(n)
         ]
 
-    # -----------------------------------------------------------------------
     # Heatmap normalisation helpers
 
     @staticmethod
@@ -847,7 +842,7 @@ class Solver:
         """
         Row-normalize: scale each row so all rows have equal sum (avg).
         Then symmetrize: h[i][j] = (h[i][j] + h[j][i]) / 2.
-        Mirrors C++ LooperSolver::normalizeHeatmap().
+        Mirrors Reference LooperSolver::normalizeHeatmap().
         """
         row_sums = [sum(h[i]) for i in range(n)]
         total = sum(row_sums)
@@ -874,7 +869,7 @@ class Solver:
     def _normalize_heatmap_diagonal_total(h: list, n: int, val: float) -> None:
         """
         Normalize so the average of the first non-zero diagonal equals val.
-        Mirrors C++ normalizeHeatmapDiagonalTotal().
+        Mirrors Reference normalizeHeatmapDiagonalTotal().
         Modifies h in place.
         """
         # Find diagonal size
@@ -911,7 +906,7 @@ class Solver:
     ) -> None:
         """
         Scale inter-chromosomal entries.
-        Mirrors C++ normalizeHeatmapInter().
+        Mirrors Reference normalizeHeatmapInter().
         Modifies h in place.
         """
         # This is only relevant for multi-chromosome runs; skip for now.
@@ -925,7 +920,7 @@ class Solver:
     ) -> tuple:
         """
         Convert normalized contact frequency heatmap to expected distance heatmap.
-        Mirrors C++ createDistanceHeatmap().
+        Mirrors Reference createDistanceHeatmap().
 
         Returns (dist_heatmap, avg_dist) where dist_heatmap is a 2D list.
         Entries within diagonal_size are set to -1 (ignored in scoring).
@@ -961,7 +956,6 @@ class Solver:
 
         return dist, avg
 
-    # -----------------------------------------------------------------------
     # Output helpers
 
     def get_leaf_positions(self, chr_: str) -> list:

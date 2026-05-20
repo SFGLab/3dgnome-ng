@@ -1,15 +1,5 @@
 """
-src/energy.py - scoring / energy functions for 3dgnome-ng.
-
-All functions must match the C++ reference exactly (within 1e-6 absolute
-tolerance).  The harness in harness/compare.py tests each one independently.
-
-Non-obvious details (see AGENTS.md):
-  - angle_metric() is NOT acos: it is  1 - (dot(n1, n2) + 1) / 2
-  - score_heatmap() double-counts: every pair (i,j) contributes twice
-  - score_arcs() counts each arc once (i < j convention in global score)
-  - metropolis_prob() uses ratio, not difference: exp(-coef * curr/prev / T)
-  - random_vector() is uniform in a cube: each component in [-step, step]
+scoring / energy functions for 3dgnome-ng.
 """
 
 import math
@@ -18,36 +8,32 @@ import random
 import numpy as np
 
 
-# ---------------------------------------------------------------------------
 # Distance conversion functions
-# (signatures match compare.py _try_import calls exactly)
 
 def genomic_length_to_distance(length_bp: int, base: float, scale: float, power: float) -> float:
-    """C++: genomicLengthToDistance(length) = base + scale * (length/1000)^power"""
+    """Reference: genomicLengthToDistance(length) = base + scale * (length/1000)^power"""
     return base + scale * (length_bp / 1000.0) ** power
 
 
 def freq_to_dist_heatmap(freq: float, scale: float, power: float) -> float:
-    """C++: freqToDistanceHeatmap(freq) = scale * freq^power"""
+    """Reference: freqToDistanceHeatmap(freq) = scale * freq^power"""
     return scale * (freq ** power)
 
 
 def freq_to_dist_heatmap_inter(freq: float, scale_inter: float, power_inter: float) -> float:
-    """C++: freqToDistanceHeatmapInter(freq) = scale_inter * freq^power_inter"""
+    """Reference: freqToDistanceHeatmapInter(freq) = scale_inter * freq^power_inter"""
     return scale_inter * (freq ** power_inter)
 
 
 def freq_to_distance(freq: int, a: float, scale: float, shift: float, base_level: float) -> float:
-    """C++: freqToDistance(freq) = base_level + scale / exp(a * (freq + shift))"""
+    """Reference: freqToDistance(freq) = base_level + scale / exp(a * (freq + shift))"""
     try:
         return base_level + scale / math.exp(a * (freq + shift))
-    except OverflowError:  # C++ exp() returns inf -> scale/inf = 0
+    except OverflowError:  # Reference exp() returns inf -> scale/inf = 0
         return base_level
 
 
-# ---------------------------------------------------------------------------
 # Angle metric
-# NOT acos - this is the linear dissimilarity used throughout 3dgnome.
 
 def angle_metric(v1, v2) -> float:
     """
@@ -63,18 +49,17 @@ def angle_metric(v1, v2) -> float:
     return 1.0 - (dot + 1.0) / 2.0
 
 
-# ---------------------------------------------------------------------------
 # Heatmap score (double-counted)
 
 def score_heatmap(pos: np.ndarray, exp_dist: np.ndarray, diag_size: int) -> float:
     """
-    Full heatmap energy score (double-counted, matching C++ calcScoreHeatmapActiveRegion(-1)).
+    Full heatmap energy score (double-counted, matching Reference calcScoreHeatmapActiveRegion(-1)).
 
     pos:      (N, 3) float array - bead positions
     exp_dist: (N, N) float array - expected pairwise distances
     diag_size: int - skip pairs within this diagonal band
 
-    The C++ implementation calls calcScoreHeatmapActiveRegion(moved) for every
+    The Reference implementation calls calcScoreHeatmapActiveRegion(moved) for every
     moved index.  That inner function sums over all i != moved with
     |i - moved| >= diag_size and exp_dist[i][moved] >= 1e-6.
     Together, every pair (i, j) with i != j is counted twice - once when
@@ -99,7 +84,6 @@ def score_heatmap(pos: np.ndarray, exp_dist: np.ndarray, diag_size: int) -> floa
     return float(contrib.sum())
 
 
-# ---------------------------------------------------------------------------
 # Arc spring score
 
 def score_arcs(
@@ -119,7 +103,7 @@ def score_arcs(
     stretch_k: spring constant when d > exp_d
     squeeze_k: spring constant when d < exp_d
 
-    Matches C++ calcScoreDistancesActiveRegion() (global, i < j pairs).
+    Matches Reference calcScoreDistancesActiveRegion() (global, i < j pairs).
     """
     pos = np.asarray(pos, dtype=np.float64)
     sc = 0.0
@@ -135,7 +119,6 @@ def score_arcs(
     return sc
 
 
-# ---------------------------------------------------------------------------
 # Chain smoothness score
 
 def score_smooth(
@@ -158,7 +141,7 @@ def score_smooth(
 
     Returns sca * w_dist + scb * w_angle.
 
-    Matches C++ calcScoreStructureSmooth(true, true) [global].
+    Matches Reference calcScoreStructureSmooth(true, true) [global].
     """
     pos = np.asarray(pos, dtype=np.float64)
     dist_to_next = np.asarray(dist_to_next, dtype=np.float64)
@@ -181,7 +164,6 @@ def score_smooth(
     return sca * w_dist + scb * w_angle
 
 
-# ---------------------------------------------------------------------------
 # Metropolis acceptance probability
 
 def metropolis_prob(
@@ -194,7 +176,7 @@ def metropolis_prob(
     """
     Metropolis acceptance probability.
 
-    C++: tempJumpScale * exp(-tempJumpCoef * (score_curr / score_prev) / T)
+    Reference: tempJumpScale * exp(-tempJumpCoef * (score_curr / score_prev) / T)
 
     Note: jump_scale can exceed 1.0 (default 50), so the result can be > 1.
     The caller decides whether to accept by comparing against rand().
@@ -204,14 +186,13 @@ def metropolis_prob(
     return jump_scale * math.exp(-jump_coef * (score_curr / score_prev) / T)
 
 
-# ---------------------------------------------------------------------------
 # CTCF orientation energy functions
 
 def calc_orientation(pos: np.ndarray, cind: int, n: int, char_orientation: str) -> np.ndarray:
     """
     Normalized orientation vector for bead at active-region index cind.
 
-    Matches C++ LooperSolver::calcOrientation(cind):
+    Matches Reference LooperSolver::calcOrientation(cind):
       - endpoints: one-sided difference
       - interior: central difference (pos[cind+1] - pos[cind-1])
       - 'L' motif: negate
@@ -240,7 +221,7 @@ def score_orientation(
 ) -> float:
     """
     Full CTCF orientation score (uses arc weights, double-counts each arc pair).
-    Matches C++ calcScoreOrientation(const vector<vector3>& orientation).
+    Matches Reference calcScoreOrientation(const vector<vector3>& orientation).
 
     anchor_orientations: list of (3,) arrays indexed by anchor list position
     neighbors:  {anchor_i: [anchor_j, ...]}
@@ -267,8 +248,8 @@ def local_score_orientation(
 ) -> float:
     """
     Local CTCF orientation score for one anchor — UNWEIGHTED.
-    Mirrors C++ calcScoreOrientation(orn, anchor_index), used as the harness
-    reference (test_orientation in compare.py) for bit-equivalence with C++.
+    Mirrors Reference calcScoreOrientation(orn, anchor_index), used as the harness
+    reference (test_orientation in compare.py) for bit-equivalence with Reference.
 
     NOT used by the actual MC loop. The MC kernel uses _local_score_orientation_nb
     in mc.py which is WEIGHTED (drift-free incremental update); see
@@ -284,9 +265,8 @@ def local_score_orientation(
     return err * motif_weight
 
 
-# ---------------------------------------------------------------------------
 # Fast NumPy-based scoring for use inside the MC loop
-# These replicate the C++ "local" scoring functions used during MC steps.
+# These replicate the Reference "local" scoring functions used during MC steps.
 
 def _np_dist(a: np.ndarray, b: np.ndarray) -> float:
     d = a - b
@@ -303,7 +283,7 @@ def local_score_heatmap_np(
 ) -> float:
     """
     Local heatmap score for bead `moved`.
-    Matches C++ calcScoreHeatmapActiveRegion(moved).
+    Matches Reference calcScoreHeatmapActiveRegion(moved).
     pos: (N, 3), exp_dist: (N, N)
     """
     n = pos.shape[0]
@@ -344,7 +324,7 @@ def local_score_arcs_np(
 ) -> float:
     """
     Local arc score for bead `moved`.
-    Matches C++ calcScoreDistancesActiveRegion(cluster_moved).
+    Reference: calcScoreDistancesActiveRegion(cluster_moved).
     exp_dist_mat: (N, N) where -1 means repulsion, 0 means no arc.
     """
     n = pos.shape[0]

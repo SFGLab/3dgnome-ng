@@ -244,12 +244,11 @@ def check_close_enough(name: str, cpp_val: float, py_val, rtol: float = 1e-5):
 # Try to import Python implementation
 
 def _try_import(fn_name: str):
-    """Return function from src/ or None if not yet implemented."""
+    """Return function from gnome3d/ or None if not yet implemented."""
     try:
         import importlib
-        sys.path.insert(0, str(ROOT / "src"))
-        # Adjust module paths as src/ is developed
-        mod = importlib.import_module("energy")
+        sys.path.insert(0, str(ROOT))
+        mod = importlib.import_module("gnome3d.energy")
         fn = getattr(mod, fn_name, None)
         if fn is None:
             return None
@@ -475,8 +474,8 @@ def test_densify(reference_only=False):
         _root = str(ROOT)
         if _root not in sys.path:
             sys.path.insert(0, _root)
-        from src.solver import Solver
-        from src.hierarchy import Cluster, LVL_ANCHOR
+        from gnome3d.solver import Solver
+        from gnome3d.hierarchy import Cluster, LVL_ANCHOR
     except ImportError as exc:
         for name in ("densify.bead_count", "densify.n_fixed",
                      "densify.anchor_pos", "densify.dtn_nonneg", "densify.interp"):
@@ -798,8 +797,8 @@ def test_contact_heatmaps(reference_only=False):
         _root = str(ROOT)
         if _root not in sys.path:
             sys.path.insert(0, _root)
-        from src.solver import Solver as _Sv
-        from src.io import InteractionArc as _IA
+        from gnome3d.solver import Solver as _Sv
+        from gnome3d.io import InteractionArc as _IA
     except ImportError as exc:
         for name in _test_names:
             print(f"  {SKIP}  {name}  ({exc})")
@@ -929,8 +928,8 @@ def test_subanchor_heat(reference_only=False):
         _root = str(ROOT)
         if _root not in sys.path:
             sys.path.insert(0, _root)
-        from src.solver import Solver as _Sv
-        from src.mc import mc_smooth, _init_heat_nb, _as_f64
+        from gnome3d.solver import Solver as _Sv
+        from gnome3d.mc import mc_smooth, _init_heat_nb, _as_f64
     except ImportError as exc:
         for name in _test_names:
             print(f"  {SKIP}  {name}  ({exc})")

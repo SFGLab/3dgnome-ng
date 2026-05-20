@@ -23,8 +23,8 @@ ROOT = Path(__file__).parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.settings import Settings
-from src.io import load_anchors, load_arcs, mark_arcs, remove_empty_anchors, parse_region, load_breakpoints
+from gnome3d.settings import Settings
+from gnome3d.io import load_anchors, load_arcs, mark_arcs, remove_empty_anchors, parse_region, load_breakpoints
 
 
 def find_regions(

@@ -1,12 +1,5 @@
 """
-src/io.py - File loading for 3dgnome-ng.
-
-Mirrors C++ InteractionArcs loading methods:
-  - loadAnchorsData()      -> load_anchors()
-  - loadPetClustersData()  -> load_arcs()
-  - markArcs()             -> mark_arcs()
-  - removeEmptyAnchors()   -> remove_empty_anchors()
-  - createSingletonHeatmap() -> create_singleton_heatmap()
+File loading for 3dgnome-ng.
 """
 
 from __future__ import annotations
@@ -68,7 +61,7 @@ class BedRegion:
 def parse_region(region_str: str) -> Optional[BedRegion]:
     """
     Parse 'chr:start-end' string.  Returns None on failure.
-    C++ BedRegion::tryParse uses sscanf(str, "%30[^:]:%d-%d", ...) - dash separator.
+    Reference BedRegion::tryParse uses sscanf(str, "%30[^:]:%d-%d", ...).
     """
     try:
         chr_part, range_part = region_str.split(":", 1)
@@ -78,7 +71,6 @@ def parse_region(region_str: str) -> Optional[BedRegion]:
         return None
 
 
-# ---------------------------------------------------------------------------
 # Load anchors from BED file
 
 def load_anchors(
@@ -127,7 +119,6 @@ def load_anchors(
     return anchors
 
 
-# ---------------------------------------------------------------------------
 # Load PET cluster arcs from BEDPE file
 
 def load_arcs(
@@ -195,8 +186,7 @@ def load_arcs(
     return raw
 
 
-# ---------------------------------------------------------------------------
-# markArcs: map RawArcs -> anchor-indexed InteractionArcs
+# map RawArcs -> anchor-indexed InteractionArcs
 
 def mark_arcs(
     anchors: dict,
@@ -204,7 +194,7 @@ def mark_arcs(
 ) -> dict:
     """
     Map genomic-position arcs to anchor-index arcs.
-    Mirrors C++ InteractionArcs::markArcs().
+    Mirrors Reference InteractionArcs::markArcs().
 
     anchors:  dict[chr -> list[Anchor]]
     raw_arcs: dict[chr -> list[RawArc]] (sorted by start)
@@ -308,8 +298,7 @@ def mark_arcs(
     return arcs
 
 
-# ---------------------------------------------------------------------------
-# removeEmptyAnchors: keep only anchors that are endpoints of at least one arc
+# keep only anchors that are endpoints of at least one arc
 
 def remove_empty_anchors(
     anchors: dict,
@@ -317,7 +306,7 @@ def remove_empty_anchors(
 ) -> dict:
     """
     Remove anchors that are not endpoints of any arc.
-    Mirrors C++ InteractionArcs::removeEmptyAnchors().
+    Mirrors Reference InteractionArcs::removeEmptyAnchors().
 
     Returns new anchors dict (original is not modified).
     Also updates arc start/end indices to reflect removed anchors.
@@ -368,7 +357,6 @@ def remove_empty_anchors(
     return new_anchors
 
 
-# ---------------------------------------------------------------------------
 # Load segment breakpoints
 
 def load_breakpoints(path: str, chrs: list) -> dict:
@@ -396,7 +384,6 @@ def load_breakpoints(path: str, chrs: list) -> dict:
     return bp
 
 
-# ---------------------------------------------------------------------------
 # Create singleton heatmap from BEDPE file
 
 def create_singleton_heatmap(
@@ -410,7 +397,7 @@ def create_singleton_heatmap(
 ) -> list:
     """
     Read singletons BEDPE, bin into a contact frequency heatmap.
-    Mirrors C++ createSingletonHeatmap().
+    Mirrors Reference createSingletonHeatmap().
 
     bins:           dict[chr -> list[int]] of bin boundary positions
     start_ind:      dict[chr -> int] mapping chr to starting heatmap column index
@@ -418,7 +405,7 @@ def create_singleton_heatmap(
     chr_set:        set of chromosomes to include
     bin_lengths_mb: flat list of bin genomic lengths in Mb (global bin index).
                     When provided, h[i][j] is divided by len_i * len_j after
-                    binning, mirroring C++ createSingletonHeatmap() normalisation.
+                    binning, mirroring Reference createSingletonHeatmap() normalisation.
 
     Returns a 2D list h[i][j] = float contact frequency.
     """
@@ -511,7 +498,7 @@ def create_singleton_heatmap_from_contacts(
 
     bin_lengths_mb: flat list of bin genomic lengths in Mb (global bin index).
                     When provided, h[i][j] is divided by len_i * len_j after
-                    binning, mirroring C++ createSingletonHeatmap() normalisation.
+                    binning, mirroring Reference createSingletonHeatmap() normalisation.
     """
     import bisect
 
@@ -548,7 +535,6 @@ def create_singleton_heatmap_from_contacts(
     return h
 
 
-# ---------------------------------------------------------------------------
 # CIF export
 
 def write_cif(

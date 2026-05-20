@@ -1,9 +1,9 @@
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.backends.legacy:build"
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "3dgnome-ng"
+name = "gnome3d-ng"
 version = "0.1.0"
 description = "3dgnome reimplementation"
 requires-python = ">=3.10"
@@ -13,8 +13,8 @@ dependencies = [
 ]
 
 [project.scripts]
-3dgnome-ng = "main:main"
+gnome3d-ng = "gnome3d.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src*"]
+include = ["gnome3d*"]

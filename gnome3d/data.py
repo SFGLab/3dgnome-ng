@@ -1,7 +1,5 @@
 """
-src/data.py - ContactData: the engine's input contract.
-
-All data the solver needs lives here.  Two factory methods cover the two
+All data the solver needs lives here. Two factory methods cover the two
 supported input paths:
 
     ContactData.from_files(settings, chrs, region)
@@ -59,9 +57,6 @@ class ContactData:
     breakpoints: dict[str, list] = field(default_factory=dict)
     singletons: list = field(default_factory=list)
 
-    # -----------------------------------------------------------------------
-    # File-based factory
-
     @classmethod
     def from_files(
         cls,
@@ -113,9 +108,6 @@ class ContactData:
             singletons=singletons,
         )
 
-    # -----------------------------------------------------------------------
-    # DataFrame-based factory
-
     @classmethod
     def from_dataframes(
         cls,
@@ -149,7 +141,7 @@ class ContactData:
         """
         chr_set = set(chrs) if chrs is not None else set(anchors_df["chr"].unique())
 
-        # -- anchors ----------------------------------------------------------
+        # anchors
         anchors: dict[str, list] = {}
         for _, row in anchors_df.iterrows():
             c = str(row["chr"])
@@ -161,7 +153,7 @@ class ContactData:
             ori = str(row["orientation"]) if "orientation" in row.index else "N"
             anchors.setdefault(c, []).append(Anchor(c, st, en, ori))
 
-        # -- raw arcs -> mark -> remove empty ----------------------------------
+        # raw arcs -> mark -> remove empty
         raw_arcs: dict[str, list] = {}
         for _, row in arcs_df.iterrows():
             ca, cb = str(row["chr_a"]), str(row["chr_b"])
@@ -185,7 +177,7 @@ class ContactData:
         arcs = mark_arcs(anchors, raw_arcs)
         anchors = remove_empty_anchors(anchors, arcs)
 
-        # -- breakpoints ------------------------------------------------------
+        # breakpoints
         breakpoints: dict[str, list] = {}
         if breakpoints_df is not None:
             for _, row in breakpoints_df.iterrows():
@@ -194,7 +186,7 @@ class ContactData:
                     continue
                 breakpoints.setdefault(c, []).append(int(row["pos"]))
 
-        # -- singletons -------------------------------------------------------
+        # singletons
         singletons: list = []
         if singletons_df is not None:
             for _, row in singletons_df.iterrows():
@@ -215,7 +207,6 @@ class ContactData:
         )
 
 
-# ---------------------------------------------------------------------------
 # Internal helpers
 
 def _load_singletons(
