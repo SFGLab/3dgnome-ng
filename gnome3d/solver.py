@@ -1,5 +1,5 @@
 """
-src/solver.py - High-level LooperSolver analog for 3dgnome-ng.
+High-level LooperSolver analog for 3dgnome-ng.
 
 Orchestrates data loading, hierarchy building, and MC reconstruction.
 Mirrors Reference LooperSolver methods:
@@ -111,7 +111,7 @@ class Solver:
         bin_lengths_mb is a flat list aligned to global bin indices giving
         the genomic span of each bin in Mb.  The first and last bins of each
         chromosome use the actual cluster start/end (not the 0/1e9 sentinels)
-        so their lengths are not artificially inflated — mirrors the Reference min/max
+        so their lengths are not artificially inflated - mirrors the Reference min/max
         position update done after reading contacts.
         """
         bins = {}
@@ -486,11 +486,11 @@ class Solver:
         Mirrors Reference createSingletonSubanchorHeatmap().
 
         Returns (anchor_heatmap, subanchor_heatmap_raw) where:
-          anchor_heatmap:      (n_anchors, n_anchors) float64 — normalized contact
+          anchor_heatmap:      (n_anchors, n_anchors) float64 - normalized contact
                                density between anchor pairs; used for expected-distance
                                scaling in arc MC.
           subanchor_heatmap_raw: (N, N) float64 where N = n_anchors + (n_anchors-1)*ld
-                               — normalized contact density at densified-bead resolution;
+                               - normalized contact density at densified-bead resolution;
                                used for heat energy in smooth MC.
         """
         import bisect
@@ -536,7 +536,7 @@ class Solver:
         # Note: Python filters by chromosome (c1 != chr_ or c2 != chr_). Reference's
         # createSingletonSubanchorHeatmap does NOT filter by chromosome, so it
         # bins cross-chromosomal contacts whose midpoints fall in the region.
-        # See [[project-singleton-chr-filter-divergence]] — this is intentional.
+        # See [[project-singleton-chr-filter-divergence]] - this is intentional.
         h_sub = np.zeros((N, N), dtype=np.float64)
 
         for c1, p1, c2, p2, sc in self._singletons:

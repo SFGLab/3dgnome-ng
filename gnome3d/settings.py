@@ -1,5 +1,5 @@
 """
-src/settings.py - Configuration for 3dgnome-ng.
+Configuration for 3dgnome-ng.
 
 Mirrors Reference Settings class.  All defaults match Settings::init() in Settings.cpp.
 """
@@ -112,6 +112,15 @@ class Settings:
         self.mc_stop_improvement = 0.995
         self.mc_stop_successes = 5
         self.mc_stop_steps = 10000
+
+        # ---- excluded volume (NEW FEATURE, diverges from C++ reference) ----
+        # See AGENTS.md "Python divergences from reference" for context.
+        self.use_excluded_volume = False
+        self.exclusion_radius = 1.0           # r0: pairs closer than this incur penalty
+        self.exclusion_weight = 1.0           # k: multiplier (comparable to spring_*)
+        self.exclusion_apply_to_arcs = False
+        self.exclusion_apply_to_smooth = True
+        self.exclusion_skip_neighbors = 1     # skip pairs with |i-j| <= this (1 = skip bonded)
 
         # ---- MC smooth ----
         self.max_temp_smooth = 20.0
@@ -254,6 +263,18 @@ class Settings:
         self.mc_stop_improvement = getf("simulation_arcs", "stop_condition_improvement_threshold",
                                         self.mc_stop_improvement)
         self.mc_stop_successes = geti("simulation_arcs", "stop_condition_successes_threshold", self.mc_stop_successes)
+
+        # [excluded_volume]
+        self.use_excluded_volume = getb("excluded_volume", "use_excluded_volume",
+                                        self.use_excluded_volume)
+        self.exclusion_radius = getf("excluded_volume", "radius", self.exclusion_radius)
+        self.exclusion_weight = getf("excluded_volume", "weight", self.exclusion_weight)
+        self.exclusion_apply_to_arcs = getb("excluded_volume", "apply_to_arcs",
+                                            self.exclusion_apply_to_arcs)
+        self.exclusion_apply_to_smooth = getb("excluded_volume", "apply_to_smooth",
+                                              self.exclusion_apply_to_smooth)
+        self.exclusion_skip_neighbors = geti("excluded_volume", "skip_neighbors",
+                                             self.exclusion_skip_neighbors)
 
         # [simulation_arcs_smooth]
         self.smooth_dist_weight = getf("simulation_arcs_smooth", "dist_weight", self.smooth_dist_weight)

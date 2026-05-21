@@ -1,5 +1,5 @@
 """
-gnome3d/simulate.py - High-level entry point for 3dgnome-ng.
+High-level entry point for 3dgnome-ng.
 
 Thin wrappers around the Settings / ContactData / Solver pipeline.
 """

@@ -247,7 +247,7 @@ def local_score_orientation(
     motifs_symmetric: bool = True,
 ) -> float:
     """
-    Local CTCF orientation score for one anchor — UNWEIGHTED.
+    Local CTCF orientation score for one anchor - UNWEIGHTED.
     Mirrors Reference calcScoreOrientation(orn, anchor_index), used as the harness
     reference (test_orientation in compare.py) for bit-equivalence with Reference.
 

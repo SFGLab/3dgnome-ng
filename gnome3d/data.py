@@ -2,17 +2,17 @@
 All data the solver needs lives here. Two factory methods cover the two
 supported input paths:
 
-    ContactData.from_files(settings, chrs, region)
-        Reads anchors, arcs, breakpoints, and singletons from the files
-        referenced by `settings`.
+ContactData.from_files(settings, chrs, region)
+    Reads anchors, arcs, breakpoints, and singletons from the files
+    referenced by `settings`.
 
-    ContactData.from_dataframes(anchors_df, arcs_df, ...)
-        Converts pandas DataFrames into the same internal representation.
-        Expected columns:
-            anchors_df:     chr, start, end[, orientation]
-            arcs_df:        chr_a, start_a, end_a, chr_b, start_b, end_b, score
-            breakpoints_df: chr, pos
-            singletons_df:  chr1, pos1, chr2, pos2, score
+ContactData.from_dataframes(anchors_df, arcs_df, ...)
+    Converts pandas DataFrames into the same internal representation.
+    Expected columns:
+        anchors_df:     chr, start, end[, orientation]
+        arcs_df:        chr_a, start_a, end_a, chr_b, start_b, end_b, score
+        breakpoints_df: chr, pos
+        singletons_df:  chr1, pos1, chr2, pos2, score
 
 Once constructed, a ContactData instance is file-independent and can be
 passed directly to Solver.load().

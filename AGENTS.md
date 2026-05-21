@@ -2,9 +2,20 @@
 
 ## Project Goal
 
-Python reimplementation of the Monte Carlo (MC) core of **3dgnome**. The original implementation is a ~6,400-line C++ simulation (`3dnome/MC/`) that predicts 3D chromosome structure from Hi-C contact frequency data. The reimplementation lives in `src/` and must reproduce the same algorithm behavior. MC loops run on CPU via Numba JIT; torch is used only for GPU device detection and the reference scoring functions in `src/energy.py`.
+Python reimplementation of the Monte Carlo (MC) core of **3dgnome**. The original implementation is a ~6,400-line C++ simulation (`3dnome/MC/`) that predicts 3D chromosome structure from Hi-C contact frequency data. The reimplementation lives in `gnome3d/` and reproduced the C++ algorithm behavior as its starting point. MC loops run on CPU via Numba JIT; torch is used only for GPU device detection and the reference scoring functions in `gnome3d/energy.py`.
 
 Do **not** modify anything inside `3dnome/`. That directory is the reference implementation - read it, never change it.
+
+### Status: post-parity, feature-extension phase
+
+The Python port reached algorithmic parity with the C++ reference; that work is documented and frozen. **New work no longer requires matching C++.** Features added from here on (biophysics extensions, new energy terms, scheduling tweaks, etc.) are expected to diverge intentionally from `3dnome/`.
+
+Rules for new feature work:
+
+- **All new features must be opt-in via `gnome3d/settings.py`.** Default-off so existing configs continue to reproduce the parity-era behavior.
+- **Document divergences** in the "Python divergences from reference" section below — what changed, why, and which setting toggles it.
+- The C++ reference and `harness/compare.py` / `harness/integration.py` remain authoritative for the **parity baseline** (feature flags off). They are not authoritative for new features.
+- Inside a feature's own code, document any non-obvious behavior; project memory (`[[…]]` links) carries the longer-form rationale.
 
 ---
 
@@ -332,11 +343,46 @@ The test auto-skips the Python comparison if `src/simulate.py` is missing or rai
 
 ---
 
+## Python divergences from reference
+
+Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diverges, why, and how to toggle/restore parity. Keep this list current — new entries must be added when introducing diverging behavior, and removed when behavior is brought back into parity.
+
+### Refactors (no behavior change at parity settings)
+
+- **Unified smooth-MC kernel** ([gnome3d/mc.py](gnome3d/mc.py))
+  C++ has separate `MonteCarloArcsSmooth` branches per feature combo. Python collapses the four prior specialized kernels (`_batch_smooth_nb`, `_batch_smooth_heat_nb`, `_batch_smooth_orientation_nb`, `_batch_smooth_orientation_heat_nb`) into one `_batch_smooth_kernel_nb` driven by `use_heat`/`use_orn` flags. Energy terms (struct, heat, orn) are tracked as independent components (`score_struct`, `score_orn`, `score_heat`) and combined per step.
+  Side benefit: heat/orn paths previously did a full O(N) structure recompute every MC step — now incremental like the pure-smooth path. Verified drift stays at float-noise (~1e-9) under the codebase's reciprocal-neighbor invariant.
+
+### Algorithm divergences
+
+- **Orientation MC: weighted local scorer**
+  Python uses a weighted local delta in `_local_score_orientation_nb` ([gnome3d/mc.py](gnome3d/mc.py)) so the incremental update is exact w.r.t. `_score_orientation_full_nb`. C++ uses an unweighted local scorer that drifts over many steps. See `[[project-orientation-mc-fix]]`. The reference scorer in `gnome3d/energy.py` stays unweighted so `harness/compare.py` still passes.
+
+- **Singleton chr filter** (data loading)
+  C++ bins inter-chromosomal singletons by position; Python correctly filters by chromosome. Smooth-MC heat scores diverge 3-5× as a result, but final structures still match. See `[[project-singleton-chr-filter-divergence]]`.
+
+### New features (opt-in via settings, default-off)
+
+- **Excluded volume** — `settings.use_excluded_volume = true` to enable.
+  Soft harmonic repulsion preventing bead overlap. For pairs `(i, j)` with `|i - j| > exclusion_skip_neighbors` and `d_ij < exclusion_radius`, contributes `exclusion_weight * ((r0 - d)/r0)²` to the score. Implemented as an independent score component with the same `2 * (local_curr - local_prev)` incremental pattern as the heat term. Settings:
+    - `use_excluded_volume` (master toggle)
+    - `exclusion_radius` (r₀, position units; default 1.0)
+    - `exclusion_weight` (k, comparable to spring constants; default 1.0)
+    - `exclusion_apply_to_arcs` (gate for arc MC; default false)
+    - `exclusion_apply_to_smooth` (gate for smooth MC; default true)
+    - `exclusion_skip_neighbors` (skip pairs with `|i-j|` ≤ this; default 1, i.e. skip bonded)
+
+  Why not in C++: 3dnome uses an inverse-distance repulsion only on pairs where the input arc matrix is marked negative — a sparse, conditional repulsion. This adds a global polymer-physics excluded-volume term independent of input data. Touches arc-MC (`_batch_arcs_nb`) and smooth-MC (`_batch_smooth_kernel_nb`).
+
+---
+
 ## Correctness Rules
 
-1. **Every algorithmic choice must be verified against the C++ source before implementation.** Do not invent behavior.
+These rules apply to the **parity baseline** (all new feature flags off). New feature work has its own rules in [Status: post-parity, feature-extension phase](#status-post-parity-feature-extension-phase) above.
+
+1. When working on or near parity code, verify algorithmic choices against the C++ source. Do not invent behavior on the parity path.
 2. If behavior in the C++ source is ambiguous or surprising, document it explicitly rather than working around it.
-3. **Run `python harness/compare.py` after implementing each function in `src/`.** A function is not done until the harness reports PASS for its group.
-4. **Run `python harness/integration.py` after implementing `src/simulate.py`.** The integration test is not PASS until the bead-position distributions of C++ and Python ensembles are statistically compatible.
-5. The scoring functions must produce numerically equivalent results to the C++ on the same inputs (within 1e-6 absolute tolerance).
-6. Do not add features, abstractions, or generalizations beyond what the C++ reference implements.
+3. **Run `python harness/compare.py` after touching parity-baseline scoring code.** A function is not done until the harness reports PASS for its group.
+4. **Run `python harness/integration.py` after touching parity-baseline MC code.** Bead-position distributions of C++ and Python ensembles must remain statistically compatible.
+5. Parity-baseline scoring functions must produce numerically equivalent results to the C++ on the same inputs (within 1e-6 absolute tolerance).
+6. New features are allowed and encouraged to diverge from C++. They must be opt-in via `gnome3d/settings.py`, documented in the divergences section above, and must not change behavior when their flag is off.

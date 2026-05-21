@@ -1,10 +1,10 @@
 """
-    Command-line interface for 3dgnome-ng.
+Command-line interface for 3dgnome-ng.
 
-    gnome3d-ng --config data/GM12878/config.ini \
-               --region chr1:18288319-20307135   \
-               --n 1                             \
-               --out out/
+gnome3d-ng --config data/GM12878/config.ini \
+           --region chr1:18288319-20307135   \
+           --n 1                             \
+           --out out/
 """
 
 import argparse
