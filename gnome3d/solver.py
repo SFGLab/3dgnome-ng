@@ -642,16 +642,26 @@ class Solver:
 
         Returns (N, N) float64 target distance matrix or None if heatmap empty.
         """
+        import time
+
         s = self.s
         n = len(pos)
         n_reps = int(s.subanchor_estimate_replicates)
         n_steps = int(s.subanchor_estimate_steps)
+        log1 = s.output_level >= 1
+
+        if log1:
+            n_movable = int((~fixed).sum())
+            print(f"  [{label}] heat dist matrix: {n} beads "
+                  f"({n_movable} movable), {n_reps} reps × {n_steps} steps")
 
         avg_dist = np.zeros((n, n), dtype=np.float64)
+        t_mc_total = 0.0
 
         # Mirrors Reference: for each replicate, run n_steps MC passes from pos+noise,
         # keep the best structure, then accumulate pairwise distances from it.
         for rep in range(n_reps):
+            t_rep = time.perf_counter()
             rep_best_score = -1.0
             rep_best_pos = None
             for step in range(n_steps):
@@ -667,25 +677,51 @@ class Solver:
                     rep_best_pos = pos_trial.copy()
             diff = rep_best_pos[:, np.newaxis, :] - rep_best_pos[np.newaxis, :, :]
             avg_dist += np.sqrt((diff * diff).sum(axis=2))
+            t_rep = time.perf_counter() - t_rep
+            t_mc_total += t_rep
+            if log1:
+                print(f"    rep {rep + 1}/{n_reps}: best_score={rep_best_score:.4f}  "
+                      f"({t_rep:.2f}s)")
 
         avg_dist /= n_reps
 
         # Create expected distance matrix mirroring Reference createExpectedDistSubanchorHeatmap().
         avg_heat = float(subanchor_heat_raw.mean())
         if avg_heat < 1e-6:
+            if log1:
+                print(f"  [{label}] heat dist matrix: empty heatmap (mean<1e-6), skipped")
             return None
 
         influence = float(s.subanchor_heatmap_influence)
         heat_dist = np.zeros((n, n), dtype=np.float64)
+        n_pairs_active = 0
+        n_pairs_capped = 0
 
         for i in range(n):
             for j in range(i + 1, n):
                 s_val = (subanchor_heat_raw[i, j] / avg_heat) * influence
+                if s_val > 0.0:
+                    n_pairs_active += 1
                 if s_val > 1.0:
                     s_val = 1.0
+                    n_pairs_capped += 1
                 target = avg_dist[i, j] * (1.0 - s_val)
                 heat_dist[i, j] = target
                 heat_dist[j, i] = target
+
+        if log1:
+            n_pairs_total = n * (n - 1) // 2
+            iu = np.triu_indices(n, k=1)
+            upper = heat_dist[iu]
+            avg_dist_upper = avg_dist[iu]
+            mean_reduction = (1.0 - upper.mean() / avg_dist_upper.mean()) * 100.0 \
+                if avg_dist_upper.mean() > 0 else 0.0
+            print(f"  [{label}] heat dist matrix: avg_pair_dist={avg_dist_upper.mean():.3f}  "
+                  f"avg_heat={avg_heat:.4g}  influence={influence}")
+            print(f"  [{label}] heat dist matrix: {n_pairs_active}/{n_pairs_total} pairs active "
+                  f"({n_pairs_capped} capped at full reduction); "
+                  f"mean target reduction {mean_reduction:.1f}%  "
+                  f"(total MC time {t_mc_total:.2f}s)")
 
         return heat_dist
 
@@ -818,10 +854,6 @@ class Solver:
         # distances, then scales them down for high-contact pairs.
         heat_dist = None
         if subanchor_heat_raw is not None and s.use_subanchor_heatmap:
-            if s.output_level >= 2:
-                print(f"  [{label}] building subanchor heat dist matrix "
-                      f"({s.subanchor_estimate_replicates} replicates × "
-                      f"{s.subanchor_estimate_steps} steps)")
             heat_dist = self._build_heat_dist_subanchor(
                 pos, fixed, dtn, subanchor_heat_raw, step_size, label=label, log2=False)
 

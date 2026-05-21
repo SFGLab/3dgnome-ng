@@ -547,34 +547,85 @@ def write_cif(
 
     beads : list of (midpoint_bp, x, y, z)
         One entry per anchor bead, as returned by run_region() for one structure.
+
+    Includes _entity / _entity_poly / _entity_poly_seq declarations so ChimeraX
+    knows this is a polymer, and explicit `_struct_conn` covale records between
+    consecutive Cα atoms.
     """
-    header = f"""data_{entry_id}
-#
-_entry.id {entry_id}
-#
-_audit_conform.dict_name       mmcif_pdbx.dic
-_audit_conform.dict_version    5.296
-_audit_conform.dict_location   http://mmcif.pdb.org/dictionaries/ascii/mmcif_pdbx.dic
-#
-loop_
-_atom_site.group_PDB
-_atom_site.id
-_atom_site.type_symbol
-_atom_site.label_atom_id
-_atom_site.label_alt_id
-_atom_site.label_comp_id
-_atom_site.label_asym_id
-_atom_site.label_entity_id
-_atom_site.label_seq_id
-_atom_site.pdbx_PDB_ins_code
-_atom_site.Cartn_x
-_atom_site.Cartn_y
-_atom_site.Cartn_z
-_atom_site.occupancy
-_atom_site.B_iso_or_equiv
-_atom_site.auth_asym_id
-"""
+    n = len(beads)
     with open(path, "w") as f:
-        f.write(header)
+        f.write(f"data_{entry_id}\n")
+        f.write("#\n")
+        f.write(f"_entry.id {entry_id}\n")
+        f.write("#\n")
+        f.write("_audit_conform.dict_name       mmcif_pdbx.dic\n")
+        f.write("_audit_conform.dict_version    5.296\n")
+        f.write("_audit_conform.dict_location   "
+                "http://mmcif.pdb.org/dictionaries/ascii/mmcif_pdbx.dic\n")
+        f.write("#\n")
+        # Polymer entity declaration — what ChimeraX needs to skip distance
+        # inference and use sequential connectivity.
+        f.write("loop_\n")
+        f.write("_entity.id\n")
+        f.write("_entity.type\n")
+        f.write("_entity.src_method\n")
+        f.write("_entity.pdbx_description\n")
+        f.write('1 polymer syn "3dgnome chromatin model"\n')
+        f.write("#\n")
+        f.write("_entity_poly.entity_id 1\n")
+        f.write("_entity_poly.type polypeptide(L)\n")
+        f.write("_entity_poly.nstd_linkage no\n")
+        f.write("_entity_poly.nstd_monomer no\n")
+        f.write("#\n")
+        f.write("loop_\n")
+        f.write("_entity_poly_seq.entity_id\n")
+        f.write("_entity_poly_seq.num\n")
+        f.write("_entity_poly_seq.mon_id\n")
+        f.write("_entity_poly_seq.hetero\n")
+        for i in range(1, n + 1):
+            f.write(f"1 {i} ALA n\n")
+        f.write("#\n")
+        # Atom records
+        f.write("loop_\n")
+        f.write("_atom_site.group_PDB\n")
+        f.write("_atom_site.id\n")
+        f.write("_atom_site.type_symbol\n")
+        f.write("_atom_site.label_atom_id\n")
+        f.write("_atom_site.label_alt_id\n")
+        f.write("_atom_site.label_comp_id\n")
+        f.write("_atom_site.label_asym_id\n")
+        f.write("_atom_site.label_entity_id\n")
+        f.write("_atom_site.label_seq_id\n")
+        f.write("_atom_site.pdbx_PDB_ins_code\n")
+        f.write("_atom_site.Cartn_x\n")
+        f.write("_atom_site.Cartn_y\n")
+        f.write("_atom_site.Cartn_z\n")
+        f.write("_atom_site.occupancy\n")
+        f.write("_atom_site.B_iso_or_equiv\n")
+        f.write("_atom_site.auth_asym_id\n")
         for i, (_, x, y, z) in enumerate(beads, start=1):
             f.write(f"ATOM {i} C CA . ALA A 1 {i} ? {x} {y} {z} 1.00 99.99 C\n")
+
+        # Explicit backbone bonds (CA-CA) between consecutive residues.
+        # The polymer entity declaration alone is not enough for ChimeraX:
+        # it still uses a distance threshold (~4 A) to decide which Cα-Cα
+        # pairs to draw bonds for, which breaks for chromatin models where
+        # bead spacing varies. _struct_conn covale records force the bonds
+        # explicitly regardless of distance.
+        if n > 1:
+            f.write("#\n")
+            f.write("loop_\n")
+            f.write("_struct_conn.id\n")
+            f.write("_struct_conn.conn_type_id\n")
+            f.write("_struct_conn.ptnr1_label_asym_id\n")
+            f.write("_struct_conn.ptnr1_label_comp_id\n")
+            f.write("_struct_conn.ptnr1_label_seq_id\n")
+            f.write("_struct_conn.ptnr1_label_atom_id\n")
+            f.write("_struct_conn.ptnr2_label_asym_id\n")
+            f.write("_struct_conn.ptnr2_label_comp_id\n")
+            f.write("_struct_conn.ptnr2_label_seq_id\n")
+            f.write("_struct_conn.ptnr2_label_atom_id\n")
+            for i in range(1, n):
+                f.write(f"c{i} covale A ALA {i} CA A ALA {i + 1} CA\n")
+
+
