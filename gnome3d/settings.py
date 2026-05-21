@@ -113,8 +113,7 @@ class Settings:
         self.mc_stop_successes = 5
         self.mc_stop_steps = 10000
 
-        # ---- excluded volume (NEW FEATURE, diverges from C++ reference) ----
-        # See AGENTS.md "Python divergences from reference" for context.
+        # ---- excluded volume ----
         self.use_excluded_volume = False
         self.exclusion_radius = 1.0           # r0: pairs closer than this incur penalty
         self.exclusion_weight = 1.0           # k: multiplier (comparable to spring_*)
