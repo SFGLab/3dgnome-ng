@@ -374,6 +374,25 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in C++: 3dnome uses an inverse-distance repulsion only on pairs where the input arc matrix is marked negative — a sparse, conditional repulsion. This adds a global polymer-physics excluded-volume term independent of input data. Touches arc-MC (`_batch_arcs_nb`) and smooth-MC (`_batch_smooth_kernel_nb`).
 
+- **Spherical confinement** — `settings.use_confinement = true` to enable.
+  Soft envelope mimicking a nuclear boundary. For each bead at distance `r` from the per-MC-call centroid, contributes `confinement_weight * ((r - R)/R)²` if `r > R`, else 0. Per-bead (single-counted) — delta is `(local_curr - local_prev)` with no factor of 2. Settings:
+    - `use_confinement` (master toggle)
+    - `confinement_radius` (R; 0 = auto from bead count + bond length, see below)
+    - `confinement_weight` (k; comparable to spring constants; default 1.0)
+    - `confinement_packing_factor` (used only when radius=0; default 1.5 ≈ packing fraction ~7%)
+    - `confinement_apply_to_arcs` (default true)
+    - `confinement_apply_to_smooth` (default true)
+
+  Auto-radius: `R = packing_factor × avg_bond × N^(1/3)` where `avg_bond` is the mean of positive expected distances (arcs) or `mean(dtn)` (smooth). Center is computed as the centroid of starting positions, so per-IB MC calls naturally confine around the IB centroid; global calls (segment level) confine around the chromosome centroid. Motivated by: small interaction blocks in full-chromosome runs were getting flung out as long stretched chains because chain-bond springs alone couldn't hold loosely-constrained anchors. Touches arc-MC and smooth-MC.
+
+- **Small-IB spring boost** — `settings.use_small_ib_boost = true` to enable.
+  When an IB has fewer anchors than `small_ib_threshold`, multiplies `spring_stretch_arcs`, `spring_squeeze_arcs`, `spring_stretch`, `spring_squeeze`, `spring_angular` by `small_ib_spring_multiplier` for that IB only. No kernel changes — implemented in `solver.py::_settings_for_ib()` by passing a `copy.copy(self.s)` clone with boosted values to `_reconstruct_cluster_arcs` / `_reconstruct_cluster_smooth` via an `s_override` parameter. Thread-safe (never mutates `self.s`). Settings:
+    - `use_small_ib_boost`
+    - `small_ib_threshold` (anchor count below which an IB is "small"; default 10)
+    - `small_ib_spring_multiplier` (default 5.0)
+
+  Why not in C++: complements confinement to prevent under-constrained small IBs from stretching out. The boost tightens chain and bond springs so the chain compresses against any repulsive/heatmap forces. Targeted: only affects small IBs, doesn't change behavior of large well-constrained IBs.
+
 ---
 
 ## Correctness Rules

@@ -10,6 +10,8 @@ Mirrors Reference LooperSolver methods:
 
 from __future__ import annotations
 
+import copy
+
 import numpy as np
 
 from .data import ContactData
@@ -345,11 +347,17 @@ class Solver:
         """
         All work for one IB: arc MC + smooth MC.  Safe to call from a thread
         because each IB owns a disjoint subset of cluster indices.
+
+        If small_ib_boost is enabled and this IB is below threshold, spring
+        constants are multiplied for the duration of this IB only — a local
+        settings copy is used so we never mutate self.s (thread-safe).
         """
         log1 = self.s.output_level >= 1
         log2 = self.s.output_level >= 2
         if log1:
             print(f"\n[solver] {ib_label}  ({len(active_region)} anchors)")
+
+        s_ib = self._settings_for_ib(active_region, ib_label, log1)
 
         # Build singleton contact heatmaps if either feature is enabled.
         # Both heatmaps are derived from a single singleton-binning pass so
@@ -361,10 +369,30 @@ class Solver:
 
         exp_dist = self._calc_anchor_expected_distances(active_region, chr_, anchor_heat)
         self._reconstruct_cluster_arcs(ib_idx, active_region, exp_dist, ib_label,
-                                       log1=log1, log2=log2)
+                                       log1=log1, log2=log2, s_override=s_ib)
         return self._reconstruct_cluster_smooth(active_region, chr_, ib_label,
                                                 subanchor_heat_raw=subanchor_heat_raw,
-                                                log1=log1, log2=log2)
+                                                log1=log1, log2=log2, s_override=s_ib)
+
+    def _settings_for_ib(self, active_region: list, ib_label: str, log1: bool):
+        """Return self.s or a boosted copy if this IB qualifies as 'small'."""
+        if not getattr(self.s, "use_small_ib_boost", False):
+            return self.s
+        threshold = int(getattr(self.s, "small_ib_threshold", 10))
+        if len(active_region) >= threshold:
+            return self.s
+        m = float(getattr(self.s, "small_ib_spring_multiplier", 1.0))
+        if m == 1.0:
+            return self.s
+        s_boost = copy.copy(self.s)
+        s_boost.spring_stretch_arcs = self.s.spring_stretch_arcs * m
+        s_boost.spring_squeeze_arcs = self.s.spring_squeeze_arcs * m
+        s_boost.spring_stretch = self.s.spring_stretch * m
+        s_boost.spring_squeeze = self.s.spring_squeeze * m
+        s_boost.spring_angular = self.s.spring_angular * m
+        if log1:
+            print(f"  {ib_label}  small-IB spring boost ×{m}")
+        return s_boost
 
     def _calc_anchor_expected_distances(
         self,
@@ -433,12 +461,13 @@ class Solver:
         label: str = "",
         log1: bool = True,
         log2: bool = True,
+        s_override = None,
     ) -> None:
         """
         MC reconstruction for one interaction block (anchor level).
         Mirrors Reference reconstructClusterArcsDistances().
         """
-        s = self.s
+        s = s_override if s_override is not None else self.s
         active_size = len(active_region)
 
         # Compute noise size (avg expected distance between consecutive anchors * noise_arcs)
@@ -735,6 +764,7 @@ class Solver:
         subanchor_heat_raw: np.ndarray = None,
         log1: bool = True,
         log2: bool = False,
+        s_override = None,
     ) -> list:
         """
         Densify active region, then run smooth MC (chain + angle energy).
@@ -748,7 +778,7 @@ class Solver:
           - adds heat energy term to the final smooth MC
         """
         import math as _math
-        s = self.s
+        s = s_override if s_override is not None else self.s
         pos, fixed, gpos, dtn, anchor_map = self._densify_active_region(active_region)
         n = len(pos)
         if n <= 2:

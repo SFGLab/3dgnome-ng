@@ -121,6 +121,22 @@ class Settings:
         self.exclusion_apply_to_smooth = True
         self.exclusion_skip_neighbors = 1     # skip pairs with |i-j| <= this (1 = skip bonded)
 
+        # ---- confinement ----
+        # Soft sphere around per-MC-call centroid; pulls beads back inside.
+        self.use_confinement = False
+        self.confinement_radius = 0.0           # 0 = auto from bead count + bond length
+        self.confinement_weight = 1.0
+        self.confinement_packing_factor = 1.5   # used only when radius == 0 (auto)
+        self.confinement_apply_to_arcs = True
+        self.confinement_apply_to_smooth = True
+
+        # ---- small-IB spring boost ----
+        # Multiplies spring constants when reconstructing IBs with few anchors,
+        # to keep loosely-constrained chains from stretching out of the model.
+        self.use_small_ib_boost = False
+        self.small_ib_threshold = 10            # IBs with anchors < this are "small"
+        self.small_ib_spring_multiplier = 5.0
+
         # ---- MC smooth ----
         self.max_temp_smooth = 20.0
         self.dt_temp_smooth = 0.99995
@@ -274,6 +290,24 @@ class Settings:
                                               self.exclusion_apply_to_smooth)
         self.exclusion_skip_neighbors = geti("excluded_volume", "skip_neighbors",
                                              self.exclusion_skip_neighbors)
+
+        # [confinement]
+        self.use_confinement = getb("confinement", "use_confinement", self.use_confinement)
+        self.confinement_radius = getf("confinement", "radius", self.confinement_radius)
+        self.confinement_weight = getf("confinement", "weight", self.confinement_weight)
+        self.confinement_packing_factor = getf("confinement", "packing_factor",
+                                               self.confinement_packing_factor)
+        self.confinement_apply_to_arcs = getb("confinement", "apply_to_arcs",
+                                              self.confinement_apply_to_arcs)
+        self.confinement_apply_to_smooth = getb("confinement", "apply_to_smooth",
+                                                self.confinement_apply_to_smooth)
+
+        # [small_ib_boost]
+        self.use_small_ib_boost = getb("small_ib_boost", "use_small_ib_boost",
+                                       self.use_small_ib_boost)
+        self.small_ib_threshold = geti("small_ib_boost", "threshold", self.small_ib_threshold)
+        self.small_ib_spring_multiplier = getf("small_ib_boost", "spring_multiplier",
+                                               self.small_ib_spring_multiplier)
 
         # [simulation_arcs_smooth]
         self.smooth_dist_weight = getf("simulation_arcs_smooth", "dist_weight", self.smooth_dist_weight)

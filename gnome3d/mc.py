@@ -79,6 +79,35 @@ def _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w):
     return sc
 
 
+# Confinement helpers (soft spherical envelope around a center)
+#
+#   E(p) = weight * ((|r_p - c| - R) / R)^2   if |r_p - c| > R
+#        = 0                                  otherwise
+#
+# Per-bead (not per-pair), single-counted globally. Delta is (curr - prev),
+# no factor of 2.
+
+@njit(cache=True)
+def _local_confine_nb(pos, p, cx, cy, cz, R, weight):
+    dx = pos[p, 0] - cx
+    dy = pos[p, 1] - cy
+    dz = pos[p, 2] - cz
+    r = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if r <= R:
+        return 0.0
+    rel = (r - R) / R
+    return weight * rel * rel
+
+
+@njit(cache=True)
+def _init_confine_nb(pos, cx, cy, cz, R, weight):
+    n = pos.shape[0]
+    err = 0.0
+    for p in range(n):
+        err += _local_confine_nb(pos, p, cx, cy, cz, R, weight)
+    return err
+
+
 # Excluded-volume helpers (harmonic soft repulsion, cutoff at r0)
 #
 #   E_pair(d) = weight * ((r0 - d) / r0)^2   if d < r0
@@ -143,22 +172,24 @@ def _batch_smooth_kernel_nb(
     anchor_orn, bead_to_anchor_k,
     motif_weight, symmetric,
     use_excl, excl_r0, excl_weight, excl_skip,
-    score_struct, score_orn, score_heat, score_excl,
+    use_conf, conf_cx, conf_cy, conf_cz, conf_R, conf_weight,
+    score_struct, score_orn, score_heat, score_excl, score_conf,
 ):
     """Unified smooth-MC kernel.  Energy terms (toggled by flags):
       * structure   (always on): incremental delta via _local_smooth_nb
       * heat        (use_heat):  incremental delta via _local_heat_nb, 2x factor
       * orientation (use_orn):   incremental delta via weighted local, 2x factor
       * excl. vol   (use_excl):  incremental delta via _local_excl_nb, 2x factor
+      * confinement (use_conf):  incremental delta via _local_confine_nb, no 2x
 
-    Returns (T_out, score_struct, score_orn, score_heat, score_excl, n_ok).
+    Returns (T, score_struct, score_orn, score_heat, score_excl, score_conf, n_ok).
     Disabled-term arrays must still be valid-typed (any shape) - they are not
     indexed when their flag is False.
     """
     n = pos.shape[0]
     n_mov = movable.shape[0]
     n_ok = 0
-    score = score_struct + score_orn + score_heat + score_excl
+    score = score_struct + score_orn + score_heat + score_excl + score_conf
     for _ in range(n_steps):
         p = movable[np.random.randint(0, n_mov)]
         dx = np.random.uniform(-step_size, step_size)
@@ -174,6 +205,11 @@ def _batch_smooth_kernel_nb(
         loc_excl_prev = 0.0
         if use_excl:
             loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+
+        loc_conf_prev = 0.0
+        if use_conf:
+            loc_conf_prev = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz,
+                                              conf_R, conf_weight)
 
         orn_k = -1
         prev_ox = 0.0
@@ -208,6 +244,12 @@ def _batch_smooth_kernel_nb(
             loc_excl_curr = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
             score_excl_new = score_excl + 2.0 * (loc_excl_curr - loc_excl_prev)
 
+        score_conf_new = score_conf
+        if use_conf:
+            loc_conf_curr = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz,
+                                              conf_R, conf_weight)
+            score_conf_new = score_conf + (loc_conf_curr - loc_conf_prev)
+
         score_orn_new = score_orn
         if use_orn and orn_k >= 0:
             ar = anchor_ar[orn_k]
@@ -220,7 +262,8 @@ def _batch_smooth_kernel_nb(
                 motif_weight, symmetric)
             score_orn_new = score_orn + 2.0 * (loc_orn_curr - loc_orn_prev)
 
-        score_new = score_struct_new + score_orn_new + score_heat_new + score_excl_new
+        score_new = (score_struct_new + score_orn_new + score_heat_new
+                     + score_excl_new + score_conf_new)
 
         ok = score_new < score
         if not ok and T > 0.0 and score > 0.0:
@@ -233,6 +276,7 @@ def _batch_smooth_kernel_nb(
             score_orn = score_orn_new
             score_heat = score_heat_new
             score_excl = score_excl_new
+            score_conf = score_conf_new
         else:
             pos[p, 0] -= dx
             pos[p, 1] -= dy
@@ -242,7 +286,7 @@ def _batch_smooth_kernel_nb(
                 anchor_orn[orn_k, 1] = prev_oy
                 anchor_orn[orn_k, 2] = prev_oz
         T *= dt
-    return T, score_struct, score_orn, score_heat, score_excl, n_ok
+    return T, score_struct, score_orn, score_heat, score_excl, score_conf, n_ok
 
 
 # Orientation MC helpers
@@ -419,15 +463,16 @@ def _init_arcs_nb(pos, exp, stretch_k, squeeze_k):
 def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
                    n_steps, stretch_k, squeeze_k,
                    use_excl, excl_r0, excl_weight, excl_skip,
-                   score_arcs, score_excl):
-    """Run n_steps arc-MC steps with optional excluded-volume energy.
+                   use_conf, conf_cx, conf_cy, conf_cz, conf_R, conf_weight,
+                   score_arcs, score_excl, score_conf):
+    """Run n_steps arc-MC steps with optional excluded-volume and confinement.
 
-    Returns (T_out, score_arcs, score_excl, n_ok).
-    Arc spring score uses (curr - prev) delta; excl uses 2*(curr - prev).
+    Returns (T, score_arcs, score_excl, score_conf, n_ok).
+    Arc spring uses (curr - prev); excl uses 2*(curr - prev); confine uses (curr - prev).
     """
     n = pos.shape[0]
     n_ok = 0
-    score = score_arcs + score_excl
+    score = score_arcs + score_excl + score_conf
     for _ in range(n_steps):
         p = np.random.randint(0, n)
         dx = np.random.uniform(-step_size, step_size)
@@ -438,6 +483,10 @@ def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
         loc_excl_prev = 0.0
         if use_excl:
             loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+        loc_conf_prev = 0.0
+        if use_conf:
+            loc_conf_prev = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz,
+                                              conf_R, conf_weight)
 
         pos[p, 0] += dx
         pos[p, 1] += dy
@@ -451,7 +500,13 @@ def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
             loc_excl_curr = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
             score_excl_new = score_excl + 2.0 * (loc_excl_curr - loc_excl_prev)
 
-        score_new = score_arcs_new + score_excl_new
+        score_conf_new = score_conf
+        if use_conf:
+            loc_conf_curr = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz,
+                                              conf_R, conf_weight)
+            score_conf_new = score_conf + (loc_conf_curr - loc_conf_prev)
+
+        score_new = score_arcs_new + score_excl_new + score_conf_new
         ok = score_new <= score
         if not ok and score > 0.0 and T > 0.0:
             ok = (np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T))
@@ -461,12 +516,13 @@ def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
             score = score_new
             score_arcs = score_arcs_new
             score_excl = score_excl_new
+            score_conf = score_conf_new
         else:
             pos[p, 0] -= dx
             pos[p, 1] -= dy
             pos[p, 2] -= dz
         T *= dt
-    return T, score_arcs, score_excl, n_ok
+    return T, score_arcs, score_excl, score_conf, n_ok
 
 
 # Heatmap MC helpers
@@ -655,19 +711,41 @@ def mc_arcs(
 
     pw = _as_f64(pos)
     exp64 = _as_f64(exp_dist_mat)
+
+    # Confinement: center = centroid of starting pos; auto-radius derives from
+    # mean positive expected-distance and bead count.
+    use_conf = (bool(getattr(settings, "use_confinement", False))
+                and bool(getattr(settings, "confinement_apply_to_arcs", False)))
+    conf_cx = conf_cy = conf_cz = 0.0
+    conf_R = 1.0
+    conf_weight = float(getattr(settings, "confinement_weight", 1.0))
+    if use_conf:
+        conf_cx, conf_cy, conf_cz = (float(pw[:, 0].mean()),
+                                     float(pw[:, 1].mean()),
+                                     float(pw[:, 2].mean()))
+        conf_R = float(getattr(settings, "confinement_radius", 0.0))
+        if conf_R <= 0.0:
+            pos_mask = exp64 > 1e-6
+            avg_bond = float(exp64[pos_mask].mean()) if pos_mask.any() else 1.0
+            pf = float(getattr(settings, "confinement_packing_factor", 1.5))
+            conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
+
     score_arcs = float(_init_arcs_nb(pw, exp64, stretch_k, squeeze_k))
     score_excl = float(_init_excl_nb(pw, excl_r0, excl_weight, excl_skip)) if use_excl else 0.0
-    score = score_arcs + score_excl
+    score_conf = (float(_init_confine_nb(pw, conf_cx, conf_cy, conf_cz, conf_R, conf_weight))
+                  if use_conf else 0.0)
+    score = score_arcs + score_excl + score_conf
 
     ms_score = score
     step_i = 0
     while True:
-        T, score_arcs, score_excl, n_ok = _batch_arcs_nb(
+        T, score_arcs, score_excl, score_conf, n_ok = _batch_arcs_nb(
             pw, exp64, float(step_size), T, dt, jump_scale, jump_coef,
             stop_steps, stretch_k, squeeze_k,
             use_excl, excl_r0, excl_weight, excl_skip,
-            score_arcs, score_excl)
-        score = score_arcs + score_excl
+            use_conf, conf_cx, conf_cy, conf_cz, conf_R, conf_weight,
+            score_arcs, score_excl, score_conf)
+        score = score_arcs + score_excl + score_conf
         step_i += stop_steps
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (
@@ -741,6 +819,10 @@ def mc_smooth(
     excl_weight = float(getattr(settings, "exclusion_weight", 1.0))
     excl_skip = int(getattr(settings, "exclusion_skip_neighbors", 1))
 
+    use_conf = (bool(getattr(settings, "use_confinement", False))
+                and bool(getattr(settings, "confinement_apply_to_smooth", False)))
+    conf_weight = float(getattr(settings, "confinement_weight", 1.0))
+
     movable = np.where(~fixed)[0]
     if len(movable) == 0:
         return 0.0
@@ -750,6 +832,19 @@ def mc_smooth(
     pw = _as_f64(pos)
     dtn64 = _as_f64(dtn)
     mov64 = np.ascontiguousarray(movable, dtype=np.int64)
+
+    # Confinement center = centroid of starting pos; auto-radius from dtn + N.
+    conf_cx = conf_cy = conf_cz = 0.0
+    conf_R = 1.0
+    if use_conf:
+        conf_cx, conf_cy, conf_cz = (float(pw[:, 0].mean()),
+                                     float(pw[:, 1].mean()),
+                                     float(pw[:, 2].mean()))
+        conf_R = float(getattr(settings, "confinement_radius", 0.0))
+        if conf_R <= 0.0:
+            avg_bond = float(dtn64.mean()) if dtn64.size > 0 else 1.0
+            pf = float(getattr(settings, "confinement_packing_factor", 1.5))
+            conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
     # Heat state (dummy when disabled - never indexed inside the kernel)
     if use_heat:
@@ -804,12 +899,15 @@ def mc_smooth(
     score_struct = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k,
                                          ang_k, dist_w, ang_w))
     score_excl = float(_init_excl_nb(pw, excl_r0, excl_weight, excl_skip)) if use_excl else 0.0
-    score = score_struct + score_orn + score_heat + score_excl
+    score_conf = (float(_init_confine_nb(pw, conf_cx, conf_cy, conf_cz, conf_R, conf_weight))
+                  if use_conf else 0.0)
+    score = score_struct + score_orn + score_heat + score_excl + score_conf
 
     ms_score = score
     step_i = 0
     while True:
-        T, score_struct, score_orn, score_heat, score_excl, n_ok = _batch_smooth_kernel_nb(
+        (T, score_struct, score_orn, score_heat, score_excl,
+         score_conf, n_ok) = _batch_smooth_kernel_nb(
             pw, dtn64, mov64, float(step_size), T, dt, jump_scale, jump_coef,
             stop_steps, stretch_k, squeeze_k, ang_k, dist_w, ang_w,
             use_heat, heat64, heat_weight,
@@ -818,9 +916,10 @@ def mc_smooth(
             anchor_orn, bead_to_anchor_k,
             motif_weight, motifs_symmetric,
             use_excl, excl_r0, excl_weight, excl_skip,
-            score_struct, score_orn, score_heat, score_excl,
+            use_conf, conf_cx, conf_cy, conf_cz, conf_R, conf_weight,
+            score_struct, score_orn, score_heat, score_excl, score_conf,
         )
-        score = score_struct + score_orn + score_heat + score_excl
+        score = score_struct + score_orn + score_heat + score_excl + score_conf
         step_i += stop_steps
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (
