@@ -17,6 +17,7 @@ from gnome3d.data import ContactData
 from gnome3d.io import parse_region, write_cif
 from gnome3d.settings import Settings
 from gnome3d.solver import Solver
+from gnome3d.types import BedRegion
 
 
 def _run_structure(
@@ -24,8 +25,8 @@ def _run_structure(
     n: int,
     s: Settings,
     data: ContactData,
-    chrs_list: list,
-    region,
+    chrs_list: list[str],
+    region: BedRegion | None,
     out_dir: Path,
     entry_base: str,
 ) -> int:
@@ -46,7 +47,7 @@ def _run_structure(
     return len(beads)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="3dgnome-ng structure prediction")
     parser.add_argument("--config", required=True, help="Path to config.ini")
     parser.add_argument("--region", required=True,

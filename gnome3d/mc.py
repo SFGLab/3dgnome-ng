@@ -12,16 +12,42 @@ Acceptance criterion (all loops):
       or rand() < jump_scale * exp(-jump_coef * score_new/score_curr / T)
 """
 
+from __future__ import annotations
+
 import math
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 
 import numpy as np
-from numba import njit
+from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
+
+from .types import BoolArray, F64Array, I32Array, I64Array
+
+if TYPE_CHECKING:
+    from .settings import Settings
+
+# Typed wrapper around numba.njit so pyright sees decorated functions
+# with their original signatures.  At runtime this is just numba.njit.
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def njit(**kwargs: Any) -> Callable[[F], F]:
+    def decorator(fn: F) -> F:
+        return cast(F, _njit(**kwargs)(fn))
+
+    return decorator
 
 
 # Smooth MC helpers
 
 @njit(cache=True)
-def _smooth_len_nb(pos, dtn, i, stretch_k, squeeze_k, dist_w):
+def _smooth_len_nb(
+    pos: F64Array,
+    dtn: F64Array,
+    i: int,
+    stretch_k: float,
+    squeeze_k: float,
+    dist_w: float,
+) -> float:
     dx = pos[i, 0] - pos[i + 1, 0]
     dy = pos[i, 1] - pos[i + 1, 1]
     dz = pos[i, 2] - pos[i + 1, 2]
@@ -35,7 +61,7 @@ def _smooth_len_nb(pos, dtn, i, stretch_k, squeeze_k, dist_w):
 
 
 @njit(cache=True)
-def _smooth_ang_nb(pos, i, ang_k, ang_w):
+def _smooth_ang_nb(pos: F64Array, i: int, ang_k: float, ang_w: float) -> float:
     v1x = pos[i, 0] - pos[i + 1, 0]
     v1y = pos[i, 1] - pos[i + 1, 1]
     v1z = pos[i, 2] - pos[i + 1, 2]
@@ -47,14 +73,26 @@ def _smooth_ang_nb(pos, i, ang_k, ang_w):
     if n1 < 1e-12 or n2 < 1e-12:
         return 0.0
     cos_a = (v1x * v2x + v1y * v2y + v1z * v2z) / (n1 * n2)
-    if cos_a > 1.0: cos_a = 1.0
-    if cos_a < -1.0: cos_a = -1.0
+    if cos_a > 1.0:
+        cos_a = 1.0
+    if cos_a < -1.0:
+        cos_a = -1.0
     ang = 1.0 - (cos_a + 1.0) * 0.5
     return ang * ang * ang * ang_k * ang_w
 
 
 @njit(cache=True)
-def _local_smooth_nb(pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w):
+def _local_smooth_nb(
+    pos: F64Array,
+    dtn: F64Array,
+    p: int,
+    n: int,
+    stretch_k: float,
+    squeeze_k: float,
+    ang_k: float,
+    dist_w: float,
+    ang_w: float,
+) -> float:
     sc = 0.0
     i = p - 1
     if 0 <= i < n - 1:
@@ -69,7 +107,15 @@ def _local_smooth_nb(pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
 
 
 @njit(cache=True)
-def _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w):
+def _init_smooth_nb(
+    pos: F64Array,
+    dtn: F64Array,
+    stretch_k: float,
+    squeeze_k: float,
+    ang_k: float,
+    dist_w: float,
+    ang_w: float,
+) -> float:
     n = pos.shape[0]
     sc = 0.0
     for i in range(n - 1):
@@ -88,7 +134,9 @@ def _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w):
 # no factor of 2.
 
 @njit(cache=True)
-def _local_confine_nb(pos, p, cx, cy, cz, R, weight):
+def _local_confine_nb(
+    pos: F64Array, p: int, cx: float, cy: float, cz: float, R: float, weight: float
+) -> float:
     dx = pos[p, 0] - cx
     dy = pos[p, 1] - cy
     dz = pos[p, 2] - cz
@@ -100,7 +148,9 @@ def _local_confine_nb(pos, p, cx, cy, cz, R, weight):
 
 
 @njit(cache=True)
-def _init_confine_nb(pos, cx, cy, cz, R, weight):
+def _init_confine_nb(
+    pos: F64Array, cx: float, cy: float, cz: float, R: float, weight: float
+) -> float:
     n = pos.shape[0]
     err = 0.0
     for p in range(n):
@@ -118,7 +168,7 @@ def _init_confine_nb(pos, cx, cy, cz, R, weight):
 # sum_{i != j, |i-j| > skip} E_pair(d_ij). Delta is 2 * (local_curr - local_prev).
 
 @njit(cache=True)
-def _excl_pair_nb(d, r0, weight):
+def _excl_pair_nb(d: float, r0: float, weight: float) -> float:
     if d >= r0:
         return 0.0
     rel = (r0 - d) / r0
@@ -126,7 +176,7 @@ def _excl_pair_nb(d, r0, weight):
 
 
 @njit(cache=True)
-def _local_excl_nb(pos, p, r0, weight, skip):
+def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -> float:
     n = pos.shape[0]
     err = 0.0
     for i in range(n):
@@ -144,7 +194,7 @@ def _local_excl_nb(pos, p, r0, weight, skip):
 
 
 @njit(cache=True)
-def _init_excl_nb(pos, r0, weight, skip):
+def _init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
     n = pos.shape[0]
     err = 0.0
     for i in range(n):
@@ -164,17 +214,49 @@ def _init_excl_nb(pos, r0, weight, skip):
 
 @njit(cache=True)
 def _batch_smooth_kernel_nb(
-    pos, dtn, movable, step_size, T, dt, jump_scale, jump_coef, n_steps,
-    stretch_k, squeeze_k, ang_k, dist_w, ang_w,
-    use_heat, heat_dist, heat_weight,
-    use_orn, orn_is_L, anchor_ar,
-    nbr_offsets, nbr_indices, nbr_weights,
-    anchor_orn, bead_to_anchor_k,
-    motif_weight, symmetric,
-    use_excl, excl_r0, excl_weight, excl_skip,
-    use_conf, conf_cx, conf_cy, conf_cz, conf_R, conf_weight,
-    score_struct, score_orn, score_heat, score_excl, score_conf,
-):
+    pos: F64Array,
+    dtn: F64Array,
+    movable: I64Array,
+    step_size: float,
+    T: float,
+    dt: float,
+    jump_scale: float,
+    jump_coef: float,
+    n_steps: int,
+    stretch_k: float,
+    squeeze_k: float,
+    ang_k: float,
+    dist_w: float,
+    ang_w: float,
+    use_heat: bool,
+    heat_dist: F64Array,
+    heat_weight: float,
+    use_orn: bool,
+    orn_is_L: BoolArray,
+    anchor_ar: I32Array,
+    nbr_offsets: I32Array,
+    nbr_indices: I32Array,
+    nbr_weights: F64Array,
+    anchor_orn: F64Array,
+    bead_to_anchor_k: I32Array,
+    motif_weight: float,
+    symmetric: bool,
+    use_excl: bool,
+    excl_r0: float,
+    excl_weight: float,
+    excl_skip: int,
+    use_conf: bool,
+    conf_cx: float,
+    conf_cy: float,
+    conf_cz: float,
+    conf_R: float,
+    conf_weight: float,
+    score_struct: float,
+    score_orn: float,
+    score_heat: float,
+    score_excl: float,
+    score_conf: float,
+) -> tuple[float, float, float, float, float, float, int]:
     """Smooth-MC kernel.  Energy terms (toggled by flags):
       * structure   (always on): incremental delta via _local_smooth_nb
       * heat        (use_heat):  incremental delta via _local_heat_nb, 2x factor
@@ -191,7 +273,7 @@ def _batch_smooth_kernel_nb(
     n_ok = 0
     score = score_struct + score_orn + score_heat + score_excl + score_conf
     for _ in range(n_steps):
-        p = movable[np.random.randint(0, n_mov)]
+        p: int = int(movable[np.random.randint(0, n_mov)])
         dx = np.random.uniform(-step_size, step_size)
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
@@ -211,13 +293,13 @@ def _batch_smooth_kernel_nb(
             loc_conf_prev = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz,
                                               conf_R, conf_weight)
 
-        orn_k = -1
+        orn_k: int = -1
         prev_ox = 0.0
         prev_oy = 0.0
         prev_oz = 0.0
         loc_orn_prev = 0.0
         if use_orn:
-            orn_k = bead_to_anchor_k[p]
+            orn_k = int(bead_to_anchor_k[p])
             if orn_k >= 0:
                 prev_ox = anchor_orn[orn_k, 0]
                 prev_oy = anchor_orn[orn_k, 1]
@@ -252,8 +334,8 @@ def _batch_smooth_kernel_nb(
 
         score_orn_new = score_orn
         if use_orn and orn_k >= 0:
-            ar = anchor_ar[orn_k]
-            ox, oy, oz = _calc_orientation_nb(pos, ar, n, orn_is_L[ar])
+            ar: int = int(anchor_ar[orn_k])
+            ox, oy, oz = _calc_orientation_nb(pos, ar, n, bool(orn_is_L[ar]))
             anchor_orn[orn_k, 0] = ox
             anchor_orn[orn_k, 1] = oy
             anchor_orn[orn_k, 2] = oz
@@ -292,7 +374,9 @@ def _batch_smooth_kernel_nb(
 # Orientation MC helpers
 
 @njit(cache=True)
-def _calc_orientation_nb(pos, cind, n, is_L):
+def _calc_orientation_nb(
+    pos: F64Array, cind: int, n: int, is_L: bool
+) -> tuple[float, float, float]:
     """Returns (ox, oy, oz) normalized orientation vector for anchor at cind."""
     if cind == 0:
         ox = pos[cind + 1, 0] - pos[cind, 0]
@@ -319,8 +403,14 @@ def _calc_orientation_nb(pos, cind, n, is_L):
 
 
 @njit(cache=True)
-def _score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices, nbr_weights,
-                               motif_weight, symmetric):
+def _score_orientation_full_nb(
+    anchor_orn: F64Array,
+    nbr_offsets: I32Array,
+    nbr_indices: I32Array,
+    nbr_weights: F64Array,
+    motif_weight: float,
+    symmetric: bool,
+) -> float:
     """Global orientation score with arc weights; used for initialisation only."""
     n_anchors = anchor_orn.shape[0]
     err = 0.0
@@ -345,8 +435,15 @@ def _score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices, nbr_weights
 
 
 @njit(cache=True)
-def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
-                                nbr_weights, motif_weight, symmetric):
+def _local_score_orientation_nb(
+    anchor_orn: F64Array,
+    k: int,
+    nbr_offsets: I32Array,
+    nbr_indices: I32Array,
+    nbr_weights: F64Array,
+    motif_weight: float,
+    symmetric: bool,
+) -> float:
     """Local orientation score for anchor k, weighted by per-arc weights.
     Used for the incremental update: score_orn += 2*(local_curr - local_prev).
     The weights make this delta exact w.r.t. _score_orientation_full_nb - no drift.
@@ -374,7 +471,7 @@ def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
 
 
 @njit(cache=True)
-def _local_heat_nb(pos, heat_dist, p, heat_weight):
+def _local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: float) -> float:
     """Local heat score for bead p vs all others.
     Mirrors Reference calcScoreSubanchorHeatmap(int moved) - sums all i != p.
     """
@@ -396,7 +493,7 @@ def _local_heat_nb(pos, heat_dist, p, heat_weight):
 
 
 @njit(cache=True)
-def _init_heat_nb(pos, heat_dist, heat_weight):
+def _init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> float:
     """Global heat score (double-counts pairs, matching Reference calcScoreSubanchorHeatmap())."""
     n = pos.shape[0]
     err = 0.0
@@ -419,7 +516,9 @@ def _init_heat_nb(pos, heat_dist, heat_weight):
 # Arcs MC helpers
 
 @njit(cache=True)
-def _local_arcs_nb(pos, exp, p, stretch_k, squeeze_k):
+def _local_arcs_nb(
+    pos: F64Array, exp: F64Array, p: int, stretch_k: float, squeeze_k: float
+) -> float:
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
@@ -439,7 +538,9 @@ def _local_arcs_nb(pos, exp, p, stretch_k, squeeze_k):
 
 
 @njit(cache=True)
-def _init_arcs_nb(pos, exp, stretch_k, squeeze_k):
+def _init_arcs_nb(
+    pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float
+) -> float:
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
@@ -460,11 +561,31 @@ def _init_arcs_nb(pos, exp, stretch_k, squeeze_k):
 
 
 @njit(cache=True)
-def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
-                   n_steps, stretch_k, squeeze_k,
-                   use_excl, excl_r0, excl_weight, excl_skip,
-                   use_conf, conf_cx, conf_cy, conf_cz, conf_R, conf_weight,
-                   score_arcs, score_excl, score_conf):
+def _batch_arcs_nb(
+    pos: F64Array,
+    exp: F64Array,
+    step_size: float,
+    T: float,
+    dt: float,
+    jump_scale: float,
+    jump_coef: float,
+    n_steps: int,
+    stretch_k: float,
+    squeeze_k: float,
+    use_excl: bool,
+    excl_r0: float,
+    excl_weight: float,
+    excl_skip: int,
+    use_conf: bool,
+    conf_cx: float,
+    conf_cy: float,
+    conf_cz: float,
+    conf_R: float,
+    conf_weight: float,
+    score_arcs: float,
+    score_excl: float,
+    score_conf: float,
+) -> tuple[float, float, float, float, int]:
     """Run n_steps arc-MC steps with optional excluded-volume and confinement.
 
     Returns (T, score_arcs, score_excl, score_conf, n_ok).
@@ -474,7 +595,7 @@ def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
     n_ok = 0
     score = score_arcs + score_excl + score_conf
     for _ in range(n_steps):
-        p = np.random.randint(0, n)
+        p: int = int(np.random.randint(0, n))  # pyright: ignore[reportUnknownArgumentType]
         dx = np.random.uniform(-step_size, step_size)
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
@@ -528,7 +649,9 @@ def _batch_arcs_nb(pos, exp, step_size, T, dt, jump_scale, jump_coef,
 # Heatmap MC helpers
 
 @njit(cache=True)
-def _local_heatmap_nb(pos, exp_safe, skip_col, p):
+def _local_heatmap_nb(
+    pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p: int
+) -> float:
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
@@ -545,7 +668,7 @@ def _local_heatmap_nb(pos, exp_safe, skip_col, p):
 
 
 @njit(cache=True)
-def _init_heatmap_nb(pos, exp_safe, skip):
+def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float:
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
@@ -563,13 +686,23 @@ def _init_heatmap_nb(pos, exp_safe, skip):
 
 
 @njit(cache=True)
-def _batch_heatmap_nb(pos, exp_safe, skip, step_size, T, dt,
-                      jump_scale, jump_coef, n_steps, score):
+def _batch_heatmap_nb(
+    pos: F64Array,
+    exp_safe: F64Array,
+    skip: BoolArray,
+    step_size: float,
+    T: float,
+    dt: float,
+    jump_scale: float,
+    jump_coef: float,
+    n_steps: int,
+    score: float,
+) -> tuple[float, float, int]:
     """Run n_steps heatmap-MC steps.  Returns (T_out, score_out, n_ok)."""
     n = pos.shape[0]
     n_ok = 0
     for _ in range(n_steps):
-        p = np.random.randint(0, n)
+        p: int = int(np.random.randint(0, n))  # pyright: ignore[reportUnknownArgumentType]
         dx = np.random.uniform(-step_size, step_size)
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
@@ -599,18 +732,18 @@ def _batch_heatmap_nb(pos, exp_safe, skip, step_size, T, dt,
 
 # Shared helper
 
-def _as_f64(arr):
+def _as_f64(arr: np.ndarray[Any, Any]) -> F64Array:
     return np.ascontiguousarray(arr, dtype=np.float64)
 
 
 # Public MC loops
 
 def mc_heatmap(
-    pos: np.ndarray,  # (N, 3) float32 - modified in place
-    exp_dist: np.ndarray,  # (N, N) - expected pairwise distances
+    pos: np.ndarray[Any, Any],  # (N, 3) float32 - modified in place
+    exp_dist: np.ndarray[Any, Any],  # (N, N) - expected pairwise distances
     diag_size: int,
     step_size: float,
-    settings,
+    settings: Settings,
     label: str = "",
     verbose: bool = False,
 ) -> float:
@@ -626,7 +759,7 @@ def mc_heatmap(
     if n <= 1:
         return 0.0
 
-    idx = np.arange(n)
+    idx: I64Array = np.arange(n, dtype=np.int64)
     diag_mask = np.abs(idx[:, None] - idx[None, :]) < diag_size
     skip = diag_mask | (exp_dist < 1e-6)
     exp_safe = np.where(skip, 1.0, exp_dist)
@@ -643,7 +776,7 @@ def mc_heatmap(
 
     pw = _as_f64(pos)
     es64 = _as_f64(exp_safe)
-    skip_b = np.ascontiguousarray(skip, dtype=np.bool_)
+    skip_b: BoolArray = np.ascontiguousarray(skip, dtype=np.bool_)
     score = float(_init_heatmap_nb(pw, es64, skip_b))
 
     ms_score = score
@@ -671,10 +804,10 @@ def mc_heatmap(
 
 
 def mc_arcs(
-    pos: np.ndarray,  # (N, 3) float32 - modified in place
-    exp_dist_mat: np.ndarray,  # (N, N) - -1=repulsion, 0=none, >0=spring distance
+    pos: np.ndarray[Any, Any],  # (N, 3) float32 - modified in place
+    exp_dist_mat: np.ndarray[Any, Any],  # (N, N) - -1=repulsion, 0=none, >0=spring distance
     step_size: float,
-    settings,
+    settings: Settings,
     label: str = "",
     verbose: bool = False,
 ) -> float:
@@ -701,11 +834,10 @@ def mc_arcs(
     stretch_k = float(settings.spring_stretch_arcs)
     squeeze_k = float(settings.spring_squeeze_arcs)
 
-    use_excl = (bool(getattr(settings, "use_excluded_volume", False))
-                and bool(getattr(settings, "exclusion_apply_to_arcs", False)))
-    excl_r0 = float(getattr(settings, "exclusion_radius", 1.0))
-    excl_weight = float(getattr(settings, "exclusion_weight", 1.0))
-    excl_skip = int(getattr(settings, "exclusion_skip_neighbors", 1))
+    use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
+    excl_r0 = float(settings.exclusion_radius)
+    excl_weight = float(settings.exclusion_weight)
+    excl_skip = int(settings.exclusion_skip_neighbors)
 
     prefix = f"    [{label}] " if label else "    "
 
@@ -714,20 +846,21 @@ def mc_arcs(
 
     # Confinement: center = centroid of starting pos; auto-radius derives from
     # mean positive expected-distance and bead count.
-    use_conf = (bool(getattr(settings, "use_confinement", False))
-                and bool(getattr(settings, "confinement_apply_to_arcs", False)))
-    conf_cx = conf_cy = conf_cz = 0.0
-    conf_R = 1.0
-    conf_weight = float(getattr(settings, "confinement_weight", 1.0))
+    use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_arcs)
+    conf_cx: float = 0.0
+    conf_cy: float = 0.0
+    conf_cz: float = 0.0
+    conf_R: float = 1.0
+    conf_weight = float(settings.confinement_weight)
     if use_conf:
-        conf_cx, conf_cy, conf_cz = (float(pw[:, 0].mean()),
-                                     float(pw[:, 1].mean()),
-                                     float(pw[:, 2].mean()))
-        conf_R = float(getattr(settings, "confinement_radius", 0.0))
+        conf_cx = float(pw[:, 0].mean())
+        conf_cy = float(pw[:, 1].mean())
+        conf_cz = float(pw[:, 2].mean())
+        conf_R = float(settings.confinement_radius)
         if conf_R <= 0.0:
             pos_mask = exp64 > 1e-6
             avg_bond = float(exp64[pos_mask].mean()) if pos_mask.any() else 1.0
-            pf = float(getattr(settings, "confinement_packing_factor", 1.5))
+            pf = float(settings.confinement_packing_factor)
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
     score_arcs = float(_init_arcs_nb(pw, exp64, stretch_k, squeeze_k))
@@ -765,15 +898,15 @@ def mc_arcs(
 
 
 def mc_smooth(
-    pos: np.ndarray,  # (N, 3) float32 - modified in place; anchors are fixed
-    dtn: np.ndarray,  # (N-1,) expected distances between consecutive beads
-    fixed: np.ndarray,  # (N,) bool - True for anchor beads (never moved)
+    pos: np.ndarray[Any, Any],  # (N, 3) float32 - modified in place; anchors are fixed
+    dtn: np.ndarray[Any, Any],  # (N-1,) expected distances between consecutive beads
+    fixed: np.ndarray[Any, Any],  # (N,) bool - True for anchor beads (never moved)
     step_size: float,
-    settings,
-    char_orientations: np.ndarray = None,  # (N,) CTCF orientation chars; None = no motif
-    anchor_neighbors: dict = None,  # {anchor_k: [anchor_j, ...]}
-    anchor_neighbor_weights: dict = None,  # {anchor_k: [float, ...]}
-    heat_dist: np.ndarray = None,  # (N, N) subanchor heat expected distances; None = disabled
+    settings: Settings,
+    char_orientations: np.ndarray[Any, Any] | None = None,  # (N,) CTCF orientation chars; None = no motif
+    anchor_neighbors: dict[int, list[int]] | None = None,  # {anchor_k: [anchor_j, ...]}
+    anchor_neighbor_weights: dict[int, list[float]] | None = None,  # {anchor_k: [float, ...]}
+    heat_dist: np.ndarray[Any, Any] | None = None,  # (N, N) subanchor heat expected distances; None = disabled
     label: str = "",
     verbose: bool = False,
 ) -> float:
@@ -806,24 +939,23 @@ def mc_smooth(
     use_orn = (
         char_orientations is not None
         and anchor_neighbors is not None
-        and getattr(settings, "use_ctcf_motif", False)
+        and anchor_neighbor_weights is not None
+        and bool(settings.use_ctcf_motif)
     )
     use_heat = heat_dist is not None
-    motif_weight = float(getattr(settings, "motif_weight", 1.0))
-    motifs_symmetric = bool(getattr(settings, "motifs_symmetric", True))
-    heat_weight = float(getattr(settings, "subanchor_heatmap_dist_weight", 0.01))
+    motif_weight = float(settings.motif_weight)
+    motifs_symmetric = bool(settings.motifs_symmetric)
+    heat_weight = float(settings.subanchor_heatmap_dist_weight)
 
-    use_excl = (bool(getattr(settings, "use_excluded_volume", False))
-                and bool(getattr(settings, "exclusion_apply_to_smooth", False)))
-    excl_r0 = float(getattr(settings, "exclusion_radius", 1.0))
-    excl_weight = float(getattr(settings, "exclusion_weight", 1.0))
-    excl_skip = int(getattr(settings, "exclusion_skip_neighbors", 1))
+    use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
+    excl_r0 = float(settings.exclusion_radius)
+    excl_weight = float(settings.exclusion_weight)
+    excl_skip = int(settings.exclusion_skip_neighbors)
 
-    use_conf = (bool(getattr(settings, "use_confinement", False))
-                and bool(getattr(settings, "confinement_apply_to_smooth", False)))
-    conf_weight = float(getattr(settings, "confinement_weight", 1.0))
+    use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth)
+    conf_weight = float(settings.confinement_weight)
 
-    movable = np.where(~fixed)[0]
+    movable: I64Array = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
     if len(movable) == 0:
         return 0.0
 
@@ -831,23 +963,25 @@ def mc_smooth(
 
     pw = _as_f64(pos)
     dtn64 = _as_f64(dtn)
-    mov64 = np.ascontiguousarray(movable, dtype=np.int64)
 
     # Confinement center = centroid of starting pos; auto-radius from dtn + N.
-    conf_cx = conf_cy = conf_cz = 0.0
-    conf_R = 1.0
+    conf_cx: float = 0.0
+    conf_cy: float = 0.0
+    conf_cz: float = 0.0
+    conf_R: float = 1.0
     if use_conf:
-        conf_cx, conf_cy, conf_cz = (float(pw[:, 0].mean()),
-                                     float(pw[:, 1].mean()),
-                                     float(pw[:, 2].mean()))
-        conf_R = float(getattr(settings, "confinement_radius", 0.0))
+        conf_cx = float(pw[:, 0].mean())
+        conf_cy = float(pw[:, 1].mean())
+        conf_cz = float(pw[:, 2].mean())
+        conf_R = float(settings.confinement_radius)
         if conf_R <= 0.0:
             avg_bond = float(dtn64.mean()) if dtn64.size > 0 else 1.0
-            pf = float(getattr(settings, "confinement_packing_factor", 1.5))
+            pf = float(settings.confinement_packing_factor)
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
     # Heat state (dummy when disabled - never indexed inside the kernel)
     if use_heat:
+        assert heat_dist is not None
         heat64 = _as_f64(heat_dist)
         score_heat = float(_init_heat_nb(pw, heat64, heat_weight))
     else:
@@ -856,30 +990,37 @@ def mc_smooth(
 
     # Orientation state (dummy when disabled)
     if use_orn:
+        assert anchor_neighbors is not None
+        assert anchor_neighbor_weights is not None
+        assert char_orientations is not None
         from .util import calc_orientation as _calc_orn
-        anchor_ar = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
+        anchor_ar: I32Array = np.array(
+            [int(i) for i in np.where(fixed)[0]], dtype=np.int32
+        )
         n_anchors = len(anchor_ar)
-        nbr_offsets = np.zeros(n_anchors + 1, dtype=np.int32)
+        nbr_offsets: I32Array = np.zeros(n_anchors + 1, dtype=np.int32)
         for _k in range(n_anchors):
             nbr_offsets[_k + 1] = nbr_offsets[_k] + len(anchor_neighbors.get(_k, []))
         _total = int(nbr_offsets[n_anchors])
-        nbr_indices = np.empty(_total, dtype=np.int32)
-        nbr_weights_arr = np.empty(_total, dtype=np.float64)
+        nbr_indices: I32Array = np.empty(_total, dtype=np.int32)
+        nbr_weights_arr: F64Array = np.empty(_total, dtype=np.float64)
         for _k in range(n_anchors):
             for _ki, (_j, _w) in enumerate(zip(anchor_neighbors.get(_k, []),
                                                anchor_neighbor_weights.get(_k, []))):
                 _off = nbr_offsets[_k] + _ki
                 nbr_indices[_off] = _j
                 nbr_weights_arr[_off] = _w
-        orn_is_L = np.array([c == 'L' for c in char_orientations], dtype=np.bool_)
-        bead_to_anchor_k = np.full(n, -1, dtype=np.int32)
+        orn_is_L: BoolArray = np.array(
+            [c == 'L' for c in char_orientations], dtype=np.bool_
+        )
+        bead_to_anchor_k: I32Array = cast(I32Array, np.full(n, -1, dtype=np.int32))
         for _k in range(n_anchors):
             _ar = int(anchor_ar[_k])
             if _ar > 0:
                 bead_to_anchor_k[_ar - 1] = _k
             if _ar + 1 < n:
                 bead_to_anchor_k[_ar + 1] = _k
-        anchor_orn = np.zeros((n_anchors, 3), dtype=np.float64)
+        anchor_orn: F64Array = np.zeros((n_anchors, 3), dtype=np.float64)
         for _k in range(n_anchors):
             _ar = int(anchor_ar[_k])
             anchor_orn[_k] = _calc_orn(pw, _ar, n, char_orientations[_ar])
@@ -892,7 +1033,7 @@ def mc_smooth(
         nbr_indices = np.zeros(1, dtype=np.int32)
         nbr_weights_arr = np.zeros(1, dtype=np.float64)
         orn_is_L = np.zeros(1, dtype=np.bool_)
-        bead_to_anchor_k = np.full(n, -1, dtype=np.int32)
+        bead_to_anchor_k = cast(I32Array, np.full(n, -1, dtype=np.int32))
         anchor_orn = np.zeros((1, 3), dtype=np.float64)
         score_orn = 0.0
 
@@ -908,7 +1049,7 @@ def mc_smooth(
     while True:
         (T, score_struct, score_orn, score_heat, score_excl,
          score_conf, n_ok) = _batch_smooth_kernel_nb(
-            pw, dtn64, mov64, float(step_size), T, dt, jump_scale, jump_coef,
+            pw, dtn64, movable, float(step_size), T, dt, jump_scale, jump_coef,
             stop_steps, stretch_k, squeeze_k, ang_k, dist_w, ang_w,
             use_heat, heat64, heat_weight,
             use_orn, orn_is_L, anchor_ar,

@@ -18,3 +18,20 @@ gnome3d-ng = "gnome3d.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["gnome3d*"]
+
+[tool.pyright]
+include = ["gnome3d"]
+exclude = ["**/__pycache__", ".venv", "build", "dist"]
+pythonVersion = "3.11"
+pythonPlatform = "Darwin"
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "none"
+reportUnknownMemberType = "warning"
+reportUnknownArgumentType = "warning"
+reportUnknownVariableType = "warning"
+reportUnknownParameterType = "error"
+reportMissingParameterType = "error"
+reportMissingTypeArgument = "error"
+reportConstantRedefinition = "none"

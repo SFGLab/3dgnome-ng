@@ -1,4 +1,22 @@
 from dataclasses import dataclass
+from typing import TypeAlias
+
+import numpy as np
+from numpy.typing import NDArray
+
+# Numpy array aliases used throughout the package.
+F32Array: TypeAlias = NDArray[np.float32]
+F64Array: TypeAlias = NDArray[np.float64]
+I32Array: TypeAlias = NDArray[np.int32]
+I64Array: TypeAlias = NDArray[np.int64]
+BoolArray: TypeAlias = NDArray[np.bool_]
+StrArray: TypeAlias = NDArray[np.str_]
+
+# (chr1, pos1, chr2, pos2, score) singleton contact tuple.
+SingletonContact: TypeAlias = tuple[str, int, str, int, int]
+
+# (genomic_midpoint_bp, x, y, z) bead position output tuple.
+BeadOut: TypeAlias = tuple[int, float, float, float]
 
 
 @dataclass
@@ -38,6 +56,17 @@ class InteractionArc:
     factor: int = 0
     genomic_start: int = 0
     genomic_end: int = 0
+
+
+# Arc-collection mappings used everywhere downstream.
+
+AnchorMap: TypeAlias = dict[str, list["Anchor"]]
+
+ArcMap: TypeAlias = dict[str, list[InteractionArc]]
+
+RawArcMap: TypeAlias = dict[str, list["RawArc"]]
+
+BreakpointMap: TypeAlias = dict[str, list[int]]
 
 
 @dataclass

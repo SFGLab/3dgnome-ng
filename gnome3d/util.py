@@ -2,10 +2,14 @@
 util functions for 3dgnome-ng.
 """
 
+from __future__ import annotations
+
 import math
 import random
 
 import numpy as np
+
+from .types import F32Array, F64Array
 
 
 # Distance conversion functions
@@ -32,7 +36,8 @@ def freq_to_distance(freq: int, a: float, scale: float, shift: float, base_level
     except OverflowError:  # Reference exp() returns inf -> scale/inf = 0
         return base_level
 
-def random_vector_np(step: float) -> np.ndarray:
+
+def random_vector_np(step: float) -> F32Array:
     """Uniform cube displacement: each component in [-step, step]."""
     return np.array([
         random.uniform(-step, step),
@@ -41,7 +46,7 @@ def random_vector_np(step: float) -> np.ndarray:
     ], dtype=np.float32)
 
 
-def calc_orientation(pos: np.ndarray, cind: int, n: int, char_orientation: str) -> np.ndarray:
+def calc_orientation(pos: F64Array, cind: int, n: int, char_orientation: str) -> F64Array:
     """
     Normalized orientation vector for bead at active-region index cind.
     """
@@ -56,4 +61,4 @@ def calc_orientation(pos: np.ndarray, cind: int, n: int, char_orientation: str) 
     norm = float(np.linalg.norm(orn))
     if norm > 1e-12:
         orn = orn / norm
-    return orn.copy()
+    return np.asarray(orn, dtype=np.float64).copy()

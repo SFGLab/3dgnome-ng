@@ -9,10 +9,142 @@ from pathlib import Path
 
 
 class Settings:
-    def __init__(self):
+    # ---- output / misc ----
+    output_level: int
+    random_walk: bool
+    use_2d: bool
+    loop_density: int
+
+    # ---- data paths ----
+    data_dir: str
+    data_anchors: str
+    data_pet_clusters: str
+    data_singletons: str
+    data_singletons_inter: str
+    data_factors: str
+    data_split_singletons_by_chr: bool
+    data_centromeres: str
+    data_segment_split: str
+    data_segment_heatmap: str
+
+    # ---- template ----
+    template_segment: str
+    template_scale: float
+    dist_heatmap: str
+    dist_heatmap_scale: float
+
+    # ---- motif orientation ----
+    use_ctcf_motif: bool
+    motifs_symmetric: bool
+    motif_weight: float
+
+    # ---- anchor heatmap ----
+    use_anchor_heatmap: bool
+    anchor_heatmap_influence: float
+    anchor_heatmap_dist_weight: float
+
+    # ---- subanchor heatmap ----
+    use_subanchor_heatmap: bool
+    subanchor_heatmap_influence: float
+    subanchor_heatmap_dist_weight: float
+    subanchor_estimate_steps: int
+    subanchor_estimate_replicates: int
+
+    # ---- PET / arc length limits ----
+    max_pet_length: int
+    long_pet_power: float
+    long_pet_scale: float
+
+    # ---- heatmap parameters ----
+    heatmap_inter_scaling: float
+    heatmap_distance_stretching: float
+
+    # ---- distance conversion ----
+    genomic_dist_power: float
+    genomic_dist_scale: float
+    genomic_dist_base: float
+    freq_dist_scale: float
+    freq_dist_power: float
+    freq_dist_scale_inter: float
+    freq_dist_power_inter: float
+    count_dist_a: float
+    count_dist_scale: float
+    count_dist_shift: float
+    count_dist_base_level: float
+
+    # ---- spring constants ----
+    spring_stretch: float
+    spring_squeeze: float
+    spring_angular: float
+    spring_stretch_arcs: float
+    spring_squeeze_arcs: float
+
+    # ---- simulation steps ----
+    steps_lvl1: int
+    steps_lvl2: int
+    steps_arcs: int
+    steps_smooth: int
+
+    # ---- noise coefficients ----
+    noise_lvl1: float
+    noise_lvl2: float
+    noise_arcs: float
+    noise_smooth: float
+
+    # ---- MC heatmap ----
+    max_temp_heatmap: float
+    dt_temp_heatmap: float
+    jump_scale_heatmap: float
+    jump_coef_heatmap: float
+    mc_stop_improvement_heatmap: float
+    mc_stop_successes_heatmap: int
+    mc_stop_steps_heatmap: int
+
+    # ---- MC arcs ----
+    max_temp: float
+    dt_temp: float
+    jump_scale: float
+    jump_coef: float
+    mc_stop_improvement: float
+    mc_stop_successes: int
+    mc_stop_steps: int
+
+    # ---- excluded volume ----
+    use_excluded_volume: bool
+    exclusion_radius: float
+    exclusion_weight: float
+    exclusion_apply_to_arcs: bool
+    exclusion_apply_to_smooth: bool
+    exclusion_skip_neighbors: int
+
+    # ---- confinement ----
+    use_confinement: bool
+    confinement_radius: float
+    confinement_weight: float
+    confinement_packing_factor: float
+    confinement_apply_to_arcs: bool
+    confinement_apply_to_smooth: bool
+
+    # ---- small-IB spring boost ----
+    use_small_ib_boost: bool
+    small_ib_threshold: int
+    small_ib_spring_multiplier: float
+
+    # ---- MC smooth ----
+    max_temp_smooth: float
+    dt_temp_smooth: float
+    jump_scale_smooth: float
+    jump_coef_smooth: float
+    mc_stop_improvement_smooth: float
+    mc_stop_successes_smooth: int
+    mc_stop_steps_smooth: int
+    smooth_dist_weight: float
+    smooth_angle_weight: float
+
+    def __init__(self) -> None:
         self._set_defaults()
 
-    def _set_defaults(self):
+    def _set_defaults(self) -> None:
         # ---- output / misc ----
         self.output_level = 0
         self.random_walk = False
@@ -115,18 +247,18 @@ class Settings:
 
         # ---- excluded volume ----
         self.use_excluded_volume = False
-        self.exclusion_radius = 1.0           # r0: pairs closer than this incur penalty
-        self.exclusion_weight = 1.0           # k: multiplier (comparable to spring_*)
+        self.exclusion_radius = 1.0  # r0: pairs closer than this incur penalty
+        self.exclusion_weight = 1.0  # k: multiplier (comparable to spring_*)
         self.exclusion_apply_to_arcs = False
         self.exclusion_apply_to_smooth = True
-        self.exclusion_skip_neighbors = 1     # skip pairs with |i-j| <= this (1 = skip bonded)
+        self.exclusion_skip_neighbors = 1  # skip pairs with |i-j| <= this (1 = skip bonded)
 
         # ---- confinement ----
         # Soft sphere around per-MC-call centroid; pulls beads back inside.
         self.use_confinement = False
-        self.confinement_radius = 0.0           # 0 = auto from bead count + bond length
+        self.confinement_radius = 0.0  # 0 = auto from bead count + bond length
         self.confinement_weight = 1.0
-        self.confinement_packing_factor = 1.5   # used only when radius == 0 (auto)
+        self.confinement_packing_factor = 1.5  # used only when radius == 0 (auto)
         self.confinement_apply_to_arcs = True
         self.confinement_apply_to_smooth = True
 
@@ -134,7 +266,7 @@ class Settings:
         # Multiplies spring constants when reconstructing IBs with few anchors,
         # to keep loosely-constrained chains from stretching out of the model.
         self.use_small_ib_boost = False
-        self.small_ib_threshold = 10            # IBs with anchors < this are "small"
+        self.small_ib_threshold = 10  # IBs with anchors < this are "small"
         self.small_ib_spring_multiplier = 5.0
 
         # ---- MC smooth ----
@@ -152,28 +284,28 @@ class Settings:
         cfg = configparser.ConfigParser()
         cfg.read(path)
 
-        def get(section, key, default):
+        def get(section: str, key: str) -> str | None:
             try:
                 return cfg.get(section, key)
             except (configparser.NoSectionError, configparser.NoOptionError):
                 return None
 
-        def geti(section, key, default):
-            v = get(section, key, default)
+        def geti(section: str, key: str, default: int) -> int:
+            v = get(section, key)
             return int(v) if v is not None else default
 
-        def getf(section, key, default):
-            v = get(section, key, default)
+        def getf(section: str, key: str, default: float) -> float:
+            v = get(section, key)
             return float(v) if v is not None else default
 
-        def getb(section, key, default):
-            v = get(section, key, default)
+        def getb(section: str, key: str, default: bool) -> bool:
+            v = get(section, key)
             if v is None:
                 return default
             return v.strip().lower() in ("yes", "true", "1")
 
-        def gets(section, key, default):
-            v = get(section, key, default)
+        def gets(section: str, key: str, default: str) -> str:
+            v = get(section, key)
             return v.strip() if v is not None else default
 
         # [main]

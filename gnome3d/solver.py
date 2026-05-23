@@ -7,6 +7,7 @@ Orchestrates data loading, hierarchy building, and MC reconstruction.
 from __future__ import annotations
 
 import copy
+from typing import Any
 
 import numpy as np
 
@@ -19,36 +20,50 @@ from .hierarchy import (
 from .io import create_singleton_heatmap
 from .mc import mc_heatmap, mc_arcs, mc_smooth
 from .settings import Settings
-from .types import BedRegion
+from .types import (
+    AnchorMap,
+    ArcMap,
+    BeadOut,
+    BedRegion,
+    BoolArray,
+    F32Array,
+    F64Array,
+    SingletonContact,
+)
+
+# Map chr -> list of cluster indices at some hierarchy level.
+ChrLevel = dict[str, list[int]]
+# Anchor map entry produced by densification: (bead_index, cluster_index).
+AnchorMapEntry = tuple[int, int]
 
 
 class Solver:
 
-    def __init__(self, settings: Settings):
-        self.s = settings
+    def __init__(self, settings: Settings) -> None:
+        self.s: Settings = settings
         self.clusters: list[Cluster] = []
         self.chr_root: dict[str, int] = {}
         self.chr_first_cluster: dict[str, int] = {}
         self.chrs: list[str] = []
 
         # Arc data (after mark_arcs / remove_empty_anchors)
-        self.anchors: dict = {}  # chr -> list[Anchor]
-        self.arcs: dict = {}  # chr -> list[InteractionArc] (global indices)
+        self.anchors: AnchorMap = {}
+        self.arcs: ArcMap = {}
 
         # Heatmap structures
-        self.heatmap_dist: np.ndarray | None = None  # (N, N) expected distances
+        self.heatmap_dist: F64Array | None = None  # (N, N) expected distances
         self.heatmap_dist_diag: int = 0
 
         self.selected_region: BedRegion | None = None
-        self.dense_active_regions: dict = {}  # chr -> list of (gpos, x, y, z)
-        self._singletons: list = []
+        self.dense_active_regions: dict[str, list[BeadOut]] = {}
+        self._singletons: list[SingletonContact] = []
 
     # Data loading and hierarchy construction
 
     def load(
         self,
         data: ContactData,
-        chrs_list: list,
+        chrs_list: list[str],
         region: BedRegion | None = None,
     ) -> None:
         """
@@ -74,8 +89,6 @@ class Solver:
         Position beads at segment level using singleton heatmap MC.
         Mirrors Reference LooperSolver::reconstructClustersHeatmap().
         """
-        s = self.s
-
         # setLevel(LVL_SEGMENT) -> current_level contains segment cluster indices
         current_level = set_level(
             LVL_SEGMENT - LVL_CHROMOSOME,  # steps down from root
@@ -99,7 +112,9 @@ class Solver:
             print("\n[solver] segment level")
         self._reconstruct_heatmap_single_level(current_level)
 
-    def _compute_segment_bins(self, current_level: dict) -> tuple:
+    def _compute_segment_bins(
+        self, current_level: ChrLevel
+    ) -> tuple[dict[str, list[int]], dict[str, int], int, list[float]]:
         """
         Compute heatmap bin boundaries for segment-level clusters.
         Mirrors bin calculation in createSingletonHeatmap().
@@ -111,10 +126,10 @@ class Solver:
         so their lengths are not artificially inflated - mirrors the Reference min/max
         position update done after reading contacts.
         """
-        bins = {}
-        start_ind = {}
+        bins: dict[str, list[int]] = {}
+        start_ind: dict[str, int] = {}
         curr_idx = 0
-        bin_lengths_mb = []
+        bin_lengths_mb: list[float] = []
 
         for chr_ in self.chrs:
             segs = current_level.get(chr_, [])
@@ -142,7 +157,7 @@ class Solver:
 
         return bins, start_ind, curr_idx, bin_lengths_mb
 
-    def _reconstruct_heatmap_single_level(self, current_level: dict) -> None:
+    def _reconstruct_heatmap_single_level(self, current_level: ChrLevel) -> None:
         """
         Reconstruct segment-level positions using singleton heatmap MC.
         Mirrors Reference reconstructClustersHeatmapSingleLevel(1) (segment level).
@@ -171,7 +186,7 @@ class Solver:
             h_norm, total_size, inter=False
         )
 
-        self.heatmap_dist = np.array(heatmap_dist)
+        self.heatmap_dist = np.array(heatmap_dist, dtype=np.float64)
         self.heatmap_dist_diag = self._get_diagonal_size(h_norm, total_size)
 
         # Place initial positions: parent IB position for all segments in chr
@@ -189,7 +204,7 @@ class Solver:
                 self.clusters[seg_idx].pos = origin.copy()
 
         # Concatenate all segment indices into active_region
-        active_region = []
+        active_region: list[int] = []
         for chr_ in self.chrs:
             active_region.extend(current_level.get(chr_, []))
 
@@ -200,14 +215,17 @@ class Solver:
         step_size = avg_dist * s.noise_lvl2
 
         # Build position array for active beads
-        pos = np.array([self.clusters[i].pos for i in active_region], dtype=np.float32)
+        pos: F32Array = np.array(
+            [self.clusters[i].pos for i in active_region], dtype=np.float32
+        )
 
         n = len(active_region)
         best_score = -1.0
-        best_pos = pos.copy()
+        best_pos: F32Array = pos.copy()
 
         log1 = s.output_level >= 1
         log2 = s.output_level >= 2
+        assert self.heatmap_dist is not None
         for run in range(s.steps_lvl2):
             if log1:
                 print(f"[solver] heatmap run {run + 1}/{s.steps_lvl2}  ({n} beads)")
@@ -234,7 +252,7 @@ class Solver:
             if segs:
                 self._interpolate_children_linear(segs)
 
-    def _interpolate_children_linear(self, parent_indices: list) -> None:
+    def _interpolate_children_linear(self, parent_indices: list[int]) -> None:
         """
         Set child cluster positions by linear interpolation between parents.
         Used for IBs between segments, and anchors within IBs.
@@ -295,12 +313,12 @@ class Solver:
                 print(f"\n[solver] anchor level: {chr_}")
             self._position_interaction_blocks(segs)
 
-            ibs = []
+            ibs: list[int] = []
             for seg_idx in segs:
                 ibs.extend(self.clusters[seg_idx].children)
             n_ibs = len(ibs)
 
-            work = []
+            work: list[tuple[int, int, str, list[int]]] = []
             for ib_i, ib_idx in enumerate(ibs):
                 ib = self.clusters[ib_idx]
                 active_region = list(ib.children)
@@ -317,7 +335,7 @@ class Solver:
                 beads = self._process_ib(ib_idx, ib_label, active_region, chr_)
                 self.dense_active_regions.setdefault(chr_, []).extend(beads)
 
-    def _position_interaction_blocks(self, segs: list) -> None:
+    def _position_interaction_blocks(self, segs: list[int]) -> None:
         """
         Position IB clusters between segment positions.
         Mirrors Reference positionInteractionBlocks().
@@ -327,7 +345,7 @@ class Solver:
         else:
             # Random walk
             seg = self.clusters[segs[0]]
-            pos = np.zeros(3, dtype=np.float32)
+            pos: F32Array = np.zeros(3, dtype=np.float32)
             for ib_idx in seg.children:
                 pos = pos + random_vector_np(100.0)
                 self.clusters[ib_idx].pos = pos.copy()
@@ -336,9 +354,9 @@ class Solver:
         self,
         ib_idx: int,
         ib_label: str,
-        active_region: list,
+        active_region: list[int],
         chr_: str,
-    ) -> list:
+    ) -> list[BeadOut]:
         """
         All work for one IB: arc MC + smooth MC.  Safe to call from a thread
         because each IB owns a disjoint subset of cluster indices.
@@ -357,8 +375,8 @@ class Solver:
         # Build singleton contact heatmaps if either feature is enabled.
         # Both heatmaps are derived from a single singleton-binning pass so
         # we do it here before any MC and pass results down.
-        anchor_heat = None
-        subanchor_heat_raw = None
+        anchor_heat: F64Array | None = None
+        subanchor_heat_raw: F64Array | None = None
         if (self.s.use_anchor_heatmap or self.s.use_subanchor_heatmap) and self._singletons:
             anchor_heat, subanchor_heat_raw = self._build_contact_heatmaps(active_region, chr_)
 
@@ -369,17 +387,19 @@ class Solver:
                                                 subanchor_heat_raw=subanchor_heat_raw,
                                                 log1=log1, log2=log2, s_override=s_ib)
 
-    def _settings_for_ib(self, active_region: list, ib_label: str, log1: bool):
+    def _settings_for_ib(
+        self, active_region: list[int], ib_label: str, log1: bool
+    ) -> Settings:
         """Return self.s or a boosted copy if this IB qualifies as 'small'."""
-        if not getattr(self.s, "use_small_ib_boost", False):
+        if not self.s.use_small_ib_boost:
             return self.s
-        threshold = int(getattr(self.s, "small_ib_threshold", 10))
+        threshold = self.s.small_ib_threshold
         if len(active_region) >= threshold:
             return self.s
-        m = float(getattr(self.s, "small_ib_spring_multiplier", 1.0))
+        m = self.s.small_ib_spring_multiplier
         if m == 1.0:
             return self.s
-        s_boost = copy.copy(self.s)
+        s_boost: Settings = copy.copy(self.s)
         s_boost.spring_stretch_arcs = self.s.spring_stretch_arcs * m
         s_boost.spring_squeeze_arcs = self.s.spring_squeeze_arcs * m
         s_boost.spring_stretch = self.s.spring_stretch * m
@@ -391,10 +411,10 @@ class Solver:
 
     def _calc_anchor_expected_distances(
         self,
-        active_region: list,
+        active_region: list[int],
         chr_: str,
-        anchor_heatmap: np.ndarray = None,
-    ) -> np.ndarray:
+        anchor_heatmap: F64Array | None = None,
+    ) -> F64Array:
         """
         Build expected distance matrix for anchor-level active region.
         Mirrors Reference calcAnchorExpectedDistancesHeatmap().
@@ -409,7 +429,7 @@ class Solver:
           mat[i,j] > 0   -> expected distance from freqToDistance(score)
         """
         n = len(active_region)
-        mat = np.full((n, n), -1.0, dtype=np.float64)
+        mat: F64Array = np.full((n, n), -1.0, dtype=np.float64)
         np.fill_diagonal(mat, 0.0)
 
         cluster_to_active = {ci: ai for ai, ci in enumerate(active_region)}
@@ -432,7 +452,7 @@ class Solver:
 
         # Apply anchor heatmap: scale down expected distances for high-contact pairs.
         # Mirrors Reference post-processing in calcAnchorExpectedDistancesHeatmap().
-        if (anchor_heatmap is not None and self.s.use_anchor_heatmap):
+        if anchor_heatmap is not None and self.s.use_anchor_heatmap:
             max_val = float(anchor_heatmap.max())
             influence = float(self.s.anchor_heatmap_influence)
             if max_val > 1e-6:
@@ -440,10 +460,10 @@ class Solver:
                     for j in range(i + 1, n):
                         if mat[i, j] <= 0.0:
                             continue
-                        s = (anchor_heatmap[i, j] / max_val) * influence
-                        if s > 1.0:
-                            s = 1.0
-                        mat[i, j] *= (1.0 - s)
+                        s_val = (anchor_heatmap[i, j] / max_val) * influence
+                        if s_val > 1.0:
+                            s_val = 1.0
+                        mat[i, j] *= (1.0 - s_val)
                         mat[j, i] = mat[i, j]
 
         return mat
@@ -451,12 +471,12 @@ class Solver:
     def _reconstruct_cluster_arcs(
         self,
         ib_idx: int,
-        active_region: list,
-        exp_dist: np.ndarray,
+        active_region: list[int],
+        exp_dist: F64Array,
         label: str = "",
         log1: bool = True,
         log2: bool = True,
-        s_override=None,
+        s_override: Settings | None = None,
     ) -> None:
         """
         MC reconstruction for one interaction block (anchor level).
@@ -476,16 +496,18 @@ class Solver:
             self.clusters[active_region[i]].dist_to_next = s.genomic_length_to_distance(d)
 
         # Store initial positions
-        initial_pos = np.array([self.clusters[i].pos for i in active_region], dtype=np.float32)
+        initial_pos: F32Array = np.array(
+            [self.clusters[i].pos for i in active_region], dtype=np.float32
+        )
 
         best_score = -1.0
-        best_pos = initial_pos.copy()
+        best_pos: F32Array = initial_pos.copy()
 
         for run in range(s.steps_arcs):
             run_label = f"{label} run {run + 1}/{s.steps_arcs}" if label else f"arcs run {run + 1}"
             if log1:
                 print(f"  {run_label}")
-            pos = initial_pos.copy()
+            pos: F32Array = initial_pos.copy()
             for i in range(active_size):
                 pos[i] += random_vector_np(noise_size_small)
 
@@ -502,9 +524,9 @@ class Solver:
 
     def _build_contact_heatmaps(
         self,
-        active_region: list,
+        active_region: list[int],
         chr_: str,
-    ) -> tuple:
+    ) -> tuple[F64Array, F64Array]:
         """
         Build anchor-level and subanchor-level singleton contact heatmaps.
         Mirrors Reference createSingletonSubanchorHeatmap().
@@ -561,7 +583,7 @@ class Solver:
         # createSingletonSubanchorHeatmap does NOT filter by chromosome, so it
         # bins cross-chromosomal contacts whose midpoints fall in the region.
         # See [[project-singleton-chr-filter-divergence]] - this is intentional.
-        h_sub = np.zeros((N, N), dtype=np.float64)
+        h_sub: F64Array = np.zeros((N, N), dtype=np.float64)
 
         for c1, p1, c2, p2, sc in self._singletons:
             if c1 != chr_ or c2 != chr_:
@@ -582,7 +604,7 @@ class Solver:
 
         # Extract anchor heatmap from raw subanchor values (BEFORE normalization),
         # normalized by anchor area in Mbp^2.  Mirrors Reference lines 1267-1273.
-        h_anchor = np.zeros((n_anchors, n_anchors), dtype=np.float64)
+        h_anchor: F64Array = np.zeros((n_anchors, n_anchors), dtype=np.float64)
         for i in range(n_anchors):
             ai = i * (ld + 1)
             al_i = max(anchor_lens[i], 1)
@@ -600,7 +622,7 @@ class Solver:
             h_sub /= avg_count
 
             # Bin sizes in kb: anchor bins use anchor_len, subanchor bins use gap/ld
-            bin_sizes = np.empty(N, dtype=np.float64)
+            bin_sizes: F64Array = np.empty(N, dtype=np.float64)
             for k in range(N):
                 anchor_idx = k // (ld + 1)
                 if k % (ld + 1) == 0:
@@ -622,14 +644,14 @@ class Solver:
 
     def _build_heat_dist_subanchor(
         self,
-        pos: np.ndarray,
-        fixed: np.ndarray,
-        dtn: np.ndarray,
-        subanchor_heat_raw: np.ndarray,
+        pos: F32Array,
+        fixed: BoolArray,
+        dtn: F32Array,
+        subanchor_heat_raw: F64Array,
         step_size: float,
         label: str = "",
         log2: bool = False,
-    ) -> np.ndarray | None:
+    ) -> F64Array | None:
         """
         Estimate expected pairwise distances for subanchor heat energy.
         Mirrors Reference pipeline: run N dry smooth MC passes, average pairwise
@@ -650,7 +672,7 @@ class Solver:
             print(f"  [{label}] heat dist matrix: {n} beads "
                   f"({n_movable} movable), {n_reps} reps × {n_steps} steps")
 
-        avg_dist = np.zeros((n, n), dtype=np.float64)
+        avg_dist: F64Array = np.zeros((n, n), dtype=np.float64)
         t_mc_total = 0.0
 
         # Mirrors Reference: for each replicate, run n_steps MC passes from pos+noise,
@@ -658,9 +680,9 @@ class Solver:
         for rep in range(n_reps):
             t_rep = time.perf_counter()
             rep_best_score = -1.0
-            rep_best_pos = None
+            rep_best_pos: F32Array = pos.copy()
             for step in range(n_steps):
-                pos_trial = pos.copy()
+                pos_trial: F32Array = pos.copy()
                 for i in range(n):
                     if not fixed[i]:
                         pos_trial[i] += random_vector_np(step_size)
@@ -688,7 +710,7 @@ class Solver:
             return None
 
         influence = float(s.subanchor_heatmap_influence)
-        heat_dist = np.zeros((n, n), dtype=np.float64)
+        heat_dist: F64Array = np.zeros((n, n), dtype=np.float64)
         n_pairs_active = 0
         n_pairs_capped = 0
 
@@ -720,7 +742,9 @@ class Solver:
 
         return heat_dist
 
-    def _densify_active_region(self, active_region: list) -> tuple:
+    def _densify_active_region(
+        self, active_region: list[int]
+    ) -> tuple[F32Array, BoolArray, list[int], F32Array, list[AnchorMapEntry]]:
         """
         Insert loop_density subanchor beads between each consecutive anchor pair.
         Returns (pos, fixed, gpos, dtn, anchor_map) where:
@@ -734,10 +758,10 @@ class Solver:
         ld = self.s.loop_density
         bead_starts: list[int] = []
         bead_ends: list[int] = []
-        bead_pos: list = []
+        bead_pos: list[F32Array] = []
         bead_gpos: list[int] = []
         bead_fixed: list[bool] = []
-        anchor_map: list[tuple] = []
+        anchor_map: list[AnchorMapEntry] = []
 
         for i in range(len(active_region) - 1):
             ai = active_region[i]
@@ -759,7 +783,7 @@ class Solver:
             for j in range(ld):
                 p += d_bp
                 t = (j + 1.0) / (ld + 1)
-                sub_pos = ((1.0 - t) * ca.pos + t * cb.pos).astype(np.float32)
+                sub_pos: F32Array = ((1.0 - t) * ca.pos + t * cb.pos).astype(np.float32)
                 bead_starts.append(p)
                 bead_ends.append(p)
                 bead_pos.append(sub_pos)
@@ -777,10 +801,10 @@ class Solver:
         anchor_map.append((k, last_ci))
 
         n = len(bead_pos)
-        pos_arr = np.array(bead_pos, dtype=np.float32)
-        fixed_arr = np.array(bead_fixed, dtype=bool)
+        pos_arr: F32Array = np.array(bead_pos, dtype=np.float32)
+        fixed_arr: BoolArray = np.array(bead_fixed, dtype=np.bool_)
 
-        dtn = np.zeros(n - 1, dtype=np.float32)
+        dtn: F32Array = np.zeros(n - 1, dtype=np.float32)
         for i in range(n - 1):
             gap = max(bead_gpos[i + 1] - bead_gpos[i], 0)
             dtn[i] = float(self.s.genomic_length_to_distance(gap))
@@ -789,14 +813,14 @@ class Solver:
 
     def _reconstruct_cluster_smooth(
         self,
-        active_region: list,
+        active_region: list[int],
         chr_: str = "",
         label: str = "",
-        subanchor_heat_raw: np.ndarray = None,
+        subanchor_heat_raw: F64Array | None = None,
         log1: bool = True,
         log2: bool = False,
-        s_override=None,
-    ) -> list:
+        s_override: Settings | None = None,
+    ) -> list[BeadOut]:
         """
         Densify active region, then run smooth MC (chain + angle energy).
         Writes final anchor positions back to self.clusters.
@@ -819,10 +843,10 @@ class Solver:
         step_size = avg_dtn * s.noise_smooth
 
         # Build CTCF orientation data if enabled
-        char_orn = None
-        anchor_neighbors = None
-        anchor_neighbor_weights = None
-        if getattr(s, "use_ctcf_motif", False) and chr_:
+        char_orn: np.ndarray[Any, Any] | None = None
+        anchor_neighbors: dict[int, list[int]] | None = None
+        anchor_neighbor_weights: dict[int, list[float]] | None = None
+        if s.use_ctcf_motif and chr_:
             char_orn = np.array(['N'] * n, dtype='<U1')
             n_anchors_orn = len(anchor_map)
             cluster_to_anchor_k = {ci: k for k, (_, ci) in enumerate(anchor_map)}
@@ -847,19 +871,19 @@ class Solver:
         # Build subanchor heat distance matrix if enabled.
         # This runs N dry smooth MC passes without heat to estimate avg pairwise
         # distances, then scales them down for high-contact pairs.
-        heat_dist = None
+        heat_dist: F64Array | None = None
         if subanchor_heat_raw is not None and s.use_subanchor_heatmap:
             heat_dist = self._build_heat_dist_subanchor(
                 pos, fixed, dtn, subanchor_heat_raw, step_size, label=label, log2=False)
 
         best_score = -1.0
-        best_pos = pos.copy()
+        best_pos: F32Array = pos.copy()
 
         for run in range(s.steps_smooth):
             run_label = f"{label} smooth {run + 1}/{s.steps_smooth}"
             if log1:
                 print(f"  {run_label}")
-            pos_run = best_pos.copy()
+            pos_run: F32Array = best_pos.copy()
             for i in range(n):
                 if not fixed[i]:
                     pos_run[i] += random_vector_np(step_size)
@@ -886,7 +910,7 @@ class Solver:
     # Heatmap normalisation helpers
 
     @staticmethod
-    def _get_diagonal_size(h: list, n: int) -> int:
+    def _get_diagonal_size(h: list[list[float]], n: int) -> int:
         """Find smallest w such that any cell at distance w from diagonal is non-zero."""
         for w in range(n):
             for i in range(n - w):
@@ -895,7 +919,7 @@ class Solver:
         return 0
 
     @staticmethod
-    def _normalize_heatmap(h: list, n: int) -> list:
+    def _normalize_heatmap(h: list[list[float]], n: int) -> list[list[float]]:
         """
         Row-normalize: scale each row so all rows have equal sum (avg).
         Then symmetrize: h[i][j] = (h[i][j] + h[j][i]) / 2.
@@ -907,7 +931,7 @@ class Solver:
             return h
         expected = total / n
 
-        out = [[0.0] * n for _ in range(n)]
+        out: list[list[float]] = [[0.0] * n for _ in range(n)]
         for i in range(n):
             mn = expected / row_sums[i] if row_sums[i] > 1e-10 else 1.0
             for j in range(n):
@@ -923,7 +947,9 @@ class Solver:
         return out
 
     @staticmethod
-    def _normalize_heatmap_diagonal_total(h: list, n: int, val: float) -> None:
+    def _normalize_heatmap_diagonal_total(
+        h: list[list[float]], n: int, val: float
+    ) -> None:
         """
         Normalize so the average of the first non-zero diagonal equals val.
         Mirrors Reference normalizeHeatmapDiagonalTotal().
@@ -956,9 +982,9 @@ class Solver:
 
     @staticmethod
     def _normalize_heatmap_inter(
-        h: list,
+        h: list[list[float]],
         n: int,
-        current_level: dict,
+        current_level: ChrLevel,
         scale: float,
     ) -> None:
         """
@@ -971,10 +997,10 @@ class Solver:
 
     def _create_distance_heatmap(
         self,
-        h: list,
+        h: list[list[float]],
         n: int,
         inter: bool = False,
-    ) -> tuple:
+    ) -> tuple[list[list[float]], float]:
         """
         Convert normalized contact frequency heatmap to expected distance heatmap.
         Mirrors Reference createDistanceHeatmap().
@@ -985,7 +1011,7 @@ class Solver:
         s = self.s
         diag = self._get_diagonal_size(h, n)
 
-        dist = [[0.0] * n for _ in range(n)]
+        dist: list[list[float]] = [[0.0] * n for _ in range(n)]
         for i in range(n):
             for j in range(i, n):
                 val = h[i][j]
@@ -1015,7 +1041,7 @@ class Solver:
 
     # Output helpers
 
-    def get_leaf_positions(self, chr_: str) -> list:
+    def get_leaf_positions(self, chr_: str) -> list[BeadOut]:
         """
         Return all bead positions for chr_ as list of (midpoint_bp, x, y, z),
         sorted by genomic midpoint.  Includes subanchor beads when smooth MC
@@ -1025,7 +1051,7 @@ class Solver:
         if dense:
             return sorted(dense, key=lambda b: b[0])
         # Fallback: anchor-level beads only
-        result = []
+        result: list[BeadOut] = []
         first = self.chr_first_cluster.get(chr_, -1)
         if first < 0:
             return result
@@ -1037,9 +1063,9 @@ class Solver:
         result.sort(key=lambda b: b[0])
         return result
 
-    def get_anchor_positions(self) -> list:
+    def get_anchor_positions(self) -> list[BeadOut]:
         """All anchor beads from all chromosomes, sorted by chr then genomic position."""
-        result = []
+        result: list[BeadOut] = []
         for chr_ in self.chrs:
             first = self.chr_first_cluster.get(chr_, -1)
             if first < 0:

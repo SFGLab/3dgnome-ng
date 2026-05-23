@@ -10,6 +10,7 @@ from gnome3d.settings import Settings
 from gnome3d.io import parse_region
 from gnome3d.data import ContactData
 from gnome3d.solver import Solver
+from gnome3d.types import BeadOut
 
 
 def run_region(
@@ -17,7 +18,7 @@ def run_region(
     region: str,
     n_structures: int,
     data_dir: str | None = None,
-) -> list:
+) -> list[list[BeadOut]]:
     """
     Run MC reconstruction for the given genomic region.
 
@@ -58,7 +59,7 @@ def run_region(
     solver = Solver(s)
     solver.load(data, chrs_list, bed_region)
 
-    structures = []
+    structures: list[list[BeadOut]] = []
     for i in range(n_structures):
         print(f"\n[simulate] structure {i + 1}/{n_structures}")
         solver.reconstruct_heatmap()
@@ -79,6 +80,6 @@ def run_chromosome(
     chrom: str,
     n_structures: int,
     data_dir: str | None = None,
-) -> list:
+) -> list[list[BeadOut]]:
     """Run MC reconstruction for an entire chromosome."""
     return run_region(config_path, chrom, n_structures, data_dir=data_dir)

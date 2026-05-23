@@ -11,10 +11,20 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from .types import AnchorMap, ArcMap, BreakpointMap, F32Array, InteractionArc
+
 LVL_CHROMOSOME = 1
 LVL_SEGMENT = 2
 LVL_INTERACTION_BLOCK = 3
 LVL_ANCHOR = 4  # leaf level - original anchor clusters
+
+
+def _zero_pos() -> F32Array:
+    return np.zeros(3, dtype=np.float32)
+
+
+def _empty_int_list() -> list[int]:
+    return []
 
 
 @dataclass
@@ -23,10 +33,10 @@ class Cluster:
     end: int
     level: int = LVL_ANCHOR
     parent: int = -1
-    children: list = field(default_factory=list)  # indices into global clusters list
-    arcs: list = field(default_factory=list)  # arc indices (local, chr-specific)
+    children: list[int] = field(default_factory=_empty_int_list)  # indices into global clusters list
+    arcs: list[int] = field(default_factory=_empty_int_list)  # arc indices (local, chr-specific)
     orientation: str = "N"
-    pos: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=np.float32))
+    pos: F32Array = field(default_factory=_zero_pos)
     is_fixed: bool = False
     dist_to_next: float = 0.0
 
@@ -38,7 +48,7 @@ class Cluster:
         return self.start <= pos <= self.end
 
 
-def _other_end(arcs_chr: list, arc_idx: int, cluster_idx: int) -> int:
+def _other_end(arcs_chr: list[InteractionArc], arc_idx: int, cluster_idx: int) -> int:
     """Return the other end of arc arc_idx from cluster_idx's perspective."""
     a = arcs_chr[arc_idx]
     if a.start == cluster_idx:
@@ -49,10 +59,10 @@ def _other_end(arcs_chr: list, arc_idx: int, cluster_idx: int) -> int:
 
 
 def find_gaps(
-    clusters: list,
+    clusters: list[Cluster],
     chr_first: int,
-    chr_arcs: list,
-) -> list:
+    chr_arcs: list[InteractionArc],
+) -> list[int]:
     """
     Find gap positions: anchor indices where no arc "covers" position i.
     Mirrors Reference LooperSolver::findGaps().
@@ -94,10 +104,10 @@ def find_gaps(
 
 
 def find_split_predefined(
-    gaps: list,
-    clusters: list,
-    breakpoints: list,
-) -> list:
+    gaps: list[int],
+    clusters: list[Cluster],
+    breakpoints: list[int],
+) -> list[int]:
     """
     Use predefined breakpoints to select which gaps are segment boundaries.
     Mirrors Reference LooperSolver::findSplit() (predefined branch).
@@ -135,11 +145,11 @@ def find_split_predefined(
 
 
 def build_cluster_tree(
-    anchors: dict,
-    arcs: dict,
-    breakpoints: dict,
-    chrs: list,
-) -> tuple:
+    anchors: AnchorMap,
+    arcs: ArcMap,
+    breakpoints: BreakpointMap,
+    chrs: list[str],
+) -> tuple[list[Cluster], dict[str, int], dict[str, int]]:
     """
     Build the full cluster hierarchy for all chromosomes.
     Mirrors Reference LooperSolver::createTreeGenome() + createTreeChromosome().
@@ -195,9 +205,7 @@ def build_cluster_tree(
 
         # --- level 3: create interaction block (IB) clusters ---
         next_split_idx = 1
-        ib_start_idx = len(clusters)  # index of first IB cluster we'll create
-
-        root_children = []  # IB clusters that belong to next segment
+        root_children: list[int] = []  # IB clusters that belong to next segment
 
         current_seg_ib_start = len(clusters)  # track start of IBs in current segment
 
@@ -257,19 +265,23 @@ def build_cluster_tree(
 
 # Level traversal helpers
 
-def set_top_level(chr_root: dict, chrs: list) -> dict:
+def set_top_level(chr_root: dict[str, int], chrs: list[str]) -> dict[str, list[int]]:
     """Returns current_level = {chr: [chr_root[chr]]} for each chr."""
     return {chr_: [chr_root[chr_]] for chr_ in chrs if chr_ in chr_root}
 
 
-def level_down(current_level: dict, clusters: list, chrs: list) -> dict:
+def level_down(
+    current_level: dict[str, list[int]],
+    clusters: list[Cluster],
+    chrs: list[str],
+) -> dict[str, list[int]]:
     """
     Move one level deeper in the hierarchy.
     Mirrors Reference LooperSolver::levelDown().
     """
     new_level: dict[str, list[int]] = {}
     for chr_ in chrs:
-        tmp = []
+        tmp: list[int] = []
         for idx in current_level.get(chr_, []):
             if not clusters[idx].children:
                 tmp.append(idx)
@@ -279,7 +291,12 @@ def level_down(current_level: dict, clusters: list, chrs: list) -> dict:
     return new_level
 
 
-def set_level(level: int, chr_root: dict, clusters: list, chrs: list) -> dict:
+def set_level(
+    level: int,
+    chr_root: dict[str, int],
+    clusters: list[Cluster],
+    chrs: list[str],
+) -> dict[str, list[int]]:
     """
     Set current_level to correspond to the given level number.
     Mirrors Reference LooperSolver::setLevel(level) which calls setTopLevel() then

@@ -21,18 +21,39 @@ passed directly to Solver.load().
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    import pandas as pd
-
-from .types import InteractionArc, BedRegion, RawArc, Anchor
+from .types import (
+    Anchor,
+    AnchorMap,
+    ArcMap,
+    BedRegion,
+    BreakpointMap,
+    InteractionArc,
+    RawArc,
+    RawArcMap,
+    SingletonContact,
+)
 from .io import load_anchors, load_arcs, load_breakpoints, load_singletons
 
-# A singleton contact in genomic coordinates.
-# Stored as a plain tuple for memory efficiency.
-# (chr1, pos1, chr2, pos2, score)
-SingletonContact = tuple  # (str, int, str, int, int)
+if TYPE_CHECKING:
+    from .settings import Settings
+
+
+def _empty_anchor_map() -> AnchorMap:
+    return {}
+
+
+def _empty_arc_map() -> ArcMap:
+    return {}
+
+
+def _empty_breakpoint_map() -> BreakpointMap:
+    return {}
+
+
+def _empty_singleton_list() -> list[SingletonContact]:
+    return []
 
 
 @dataclass
@@ -44,15 +65,15 @@ class ContactData:
     singletons:  list of (chr1, pos1, chr2, pos2, score) contacts
                  used to build the segment-level heatmap
     """
-    anchors: dict[str, list] = field(default_factory=dict)
-    arcs: dict[str, list] = field(default_factory=dict)
-    breakpoints: dict[str, list] = field(default_factory=dict)
-    singletons: list = field(default_factory=list)
+    anchors: AnchorMap = field(default_factory=_empty_anchor_map)
+    arcs: ArcMap = field(default_factory=_empty_arc_map)
+    breakpoints: BreakpointMap = field(default_factory=_empty_breakpoint_map)
+    singletons: list[SingletonContact] = field(default_factory=_empty_singleton_list)
 
     @classmethod
     def from_files(
         cls,
-        settings,
+        settings: Settings,
         chrs: list[str],
         region: BedRegion | None = None,
     ) -> ContactData:
@@ -101,10 +122,10 @@ class ContactData:
     @classmethod
     def from_dataframes(
         cls,
-        anchors_df,
-        arcs_df,
-        breakpoints_df=None,
-        singletons_df=None,
+        anchors_df: Any,
+        arcs_df: Any,
+        breakpoints_df: Any | None = None,
+        singletons_df: Any | None = None,
         chrs: list[str] | None = None,
         region: BedRegion | None = None,
         max_pet_length: int = 1_000_000,
@@ -129,10 +150,12 @@ class ContactData:
         max_pet_length : int
             Arcs longer than this are discarded.
         """
-        chr_set = set(chrs) if chrs is not None else set(anchors_df["chr"].unique())
+        chr_set: set[str] = (
+            set(chrs) if chrs is not None else {str(c) for c in anchors_df["chr"].unique()}
+        )
 
         # anchors
-        anchors: dict[str, list] = {}
+        anchors: AnchorMap = {}
         for _, row in anchors_df.iterrows():
             c = str(row["chr"])
             if c not in chr_set:
@@ -144,7 +167,7 @@ class ContactData:
             anchors.setdefault(c, []).append(Anchor(c, st, en, ori))
 
         # raw arcs -> mark -> remove empty
-        raw_arcs: dict[str, list] = {}
+        raw_arcs: RawArcMap = {}
         for _, row in arcs_df.iterrows():
             ca, cb = str(row["chr_a"]), str(row["chr_b"])
             if ca != cb or ca not in chr_set:
@@ -168,7 +191,7 @@ class ContactData:
         anchors = remove_empty_anchors(anchors, arcs)
 
         # breakpoints
-        breakpoints: dict[str, list] = {}
+        breakpoints: BreakpointMap = {}
         if breakpoints_df is not None:
             for _, row in breakpoints_df.iterrows():
                 c = str(row["chr"])
@@ -177,7 +200,7 @@ class ContactData:
                 breakpoints.setdefault(c, []).append(int(row["pos"]))
 
         # singletons
-        singletons: list = []
+        singletons: list[SingletonContact] = []
         if singletons_df is not None:
             for _, row in singletons_df.iterrows():
                 c1, c2 = str(row["chr1"]), str(row["chr2"])
@@ -200,9 +223,9 @@ class ContactData:
 # map RawArcs -> anchor-indexed InteractionArcs
 
 def mark_arcs(
-    anchors: dict,
-    raw_arcs: dict,
-) -> dict:
+    anchors: AnchorMap,
+    raw_arcs: RawArcMap,
+) -> ArcMap:
     """
     Map genomic-position arcs to anchor-index arcs.
     Mirrors Reference InteractionArcs::markArcs().
@@ -214,7 +237,7 @@ def mark_arcs(
     """
     import bisect
 
-    arcs: dict[str, list[InteractionArc]] = {}
+    arcs: ArcMap = {}
 
     for chr_ in anchors:
         chr_anchors = anchors[chr_]
@@ -235,11 +258,11 @@ def mark_arcs(
                 i -= 1
             return -1
 
-        result = []
-        tmp_arcs: dict[int, list] = {}  # end_idx -> staged arcs for current start group
+        result: list[InteractionArc] = []
+        tmp_arcs: dict[int, list[InteractionArc]] = {}  # end_idx -> staged arcs for current start group
         last_start = -1
 
-        def flush(target_list):
+        def flush(target_list: list[InteractionArc]) -> None:
             for end_idx, arcs_group in sorted(tmp_arcs.items()):
                 if len(arcs_group) == 1:
                     target_list.append(arcs_group[0])
@@ -273,25 +296,14 @@ def mark_arcs(
                         target_list.append(summary)
             tmp_arcs.clear()
 
-        cnt = len(chr_raw)
-        for idx in range(cnt + 1):  # +1 to flush at end
-            st = -1
-            end = -1
-            if idx < cnt:
-                raw = chr_raw[idx]
-                st = find_anchor(raw.start)
-                end = find_anchor(raw.end)
-
-                if st == -1 or end == -1 or st == end:
-                    continue
-
-            if st != last_start or idx == cnt:
+        for raw in chr_raw:
+            st = find_anchor(raw.start)
+            end = find_anchor(raw.end)
+            if st == -1 or end == -1 or st == end:
+                continue
+            if st != last_start:
                 flush(result)
                 last_start = st
-
-            if idx == cnt:
-                break
-
             arc = InteractionArc(
                 start=st,
                 end=end,
@@ -302,6 +314,7 @@ def mark_arcs(
                 genomic_end=raw.end,
             )
             tmp_arcs.setdefault(end, []).append(arc)
+        flush(result)
 
         arcs[chr_] = result
         print(f"  marked arcs {chr_}: {len(result)}")
@@ -312,9 +325,9 @@ def mark_arcs(
 # keep only anchors that are endpoints of at least one arc
 
 def remove_empty_anchors(
-    anchors: dict,
-    arcs: dict,
-) -> dict:
+    anchors: AnchorMap,
+    arcs: ArcMap,
+) -> AnchorMap:
     """
     Remove anchors that are not endpoints of any arc.
     Mirrors Reference InteractionArcs::removeEmptyAnchors().
@@ -322,8 +335,8 @@ def remove_empty_anchors(
     Returns new anchors dict (original is not modified).
     Also updates arc start/end indices to reflect removed anchors.
     """
-    new_anchors = {}
-    index_maps = {}  # old_index -> new_index per chr
+    new_anchors: AnchorMap = {}
+    index_maps: dict[str, dict[int, int]] = {}
 
     for chr_ in anchors:
         chr_anchors = anchors[chr_]
@@ -339,8 +352,8 @@ def remove_empty_anchors(
                 used[arc.end] = True
 
         # Build new list and index map
-        new_list = []
-        idx_map = {}
+        new_list: list[Anchor] = []
+        idx_map: dict[int, int] = {}
         for i, anchor in enumerate(chr_anchors):
             if used[i]:
                 idx_map[i] = len(new_list)
@@ -355,7 +368,7 @@ def remove_empty_anchors(
     # Remap arc indices
     for chr_ in arcs:
         idx_map = index_maps.get(chr_, {})
-        valid_arcs = []
+        valid_arcs: list[InteractionArc] = []
         for arc in arcs[chr_]:
             ns = idx_map.get(arc.start, -1)
             ne = idx_map.get(arc.end, -1)

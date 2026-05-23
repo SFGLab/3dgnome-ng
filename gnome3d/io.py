@@ -5,12 +5,19 @@ File loading for 3dgnome-ng.
 from __future__ import annotations
 
 import os
-from typing import Optional
 
-from .types import BedRegion, Anchor, RawArc
+from .types import (
+    AnchorMap,
+    Anchor,
+    BedRegion,
+    BreakpointMap,
+    RawArc,
+    RawArcMap,
+    SingletonContact,
+)
 
 
-def parse_region(region_str: str) -> Optional[BedRegion]:
+def parse_region(region_str: str) -> BedRegion | None:
     """
     Parse 'chr:start-end' string.  Returns None on failure.
     Reference BedRegion::tryParse uses sscanf(str, "%30[^:]:%d-%d", ...).
@@ -27,9 +34,9 @@ def parse_region(region_str: str) -> Optional[BedRegion]:
 
 def load_anchors(
     path: str,
-    chr_set: set,
-    region: Optional[BedRegion] = None,
-) -> dict:
+    chr_set: set[str],
+    region: BedRegion | None = None,
+) -> AnchorMap:
     """
     Load anchor BED file.  Format: chr start end [orientation]
 
@@ -37,7 +44,7 @@ def load_anchors(
     Anchors are included only if at least one end falls within `region`
     (if specified).
     """
-    anchors: dict[str, list[Anchor]] = {}
+    anchors: AnchorMap = {}
     if not path or not os.path.exists(path):
         print(f"[io] anchors file not found: {path}")
         return anchors
@@ -75,18 +82,18 @@ def load_anchors(
 
 def load_arcs(
     path: str,
-    chr_set: set,
-    region: Optional[BedRegion] = None,
+    chr_set: set[str],
+    region: BedRegion | None = None,
     max_pet_length: int = 1_000_000,
-) -> dict:
+) -> RawArcMap:
     """
     Load PET cluster BEDPE file.  Format: chr_a start_a end_a chr_b start_b end_b score
 
     Returns dict[chr -> list[RawArc]], sorted by start, intra only.
     Arcs longer than max_pet_length are excluded (they go to long_arcs).
     """
-    raw: dict[str, list[RawArc]] = {}
-    long_arcs: dict[str, list[RawArc]] = {}
+    raw: RawArcMap = {}
+    long_arcs: RawArcMap = {}
 
     if not path or not os.path.exists(path):
         print(f"[io] arcs file not found: {path}")
@@ -140,13 +147,13 @@ def load_arcs(
 
 # Load segment breakpoints
 
-def load_breakpoints(path: str, chrs: list) -> dict:
+def load_breakpoints(path: str, chrs: list[str]) -> BreakpointMap:
     """
     Load segment breakpoint BED file.  Format: chr pos pos
 
     Returns dict[chr -> list[int]] of breakpoint positions.
     """
-    bp: dict[str, list[int]] = {}
+    bp: BreakpointMap = {}
     if not path or not os.path.exists(path):
         return bp
 
@@ -169,14 +176,13 @@ def load_breakpoints(path: str, chrs: list) -> dict:
 
 def load_singletons(
     path: str,
-    chr_set: set,
+    chr_set: set[str],
     region: BedRegion | None,
-) -> list:
+) -> list[SingletonContact]:
     """
     Read a singletons BEDPE file into a list of (chr1, pos1, chr2, pos2, score).
     """
-    import os
-    contacts = []
+    contacts: list[SingletonContact] = []
     if not path or not os.path.exists(path):
         print(f"[data] singletons file not found: {path}")
         return contacts
@@ -207,12 +213,12 @@ def load_singletons(
 # Create singleton heatmap from pre-loaded contacts
 
 def create_singleton_heatmap(
-    contacts: list,
-    bins: dict,
-    start_ind: dict,
+    contacts: list[SingletonContact],
+    bins: dict[str, list[int]],
+    start_ind: dict[str, int],
     total_size: int,
-    bin_lengths_mb: Optional[list] = None,
-) -> list:
+    bin_lengths_mb: list[float] | None = None,
+) -> list[list[float]]:
     """
     Build a contact frequency heatmap from a list of (chr1,pos1,chr2,pos2,score)
     tuples (as produced by ContactData.from_files / from_dataframes).
@@ -226,7 +232,7 @@ def create_singleton_heatmap(
     """
     import bisect
 
-    h = [[0.0] * total_size for _ in range(total_size)]
+    h: list[list[float]] = [[0.0] * total_size for _ in range(total_size)]
     ok_cnt = 0
 
     for c1, p1, c2, p2, sc in contacts:
@@ -263,7 +269,7 @@ def create_singleton_heatmap(
 
 def write_cif(
     path: str,
-    beads: list,
+    beads: list[tuple[int, float, float, float]],
     entry_id: str = "3dgnome",
 ) -> None:
     """
