@@ -77,12 +77,20 @@ class Solver:
         """
         Position beads at segment level using singleton heatmap MC.
         Mirrors Reference LooperSolver::reconstructClustersHeatmap().
+
+        When settings.random_walk is True the segment level is positioned via
+        a chained random walk instead of heatmap MC; subsequent levels still
+        run normally.  Mirrors C++ LooperSolver.cpp lines 80-98.
         """
         # setLevel(LVL_SEGMENT) -> current_level contains segment cluster indices
         current_level = set_level(
             LVL_SEGMENT - LVL_CHROMOSOME,  # steps down from root
             self.chr_root, self.clusters, self.chrs
         )
+
+        if self.s.random_walk:
+            self._random_walk_segment_level(current_level)
+            return
 
         # Check if only 1 segment total across all chromosomes
         total_segs = sum(len(v) for v in current_level.values())
@@ -100,6 +108,32 @@ class Solver:
         if self.s.output_level >= 1:
             print("\n[solver] segment level")
         self._reconstruct_heatmap_single_level(current_level)
+
+    def _random_walk_segment_level(self, current_level: ChrLevel) -> None:
+        """
+        Position segment-level beads via a chained random walk.
+        Each chromosome starts at the origin, takes one big step of size
+        genomic_length_to_distance(1Mb) to break symmetry, then takes
+        len(segs) small steps of 50 units each (Reference constant).
+        Mirrors C++ LooperSolver.cpp:84-97.
+        """
+        in_2d = self.s.use_2d
+        size = float(self.s.genomic_length_to_distance(1_000_000))
+        if self.s.output_level >= 1:
+            print(f"[solver] random walk for segment level  (size={size:.2f}, 2D={in_2d})")
+        for chr_ in self.chrs:
+            segs = current_level.get(chr_, [])
+            if not segs:
+                continue
+            if self.s.output_level >= 1:
+                print(f"  {chr_}: {len(segs)} segment(s)")
+            rw_pos: F32Array = np.zeros(3, dtype=np.float32)
+            rw_pos = rw_pos + random_vector_np(size, in_2d=in_2d)  # first point
+            for seg_idx in segs:
+                rw_pos = rw_pos + random_vector_np(50.0, in_2d=in_2d)
+                self.clusters[seg_idx].pos = rw_pos.copy()
+            # smoothly propagate to IB / anchor levels
+            self._interpolate_children_linear(segs)
 
     def _compute_segment_bins(
         self, current_level: ChrLevel

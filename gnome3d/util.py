@@ -37,12 +37,16 @@ def freq_to_distance(freq: int, a: float, scale: float, shift: float, base_level
         return base_level
 
 
-def random_vector_np(step: float) -> F32Array:
-    """Uniform cube displacement: each component in [-step, step]."""
+def random_vector_np(step: float, in_2d: bool = False) -> F32Array:
+    """Uniform cube displacement: each component in [-step, step].
+    Mirrors Reference displace() in lib/common.cpp.  When in_2d is True, the
+    z component is forced to 0 (matches `Settings::use2D` branch).
+    """
+    z = 0.0 if in_2d else random.uniform(-step, step)
     return np.array([
         random.uniform(-step, step),
         random.uniform(-step, step),
-        random.uniform(-step, step),
+        z,
     ], dtype=np.float32)
 
 

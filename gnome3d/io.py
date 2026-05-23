@@ -269,6 +269,12 @@ def write_cif(
 
     beads : list of BeadOut = (start_bp, end_bp, x, y, z)
         One entry per anchor bead, as returned by run_region() for one structure.
+
+    Each bead carries its genomic region in two non-standard extension columns:
+      _atom_site.gnome_region_start  - genomic start (bp)
+      _atom_site.gnome_region_end    - genomic end   (bp)
+    Standard mmCIF viewers ignore unknown _atom_site.* columns; downstream tools
+    that want the per-bead genomic span can parse them directly.
     """
     header = f"""data_{entry_id}
 #
@@ -295,8 +301,13 @@ _atom_site.Cartn_z
 _atom_site.occupancy
 _atom_site.B_iso_or_equiv
 _atom_site.auth_asym_id
+_atom_site.gnome_region_start
+_atom_site.gnome_region_end
 """
     with open(path, "w") as f:
         f.write(header)
-        for i, (_, _, x, y, z) in enumerate(beads, start=1):
-            f.write(f"ATOM {i} C CA . ALA A 1 {i} ? {x} {y} {z} 1.00 99.99 C\n")
+        for i, (start, end, x, y, z) in enumerate(beads, start=1):
+            f.write(
+                f"ATOM {i} C CA . ALA A 1 {i} ? {x} {y} {z} 1.00 99.99 C "
+                f"{start} {end}\n"
+            )
