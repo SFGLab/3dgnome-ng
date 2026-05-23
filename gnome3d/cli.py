@@ -10,41 +10,13 @@ gnome3d-ng --config data/GM12878/config.ini \
 import argparse
 import os
 import sys
-import threading
-import weakref
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from concurrent.futures.thread import _worker, _threads_queues
 from pathlib import Path
 
-from gnome3d.settings import Settings
-from gnome3d.io import parse_region, write_cif
 from gnome3d.data import ContactData
+from gnome3d.io import parse_region, write_cif
+from gnome3d.settings import Settings
 from gnome3d.solver import Solver
-
-
-class _DaemonThreadPoolExecutor(ThreadPoolExecutor):
-    def _adjust_thread_count(self):
-        if self._idle_semaphore.acquire(timeout=0):
-            return
-
-        def weakref_cb(_, q=self._work_queue):
-            q.put(None)
-
-        num_threads = len(self._threads)
-        if num_threads < self._max_workers:
-            thread_name = "%s_%d" % (self._thread_name_prefix or self, num_threads)
-            t = threading.Thread(
-                name=thread_name,
-                target=_worker,
-                args=(weakref.ref(self, weakref_cb),
-                      self._work_queue,
-                      self._initializer,
-                      self._initargs),
-                daemon=True,
-            )
-            t.start()
-            self._threads.add(t)
-            _threads_queues[t] = self._work_queue
 
 
 def _run_structure(
@@ -114,7 +86,7 @@ def main():
     n_workers = min(n, os.cpu_count() or 1)
     print(f"[main] running {n} structure(s) with {n_workers} worker(s)")
 
-    pool = _DaemonThreadPoolExecutor(max_workers=n_workers)
+    pool = ThreadPoolExecutor(max_workers=n_workers)
     futures = {
         pool.submit(_run_structure, i, n, s, data, chrs_list, bed_region, out_dir, entry_base): i
         for i in range(n)
@@ -123,14 +95,12 @@ def main():
         for fut in as_completed(futures):
             fut.result()
     except KeyboardInterrupt:
-        for f in futures:
-            f.cancel()
-        pool.shutdown(wait=False)
+        pool.shutdown(wait=False, cancel_futures=True)
         raise
     else:
         pool.shutdown(wait=True)
 
-    print(f"\n[main] done - {n} structure(s) written to {out_dir}/")
+    print(f"\n[main] {n} structure(s) written to {out_dir}/")
 
 
 if __name__ == "__main__":

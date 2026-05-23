@@ -2,10 +2,6 @@
 High-level LooperSolver analog for 3dgnome-ng.
 
 Orchestrates data loading, hierarchy building, and MC reconstruction.
-Mirrors Reference LooperSolver methods:
-  - setContactData()              -> set_contact_data()
-  - reconstructClustersHeatmap()  -> reconstruct_heatmap()
-  - reconstructClustersArcsDistances() -> reconstruct_arcs()
 """
 
 from __future__ import annotations
@@ -15,16 +11,15 @@ import copy
 import numpy as np
 
 from .data import ContactData
-from .energy import random_vector_np
+from .util import random_vector_np
 from .hierarchy import (
     Cluster, LVL_ANCHOR, LVL_SEGMENT, LVL_CHROMOSOME,
-    build_cluster_tree, set_level, )
-from .io import (
-    BedRegion,
-    create_singleton_heatmap_from_contacts,
+    build_cluster_tree, set_level,
 )
+from .io import create_singleton_heatmap
 from .mc import mc_heatmap, mc_arcs, mc_smooth
 from .settings import Settings
+from .types import BedRegion
 
 
 class Solver:
@@ -157,7 +152,7 @@ class Solver:
 
         if self.s.output_level >= 1:
             print("[solver] create segment heatmap")
-        h_raw = create_singleton_heatmap_from_contacts(
+        h_raw = create_singleton_heatmap(
             self._singletons, bins, start_ind, total_size, bin_lengths_mb=bin_lengths_mb
         )
 
@@ -461,7 +456,7 @@ class Solver:
         label: str = "",
         log1: bool = True,
         log2: bool = True,
-        s_override = None,
+        s_override=None,
     ) -> None:
         """
         MC reconstruction for one interaction block (anchor level).
@@ -800,7 +795,7 @@ class Solver:
         subanchor_heat_raw: np.ndarray = None,
         log1: bool = True,
         log2: bool = False,
-        s_override = None,
+        s_override=None,
     ) -> list:
         """
         Densify active region, then run smooth MC (chain + angle energy).

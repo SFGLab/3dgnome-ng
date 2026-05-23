@@ -26,16 +26,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import pandas as pd
 
-from .io import (
-    Anchor,
-    BedRegion,
-    RawArc,
-    load_anchors,
-    load_arcs,
-    mark_arcs,
-    remove_empty_anchors,
-    load_breakpoints,
-)
+from .types import InteractionArc, BedRegion, RawArc, Anchor
+from .io import load_anchors, load_arcs, load_breakpoints, load_singletons
 
 # A singleton contact in genomic coordinates.
 # Stored as a plain tuple for memory efficiency.
@@ -97,9 +89,7 @@ class ContactData:
         breakpoints = load_breakpoints(s.data_path(s.data_segment_split), chrs)
 
         print("[data] load singletons")
-        singletons = _load_singletons(
-            s.data_path(s.data_singletons), chr_set, region
-        )
+        singletons = load_singletons(s.data_path(s.data_singletons), chr_set, region)
 
         return cls(
             anchors=anchors,
@@ -207,40 +197,172 @@ class ContactData:
         )
 
 
-# Internal helpers
+# map RawArcs -> anchor-indexed InteractionArcs
 
-def _load_singletons(
-    path: str,
-    chr_set: set,
-    region: BedRegion | None,
-) -> list:
+def mark_arcs(
+    anchors: dict,
+    raw_arcs: dict,
+) -> dict:
     """
-    Read a singletons BEDPE file into a list of (chr1, pos1, chr2, pos2, score).
+    Map genomic-position arcs to anchor-index arcs.
+    Mirrors Reference InteractionArcs::markArcs().
+
+    anchors:  dict[chr -> list[Anchor]]
+    raw_arcs: dict[chr -> list[RawArc]] (sorted by start)
+
+    Returns dict[chr -> list[InteractionArc]].
     """
-    import os
-    contacts = []
-    if not path or not os.path.exists(path):
-        print(f"[data] singletons file not found: {path}")
-        return contacts
+    import bisect
 
-    line_cnt = 0
-    with open(path) as f:
-        for line in f:
-            line_cnt += 1
-            if line_cnt % 1_000_000 == 0:
-                print(f"  . ({line_cnt} lines)")
-            parts = line.split()
-            if len(parts) < 7:
-                continue
-            c1, c2 = parts[0], parts[3]
-            if c1 not in chr_set or c2 not in chr_set:
-                continue
-            p1 = int(parts[1])
-            p2 = int(parts[4])
-            sc = int(parts[6])
-            if region is not None and not (region.contains(p1) and region.contains(p2)):
-                continue
-            contacts.append((c1, p1, c2, p2, sc))
+    arcs: dict[str, list[InteractionArc]] = {}
 
-    print(f"  singletons loaded: {len(contacts)}")
-    return contacts
+    for chr_ in anchors:
+        chr_anchors = anchors[chr_]
+        chr_raw = raw_arcs.get(chr_, [])
+
+        # Binary-search index: anchor start positions (anchors assumed sorted by start).
+        # For a query pos, bisect gives the last anchor with start <= pos; we then
+        # verify pos <= anchor.end.  Anchors in ChIA-PET data don't overlap, so at
+        # most one candidate needs checking.
+        anc_starts = [a.start for a in chr_anchors]
+
+        def find_anchor(pos: int) -> int:
+            i = bisect.bisect_right(anc_starts, pos) - 1
+            while i >= 0:
+                a = chr_anchors[i]
+                if a.length() > 1 and a.start <= pos <= a.end:
+                    return i
+                i -= 1
+            return -1
+
+        result = []
+        tmp_arcs: dict[int, list] = {}  # end_idx -> staged arcs for current start group
+        last_start = -1
+
+        def flush(target_list):
+            for end_idx, arcs_group in sorted(tmp_arcs.items()):
+                if len(arcs_group) == 1:
+                    target_list.append(arcs_group[0])
+                else:
+                    arcs_group.sort(key=lambda a: a.factor)
+                    multiple_factors = any(
+                        arcs_group[j].factor != arcs_group[j - 1].factor
+                        for j in range(1, len(arcs_group))
+                    )
+                    total_score = 0
+                    factor_score = 0
+                    first_of_factor = 0
+                    for j in range(len(arcs_group) + 1):
+                        if j == len(arcs_group) or (j > 0 and arcs_group[j].factor != arcs_group[j - 1].factor):
+                            arcs_group[first_of_factor].score = factor_score
+                            arcs_group[first_of_factor].eff_score = 0 if multiple_factors else factor_score
+                            target_list.append(arcs_group[first_of_factor])
+                            first_of_factor = j
+                            total_score += factor_score
+                            factor_score = 0
+                        if j < len(arcs_group):
+                            factor_score += arcs_group[j].score
+                    if multiple_factors:
+                        summary = InteractionArc(
+                            start=arcs_group[0].start,
+                            end=end_idx,
+                            score=0,
+                            eff_score=total_score,
+                            factor=-1,
+                        )
+                        target_list.append(summary)
+            tmp_arcs.clear()
+
+        cnt = len(chr_raw)
+        for idx in range(cnt + 1):  # +1 to flush at end
+            st = -1
+            end = -1
+            if idx < cnt:
+                raw = chr_raw[idx]
+                st = find_anchor(raw.start)
+                end = find_anchor(raw.end)
+
+                if st == -1 or end == -1 or st == end:
+                    continue
+
+            if st != last_start or idx == cnt:
+                flush(result)
+                last_start = st
+
+            if idx == cnt:
+                break
+
+            arc = InteractionArc(
+                start=st,
+                end=end,
+                score=int(raw.score),
+                eff_score=0,
+                factor=0,
+                genomic_start=raw.start,
+                genomic_end=raw.end,
+            )
+            tmp_arcs.setdefault(end, []).append(arc)
+
+        arcs[chr_] = result
+        print(f"  marked arcs {chr_}: {len(result)}")
+
+    return arcs
+
+
+# keep only anchors that are endpoints of at least one arc
+
+def remove_empty_anchors(
+    anchors: dict,
+    arcs: dict,
+) -> dict:
+    """
+    Remove anchors that are not endpoints of any arc.
+    Mirrors Reference InteractionArcs::removeEmptyAnchors().
+
+    Returns new anchors dict (original is not modified).
+    Also updates arc start/end indices to reflect removed anchors.
+    """
+    new_anchors = {}
+    index_maps = {}  # old_index -> new_index per chr
+
+    for chr_ in anchors:
+        chr_anchors = anchors[chr_]
+        chr_arcs = arcs.get(chr_, [])
+        n = len(chr_anchors)
+
+        # Mark which anchors are used
+        used = [False] * n
+        for arc in chr_arcs:
+            if 0 <= arc.start < n:
+                used[arc.start] = True
+            if 0 <= arc.end < n:
+                used[arc.end] = True
+
+        # Build new list and index map
+        new_list = []
+        idx_map = {}
+        for i, anchor in enumerate(chr_anchors):
+            if used[i]:
+                idx_map[i] = len(new_list)
+                new_list.append(anchor)
+
+        removed = n - len(new_list)
+        print(f"  removed empty anchors {chr_}: {removed}")
+
+        new_anchors[chr_] = new_list
+        index_maps[chr_] = idx_map
+
+    # Remap arc indices
+    for chr_ in arcs:
+        idx_map = index_maps.get(chr_, {})
+        valid_arcs = []
+        for arc in arcs[chr_]:
+            ns = idx_map.get(arc.start, -1)
+            ne = idx_map.get(arc.end, -1)
+            if ns >= 0 and ne >= 0:
+                arc.start = ns
+                arc.end = ne
+                valid_arcs.append(arc)
+        arcs[chr_] = valid_arcs
+
+    return new_anchors

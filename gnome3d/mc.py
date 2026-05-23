@@ -175,7 +175,7 @@ def _batch_smooth_kernel_nb(
     use_conf, conf_cx, conf_cy, conf_cz, conf_R, conf_weight,
     score_struct, score_orn, score_heat, score_excl, score_conf,
 ):
-    """Unified smooth-MC kernel.  Energy terms (toggled by flags):
+    """Smooth-MC kernel.  Energy terms (toggled by flags):
       * structure   (always on): incremental delta via _local_smooth_nb
       * heat        (use_heat):  incremental delta via _local_heat_nb, 2x factor
       * orientation (use_orn):   incremental delta via weighted local, 2x factor
@@ -183,7 +183,7 @@ def _batch_smooth_kernel_nb(
       * confinement (use_conf):  incremental delta via _local_confine_nb, no 2x
 
     Returns (T, score_struct, score_orn, score_heat, score_excl, score_conf, n_ok).
-    Disabled-term arrays must still be valid-typed (any shape) - they are not
+    Disabled-term arrays must still be valid-typed (any shape), as they are not
     indexed when their flag is False.
     """
     n = pos.shape[0]
@@ -347,11 +347,11 @@ def _score_orientation_full_nb(anchor_orn, nbr_offsets, nbr_indices, nbr_weights
 @njit(cache=True)
 def _local_score_orientation_nb(anchor_orn, k, nbr_offsets, nbr_indices,
                                 nbr_weights, motif_weight, symmetric):
-    """Local orientation score for anchor k, WEIGHTED by per-arc weights.
+    """Local orientation score for anchor k, weighted by per-arc weights.
     Used for the incremental update: score_orn += 2*(local_curr - local_prev).
     The weights make this delta exact w.r.t. _score_orientation_full_nb - no drift.
     Diverges from Reference calcScoreOrientation(orn, anchor_index), which is unweighted
-    and therefore drifts; see [[project-orientation-mc-fix]].
+    and therefore drifts.
     """
     err = 0.0
     for ki in range(nbr_offsets[k], nbr_offsets[k + 1]):
@@ -615,7 +615,7 @@ def mc_heatmap(
     verbose: bool = False,
 ) -> float:
     """
-    MonteCarloHeatmap: simulated annealing using heatmap distance energy.
+    Simulated annealing using heatmap distance energy.
 
     Global score is double-counted, so the MC update rule is:
         score += 2 * (local_curr - local_prev)
@@ -679,7 +679,7 @@ def mc_arcs(
     verbose: bool = False,
 ) -> float:
     """
-    MonteCarloArcs: simulated annealing using arc spring energy.
+    Simulated annealing using arc spring energy.
 
     Global score counts i < j pairs once.  Local score sums all other beads,
     so the MC update rule is:
@@ -778,7 +778,7 @@ def mc_smooth(
     verbose: bool = False,
 ) -> float:
     """
-    MonteCarloArcsSmooth: chain connectivity + angle MC.
+    Chain connectivity + angle MC.
 
     Optionally adds CTCF orientation energy (char_orientations) and/or
     subanchor heat energy (heat_dist).  Mirrors Reference MonteCarloArcsSmooth
@@ -856,7 +856,7 @@ def mc_smooth(
 
     # Orientation state (dummy when disabled)
     if use_orn:
-        from .energy import calc_orientation as _calc_orn
+        from .util import calc_orientation as _calc_orn
         anchor_ar = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
         n_anchors = len(anchor_ar)
         nbr_offsets = np.zeros(n_anchors + 1, dtype=np.int32)
