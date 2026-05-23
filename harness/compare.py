@@ -510,7 +510,8 @@ def test_densify(reference_only=False):
         solver.clusters.append(c)
         active_region.append(i)
 
-    pos, fixed, gpos, dtn, anchor_map = solver._densify_active_region(active_region)
+    pos, fixed, starts, ends, gpos, dtn, anchor_map = solver._densify_active_region(active_region)
+    _ = (starts, ends)  # not asserted in this test; smooth-MC consumes them for BeadOut output
 
     n_anc = len(anchor_starts)
     exp_n = n_anc + (n_anc - 1) * LD  # 4 + 3*3 = 13
@@ -816,21 +817,28 @@ def test_contact_heatmaps(reference_only=False):
         @property
         def level(self): return 0
 
-    class _St:
-        loop_density = 3
-        use_anchor_heatmap = True; anchor_heatmap_influence = 0.5
-        use_subanchor_heatmap = True; subanchor_heatmap_influence = 0.1
-        subanchor_heatmap_dist_weight = 0.01
-        subanchor_estimate_replicates = 2; subanchor_estimate_steps = 2
+    # Use the real Settings (with defaults) and override only the few values
+    # this test needs. Keeps the stub resilient to new fields in gnome3d.
+    from gnome3d.settings import Settings as _Settings
 
-        @staticmethod
-        def genomic_length_to_distance(bp):
-            return 1.0 + 0.5 * (max(bp, 0) / 1000.0) ** 0.75
+    def _make_settings():
+        s = _Settings()
+        s.loop_density = 3
+        s.use_anchor_heatmap = True
+        s.anchor_heatmap_influence = 0.5
+        s.use_subanchor_heatmap = True
+        s.subanchor_heatmap_influence = 0.1
+        s.subanchor_heatmap_dist_weight = 0.01
+        s.subanchor_estimate_replicates = 2
+        s.subanchor_estimate_steps = 2
+        # Trivial monotonic stand-in for the distance function used here.
+        s.genomic_length_to_distance = lambda bp: 1.0 + 0.5 * (max(bp, 0) / 1000.0) ** 0.75
+        return s
 
     def _sv(ancs, sins):
         sv = _Sv.__new__(_Sv)
-        sv.s = _St(); sv.clusters = ancs; sv.arcs = {"chr1": []}
-        sv._singletons = sins; sv.chrs = []
+        sv.s = _make_settings(); sv.clusters = ancs; sv.arcs = {"chr1": []}
+        sv.singletons = sins; sv.chrs = []
         return sv
 
     ld, n_anc = 3, 3
@@ -866,7 +874,7 @@ def test_contact_heatmaps(reference_only=False):
 
     # Anchor heatmap scales distances: C++ reference from anchor_scale mode
     h_m = _np.array(_hm)
-    sv6 = _Sv.__new__(_Sv); sv6.s = _St()
+    sv6 = _Sv.__new__(_Sv); sv6.s = _make_settings()
     sv6.clusters = [_Cl(0, 100), _Cl(500, 600)]
     arc = _IA(start=0, end=1, score=10)
     sv6.clusters[0].arcs = [0]; sv6.clusters[1].arcs = [0]
@@ -875,7 +883,7 @@ def test_contact_heatmaps(reference_only=False):
     check("anchor_heatmap.scales_distances", cpp_scaled.get((0, 1), float("nan")), float(mat[0, 1]))
 
     # Anchor heatmap disabled → no scaling (pure Python: expected value is unscaled base=5.0)
-    st7 = _St(); st7.use_anchor_heatmap = False
+    st7 = _make_settings(); st7.use_anchor_heatmap = False
     sv7 = _Sv.__new__(_Sv); sv7.s = st7
     sv7.clusters = [_Cl(0, 100), _Cl(500, 600)]
     arc7 = _IA(start=0, end=1, score=10)
@@ -947,22 +955,30 @@ def test_subanchor_heat(reference_only=False):
         @property
         def level(self): return 0
 
-    class _St:
-        loop_density = 3; use_anchor_heatmap = True; anchor_heatmap_influence = 0.5
-        use_subanchor_heatmap = True; subanchor_heatmap_influence = 0.5
-        subanchor_heatmap_dist_weight = 0.01
-        subanchor_estimate_replicates = 2; subanchor_estimate_steps = 2
-        max_temp_smooth = 5.0; dt_temp_smooth = 0.99
-        jump_scale_smooth = 50.0; jump_coef_smooth = 20.0
-        mc_stop_steps_smooth = 100; mc_stop_improvement_smooth = 0.995
-        mc_stop_successes_smooth = 3
-        spring_stretch = 0.1; spring_squeeze = 0.1; spring_angular = 0.1
-        smooth_dist_weight = 1.0; smooth_angle_weight = 1.0
-        noise_smooth = 5.0; use_ctcf_motif = False
+    from gnome3d.settings import Settings as _Settings
 
-        @staticmethod
-        def genomic_length_to_distance(bp):
-            return 1.0 + 0.5 * (max(bp, 0) / 1000.0) ** 0.75
+    def _make_settings():
+        s = _Settings()
+        s.loop_density = 3
+        s.use_anchor_heatmap = True
+        s.anchor_heatmap_influence = 0.5
+        s.use_subanchor_heatmap = True
+        s.subanchor_heatmap_influence = 0.5
+        s.subanchor_heatmap_dist_weight = 0.01
+        s.subanchor_estimate_replicates = 2
+        s.subanchor_estimate_steps = 2
+        s.max_temp_smooth = 5.0
+        s.dt_temp_smooth = 0.99
+        s.mc_stop_steps_smooth = 100
+        s.spring_stretch = 0.1
+        s.spring_squeeze = 0.1
+        s.spring_angular = 0.1
+        s.smooth_dist_weight = 1.0
+        s.smooth_angle_weight = 1.0
+        s.noise_smooth = 5.0
+        s.use_ctcf_motif = False
+        s.genomic_length_to_distance = lambda bp: 1.0 + 0.5 * (max(bp, 0) / 1000.0) ** 0.75
+        return s
 
     n = 9
     ancs = [_Cl(0, 100), _Cl(500, 600), _Cl(1200, 1300)]
@@ -971,8 +987,8 @@ def test_subanchor_heat(reference_only=False):
     dtn = _np.full(n - 1, 2.0, dtype=_np.float32)
 
     def _sv():
-        sv = _Sv.__new__(_Sv); sv.s = _St(); sv.clusters = ancs
-        sv.arcs = {}; sv._singletons = []; sv.chrs = []
+        sv = _Sv.__new__(_Sv); sv.s = _make_settings(); sv.clusters = ancs
+        sv.arcs = {}; sv.singletons = []; sv.chrs = []
         return sv
 
     # 1. Zero heatmap → None
@@ -995,7 +1011,7 @@ def test_subanchor_heat(reference_only=False):
     _np.random.seed(42)
     pos3 = _np.random.rand(n, 3).astype(_np.float32) * 5.0
     heat3 = _np.full((n, n), 0.1); _np.fill_diagonal(heat3, 0.0)
-    st3 = _St(); st3.mc_stop_steps_smooth = 200; st3.mc_stop_successes_smooth = 2
+    st3 = _make_settings(); st3.mc_stop_steps_smooth = 200; st3.mc_stop_successes_smooth = 2
     st3.mc_stop_improvement_smooth = 0.5
     s3 = mc_smooth(pos3, dtn, fixed, step_size=0.5, settings=st3, heat_dist=heat3)
     check("subanchor_heat.mc_smooth_heat_finite", 1.0,
@@ -1007,7 +1023,7 @@ def test_subanchor_heat(reference_only=False):
     dtn7 = _np.full(n7 - 1, 1.0, dtype=_np.float32)
     _np.random.seed(0); pos4 = _np.random.rand(n7, 3).astype(_np.float32) * 3.0
     heat4 = _np.full((n7, n7), 2.0); _np.fill_diagonal(heat4, 0.0)
-    st4 = _St(); st4.use_ctcf_motif = True; st4.mc_stop_steps_smooth = 100
+    st4 = _make_settings(); st4.use_ctcf_motif = True; st4.mc_stop_steps_smooth = 100
     st4.mc_stop_successes_smooth = 2; st4.mc_stop_improvement_smooth = 0.5
     s4 = mc_smooth(pos4, dtn7, fixed7, step_size=0.5, settings=st4,
                    char_orientations=_np.array(['R', 'N', 'N', 'L', 'N', 'N', 'R'], dtype='<U1'),

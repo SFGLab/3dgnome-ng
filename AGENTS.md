@@ -388,6 +388,13 @@ The test auto-skips the Python comparison if `src/simulate.py` is missing or rai
 
 Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diverges, why, and how to toggle/restore parity. Keep this list current — new entries must be added when introducing diverging behavior, and removed when behavior is brought back into parity.
 
+### Settings hygiene
+
+- **`noise_arcs` removed.** The C++ reference declares `noiseCoefficientLevelAnchor` (read as `noise_arcs` in `[main]`) and multiplies it into a local `noise_size` variable in `LooperSolver.cpp:2085`, but the arc-MC call site on line 2136 passes a hardcoded `noise_size_small=0.005` instead — making the setting effectively dead in C++. Python uses the same 0.005 hardcoded constant in [solver.py::_reconstruct_cluster_arcs](gnome3d/solver.py); the setting was dropped to avoid implying configurability.
+- **`random_walk` ported.** Previously loaded-but-unused; now drives [solver.py::_random_walk_segment_level](gnome3d/solver.py), mirroring C++ `LooperSolver.cpp:80-98` (chained 50.0-step walk per chromosome instead of segment-level heatmap MC). Honors `use_2d`.
+- **`long_pet_*` ported.** Long-range arcs (gap > `max_pet_length`) are no longer discarded by [io.load_arcs](gnome3d/io.py) — they are carried on `ContactData.long_arcs` and folded into the segment heatmap by [solver.py::_add_long_pet_to_segment_heatmap](gnome3d/solver.py) as `long_pet_scale * arc.score ** long_pet_power`. Mirrors C++ `LooperSolver.cpp:1069-1104`, including the asymmetric `h[st][end] += val` pattern (the downstream symmetrize step in `_normalize_heatmap` averages it to `val` on each side).
+- **`steps_lvl1` / `noise_lvl1` still inert.** They control the C++ chromosome-level MC (level==0), which Python does not yet have. Left in `Settings` as forward-compat scaffolding.
+
 ### Refactors (no behavior change at parity settings)
 
 - **Unified smooth-MC kernel** ([gnome3d/mc.py](gnome3d/mc.py))

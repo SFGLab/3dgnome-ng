@@ -9,10 +9,7 @@ from __future__ import annotations
 import copy
 from typing import Any
 
-import numpy as np
-
 from .data import ContactData
-from .util import random_vector_np
 from .hierarchy import (
     Cluster, LVL_ANCHOR, LVL_SEGMENT, LVL_CHROMOSOME,
     build_cluster_tree, set_level,
@@ -21,6 +18,7 @@ from .io import create_singleton_heatmap
 from .mc import mc_heatmap, mc_arcs, mc_smooth
 from .settings import Settings
 from .types import *
+from .util import random_vector_np
 
 # Anchor map entry produced by densification: (bead_index, cluster_index).
 AnchorMapEntry = tuple[int, ClusterIndex]
@@ -45,7 +43,9 @@ class Solver:
 
         self.selected_region: BedRegion | None = None
         self.dense_active_regions: dict[str, list[BeadOut]] = {}
-        self._singletons: list[SingletonContact] = []
+        
+        self.singletons: list[SingletonContact] = []
+        self.long_arcs: RawArcMap = {}
 
     # Data loading and hierarchy construction
 
@@ -63,7 +63,8 @@ class Solver:
         self.selected_region = region
         self.anchors = data.anchors
         self.arcs = data.arcs
-        self._singletons = data.singletons
+        self.singletons = data.singletons
+        self.long_arcs = data.long_arcs
 
         print("[solver] build cluster hierarchy")
         self.clusters, self.chr_root, self.chr_first_cluster = build_cluster_tree(
@@ -80,7 +81,7 @@ class Solver:
 
         When settings.random_walk is True the segment level is positioned via
         a chained random walk instead of heatmap MC; subsequent levels still
-        run normally.  Mirrors C++ LooperSolver.cpp lines 80-98.
+        run normally.  Mirrors Reference LooperSolver.cpp lines 80-98.
         """
         # setLevel(LVL_SEGMENT) -> current_level contains segment cluster indices
         current_level = set_level(
@@ -115,7 +116,7 @@ class Solver:
         Each chromosome starts at the origin, takes one big step of size
         genomic_length_to_distance(1Mb) to break symmetry, then takes
         len(segs) small steps of 50 units each (Reference constant).
-        Mirrors C++ LooperSolver.cpp:84-97.
+        Mirrors Reference LooperSolver.cpp:84-97.
         """
         in_2d = self.s.use_2d
         size = float(self.s.genomic_length_to_distance(1_000_000))
@@ -180,6 +181,49 @@ class Solver:
 
         return bins, start_ind, curr_idx, bin_lengths_mb
 
+    def _add_long_pet_to_segment_heatmap(
+        self,
+        h: list[list[float]],
+        bins: dict[str, list[int]],
+        start_ind: dict[str, int],
+        total_size: int,
+    ) -> None:
+        """
+        Bin long-range PET arcs (gap > max_pet_length) into the segment heatmap.
+        Each arc contributes long_pet_scale * arc.score ** long_pet_power to the
+        (st, end) bin pair. Mirrors Reference LooperSolver.cpp:1069-1104.
+
+        Note: the Reference reference does h[st][end] += val twice (to the same cell),
+        not symmetrically.  The downstream _normalize_heatmap symmetrize step
+        averages [st][end] and [end][st] so the net effect is val on each side
+        after normalization. We preserve the same pattern for parity.
+        """
+        if not self.long_arcs:
+            return
+        import bisect
+        scale = self.s.long_pet_scale
+        power = self.s.long_pet_power
+        n_added = 0
+        for chr_ in self.chrs:
+            chrlong_arcs = self.long_arcs.get(chr_, [])
+            chr_bins = bins.get(chr_)
+            if not chrlong_arcs or chr_bins is None:
+                continue
+            si_base = start_ind.get(chr_, 0)
+            for arc in chrlong_arcs:
+                st = si_base + bisect.bisect_right(chr_bins, arc.start) - 1
+                end = si_base + bisect.bisect_right(chr_bins, arc.end) - 1
+                if st == end:
+                    continue
+                if st < 0 or end < 0 or st >= total_size or end >= total_size:
+                    continue
+                val = scale * (arc.score ** power)
+                h[st][end] += val
+                h[st][end] += val
+                n_added += 1
+        if n_added > 0 and self.s.output_level >= 1:
+            print(f"  long-PET folded into segment heatmap: {n_added} arcs")
+
     def _reconstruct_heatmap_single_level(self, current_level: ChrLevel) -> None:
         """
         Reconstruct segment-level positions using singleton heatmap MC.
@@ -191,8 +235,13 @@ class Solver:
         if self.s.output_level >= 1:
             print("[solver] create segment heatmap")
         h_raw = create_singleton_heatmap(
-            self._singletons, bins, start_ind, total_size, bin_lengths_mb=bin_lengths_mb
+            self.singletons, bins, start_ind, total_size, bin_lengths_mb=bin_lengths_mb
         )
+
+        # Fold long-range PET arcs into the segment heatmap (mirrors Reference
+        # LooperSolver.cpp:1069-1104). Each long arc contributes
+        # long_pet_scale * arc.score ** long_pet_power to the (st, end) cell.
+        self._add_long_pet_to_segment_heatmap(h_raw, bins, start_ind, total_size)
 
         # Normalize heatmap rows to equal expected sum
         h_norm = self._normalize_heatmap(h_raw, total_size)
@@ -400,7 +449,7 @@ class Solver:
         # we do it here before any MC and pass results down.
         anchor_heat: F64Array | None = None
         subanchor_heat_raw: F64Array | None = None
-        if (self.s.use_anchor_heatmap or self.s.use_subanchor_heatmap) and self._singletons:
+        if (self.s.use_anchor_heatmap or self.s.use_subanchor_heatmap) and self.singletons:
             anchor_heat, subanchor_heat_raw = self._build_contact_heatmaps(active_region, chr_)
 
         exp_dist = self._calc_anchor_expected_distances(active_region, chr_, anchor_heat)
@@ -508,8 +557,8 @@ class Solver:
         s = s_override if s_override is not None else self.s
         active_size = len(active_region)
 
-        # Compute noise size (avg expected distance between consecutive anchors * noise_arcs)
-        # Reference uses hardcoded noise_size_small = 0.005 for anchor level
+        # Arc-level uses a hardcoded noise size (matches Reference LooperSolver.cpp:2136
+        # which passes noise_size_small=0.005, ignoring noiseCoefficientLevelAnchor).
         noise_size_small = 0.005
 
         # Compute dist_to_next for each anchor
@@ -608,7 +657,7 @@ class Solver:
         # See [[project-singleton-chr-filter-divergence]] - this is intentional.
         h_sub: F64Array = np.zeros((N, N), dtype=np.float64)
 
-        for c1, p1, c2, p2, sc in self._singletons:
+        for c1, p1, c2, p2, sc in self.singletons:
             if c1 != chr_ or c2 != chr_:
                 continue
             if p1 < region_start or p1 > region_end:

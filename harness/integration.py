@@ -385,7 +385,8 @@ def parse_hcm(hcm_path: Path):
     Parse a .hcm model file and return sorted leaf-bead positions.
 
     Returns:
-        list of (midpoint_bp, x, y, z) tuples sorted by genomic midpoint.
+        list of BeadOut = (start_bp, end_bp, x, y, z) tuples sorted by genomic start.
+        Matches gnome3d.types.BeadOut so Python and C++ ensembles share the same shape.
 
     The .hcm format (toFilePreviousFormat):
         line 1:  n_clusters  n_arcs  root_index  n_factors
@@ -398,7 +399,7 @@ def parse_hcm(hcm_path: Path):
         n_clusters = int(header[0])
         _n_arcs = int(header[1])
         _root = int(header[2])
-        n_factors = int(header[3])
+        _n_factors = int(header[3])
 
         # factor names line
         _ = f.readline()
@@ -406,15 +407,16 @@ def parse_hcm(hcm_path: Path):
         clusters = []
         for _ in range(n_clusters):
             parts = f.readline().split()
-            mid = int(parts[0])
-            # start = int(parts[1])  # not needed
-            # end   = int(parts[2])
+            # mid = int(parts[0])  # midpoint - derivable from start/end
+            start = int(parts[1])
+            end = int(parts[2])
             x, y, z = float(parts[3]), float(parts[4]), float(parts[5])
             n_ch = int(parts[6])
-            clusters.append((mid, x, y, z, n_ch))
+            clusters.append((start, end, x, y, z, n_ch))
 
-    # Leaf beads: clusters with no children, sorted by genomic midpoint
-    leaves = [(mid, x, y, z) for mid, x, y, z, n_ch in clusters if n_ch == 0]
+    # Leaf beads: clusters with no children, sorted by genomic start
+    leaves = [(start, end, x, y, z)
+              for start, end, x, y, z, n_ch in clusters if n_ch == 0]
     leaves.sort(key=lambda b: b[0])
     return leaves
 
@@ -572,7 +574,7 @@ def try_python_ensemble(config: Path, n: int, region: str) -> list | None:
     Call gnome3d.simulate.run_region if available.
     Expected signature:
         run_region(config_path: str, region: str, n_structures: int)
-            -> list of list[(midpoint_bp, x, y, z)]
+            -> list[list[BeadOut]]   # BeadOut = (start_bp, end_bp, x, y, z)
     Returns None if not yet implemented.
     """
     sys.path.insert(0, str(ROOT))
@@ -593,12 +595,16 @@ def try_python_ensemble(config: Path, n: int, region: str) -> list | None:
 # Print ensemble statistics
 
 def print_stats(label: str, structures: list) -> dict:
-    """Compute and print summary statistics for an ensemble."""
-    rg_vals = [radius_of_gyration([(x, y, z) for _, x, y, z in s]) for s in structures]
+    """Compute and print summary statistics for an ensemble.
+
+    Accepts beads as either (mid, x, y, z) (legacy) or BeadOut
+    (start, end, x, y, z). xyz is always the last 3 fields.
+    """
+    rg_vals = [radius_of_gyration([tuple(b[-3:]) for b in s]) for s in structures]
     bond_vals = []
     pwd_vals = []
     for s in structures:
-        pts = [(x, y, z) for _, x, y, z in s]
+        pts = [tuple(b[-3:]) for b in s]
         bond_vals.extend(consecutive_distances(pts))
         pwd_vals.extend(pairwise_distances(pts))
 
@@ -637,7 +643,7 @@ def structural_distance_matrix(structures: list) -> list:
     # Build (n, k) matrix where k = M*(M-1)/2 pairwise distances per structure
     rows = []
     for s in structures:
-        pts = np.array([(x, y, z) for _, x, y, z in s], dtype=np.float64)
+        pts = np.array([b[-3:] for b in s], dtype=np.float64)
         diff = pts[:, None, :] - pts[None, :, :]  # (M, M, 3)
         d = np.sqrt((diff * diff).sum(axis=2))  # (M, M)
         idx = np.triu_indices(len(pts), k=1)
@@ -698,7 +704,16 @@ def _save_cache(path: Path, region: str, n: int, fast: bool,
 def _load_cache(path: Path) -> tuple:
     with open(path) as f:
         cached = json.load(f)
-    structs = [[(b[0], b[1], b[2], b[3]) for b in s] for s in cached["structures"]]
+    # Caches written before BeadOut was widened store 4-tuples (mid, x, y, z);
+    # newer ones store 5-tuples (start, end, x, y, z). Promote legacy entries
+    # by treating midpoint as both start and end.
+    def _promote(b: list) -> tuple:
+        if len(b) == 5:
+            return (int(b[0]), int(b[1]), float(b[2]), float(b[3]), float(b[4]))
+        # legacy 4-tuple: (mid, x, y, z)
+        mid = int(b[0])
+        return (mid, mid, float(b[1]), float(b[2]), float(b[3]))
+    structs = [[_promote(b) for b in s] for s in cached["structures"]]
     return structs, cached["raw_lines"]
 
 

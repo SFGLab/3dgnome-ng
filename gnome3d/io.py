@@ -77,19 +77,23 @@ def load_arcs(
     chr_set: set[str],
     region: BedRegion | None = None,
     max_pet_length: int = 1_000_000,
-) -> RawArcMap:
+) -> tuple[RawArcMap, RawArcMap]:
     """
     Load PET cluster BEDPE file.  Format: chr_a start_a end_a chr_b start_b end_b score
 
-    Returns dict[chr -> list[RawArc]], sorted by start, intra only.
-    Arcs longer than max_pet_length are excluded (they go to long_arcs).
+    Returns (raw, long_arcs) where:
+      raw       : dict[chr -> list[RawArc]], sorted by start, intra only
+      long_arcs : dict[chr -> list[RawArc]], arcs with (end-start) > max_pet_length
+
+    Long arcs are not anchor-mapped (they would be too sparse) but are folded back
+    into the segment-level heatmap by Solver, mirroring Reference LooperSolver.cpp:1069-1104.
     """
     raw: RawArcMap = {}
     long_arcs: RawArcMap = {}
 
     if not path or not os.path.exists(path):
         print(f"[io] arcs file not found: {path}")
-        return raw
+        return raw, long_arcs
 
     added = 0
     long_cnt = 0
@@ -133,8 +137,8 @@ def load_arcs(
             lst.insert(p, arc)
             added += 1
 
-    print(f"  arcs loaded: {added}, long arcs discarded: {long_cnt}")
-    return raw
+    print(f"  arcs loaded: {added}, long arcs separated: {long_cnt}")
+    return raw, long_arcs
 
 
 # Load segment breakpoints

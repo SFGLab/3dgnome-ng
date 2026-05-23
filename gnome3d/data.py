@@ -42,6 +42,9 @@ class ContactData:
     arcs: ArcMap = field(default_factory=empty_arc_map)
     breakpoints: BreakpointMap = field(default_factory=empty_breakpoint_map)
     singletons: list[SingletonContact] = field(default_factory=empty_singleton_list)
+    # Long-range arcs (gap > max_pet_length): not anchor-mapped, folded into the
+    # segment heatmap by Solver. Mirrors Reference InteractionArcs::long_arcs.
+    long_arcs: RawArcMap = field(default_factory=empty_raw_arc_map)
 
     @classmethod
     def from_files(
@@ -69,7 +72,7 @@ class ContactData:
         anchors = load_anchors(s.data_path(s.data_anchors), chr_set, region)
 
         print("[data] load arcs")
-        raw_arcs = load_arcs(
+        raw_arcs, long_arcs = load_arcs(
             s.data_path(s.data_pet_clusters), chr_set, region, s.max_pet_length
         )
 
@@ -90,6 +93,7 @@ class ContactData:
             arcs=arcs,
             breakpoints=breakpoints,
             singletons=singletons,
+            long_arcs=long_arcs,
         )
 
     @classmethod
@@ -141,6 +145,7 @@ class ContactData:
 
         # raw arcs -> mark -> remove empty
         raw_arcs: RawArcMap = {}
+        long_arcs: RawArcMap = {}
         for _, row in arcs_df.iterrows():
             ca, cb = str(row["chr_a"]), str(row["chr_b"])
             if ca != cb or ca not in chr_set:
@@ -151,9 +156,10 @@ class ContactData:
                 posa, posb = posb, posa
             if region is not None and not (region.contains(posa) and region.contains(posb)):
                 continue
-            if posb - posa > max_pet_length:
-                continue
             arc = RawArc(posa, posb, float(row["score"]))
+            if posb - posa > max_pet_length:
+                long_arcs.setdefault(ca, []).append(arc)
+                continue
             lst = raw_arcs.setdefault(ca, [])
             p = len(lst)
             while p > 0 and lst[p - 1].start > arc.start:
@@ -190,6 +196,7 @@ class ContactData:
             arcs=arcs,
             breakpoints=breakpoints,
             singletons=singletons,
+            long_arcs=long_arcs,
         )
 
 

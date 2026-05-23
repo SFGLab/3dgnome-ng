@@ -112,6 +112,10 @@ def empty_arc_map() -> ArcMap:
     return {}
 
 
+def empty_raw_arc_map() -> RawArcMap:
+    return {}
+
+
 def empty_breakpoint_map() -> BreakpointMap:
     return {}
 

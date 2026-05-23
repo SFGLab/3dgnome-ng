@@ -88,8 +88,12 @@ class Settings:
     # ---- noise coefficients ----
     noise_lvl1: float
     noise_lvl2: float
-    noise_arcs: float
     noise_smooth: float
+    # Note: `noise_arcs` is not kept. The Reference reference computes a
+    # multiplied noise_size with noiseCoefficientLevelAnchor (Settings.cpp:364)
+    # but the arc-MC call site passes a hardcoded noise_size_small=0.005 instead
+    # (LooperSolver.cpp:2136). Python uses the same 0.005, so the setting has no
+    # effect either way.
 
     # ---- MC heatmap ----
     max_temp_heatmap: float
@@ -224,7 +228,6 @@ class Settings:
         # ---- noise coefficients ----
         self.noise_lvl1 = 1.0
         self.noise_lvl2 = 0.1
-        self.noise_arcs = 0.5
         self.noise_smooth = 0.5
 
         # ---- MC heatmap ----
@@ -322,7 +325,7 @@ class Settings:
         self.steps_smooth = geti("main", "steps_smooth", self.steps_smooth)
         self.noise_lvl1 = getf("main", "noise_lvl1", self.noise_lvl1)
         self.noise_lvl2 = getf("main", "noise_lvl2", self.noise_lvl2)
-        self.noise_arcs = getf("main", "noise_arcs", self.noise_arcs)
+        # noise_arcs intentionally ignored (see Settings class comment).
         self.noise_smooth = getf("main", "noise_smooth", self.noise_smooth)
 
         # [data]
