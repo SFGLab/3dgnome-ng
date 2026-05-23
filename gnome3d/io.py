@@ -22,6 +22,73 @@ def parse_region(region_str: str) -> BedRegion | None:
         return None
 
 
+def _expand_chr_range(token: str) -> list[str]:
+    """
+    Expand 'chrN-chrM' into [chrN, chrN+1, ..., chrM] when both ends are
+    numeric.  Anything else is returned as a single-element list.
+    Examples:
+      'chr1-chr3' -> ['chr1', 'chr2', 'chr3']
+      'chrX'      -> ['chrX']
+      'chr1-chrX' -> ['chr1-chrX']  (non-numeric end: not expanded)
+    """
+    if "-" not in token:
+        return [token]
+    lo, hi = token.split("-", 1)
+    prefix_lo = "".join(c for c in lo if not c.isdigit())
+    prefix_hi = "".join(c for c in hi if not c.isdigit())
+    suffix_lo = lo[len(prefix_lo):]
+    suffix_hi = hi[len(prefix_hi):]
+    if prefix_lo != prefix_hi or not suffix_lo or not suffix_hi:
+        return [token]
+    try:
+        a, b = int(suffix_lo), int(suffix_hi)
+    except ValueError:
+        return [token]
+    if b < a:
+        return [token]
+    return [f"{prefix_lo}{i}" for i in range(a, b + 1)]
+
+
+def parse_chrs_arg(arg: str) -> tuple[list[str], BedRegion | None]:
+    """
+    Parse the CLI chromosomes/region argument.  Mirrors the Reference -c flag.
+
+    Accepts:
+      'chr14:18288319-20307135' -> (['chr14'], BedRegion(...))    single region
+      'chr14'                   -> (['chr14'], None)              single chromosome
+      'chr1,chr3,chrX'          -> (['chr1','chr3','chrX'], None) comma list
+      'chr1-chr22,chrX'         -> (['chr1',...,'chr22','chrX'], None)  range + extras
+      ''                        -> default whole human genome (chr1..chr22, chrX)
+    """
+    arg = arg.strip()
+    if not arg:
+        return ([f"chr{i}" for i in range(1, 23)] + ["chrX"], None)
+
+    region = parse_region(arg)
+
+    if region is not None:
+        return ([region.chr], region)
+
+    chrs: list[str] = []
+
+    for token in arg.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        chrs.extend(_expand_chr_range(token))
+
+    # de-dup while preserving order
+    seen: set[str] = set()
+    unique: list[str] = []
+
+    for c in chrs:
+        if c not in seen:
+            seen.add(c)
+            unique.append(c)
+
+    return unique, None
+
+
 # Load anchors from BED file
 
 def load_anchors(
@@ -67,6 +134,7 @@ def load_anchors(
 
     for chr_, lst in anchors.items():
         print(f"  anchors loaded: {chr_}: {len(lst)}")
+
     return anchors
 
 

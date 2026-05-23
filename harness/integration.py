@@ -2,7 +2,7 @@
 """
 harness/integration.py - integration test for 3dgnome-ng.
 
-Runs the C++ 3dnome binary on a small chr1 region (~2 Mb, ~34 anchor beads)
+Runs the reference 3dnome binary on a small chr1 region (~2 Mb, ~34 anchor beads)
 to produce an ensemble of structures, then runs the Python reimplementation
 on the same region and compares bead-position distributions.
 
@@ -11,17 +11,17 @@ Distributions compared per ensemble:
   - Pooled pairwise inter-bead distances (all i<j pairs, all structures)
   - Consecutive bond lengths along the chain
 
-When both C++ and Python ensembles are available, a 2-sample KS test is used
+When both reference and Python ensembles are available, a 2-sample KS test is used
 to decide PASS/FAIL.  When Python is not yet implemented the test prints the
-C++ reference statistics and exits 0 (no failure for unimplemented code).
+reference statistics and exits 0 (no failure for unimplemented code).
 
-C++ results are automatically cached to out/cpp_cache/ after each run so that
-subsequent runs with --python-only skip the (slow) C++ step entirely.
+reference results are automatically cached to out/cpp_cache/ after each run so that
+subsequent runs with --python-only skip the (slow) reference step entirely.
 
 Usage:
     python harness/integration.py              # full test (auto-skips Python)
-    python harness/integration.py --cpp-only   # force C++ reference only
-    python harness/integration.py --python-only  # skip C++, load cached results
+    python harness/integration.py --cpp-only   # force reference only
+    python harness/integration.py --python-only  # skip reference, load cached results
     python harness/integration.py -n 5         # ensemble size (default 5)
     python harness/integration.py --keep       # keep temp output files
     python harness/integration.py --fast       # very fast but low-quality MC
@@ -59,7 +59,7 @@ KS_D_THRESHOLD = 0.05
 KS_PWD_MAX_SAMPLES = 50_000
 
 # Structural distance benchmark (from cudaMMC_benchmark_analysis.ipynb):
-# median inter-model structural distance ratio (Python/C++) must be within this
+# median inter-model structural distance ratio (Python/reference) must be within this
 # fraction of 1.0.  Mirrors the notebook's median ratio check.
 STRUCT_DIST_RATIO_THRESHOLD = 0.10
 
@@ -70,10 +70,10 @@ SKIP_STR = "\033[33mSKIP\033[0m"
 # ---------------------------------------------------------------------------
 # Milestone capture
 
-# Matches both C++ and Python milestone lines:
+# Matches both reference and Python milestone lines:
 #   "    step   13000  score=11.6605  ratio=1.0000  ok=9/1000  [done]"
 _MS_RE = re.compile(r'step\s+([\d,]+)\s+score=([^\s]+)\s+ratio=([^\s]+)\s+ok=(\d+)/(\d+)')
-# Matches C++ IB header lines (raw subprocess output, no "[cpp]" prefix):
+# Matches reference IB header lines (raw subprocess output, no "[cpp]" prefix):
 #   "  chr1 1/2"
 _IB_RE = re.compile(r'^\s+\S+\s+(\d+/\d+)\s*$')
 # Matches Python milestone label brackets: "[chr1 IB 1/2 run 1/1]" / "smooth"
@@ -110,7 +110,7 @@ class _TeeOut:
 
 def _parse_cpp_milestones(raw_lines: list) -> dict:
     """
-    Parse raw C++ subprocess lines (no "[cpp]" prefix) into
+    Parse raw reference subprocess lines (no "[cpp]" prefix) into
     {(ib, phase): [(step, score, ok, total, done), ...]}.
     Arc phase milestones come first; after arc [done] the remaining
     milestones for that IB belong to the smooth phase.
@@ -206,8 +206,8 @@ def print_step_comparison(cpp_ms: dict, py_ms: dict, n_structs: int) -> None:
             continue
 
         print(f"\n  IB {ib} - {phase} MC")
-        print(f"  {'step':>8}  {'C++ score':>11}  {'Py score':>11}  "
-              f"{'Δ%':>7}  {'C++ ok/N':>13}  {'Py ok/N':>13}")
+        print(f"  {'step':>8}  {'Ref score':>11}  {'Py score':>11}  "
+              f"{'Δ%':>7}  {'Ref ok/N':>13}  {'Py ok/N':>13}")
         print("  " + "─" * 72)
 
         for step in steps:
@@ -386,7 +386,7 @@ def parse_hcm(hcm_path: Path):
 
     Returns:
         list of BeadOut = (start_bp, end_bp, x, y, z) tuples sorted by genomic start.
-        Matches gnome3d.types.BeadOut so Python and C++ ensembles share the same shape.
+        Matches gnome3d.types.BeadOut so Python and reference ensembles share the same shape.
 
     The .hcm format (toFilePreviousFormat):
         line 1:  n_clusters  n_arcs  root_index  n_factors
@@ -516,7 +516,7 @@ def _subsample(values: list, n: int, seed: int = 42) -> list:
 
 
 # ---------------------------------------------------------------------------
-# Run C++ binary
+# Run reference binary
 
 def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int,
                      region: str, region_label: str) -> list:
@@ -551,7 +551,7 @@ def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int,
         sys.exit(f"[cpp] 3dnome exited with code {proc.returncode}")
 
     # Collect output .hcm files.
-    # C++ names: loops_{label}.hcm for n=1, loops_{label}_{i}.hcm for n>1.
+    # reference names: loops_{label}.hcm for n=1, loops_{label}_{i}.hcm for n>1.
     structures = []
     for i in range(n):
         hcm = (outdir / f"loops_{region_label}.hcm") if n == 1 else \
@@ -698,7 +698,7 @@ def _save_cache(path: Path, region: str, n: int, fast: bool,
             "structures": [[list(b) for b in s] for s in structs],
             "raw_lines": raw_lines,
         }, f)
-    print(f"[integration] C++ results cached to {path}")
+    print(f"[integration] reference results cached to {path}")
 
 
 def _load_cache(path: Path) -> tuple:
@@ -722,11 +722,11 @@ def main():
     parser.add_argument("-n", "--n-structures", type=int, default=5,
                         help="ensemble size (default 5)")
     parser.add_argument("--cpp-only", action="store_true",
-                        help="run C++ reference only, skip Python comparison")
+                        help="run reference only, skip Python comparison")
     parser.add_argument("--python-only", action="store_true",
-                        help="skip C++ run; load cached C++ results (requires a prior full run)")
+                        help="skip reference run; load cached results (requires a prior full run)")
     parser.add_argument("--cache-dir", metavar="PATH", default=None,
-                        help="directory for C++ result cache (default: out/cpp_cache)")
+                        help="directory for reference result cache (default: out/cpp_cache)")
     parser.add_argument("--keep", action="store_true",
                         help="keep temp output directory after test")
     parser.add_argument("--fast", action="store_true",
@@ -798,19 +798,19 @@ def main():
                  use_subanchor_heatmap=use_subanchor_heatmap)
 
     # max_level=2 -> heatmap MC + arc MC + smooth MC (Level 4 runs inside arc reconstruction).
-    # Both C++ and Python produce subanchor beads: n_anchors + (n_anchors-1)*loop_density.
+    # Both reference and Python produce subanchor beads: n_anchors + (n_anchors-1)*loop_density.
     MAX_LEVEL = 2
 
     try:
-        # -- C++ ensemble --------------------------------------------------
+        # -- reference ensemble --------------------------------------------------
         if args.python_only:
             if not cache_file.exists():
                 sys.exit(
-                    f"[error] no cached C++ results found: {cache_file}\n"
+                    f"[error] no cached reference results found: {cache_file}\n"
                     f"  run without --python-only first to generate the cache"
                 )
             cpp_structs, cpp_raw = _load_cache(cache_file)
-            print(f"[integration] loaded {len(cpp_structs)} cached C++ structures from {cache_file}")
+            print(f"[integration] loaded {len(cpp_structs)} cached reference structures from {cache_file}")
         else:
             cpp_outdir = tmpdir / "cpp"
             cpp_outdir.mkdir()
@@ -836,7 +836,7 @@ def main():
         if py_structs is None:
             print(f"\n  [{SKIP_STR}] Python src/simulate.run_region not implemented - "
                   "skipping comparison")
-            print("\n[integration] C++ reference run complete.")
+            print("\n[integration] reference run complete.")
             return
 
         if args.output_dir:
@@ -850,13 +850,13 @@ def main():
         n_cpp = len(cpp_structs[0])
         n_py = len(py_structs[0])
         if n_cpp != n_py:
-            print(f"  {FAIL_STR}  bead count mismatch: C++={n_cpp}  Python={n_py}")
+            print(f"  {FAIL_STR}  bead count mismatch: ref={n_cpp}  Python={n_py}")
             results.append(False)
         else:
             print(f"  {PASS_STR}  bead count matches: {n_cpp} (anchors + subanchors)")
             results.append(True)
 
-        cpp_stats = print_stats("C++", cpp_structs)
+        cpp_stats = print_stats("Ref", cpp_structs)
         py_stats = print_stats("Python", py_structs)
 
         # KS test on Rg distribution
@@ -899,7 +899,7 @@ def main():
             ok_sd = math.isfinite(ratio) and abs(ratio - 1.0) <= STRUCT_DIST_RATIO_THRESHOLD
             status = PASS_STR if ok_sd else FAIL_STR
             print(f"  {status}  struct diversity  median ratio={ratio:.3f}"
-                  f"  (C++ med={cpp_med:.4f}  Py med={py_med:.4f}"
+                  f"  (ref med={cpp_med:.4f}  Py med={py_med:.4f}"
                   f"  threshold=±{STRUCT_DIST_RATIO_THRESHOLD:.0%})")
             results.append(ok_sd)
 

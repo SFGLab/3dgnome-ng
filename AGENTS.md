@@ -2,19 +2,23 @@
 
 ## Project Goal
 
-Python reimplementation of the Monte Carlo (MC) core of **3dgnome**. The original implementation is a ~6,400-line C++ simulation (`3dnome/MC/`) that predicts 3D chromosome structure from Hi-C contact frequency data. The reimplementation lives in `gnome3d/` and reproduced the C++ algorithm behavior as its starting point. MC loops run on CPU via Numba JIT; torch is used only for GPU device detection and the reference scoring functions in `gnome3d/energy.py`.
+Python reimplementation of the Monte Carlo (MC) core of **3dgnome**. The reference implementation (`3dnome/MC/`) is a ~6,400-line simulation that predicts 3D chromosome structure from Hi-C contact frequency data. The reimplementation lives in `gnome3d/` and reproduced the reference algorithm as its starting point. MC loops run on CPU via Numba JIT; torch is used only for GPU device detection and the reference scoring functions in `gnome3d/energy.py`.
 
 Do **not** modify anything inside `3dnome/`. That directory is the reference implementation - read it, never change it.
 
+### Terminology
+
+Refer to `3dnome/MC/` as **"the reference"** (or "the reference implementation"), never as "C++". The language it happens to be written in is irrelevant to the design; the relevant fact is that it is the algorithmic source-of-truth we port from. This applies in code comments, docstrings, agent-visible documentation, commit messages, and conversations. When you cite a specific file or line, write `LooperSolver.cpp:1069-1104` — not "the C++ code at...".
+
 ### Status: post-parity, feature-extension phase
 
-The Python port reached algorithmic parity with the C++ reference; that work is documented and frozen. **New work no longer requires matching C++.** Features added from here on (biophysics extensions, new energy terms, scheduling tweaks, etc.) are expected to diverge intentionally from `3dnome/`.
+The Python port reached algorithmic parity with the reference; that work is documented and frozen. **New work no longer requires matching the reference.** Features added from here on (biophysics extensions, new energy terms, scheduling tweaks, etc.) are expected to diverge intentionally from `3dnome/`.
 
 Rules for new feature work:
 
 - **All new features must be opt-in via `gnome3d/settings.py`.** Default-off so existing configs continue to reproduce the parity-era behavior.
 - **Document divergences** in the "Python divergences from reference" section below — what changed, why, and which setting toggles it.
-- The C++ reference and `harness/compare.py` / `harness/integration.py` remain authoritative for the **parity baseline** (feature flags off). They are not authoritative for new features.
+- The reference and `harness/compare.py` / `harness/integration.py` remain authoritative for the **parity baseline** (feature flags off). They are not authoritative for new features.
 - Inside a feature's own code, document any non-obvious behavior; project memory (`[[…]]` links) carries the longer-form rationale.
 
 ---
@@ -23,7 +27,7 @@ Rules for new feature work:
 
 ```
 3dgnome-torch/
-├── 3dnome/MC/                  # Reference C++ implementation (READ ONLY)
+├── 3dnome/MC/                  # Reference implementation (READ ONLY)
 │   ├── LooperSolver.cpp/h      # Main solver - all MC loops live here
 │   ├── Chromosome.cpp/h        # 3D structure (list of bead positions)
 │   ├── HierarchicalChromosome.cpp/h  # Multi-level representation
@@ -43,7 +47,7 @@ Python environment: `.venv/bin/python` (Python 3.11, torch >= 2.0, numpy >= 1.24
 ```
 3dgnome-torch/
 ├── harness/
-│   ├── scorer.cpp      # C++ reference scorer compiled against real 3dnome sources
+│   ├── scorer.cpp      # reference scorer compiled against real 3dnome sources
 │   ├── compare.py      # Unit-level correctness harness (energy functions)
 │   └── integration.py  # Integration test: run full MC on a region, compare distributions
 ```
@@ -187,7 +191,7 @@ Reference: `calcScoreSubanchorHeatmap()` line 1782.
 | Subanchor (4) | Random 3D displacement | `~5.0` (absolute) |
 | Subanchor (4) | CTCF orientation update | triggered when near-anchor bead moves |
 
-Displacement vectors are sampled from a 3D Gaussian (or uniform sphere). The C++ implementation uses `randBall()` / `randBallGaussian()` in `lib/common.h`.
+Displacement vectors are sampled from a 3D Gaussian (or uniform sphere). The reference uses `randBall()` / `randBallGaussian()` in `lib/common.h`.
 
 ---
 
@@ -230,7 +234,7 @@ src/
 ### PyTorch notes
 
 - Store all bead positions as a `(N, 3)` float32 tensor on the target device.
-- Energy functions should operate on tensor slices for the *active region* only (not all N beads), matching the C++ local-score pattern.
+- Energy functions should operate on tensor slices for the *active region* only (not all N beads), matching the reference local-score pattern.
 - The inner MC loop is inherently sequential (each step depends on the previous accept/reject), so do **not** try to batch proposals within a single chain. Batch across independent MC chains instead (ensemble generation).
 - `torch.no_grad()` everywhere in the MC loop - we are doing stochastic search, not gradient descent.
 - Use `torch.compile` or keep operations simple to avoid recompilation overhead inside the loop.
@@ -239,7 +243,7 @@ src/
 
 ## Reference Files to Read First
 
-When working on any piece of the rewrite, read the corresponding C++ reference first:
+When working on any piece of the rewrite, read the corresponding reference file first:
 
 | Task | Reference |
 |------|-----------|
@@ -306,7 +310,7 @@ The harness compiles `harness/scorer.cpp` directly against the real 3dnome MC so
 # First build (auto-runs on first comparison too)
 python harness/compare.py --build-only
 
-# Print C++ reference values only - no Python impl needed
+# Print reference values only - no Python impl needed
 python harness/compare.py --reference
 
 # Run all tests (skips anything not yet in src/)
@@ -331,7 +335,7 @@ python harness/compare.py heatmap arcs smooth
 ### Non-obvious details captured in scorer.cpp
 
 - **`angle()` is NOT `acos`**: `3dnome/MC/lib/common.cpp:40` defines it as `1 - (dot(norm(v1), norm(v2)) + 1) / 2`, a linear dissimilarity in [0, 1]. The smooth score's cubic penalty uses this.
-- **Heatmap score double-counts**: the C++ computes `sum_moved sum_i err(i, moved)`, which counts every pair (i,j) twice. The Python must match this convention exactly so that the MC delta `2*(local_curr - local_prev)` is consistent.
+- **Heatmap score double-counts**: the reference computes `sum_moved sum_i err(i, moved)`, which counts every pair (i,j) twice. The Python must match this convention exactly so that the MC delta `2*(local_curr - local_prev)` is consistent.
 - **Global score update**: `score_curr += 2.0 * (local_score_curr - local_score_prev)`. The factor 2 comes from the double-counting above.
 - **Metropolis uses ratio, not difference**: acceptance probability is `jump_scale * exp(-jump_coef * (score_curr / score_prev) / T)`, and `jump_scale` (default 50) can push the probability above 1.
 - **Random displacement is uniform in a cube**: `random_vector(step)` returns `(rand(±step), rand(±step), rand(±step))`, not a sphere or Gaussian.
@@ -340,7 +344,7 @@ python harness/compare.py heatmap arcs smooth
 
 ## Integration Test
 
-`harness/integration.py` runs the real C++ binary on a small ~2 Mb chr1 region (`chr1:18288319:20307135`, ~34 anchor beads) to produce an ensemble of structures, then runs the Python reimplementation on the same region and compares their bead-position distributions.
+`harness/integration.py` runs the reference binary on a small ~2 Mb chr1 region (`chr1:18288319:20307135`, ~34 anchor beads) to produce an ensemble of structures, then runs the Python reimplementation on the same region and compares their bead-position distributions.
 
 ### What it measures
 
@@ -350,7 +354,7 @@ python harness/compare.py heatmap arcs smooth
 | Pooled pairwise distances | all i<j pairs from all structures; 2-sample KS test |
 | Consecutive bond lengths | chain bond distribution; 2-sample KS test |
 
-PASS criteria: KS statistic ≤ 0.3 and p-value ≥ 0.05 for both pairwise and bond distributions.  The C++ run uses `-v 2` (heatmap + arc reconstruction), so leaf beads in the output are the ~34 anchor-level clusters.
+PASS criteria: KS statistic ≤ 0.3 and p-value ≥ 0.05 for both pairwise and bond distributions.  The reference run uses `-v 2` (heatmap + arc reconstruction), so leaf beads in the output are the ~34 anchor-level clusters.
 
 ### Interface Python must expose
 
@@ -360,14 +364,14 @@ def run_region(config_path: str, region: str, n_structures: int) -> list:
     """
     Run MC for the given region and return n_structures conformations.
     Each conformation is a list of (midpoint_bp, x, y, z) sorted by genomic position,
-    matching the anchor-level beads output by C++ at -v 2.
+    matching the anchor-level beads output by the reference at -v 2.
     """
 ```
 
 ### Usage
 
 ```bash
-# C++ reference run only (no Python required)
+# reference run only (no Python required)
 python harness/integration.py --cpp-only   # region: chr1:18288319-20307135 (dash, not colon)
 
 # Full comparison (skips Python side gracefully if not implemented)
@@ -390,24 +394,27 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
 ### Settings hygiene
 
-- **`noise_arcs` removed.** The C++ reference declares `noiseCoefficientLevelAnchor` (read as `noise_arcs` in `[main]`) and multiplies it into a local `noise_size` variable in `LooperSolver.cpp:2085`, but the arc-MC call site on line 2136 passes a hardcoded `noise_size_small=0.005` instead — making the setting effectively dead in C++. Python uses the same 0.005 hardcoded constant in [solver.py::_reconstruct_cluster_arcs](gnome3d/solver.py); the setting was dropped to avoid implying configurability.
-- **`random_walk` ported.** Previously loaded-but-unused; now drives [solver.py::_random_walk_segment_level](gnome3d/solver.py), mirroring C++ `LooperSolver.cpp:80-98` (chained 50.0-step walk per chromosome instead of segment-level heatmap MC). Honors `use_2d`.
-- **`long_pet_*` ported.** Long-range arcs (gap > `max_pet_length`) are no longer discarded by [io.load_arcs](gnome3d/io.py) — they are carried on `ContactData.long_arcs` and folded into the segment heatmap by [solver.py::_add_long_pet_to_segment_heatmap](gnome3d/solver.py) as `long_pet_scale * arc.score ** long_pet_power`. Mirrors C++ `LooperSolver.cpp:1069-1104`, including the asymmetric `h[st][end] += val` pattern (the downstream symmetrize step in `_normalize_heatmap` averages it to `val` on each side).
-- **`steps_lvl1` / `noise_lvl1` still inert.** They control the C++ chromosome-level MC (level==0), which Python does not yet have. Left in `Settings` as forward-compat scaffolding.
+- **`noise_arcs` removed.** The reference declares `noiseCoefficientLevelAnchor` (read as `noise_arcs` in `[main]`) and multiplies it into a local `noise_size` variable in `LooperSolver.cpp:2085`, but the arc-MC call site on line 2136 passes a hardcoded `noise_size_small=0.005` instead — making the setting effectively dead in the reference. Python uses the same 0.005 hardcoded constant in [solver.py::_reconstruct_cluster_arcs](gnome3d/solver.py); the setting was dropped to avoid implying configurability.
+- **`random_walk` ported.** Previously loaded-but-unused; now drives [solver.py::_random_walk_segment_level](gnome3d/solver.py), mirroring `LooperSolver.cpp:80-98` (chained 50.0-step walk per chromosome instead of segment-level heatmap MC). Honors `use_2d`.
+- **`long_pet_*` ported.** Long-range arcs (gap > `max_pet_length`) are no longer discarded by [io.load_arcs](gnome3d/io.py) — they are carried on `ContactData.long_arcs` and folded into the segment heatmap by [solver.py::_add_long_pet_to_segment_heatmap](gnome3d/solver.py) as `long_pet_scale * arc.score ** long_pet_power`. Mirrors `LooperSolver.cpp:1069-1104`, including the asymmetric `h[st][end] += val` pattern (the downstream symmetrize step in `_normalize_heatmap` averages it to `val` on each side).
+- **Chromosome-level MC ported.** Previously `steps_lvl1` / `noise_lvl1` were inert because Python had no chr-level reconstruction. Now [solver.py::_reconstruct_chromosome_level](gnome3d/solver.py) builds an n_chr × n_chr inter-chromosomal singleton heatmap, normalizes its first non-zero diagonal to 1.0, converts to expected distances, and runs `mc_heatmap` with `steps_lvl1` runs at `noise_lvl1 × avg_dist` step size. Mirrors `LooperSolver.cpp` lines 119-160 and 265-322. Triggered only when `len(chrs) > 1`; single-chr runs are unaffected. If the singleton input has no inter-chr contacts the chr roots are scattered randomly instead.
+- **`normalizeHeatmapInter` ported.** [solver.py::_normalize_heatmap_inter](gnome3d/solver.py) was previously a no-op stub; now it multiplies the segment heatmap by `heatmap_inter_scaling` and divides intra-chromosome blocks back, matching `LooperSolver.cpp:1422-1459`. Net effect: intra-chr unchanged, inter-chr × scale. Active only on multi-chr runs (length-1 `current_level` short-circuits).
+- **Multi-chromosome CLI / API surface.** [cli.py](gnome3d/cli.py) and [simulate.py::run_genome](gnome3d/simulate.py) accept the same syntax as the reference's `-c` flag: single chromosome, comma-separated list, `chrN-chrM` numeric range, or single sub-chromosomal region. Default (empty string) matches the reference: `chr1-chr22,chrX`. Parsing is centralized in [io.py::parse_chrs_arg](gnome3d/io.py). The CLI now writes one CIF per chromosome when more than one chr was requested (using a `_<chr>_` suffix in the filename); single-chr/region runs keep the old single-CIF behavior. `run_region` keeps its original single-region semantics for backward compatibility; `run_genome` returns `list[dict[str, list[BeadOut]]]` so per-chromosome bead lists are preserved.
+- **`data_singletons_inter` loaded.** [data.py::ContactData.from_files](gnome3d/data.py) reads the optional second singletons file (config key `[data] singletons_inter`) and appends to `singletons` whenever `len(chrs) > 1`. Mirrors `LooperSolver.cpp:970` which adds inter-chromosomal singleton files for multi-chr runs. Single-chr runs skip this file (per-chr contacts in the main file are sufficient and the inter file is often a sparse stub).
 
 ### Refactors (no behavior change at parity settings)
 
 - **Unified smooth-MC kernel** ([gnome3d/mc.py](gnome3d/mc.py))
-  C++ has separate `MonteCarloArcsSmooth` branches per feature combo. Python collapses the four prior specialized kernels (`_batch_smooth_nb`, `_batch_smooth_heat_nb`, `_batch_smooth_orientation_nb`, `_batch_smooth_orientation_heat_nb`) into one `_batch_smooth_kernel_nb` driven by `use_heat`/`use_orn` flags. Energy terms (struct, heat, orn) are tracked as independent components (`score_struct`, `score_orn`, `score_heat`) and combined per step.
+  The reference has separate `MonteCarloArcsSmooth` branches per feature combo. Python collapses the four prior specialized kernels (`_batch_smooth_nb`, `_batch_smooth_heat_nb`, `_batch_smooth_orientation_nb`, `_batch_smooth_orientation_heat_nb`) into one `_batch_smooth_kernel_nb` driven by `use_heat`/`use_orn` flags. Energy terms (struct, heat, orn) are tracked as independent components (`score_struct`, `score_orn`, `score_heat`) and combined per step.
   Side benefit: heat/orn paths previously did a full O(N) structure recompute every MC step — now incremental like the pure-smooth path. Verified drift stays at float-noise (~1e-9) under the codebase's reciprocal-neighbor invariant.
 
 ### Algorithm divergences
 
 - **Orientation MC: weighted local scorer**
-  Python uses a weighted local delta in `_local_score_orientation_nb` ([gnome3d/mc.py](gnome3d/mc.py)) so the incremental update is exact w.r.t. `_score_orientation_full_nb`. C++ uses an unweighted local scorer that drifts over many steps. See `[[project-orientation-mc-fix]]`. The reference scorer in `gnome3d/energy.py` stays unweighted so `harness/compare.py` still passes.
+  Python uses a weighted local delta in `_local_score_orientation_nb` ([gnome3d/mc.py](gnome3d/mc.py)) so the incremental update is exact w.r.t. `_score_orientation_full_nb`. The reference uses an unweighted local scorer that drifts over many steps. See `[[project-orientation-mc-fix]]`. The reference scorer in `gnome3d/energy.py` stays unweighted so `harness/compare.py` still passes.
 
 - **Singleton chr filter** (data loading)
-  C++ bins inter-chromosomal singletons by position; Python correctly filters by chromosome. Smooth-MC heat scores diverge 3-5× as a result, but final structures still match. See `[[project-singleton-chr-filter-divergence]]`.
+  The reference bins inter-chromosomal singletons by position; Python correctly filters by chromosome. Smooth-MC heat scores diverge 3-5× as a result, but final structures still match. See `[[project-singleton-chr-filter-divergence]]`.
 
 ### New features (opt-in via settings, default-off)
 
@@ -420,7 +427,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     - `exclusion_apply_to_smooth` (gate for smooth MC; default true)
     - `exclusion_skip_neighbors` (skip pairs with `|i-j|` ≤ this; default 1, i.e. skip bonded)
 
-  Why not in C++: 3dnome uses an inverse-distance repulsion only on pairs where the input arc matrix is marked negative — a sparse, conditional repulsion. This adds a global polymer-physics excluded-volume term independent of input data. Touches arc-MC (`_batch_arcs_nb`) and smooth-MC (`_batch_smooth_kernel_nb`).
+  Why not in the reference: 3dnome uses an inverse-distance repulsion only on pairs where the input arc matrix is marked negative — a sparse, conditional repulsion. This adds a global polymer-physics excluded-volume term independent of input data. Touches arc-MC (`_batch_arcs_nb`) and smooth-MC (`_batch_smooth_kernel_nb`).
 
 - **Spherical confinement** — `settings.use_confinement = true` to enable.
   Soft envelope mimicking a nuclear boundary. For each bead at distance `r` from the per-MC-call centroid, contributes `confinement_weight * ((r - R)/R)²` if `r > R`, else 0. Per-bead (single-counted) — delta is `(local_curr - local_prev)` with no factor of 2. Settings:
@@ -439,7 +446,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     - `small_ib_threshold` (anchor count below which an IB is "small"; default 10)
     - `small_ib_spring_multiplier` (default 5.0)
 
-  Why not in C++: complements confinement to prevent under-constrained small IBs from stretching out. The boost tightens chain and bond springs so the chain compresses against any repulsive/heatmap forces. Targeted: only affects small IBs, doesn't change behavior of large well-constrained IBs.
+  Why not in the reference: complements confinement to prevent under-constrained small IBs from stretching out. The boost tightens chain and bond springs so the chain compresses against any repulsive/heatmap forces. Targeted: only affects small IBs, doesn't change behavior of large well-constrained IBs.
 
 ---
 
@@ -447,9 +454,9 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
 These rules apply to the **parity baseline** (all new feature flags off). New feature work has its own rules in [Status: post-parity, feature-extension phase](#status-post-parity-feature-extension-phase) above.
 
-1. When working on or near parity code, verify algorithmic choices against the C++ source. Do not invent behavior on the parity path.
-2. If behavior in the C++ source is ambiguous or surprising, document it explicitly rather than working around it.
+1. When working on or near parity code, verify algorithmic choices against the reference source. Do not invent behavior on the parity path.
+2. If behavior in the reference source is ambiguous or surprising, document it explicitly rather than working around it.
 3. **Run `python harness/compare.py` after touching parity-baseline scoring code.** A function is not done until the harness reports PASS for its group.
-4. **Run `python harness/integration.py` after touching parity-baseline MC code.** Bead-position distributions of C++ and Python ensembles must remain statistically compatible.
-5. Parity-baseline scoring functions must produce numerically equivalent results to the C++ on the same inputs (within 1e-6 absolute tolerance).
-6. New features are allowed and encouraged to diverge from C++. They must be opt-in via `gnome3d/settings.py`, documented in the divergences section above, and must not change behavior when their flag is off.
+4. **Run `python harness/integration.py` after touching parity-baseline MC code.** Bead-position distributions of reference and Python ensembles must remain statistically compatible.
+5. Parity-baseline scoring functions must produce numerically equivalent results to the reference on the same inputs (within 1e-6 absolute tolerance).
+6. New features are allowed and encouraged to diverge from the reference. They must be opt-in via `gnome3d/settings.py`, documented in the divergences section above, and must not change behavior when their flag is off.

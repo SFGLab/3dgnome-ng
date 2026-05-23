@@ -43,7 +43,7 @@ class Solver:
 
         self.selected_region: BedRegion | None = None
         self.dense_active_regions: dict[str, list[BeadOut]] = {}
-        
+
         self.singletons: list[SingletonContact] = []
         self.long_arcs: RawArcMap = {}
 
@@ -106,9 +106,107 @@ class Solver:
                 self._interpolate_children_linear(current_level[chr_])
             return
 
+        # Multi-chromosome runs: position chromosome root beads relative to one
+        # another via a coarse inter-chr singleton heatmap before the segment-
+        # level pass.  Mirrors Reference LooperSolver.cpp lines 119-160.
+        if len(self.chrs) > 1:
+            self._reconstruct_chromosome_level()
+
         if self.s.output_level >= 1:
             print("\n[solver] segment level")
         self._reconstruct_heatmap_single_level(current_level)
+
+    def _reconstruct_chromosome_level(self) -> None:
+        """
+        Position chromosome root beads via heatmap MC over an n_chr × n_chr
+        inter-chromosomal singleton heatmap.  Mirrors Reference
+        LooperSolver::reconstructClustersHeatmapSingleLevel(0).
+
+        For each pair of chromosomes (i, j), the heatmap cell h[i][j] is the
+        sum of singleton scores between those chromosomes.  Self-self contacts
+        are ignored (diagonal stays zero, which `_normalize_heatmap_diagonal_total`
+        treats correctly — it normalizes the first non-zero diagonal).
+
+        If no inter-chromosomal singletons are available the MC has no signal
+        to optimize against, so chr roots are scattered randomly around the
+        origin instead.
+
+        After this method runs each chr root cluster has a position; the
+        segment-level MC then initializes its segment beads at the chr root.
+        """
+        s = self.s
+        n_chr = len(self.chrs)
+        if n_chr <= 1:
+            return
+
+        chr_to_idx = {chr_: i for i, chr_ in enumerate(self.chrs)}
+        h: list[list[float]] = [[0.0] * n_chr for _ in range(n_chr)]
+        n_inter = 0
+        for c1, _p1, c2, _p2, sc in self.singletons:
+            i = chr_to_idx.get(c1, -1)
+            j = chr_to_idx.get(c2, -1)
+            if i < 0 or j < 0 or i == j:
+                continue
+            h[i][j] += sc
+            h[j][i] += sc
+            n_inter += 1
+
+        if s.output_level >= 1:
+            print(f"\n[solver] chromosome level  "
+                  f"({n_chr} chr, {n_inter} inter-chr singletons)")
+
+        if n_inter == 0:
+            if s.output_level >= 1:
+                print("  no inter-chromosomal singletons; scattering chr roots randomly")
+            for chr_ in self.chrs:
+                root_idx = self.chr_root.get(chr_)
+                if root_idx is not None:
+                    self.clusters[root_idx].pos = random_vector_np(
+                        100.0, in_2d=s.use_2d)
+            return
+
+        # Normalize first non-zero diagonal to 1.0; convert freq → expected dist.
+        self._normalize_heatmap_diagonal_total(h, n_chr, 1.0)
+        heatmap_dist, avg_dist = self._create_distance_heatmap(h, n_chr, inter=False)
+        self.heatmap_dist = np.array(heatmap_dist, dtype=np.float64)
+        self.heatmap_dist_diag = self._get_diagonal_size(h, n_chr)
+
+        step_size = avg_dist * s.noise_lvl1
+
+        # Initial chr root positions: scatter around the origin, mirroring Reference
+        # LooperSolver.cpp:308 which does `initial + random_vector(avg_dist)`
+        # with initial=origin at chr level.
+        initial_pos: F32Array = np.zeros((n_chr, 3), dtype=np.float32)
+        for i in range(n_chr):
+            initial_pos[i] = random_vector_np(step_size, in_2d=s.use_2d)
+
+        pos: F32Array = initial_pos.copy()
+        best_pos: F32Array = pos.copy()
+        best_score = -1.0
+
+        log1 = s.output_level >= 1
+        log2 = s.output_level >= 2
+        for run in range(s.steps_lvl1):
+            if log1:
+                print(f"[solver] chr-level run {run + 1}/{s.steps_lvl1}  "
+                      f"({n_chr} chr)")
+            for i in range(n_chr):
+                pos[i] = initial_pos[i] + random_vector_np(step_size, in_2d=s.use_2d)
+            score = mc_heatmap(pos, self.heatmap_dist, self.heatmap_dist_diag,
+                               step_size, s, label=f"chr run {run + 1}",
+                               verbose=log2)
+            if score < best_score or best_score < 0:
+                best_score = score
+                best_pos = pos.copy()
+            if log1:
+                print(f"  -> score={score:.6f}  best={best_score:.6f}")
+
+        # Write best positions back into the chr root clusters; segment-level
+        # MC will pick these up as origin via clusters[seg.parent].pos.
+        for i, chr_ in enumerate(self.chrs):
+            root_idx = self.chr_root.get(chr_)
+            if root_idx is not None:
+                self.clusters[root_idx].pos = best_pos[i].copy()
 
     def _random_walk_segment_level(self, current_level: ChrLevel) -> None:
         """
@@ -649,6 +747,7 @@ class Solver:
             breaks.append(cb_start)
 
         breaks.append(region_end)
+        
         # Number of bins = len(breaks)-1 = 1 + (n_anchors-1)*(ld+1) = N
         # Bin singleton contacts into subanchor heatmap.
         # Note: Python filters by chromosome (c1 != chr_ or c2 != chr_). Reference's
@@ -1067,12 +1166,37 @@ class Solver:
         scale: float,
     ) -> None:
         """
-        Scale inter-chromosomal entries.
-        Mirrors Reference normalizeHeatmapInter().
-        Modifies h in place.
+        Scale inter-chromosomal entries by `scale`, leaving intra-chr blocks
+        unchanged.  Mirrors Reference normalizeHeatmapInter().  Modifies h
+        in place.
+
+        Implementation matches the reference: multiply the entire heatmap by
+        `scale`, then divide intra-chromosome blocks back by `scale`.  Net
+        effect is intra-chr × 1 = unchanged, inter-chr × scale = boosted.
         """
-        # This is only relevant for multi-chromosome runs; skip for now.
-        pass
+        # Determine row/col index ranges for each chromosome's block.
+        # current_level[chr] holds the cluster indices in this level for chr;
+        # block lengths come from those list lengths.
+        chrs_in_order = [c for c in current_level if current_level[c]]
+        if len(chrs_in_order) <= 1:
+            return  # nothing inter-chr to scale
+
+        block_starts: list[int] = [0]
+        for chr_ in chrs_in_order:
+            block_starts.append(block_starts[-1] + len(current_level[chr_]))
+        if block_starts[-1] != n:
+            # Shape mismatch — leave heatmap untouched rather than scrambling it.
+            return
+
+        for i in range(n):
+            for j in range(n):
+                h[i][j] *= scale
+
+        for b in range(len(chrs_in_order)):
+            lo, hi = block_starts[b], block_starts[b + 1]
+            for i in range(lo, hi):
+                for j in range(lo, hi):
+                    h[i][j] /= scale
 
     def _create_distance_heatmap(
         self,

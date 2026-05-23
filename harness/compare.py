@@ -2,13 +2,13 @@
 """
 harness/compare.py - 3dgnome-ng correctness harness.
 
-Compares the C++ reference scorer against the Python (src/) reimplementation.
+Compares the reference scorer against the Python (src/) reimplementation.
 Run from the repository root:
 
     python harness/compare.py              # run all tests
     python harness/compare.py distfns      # run one test group
     python harness/compare.py --build-only # just compile scorer
-    python harness/compare.py --reference  # print C++ reference values only
+    python harness/compare.py --reference  # print reference values only
 
 Exits 0 when all implemented tests pass, 1 on any failure.
 The harness skips tests whose Python counterpart is not yet implemented -
@@ -115,7 +115,7 @@ def dtn_txt(dtn) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Reference C++ computations (as Python, matching scorer.cpp exactly)
+# Reference computations (as Python, matching scorer.cpp exactly)
 # These are NOT the implementation-under-test - they are ground truth for
 # generating expected values without running the binary.
 
@@ -210,7 +210,7 @@ _results = []
 
 
 def check(name: str, cpp_val: float, py_val, atol: float = ATOL):
-    """Compare C++ reference value to Python implementation value."""
+    """Compare reference value to Python implementation value."""
     if py_val is None:
         print(f"  {SKIP}  {name}  (not implemented)")
         _results.append(("skip", name))
@@ -461,12 +461,12 @@ def test_smooth(reference_only=False):
 def test_densify(reference_only=False):
     """
     Validates _densify_active_region: bead count, fixed positions, dtn sign,
-    and subanchor linear interpolation.  Pure Python - no C++ scorer needed.
+    and subanchor linear interpolation.  Pure Python - no reference scorer needed.
     """
     print("\n[densify] Subanchor densification (_densify_active_region)")
 
     if reference_only:
-        print("  (pure Python validation - no C++ reference)")
+        print("  (pure Python validation - no reference)")
         return
 
     try:
@@ -559,7 +559,7 @@ def orient_spec_txt(anchors, arcs):
 
 
 def ref_calc_orientation(positions, cind, n, char_orientation):
-    """Matches C++ calcOrientation(cind)."""
+    """Matches reference calcOrientation(cind)."""
     if cind == 0:
         orn = [positions[cind + 1][k] - positions[cind][k] for k in range(3)]
     elif cind == n - 1:
@@ -760,12 +760,12 @@ def test_angle(reference_only=False):
 def test_contact_heatmaps(reference_only=False):
     """
     Validates _build_contact_heatmaps and anchor heatmap distance scaling.
-    anchor_heatmap.scales_distances uses C++ anchor_scale scorer mode.
+    anchor_heatmap.scales_distances uses reference anchor_scale scorer mode.
     Structural tests (shape, singletons, symmetry) are pure Python.
     """
     print("\n[contact_heatmaps] Singleton contact heatmap building and anchor distance scaling")
 
-    # Get C++ reference for anchor scaling first (needed for reference_only mode too).
+    # Get reference for anchor scaling first (needed for reference_only mode too).
     # base_dist: arc(0,1) → freq_to_distance=5.0; influence=0.5; heatmap[0,1]=10, max=10
     # Expected: s=(10/10)*0.5=0.5 → 5.0*(1-0.5)=2.5
     _bd = [[0.0, 5.0], [5.0, 0.0]]
@@ -782,7 +782,7 @@ def test_contact_heatmaps(reference_only=False):
 
     if reference_only:
         print(f"  anchor_heatmap.scales_distances cpp={cpp_scaled.get((0, 1)):.8g}")
-        print("  (structural heatmap tests: pure Python - no C++ reference)")
+        print("  (structural heatmap tests: pure Python - no reference)")
         return
 
     _test_names = [
@@ -872,7 +872,7 @@ def test_contact_heatmaps(reference_only=False):
     h_a5, _ = sv5._build_contact_heatmaps([0, 1], "chr1")
     check("contact_heatmaps.wrong_chr", 0.0, float(h_a5.max()), atol=0)
 
-    # Anchor heatmap scales distances: C++ reference from anchor_scale mode
+    # Anchor heatmap scales distances: reference from anchor_scale mode
     h_m = _np.array(_hm)
     sv6 = _Sv.__new__(_Sv); sv6.s = _make_settings()
     sv6.clusters = [_Cl(0, 100), _Cl(500, 600)]
@@ -890,19 +890,19 @@ def test_contact_heatmaps(reference_only=False):
     sv7.clusters[0].arcs = [0]; sv7.clusters[1].arcs = [0]
     sv7.arcs = {"chr1": [arc7]}; sv7.s.freq_to_distance = lambda sc: 5.0
     mat7 = sv7._calc_anchor_expected_distances([0, 1], "chr1", h_m)
-    # No C++ scorer: disabled path returns unscaled freq_to_distance output (5.0 by construction)
+    # No reference scorer: disabled path returns unscaled freq_to_distance output (5.0 by construction)
     check("anchor_heatmap.disabled", 5.0, float(mat7[0, 1]))
 
 
 def test_subanchor_heat(reference_only=False):
     """
     Validates _build_heat_dist_subanchor and mc_smooth heat integration.
-    local_sum_eq_init uses C++ heat_score scorer mode.
+    local_sum_eq_init uses reference heat_score scorer mode.
     Remaining checks are pure Python.
     """
     print("\n[subanchor_heat] Subanchor heat distance targets and mc_smooth integration")
 
-    # Get C++ reference for local_sum_eq_init first (needed for reference_only mode).
+    # Get reference for local_sum_eq_init first (needed for reference_only mode).
     # heat_score mode: dist_weight=1.0, fixed 5-bead random setup (RandomState 7).
     import numpy as _np_pre
     _rng = _np_pre.random.RandomState(7)
@@ -921,7 +921,7 @@ def test_subanchor_heat(reference_only=False):
 
     if reference_only:
         print(f"  subanchor_heat.local_sum_eq_init cpp={cpp_global_heat:.8g}")
-        print("  (remaining subanchor_heat checks: pure Python - no C++ reference)")
+        print("  (remaining subanchor_heat checks: pure Python - no reference)")
         return
 
     _test_names = [
@@ -1033,8 +1033,8 @@ def test_subanchor_heat(reference_only=False):
     check("subanchor_heat.mc_smooth_orn_heat_finite", 1.0,
           1.0 if _m.isfinite(s4) and s4 >= 0.0 else 0.0, atol=0)
 
-    # 5. C++ global heat score == Python _init_heat_nb (verifies Numba vs C++ formula)
-    # Tolerance is relative: C++ uses float32, Python uses float64, causing ~1e-7 rel diff.
+    # 5. reference global heat score == Python _init_heat_nb (verifies Numba vs reference formula)
+    # Tolerance is relative: reference uses float32, Python uses float64, causing ~1e-7 rel diff.
     pos5 = _np.array(_pos5); hd5 = _np.array(_hd5)
     pw5 = _as_f64(pos5); hd64 = _as_f64(hd5)
     py_init = float(_init_heat_nb(pw5, hd64, 1.0))
@@ -1079,7 +1079,7 @@ def main():
     parser.add_argument("--build-only", action="store_true")
     parser.add_argument("--rebuild", action="store_true", help="Force recompile scorer.cpp")
     parser.add_argument("--reference", action="store_true",
-                        help="Print C++ reference values only; do not run Python impl")
+                        help="Print reference values only; do not run Python impl")
     args = parser.parse_args()
 
     build_scorer(force=args.rebuild or args.build_only)

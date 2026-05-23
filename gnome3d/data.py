@@ -29,6 +29,7 @@ from .types import *
 if TYPE_CHECKING:
     from .settings import Settings
 
+
 @dataclass
 class ContactData:
     """
@@ -87,6 +88,15 @@ class ContactData:
 
         print("[data] load singletons")
         singletons = load_singletons(s.data_path(s.data_singletons), chr_set, region)
+
+        # Optional second file for inter-chromosomal singletons (matches the
+        # Reference `data_singletons_inter` config key).  Only meaningful for
+        # multi-chromosome runs - inter-chr contacts feed the chr-level MC.
+        if s.data_singletons_inter and len(chrs) > 1:
+            inter_path = s.data_path(s.data_singletons_inter)
+            print("[data] load inter-chr singletons")
+            inter = load_singletons(inter_path, chr_set, region)
+            singletons.extend(inter)
 
         return cls(
             anchors=anchors,
