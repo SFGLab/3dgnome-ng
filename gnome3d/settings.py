@@ -134,6 +134,10 @@ class Settings:
     small_ib_threshold: int
     small_ib_spring_multiplier: float
 
+    # ---- overlapping-anchor handling (densification) ----
+    overlap_anchor_strict: bool
+    drop_zero_length_subanchors: bool
+
     # ---- MC smooth ----
     max_temp_smooth: float
     dt_temp_smooth: float
@@ -271,6 +275,23 @@ class Settings:
         self.use_small_ib_boost = False
         self.small_ib_threshold = 10  # IBs with anchors < this are "small"
         self.small_ib_spring_multiplier = 5.0
+
+        # ---- overlapping-anchor handling ----
+        # overlap_anchor_strict controls span computation in densification:
+        #   False (default): subanchors tile the overlap region with non-degenerate
+        #     genomic ranges (Python divergence).
+        #   True: reference-parity — overlap clamps to 0, so MC-chain subanchors
+        #     between overlapping anchors are placed at a single boundary point
+        #     (matches LooperSolver.cpp:1829-1831).
+        # drop_zero_length_subanchors is an independent output-filtering toggle:
+        #   False (default): every densified subanchor appears in the BeadOut output,
+        #     even if start == end.
+        #   True: subanchor BeadOut entries with start == end are filtered out of
+        #     the output (the MC chain still contains them; only the externally
+        #     visible bead list drops them). Useful with strict mode to suppress
+        #     the collapsed-overlap zero-length noise.
+        self.overlap_anchor_strict = False
+        self.drop_zero_length_subanchors = False
 
         # ---- MC smooth ----
         self.max_temp_smooth = 20.0
@@ -493,6 +514,14 @@ class Settings:
         self.small_ib_threshold = geti("small_ib_boost", "threshold", self.small_ib_threshold)
         self.small_ib_spring_multiplier = getf(
             "small_ib_boost", "spring_multiplier", self.small_ib_spring_multiplier
+        )
+
+        # [main] overlapping-anchor handling toggles (kept under [main] for simplicity).
+        self.overlap_anchor_strict = getb(
+            "main", "overlap_anchor_strict", self.overlap_anchor_strict
+        )
+        self.drop_zero_length_subanchors = getb(
+            "main", "drop_zero_length_subanchors", self.drop_zero_length_subanchors
         )
 
         # [simulation_arcs_smooth]

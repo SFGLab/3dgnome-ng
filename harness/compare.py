@@ -525,6 +525,8 @@ def test_densify(reference_only=False):
             "densify.anchor_pos",
             "densify.dtn_nonneg",
             "densify.interp",
+            "densify.subanchor_inside",
+            "densify.unique_starts",
         ):
             print(f"  {SKIP}  {name}  ({exc})")
             _results.append(("skip", name))
@@ -542,6 +544,8 @@ def test_densify(reference_only=False):
 
     class _FakeSettings:
         loop_density = LD
+        overlap_anchor_strict = False
+        drop_zero_length_subanchors = False
 
         @staticmethod
         def genomic_length_to_distance(bp):
@@ -577,7 +581,8 @@ def test_densify(reference_only=False):
     ok_dtn = bool((dtn >= 0).all())
     check("densify.dtn_nonneg", 1.0, 1.0 if ok_dtn else 0.0, atol=0)
 
-    # 5. Subanchor positions are linearly interpolated between adjacent anchor beads
+    # 5. Subanchor positions are linearly interpolated between adjacent anchor
+    # beads at fractions t = (j + 1) / (ld + 1) along the chain.
     ok_interp = True
     for seg in range(n_anc - 1):
         ca_i = seg * (LD + 1)
@@ -588,6 +593,35 @@ def test_densify(reference_only=False):
             if not _np.allclose(pos[ca_i + 1 + j], exp_pos, atol=1e-5):
                 ok_interp = False
     check("densify.interp", 1.0, 1.0 if ok_interp else 0.0, atol=0)
+
+    # 6. Subanchor ranges sit strictly inside the in-between region: no
+    # subanchor start/end coincides with an anchor boundary, and consecutive
+    # subanchor edges meet at unique values (no two beads share a start).
+    ok_inside = True
+    ok_unique = True
+    seen_starts: set[int] = set()
+    for seg in range(n_anc - 1):
+        ca_i = seg * (LD + 1)
+        cb_i = ca_i + (LD + 1)
+        boundary_lo = min(ends[ca_i], starts[cb_i])
+        boundary_hi = max(ends[ca_i], starts[cb_i])
+        if boundary_hi - boundary_lo > LD + 1:  # only meaningful when span is large enough
+            for j in range(LD):
+                bi = ca_i + 1 + j
+                if starts[bi] <= boundary_lo or ends[bi] >= boundary_hi:
+                    ok_inside = False
+        for j in range(LD):
+            bi = ca_i + 1 + j
+            if starts[bi] in seen_starts:
+                ok_unique = False
+            seen_starts.add(starts[bi])
+    # also include anchor starts in the uniqueness check
+    for ci in active_region:
+        if solver.clusters[ci].start in seen_starts:
+            ok_unique = False
+        seen_starts.add(solver.clusters[ci].start)
+    check("densify.subanchor_inside", 1.0, 1.0 if ok_inside else 0.0, atol=0)
+    check("densify.unique_starts", 1.0, 1.0 if ok_unique else 0.0, atol=0)
 
 
 def orient_spec_txt(anchors, arcs):

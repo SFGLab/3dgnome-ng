@@ -400,8 +400,13 @@ def parse_hcm(hcm_path: Path):
     Parse a .hcm model file and return sorted leaf-bead positions.
 
     Returns:
-        list of BeadOut = (start_bp, end_bp, x, y, z) tuples sorted by genomic start.
-        Matches gnome3d.types.BeadOut so Python and reference ensembles share the same shape.
+        list of 6-tuples (start_bp, end_bp, x, y, z, kind) sorted by genomic start,
+        matching the shape of gnome3d.types.BeadOut.
+
+    HCM doesn't tag bead kind; for `-v 2` runs every leaf is an anchor-level
+    cluster, so we label them all "anchor" here.  If we ever exercise `-v 3`
+    in the harness, leaves will be a mix of anchor + subanchor and this needs
+    revisiting.
 
     The .hcm format (toFilePreviousFormat):
         line 1:  n_clusters  n_arcs  root_index  n_factors
@@ -429,8 +434,10 @@ def parse_hcm(hcm_path: Path):
             n_ch = int(parts[6])
             clusters.append((start, end, x, y, z, n_ch))
 
-    # Leaf beads: clusters with no children, sorted by genomic start
-    leaves = [(start, end, x, y, z) for start, end, x, y, z, n_ch in clusters if n_ch == 0]
+    # Leaf beads: clusters with no children, sorted by genomic start.
+    leaves = [
+        (start, end, x, y, z, "anchor") for start, end, x, y, z, n_ch in clusters if n_ch == 0
+    ]
     leaves.sort(key=lambda b: b[0])
     return leaves
 
@@ -628,14 +635,18 @@ def try_python_ensemble(config: Path, n: int, region: str) -> list | None:
 def print_stats(label: str, structures: list) -> dict:
     """Compute and print summary statistics for an ensemble.
 
-    Accepts beads as either (mid, x, y, z) (legacy) or BeadOut
-    (start, end, x, y, z). xyz is always the last 3 fields.
+    Beads are uniformly 6-tuples (start, end, x, y, z, kind) after
+    parse_hcm / _load_cache normalization, so xyz is at indices 2..5.
     """
-    rg_vals = [radius_of_gyration([tuple(b[-3:]) for b in s]) for s in structures]
+
+    def xyz(b):
+        return (b[2], b[3], b[4])
+
+    rg_vals = [radius_of_gyration([xyz(b) for b in s]) for s in structures]
     bond_vals = []
     pwd_vals = []
     for s in structures:
-        pts = [tuple(b[-3:]) for b in s]
+        pts = [xyz(b) for b in s]
         bond_vals.extend(consecutive_distances(pts))
         pwd_vals.extend(pairwise_distances(pts))
 
@@ -674,7 +685,7 @@ def structural_distance_matrix(structures: list) -> list:
     # Build (n, k) matrix where k = M*(M-1)/2 pairwise distances per structure
     rows = []
     for s in structures:
-        pts = np.array([b[-3:] for b in s], dtype=np.float64)
+        pts = np.array([(b[2], b[3], b[4]) for b in s], dtype=np.float64)
         diff = pts[:, None, :] - pts[None, :, :]  # (M, M, 3)
         d = np.sqrt((diff * diff).sum(axis=2))  # (M, M)
         idx = np.triu_indices(len(pts), k=1)
@@ -747,15 +758,20 @@ def _load_cache(path: Path) -> tuple:
     with open(path) as f:
         cached = json.load(f)
 
-    # Caches written before BeadOut was widened store 4-tuples (mid, x, y, z);
-    # newer ones store 5-tuples (start, end, x, y, z). Promote legacy entries
-    # by treating midpoint as both start and end.
+    # Three legacy cache shapes coexist:
+    #   - 4-tuple (mid, x, y, z)              - earliest
+    #   - 5-tuple (start, end, x, y, z)       - after BeadOut widening
+    #   - 6-tuple (start, end, x, y, z, kind) - current
+    # Promote everything to the current 6-tuple shape; HCM leaves at -v 2 are
+    # all anchor-level clusters so legacy entries get kind = "anchor".
     def _promote(b: list) -> tuple:
+        if len(b) >= 6:
+            return (int(b[0]), int(b[1]), float(b[2]), float(b[3]), float(b[4]), str(b[5]))
         if len(b) == 5:
-            return (int(b[0]), int(b[1]), float(b[2]), float(b[3]), float(b[4]))
-        # legacy 4-tuple: (mid, x, y, z)
+            return (int(b[0]), int(b[1]), float(b[2]), float(b[3]), float(b[4]), "anchor")
+        # legacy 4-tuple: (mid, x, y, z) — treat midpoint as both start and end.
         mid = int(b[0])
-        return (mid, mid, float(b[1]), float(b[2]), float(b[3]))
+        return (mid, mid, float(b[1]), float(b[2]), float(b[3]), "anchor")
 
     structs = [[_promote(b) for b in s] for s in cached["structures"]]
     return structs, cached["raw_lines"]

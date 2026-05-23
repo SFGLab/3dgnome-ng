@@ -988,19 +988,40 @@ class Solver:
             bead_fixed.append(True)
             anchor_map.append((k, ai))
 
-            gap_bp = max(
-                cb.start - ca.end, 0
-            )  # clamp: overlapping anchors -> place subanchors at boundary
-            d_bp = gap_bp // (ld + 1)
-            p = ca.end
+            # Subanchor genomic span: the region between adjacent anchors.
+            # Subanchor j sits at midpoint (j+1)/(ld+1) of the in-between
+            # region and owns a slot of width d_bp centered on that midpoint
+            # (half-slot buffer at each end → starts/ends never coincide with
+            # ca.end or cb.start).
+            #
+            # The in-between region depends on `overlap_anchor_strict`:
+            #   - False (default, Python divergence): symmetric in gap/overlap.
+            #     Non-overlap → [ca.end, cb.start] (gap).
+            #     Overlap     → [cb.start, ca.end] (overlap; tiled with subanchors).
+            #     Touching    → span = 0 (degenerate, unavoidable).
+            #   - True (reference parity, LooperSolver.cpp:1829-1831):
+            #     `range = cb.start - ca.end` clamped to 0 below — overlap collapses
+            #     to a single point at ca.end; subanchors all degenerate there.
+            if self.s.overlap_anchor_strict:
+                boundary_lo = ca.end
+                span = max(cb.start - ca.end, 0)
+            else:
+                boundary_lo = min(ca.end, cb.start)
+                boundary_hi = max(ca.end, cb.start)
+                span = boundary_hi - boundary_lo  # >= 0
+            d_bp = span // (ld + 1)
+            half_lo = d_bp // 2
+            half_hi = d_bp - half_lo
             for j in range(ld):
-                p += d_bp
+                midpoint = boundary_lo + (j + 1) * d_bp
+                s_bp = midpoint - half_lo
+                e_bp = midpoint + half_hi
                 t = (j + 1.0) / (ld + 1)
                 sub_pos: F32Array = ((1.0 - t) * ca.pos + t * cb.pos).astype(np.float32)
-                bead_starts.append(p)
-                bead_ends.append(p)
+                bead_starts.append(s_bp)
+                bead_ends.append(e_bp)
                 bead_pos.append(sub_pos)
-                bead_gpos.append(p)
+                bead_gpos.append(midpoint)
                 bead_fixed.append(False)
 
         last_ci = active_region[-1]
@@ -1125,15 +1146,22 @@ class Solver:
         for bead_idx, cluster_idx in anchor_map:
             self.clusters[cluster_idx].pos = best_pos[bead_idx].copy()
 
+        # When drop_zero_length_subanchors is set, omit subanchor BeadOut entries
+        # with start == end from the output.  The MC chain still contains them
+        # (needed for chain smoothness); we only filter the externally visible
+        # bead list.  Anchors are always emitted regardless of width.
+        drop_zero = self.s.drop_zero_length_subanchors
         return [
-            (
-                starts[i],
-                ends[i],
-                float(best_pos[i, 0]),
-                float(best_pos[i, 1]),
-                float(best_pos[i, 2]),
+            BeadOut(
+                start=starts[i],
+                end=ends[i],
+                x=float(best_pos[i, 0]),
+                y=float(best_pos[i, 1]),
+                z=float(best_pos[i, 2]),
+                kind="anchor" if bool(fixed[i]) else "subanchor",
             )
             for i in range(n)
+            if not (drop_zero and not bool(fixed[i]) and starts[i] == ends[i])
         ]
 
     # Heatmap normalisation helpers
@@ -1310,7 +1338,16 @@ class Solver:
             c = self.clusters[i]
             if c.level != LVL_ANCHOR:
                 break
-            result.append((c.start, c.end, float(c.pos[0]), float(c.pos[1]), float(c.pos[2])))
+            result.append(
+                BeadOut(
+                    start=c.start,
+                    end=c.end,
+                    x=float(c.pos[0]),
+                    y=float(c.pos[1]),
+                    z=float(c.pos[2]),
+                    kind="anchor",
+                )
+            )
         result.sort(key=lambda b: b[0])
         return result
 
@@ -1326,5 +1363,5 @@ class Solver:
                 if c.level != LVL_ANCHOR:
                     break
                 x, y, z = float(c.pos[0]), float(c.pos[1]), float(c.pos[2])
-                result.append((c.start, c.end, x, y, z))
+                result.append(BeadOut(start=c.start, end=c.end, x=x, y=y, z=z, kind="anchor"))
         return sorted(result, key=lambda b: b[0])

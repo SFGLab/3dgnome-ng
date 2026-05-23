@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import Literal, NamedTuple, TypeAlias
 
 import numpy as np
 from numpy.typing import NDArray
@@ -15,11 +15,37 @@ StrArray: TypeAlias = NDArray[np.str_]
 # (chr1, pos1, chr2, pos2, score) singleton contact tuple.
 SingletonContact: TypeAlias = tuple[str, int, str, int, int]
 
-# (genomic_start_bp, genomic_end_bp, x, y, z) bead position output tuple.
-# start/end give the genomic region this bead covers; midpoint = (start+end)//2.
-# start is the first field so sorted(beads, key=lambda b: b[0]) still yields
-# left-to-right genomic order.
-BeadOut: TypeAlias = tuple[int, int, float, float, float]
+BeadKind: TypeAlias = Literal["anchor", "subanchor"]
+
+
+class BeadOut(NamedTuple):
+    """One bead in a reconstructed structure.
+
+    start/end give the genomic region this bead covers (bp); midpoint =
+    (start+end)//2.  start is the first field so sorted(beads, key=lambda b: b.start)
+    still yields left-to-right genomic order.
+
+    kind is "anchor" for original ChIA-PET loop-base beads (level=LVL_ANCHOR)
+    and "subanchor" for the loop_density beads inserted by densification.
+
+    BeadOut is a NamedTuple so it iterates and unpacks like a regular 6-tuple
+    AND supports named access (b.kind, b.start, b.x, ...).
+    """
+
+    start: int
+    end: int
+    x: float
+    y: float
+    z: float
+    kind: BeadKind
+
+    @property
+    def midpoint(self) -> int:
+        return (self.start + self.end) // 2
+
+    @property
+    def span(self) -> int:
+        return self.end - self.start + 1
 
 
 @dataclass

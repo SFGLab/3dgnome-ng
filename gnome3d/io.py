@@ -345,14 +345,19 @@ def write_cif(
     """
     Write a single structure to an mmCIF file.
 
-    beads : list of BeadOut = (start_bp, end_bp, x, y, z)
+    beads : list of BeadOut = (start_bp, end_bp, x, y, z, kind)
         One entry per anchor bead, as returned by run_region() for one structure.
 
-    Each bead carries its genomic region in two non-standard extension columns:
+    Each bead carries its genomic region and kind in three non-standard extension
+    columns:
       _atom_site.gnome_region_start  - genomic start (bp)
       _atom_site.gnome_region_end    - genomic end   (bp)
+      _atom_site.gnome_bead_kind     - "anchor" | "subanchor"
     Standard mmCIF viewers ignore unknown _atom_site.* columns; downstream tools
-    that want the per-bead genomic span can parse them directly.
+    that want the per-bead genomic span can parse them directly.  As an extra
+    hint to viewers that DO honour residue names, anchor beads use label_comp_id
+    = "ALA" while subanchor beads use "GLY", which gives default color-coding
+    in PyMOL / ChimeraX / Mol* without any custom scripting.
     """
     header = f"""data_{entry_id}
 #
@@ -381,8 +386,14 @@ _atom_site.B_iso_or_equiv
 _atom_site.auth_asym_id
 _atom_site.gnome_region_start
 _atom_site.gnome_region_end
+_atom_site.gnome_bead_kind
 """
     with open(path, "w") as f:
         f.write(header)
-        for i, (start, end, x, y, z) in enumerate(beads, start=1):
-            f.write(f"ATOM {i} C CA . ALA A 1 {i} ? {x} {y} {z} 1.00 99.99 C {start} {end}\n")
+        for i, bead in enumerate(beads, start=1):
+            comp = "ALA" if bead.kind == "anchor" else "GLY"
+            f.write(
+                f"ATOM {i} C CA . {comp} A 1 {i} ? "
+                f"{bead.x} {bead.y} {bead.z} 1.00 99.99 C "
+                f"{bead.start} {bead.end} {bead.kind}\n"
+            )

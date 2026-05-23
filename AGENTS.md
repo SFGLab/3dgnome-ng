@@ -434,6 +434,27 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 - **Singleton chr filter** (data loading)
   The reference bins inter-chromosomal singletons by position; Python correctly filters by chromosome. Smooth-MC heat scores diverge 3-5× as a result, but final structures still match. See `[[project-singleton-chr-filter-divergence]]`.
 
+- **`BeadOut` is a NamedTuple with a `kind` field** ([gnome3d/types.py](gnome3d/types.py))
+  Output beads were widened from a 5-tuple `(start, end, x, y, z)` to a 6-field NamedTuple `(start, end, x, y, z, kind)` where `kind: Literal["anchor", "subanchor"]`. Iteration / positional unpacking still works (NamedTuple subclasses tuple) but consumers must expect length 6, not 5. Named access also available: `b.start`, `b.kind`, plus convenience properties `b.midpoint` and `b.span`. The CIF writer emits `kind` via a non-standard `_atom_site.gnome_bead_kind` column and additionally distinguishes anchors (`label_comp_id = ALA`) from subanchors (`label_comp_id = GLY`) so default mmCIF viewers color-code them automatically.
+
+- **Subanchor densification: centered slots instead of single points** ([gnome3d/solver.py::_densify_active_region](gnome3d/solver.py))
+  The reference places each subanchor at a single genomic point `ca.end + (j+1) * gap_bp / (ld+1)`, so each subanchor bead has zero genomic width and adjacent anchors collapse all ld subanchors into one point when overlapping. Python keeps the same midpoint positions but gives each subanchor j a slot of width `d_bp = span // (ld+1)` centered on its midpoint. Properties:
+    - Subanchor midpoints, 3D position interpolation (`t = (j+1)/(ld+1)`), and `dtn` are unchanged versus the reference's point scheme.
+    - Each subanchor has a non-degenerate genomic range whenever the in-between region is at least `ld+1` bp wide.
+    - Subanchor starts/ends never coincide with adjacent anchor boundaries (`ca.end` or `cb.start`), so sorting beads by start gives a unique total order — this fixes the bead-collision issue where overlapping anchors produced subanchors sharing a `start` value with the next anchor.
+
+  Behavior on overlapping anchors is controlled by two independent settings:
+
+    - **`overlap_anchor_strict`** (default `False`) — span computation.
+      - `False`: `span = abs(cb.start - ca.end)`; non-overlap tiles the gap `[ca.end, cb.start]`, overlap tiles the overlap `[cb.start, ca.end]` with non-degenerate ranges. Python divergence.
+      - `True`: `span = max(cb.start - ca.end, 0)` matches `LooperSolver.cpp:1829-1831` — overlap clamps to 0 so MC-chain subanchors between overlapping anchors collapse to a single boundary point.
+
+    - **`drop_zero_length_subanchors`** (default `False`) — output filter, independent of the span setting.
+      - `False`: every densified subanchor appears in the `BeadOut` output, even when `start == end`.
+      - `True`: subanchor entries with `start == end` are filtered out of the externally visible bead list. The MC chain still contains them (needed for chain smoothness); only the output is cleaned. Useful in combination with `overlap_anchor_strict = True` to suppress the collapsed-overlap zero-length entries the reference would otherwise emit.
+
+  The `densify.subanchor_inside` and `densify.unique_starts` checks in `harness/compare.py` enforce the default-mode invariants.
+
 ### New features (opt-in via settings, default-off)
 
 - **Excluded volume** — `settings.use_excluded_volume = true` to enable.
