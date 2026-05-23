@@ -21,7 +21,6 @@ import os
 import subprocess
 import sys
 import tempfile
-import textwrap
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
@@ -35,27 +34,34 @@ ATOL = 1e-6  # absolute tolerance for floating-point comparisons
 # ---------------------------------------------------------------------------
 # Build helpers
 
+
 def build_scorer(force: bool = False) -> None:
     if not force and SCORER_BIN.exists():
         return
     mc = ROOT / "3dnome" / "MC"
     sources = (
-        list(mc.glob("*.cpp")) +
-        list((mc / "lib").glob("*.cpp")) +
-        list((mc / "lib").glob("*.c"))
+        list(mc.glob("*.cpp")) + list((mc / "lib").glob("*.cpp")) + list((mc / "lib").glob("*.c"))
     )
     # Exclude main.cpp (it's in tools/, not MC/ directly, so not picked up above)
-    cmd = [
-              "g++", "-std=c++0x", "-Wno-write-strings", "-O2",
-              f"-I{mc}",
-              "-o", str(SCORER_BIN),
-              str(SCORER_SRC),
-          ] + [str(s) for s in sources] + ["-lm"]
+    cmd = (
+        [
+            "g++",
+            "-std=c++0x",
+            "-Wno-write-strings",
+            "-O2",
+            f"-I{mc}",
+            "-o",
+            str(SCORER_BIN),
+            str(SCORER_SRC),
+        ]
+        + [str(s) for s in sources]
+        + ["-lm"]
+    )
     print(f"[build] {' '.join(cmd)}")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         print(result.stderr)
-        sys.exit(f"[build] scorer.cpp compilation failed")
+        sys.exit("[build] scorer.cpp compilation failed")
     print("[build] scorer compiled OK")
 
 
@@ -91,6 +97,7 @@ def run_scorer_filtered(*args: str, prefixes: tuple = (), stdin_text: str = "") 
 # ---------------------------------------------------------------------------
 # Fixture helpers
 
+
 def write_tmp(content: str, suffix: str = ".txt") -> str:
     f = tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False)
     f.write(content)
@@ -119,12 +126,13 @@ def dtn_txt(dtn) -> str:
 # These are NOT the implementation-under-test - they are ground truth for
 # generating expected values without running the binary.
 
+
 def ref_genomic_dist(length_bp, base, scale, power):
     return base + scale * (length_bp / 1000.0) ** power
 
 
 def ref_freq_to_dist_heatmap(freq, scale, power):
-    return scale * (freq ** power)
+    return scale * (freq**power)
 
 
 def ref_freq_to_dist(freq, a, scale, shift, base_level):
@@ -220,7 +228,9 @@ def check(name: str, cpp_val: float, py_val, atol: float = ATOL):
     if ok:
         print(f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}")
     else:
-        print(f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}  diff={abs(cpp_val - py_val):.3e}")
+        print(
+            f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}  diff={abs(cpp_val - py_val):.3e}"
+        )
     _results.append(("pass" if ok else "fail", name))
 
 
@@ -236,17 +246,21 @@ def check_close_enough(name: str, cpp_val: float, py_val, rtol: float = 1e-5):
     if ok:
         print(f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}")
     else:
-        print(f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}  rel={abs(cpp_val - py_val) / denom:.3e}")
+        print(
+            f"  {status}  {name}  cpp={cpp_val:.8g}  py={py_val:.8g}  rel={abs(cpp_val - py_val) / denom:.3e}"
+        )
     _results.append(("pass" if ok else "fail", name))
 
 
 # ---------------------------------------------------------------------------
 # Try to import Python implementation
 
+
 def _try_import(fn_name: str):
     """Return function from gnome3d/ or None if not yet implemented."""
     try:
         import importlib
+
         sys.path.insert(0, str(ROOT))
         mod = importlib.import_module("gnome3d.energy")
         fn = getattr(mod, fn_name, None)
@@ -260,12 +274,19 @@ def _try_import(fn_name: str):
 # ---------------------------------------------------------------------------
 # Test groups
 
-DEFAULT_DIST_PARAMS = dict(
-    base=1.0, scale=0.5, power=0.75,
-    freq_scale=25.0, freq_power=-0.6,
-    freq_scale_inter=120.0, freq_power_inter=-1.0,
-    count_a=0.2, count_scale=1.8, count_shift=8, count_base=0.2,
-)
+DEFAULT_DIST_PARAMS = {
+    "base": 1.0,
+    "scale": 0.5,
+    "power": 0.75,
+    "freq_scale": 25.0,
+    "freq_power": -0.6,
+    "freq_scale_inter": 120.0,
+    "freq_power_inter": -1.0,
+    "count_a": 0.2,
+    "count_scale": 1.8,
+    "count_shift": 8,
+    "count_base": 0.2,
+}
 
 
 def test_distfns(reference_only=False):
@@ -273,10 +294,16 @@ def test_distfns(reference_only=False):
     p = DEFAULT_DIST_PARAMS
 
     param_args = [
-        str(p["base"]), str(p["scale"]), str(p["power"]),
-        str(p["freq_scale"]), str(p["freq_power"]),
-        str(p["freq_scale_inter"]), str(p["freq_power_inter"]),
-        str(p["count_a"]), str(p["count_scale"]), str(p["count_shift"]),
+        str(p["base"]),
+        str(p["scale"]),
+        str(p["power"]),
+        str(p["freq_scale"]),
+        str(p["freq_power"]),
+        str(p["freq_scale_inter"]),
+        str(p["freq_power_inter"]),
+        str(p["count_a"]),
+        str(p["count_scale"]),
+        str(p["count_shift"]),
         str(p["count_base"]),
     ]
 
@@ -321,12 +348,17 @@ def test_distfns(reference_only=False):
             check(f"freq_to_dist_heatmap({f_})", cpp_val, py_val)
         elif parts[0] == "freq_inter":
             f_, cpp_val = float(parts[1]), float(parts[3])
-            py_val = py_freq_i(f_, p["freq_scale_inter"], p["freq_power_inter"]) if py_freq_i else None
+            py_val = (
+                py_freq_i(f_, p["freq_scale_inter"], p["freq_power_inter"]) if py_freq_i else None
+            )
             check(f"freq_to_dist_inter({f_})", cpp_val, py_val)
         elif parts[0] == "count":
             n_, cpp_val = int(float(parts[1])), float(parts[3])
-            py_val = py_count(n_, p["count_a"], p["count_scale"], p["count_shift"],
-                              p["count_base"]) if py_count else None
+            py_val = (
+                py_count(n_, p["count_a"], p["count_scale"], p["count_shift"], p["count_base"])
+                if py_count
+                else None
+            )
             check(f"freq_to_distance(count={n_})", cpp_val, py_val)
 
 
@@ -349,7 +381,6 @@ def test_heatmap(reference_only=False):
     pos = SYNTHETIC_POSITIONS_5
     n = len(pos)
     diag = 2
-    stretch_k, squeeze_k = 1.0, 1.0
 
     # Build a simple expected distance matrix: actual distances * 0.9 (slight mismatch)
     def actual_dist(i, j):
@@ -362,7 +393,7 @@ def test_heatmap(reference_only=False):
     try:
         cpp_val = float(run_scorer("heatmap", str(diag), pos_f, expd_f))
     finally:
-        os.unlink(pos_f);
+        os.unlink(pos_f)
         os.unlink(expd_f)
 
     ref_val = ref_score_heatmap(pos, exp_dist, diag)
@@ -376,6 +407,7 @@ def test_heatmap(reference_only=False):
     py_val = None
     if py_fn:
         import numpy as _np
+
         pos_a = _np.asarray(pos, dtype=_np.float64)
         expd_a = _np.asarray(exp_dist, dtype=_np.float64)
         py_val = float(py_fn(pos_a, expd_a, diag))
@@ -394,7 +426,7 @@ def test_arcs(reference_only=False):
     try:
         cpp_val = float(run_scorer("arcs", str(stretch_k), str(squeeze_k), pos_f, arcs_f))
     finally:
-        os.unlink(pos_f);
+        os.unlink(pos_f)
         os.unlink(arcs_f)
 
     ref_val = ref_score_arcs(pos, arcs, stretch_k, squeeze_k)
@@ -408,6 +440,7 @@ def test_arcs(reference_only=False):
     py_val = None
     if py_fn:
         import numpy as _np
+
         pos_a = _np.asarray(pos, dtype=_np.float64)
         py_val = float(py_fn(pos_a, list(arcs), stretch_k, squeeze_k))
 
@@ -420,6 +453,7 @@ def test_smooth(reference_only=False):
     n = len(pos)
     # dist_to_next: expected bond lengths (slightly off from actual)
     import math as _math
+
     dist_to_next = [
         _math.sqrt(sum((pos[i][k] - pos[i + 1][k]) ** 2 for k in range(3))) * 0.85
         for i in range(n - 1)
@@ -430,14 +464,20 @@ def test_smooth(reference_only=False):
     pos_f = write_tmp(positions_txt(pos))
     dtn_f = write_tmp(dtn_txt(dist_to_next))
     try:
-        cpp_val = float(run_scorer(
-            "smooth",
-            str(stretch_k), str(squeeze_k), str(angular_k),
-            str(w_dist), str(w_angle),
-            pos_f, dtn_f
-        ))
+        cpp_val = float(
+            run_scorer(
+                "smooth",
+                str(stretch_k),
+                str(squeeze_k),
+                str(angular_k),
+                str(w_dist),
+                str(w_angle),
+                pos_f,
+                dtn_f,
+            )
+        )
     finally:
-        os.unlink(pos_f);
+        os.unlink(pos_f)
         os.unlink(dtn_f)
 
     ref_val = ref_score_smooth(pos, dist_to_next, stretch_k, squeeze_k, angular_k, w_dist, w_angle)
@@ -451,6 +491,7 @@ def test_smooth(reference_only=False):
     py_val = None
     if py_fn:
         import numpy as _np
+
         pos_a = _np.asarray(pos, dtype=_np.float64)
         dtn_a = _np.asarray(dist_to_next, dtype=_np.float64)
         py_val = float(py_fn(pos_a, dtn_a, stretch_k, squeeze_k, angular_k, w_dist, w_angle))
@@ -471,14 +512,20 @@ def test_densify(reference_only=False):
 
     try:
         import numpy as _np
+
         _root = str(ROOT)
         if _root not in sys.path:
             sys.path.insert(0, _root)
+        from gnome3d.hierarchy import LVL_ANCHOR, Cluster
         from gnome3d.solver import Solver
-        from gnome3d.hierarchy import Cluster, LVL_ANCHOR
     except ImportError as exc:
-        for name in ("densify.bead_count", "densify.n_fixed",
-                     "densify.anchor_pos", "densify.dtn_nonneg", "densify.interp"):
+        for name in (
+            "densify.bead_count",
+            "densify.n_fixed",
+            "densify.anchor_pos",
+            "densify.dtn_nonneg",
+            "densify.interp",
+        ):
             print(f"  {SKIP}  {name}  ({exc})")
             _results.append(("skip", name))
         return
@@ -523,8 +570,7 @@ def test_densify(reference_only=False):
     check("densify.n_fixed", float(n_anc), float(int(fixed.sum())), atol=0)
 
     # 3. Anchor 3-D positions preserved in pos array
-    ok_pos = all(_np.allclose(pos[bi], solver.clusters[ci].pos, atol=1e-5)
-                 for bi, ci in anchor_map)
+    ok_pos = all(_np.allclose(pos[bi], solver.clusters[ci].pos, atol=1e-5) for bi, ci in anchor_map)
     check("densify.anchor_pos", 1.0, 1.0 if ok_pos else 0.0, atol=0)
 
     # 4. All dtn values are non-negative
@@ -566,7 +612,7 @@ def ref_calc_orientation(positions, cind, n, char_orientation):
         orn = [positions[cind][k] - positions[cind - 1][k] for k in range(3)]
     else:
         orn = [positions[cind + 1][k] - positions[cind - 1][k] for k in range(3)]
-    if char_orientation == 'L':
+    if char_orientation == "L":
         orn = [-x for x in orn]
     norm = ref_vlen(orn)
     if norm > 1e-12:
@@ -574,8 +620,9 @@ def ref_calc_orientation(positions, cind, n, char_orientation):
     return orn
 
 
-def ref_score_orientation_full(anchor_orn, neighbors, neighbor_weights, motif_weight,
-                               motifs_symmetric=True):
+def ref_score_orientation_full(
+    anchor_orn, neighbors, neighbor_weights, motif_weight, motifs_symmetric=True
+):
     err = 0.0
     sign = 1.0 if motifs_symmetric else -1.0
     for i, nbrs in neighbors.items():
@@ -587,8 +634,9 @@ def ref_score_orientation_full(anchor_orn, neighbors, neighbor_weights, motif_we
     return err * motif_weight
 
 
-def ref_score_orientation_local(anchor_orn, anchor_index, neighbors, motif_weight,
-                                motifs_symmetric=True):
+def ref_score_orientation_local(
+    anchor_orn, anchor_index, neighbors, motif_weight, motifs_symmetric=True
+):
     err = 0.0
     sign = 1.0 if motifs_symmetric else -1.0
     for j in neighbors[anchor_index]:
@@ -617,7 +665,7 @@ def test_orientation(reference_only=False):
         (5.0, 5.0, 0.0),  # anchor 2  'R'
     ]
     n = len(pos)
-    anchors_spec = [(0, 'R'), (5, 'L'), (10, 'R')]
+    anchors_spec = [(0, "R"), (5, "L"), (10, "R")]
     # arcs between anchor-list pairs with weights sqrt(arc_score)
     arcs_spec = [(0, 1, 1.5), (1, 2, 2.0)]
     motif_weight = 2.5
@@ -627,10 +675,15 @@ def test_orientation(reference_only=False):
     spec_f = write_tmp(orient_spec_txt(anchors_spec, arcs_spec))
     try:
         raw = run_scorer_filtered(
-            "orientation", str(motif_weight), str(motifs_sym), pos_f, spec_f,
-            prefixes=("orientation", "global", "local"))
+            "orientation",
+            str(motif_weight),
+            str(motifs_sym),
+            pos_f,
+            spec_f,
+            prefixes=("orientation", "global", "local"),
+        )
     finally:
-        os.unlink(pos_f);
+        os.unlink(pos_f)
         os.unlink(spec_f)
 
     # Parse scorer output
@@ -660,17 +713,23 @@ def test_orientation(reference_only=False):
     # Verify scorer vs reference (sanity check)
     for k in range(n_anchors):
         for dim in range(3):
-            assert abs(cpp_orn[k][dim] - ref_orn[k][dim]) < 1e-5, \
+            assert abs(cpp_orn[k][dim] - ref_orn[k][dim]) < 1e-5, (
                 f"orientation vector mismatch anchor {k} dim {dim}"
+            )
 
-    ref_global = ref_score_orientation_full(ref_orn, neighbors_py, weights_py,
-                                            motif_weight, motifs_sym == 1)
-    assert abs(cpp_global - ref_global) < 1e-4, \
+    ref_global = ref_score_orientation_full(
+        ref_orn, neighbors_py, weights_py, motif_weight, motifs_sym == 1
+    )
+    assert abs(cpp_global - ref_global) < 1e-4, (
         f"scorer/ref global mismatch: {cpp_global} vs {ref_global}"
+    )
     for k in range(n_anchors):
-        ref_loc = ref_score_orientation_local(ref_orn, k, neighbors_py, motif_weight, motifs_sym == 1)
-        assert abs(cpp_local[k] - ref_loc) < 1e-4, \
+        ref_loc = ref_score_orientation_local(
+            ref_orn, k, neighbors_py, motif_weight, motifs_sym == 1
+        )
+        assert abs(cpp_local[k] - ref_loc) < 1e-4, (
             f"scorer/ref local[{k}] mismatch: {cpp_local[k]} vs {ref_loc}"
+        )
 
     if reference_only:
         print(f"  global = {cpp_global:.10f}")
@@ -681,6 +740,7 @@ def test_orientation(reference_only=False):
 
     # Python implementation checks
     import numpy as _np
+
     py_calc_orn = _try_import("calc_orientation")
     py_score_orn = _try_import("score_orientation")
     py_local_orn = _try_import("local_score_orientation")
@@ -689,13 +749,11 @@ def test_orientation(reference_only=False):
     py_orn = None
     if py_calc_orn:
         py_orn = [
-            py_calc_orn(pos_np, anchors_spec[k][0], n, anchors_spec[k][1])
-            for k in range(n_anchors)
+            py_calc_orn(pos_np, anchors_spec[k][0], n, anchors_spec[k][1]) for k in range(n_anchors)
         ]
         for k in range(n_anchors):
             for dim in range(3):
-                check(f"calc_orientation[{k}][{dim}]",
-                      cpp_orn[k][dim], float(py_orn[k][dim]))
+                check(f"calc_orientation[{k}][{dim}]", cpp_orn[k][dim], float(py_orn[k][dim]))
 
     # Global score
     py_global = None
@@ -749,7 +807,9 @@ def test_angle(reference_only=False):
     py_fn = _try_import("angle_metric") if not reference_only else None
     for v1, v2, expected in cases:
         ref_val = ref_angle_metric(v1, v2)
-        assert abs(ref_val - expected) < 1e-6, f"ref_angle_metric({v1},{v2}) = {ref_val}, expected {expected}"
+        assert abs(ref_val - expected) < 1e-6, (
+            f"ref_angle_metric({v1},{v2}) = {ref_val}, expected {expected}"
+        )
         if reference_only:
             print(f"  angle({v1}, {v2}) = {ref_val:.6f}  (expected {expected})")
         else:
@@ -774,11 +834,14 @@ def test_contact_heatmaps(reference_only=False):
     hm_f = write_tmp(matrix_txt(_hm))
     try:
         _raw = run_scorer_filtered("anchor_scale", "0.5", bd_f, hm_f)
-        cpp_scaled = {(int(p[0]), int(p[1])): float(p[2])
-                      for line in _raw.splitlines()
-                      if len((p := line.split())) == 3}
+        cpp_scaled = {
+            (int(p[0]), int(p[1])): float(p[2])
+            for line in _raw.splitlines()
+            if len(p := line.split()) == 3
+        }
     finally:
-        os.unlink(bd_f); os.unlink(hm_f)
+        os.unlink(bd_f)
+        os.unlink(hm_f)
 
     if reference_only:
         print(f"  anchor_heatmap.scales_distances cpp={cpp_scaled.get((0, 1)):.8g}")
@@ -786,20 +849,26 @@ def test_contact_heatmaps(reference_only=False):
         return
 
     _test_names = [
-        "contact_heatmaps.sub_shape", "contact_heatmaps.anc_shape",
-        "contact_heatmaps.no_singletons_anc", "contact_heatmaps.no_singletons_sub",
-        "contact_heatmaps.in_region", "contact_heatmaps.anc_symmetric",
-        "contact_heatmaps.out_of_region", "contact_heatmaps.wrong_chr",
-        "anchor_heatmap.scales_distances", "anchor_heatmap.disabled",
+        "contact_heatmaps.sub_shape",
+        "contact_heatmaps.anc_shape",
+        "contact_heatmaps.no_singletons_anc",
+        "contact_heatmaps.no_singletons_sub",
+        "contact_heatmaps.in_region",
+        "contact_heatmaps.anc_symmetric",
+        "contact_heatmaps.out_of_region",
+        "contact_heatmaps.wrong_chr",
+        "anchor_heatmap.scales_distances",
+        "anchor_heatmap.disabled",
     ]
 
     try:
         import numpy as _np
+
         _root = str(ROOT)
         if _root not in sys.path:
             sys.path.insert(0, _root)
-        from gnome3d.solver import Solver as _Sv
         from gnome3d.io import InteractionArc as _IA
+        from gnome3d.solver import Solver as _Sv
     except ImportError as exc:
         for name in _test_names:
             print(f"  {SKIP}  {name}  ({exc})")
@@ -808,14 +877,20 @@ def test_contact_heatmaps(reference_only=False):
 
     class _Cl:
         def __init__(self, start, end):
-            self.start = start; self.end = end
-            self.genomic_pos = (start + end) // 2; self.orientation = "N"
+            self.start = start
+            self.end = end
+            self.genomic_pos = (start + end) // 2
+            self.orientation = "N"
             self.pos = _np.zeros(3, dtype=_np.float32)
-            self.arcs = []; self.children = []; self.parent = -1
-            self.is_fixed = False; self.dist_to_next = 0.0
+            self.arcs = []
+            self.children = []
+            self.parent = -1
+            self.is_fixed = False
+            self.dist_to_next = 0.0
 
         @property
-        def level(self): return 0
+        def level(self):
+            return 0
 
     # Use the real Settings (with defaults) and override only the few values
     # this test needs. Keeps the stub resilient to new fields in gnome3d.
@@ -837,8 +912,11 @@ def test_contact_heatmaps(reference_only=False):
 
     def _sv(ancs, sins):
         sv = _Sv.__new__(_Sv)
-        sv.s = _make_settings(); sv.clusters = ancs; sv.arcs = {"chr1": []}
-        sv.singletons = sins; sv.chrs = []
+        sv.s = _make_settings()
+        sv.clusters = ancs
+        sv.arcs = {"chr1": []}
+        sv.singletons = sins
+        sv.chrs = []
         return sv
 
     ld, n_anc = 3, 3
@@ -874,21 +952,28 @@ def test_contact_heatmaps(reference_only=False):
 
     # Anchor heatmap scales distances: reference from anchor_scale mode
     h_m = _np.array(_hm)
-    sv6 = _Sv.__new__(_Sv); sv6.s = _make_settings()
+    sv6 = _Sv.__new__(_Sv)
+    sv6.s = _make_settings()
     sv6.clusters = [_Cl(0, 100), _Cl(500, 600)]
     arc = _IA(start=0, end=1, score=10)
-    sv6.clusters[0].arcs = [0]; sv6.clusters[1].arcs = [0]
-    sv6.arcs = {"chr1": [arc]}; sv6.s.freq_to_distance = lambda sc: 5.0
+    sv6.clusters[0].arcs = [0]
+    sv6.clusters[1].arcs = [0]
+    sv6.arcs = {"chr1": [arc]}
+    sv6.s.freq_to_distance = lambda sc: 5.0
     mat = sv6._calc_anchor_expected_distances([0, 1], "chr1", h_m)
     check("anchor_heatmap.scales_distances", cpp_scaled.get((0, 1), float("nan")), float(mat[0, 1]))
 
     # Anchor heatmap disabled → no scaling (pure Python: expected value is unscaled base=5.0)
-    st7 = _make_settings(); st7.use_anchor_heatmap = False
-    sv7 = _Sv.__new__(_Sv); sv7.s = st7
+    st7 = _make_settings()
+    st7.use_anchor_heatmap = False
+    sv7 = _Sv.__new__(_Sv)
+    sv7.s = st7
     sv7.clusters = [_Cl(0, 100), _Cl(500, 600)]
     arc7 = _IA(start=0, end=1, score=10)
-    sv7.clusters[0].arcs = [0]; sv7.clusters[1].arcs = [0]
-    sv7.arcs = {"chr1": [arc7]}; sv7.s.freq_to_distance = lambda sc: 5.0
+    sv7.clusters[0].arcs = [0]
+    sv7.clusters[1].arcs = [0]
+    sv7.arcs = {"chr1": [arc7]}
+    sv7.s.freq_to_distance = lambda sc: 5.0
     mat7 = sv7._calc_anchor_expected_distances([0, 1], "chr1", h_m)
     # No reference scorer: disabled path returns unscaled freq_to_distance output (5.0 by construction)
     check("anchor_heatmap.disabled", 5.0, float(mat7[0, 1]))
@@ -905,19 +990,20 @@ def test_subanchor_heat(reference_only=False):
     # Get reference for local_sum_eq_init first (needed for reference_only mode).
     # heat_score mode: dist_weight=1.0, fixed 5-bead random setup (RandomState 7).
     import numpy as _np_pre
+
     _rng = _np_pre.random.RandomState(7)
     _pos5 = _rng.rand(5, 3) * 5.0
-    _hd5  = _np_pre.abs(_rng.randn(5, 5)) + 0.5
+    _hd5 = _np_pre.abs(_rng.randn(5, 5)) + 0.5
     _np_pre.fill_diagonal(_hd5, 0.0)
     _hd5 = (_hd5 + _hd5.T) / 2
     pos5_f = write_tmp(positions_txt(_pos5.tolist()))
-    hd5_f  = write_tmp(matrix_txt(_hd5.tolist()))
+    hd5_f = write_tmp(matrix_txt(_hd5.tolist()))
     try:
-        _raw_hs = run_scorer_filtered("heat_score", "1.0", pos5_f, hd5_f,
-                                      prefixes=("global",))
+        _raw_hs = run_scorer_filtered("heat_score", "1.0", pos5_f, hd5_f, prefixes=("global",))
         cpp_global_heat = float(_raw_hs.strip().split()[1])
     finally:
-        os.unlink(pos5_f); os.unlink(hd5_f)
+        os.unlink(pos5_f)
+        os.unlink(hd5_f)
 
     if reference_only:
         print(f"  subanchor_heat.local_sum_eq_init cpp={cpp_global_heat:.8g}")
@@ -925,19 +1011,24 @@ def test_subanchor_heat(reference_only=False):
         return
 
     _test_names = [
-        "subanchor_heat.zero_heatmap_none", "subanchor_heat.high_contact_smaller",
-        "subanchor_heat.nonneg_distances", "subanchor_heat.mc_smooth_heat_finite",
-        "subanchor_heat.mc_smooth_orn_heat_finite", "subanchor_heat.local_sum_eq_init",
+        "subanchor_heat.zero_heatmap_none",
+        "subanchor_heat.high_contact_smaller",
+        "subanchor_heat.nonneg_distances",
+        "subanchor_heat.mc_smooth_heat_finite",
+        "subanchor_heat.mc_smooth_orn_heat_finite",
+        "subanchor_heat.local_sum_eq_init",
     ]
 
     try:
-        import numpy as _np
         import math as _m
+
+        import numpy as _np
+
         _root = str(ROOT)
         if _root not in sys.path:
             sys.path.insert(0, _root)
+        from gnome3d.mc import _as_f64, _init_heat_nb, mc_smooth
         from gnome3d.solver import Solver as _Sv
-        from gnome3d.mc import mc_smooth, _init_heat_nb, _as_f64
     except ImportError as exc:
         for name in _test_names:
             print(f"  {SKIP}  {name}  ({exc})")
@@ -946,14 +1037,20 @@ def test_subanchor_heat(reference_only=False):
 
     class _Cl:
         def __init__(self, start, end):
-            self.start = start; self.end = end
-            self.genomic_pos = (start + end) // 2; self.orientation = "N"
+            self.start = start
+            self.end = end
+            self.genomic_pos = (start + end) // 2
+            self.orientation = "N"
             self.pos = _np.zeros(3, dtype=_np.float32)
-            self.arcs = []; self.children = []; self.parent = -1
-            self.is_fixed = False; self.dist_to_next = 0.0
+            self.arcs = []
+            self.children = []
+            self.parent = -1
+            self.is_fixed = False
+            self.dist_to_next = 0.0
 
         @property
-        def level(self): return 0
+        def level(self):
+            return 0
 
     from gnome3d.settings import Settings as _Settings
 
@@ -987,8 +1084,12 @@ def test_subanchor_heat(reference_only=False):
     dtn = _np.full(n - 1, 2.0, dtype=_np.float32)
 
     def _sv():
-        sv = _Sv.__new__(_Sv); sv.s = _make_settings(); sv.clusters = ancs
-        sv.arcs = {}; sv.singletons = []; sv.chrs = []
+        sv = _Sv.__new__(_Sv)
+        sv.s = _make_settings()
+        sv.clusters = ancs
+        sv.arcs = {}
+        sv.singletons = []
+        sv.chrs = []
         return sv
 
     # 1. Zero heatmap → None
@@ -1000,49 +1101,85 @@ def test_subanchor_heat(reference_only=False):
     pos2 = _np.zeros((n, 3), dtype=_np.float32)
     for i in range(n):
         pos2[i, 0] = float(i) * 2.0
-    h2 = _np.zeros((n, n)); h2[0, 8] = h2[8, 0] = 100.0; h2[0, 4] = h2[4, 0] = 1.0
+    h2 = _np.zeros((n, n))
+    h2[0, 8] = h2[8, 0] = 100.0
+    h2[0, 4] = h2[4, 0] = 1.0
     heat2 = _sv()._build_heat_dist_subanchor(pos2, fixed, dtn, h2, step_size=0.5)
-    check("subanchor_heat.high_contact_smaller", 1.0,
-          1.0 if (heat2 is not None and heat2[0, 8] <= heat2[0, 4] + 1e-6) else 0.0, atol=0)
-    check("subanchor_heat.nonneg_distances", 1.0,
-          1.0 if (heat2 is not None and float(heat2.min()) >= 0.0) else 0.0, atol=0)
+    check(
+        "subanchor_heat.high_contact_smaller",
+        1.0,
+        1.0 if (heat2 is not None and heat2[0, 8] <= heat2[0, 4] + 1e-6) else 0.0,
+        atol=0,
+    )
+    check(
+        "subanchor_heat.nonneg_distances",
+        1.0,
+        1.0 if (heat2 is not None and float(heat2.min()) >= 0.0) else 0.0,
+        atol=0,
+    )
 
     # 3. mc_smooth with heat produces finite non-negative score
     _np.random.seed(42)
     pos3 = _np.random.rand(n, 3).astype(_np.float32) * 5.0
-    heat3 = _np.full((n, n), 0.1); _np.fill_diagonal(heat3, 0.0)
-    st3 = _make_settings(); st3.mc_stop_steps_smooth = 200; st3.mc_stop_successes_smooth = 2
+    heat3 = _np.full((n, n), 0.1)
+    _np.fill_diagonal(heat3, 0.0)
+    st3 = _make_settings()
+    st3.mc_stop_steps_smooth = 200
+    st3.mc_stop_successes_smooth = 2
     st3.mc_stop_improvement_smooth = 0.5
     s3 = mc_smooth(pos3, dtn, fixed, step_size=0.5, settings=st3, heat_dist=heat3)
-    check("subanchor_heat.mc_smooth_heat_finite", 1.0,
-          1.0 if _m.isfinite(s3) and s3 >= 0.0 else 0.0, atol=0)
+    check(
+        "subanchor_heat.mc_smooth_heat_finite",
+        1.0,
+        1.0 if _m.isfinite(s3) and s3 >= 0.0 else 0.0,
+        atol=0,
+    )
 
     # 4. mc_smooth with heat + orientation produces finite score
-    n7 = 7; fixed7 = _np.zeros(n7, dtype=bool)
+    n7 = 7
+    fixed7 = _np.zeros(n7, dtype=bool)
     fixed7[0] = fixed7[3] = fixed7[6] = True
     dtn7 = _np.full(n7 - 1, 1.0, dtype=_np.float32)
-    _np.random.seed(0); pos4 = _np.random.rand(n7, 3).astype(_np.float32) * 3.0
-    heat4 = _np.full((n7, n7), 2.0); _np.fill_diagonal(heat4, 0.0)
-    st4 = _make_settings(); st4.use_ctcf_motif = True; st4.mc_stop_steps_smooth = 100
-    st4.mc_stop_successes_smooth = 2; st4.mc_stop_improvement_smooth = 0.5
-    s4 = mc_smooth(pos4, dtn7, fixed7, step_size=0.5, settings=st4,
-                   char_orientations=_np.array(['R', 'N', 'N', 'L', 'N', 'N', 'R'], dtype='<U1'),
-                   anchor_neighbors={0: [1], 1: [0, 2], 2: [1]},
-                   anchor_neighbor_weights={0: [1.0], 1: [1.0, 1.0], 2: [1.0]},
-                   heat_dist=heat4)
-    check("subanchor_heat.mc_smooth_orn_heat_finite", 1.0,
-          1.0 if _m.isfinite(s4) and s4 >= 0.0 else 0.0, atol=0)
+    _np.random.seed(0)
+    pos4 = _np.random.rand(n7, 3).astype(_np.float32) * 3.0
+    heat4 = _np.full((n7, n7), 2.0)
+    _np.fill_diagonal(heat4, 0.0)
+    st4 = _make_settings()
+    st4.use_ctcf_motif = True
+    st4.mc_stop_steps_smooth = 100
+    st4.mc_stop_successes_smooth = 2
+    st4.mc_stop_improvement_smooth = 0.5
+    s4 = mc_smooth(
+        pos4,
+        dtn7,
+        fixed7,
+        step_size=0.5,
+        settings=st4,
+        char_orientations=_np.array(["R", "N", "N", "L", "N", "N", "R"], dtype="<U1"),
+        anchor_neighbors={0: [1], 1: [0, 2], 2: [1]},
+        anchor_neighbor_weights={0: [1.0], 1: [1.0, 1.0], 2: [1.0]},
+        heat_dist=heat4,
+    )
+    check(
+        "subanchor_heat.mc_smooth_orn_heat_finite",
+        1.0,
+        1.0 if _m.isfinite(s4) and s4 >= 0.0 else 0.0,
+        atol=0,
+    )
 
     # 5. reference global heat score == Python _init_heat_nb (verifies Numba vs reference formula)
     # Tolerance is relative: reference uses float32, Python uses float64, causing ~1e-7 rel diff.
-    pos5 = _np.array(_pos5); hd5 = _np.array(_hd5)
-    pw5 = _as_f64(pos5); hd64 = _as_f64(hd5)
+    pos5 = _np.array(_pos5)
+    hd5 = _np.array(_hd5)
+    pw5 = _as_f64(pos5)
+    hd64 = _as_f64(hd5)
     py_init = float(_init_heat_nb(pw5, hd64, 1.0))
     check_close_enough("subanchor_heat.local_sum_eq_init", cpp_global_heat, py_init)
 
 
 # ---------------------------------------------------------------------------
 # Summary
+
 
 def print_summary():
     passes = sum(1 for r, _ in _results if r == "pass")
@@ -1074,12 +1211,19 @@ ALL_TESTS = {
 
 def main():
     parser = argparse.ArgumentParser(description="3dgnome-ng correctness harness")
-    parser.add_argument("tests", nargs="*", metavar="TEST",
-                        help=f"Test groups to run (default: all). Choices: {', '.join(ALL_TESTS)}")
+    parser.add_argument(
+        "tests",
+        nargs="*",
+        metavar="TEST",
+        help=f"Test groups to run (default: all). Choices: {', '.join(ALL_TESTS)}",
+    )
     parser.add_argument("--build-only", action="store_true")
     parser.add_argument("--rebuild", action="store_true", help="Force recompile scorer.cpp")
-    parser.add_argument("--reference", action="store_true",
-                        help="Print reference values only; do not run Python impl")
+    parser.add_argument(
+        "--reference",
+        action="store_true",
+        help="Print reference values only; do not run Python impl",
+    )
     args = parser.parse_args()
 
     build_scorer(force=args.rebuild or args.build_only)

@@ -35,3 +35,39 @@ reportUnknownParameterType = "error"
 reportMissingParameterType = "error"
 reportMissingTypeArgument = "error"
 reportConstantRedefinition = "none"
+
+[tool.ruff]
+# Apply to project source + tests.  Skip vendored / generated dirs.
+target-version = "py311"
+line-length = 100
+extend-exclude = ["3dnome", ".venv", "build", "dist", "out", "data"]
+
+[tool.ruff.format]
+# Black-compatible defaults; explicit for clarity.
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint]
+# Start conservative: pycodestyle (E), pyflakes (F), pyupgrade (UP),
+# isort import sorting (I), bugbear-lite (B), and complexity (C4) checks.
+# Add more groups as the team gets comfortable.
+select = ["E", "F", "I", "UP", "B", "C4"]
+ignore = [
+    "E501",  # line length - already enforced by formatter
+    "E731",  # lambda assigns - used for tiny test helpers (Settings stand-ins)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Star-imports of the public type aliases are intentional in these modules
+# (they re-export gnome3d.types as a flat namespace).
+"gnome3d/solver.py" = ["F405", "F403"]
+"gnome3d/io.py" = ["F405", "F403"]
+"gnome3d/data.py" = ["F405", "F403", "B023"]
+"gnome3d/hierarchy.py" = ["F405", "F403"]
+"gnome3d/mc.py" = ["F405", "F403"]
+# The harness uses tight one-liner stubs (lots of `;`), tuple short names like
+# `l` for length, and zip() without strict=. These are intentional for compact
+# test fixtures, not real code.
+"harness/compare.py" = ["E702", "E703", "E741", "B007", "B905"]
+"harness/integration.py" = ["B007", "B905"]

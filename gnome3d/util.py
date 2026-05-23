@@ -11,8 +11,8 @@ import numpy as np
 
 from .types import F32Array, F64Array
 
-
 # Distance conversion functions
+
 
 def genomic_length_to_distance(length_bp: int, base: float, scale: float, power: float) -> float:
     """Reference: genomicLengthToDistance(length) = base + scale * (length/1000)^power"""
@@ -21,12 +21,12 @@ def genomic_length_to_distance(length_bp: int, base: float, scale: float, power:
 
 def freq_to_dist_heatmap(freq: float, scale: float, power: float) -> float:
     """Reference: freqToDistanceHeatmap(freq) = scale * freq^power"""
-    return scale * (freq ** power)
+    return scale * (freq**power)
 
 
 def freq_to_dist_heatmap_inter(freq: float, scale_inter: float, power_inter: float) -> float:
     """Reference: freqToDistanceHeatmapInter(freq) = scale_inter * freq^power_inter"""
-    return scale_inter * (freq ** power_inter)
+    return scale_inter * (freq**power_inter)
 
 
 def freq_to_distance(freq: int, a: float, scale: float, shift: float, base_level: float) -> float:
@@ -43,11 +43,14 @@ def random_vector_np(step: float, in_2d: bool = False) -> F32Array:
     z component is forced to 0 (matches `Settings::use2D` branch).
     """
     z = 0.0 if in_2d else random.uniform(-step, step)
-    return np.array([
-        random.uniform(-step, step),
-        random.uniform(-step, step),
-        z,
-    ], dtype=np.float32)
+    return np.array(
+        [
+            random.uniform(-step, step),
+            random.uniform(-step, step),
+            z,
+        ],
+        dtype=np.float32,
+    )
 
 
 def calc_orientation(pos: F64Array, cind: int, n: int, char_orientation: str) -> F64Array:
@@ -60,7 +63,7 @@ def calc_orientation(pos: F64Array, cind: int, n: int, char_orientation: str) ->
         orn = pos[cind] - pos[cind - 1]
     else:
         orn = pos[cind + 1] - pos[cind - 1]
-    if char_orientation == 'L':
+    if char_orientation == "L":
         orn = -orn
     norm = float(np.linalg.norm(orn))
     if norm > 1e-12:

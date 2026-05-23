@@ -36,8 +36,8 @@ def _expand_chr_range(token: str) -> list[str]:
     lo, hi = token.split("-", 1)
     prefix_lo = "".join(c for c in lo if not c.isdigit())
     prefix_hi = "".join(c for c in hi if not c.isdigit())
-    suffix_lo = lo[len(prefix_lo):]
-    suffix_hi = hi[len(prefix_hi):]
+    suffix_lo = lo[len(prefix_lo) :]
+    suffix_hi = hi[len(prefix_hi) :]
     if prefix_lo != prefix_hi or not suffix_lo or not suffix_hi:
         return [token]
     try:
@@ -91,6 +91,7 @@ def parse_chrs_arg(arg: str) -> tuple[list[str], BedRegion | None]:
 
 # Load anchors from BED file
 
+
 def load_anchors(
     path: str,
     chr_set: set[str],
@@ -139,6 +140,7 @@ def load_anchors(
 
 
 # Load PET cluster arcs from BEDPE file
+
 
 def load_arcs(
     path: str,
@@ -211,6 +213,7 @@ def load_arcs(
 
 # Load segment breakpoints
 
+
 def load_breakpoints(path: str, chrs: list[str]) -> BreakpointMap:
     """
     Load segment breakpoint BED file.  Format: chr pos pos
@@ -237,6 +240,7 @@ def load_breakpoints(path: str, chrs: list[str]) -> BreakpointMap:
 
 
 # Load singletons
+
 
 def load_singletons(
     path: str,
@@ -275,6 +279,7 @@ def load_singletons(
 
 
 # Create singleton heatmap from pre-loaded contacts
+
 
 def create_singleton_heatmap(
     contacts: list[SingletonContact],
@@ -331,6 +336,7 @@ def create_singleton_heatmap(
 
 # CIF export
 
+
 def write_cif(
     path: str,
     beads: list[BeadOut],
@@ -379,7 +385,4 @@ _atom_site.gnome_region_end
     with open(path, "w") as f:
         f.write(header)
         for i, (start, end, x, y, z) in enumerate(beads, start=1):
-            f.write(
-                f"ATOM {i} C CA . ALA A 1 {i} ? {x} {y} {z} 1.00 99.99 C "
-                f"{start} {end}\n"
-            )
+            f.write(f"ATOM {i} C CA . ALA A 1 {i} ? {x} {y} {z} 1.00 99.99 C {start} {end}\n")

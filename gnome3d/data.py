@@ -39,6 +39,7 @@ class ContactData:
     singletons:  list of (chr1, pos1, chr2, pos2, score) contacts
                  used to build the segment-level heatmap
     """
+
     anchors: AnchorMap = field(default_factory=empty_anchor_map)
     arcs: ArcMap = field(default_factory=empty_arc_map)
     breakpoints: BreakpointMap = field(default_factory=empty_breakpoint_map)
@@ -212,6 +213,7 @@ class ContactData:
 
 # map RawArcs -> anchor-indexed InteractionArcs
 
+
 def mark_arcs(
     anchors: AnchorMap,
     raw_arcs: RawArcMap,
@@ -249,7 +251,9 @@ def mark_arcs(
             return -1
 
         result: list[InteractionArc] = []
-        tmp_arcs: dict[int, list[InteractionArc]] = {}  # end_idx -> staged arcs for current start group
+        tmp_arcs: dict[
+            int, list[InteractionArc]
+        ] = {}  # end_idx -> staged arcs for current start group
         last_start = -1
 
         def flush(target_list: list[InteractionArc]) -> None:
@@ -266,9 +270,13 @@ def mark_arcs(
                     factor_score = 0
                     first_of_factor = 0
                     for j in range(len(arcs_group) + 1):
-                        if j == len(arcs_group) or (j > 0 and arcs_group[j].factor != arcs_group[j - 1].factor):
+                        if j == len(arcs_group) or (
+                            j > 0 and arcs_group[j].factor != arcs_group[j - 1].factor
+                        ):
                             arcs_group[first_of_factor].score = factor_score
-                            arcs_group[first_of_factor].eff_score = 0 if multiple_factors else factor_score
+                            arcs_group[first_of_factor].eff_score = (
+                                0 if multiple_factors else factor_score
+                            )
                             target_list.append(arcs_group[first_of_factor])
                             first_of_factor = j
                             total_score += factor_score
@@ -313,6 +321,7 @@ def mark_arcs(
 
 
 # keep only anchors that are endpoints of at least one arc
+
 
 def remove_empty_anchors(
     anchors: AnchorMap,

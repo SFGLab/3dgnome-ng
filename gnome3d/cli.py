@@ -69,16 +69,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="3dgnome-ng structure prediction")
     parser.add_argument("--config", required=True, help="Path to config.ini")
     parser.add_argument(
-        "--region", default="",
-        help=("Chromosomes/region to reconstruct.  Examples: "
-              "'chr14:18288319-20307135' (single region), 'chr14' (single chr), "
-              "'chr1,chr3,chrX' (comma list), 'chr1-chr22,chrX' (range + extras). "
-              "Default (empty): chr1-chr22,chrX (whole human genome, matches Reference)."),
+        "--region",
+        default="",
+        help=(
+            "Chromosomes/region to reconstruct.  Examples: "
+            "'chr14:18288319-20307135' (single region), 'chr14' (single chr), "
+            "'chr1,chr3,chrX' (comma list), 'chr1-chr22,chrX' (range + extras). "
+            "Default (empty): chr1-chr22,chrX (whole human genome, matches Reference)."
+        ),
     )
-    parser.add_argument("-n", "--n-structures", type=int, default=1,
-                        help="Number of independent structures to generate (default 1)")
-    parser.add_argument("--data-dir", default=None,
-                        help="Override data_dir from config")
+    parser.add_argument(
+        "-n",
+        "--n-structures",
+        type=int,
+        default=1,
+        help="Number of independent structures to generate (default 1)",
+    )
+    parser.add_argument("--data-dir", default=None, help="Override data_dir from config")
     parser.add_argument("--out", default=".", help="Output directory (default: .)")
     args = parser.parse_args()
 
@@ -92,9 +99,10 @@ def main() -> None:
     if args.data_dir:
         s.data_dir = args.data_dir
     print(f"[main] config: {args.config}  data_dir: {s.data_dir}")
-    print(f"[main] chromosomes ({len(chrs_list)}): {','.join(chrs_list)}"
-          + (f"  region={bed_region.chr}:{bed_region.start}-{bed_region.end}"
-             if bed_region else ""))
+    print(
+        f"[main] chromosomes ({len(chrs_list)}): {','.join(chrs_list)}"
+        + (f"  region={bed_region.chr}:{bed_region.start}-{bed_region.end}" if bed_region else "")
+    )
 
     data = ContactData.from_files(s, chrs_list, bed_region)
 

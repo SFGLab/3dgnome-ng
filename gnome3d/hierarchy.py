@@ -16,6 +16,7 @@ LVL_SEGMENT: int = 2
 LVL_INTERACTION_BLOCK: int = 3
 LVL_ANCHOR: int = 4  # leaf level - original anchor clusters
 
+
 @dataclass
 class Cluster:
     start: int
@@ -263,6 +264,7 @@ def build_cluster_tree(
 
 
 # Level traversal helpers
+
 
 def set_top_level(chr_root: ChrRootMap, chrs: list[str]) -> ChrLevel:
     """Returns current_level = {chr: [chr_root[chr]]} for each chr."""

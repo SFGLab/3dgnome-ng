@@ -37,7 +37,6 @@ import argparse
 import io
 import json
 import math
-import os
 import re
 import shutil
 import subprocess
@@ -72,12 +71,12 @@ SKIP_STR = "\033[33mSKIP\033[0m"
 
 # Matches both reference and Python milestone lines:
 #   "    step   13000  score=11.6605  ratio=1.0000  ok=9/1000  [done]"
-_MS_RE = re.compile(r'step\s+([\d,]+)\s+score=([^\s]+)\s+ratio=([^\s]+)\s+ok=(\d+)/(\d+)')
+_MS_RE = re.compile(r"step\s+([\d,]+)\s+score=([^\s]+)\s+ratio=([^\s]+)\s+ok=(\d+)/(\d+)")
 # Matches reference IB header lines (raw subprocess output, no "[cpp]" prefix):
 #   "  chr1 1/2"
-_IB_RE = re.compile(r'^\s+\S+\s+(\d+/\d+)\s*$')
+_IB_RE = re.compile(r"^\s+\S+\s+(\d+/\d+)\s*$")
 # Matches Python milestone label brackets: "[chr1 IB 1/2 run 1/1]" / "smooth"
-_PY_LBL = re.compile(r'\[(?:\S+\s+)?IB\s+(\d+/\d+)\s+(run|smooth)')
+_PY_LBL = re.compile(r"\[(?:\S+\s+)?IB\s+(\d+/\d+)\s+(run|smooth)")
 
 
 class _TeeOut:
@@ -127,7 +126,7 @@ def _parse_cpp_milestones(raw_lines: list) -> dict:
         m = _MS_RE.search(line)
         if m and cur_ib is not None:
             phase = "smooth" if arc_done else "arc"
-            step = int(m.group(1).replace(',', ''))
+            step = int(m.group(1).replace(",", ""))
             score = float(m.group(2))
             ok = int(m.group(4))
             total = int(m.group(5))
@@ -150,7 +149,7 @@ def _parse_py_milestones(text: str) -> dict:
         if lm and m:
             ib = lm.group(1)
             phase = "arc" if lm.group(2) == "run" else "smooth"
-            step = int(m.group(1).replace(',', ''))
+            step = int(m.group(1).replace(",", ""))
             score = float(m.group(2))
             ok = int(m.group(4))
             total = int(m.group(5))
@@ -175,21 +174,22 @@ def _merge_milestones(all_data: list) -> dict:
         rows = []
         for step in sorted(by_step):
             vals = by_step[step]
-            rows.append((
-                step,
-                sum(v[0] for v in vals) / len(vals),
-                sum(v[1] for v in vals) / len(vals),
-                vals[0][2],
-                any(v[3] for v in vals),
-            ))
+            rows.append(
+                (
+                    step,
+                    sum(v[0] for v in vals) / len(vals),
+                    sum(v[1] for v in vals) / len(vals),
+                    vals[0][2],
+                    any(v[3] for v in vals),
+                )
+            )
         result[(ib, phase)] = rows
     return result
 
 
 def print_step_comparison(cpp_ms: dict, py_ms: dict, n_structs: int) -> None:
     """Print a side-by-side per-milestone convergence table."""
-    all_keys = sorted(set(cpp_ms) | set(py_ms),
-                      key=lambda k: (k[0], 0 if k[1] == "arc" else 1))
+    all_keys = sorted(set(cpp_ms) | set(py_ms), key=lambda k: (k[0], 0 if k[1] == "arc" else 1))
     if not all_keys:
         return
 
@@ -206,8 +206,10 @@ def print_step_comparison(cpp_ms: dict, py_ms: dict, n_structs: int) -> None:
             continue
 
         print(f"\n  IB {ib} - {phase} MC")
-        print(f"  {'step':>8}  {'Ref score':>11}  {'Py score':>11}  "
-              f"{'Δ%':>7}  {'Ref ok/N':>13}  {'Py ok/N':>13}")
+        print(
+            f"  {'step':>8}  {'Ref score':>11}  {'Py score':>11}  "
+            f"{'Δ%':>7}  {'Ref ok/N':>13}  {'Py ok/N':>13}"
+        )
         print("  " + "─" * 72)
 
         for step in steps:
@@ -347,17 +349,29 @@ def write_config(
         # Very fast: ~10 s per structure, low quality
         cfg = BASE_CONFIG.format(
             data_dir=DATA_DIR,
-            delta_heatmap=0.995, successes_heatmap=2, steps_heatmap=1000,
-            delta_arcs=0.995, successes_arcs=5, steps_arcs=1000,
-            delta_smooth=0.995, successes_smooth=5, steps_smooth=1000,
+            delta_heatmap=0.995,
+            successes_heatmap=2,
+            steps_heatmap=1000,
+            delta_arcs=0.995,
+            successes_arcs=5,
+            steps_arcs=1000,
+            delta_smooth=0.995,
+            successes_smooth=5,
+            steps_smooth=1000,
         )
     else:
         # Balanced: ~2 min per structure, reasonable quality
         cfg = BASE_CONFIG.format(
             data_dir=DATA_DIR,
-            delta_heatmap=0.999, successes_heatmap=5, steps_heatmap=5000,
-            delta_arcs=0.999, successes_arcs=20, steps_arcs=5000,
-            delta_smooth=0.999, successes_smooth=20, steps_smooth=5000,
+            delta_heatmap=0.999,
+            successes_heatmap=5,
+            steps_heatmap=5000,
+            delta_arcs=0.999,
+            successes_arcs=20,
+            steps_arcs=5000,
+            delta_smooth=0.999,
+            successes_smooth=20,
+            steps_smooth=5000,
         )
     if use_orientation:
         cfg = cfg.replace(
@@ -379,6 +393,7 @@ def write_config(
 
 # ---------------------------------------------------------------------------
 # HCM file parser
+
 
 def parse_hcm(hcm_path: Path):
     """
@@ -415,14 +430,14 @@ def parse_hcm(hcm_path: Path):
             clusters.append((start, end, x, y, z, n_ch))
 
     # Leaf beads: clusters with no children, sorted by genomic start
-    leaves = [(start, end, x, y, z)
-              for start, end, x, y, z, n_ch in clusters if n_ch == 0]
+    leaves = [(start, end, x, y, z) for start, end, x, y, z, n_ch in clusters if n_ch == 0]
     leaves.sort(key=lambda b: b[0])
     return leaves
 
 
 # ---------------------------------------------------------------------------
 # Distribution statistics
+
 
 def radius_of_gyration(positions):
     """Rg = sqrt(mean(||r_i - r_cm||^2))."""
@@ -474,6 +489,7 @@ def ks_2samp(a, b):
     """
     try:
         from scipy.stats import ks_2samp as scipy_ks
+
         return scipy_ks(a, b)
     except ImportError:
         pass
@@ -509,6 +525,7 @@ def ks_2samp(a, b):
 def _subsample(values: list, n: int, seed: int = 42) -> list:
     """Return a random subsample of at most n elements (deterministic)."""
     import random as _rnd
+
     if len(values) <= n:
         return values
     rng = _rnd.Random(seed)
@@ -518,21 +535,30 @@ def _subsample(values: list, n: int, seed: int = 42) -> list:
 # ---------------------------------------------------------------------------
 # Run reference binary
 
-def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int,
-                     region: str, region_label: str) -> list:
+
+def run_cpp_ensemble(
+    outdir: Path, config: Path, n: int, max_level: int, region: str, region_label: str
+) -> list:
     """
     Run 3dnome on the test region, produce n structures.
     Returns list of bead-position lists (one per structure).
     """
     cmd = [
         str(CPP_BIN),
-        "-a", "create",
-        "-s", str(config),
-        "-n", region_label,
-        "-c", region,
-        "-o", str(outdir) + "/",
-        "-m", str(n),
-        "-v", str(max_level),
+        "-a",
+        "create",
+        "-s",
+        str(config),
+        "-n",
+        region_label,
+        "-c",
+        region,
+        "-o",
+        str(outdir) + "/",
+        "-m",
+        str(n),
+        "-v",
+        str(max_level),
     ]
     print(f"[cpp] running: {' '.join(cmd)}")
     proc = subprocess.Popen(
@@ -554,8 +580,11 @@ def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int,
     # reference names: loops_{label}.hcm for n=1, loops_{label}_{i}.hcm for n>1.
     structures = []
     for i in range(n):
-        hcm = (outdir / f"loops_{region_label}.hcm") if n == 1 else \
-            (outdir / f"loops_{region_label}_{i}.hcm")
+        hcm = (
+            (outdir / f"loops_{region_label}.hcm")
+            if n == 1
+            else (outdir / f"loops_{region_label}_{i}.hcm")
+        )
         if not hcm.exists():
             sys.exit(f"[cpp] expected output not found: {hcm}")
         beads = parse_hcm(hcm)
@@ -568,6 +597,7 @@ def run_cpp_ensemble(outdir: Path, config: Path, n: int, max_level: int,
 
 # ---------------------------------------------------------------------------
 # Try Python reimplementation
+
 
 def try_python_ensemble(config: Path, n: int, region: str) -> list | None:
     """
@@ -593,6 +623,7 @@ def try_python_ensemble(config: Path, n: int, region: str) -> list | None:
 
 # ---------------------------------------------------------------------------
 # Print ensemble statistics
+
 
 def print_stats(label: str, structures: list) -> dict:
     """Compute and print summary statistics for an ensemble.
@@ -665,10 +696,12 @@ def structural_distance_matrix(structures: list) -> list:
 # ---------------------------------------------------------------------------
 # Main
 
+
 def save_cif_ensemble(structs: list, label: str, outdir: Path, region_label: str) -> None:
     """Write each structure in structs as a CIF file under outdir."""
     sys.path.insert(0, str(ROOT))
     from gnome3d.io import write_cif
+
     outdir.mkdir(parents=True, exist_ok=True)
     for i, beads in enumerate(structs, start=1):
         path = outdir / f"{region_label}_{label}_s{i}.cif"
@@ -681,29 +714,39 @@ def _cache_path(cache_dir: Path, region_label: str, n: int) -> Path:
     return cache_dir / f"{region_label}_n{n}.json"
 
 
-def _save_cache(path: Path, region: str, n: int, fast: bool,
-                structs: list, raw_lines: list,
-                use_orientation: bool = False,
-                use_anchor_heatmap: bool = False,
-                use_subanchor_heatmap: bool = False) -> None:
+def _save_cache(
+    path: Path,
+    region: str,
+    n: int,
+    fast: bool,
+    structs: list,
+    raw_lines: list,
+    use_orientation: bool = False,
+    use_anchor_heatmap: bool = False,
+    use_subanchor_heatmap: bool = False,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
-        json.dump({
-            "region": region,
-            "n_structures": n,
-            "mode": "fast" if fast else "balanced",
-            "use_orientation": use_orientation,
-            "use_anchor_heatmap": use_anchor_heatmap,
-            "use_subanchor_heatmap": use_subanchor_heatmap,
-            "structures": [[list(b) for b in s] for s in structs],
-            "raw_lines": raw_lines,
-        }, f)
+        json.dump(
+            {
+                "region": region,
+                "n_structures": n,
+                "mode": "fast" if fast else "balanced",
+                "use_orientation": use_orientation,
+                "use_anchor_heatmap": use_anchor_heatmap,
+                "use_subanchor_heatmap": use_subanchor_heatmap,
+                "structures": [[list(b) for b in s] for s in structs],
+                "raw_lines": raw_lines,
+            },
+            f,
+        )
     print(f"[integration] reference results cached to {path}")
 
 
 def _load_cache(path: Path) -> tuple:
     with open(path) as f:
         cached = json.load(f)
+
     # Caches written before BeadOut was widened store 4-tuples (mid, x, y, z);
     # newer ones store 5-tuples (start, end, x, y, z). Promote legacy entries
     # by treating midpoint as both start and end.
@@ -713,37 +756,64 @@ def _load_cache(path: Path) -> tuple:
         # legacy 4-tuple: (mid, x, y, z)
         mid = int(b[0])
         return (mid, mid, float(b[1]), float(b[2]), float(b[3]))
+
     structs = [[_promote(b) for b in s] for s in cached["structures"]]
     return structs, cached["raw_lines"]
 
 
 def main():
     parser = argparse.ArgumentParser(description="3dgnome-ng integration test")
-    parser.add_argument("-n", "--n-structures", type=int, default=5,
-                        help="ensemble size (default 5)")
-    parser.add_argument("--cpp-only", action="store_true",
-                        help="run reference only, skip Python comparison")
-    parser.add_argument("--python-only", action="store_true",
-                        help="skip reference run; load cached results (requires a prior full run)")
-    parser.add_argument("--cache-dir", metavar="PATH", default=None,
-                        help="directory for reference result cache (default: out/cpp_cache)")
-    parser.add_argument("--keep", action="store_true",
-                        help="keep temp output directory after test")
-    parser.add_argument("--fast", action="store_true",
-                        help="use very fast (low quality) MC settings (~5s/structure)")
-    parser.add_argument("--output-dir", metavar="PATH",
-                        help="write output CIF files to this directory (created if needed)")
-    parser.add_argument("--region-override", metavar="REGION",
-                        help="override test region (must be in data dir and match config)")
-    parser.add_argument("--with-orientation", action="store_true",
-                        help="enable CTCF motif orientation energy (use_motif_orientation=yes); "
-                             "uses a separate cache slot from the no-orientation run")
-    parser.add_argument("--with-anchor-heatmap", action="store_true",
-                        help="enable anchor singleton heatmap (use_anchor_heatmap=yes); "
-                             "scales expected anchor distances by singleton contact frequency")
-    parser.add_argument("--with-subanchor-heatmap", action="store_true",
-                        help="enable subanchor heat energy in smooth MC (use_subanchor_heatmap=yes); "
-                             "implies --with-anchor-heatmap (both heatmaps are built together)")
+    parser.add_argument(
+        "-n", "--n-structures", type=int, default=5, help="ensemble size (default 5)"
+    )
+    parser.add_argument(
+        "--cpp-only", action="store_true", help="run reference only, skip Python comparison"
+    )
+    parser.add_argument(
+        "--python-only",
+        action="store_true",
+        help="skip reference run; load cached results (requires a prior full run)",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        metavar="PATH",
+        default=None,
+        help="directory for reference result cache (default: out/cpp_cache)",
+    )
+    parser.add_argument("--keep", action="store_true", help="keep temp output directory after test")
+    parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="use very fast (low quality) MC settings (~5s/structure)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        metavar="PATH",
+        help="write output CIF files to this directory (created if needed)",
+    )
+    parser.add_argument(
+        "--region-override",
+        metavar="REGION",
+        help="override test region (must be in data dir and match config)",
+    )
+    parser.add_argument(
+        "--with-orientation",
+        action="store_true",
+        help="enable CTCF motif orientation energy (use_motif_orientation=yes); "
+        "uses a separate cache slot from the no-orientation run",
+    )
+    parser.add_argument(
+        "--with-anchor-heatmap",
+        action="store_true",
+        help="enable anchor singleton heatmap (use_anchor_heatmap=yes); "
+        "scales expected anchor distances by singleton contact frequency",
+    )
+    parser.add_argument(
+        "--with-subanchor-heatmap",
+        action="store_true",
+        help="enable subanchor heat energy in smooth MC (use_subanchor_heatmap=yes); "
+        "implies --with-anchor-heatmap (both heatmaps are built together)",
+    )
     args = parser.parse_args()
 
     if args.python_only and args.cpp_only:
@@ -785,17 +855,21 @@ def main():
     print(f"[integration] ensemble size: {args.n_structures}")
     print(f"[integration] mode: {'fast' if args.fast else 'balanced'}")
     if use_orn:
-        print(f"[integration] CTCF motif orientation: ENABLED")
+        print("[integration] CTCF motif orientation: ENABLED")
     if use_anchor_heatmap:
-        print(f"[integration] anchor heatmap: ENABLED")
+        print("[integration] anchor heatmap: ENABLED")
     if use_subanchor_heatmap:
-        print(f"[integration] subanchor heatmap: ENABLED")
+        print("[integration] subanchor heatmap: ENABLED")
 
     tmpdir = Path(tempfile.mkdtemp(prefix="gnome3d_integ_"))
     config = tmpdir / "config.ini"
-    write_config(config, fast=args.fast, use_orientation=use_orn,
-                 use_anchor_heatmap=use_anchor_heatmap,
-                 use_subanchor_heatmap=use_subanchor_heatmap)
+    write_config(
+        config,
+        fast=args.fast,
+        use_orientation=use_orn,
+        use_anchor_heatmap=use_anchor_heatmap,
+        use_subanchor_heatmap=use_subanchor_heatmap,
+    )
 
     # max_level=2 -> heatmap MC + arc MC + smooth MC (Level 4 runs inside arc reconstruction).
     # Both reference and Python produce subanchor beads: n_anchors + (n_anchors-1)*loop_density.
@@ -810,16 +884,26 @@ def main():
                     f"  run without --python-only first to generate the cache"
                 )
             cpp_structs, cpp_raw = _load_cache(cache_file)
-            print(f"[integration] loaded {len(cpp_structs)} cached reference structures from {cache_file}")
+            print(
+                f"[integration] loaded {len(cpp_structs)} cached reference structures from {cache_file}"
+            )
         else:
             cpp_outdir = tmpdir / "cpp"
             cpp_outdir.mkdir()
             cpp_structs, cpp_raw = run_cpp_ensemble(
-                cpp_outdir, config, args.n_structures, MAX_LEVEL, region, region_label)
-            _save_cache(cache_file, region, args.n_structures, args.fast,
-                        cpp_structs, cpp_raw, use_orientation=use_orn,
-                        use_anchor_heatmap=use_anchor_heatmap,
-                        use_subanchor_heatmap=use_subanchor_heatmap)
+                cpp_outdir, config, args.n_structures, MAX_LEVEL, region, region_label
+            )
+            _save_cache(
+                cache_file,
+                region,
+                args.n_structures,
+                args.fast,
+                cpp_structs,
+                cpp_raw,
+                use_orientation=use_orn,
+                use_anchor_heatmap=use_anchor_heatmap,
+                use_subanchor_heatmap=use_subanchor_heatmap,
+            )
 
         if args.output_dir:
             save_cif_ensemble(cpp_structs, "cpp", Path(args.output_dir), region_label)
@@ -834,8 +918,10 @@ def main():
             py_ms_raw = _parse_py_milestones(tee.getvalue())
 
         if py_structs is None:
-            print(f"\n  [{SKIP_STR}] Python src/simulate.run_region not implemented - "
-                  "skipping comparison")
+            print(
+                f"\n  [{SKIP_STR}] Python src/simulate.run_region not implemented - "
+                "skipping comparison"
+            )
             print("\n[integration] reference run complete.")
             return
 
@@ -873,8 +959,10 @@ def main():
         d_pw, p_pw = ks_2samp(cpp_pwd, py_pwd)
         ok_pw = d_pw <= KS_D_THRESHOLD
         status = PASS_STR if ok_pw else FAIL_STR
-        print(f"  {status}  pairwise dist KS  d={d_pw:.3f}  p={p_pw:.3f}"
-              f"  (subsampled {len(cpp_pwd):,}/{len(cpp_stats['pwd']):,})")
+        print(
+            f"  {status}  pairwise dist KS  d={d_pw:.3f}  p={p_pw:.3f}"
+            f"  (subsampled {len(cpp_pwd):,}/{len(cpp_stats['pwd']):,})"
+        )
         results.append(ok_pw)
 
         # KS test on bond lengths
@@ -898,9 +986,11 @@ def main():
             ratio = py_med / cpp_med if cpp_med > 1e-9 else float("nan")
             ok_sd = math.isfinite(ratio) and abs(ratio - 1.0) <= STRUCT_DIST_RATIO_THRESHOLD
             status = PASS_STR if ok_sd else FAIL_STR
-            print(f"  {status}  struct diversity  median ratio={ratio:.3f}"
-                  f"  (ref med={cpp_med:.4f}  Py med={py_med:.4f}"
-                  f"  threshold=±{STRUCT_DIST_RATIO_THRESHOLD:.0%})")
+            print(
+                f"  {status}  struct diversity  median ratio={ratio:.3f}"
+                f"  (ref med={cpp_med:.4f}  Py med={py_med:.4f}"
+                f"  threshold=±{STRUCT_DIST_RATIO_THRESHOLD:.0%})"
+            )
             results.append(ok_sd)
 
         all_ok = all(results)

@@ -291,6 +291,24 @@ def njit(**kwargs: Any) -> Callable[[F], F]:
 
 Decorated functions keep their original signatures under pyright while still being JIT-compiled at runtime. **Do not use `typing.cast` inside `@njit` kernels** — numba's nopython frontend doesn't recognise it. For random-index lines like `int(np.random.randint(0, n))` where numpy stubs return `Any`, use a per-line `# pyright: ignore[reportUnknownArgumentType]` comment instead.
 
+### Formatting and linting
+
+The project uses **`ruff`** for both formatting (Black-compatible) and linting. Config lives in `pyproject.toml` under `[tool.ruff]`. Installed in the project venv.
+
+```bash
+.venv/bin/ruff format gnome3d/ harness/         # apply formatting
+.venv/bin/ruff format --check gnome3d/ harness/  # CI-style dry-run
+.venv/bin/ruff check  gnome3d/ harness/         # lint
+.venv/bin/ruff check  gnome3d/ harness/ --fix   # apply safe auto-fixes
+```
+
+Current state: **0 lint issues, all files formatted**. Lint groups enabled: `E F I UP B C4` (pycodestyle, pyflakes, isort, pyupgrade, bugbear-lite, comprehensions). Run format + lint before committing changes to `gnome3d/` or `harness/`.
+
+Per-file ignores in `pyproject.toml`:
+- `gnome3d/{solver,io,data,hierarchy,mc}.py`: F403/F405 — these modules re-export `gnome3d.types` via `from .types import *`.
+- `gnome3d/data.py`: also B023 — `mark_arcs` uses an intentional closure pattern over loop locals.
+- `harness/compare.py`: E702, E703, E741, B007, B905 — the test stubs use compact one-liners with `;`, ambiguous names like `l`, and `zip()` without `strict=`.
+
 ### Adding new code
 
 - Annotate every function signature (params + return). Strict mode requires it.

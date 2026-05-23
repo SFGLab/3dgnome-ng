@@ -15,7 +15,8 @@ Acceptance criterion (all loops):
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
@@ -38,6 +39,7 @@ def njit(**kwargs: Any) -> Callable[[F], F]:
 
 
 # Smooth MC helpers
+
 
 @njit(cache=True)
 def _smooth_len_nb(
@@ -133,6 +135,7 @@ def _init_smooth_nb(
 # Per-bead (not per-pair), single-counted globally. Delta is (curr - prev),
 # no factor of 2.
 
+
 @njit(cache=True)
 def _local_confine_nb(
     pos: F64Array, p: int, cx: float, cy: float, cz: float, R: float, weight: float
@@ -166,6 +169,7 @@ def _init_confine_nb(
 # Normalized by r0 so `weight` is dimensionally comparable to spring constants.
 # Global score double-counts pairs (matches the heat-energy convention):
 # sum_{i != j, |i-j| > skip} E_pair(d_ij). Delta is 2 * (local_curr - local_prev).
+
 
 @njit(cache=True)
 def _excl_pair_nb(d: float, r0: float, weight: float) -> float:
@@ -278,8 +282,9 @@ def _batch_smooth_kernel_nb(
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
 
-        loc_struct_prev = _local_smooth_nb(pos, dtn, p, n,
-                                           stretch_k, squeeze_k, ang_k, dist_w, ang_w)
+        loc_struct_prev = _local_smooth_nb(
+            pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
+        )
         loc_heat_prev = 0.0
         if use_heat:
             loc_heat_prev = _local_heat_nb(pos, heat_dist, p, heat_weight)
@@ -290,8 +295,9 @@ def _batch_smooth_kernel_nb(
 
         loc_conf_prev = 0.0
         if use_conf:
-            loc_conf_prev = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz,
-                                              conf_R, conf_weight)
+            loc_conf_prev = _local_confine_nb(
+                pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight
+            )
 
         orn_k: int = -1
         prev_ox = 0.0
@@ -305,15 +311,22 @@ def _batch_smooth_kernel_nb(
                 prev_oy = anchor_orn[orn_k, 1]
                 prev_oz = anchor_orn[orn_k, 2]
                 loc_orn_prev = _local_score_orientation_nb(
-                    anchor_orn, orn_k, nbr_offsets, nbr_indices, nbr_weights,
-                    motif_weight, symmetric)
+                    anchor_orn,
+                    orn_k,
+                    nbr_offsets,
+                    nbr_indices,
+                    nbr_weights,
+                    motif_weight,
+                    symmetric,
+                )
 
         pos[p, 0] += dx
         pos[p, 1] += dy
         pos[p, 2] += dz
 
-        loc_struct_curr = _local_smooth_nb(pos, dtn, p, n,
-                                           stretch_k, squeeze_k, ang_k, dist_w, ang_w)
+        loc_struct_curr = _local_smooth_nb(
+            pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
+        )
         score_struct_new = score_struct - loc_struct_prev + loc_struct_curr
 
         score_heat_new = score_heat
@@ -328,8 +341,9 @@ def _batch_smooth_kernel_nb(
 
         score_conf_new = score_conf
         if use_conf:
-            loc_conf_curr = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz,
-                                              conf_R, conf_weight)
+            loc_conf_curr = _local_confine_nb(
+                pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight
+            )
             score_conf_new = score_conf + (loc_conf_curr - loc_conf_prev)
 
         score_orn_new = score_orn
@@ -340,17 +354,17 @@ def _batch_smooth_kernel_nb(
             anchor_orn[orn_k, 1] = oy
             anchor_orn[orn_k, 2] = oz
             loc_orn_curr = _local_score_orientation_nb(
-                anchor_orn, orn_k, nbr_offsets, nbr_indices, nbr_weights,
-                motif_weight, symmetric)
+                anchor_orn, orn_k, nbr_offsets, nbr_indices, nbr_weights, motif_weight, symmetric
+            )
             score_orn_new = score_orn + 2.0 * (loc_orn_curr - loc_orn_prev)
 
-        score_new = (score_struct_new + score_orn_new + score_heat_new
-                     + score_excl_new + score_conf_new)
+        score_new = (
+            score_struct_new + score_orn_new + score_heat_new + score_excl_new + score_conf_new
+        )
 
         ok = score_new < score
         if not ok and T > 0.0 and score > 0.0:
-            ok = (np.random.random() <
-                  jump_scale * math.exp(-jump_coef * (score_new / score) / T))
+            ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T)
         if ok:
             n_ok += 1
             score = score_new
@@ -372,6 +386,7 @@ def _batch_smooth_kernel_nb(
 
 
 # Orientation MC helpers
+
 
 @njit(cache=True)
 def _calc_orientation_nb(
@@ -515,6 +530,7 @@ def _init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> flo
 
 # Arcs MC helpers
 
+
 @njit(cache=True)
 def _local_arcs_nb(
     pos: F64Array, exp: F64Array, p: int, stretch_k: float, squeeze_k: float
@@ -538,9 +554,7 @@ def _local_arcs_nb(
 
 
 @njit(cache=True)
-def _init_arcs_nb(
-    pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float
-) -> float:
+def _init_arcs_nb(pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float) -> float:
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
@@ -606,8 +620,9 @@ def _batch_arcs_nb(
             loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
         loc_conf_prev = 0.0
         if use_conf:
-            loc_conf_prev = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz,
-                                              conf_R, conf_weight)
+            loc_conf_prev = _local_confine_nb(
+                pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight
+            )
 
         pos[p, 0] += dx
         pos[p, 1] += dy
@@ -623,14 +638,15 @@ def _batch_arcs_nb(
 
         score_conf_new = score_conf
         if use_conf:
-            loc_conf_curr = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz,
-                                              conf_R, conf_weight)
+            loc_conf_curr = _local_confine_nb(
+                pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight
+            )
             score_conf_new = score_conf + (loc_conf_curr - loc_conf_prev)
 
         score_new = score_arcs_new + score_excl_new + score_conf_new
         ok = score_new <= score
         if not ok and score > 0.0 and T > 0.0:
-            ok = (np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T))
+            ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T)
 
         if ok:
             n_ok += 1
@@ -648,10 +664,9 @@ def _batch_arcs_nb(
 
 # Heatmap MC helpers
 
+
 @njit(cache=True)
-def _local_heatmap_nb(
-    pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p: int
-) -> float:
+def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p: int) -> float:
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
@@ -717,8 +732,7 @@ def _batch_heatmap_nb(
         score_new = score + 2.0 * (loc_curr - loc_prev)
         ok = score_new <= score
         if not ok and T > 0.0 and score > 0.0:
-            ok = (np.random.random() <
-                  jump_scale * math.exp(-jump_coef * (score_new / score) / T))
+            ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T)
         if ok:
             n_ok += 1
             score = score_new
@@ -732,11 +746,13 @@ def _batch_heatmap_nb(
 
 # Shared helper
 
+
 def _as_f64(arr: np.ndarray[Any, Any]) -> F64Array:
     return np.ascontiguousarray(arr, dtype=np.float64)
 
 
 # Public MC loops
+
 
 def mc_heatmap(
     pos: np.ndarray[Any, Any],  # (N, 3) float32 - modified in place
@@ -783,18 +799,17 @@ def mc_heatmap(
     step_i = 0
     while True:
         T, score, n_ok = _batch_heatmap_nb(
-            pw, es64, skip_b, float(step_size), T, dt,
-            jump_scale, jump_coef, stop_steps, score)
+            pw, es64, skip_b, float(step_size), T, dt, jump_scale, jump_coef, stop_steps, score
+        )
         step_i += stop_steps
         ratio = score / ms_score if ms_score > 0 else 1.0
-        converged = (
-            (score > stop_improvement * ms_score and n_ok < stop_successes)
-            or score < 1e-6
-        )
+        converged = (score > stop_improvement * ms_score and n_ok < stop_successes) or score < 1e-6
         if verbose:
-            print(f"{prefix}step {step_i:>7,}  score={score:.4f}"
-                  f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}"
-                  + ("  [done]" if converged else ""), flush=True)
+            print(
+                f"{prefix}step {step_i:>7,}  score={score:.4f}"
+                f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}" + ("  [done]" if converged else ""),
+                flush=True,
+            )
         if converged:
             break
         ms_score = score
@@ -865,30 +880,55 @@ def mc_arcs(
 
     score_arcs = float(_init_arcs_nb(pw, exp64, stretch_k, squeeze_k))
     score_excl = float(_init_excl_nb(pw, excl_r0, excl_weight, excl_skip)) if use_excl else 0.0
-    score_conf = (float(_init_confine_nb(pw, conf_cx, conf_cy, conf_cz, conf_R, conf_weight))
-                  if use_conf else 0.0)
+    score_conf = (
+        float(_init_confine_nb(pw, conf_cx, conf_cy, conf_cz, conf_R, conf_weight))
+        if use_conf
+        else 0.0
+    )
     score = score_arcs + score_excl + score_conf
 
     ms_score = score
     step_i = 0
     while True:
         T, score_arcs, score_excl, score_conf, n_ok = _batch_arcs_nb(
-            pw, exp64, float(step_size), T, dt, jump_scale, jump_coef,
-            stop_steps, stretch_k, squeeze_k,
-            use_excl, excl_r0, excl_weight, excl_skip,
-            use_conf, conf_cx, conf_cy, conf_cz, conf_R, conf_weight,
-            score_arcs, score_excl, score_conf)
+            pw,
+            exp64,
+            float(step_size),
+            T,
+            dt,
+            jump_scale,
+            jump_coef,
+            stop_steps,
+            stretch_k,
+            squeeze_k,
+            use_excl,
+            excl_r0,
+            excl_weight,
+            excl_skip,
+            use_conf,
+            conf_cx,
+            conf_cy,
+            conf_cz,
+            conf_R,
+            conf_weight,
+            score_arcs,
+            score_excl,
+            score_conf,
+        )
         score = score_arcs + score_excl + score_conf
         step_i += stop_steps
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (
             (score > stop_improvement * ms_score and n_ok < stop_successes)
-            or score < 1e-5 or ratio > 0.9999
+            or score < 1e-5
+            or ratio > 0.9999
         )
         if verbose:
-            print(f"{prefix}step {step_i:>7,}  score={score:.4f}"
-                  f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}"
-                  + ("  [done]" if converged else ""), flush=True)
+            print(
+                f"{prefix}step {step_i:>7,}  score={score:.4f}"
+                f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}" + ("  [done]" if converged else ""),
+                flush=True,
+            )
         if converged:
             break
         ms_score = score
@@ -903,10 +943,12 @@ def mc_smooth(
     fixed: np.ndarray[Any, Any],  # (N,) bool - True for anchor beads (never moved)
     step_size: float,
     settings: Settings,
-    char_orientations: np.ndarray[Any, Any] | None = None,  # (N,) CTCF orientation chars; None = no motif
+    char_orientations: np.ndarray[Any, Any]
+    | None = None,  # (N,) CTCF orientation chars; None = no motif
     anchor_neighbors: dict[int, list[int]] | None = None,  # {anchor_k: [anchor_j, ...]}
     anchor_neighbor_weights: dict[int, list[float]] | None = None,  # {anchor_k: [float, ...]}
-    heat_dist: np.ndarray[Any, Any] | None = None,  # (N, N) subanchor heat expected distances; None = disabled
+    heat_dist: np.ndarray[Any, Any]
+    | None = None,  # (N, N) subanchor heat expected distances; None = disabled
     label: str = "",
     verbose: bool = False,
 ) -> float:
@@ -994,9 +1036,8 @@ def mc_smooth(
         assert anchor_neighbor_weights is not None
         assert char_orientations is not None
         from .util import calc_orientation as _calc_orn
-        anchor_ar: I32Array = np.array(
-            [int(i) for i in np.where(fixed)[0]], dtype=np.int32
-        )
+
+        anchor_ar: I32Array = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
         n_anchors = len(anchor_ar)
         nbr_offsets: I32Array = np.zeros(n_anchors + 1, dtype=np.int32)
         for _k in range(n_anchors):
@@ -1005,14 +1046,13 @@ def mc_smooth(
         nbr_indices: I32Array = np.empty(_total, dtype=np.int32)
         nbr_weights_arr: F64Array = np.empty(_total, dtype=np.float64)
         for _k in range(n_anchors):
-            for _ki, (_j, _w) in enumerate(zip(anchor_neighbors.get(_k, []),
-                                               anchor_neighbor_weights.get(_k, []))):
+            for _ki, (_j, _w) in enumerate(
+                zip(anchor_neighbors.get(_k, []), anchor_neighbor_weights.get(_k, []), strict=True)
+            ):
                 _off = nbr_offsets[_k] + _ki
                 nbr_indices[_off] = _j
                 nbr_weights_arr[_off] = _w
-        orn_is_L: BoolArray = np.array(
-            [c == 'L' for c in char_orientations], dtype=np.bool_
-        )
+        orn_is_L: BoolArray = np.array([c == "L" for c in char_orientations], dtype=np.bool_)
         bead_to_anchor_k: I32Array = cast(I32Array, np.full(n, -1, dtype=np.int32))
         for _k in range(n_anchors):
             _ar = int(anchor_ar[_k])
@@ -1024,9 +1064,16 @@ def mc_smooth(
         for _k in range(n_anchors):
             _ar = int(anchor_ar[_k])
             anchor_orn[_k] = _calc_orn(pw, _ar, n, char_orientations[_ar])
-        score_orn = float(_score_orientation_full_nb(
-            anchor_orn, nbr_offsets, nbr_indices, nbr_weights_arr,
-            motif_weight, motifs_symmetric))
+        score_orn = float(
+            _score_orientation_full_nb(
+                anchor_orn,
+                nbr_offsets,
+                nbr_indices,
+                nbr_weights_arr,
+                motif_weight,
+                motifs_symmetric,
+            )
+        )
     else:
         anchor_ar = np.zeros(1, dtype=np.int32)
         nbr_offsets = np.zeros(2, dtype=np.int32)
@@ -1037,40 +1084,74 @@ def mc_smooth(
         anchor_orn = np.zeros((1, 3), dtype=np.float64)
         score_orn = 0.0
 
-    score_struct = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k,
-                                         ang_k, dist_w, ang_w))
+    score_struct = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
     score_excl = float(_init_excl_nb(pw, excl_r0, excl_weight, excl_skip)) if use_excl else 0.0
-    score_conf = (float(_init_confine_nb(pw, conf_cx, conf_cy, conf_cz, conf_R, conf_weight))
-                  if use_conf else 0.0)
+    score_conf = (
+        float(_init_confine_nb(pw, conf_cx, conf_cy, conf_cz, conf_R, conf_weight))
+        if use_conf
+        else 0.0
+    )
     score = score_struct + score_orn + score_heat + score_excl + score_conf
 
     ms_score = score
     step_i = 0
     while True:
-        (T, score_struct, score_orn, score_heat, score_excl,
-         score_conf, n_ok) = _batch_smooth_kernel_nb(
-            pw, dtn64, movable, float(step_size), T, dt, jump_scale, jump_coef,
-            stop_steps, stretch_k, squeeze_k, ang_k, dist_w, ang_w,
-            use_heat, heat64, heat_weight,
-            use_orn, orn_is_L, anchor_ar,
-            nbr_offsets, nbr_indices, nbr_weights_arr,
-            anchor_orn, bead_to_anchor_k,
-            motif_weight, motifs_symmetric,
-            use_excl, excl_r0, excl_weight, excl_skip,
-            use_conf, conf_cx, conf_cy, conf_cz, conf_R, conf_weight,
-            score_struct, score_orn, score_heat, score_excl, score_conf,
+        (T, score_struct, score_orn, score_heat, score_excl, score_conf, n_ok) = (
+            _batch_smooth_kernel_nb(
+                pw,
+                dtn64,
+                movable,
+                float(step_size),
+                T,
+                dt,
+                jump_scale,
+                jump_coef,
+                stop_steps,
+                stretch_k,
+                squeeze_k,
+                ang_k,
+                dist_w,
+                ang_w,
+                use_heat,
+                heat64,
+                heat_weight,
+                use_orn,
+                orn_is_L,
+                anchor_ar,
+                nbr_offsets,
+                nbr_indices,
+                nbr_weights_arr,
+                anchor_orn,
+                bead_to_anchor_k,
+                motif_weight,
+                motifs_symmetric,
+                use_excl,
+                excl_r0,
+                excl_weight,
+                excl_skip,
+                use_conf,
+                conf_cx,
+                conf_cy,
+                conf_cz,
+                conf_R,
+                conf_weight,
+                score_struct,
+                score_orn,
+                score_heat,
+                score_excl,
+                score_conf,
+            )
         )
         score = score_struct + score_orn + score_heat + score_excl + score_conf
         step_i += stop_steps
         ratio = score / ms_score if ms_score > 0 else 1.0
-        converged = (
-            (score > stop_improvement * ms_score and n_ok < stop_successes)
-            or score < 1e-6
-        )
+        converged = (score > stop_improvement * ms_score and n_ok < stop_successes) or score < 1e-6
         if verbose:
-            print(f"{prefix}step {step_i:>7,}  score={score:.4f}"
-                  f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}"
-                  + ("  [done]" if converged else ""), flush=True)
+            print(
+                f"{prefix}step {step_i:>7,}  score={score:.4f}"
+                f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}" + ("  [done]" if converged else ""),
+                flush=True,
+            )
         if converged:
             break
         ms_score = score

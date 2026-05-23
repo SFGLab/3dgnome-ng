@@ -43,6 +43,7 @@ class Anchor:
 @dataclass
 class RawArc:
     """Arc in genomic coordinates (before anchor-index mapping)."""
+
     start: int  # genomic midpoint of left anchor
     end: int  # genomic midpoint of right anchor
     score: float
@@ -52,6 +53,7 @@ class RawArc:
 @dataclass
 class InteractionArc:
     """Arc after anchor-index mapping."""
+
     start: int  # index into anchors list (local, chr-relative)
     end: int  # index into anchors list (local, chr-relative)
     score: int
@@ -102,7 +104,9 @@ class BedRegion:
     def contains(self, pos: int) -> bool:
         return self.start <= pos <= self.end
 
+
 # Empty initializers
+
 
 def empty_anchor_map() -> AnchorMap:
     return {}

@@ -6,9 +6,9 @@ Thin wrappers around the Settings / ContactData / Solver pipeline.
 
 from __future__ import annotations
 
-from .settings import Settings
-from .io import parse_chrs_arg, parse_region
 from .data import ContactData
+from .io import parse_chrs_arg, parse_region
+from .settings import Settings
 from .solver import Solver
 from .types import BeadOut
 
@@ -147,9 +147,7 @@ def run_genome(
                 per_chr[chr_] = beads
                 any_beads = True
         if not any_beads:
-            raise RuntimeError(
-                f"Structure {i + 1}: no leaf beads from any chromosome"
-            )
+            raise RuntimeError(f"Structure {i + 1}: no leaf beads from any chromosome")
         structures.append(per_chr)
 
     return structures

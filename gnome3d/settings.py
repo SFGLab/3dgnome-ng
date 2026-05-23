@@ -335,8 +335,9 @@ class Settings:
         self.data_singletons = gets("data", "singletons", self.data_singletons)
         self.data_singletons_inter = gets("data", "singletons_inter", self.data_singletons_inter)
         self.data_factors = gets("data", "factors", self.data_factors)
-        self.data_split_singletons_by_chr = getb("data", "split_singleton_files_by_chr",
-                                                 self.data_split_singletons_by_chr)
+        self.data_split_singletons_by_chr = getb(
+            "data", "split_singleton_files_by_chr", self.data_split_singletons_by_chr
+        )
         self.data_centromeres = gets("data", "centromeres", self.data_centromeres)
         self.data_segment_split = gets("data", "segment_split", self.data_segment_split)
         self.data_segment_heatmap = gets("data", "segment_heatmap", self.data_segment_heatmap)
@@ -353,56 +354,94 @@ class Settings:
         self.genomic_dist_base = getf("distance", "genomic_dist_base", self.genomic_dist_base)
         self.freq_dist_scale = getf("distance", "freq_dist_scale", self.freq_dist_scale)
         self.freq_dist_power = getf("distance", "freq_dist_power", self.freq_dist_power)
-        self.freq_dist_scale_inter = getf("distance", "freq_dist_scale_inter", self.freq_dist_scale_inter)
-        self.freq_dist_power_inter = getf("distance", "freq_dist_power_inter", self.freq_dist_power_inter)
+        self.freq_dist_scale_inter = getf(
+            "distance", "freq_dist_scale_inter", self.freq_dist_scale_inter
+        )
+        self.freq_dist_power_inter = getf(
+            "distance", "freq_dist_power_inter", self.freq_dist_power_inter
+        )
         self.count_dist_a = getf("distance", "count_dist_a", self.count_dist_a)
         self.count_dist_scale = getf("distance", "count_dist_scale", self.count_dist_scale)
         self.count_dist_shift = getf("distance", "count_dist_shift", self.count_dist_shift)
-        self.count_dist_base_level = getf("distance", "count_dist_base_level", self.count_dist_base_level)
+        self.count_dist_base_level = getf(
+            "distance", "count_dist_base_level", self.count_dist_base_level
+        )
 
         # [heatmaps]
         self.heatmap_inter_scaling = getf("heatmaps", "inter_scaling", self.heatmap_inter_scaling)
-        self.heatmap_distance_stretching = getf("heatmaps", "distance_heatmap_stretching",
-                                                self.heatmap_distance_stretching)
+        self.heatmap_distance_stretching = getf(
+            "heatmaps", "distance_heatmap_stretching", self.heatmap_distance_stretching
+        )
 
         # [springs]
         self.spring_stretch = getf("springs", "stretch_constant", self.spring_stretch)
         self.spring_squeeze = getf("springs", "squeeze_constant", self.spring_squeeze)
         self.spring_angular = getf("springs", "angular_constant", self.spring_angular)
-        self.spring_stretch_arcs = getf("springs", "stretch_constant_arcs", self.spring_stretch_arcs)
-        self.spring_squeeze_arcs = getf("springs", "squeeze_constant_arcs", self.spring_squeeze_arcs)
+        self.spring_stretch_arcs = getf(
+            "springs", "stretch_constant_arcs", self.spring_stretch_arcs
+        )
+        self.spring_squeeze_arcs = getf(
+            "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs
+        )
 
         # [motif_orientation]
-        self.use_ctcf_motif = getb("motif_orientation", "use_motif_orientation", self.use_ctcf_motif)
+        self.use_ctcf_motif = getb(
+            "motif_orientation", "use_motif_orientation", self.use_ctcf_motif
+        )
         self.motif_weight = getf("motif_orientation", "weight", self.motif_weight)
         self.motifs_symmetric = getb("motif_orientation", "symmetric_motifs", self.motifs_symmetric)
 
         # [anchor_heatmap]
-        self.use_anchor_heatmap = getb("anchor_heatmap", "use_anchor_heatmap", self.use_anchor_heatmap)
-        self.anchor_heatmap_influence = getf("anchor_heatmap", "heatmap_influence", self.anchor_heatmap_influence)
+        self.use_anchor_heatmap = getb(
+            "anchor_heatmap", "use_anchor_heatmap", self.use_anchor_heatmap
+        )
+        self.anchor_heatmap_influence = getf(
+            "anchor_heatmap", "heatmap_influence", self.anchor_heatmap_influence
+        )
 
         # [subanchor_heatmap]
-        self.use_subanchor_heatmap = getb("subanchor_heatmap", "use_subanchor_heatmap", self.use_subanchor_heatmap)
-        self.subanchor_heatmap_influence = getf("subanchor_heatmap", "heatmap_influence",
-                                                self.subanchor_heatmap_influence)
-        self.subanchor_heatmap_dist_weight = getf("subanchor_heatmap", "heatmap_dist_weight",
-                                                  self.subanchor_heatmap_dist_weight)
-        self.subanchor_estimate_steps = geti("subanchor_heatmap", "estimate_distances_steps",
-                                             self.subanchor_estimate_steps)
-        self.subanchor_estimate_replicates = geti("subanchor_heatmap", "estimate_distances_replicates",
-                                                  self.subanchor_estimate_replicates)
+        self.use_subanchor_heatmap = getb(
+            "subanchor_heatmap", "use_subanchor_heatmap", self.use_subanchor_heatmap
+        )
+        self.subanchor_heatmap_influence = getf(
+            "subanchor_heatmap", "heatmap_influence", self.subanchor_heatmap_influence
+        )
+        self.subanchor_heatmap_dist_weight = getf(
+            "subanchor_heatmap", "heatmap_dist_weight", self.subanchor_heatmap_dist_weight
+        )
+        self.subanchor_estimate_steps = geti(
+            "subanchor_heatmap", "estimate_distances_steps", self.subanchor_estimate_steps
+        )
+        self.subanchor_estimate_replicates = geti(
+            "subanchor_heatmap", "estimate_distances_replicates", self.subanchor_estimate_replicates
+        )
 
         # [simulation_heatmap]
-        self.max_temp_heatmap = getf("simulation_heatmap", "max_temp_heatmap", self.max_temp_heatmap)
-        self.dt_temp_heatmap = getf("simulation_heatmap", "delta_temp_heatmap", self.dt_temp_heatmap)
-        self.jump_scale_heatmap = getf("simulation_heatmap", "jump_temp_scale_heatmap", self.jump_scale_heatmap)
-        self.jump_coef_heatmap = getf("simulation_heatmap", "jump_temp_coef_heatmap", self.jump_coef_heatmap)
-        self.mc_stop_steps_heatmap = geti("simulation_heatmap", "stop_condition_steps_heatmap",
-                                          self.mc_stop_steps_heatmap)
-        self.mc_stop_improvement_heatmap = getf("simulation_heatmap", "stop_condition_improvement_threshold_heatmap",
-                                                self.mc_stop_improvement_heatmap)
-        self.mc_stop_successes_heatmap = geti("simulation_heatmap", "stop_condition_successes_threshold_heatmap",
-                                              self.mc_stop_successes_heatmap)
+        self.max_temp_heatmap = getf(
+            "simulation_heatmap", "max_temp_heatmap", self.max_temp_heatmap
+        )
+        self.dt_temp_heatmap = getf(
+            "simulation_heatmap", "delta_temp_heatmap", self.dt_temp_heatmap
+        )
+        self.jump_scale_heatmap = getf(
+            "simulation_heatmap", "jump_temp_scale_heatmap", self.jump_scale_heatmap
+        )
+        self.jump_coef_heatmap = getf(
+            "simulation_heatmap", "jump_temp_coef_heatmap", self.jump_coef_heatmap
+        )
+        self.mc_stop_steps_heatmap = geti(
+            "simulation_heatmap", "stop_condition_steps_heatmap", self.mc_stop_steps_heatmap
+        )
+        self.mc_stop_improvement_heatmap = getf(
+            "simulation_heatmap",
+            "stop_condition_improvement_threshold_heatmap",
+            self.mc_stop_improvement_heatmap,
+        )
+        self.mc_stop_successes_heatmap = geti(
+            "simulation_heatmap",
+            "stop_condition_successes_threshold_heatmap",
+            self.mc_stop_successes_heatmap,
+        )
 
         # [simulation_arcs]
         self.max_temp = getf("simulation_arcs", "max_temp", self.max_temp)
@@ -410,72 +449,112 @@ class Settings:
         self.jump_scale = getf("simulation_arcs", "jump_temp_scale", self.jump_scale)
         self.jump_coef = getf("simulation_arcs", "jump_temp_coef", self.jump_coef)
         self.mc_stop_steps = geti("simulation_arcs", "stop_condition_steps", self.mc_stop_steps)
-        self.mc_stop_improvement = getf("simulation_arcs", "stop_condition_improvement_threshold",
-                                        self.mc_stop_improvement)
-        self.mc_stop_successes = geti("simulation_arcs", "stop_condition_successes_threshold", self.mc_stop_successes)
+        self.mc_stop_improvement = getf(
+            "simulation_arcs", "stop_condition_improvement_threshold", self.mc_stop_improvement
+        )
+        self.mc_stop_successes = geti(
+            "simulation_arcs", "stop_condition_successes_threshold", self.mc_stop_successes
+        )
 
         # [excluded_volume]
-        self.use_excluded_volume = getb("excluded_volume", "use_excluded_volume",
-                                        self.use_excluded_volume)
+        self.use_excluded_volume = getb(
+            "excluded_volume", "use_excluded_volume", self.use_excluded_volume
+        )
         self.exclusion_radius = getf("excluded_volume", "radius", self.exclusion_radius)
         self.exclusion_weight = getf("excluded_volume", "weight", self.exclusion_weight)
-        self.exclusion_apply_to_arcs = getb("excluded_volume", "apply_to_arcs",
-                                            self.exclusion_apply_to_arcs)
-        self.exclusion_apply_to_smooth = getb("excluded_volume", "apply_to_smooth",
-                                              self.exclusion_apply_to_smooth)
-        self.exclusion_skip_neighbors = geti("excluded_volume", "skip_neighbors",
-                                             self.exclusion_skip_neighbors)
+        self.exclusion_apply_to_arcs = getb(
+            "excluded_volume", "apply_to_arcs", self.exclusion_apply_to_arcs
+        )
+        self.exclusion_apply_to_smooth = getb(
+            "excluded_volume", "apply_to_smooth", self.exclusion_apply_to_smooth
+        )
+        self.exclusion_skip_neighbors = geti(
+            "excluded_volume", "skip_neighbors", self.exclusion_skip_neighbors
+        )
 
         # [confinement]
         self.use_confinement = getb("confinement", "use_confinement", self.use_confinement)
         self.confinement_radius = getf("confinement", "radius", self.confinement_radius)
         self.confinement_weight = getf("confinement", "weight", self.confinement_weight)
-        self.confinement_packing_factor = getf("confinement", "packing_factor",
-                                               self.confinement_packing_factor)
-        self.confinement_apply_to_arcs = getb("confinement", "apply_to_arcs",
-                                              self.confinement_apply_to_arcs)
-        self.confinement_apply_to_smooth = getb("confinement", "apply_to_smooth",
-                                                self.confinement_apply_to_smooth)
+        self.confinement_packing_factor = getf(
+            "confinement", "packing_factor", self.confinement_packing_factor
+        )
+        self.confinement_apply_to_arcs = getb(
+            "confinement", "apply_to_arcs", self.confinement_apply_to_arcs
+        )
+        self.confinement_apply_to_smooth = getb(
+            "confinement", "apply_to_smooth", self.confinement_apply_to_smooth
+        )
 
         # [small_ib_boost]
-        self.use_small_ib_boost = getb("small_ib_boost", "use_small_ib_boost",
-                                       self.use_small_ib_boost)
+        self.use_small_ib_boost = getb(
+            "small_ib_boost", "use_small_ib_boost", self.use_small_ib_boost
+        )
         self.small_ib_threshold = geti("small_ib_boost", "threshold", self.small_ib_threshold)
-        self.small_ib_spring_multiplier = getf("small_ib_boost", "spring_multiplier",
-                                               self.small_ib_spring_multiplier)
+        self.small_ib_spring_multiplier = getf(
+            "small_ib_boost", "spring_multiplier", self.small_ib_spring_multiplier
+        )
 
         # [simulation_arcs_smooth]
-        self.smooth_dist_weight = getf("simulation_arcs_smooth", "dist_weight", self.smooth_dist_weight)
-        self.smooth_angle_weight = getf("simulation_arcs_smooth", "angle_weight", self.smooth_angle_weight)
+        self.smooth_dist_weight = getf(
+            "simulation_arcs_smooth", "dist_weight", self.smooth_dist_weight
+        )
+        self.smooth_angle_weight = getf(
+            "simulation_arcs_smooth", "angle_weight", self.smooth_angle_weight
+        )
         self.max_temp_smooth = getf("simulation_arcs_smooth", "max_temp", self.max_temp_smooth)
         self.dt_temp_smooth = getf("simulation_arcs_smooth", "delta_temp", self.dt_temp_smooth)
-        self.jump_scale_smooth = getf("simulation_arcs_smooth", "jump_temp_scale", self.jump_scale_smooth)
-        self.jump_coef_smooth = getf("simulation_arcs_smooth", "jump_temp_coef", self.jump_coef_smooth)
-        self.mc_stop_steps_smooth = geti("simulation_arcs_smooth", "stop_condition_steps", self.mc_stop_steps_smooth)
-        self.mc_stop_improvement_smooth = getf("simulation_arcs_smooth", "stop_condition_improvement_threshold",
-                                               self.mc_stop_improvement_smooth)
-        self.mc_stop_successes_smooth = geti("simulation_arcs_smooth", "stop_condition_successes_threshold",
-                                             self.mc_stop_successes_smooth)
+        self.jump_scale_smooth = getf(
+            "simulation_arcs_smooth", "jump_temp_scale", self.jump_scale_smooth
+        )
+        self.jump_coef_smooth = getf(
+            "simulation_arcs_smooth", "jump_temp_coef", self.jump_coef_smooth
+        )
+        self.mc_stop_steps_smooth = geti(
+            "simulation_arcs_smooth", "stop_condition_steps", self.mc_stop_steps_smooth
+        )
+        self.mc_stop_improvement_smooth = getf(
+            "simulation_arcs_smooth",
+            "stop_condition_improvement_threshold",
+            self.mc_stop_improvement_smooth,
+        )
+        self.mc_stop_successes_smooth = geti(
+            "simulation_arcs_smooth",
+            "stop_condition_successes_threshold",
+            self.mc_stop_successes_smooth,
+        )
 
         return True
 
     def genomic_length_to_distance(self, length_bp: int) -> float:
         from .util import genomic_length_to_distance
-        return genomic_length_to_distance(length_bp, self.genomic_dist_base,
-                                          self.genomic_dist_scale, self.genomic_dist_power)
+
+        return genomic_length_to_distance(
+            length_bp, self.genomic_dist_base, self.genomic_dist_scale, self.genomic_dist_power
+        )
 
     def freq_to_dist_heatmap(self, freq: float) -> float:
         from .util import freq_to_dist_heatmap
+
         return freq_to_dist_heatmap(freq, self.freq_dist_scale, self.freq_dist_power)
 
     def freq_to_dist_heatmap_inter(self, freq: float) -> float:
         from .util import freq_to_dist_heatmap_inter
-        return freq_to_dist_heatmap_inter(freq, self.freq_dist_scale_inter, self.freq_dist_power_inter)
+
+        return freq_to_dist_heatmap_inter(
+            freq, self.freq_dist_scale_inter, self.freq_dist_power_inter
+        )
 
     def freq_to_distance(self, freq: int) -> float:
         from .util import freq_to_distance
-        return freq_to_distance(freq, self.count_dist_a, self.count_dist_scale,
-                                self.count_dist_shift, self.count_dist_base_level)
+
+        return freq_to_distance(
+            freq,
+            self.count_dist_a,
+            self.count_dist_scale,
+            self.count_dist_shift,
+            self.count_dist_base_level,
+        )
 
     def data_path(self, filename: str) -> str:
         """Resolve a data filename relative to data_dir."""
