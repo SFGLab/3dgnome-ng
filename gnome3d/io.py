@@ -261,13 +261,13 @@ def create_singleton_heatmap(
 
 def write_cif(
     path: str,
-    beads: list[tuple[int, float, float, float]],
+    beads: list[BeadOut],
     entry_id: str = "3dgnome",
 ) -> None:
     """
     Write a single structure to an mmCIF file.
 
-    beads : list of (midpoint_bp, x, y, z)
+    beads : list of BeadOut = (start_bp, end_bp, x, y, z)
         One entry per anchor bead, as returned by run_region() for one structure.
     """
     header = f"""data_{entry_id}
@@ -298,5 +298,5 @@ _atom_site.auth_asym_id
 """
     with open(path, "w") as f:
         f.write(header)
-        for i, (_, x, y, z) in enumerate(beads, start=1):
+        for i, (_, _, x, y, z) in enumerate(beads, start=1):
             f.write(f"ATOM {i} C CA . ALA A 1 {i} ? {x} {y} {z} 1.00 99.99 C\n")

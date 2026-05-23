@@ -15,8 +15,11 @@ StrArray: TypeAlias = NDArray[np.str_]
 # (chr1, pos1, chr2, pos2, score) singleton contact tuple.
 SingletonContact: TypeAlias = tuple[str, int, str, int, int]
 
-# (genomic_midpoint_bp, x, y, z) bead position output tuple.
-BeadOut: TypeAlias = tuple[int, float, float, float]
+# (genomic_start_bp, genomic_end_bp, x, y, z) bead position output tuple.
+# start/end give the genomic region this bead covers; midpoint = (start+end)//2.
+# start is the first field so sorted(beads, key=lambda b: b[0]) still yields
+# left-to-right genomic order.
+BeadOut: TypeAlias = tuple[int, int, float, float, float]
 
 
 @dataclass

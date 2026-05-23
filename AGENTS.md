@@ -255,6 +255,47 @@ When working on any piece of the rewrite, read the corresponding C++ reference f
 
 ---
 
+## Typechecking
+
+The whole `gnome3d/` package is type-checked under **pyright strict mode**. Config lives in `pyproject.toml` under `[tool.pyright]`. Pyright is installed in the project venv:
+
+```bash
+.venv/bin/pyright              # check all of gnome3d/
+.venv/bin/pyright gnome3d/mc.py  # check one file
+```
+
+Current state: **0 errors, 0 warnings**. New code is expected to maintain that. Run pyright before committing changes to `gnome3d/`.
+
+### Conventions
+
+- **Numpy array aliases** live in [gnome3d/types.py](gnome3d/types.py): `F32Array`, `F64Array`, `I32Array`, `I64Array`, `BoolArray`. Use these instead of bare `np.ndarray` so dtype intent is visible.
+- **Semantic int aliases** also in `types.py`: `ClusterIndex`, `LocalArcIndex`, `GenomicPos`. They are `int` at runtime — they document the intent of an `int` parameter (a cluster index into `Solver.clusters` is not the same thing as a chr-relative arc index, even though both are `int`).
+- **Collection aliases**: `AnchorMap`, `ArcMap`, `RawArcMap`, `BreakpointMap`, `ChrRootMap`, `ChrFirstClusterMap`, `ChrLevel`, `SingletonContact`, `BeadOut`. Prefer these over inline `dict[str, list[…]]` spellings.
+- **Output tuples**: `BeadOut = tuple[int, int, float, float, float]` = `(genomic_start_bp, genomic_end_bp, x, y, z)`. First field is start so `sorted(beads, key=lambda b: b[0])` still gives left-to-right genomic order.
+- **Dataclass defaults**: use a named factory function (e.g. `_empty_cluster_index_list`) instead of `field(default_factory=list)` — bare `list` leaks `list[Unknown]` through pyright in strict mode.
+
+### Numba interop
+
+`@njit` from numba has no type stubs, which would otherwise force every JIT-compiled function to be typed as `Any`. [gnome3d/mc.py](gnome3d/mc.py) wraps it with a typed identity decorator:
+
+```python
+def njit(**kwargs: Any) -> Callable[[F], F]:
+    def decorator(fn: F) -> F:
+        return cast(F, _njit(**kwargs)(fn))
+    return decorator
+```
+
+Decorated functions keep their original signatures under pyright while still being JIT-compiled at runtime. **Do not use `typing.cast` inside `@njit` kernels** — numba's nopython frontend doesn't recognise it. For random-index lines like `int(np.random.randint(0, n))` where numpy stubs return `Any`, use a per-line `# pyright: ignore[reportUnknownArgumentType]` comment instead.
+
+### Adding new code
+
+- Annotate every function signature (params + return). Strict mode requires it.
+- Avoid bare `list`, `dict`, `tuple` in annotations — always parameterise.
+- For numpy arrays in non-kernel code, use the aliases (`F32Array`, etc.).
+- Inside `@njit` kernels, parameter and local annotations are advisory only (numba ignores them) but still required for pyright. Keep them realistic — they document the contract.
+
+---
+
 ## Correctness Harness
 
 The harness compiles `harness/scorer.cpp` directly against the real 3dnome MC sources (`3dnome/MC/*.cpp`). It uses `#define private public` before including `LooperSolver.h` to expose private methods - access control is compile-time only, so the object layout and compiled method bodies are identical to production. The result is that every comparison runs the actual `calcScoreHeatmapActiveRegion()`, `calcScoreStructureSmooth()`, etc. - not a reimplementation.

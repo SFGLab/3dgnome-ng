@@ -351,7 +351,7 @@ class Solver:
         because each IB owns a disjoint subset of cluster indices.
 
         If small_ib_boost is enabled and this IB is below threshold, spring
-        constants are multiplied for the duration of this IB only — a local
+        constants are multiplied for the duration of this IB only - a local
         settings copy is used so we never mutate self.s (thread-safe).
         """
         log1 = self.s.output_level >= 1
@@ -733,12 +733,16 @@ class Solver:
 
     def _densify_active_region(
         self, active_region: list[int]
-    ) -> tuple[F32Array, BoolArray, list[int], F32Array, list[AnchorMapEntry]]:
+    ) -> tuple[
+        F32Array, BoolArray, list[int], list[int], list[int], F32Array, list[AnchorMapEntry]
+    ]:
         """
         Insert loop_density subanchor beads between each consecutive anchor pair.
-        Returns (pos, fixed, gpos, dtn, anchor_map) where:
+        Returns (pos, fixed, starts, ends, gpos, dtn, anchor_map) where:
           pos        : (N, 3) float32 bead positions
           fixed      : (N,) bool - True for original anchor beads
+          starts     : list[int] genomic start bp per bead
+          ends       : list[int] genomic end bp per bead (== start for subanchors)
           gpos       : list[int] genomic midpoints
           dtn        : (N-1,) float32 expected consecutive distances
           anchor_map : list of (pos_index, cluster_index) for anchor beads
@@ -798,7 +802,7 @@ class Solver:
             gap = max(bead_gpos[i + 1] - bead_gpos[i], 0)
             dtn[i] = float(self.s.genomic_length_to_distance(gap))
 
-        return pos_arr, fixed_arr, bead_gpos, dtn, anchor_map
+        return pos_arr, fixed_arr, bead_starts, bead_ends, bead_gpos, dtn, anchor_map
 
     def _reconstruct_cluster_smooth(
         self,
@@ -813,7 +817,8 @@ class Solver:
         """
         Densify active region, then run smooth MC (chain + angle energy).
         Writes final anchor positions back to self.clusters.
-        Returns list of (genomic_pos, x, y, z) for ALL beads (anchors + subanchors).
+        Returns list of (genomic_start, genomic_end, x, y, z) for ALL beads
+        (anchors + subanchors). For subanchors start == end (point bin).
         Mirrors Reference MonteCarloArcsSmooth loop in reconstructClustersArcsDistances().
 
         When subanchor_heat_raw is provided and use_subanchor_heatmap is True:
@@ -823,7 +828,8 @@ class Solver:
         """
         import math as _math
         s = s_override if s_override is not None else self.s
-        pos, fixed, gpos, dtn, anchor_map = self._densify_active_region(active_region)
+        pos, fixed, starts, ends, gpos, dtn, anchor_map = self._densify_active_region(active_region)
+        _ = gpos  # unused once start/end carry genomic info; keep for potential debug
         n = len(pos)
         if n <= 2:
             return []
@@ -892,7 +898,8 @@ class Solver:
             self.clusters[cluster_idx].pos = best_pos[bead_idx].copy()
 
         return [
-            (gpos[i], float(best_pos[i, 0]), float(best_pos[i, 1]), float(best_pos[i, 2]))
+            (starts[i], ends[i],
+             float(best_pos[i, 0]), float(best_pos[i, 1]), float(best_pos[i, 2]))
             for i in range(n)
         ]
 
@@ -1032,8 +1039,8 @@ class Solver:
 
     def get_leaf_positions(self, chr_: str) -> list[BeadOut]:
         """
-        Return all bead positions for chr_ as list of (midpoint_bp, x, y, z),
-        sorted by genomic midpoint.  Includes subanchor beads when smooth MC
+        Return all bead positions for chr_ as list of (start_bp, end_bp, x, y, z),
+        sorted by genomic start.  Includes subanchor beads when smooth MC
         has been run; falls back to anchor-only otherwise.
         """
         dense = self.dense_active_regions.get(chr_)
@@ -1048,12 +1055,13 @@ class Solver:
             c = self.clusters[i]
             if c.level != LVL_ANCHOR:
                 break
-            result.append((c.genomic_pos, float(c.pos[0]), float(c.pos[1]), float(c.pos[2])))
+            result.append((c.start, c.end,
+                           float(c.pos[0]), float(c.pos[1]), float(c.pos[2])))
         result.sort(key=lambda b: b[0])
         return result
 
     def get_anchor_positions(self) -> list[BeadOut]:
-        """All anchor beads from all chromosomes, sorted by chr then genomic position."""
+        """All anchor beads from all chromosomes, sorted by chr then genomic start."""
         result: list[BeadOut] = []
         for chr_ in self.chrs:
             first = self.chr_first_cluster.get(chr_, -1)
@@ -1063,7 +1071,6 @@ class Solver:
                 c = self.clusters[i]
                 if c.level != LVL_ANCHOR:
                     break
-                mid = c.genomic_pos
                 x, y, z = float(c.pos[0]), float(c.pos[1]), float(c.pos[2])
-                result.append((mid, x, y, z))
+                result.append((c.start, c.end, x, y, z))
         return sorted(result, key=lambda b: b[0])
