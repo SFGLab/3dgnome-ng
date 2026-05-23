@@ -217,12 +217,12 @@ class Solver:
             score = mc_heatmap(pos, self.heatmap_dist, self.heatmap_dist_diag,
                                step_size, s, label=f"heatmap run {run + 1}",
                                verbose=log2)
-            if log1:
-                print(f"  -> score={score:.6f}  best={best_score:.6f}")
 
             if score < best_score or best_score < 0:
                 best_score = score
                 best_pos = pos.copy()
+            if log1:
+                print(f"  -> score={score:.6f}  best={best_score:.6f}")
 
         # Restore best
         for i, idx in enumerate(active_region):
