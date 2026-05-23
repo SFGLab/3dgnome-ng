@@ -6,15 +6,7 @@ from __future__ import annotations
 
 import os
 
-from .types import (
-    AnchorMap,
-    Anchor,
-    BedRegion,
-    BreakpointMap,
-    RawArc,
-    RawArcMap,
-    SingletonContact,
-)
+from .types import *
 
 
 def parse_region(region_str: str) -> BedRegion | None:

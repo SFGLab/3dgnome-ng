@@ -20,41 +20,14 @@ passed directly to Solver.load().
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import field
 from typing import TYPE_CHECKING, Any
 
-from .types import (
-    Anchor,
-    AnchorMap,
-    ArcMap,
-    BedRegion,
-    BreakpointMap,
-    InteractionArc,
-    RawArc,
-    RawArcMap,
-    SingletonContact,
-)
 from .io import load_anchors, load_arcs, load_breakpoints, load_singletons
+from .types import *
 
 if TYPE_CHECKING:
     from .settings import Settings
-
-
-def _empty_anchor_map() -> AnchorMap:
-    return {}
-
-
-def _empty_arc_map() -> ArcMap:
-    return {}
-
-
-def _empty_breakpoint_map() -> BreakpointMap:
-    return {}
-
-
-def _empty_singleton_list() -> list[SingletonContact]:
-    return []
-
 
 @dataclass
 class ContactData:
@@ -65,10 +38,10 @@ class ContactData:
     singletons:  list of (chr1, pos1, chr2, pos2, score) contacts
                  used to build the segment-level heatmap
     """
-    anchors: AnchorMap = field(default_factory=_empty_anchor_map)
-    arcs: ArcMap = field(default_factory=_empty_arc_map)
-    breakpoints: BreakpointMap = field(default_factory=_empty_breakpoint_map)
-    singletons: list[SingletonContact] = field(default_factory=_empty_singleton_list)
+    anchors: AnchorMap = field(default_factory=empty_anchor_map)
+    arcs: ArcMap = field(default_factory=empty_arc_map)
+    breakpoints: BreakpointMap = field(default_factory=empty_breakpoint_map)
+    singletons: list[SingletonContact] = field(default_factory=empty_singleton_list)
 
     @classmethod
     def from_files(

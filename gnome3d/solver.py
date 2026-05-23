@@ -20,21 +20,10 @@ from .hierarchy import (
 from .io import create_singleton_heatmap
 from .mc import mc_heatmap, mc_arcs, mc_smooth
 from .settings import Settings
-from .types import (
-    AnchorMap,
-    ArcMap,
-    BeadOut,
-    BedRegion,
-    BoolArray,
-    F32Array,
-    F64Array,
-    SingletonContact,
-)
+from .types import *
 
-# Map chr -> list of cluster indices at some hierarchy level.
-ChrLevel = dict[str, list[int]]
 # Anchor map entry produced by densification: (bead_index, cluster_index).
-AnchorMapEntry = tuple[int, int]
+AnchorMapEntry = tuple[int, ClusterIndex]
 
 
 class Solver:
@@ -42,8 +31,8 @@ class Solver:
     def __init__(self, settings: Settings) -> None:
         self.s: Settings = settings
         self.clusters: list[Cluster] = []
-        self.chr_root: dict[str, int] = {}
-        self.chr_first_cluster: dict[str, int] = {}
+        self.chr_root: ChrRootMap = {}
+        self.chr_first_cluster: ChrFirstClusterMap = {}
         self.chrs: list[str] = []
 
         # Arc data (after mark_arcs / remove_empty_anchors)

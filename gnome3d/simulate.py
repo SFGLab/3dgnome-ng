@@ -6,11 +6,11 @@ Thin wrappers around the Settings / ContactData / Solver pipeline.
 
 from __future__ import annotations
 
-from gnome3d.settings import Settings
-from gnome3d.io import parse_region
-from gnome3d.data import ContactData
-from gnome3d.solver import Solver
-from gnome3d.types import BeadOut
+from .settings import Settings
+from .io import parse_region
+from .data import ContactData
+from .solver import Solver
+from .types import BeadOut
 
 
 def run_region(

@@ -69,6 +69,27 @@ RawArcMap: TypeAlias = dict[str, list["RawArc"]]
 BreakpointMap: TypeAlias = dict[str, list[int]]
 
 
+# Cluster-hierarchy types.
+
+# A cluster index is a position in Solver.clusters (or the global list returned by build_cluster_tree).
+ClusterIndex: TypeAlias = int
+
+# A local arc index (chr-relative) - position in ArcMap[chr_].
+LocalArcIndex: TypeAlias = int
+
+# A genomic position in basepairs.
+GenomicPos: TypeAlias = int
+
+# Per-chromosome root cluster index (level = LVL_CHROMOSOME).
+ChrRootMap: TypeAlias = dict[str, ClusterIndex]
+
+# Per-chromosome index of the first anchor cluster (level = LVL_ANCHOR).
+ChrFirstClusterMap: TypeAlias = dict[str, ClusterIndex]
+
+# A traversal "current level" snapshot: chr -> list of cluster indices at that depth.
+ChrLevel: TypeAlias = dict[str, list[ClusterIndex]]
+
+
 @dataclass
 class BedRegion:
     chr: str
@@ -77,3 +98,32 @@ class BedRegion:
 
     def contains(self, pos: int) -> bool:
         return self.start <= pos <= self.end
+
+# Empty initializers
+
+def empty_anchor_map() -> AnchorMap:
+    return {}
+
+
+def empty_arc_map() -> ArcMap:
+    return {}
+
+
+def empty_breakpoint_map() -> BreakpointMap:
+    return {}
+
+
+def empty_singleton_list() -> list[SingletonContact]:
+    return []
+
+
+def zero_pos() -> F32Array:
+    return np.zeros(3, dtype=np.float32)
+
+
+def empty_cluster_index_list() -> list[ClusterIndex]:
+    return []
+
+
+def empty_local_arc_index_list() -> list[LocalArcIndex]:
+    return []
