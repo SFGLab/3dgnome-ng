@@ -711,37 +711,59 @@ def _batch_heatmap_nb(
     jump_scale: float,
     jump_coef: float,
     n_steps: int,
-    score: float,
-) -> tuple[float, float, int]:
-    """Run n_steps heatmap-MC steps.  Returns (T_out, score_out, n_ok)."""
+    use_excl: bool,
+    excl_r0: float,
+    excl_weight: float,
+    excl_skip: int,
+    score_hm: float,
+    score_excl: float,
+) -> tuple[float, float, float, int]:
+    """Run n_steps heatmap-MC steps with optional excluded-volume term.
+
+    Returns (T_out, score_hm_out, score_excl_out, n_ok).
+    Heatmap score double-counts pairs (factor 2 on delta); excl also double-counts.
+    """
     n = pos.shape[0]
     n_ok = 0
+    score = score_hm + score_excl
     for _ in range(n_steps):
         p: int = int(np.random.randint(0, n))  # pyright: ignore[reportUnknownArgumentType]
         dx = np.random.uniform(-step_size, step_size)
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
 
-        loc_prev = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
+        loc_hm_prev = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
+        loc_excl_prev = 0.0
+        if use_excl:
+            loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+
         pos[p, 0] += dx
         pos[p, 1] += dy
         pos[p, 2] += dz
-        loc_curr = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
 
-        # heatmap score double-counts: factor 2
-        score_new = score + 2.0 * (loc_curr - loc_prev)
+        loc_hm_curr = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
+        score_hm_new = score_hm + 2.0 * (loc_hm_curr - loc_hm_prev)
+
+        score_excl_new = score_excl
+        if use_excl:
+            loc_excl_curr = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+            score_excl_new = score_excl + 2.0 * (loc_excl_curr - loc_excl_prev)
+
+        score_new = score_hm_new + score_excl_new
         ok = score_new <= score
         if not ok and T > 0.0 and score > 0.0:
             ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T)
         if ok:
             n_ok += 1
             score = score_new
+            score_hm = score_hm_new
+            score_excl = score_excl_new
         else:
             pos[p, 0] -= dx
             pos[p, 1] -= dy
             pos[p, 2] -= dz
         T *= dt
-    return T, score, n_ok
+    return T, score_hm, score_excl, n_ok
 
 
 # Shared helper
@@ -788,19 +810,48 @@ def mc_heatmap(
     stop_improvement = float(settings.mc_stop_improvement_heatmap)
     stop_successes = int(settings.mc_stop_successes_heatmap)
 
+    use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_heatmap)
+    excl_weight = float(settings.exclusion_weight)
+    excl_skip = int(settings.exclusion_skip_neighbors)
+    # Heatmap-level EV radius: explicit setting wins; 0 → auto-derive as
+    # auto_factor * mean(active expected distances) so EV activates when beads
+    # get closer than the configurable fraction of the typical target distance.
+    excl_r0 = float(settings.exclusion_radius_heatmap)
+    if use_excl and excl_r0 <= 0.0:
+        active = np.asarray(exp_dist)[~skip]
+        factor = float(settings.exclusion_auto_factor_heatmap)
+        excl_r0 = factor * float(active.mean()) if active.size > 0 else 1.0
+
     prefix = f"    [{label}] " if label else "    "
 
     pw = _as_f64(pos)
     es64 = _as_f64(exp_safe)
     skip_b: BoolArray = np.ascontiguousarray(skip, dtype=np.bool_)
-    score = float(_init_heatmap_nb(pw, es64, skip_b))
+    score_hm = float(_init_heatmap_nb(pw, es64, skip_b))
+    score_excl = float(_init_excl_nb(pw, excl_r0, excl_weight, excl_skip)) if use_excl else 0.0
+    score = score_hm + score_excl
 
     ms_score = score
     step_i = 0
     while True:
-        T, score, n_ok = _batch_heatmap_nb(
-            pw, es64, skip_b, float(step_size), T, dt, jump_scale, jump_coef, stop_steps, score
+        T, score_hm, score_excl, n_ok = _batch_heatmap_nb(
+            pw,
+            es64,
+            skip_b,
+            float(step_size),
+            T,
+            dt,
+            jump_scale,
+            jump_coef,
+            stop_steps,
+            use_excl,
+            excl_r0,
+            excl_weight,
+            excl_skip,
+            score_hm,
+            score_excl,
         )
+        score = score_hm + score_excl
         step_i += stop_steps
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (score > stop_improvement * ms_score and n_ok < stop_successes) or score < 1e-6
@@ -850,7 +901,6 @@ def mc_arcs(
     squeeze_k = float(settings.spring_squeeze_arcs)
 
     use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
-    excl_r0 = float(settings.exclusion_radius)
     excl_weight = float(settings.exclusion_weight)
     excl_skip = int(settings.exclusion_skip_neighbors)
 
@@ -858,6 +908,13 @@ def mc_arcs(
 
     pw = _as_f64(pos)
     exp64 = _as_f64(exp_dist_mat)
+
+    # Arc-level EV radius: 0 → auto = factor * mean(active arc expected dist).
+    excl_r0 = float(settings.exclusion_radius_arcs)
+    if use_excl and excl_r0 <= 0.0:
+        pos_mask = exp64 > 1e-6
+        factor = float(settings.exclusion_auto_factor_arcs)
+        excl_r0 = factor * float(exp64[pos_mask].mean()) if pos_mask.any() else 1.0
 
     # Confinement: center = centroid of starting pos; auto-radius derives from
     # mean positive expected-distance and bead count.
@@ -871,11 +928,11 @@ def mc_arcs(
         conf_cx = float(pw[:, 0].mean())
         conf_cy = float(pw[:, 1].mean())
         conf_cz = float(pw[:, 2].mean())
-        conf_R = float(settings.confinement_radius)
+        conf_R = float(settings.confinement_radius_arcs)
         if conf_R <= 0.0:
             pos_mask = exp64 > 1e-6
             avg_bond = float(exp64[pos_mask].mean()) if pos_mask.any() else 1.0
-            pf = float(settings.confinement_packing_factor)
+            pf = float(settings.confinement_packing_factor_arcs)
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
     score_arcs = float(_init_arcs_nb(pw, exp64, stretch_k, squeeze_k))
@@ -990,9 +1047,16 @@ def mc_smooth(
     heat_weight = float(settings.subanchor_heatmap_dist_weight)
 
     use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
-    excl_r0 = float(settings.exclusion_radius)
     excl_weight = float(settings.exclusion_weight)
     excl_skip = int(settings.exclusion_skip_neighbors)
+
+    # Smooth-level EV radius: 0 → auto = factor * mean(dtn) where dtn is the
+    # chain-bond expected distance array.
+    excl_r0 = float(settings.exclusion_radius_smooth)
+    if use_excl and excl_r0 <= 0.0:
+        dtn_arr = np.asarray(dtn)
+        factor = float(settings.exclusion_auto_factor_smooth)
+        excl_r0 = factor * float(dtn_arr.mean()) if dtn_arr.size > 0 else 1.0
 
     use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth)
     conf_weight = float(settings.confinement_weight)
@@ -1015,10 +1079,10 @@ def mc_smooth(
         conf_cx = float(pw[:, 0].mean())
         conf_cy = float(pw[:, 1].mean())
         conf_cz = float(pw[:, 2].mean())
-        conf_R = float(settings.confinement_radius)
+        conf_R = float(settings.confinement_radius_smooth)
         if conf_R <= 0.0:
             avg_bond = float(dtn64.mean()) if dtn64.size > 0 else 1.0
-            pf = float(settings.confinement_packing_factor)
+            pf = float(settings.confinement_packing_factor_smooth)
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
     # Heat state (dummy when disabled - never indexed inside the kernel)

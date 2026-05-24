@@ -655,7 +655,7 @@ def print_stats(label: str, structures: list) -> dict:
     pwd_m, pwd_s = mean_std(pwd_vals)
 
     n_beads = len(structures[0])
-    print(f"\n  [{label}]  {len(structures)} structures × {n_beads} beads")
+    print(f"\n  [{label}]  {len(structures)} structures * {n_beads} beads")
     print(f"    Rg:              {rg_m:8.3f} ± {rg_s:.3f}  (radius of gyration)")
     print(f"    bond length:     {bond_m:8.3f} ± {bond_s:.3f}  (consecutive beads)")
     print(f"    mean pairwise d: {pwd_m:8.3f} ± {pwd_s:.3f}  (all bead pairs)")
@@ -769,7 +769,7 @@ def _load_cache(path: Path) -> tuple:
             return (int(b[0]), int(b[1]), float(b[2]), float(b[3]), float(b[4]), str(b[5]))
         if len(b) == 5:
             return (int(b[0]), int(b[1]), float(b[2]), float(b[3]), float(b[4]), "anchor")
-        # legacy 4-tuple: (mid, x, y, z) — treat midpoint as both start and end.
+        # legacy 4-tuple: (mid, x, y, z) - treat midpoint as both start and end.
         mid = int(b[0])
         return (mid, mid, float(b[1]), float(b[2]), float(b[3]), "anchor")
 

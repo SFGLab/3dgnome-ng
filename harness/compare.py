@@ -527,6 +527,8 @@ def test_densify(reference_only=False):
             "densify.interp",
             "densify.subanchor_inside",
             "densify.unique_starts",
+            "densify.dynamic_counts_match",
+            "densify.dynamic_total_beads",
         ):
             print(f"  {SKIP}  {name}  ({exc})")
             _results.append(("skip", name))
@@ -546,6 +548,20 @@ def test_densify(reference_only=False):
         loop_density = LD
         overlap_anchor_strict = False
         drop_zero_length_subanchors = False
+        use_dynamic_loop_density = False
+        target_bp_per_subanchor = 5000
+        min_subanchors_per_arc = 0
+        max_subanchors_per_arc = 50
+        use_ib_mc = False
+        exclusion_apply_to_ib = True
+        exclusion_radius_arcs = 0.0
+        exclusion_radius_smooth = 0.0
+        exclusion_radius_heatmap = 0.0
+        exclusion_radius_ib = 0.0
+        exclusion_auto_factor_arcs = 0.5
+        exclusion_auto_factor_smooth = 0.5
+        exclusion_auto_factor_heatmap = 0.5
+        exclusion_auto_factor_ib = 0.5
 
         @staticmethod
         def genomic_length_to_distance(bp):
@@ -622,6 +638,56 @@ def test_densify(reference_only=False):
         seen_starts.add(solver.clusters[ci].start)
     check("densify.subanchor_inside", 1.0, 1.0 if ok_inside else 0.0, atol=0)
     check("densify.unique_starts", 1.0, 1.0 if ok_unique else 0.0, atol=0)
+
+    # 7. Dynamic loop density: subanchor count per arc tracks span / target,
+    #    clamped to [min, max].  Default mode (fixed ld) is unaffected.
+    dyn_specs = [(0, 1000), (1500, 2500), (52000, 53000), (54000, 55000)]
+    # arc spans: 500, 49500, 1000
+    dyn_solver = Solver.__new__(Solver)
+
+    class _DynSettings:
+        loop_density = 5  # not used in dynamic mode
+        overlap_anchor_strict = False
+        drop_zero_length_subanchors = False
+        use_dynamic_loop_density = True
+        target_bp_per_subanchor = 5000
+        min_subanchors_per_arc = 0
+        max_subanchors_per_arc = 100
+
+        @staticmethod
+        def genomic_length_to_distance(bp):
+            return 1.0 + 0.5 * (max(bp, 0) / 1000.0) ** 0.75
+
+    dyn_solver.s = _DynSettings()
+    dyn_solver.clusters = []
+    dyn_ar = []
+    for i, (st, en) in enumerate(dyn_specs):
+        c = Cluster(start=st, end=en, level=LVL_ANCHOR)
+        c.pos = _np.zeros(3, dtype=_np.float32)
+        dyn_solver.clusters.append(c)
+        dyn_ar.append(i)
+
+    dyn_counts = dyn_solver._subanchor_counts_per_arc(dyn_ar)
+    # n_subanchors = round(span / target) - 1, clamped to [min, max].
+    # arc 0: span    500 → round(0.1) - 1 = -1 → clamped to 0
+    # arc 1: span 49500 → round(9.9) - 1 = 9
+    # arc 2: span   1000 → round(0.2) - 1 = -1 → clamped to 0
+    expected_counts = [0, 9, 0]
+    check(
+        "densify.dynamic_counts_match",
+        1.0,
+        1.0 if dyn_counts == expected_counts else 0.0,
+        atol=0,
+    )
+
+    # Total beads = n_anchors + sum(counts) for dynamic mode.
+    dyn_pos, *_ = dyn_solver._densify_active_region(dyn_ar)
+    check(
+        "densify.dynamic_total_beads",
+        float(len(dyn_specs) + sum(expected_counts)),
+        float(len(dyn_pos)),
+        atol=0,
+    )
 
 
 def orient_spec_txt(anchors, arcs):

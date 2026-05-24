@@ -115,19 +115,39 @@ class Settings:
 
     # ---- excluded volume ----
     use_excluded_volume: bool
-    exclusion_radius: float
     exclusion_weight: float
     exclusion_apply_to_arcs: bool
     exclusion_apply_to_smooth: bool
+    exclusion_apply_to_heatmap: bool
+    exclusion_apply_to_ib: bool
     exclusion_skip_neighbors: int
+    # Per-level radius (one knob per MC level).  0.0 = auto = factor * mean
+    # of that level's natural bond / expected distance.  Each level has its
+    # own factor (default 0.5 - half the typical bead-bead target).
+    exclusion_radius_arcs: float
+    exclusion_radius_smooth: float
+    exclusion_radius_heatmap: float
+    exclusion_radius_ib: float
+    exclusion_auto_factor_arcs: float
+    exclusion_auto_factor_smooth: float
+    exclusion_auto_factor_heatmap: float
+    exclusion_auto_factor_ib: float
+
+    # ---- IB-level MC pass (chain bonds + EV between IB centroids) ----
+    use_ib_mc: bool
 
     # ---- confinement ----
     use_confinement: bool
-    confinement_radius: float
     confinement_weight: float
-    confinement_packing_factor: float
     confinement_apply_to_arcs: bool
     confinement_apply_to_smooth: bool
+    confinement_apply_to_ib: bool
+    confinement_radius_arcs: float
+    confinement_radius_smooth: float
+    confinement_radius_ib: float
+    confinement_packing_factor_arcs: float
+    confinement_packing_factor_smooth: float
+    confinement_packing_factor_ib: float
 
     # ---- small-IB spring boost ----
     use_small_ib_boost: bool
@@ -137,6 +157,12 @@ class Settings:
     # ---- overlapping-anchor handling (densification) ----
     overlap_anchor_strict: bool
     drop_zero_length_subanchors: bool
+
+    # ---- dynamic loop density ----
+    use_dynamic_loop_density: bool
+    target_bp_per_subanchor: int
+    min_subanchors_per_arc: int
+    max_subanchors_per_arc: int
 
     # ---- MC smooth ----
     max_temp_smooth: float
@@ -253,21 +279,62 @@ class Settings:
         self.mc_stop_steps = 10000
 
         # ---- excluded volume ----
+        # One radius knob per MC level, with auto-derivation when set to 0.0
+        # so the user doesn't need to know the typical bead-bead distance for
+        # each level (anchor MC is unit-scale, smooth MC is unit-scale, heatmap
+        # MC is at heatmap-distance scale, IB MC is at the genomic-distance
+        # scale between IB midpoints). Auto picks `factor * mean(bond)` from
+        # that level's own data - each level has its own factor (default 0.5).
         self.use_excluded_volume = False
-        self.exclusion_radius = 1.0  # r0: pairs closer than this incur penalty
         self.exclusion_weight = 1.0  # k: multiplier (comparable to spring_*)
         self.exclusion_apply_to_arcs = False
         self.exclusion_apply_to_smooth = True
+        self.exclusion_apply_to_heatmap = False
+        self.exclusion_apply_to_ib = True  # IB-level MC (default on with use_ib_mc)
         self.exclusion_skip_neighbors = 1  # skip pairs with |i-j| <= this (1 = skip bonded)
+        # Per-level radius: 0.0 = auto from this level's bond-length mean.
+        self.exclusion_radius_arcs = 0.0
+        self.exclusion_radius_smooth = 0.0
+        self.exclusion_radius_heatmap = 0.0
+        self.exclusion_radius_ib = 0.0
+        # Per-level auto factor: used only when the matching radius is 0.0.
+        # 0.5 means "EV kicks in once beads get closer than half the typical
+        # bond distance at this level".
+        self.exclusion_auto_factor_arcs = 0.5
+        self.exclusion_auto_factor_smooth = 0.5
+        self.exclusion_auto_factor_heatmap = 0.5
+        self.exclusion_auto_factor_ib = 0.5
+
+        # ---- IB-level MC pass ----
+        # When enabled, each segment runs a small chain-spring + EV MC pass over
+        # its child IB centroids after the initial random-walk / interpolation
+        # placement. Pushes IBs apart so each IB's smooth-MC sphere has room
+        # to breathe - addresses the "central blob" pathology with dynamic
+        # loop density and many subanchors per IB.  EV inside this pass is
+        # controlled by `exclusion_apply_to_ib`, `exclusion_radius_ib`, and
+        # `exclusion_auto_factor_ib` under [excluded_volume].
+        self.use_ib_mc = False
 
         # ---- confinement ----
         # Soft sphere around per-MC-call centroid; pulls beads back inside.
+        # Each level has its own radius and packing factor: anchor MC, smooth MC
+        # and IB MC operate at different spatial scales, so the typical "ball
+        # radius" is also different. radius = 0 auto-derives from that level's
+        # own bond data as `packing_factor * mean(bond) * N^(1/3)`.
         self.use_confinement = False
-        self.confinement_radius = 0.0  # 0 = auto from bead count + bond length
         self.confinement_weight = 1.0
-        self.confinement_packing_factor = 1.5  # used only when radius == 0 (auto)
         self.confinement_apply_to_arcs = True
         self.confinement_apply_to_smooth = True
+        self.confinement_apply_to_ib = True
+        self.confinement_radius_arcs = 0.0
+        self.confinement_radius_smooth = 0.0
+        self.confinement_radius_ib = 0.0
+        # Packing factor for the auto formula; defaults tuned per level.
+        # IB chains are short and should pack tighter (the original blob
+        # pathology comes from over-extending the IB chain) so default < 1.
+        self.confinement_packing_factor_arcs = 1.5
+        self.confinement_packing_factor_smooth = 1.5
+        self.confinement_packing_factor_ib = 0.75
 
         # ---- small-IB spring boost ----
         # Multiplies spring constants when reconstructing IBs with few anchors,
@@ -280,7 +347,7 @@ class Settings:
         # overlap_anchor_strict controls span computation in densification:
         #   False (default): subanchors tile the overlap region with non-degenerate
         #     genomic ranges (Python divergence).
-        #   True: reference-parity — overlap clamps to 0, so MC-chain subanchors
+        #   True: reference-parity - overlap clamps to 0, so MC-chain subanchors
         #     between overlapping anchors are placed at a single boundary point
         #     (matches LooperSolver.cpp:1829-1831).
         # drop_zero_length_subanchors is an independent output-filtering toggle:
@@ -292,6 +359,20 @@ class Settings:
         #     the collapsed-overlap zero-length noise.
         self.overlap_anchor_strict = False
         self.drop_zero_length_subanchors = False
+
+        # ---- dynamic loop density ----
+        # When False (default), every arc gets exactly self.loop_density subanchors.
+        # When True, subanchor count for arc i is round(span_bp / target_bp_per_subanchor),
+        # clamped to [min_subanchors_per_arc, max_subanchors_per_arc].  Aims to keep
+        # roughly equal genomic distance between beads instead of equal beads per arc.
+        # If the arc span is small relative to the target the count drops toward
+        # min_subanchors_per_arc (0 → adjacent anchors get no subanchors).
+        # The contact-heatmap binning and densification stay in sync - both use the
+        # same per-arc counts, so use_subanchor_heatmap remains compatible.
+        self.use_dynamic_loop_density = False
+        self.target_bp_per_subanchor = 5000  # 5 kb per bead at default density
+        self.min_subanchors_per_arc = 0  # allow very short arcs to skip subanchors
+        self.max_subanchors_per_arc = 50  # cap to avoid runaway on huge gaps
 
         # ---- MC smooth ----
         self.max_temp_smooth = 20.0
@@ -481,7 +562,6 @@ class Settings:
         self.use_excluded_volume = getb(
             "excluded_volume", "use_excluded_volume", self.use_excluded_volume
         )
-        self.exclusion_radius = getf("excluded_volume", "radius", self.exclusion_radius)
         self.exclusion_weight = getf("excluded_volume", "weight", self.exclusion_weight)
         self.exclusion_apply_to_arcs = getb(
             "excluded_volume", "apply_to_arcs", self.exclusion_apply_to_arcs
@@ -489,22 +569,70 @@ class Settings:
         self.exclusion_apply_to_smooth = getb(
             "excluded_volume", "apply_to_smooth", self.exclusion_apply_to_smooth
         )
+        self.exclusion_apply_to_heatmap = getb(
+            "excluded_volume", "apply_to_heatmap", self.exclusion_apply_to_heatmap
+        )
+        self.exclusion_apply_to_ib = getb(
+            "excluded_volume", "apply_to_ib", self.exclusion_apply_to_ib
+        )
         self.exclusion_skip_neighbors = geti(
             "excluded_volume", "skip_neighbors", self.exclusion_skip_neighbors
         )
+        # Per-level radii.  Key naming: radius_<level>.  0 = auto.
+        self.exclusion_radius_arcs = getf(
+            "excluded_volume", "radius_arcs", self.exclusion_radius_arcs
+        )
+        self.exclusion_radius_smooth = getf(
+            "excluded_volume", "radius_smooth", self.exclusion_radius_smooth
+        )
+        self.exclusion_radius_heatmap = getf(
+            "excluded_volume", "radius_heatmap", self.exclusion_radius_heatmap
+        )
+        self.exclusion_radius_ib = getf("excluded_volume", "radius_ib", self.exclusion_radius_ib)
+        # Per-level auto-factor.  Used only when the matching radius is 0.
+        self.exclusion_auto_factor_arcs = getf(
+            "excluded_volume", "auto_factor_arcs", self.exclusion_auto_factor_arcs
+        )
+        self.exclusion_auto_factor_smooth = getf(
+            "excluded_volume", "auto_factor_smooth", self.exclusion_auto_factor_smooth
+        )
+        self.exclusion_auto_factor_heatmap = getf(
+            "excluded_volume", "auto_factor_heatmap", self.exclusion_auto_factor_heatmap
+        )
+        self.exclusion_auto_factor_ib = getf(
+            "excluded_volume", "auto_factor_ib", self.exclusion_auto_factor_ib
+        )
+
+        # [simulation_ib]
+        self.use_ib_mc = getb("simulation_ib", "use_ib_mc", self.use_ib_mc)
 
         # [confinement]
         self.use_confinement = getb("confinement", "use_confinement", self.use_confinement)
-        self.confinement_radius = getf("confinement", "radius", self.confinement_radius)
         self.confinement_weight = getf("confinement", "weight", self.confinement_weight)
-        self.confinement_packing_factor = getf(
-            "confinement", "packing_factor", self.confinement_packing_factor
-        )
         self.confinement_apply_to_arcs = getb(
             "confinement", "apply_to_arcs", self.confinement_apply_to_arcs
         )
         self.confinement_apply_to_smooth = getb(
             "confinement", "apply_to_smooth", self.confinement_apply_to_smooth
+        )
+        self.confinement_apply_to_ib = getb(
+            "confinement", "apply_to_ib", self.confinement_apply_to_ib
+        )
+        self.confinement_radius_arcs = getf(
+            "confinement", "radius_arcs", self.confinement_radius_arcs
+        )
+        self.confinement_radius_smooth = getf(
+            "confinement", "radius_smooth", self.confinement_radius_smooth
+        )
+        self.confinement_radius_ib = getf("confinement", "radius_ib", self.confinement_radius_ib)
+        self.confinement_packing_factor_arcs = getf(
+            "confinement", "packing_factor_arcs", self.confinement_packing_factor_arcs
+        )
+        self.confinement_packing_factor_smooth = getf(
+            "confinement", "packing_factor_smooth", self.confinement_packing_factor_smooth
+        )
+        self.confinement_packing_factor_ib = getf(
+            "confinement", "packing_factor_ib", self.confinement_packing_factor_ib
         )
 
         # [small_ib_boost]
@@ -522,6 +650,20 @@ class Settings:
         )
         self.drop_zero_length_subanchors = getb(
             "main", "drop_zero_length_subanchors", self.drop_zero_length_subanchors
+        )
+
+        # [main] dynamic loop density toggles.
+        self.use_dynamic_loop_density = getb(
+            "main", "use_dynamic_loop_density", self.use_dynamic_loop_density
+        )
+        self.target_bp_per_subanchor = geti(
+            "main", "target_bp_per_subanchor", self.target_bp_per_subanchor
+        )
+        self.min_subanchors_per_arc = geti(
+            "main", "min_subanchors_per_arc", self.min_subanchors_per_arc
+        )
+        self.max_subanchors_per_arc = geti(
+            "main", "max_subanchors_per_arc", self.max_subanchors_per_arc
         )
 
         # [simulation_arcs_smooth]

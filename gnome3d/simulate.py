@@ -10,7 +10,44 @@ from .data import ContactData
 from .io import parse_chrs_arg, parse_region
 from .settings import Settings
 from .solver import Solver
-from .types import BeadOut
+from .types import BeadOut, BedRegion
+
+
+def simulate(
+    settings: Settings,
+    data: ContactData,
+    chrs_list: list[str],
+    n_structures: int = 1,
+    region: BedRegion | None = None,
+) -> list[dict[str, list[BeadOut]]]:
+    """
+    Core MC reconstruction loop. Takes pre-built Settings and ContactData;
+    does no file I/O. Use this when settings and contact data are constructed
+    in-memory (notebooks, tests, sweeps) instead of being loaded from an .ini
+    file. For the config-file entry points see `run_region` / `run_genome`.
+
+    Returns one dict[chr -> list[BeadOut]] per structure.
+    """
+    solver = Solver(settings)
+    solver.load(data, chrs_list, region)
+
+    structures: list[dict[str, list[BeadOut]]] = []
+    for i in range(n_structures):
+        print(f"\n[simulate] structure {i + 1}/{n_structures}")
+        solver.reconstruct_heatmap()
+        solver.reconstruct_arcs()
+        per_chr: dict[str, list[BeadOut]] = {}
+        any_beads = False
+        for chr_ in chrs_list:
+            beads = solver.get_leaf_positions(chr_)
+            if beads:
+                per_chr[chr_] = beads
+                any_beads = True
+        if not any_beads:
+            raise RuntimeError(f"Structure {i + 1}: no leaf beads from any chromosome")
+        structures.append(per_chr)
+
+    return structures
 
 
 def run_region(
@@ -57,24 +94,8 @@ def run_region(
         s.data_dir = str(data_dir)
 
     data = ContactData.from_files(s, chrs_list, bed_region)
-
-    solver = Solver(s)
-    solver.load(data, chrs_list, bed_region)
-
-    structures: list[list[BeadOut]] = []
-    for i in range(n_structures):
-        print(f"\n[simulate] structure {i + 1}/{n_structures}")
-        solver.reconstruct_heatmap()
-        solver.reconstruct_arcs()
-        beads = solver.get_leaf_positions(chrs_list[0])
-        if not beads:
-            raise RuntimeError(
-                f"Structure {i + 1}: no leaf beads returned - "
-                "check hierarchy building or anchor loading."
-            )
-        structures.append(beads)
-
-    return structures
+    structures = simulate(s, data, chrs_list, n_structures, region=bed_region)
+    return [per_chr[chrs_list[0]] for per_chr in structures]
 
 
 def run_chromosome(
@@ -130,24 +151,4 @@ def run_genome(
         s.data_dir = str(data_dir)
 
     data = ContactData.from_files(s, chrs_list, bed_region)
-
-    solver = Solver(s)
-    solver.load(data, chrs_list, bed_region)
-
-    structures: list[dict[str, list[BeadOut]]] = []
-    for i in range(n_structures):
-        print(f"\n[simulate] structure {i + 1}/{n_structures}")
-        solver.reconstruct_heatmap()
-        solver.reconstruct_arcs()
-        per_chr: dict[str, list[BeadOut]] = {}
-        any_beads = False
-        for chr_ in chrs_list:
-            beads = solver.get_leaf_positions(chr_)
-            if beads:
-                per_chr[chr_] = beads
-                any_beads = True
-        if not any_beads:
-            raise RuntimeError(f"Structure {i + 1}: no leaf beads from any chromosome")
-        structures.append(per_chr)
-
-    return structures
+    return simulate(s, data, chrs_list, n_structures, region=bed_region)

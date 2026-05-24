@@ -455,29 +455,80 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   The `densify.subanchor_inside` and `densify.unique_starts` checks in `harness/compare.py` enforce the default-mode invariants.
 
+- **Dynamic loop density** — `settings.use_dynamic_loop_density = True` to enable. ([gnome3d/solver.py::_subanchor_counts_per_arc](gnome3d/solver.py))
+  The reference (and Python's default) inserts a fixed `loop_density` subanchor count between every adjacent anchor pair, regardless of arc span. With arcs spanning anything from a few hundred bp to hundreds of kb in real ChIA-PET data, this gives **>100× imbalance** in genomic-bp-per-bead between short and long arcs. Dynamic mode picks the count per arc so the *chain segments connecting beads* are roughly `target_bp_per_subanchor` long:
+
+    `n_subanchors = round(span / target) − 1`  (clamped to `[min, max]`)
+
+  An arc with `n` subanchors has `n + 1` consecutive chain segments. Short arcs (`span < 1.5 × target`) round to 1 segment → 0 subanchors → the two anchors are linked directly.
+
+    - `target_bp_per_subanchor` (int, default `5000`) — target genomic distance per chain segment.
+    - `min_subanchors_per_arc` (int, default `0`) — set to `1` to force at least one subanchor between every pair regardless of span.
+    - `max_subanchors_per_arc` (int, default `50`) — cap to avoid runaway counts on huge gaps (a 444 kb arc at 5 kb target would otherwise insert 88 subanchors).
+
+  Both [_densify_active_region](gnome3d/solver.py) and [_build_contact_heatmaps](gnome3d/solver.py) consume the same `_subanchor_counts_per_arc` output, so the densified bead chain and the subanchor contact heatmap stay in sync — `use_subanchor_heatmap` remains compatible with dynamic mode. For arcs with `count == 0` the contact heatmap merges that gap's half into each flanking anchor's bin (midpoint break); the smooth-MC chain just links the two anchors directly.
+
+  Default behavior (`use_dynamic_loop_density = False`) is unchanged.  The `densify.dynamic_counts_match` and `densify.dynamic_total_beads` checks in `harness/compare.py` exercise the dynamic path.
+
 ### New features (opt-in via settings, default-off)
 
 - **Excluded volume** — `settings.use_excluded_volume = true` to enable.
-  Soft harmonic repulsion preventing bead overlap. For pairs `(i, j)` with `|i - j| > exclusion_skip_neighbors` and `d_ij < exclusion_radius`, contributes `exclusion_weight * ((r0 - d)/r0)²` to the score. Implemented as an independent score component with the same `2 * (local_curr - local_prev)` incremental pattern as the heat term. Settings:
-    - `use_excluded_volume` (master toggle)
-    - `exclusion_radius` (r₀, position units; default 1.0)
+  Soft harmonic repulsion preventing bead overlap. For pairs `(i, j)` with `|i - j| > exclusion_skip_neighbors` and `d_ij < r₀`, contributes `exclusion_weight * ((r0 - d)/r0)²` to the score. Implemented as an independent score component with the same `2 * (local_curr - local_prev)` incremental pattern as the heat term.
+
+  **Per-level radius + auto-factor.** EV runs at four different MC levels (arcs / smooth / heatmap / IB) whose natural bead-bead distance scales differ by orders of magnitude — anchor beads sit at unit scale, IB centroids at hundreds of units. Each level has its own radius knob and its own auto-factor knob:
+
+    | Level | Radius field | Factor field | Auto formula (when radius = 0) |
+    |---|---|---|---|
+    | arcs   | `exclusion_radius_arcs`    | `exclusion_auto_factor_arcs`    | `factor × mean(positive arc expected distance)` |
+    | smooth | `exclusion_radius_smooth`  | `exclusion_auto_factor_smooth`  | `factor × mean(dtn)` (chain bond distances) |
+    | heatmap| `exclusion_radius_heatmap` | `exclusion_auto_factor_heatmap` | `factor × mean(active heatmap target distance)` |
+    | ib     | `exclusion_radius_ib`      | `exclusion_auto_factor_ib`      | `factor × mean(IB chain-bond dtn)` |
+
+    All radii default to `0` (auto). All auto factors default to `0.5` ("EV kicks in once beads get closer than half the typical bond distance at that level"). Setting a radius to a positive value disables auto-derive for that level.
+
+  **Gates** (which MC passes consult EV at all):
+    - `use_excluded_volume` (master)
+    - `exclusion_apply_to_arcs` (default false)
+    - `exclusion_apply_to_smooth` (default true)
+    - `exclusion_apply_to_heatmap` (default false)
+    - `exclusion_apply_to_ib` (default true, only kicks in when `use_ib_mc` is on)
+
+  **Shared knobs:**
     - `exclusion_weight` (k, comparable to spring constants; default 1.0)
-    - `exclusion_apply_to_arcs` (gate for arc MC; default false)
-    - `exclusion_apply_to_smooth` (gate for smooth MC; default true)
     - `exclusion_skip_neighbors` (skip pairs with `|i-j|` ≤ this; default 1, i.e. skip bonded)
 
-  Why not in the reference: 3dnome uses an inverse-distance repulsion only on pairs where the input arc matrix is marked negative — a sparse, conditional repulsion. This adds a global polymer-physics excluded-volume term independent of input data. Touches arc-MC (`_batch_arcs_nb`) and smooth-MC (`_batch_smooth_kernel_nb`).
+  Ini key names under `[excluded_volume]`: `use_excluded_volume`, `weight`, `apply_to_arcs`, `apply_to_smooth`, `apply_to_heatmap`, `apply_to_ib`, `skip_neighbors`, `radius_arcs`, `radius_smooth`, `radius_heatmap`, `radius_ib`, `auto_factor_arcs`, `auto_factor_smooth`, `auto_factor_heatmap`, `auto_factor_ib`.
+
+  Why not in the reference: 3dnome uses an inverse-distance repulsion only on pairs where the input arc matrix is marked negative — a sparse, conditional repulsion. This adds a global polymer-physics excluded-volume term independent of input data. Touches arc-MC (`_batch_arcs_nb`), smooth-MC (`_batch_smooth_kernel_nb`), and heatmap-MC (`_batch_heatmap_nb`).
+
+- **IB-level MC pass** — `settings.use_ib_mc = true` to enable. ([gnome3d/solver.py::_ib_mc_refine](gnome3d/solver.py))
+  Address the "central blob" pathology in full-chromosome runs (very visible with `use_dynamic_loop_density = true` + small `target_bp_per_subanchor`): the reference / Python default places IB centroids by random walk or linear interpolation with no MC, so when each IB's smooth-MC fills a fat sphere of beads the spheres overlap into a tangle around the origin. This pass runs `mc_smooth` over each segment's child IB centroids with chain-bond targets from `genomic_length_to_distance` between consecutive IB midpoints, plus excluded volume so IBs push each other apart. Touches `solver.py::_position_interaction_blocks` → `_ib_mc_refine`.
+
+  Ini layout:
+  ```ini
+  [simulation_ib]
+  use_ib_mc = yes
+
+  [excluded_volume]
+  apply_to_ib = yes
+  radius_ib = 0             # 0 = auto from IB chain-bond scale
+  auto_factor_ib = 0.5      # used when radius_ib = 0
+  ```
+
+  EV settings for this pass live under `[excluded_volume]` (consistent with the other levels): `exclusion_apply_to_ib`, `exclusion_radius_ib`, `exclusion_auto_factor_ib`. Defaults preserve reference behavior; opt-in for whole-chromosome / dynamic-density runs.
 
 - **Spherical confinement** — `settings.use_confinement = true` to enable.
-  Soft envelope mimicking a nuclear boundary. For each bead at distance `r` from the per-MC-call centroid, contributes `confinement_weight * ((r - R)/R)²` if `r > R`, else 0. Per-bead (single-counted) — delta is `(local_curr - local_prev)` with no factor of 2. Settings:
-    - `use_confinement` (master toggle)
-    - `confinement_radius` (R; 0 = auto from bead count + bond length, see below)
-    - `confinement_weight` (k; comparable to spring constants; default 1.0)
-    - `confinement_packing_factor` (used only when radius=0; default 1.5 ≈ packing fraction ~7%)
-    - `confinement_apply_to_arcs` (default true)
-    - `confinement_apply_to_smooth` (default true)
+  Soft envelope mimicking a nuclear boundary. For each bead at distance `r` from the per-MC-call centroid, contributes `confinement_weight * ((r - R)/R)²` if `r > R`, else 0. Per-bead (single-counted) — delta is `(local_curr - local_prev)` with no factor of 2. Each MC level has its own radius and packing factor (the spatial scale differs across levels):
 
-  Auto-radius: `R = packing_factor × avg_bond × N^(1/3)` where `avg_bond` is the mean of positive expected distances (arcs) or `mean(dtn)` (smooth). Center is computed as the centroid of starting positions, so per-IB MC calls naturally confine around the IB centroid; global calls (segment level) confine around the chromosome centroid. Motivated by: small interaction blocks in full-chromosome runs were getting flung out as long stretched chains because chain-bond springs alone couldn't hold loosely-constrained anchors. Touches arc-MC and smooth-MC.
+  | Level | Radius | Packing factor | Auto formula |
+  |---|---|---|---|
+  | arcs   | `confinement_radius_arcs`   | `confinement_packing_factor_arcs`   (default 1.5)  | `pf × mean(positive arc expected) × N^(1/3)` |
+  | smooth | `confinement_radius_smooth` | `confinement_packing_factor_smooth` (default 1.5)  | `pf × mean(dtn) × N^(1/3)` |
+  | ib     | `confinement_radius_ib`     | `confinement_packing_factor_ib`     (default 0.75) | `pf × mean(IB chain dtn) × N^(1/3)` |
+
+  Shared knobs: `use_confinement` (master toggle), `confinement_weight` (k; comparable to spring constants; default 1.0). Apply flags per level: `confinement_apply_to_arcs`, `confinement_apply_to_smooth`, `confinement_apply_to_ib` (all default true). Center is always the centroid of starting positions at that MC call.
+
+  Motivation: at the IB level, EV pushes IBs apart but only nearest-neighbor chain bonds pull them back, so the segment stretches out into a long sausage. The IB tether (small packing factor → tight sphere around the segment centroid) softly holds the chain together while EV still keeps IB spheres from overlapping. At arc / smooth levels, confinement instead acts as a nuclear-like envelope for under-constrained small IBs.
 
 - **Small-IB spring boost** — `settings.use_small_ib_boost = true` to enable.
   When an IB has fewer anchors than `small_ib_threshold`, multiplies `spring_stretch_arcs`, `spring_squeeze_arcs`, `spring_stretch`, `spring_squeeze`, `spring_angular` by `small_ib_spring_multiplier` for that IB only. No kernel changes — implemented in `solver.py::_settings_for_ib()` by passing a `copy.copy(self.s)` clone with boosted values to `_reconstruct_cluster_arcs` / `_reconstruct_cluster_smooth` via an `s_override` parameter. Thread-safe (never mutates `self.s`). Settings:

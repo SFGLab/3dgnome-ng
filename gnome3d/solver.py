@@ -123,14 +123,14 @@ class Solver:
 
     def _reconstruct_chromosome_level(self) -> None:
         """
-        Position chromosome root beads via heatmap MC over an n_chr × n_chr
+        Position chromosome root beads via heatmap MC over an n_chr * n_chr
         inter-chromosomal singleton heatmap.  Mirrors Reference
         LooperSolver::reconstructClustersHeatmapSingleLevel(0).
 
         For each pair of chromosomes (i, j), the heatmap cell h[i][j] is the
         sum of singleton scores between those chromosomes.  Self-self contacts
         are ignored (diagonal stays zero, which `_normalize_heatmap_diagonal_total`
-        treats correctly — it normalizes the first non-zero diagonal).
+        treats correctly - it normalizes the first non-zero diagonal).
 
         If no inter-chromosomal singletons are available the MC has no signal
         to optimize against, so chr roots are scattered randomly around the
@@ -524,6 +524,10 @@ class Solver:
         """
         Position IB clusters between segment positions.
         Mirrors Reference positionInteractionBlocks().
+
+        When `use_ib_mc` is set, follows up the initial placement with a
+        small MC pass on the IB centroids (chain bonds + excluded volume)
+        so subsequent IB-level smooth-MC spheres have room to breathe.
         """
         if len(segs) > 1:
             self._interpolate_children_linear(segs)
@@ -534,6 +538,107 @@ class Solver:
             for ib_idx in seg.children:
                 pos = pos + random_vector_np(100.0)
                 self.clusters[ib_idx].pos = pos.copy()
+
+        if self.s.use_ib_mc:
+            self._ib_mc_refine(segs)
+
+    def _ib_mc_refine(self, segs: list[int]) -> None:
+        """
+        Refine IB centroid positions with a small chain-bond + excluded-volume
+        MC pass.  For each segment, the segment's IB centroids form a chain;
+        we run mc_smooth on them with `fixed = all False` so every IB moves,
+        and turn on excluded volume so IBs push each other apart.  Bond
+        targets come from genomic_length_to_distance applied to the genomic
+        gap between consecutive IB midpoints.
+
+        Confinement (when `use_confinement and confinement_apply_to_ib`) adds
+        a soft tether toward the segment centroid so the IB chain stays
+        compact instead of expanding outward under EV pressure alone.
+
+        Opt-in via `use_ib_mc`. EV and confinement at this pass route through
+        the smooth-MC kernel using the IB-level radius / packing-factor knobs
+        (under [excluded_volume] and [confinement] respectively).
+        """
+        s = self.s
+        log1 = s.output_level >= 1
+        log2 = s.output_level >= 2
+        for seg_idx in segs:
+            ibs = list(self.clusters[seg_idx].children)
+            if len(ibs) <= 1:
+                continue
+
+            pos: F32Array = np.array([self.clusters[ib].pos for ib in ibs], dtype=np.float32)
+            dtn: F32Array = np.zeros(len(ibs) - 1, dtype=np.float32)
+            for i in range(len(ibs) - 1):
+                gap = abs(self.clusters[ibs[i + 1]].genomic_pos - self.clusters[ibs[i]].genomic_pos)
+                dtn[i] = float(s.genomic_length_to_distance(gap))
+            fixed: BoolArray = np.zeros(len(ibs), dtype=np.bool_)
+
+            avg_dtn = float(dtn.mean()) if dtn.size > 0 else 1.0
+            step_size = avg_dtn * s.noise_smooth
+
+            # Per-IB-MC settings clone: route EV and confinement through the
+            # smooth-MC kernel using IB-scale radius/factor.  mc_smooth
+            # auto-derives from its own dtn input, so we forward the IB-level
+            # radius and factor onto smooth-level fields (the clone is local;
+            # the real Settings stays intact). Disable orientation and heat
+            # (IB chain has no per-bead motif data or heat target).
+            s_ib = copy.copy(s)
+            s_ib.use_ctcf_motif = False
+            s_ib.use_subanchor_heatmap = False
+            s_ib.use_excluded_volume = s.use_excluded_volume and s.exclusion_apply_to_ib
+            s_ib.exclusion_apply_to_smooth = True
+            s_ib.exclusion_radius_smooth = s.exclusion_radius_ib
+            s_ib.exclusion_auto_factor_smooth = s.exclusion_auto_factor_ib
+            # IBs are not "bonded" in the same way subanchors are - skip only
+            # the immediate neighbor so the chain can flex but non-neighbors
+            # still repel each other.
+            s_ib.exclusion_skip_neighbors = 1
+            # Confinement: soft tether toward the segment centroid keeps the
+            # IB chain compact instead of stretching out under EV pressure.
+            s_ib.use_confinement = s.use_confinement and s.confinement_apply_to_ib
+            s_ib.confinement_apply_to_smooth = True
+            s_ib.confinement_radius_smooth = s.confinement_radius_ib
+            s_ib.confinement_packing_factor_smooth = s.confinement_packing_factor_ib
+
+            # Compute the radii that mc_smooth will end up using (for logging).
+            log_ev_r0 = (
+                s.exclusion_radius_ib
+                if s.exclusion_radius_ib > 0.0
+                else s.exclusion_auto_factor_ib * avg_dtn
+            )
+            log_conf_R = (
+                s.confinement_radius_ib
+                if s.confinement_radius_ib > 0.0
+                else s.confinement_packing_factor_ib * avg_dtn * (len(ibs) ** (1.0 / 3.0))
+            )
+            if log1:
+                conf_tag = (
+                    f", tether_R={log_conf_R:.2f}"
+                    if (s.use_confinement and s.confinement_apply_to_ib)
+                    else ""
+                )
+                print(
+                    f"  [IB-MC] seg {seg_idx}: {len(ibs)} IBs, "
+                    f"avg_bond={avg_dtn:.2f}, ev_r0={log_ev_r0:.3f}, "
+                    f"step={step_size:.3f}{conf_tag}"
+                )
+            gyr_before = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
+            mc_smooth(
+                pos,
+                dtn,
+                fixed,
+                step_size,
+                s_ib,
+                label=f"IB-MC seg{seg_idx}",
+                verbose=log2,
+            )
+            gyr_after = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
+            if log1:
+                print(f"  [IB-MC] seg {seg_idx}: gyr {gyr_before:.2f} -> {gyr_after:.2f}")
+
+            for i, ib in enumerate(ibs):
+                self.clusters[ib].pos = pos[i].copy()
 
     def _process_ib(
         self,
@@ -596,7 +701,7 @@ class Solver:
         s_boost.spring_squeeze = self.s.spring_squeeze * m
         s_boost.spring_angular = self.s.spring_angular * m
         if log1:
-            print(f"  {ib_label}  small-IB spring boost ×{m}")
+            print(f"  {ib_label}  small-IB spring boost *{m}")
         return s_boost
 
     def _calc_anchor_expected_distances(
@@ -713,6 +818,47 @@ class Solver:
         for i, ci in enumerate(active_region):
             self.clusters[ci].pos = best_pos[i].copy()
 
+    def _subanchor_counts_per_arc(self, active_region: list[int]) -> list[int]:
+        """
+        Number of subanchors to insert between each consecutive anchor pair.
+
+        Default mode (`use_dynamic_loop_density = False`): uniform
+        `self.s.loop_density` for every arc - matches the historical behavior
+        and the reference.
+
+        Dynamic mode (`use_dynamic_loop_density = True`): for each arc with
+        in-between span `span_bp`, pick the subanchor count so that the chain
+        segments connecting beads are roughly `target_bp_per_subanchor` long.
+        With `n` subanchors there are `n + 1` segments in the gap, so
+        `n = round(span_bp / target) - 1` (clamped to `[min, max]`).
+
+        Examples (target = 5kb): a 3 kb arc rounds to 1 segment → 0 subanchors;
+        a 5 kb arc → 1 segment → 0 subanchors (consecutive anchors are linked
+        directly); a 10 kb arc → 2 segments → 1 subanchor; a 50 kb arc → 10
+        segments → 9 subanchors.  Set `min_subanchors_per_arc = 1` to force
+        at least one subanchor between every pair regardless of span.
+
+        Both `_densify_active_region` and `_build_contact_heatmaps` consume
+        this so the densified bead chain and the subanchor heatmap binning
+        stay in sync.
+        """
+        n_arcs = max(len(active_region) - 1, 0)
+        if not self.s.use_dynamic_loop_density:
+            return [self.s.loop_density] * n_arcs
+
+        target = max(self.s.target_bp_per_subanchor, 1)
+        mn = max(self.s.min_subanchors_per_arc, 0)
+        mx = max(self.s.max_subanchors_per_arc, mn)
+        counts: list[int] = []
+        for i in range(n_arcs):
+            ca = self.clusters[active_region[i]]
+            cb = self.clusters[active_region[i + 1]]
+            span = abs(cb.start - ca.end)
+            # n_segments = round(span / target); subanchors = segments - 1.
+            n = round(span / target) - 1
+            counts.append(max(mn, min(mx, n)))
+        return counts
+
     def _build_contact_heatmaps(
         self,
         active_region: list[int],
@@ -733,42 +879,58 @@ class Solver:
         import bisect
 
         n_anchors = len(active_region)
-        ld = self.s.loop_density
+        counts = self._subanchor_counts_per_arc(active_region)  # length n_anchors-1
+        # Total bins = anchors + subanchors. Each arc i contributes counts[i] bins.
+        N = n_anchors + sum(counts)
 
-        # Total densified beads = n_anchors + (n_anchors-1)*ld = 1 + (n_anchors-1)*(ld+1)
-        N = n_anchors + (n_anchors - 1) * ld
+        # anchor_offsets[k] is the flat-bin index of anchor k.
+        # Subanchor j of arc i lives at bin offsets[i] + 1 + j  (j = 0..counts[i]-1).
+        anchor_offsets: list[int] = [0]
+        for c in counts:
+            anchor_offsets.append(anchor_offsets[-1] + 1 + c)
 
-        # Build genomic break boundaries mirroring Reference createSingletonSubanchorHeatmap().
-        # Anchor k occupies bin k*(ld+1).  Subanchor j in span k→k+1 occupies
-        # bin k*(ld+1)+j  (j=1..ld).
         anchor_lens: list[int] = []
         gap_lens: list[int] = []
 
         region_start = self.clusters[active_region[0]].start
         region_end = self.clusters[active_region[-1]].end
 
-        # breaks[i] is the left boundary of bin i
+        # Build break boundaries.  breaks[k] = left edge of bin k.
+        # For each arc i: anchor i ends at ca.end, then counts[i] subanchor bins
+        # tile [ca.end, cb.start], then anchor (i+1) begins at cb.start.  If
+        # counts[i] == 0 there's no subanchor bin for that arc - we still need
+        # a single break separating the two anchor bins, set to the midpoint
+        # of the gap so each anchor absorbs half of it (negligible when count
+        # collapses to 0 only for short arcs anyway).
         breaks: list[int] = [region_start]
         anchor_lens.append(
             self.clusters[active_region[0]].end - self.clusters[active_region[0]].start
         )
 
-        for i in range(1, n_anchors):
-            ca_end = self.clusters[active_region[i - 1]].end
-            cb_start = self.clusters[active_region[i]].start
+        for i in range(n_anchors - 1):
+            ca_end = self.clusters[active_region[i]].end
+            cb_start = self.clusters[active_region[i + 1]].start
             gap = max(cb_start - ca_end, 0)
-            anchor_len = self.clusters[active_region[i]].end - self.clusters[active_region[i]].start
+            anchor_len = (
+                self.clusters[active_region[i + 1]].end - self.clusters[active_region[i + 1]].start
+            )
             gap_lens.append(gap)
             anchor_lens.append(anchor_len)
-            # ld+1 new break boundaries: span_start, ld-1 interior, span_end
-            breaks.append(ca_end)
-            for j in range(1, ld):
-                breaks.append(ca_end + int(gap * j / ld))
-            breaks.append(cb_start)
+            c = counts[i]
+            if c >= 1:
+                # ca.end closes anchor i's bin; c-1 interior breaks tile the gap;
+                # cb.start opens anchor (i+1)'s bin.
+                breaks.append(ca_end)
+                for j in range(1, c):
+                    breaks.append(ca_end + int(gap * j / c))
+                breaks.append(cb_start)
+            else:
+                # No subanchor bin for this arc; split the gap evenly between
+                # the two flanking anchors with a midpoint break.
+                breaks.append((ca_end + cb_start) // 2)
 
         breaks.append(region_end)
 
-        # Number of bins = len(breaks)-1 = 1 + (n_anchors-1)*(ld+1) = N
         # Bin singleton contacts into subanchor heatmap.
         # Note: Python filters by chromosome (c1 != chr_ or c2 != chr_). Reference's
         # createSingletonSubanchorHeatmap does NOT filter by chromosome, so it
@@ -797,14 +959,25 @@ class Solver:
         # normalized by anchor area in Mbp^2.  Mirrors Reference lines 1267-1273.
         h_anchor: F64Array = np.zeros((n_anchors, n_anchors), dtype=np.float64)
         for i in range(n_anchors):
-            ai = i * (ld + 1)
+            ai = anchor_offsets[i]
             al_i = max(anchor_lens[i], 1)
             for j in range(i + 1, n_anchors):
-                aj = j * (ld + 1)
+                aj = anchor_offsets[j]
                 al_j = max(anchor_lens[j], 1)
                 val = h_sub[ai, aj] / (al_i * al_j / 1e6)
                 h_anchor[i, j] = val
                 h_anchor[j, i] = val
+
+        # Per-bin metadata for the subanchor heatmap normalization step:
+        # which anchor/arc each bin belongs to, and whether it is an anchor bin.
+        bin_is_anchor: list[bool] = [False] * N
+        bin_arc_idx: list[int] = [-1] * N
+        for k in range(n_anchors):
+            bin_is_anchor[anchor_offsets[k]] = True
+        for i, c in enumerate(counts):
+            base = anchor_offsets[i] + 1
+            for j in range(c):
+                bin_arc_idx[base + j] = i
 
         # Normalize subanchor heatmap: divide by avg count, then by bin areas.
         # Mirrors Reference lines 1294-1320.
@@ -812,16 +985,19 @@ class Solver:
         if avg_count > 1e-6:
             h_sub /= avg_count
 
-            # Bin sizes in kb: anchor bins use anchor_len, subanchor bins use gap/ld
+            # Bin sizes in kb: anchor bins use the anchor's own length, subanchor
+            # bins use gap_len / counts[arc].
             bin_sizes: F64Array = np.empty(N, dtype=np.float64)
             for k in range(N):
-                anchor_idx = k // (ld + 1)
-                if k % (ld + 1) == 0:
-                    bin_sizes[k] = max(anchor_lens[anchor_idx], 1) / 1000.0
+                if bin_is_anchor[k]:
+                    # Find which anchor index this bin corresponds to.
+                    a_idx = anchor_offsets.index(k)
+                    bin_sizes[k] = max(anchor_lens[a_idx], 1) / 1000.0
                 else:
-                    gap_idx = anchor_idx
-                    gl = gap_lens[gap_idx] if gap_idx < len(gap_lens) else 1
-                    bin_sizes[k] = max(gl / ld, 1) / 1000.0
+                    arc_i = bin_arc_idx[k]
+                    gl = gap_lens[arc_i] if 0 <= arc_i < len(gap_lens) else 1
+                    c = counts[arc_i] if 0 <= arc_i < len(counts) else 1
+                    bin_sizes[k] = max(gl / max(c, 1), 1) / 1000.0
 
             for i in range(N):
                 for j in range(i + 1, N):
@@ -862,7 +1038,7 @@ class Solver:
             n_movable = int((~fixed).sum())
             print(
                 f"  [{label}] heat dist matrix: {n} beads "
-                f"({n_movable} movable), {n_reps} reps × {n_steps} steps"
+                f"({n_movable} movable), {n_reps} reps * {n_steps} steps"
             )
 
         avg_dist: F64Array = np.zeros((n, n), dtype=np.float64)
@@ -966,7 +1142,7 @@ class Solver:
           anchor_map : list of (pos_index, cluster_index) for anchor beads
         Mirrors Reference LooperSolver::densifyActiveRegion().
         """
-        ld = self.s.loop_density
+        counts = self._subanchor_counts_per_arc(active_region)
         bead_starts: list[int] = []
         bead_ends: list[int] = []
         bead_pos: list[F32Array] = []
@@ -979,6 +1155,7 @@ class Solver:
             aj = active_region[i + 1]
             ca = self.clusters[ai]
             cb = self.clusters[aj]
+            ld = counts[i]
 
             k = len(bead_pos)
             bead_starts.append(ca.start)
@@ -1000,7 +1177,7 @@ class Solver:
             #     Overlap     → [cb.start, ca.end] (overlap; tiled with subanchors).
             #     Touching    → span = 0 (degenerate, unavoidable).
             #   - True (reference parity, LooperSolver.cpp:1829-1831):
-            #     `range = cb.start - ca.end` clamped to 0 below — overlap collapses
+            #     `range = cb.start - ca.end` clamped to 0 below - overlap collapses
             #     to a single point at ca.end; subanchors all degenerate there.
             if self.s.overlap_anchor_strict:
                 boundary_lo = ca.end
@@ -1249,7 +1426,7 @@ class Solver:
 
         Implementation matches the reference: multiply the entire heatmap by
         `scale`, then divide intra-chromosome blocks back by `scale`.  Net
-        effect is intra-chr × 1 = unchanged, inter-chr × scale = boosted.
+        effect is intra-chr * 1 = unchanged, inter-chr * scale = boosted.
         """
         # Determine row/col index ranges for each chromosome's block.
         # current_level[chr] holds the cluster indices in this level for chr;
@@ -1262,7 +1439,7 @@ class Solver:
         for chr_ in chrs_in_order:
             block_starts.append(block_starts[-1] + len(current_level[chr_]))
         if block_starts[-1] != n:
-            # Shape mismatch — leave heatmap untouched rather than scrambling it.
+            # Shape mismatch - leave heatmap untouched rather than scrambling it.
             return
 
         for i in range(n):
