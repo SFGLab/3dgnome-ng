@@ -134,7 +134,20 @@ class Settings:
     exclusion_auto_factor_ib: float
 
     # ---- IB-level MC pass (chain bonds + EV between IB centroids) ----
+    # IB MC is a peer stage to smooth/arcs/heatmap, not a sub-mode of smooth.
+    # It owns its own MC schedule, chain spring constants, and step noise.
     use_ib_mc: bool
+    max_temp_ib: float
+    dt_temp_ib: float
+    jump_scale_ib: float
+    jump_coef_ib: float
+    mc_stop_improvement_ib: float
+    mc_stop_successes_ib: int
+    mc_stop_steps_ib: int
+    spring_stretch_ib: float
+    spring_squeeze_ib: float
+    dist_weight_ib: float
+    noise_ib: float
 
     # ---- confinement ----
     use_confinement: bool
@@ -312,8 +325,21 @@ class Settings:
         # to breathe - addresses the "central blob" pathology with dynamic
         # loop density and many subanchors per IB.  EV inside this pass is
         # controlled by `exclusion_apply_to_ib`, `exclusion_radius_ib`, and
-        # `exclusion_auto_factor_ib` under [excluded_volume].
+        # `exclusion_auto_factor_ib` under [excluded_volume]. IB MC owns its
+        # own MC schedule + chain spring constants; defaults mirror the smooth
+        # stage so existing configs behave identically.
         self.use_ib_mc = False
+        self.max_temp_ib = 20.0
+        self.dt_temp_ib = 0.99995
+        self.jump_scale_ib = 50.0
+        self.jump_coef_ib = 20.0
+        self.mc_stop_improvement_ib = 0.995
+        self.mc_stop_successes_ib = 5
+        self.mc_stop_steps_ib = 10000
+        self.spring_stretch_ib = 0.1
+        self.spring_squeeze_ib = 0.1
+        self.dist_weight_ib = 1.0
+        self.noise_ib = 0.5
 
         # ---- confinement ----
         # Soft sphere around per-MC-call centroid; pulls beads back inside.
@@ -429,6 +455,7 @@ class Settings:
         self.noise_lvl2 = getf("main", "noise_lvl2", self.noise_lvl2)
         # noise_arcs intentionally ignored (see Settings class comment).
         self.noise_smooth = getf("main", "noise_smooth", self.noise_smooth)
+        self.noise_ib = getf("main", "noise_ib", self.noise_ib)
 
         # [data]
         self.data_dir = gets("data", "data_dir", self.data_dir)
@@ -485,6 +512,8 @@ class Settings:
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs
         )
+        self.spring_stretch_ib = getf("springs", "stretch_constant_ib", self.spring_stretch_ib)
+        self.spring_squeeze_ib = getf("springs", "squeeze_constant_ib", self.spring_squeeze_ib)
 
         # [motif_orientation]
         self.use_ctcf_motif = getb(
@@ -605,6 +634,22 @@ class Settings:
 
         # [simulation_ib]
         self.use_ib_mc = getb("simulation_ib", "use_ib_mc", self.use_ib_mc)
+        self.max_temp_ib = getf("simulation_ib", "max_temp", self.max_temp_ib)
+        self.dt_temp_ib = getf("simulation_ib", "delta_temp", self.dt_temp_ib)
+        self.jump_scale_ib = getf("simulation_ib", "jump_temp_scale", self.jump_scale_ib)
+        self.jump_coef_ib = getf("simulation_ib", "jump_temp_coef", self.jump_coef_ib)
+        self.mc_stop_steps_ib = geti("simulation_ib", "stop_condition_steps", self.mc_stop_steps_ib)
+        self.mc_stop_improvement_ib = getf(
+            "simulation_ib",
+            "stop_condition_improvement_threshold",
+            self.mc_stop_improvement_ib,
+        )
+        self.mc_stop_successes_ib = geti(
+            "simulation_ib",
+            "stop_condition_successes_threshold",
+            self.mc_stop_successes_ib,
+        )
+        self.dist_weight_ib = getf("simulation_ib", "dist_weight", self.dist_weight_ib)
 
         # [confinement]
         self.use_confinement = getb("confinement", "use_confinement", self.use_confinement)

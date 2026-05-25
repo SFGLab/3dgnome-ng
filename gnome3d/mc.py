@@ -2,13 +2,18 @@
 Monte Carlo simulation loops for 3dgnome-ng.
 
 Mirrors Reference LooperSolver::MonteCarloHeatmap(), MonteCarloArcs(), and
-MonteCarloArcsSmooth().
+MonteCarloArcsSmooth(). The four public entry points - mc_heatmap, mc_arcs,
+mc_smooth, mc_ib - all share a single numba kernel `_batch_mc_nb`; they
+differ only in (a) which structure-energy variant to use, and (b) which
+optional energy terms (heat / orientation / excluded volume / confinement)
+are wired up. Each public function reads its own level's settings; the
+kernel itself is settings-free.
 
-On first import the JIT functions compile (~10-30 s); subsequent runs
-load from cache
+On first import the JIT functions compile (~10-30 s); subsequent runs load
+from cache.
 
 Acceptance criterion (all loops):
-    ok = (score_new <= score_curr)
+    ok = (score_new <= score_curr)   (or <  for smooth - strict_better=True)
       or rand() < jump_scale * exp(-jump_coef * score_new/score_curr / T)
 """
 
@@ -36,6 +41,12 @@ def njit(**kwargs: Any) -> Callable[[F], F]:
         return cast(F, _njit(**kwargs)(fn))
 
     return decorator
+
+
+# Structure-term selector.  Kept as plain ints (numba-friendly).
+STRUCT_ARCS = 0
+STRUCT_CHAIN = 1
+STRUCT_HEATMAP = 2
 
 
 # Smooth MC helpers
@@ -216,176 +227,7 @@ def _init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
     return err
 
 
-@njit(cache=True)
-def _batch_smooth_kernel_nb(
-    pos: F64Array,
-    dtn: F64Array,
-    movable: I64Array,
-    step_size: float,
-    T: float,
-    dt: float,
-    jump_scale: float,
-    jump_coef: float,
-    n_steps: int,
-    stretch_k: float,
-    squeeze_k: float,
-    ang_k: float,
-    dist_w: float,
-    ang_w: float,
-    use_heat: bool,
-    heat_dist: F64Array,
-    heat_weight: float,
-    use_orn: bool,
-    orn_is_L: BoolArray,
-    anchor_ar: I32Array,
-    nbr_offsets: I32Array,
-    nbr_indices: I32Array,
-    nbr_weights: F64Array,
-    anchor_orn: F64Array,
-    bead_to_anchor_k: I32Array,
-    motif_weight: float,
-    symmetric: bool,
-    use_excl: bool,
-    excl_r0: float,
-    excl_weight: float,
-    excl_skip: int,
-    use_conf: bool,
-    conf_cx: float,
-    conf_cy: float,
-    conf_cz: float,
-    conf_R: float,
-    conf_weight: float,
-    score_struct: float,
-    score_orn: float,
-    score_heat: float,
-    score_excl: float,
-    score_conf: float,
-) -> tuple[float, float, float, float, float, float, int]:
-    """Smooth-MC kernel.  Energy terms (toggled by flags):
-      * structure   (always on): incremental delta via _local_smooth_nb
-      * heat        (use_heat):  incremental delta via _local_heat_nb, 2x factor
-      * orientation (use_orn):   incremental delta via weighted local, 2x factor
-      * excl. vol   (use_excl):  incremental delta via _local_excl_nb, 2x factor
-      * confinement (use_conf):  incremental delta via _local_confine_nb, no 2x
-
-    Returns (T, score_struct, score_orn, score_heat, score_excl, score_conf, n_ok).
-    Disabled-term arrays must still be valid-typed (any shape), as they are not
-    indexed when their flag is False.
-    """
-    n = pos.shape[0]
-    n_mov = movable.shape[0]
-    n_ok = 0
-    score = score_struct + score_orn + score_heat + score_excl + score_conf
-    for _ in range(n_steps):
-        p: int = int(movable[np.random.randint(0, n_mov)])
-        dx = np.random.uniform(-step_size, step_size)
-        dy = np.random.uniform(-step_size, step_size)
-        dz = np.random.uniform(-step_size, step_size)
-
-        loc_struct_prev = _local_smooth_nb(
-            pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
-        )
-        loc_heat_prev = 0.0
-        if use_heat:
-            loc_heat_prev = _local_heat_nb(pos, heat_dist, p, heat_weight)
-
-        loc_excl_prev = 0.0
-        if use_excl:
-            loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
-
-        loc_conf_prev = 0.0
-        if use_conf:
-            loc_conf_prev = _local_confine_nb(
-                pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight
-            )
-
-        orn_k: int = -1
-        prev_ox = 0.0
-        prev_oy = 0.0
-        prev_oz = 0.0
-        loc_orn_prev = 0.0
-        if use_orn:
-            orn_k = int(bead_to_anchor_k[p])
-            if orn_k >= 0:
-                prev_ox = anchor_orn[orn_k, 0]
-                prev_oy = anchor_orn[orn_k, 1]
-                prev_oz = anchor_orn[orn_k, 2]
-                loc_orn_prev = _local_score_orientation_nb(
-                    anchor_orn,
-                    orn_k,
-                    nbr_offsets,
-                    nbr_indices,
-                    nbr_weights,
-                    motif_weight,
-                    symmetric,
-                )
-
-        pos[p, 0] += dx
-        pos[p, 1] += dy
-        pos[p, 2] += dz
-
-        loc_struct_curr = _local_smooth_nb(
-            pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
-        )
-        score_struct_new = score_struct - loc_struct_prev + loc_struct_curr
-
-        score_heat_new = score_heat
-        if use_heat:
-            loc_heat_curr = _local_heat_nb(pos, heat_dist, p, heat_weight)
-            score_heat_new = score_heat + 2.0 * (loc_heat_curr - loc_heat_prev)
-
-        score_excl_new = score_excl
-        if use_excl:
-            loc_excl_curr = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
-            score_excl_new = score_excl + 2.0 * (loc_excl_curr - loc_excl_prev)
-
-        score_conf_new = score_conf
-        if use_conf:
-            loc_conf_curr = _local_confine_nb(
-                pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight
-            )
-            score_conf_new = score_conf + (loc_conf_curr - loc_conf_prev)
-
-        score_orn_new = score_orn
-        if use_orn and orn_k >= 0:
-            ar: int = int(anchor_ar[orn_k])
-            ox, oy, oz = _calc_orientation_nb(pos, ar, n, bool(orn_is_L[ar]))
-            anchor_orn[orn_k, 0] = ox
-            anchor_orn[orn_k, 1] = oy
-            anchor_orn[orn_k, 2] = oz
-            loc_orn_curr = _local_score_orientation_nb(
-                anchor_orn, orn_k, nbr_offsets, nbr_indices, nbr_weights, motif_weight, symmetric
-            )
-            score_orn_new = score_orn + 2.0 * (loc_orn_curr - loc_orn_prev)
-
-        score_new = (
-            score_struct_new + score_orn_new + score_heat_new + score_excl_new + score_conf_new
-        )
-
-        ok = score_new < score
-        if not ok and T > 0.0 and score > 0.0:
-            ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T)
-        if ok:
-            n_ok += 1
-            score = score_new
-            score_struct = score_struct_new
-            score_orn = score_orn_new
-            score_heat = score_heat_new
-            score_excl = score_excl_new
-            score_conf = score_conf_new
-        else:
-            pos[p, 0] -= dx
-            pos[p, 1] -= dy
-            pos[p, 2] -= dz
-            if use_orn and orn_k >= 0:
-                anchor_orn[orn_k, 0] = prev_ox
-                anchor_orn[orn_k, 1] = prev_oy
-                anchor_orn[orn_k, 2] = prev_oz
-        T *= dt
-    return T, score_struct, score_orn, score_heat, score_excl, score_conf, n_ok
-
-
-# Orientation MC helpers
+# Orientation MC helpers (smooth-only)
 
 
 @njit(cache=True)
@@ -485,6 +327,9 @@ def _local_score_orientation_nb(
     return err * motif_weight
 
 
+# Heat MC helpers (smooth-only, subanchor heatmap)
+
+
 @njit(cache=True)
 def _local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: float) -> float:
     """Local heat score for bead p vs all others.
@@ -574,94 +419,6 @@ def _init_arcs_nb(pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: flo
     return sc
 
 
-@njit(cache=True)
-def _batch_arcs_nb(
-    pos: F64Array,
-    exp: F64Array,
-    step_size: float,
-    T: float,
-    dt: float,
-    jump_scale: float,
-    jump_coef: float,
-    n_steps: int,
-    stretch_k: float,
-    squeeze_k: float,
-    use_excl: bool,
-    excl_r0: float,
-    excl_weight: float,
-    excl_skip: int,
-    use_conf: bool,
-    conf_cx: float,
-    conf_cy: float,
-    conf_cz: float,
-    conf_R: float,
-    conf_weight: float,
-    score_arcs: float,
-    score_excl: float,
-    score_conf: float,
-) -> tuple[float, float, float, float, int]:
-    """Run n_steps arc-MC steps with optional excluded-volume and confinement.
-
-    Returns (T, score_arcs, score_excl, score_conf, n_ok).
-    Arc spring uses (curr - prev); excl uses 2*(curr - prev); confine uses (curr - prev).
-    """
-    n = pos.shape[0]
-    n_ok = 0
-    score = score_arcs + score_excl + score_conf
-    for _ in range(n_steps):
-        p: int = int(np.random.randint(0, n))  # pyright: ignore[reportUnknownArgumentType]
-        dx = np.random.uniform(-step_size, step_size)
-        dy = np.random.uniform(-step_size, step_size)
-        dz = np.random.uniform(-step_size, step_size)
-
-        loc_arc_prev = _local_arcs_nb(pos, exp, p, stretch_k, squeeze_k)
-        loc_excl_prev = 0.0
-        if use_excl:
-            loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
-        loc_conf_prev = 0.0
-        if use_conf:
-            loc_conf_prev = _local_confine_nb(
-                pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight
-            )
-
-        pos[p, 0] += dx
-        pos[p, 1] += dy
-        pos[p, 2] += dz
-
-        loc_arc_curr = _local_arcs_nb(pos, exp, p, stretch_k, squeeze_k)
-        score_arcs_new = score_arcs - loc_arc_prev + loc_arc_curr
-
-        score_excl_new = score_excl
-        if use_excl:
-            loc_excl_curr = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
-            score_excl_new = score_excl + 2.0 * (loc_excl_curr - loc_excl_prev)
-
-        score_conf_new = score_conf
-        if use_conf:
-            loc_conf_curr = _local_confine_nb(
-                pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight
-            )
-            score_conf_new = score_conf + (loc_conf_curr - loc_conf_prev)
-
-        score_new = score_arcs_new + score_excl_new + score_conf_new
-        ok = score_new <= score
-        if not ok and score > 0.0 and T > 0.0:
-            ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T)
-
-        if ok:
-            n_ok += 1
-            score = score_new
-            score_arcs = score_arcs_new
-            score_excl = score_excl_new
-            score_conf = score_conf_new
-        else:
-            pos[p, 0] -= dx
-            pos[p, 1] -= dy
-            pos[p, 2] -= dz
-        T *= dt
-    return T, score_arcs, score_excl, score_conf, n_ok
-
-
 # Heatmap MC helpers
 
 
@@ -700,80 +457,434 @@ def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> floa
     return sc
 
 
+# Unified MC kernel
+#
+# One numba kernel handles all four stages.  Structure-term variant is
+# selected by `struct_type` (STRUCT_ARCS / STRUCT_CHAIN / STRUCT_HEATMAP).
+# Optional energy terms (heat / orn / excl / conf) are toggled by their use_*
+# flags; their data arrays must still be valid-typed (any shape) since
+# disabled-term arrays are not indexed.
+#
+# Delta conventions:
+#   * structure  : score += struct_delta_factor * (local_curr - local_prev)
+#                  (1.0 for arcs/chain, 2.0 for heatmap)
+#   * heat       : score += 2 * (curr - prev)
+#   * orientation: score += 2 * (curr - prev)
+#   * excluded   : score += 2 * (curr - prev)
+#   * confinement: score += 1 * (curr - prev)
+#
+# Acceptance: ok = (score_new < score) if strict_better else (score_new <= score)
+# Smooth uses strict (preserves prior behaviour); arcs/heatmap use non-strict.
+
+
 @njit(cache=True)
-def _batch_heatmap_nb(
+def _batch_mc_nb(
     pos: F64Array,
-    exp_safe: F64Array,
-    skip: BoolArray,
+    movable: I64Array,
+    # ---- Structure term ----
+    struct_type: int,
+    exp_mat: F64Array,
+    dtn: F64Array,
+    skip_mat: BoolArray,
+    stretch_k: float,
+    squeeze_k: float,
+    ang_k: float,
+    dist_w: float,
+    ang_w: float,
+    struct_delta_factor: float,
+    # ---- Heat term ----
+    use_heat: bool,
+    heat_dist: F64Array,
+    heat_weight: float,
+    # ---- Orientation term ----
+    use_orn: bool,
+    orn_is_L: BoolArray,
+    anchor_ar: I32Array,
+    nbr_offsets: I32Array,
+    nbr_indices: I32Array,
+    nbr_weights: F64Array,
+    anchor_orn: F64Array,
+    bead_to_anchor_k: I32Array,
+    motif_weight: float,
+    motifs_symmetric: bool,
+    # ---- Excluded volume term ----
+    use_excl: bool,
+    excl_r0: float,
+    excl_weight: float,
+    excl_skip: int,
+    # ---- Confinement term ----
+    use_conf: bool,
+    conf_cx: float,
+    conf_cy: float,
+    conf_cz: float,
+    conf_R: float,
+    conf_weight: float,
+    # ---- MC schedule ----
     step_size: float,
     T: float,
     dt: float,
     jump_scale: float,
     jump_coef: float,
     n_steps: int,
-    use_excl: bool,
-    excl_r0: float,
-    excl_weight: float,
-    excl_skip: int,
-    score_hm: float,
+    strict_better: bool,
+    # ---- Initial scores ----
+    score_struct: float,
+    score_heat: float,
+    score_orn: float,
     score_excl: float,
-) -> tuple[float, float, float, int]:
-    """Run n_steps heatmap-MC steps with optional excluded-volume term.
-
-    Returns (T_out, score_hm_out, score_excl_out, n_ok).
-    Heatmap score double-counts pairs (factor 2 on delta); excl also double-counts.
-    """
+    score_conf: float,
+) -> tuple[float, float, float, float, float, float, int]:
     n = pos.shape[0]
+    n_mov = movable.shape[0]
     n_ok = 0
-    score = score_hm + score_excl
+    score = score_struct + score_heat + score_orn + score_excl + score_conf
+
     for _ in range(n_steps):
-        p: int = int(np.random.randint(0, n))  # pyright: ignore[reportUnknownArgumentType]
+        p: int = int(movable[np.random.randint(0, n_mov)])
         dx = np.random.uniform(-step_size, step_size)
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
 
-        loc_hm_prev = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
+        # --- prev local scores ---
+        if struct_type == STRUCT_ARCS:
+            loc_struct_prev = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k)
+        elif struct_type == STRUCT_CHAIN:
+            loc_struct_prev = _local_smooth_nb(
+                pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
+            )
+        else:  # STRUCT_HEATMAP
+            loc_struct_prev = _local_heatmap_nb(pos, exp_mat, skip_mat[:, p], p)
+
+        loc_heat_prev = 0.0
+        if use_heat:
+            loc_heat_prev = _local_heat_nb(pos, heat_dist, p, heat_weight)
+
         loc_excl_prev = 0.0
         if use_excl:
             loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
 
+        loc_conf_prev = 0.0
+        if use_conf:
+            loc_conf_prev = _local_confine_nb(
+                pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight
+            )
+
+        orn_k: int = -1
+        prev_ox = 0.0
+        prev_oy = 0.0
+        prev_oz = 0.0
+        loc_orn_prev = 0.0
+        if use_orn:
+            orn_k = int(bead_to_anchor_k[p])
+            if orn_k >= 0:
+                prev_ox = anchor_orn[orn_k, 0]
+                prev_oy = anchor_orn[orn_k, 1]
+                prev_oz = anchor_orn[orn_k, 2]
+                loc_orn_prev = _local_score_orientation_nb(
+                    anchor_orn,
+                    orn_k,
+                    nbr_offsets,
+                    nbr_indices,
+                    nbr_weights,
+                    motif_weight,
+                    motifs_symmetric,
+                )
+
+        # --- trial move ---
         pos[p, 0] += dx
         pos[p, 1] += dy
         pos[p, 2] += dz
 
-        loc_hm_curr = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
-        score_hm_new = score_hm + 2.0 * (loc_hm_curr - loc_hm_prev)
+        # --- new local scores ---
+        if struct_type == STRUCT_ARCS:
+            loc_struct_curr = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k)
+        elif struct_type == STRUCT_CHAIN:
+            loc_struct_curr = _local_smooth_nb(
+                pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
+            )
+        else:  # STRUCT_HEATMAP
+            loc_struct_curr = _local_heatmap_nb(pos, exp_mat, skip_mat[:, p], p)
+        score_struct_new = score_struct + struct_delta_factor * (loc_struct_curr - loc_struct_prev)
+
+        score_heat_new = score_heat
+        if use_heat:
+            loc_heat_curr = _local_heat_nb(pos, heat_dist, p, heat_weight)
+            score_heat_new = score_heat + 2.0 * (loc_heat_curr - loc_heat_prev)
 
         score_excl_new = score_excl
         if use_excl:
             loc_excl_curr = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
             score_excl_new = score_excl + 2.0 * (loc_excl_curr - loc_excl_prev)
 
-        score_new = score_hm_new + score_excl_new
-        ok = score_new <= score
+        score_conf_new = score_conf
+        if use_conf:
+            loc_conf_curr = _local_confine_nb(
+                pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight
+            )
+            score_conf_new = score_conf + (loc_conf_curr - loc_conf_prev)
+
+        score_orn_new = score_orn
+        if use_orn and orn_k >= 0:
+            ar: int = int(anchor_ar[orn_k])
+            ox, oy, oz = _calc_orientation_nb(pos, ar, n, bool(orn_is_L[ar]))
+            anchor_orn[orn_k, 0] = ox
+            anchor_orn[orn_k, 1] = oy
+            anchor_orn[orn_k, 2] = oz
+            loc_orn_curr = _local_score_orientation_nb(
+                anchor_orn,
+                orn_k,
+                nbr_offsets,
+                nbr_indices,
+                nbr_weights,
+                motif_weight,
+                motifs_symmetric,
+            )
+            score_orn_new = score_orn + 2.0 * (loc_orn_curr - loc_orn_prev)
+
+        score_new = (
+            score_struct_new + score_heat_new + score_orn_new + score_excl_new + score_conf_new
+        )
+
+        if strict_better:
+            ok = score_new < score
+        else:
+            ok = score_new <= score
         if not ok and T > 0.0 and score > 0.0:
             ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T)
+
         if ok:
             n_ok += 1
             score = score_new
-            score_hm = score_hm_new
+            score_struct = score_struct_new
+            score_heat = score_heat_new
+            score_orn = score_orn_new
             score_excl = score_excl_new
+            score_conf = score_conf_new
         else:
             pos[p, 0] -= dx
             pos[p, 1] -= dy
             pos[p, 2] -= dz
+            if use_orn and orn_k >= 0:
+                anchor_orn[orn_k, 0] = prev_ox
+                anchor_orn[orn_k, 1] = prev_oy
+                anchor_orn[orn_k, 2] = prev_oz
         T *= dt
-    return T, score_hm, score_excl, n_ok
+    return T, score_struct, score_heat, score_orn, score_excl, score_conf, n_ok
 
 
-# Shared helper
+# ----- shared helpers -----
 
 
 def _as_f64(arr: np.ndarray[Any, Any]) -> F64Array:
     return np.ascontiguousarray(arr, dtype=np.float64)
 
 
-# Public MC loops
+def _dummy_f64(shape: tuple[int, ...] = (1, 1)) -> F64Array:
+    return np.zeros(shape, dtype=np.float64)
+
+
+def _dummy_bool(shape: tuple[int, ...] = (1, 1)) -> BoolArray:
+    return np.zeros(shape, dtype=np.bool_)
+
+
+def _dummy_i32(shape: tuple[int, ...] = (1,)) -> I32Array:
+    return np.zeros(shape, dtype=np.int32)
+
+
+def _prepare_orientation(
+    pw: F64Array,
+    fixed: np.ndarray[Any, Any],
+    char_orientations: np.ndarray[Any, Any],
+    anchor_neighbors: dict[int, list[int]],
+    anchor_neighbor_weights: dict[int, list[float]],
+    motif_weight: float,
+    motifs_symmetric: bool,
+) -> tuple[I32Array, I32Array, I32Array, F64Array, BoolArray, I32Array, F64Array, float]:
+    """Build numba-friendly orientation arrays from the Python dicts.
+
+    Returns (anchor_ar, nbr_offsets, nbr_indices, nbr_weights, orn_is_L,
+             bead_to_anchor_k, anchor_orn, score_orn).
+    """
+    from .util import calc_orientation as _calc_orn
+
+    n = pw.shape[0]
+    anchor_ar: I32Array = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
+    n_anchors = len(anchor_ar)
+    nbr_offsets: I32Array = np.zeros(n_anchors + 1, dtype=np.int32)
+    for k in range(n_anchors):
+        nbr_offsets[k + 1] = nbr_offsets[k] + len(anchor_neighbors.get(k, []))
+    total = int(nbr_offsets[n_anchors])
+    nbr_indices: I32Array = np.empty(total, dtype=np.int32)
+    nbr_weights: F64Array = np.empty(total, dtype=np.float64)
+    for k in range(n_anchors):
+        for ki, (j, w) in enumerate(
+            zip(anchor_neighbors.get(k, []), anchor_neighbor_weights.get(k, []), strict=True)
+        ):
+            off = nbr_offsets[k] + ki
+            nbr_indices[off] = j
+            nbr_weights[off] = w
+    orn_is_L: BoolArray = np.array([c == "L" for c in char_orientations], dtype=np.bool_)
+    bead_to_anchor_k: I32Array = cast(I32Array, np.full(n, -1, dtype=np.int32))
+    for k in range(n_anchors):
+        ar = int(anchor_ar[k])
+        if ar > 0:
+            bead_to_anchor_k[ar - 1] = k
+        if ar + 1 < n:
+            bead_to_anchor_k[ar + 1] = k
+    anchor_orn: F64Array = np.zeros((n_anchors, 3), dtype=np.float64)
+    for k in range(n_anchors):
+        ar = int(anchor_ar[k])
+        anchor_orn[k] = _calc_orn(pw, ar, n, char_orientations[ar])
+    score_orn = float(
+        _score_orientation_full_nb(
+            anchor_orn, nbr_offsets, nbr_indices, nbr_weights, motif_weight, motifs_symmetric
+        )
+    )
+    return (
+        anchor_ar,
+        nbr_offsets,
+        nbr_indices,
+        nbr_weights,
+        orn_is_L,
+        bead_to_anchor_k,
+        anchor_orn,
+        score_orn,
+    )
+
+
+def _run_outer_loop(
+    pw: F64Array,
+    movable: I64Array,
+    struct_type: int,
+    exp_mat: F64Array,
+    dtn: F64Array,
+    skip_mat: BoolArray,
+    stretch_k: float,
+    squeeze_k: float,
+    ang_k: float,
+    dist_w: float,
+    ang_w: float,
+    struct_delta_factor: float,
+    use_heat: bool,
+    heat_dist: F64Array,
+    heat_weight: float,
+    use_orn: bool,
+    orn_is_L: BoolArray,
+    anchor_ar: I32Array,
+    nbr_offsets: I32Array,
+    nbr_indices: I32Array,
+    nbr_weights: F64Array,
+    anchor_orn: F64Array,
+    bead_to_anchor_k: I32Array,
+    motif_weight: float,
+    motifs_symmetric: bool,
+    use_excl: bool,
+    excl_r0: float,
+    excl_weight: float,
+    excl_skip: int,
+    use_conf: bool,
+    conf_cx: float,
+    conf_cy: float,
+    conf_cz: float,
+    conf_R: float,
+    conf_weight: float,
+    step_size: float,
+    T: float,
+    dt: float,
+    jump_scale: float,
+    jump_coef: float,
+    stop_steps: int,
+    stop_improvement: float,
+    stop_successes: int,
+    strict_better: bool,
+    score_eps: float,
+    stop_when_ratio_above: float,
+    score_struct: float,
+    score_heat: float,
+    score_orn: float,
+    score_excl: float,
+    score_conf: float,
+    label: str,
+    verbose: bool,
+) -> float:
+    """Drive the unified kernel until convergence; return the final total score."""
+    prefix = f"    [{label}] " if label else "    "
+    score = score_struct + score_heat + score_orn + score_excl + score_conf
+    ms_score = score
+    step_i = 0
+    while True:
+        (T, score_struct, score_heat, score_orn, score_excl, score_conf, n_ok) = _batch_mc_nb(
+            pw,
+            movable,
+            struct_type,
+            exp_mat,
+            dtn,
+            skip_mat,
+            stretch_k,
+            squeeze_k,
+            ang_k,
+            dist_w,
+            ang_w,
+            struct_delta_factor,
+            use_heat,
+            heat_dist,
+            heat_weight,
+            use_orn,
+            orn_is_L,
+            anchor_ar,
+            nbr_offsets,
+            nbr_indices,
+            nbr_weights,
+            anchor_orn,
+            bead_to_anchor_k,
+            motif_weight,
+            motifs_symmetric,
+            use_excl,
+            excl_r0,
+            excl_weight,
+            excl_skip,
+            use_conf,
+            conf_cx,
+            conf_cy,
+            conf_cz,
+            conf_R,
+            conf_weight,
+            float(step_size),
+            T,
+            dt,
+            jump_scale,
+            jump_coef,
+            stop_steps,
+            strict_better,
+            score_struct,
+            score_heat,
+            score_orn,
+            score_excl,
+            score_conf,
+        )
+        score = score_struct + score_heat + score_orn + score_excl + score_conf
+        step_i += stop_steps
+        ratio = score / ms_score if ms_score > 0 else 1.0
+        converged = (
+            (score > stop_improvement * ms_score and n_ok < stop_successes)
+            or score < score_eps
+            or ratio > stop_when_ratio_above
+        )
+        if verbose:
+            print(
+                f"{prefix}step {step_i:>7,}  score={score:.4f}"
+                f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}" + ("  [done]" if converged else ""),
+                flush=True,
+            )
+        if converged:
+            return score
+        ms_score = score
+
+
+# Public MC entry points
+#
+# All four delegate to `_batch_mc_nb` via `_run_outer_loop`.  Each reads its
+# own level's settings and prepares the term data the kernel needs.
 
 
 def mc_heatmap(
@@ -785,13 +896,8 @@ def mc_heatmap(
     label: str = "",
     verbose: bool = False,
 ) -> float:
-    """
-    Simulated annealing using heatmap distance energy.
-
-    Global score is double-counted, so the MC update rule is:
-        score += 2 * (local_curr - local_prev)
-
-    Mirrors Reference LooperSolver::MonteCarloHeatmap().  Returns final score.
+    """Simulated annealing using heatmap distance energy.  Double-counted
+    structure (delta factor 2). Mirrors Reference LooperSolver::MonteCarloHeatmap().
     """
     n = pos.shape[0]
     if n <= 1:
@@ -802,128 +908,121 @@ def mc_heatmap(
     skip = diag_mask | (exp_dist < 1e-6)
     exp_safe = np.where(skip, 1.0, exp_dist)
 
-    T = float(settings.max_temp_heatmap)
-    dt = float(settings.dt_temp_heatmap)
-    jump_scale = float(settings.jump_scale_heatmap)
-    jump_coef = float(settings.jump_coef_heatmap)
-    stop_steps = int(settings.mc_stop_steps_heatmap)
-    stop_improvement = float(settings.mc_stop_improvement_heatmap)
-    stop_successes = int(settings.mc_stop_successes_heatmap)
-
     use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_heatmap)
-    excl_weight = float(settings.exclusion_weight)
-    excl_skip = int(settings.exclusion_skip_neighbors)
-    # Heatmap-level EV radius: explicit setting wins; 0 → auto-derive as
-    # auto_factor * mean(active expected distances) so EV activates when beads
-    # get closer than the configurable fraction of the typical target distance.
     excl_r0 = float(settings.exclusion_radius_heatmap)
     if use_excl and excl_r0 <= 0.0:
         active = np.asarray(exp_dist)[~skip]
         factor = float(settings.exclusion_auto_factor_heatmap)
         excl_r0 = factor * float(active.mean()) if active.size > 0 else 1.0
 
-    prefix = f"    [{label}] " if label else "    "
-
     pw = _as_f64(pos)
     es64 = _as_f64(exp_safe)
     skip_b: BoolArray = np.ascontiguousarray(skip, dtype=np.bool_)
-    score_hm = float(_init_heatmap_nb(pw, es64, skip_b))
-    score_excl = float(_init_excl_nb(pw, excl_r0, excl_weight, excl_skip)) if use_excl else 0.0
-    score = score_hm + score_excl
-
-    ms_score = score
-    step_i = 0
-    while True:
-        T, score_hm, score_excl, n_ok = _batch_heatmap_nb(
-            pw,
-            es64,
-            skip_b,
-            float(step_size),
-            T,
-            dt,
-            jump_scale,
-            jump_coef,
-            stop_steps,
-            use_excl,
-            excl_r0,
-            excl_weight,
-            excl_skip,
-            score_hm,
-            score_excl,
-        )
-        score = score_hm + score_excl
-        step_i += stop_steps
-        ratio = score / ms_score if ms_score > 0 else 1.0
-        converged = (score > stop_improvement * ms_score and n_ok < stop_successes) or score < 1e-6
-        if verbose:
-            print(
-                f"{prefix}step {step_i:>7,}  score={score:.4f}"
-                f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}" + ("  [done]" if converged else ""),
-                flush=True,
+    movable: I64Array = np.arange(n, dtype=np.int64)
+    score_struct = float(_init_heatmap_nb(pw, es64, skip_b))
+    score_excl = (
+        float(
+            _init_excl_nb(
+                pw,
+                excl_r0,
+                float(settings.exclusion_weight),
+                int(settings.exclusion_skip_neighbors),
             )
-        if converged:
-            break
-        ms_score = score
+        )
+        if use_excl
+        else 0.0
+    )
 
+    score = _run_outer_loop(
+        pw=pw,
+        movable=movable,
+        struct_type=STRUCT_HEATMAP,
+        exp_mat=es64,
+        dtn=_dummy_f64((1,)),
+        skip_mat=skip_b,
+        stretch_k=1.0,
+        squeeze_k=1.0,
+        ang_k=0.0,
+        dist_w=1.0,
+        ang_w=1.0,
+        struct_delta_factor=2.0,
+        use_heat=False,
+        heat_dist=_dummy_f64(),
+        heat_weight=0.0,
+        use_orn=False,
+        orn_is_L=np.zeros(1, dtype=np.bool_),
+        anchor_ar=_dummy_i32(),
+        nbr_offsets=np.zeros(2, dtype=np.int32),
+        nbr_indices=_dummy_i32(),
+        nbr_weights=np.zeros(1, dtype=np.float64),
+        anchor_orn=np.zeros((1, 3), dtype=np.float64),
+        bead_to_anchor_k=cast(I32Array, np.full(n, -1, dtype=np.int32)),
+        motif_weight=0.0,
+        motifs_symmetric=True,
+        use_excl=use_excl,
+        excl_r0=excl_r0,
+        excl_weight=float(settings.exclusion_weight),
+        excl_skip=int(settings.exclusion_skip_neighbors),
+        use_conf=False,
+        conf_cx=0.0,
+        conf_cy=0.0,
+        conf_cz=0.0,
+        conf_R=1.0,
+        conf_weight=0.0,
+        step_size=step_size,
+        T=float(settings.max_temp_heatmap),
+        dt=float(settings.dt_temp_heatmap),
+        jump_scale=float(settings.jump_scale_heatmap),
+        jump_coef=float(settings.jump_coef_heatmap),
+        stop_steps=int(settings.mc_stop_steps_heatmap),
+        stop_improvement=float(settings.mc_stop_improvement_heatmap),
+        stop_successes=int(settings.mc_stop_successes_heatmap),
+        strict_better=False,
+        score_eps=1e-6,
+        stop_when_ratio_above=2.0,
+        score_struct=score_struct,
+        score_heat=0.0,
+        score_orn=0.0,
+        score_excl=score_excl,
+        score_conf=0.0,
+        label=label,
+        verbose=verbose,
+    )
     pos[:] = pw.astype(pos.dtype)
     return score
 
 
 def mc_arcs(
-    pos: np.ndarray[Any, Any],  # (N, 3) float32 - modified in place
-    exp_dist_mat: np.ndarray[Any, Any],  # (N, N) - -1=repulsion, 0=none, >0=spring distance
+    pos: np.ndarray[Any, Any],
+    exp_dist_mat: np.ndarray[Any, Any],
     step_size: float,
     settings: Settings,
     label: str = "",
     verbose: bool = False,
 ) -> float:
-    """
-    Simulated annealing using arc spring energy.
-
-    Global score counts i < j pairs once.  Local score sums all other beads,
-    so the MC update rule is:
-        score = score - local_prev + local_curr   (no factor 2)
-
-    Mirrors Reference LooperSolver::MonteCarloArcs().  Returns final score.
+    """Simulated annealing with arc spring energy (pair springs from `exp_dist_mat`).
+    Single-counted structure (delta factor 1). Mirrors Reference LooperSolver::MonteCarloArcs().
     """
     n = pos.shape[0]
     if n <= 1:
         return 0.0
 
-    T = float(settings.max_temp)
-    dt = float(settings.dt_temp)
-    jump_scale = float(settings.jump_scale)
-    jump_coef = float(settings.jump_coef)
-    stop_steps = int(settings.mc_stop_steps)
-    stop_improvement = float(settings.mc_stop_improvement)
-    stop_successes = int(settings.mc_stop_successes)
+    pw = _as_f64(pos)
+    exp64 = _as_f64(exp_dist_mat)
+
     stretch_k = float(settings.spring_stretch_arcs)
     squeeze_k = float(settings.spring_squeeze_arcs)
 
     use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
-    excl_weight = float(settings.exclusion_weight)
-    excl_skip = int(settings.exclusion_skip_neighbors)
-
-    prefix = f"    [{label}] " if label else "    "
-
-    pw = _as_f64(pos)
-    exp64 = _as_f64(exp_dist_mat)
-
-    # Arc-level EV radius: 0 → auto = factor * mean(active arc expected dist).
     excl_r0 = float(settings.exclusion_radius_arcs)
     if use_excl and excl_r0 <= 0.0:
         pos_mask = exp64 > 1e-6
         factor = float(settings.exclusion_auto_factor_arcs)
         excl_r0 = factor * float(exp64[pos_mask].mean()) if pos_mask.any() else 1.0
 
-    # Confinement: center = centroid of starting pos; auto-radius derives from
-    # mean positive expected-distance and bead count.
     use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_arcs)
-    conf_cx: float = 0.0
-    conf_cy: float = 0.0
-    conf_cz: float = 0.0
-    conf_R: float = 1.0
-    conf_weight = float(settings.confinement_weight)
+    conf_cx = conf_cy = conf_cz = 0.0
+    conf_R = 1.0
     if use_conf:
         conf_cx = float(pw[:, 0].mean())
         conf_cy = float(pw[:, 1].mean())
@@ -935,146 +1034,143 @@ def mc_arcs(
             pf = float(settings.confinement_packing_factor_arcs)
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
-    score_arcs = float(_init_arcs_nb(pw, exp64, stretch_k, squeeze_k))
-    score_excl = float(_init_excl_nb(pw, excl_r0, excl_weight, excl_skip)) if use_excl else 0.0
+    movable: I64Array = np.arange(n, dtype=np.int64)
+    score_struct = float(_init_arcs_nb(pw, exp64, stretch_k, squeeze_k))
+    score_excl = (
+        float(
+            _init_excl_nb(
+                pw,
+                excl_r0,
+                float(settings.exclusion_weight),
+                int(settings.exclusion_skip_neighbors),
+            )
+        )
+        if use_excl
+        else 0.0
+    )
     score_conf = (
-        float(_init_confine_nb(pw, conf_cx, conf_cy, conf_cz, conf_R, conf_weight))
+        float(
+            _init_confine_nb(
+                pw, conf_cx, conf_cy, conf_cz, conf_R, float(settings.confinement_weight)
+            )
+        )
         if use_conf
         else 0.0
     )
-    score = score_arcs + score_excl + score_conf
 
-    ms_score = score
-    step_i = 0
-    while True:
-        T, score_arcs, score_excl, score_conf, n_ok = _batch_arcs_nb(
-            pw,
-            exp64,
-            float(step_size),
-            T,
-            dt,
-            jump_scale,
-            jump_coef,
-            stop_steps,
-            stretch_k,
-            squeeze_k,
-            use_excl,
-            excl_r0,
-            excl_weight,
-            excl_skip,
-            use_conf,
-            conf_cx,
-            conf_cy,
-            conf_cz,
-            conf_R,
-            conf_weight,
-            score_arcs,
-            score_excl,
-            score_conf,
-        )
-        score = score_arcs + score_excl + score_conf
-        step_i += stop_steps
-        ratio = score / ms_score if ms_score > 0 else 1.0
-        converged = (
-            (score > stop_improvement * ms_score and n_ok < stop_successes)
-            or score < 1e-5
-            or ratio > 0.9999
-        )
-        if verbose:
-            print(
-                f"{prefix}step {step_i:>7,}  score={score:.4f}"
-                f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}" + ("  [done]" if converged else ""),
-                flush=True,
-            )
-        if converged:
-            break
-        ms_score = score
-
+    score = _run_outer_loop(
+        pw=pw,
+        movable=movable,
+        struct_type=STRUCT_ARCS,
+        exp_mat=exp64,
+        dtn=_dummy_f64((1,)),
+        skip_mat=_dummy_bool(),
+        stretch_k=stretch_k,
+        squeeze_k=squeeze_k,
+        ang_k=0.0,
+        dist_w=1.0,
+        ang_w=1.0,
+        struct_delta_factor=1.0,
+        use_heat=False,
+        heat_dist=_dummy_f64(),
+        heat_weight=0.0,
+        use_orn=False,
+        orn_is_L=np.zeros(1, dtype=np.bool_),
+        anchor_ar=_dummy_i32(),
+        nbr_offsets=np.zeros(2, dtype=np.int32),
+        nbr_indices=_dummy_i32(),
+        nbr_weights=np.zeros(1, dtype=np.float64),
+        anchor_orn=np.zeros((1, 3), dtype=np.float64),
+        bead_to_anchor_k=cast(I32Array, np.full(n, -1, dtype=np.int32)),
+        motif_weight=0.0,
+        motifs_symmetric=True,
+        use_excl=use_excl,
+        excl_r0=excl_r0,
+        excl_weight=float(settings.exclusion_weight),
+        excl_skip=int(settings.exclusion_skip_neighbors),
+        use_conf=use_conf,
+        conf_cx=conf_cx,
+        conf_cy=conf_cy,
+        conf_cz=conf_cz,
+        conf_R=conf_R,
+        conf_weight=float(settings.confinement_weight),
+        step_size=step_size,
+        T=float(settings.max_temp),
+        dt=float(settings.dt_temp),
+        jump_scale=float(settings.jump_scale),
+        jump_coef=float(settings.jump_coef),
+        stop_steps=int(settings.mc_stop_steps),
+        stop_improvement=float(settings.mc_stop_improvement),
+        stop_successes=int(settings.mc_stop_successes),
+        strict_better=False,
+        score_eps=1e-5,
+        stop_when_ratio_above=0.9999,
+        score_struct=score_struct,
+        score_heat=0.0,
+        score_orn=0.0,
+        score_excl=score_excl,
+        score_conf=score_conf,
+        label=label,
+        verbose=verbose,
+    )
     pos[:] = pw.astype(pos.dtype)
     return score
 
 
 def mc_smooth(
-    pos: np.ndarray[Any, Any],  # (N, 3) float32 - modified in place; anchors are fixed
-    dtn: np.ndarray[Any, Any],  # (N-1,) expected distances between consecutive beads
-    fixed: np.ndarray[Any, Any],  # (N,) bool - True for anchor beads (never moved)
+    pos: np.ndarray[Any, Any],
+    dtn: np.ndarray[Any, Any],
+    fixed: np.ndarray[Any, Any],
     step_size: float,
     settings: Settings,
-    char_orientations: np.ndarray[Any, Any]
-    | None = None,  # (N,) CTCF orientation chars; None = no motif
-    anchor_neighbors: dict[int, list[int]] | None = None,  # {anchor_k: [anchor_j, ...]}
-    anchor_neighbor_weights: dict[int, list[float]] | None = None,  # {anchor_k: [float, ...]}
-    heat_dist: np.ndarray[Any, Any]
-    | None = None,  # (N, N) subanchor heat expected distances; None = disabled
+    char_orientations: np.ndarray[Any, Any] | None = None,
+    anchor_neighbors: dict[int, list[int]] | None = None,
+    anchor_neighbor_weights: dict[int, list[float]] | None = None,
+    heat_dist: np.ndarray[Any, Any] | None = None,
     label: str = "",
     verbose: bool = False,
 ) -> float:
-    """
-    Chain connectivity + angle MC.
-
-    Optionally adds CTCF orientation energy (char_orientations) and/or
-    subanchor heat energy (heat_dist).  Mirrors Reference MonteCarloArcsSmooth
-    with useCTCFMotifOrientation and use_subanchor_heatmap flags.
-
-    Anchor beads (fixed=True) are never moved.  Returns final score.
+    """Chain connectivity + angle MC.  Optionally adds CTCF orientation and/or
+    subanchor heat. Anchor beads (fixed=True) never move. Single-counted
+    structure (delta factor 1). Mirrors Reference MonteCarloArcsSmooth.
     """
     n = pos.shape[0]
     if n <= 2:
         return 0.0
 
-    T = float(settings.max_temp_smooth)
-    dt = float(settings.dt_temp_smooth)
-    jump_scale = float(settings.jump_scale_smooth)
-    jump_coef = float(settings.jump_coef_smooth)
-    stop_steps = int(settings.mc_stop_steps_smooth)
-    stop_improvement = float(settings.mc_stop_improvement_smooth)
-    stop_successes = int(settings.mc_stop_successes_smooth)
+    movable: I64Array = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    if len(movable) == 0:
+        return 0.0
+
+    pw = _as_f64(pos)
+    dtn64 = _as_f64(dtn)
+
     stretch_k = float(settings.spring_stretch)
     squeeze_k = float(settings.spring_squeeze)
     ang_k = float(settings.spring_angular)
     dist_w = float(settings.smooth_dist_weight)
     ang_w = float(settings.smooth_angle_weight)
 
+    use_heat = heat_dist is not None
     use_orn = (
         char_orientations is not None
         and anchor_neighbors is not None
         and anchor_neighbor_weights is not None
         and bool(settings.use_ctcf_motif)
     )
-    use_heat = heat_dist is not None
     motif_weight = float(settings.motif_weight)
     motifs_symmetric = bool(settings.motifs_symmetric)
     heat_weight = float(settings.subanchor_heatmap_dist_weight)
 
     use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
-    excl_weight = float(settings.exclusion_weight)
-    excl_skip = int(settings.exclusion_skip_neighbors)
-
-    # Smooth-level EV radius: 0 → auto = factor * mean(dtn) where dtn is the
-    # chain-bond expected distance array.
     excl_r0 = float(settings.exclusion_radius_smooth)
     if use_excl and excl_r0 <= 0.0:
-        dtn_arr = np.asarray(dtn)
         factor = float(settings.exclusion_auto_factor_smooth)
-        excl_r0 = factor * float(dtn_arr.mean()) if dtn_arr.size > 0 else 1.0
+        excl_r0 = factor * float(dtn64.mean()) if dtn64.size > 0 else 1.0
 
     use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth)
-    conf_weight = float(settings.confinement_weight)
-
-    movable: I64Array = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
-    if len(movable) == 0:
-        return 0.0
-
-    prefix = f"    [{label}] " if label else "    "
-
-    pw = _as_f64(pos)
-    dtn64 = _as_f64(dtn)
-
-    # Confinement center = centroid of starting pos; auto-radius from dtn + N.
-    conf_cx: float = 0.0
-    conf_cy: float = 0.0
-    conf_cz: float = 0.0
-    conf_R: float = 1.0
+    conf_cx = conf_cy = conf_cz = 0.0
+    conf_R = 1.0
     if use_conf:
         conf_cx = float(pw[:, 0].mean())
         conf_cy = float(pw[:, 1].mean())
@@ -1085,140 +1181,249 @@ def mc_smooth(
             pf = float(settings.confinement_packing_factor_smooth)
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
-    # Heat state (dummy when disabled - never indexed inside the kernel)
     if use_heat:
         assert heat_dist is not None
         heat64 = _as_f64(heat_dist)
         score_heat = float(_init_heat_nb(pw, heat64, heat_weight))
     else:
-        heat64 = np.zeros((1, 1), dtype=np.float64)
+        heat64 = _dummy_f64()
         score_heat = 0.0
 
-    # Orientation state (dummy when disabled)
     if use_orn:
+        assert char_orientations is not None
         assert anchor_neighbors is not None
         assert anchor_neighbor_weights is not None
-        assert char_orientations is not None
-        from .util import calc_orientation as _calc_orn
-
-        anchor_ar: I32Array = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
-        n_anchors = len(anchor_ar)
-        nbr_offsets: I32Array = np.zeros(n_anchors + 1, dtype=np.int32)
-        for _k in range(n_anchors):
-            nbr_offsets[_k + 1] = nbr_offsets[_k] + len(anchor_neighbors.get(_k, []))
-        _total = int(nbr_offsets[n_anchors])
-        nbr_indices: I32Array = np.empty(_total, dtype=np.int32)
-        nbr_weights_arr: F64Array = np.empty(_total, dtype=np.float64)
-        for _k in range(n_anchors):
-            for _ki, (_j, _w) in enumerate(
-                zip(anchor_neighbors.get(_k, []), anchor_neighbor_weights.get(_k, []), strict=True)
-            ):
-                _off = nbr_offsets[_k] + _ki
-                nbr_indices[_off] = _j
-                nbr_weights_arr[_off] = _w
-        orn_is_L: BoolArray = np.array([c == "L" for c in char_orientations], dtype=np.bool_)
-        bead_to_anchor_k: I32Array = cast(I32Array, np.full(n, -1, dtype=np.int32))
-        for _k in range(n_anchors):
-            _ar = int(anchor_ar[_k])
-            if _ar > 0:
-                bead_to_anchor_k[_ar - 1] = _k
-            if _ar + 1 < n:
-                bead_to_anchor_k[_ar + 1] = _k
-        anchor_orn: F64Array = np.zeros((n_anchors, 3), dtype=np.float64)
-        for _k in range(n_anchors):
-            _ar = int(anchor_ar[_k])
-            anchor_orn[_k] = _calc_orn(pw, _ar, n, char_orientations[_ar])
-        score_orn = float(
-            _score_orientation_full_nb(
-                anchor_orn,
-                nbr_offsets,
-                nbr_indices,
-                nbr_weights_arr,
-                motif_weight,
-                motifs_symmetric,
-            )
+        (
+            anchor_ar,
+            nbr_offsets,
+            nbr_indices,
+            nbr_weights,
+            orn_is_L,
+            bead_to_anchor_k,
+            anchor_orn,
+            score_orn,
+        ) = _prepare_orientation(
+            pw,
+            fixed,
+            char_orientations,
+            anchor_neighbors,
+            anchor_neighbor_weights,
+            motif_weight,
+            motifs_symmetric,
         )
     else:
-        anchor_ar = np.zeros(1, dtype=np.int32)
+        anchor_ar = _dummy_i32()
         nbr_offsets = np.zeros(2, dtype=np.int32)
-        nbr_indices = np.zeros(1, dtype=np.int32)
-        nbr_weights_arr = np.zeros(1, dtype=np.float64)
+        nbr_indices = _dummy_i32()
+        nbr_weights = np.zeros(1, dtype=np.float64)
         orn_is_L = np.zeros(1, dtype=np.bool_)
         bead_to_anchor_k = cast(I32Array, np.full(n, -1, dtype=np.int32))
         anchor_orn = np.zeros((1, 3), dtype=np.float64)
         score_orn = 0.0
 
     score_struct = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
-    score_excl = float(_init_excl_nb(pw, excl_r0, excl_weight, excl_skip)) if use_excl else 0.0
+    score_excl = (
+        float(
+            _init_excl_nb(
+                pw,
+                excl_r0,
+                float(settings.exclusion_weight),
+                int(settings.exclusion_skip_neighbors),
+            )
+        )
+        if use_excl
+        else 0.0
+    )
     score_conf = (
-        float(_init_confine_nb(pw, conf_cx, conf_cy, conf_cz, conf_R, conf_weight))
+        float(
+            _init_confine_nb(
+                pw, conf_cx, conf_cy, conf_cz, conf_R, float(settings.confinement_weight)
+            )
+        )
         if use_conf
         else 0.0
     )
-    score = score_struct + score_orn + score_heat + score_excl + score_conf
 
-    ms_score = score
-    step_i = 0
-    while True:
-        (T, score_struct, score_orn, score_heat, score_excl, score_conf, n_ok) = (
-            _batch_smooth_kernel_nb(
-                pw,
-                dtn64,
-                movable,
-                float(step_size),
-                T,
-                dt,
-                jump_scale,
-                jump_coef,
-                stop_steps,
-                stretch_k,
-                squeeze_k,
-                ang_k,
-                dist_w,
-                ang_w,
-                use_heat,
-                heat64,
-                heat_weight,
-                use_orn,
-                orn_is_L,
-                anchor_ar,
-                nbr_offsets,
-                nbr_indices,
-                nbr_weights_arr,
-                anchor_orn,
-                bead_to_anchor_k,
-                motif_weight,
-                motifs_symmetric,
-                use_excl,
-                excl_r0,
-                excl_weight,
-                excl_skip,
-                use_conf,
-                conf_cx,
-                conf_cy,
-                conf_cz,
-                conf_R,
-                conf_weight,
-                score_struct,
-                score_orn,
-                score_heat,
-                score_excl,
-                score_conf,
+    score = _run_outer_loop(
+        pw=pw,
+        movable=movable,
+        struct_type=STRUCT_CHAIN,
+        exp_mat=_dummy_f64(),
+        dtn=dtn64,
+        skip_mat=_dummy_bool(),
+        stretch_k=stretch_k,
+        squeeze_k=squeeze_k,
+        ang_k=ang_k,
+        dist_w=dist_w,
+        ang_w=ang_w,
+        struct_delta_factor=1.0,
+        use_heat=use_heat,
+        heat_dist=heat64,
+        heat_weight=heat_weight,
+        use_orn=use_orn,
+        orn_is_L=orn_is_L,
+        anchor_ar=anchor_ar,
+        nbr_offsets=nbr_offsets,
+        nbr_indices=nbr_indices,
+        nbr_weights=nbr_weights,
+        anchor_orn=anchor_orn,
+        bead_to_anchor_k=bead_to_anchor_k,
+        motif_weight=motif_weight,
+        motifs_symmetric=motifs_symmetric,
+        use_excl=use_excl,
+        excl_r0=excl_r0,
+        excl_weight=float(settings.exclusion_weight),
+        excl_skip=int(settings.exclusion_skip_neighbors),
+        use_conf=use_conf,
+        conf_cx=conf_cx,
+        conf_cy=conf_cy,
+        conf_cz=conf_cz,
+        conf_R=conf_R,
+        conf_weight=float(settings.confinement_weight),
+        step_size=step_size,
+        T=float(settings.max_temp_smooth),
+        dt=float(settings.dt_temp_smooth),
+        jump_scale=float(settings.jump_scale_smooth),
+        jump_coef=float(settings.jump_coef_smooth),
+        stop_steps=int(settings.mc_stop_steps_smooth),
+        stop_improvement=float(settings.mc_stop_improvement_smooth),
+        stop_successes=int(settings.mc_stop_successes_smooth),
+        strict_better=True,
+        score_eps=1e-6,
+        stop_when_ratio_above=2.0,
+        score_struct=score_struct,
+        score_heat=score_heat,
+        score_orn=score_orn,
+        score_excl=score_excl,
+        score_conf=score_conf,
+        label=label,
+        verbose=verbose,
+    )
+    pos[:] = pw.astype(pos.dtype)
+    return score
+
+
+def mc_ib(
+    pos: np.ndarray[Any, Any],
+    dtn: np.ndarray[Any, Any],
+    step_size: float,
+    settings: Settings,
+    label: str = "",
+    verbose: bool = False,
+) -> float:
+    """IB-centroid chain MC (peer to mc_smooth, not a sub-mode of it).
+
+    Energy: chain bonds (no angle term, no orientation, no heat) + optional
+    IB-scale excluded volume + optional IB-scale confinement.  All IBs move
+    (no fixed set). Reads only its own settings: `spring_*_ib`, `dist_weight_ib`,
+    `max_temp_ib`/`dt_temp_ib`/`jump_*_ib`/`mc_stop_*_ib` under [simulation_ib],
+    plus the `*_ib` knobs under [excluded_volume] and [confinement].
+    """
+    n = pos.shape[0]
+    if n <= 1:
+        return 0.0
+
+    pw = _as_f64(pos)
+    dtn64 = _as_f64(dtn)
+    movable: I64Array = np.arange(n, dtype=np.int64)
+
+    stretch_k = float(settings.spring_stretch_ib)
+    squeeze_k = float(settings.spring_squeeze_ib)
+    dist_w = float(settings.dist_weight_ib)
+    # IB chain has no angle term: too few IBs for stable angle statistics,
+    # and the chain is meant to be flexible (loops curl back on themselves).
+    ang_k = 0.0
+    ang_w = 0.0
+
+    use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_ib)
+    excl_r0 = float(settings.exclusion_radius_ib)
+    if use_excl and excl_r0 <= 0.0:
+        factor = float(settings.exclusion_auto_factor_ib)
+        excl_r0 = factor * float(dtn64.mean()) if dtn64.size > 0 else 1.0
+
+    use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_ib)
+    conf_cx = conf_cy = conf_cz = 0.0
+    conf_R = 1.0
+    if use_conf:
+        conf_cx = float(pw[:, 0].mean())
+        conf_cy = float(pw[:, 1].mean())
+        conf_cz = float(pw[:, 2].mean())
+        conf_R = float(settings.confinement_radius_ib)
+        if conf_R <= 0.0:
+            avg_bond = float(dtn64.mean()) if dtn64.size > 0 else 1.0
+            pf = float(settings.confinement_packing_factor_ib)
+            conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
+
+    score_struct = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
+    score_excl = (
+        float(_init_excl_nb(pw, excl_r0, float(settings.exclusion_weight), 1)) if use_excl else 0.0
+    )
+    score_conf = (
+        float(
+            _init_confine_nb(
+                pw, conf_cx, conf_cy, conf_cz, conf_R, float(settings.confinement_weight)
             )
         )
-        score = score_struct + score_orn + score_heat + score_excl + score_conf
-        step_i += stop_steps
-        ratio = score / ms_score if ms_score > 0 else 1.0
-        converged = (score > stop_improvement * ms_score and n_ok < stop_successes) or score < 1e-6
-        if verbose:
-            print(
-                f"{prefix}step {step_i:>7,}  score={score:.4f}"
-                f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}" + ("  [done]" if converged else ""),
-                flush=True,
-            )
-        if converged:
-            break
-        ms_score = score
+        if use_conf
+        else 0.0
+    )
 
+    score = _run_outer_loop(
+        pw=pw,
+        movable=movable,
+        struct_type=STRUCT_CHAIN,
+        exp_mat=_dummy_f64(),
+        dtn=dtn64,
+        skip_mat=_dummy_bool(),
+        stretch_k=stretch_k,
+        squeeze_k=squeeze_k,
+        ang_k=ang_k,
+        dist_w=dist_w,
+        ang_w=ang_w,
+        struct_delta_factor=1.0,
+        use_heat=False,
+        heat_dist=_dummy_f64(),
+        heat_weight=0.0,
+        use_orn=False,
+        orn_is_L=np.zeros(1, dtype=np.bool_),
+        anchor_ar=_dummy_i32(),
+        nbr_offsets=np.zeros(2, dtype=np.int32),
+        nbr_indices=_dummy_i32(),
+        nbr_weights=np.zeros(1, dtype=np.float64),
+        anchor_orn=np.zeros((1, 3), dtype=np.float64),
+        bead_to_anchor_k=cast(I32Array, np.full(n, -1, dtype=np.int32)),
+        motif_weight=0.0,
+        motifs_symmetric=True,
+        use_excl=use_excl,
+        excl_r0=excl_r0,
+        excl_weight=float(settings.exclusion_weight),
+        # IB chain: only skip the immediate neighbor (the bond itself) so
+        # non-neighbor IBs still repel each other.
+        excl_skip=1,
+        use_conf=use_conf,
+        conf_cx=conf_cx,
+        conf_cy=conf_cy,
+        conf_cz=conf_cz,
+        conf_R=conf_R,
+        conf_weight=float(settings.confinement_weight),
+        step_size=step_size,
+        T=float(settings.max_temp_ib),
+        dt=float(settings.dt_temp_ib),
+        jump_scale=float(settings.jump_scale_ib),
+        jump_coef=float(settings.jump_coef_ib),
+        stop_steps=int(settings.mc_stop_steps_ib),
+        stop_improvement=float(settings.mc_stop_improvement_ib),
+        stop_successes=int(settings.mc_stop_successes_ib),
+        strict_better=True,
+        score_eps=1e-6,
+        stop_when_ratio_above=2.0,
+        score_struct=score_struct,
+        score_heat=0.0,
+        score_orn=0.0,
+        score_excl=score_excl,
+        score_conf=score_conf,
+        label=label,
+        verbose=verbose,
+    )
     pos[:] = pw.astype(pos.dtype)
     return score

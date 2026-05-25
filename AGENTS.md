@@ -502,20 +502,43 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: 3dnome uses an inverse-distance repulsion only on pairs where the input arc matrix is marked negative — a sparse, conditional repulsion. This adds a global polymer-physics excluded-volume term independent of input data. Touches arc-MC (`_batch_arcs_nb`), smooth-MC (`_batch_smooth_kernel_nb`), and heatmap-MC (`_batch_heatmap_nb`).
 
 - **IB-level MC pass** — `settings.use_ib_mc = true` to enable. ([gnome3d/solver.py::_ib_mc_refine](gnome3d/solver.py))
-  Address the "central blob" pathology in full-chromosome runs (very visible with `use_dynamic_loop_density = true` + small `target_bp_per_subanchor`): the reference / Python default places IB centroids by random walk or linear interpolation with no MC, so when each IB's smooth-MC fills a fat sphere of beads the spheres overlap into a tangle around the origin. This pass runs `mc_smooth` over each segment's child IB centroids with chain-bond targets from `genomic_length_to_distance` between consecutive IB midpoints, plus excluded volume so IBs push each other apart. Touches `solver.py::_position_interaction_blocks` → `_ib_mc_refine`.
+  Address the "central blob" pathology in full-chromosome runs (very visible with `use_dynamic_loop_density = true` + small `target_bp_per_subanchor`): the reference / Python default places IB centroids by random walk or linear interpolation with no MC, so when each IB's smooth-MC fills a fat sphere of beads the spheres overlap into a tangle around the origin.
 
-  Ini layout:
+  This pass runs `mc_ib` over each segment's child IB centroids with chain-bond targets from `genomic_length_to_distance` between consecutive IB midpoints, plus optional excluded volume so IBs push each other apart and optional confinement so the chain doesn't stretch out. `mc_ib` is a **peer stage** to `mc_smooth` — *not* a sub-mode of it. It owns its own MC schedule, chain spring constants, step noise, and EV/confinement knobs. Both stages share only the unified `_batch_mc_nb` kernel; neither extends the other.
+
+  Ini layout (key names follow the same conventions as `[simulation_arcs_smooth]`, `[springs]`, and `[main]`; defaults mirror the smooth stage so existing configs keep working):
   ```ini
+  [main]
+  noise_ib = 0.5                                    # step_size = noise_ib * mean(dtn)
+
+  [springs]
+  stretch_constant_ib = 0.1
+  squeeze_constant_ib = 0.1
+
   [simulation_ib]
-  use_ib_mc = yes
+  use_ib_mc                              = yes
+  max_temp                               = 20.0
+  delta_temp                             = 0.99995
+  jump_temp_scale                        = 50.0
+  jump_temp_coef                         = 20.0
+  stop_condition_steps                   = 10000
+  stop_condition_improvement_threshold   = 0.995
+  stop_condition_successes_threshold     = 5
+  dist_weight                            = 1.0
 
   [excluded_volume]
-  apply_to_ib = yes
-  radius_ib = 0             # 0 = auto from IB chain-bond scale
-  auto_factor_ib = 0.5      # used when radius_ib = 0
+  apply_to_ib    = yes
+  radius_ib      = 0                                # 0 = auto from IB chain-bond scale
+  auto_factor_ib = 0.5                              # used when radius_ib = 0
+
+  [confinement]
+  use_confinement   = yes
+  apply_to_ib       = yes
+  radius_ib         = 0                             # 0 = auto = packing_factor * mean(dtn) * N^(1/3)
+  packing_factor_ib = 0.75
   ```
 
-  EV settings for this pass live under `[excluded_volume]` (consistent with the other levels): `exclusion_apply_to_ib`, `exclusion_radius_ib`, `exclusion_auto_factor_ib`. Defaults preserve reference behavior; opt-in for whole-chromosome / dynamic-density runs.
+  Why a peer (not a child of smooth): smooth-MC operates on per-IB sub-anchor chains with CTCF orientations, heat maps, and angle springs; IB-MC operates on inter-IB centroids — no orientations, no heat target, no angle term, different spatial scale and tolerance. Conflating their settings makes both stages harder to tune independently.
 
 - **Spherical confinement** — `settings.use_confinement = true` to enable.
   Soft envelope mimicking a nuclear boundary. For each bead at distance `r` from the per-MC-call centroid, contributes `confinement_weight * ((r - R)/R)²` if `r > R`, else 0. Per-bead (single-counted) — delta is `(local_curr - local_prev)` with no factor of 2. Each MC level has its own radius and packing factor (the spatial scale differs across levels):

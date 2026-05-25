@@ -19,7 +19,7 @@ from .hierarchy import (
     set_level,
 )
 from .io import create_singleton_heatmap
-from .mc import mc_arcs, mc_heatmap, mc_smooth
+from .mc import mc_arcs, mc_heatmap, mc_ib, mc_smooth
 from .settings import Settings
 from .types import *
 from .util import random_vector_np
@@ -544,20 +544,11 @@ class Solver:
 
     def _ib_mc_refine(self, segs: list[int]) -> None:
         """
-        Refine IB centroid positions with a small chain-bond + excluded-volume
-        MC pass.  For each segment, the segment's IB centroids form a chain;
-        we run mc_smooth on them with `fixed = all False` so every IB moves,
-        and turn on excluded volume so IBs push each other apart.  Bond
-        targets come from genomic_length_to_distance applied to the genomic
-        gap between consecutive IB midpoints.
-
-        Confinement (when `use_confinement and confinement_apply_to_ib`) adds
-        a soft tether toward the segment centroid so the IB chain stays
-        compact instead of expanding outward under EV pressure alone.
-
-        Opt-in via `use_ib_mc`. EV and confinement at this pass route through
-        the smooth-MC kernel using the IB-level radius / packing-factor knobs
-        (under [excluded_volume] and [confinement] respectively).
+        Refine IB centroid positions with a small chain-bond + EV + confinement
+        MC pass.  Calls mc_ib directly - no settings clone, no field renaming.
+        Each segment's IB centroids form a chain (bond targets from
+        genomic_length_to_distance).  EV and confinement read their own
+        IB-level settings (`*_ib`).  Opt-in via `use_ib_mc`.
         """
         s = self.s
         log1 = s.output_level >= 1
@@ -572,47 +563,21 @@ class Solver:
             for i in range(len(ibs) - 1):
                 gap = abs(self.clusters[ibs[i + 1]].genomic_pos - self.clusters[ibs[i]].genomic_pos)
                 dtn[i] = float(s.genomic_length_to_distance(gap))
-            fixed: BoolArray = np.zeros(len(ibs), dtype=np.bool_)
 
             avg_dtn = float(dtn.mean()) if dtn.size > 0 else 1.0
-            step_size = avg_dtn * s.noise_smooth
+            step_size = avg_dtn * s.noise_ib
 
-            # Per-IB-MC settings clone: route EV and confinement through the
-            # smooth-MC kernel using IB-scale radius/factor.  mc_smooth
-            # auto-derives from its own dtn input, so we forward the IB-level
-            # radius and factor onto smooth-level fields (the clone is local;
-            # the real Settings stays intact). Disable orientation and heat
-            # (IB chain has no per-bead motif data or heat target).
-            s_ib = copy.copy(s)
-            s_ib.use_ctcf_motif = False
-            s_ib.use_subanchor_heatmap = False
-            s_ib.use_excluded_volume = s.use_excluded_volume and s.exclusion_apply_to_ib
-            s_ib.exclusion_apply_to_smooth = True
-            s_ib.exclusion_radius_smooth = s.exclusion_radius_ib
-            s_ib.exclusion_auto_factor_smooth = s.exclusion_auto_factor_ib
-            # IBs are not "bonded" in the same way subanchors are - skip only
-            # the immediate neighbor so the chain can flex but non-neighbors
-            # still repel each other.
-            s_ib.exclusion_skip_neighbors = 1
-            # Confinement: soft tether toward the segment centroid keeps the
-            # IB chain compact instead of stretching out under EV pressure.
-            s_ib.use_confinement = s.use_confinement and s.confinement_apply_to_ib
-            s_ib.confinement_apply_to_smooth = True
-            s_ib.confinement_radius_smooth = s.confinement_radius_ib
-            s_ib.confinement_packing_factor_smooth = s.confinement_packing_factor_ib
-
-            # Compute the radii that mc_smooth will end up using (for logging).
-            log_ev_r0 = (
-                s.exclusion_radius_ib
-                if s.exclusion_radius_ib > 0.0
-                else s.exclusion_auto_factor_ib * avg_dtn
-            )
-            log_conf_R = (
-                s.confinement_radius_ib
-                if s.confinement_radius_ib > 0.0
-                else s.confinement_packing_factor_ib * avg_dtn * (len(ibs) ** (1.0 / 3.0))
-            )
             if log1:
+                log_ev_r0 = (
+                    s.exclusion_radius_ib
+                    if s.exclusion_radius_ib > 0.0
+                    else s.exclusion_auto_factor_ib * avg_dtn
+                )
+                log_conf_R = (
+                    s.confinement_radius_ib
+                    if s.confinement_radius_ib > 0.0
+                    else s.confinement_packing_factor_ib * avg_dtn * (len(ibs) ** (1.0 / 3.0))
+                )
                 conf_tag = (
                     f", tether_R={log_conf_R:.2f}"
                     if (s.use_confinement and s.confinement_apply_to_ib)
@@ -623,16 +588,9 @@ class Solver:
                     f"avg_bond={avg_dtn:.2f}, ev_r0={log_ev_r0:.3f}, "
                     f"step={step_size:.3f}{conf_tag}"
                 )
+
             gyr_before = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
-            mc_smooth(
-                pos,
-                dtn,
-                fixed,
-                step_size,
-                s_ib,
-                label=f"IB-MC seg{seg_idx}",
-                verbose=log2,
-            )
+            mc_ib(pos, dtn, step_size, s, label=f"IB-MC seg{seg_idx}", verbose=log2)
             gyr_after = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
             if log1:
                 print(f"  [IB-MC] seg {seg_idx}: gyr {gyr_before:.2f} -> {gyr_after:.2f}")
