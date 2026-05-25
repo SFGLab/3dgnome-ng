@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
+from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from .types import BoolArray, F64Array, I32Array, I64Array
 
@@ -52,7 +53,7 @@ STRUCT_HEATMAP = 2
 # Smooth MC helpers
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _smooth_len_nb(
     pos: F64Array,
     dtn: F64Array,
@@ -73,7 +74,7 @@ def _smooth_len_nb(
     return rel * rel * k * dist_w
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _smooth_ang_nb(pos: F64Array, i: int, ang_k: float, ang_w: float) -> float:
     v1x = pos[i, 0] - pos[i + 1, 0]
     v1y = pos[i, 1] - pos[i + 1, 1]
@@ -94,7 +95,7 @@ def _smooth_ang_nb(pos: F64Array, i: int, ang_k: float, ang_w: float) -> float:
     return ang * ang * ang * ang_k * ang_w
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _local_smooth_nb(
     pos: F64Array,
     dtn: F64Array,
@@ -119,7 +120,7 @@ def _local_smooth_nb(
     return sc
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _init_smooth_nb(
     pos: F64Array,
     dtn: F64Array,
@@ -147,7 +148,7 @@ def _init_smooth_nb(
 # no factor of 2.
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _local_confine_nb(
     pos: F64Array, p: int, cx: float, cy: float, cz: float, R: float, weight: float
 ) -> float:
@@ -161,7 +162,7 @@ def _local_confine_nb(
     return weight * rel * rel
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _init_confine_nb(
     pos: F64Array, cx: float, cy: float, cz: float, R: float, weight: float
 ) -> float:
@@ -182,7 +183,7 @@ def _init_confine_nb(
 # sum_{i != j, |i-j| > skip} E_pair(d_ij). Delta is 2 * (local_curr - local_prev).
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _excl_pair_nb(d: float, r0: float, weight: float) -> float:
     if d >= r0:
         return 0.0
@@ -190,7 +191,7 @@ def _excl_pair_nb(d: float, r0: float, weight: float) -> float:
     return weight * rel * rel
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -> float:
     n = pos.shape[0]
     err = 0.0
@@ -208,11 +209,12 @@ def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -
     return err
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
     n = pos.shape[0]
     err = 0.0
     for i in range(n):
+        row_err = 0.0
         for j in range(n):
             diff = i - j
             if diff < 0:
@@ -223,14 +225,15 @@ def _init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
             dy = pos[i, 1] - pos[j, 1]
             dz = pos[i, 2] - pos[j, 2]
             d = math.sqrt(dx * dx + dy * dy + dz * dz)
-            err += _excl_pair_nb(d, r0, weight)
+            row_err += _excl_pair_nb(d, r0, weight)
+        err += row_err
     return err
 
 
 # Orientation MC helpers (smooth-only)
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _calc_orientation_nb(
     pos: F64Array, cind: int, n: int, is_L: bool
 ) -> tuple[float, float, float]:
@@ -259,7 +262,7 @@ def _calc_orientation_nb(
     return ox, oy, oz
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _score_orientation_full_nb(
     anchor_orn: F64Array,
     nbr_offsets: I32Array,
@@ -291,7 +294,7 @@ def _score_orientation_full_nb(
     return err * motif_weight
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _local_score_orientation_nb(
     anchor_orn: F64Array,
     k: int,
@@ -330,7 +333,7 @@ def _local_score_orientation_nb(
 # Heat MC helpers (smooth-only, subanchor heatmap)
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: float) -> float:
     """Local heat score for bead p vs all others.
     Mirrors Reference calcScoreSubanchorHeatmap(int moved) - sums all i != p.
@@ -352,12 +355,13 @@ def _local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: floa
     return err * heat_weight
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> float:
     """Global heat score (double-counts pairs, matching Reference calcScoreSubanchorHeatmap())."""
     n = pos.shape[0]
     err = 0.0
     for i in range(n):
+        row_err = 0.0
         for j in range(n):
             if i == j:
                 continue
@@ -369,14 +373,15 @@ def _init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> flo
             dz = pos[i, 2] - pos[j, 2]
             d = math.sqrt(dx * dx + dy * dy + dz * dz)
             rel = (d - exp_d) / exp_d
-            err += rel * rel
+            row_err += rel * rel
+        err += row_err
     return err * heat_weight
 
 
 # Arcs MC helpers
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _local_arcs_nb(
     pos: F64Array, exp: F64Array, p: int, stretch_k: float, squeeze_k: float
 ) -> float:
@@ -398,11 +403,12 @@ def _local_arcs_nb(
     return sc
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _init_arcs_nb(pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float) -> float:
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
+        row_sc = 0.0
         for j in range(i + 1, n):
             e = exp[i, j]
             if -1e-10 < e < 1e-6:
@@ -412,17 +418,18 @@ def _init_arcs_nb(pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: flo
             dz = pos[i, 2] - pos[j, 2]
             d = math.sqrt(dx * dx + dy * dy + dz * dz)
             if e < 0.0:
-                sc += 1.0 / (d if d > 1e-10 else 1e-10)
+                row_sc += 1.0 / (d if d > 1e-10 else 1e-10)
             else:
                 rel = (d - e) / e
-                sc += rel * rel * (stretch_k if rel >= 0.0 else squeeze_k)
+                row_sc += rel * rel * (stretch_k if rel >= 0.0 else squeeze_k)
+        sc += row_sc
     return sc
 
 
 # Heatmap MC helpers
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p: int) -> float:
     n = pos.shape[0]
     sc = 0.0
@@ -439,11 +446,13 @@ def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p:
     return sc
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float:
+    """O(N^2) init - parallelised over rows; sum reduction is auto-handled."""
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
+        row_sc = 0.0
         for j in range(n):
             if skip[i, j]:
                 continue
@@ -453,7 +462,8 @@ def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> floa
             d = math.sqrt(dx * dx + dy * dy + dz * dz)
             e = exp_safe[i, j]
             err = (d - e) / e
-            sc += err * err
+            row_sc += err * err
+        sc += row_sc
     return sc
 
 
@@ -477,7 +487,7 @@ def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> floa
 # Smooth uses strict (preserves prior behaviour); arcs/heatmap use non-strict.
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def _batch_mc_nb(
     pos: F64Array,
     movable: I64Array,
@@ -887,6 +897,385 @@ def _run_outer_loop(
 # own level's settings and prepares the term data the kernel needs.
 
 
+@njit(cache=True, nogil=True)
+def _batch_heatmap_chain_nb(
+    pos: F64Array,
+    exp_safe: F64Array,
+    skip: BoolArray,
+    step_size: float,
+    T: float,
+    dt: float,
+    jump_scale: float,
+    jump_coef: float,
+    n_steps: int,
+    score_hm: float,
+) -> tuple[float, float, int]:
+    """One batch of heatmap MC steps for a single chain.  Stripped-down vs
+    `_batch_mc_nb` (no EV, no other terms) so it can be called from a parallel
+    K-chain kernel without lugging 40+ args around.
+    """
+    n = pos.shape[0]
+    n_ok = 0
+    for _ in range(n_steps):
+        p: int = int(np.random.randint(0, n))  # pyright: ignore[reportUnknownArgumentType]
+        dx = np.random.uniform(-step_size, step_size)
+        dy = np.random.uniform(-step_size, step_size)
+        dz = np.random.uniform(-step_size, step_size)
+
+        loc_prev = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
+        pos[p, 0] += dx
+        pos[p, 1] += dy
+        pos[p, 2] += dz
+        loc_curr = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
+        score_new = score_hm + 2.0 * (loc_curr - loc_prev)
+
+        ok = score_new <= score_hm
+        if not ok and T > 0.0 and score_hm > 0.0:
+            ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score_hm) / T)
+
+        if ok:
+            n_ok += 1
+            score_hm = score_new
+        else:
+            pos[p, 0] -= dx
+            pos[p, 1] -= dy
+            pos[p, 2] -= dz
+        T *= dt
+    return T, score_hm, n_ok
+
+
+@njit(cache=True, parallel=True, nogil=True)
+def _mc_heatmap_kchains_nb(
+    pos_k: F64Array,  # (K, N, 3)
+    exp_safe: F64Array,  # (N, N)
+    skip: BoolArray,  # (N, N)
+    max_temp: float,
+    dt: float,
+    jump_scale: float,
+    jump_coef: float,
+    stop_steps: int,
+    stop_improvement: float,
+    stop_successes: int,
+    step_size: float,
+    final_scores: F64Array,  # (K,) output
+) -> None:
+    """Run K independent heatmap MC chains in parallel.  `for k in prange(K)`
+    gives each chain a thread-local execution context with its own RNG state,
+    so true parallelism is achievable - this is the cudaMMC-style "K parallel
+    chains, take the best" pattern expressed in pure numba.
+    """
+    K = pos_k.shape[0]
+    for k in prange(K):  # pyright: ignore[reportGeneralTypeIssues]
+        pos = pos_k[k]  # view into the (k, :, :) slice
+        T = max_temp
+        score = _init_heatmap_nb(pos, exp_safe, skip)
+        ms_score = score
+        # Outer convergence loop entirely inside the kernel.
+        while True:
+            T, score, n_ok = _batch_heatmap_chain_nb(
+                pos,
+                exp_safe,
+                skip,
+                step_size,
+                T,
+                dt,
+                jump_scale,
+                jump_coef,
+                stop_steps,
+                score,
+            )
+            converged = (
+                score > stop_improvement * ms_score and n_ok < stop_successes
+            ) or score < 1e-6
+            if converged:
+                break
+            ms_score = score
+        final_scores[k] = score
+
+
+def _mc_heatmap_multichain(
+    pos: np.ndarray[Any, Any],
+    exp_dist: np.ndarray[Any, Any],
+    diag_size: int,
+    step_size: float,
+    settings: Settings,
+    label: str,
+    verbose: bool,
+) -> float:
+    """Run K independent MC chains via `@njit(parallel=True)` + prange, then
+    pick the best.  All chains live in a single kernel launch, so per-thread
+    RNG state is independent (no contention) and Python/GIL is out of the loop
+    once the kernel starts.
+    """
+    n = pos.shape[0]
+    if n <= 1:
+        return 0.0
+
+    K = max(1, int(settings.mc_heatmap_chains))
+
+    idx: I64Array = np.arange(n, dtype=np.int64)
+    diag_mask = np.abs(idx[:, None] - idx[None, :]) < diag_size
+    skip_np = diag_mask | (exp_dist < 1e-6)
+    exp_safe_np = np.where(skip_np, 1.0, exp_dist)
+
+    pos_k: F64Array = np.ascontiguousarray(
+        np.broadcast_to(pos.astype(np.float64), (K, n, 3)).copy()
+    )
+    exp_safe = np.ascontiguousarray(exp_safe_np.astype(np.float64))
+    skip = np.ascontiguousarray(skip_np.astype(np.bool_))
+    final_scores: F64Array = np.zeros(K, dtype=np.float64)
+
+    if verbose:
+        prefix = f"    [{label}] " if label else "    "
+        print(f"{prefix}K={K} N={n} (numba prange parallel)", flush=True)
+
+    _mc_heatmap_kchains_nb(
+        pos_k,
+        exp_safe,
+        skip,
+        float(settings.max_temp_heatmap),
+        float(settings.dt_temp_heatmap),
+        float(settings.jump_scale_heatmap),
+        float(settings.jump_coef_heatmap),
+        int(settings.mc_stop_steps_heatmap),
+        float(settings.mc_stop_improvement_heatmap),
+        int(settings.mc_stop_successes_heatmap),
+        float(step_size),
+        final_scores,
+    )
+
+    best_k: int = int(np.argmin(final_scores))
+    pos[:] = pos_k[best_k].astype(pos.dtype)
+    if verbose:
+        prefix = f"    [{label}] " if label else "    "
+        print(
+            f"{prefix}scores: "
+            + ", ".join(f"{s:.2f}" for s in final_scores)
+            + f"  -> picked ch{best_k}",
+            flush=True,
+        )
+    return float(final_scores[best_k])
+
+
+# Smooth-MC multi-chain (chain bonds + optional heat term)
+
+
+@njit(cache=True, nogil=True)
+def _batch_smooth_chain_nb(
+    pos: F64Array,
+    dtn: F64Array,
+    movable: I64Array,
+    use_heat: bool,
+    heat_dist: F64Array,
+    heat_weight: float,
+    step_size: float,
+    T: float,
+    dt: float,
+    jump_scale: float,
+    jump_coef: float,
+    n_steps: int,
+    stretch_k: float,
+    squeeze_k: float,
+    ang_k: float,
+    dist_w: float,
+    ang_w: float,
+    score_struct: float,
+    score_heat: float,
+) -> tuple[float, float, float, int]:
+    """One batch of smooth MC steps for a single chain - simplified form (chain
+    bonds + angles + optional heat; no orientation, EV, confinement).  Used
+    only inside the parallel K-chain kernel `_mc_smooth_kchains_nb`."""
+    n = pos.shape[0]
+    n_mov = movable.shape[0]
+    n_ok = 0
+    score = score_struct + score_heat
+
+    for _ in range(n_steps):
+        p: int = int(movable[np.random.randint(0, n_mov)])
+        dx = np.random.uniform(-step_size, step_size)
+        dy = np.random.uniform(-step_size, step_size)
+        dz = np.random.uniform(-step_size, step_size)
+
+        loc_struct_prev = _local_smooth_nb(
+            pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
+        )
+        loc_heat_prev = 0.0
+        if use_heat:
+            loc_heat_prev = _local_heat_nb(pos, heat_dist, p, heat_weight)
+
+        pos[p, 0] += dx
+        pos[p, 1] += dy
+        pos[p, 2] += dz
+
+        loc_struct_curr = _local_smooth_nb(
+            pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
+        )
+        score_struct_new = score_struct - loc_struct_prev + loc_struct_curr
+
+        score_heat_new = score_heat
+        if use_heat:
+            loc_heat_curr = _local_heat_nb(pos, heat_dist, p, heat_weight)
+            score_heat_new = score_heat + 2.0 * (loc_heat_curr - loc_heat_prev)
+
+        score_new = score_struct_new + score_heat_new
+
+        ok = score_new < score  # smooth uses strict less-than
+        if not ok and T > 0.0 and score > 0.0:
+            ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T)
+
+        if ok:
+            n_ok += 1
+            score = score_new
+            score_struct = score_struct_new
+            score_heat = score_heat_new
+        else:
+            pos[p, 0] -= dx
+            pos[p, 1] -= dy
+            pos[p, 2] -= dz
+        T *= dt
+    return T, score_struct, score_heat, n_ok
+
+
+@njit(cache=True, parallel=True, nogil=True)
+def _mc_smooth_kchains_nb(
+    pos_k: F64Array,
+    dtn: F64Array,
+    movable: I64Array,
+    use_heat: bool,
+    heat_dist: F64Array,
+    heat_weight: float,
+    max_temp: float,
+    dt: float,
+    jump_scale: float,
+    jump_coef: float,
+    stop_steps: int,
+    stop_improvement: float,
+    stop_successes: int,
+    step_size: float,
+    stretch_k: float,
+    squeeze_k: float,
+    ang_k: float,
+    dist_w: float,
+    ang_w: float,
+    final_scores: F64Array,
+) -> None:
+    """Run K independent smooth MC chains in parallel.  Same pattern as
+    `_mc_heatmap_kchains_nb`: `for k in prange(K)` gives each chain its own
+    thread-local execution context with independent RNG state.
+    """
+    K = pos_k.shape[0]
+    for k in prange(K):  # pyright: ignore[reportGeneralTypeIssues]
+        pos = pos_k[k]
+        T = max_temp
+        score_struct = _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
+        score_heat = _init_heat_nb(pos, heat_dist, heat_weight) if use_heat else 0.0
+        score = score_struct + score_heat
+        ms_score = score
+        while True:
+            T, score_struct, score_heat, n_ok = _batch_smooth_chain_nb(
+                pos,
+                dtn,
+                movable,
+                use_heat,
+                heat_dist,
+                heat_weight,
+                step_size,
+                T,
+                dt,
+                jump_scale,
+                jump_coef,
+                stop_steps,
+                stretch_k,
+                squeeze_k,
+                ang_k,
+                dist_w,
+                ang_w,
+                score_struct,
+                score_heat,
+            )
+            score = score_struct + score_heat
+            converged = (
+                score > stop_improvement * ms_score and n_ok < stop_successes
+            ) or score < 1e-6
+            if converged:
+                break
+            ms_score = score
+        final_scores[k] = score
+
+
+def _mc_smooth_multichain(
+    pos: np.ndarray[Any, Any],
+    dtn: np.ndarray[Any, Any],
+    fixed: np.ndarray[Any, Any],
+    step_size: float,
+    settings: Settings,
+    heat_dist: np.ndarray[Any, Any] | None,
+    label: str,
+    verbose: bool,
+) -> float:
+    """K-chain prange-parallel smooth MC.  Only supports the simple config
+    (chain bonds + optional heat; no orientation/EV/confinement).  Callers
+    must verify those terms are off before dispatching here."""
+    n = pos.shape[0]
+    K = max(1, int(settings.mc_smooth_chains))
+
+    movable: I64Array = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    if len(movable) == 0:
+        return 0.0
+
+    pos_k: F64Array = np.ascontiguousarray(
+        np.broadcast_to(pos.astype(np.float64), (K, n, 3)).copy()
+    )
+    dtn64 = _as_f64(dtn)
+    use_heat = heat_dist is not None
+    if use_heat:
+        assert heat_dist is not None
+        heat64 = _as_f64(heat_dist)
+    else:
+        heat64 = np.zeros((1, 1), dtype=np.float64)
+
+    final_scores: F64Array = np.zeros(K, dtype=np.float64)
+
+    if verbose:
+        prefix = f"    [{label}] " if label else "    "
+        print(f"{prefix}smooth K={K} N={n} (numba prange parallel)", flush=True)
+
+    _mc_smooth_kchains_nb(
+        pos_k,
+        dtn64,
+        movable,
+        use_heat,
+        heat64,
+        float(settings.subanchor_heatmap_dist_weight),
+        float(settings.max_temp_smooth),
+        float(settings.dt_temp_smooth),
+        float(settings.jump_scale_smooth),
+        float(settings.jump_coef_smooth),
+        int(settings.mc_stop_steps_smooth),
+        float(settings.mc_stop_improvement_smooth),
+        int(settings.mc_stop_successes_smooth),
+        float(step_size),
+        float(settings.spring_stretch),
+        float(settings.spring_squeeze),
+        float(settings.spring_angular),
+        float(settings.smooth_dist_weight),
+        float(settings.smooth_angle_weight),
+        final_scores,
+    )
+
+    best_k: int = int(np.argmin(final_scores))
+    pos[:] = pos_k[best_k].astype(pos.dtype)
+    if verbose:
+        prefix = f"    [{label}] " if label else "    "
+        print(
+            f"{prefix}smooth scores: "
+            + ", ".join(f"{s:.2f}" for s in final_scores)
+            + f"  -> picked ch{best_k}",
+            flush=True,
+        )
+    return float(final_scores[best_k])
+
+
 def mc_heatmap(
     pos: np.ndarray[Any, Any],  # (N, 3) float32 - modified in place
     exp_dist: np.ndarray[Any, Any],  # (N, N) - expected pairwise distances
@@ -898,7 +1287,14 @@ def mc_heatmap(
 ) -> float:
     """Simulated annealing using heatmap distance energy.  Double-counted
     structure (delta factor 2). Mirrors Reference LooperSolver::MonteCarloHeatmap().
+
+    When `settings.mc_heatmap_chains > 1`, runs that many independent MC
+    chains in parallel via numba threading and keeps the one with the best
+    final score - essentially an embarrassingly-parallel restart strategy.
     """
+    if int(settings.mc_heatmap_chains) > 1:
+        return _mc_heatmap_multichain(pos, exp_dist, diag_size, step_size, settings, label, verbose)
+
     n = pos.shape[0]
     if n <= 1:
         return 0.0
@@ -1133,10 +1529,29 @@ def mc_smooth(
     """Chain connectivity + angle MC.  Optionally adds CTCF orientation and/or
     subanchor heat. Anchor beads (fixed=True) never move. Single-counted
     structure (delta factor 1). Mirrors Reference MonteCarloArcsSmooth.
+
+    When `settings.mc_smooth_chains > 1` AND the call uses the simple config
+    (no orientation, no EV, no confinement), dispatches to a prange-parallel
+    K-chain kernel and keeps the best score.  Complex configs fall back to
+    single-chain.
     """
     n = pos.shape[0]
     if n <= 2:
         return 0.0
+
+    # Multi-chain dispatch (simple-config path only).
+    if int(settings.mc_smooth_chains) > 1:
+        simple_config = (
+            char_orientations is None
+            and not (
+                bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
+            )
+            and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
+        )
+        if simple_config:
+            return _mc_smooth_multichain(
+                pos, dtn, fixed, step_size, settings, heat_dist, label, verbose
+            )
 
     movable: I64Array = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
     if len(movable) == 0:

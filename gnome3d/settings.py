@@ -104,6 +104,15 @@ class Settings:
     mc_stop_successes_heatmap: int
     mc_stop_steps_heatmap: int
 
+    # ---- MC parallelism ----
+    # `mc_*_chains` > 1 runs K independent MC chains in parallel
+    # (numba prange + thread-local RNG) and keeps the best by final score.
+    # K=1 disables.  Smooth multichain only triggers when the call uses the
+    # simple chain+heat configuration (no orientation/EV/confinement) - more
+    # complex configs fall back to single-chain.
+    mc_heatmap_chains: int
+    mc_smooth_chains: int
+
     # ---- MC arcs ----
     max_temp: float
     dt_temp: float
@@ -281,6 +290,10 @@ class Settings:
         self.mc_stop_improvement_heatmap = 0.995
         self.mc_stop_successes_heatmap = 5
         self.mc_stop_steps_heatmap = 10000
+
+        # ---- MC backend ----
+        self.mc_heatmap_chains = 1
+        self.mc_smooth_chains = 1
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -573,6 +586,10 @@ class Settings:
             "stop_condition_successes_threshold_heatmap",
             self.mc_stop_successes_heatmap,
         )
+
+        # [mc_backend]
+        self.mc_heatmap_chains = geti("mc_backend", "heatmap_chains", self.mc_heatmap_chains)
+        self.mc_smooth_chains = geti("mc_backend", "smooth_chains", self.mc_smooth_chains)
 
         # [simulation_arcs]
         self.max_temp = getf("simulation_arcs", "max_temp", self.max_temp)
