@@ -53,7 +53,7 @@ STRUCT_HEATMAP = 2
 # Smooth MC helpers
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _smooth_len_nb(
     pos: F64Array,
     dtn: F64Array,
@@ -74,7 +74,7 @@ def _smooth_len_nb(
     return rel * rel * k * dist_w
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _smooth_ang_nb(pos: F64Array, i: int, ang_k: float, ang_w: float) -> float:
     v1x = pos[i, 0] - pos[i + 1, 0]
     v1y = pos[i, 1] - pos[i + 1, 1]
@@ -95,7 +95,7 @@ def _smooth_ang_nb(pos: F64Array, i: int, ang_k: float, ang_w: float) -> float:
     return ang * ang * ang * ang_k * ang_w
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _local_smooth_nb(
     pos: F64Array,
     dtn: F64Array,
@@ -120,7 +120,7 @@ def _local_smooth_nb(
     return sc
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _init_smooth_nb(
     pos: F64Array,
     dtn: F64Array,
@@ -148,7 +148,7 @@ def _init_smooth_nb(
 # no factor of 2.
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _local_confine_nb(
     pos: F64Array, p: int, cx: float, cy: float, cz: float, R: float, weight: float
 ) -> float:
@@ -162,7 +162,7 @@ def _local_confine_nb(
     return weight * rel * rel
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _init_confine_nb(
     pos: F64Array, cx: float, cy: float, cz: float, R: float, weight: float
 ) -> float:
@@ -183,7 +183,7 @@ def _init_confine_nb(
 # sum_{i != j, |i-j| > skip} E_pair(d_ij). Delta is 2 * (local_curr - local_prev).
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _excl_pair_nb(d: float, r0: float, weight: float) -> float:
     if d >= r0:
         return 0.0
@@ -191,7 +191,7 @@ def _excl_pair_nb(d: float, r0: float, weight: float) -> float:
     return weight * rel * rel
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -> float:
     n = pos.shape[0]
     err = 0.0
@@ -209,7 +209,7 @@ def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -
     return err
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
     n = pos.shape[0]
     err = 0.0
@@ -233,7 +233,7 @@ def _init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
 # Orientation MC helpers (smooth-only)
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _calc_orientation_nb(
     pos: F64Array, cind: int, n: int, is_L: bool
 ) -> tuple[float, float, float]:
@@ -262,7 +262,7 @@ def _calc_orientation_nb(
     return ox, oy, oz
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _score_orientation_full_nb(
     anchor_orn: F64Array,
     nbr_offsets: I32Array,
@@ -294,7 +294,7 @@ def _score_orientation_full_nb(
     return err * motif_weight
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _local_score_orientation_nb(
     anchor_orn: F64Array,
     k: int,
@@ -333,7 +333,7 @@ def _local_score_orientation_nb(
 # Heat MC helpers (smooth-only, subanchor heatmap)
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: float) -> float:
     """Local heat score for bead p vs all others.
     Mirrors Reference calcScoreSubanchorHeatmap(int moved) - sums all i != p.
@@ -355,7 +355,7 @@ def _local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: floa
     return err * heat_weight
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> float:
     """Global heat score (double-counts pairs, matching Reference calcScoreSubanchorHeatmap())."""
     n = pos.shape[0]
@@ -381,7 +381,7 @@ def _init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> flo
 # Arcs MC helpers
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _local_arcs_nb(
     pos: F64Array, exp: F64Array, p: int, stretch_k: float, squeeze_k: float
 ) -> float:
@@ -403,7 +403,7 @@ def _local_arcs_nb(
     return sc
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _init_arcs_nb(pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float) -> float:
     n = pos.shape[0]
     sc = 0.0
@@ -429,7 +429,7 @@ def _init_arcs_nb(pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: flo
 # Heatmap MC helpers
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p: int) -> float:
     n = pos.shape[0]
     sc = 0.0
@@ -446,7 +446,7 @@ def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p:
     return sc
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float:
     """O(N^2) init - parallelised over rows; sum reduction is auto-handled."""
     n = pos.shape[0]
@@ -487,7 +487,7 @@ def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> floa
 # Smooth uses strict (preserves prior behaviour); arcs/heatmap use non-strict.
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _batch_mc_nb(
     pos: F64Array,
     movable: I64Array,
@@ -897,7 +897,7 @@ def _run_outer_loop(
 # own level's settings and prepares the term data the kernel needs.
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _batch_heatmap_chain_nb(
     pos: F64Array,
     exp_safe: F64Array,
@@ -1060,7 +1060,7 @@ def _mc_heatmap_multichain(
 # Smooth-MC multi-chain (chain bonds + optional heat term)
 
 
-@njit(cache=True, nogil=True)
+@njit(cache=True, fastmath=True, nogil=True)
 def _batch_smooth_chain_nb(
     pos: F64Array,
     dtn: F64Array,
