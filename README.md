@@ -102,3 +102,33 @@ The region string uses `chr:start-end` format (colon + dash):
 ```
 chr1:18288319-20307135
 ```
+
+---
+
+## Acknowledgements
+
+This project is a Python reimplementation of the 3D-GNOME family of tools developed by many authors. All credit for the
+underlying algorithm, modelling philosophy, and validation work belongs to the original authors. If you use this code in
+academic work, please cite the relevant papers below:
+
+- Tang Z., Luo O. J., Li X., Zheng M., Zhu J. J., Szalaj P., Trzaskoma P., Magalska A., Wlodarczyk J., Ruszczycki B.,
+  Michalski P., Piecuch E., Wang P., Wang D., Tian S. Z., Penrad-Mobayed M., Sachs L. M., Ruan X., Wei C.-L., Liu E. T.,
+  Wilczynski G. M., Plewczynski D., Li G., Ruan Y.(2015). **CTCF-Mediated Human 3D Genome Architecture Reveals Chromatin
+  Topology for Transcription.** *Cell.* [doi:10.1016/j.cell.2015.11.024](https://doi.org/10.1016/j.cell.2015.11.024)
+
+- Szałaj P., Tang Z., Michalski P., Pietal M. J., Luo O. J., Sadowski M., Li X., Radew K., Ruan Y., Plewczynski D. (
+  2016). **An integrated 3-Dimensional Genome Modeling Engine for data-driven simulation of spatial genome organization.
+  ** *Genome Research.* [doi:10.1101/gr.205062.116](https://doi.org/10.1101/gr.205062.116)
+
+- Wlasnowolski M., Sadowski M., Czarnota T., Jodkowska K., Szalaj P., Tang Z., Ruan Y., Plewczynski D. (2020). *
+  *3D-GNOME 2.0: a three-dimensional genome modeling engine for predicting structural variation-driven alterations of
+  chromatin spatial structure in the human genome.** *Nucleic Acids Research,* 48(W1),
+  W170–W176. [doi:10.1093/nar/gkaa388](https://doi.org/10.1093/nar/gkaa388)
+
+- Wlasnowolski M., Kadlof M., Sengupta K., Plewczynski D. (2023). **3D-GNOME 3.0: a three-dimensional genome modelling
+  engine for analysing changes of promoter-enhancer contacts in the human genome.** *Nucleic Acids Research,* 51 (Web
+  Server issue), W5–W10. [doi:10.1093/nar/gkad354](https://doi.org/10.1093/nar/gkad354)
+
+- Wlasnowolski M., Grabowski P., Roszczyk D., Kaczmarski K., Plewczynski D. (2023). **cudaMMC: GPU-enhanced multiscale
+  Monte Carlo chromatin 3D modelling.**
+  *Bioinformatics.* [doi:10.1093/bioinformatics/btad588](https://doi.org/10.1093/bioinformatics/btad588)
