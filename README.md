@@ -40,19 +40,17 @@ Alternatively, runtime deps alone can be installed via `pip install -r requireme
 The C++ binary is used only for the integration test (comparing distributions). Build it once:
 
 ```bash
-make 3dnome        # builds 3dnome/3dnome
-make scorer        # builds harness/scorer (unit-test scorer)
-make               # builds both
+make 3dnome # builds 3dnome/3dnome
 ```
 
 ---
 
 ## Running the Python reimplementation
 
-### Quick start - single region
+### Quick start
 
 ```python
-from src.simulate import run_region
+from gnome3d.simulate import run_region
 
 region = "chr1:18288319-20307135"
 entry_id = region.replace(':', '_').replace('-', '_')
@@ -64,13 +62,12 @@ structures = run_region(
     data_dir="data/GM12878",  # override the absolute path baked into config.ini
 )
 
-# Each structure is a list of (midpoint_bp, x, y, z) tuples
+# Each structure is a list of BeadOut (start, end, x, y, z, kind) tuples
 for i, s in enumerate(structures):
-    print(f"structure {i + 1}: {len(s)} beads, "
-          f"first bead at bp={s[0][0]}, pos=({s[0][1]:.3f}, {s[0][2]:.3f}, {s[0][3]:.3f})")
+    print(f"structure {i + 1}: {len(s)} beads, first bead: {s.start} {s.end} {s.x:.2f} {s.y:.2f} {s.z:.2f} {s.kind}")
 
 # Save each structure as its own mmCIF file
-from src.io import write_cif
+from gnome3d.io import write_cif
 
 for i, s in enumerate(structures, start=1):
     write_cif(f"{entry_id}_structure_{i}.cif", s, entry_id=f"{entry_id}_s{i}")
@@ -86,18 +83,6 @@ Beads are written as sequential ALA residues on chain A - ChimeraX connects them
 
 `data_dir` overrides the `data_dir` key in the config, which is useful because the bundled `config.ini` has it hardcoded
 to `/Projects/GM12878/`. Pass the actual local path instead.
-
-### Fast run (lower quality, useful for testing)
-
-Use a config with relaxed MC settings:
-
-```ini
-[simulation_arcs]
-delta_temp = 0.995
-stop_condition_steps = 1000
-```
-
-Or pass the `--fast` flag to the integration harness (see below).
 
 ---
 
