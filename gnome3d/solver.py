@@ -516,9 +516,34 @@ class Solver:
                     self.clusters[a_idx].pos = ib.pos.copy()
                 work.append((ib_i, ib_idx, ib_label, active_region))
 
-            for _ib_i, ib_idx, ib_label, active_region in work:
-                beads = self._process_ib(ib_idx, ib_label, active_region, chr_)
-                self.dense_active_regions.setdefault(chr_, []).extend(beads)
+            n_workers = max(1, int(self.s.ib_workers))
+            if n_workers > 1 and len(work) > 1:
+                # IBs are independent (each owns a disjoint subset of cluster
+                # indices, per `_process_ib`'s docstring), so threading gives
+                # true parallelism with the nogil JIT kernels.  We preserve
+                # the original IB order in the output by collecting into a
+                # per-position bucket.
+                from concurrent.futures import ThreadPoolExecutor
+
+                results: list[list[BeadOut] | None] = [None] * len(work)
+
+                def _run(
+                    idx: int, _work: list[tuple[int, int, str, list[int]]] = work, _chr: str = chr_
+                ) -> tuple[int, list[BeadOut]]:
+                    _ib_i, ib_idx, ib_label, active_region = _work[idx]
+                    return idx, self._process_ib(ib_idx, ib_label, active_region, _chr)
+
+                with ThreadPoolExecutor(max_workers=n_workers) as ex:
+                    for idx, beads in ex.map(_run, range(len(work))):
+                        results[idx] = beads
+
+                for beads in results:
+                    if beads:
+                        self.dense_active_regions.setdefault(chr_, []).extend(beads)
+            else:
+                for _ib_i, ib_idx, ib_label, active_region in work:
+                    beads = self._process_ib(ib_idx, ib_label, active_region, chr_)
+                    self.dense_active_regions.setdefault(chr_, []).extend(beads)
 
     def _position_interaction_blocks(self, segs: list[int]) -> None:
         """

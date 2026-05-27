@@ -112,6 +112,10 @@ class Settings:
     # complex configs fall back to single-chain.
     mc_heatmap_chains: int
     mc_smooth_chains: int
+    # `ib_workers > 1` processes IBs concurrently (each IB is an independent
+    # subproblem). JIT kernels are nogil=True, so Python threading actually
+    # parallelises here.
+    ib_workers: int
 
     # ---- MC arcs ----
     max_temp: float
@@ -294,6 +298,7 @@ class Settings:
         # ---- MC backend ----
         self.mc_heatmap_chains = 1
         self.mc_smooth_chains = 1
+        self.ib_workers = 1
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -587,9 +592,10 @@ class Settings:
             self.mc_stop_successes_heatmap,
         )
 
-        # [mc_backend]
-        self.mc_heatmap_chains = geti("mc_backend", "heatmap_chains", self.mc_heatmap_chains)
-        self.mc_smooth_chains = geti("mc_backend", "smooth_chains", self.mc_smooth_chains)
+        # [simulation_backend]
+        self.mc_heatmap_chains = geti("simulation_backend", "heatmap_chains", self.mc_heatmap_chains)
+        self.mc_smooth_chains = geti("simulation_backend", "smooth_chains", self.mc_smooth_chains)
+        self.ib_workers = geti("simulation_backend", "ib_workers", self.ib_workers)
 
         # [simulation_arcs]
         self.max_temp = getf("simulation_arcs", "max_temp", self.max_temp)

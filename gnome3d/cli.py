@@ -116,6 +116,13 @@ def main() -> None:
     # Numba releases the GIL during MC, so threads genuinely overlap.
     n = args.n_structures
     n_workers = min(n, os.cpu_count() or 1)
+    # Avoid nesting structure-level and IB-level thread pools: when we already
+    # parallelise across structures, force ib_workers=1 inside each worker.
+    # Numba is also threading inside the MC kernels, so over-subscription here
+    # only hurts throughput.
+    if n_workers > 1 and s.ib_workers > 1:
+        print(f"[main] n_structures>1: forcing ib_workers=1 (was {s.ib_workers})")
+        s.ib_workers = 1
     print(f"[main] running {n} structure(s) with {n_workers} worker(s)")
 
     pool = ThreadPoolExecutor(max_workers=n_workers)
