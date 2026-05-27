@@ -317,7 +317,7 @@ class Settings:
         # scale between IB midpoints). Auto picks `factor * mean(bond)` from
         # that level's own data - each level has its own factor (default 0.5).
         self.use_excluded_volume = False
-        self.exclusion_weight = 1.0  # k: multiplier (comparable to spring_*)
+        self.exclusion_weight = 0.5  # k: multiplier (comparable to spring_*)
         self.exclusion_apply_to_arcs = False
         self.exclusion_apply_to_smooth = True
         self.exclusion_apply_to_heatmap = False
@@ -366,7 +366,7 @@ class Settings:
         # radius" is also different. radius = 0 auto-derives from that level's
         # own bond data as `packing_factor * mean(bond) * N^(1/3)`.
         self.use_confinement = False
-        self.confinement_weight = 1.0
+        self.confinement_weight = 0.5
         self.confinement_apply_to_arcs = True
         self.confinement_apply_to_smooth = True
         self.confinement_apply_to_ib = True

@@ -9,15 +9,25 @@ The reference C++ implementation lives in `3dnome/` (read-only). The rewrite liv
 ## Requirements
 
 - Python 3.10+
-- PyTorch >= 2.0
 - NumPy >= 1.24
+- Numba >= 0.59
 - g++ (for building the C++ reference binary and the test scorer)
+
+### Install
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
+
+### Install with dev tooling (ruff + pyright)
+
+```bash
+pip install -e ".[dev]"
+```
+
+Alternatively, runtime deps alone can be installed via `pip install -r requirements.txt`.
 
 ---
 
