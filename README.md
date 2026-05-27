@@ -4,6 +4,8 @@ Python reimplementation of the [3dgnome](https://bitbucket.org/3dome/3dgnome/src
 
 The reference C++ implementation lives in `3dnome/` (read-only). The rewrite lives in `src/`.
 
+WARNING: this is a very experimental playground project. (sic: it doesn't even reimplement 3dgnome properly to the letter). New features and optimizations will be added iteratively. Use at your own risk.
+
 ---
 
 ## Requirements
