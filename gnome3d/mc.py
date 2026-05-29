@@ -1453,6 +1453,46 @@ def mc_arcs(
         return 0.0
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
+    # JAX backend dispatch.  Supports chain (arcs) + EV.  Confinement still
+    # routes to numba.  Same opt-in switch as mc_smooth.
+    if str(settings.mc_backend).strip().lower() == "jax":
+        has_confinement = bool(settings.use_confinement) and bool(
+            settings.confinement_apply_to_arcs
+        )
+        if not has_confinement:
+            from . import mc_jax
+
+            if settings.output_level >= 1:
+                lbl = f"[{label}] " if label else ""
+                terms = ["arcs"]
+                if bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs):
+                    terms.append("EV")
+                print(
+                    f"    {lbl}mc_arcs: backend=jax  N={n}  terms=[{'+'.join(terms)}]",
+                    flush=True,
+                )
+            score = mc_jax.mc_arcs_jax(
+                pos, exp_dist_mat, step_size, settings, label=label, verbose=verbose
+            )
+            if _MC_PROFILE_PATH:
+                _log_mc_call(
+                    "arcs",
+                    n,
+                    1,
+                    int(settings.mc_stop_steps),
+                    time.perf_counter() - _t0,
+                    score,
+                    label,
+                )
+            return score
+        elif settings.output_level >= 1:
+            lbl = f"[{label}] " if label else ""
+            print(
+                f"    {lbl}mc_arcs: backend=jax requested but falling back to "
+                f"numba (confinement enabled)",
+                flush=True,
+            )
+
     pw = _as_f64(pos)
     exp64 = _as_f64(exp_dist_mat)
 

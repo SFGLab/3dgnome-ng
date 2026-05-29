@@ -832,6 +832,418 @@ def _build_smooth_kernel(
 
 
 # ---------------------------------------------------------------------------
+# Arcs kernel construction (separate from smooth; different energy + schedule)
+# ---------------------------------------------------------------------------
+
+
+def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
+    """Build (or look up cached) compiled arcs-MC kernel.
+
+    Arcs MC differs from smooth in three ways:
+      1. **Energy**: pairwise springs from `exp_dist_mat` with a repulsion
+         branch for negative `exp` entries.  No chain bonds, no angles, no
+         heat, no orientation.
+      2. **Acceptance**: non-strict (`score_new <= score`) vs smooth's strict.
+      3. **Convergence**: an additional `stop_when_ratio_above` clause
+         (0.9999 in production) that exits early when improvement stalls.
+
+    Cache key: (n_steps_per_batch, excl_skip).  EV support is always wired
+    (excl_w=0 disables it at runtime, constant-folded by XLA).
+    """
+    cache_key = ("arcs", n_steps_per_batch, excl_skip)
+    # _kernel_cache is typed for the smooth case; arcs uses string-prefixed
+    # tuple keys to share the same dict without collision.
+    if cache_key in _kernel_cache:  # pyright: ignore[reportArgumentType]
+        return _kernel_cache[cache_key]  # pyright: ignore[reportArgumentType]
+
+    assert _jax is not None and _jnp is not None
+    jax = _jax
+    jnp = _jnp
+
+    def _local_arcs_at(
+        pos: Any,
+        p_pos: Any,
+        p: Any,
+        exp_mat: Any,
+        stretch_k: Any,
+        squeeze_k: Any,
+    ) -> Any:
+        """Mirror of gnome3d.mc._local_arcs_nb, with bead p virtually at p_pos.
+        Three branches per i:
+          - i == p:            contribute 0
+          - exp[i,p] < 0:      repulsion 1/d (with d clamped to 1e-10 min)
+          - exp[i,p] >= 1e-6:  asymmetric spring (d-e)/e
+          - else (in [0, 1e-6)): contribute 0 (no arc, no repulsion)
+        """
+        n = pos.shape[0]
+        diff = pos - p_pos
+        d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+        e = exp_mat[:, p]
+        idx = jnp.arange(n)
+        not_self = idx != p
+        is_repulse = jnp.logical_and(not_self, e < 0.0)
+        is_spring = jnp.logical_and(not_self, e >= 1e-6)
+
+        d_safe = jnp.maximum(d, 1e-10)
+        rep = 1.0 / d_safe
+
+        e_safe = jnp.maximum(e, 1e-6)
+        rel = (d - e_safe) / e_safe
+        k = jnp.where(rel >= 0, stretch_k, squeeze_k)
+        spring = rel * rel * k
+
+        contrib = jnp.where(is_repulse, rep, jnp.where(is_spring, spring, 0.0))
+        return jnp.sum(contrib)
+
+    def _local_excl_at(pos: Any, p_pos: Any, p: Any, r0: Any, weight: Any) -> Any:
+        n = pos.shape[0]
+        diff = pos - p_pos
+        d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+        rel = jnp.maximum(0.0, (r0 - d) / r0)
+        contrib = weight * rel * rel
+        idx = jnp.arange(n)
+        in_range = jnp.abs(idx - p) > excl_skip
+        return jnp.sum(jnp.where(in_range, contrib, 0.0))
+
+    def _init_arcs(pos: Any, exp_mat: Any, stretch_k: Any, squeeze_k: Any) -> Any:
+        """O(N^2) init via row-at-a-time scan, summing only upper triangle
+        (i < j) to match gnome3d.mc._init_arcs_nb."""
+        n = pos.shape[0]
+        idx = jnp.arange(n)
+
+        def scan_body(carry: Any, i: Any) -> tuple[Any, None]:
+            diff = pos - pos[i]
+            d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+            e = exp_mat[:, i]
+            above = idx > i
+            # Match numba: skip e in (-1e-10, 1e-6).
+            is_repulse = jnp.logical_and(above, e <= -1e-10)
+            is_spring = jnp.logical_and(above, e >= 1e-6)
+
+            d_safe = jnp.maximum(d, 1e-10)
+            rep = 1.0 / d_safe
+            e_safe = jnp.maximum(e, 1e-6)
+            rel = (d - e_safe) / e_safe
+            k = jnp.where(rel >= 0, stretch_k, squeeze_k)
+            spring = rel * rel * k
+
+            row = jnp.where(is_repulse, rep, jnp.where(is_spring, spring, 0.0))
+            return carry + jnp.sum(row), None
+
+        total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
+        return total
+
+    def _init_excl(pos: Any, r0: Any, weight: Any) -> Any:
+        n = pos.shape[0]
+        idx = jnp.arange(n)
+
+        def scan_body(carry: Any, i: Any) -> tuple[Any, None]:
+            diff = pos - pos[i]
+            d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+            rel = jnp.maximum(0.0, (r0 - d) / r0)
+            contrib = weight * rel * rel
+            in_range = jnp.abs(idx - i) > excl_skip
+            return carry + jnp.sum(jnp.where(in_range, contrib, 0.0)), None
+
+        total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
+        return total
+
+    def chain_batch(
+        pos0: Any,
+        ss0: Any,
+        se0: Any,
+        T0_: Any,
+        exp_mat: Any,
+        step_size: Any,
+        dt: Any,
+        js: Any,
+        jc: Any,
+        stretch_k: Any,
+        squeeze_k: Any,
+        r0: Any,
+        excl_w: Any,
+        key: Any,
+    ) -> Any:
+        n = pos0.shape[0]
+        k_p, k_d, k_a = jax.random.split(key, 3)
+        # Arcs: all beads are movable (mc.py uses np.arange(n)).
+        ps = jax.random.randint(k_p, (n_steps_per_batch,), 0, n)
+        disps = jax.random.uniform(
+            k_d,
+            (n_steps_per_batch, 3),
+            minval=-step_size,
+            maxval=step_size,
+            dtype=pos0.dtype,
+        )
+        accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
+
+        def body(i: Any, carry: Any) -> Any:
+            pos, ss, se, T, n_ok = carry
+            p = ps[i]
+            delta = disps[i]
+            u = accs[i]
+
+            score = ss + se
+            old_p = pos[p]
+            new_p = old_p + delta
+
+            loc_s_prev = _local_arcs_at(pos, old_p, p, exp_mat, stretch_k, squeeze_k)
+            loc_s_curr = _local_arcs_at(pos, new_p, p, exp_mat, stretch_k, squeeze_k)
+            # struct_delta_factor = 1 for arcs (single-counted)
+            ss_new = ss + (loc_s_curr - loc_s_prev)
+
+            loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w)
+            loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w)
+            se_new = se + 2.0 * (loc_e_curr - loc_e_prev)
+
+            score_new = ss_new + se_new
+
+            # Arcs uses NON-strict acceptance: score_new <= score.
+            ok_unc = score_new <= score
+            can_jump = jnp.logical_and(T > 0, score > 0)
+            exponent = -jc * (score_new / jnp.maximum(score, 1e-30)) / jnp.maximum(T, 1e-30)
+            exponent = jnp.clip(exponent, -80.0, 80.0)
+            p_acc = js * jnp.exp(exponent)
+            ok = jnp.logical_or(ok_unc, jnp.logical_and(can_jump, u < p_acc))
+
+            final_p = jnp.where(ok, new_p, old_p)
+            pos_next = pos.at[p].set(final_p)
+            ss_next = jnp.where(ok, ss_new, ss)
+            se_next = jnp.where(ok, se_new, se)
+            n_ok_next = n_ok + jnp.where(ok, 1, 0)
+            return (pos_next, ss_next, se_next, T * dt, n_ok_next)
+
+        init = (pos0, ss0, se0, T0_, jnp.int32(0))
+        return jax.lax.fori_loop(0, n_steps_per_batch, body, init)
+
+    in_axes = (
+        0,
+        0,
+        0,
+        None,  # pos, ss, se, T0
+        None,  # exp_mat
+        None,
+        None,
+        None,
+        None,  # step_size, dt, js, jc
+        None,
+        None,  # stretch_k, squeeze_k
+        None,
+        None,  # r0, excl_w
+        0,  # key
+    )
+    out_axes = (0, 0, 0, None, 0)
+    batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
+
+    _MAX_ITERS: int = 10000
+
+    @jax.jit
+    def kernel_full(
+        pos_k: Any,
+        ss_k: Any,
+        se_k: Any,
+        T_init: Any,
+        exp_mat: Any,
+        step_size: Any,
+        dt: Any,
+        js: Any,
+        jc: Any,
+        stretch_k: Any,
+        squeeze_k: Any,
+        r0: Any,
+        excl_w: Any,
+        base_key: Any,
+        stop_improvement: Any,
+        stop_successes: Any,
+        score_eps: Any,
+        stop_when_ratio_above: Any,
+    ) -> Any:
+        K = pos_k.shape[0]
+
+        def cond_fn(state: Any) -> Any:
+            _, _, _, _, _, iter_i, _, converged = state
+            return jnp.logical_and(jnp.logical_not(converged), iter_i < _MAX_ITERS)
+
+        def body_fn(state: Any) -> Any:
+            pos, ss, se, T, ms_score, iter_i, _, _ = state
+            iter_key = jax.random.fold_in(base_key, iter_i + 1)
+            keys = jax.random.split(iter_key, K)
+            pos, ss, se, T, n_ok = batched(
+                pos,
+                ss,
+                se,
+                T,
+                exp_mat,
+                step_size,
+                dt,
+                js,
+                jc,
+                stretch_k,
+                squeeze_k,
+                r0,
+                excl_w,
+                keys,
+            )
+            score_per_chain = ss + se
+            best_idx = jnp.argmin(score_per_chain)
+            score = score_per_chain[best_idx]
+            n_ok_best = n_ok[best_idx]
+
+            ratio = score / jnp.maximum(ms_score, 1e-30)
+            plateaued = jnp.logical_and(
+                score > stop_improvement * ms_score, n_ok_best < stop_successes
+            )
+            eps_done = score < score_eps
+            ratio_done = ratio > stop_when_ratio_above
+            converged = jnp.logical_or(jnp.logical_or(plateaued, eps_done), ratio_done)
+            return (pos, ss, se, T, score, iter_i + 1, n_ok_best, converged)
+
+        init_state = (
+            pos_k,
+            ss_k,
+            se_k,
+            T_init,
+            jnp.float32(1e30),
+            jnp.int32(0),
+            jnp.int32(0),
+            jnp.bool_(False),
+        )
+        final = jax.lax.while_loop(cond_fn, body_fn, init_state)
+        pos_f, ss_f, se_f, _T_f, final_score, iter_f, _, converged_f = final
+        return pos_f, ss_f, se_f, final_score, iter_f, converged_f
+
+    init_arcs = jax.jit(jax.vmap(_init_arcs, in_axes=(0, None, None, None)))
+    init_excl_arcs = jax.jit(jax.vmap(_init_excl, in_axes=(0, None, None)))
+
+    bundle = (kernel_full, init_arcs, init_excl_arcs)
+    _kernel_cache[cache_key] = bundle  # pyright: ignore[reportArgumentType]
+    return bundle
+
+
+def mc_arcs_jax(
+    pos: np.ndarray[Any, Any],
+    exp_dist_mat: np.ndarray[Any, Any],
+    step_size: float,
+    settings: "Settings",
+    label: str = "",
+    verbose: bool = False,
+) -> float:
+    """JAX backend for mc_arcs.  Same contract as [mc.mc_arcs] minus
+    confinement support.  Dispatcher in [mc.py::mc_arcs] gates on that.
+
+    Mutates `pos` in place (writes the best-chain final positions back) and
+    returns the best chain's final score.
+    """
+    if not _ensure_jax():
+        raise RuntimeError(
+            "settings.mc_backend='jax' but JAX is not installed.  "
+            "Install with `pip install gnome3d-ng[jax]` or set mc_backend='numba'."
+        )
+    assert _jax is not None and _jnp is not None
+    jax = _jax
+    jnp = _jnp
+
+    n: int = pos.shape[0]
+    if n <= 1:
+        return 0.0
+
+    K: int = 1  # arcs has no multichain in production today
+    n_steps_per_batch: int = int(settings.mc_stop_steps)
+
+    use_excl: bool = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
+    excl_skip: int = int(settings.exclusion_skip_neighbors)
+    excl_w_v: float = float(settings.exclusion_weight) if use_excl else 0.0
+    excl_r0: float
+    if use_excl:
+        excl_r0 = float(settings.exclusion_radius_arcs)
+        if excl_r0 <= 0.0:
+            pos_mask = np.asarray(exp_dist_mat) > 1e-6
+            factor = float(settings.exclusion_auto_factor_arcs)
+            excl_r0 = (
+                factor * float(np.asarray(exp_dist_mat)[pos_mask].mean()) if pos_mask.any() else 1.0
+            )
+    else:
+        excl_r0 = 1.0
+
+    bundle = _build_arcs_kernel(n_steps_per_batch, excl_skip)
+    kernel_full, init_arcs, init_excl = bundle
+
+    pos_f32: F32Array = pos.astype(np.float32)
+    pos_k_np: F32Array = np.broadcast_to(pos_f32, (K, n, 3)).copy()
+    exp_mat_np: F32Array = exp_dist_mat.astype(np.float32)
+
+    pos_k = jnp.asarray(pos_k_np)
+    exp_mat_j = jnp.asarray(exp_mat_np)
+
+    stretch_k_v: float = float(settings.spring_stretch_arcs)
+    squeeze_k_v: float = float(settings.spring_squeeze_arcs)
+    ss_k = init_arcs(
+        pos_k,
+        exp_mat_j,
+        jnp.float32(stretch_k_v),
+        jnp.float32(squeeze_k_v),
+    )
+    se_k = (
+        init_excl(pos_k, jnp.float32(excl_r0), jnp.float32(excl_w_v))
+        if use_excl
+        else jnp.zeros((K,), dtype=jnp.float32)
+    )
+
+    T = jnp.float32(settings.max_temp)
+    dt = jnp.float32(settings.dt_temp)
+    js = jnp.float32(settings.jump_scale)
+    jc = jnp.float32(settings.jump_coef)
+    stretch_k_j = jnp.float32(stretch_k_v)
+    squeeze_k_j = jnp.float32(squeeze_k_v)
+    r0_j = jnp.float32(excl_r0)
+    excl_w_j = jnp.float32(excl_w_v)
+    step_size_j = jnp.float32(step_size)
+    stop_improvement = jnp.float32(settings.mc_stop_improvement)
+    stop_successes = jnp.int32(settings.mc_stop_successes)
+    score_eps = jnp.float32(1e-5)
+    stop_when_ratio_above = jnp.float32(0.9999)
+    seed_offset: int = abs(hash(label)) % (2**31) if label else 0
+    base_key = jax.random.PRNGKey(seed_offset)
+
+    pos_k, ss_k, se_k, final_score_best, iter_count, converged_flag = kernel_full(
+        pos_k,
+        ss_k,
+        se_k,
+        T,
+        exp_mat_j,
+        step_size_j,
+        dt,
+        js,
+        jc,
+        stretch_k_j,
+        squeeze_k_j,
+        r0_j,
+        excl_w_j,
+        base_key,
+        stop_improvement,
+        stop_successes,
+        score_eps,
+        stop_when_ratio_above,
+    )
+
+    score_per_chain = np.asarray(ss_k + se_k)
+    iter_n = int(iter_count)
+    converged_v = bool(converged_flag)
+    if verbose:
+        prefix = f"    [{label}] " if label else "    "
+        tail = "[done]" if converged_v else "[max-iters reached]"
+        print(
+            f"{prefix}step {iter_n * n_steps_per_batch:>7,}  "
+            f"score={float(final_score_best):.4f}  batches={iter_n}  {tail}",
+            flush=True,
+        )
+
+    best_k: int = int(np.argmin(score_per_chain))
+    pos[:] = np.asarray(pos_k[best_k]).astype(pos.dtype)
+    return float(score_per_chain[best_k])
+
+
+# ---------------------------------------------------------------------------
 # Public entry: mirrors gnome3d.mc.mc_smooth signature
 # ---------------------------------------------------------------------------
 
