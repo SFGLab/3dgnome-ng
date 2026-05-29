@@ -116,13 +116,25 @@ class Settings:
     # subproblem). JIT kernels are nogil=True, so Python threading actually
     # parallelises here.
     ib_workers: int
-    # `mc_backend` selects which compute backend handles the smooth-MC hot path.
-    # 'numba' is the default and always available (current production path).
-    # 'jax' routes the simple-config smooth-MC (chain bonds + EV; no orientation
-    # or confinement) to a JAX/CUDA kernel — typically 5-30x faster at N>=2048
-    # on NVIDIA hardware. Non-simple configs (orientation/confinement enabled)
-    # always fall through to numba regardless of this setting.
+    # `mc_backend` selects which compute backend handles the MC hot paths.
+    # 'numba' (default) is the production-tested CPU implementation.
+    # 'jax' routes per-level MC calls to a JAX/CUDA kernel — typically 5-30x
+    # faster than numba on smooth-MC at N>=2048.  Per-level apply flags below
+    # control which levels actually use JAX when mc_backend='jax'; flags have
+    # no effect when mc_backend='numba'.  Defaults reflect measured wins:
+    #   smooth:  yes (JAX wins big — chain+EV+heat+orient+conf, all dense O(N))
+    #   arcs:    no  (JAX loses — arc energy is SPARSE, numba's per-pair
+    #                early-continue beats JAX's dense kernel at production N)
+    #   heatmap: no  (per profile, heatmap is <0.1% of typical wall — chr-level
+    #                only fires at N=3-23 where JAX overhead dominates.
+    #                Enable for multi-chr workloads where segment-level
+    #                heatmap-MC can hit larger N.)
+    # mc_ib has no JAX implementation (also <1% of typical wall per profile),
+    # so no apply flag.
     mc_backend: str
+    mc_backend_apply_to_smooth: bool
+    mc_backend_apply_to_arcs: bool
+    mc_backend_apply_to_heatmap: bool
 
     # ---- MC arcs ----
     max_temp: float
@@ -307,6 +319,9 @@ class Settings:
         self.mc_smooth_chains = 1
         self.ib_workers = 1
         self.mc_backend = "numba"
+        self.mc_backend_apply_to_smooth = True
+        self.mc_backend_apply_to_arcs = False
+        self.mc_backend_apply_to_heatmap = False
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -607,6 +622,15 @@ class Settings:
         self.mc_smooth_chains = geti("simulation_backend", "smooth_chains", self.mc_smooth_chains)
         self.ib_workers = geti("simulation_backend", "ib_workers", self.ib_workers)
         self.mc_backend = gets("simulation_backend", "mc_backend", self.mc_backend)
+        self.mc_backend_apply_to_smooth = getb(
+            "simulation_backend", "mc_backend_apply_to_smooth", self.mc_backend_apply_to_smooth
+        )
+        self.mc_backend_apply_to_arcs = getb(
+            "simulation_backend", "mc_backend_apply_to_arcs", self.mc_backend_apply_to_arcs
+        )
+        self.mc_backend_apply_to_heatmap = getb(
+            "simulation_backend", "mc_backend_apply_to_heatmap", self.mc_backend_apply_to_heatmap
+        )
 
         # [simulation_arcs]
         self.max_temp = getf("simulation_arcs", "max_temp", self.max_temp)

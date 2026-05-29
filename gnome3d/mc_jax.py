@@ -1414,6 +1414,366 @@ def mc_arcs_jax(
 
 
 # ---------------------------------------------------------------------------
+# Heatmap kernel construction (separate from smooth/arcs; simplest energy)
+# ---------------------------------------------------------------------------
+
+
+def _build_heatmap_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
+    """Build (or look up cached) compiled heatmap-MC kernel.
+
+    Heatmap MC is the simplest of the three JAX kernels:
+      - Energy: pairwise distance error vs `exp_dist`, masked by `skip` (the
+        diagonal band + zero-frequency cells).  Double-counted (delta factor 2).
+      - Optional excluded volume.
+      - No chain bonds, angles, heat, orientation, or confinement.
+      - Acceptance: non-strict (`score_new <= score`).
+      - Convergence uses score_eps=1e-6 and the standard plateau check;
+        the `stop_when_ratio_above` clause is disabled (set to 2.0).
+
+    Cache key: ("heatmap", n_steps_per_batch, excl_skip).
+    """
+    cache_key = ("heatmap", n_steps_per_batch, excl_skip)
+    if cache_key in _kernel_cache:  # pyright: ignore[reportArgumentType]
+        return _kernel_cache[cache_key]  # pyright: ignore[reportArgumentType]
+
+    assert _jax is not None and _jnp is not None
+    jax = _jax
+    jnp = _jnp
+
+    def _local_heatmap_at(pos: Any, p_pos: Any, p: Any, exp_safe: Any, skip: Any) -> Any:
+        """Mirror of gnome3d.mc._local_heatmap_nb, with bead p virtually at
+        p_pos.  Returns scalar.  `exp_safe[:, p]` is the expected distance
+        column (1.0 wherever `skip[:, p]` is True, so the err formula is safe)."""
+        diff = pos - p_pos
+        d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+        e = exp_safe[:, p]
+        skip_col = skip[:, p]
+        err = (d - e) / e
+        contrib = err * err
+        return jnp.sum(jnp.where(skip_col, 0.0, contrib))
+
+    def _local_excl_at(pos: Any, p_pos: Any, p: Any, r0: Any, weight: Any) -> Any:
+        n = pos.shape[0]
+        diff = pos - p_pos
+        d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+        rel = jnp.maximum(0.0, (r0 - d) / r0)
+        contrib = weight * rel * rel
+        idx = jnp.arange(n)
+        in_range = jnp.abs(idx - p) > excl_skip
+        return jnp.sum(jnp.where(in_range, contrib, 0.0))
+
+    def _init_heatmap(pos: Any, exp_safe: Any, skip: Any) -> Any:
+        """O(N²) init via row-at-a-time scan."""
+        n = pos.shape[0]
+
+        def scan_body(carry: Any, i: Any) -> tuple[Any, None]:
+            diff = pos - pos[i]
+            d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+            e = exp_safe[:, i]
+            skip_col = skip[:, i]
+            err = (d - e) / e
+            contrib = err * err
+            return carry + jnp.sum(jnp.where(skip_col, 0.0, contrib)), None
+
+        total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), jnp.arange(n))
+        return total
+
+    def _init_excl(pos: Any, r0: Any, weight: Any) -> Any:
+        n = pos.shape[0]
+        idx = jnp.arange(n)
+
+        def scan_body(carry: Any, i: Any) -> tuple[Any, None]:
+            diff = pos - pos[i]
+            d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+            rel = jnp.maximum(0.0, (r0 - d) / r0)
+            contrib = weight * rel * rel
+            in_range = jnp.abs(idx - i) > excl_skip
+            return carry + jnp.sum(jnp.where(in_range, contrib, 0.0)), None
+
+        total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
+        return total
+
+    def chain_batch(
+        pos0: Any,
+        ss0: Any,
+        se0: Any,
+        T0_: Any,
+        exp_safe: Any,
+        skip: Any,
+        step_size: Any,
+        dt: Any,
+        js: Any,
+        jc: Any,
+        r0: Any,
+        excl_w: Any,
+        key: Any,
+    ) -> Any:
+        n = pos0.shape[0]
+        k_p, k_d, k_a = jax.random.split(key, 3)
+        # Heatmap: all beads movable (mc.py uses np.arange(n)).
+        ps = jax.random.randint(k_p, (n_steps_per_batch,), 0, n)
+        disps = jax.random.uniform(
+            k_d,
+            (n_steps_per_batch, 3),
+            minval=-step_size,
+            maxval=step_size,
+            dtype=pos0.dtype,
+        )
+        accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
+
+        def body(i: Any, carry: Any) -> Any:
+            pos, ss, se, T, n_ok = carry
+            p = ps[i]
+            delta = disps[i]
+            u = accs[i]
+
+            score = ss + se
+            old_p = pos[p]
+            new_p = old_p + delta
+
+            loc_s_prev = _local_heatmap_at(pos, old_p, p, exp_safe, skip)
+            loc_s_curr = _local_heatmap_at(pos, new_p, p, exp_safe, skip)
+            # struct_delta_factor = 2 for heatmap (double-counted)
+            ss_new = ss + 2.0 * (loc_s_curr - loc_s_prev)
+
+            loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w)
+            loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w)
+            se_new = se + 2.0 * (loc_e_curr - loc_e_prev)
+
+            score_new = ss_new + se_new
+
+            # Heatmap uses NON-strict acceptance: score_new <= score.
+            ok_unc = score_new <= score
+            can_jump = jnp.logical_and(T > 0, score > 0)
+            exponent = -jc * (score_new / jnp.maximum(score, 1e-30)) / jnp.maximum(T, 1e-30)
+            exponent = jnp.clip(exponent, -80.0, 80.0)
+            p_acc = js * jnp.exp(exponent)
+            ok = jnp.logical_or(ok_unc, jnp.logical_and(can_jump, u < p_acc))
+
+            final_p = jnp.where(ok, new_p, old_p)
+            pos_next = pos.at[p].set(final_p)
+            ss_next = jnp.where(ok, ss_new, ss)
+            se_next = jnp.where(ok, se_new, se)
+            n_ok_next = n_ok + jnp.where(ok, 1, 0)
+            return (pos_next, ss_next, se_next, T * dt, n_ok_next)
+
+        init = (pos0, ss0, se0, T0_, jnp.int32(0))
+        return jax.lax.fori_loop(0, n_steps_per_batch, body, init)
+
+    in_axes = (
+        0,
+        0,
+        0,
+        None,  # pos, ss, se, T0
+        None,
+        None,  # exp_safe, skip
+        None,
+        None,
+        None,
+        None,  # step_size, dt, js, jc
+        None,
+        None,  # r0, excl_w
+        0,  # key
+    )
+    out_axes = (0, 0, 0, None, 0)
+    batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
+
+    _MAX_ITERS: int = 10000
+
+    @jax.jit
+    def kernel_full(
+        pos_k: Any,
+        ss_k: Any,
+        se_k: Any,
+        T_init: Any,
+        exp_safe: Any,
+        skip: Any,
+        step_size: Any,
+        dt: Any,
+        js: Any,
+        jc: Any,
+        r0: Any,
+        excl_w: Any,
+        base_key: Any,
+        stop_improvement: Any,
+        stop_successes: Any,
+        score_eps: Any,
+    ) -> Any:
+        K = pos_k.shape[0]
+
+        def cond_fn(state: Any) -> Any:
+            _, _, _, _, _, iter_i, _, converged = state
+            return jnp.logical_and(jnp.logical_not(converged), iter_i < _MAX_ITERS)
+
+        def body_fn(state: Any) -> Any:
+            pos, ss, se, T, ms_score, iter_i, _, _ = state
+            iter_key = jax.random.fold_in(base_key, iter_i + 1)
+            keys = jax.random.split(iter_key, K)
+            pos, ss, se, T, n_ok = batched(
+                pos,
+                ss,
+                se,
+                T,
+                exp_safe,
+                skip,
+                step_size,
+                dt,
+                js,
+                jc,
+                r0,
+                excl_w,
+                keys,
+            )
+            score_per_chain = ss + se
+            best_idx = jnp.argmin(score_per_chain)
+            score = score_per_chain[best_idx]
+            n_ok_best = n_ok[best_idx]
+            plateaued = jnp.logical_and(
+                score > stop_improvement * ms_score, n_ok_best < stop_successes
+            )
+            eps_done = score < score_eps
+            converged = jnp.logical_or(plateaued, eps_done)
+            return (pos, ss, se, T, score, iter_i + 1, n_ok_best, converged)
+
+        init_state = (
+            pos_k,
+            ss_k,
+            se_k,
+            T_init,
+            jnp.float32(1e30),
+            jnp.int32(0),
+            jnp.int32(0),
+            jnp.bool_(False),
+        )
+        final = jax.lax.while_loop(cond_fn, body_fn, init_state)
+        pos_f, ss_f, se_f, _T_f, final_score, iter_f, _, converged_f = final
+        return pos_f, ss_f, se_f, final_score, iter_f, converged_f
+
+    init_heatmap = jax.jit(jax.vmap(_init_heatmap, in_axes=(0, None, None)))
+    init_excl_heatmap = jax.jit(jax.vmap(_init_excl, in_axes=(0, None, None)))
+
+    bundle = (kernel_full, init_heatmap, init_excl_heatmap)
+    _kernel_cache[cache_key] = bundle  # pyright: ignore[reportArgumentType]
+    return bundle
+
+
+def mc_heatmap_jax(
+    pos: np.ndarray[Any, Any],
+    exp_dist: np.ndarray[Any, Any],
+    diag_size: int,
+    step_size: float,
+    settings: "Settings",
+    label: str = "",
+    verbose: bool = False,
+) -> float:
+    """JAX backend for mc_heatmap.  Supports heatmap energy + (optional)
+    excluded volume.  Same contract as [mc.mc_heatmap].
+
+    Mutates `pos` in place and returns the best chain's final score.
+    """
+    if not _ensure_jax():
+        raise RuntimeError(
+            "settings.mc_backend='jax' but JAX is not installed.  "
+            "Install with `pip install gnome3d-ng[jax]` or set mc_backend='numba'."
+        )
+    assert _jax is not None and _jnp is not None
+    jax = _jax
+    jnp = _jnp
+
+    n: int = pos.shape[0]
+    if n <= 1:
+        return 0.0
+
+    K: int = max(1, int(settings.mc_heatmap_chains))
+    n_steps_per_batch: int = int(settings.mc_stop_steps_heatmap)
+
+    # Build the skip mask: diagonal band of width `diag_size` + zero entries.
+    idx = np.arange(n, dtype=np.int64)
+    diag_mask = np.abs(idx[:, None] - idx[None, :]) < diag_size
+    skip_np = diag_mask | (np.asarray(exp_dist) < 1e-6)
+    exp_safe_np = np.where(skip_np, 1.0, exp_dist).astype(np.float32)
+
+    use_excl: bool = bool(settings.use_excluded_volume) and bool(
+        settings.exclusion_apply_to_heatmap
+    )
+    excl_skip: int = int(settings.exclusion_skip_neighbors)
+    excl_w_v: float = float(settings.exclusion_weight) if use_excl else 0.0
+    if use_excl:
+        active = np.asarray(exp_dist)[~skip_np]
+        excl_r0: float = float(settings.exclusion_radius_heatmap)
+        if excl_r0 <= 0.0:
+            factor = float(settings.exclusion_auto_factor_heatmap)
+            excl_r0 = factor * float(active.mean()) if active.size > 0 else 1.0
+    else:
+        excl_r0 = 1.0
+
+    bundle = _build_heatmap_kernel(n_steps_per_batch, excl_skip)
+    kernel_full, init_heatmap, init_excl = bundle
+
+    pos_f32: F32Array = pos.astype(np.float32)
+    pos_k_np: F32Array = np.broadcast_to(pos_f32, (K, n, 3)).copy()
+
+    pos_k = jnp.asarray(pos_k_np)
+    exp_safe_j = jnp.asarray(exp_safe_np)
+    skip_j = jnp.asarray(skip_np.astype(np.bool_))
+
+    ss_k = init_heatmap(pos_k, exp_safe_j, skip_j)
+    se_k = (
+        init_excl(pos_k, jnp.float32(excl_r0), jnp.float32(excl_w_v))
+        if use_excl
+        else jnp.zeros((K,), dtype=jnp.float32)
+    )
+
+    T = jnp.float32(settings.max_temp_heatmap)
+    dt = jnp.float32(settings.dt_temp_heatmap)
+    js = jnp.float32(settings.jump_scale_heatmap)
+    jc = jnp.float32(settings.jump_coef_heatmap)
+    r0_j = jnp.float32(excl_r0)
+    excl_w_j = jnp.float32(excl_w_v)
+    step_size_j = jnp.float32(step_size)
+    stop_improvement = jnp.float32(settings.mc_stop_improvement_heatmap)
+    stop_successes = jnp.int32(settings.mc_stop_successes_heatmap)
+    score_eps = jnp.float32(1e-6)
+    seed_offset: int = abs(hash(label)) % (2**31) if label else 0
+    base_key = jax.random.PRNGKey(seed_offset)
+
+    pos_k, ss_k, se_k, final_score_best, iter_count, converged_flag = kernel_full(
+        pos_k,
+        ss_k,
+        se_k,
+        T,
+        exp_safe_j,
+        skip_j,
+        step_size_j,
+        dt,
+        js,
+        jc,
+        r0_j,
+        excl_w_j,
+        base_key,
+        stop_improvement,
+        stop_successes,
+        score_eps,
+    )
+
+    score_per_chain = np.asarray(ss_k + se_k)
+    iter_n = int(iter_count)
+    converged_v = bool(converged_flag)
+    if verbose:
+        prefix = f"    [{label}] " if label else "    "
+        tail = "[done]" if converged_v else "[max-iters reached]"
+        print(
+            f"{prefix}step {iter_n * n_steps_per_batch:>7,}  "
+            f"score={float(final_score_best):.4f}  batches={iter_n}  {tail}",
+            flush=True,
+        )
+
+    best_k: int = int(np.argmin(score_per_chain))
+    pos[:] = np.asarray(pos_k[best_k]).astype(pos.dtype)
+    return float(score_per_chain[best_k])
+
+
+# ---------------------------------------------------------------------------
 # Public entry: mirrors gnome3d.mc.mc_smooth signature
 # ---------------------------------------------------------------------------
 

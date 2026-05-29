@@ -10,14 +10,26 @@ Thin layer that:
     backends — every call is timed and recorded here so the log shape stays
     consistent regardless of which backend ran
 
-Backend support matrix (see [gnome3d/mc_jax.py] for term details):
+Backend support matrix.  Each level dispatches to JAX iff `mc_backend='jax'`
+AND the level-specific apply flag is set (see [gnome3d/settings.py]).
 
-  | level   | numba | jax (when mc_backend='jax')                    |
-  |---------|-------|------------------------------------------------|
-  | heatmap | full  | not ported (heatmap is <0.1% of typical wall) |
-  | arcs    | full  | arcs + EV + confinement                        |
-  | smooth  | full  | chain + EV + heat + orient + confinement       |
-  | ib      | full  | not ported (IB is <1% of typical wall)         |
+  | level   | numba | jax kernel + supported terms              | default JAX flag |
+  |---------|-------|-------------------------------------------|------------------|
+  | heatmap | full  | heatmap + EV                              | off              |
+  | arcs    | full  | arcs + EV + confinement (loses to numba)  | off              |
+  | smooth  | full  | chain + EV + heat + orient + conf         | on               |
+  | ib      | full  | not ported (<1% of typical wall)          | n/a              |
+
+Why arcs default is off: at the production N range (typically <500, max
+~1043 per chr22 profile), the sparse arc energy makes numba's per-pair
+early-continue beat JAX's dense O(N) kernel.  Measured 1.9x regression at
+N=1043 with JAX.  Opt in via `mc_backend_apply_to_arcs=yes` for an
+arc-dense workload.
+
+Why heatmap default is off: per chr-level profile, heatmap-MC fires once at
+N=3-23 and runs in <300ms total — far below JAX dispatch overhead.  Opt in
+via `mc_backend_apply_to_heatmap=yes` for multi-chr or segment-level workloads
+where heatmap-MC can hit N=hundreds to thousands.
 
 The harness modules import a couple of numba helpers from this file
 (`_as_f64`, `_init_heat_nb`) — those are re-exported from mc_numba below.
@@ -77,6 +89,18 @@ def _backend_is_jax(settings: Settings) -> bool:
     return str(settings.mc_backend).strip().lower() == "jax"
 
 
+def _use_jax_for_smooth(settings: Settings) -> bool:
+    return _backend_is_jax(settings) and bool(settings.mc_backend_apply_to_smooth)
+
+
+def _use_jax_for_arcs(settings: Settings) -> bool:
+    return _backend_is_jax(settings) and bool(settings.mc_backend_apply_to_arcs)
+
+
+def _use_jax_for_heatmap(settings: Settings) -> bool:
+    return _backend_is_jax(settings) and bool(settings.mc_backend_apply_to_heatmap)
+
+
 # ---------------------------------------------------------------------------
 # Public entries — thin dispatchers
 # ---------------------------------------------------------------------------
@@ -91,19 +115,37 @@ def mc_heatmap(
     label: str = "",
     verbose: bool = False,
 ) -> float:
-    """Heatmap-energy MC dispatch.  No JAX backend; always numba.
-
-    Heatmap-MC accounts for <0.1% of total wall time in production profiles
-    (single chr-level call at N=3-23), so a JAX port is not worth the
-    engineering.  The dispatcher is here for uniform profiling + signature
-    parity with the other levels.
+    """Heatmap-MC dispatch.  Routes to JAX iff `settings.mc_backend == "jax"`
+    AND `settings.mc_backend_apply_to_heatmap == True` (defaults to False —
+    per profile, heatmap-MC is <0.1% of typical wall time at chr-level
+    (N=3-23) where JAX overhead exceeds the win).  Enable for multi-chr
+    workloads where segment-level heatmap-MC can reach larger N.  Supported
+    on JAX path: heatmap energy + EV.
     """
     n = pos.shape[0]
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
-    score = mc_numba.mc_heatmap_numba(
-        pos, exp_dist, diag_size, step_size, settings, label=label, verbose=verbose
-    )
+    if _use_jax_for_heatmap(settings):
+        from . import mc_jax
+
+        if settings.output_level >= 1:
+            lbl = f"[{label}] " if label else ""
+            terms = ["heatmap"]
+            if bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_heatmap):
+                terms.append("EV")
+            print(
+                f"    {lbl}mc_heatmap: backend=jax  N={n}  "
+                f"K={int(settings.mc_heatmap_chains)}  "
+                f"terms=[{'+'.join(terms)}]",
+                flush=True,
+            )
+        score = mc_jax.mc_heatmap_jax(
+            pos, exp_dist, diag_size, step_size, settings, label=label, verbose=verbose
+        )
+    else:
+        score = mc_numba.mc_heatmap_numba(
+            pos, exp_dist, diag_size, step_size, settings, label=label, verbose=verbose
+        )
 
     if _MC_PROFILE_PATH:
         _log_mc_call(
@@ -126,14 +168,16 @@ def mc_arcs(
     label: str = "",
     verbose: bool = False,
 ) -> float:
-    """Arc-MC dispatch — routes to JAX when `settings.mc_backend == "jax"`,
-    else to numba.  Supported on JAX: arc springs + EV + confinement."""
+    """Arc-MC dispatch.  Routes to JAX iff `settings.mc_backend == "jax"`
+    AND `settings.mc_backend_apply_to_arcs == True` (defaults to False — JAX
+    arcs loses to numba at the production N range; see [mc_jax.py::mc_arcs_jax]).
+    Supported on JAX path: arc springs + EV + confinement."""
     n = pos.shape[0]
     if n <= 1:
         return 0.0
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
-    if _backend_is_jax(settings):
+    if _use_jax_for_arcs(settings):
         from . import mc_jax
 
         if settings.output_level >= 1:
@@ -181,16 +225,17 @@ def mc_smooth(
     label: str = "",
     verbose: bool = False,
 ) -> float:
-    """Smooth-MC dispatch — routes to JAX when `settings.mc_backend == "jax"`,
-    else to numba.  Supported on JAX: chain bonds + angles + EV + heat
-    (subanchor heatmap) + CTCF orientation + confinement (the full production
-    energy combo)."""
+    """Smooth-MC dispatch.  Routes to JAX iff `settings.mc_backend == "jax"`
+    AND `settings.mc_backend_apply_to_smooth == True` (defaults to True — JAX
+    wins big on smooth at production N).  Supported on JAX path: chain bonds
+    + angles + EV + heat (subanchor heatmap) + CTCF orientation + confinement
+    (the full production energy combo)."""
     n = pos.shape[0]
     if n <= 2:
         return 0.0
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
-    if _backend_is_jax(settings):
+    if _use_jax_for_smooth(settings):
         from . import mc_jax
 
         if settings.output_level >= 1:
