@@ -212,6 +212,23 @@ def _build_smooth_kernel(
         in_range = jnp.abs(idx - p) > excl_skip
         return jnp.sum(jnp.where(in_range, contrib, 0.0))
 
+    # ---- confinement helper ----
+    #
+    # Per-bead soft envelope.  Mirrors gnome3d.mc._local_confine_nb:
+    #   E(p) = weight * ((|r_p - c| - R) / R)²   if |r_p - c| > R
+    #        = 0                                  otherwise
+    # Delta factor 1 (single-counted globally).  Always wired into the kernel;
+    # weight=0 disables it via XLA constant-folding.
+
+    def _local_confine_at(p_pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any) -> Any:
+        dx = p_pos[0] - cx
+        dy = p_pos[1] - cy
+        dz = p_pos[2] - cz
+        r = jnp.sqrt(dx * dx + dy * dy + dz * dz)
+        rel = (r - R) / jnp.maximum(R, 1e-30)
+        contrib = weight * rel * rel
+        return jnp.where(r > R, contrib, 0.0)
+
     # ---- heat (subanchor heatmap) helpers ----
 
     def _local_heat_at(pos: Any, p_pos: Any, p: Any, heat_dist: Any, heat_weight: Any) -> Any:
@@ -294,6 +311,7 @@ def _build_smooth_kernel(
         se0: Any,
         sh0: Any,
         so0: Any,
+        sc0: Any,
         anchor_orn0: Any,
         T0_: Any,
         # static problem data
@@ -321,11 +339,16 @@ def _build_smooth_kernel(
         heat_weight: Any,
         motif_weight: Any,
         symmetric: Any,
+        conf_cx: Any,
+        conf_cy: Any,
+        conf_cz: Any,
+        conf_R: Any,
+        conf_w: Any,
         # RNG
         key: Any,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         """One batch of `n_steps_per_batch` MC steps for ONE chain.  Returns
-        (pos_f, ss_f, se_f, sh_f, so_f, anchor_orn_f, T_f, n_ok)."""
+        (pos_f, ss_f, se_f, sh_f, so_f, sc_f, anchor_orn_f, T_f, n_ok)."""
         n_movable = movable.shape[0]
         k_p, k_d, k_a = jax.random.split(key, 3)
         idx_picks = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_movable)
@@ -340,12 +363,12 @@ def _build_smooth_kernel(
         accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
 
         def body(i: Any, carry: Any) -> Any:
-            pos, ss, se, sh, so, anchor_orn, T, n_ok = carry
+            pos, ss, se, sh, so, sc, anchor_orn, T, n_ok = carry
             p = ps[i]
             delta = disps[i]
             u = accs[i]
 
-            score = ss + se + sh + so
+            score = ss + se + sh + so + sc
             old_p = pos[p]
             new_p = old_p + delta
 
@@ -413,7 +436,14 @@ def _build_smooth_kernel(
                 has_orn = False
                 safe_k = jnp.int32(0)
 
-            score_new = ss_new + se_new + sh_new + so_new
+            # ---- confinement (per-bead, single-counted, delta factor 1) ----
+            # When conf_w == 0 the entire contribution folds to zero; XLA
+            # eliminates the branch.  Always wired so no new cache key needed.
+            loc_c_prev = _local_confine_at(old_p, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
+            loc_c_curr = _local_confine_at(new_p, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
+            sc_new = sc + (loc_c_curr - loc_c_prev)
+
+            score_new = ss_new + se_new + sh_new + so_new + sc_new
 
             ok_unc = score_new < score  # smooth uses STRICT less-than
             can_jump = jnp.logical_and(T > 0, score > 0)
@@ -428,6 +458,7 @@ def _build_smooth_kernel(
             se_next = jnp.where(ok, se_new, se)
             sh_next = jnp.where(ok, sh_new, sh)
             so_next = jnp.where(ok, so_new, so)
+            sc_next = jnp.where(ok, sc_new, sc)
             if use_orn:
                 # Accept = keep anchor_orn_trial; reject = keep anchor_orn.
                 # We only modified anchor_orn[safe_k], so equivalently:
@@ -442,22 +473,24 @@ def _build_smooth_kernel(
                 se_next,
                 sh_next,
                 so_next,
+                sc_next,
                 anchor_orn_next,
                 T * dt,
                 n_ok_next,
             )
 
-        init = (pos0, ss0, se0, sh0, so0, anchor_orn0, T0_, jnp.int32(0))
+        init = (pos0, ss0, se0, sh0, so0, sc0, anchor_orn0, T0_, jnp.int32(0))
         return jax.lax.fori_loop(0, n_steps_per_batch, body, init)
 
     # vmap over K chains; problem data and schedule are shared (None).
-    # Per-chain: pos, all 4 scores, anchor_orn, key.  T is shared (deterministic).
+    # Per-chain: pos, all 5 scores, anchor_orn, key.  T is shared (deterministic).
     in_axes = (
         0,
         0,
         0,
         0,
-        0,  # pos, ss, se, sh, so
+        0,
+        0,  # pos, ss, se, sh, so, sc
         0,  # anchor_orn
         None,  # T0
         None,
@@ -483,9 +516,14 @@ def _build_smooth_kernel(
         None,  # heat_weight
         None,
         None,  # motif_weight, symmetric
+        None,
+        None,
+        None,
+        None,
+        None,  # conf_cx, conf_cy, conf_cz, conf_R, conf_w
         0,  # key
     )
-    out_axes = (0, 0, 0, 0, 0, 0, None, 0)
+    out_axes = (0, 0, 0, 0, 0, 0, 0, None, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
 
     @jax.jit
@@ -495,6 +533,7 @@ def _build_smooth_kernel(
         se_k: Any,
         sh_k: Any,
         so_k: Any,
+        sc_k: Any,
         anchor_orn_k: Any,
         T: Any,
         dtn: Any,
@@ -520,6 +559,11 @@ def _build_smooth_kernel(
         heat_weight: Any,
         motif_weight: Any,
         symmetric: Any,
+        conf_cx: Any,
+        conf_cy: Any,
+        conf_cz: Any,
+        conf_R: Any,
+        conf_w: Any,
         keys: Any,
     ) -> Any:
         return batched(
@@ -528,6 +572,7 @@ def _build_smooth_kernel(
             se_k,
             sh_k,
             so_k,
+            sc_k,
             anchor_orn_k,
             T,
             dtn,
@@ -553,6 +598,11 @@ def _build_smooth_kernel(
             heat_weight,
             motif_weight,
             symmetric,
+            conf_cx,
+            conf_cy,
+            conf_cz,
+            conf_R,
+            conf_w,
             keys,
         )
 
@@ -577,6 +627,7 @@ def _build_smooth_kernel(
         se_k: Any,
         sh_k: Any,
         so_k: Any,
+        sc_k: Any,
         anchor_orn_k: Any,
         T_init: Any,
         dtn: Any,
@@ -602,6 +653,11 @@ def _build_smooth_kernel(
         heat_weight: Any,
         motif_weight: Any,
         symmetric: Any,
+        conf_cx: Any,
+        conf_cy: Any,
+        conf_cz: Any,
+        conf_R: Any,
+        conf_w: Any,
         base_key: Any,
         stop_improvement: Any,
         stop_successes: Any,
@@ -610,20 +666,21 @@ def _build_smooth_kernel(
         K = pos_k.shape[0]
 
         def cond_fn(state: Any) -> Any:
-            _, _, _, _, _, _, _, _, iter_i, _, converged = state
+            _, _, _, _, _, _, _, _, _, iter_i, _, converged = state
             return jnp.logical_and(jnp.logical_not(converged), iter_i < _MAX_ITERS)
 
         def body_fn(state: Any) -> Any:
-            pos, ss, se, sh, so, anchor_orn, T, ms_score, iter_i, _, _ = state
+            pos, ss, se, sh, so, sc, anchor_orn, T, ms_score, iter_i, _, _ = state
             # Derive K per-chain keys deterministically from iter_i
             iter_key = jax.random.fold_in(base_key, iter_i + 1)
             keys = jax.random.split(iter_key, K)
-            pos, ss, se, sh, so, anchor_orn, T, n_ok = batched(
+            pos, ss, se, sh, so, sc, anchor_orn, T, n_ok = batched(
                 pos,
                 ss,
                 se,
                 sh,
                 so,
+                sc,
                 anchor_orn,
                 T,
                 dtn,
@@ -649,9 +706,14 @@ def _build_smooth_kernel(
                 heat_weight,
                 motif_weight,
                 symmetric,
+                conf_cx,
+                conf_cy,
+                conf_cz,
+                conf_R,
+                conf_w,
                 keys,
             )
-            score_per_chain = ss + se + sh + so
+            score_per_chain = ss + se + sh + so + sc
             best_idx = jnp.argmin(score_per_chain)
             score = score_per_chain[best_idx]
             n_ok_best = n_ok[best_idx]
@@ -660,7 +722,7 @@ def _build_smooth_kernel(
             )
             eps_done = score < score_eps
             converged = jnp.logical_or(plateaued, eps_done)
-            return (pos, ss, se, sh, so, anchor_orn, T, score, iter_i + 1, n_ok_best, converged)
+            return (pos, ss, se, sh, so, sc, anchor_orn, T, score, iter_i + 1, n_ok_best, converged)
 
         # ms_score init: very large so the first batch never trips the
         # "improvement < threshold" check.  Matches the Python loop's
@@ -671,6 +733,7 @@ def _build_smooth_kernel(
             se_k,
             sh_k,
             so_k,
+            sc_k,
             anchor_orn_k,
             T_init,
             jnp.float32(1e30),  # ms_score
@@ -685,6 +748,7 @@ def _build_smooth_kernel(
             se_f,
             sh_f,
             so_f,
+            sc_f,
             anchor_orn_f,
             _T_f,
             final_score,
@@ -692,7 +756,7 @@ def _build_smooth_kernel(
             _n_ok_best_f,
             converged_f,
         ) = final
-        return (pos_f, ss_f, se_f, sh_f, so_f, anchor_orn_f, final_score, iter_f, converged_f)
+        return (pos_f, ss_f, se_f, sh_f, so_f, sc_f, anchor_orn_f, final_score, iter_f, converged_f)
 
     # ---- init helpers (one-shot per chain on entry) ----
 
@@ -742,6 +806,15 @@ def _build_smooth_kernel(
 
         total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
         return heat_weight * total
+
+    def _init_confine_single(pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any) -> Any:
+        """Sum of per-bead confinement contributions.
+        Mirrors gnome3d.mc._init_confine_nb."""
+
+        def per_bead(p_pos: Any) -> Any:
+            return _local_confine_at(p_pos, cx, cy, cz, R, weight)
+
+        return jnp.sum(jax.vmap(per_bead)(pos))
 
     def _init_anchor_orientations_single(
         pos: Any,
@@ -810,6 +883,12 @@ def _build_smooth_kernel(
     )
     init_excl = jax.jit(jax.vmap(_init_excl_single, in_axes=(0, None, None)))
     init_heat = jax.jit(jax.vmap(_init_heat_single, in_axes=(0, None, None)))
+    init_confine = jax.jit(
+        jax.vmap(
+            _init_confine_single,
+            in_axes=(0, None, None, None, None, None),
+        )
+    )
     init_anchor_orn = jax.jit(jax.vmap(_init_anchor_orientations_single, in_axes=(0, None, None)))
     init_orn_score = jax.jit(
         jax.vmap(
@@ -824,6 +903,7 @@ def _build_smooth_kernel(
         init_smooth,
         init_excl,
         init_heat,
+        init_confine,
         init_anchor_orn,
         init_orn_score,
     )
@@ -905,6 +985,16 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         in_range = jnp.abs(idx - p) > excl_skip
         return jnp.sum(jnp.where(in_range, contrib, 0.0))
 
+    def _local_confine_at(p_pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any) -> Any:
+        """Per-bead soft envelope; see [mc.py::_local_confine_nb]."""
+        dx = p_pos[0] - cx
+        dy = p_pos[1] - cy
+        dz = p_pos[2] - cz
+        r = jnp.sqrt(dx * dx + dy * dy + dz * dz)
+        rel = (r - R) / jnp.maximum(R, 1e-30)
+        contrib = weight * rel * rel
+        return jnp.where(r > R, contrib, 0.0)
+
     def _init_arcs(pos: Any, exp_mat: Any, stretch_k: Any, squeeze_k: Any) -> Any:
         """O(N^2) init via row-at-a-time scan, summing only upper triangle
         (i < j) to match gnome3d.mc._init_arcs_nb."""
@@ -948,10 +1038,17 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
         return total
 
+    def _init_confine(pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any) -> Any:
+        def per_bead(p_pos: Any) -> Any:
+            return _local_confine_at(p_pos, cx, cy, cz, R, weight)
+
+        return jnp.sum(jax.vmap(per_bead)(pos))
+
     def chain_batch(
         pos0: Any,
         ss0: Any,
         se0: Any,
+        sc0: Any,
         T0_: Any,
         exp_mat: Any,
         step_size: Any,
@@ -962,6 +1059,11 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         squeeze_k: Any,
         r0: Any,
         excl_w: Any,
+        conf_cx: Any,
+        conf_cy: Any,
+        conf_cz: Any,
+        conf_R: Any,
+        conf_w: Any,
         key: Any,
     ) -> Any:
         n = pos0.shape[0]
@@ -978,12 +1080,12 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
 
         def body(i: Any, carry: Any) -> Any:
-            pos, ss, se, T, n_ok = carry
+            pos, ss, se, sc, T, n_ok = carry
             p = ps[i]
             delta = disps[i]
             u = accs[i]
 
-            score = ss + se
+            score = ss + se + sc
             old_p = pos[p]
             new_p = old_p + delta
 
@@ -996,7 +1098,13 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w)
             se_new = se + 2.0 * (loc_e_curr - loc_e_prev)
 
-            score_new = ss_new + se_new
+            # Confinement: per-bead, delta factor 1.  When conf_w=0 the whole
+            # contribution folds to zero and XLA elides the branch.
+            loc_c_prev = _local_confine_at(old_p, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
+            loc_c_curr = _local_confine_at(new_p, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
+            sc_new = sc + (loc_c_curr - loc_c_prev)
+
+            score_new = ss_new + se_new + sc_new
 
             # Arcs uses NON-strict acceptance: score_new <= score.
             ok_unc = score_new <= score
@@ -1010,17 +1118,19 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             pos_next = pos.at[p].set(final_p)
             ss_next = jnp.where(ok, ss_new, ss)
             se_next = jnp.where(ok, se_new, se)
+            sc_next = jnp.where(ok, sc_new, sc)
             n_ok_next = n_ok + jnp.where(ok, 1, 0)
-            return (pos_next, ss_next, se_next, T * dt, n_ok_next)
+            return (pos_next, ss_next, se_next, sc_next, T * dt, n_ok_next)
 
-        init = (pos0, ss0, se0, T0_, jnp.int32(0))
+        init = (pos0, ss0, se0, sc0, T0_, jnp.int32(0))
         return jax.lax.fori_loop(0, n_steps_per_batch, body, init)
 
     in_axes = (
         0,
         0,
         0,
-        None,  # pos, ss, se, T0
+        0,
+        None,  # pos, ss, se, sc, T0
         None,  # exp_mat
         None,
         None,
@@ -1030,9 +1140,14 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         None,  # stretch_k, squeeze_k
         None,
         None,  # r0, excl_w
+        None,
+        None,
+        None,
+        None,
+        None,  # conf_cx..conf_w
         0,  # key
     )
-    out_axes = (0, 0, 0, None, 0)
+    out_axes = (0, 0, 0, 0, None, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
 
     _MAX_ITERS: int = 10000
@@ -1042,6 +1157,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         pos_k: Any,
         ss_k: Any,
         se_k: Any,
+        sc_k: Any,
         T_init: Any,
         exp_mat: Any,
         step_size: Any,
@@ -1052,6 +1168,11 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         squeeze_k: Any,
         r0: Any,
         excl_w: Any,
+        conf_cx: Any,
+        conf_cy: Any,
+        conf_cz: Any,
+        conf_R: Any,
+        conf_w: Any,
         base_key: Any,
         stop_improvement: Any,
         stop_successes: Any,
@@ -1061,17 +1182,18 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         K = pos_k.shape[0]
 
         def cond_fn(state: Any) -> Any:
-            _, _, _, _, _, iter_i, _, converged = state
+            _, _, _, _, _, _, iter_i, _, converged = state
             return jnp.logical_and(jnp.logical_not(converged), iter_i < _MAX_ITERS)
 
         def body_fn(state: Any) -> Any:
-            pos, ss, se, T, ms_score, iter_i, _, _ = state
+            pos, ss, se, sc, T, ms_score, iter_i, _, _ = state
             iter_key = jax.random.fold_in(base_key, iter_i + 1)
             keys = jax.random.split(iter_key, K)
-            pos, ss, se, T, n_ok = batched(
+            pos, ss, se, sc, T, n_ok = batched(
                 pos,
                 ss,
                 se,
+                sc,
                 T,
                 exp_mat,
                 step_size,
@@ -1082,9 +1204,14 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
                 squeeze_k,
                 r0,
                 excl_w,
+                conf_cx,
+                conf_cy,
+                conf_cz,
+                conf_R,
+                conf_w,
                 keys,
             )
-            score_per_chain = ss + se
+            score_per_chain = ss + se + sc
             best_idx = jnp.argmin(score_per_chain)
             score = score_per_chain[best_idx]
             n_ok_best = n_ok[best_idx]
@@ -1096,12 +1223,13 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             eps_done = score < score_eps
             ratio_done = ratio > stop_when_ratio_above
             converged = jnp.logical_or(jnp.logical_or(plateaued, eps_done), ratio_done)
-            return (pos, ss, se, T, score, iter_i + 1, n_ok_best, converged)
+            return (pos, ss, se, sc, T, score, iter_i + 1, n_ok_best, converged)
 
         init_state = (
             pos_k,
             ss_k,
             se_k,
+            sc_k,
             T_init,
             jnp.float32(1e30),
             jnp.int32(0),
@@ -1109,13 +1237,14 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             jnp.bool_(False),
         )
         final = jax.lax.while_loop(cond_fn, body_fn, init_state)
-        pos_f, ss_f, se_f, _T_f, final_score, iter_f, _, converged_f = final
-        return pos_f, ss_f, se_f, final_score, iter_f, converged_f
+        pos_f, ss_f, se_f, sc_f, _T_f, final_score, iter_f, _, converged_f = final
+        return pos_f, ss_f, se_f, sc_f, final_score, iter_f, converged_f
 
     init_arcs = jax.jit(jax.vmap(_init_arcs, in_axes=(0, None, None, None)))
     init_excl_arcs = jax.jit(jax.vmap(_init_excl, in_axes=(0, None, None)))
+    init_confine_arcs = jax.jit(jax.vmap(_init_confine, in_axes=(0, None, None, None, None, None)))
 
-    bundle = (kernel_full, init_arcs, init_excl_arcs)
+    bundle = (kernel_full, init_arcs, init_excl_arcs, init_confine_arcs)
     _kernel_cache[cache_key] = bundle  # pyright: ignore[reportArgumentType]
     return bundle
 
@@ -1128,8 +1257,8 @@ def mc_arcs_jax(
     label: str = "",
     verbose: bool = False,
 ) -> float:
-    """JAX backend for mc_arcs.  Same contract as [mc.mc_arcs] minus
-    confinement support.  Dispatcher in [mc.py::mc_arcs] gates on that.
+    """JAX backend for mc_arcs.  Supports arc springs + EV + (optional)
+    confinement.  Same contract as [mc.mc_arcs].
 
     Mutates `pos` in place (writes the best-chain final positions back) and
     returns the best chain's final score.
@@ -1165,8 +1294,26 @@ def mc_arcs_jax(
     else:
         excl_r0 = 1.0
 
+    # ---- confinement setup (always wired into the kernel; weight=0 disables) ----
+    use_conf: bool = bool(settings.use_confinement) and bool(settings.confinement_apply_to_arcs)
+    if use_conf:
+        conf_cx_v: float = float(pos[:, 0].mean())
+        conf_cy_v: float = float(pos[:, 1].mean())
+        conf_cz_v: float = float(pos[:, 2].mean())
+        conf_R_v: float = float(settings.confinement_radius_arcs)
+        if conf_R_v <= 0.0:
+            pos_mask = np.asarray(exp_dist_mat) > 1e-6
+            avg_bond = float(np.asarray(exp_dist_mat)[pos_mask].mean()) if pos_mask.any() else 1.0
+            pf = float(settings.confinement_packing_factor_arcs)
+            conf_R_v = pf * avg_bond * (n ** (1.0 / 3.0))
+        conf_w_v: float = float(settings.confinement_weight)
+    else:
+        conf_cx_v = conf_cy_v = conf_cz_v = 0.0
+        conf_R_v = 1.0
+        conf_w_v = 0.0
+
     bundle = _build_arcs_kernel(n_steps_per_batch, excl_skip)
-    kernel_full, init_arcs, init_excl = bundle
+    kernel_full, init_arcs, init_excl, init_confine = bundle
 
     pos_f32: F32Array = pos.astype(np.float32)
     pos_k_np: F32Array = np.broadcast_to(pos_f32, (K, n, 3)).copy()
@@ -1188,6 +1335,18 @@ def mc_arcs_jax(
         if use_excl
         else jnp.zeros((K,), dtype=jnp.float32)
     )
+    sc_k = (
+        init_confine(
+            pos_k,
+            jnp.float32(conf_cx_v),
+            jnp.float32(conf_cy_v),
+            jnp.float32(conf_cz_v),
+            jnp.float32(conf_R_v),
+            jnp.float32(conf_w_v),
+        )
+        if use_conf
+        else jnp.zeros((K,), dtype=jnp.float32)
+    )
 
     T = jnp.float32(settings.max_temp)
     dt = jnp.float32(settings.dt_temp)
@@ -1197,6 +1356,11 @@ def mc_arcs_jax(
     squeeze_k_j = jnp.float32(squeeze_k_v)
     r0_j = jnp.float32(excl_r0)
     excl_w_j = jnp.float32(excl_w_v)
+    conf_cx_j = jnp.float32(conf_cx_v)
+    conf_cy_j = jnp.float32(conf_cy_v)
+    conf_cz_j = jnp.float32(conf_cz_v)
+    conf_R_j = jnp.float32(conf_R_v)
+    conf_w_j = jnp.float32(conf_w_v)
     step_size_j = jnp.float32(step_size)
     stop_improvement = jnp.float32(settings.mc_stop_improvement)
     stop_successes = jnp.int32(settings.mc_stop_successes)
@@ -1205,10 +1369,11 @@ def mc_arcs_jax(
     seed_offset: int = abs(hash(label)) % (2**31) if label else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
-    pos_k, ss_k, se_k, final_score_best, iter_count, converged_flag = kernel_full(
+    pos_k, ss_k, se_k, sc_k, final_score_best, iter_count, converged_flag = kernel_full(
         pos_k,
         ss_k,
         se_k,
+        sc_k,
         T,
         exp_mat_j,
         step_size_j,
@@ -1219,6 +1384,11 @@ def mc_arcs_jax(
         squeeze_k_j,
         r0_j,
         excl_w_j,
+        conf_cx_j,
+        conf_cy_j,
+        conf_cz_j,
+        conf_R_j,
+        conf_w_j,
         base_key,
         stop_improvement,
         stop_successes,
@@ -1226,7 +1396,7 @@ def mc_arcs_jax(
         stop_when_ratio_above,
     )
 
-    score_per_chain = np.asarray(ss_k + se_k)
+    score_per_chain = np.asarray(ss_k + se_k + sc_k)
     iter_n = int(iter_count)
     converged_v = bool(converged_flag)
     if verbose:
@@ -1262,8 +1432,7 @@ def mc_smooth_jax(
     verbose: bool = False,
 ) -> float:
     """JAX backend for smooth-MC, supporting chain + EV + (optional) heat
-    + (optional) orientation.  Same contract as [mc.mc_smooth] minus
-    confinement.  Caller must gate on use_confinement off.
+    + (optional) orientation + (optional) confinement.
 
     Mutates `pos` in place (writes the best-chain final positions back) and
     returns the best chain's final score.
@@ -1308,6 +1477,26 @@ def mc_smooth_jax(
     )
     motif_weight_v: float = float(settings.motif_weight) if use_orn else 0.0
     motifs_symmetric_v: bool = bool(getattr(settings, "motifs_symmetric", True))
+
+    # ---- confinement setup ----
+    # Per-bead soft envelope; center = centroid of starting pos, radius from
+    # settings (or auto-derived).  Always wired into the kernel; when
+    # disabled, conf_w=0 so XLA folds the contribution away.
+    use_conf: bool = bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth)
+    if use_conf:
+        conf_cx_v: float = float(pos[:, 0].mean())
+        conf_cy_v: float = float(pos[:, 1].mean())
+        conf_cz_v: float = float(pos[:, 2].mean())
+        conf_R_v: float = float(settings.confinement_radius_smooth)
+        if conf_R_v <= 0.0:
+            avg_bond = float(np.asarray(dtn).mean()) if dtn.size > 0 else 1.0
+            pf = float(settings.confinement_packing_factor_smooth)
+            conf_R_v = pf * avg_bond * (n ** (1.0 / 3.0))
+        conf_w_v: float = float(settings.confinement_weight)
+    else:
+        conf_cx_v = conf_cy_v = conf_cz_v = 0.0
+        conf_R_v = 1.0
+        conf_w_v = 0.0
 
     # ---- prepare orientation arrays (padded CSR) ----
     if use_orn:
@@ -1365,6 +1554,7 @@ def mc_smooth_jax(
         init_smooth,
         init_excl,
         init_heat,
+        init_confine,
         init_anchor_orn,
         init_orn_score,
     ) = bundle
@@ -1401,6 +1591,18 @@ def mc_smooth_jax(
         if use_heat
         else jnp.zeros((K,), dtype=jnp.float32)
     )
+    sc_k = (
+        init_confine(
+            pos_k,
+            jnp.float32(conf_cx_v),
+            jnp.float32(conf_cy_v),
+            jnp.float32(conf_cz_v),
+            jnp.float32(conf_R_v),
+            jnp.float32(conf_w_v),
+        )
+        if use_conf
+        else jnp.zeros((K,), dtype=jnp.float32)
+    )
     if use_orn:
         anchor_orn_k = init_anchor_orn(pos_k, anchor_ar_j, is_L_j)
         so_k = init_orn_score(
@@ -1429,6 +1631,11 @@ def mc_smooth_jax(
     heat_w_j = jnp.float32(heat_weight_v)
     motif_w_j = jnp.float32(motif_weight_v)
     symmetric_j = jnp.bool_(motifs_symmetric_v)
+    conf_cx_j = jnp.float32(conf_cx_v)
+    conf_cy_j = jnp.float32(conf_cy_v)
+    conf_cz_j = jnp.float32(conf_cz_v)
+    conf_R_j = jnp.float32(conf_R_v)
+    conf_w_j = jnp.float32(conf_w_v)
     step_size_j = jnp.float32(step_size)
 
     stop_improvement = jnp.float32(settings.mc_stop_improvement_smooth)
@@ -1445,6 +1652,7 @@ def mc_smooth_jax(
         se_k,
         sh_k,
         so_k,
+        sc_k,
         _anchor_orn_k_final,
         final_score_best,
         iter_count,
@@ -1455,6 +1663,7 @@ def mc_smooth_jax(
         se_k,
         sh_k,
         so_k,
+        sc_k,
         anchor_orn_k,
         T,
         dtn_j,
@@ -1480,13 +1689,18 @@ def mc_smooth_jax(
         heat_w_j,
         motif_w_j,
         symmetric_j,
+        conf_cx_j,
+        conf_cy_j,
+        conf_cz_j,
+        conf_R_j,
+        conf_w_j,
         base_key,
         stop_improvement,
         stop_successes,
         score_eps,
     )
 
-    score_per_chain = np.asarray(ss_k + se_k + sh_k + so_k)
+    score_per_chain = np.asarray(ss_k + se_k + sh_k + so_k + sc_k)
     iter_n = int(iter_count)
     converged_v = bool(converged_flag)
 
