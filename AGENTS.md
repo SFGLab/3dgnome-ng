@@ -561,6 +561,38 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: complements confinement to prevent under-constrained small IBs from stretching out. The boost tightens chain and bond springs so the chain compresses against any repulsive/heatmap forces. Targeted: only affects small IBs, doesn't change behavior of large well-constrained IBs.
 
+- **JAX/CUDA backend** — `settings.mc_backend = "jax"` to enable. ([gnome3d/mc_jax.py](gnome3d/mc_jax.py))
+
+  Routes selected MC levels to a JAX/CUDA kernel instead of the default numba CPU implementation. Measured ~2× total speedup on chr22 dryrun (21 min → 10:26), peak ~6× per-kernel on the largest smooth-MC call (N=10116: 570s numba → 100s JAX). The win compounds with chromosome size since smooth-MC is ~90% of total wall time.
+
+  Architecture: `gnome3d/mc.py` is a thin dispatcher. `gnome3d/mc_numba.py` holds the production numba implementations. `gnome3d/mc_jax.py` holds the JAX kernels. Both backends share the same public signatures (`mc_heatmap`, `mc_arcs`, `mc_smooth`, `mc_ib`); the dispatcher routes by setting.
+
+  Each MC level has its own JAX-routing flag, defaulting to the regime where JAX is measured to win:
+
+  | level   | JAX kernel terms                                     | default flag       | rationale                                                    |
+  |---------|------------------------------------------------------|--------------------|--------------------------------------------------------------|
+  | smooth  | chain + EV + heat + orient + confinement (full set)  | **on**             | 5–6× win at N≥1024 with full energy terms                    |
+  | arcs    | arc springs + EV + confinement                        | off                | arc energy is sparse; numba's per-pair early-continue wins at N<5000 |
+  | heatmap | heatmap distance + EV                                 | off                | chr-level fires once at N=3-23, below JAX overhead floor; enable for multi-chr |
+  | ib      | not ported                                            | n/a                | <1% of typical wall                                          |
+
+  Settings (under `[simulation_backend]`):
+  - `mc_backend` (`"numba"` | `"jax"`; default `"numba"`)
+  - `mc_backend_apply_to_smooth` (default `yes`)
+  - `mc_backend_apply_to_arcs` (default `no`)
+  - `mc_backend_apply_to_heatmap` (default `no`)
+
+  Install: `pip install gnome3d-ng[jax] "jax[cuda12]"` (NVIDIA) or `"jax[rocm6]"` (AMD). Without JAX installed, the dispatcher raises a clear error if `mc_backend="jax"` is set; otherwise it never imports JAX. The `[jax]` extras dep in `pyproject.toml` is **optional** — base install is numba-only.
+
+  Implementation notes:
+  - **Per-shape XLA compile cost** (~1–60s per (N, K, n_anchors) combo) is paid once per machine via the persistent compile cache at `~/.cache/gnome3d/jax` (override with `GNOME3D_JAX_CACHE`).
+  - **Convergence loop runs on-device** via `lax.while_loop` — one JAX call drives the full annealing, no Python sync between batches.
+  - **Float32 throughout the JAX path** — bench showed f64 is 2× slower on consumer GPUs (1/32 throughput) with no quality benefit at production run lengths.
+  - **`cli.py` auto-forces `ib_workers=1` when `mc_backend=jax`** — multiple Python threads contending for a single GPU is net-negative; restarts go inside JAX via `mc_smooth_chains` (vmap), not via thread pools.
+  - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
+
+  Why not in the reference: 3dgnome is CPU-only. The JAX port is a Python-side acceleration of the same algorithm; numerical results agree with numba within float32 RNG-trajectory noise. Harness/parity tests run with default settings (`mc_backend=numba`), so the new backend doesn't affect the parity baseline.
+
 ---
 
 ## Correctness Rules
