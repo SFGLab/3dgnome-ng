@@ -20,6 +20,8 @@ Acceptance criterion (all loops):
 from __future__ import annotations
 
 import math
+import os
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
@@ -31,6 +33,27 @@ from .types import BoolArray, F64Array, I32Array, I64Array
 
 if TYPE_CHECKING:
     from .settings import Settings
+
+
+# MC call profiler: append-only CSV of (level, N, K, n_steps_per_batch,
+# wall_s, score, label) per top-level MC call.  Enabled by setting the env
+# var GNOME3D_MC_PROFILE to a target path.  Used to characterise the N/K
+# distribution of real workloads (e.g. to decide whether a GPU backend is
+# worthwhile for a given MC level).  No-op when the env var is unset.
+_MC_PROFILE_PATH = os.environ.get("GNOME3D_MC_PROFILE")
+
+
+def _log_mc_call(
+    level: str, n: int, k: int, n_steps: int, wall_s: float, score: float, label: str
+) -> None:
+    if not _MC_PROFILE_PATH:
+        return
+    new_file = (not os.path.exists(_MC_PROFILE_PATH)) or os.path.getsize(_MC_PROFILE_PATH) == 0
+    with open(_MC_PROFILE_PATH, "a") as f:
+        if new_file:
+            f.write("level,N,K,n_steps_per_batch,wall_s,score,label\n")
+        safe_label = label.replace('"', "'")
+        f.write(f'{level},{n},{k},{n_steps},{wall_s:.6f},{score:.6f},"{safe_label}"\n')
 
 # Typed wrapper around numba.njit so pyright sees decorated functions
 # with their original signatures.  At runtime this is just numba.njit.
@@ -1292,10 +1315,19 @@ def mc_heatmap(
     chains in parallel via numba threading and keeps the one with the best
     final score - essentially an embarrassingly-parallel restart strategy.
     """
-    if int(settings.mc_heatmap_chains) > 1:
-        return _mc_heatmap_multichain(pos, exp_dist, diag_size, step_size, settings, label, verbose)
-
     n = pos.shape[0]
+    _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
+
+    if int(settings.mc_heatmap_chains) > 1:
+        score = _mc_heatmap_multichain(pos, exp_dist, diag_size, step_size, settings, label, verbose)
+        if _MC_PROFILE_PATH:
+            _log_mc_call(
+                "heatmap", n, int(settings.mc_heatmap_chains),
+                int(settings.mc_stop_steps_heatmap),
+                time.perf_counter() - _t0, score, label,
+            )
+        return score
+
     if n <= 1:
         return 0.0
 
@@ -1385,6 +1417,12 @@ def mc_heatmap(
         verbose=verbose,
     )
     pos[:] = pw.astype(pos.dtype)
+    if _MC_PROFILE_PATH:
+        _log_mc_call(
+            "heatmap", n, int(settings.mc_heatmap_chains),
+            int(settings.mc_stop_steps_heatmap),
+            time.perf_counter() - _t0, score, label,
+        )
     return score
 
 
@@ -1402,6 +1440,7 @@ def mc_arcs(
     n = pos.shape[0]
     if n <= 1:
         return 0.0
+    _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
     pw = _as_f64(pos)
     exp64 = _as_f64(exp_dist_mat)
@@ -1510,6 +1549,11 @@ def mc_arcs(
         verbose=verbose,
     )
     pos[:] = pw.astype(pos.dtype)
+    if _MC_PROFILE_PATH:
+        _log_mc_call(
+            "arcs", n, 1, int(settings.mc_stop_steps),
+            time.perf_counter() - _t0, score, label,
+        )
     return score
 
 
@@ -1538,6 +1582,7 @@ def mc_smooth(
     n = pos.shape[0]
     if n <= 2:
         return 0.0
+    _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
     # Multi-chain dispatch (simple-config path only).
     if int(settings.mc_smooth_chains) > 1:
@@ -1549,9 +1594,16 @@ def mc_smooth(
             and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
         )
         if simple_config:
-            return _mc_smooth_multichain(
+            score = _mc_smooth_multichain(
                 pos, dtn, fixed, step_size, settings, heat_dist, label, verbose
             )
+            if _MC_PROFILE_PATH:
+                _log_mc_call(
+                    "smooth", n, int(settings.mc_smooth_chains),
+                    int(settings.mc_stop_steps_smooth),
+                    time.perf_counter() - _t0, score, label,
+                )
+            return score
 
     movable: I64Array = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
     if len(movable) == 0:
@@ -1715,6 +1767,11 @@ def mc_smooth(
         verbose=verbose,
     )
     pos[:] = pw.astype(pos.dtype)
+    if _MC_PROFILE_PATH:
+        _log_mc_call(
+            "smooth", n, 1, int(settings.mc_stop_steps_smooth),
+            time.perf_counter() - _t0, score, label,
+        )
     return score
 
 
@@ -1737,6 +1794,7 @@ def mc_ib(
     n = pos.shape[0]
     if n <= 1:
         return 0.0
+    _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
     pw = _as_f64(pos)
     dtn64 = _as_f64(dtn)
@@ -1841,4 +1899,9 @@ def mc_ib(
         verbose=verbose,
     )
     pos[:] = pw.astype(pos.dtype)
+    if _MC_PROFILE_PATH:
+        _log_mc_call(
+            "ib", n, 1, int(settings.mc_stop_steps_ib),
+            time.perf_counter() - _t0, score, label,
+        )
     return score
