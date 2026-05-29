@@ -556,6 +556,144 @@ def _build_smooth_kernel(
             keys,
         )
 
+    # ---- full convergence loop, on device ----
+    #
+    # Wraps the per-batch `batched` kernel with `lax.while_loop`.  Each
+    # iteration of the while_loop = one MC batch across all K chains.  The
+    # entire annealing runs inside ONE JAX call — no Python sync between
+    # batches.  Replaces a Python loop that did one device->host copy per
+    # batch (5-10ms × hundreds of batches per smooth call).
+    #
+    # max_iters is baked in as a static safety cap to prevent runaway loops
+    # if convergence never triggers.  At n_steps_per_batch=2000 with
+    # max_iters=10000 we cap at 20M MC steps — comfortably above any
+    # realistic convergence count.
+    _MAX_ITERS: int = 10000
+
+    @jax.jit
+    def kernel_full(
+        pos_k: Any,
+        ss_k: Any,
+        se_k: Any,
+        sh_k: Any,
+        so_k: Any,
+        anchor_orn_k: Any,
+        T_init: Any,
+        dtn: Any,
+        movable: Any,
+        heat_dist: Any,
+        anchor_ar: Any,
+        bead_to_anchor_k: Any,
+        nbr_idx: Any,
+        nbr_w: Any,
+        nbr_valid: Any,
+        is_L: Any,
+        step_size: Any,
+        dt: Any,
+        js: Any,
+        jc: Any,
+        stretch_k: Any,
+        squeeze_k: Any,
+        ang_k: Any,
+        dist_w: Any,
+        ang_w: Any,
+        r0: Any,
+        excl_w: Any,
+        heat_weight: Any,
+        motif_weight: Any,
+        symmetric: Any,
+        base_key: Any,
+        stop_improvement: Any,
+        stop_successes: Any,
+        score_eps: Any,
+    ) -> Any:
+        K = pos_k.shape[0]
+
+        def cond_fn(state: Any) -> Any:
+            _, _, _, _, _, _, _, _, iter_i, _, converged = state
+            return jnp.logical_and(jnp.logical_not(converged), iter_i < _MAX_ITERS)
+
+        def body_fn(state: Any) -> Any:
+            pos, ss, se, sh, so, anchor_orn, T, ms_score, iter_i, _, _ = state
+            # Derive K per-chain keys deterministically from iter_i
+            iter_key = jax.random.fold_in(base_key, iter_i + 1)
+            keys = jax.random.split(iter_key, K)
+            pos, ss, se, sh, so, anchor_orn, T, n_ok = batched(
+                pos,
+                ss,
+                se,
+                sh,
+                so,
+                anchor_orn,
+                T,
+                dtn,
+                movable,
+                heat_dist,
+                anchor_ar,
+                bead_to_anchor_k,
+                nbr_idx,
+                nbr_w,
+                nbr_valid,
+                is_L,
+                step_size,
+                dt,
+                js,
+                jc,
+                stretch_k,
+                squeeze_k,
+                ang_k,
+                dist_w,
+                ang_w,
+                r0,
+                excl_w,
+                heat_weight,
+                motif_weight,
+                symmetric,
+                keys,
+            )
+            score_per_chain = ss + se + sh + so
+            best_idx = jnp.argmin(score_per_chain)
+            score = score_per_chain[best_idx]
+            n_ok_best = n_ok[best_idx]
+            plateaued = jnp.logical_and(
+                score > stop_improvement * ms_score, n_ok_best < stop_successes
+            )
+            eps_done = score < score_eps
+            converged = jnp.logical_or(plateaued, eps_done)
+            return (pos, ss, se, sh, so, anchor_orn, T, score, iter_i + 1, n_ok_best, converged)
+
+        # ms_score init: very large so the first batch never trips the
+        # "improvement < threshold" check.  Matches the Python loop's
+        # `ms_score = float("inf")` initialiser.
+        init_state = (
+            pos_k,
+            ss_k,
+            se_k,
+            sh_k,
+            so_k,
+            anchor_orn_k,
+            T_init,
+            jnp.float32(1e30),  # ms_score
+            jnp.int32(0),  # iter_i
+            jnp.int32(0),  # n_ok_best (filler)
+            jnp.bool_(False),  # converged
+        )
+        final = jax.lax.while_loop(cond_fn, body_fn, init_state)
+        (
+            pos_f,
+            ss_f,
+            se_f,
+            sh_f,
+            so_f,
+            anchor_orn_f,
+            _T_f,
+            final_score,
+            iter_f,
+            _n_ok_best_f,
+            converged_f,
+        ) = final
+        return (pos_f, ss_f, se_f, sh_f, so_f, anchor_orn_f, final_score, iter_f, converged_f)
+
     # ---- init helpers (one-shot per chain on entry) ----
 
     def _init_smooth_single(
@@ -680,7 +818,15 @@ def _build_smooth_kernel(
         )
     )
 
-    bundle = (kernel, init_smooth, init_excl, init_heat, init_anchor_orn, init_orn_score)
+    bundle = (
+        kernel,  # per-batch (kept for diagnostics; unused in prod)
+        kernel_full,  # full convergence on device — the production path
+        init_smooth,
+        init_excl,
+        init_heat,
+        init_anchor_orn,
+        init_orn_score,
+    )
     _kernel_cache[cache_key] = bundle
     return bundle
 
@@ -766,9 +912,7 @@ def mc_smooth_jax(
         nbr_w_np: F32Array = np.zeros((n_anchors, max_nbrs), dtype=np.float32)
         nbr_valid_np = np.zeros((n_anchors, max_nbrs), dtype=np.bool_)
         for k_idx in range(n_anchors):
-            for m, (jn, wn) in enumerate(
-                zip(nbr_lists[k_idx], nbr_w_lists[k_idx], strict=True)
-            ):
+            for m, (jn, wn) in enumerate(zip(nbr_lists[k_idx], nbr_w_lists[k_idx], strict=True)):
                 nbr_idx_np[k_idx, m] = int(jn)
                 nbr_w_np[k_idx, m] = float(wn)
                 nbr_valid_np[k_idx, m] = True
@@ -803,7 +947,15 @@ def mc_smooth_jax(
         heat_np = np.zeros((1, 1), dtype=np.float32)  # unused placeholder
 
     bundle = _build_smooth_kernel(n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs)
-    kernel, init_smooth, init_excl, init_heat, init_anchor_orn, init_orn_score = bundle
+    (
+        _kernel_one_batch,
+        kernel_full,
+        init_smooth,
+        init_excl,
+        init_heat,
+        init_anchor_orn,
+        init_orn_score,
+    ) = bundle
 
     pos_k = jnp.asarray(pos_k_np)
     dtn_j = jnp.asarray(dtn_np)
@@ -867,71 +1019,75 @@ def mc_smooth_jax(
     symmetric_j = jnp.bool_(motifs_symmetric_v)
     step_size_j = jnp.float32(step_size)
 
-    stop_improvement: float = float(settings.mc_stop_improvement_smooth)
-    stop_successes: int = int(settings.mc_stop_successes_smooth)
-    score_eps: float = 1e-6
-    ms_score: float = float("inf")
-    step_i: int = 0
-    prefix = f"    [{label}] " if label else "    "
-    score_per_chain: Any = None  # populated in loop
+    stop_improvement = jnp.float32(settings.mc_stop_improvement_smooth)
+    stop_successes = jnp.int32(settings.mc_stop_successes_smooth)
+    score_eps = jnp.float32(1e-6)
+    base_key = jax.random.PRNGKey(seed_offset)
 
-    while True:
-        keys = jax.random.split(jax.random.PRNGKey(seed_offset + step_i + 1), K)
-        pos_k, ss_k, se_k, sh_k, so_k, anchor_orn_k, T, n_ok_k = kernel(
-            pos_k,
-            ss_k,
-            se_k,
-            sh_k,
-            so_k,
-            anchor_orn_k,
-            T,
-            dtn_j,
-            movable_j,
-            heat_j,
-            anchor_ar_j,
-            bead_to_anchor_k_j,
-            nbr_idx_j,
-            nbr_w_j,
-            nbr_valid_j,
-            is_L_j,
-            step_size_j,
-            dt,
-            js,
-            jc,
-            stretch_k_j,
-            squeeze_k_j,
-            ang_k_j,
-            dist_w_j,
-            ang_w_j,
-            r0_j,
-            excl_w_j,
-            heat_w_j,
-            motif_w_j,
-            symmetric_j,
-            keys,
+    # ONE JAX call drives the full convergence loop on device.  No per-batch
+    # Python sync.  Returns final state + (iter_count, converged) so we can
+    # log how the run terminated.
+    (
+        pos_k,
+        ss_k,
+        se_k,
+        sh_k,
+        so_k,
+        _anchor_orn_k_final,
+        final_score_best,
+        iter_count,
+        converged_flag,
+    ) = kernel_full(
+        pos_k,
+        ss_k,
+        se_k,
+        sh_k,
+        so_k,
+        anchor_orn_k,
+        T,
+        dtn_j,
+        movable_j,
+        heat_j,
+        anchor_ar_j,
+        bead_to_anchor_k_j,
+        nbr_idx_j,
+        nbr_w_j,
+        nbr_valid_j,
+        is_L_j,
+        step_size_j,
+        dt,
+        js,
+        jc,
+        stretch_k_j,
+        squeeze_k_j,
+        ang_k_j,
+        dist_w_j,
+        ang_w_j,
+        r0_j,
+        excl_w_j,
+        heat_w_j,
+        motif_w_j,
+        symmetric_j,
+        base_key,
+        stop_improvement,
+        stop_successes,
+        score_eps,
+    )
+
+    score_per_chain = np.asarray(ss_k + se_k + sh_k + so_k)
+    iter_n = int(iter_count)
+    converged_v = bool(converged_flag)
+
+    if verbose:
+        prefix = f"    [{label}] " if label else "    "
+        total_steps = iter_n * n_steps_per_batch
+        tail = "[done]" if converged_v else "[max-iters reached]"
+        print(
+            f"{prefix}step {total_steps:>7,}  score={float(final_score_best):.4f}"
+            f"  batches={iter_n}  {tail}",
+            flush=True,
         )
 
-        score_per_chain = np.asarray(ss_k + se_k + sh_k + so_k)
-        n_ok_per_chain = np.asarray(n_ok_k)
-        score: float = float(np.min(score_per_chain))
-        n_ok_best: int = int(n_ok_per_chain[int(np.argmin(score_per_chain))])
-        step_i += n_steps_per_batch
-        ratio: float = score / ms_score if ms_score > 0 else 1.0
-        converged: bool = (
-            score > stop_improvement * ms_score and n_ok_best < stop_successes
-        ) or score < score_eps
-        if verbose:
-            print(
-                f"{prefix}step {step_i:>7,}  score={score:.4f}"
-                f"  ratio={ratio:.4f}  ok={n_ok_best}/{n_steps_per_batch}"
-                + ("  [done]" if converged else ""),
-                flush=True,
-            )
-        if converged:
-            break
-        ms_score = score
-
-    assert score_per_chain is not None
     best_k: int = int(np.argmin(score_per_chain))
     pos[:] = np.asarray(pos_k[best_k]).astype(pos.dtype)
     return float(score_per_chain[best_k])
