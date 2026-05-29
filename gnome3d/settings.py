@@ -116,6 +116,13 @@ class Settings:
     # subproblem). JIT kernels are nogil=True, so Python threading actually
     # parallelises here.
     ib_workers: int
+    # `mc_backend` selects which compute backend handles the smooth-MC hot path.
+    # 'numba' is the default and always available (current production path).
+    # 'jax' routes the simple-config smooth-MC (chain bonds + EV; no orientation
+    # or confinement) to a JAX/CUDA kernel — typically 5-30x faster at N>=2048
+    # on NVIDIA hardware. Non-simple configs (orientation/confinement enabled)
+    # always fall through to numba regardless of this setting.
+    mc_backend: str
 
     # ---- MC arcs ----
     max_temp: float
@@ -299,6 +306,7 @@ class Settings:
         self.mc_heatmap_chains = 1
         self.mc_smooth_chains = 1
         self.ib_workers = 1
+        self.mc_backend = "numba"
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -596,6 +604,7 @@ class Settings:
         self.mc_heatmap_chains = geti("simulation_backend", "heatmap_chains", self.mc_heatmap_chains)
         self.mc_smooth_chains = geti("simulation_backend", "smooth_chains", self.mc_smooth_chains)
         self.ib_workers = geti("simulation_backend", "ib_workers", self.ib_workers)
+        self.mc_backend = gets("simulation_backend", "mc_backend", self.mc_backend)
 
         # [simulation_arcs]
         self.max_temp = getf("simulation_arcs", "max_temp", self.max_temp)

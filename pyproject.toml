@@ -17,6 +17,15 @@ dev = [
     "ruff>=0.6",
     "pyright>=1.1.380",
 ]
+# JAX backend for the smooth-MC hot path (settings.mc_backend = 'jax').
+# Gives 5-30x speedup over numba at N>=2048 on NVIDIA hardware.
+# This extras installs jax with CPU-only support; for GPU performance install
+# hardware-specific wheels separately, e.g.:
+#     pip install gnome3d-ng[jax] "jax[cuda12]"   # NVIDIA
+#     pip install gnome3d-ng[jax] "jax[rocm6]"    # AMD
+jax = [
+    "jax>=0.4.30",
+]
 
 [project.scripts]
 gnome3d-ng = "gnome3d.cli:main"

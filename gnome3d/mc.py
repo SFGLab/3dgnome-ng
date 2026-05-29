@@ -1584,6 +1584,30 @@ def mc_smooth(
         return 0.0
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
+    # JAX backend dispatch (opt-in via settings.mc_backend='jax').  Supports the
+    # chain+EV path — no orientation, no confinement, no heat term yet.  When
+    # the call's config matches, route to gnome3d.mc_jax and return.  If JAX
+    # is requested but not installed, mc_jax raises a clear error.
+    if str(settings.mc_backend).lower() == "jax":
+        jax_compatible = (
+            char_orientations is None
+            and heat_dist is None
+            and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
+        )
+        if jax_compatible:
+            from . import mc_jax
+
+            score = mc_jax.mc_smooth_jax(
+                pos, dtn, fixed, step_size, settings, label=label, verbose=verbose
+            )
+            if _MC_PROFILE_PATH:
+                _log_mc_call(
+                    "smooth", n, int(settings.mc_smooth_chains),
+                    int(settings.mc_stop_steps_smooth),
+                    time.perf_counter() - _t0, score, label,
+                )
+            return score
+
     # Multi-chain dispatch (simple-config path only).
     if int(settings.mc_smooth_chains) > 1:
         simple_config = (
