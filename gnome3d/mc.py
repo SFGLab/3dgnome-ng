@@ -1588,15 +1588,22 @@ def mc_smooth(
     # chain+EV path — no orientation, no confinement, no heat term yet.  When
     # the call's config matches, route to gnome3d.mc_jax and return.  If JAX
     # is requested but not installed, mc_jax raises a clear error.
-    if str(settings.mc_backend).lower() == "jax":
-        jax_compatible = (
-            char_orientations is None
-            and heat_dist is None
-            and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
+    if str(settings.mc_backend).strip().lower() == "jax":
+        has_orientation = char_orientations is not None
+        has_confinement = bool(settings.use_confinement) and bool(
+            settings.confinement_apply_to_smooth
         )
+        has_heat = heat_dist is not None
+        jax_compatible = not (has_orientation or has_confinement or has_heat)
         if jax_compatible:
             from . import mc_jax
 
+            if settings.output_level >= 1:
+                lbl = f"[{label}] " if label else ""
+                print(
+                    f"    {lbl}mc_smooth: backend=jax  N={n}  K={int(settings.mc_smooth_chains)}",
+                    flush=True,
+                )
             score = mc_jax.mc_smooth_jax(
                 pos, dtn, fixed, step_size, settings, label=label, verbose=verbose
             )
@@ -1607,6 +1614,23 @@ def mc_smooth(
                     time.perf_counter() - _t0, score, label,
                 )
             return score
+        elif settings.output_level >= 1:
+            # Loud warning: backend was requested but the call's config forces
+            # numba fallback.  Otherwise the user would see no GPU activity
+            # and think the setting is broken.
+            reasons: list[str] = []
+            if has_orientation:
+                reasons.append("orientation enabled")
+            if has_confinement:
+                reasons.append("confinement enabled")
+            if has_heat:
+                reasons.append("heat term enabled")
+            lbl = f"[{label}] " if label else ""
+            print(
+                f"    {lbl}mc_smooth: backend=jax requested but falling back to "
+                f"numba ({', '.join(reasons)})",
+                flush=True,
+            )
 
     # Multi-chain dispatch (simple-config path only).
     if int(settings.mc_smooth_chains) > 1:

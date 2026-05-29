@@ -49,7 +49,9 @@ _kernel_cache: dict[tuple[int, int], Any] = {}
 
 def _ensure_jax() -> bool:
     """Lazy-import JAX.  Returns True on success, False if not installed.
-    Idempotent — subsequent calls hit the cached `_JAX_AVAILABLE` flag."""
+    Idempotent — subsequent calls hit the cached `_JAX_AVAILABLE` flag.
+    On first successful import, prints a one-line backend banner so the user
+    can confirm JAX picked the expected device."""
     global _JAX_AVAILABLE, _jax, _jnp
     if _JAX_AVAILABLE is not None:
         return _JAX_AVAILABLE
@@ -65,10 +67,12 @@ def _ensure_jax() -> bool:
     cache_dir = os.environ.get(
         "GNOME3D_JAX_CACHE", os.path.expanduser("~/.cache/gnome3d/jax")
     )
+    cache_active = False
     try:
         from jax.experimental import compilation_cache  # type: ignore[import-not-found]
 
         compilation_cache.compilation_cache.set_cache_dir(cache_dir)  # pyright: ignore[reportUnknownMemberType]
+        cache_active = True
     except (ImportError, AttributeError):
         # older JAX, or API moved — proceed without persistent cache; each
         # process pays compile cost on first call per shape.
@@ -76,6 +80,24 @@ def _ensure_jax() -> bool:
     _jax = jax
     _jnp = jnp
     _JAX_AVAILABLE = True
+
+    # One-time backend banner — printed to stderr so it doesn't interfere with
+    # CIF output piped on stdout, and visible regardless of output_level.
+    try:
+        backend: str = str(jax.default_backend())  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+        # jax.devices() returns list[Device] but jax has no stubs; ignore types
+        _dev = jax.devices()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        devices_str: str = ", ".join(str(d) for d in _dev)  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
+    except Exception:  # noqa: BLE001 — diagnostic only, never block
+        backend = "unknown"
+        devices_str = "unknown"
+    cache_str = cache_dir if cache_active else "disabled"
+    print(
+        f"[mc_jax] JAX backend ready: backend={backend} devices=[{devices_str}] "
+        f"cache={cache_str}",
+        file=__import__("sys").stderr,
+        flush=True,
+    )
     return True
 
 
