@@ -54,6 +54,23 @@ REGION_LABEL = f"integration_test_region_{REGION.replace(':', '_').replace('-', 
 # Max KS d-statistic to PASS (CDF max-difference; sample-size-independent).
 KS_D_THRESHOLD = 0.05
 
+# Significance level for the KS p-value.  A metric FAILs only when the difference
+# is BOTH a large effect (d > KS_D_THRESHOLD) AND statistically significant
+# (p < KS_P_ALPHA).  This makes the verdict sample-size-aware: pooled metrics
+# (bond, pairwise; n ~ 10^5) always have p ~ 0, so they still gate on d alone,
+# while per-structure metrics like Rg (only n = ensemble-size samples) no longer
+# fail on small-sample quantization noise - at n=5 the KS d-statistic can only
+# land on multiples of 0.2, so d <= 0.05 is unreachable even for matching
+# distributions.  A gross Rg regression still fails: complete 5-vs-5 separation
+# gives d=1.0, p~0.008 < alpha.
+KS_P_ALPHA = 0.05
+
+
+def _ks_pass(d: float, p: float) -> bool:
+    """PASS unless the difference is both large (d > threshold) and significant."""
+    return d <= KS_D_THRESHOLD or p >= KS_P_ALPHA
+
+
 # Cap pairwise distance pool before KS
 KS_PWD_MAX_SAMPLES = 50_000
 
@@ -238,6 +255,13 @@ def print_step_comparison(cpp_ms: dict, py_ms: dict, n_structs: int) -> None:
 BASE_CONFIG = """\
 [main]
 output_level = 2
+# Reference parity: C++ densifyActiveRegion always clamps overlapping anchors
+# (LooperSolver.cpp:1830-1831), collapsing in-between subanchors to one point.
+# Python's default (overlap_anchor_strict=False) instead tiles the overlap with
+# real genomic spans, inflating chain rest lengths (dist_to_next) and producing
+# ~24% longer bonds / lower diversity than the reference.  Force strict mode so
+# the integration comparison is apples-to-apples.  (C++ ignores this unknown key.)
+overlap_anchor_strict = yes
 random_walk = no
 loop_density = 5
 use_2D = no
@@ -963,7 +987,7 @@ def main():
 
         # KS test on Rg distribution
         d_rg, p_rg = ks_2samp(cpp_stats["rg"], py_stats["rg"])
-        ok_rg = d_rg <= KS_D_THRESHOLD
+        ok_rg = _ks_pass(d_rg, p_rg)
         status = PASS_STR if ok_rg else FAIL_STR
         print(f"  {status}  Rg distribution  KS d={d_rg:.3f}  p={p_rg:.3f}")
         results.append(ok_rg)
@@ -973,7 +997,7 @@ def main():
         cpp_pwd = _subsample(cpp_stats["pwd"], KS_PWD_MAX_SAMPLES)
         py_pwd = _subsample(py_stats["pwd"], KS_PWD_MAX_SAMPLES)
         d_pw, p_pw = ks_2samp(cpp_pwd, py_pwd)
-        ok_pw = d_pw <= KS_D_THRESHOLD
+        ok_pw = _ks_pass(d_pw, p_pw)
         status = PASS_STR if ok_pw else FAIL_STR
         print(
             f"  {status}  pairwise dist KS  d={d_pw:.3f}  p={p_pw:.3f}"
@@ -983,7 +1007,7 @@ def main():
 
         # KS test on bond lengths
         d_bd, p_bd = ks_2samp(cpp_stats["bond"], py_stats["bond"])
-        ok_bd = d_bd <= KS_D_THRESHOLD
+        ok_bd = _ks_pass(d_bd, p_bd)
         status = PASS_STR if ok_bd else FAIL_STR
         print(f"  {status}  bond lengths KS   d={d_bd:.3f}  p={p_bd:.3f}")
         results.append(ok_bd)
