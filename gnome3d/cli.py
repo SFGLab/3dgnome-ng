@@ -123,6 +123,14 @@ def main() -> None:
     if n_workers > 1 and s.ib_workers > 1:
         print(f"[main] n_structures>1: forcing ib_workers=1 (was {s.ib_workers})")
         s.ib_workers = 1
+    # JAX on a single GPU does not benefit from CPU-side threading — multiple
+    # IB threads end up serialised on the device anyway, plus each pays JAX
+    # setup/sync overhead.  Force ib_workers=1 so the GPU sees one MC call at
+    # a time.  Independent restarts can still be vmapped inside each call via
+    # settings.mc_smooth_chains.
+    if str(s.mc_backend).strip().lower() == "jax" and s.ib_workers > 1:
+        print(f"[main] mc_backend=jax: forcing ib_workers=1 (was {s.ib_workers})")
+        s.ib_workers = 1
     print(f"[main] running {n} structure(s) with {n_workers} worker(s)")
 
     pool = ThreadPoolExecutor(max_workers=n_workers)

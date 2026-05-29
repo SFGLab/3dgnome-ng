@@ -601,7 +601,9 @@ class Settings:
         )
 
         # [simulation_backend]
-        self.mc_heatmap_chains = geti("simulation_backend", "heatmap_chains", self.mc_heatmap_chains)
+        self.mc_heatmap_chains = geti(
+            "simulation_backend", "heatmap_chains", self.mc_heatmap_chains
+        )
         self.mc_smooth_chains = geti("simulation_backend", "smooth_chains", self.mc_smooth_chains)
         self.ib_workers = geti("simulation_backend", "ib_workers", self.ib_workers)
         self.mc_backend = gets("simulation_backend", "mc_backend", self.mc_backend)

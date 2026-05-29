@@ -55,6 +55,7 @@ def _log_mc_call(
         safe_label = label.replace('"', "'")
         f.write(f'{level},{n},{k},{n_steps},{wall_s:.6f},{score:.6f},"{safe_label}"\n')
 
+
 # Typed wrapper around numba.njit so pyright sees decorated functions
 # with their original signatures.  At runtime this is just numba.njit.
 F = TypeVar("F", bound=Callable[..., Any])
@@ -1319,12 +1320,18 @@ def mc_heatmap(
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
     if int(settings.mc_heatmap_chains) > 1:
-        score = _mc_heatmap_multichain(pos, exp_dist, diag_size, step_size, settings, label, verbose)
+        score = _mc_heatmap_multichain(
+            pos, exp_dist, diag_size, step_size, settings, label, verbose
+        )
         if _MC_PROFILE_PATH:
             _log_mc_call(
-                "heatmap", n, int(settings.mc_heatmap_chains),
+                "heatmap",
+                n,
+                int(settings.mc_heatmap_chains),
                 int(settings.mc_stop_steps_heatmap),
-                time.perf_counter() - _t0, score, label,
+                time.perf_counter() - _t0,
+                score,
+                label,
             )
         return score
 
@@ -1419,9 +1426,13 @@ def mc_heatmap(
     pos[:] = pw.astype(pos.dtype)
     if _MC_PROFILE_PATH:
         _log_mc_call(
-            "heatmap", n, int(settings.mc_heatmap_chains),
+            "heatmap",
+            n,
+            int(settings.mc_heatmap_chains),
             int(settings.mc_stop_steps_heatmap),
-            time.perf_counter() - _t0, score, label,
+            time.perf_counter() - _t0,
+            score,
+            label,
         )
     return score
 
@@ -1551,8 +1562,13 @@ def mc_arcs(
     pos[:] = pw.astype(pos.dtype)
     if _MC_PROFILE_PATH:
         _log_mc_call(
-            "arcs", n, 1, int(settings.mc_stop_steps),
-            time.perf_counter() - _t0, score, label,
+            "arcs",
+            n,
+            1,
+            int(settings.mc_stop_steps),
+            time.perf_counter() - _t0,
+            score,
+            label,
         )
     return score
 
@@ -1584,51 +1600,63 @@ def mc_smooth(
         return 0.0
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
-    # JAX backend dispatch (opt-in via settings.mc_backend='jax').  Supports the
-    # chain+EV path — no orientation, no confinement, no heat term yet.  When
-    # the call's config matches, route to gnome3d.mc_jax and return.  If JAX
-    # is requested but not installed, mc_jax raises a clear error.
+    # JAX backend dispatch (opt-in via settings.mc_backend='jax').  Supports
+    # chain + EV + heat + orientation.  Only confinement is still gated to
+    # numba.  When the call's config matches, route to gnome3d.mc_jax and
+    # return.  If JAX is requested but not installed, mc_jax raises clearly.
     if str(settings.mc_backend).strip().lower() == "jax":
-        has_orientation = char_orientations is not None
         has_confinement = bool(settings.use_confinement) and bool(
             settings.confinement_apply_to_smooth
         )
-        has_heat = heat_dist is not None
-        jax_compatible = not (has_orientation or has_confinement or has_heat)
+        jax_compatible = not has_confinement
         if jax_compatible:
             from . import mc_jax
 
             if settings.output_level >= 1:
                 lbl = f"[{label}] " if label else ""
+                terms: list[str] = ["chain"]
+                if bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth):
+                    terms.append("EV")
+                if heat_dist is not None:
+                    terms.append("heat")
+                if char_orientations is not None:
+                    terms.append("orient")
                 print(
-                    f"    {lbl}mc_smooth: backend=jax  N={n}  K={int(settings.mc_smooth_chains)}",
+                    f"    {lbl}mc_smooth: backend=jax  N={n}  "
+                    f"K={int(settings.mc_smooth_chains)}  "
+                    f"terms=[{'+'.join(terms)}]",
                     flush=True,
                 )
             score = mc_jax.mc_smooth_jax(
-                pos, dtn, fixed, step_size, settings, label=label, verbose=verbose
+                pos,
+                dtn,
+                fixed,
+                step_size,
+                settings,
+                char_orientations=char_orientations,
+                anchor_neighbors=anchor_neighbors,
+                anchor_neighbor_weights=anchor_neighbor_weights,
+                heat_dist=heat_dist,
+                label=label,
+                verbose=verbose,
             )
             if _MC_PROFILE_PATH:
                 _log_mc_call(
-                    "smooth", n, int(settings.mc_smooth_chains),
+                    "smooth",
+                    n,
+                    int(settings.mc_smooth_chains),
                     int(settings.mc_stop_steps_smooth),
-                    time.perf_counter() - _t0, score, label,
+                    time.perf_counter() - _t0,
+                    score,
+                    label,
                 )
             return score
         elif settings.output_level >= 1:
-            # Loud warning: backend was requested but the call's config forces
-            # numba fallback.  Otherwise the user would see no GPU activity
-            # and think the setting is broken.
-            reasons: list[str] = []
-            if has_orientation:
-                reasons.append("orientation enabled")
-            if has_confinement:
-                reasons.append("confinement enabled")
-            if has_heat:
-                reasons.append("heat term enabled")
+            # Confinement is the only blocker now.
             lbl = f"[{label}] " if label else ""
             print(
                 f"    {lbl}mc_smooth: backend=jax requested but falling back to "
-                f"numba ({', '.join(reasons)})",
+                f"numba (confinement enabled)",
                 flush=True,
             )
 
@@ -1647,9 +1675,13 @@ def mc_smooth(
             )
             if _MC_PROFILE_PATH:
                 _log_mc_call(
-                    "smooth", n, int(settings.mc_smooth_chains),
+                    "smooth",
+                    n,
+                    int(settings.mc_smooth_chains),
                     int(settings.mc_stop_steps_smooth),
-                    time.perf_counter() - _t0, score, label,
+                    time.perf_counter() - _t0,
+                    score,
+                    label,
                 )
             return score
 
@@ -1817,8 +1849,13 @@ def mc_smooth(
     pos[:] = pw.astype(pos.dtype)
     if _MC_PROFILE_PATH:
         _log_mc_call(
-            "smooth", n, 1, int(settings.mc_stop_steps_smooth),
-            time.perf_counter() - _t0, score, label,
+            "smooth",
+            n,
+            1,
+            int(settings.mc_stop_steps_smooth),
+            time.perf_counter() - _t0,
+            score,
+            label,
         )
     return score
 
@@ -1949,7 +1986,12 @@ def mc_ib(
     pos[:] = pw.astype(pos.dtype)
     if _MC_PROFILE_PATH:
         _log_mc_call(
-            "ib", n, 1, int(settings.mc_stop_steps_ib),
-            time.perf_counter() - _t0, score, label,
+            "ib",
+            n,
+            1,
+            int(settings.mc_stop_steps_ib),
+            time.perf_counter() - _t0,
+            score,
+            label,
         )
     return score

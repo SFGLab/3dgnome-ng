@@ -1,104 +1,103 @@
-"""JAX backend for the smooth-MC + excluded-volume hot path.
+"""JAX backend for the smooth-MC + EV + heat + orientation hot path.
 
-Production dryrun profile (chr22, chr4) shows mc_smooth eats 89-96% of total
-MC wall time, with the heavy calls living at N=2000-10000.  Benchmarks
-([playground/bench_jax_smooth_mc.py]) show JAX at f32 is 5-70x faster than
-numba on that regime — JAX wins because xla.vmap + lax.fori_loop fuses the
-entire 5000-step annealing AND the O(N) per-step EV reduction into a single
-GPU kernel.
+Production dryrun profiles (chr22, chr4) show mc_smooth eats 89-96% of total
+MC wall time, with the heaviest calls living at N=2000-10000.  The bench in
+[playground/bench_jax_smooth_mc.py] shows JAX at f32 is 5-70x faster than
+numba on the chain+EV path — JAX wins because xla.vmap + lax.fori_loop fuses
+the entire 5000-step annealing AND the O(N) per-step reductions into a
+single GPU kernel.
 
-This module implements ONLY the "simple-config" smooth-MC path: chain bonds
-+ angles + optional excluded volume.  Orientation / confinement configs are
-NOT supported here and fall through to the numba path in [mc.py::mc_smooth].
-That matches the existing `_mc_smooth_multichain` gate.
+This module implements the smooth-MC "production" energy combo:
+  - chain bonds + angles (always)
+  - excluded volume (when settings.use_excluded_volume & apply_to_smooth)
+  - heat term / subanchor heatmap (when heat_dist is provided)
+  - CTCF orientation (when char_orientations is provided)
 
-JAX is an OPTIONAL extras dep (pyproject `[jax]`).  Importing this module
-without JAX installed must not crash — `_ensure_jax()` lazy-imports.  The
-caller dispatch in [mc.py] raises a clear error only when `mc_backend='jax'`
-is explicitly set without JAX installed.
+It does NOT support confinement yet — that's a future port.  The dispatch
+gate in [mc.py::mc_smooth] rejects confinement-enabled calls back to numba.
 
-Compile cache: first call per (N, n_steps_per_batch, n_movable) shape pays a
-~1-50s JAX/XLA compile cost.  We set up `jax.experimental.compilation_cache`
-at module init so the cost is paid once per machine, not per process.
+JAX is an optional extras dep; `_ensure_jax()` lazy-imports.  The persistent
+compile cache at `~/.cache/gnome3d/jax` makes per-shape compiles a one-time
+cost across all runs on a machine.
 """
 
-# NB: no `from __future__ import annotations` — settings type-checks reference
-# Settings at runtime via TYPE_CHECKING; we keep runtime annotations live so
-# pyright can resolve them.
+# NB: no `from __future__ import annotations` — JAX kernels reflect on live
+# type objects via decorators.  String-form annotations are fine elsewhere in
+# this file but the kernel definitions below are not annotation-sensitive.
 
 import os
+import threading
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .types import F32Array, I64Array
+from .types import F32Array, I32Array, I64Array
 
 if TYPE_CHECKING:
     from .settings import Settings
 
 
 # ---------------------------------------------------------------------------
-# Lazy import + compile-cache setup
+# Lazy import + compile-cache setup (thread-safe)
 # ---------------------------------------------------------------------------
 
 _JAX_AVAILABLE: bool | None = None  # None = not yet probed
 _jax: Any = None
 _jnp: Any = None
-_kernel_cache: dict[tuple[int, int], Any] = {}
+# Cache key: (n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs)
+_kernel_cache: dict[tuple[int, int, bool, bool, int], Any] = {}
+# Module-level lock — `ib_workers>1` may have multiple threads racing into
+# `_ensure_jax`/`_build_*` simultaneously, causing duplicate banner prints and
+# duplicate kernel-build work.
+_init_lock = threading.Lock()
 
 
 def _ensure_jax() -> bool:
     """Lazy-import JAX.  Returns True on success, False if not installed.
-    Idempotent — subsequent calls hit the cached `_JAX_AVAILABLE` flag.
-    On first successful import, prints a one-line backend banner so the user
-    can confirm JAX picked the expected device."""
+    Idempotent + thread-safe — first caller does the work, others wait."""
     global _JAX_AVAILABLE, _jax, _jnp
     if _JAX_AVAILABLE is not None:
         return _JAX_AVAILABLE
-    try:
-        import jax  # type: ignore[import-not-found]
-        import jax.numpy as jnp  # type: ignore[import-not-found]
-    except ImportError:
-        _JAX_AVAILABLE = False
-        return False
-    # Float32 is the production dtype for this backend; the benchmark showed
-    # f64 is 2x slower on consumer GPUs (1/32 throughput) with no quality
-    # benefit at the run lengths we care about.  We do NOT enable_x64.
-    cache_dir = os.environ.get(
-        "GNOME3D_JAX_CACHE", os.path.expanduser("~/.cache/gnome3d/jax")
-    )
-    cache_active = False
-    try:
-        from jax.experimental import compilation_cache  # type: ignore[import-not-found]
+    with _init_lock:
+        if _JAX_AVAILABLE is not None:
+            return _JAX_AVAILABLE  # another thread won the race
+        try:
+            import jax  # type: ignore[import-not-found]
+            import jax.numpy as jnp  # type: ignore[import-not-found]
+        except ImportError:
+            _JAX_AVAILABLE = False
+            return False
+        # f32 is the production dtype — bench showed f64 is 2x slower on
+        # consumer GPUs (1/32 throughput) with no quality benefit at these
+        # run lengths.  We do NOT enable_x64.
+        cache_dir = os.environ.get("GNOME3D_JAX_CACHE", os.path.expanduser("~/.cache/gnome3d/jax"))
+        cache_active = False
+        try:
+            from jax.experimental import compilation_cache  # type: ignore[import-not-found]
 
-        compilation_cache.compilation_cache.set_cache_dir(cache_dir)  # pyright: ignore[reportUnknownMemberType]
-        cache_active = True
-    except (ImportError, AttributeError):
-        # older JAX, or API moved — proceed without persistent cache; each
-        # process pays compile cost on first call per shape.
-        pass
-    _jax = jax
-    _jnp = jnp
-    _JAX_AVAILABLE = True
-
-    # One-time backend banner — printed to stderr so it doesn't interfere with
-    # CIF output piped on stdout, and visible regardless of output_level.
-    try:
-        backend: str = str(jax.default_backend())  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-        # jax.devices() returns list[Device] but jax has no stubs; ignore types
-        _dev = jax.devices()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        devices_str: str = ", ".join(str(d) for d in _dev)  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
-    except Exception:  # noqa: BLE001 — diagnostic only, never block
-        backend = "unknown"
-        devices_str = "unknown"
-    cache_str = cache_dir if cache_active else "disabled"
-    print(
-        f"[mc_jax] JAX backend ready: backend={backend} devices=[{devices_str}] "
-        f"cache={cache_str}",
-        file=__import__("sys").stderr,
-        flush=True,
-    )
-    return True
+            compilation_cache.compilation_cache.set_cache_dir(cache_dir)  # pyright: ignore[reportUnknownMemberType]
+            cache_active = True
+        except (ImportError, AttributeError):
+            pass
+        _jax = jax
+        _jnp = jnp
+        _JAX_AVAILABLE = True
+        # Banner — once per process, on stderr so it doesn't mix with CIF stdout.
+        try:
+            backend: str = str(jax.default_backend())  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+            _dev = jax.devices()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            devices_str: str = ", ".join(str(d) for d in _dev)  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
+        except Exception:  # noqa: BLE001
+            backend = "unknown"
+            devices_str = "unknown"
+        cache_str = cache_dir if cache_active else "disabled"
+        print(
+            f"[mc_jax] JAX backend ready: backend={backend} devices=[{devices_str}] "
+            f"cache={cache_str}",
+            file=__import__("sys").stderr,
+            flush=True,
+        )
+        return True
 
 
 def is_available() -> bool:
@@ -107,28 +106,37 @@ def is_available() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Kernel construction (cached per (n_steps_per_batch, excl_skip))
+# Kernel construction (cached per kernel signature)
 # ---------------------------------------------------------------------------
 
 
-def _build_smooth_ev_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
-    """Build (or look up cached) compiled smooth-MC + EV kernel.
+def _build_smooth_kernel(
+    n_steps_per_batch: int,
+    excl_skip: int,
+    use_heat: bool,
+    use_orn: bool,
+    max_nbrs: int,
+) -> Any:
+    """Build (or look up cached) compiled smooth-MC kernel.
 
-    The returned callable is jit'd + vmapped over K chains.  It runs ONE batch
-    of `n_steps_per_batch` MC steps for K chains in lockstep and returns
-    (pos, score_struct, score_excl, T_final, n_ok).
+    Returns (kernel, init_smooth, init_excl, init_heat, init_orn) — the four
+    init functions compute initial scores on-device, vmapped across K chains.
 
-    Static-by-cache-key: `n_steps_per_batch` (shape of pre-gen RNG arrays),
-    `excl_skip` (folded into the EV mask).  JAX further shape-specialises on
-    (N, K) per call but those are runtime args.
+    Static-by-cache-key: n_steps_per_batch, excl_skip, use_heat, use_orn,
+    max_nbrs (padding width for the orientation neighbor lists).  JAX further
+    shape-specialises on (N, K, n_anchors, n_movable) at runtime — those
+    incur per-shape compile cost (cached persistently via
+    jax.experimental.compilation_cache).
     """
-    key = (n_steps_per_batch, excl_skip)
-    if key in _kernel_cache:
-        return _kernel_cache[key]
+    cache_key = (n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs)
+    if cache_key in _kernel_cache:
+        return _kernel_cache[cache_key]
 
     assert _jax is not None and _jnp is not None
     jax = _jax
     jnp = _jnp
+
+    # ---- chain energy helpers ----
 
     def _smooth_len(pa: Any, pb: Any, e: Any, stretch_k: Any, squeeze_k: Any, dist_w: Any) -> Any:
         diff = pa - pb
@@ -150,26 +158,29 @@ def _build_smooth_ev_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         return scale * ang * ang * ang * ang_k * ang_w
 
     def _local_smooth_at(
-        pos: Any, p_pos: Any, p: Any, dtn: Any,
-        stretch_k: Any, squeeze_k: Any, ang_k: Any, dist_w: Any, ang_w: Any,
+        pos: Any,
+        p_pos: Any,
+        p: Any,
+        dtn: Any,
+        stretch_k: Any,
+        squeeze_k: Any,
+        ang_k: Any,
+        dist_w: Any,
+        ang_w: Any,
     ) -> Any:
-        """Local smooth score with bead p's position substituted by p_pos.
-        Mirrors gnome3d.mc._local_smooth_nb."""
         n = pos.shape[0]
         a_pm1 = pos[jnp.maximum(p - 1, 0)]
         bond_L_ok = jnp.logical_and(p - 1 >= 0, p - 1 < n - 1)
         bond_L = jnp.where(
             bond_L_ok,
-            _smooth_len(a_pm1, p_pos, dtn[jnp.maximum(p - 1, 0)],
-                        stretch_k, squeeze_k, dist_w),
+            _smooth_len(a_pm1, p_pos, dtn[jnp.maximum(p - 1, 0)], stretch_k, squeeze_k, dist_w),
             0.0,
         )
         a_pp1 = pos[jnp.minimum(p + 1, n - 1)]
         bond_R_ok = jnp.logical_and(p >= 0, p < n - 1)
         bond_R = jnp.where(
             bond_R_ok,
-            _smooth_len(p_pos, a_pp1, dtn[jnp.minimum(p, n - 2)],
-                        stretch_k, squeeze_k, dist_w),
+            _smooth_len(p_pos, a_pp1, dtn[jnp.minimum(p, n - 2)], stretch_k, squeeze_k, dist_w),
             0.0,
         )
 
@@ -189,9 +200,9 @@ def _build_smooth_ev_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
 
         return bond_L + bond_R + angle_at(-2) + angle_at(-1) + angle_at(0)
 
+    # ---- excluded volume helpers ----
+
     def _local_excl_at(pos: Any, p_pos: Any, p: Any, r0: Any, weight: Any) -> Any:
-        """Sum over i with |i-p| > excl_skip of weight * ((r0-d)/r0)^2 · [d<r0].
-        Returns scalar."""
         n = pos.shape[0]
         diff = pos - p_pos
         d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
@@ -201,14 +212,359 @@ def _build_smooth_ev_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         in_range = jnp.abs(idx - p) > excl_skip
         return jnp.sum(jnp.where(in_range, contrib, 0.0))
 
-    def _init_smooth(pos: Any, dtn: Any, stretch_k: Any, squeeze_k: Any, ang_k: Any,
-                    dist_w: Any, ang_w: Any) -> Any:
+    # ---- heat (subanchor heatmap) helpers ----
+
+    def _local_heat_at(pos: Any, p_pos: Any, p: Any, heat_dist: Any, heat_weight: Any) -> Any:
+        """Local heat score for bead p vs all others, evaluated as if pos[p] = p_pos.
+        Mirrors gnome3d.mc._local_heat_nb: sum_{i != p, heat_dist[i,p] > 0}
+        ((d - heat_dist[i,p]) / heat_dist[i,p])^2 * heat_weight."""
+        n = pos.shape[0]
+        diff = pos - p_pos
+        d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+        exp_d = heat_dist[:, p]  # (N,)
+        idx = jnp.arange(n)
+        # Skip i == p (the diagonal of heat_dist is zero anyway, but mask
+        # explicitly to match numba semantics) and pairs with no contact data
+        # (heat_dist < 1e-6).
+        active = jnp.logical_and(idx != p, exp_d >= 1e-6)
+        exp_d_safe = jnp.maximum(exp_d, 1e-6)
+        rel = (d - exp_d_safe) / exp_d_safe
+        contrib = rel * rel
+        return heat_weight * jnp.sum(jnp.where(active, contrib, 0.0))
+
+    # ---- orientation helpers ----
+
+    def _calc_orientation_at(pos: Any, p: Any, p_pos: Any, ar: Any, is_L: Any) -> Any:
+        """Compute the orientation vector for anchor at bead-index `ar`,
+        assuming pos[p] is replaced by p_pos.  Returns a normalised (3,) vec.
+
+        Mirrors gnome3d.mc._calc_orientation_nb edge cases:
+          - ar == 0:     orn = pos[1]  - pos[0]
+          - ar == N-1:   orn = pos[ar] - pos[ar-1]
+          - middle:      orn = pos[ar+1] - pos[ar-1]
+        Sign-flipped if is_L is True; then L2-normalised."""
+        n = pos.shape[0]
+        pp1_idx = jnp.minimum(ar + 1, n - 1)
+        pm1_idx = jnp.maximum(ar - 1, 0)
+        # Substitute p_pos at the right slot if it happens to be one of these
+        a_ar = jnp.where(ar == p, p_pos, pos[ar])
+        a_pp1 = jnp.where(pp1_idx == p, p_pos, pos[pp1_idx])
+        a_pm1 = jnp.where(pm1_idx == p, p_pos, pos[pm1_idx])
+
+        is_first = ar == 0
+        is_last = ar == n - 1
+        o_first = a_pp1 - a_ar
+        o_last = a_ar - a_pm1
+        o_mid = a_pp1 - a_pm1
+        o = jnp.where(is_first, o_first, jnp.where(is_last, o_last, o_mid))
+        o = jnp.where(is_L, -o, o)
+        nm = jnp.sqrt(jnp.sum(o * o))
+        return jnp.where(nm > 1e-12, o / jnp.maximum(nm, 1e-30), jnp.zeros_like(o))
+
+    def _local_orientation_at(
+        anchor_orn: Any,
+        k: Any,
+        nbr_idx: Any,
+        nbr_w: Any,
+        nbr_valid: Any,
+        motif_weight: Any,
+        symmetric: Any,
+    ) -> Any:
+        """Local orientation score for anchor k, summed over its (padded)
+        neighbors.  Mirrors gnome3d.mc._local_score_orientation_nb."""
+        # nbr_idx[k, :] are the neighbor anchor indices (max_nbrs wide, padded
+        # with 0 + nbr_valid=False).  nbr_w[k, :] are the per-edge weights.
+        neighbors_k = nbr_idx[k]  # (max_nbrs,)
+        weights_k = nbr_w[k]  # (max_nbrs,)
+        valid_k = nbr_valid[k]  # (max_nbrs,)
+        a = anchor_orn[k]  # (3,)
+        b = anchor_orn[neighbors_k]  # (max_nbrs, 3)
+        b_signed = jnp.where(symmetric, b, -b)
+        dot = jnp.sum(a[None, :] * b_signed, axis=1)  # (max_nbrs,)
+        ang = 1.0 - (dot + 1.0) * 0.5
+        contrib = jnp.where(valid_k, ang * ang * weights_k, 0.0)
+        return motif_weight * jnp.sum(contrib)
+
+    # ---- chain (per-batch) body ----
+
+    def chain_batch(
+        # state
+        pos0: Any,
+        ss0: Any,
+        se0: Any,
+        sh0: Any,
+        so0: Any,
+        anchor_orn0: Any,
+        T0_: Any,
+        # static problem data
+        dtn: Any,
+        movable: Any,
+        heat_dist: Any,
+        anchor_ar: Any,
+        bead_to_anchor_k: Any,
+        nbr_idx: Any,
+        nbr_w: Any,
+        nbr_valid: Any,
+        is_L: Any,
+        # schedule
+        step_size: Any,
+        dt: Any,
+        js: Any,
+        jc: Any,
+        stretch_k: Any,
+        squeeze_k: Any,
+        ang_k: Any,
+        dist_w: Any,
+        ang_w: Any,
+        r0: Any,
+        excl_w: Any,
+        heat_weight: Any,
+        motif_weight: Any,
+        symmetric: Any,
+        # RNG
+        key: Any,
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
+        """One batch of `n_steps_per_batch` MC steps for ONE chain.  Returns
+        (pos_f, ss_f, se_f, sh_f, so_f, anchor_orn_f, T_f, n_ok)."""
+        n_movable = movable.shape[0]
+        k_p, k_d, k_a = jax.random.split(key, 3)
+        idx_picks = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_movable)
+        ps = movable[idx_picks]
+        disps = jax.random.uniform(
+            k_d,
+            (n_steps_per_batch, 3),
+            minval=-step_size,
+            maxval=step_size,
+            dtype=pos0.dtype,
+        )
+        accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
+
+        def body(i: Any, carry: Any) -> Any:
+            pos, ss, se, sh, so, anchor_orn, T, n_ok = carry
+            p = ps[i]
+            delta = disps[i]
+            u = accs[i]
+
+            score = ss + se + sh + so
+            old_p = pos[p]
+            new_p = old_p + delta
+
+            # ---- struct (chain bonds + angles) ----
+            loc_s_prev = _local_smooth_at(
+                pos, old_p, p, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w
+            )
+            loc_s_curr = _local_smooth_at(
+                pos, new_p, p, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w
+            )
+            ss_new = ss + (loc_s_curr - loc_s_prev)
+
+            # ---- excluded volume ----
+            loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w)
+            loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w)
+            se_new = se + 2.0 * (loc_e_curr - loc_e_prev)
+
+            # ---- heat ----
+            if use_heat:
+                loc_h_prev = _local_heat_at(pos, old_p, p, heat_dist, heat_weight)
+                loc_h_curr = _local_heat_at(pos, new_p, p, heat_dist, heat_weight)
+                sh_new = sh + 2.0 * (loc_h_curr - loc_h_prev)
+            else:
+                sh_new = sh
+
+            # ---- orientation ----
+            if use_orn:
+                # orn_k = bead_to_anchor_k[p]; if >= 0 this bead is adjacent to
+                # an anchor whose orientation depends on p's position.
+                orn_k = bead_to_anchor_k[p]  # int, may be -1
+                has_orn = orn_k >= 0
+                safe_k = jnp.maximum(orn_k, 0)
+                # PREV orientation already lives in anchor_orn[safe_k]
+                loc_o_prev_raw = _local_orientation_at(
+                    anchor_orn,
+                    safe_k,
+                    nbr_idx,
+                    nbr_w,
+                    nbr_valid,
+                    motif_weight,
+                    symmetric,
+                )
+                loc_o_prev = jnp.where(has_orn, loc_o_prev_raw, 0.0)
+
+                # CURR: recompute anchor's orientation with p moved to new_p
+                ar_p = anchor_ar[safe_k]
+                is_L_ar = is_L[ar_p]
+                new_orn_vec = _calc_orientation_at(pos, p, new_p, ar_p, is_L_ar)
+                # Update only that slot in anchor_orn (functional, single scatter)
+                anchor_orn_trial = anchor_orn.at[safe_k].set(new_orn_vec)
+                loc_o_curr_raw = _local_orientation_at(
+                    anchor_orn_trial,
+                    safe_k,
+                    nbr_idx,
+                    nbr_w,
+                    nbr_valid,
+                    motif_weight,
+                    symmetric,
+                )
+                loc_o_curr = jnp.where(has_orn, loc_o_curr_raw, 0.0)
+                so_new = so + 2.0 * (loc_o_curr - loc_o_prev)
+            else:
+                anchor_orn_trial = anchor_orn
+                so_new = so
+                has_orn = False
+                safe_k = jnp.int32(0)
+
+            score_new = ss_new + se_new + sh_new + so_new
+
+            ok_unc = score_new < score  # smooth uses STRICT less-than
+            can_jump = jnp.logical_and(T > 0, score > 0)
+            exponent = -jc * (score_new / jnp.maximum(score, 1e-30)) / jnp.maximum(T, 1e-30)
+            exponent = jnp.clip(exponent, -80.0, 80.0)
+            p_acc = js * jnp.exp(exponent)
+            ok = jnp.logical_or(ok_unc, jnp.logical_and(can_jump, u < p_acc))
+
+            final_p = jnp.where(ok, new_p, old_p)
+            pos_next = pos.at[p].set(final_p)
+            ss_next = jnp.where(ok, ss_new, ss)
+            se_next = jnp.where(ok, se_new, se)
+            sh_next = jnp.where(ok, sh_new, sh)
+            so_next = jnp.where(ok, so_new, so)
+            if use_orn:
+                # Accept = keep anchor_orn_trial; reject = keep anchor_orn.
+                # We only modified anchor_orn[safe_k], so equivalently:
+                #   anchor_orn_next = anchor_orn_trial if ok else anchor_orn
+                anchor_orn_next = jnp.where(ok, anchor_orn_trial, anchor_orn)
+            else:
+                anchor_orn_next = anchor_orn
+            n_ok_next = n_ok + jnp.where(ok, 1, 0)
+            return (
+                pos_next,
+                ss_next,
+                se_next,
+                sh_next,
+                so_next,
+                anchor_orn_next,
+                T * dt,
+                n_ok_next,
+            )
+
+        init = (pos0, ss0, se0, sh0, so0, anchor_orn0, T0_, jnp.int32(0))
+        return jax.lax.fori_loop(0, n_steps_per_batch, body, init)
+
+    # vmap over K chains; problem data and schedule are shared (None).
+    # Per-chain: pos, all 4 scores, anchor_orn, key.  T is shared (deterministic).
+    in_axes = (
+        0,
+        0,
+        0,
+        0,
+        0,  # pos, ss, se, sh, so
+        0,  # anchor_orn
+        None,  # T0
+        None,
+        None,  # dtn, movable
+        None,  # heat_dist
+        None,
+        None,  # anchor_ar, bead_to_anchor_k
+        None,
+        None,
+        None,  # nbr_idx, nbr_w, nbr_valid
+        None,  # is_L
+        None,
+        None,
+        None,
+        None,  # step_size, dt, js, jc
+        None,
+        None,
+        None,
+        None,
+        None,  # stretch..ang_w
+        None,
+        None,  # r0, excl_w
+        None,  # heat_weight
+        None,
+        None,  # motif_weight, symmetric
+        0,  # key
+    )
+    out_axes = (0, 0, 0, 0, 0, 0, None, 0)
+    batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
+
+    @jax.jit
+    def kernel(
+        pos_k: Any,
+        ss_k: Any,
+        se_k: Any,
+        sh_k: Any,
+        so_k: Any,
+        anchor_orn_k: Any,
+        T: Any,
+        dtn: Any,
+        movable: Any,
+        heat_dist: Any,
+        anchor_ar: Any,
+        bead_to_anchor_k: Any,
+        nbr_idx: Any,
+        nbr_w: Any,
+        nbr_valid: Any,
+        is_L: Any,
+        step_size: Any,
+        dt: Any,
+        js: Any,
+        jc: Any,
+        stretch_k: Any,
+        squeeze_k: Any,
+        ang_k: Any,
+        dist_w: Any,
+        ang_w: Any,
+        r0: Any,
+        excl_w: Any,
+        heat_weight: Any,
+        motif_weight: Any,
+        symmetric: Any,
+        keys: Any,
+    ) -> Any:
+        return batched(
+            pos_k,
+            ss_k,
+            se_k,
+            sh_k,
+            so_k,
+            anchor_orn_k,
+            T,
+            dtn,
+            movable,
+            heat_dist,
+            anchor_ar,
+            bead_to_anchor_k,
+            nbr_idx,
+            nbr_w,
+            nbr_valid,
+            is_L,
+            step_size,
+            dt,
+            js,
+            jc,
+            stretch_k,
+            squeeze_k,
+            ang_k,
+            dist_w,
+            ang_w,
+            r0,
+            excl_w,
+            heat_weight,
+            motif_weight,
+            symmetric,
+            keys,
+        )
+
+    # ---- init helpers (one-shot per chain on entry) ----
+
+    def _init_smooth_single(
+        pos: Any, dtn: Any, stretch_k: Any, squeeze_k: Any, ang_k: Any, dist_w: Any, ang_w: Any
+    ) -> Any:
         n = pos.shape[0]
 
         def _bond_at(i: Any) -> Any:
-            return _smooth_len(
-                pos[i], pos[i + 1], dtn[i], stretch_k, squeeze_k, dist_w
-            )
+            return _smooth_len(pos[i], pos[i + 1], dtn[i], stretch_k, squeeze_k, dist_w)
 
         def _angle_at(i: Any) -> Any:
             return _smooth_ang(pos[i], pos[i + 1], pos[i + 2], ang_k, ang_w)
@@ -217,9 +573,7 @@ def _build_smooth_ev_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         angles = jax.vmap(_angle_at)(jnp.arange(n - 2))
         return jnp.sum(bonds) + jnp.sum(angles)
 
-    def _init_excl(pos: Any, r0: Any, weight: Any) -> Any:
-        """O(N) row-at-a-time scan; avoids the (N, N, 3) materialization that
-        would OOM at large N."""
+    def _init_excl_single(pos: Any, r0: Any, weight: Any) -> Any:
         n = pos.shape[0]
         idx = jnp.arange(n)
 
@@ -234,107 +588,100 @@ def _build_smooth_ev_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
         return total
 
-    def chain_batch(
-        pos0: Any, score_struct0: Any, score_excl0: Any, T0: Any,
-        dtn: Any, movable: Any,
-        step_size: Any, dt: Any, js: Any, jc: Any,
-        stretch_k: Any, squeeze_k: Any, ang_k: Any, dist_w: Any, ang_w: Any,
-        r0: Any, excl_w: Any, key: Any,
-    ) -> tuple[Any, Any, Any, Any, Any]:
-        """One batch of `n_steps_per_batch` MC steps for ONE chain.  Returns
-        (pos_f, score_struct_f, score_excl_f, T_f, n_ok)."""
-        n_movable = movable.shape[0]
+    def _init_heat_single(pos: Any, heat_dist: Any, heat_weight: Any) -> Any:
+        n = pos.shape[0]
+        idx = jnp.arange(n)
 
-        k_p, k_d, k_a = jax.random.split(key, 3)
-        idx_picks = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_movable)
-        ps = movable[idx_picks]
-        disps = jax.random.uniform(
-            k_d, (n_steps_per_batch, 3),
-            minval=-step_size, maxval=step_size, dtype=pos0.dtype,
+        def scan_body(carry: Any, i: Any) -> tuple[Any, None]:
+            diff = pos - pos[i]
+            d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+            exp_d = heat_dist[:, i]
+            active = jnp.logical_and(idx != i, exp_d >= 1e-6)
+            exp_d_safe = jnp.maximum(exp_d, 1e-6)
+            rel = (d - exp_d_safe) / exp_d_safe
+            contrib = rel * rel
+            return carry + jnp.sum(jnp.where(active, contrib, 0.0)), None
+
+        total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
+        return heat_weight * total
+
+    def _init_anchor_orientations_single(
+        pos: Any,
+        anchor_ar: Any,
+        is_L: Any,
+    ) -> Any:
+        """Compute (n_anchors, 3) initial orientation vectors from anchor
+        positions.  is_L is indexed by bead-index (full N).
+        """
+
+        def per_anchor(k_idx: Any) -> Any:
+            ar = anchor_ar[k_idx]
+            is_L_v = is_L[ar]
+            # p == -1 sentinel: never matches any index, so substitution branches
+            # all fall through to "use pos[...]".  (jnp.int32 cast for safety.)
+            return _calc_orientation_at(
+                pos, jnp.int32(-1), jnp.zeros((3,), dtype=pos.dtype), ar, is_L_v
+            )
+
+        return jax.vmap(per_anchor)(jnp.arange(anchor_ar.shape[0]))
+
+    def _init_orientation_score_single(
+        anchor_orn: Any,
+        nbr_idx: Any,
+        nbr_w: Any,
+        nbr_valid: Any,
+        motif_weight: Any,
+        symmetric: Any,
+    ) -> Any:
+        """Global orientation score (matches _score_orientation_full_nb)."""
+
+        def per_anchor(k_idx: Any) -> Any:
+            return _local_orientation_at(
+                anchor_orn,
+                k_idx,
+                nbr_idx,
+                nbr_w,
+                nbr_valid,
+                motif_weight,
+                symmetric,
+            )
+
+        # Sum of per-anchor local scores already gives the global (the local
+        # iterates over each anchor's own neighbor list — symmetric arcs are
+        # counted from both endpoints).  Match numba's _score_orientation_full_nb.
+        sums = jax.vmap(per_anchor)(jnp.arange(anchor_orn.shape[0]))
+        # _local_orientation_at multiplies by motif_weight already; the global
+        # in numba multiplies once at the outer return — so we need to divide
+        # back out to avoid double-counting.  Cleaner: re-compute without it.
+        # Actually _score_orientation_full_nb iterates anchor i × neighbors,
+        # then multiplies err by motif_weight ONCE.  Our per-anchor local
+        # function also multiplies, so sum gives motif_weight * sum_of_terms.
+        # That's the same as the numba global * motif_weight.  Hmm.
+        # Verify: numba _score_orientation_full_nb computes
+        #   err = sum_i sum_j w_ij * ang_ij^2 ; return err * motif_weight
+        # Our per_anchor returns motif_weight * sum_j w_kj * ang_kj^2.
+        # Sum over k = motif_weight * sum_k sum_j w_kj * ang_kj^2 = global.
+        # So we're FINE — no double-count.  Comment above is wrong.
+        return jnp.sum(sums)
+
+    init_smooth = jax.jit(
+        jax.vmap(
+            _init_smooth_single,
+            in_axes=(0, None, None, None, None, None, None),
         )
-        accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
-
-        def body(i: Any, carry: Any) -> Any:
-            pos, ss, se, T, n_ok = carry
-            p = ps[i]
-            delta = disps[i]
-            u = accs[i]
-
-            score = ss + se
-            old_p = pos[p]
-            new_p = old_p + delta
-
-            loc_struct_prev = _local_smooth_at(pos, old_p, p, dtn,
-                                                stretch_k, squeeze_k, ang_k,
-                                                dist_w, ang_w)
-            loc_excl_prev = _local_excl_at(pos, old_p, p, r0, excl_w)
-            loc_struct_curr = _local_smooth_at(pos, new_p, p, dtn,
-                                                stretch_k, squeeze_k, ang_k,
-                                                dist_w, ang_w)
-            loc_excl_curr = _local_excl_at(pos, new_p, p, r0, excl_w)
-
-            ss_new = ss + (loc_struct_curr - loc_struct_prev)
-            se_new = se + 2.0 * (loc_excl_curr - loc_excl_prev)
-            score_new = ss_new + se_new
-
-            ok_unc = score_new < score  # smooth: strict
-            can_jump = jnp.logical_and(T > 0, score > 0)
-            exponent = -jc * (score_new / jnp.maximum(score, 1e-30)) \
-                       / jnp.maximum(T, 1e-30)
-            exponent = jnp.clip(exponent, -80.0, 80.0)
-            p_acc = js * jnp.exp(exponent)
-            ok = jnp.logical_or(ok_unc, jnp.logical_and(can_jump, u < p_acc))
-
-            final_p = jnp.where(ok, new_p, old_p)
-            pos_next = pos.at[p].set(final_p)
-            ss_next = jnp.where(ok, ss_new, ss)
-            se_next = jnp.where(ok, se_new, se)
-            n_ok_next = n_ok + jnp.where(ok, 1, 0)
-            return (pos_next, ss_next, se_next, T * dt, n_ok_next)
-
-        init = (pos0, score_struct0, score_excl0, T0, jnp.int32(0))
-        pos_f, ss_f, se_f, T_f, n_ok_f = jax.lax.fori_loop(
-            0, n_steps_per_batch, body, init
+    )
+    init_excl = jax.jit(jax.vmap(_init_excl_single, in_axes=(0, None, None)))
+    init_heat = jax.jit(jax.vmap(_init_heat_single, in_axes=(0, None, None)))
+    init_anchor_orn = jax.jit(jax.vmap(_init_anchor_orientations_single, in_axes=(0, None, None)))
+    init_orn_score = jax.jit(
+        jax.vmap(
+            _init_orientation_score_single,
+            in_axes=(0, None, None, None, None, None),
         )
-        return pos_f, ss_f, se_f, T_f, n_ok_f
-
-    # vmap over K chains; problem arrays (dtn, movable) and schedule scalars
-    # are shared.  Per-chain: pos, scores, key.  T is shared (deterministic
-    # schedule, identical trajectory for every chain).
-    batched = jax.vmap(
-        chain_batch,
-        in_axes=(0, 0, 0, None,                   # pos, ss, se, T
-                 None, None,                       # dtn, movable
-                 None, None, None, None,           # step_size, dt, js, jc
-                 None, None, None, None, None,     # stretch_k..ang_w
-                 None, None,                       # r0, excl_w
-                 0),                               # key
-        out_axes=(0, 0, 0, None, 0),
     )
 
-    @jax.jit
-    def kernel(
-        pos_k: Any, ss_k: Any, se_k: Any, T: Any,
-        dtn: Any, movable: Any,
-        step_size: Any, dt: Any, js: Any, jc: Any,
-        stretch_k: Any, squeeze_k: Any, ang_k: Any, dist_w: Any, ang_w: Any,
-        r0: Any, excl_w: Any, keys: Any,
-    ) -> tuple[Any, Any, Any, Any, Any]:
-        return batched(pos_k, ss_k, se_k, T, dtn, movable,
-                       step_size, dt, js, jc,
-                       stretch_k, squeeze_k, ang_k, dist_w, ang_w,
-                       r0, excl_w, keys)
-
-    # Also expose the init functions vmapped, so the caller can compute initial
-    # scores on-device (no host roundtrip).
-    init_smooth_vmapped = jax.jit(jax.vmap(
-        _init_smooth,
-        in_axes=(0, None, None, None, None, None, None),
-    ))
-    init_excl_vmapped = jax.jit(jax.vmap(_init_excl, in_axes=(0, None, None)))
-
-    bundle = (kernel, init_smooth_vmapped, init_excl_vmapped)
-    _kernel_cache[key] = bundle
+    bundle = (kernel, init_smooth, init_excl, init_heat, init_anchor_orn, init_orn_score)
+    _kernel_cache[cache_key] = bundle
     return bundle
 
 
@@ -349,15 +696,16 @@ def mc_smooth_jax(
     fixed: np.ndarray[Any, Any],
     step_size: float,
     settings: "Settings",
+    char_orientations: np.ndarray[Any, Any] | None = None,
+    anchor_neighbors: dict[int, list[int]] | None = None,
+    anchor_neighbor_weights: dict[int, list[float]] | None = None,
+    heat_dist: np.ndarray[Any, Any] | None = None,
     label: str = "",
     verbose: bool = False,
 ) -> float:
-    """JAX backend for the simple-config smooth-MC path.
-
-    Same signature contract as [mc.mc_smooth] minus the unsupported optional
-    args (orientation, heat_dist).  The dispatcher in [mc.mc_smooth] must gate
-    on `settings.mc_backend == "jax"` AND the simple-config check before
-    calling this.
+    """JAX backend for smooth-MC, supporting chain + EV + (optional) heat
+    + (optional) orientation.  Same contract as [mc.mc_smooth] minus
+    confinement.  Caller must gate on use_confinement off.
 
     Mutates `pos` in place (writes the best-chain final positions back) and
     returns the best chain's final score.
@@ -382,9 +730,7 @@ def mc_smooth_jax(
     K: int = max(1, int(settings.mc_smooth_chains))
     n_steps_per_batch: int = int(settings.mc_stop_steps_smooth)
 
-    use_excl: bool = bool(settings.use_excluded_volume) and bool(
-        settings.exclusion_apply_to_smooth
-    )
+    use_excl: bool = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
     excl_skip: int = int(settings.exclusion_skip_neighbors)
     excl_w_v: float = float(settings.exclusion_weight) if use_excl else 0.0
     if use_excl:
@@ -393,28 +739,88 @@ def mc_smooth_jax(
             factor = float(settings.exclusion_auto_factor_smooth)
             excl_r0 = factor * float(np.asarray(dtn).mean())
     else:
-        # r0 unused when excl_w_v == 0, but the kernel still references it —
-        # pick something safe & non-zero to avoid div-by-zero.
-        excl_r0 = 1.0
+        excl_r0 = 1.0  # unused but must be valid
 
-    # Move to f32 for JAX (matches the bench finding that f32 is 2x faster
-    # with no quality loss on these run lengths).
+    use_heat: bool = heat_dist is not None
+    heat_weight_v: float = float(settings.subanchor_heatmap_dist_weight) if use_heat else 0.0
+    use_orn: bool = (
+        char_orientations is not None
+        and anchor_neighbors is not None
+        and anchor_neighbor_weights is not None
+    )
+    motif_weight_v: float = float(settings.motif_weight) if use_orn else 0.0
+    motifs_symmetric_v: bool = bool(getattr(settings, "motifs_symmetric", True))
+
+    # ---- prepare orientation arrays (padded CSR) ----
+    if use_orn:
+        assert char_orientations is not None and anchor_neighbors is not None
+        assert anchor_neighbor_weights is not None
+        anchor_ar_np: I32Array = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
+        n_anchors = int(len(anchor_ar_np))
+        # pad neighbor lists to max width; uniform shape needed for vmap.
+        nbr_lists = [list(anchor_neighbors.get(k, [])) for k in range(n_anchors)]
+        nbr_w_lists = [list(anchor_neighbor_weights.get(k, [])) for k in range(n_anchors)]
+        max_nbrs = max((len(lst) for lst in nbr_lists), default=1)
+        max_nbrs = max(max_nbrs, 1)  # at least 1 slot
+        nbr_idx_np: I32Array = np.zeros((n_anchors, max_nbrs), dtype=np.int32)
+        nbr_w_np: F32Array = np.zeros((n_anchors, max_nbrs), dtype=np.float32)
+        nbr_valid_np = np.zeros((n_anchors, max_nbrs), dtype=np.bool_)
+        for k_idx in range(n_anchors):
+            for m, (jn, wn) in enumerate(
+                zip(nbr_lists[k_idx], nbr_w_lists[k_idx], strict=True)
+            ):
+                nbr_idx_np[k_idx, m] = int(jn)
+                nbr_w_np[k_idx, m] = float(wn)
+                nbr_valid_np[k_idx, m] = True
+        # bead_to_anchor_k: -1 if bead not adjacent to an anchor; else k.
+        bead_to_anchor_k_np: I32Array = np.full(n, -1, dtype=np.int32)
+        for k_idx in range(n_anchors):
+            ar = int(anchor_ar_np[k_idx])
+            if ar > 0:
+                bead_to_anchor_k_np[ar - 1] = k_idx
+            if ar + 1 < n:
+                bead_to_anchor_k_np[ar + 1] = k_idx
+        is_L_np = np.array([c == "L" for c in char_orientations], dtype=np.bool_)
+    else:
+        n_anchors = 1  # placeholder shape
+        max_nbrs = 1
+        anchor_ar_np = np.zeros(1, dtype=np.int32)
+        nbr_idx_np = np.zeros((1, 1), dtype=np.int32)
+        nbr_w_np = np.zeros((1, 1), dtype=np.float32)
+        nbr_valid_np = np.zeros((1, 1), dtype=np.bool_)
+        bead_to_anchor_k_np = np.full(n, -1, dtype=np.int32)
+        is_L_np = np.zeros(n, dtype=np.bool_)
+
+    # ---- move state to device (f32) ----
     pos_f32: F32Array = pos.astype(np.float32)
     pos_k_np: F32Array = np.broadcast_to(pos_f32, (K, n, 3)).copy()
     dtn_np: F32Array = dtn.astype(np.float32)
+    heat_np: F32Array
+    if use_heat:
+        assert heat_dist is not None
+        heat_np = heat_dist.astype(np.float32)
+    else:
+        heat_np = np.zeros((1, 1), dtype=np.float32)  # unused placeholder
 
-    kernel, init_smooth, init_excl = _build_smooth_ev_kernel(n_steps_per_batch, excl_skip)
+    bundle = _build_smooth_kernel(n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs)
+    kernel, init_smooth, init_excl, init_heat, init_anchor_orn, init_orn_score = bundle
 
-    # Move state to device
     pos_k = jnp.asarray(pos_k_np)
     dtn_j = jnp.asarray(dtn_np)
     movable_j = jnp.asarray(movable_np)
+    heat_j = jnp.asarray(heat_np)
+    anchor_ar_j = jnp.asarray(anchor_ar_np)
+    bead_to_anchor_k_j = jnp.asarray(bead_to_anchor_k_np)
+    nbr_idx_j = jnp.asarray(nbr_idx_np)
+    nbr_w_j = jnp.asarray(nbr_w_np)
+    nbr_valid_j = jnp.asarray(nbr_valid_np)
+    is_L_j = jnp.asarray(is_L_np)
     seed_offset: int = abs(hash(label)) % (2**31) if label else 0
-    keys = jax.random.split(jax.random.PRNGKey(seed_offset), K)
 
-    # Initial scores (vmapped across chains, computed on device)
+    # ---- initial scores ----
     ss_k = init_smooth(
-        pos_k, dtn_j,
+        pos_k,
+        dtn_j,
         jnp.float32(settings.spring_stretch),
         jnp.float32(settings.spring_squeeze),
         jnp.float32(settings.spring_angular),
@@ -423,8 +829,27 @@ def mc_smooth_jax(
     )
     se_k = (
         init_excl(pos_k, jnp.float32(excl_r0), jnp.float32(excl_w_v))
-        if use_excl else jnp.zeros((K,), dtype=jnp.float32)
+        if use_excl
+        else jnp.zeros((K,), dtype=jnp.float32)
     )
+    sh_k = (
+        init_heat(pos_k, heat_j, jnp.float32(heat_weight_v))
+        if use_heat
+        else jnp.zeros((K,), dtype=jnp.float32)
+    )
+    if use_orn:
+        anchor_orn_k = init_anchor_orn(pos_k, anchor_ar_j, is_L_j)
+        so_k = init_orn_score(
+            anchor_orn_k,
+            nbr_idx_j,
+            nbr_w_j,
+            nbr_valid_j,
+            jnp.float32(motif_weight_v),
+            jnp.bool_(motifs_symmetric_v),
+        )
+    else:
+        anchor_orn_k = jnp.zeros((K, n_anchors, 3), dtype=jnp.float32)
+        so_k = jnp.zeros((K,), dtype=jnp.float32)
 
     T = jnp.float32(settings.max_temp_smooth)
     dt = jnp.float32(settings.dt_temp_smooth)
@@ -437,48 +862,64 @@ def mc_smooth_jax(
     ang_w_j = jnp.float32(settings.smooth_angle_weight)
     r0_j = jnp.float32(excl_r0)
     excl_w_j = jnp.float32(excl_w_v)
+    heat_w_j = jnp.float32(heat_weight_v)
+    motif_w_j = jnp.float32(motif_weight_v)
+    symmetric_j = jnp.bool_(motifs_symmetric_v)
     step_size_j = jnp.float32(step_size)
 
-    # Outer convergence loop driven from Python.  Each iteration is one
-    # compiled JAX kernel call processing `n_steps_per_batch` MC steps × K
-    # chains; the cost between iterations is one device->host sync to read
-    # the score for the convergence check.
     stop_improvement: float = float(settings.mc_stop_improvement_smooth)
     stop_successes: int = int(settings.mc_stop_successes_smooth)
     score_eps: float = 1e-6
     ms_score: float = float("inf")
     step_i: int = 0
     prefix = f"    [{label}] " if label else "    "
+    score_per_chain: Any = None  # populated in loop
 
     while True:
-        # Fresh per-chain keys per batch, derived from a step counter so the
-        # stream is reproducible and never repeats across batches.
-        keys = jax.random.split(
-            jax.random.PRNGKey(seed_offset + step_i + 1), K
+        keys = jax.random.split(jax.random.PRNGKey(seed_offset + step_i + 1), K)
+        pos_k, ss_k, se_k, sh_k, so_k, anchor_orn_k, T, n_ok_k = kernel(
+            pos_k,
+            ss_k,
+            se_k,
+            sh_k,
+            so_k,
+            anchor_orn_k,
+            T,
+            dtn_j,
+            movable_j,
+            heat_j,
+            anchor_ar_j,
+            bead_to_anchor_k_j,
+            nbr_idx_j,
+            nbr_w_j,
+            nbr_valid_j,
+            is_L_j,
+            step_size_j,
+            dt,
+            js,
+            jc,
+            stretch_k_j,
+            squeeze_k_j,
+            ang_k_j,
+            dist_w_j,
+            ang_w_j,
+            r0_j,
+            excl_w_j,
+            heat_w_j,
+            motif_w_j,
+            symmetric_j,
+            keys,
         )
 
-        pos_k, ss_k, se_k, T, n_ok_k = kernel(
-            pos_k, ss_k, se_k, T,
-            dtn_j, movable_j,
-            step_size_j, dt, js, jc,
-            stretch_k_j, squeeze_k_j, ang_k_j, dist_w_j, ang_w_j,
-            r0_j, excl_w_j, keys,
-        )
-
-        # Best score across chains; use it to drive convergence (the unused
-        # chains have already lost the race, so their plateauing doesn't
-        # matter for the final result).
-        score_per_chain = np.asarray(ss_k + se_k)
+        score_per_chain = np.asarray(ss_k + se_k + sh_k + so_k)
         n_ok_per_chain = np.asarray(n_ok_k)
         score: float = float(np.min(score_per_chain))
         n_ok_best: int = int(n_ok_per_chain[int(np.argmin(score_per_chain))])
-
         step_i += n_steps_per_batch
         ratio: float = score / ms_score if ms_score > 0 else 1.0
         converged: bool = (
-            (score > stop_improvement * ms_score and n_ok_best < stop_successes)
-            or score < score_eps
-        )
+            score > stop_improvement * ms_score and n_ok_best < stop_successes
+        ) or score < score_eps
         if verbose:
             print(
                 f"{prefix}step {step_i:>7,}  score={score:.4f}"
@@ -490,7 +931,7 @@ def mc_smooth_jax(
             break
         ms_score = score
 
-    # Pick best chain and write back to the caller's pos buffer
+    assert score_per_chain is not None
     best_k: int = int(np.argmin(score_per_chain))
     pos[:] = np.asarray(pos_k[best_k]).astype(pos.dtype)
     return float(score_per_chain[best_k])
