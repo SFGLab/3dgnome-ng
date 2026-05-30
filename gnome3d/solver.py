@@ -1510,18 +1510,3 @@ class Solver:
             )
         result.sort(key=lambda b: b[0])
         return result
-
-    def get_anchor_positions(self) -> list[BeadOut]:
-        """All anchor beads from all chromosomes, sorted by chr then genomic start."""
-        result: list[BeadOut] = []
-        for chr_ in self.chrs:
-            first = self.chr_first_cluster.get(chr_, -1)
-            if first < 0:
-                continue
-            for i in range(first, len(self.clusters)):
-                c = self.clusters[i]
-                if c.level != LVL_ANCHOR:
-                    break
-                x, y, z = float(c.pos[0]), float(c.pos[1]), float(c.pos[2])
-                result.append(BeadOut(start=c.start, end=c.end, x=x, y=y, z=z, kind="anchor"))
-        return sorted(result, key=lambda b: b[0])
