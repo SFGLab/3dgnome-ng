@@ -2940,7 +2940,40 @@ def mc_smooth_jax_batch(
 
     Returns one (score, final_pos (n_i, 3)) per problem, in input order.
     Does not mutate the inputs.
+
+    Caps the vmap width at `max(1, 32768 // B)` (the kscan saturation point:
+    wider is free, not faster) and runs any excess in sequential sub-batches.
+    That cap also bounds the stacked `(K, B, B)` heat tensor to <= ~131072*B
+    bytes (~4.3 GB at the largest bucket), so a dense, heat-carrying chromosome
+    can't OOM the GPU regardless of how many IBs land in one bucket.
     """
+    if not problems:
+        return []
+    bucket = bool(settings.jax_bucket_shapes)
+    bsz = [int(p["pos"].shape[0]) for p in problems]
+    big_b = max((_bucket_for(n) if bucket else n) for n in bsz)
+    max_k = max(1, 32768 // max(1, big_b))
+    if len(problems) <= max_k:
+        return _mc_smooth_jax_batch_chunk(problems, settings)
+    LOG.debug(
+        "region-batch: %d IBs > max_k=%d at B=%d; running %d sub-batches",
+        len(problems),
+        max_k,
+        big_b,
+        -(-len(problems) // max_k),
+    )
+    results: list[tuple[float, np.ndarray[Any, Any]]] = []
+    for i in range(0, len(problems), max_k):
+        results.extend(_mc_smooth_jax_batch_chunk(problems[i : i + max_k], settings))
+    return results
+
+
+def _mc_smooth_jax_batch_chunk(
+    problems: list[dict[str, Any]],
+    settings: "Settings",
+) -> list[tuple[float, np.ndarray[Any, Any]]]:
+    """One vmapped kernel launch for up to `max_k` IBs. See `mc_smooth_jax_batch`,
+    which chunks to this so the device tensors stay bounded."""
     if not _ensure_jax():
         raise RuntimeError("settings.mc_backend='jax' but JAX is not installed.")
     assert _jax is not None and _jnp is not None
