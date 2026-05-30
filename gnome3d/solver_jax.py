@@ -12,12 +12,13 @@ dispatch — and reuses everything else from `Solver` (hierarchy, arc MC, contac
 heatmaps, subanchor heat-dist prep, write-back).  See
 `gnome3d.mc_jax.mc_smooth_jax_batch` for the batched kernel entry.
 
-Both heavy phases are batched across IBs:
+Work is split into three phases per chromosome:
+  * Phase 1 (`_prepare_ibs_threaded`): arc MC + contact heatmaps + densify +
+    orientation, per IB.  Pure CPU (heat-dist deferred) and arc MC is numba/
+    nogil, so it threads across cores — wall = slowest IB, not the sum.
   * Phase 1.5 (`_batched_heat_dist`): every IB's subanchor heat-dist estimate
-    (the dry-smooth trials) runs in batched kernels, grouped by size bucket.
+    (the dry-smooth trials) runs in batched GPU kernels, grouped by size bucket.
   * Phase 2 (`_batched_final_smooth`): every IB's final smooth, likewise.
-Phase 1 (arc MC + densify + orientation) stays per-IB and serial — it is cheap
-relative to the smooths (arc MC is numba/CPU).
 
 Selected via `gnome3d.util.make_solver` when `settings.jax_region_batch` is set
 (opt-in).
@@ -25,8 +26,10 @@ Selected via `gnome3d.util.make_solver` when `settings.jax_region_batch` is set
 
 from __future__ import annotations
 
+import os
 import time
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 import numpy as np
@@ -103,15 +106,11 @@ class JaxSolver(Solver):
 
     def _dispatch_ib_work(self, chr_: str, work: list[tuple[int, int, str, list[int]]]) -> None:
         # Phase 1: prepare every IB (arc MC + contact heatmaps + densify +
-        # orientation), but DEFER the heat-dist estimate.  Cheap relative to the
-        # smooths (arc MC is numba/CPU); each IB owns disjoint clusters.
-        probs: list[dict[str, Any]] = []
-        for _ib_i, ib_idx, ib_label, active_region in work:
-            with log.step(LOG, ib_label, "(%d anchors)", len(active_region)):
-                prob = self._prepare_ib(ib_idx, active_region, chr_, defer_heat=True)
-            if prob is not None:
-                prob["ib_label"] = ib_label
-                probs.append(prob)
+        # orientation), DEFERRING the heat-dist estimate.  This phase is now
+        # pure CPU (the GPU work is all in the batched phases below), and arc MC
+        # is numba/nogil, so we thread it across cores — wall = slowest IB, not
+        # the sum.  IBs own disjoint clusters, so the threads don't race.
+        probs = self._prepare_ibs_threaded(chr_, work)
         if not probs:
             return
 
@@ -123,6 +122,29 @@ class JaxSolver(Solver):
         # each batch is shape-uniform (same energy terms + size bucket).
         beads = self._batched_final_smooth(probs)
         self.dense_active_regions.setdefault(chr_, []).extend(beads)
+
+    def _prepare_ibs_threaded(
+        self, chr_: str, work: list[tuple[int, int, str, list[int]]]
+    ) -> list[dict[str, Any]]:
+        """Run Phase-1 prep for every IB, threaded across cores.  Prep is CPU
+        only (heat-dist deferred) and arc MC is numba/nogil, so threads give
+        real parallelism; `log.parallel` keeps the interleaved output tagged."""
+
+        def prep_one(item: tuple[int, int, str, list[int]]) -> dict[str, Any] | None:
+            _ib_i, ib_idx, ib_label, active_region = item
+            with log.step(LOG, ib_label, "(%d anchors)", len(active_region)):
+                prob = self._prepare_ib(ib_idx, active_region, chr_, defer_heat=True)
+            if prob is not None:
+                prob["ib_label"] = ib_label
+            return prob
+
+        n_workers = min(len(work), os.cpu_count() or 1)
+        if n_workers > 1 and len(work) > 1:
+            with log.parallel(), ThreadPoolExecutor(max_workers=n_workers) as ex:
+                results = list(ex.map(prep_one, work))
+        else:
+            results = [prep_one(item) for item in work]
+        return [p for p in results if p is not None]
 
     def _batched_heat_dist(self, probs: list[dict[str, Any]]) -> None:
         """Phase 1.5: estimate every IB's subanchor avg-pairwise-distance in
@@ -188,7 +210,12 @@ class JaxSolver(Solver):
                             }
                         )
 
+                t0 = time.perf_counter()
                 results = mc_smooth_jax_batch(batch, s)
+                t_batch = time.perf_counter() - t0
+                LOG.info(
+                    "%d trials for %d IBs in one kernel (%.2fs)", len(batch), len(group), t_batch
+                )
 
                 # Per IB: best-of-n_steps per replicate -> accumulate avg_dist.
                 for gi, prob in enumerate(group):
@@ -203,7 +230,7 @@ class JaxSolver(Solver):
                         avg_dist += np.sqrt((diff * diff).sum(axis=2))
                     avg_dist /= n_reps
                     prob["heat_dist"] = self._heat_dist_from_avg(
-                        avg_dist, prob["subanchor_heat_raw"]
+                        avg_dist, prob["subanchor_heat_raw"], t_batch
                     )
 
     def _batched_final_smooth(self, probs: list[dict[str, Any]]) -> list[BeadOut]:
