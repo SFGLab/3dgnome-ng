@@ -1790,12 +1790,22 @@ def mc_smooth_jax(
     heat_dist: np.ndarray[Any, Any] | None = None,
     label: str = "",
     verbose: bool = False,
-) -> float:
+    pos_batch: np.ndarray[Any, Any] | None = None,
+    return_all: bool = False,
+) -> Any:
     """JAX backend for smooth-MC, supporting chain + EV + (optional) heat
     + (optional) orientation + (optional) confinement.
 
     Mutates `pos` in place (writes the best-chain final positions back) and
     returns the best chain's final score.
+
+    Batched mode (`pos_batch` given, shape (B, N, 3)): run B independent anneals
+    from distinct starts in ONE vmapped kernel (K = B), sharing `dtn`/`fixed`/
+    `heat`/schedule and using `pos` only as the reference for n/movable/centroid.
+    The shared while-loop stops when the BEST of the B chains converges (mc_jax
+    convergence is best-of-K).  With `return_all=True` this returns
+    `(scores: (B,), finals: (B, N, 3))` as numpy arrays and does NOT mutate
+    `pos` — the caller does its own per-trial selection (see solver.py IB phase).
     """
     if not _ensure_jax():
         raise RuntimeError(
@@ -1814,7 +1824,14 @@ def mc_smooth_jax(
     if len(movable_np) == 0:
         return 0.0
 
-    K: int = max(1, int(settings.mc_smooth_chains))
+    if pos_batch is not None:
+        if pos_batch.ndim != 3 or pos_batch.shape[1:] != (n, 3):
+            raise ValueError(
+                f"pos_batch must have shape (B, {n}, 3); got {pos_batch.shape}"
+            )
+        K = int(pos_batch.shape[0])
+    else:
+        K = max(1, int(settings.mc_smooth_chains))
     n_steps_per_batch: int = int(settings.mc_stop_steps_smooth)
 
     use_excl: bool = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
@@ -1898,7 +1915,11 @@ def mc_smooth_jax(
 
     # ---- move state to device (f32) ----
     pos_f32: F32Array = pos.astype(np.float32)
-    pos_k_np: F32Array = np.broadcast_to(pos_f32, (K, n, 3)).copy()
+    if pos_batch is not None:
+        # Batched mode: K distinct starts (one per trial), not a broadcast.
+        pos_k_np = np.ascontiguousarray(pos_batch.astype(np.float32))
+    else:
+        pos_k_np = np.broadcast_to(pos_f32, (K, n, 3)).copy()
     dtn_np: F32Array = dtn.astype(np.float32)
     heat_np: F32Array
     if use_heat:
@@ -2073,6 +2094,11 @@ def mc_smooth_jax(
             f"  batches={iter_n}  {tail}",
             flush=True,
         )
+
+    if return_all:
+        # Batched mode: hand back every chain's score + final positions; the
+        # caller selects per-trial.  Do NOT mutate `pos`.
+        return score_per_chain.astype(np.float64), np.asarray(pos_k).astype(np.float32)
 
     best_k: int = int(np.argmin(score_per_chain))
     pos[:] = np.asarray(pos_k[best_k]).astype(pos.dtype)

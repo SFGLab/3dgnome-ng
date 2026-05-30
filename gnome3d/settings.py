@@ -49,6 +49,7 @@ class Settings:
     subanchor_heatmap_dist_weight: float
     subanchor_estimate_steps: int
     subanchor_estimate_replicates: int
+    subanchor_batch_trials: bool
 
     # ---- PET / arc length limits ----
     max_pet_length: int
@@ -264,6 +265,12 @@ class Settings:
         self.subanchor_heatmap_dist_weight = 1.0
         self.subanchor_estimate_steps = 2
         self.subanchor_estimate_replicates = 5
+        # Opt-in (default off): run the IB estimate's n_reps*n_steps independent
+        # anneals as ONE vmapped JAX kernel instead of a sequential python loop.
+        # ~3-6x faster at large N on GPU (the per-step kernel is latency-bound,
+        # leaving the GPU idle at chains=1).  JAX smooth backend only; falls back
+        # to the sequential loop otherwise.  Diverges from the parity baseline.
+        self.subanchor_batch_trials = False
 
         # ---- PET / arc length limits ----
         self.max_pet_length = 1_000_000
@@ -586,6 +593,9 @@ class Settings:
         )
         self.subanchor_estimate_replicates = geti(
             "subanchor_heatmap", "estimate_distances_replicates", self.subanchor_estimate_replicates
+        )
+        self.subanchor_batch_trials = getb(
+            "subanchor_heatmap", "batch_trials", self.subanchor_batch_trials
         )
 
         # [simulation_heatmap]

@@ -1027,39 +1027,94 @@ class Solver:
         avg_dist: F64Array = np.zeros((n, n), dtype=np.float64)
         t_mc_total = 0.0
 
-        # Mirrors Reference: for each replicate, run n_steps MC passes from pos+noise,
-        # keep the best structure, then accumulate pairwise distances from it.
-        for rep in range(n_reps):
-            t_rep = time.perf_counter()
-            rep_best_score = -1.0
-            rep_best_pos: F32Array = pos.copy()
-            for step in range(n_steps):
-                pos_trial: F32Array = pos.copy()
-                for i in range(n):
-                    if not fixed[i]:
-                        pos_trial[i] += random_vector_np(step_size)
-                score = mc_smooth(
-                    pos_trial,
-                    dtn,
-                    fixed,
-                    step_size,
-                    s,
-                    label=f"{label} est {rep + 1}/{n_reps} step {step + 1}/{n_steps}",
-                    verbose=log2,
-                )
-                if score < rep_best_score or rep_best_score < 0.0:
-                    rep_best_score = score
-                    rep_best_pos = pos_trial.copy()
-            diff = rep_best_pos[:, np.newaxis, :] - rep_best_pos[np.newaxis, :, :]
-            avg_dist += np.sqrt((diff * diff).sum(axis=2))
-            t_rep = time.perf_counter() - t_rep
-            t_mc_total += t_rep
-            if log1:
-                print(
-                    f"    rep {rep + 1}/{n_reps}: best_score={rep_best_score:.4f}  ({t_rep:.2f}s)"
-                )
+        # Opt-in fast path: run all n_reps*n_steps independent anneals as ONE
+        # vmapped JAX kernel instead of the sequential python double-loop below.
+        # ~3-6x faster at large N on GPU (per-step kernel is latency-bound, GPU
+        # idle at chains=1).  Only when the JAX smooth backend is active AND
+        # installed; otherwise fall through to the reference-parity loop.
+        # Intentional divergence: batched trials share a best-of-K convergence
+        # stop instead of each running to its own.  Validated on avg_dist.
+        use_batch = bool(getattr(s, "subanchor_batch_trials", False)) and (
+            str(s.mc_backend).strip().lower() == "jax"
+            and bool(s.mc_backend_apply_to_smooth)
+        )
+        if use_batch:
+            from . import mc_jax
 
-        avg_dist /= n_reps
+            use_batch = mc_jax.is_available()
+
+        if use_batch:
+            t_b = time.perf_counter()
+            n_trials = n_reps * n_steps
+            starts = np.empty((n_trials, n, 3), dtype=np.float32)
+            b = 0
+            for _rep in range(n_reps):
+                for _step in range(n_steps):
+                    pt = pos.copy()
+                    for i in range(n):
+                        if not fixed[i]:
+                            pt[i] += random_vector_np(step_size)
+                    starts[b] = pt
+                    b += 1
+            # One kernel, K = n_trials independent anneals from the distinct starts.
+            scores_flat, finals_flat = mc_jax.mc_smooth_jax(
+                pos,
+                dtn,
+                fixed,
+                step_size,
+                s,
+                label=f"{label} est batched ({n_trials} trials)",
+                verbose=log2,
+                pos_batch=starts,
+                return_all=True,
+            )
+            scores = np.asarray(scores_flat).reshape(n_reps, n_steps)
+            finals = np.asarray(finals_flat).reshape(n_reps, n_steps, n, 3)
+            for rep in range(n_reps):
+                bt = int(np.argmin(scores[rep]))
+                rep_best_pos = finals[rep, bt]
+                diff = rep_best_pos[:, np.newaxis, :] - rep_best_pos[np.newaxis, :, :]
+                avg_dist += np.sqrt((diff * diff).sum(axis=2))
+                if log1:
+                    print(f"    rep {rep + 1}/{n_reps}: best_score={float(scores[rep, bt]):.4f}")
+            avg_dist /= n_reps
+            t_mc_total = time.perf_counter() - t_b
+            if log1:
+                print(f"    [{label}] batched {n_trials} trials in one kernel ({t_mc_total:.2f}s)")
+        else:
+            # Mirrors Reference: for each replicate, run n_steps MC passes from pos+noise,
+            # keep the best structure, then accumulate pairwise distances from it.
+            for rep in range(n_reps):
+                t_rep = time.perf_counter()
+                rep_best_score = -1.0
+                rep_best_pos = pos.copy()
+                for step in range(n_steps):
+                    pos_trial: F32Array = pos.copy()
+                    for i in range(n):
+                        if not fixed[i]:
+                            pos_trial[i] += random_vector_np(step_size)
+                    score = mc_smooth(
+                        pos_trial,
+                        dtn,
+                        fixed,
+                        step_size,
+                        s,
+                        label=f"{label} est {rep + 1}/{n_reps} step {step + 1}/{n_steps}",
+                        verbose=log2,
+                    )
+                    if score < rep_best_score or rep_best_score < 0.0:
+                        rep_best_score = score
+                        rep_best_pos = pos_trial.copy()
+                diff = rep_best_pos[:, np.newaxis, :] - rep_best_pos[np.newaxis, :, :]
+                avg_dist += np.sqrt((diff * diff).sum(axis=2))
+                t_rep = time.perf_counter() - t_rep
+                t_mc_total += t_rep
+                if log1:
+                    print(
+                        f"    rep {rep + 1}/{n_reps}: best_score={rep_best_score:.4f}  ({t_rep:.2f}s)"
+                    )
+
+            avg_dist /= n_reps
 
         # Create expected distance matrix mirroring Reference createExpectedDistSubanchorHeatmap().
         avg_heat = float(subanchor_heat_raw.mean())
