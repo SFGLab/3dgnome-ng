@@ -12,9 +12,12 @@ dispatch — and reuses everything else from `Solver` (hierarchy, arc MC, contac
 heatmaps, subanchor heat-dist prep, write-back).  See
 `gnome3d.mc_jax.mc_smooth_jax_batch` for the batched kernel entry.
 
-Pass 1 (this module) batches the FINAL smooth across IBs.  The subanchor
-heat-dist estimate inside `_prepare_ib` is still per-IB (itself a small batch);
-lifting it cross-IB is a planned follow-on for the rest of the win.
+Both heavy phases are batched across IBs:
+  * Phase 1.5 (`_batched_heat_dist`): every IB's subanchor heat-dist estimate
+    (the dry-smooth trials) runs in batched kernels, grouped by size bucket.
+  * Phase 2 (`_batched_final_smooth`): every IB's final smooth, likewise.
+Phase 1 (arc MC + densify + orientation) stays per-IB and serial — it is cheap
+relative to the smooths (arc MC is numba/CPU).
 
 Selected via `gnome3d.util.make_solver` when `settings.jax_region_batch` is set
 (opt-in).
@@ -99,23 +102,109 @@ class JaxSolver(Solver):
         return avg_dist, t_mc_total
 
     def _dispatch_ib_work(self, chr_: str, work: list[tuple[int, int, str, list[int]]]) -> None:
-        # Phase 1: prepare every IB (arc MC + contact heatmaps + heat-dist +
-        # smooth-problem build).  Serial and cheap relative to the final smooth
-        # (arc MC is numba/CPU); each IB owns disjoint clusters, so order-free.
+        # Phase 1: prepare every IB (arc MC + contact heatmaps + densify +
+        # orientation), but DEFER the heat-dist estimate.  Cheap relative to the
+        # smooths (arc MC is numba/CPU); each IB owns disjoint clusters.
         probs: list[dict[str, Any]] = []
         for _ib_i, ib_idx, ib_label, active_region in work:
             with log.step(LOG, ib_label, "(%d anchors)", len(active_region)):
-                prob = self._prepare_ib(ib_idx, active_region, chr_)
+                prob = self._prepare_ib(ib_idx, active_region, chr_, defer_heat=True)
             if prob is not None:
                 prob["ib_label"] = ib_label
                 probs.append(prob)
         if not probs:
             return
 
+        # Phase 1.5: estimate the subanchor heat-dist for ALL IBs in batched
+        # kernels (the dry-smooth trials), then build each target matrix.
+        self._batched_heat_dist(probs)
+
         # Phase 2: anneal all IBs' final smooths in batched kernels, grouped so
         # each batch is shape-uniform (same energy terms + size bucket).
         beads = self._batched_final_smooth(probs)
         self.dense_active_regions.setdefault(chr_, []).extend(beads)
+
+    def _batched_heat_dist(self, probs: list[dict[str, Any]]) -> None:
+        """Phase 1.5: estimate every IB's subanchor avg-pairwise-distance in
+        batched dry-smooth kernels (chain+EV+conf; no heat, no orientation),
+        then build each IB's heat-dist target matrix and attach it to its
+        problem.  This lifts the per-IB heat-dist estimate cross-IB — the half
+        of the smooth cost the serial path leaves on the table.
+
+        IBs whose subanchor heatmap is empty (mean<1e-6) are skipped entirely —
+        their estimate would be discarded anyway (matches the serial early-out).
+        """
+        s = self.s
+        n_reps = int(s.subanchor_estimate_replicates)
+        n_steps = int(s.subanchor_estimate_steps)
+        per_ib = n_reps * n_steps
+        bucket = bool(s.jax_bucket_shapes)
+
+        need = [
+            p
+            for p in probs
+            if p.get("subanchor_heat_raw") is not None
+            and float(p["subanchor_heat_raw"].mean()) >= 1e-6
+        ]
+        if not need:
+            return
+
+        groups: dict[int, list[dict[str, Any]]] = defaultdict(list)
+        for prob in need:
+            groups[_bucket_for(prob["n"]) if bucket else prob["n"]].append(prob)
+
+        for bkt, group in groups.items():
+            with log.step(
+                LOG,
+                f"batched heat-dist: {len(group)} IBs x {per_ib} trials",
+                "(bucket %d)",
+                bkt,
+            ):
+                # Flat batch of dry-smooth trials; `spans[gi]` is IB gi's start
+                # offset (it occupies `per_ib` consecutive entries).
+                batch: list[dict[str, Any]] = []
+                spans: list[int] = []
+                for prob in group:
+                    spans.append(len(batch))
+                    pos = prob["pos"]
+                    fixed = prob["fixed"]
+                    n = prob["n"]
+                    step = prob["step_size"]
+                    for _ in range(per_ib):
+                        start = pos.copy()
+                        for i in range(n):
+                            if not fixed[i]:
+                                start[i] += random_vector_np(step)
+                        batch.append(
+                            {
+                                "pos": start,
+                                "dtn": prob["dtn"],
+                                "fixed": fixed,
+                                "step_size": step,
+                                "heat_dist": None,
+                                "char_orientations": None,
+                                "anchor_neighbors": None,
+                                "anchor_neighbor_weights": None,
+                            }
+                        )
+
+                results = mc_smooth_jax_batch(batch, s)
+
+                # Per IB: best-of-n_steps per replicate -> accumulate avg_dist.
+                for gi, prob in enumerate(group):
+                    n = prob["n"]
+                    base = spans[gi]
+                    avg_dist: F64Array = np.zeros((n, n), dtype=np.float64)
+                    for rep in range(n_reps):
+                        rep_slice = results[base + rep * n_steps : base + (rep + 1) * n_steps]
+                        scores = [r[0] for r in rep_slice]
+                        best_pos = rep_slice[int(np.argmin(scores))][1]
+                        diff = best_pos[:, None, :] - best_pos[None, :, :]
+                        avg_dist += np.sqrt((diff * diff).sum(axis=2))
+                    avg_dist /= n_reps
+                    prob["heat_dist"] = self._heat_dist_from_avg(
+                        avg_dist, prob["subanchor_heat_raw"]
+                    )
 
     def _batched_final_smooth(self, probs: list[dict[str, Any]]) -> list[BeadOut]:
         """Run the per-IB final smooth as batched GPU kernels and apply results.

@@ -625,7 +625,7 @@ class Solver:
             return self._apply_smooth_problem(prob, best_pos)
 
     def _prepare_ib(
-        self, ib_idx: int, active_region: list[int], chr_: str
+        self, ib_idx: int, active_region: list[int], chr_: str, defer_heat: bool = False
     ) -> dict[str, Any] | None:
         """All per-IB work that precedes the final smooth: arc MC (writes anchor
         positions), singleton contact heatmaps, and the smooth-problem build
@@ -635,7 +635,8 @@ class Solver:
 
         Shared by the serial path (`_process_ib`) and JaxSolver's batched path,
         which calls this for every IB and then anneals them together.  The
-        caller is responsible for the IB log scope.
+        caller is responsible for the IB log scope.  `defer_heat=True` skips the
+        per-IB heat-dist estimate so the caller can batch it across IBs.
         """
         s_ib = self._settings_for_ib(active_region)
 
@@ -647,7 +648,9 @@ class Solver:
 
         exp_dist = self._calc_anchor_expected_distances(active_region, chr_, anchor_heat)
         self._reconstruct_cluster_arcs(ib_idx, active_region, exp_dist, s_override=s_ib)
-        prob = self._build_smooth_problem(active_region, chr_, subanchor_heat_raw, s_ib)
+        prob = self._build_smooth_problem(
+            active_region, chr_, subanchor_heat_raw, s_ib, defer_heat=defer_heat
+        )
         if prob is not None:
             prob["s"] = s_ib
         return prob
@@ -1004,58 +1007,72 @@ class Solver:
             avg_dist, t_mc_total = self._estimate_avg_dist(
                 pos, fixed, dtn, step_size, n_reps, n_steps
             )
+            return self._heat_dist_from_avg(avg_dist, subanchor_heat_raw, t_mc_total)
 
-            # Create expected distance matrix mirroring Reference
-            # createExpectedDistSubanchorHeatmap().
-            avg_heat = float(subanchor_heat_raw.mean())
-            if avg_heat < 1e-6:
-                LOG.info("heat dist matrix: empty heatmap (mean<1e-6), skipped")
-                return None
+    def _heat_dist_from_avg(
+        self,
+        avg_dist: F64Array,
+        subanchor_heat_raw: F64Array,
+        t_mc_total: float = 0.0,
+    ) -> F64Array | None:
+        """Turn estimated average pairwise distances + the raw subanchor heat
+        into the expected-distance target matrix (Reference
+        createExpectedDistSubanchorHeatmap): high-contact pairs get their target
+        distance scaled down by `influence`.  Returns None when the heatmap is
+        empty.  Split from the estimate so JaxSolver can estimate `avg_dist` for
+        many IBs in one batched kernel and then build each matrix here.
+        """
+        s = self.s
+        n = avg_dist.shape[0]
+        avg_heat = float(subanchor_heat_raw.mean())
+        if avg_heat < 1e-6:
+            LOG.info("heat dist matrix: empty heatmap (mean<1e-6), skipped")
+            return None
 
-            influence = float(s.subanchor_heatmap_influence)
-            heat_dist: F64Array = np.zeros((n, n), dtype=np.float64)
-            n_pairs_active = 0
-            n_pairs_capped = 0
+        influence = float(s.subanchor_heatmap_influence)
+        heat_dist: F64Array = np.zeros((n, n), dtype=np.float64)
+        n_pairs_active = 0
+        n_pairs_capped = 0
 
-            for i in range(n):
-                for j in range(i + 1, n):
-                    s_val = (subanchor_heat_raw[i, j] / avg_heat) * influence
-                    if s_val > 0.0:
-                        n_pairs_active += 1
-                    if s_val > 1.0:
-                        s_val = 1.0
-                        n_pairs_capped += 1
-                    target = avg_dist[i, j] * (1.0 - s_val)
-                    heat_dist[i, j] = target
-                    heat_dist[j, i] = target
+        for i in range(n):
+            for j in range(i + 1, n):
+                s_val = (subanchor_heat_raw[i, j] / avg_heat) * influence
+                if s_val > 0.0:
+                    n_pairs_active += 1
+                if s_val > 1.0:
+                    s_val = 1.0
+                    n_pairs_capped += 1
+                target = avg_dist[i, j] * (1.0 - s_val)
+                heat_dist[i, j] = target
+                heat_dist[j, i] = target
 
-            if LOG.isEnabledFor(logging.INFO):
-                n_pairs_total = n * (n - 1) // 2
-                iu = np.triu_indices(n, k=1)
-                upper = heat_dist[iu]
-                avg_dist_upper = avg_dist[iu]
-                mean_reduction = (
-                    (1.0 - upper.mean() / avg_dist_upper.mean()) * 100.0
-                    if avg_dist_upper.mean() > 0
-                    else 0.0
-                )
-                LOG.info(
-                    "avg_pair_dist=%.3f  avg_heat=%.4g  influence=%s",
-                    avg_dist_upper.mean(),
-                    avg_heat,
-                    influence,
-                )
-                LOG.info(
-                    "%d/%d pairs active (%d capped at full reduction); "
-                    "mean target reduction %.1f%%  (total MC time %.2fs)",
-                    n_pairs_active,
-                    n_pairs_total,
-                    n_pairs_capped,
-                    mean_reduction,
-                    t_mc_total,
-                )
+        if LOG.isEnabledFor(logging.INFO):
+            n_pairs_total = n * (n - 1) // 2
+            iu = np.triu_indices(n, k=1)
+            upper = heat_dist[iu]
+            avg_dist_upper = avg_dist[iu]
+            mean_reduction = (
+                (1.0 - upper.mean() / avg_dist_upper.mean()) * 100.0
+                if avg_dist_upper.mean() > 0
+                else 0.0
+            )
+            LOG.info(
+                "avg_pair_dist=%.3f  avg_heat=%.4g  influence=%s",
+                avg_dist_upper.mean(),
+                avg_heat,
+                influence,
+            )
+            LOG.info(
+                "%d/%d pairs active (%d capped at full reduction); "
+                "mean target reduction %.1f%%  (total MC time %.2fs)",
+                n_pairs_active,
+                n_pairs_total,
+                n_pairs_capped,
+                mean_reduction,
+                t_mc_total,
+            )
 
-            return heat_dist
+        return heat_dist
 
     def _estimate_avg_dist(
         self,
@@ -1233,6 +1250,7 @@ class Solver:
         chr_: str,
         subanchor_heat_raw: F64Array | None,
         s: Settings,
+        defer_heat: bool = False,
     ) -> dict[str, Any] | None:
         """Phase 1 of smooth reconstruction: densify the active region, build
         CTCF orientation arrays, and (if enabled) estimate the subanchor heat
@@ -1243,6 +1261,10 @@ class Solver:
         Split out from `_reconstruct_cluster_smooth` so JaxSolver can prepare
         many IBs and then anneal them in one batched kernel.  Pure prep: no
         final smooth MC, no cluster mutation.
+
+        `defer_heat=True` skips the (expensive) heat-dist estimate and instead
+        stashes `subanchor_heat_raw` in the problem so the caller can estimate
+        it for many IBs in one batched kernel (JaxSolver Pass 2).
         """
         import math as _math
 
@@ -1280,8 +1302,11 @@ class Solver:
                         anchor_neighbor_weights[k].append(_math.sqrt(max(arc.score, 0)))
 
         # Subanchor heat target matrix (itself a batch of dry smooth passes).
+        # When deferred, leave it None and carry the raw heat so the caller can
+        # batch the estimate across IBs.
         heat_dist: F64Array | None = None
-        if subanchor_heat_raw is not None and s.use_subanchor_heatmap:
+        wants_heat = subanchor_heat_raw is not None and s.use_subanchor_heatmap
+        if wants_heat and not defer_heat:
             heat_dist = self._build_heat_dist_subanchor(
                 pos, fixed, dtn, subanchor_heat_raw, step_size
             )
@@ -1296,6 +1321,9 @@ class Solver:
             "anchor_neighbor_weights": anchor_neighbor_weights,
             "heat_dist": heat_dist,
             "n": n,
+            # heat-dist deferred to a batched phase (None when not deferred or
+            # when this IB has no subanchor signal)
+            "subanchor_heat_raw": subanchor_heat_raw if (wants_heat and defer_heat) else None,
             # write-back context
             "anchor_map": anchor_map,
             "starts": starts,
