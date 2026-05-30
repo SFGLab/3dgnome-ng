@@ -57,14 +57,19 @@ _init_lock = threading.Lock()
 # worst-case padding waste is <2x compute.  N above the top bucket compiles at
 # its exact size (rare).
 _SHAPE_BUCKETS: tuple[int, ...] = (256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
+# Separate (finer/smaller) ladders for smooth orientation's anchor count and
+# neighbor width — these scale below N, so reusing _SHAPE_BUCKETS would waste a
+# lot at small sizes.
+_ANCHOR_BUCKETS: tuple[int, ...] = (16, 64, 256, 1024, 4096, 16384)
+_NBR_BUCKETS: tuple[int, ...] = (4, 8, 16, 32, 64)
 # Tracks which (kind, bucket, signature) kernels have been eagerly precompiled,
 # so precompile passes are idempotent across regions / threads.
 _precompiled: set[Any] = set()
 
 
-def _bucket_for(n: int) -> int:
+def _bucket_for(n: int, ladder: tuple[int, ...] = _SHAPE_BUCKETS) -> int:
     """Smallest ladder bucket >= n, or n itself if it exceeds the top bucket."""
-    for b in _SHAPE_BUCKETS:
+    for b in ladder:
         if n <= b:
             return b
     return n
@@ -906,7 +911,12 @@ def _build_smooth_kernel(
         motif_weight: Any,
         symmetric: Any,
     ) -> Any:
-        """Global orientation score (matches _score_orientation_full_nb)."""
+        """Global orientation score (matches _score_orientation_full_nb).
+
+        SEQUENTIAL (lax.scan) accumulation over anchors so that anchor-bucket
+        padding (pad anchors have nbr_valid=False -> contribute exactly 0) does
+        not perturb the f32 reduction order.  A tree jnp.sum would group an
+        A-padded vs n_anchors-real array differently and chaos-amplify."""
 
         def per_anchor(k_idx: Any) -> Any:
             return _local_orientation_at(
@@ -919,23 +929,15 @@ def _build_smooth_kernel(
                 symmetric,
             )
 
-        # Sum of per-anchor local scores already gives the global (the local
-        # iterates over each anchor's own neighbor list — symmetric arcs are
-        # counted from both endpoints).  Match numba's _score_orientation_full_nb.
-        sums = jax.vmap(per_anchor)(jnp.arange(anchor_orn.shape[0]))
-        # _local_orientation_at multiplies by motif_weight already; the global
-        # in numba multiplies once at the outer return — so we need to divide
-        # back out to avoid double-counting.  Cleaner: re-compute without it.
-        # Actually _score_orientation_full_nb iterates anchor i × neighbors,
-        # then multiplies err by motif_weight ONCE.  Our per-anchor local
-        # function also multiplies, so sum gives motif_weight * sum_of_terms.
-        # That's the same as the numba global * motif_weight.  Hmm.
-        # Verify: numba _score_orientation_full_nb computes
-        #   err = sum_i sum_j w_ij * ang_ij^2 ; return err * motif_weight
-        # Our per_anchor returns motif_weight * sum_j w_kj * ang_kj^2.
-        # Sum over k = motif_weight * sum_k sum_j w_kj * ang_kj^2 = global.
-        # So we're FINE — no double-count.  Comment above is wrong.
-        return jnp.sum(sums)
+        # Sum of per-anchor local scores gives the global (each local iterates
+        # its own neighbor list; symmetric arcs counted from both endpoints).
+        # Matches numba _score_orientation_full_nb: per_anchor returns
+        # motif_weight * sum_j w_kj*ang_kj^2, so sum_k = motif_weight * global.
+        def _scan_body(carry: Any, k_idx: Any) -> tuple[Any, None]:
+            return carry + per_anchor(k_idx), None
+
+        total, _ = jax.lax.scan(_scan_body, jnp.float32(0.0), jnp.arange(anchor_orn.shape[0]))
+        return total
 
     init_smooth = jax.jit(
         jax.vmap(
@@ -2182,6 +2184,22 @@ def mc_smooth_jax(
             if ar + 1 < n:
                 bead_to_anchor_k_np[ar + 1] = k_idx
         is_L_np = np.array([c == "L" for c in char_orientations], dtype=np.bool_)
+        # Phase-2 bucketing of the ANCHOR-indexed arrays: round n_anchors -> A and
+        # max_nbrs -> M so the kernel's orientation shapes come only from the
+        # (A, M) ladders, not per-region.  Pad anchors/edges get nbr_valid=False
+        # -> contribute exactly 0 to the (scan-summed) orientation score, so this
+        # is bit-identical at init.  Pad anchor_ar=0 (its orn is computed but
+        # never referenced since no valid edge points to it).
+        if bool(settings.jax_bucket_shapes):
+            A = _bucket_for(n_anchors, _ANCHOR_BUCKETS)
+            M = _bucket_for(max_nbrs, _NBR_BUCKETS)
+            ap, mp = A - n_anchors, M - max_nbrs
+            if ap > 0 or mp > 0:
+                anchor_ar_np = np.concatenate([anchor_ar_np, np.zeros(ap, dtype=np.int32)])
+                nbr_idx_np = np.pad(nbr_idx_np, ((0, ap), (0, mp)))
+                nbr_w_np = np.pad(nbr_w_np, ((0, ap), (0, mp)))
+                nbr_valid_np = np.pad(nbr_valid_np, ((0, ap), (0, mp)))  # False pads
+                n_anchors, max_nbrs = A, M
     else:
         n_anchors = 1  # placeholder shape
         max_nbrs = 1
