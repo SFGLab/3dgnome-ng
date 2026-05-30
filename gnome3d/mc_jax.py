@@ -371,14 +371,16 @@ def _build_smooth_kernel(
         conf_w: Any,
         # RNG
         key: Any,
-        # real bead count (< pos length when bucket-padded; == otherwise)
+        # real bead count + real movable count (< padded lengths when bucketed)
         n_active: Any,
+        n_movable_active: Any,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         """One batch of `n_steps_per_batch` MC steps for ONE chain.  Returns
         (pos_f, ss_f, se_f, sh_f, so_f, sc_f, anchor_orn_f, T_f, n_ok)."""
-        n_movable = movable.shape[0]
+        # `movable` is padded to the bucket; n_movable_active is the real count so
+        # the sampler only draws real movable beads (no-op when unbucketed).
         k_p, k_d, k_a = jax.random.split(key, 3)
-        idx_picks = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_movable)
+        idx_picks = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_movable_active)
         ps = movable[idx_picks]
         disps = jax.random.uniform(
             k_d,
@@ -550,6 +552,7 @@ def _build_smooth_kernel(
         None,  # conf_cx, conf_cy, conf_cz, conf_R, conf_w
         0,  # key
         None,  # n_active (shared)
+        None,  # n_movable_active (shared)
     )
     out_axes = (0, 0, 0, 0, 0, 0, 0, None, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
@@ -594,6 +597,7 @@ def _build_smooth_kernel(
         conf_w: Any,
         keys: Any,
         n_active: Any,
+        n_movable_active: Any,
     ) -> Any:
         return batched(
             pos_k,
@@ -634,6 +638,7 @@ def _build_smooth_kernel(
             conf_w,
             keys,
             n_active,
+            n_movable_active,
         )
 
     # ---- full convergence loop, on device ----
@@ -693,6 +698,7 @@ def _build_smooth_kernel(
         stop_successes: Any,
         score_eps: Any,
         n_active: Any,
+        n_movable_active: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -744,6 +750,7 @@ def _build_smooth_kernel(
                 conf_w,
                 keys,
                 n_active,
+                n_movable_active,
             )
             score_per_chain = ss + se + sh + so + sc
             best_idx = jnp.argmin(score_per_chain)
@@ -2202,11 +2209,15 @@ def mc_smooth_jax(
 
     # ---- shape bucketing: pad N up to a bucket so XLA reuses one compiled
     # kernel across all similarly-sized regions.  Pad beads are fully inert:
-    # chain/EV/confinement are masked by `n_active` (real count), heat rows are
-    # zeroed, `movable` excludes them so they never move, and orientation arrays
-    # index only real beads.  So pad positions never matter and the result is
-    # bit-identical to the unbucketed run.  n_active == n when unbucketed.
+    # chain/EV/confinement masked by `n_active`, heat rows zeroed, movement
+    # restricted to the real movable set via `n_movable_active`.  ALL bead-indexed
+    # kernel inputs are padded to B so the kernel's input shapes depend only on B
+    # (+ K, max_nbrs) — not on the per-region n/n_movable.  (Orientation's
+    # anchor-indexed arrays, shape n_anchors, are NOT yet bucketed -> with
+    # use_orn=True the kernel still recompiles per region; that's phase 2.)
+    # n_active == n and n_movable_active == len(movable) when unbucketed.
     n_active_v: int = n
+    n_movable_v: int = int(movable_np.shape[0])
     B: int = _bucket_for(n) if bool(settings.jax_bucket_shapes) else n
     if B > n:
         n_pad = B - n
@@ -2218,6 +2229,16 @@ def mc_smooth_jax(
             heat_pad = np.zeros((B, B), dtype=np.float32)
             heat_pad[:n, :n] = heat_np
             heat_np = heat_pad
+        # bead-indexed arrays -> pad to B (pad beads map to no anchor / never move)
+        bead_to_anchor_k_np = np.concatenate(
+            [bead_to_anchor_k_np, np.full(n_pad, -1, dtype=np.int32)]
+        )
+        if is_L_np.shape[0] == n:  # bead-indexed (use_orn=False); anchor-indexed -> phase 2
+            is_L_np = np.concatenate([is_L_np, np.zeros(n_pad, dtype=np.bool_)])
+        # movable -> pad to B; n_movable_v bounds the sampler so pads never picked
+        movable_np = np.concatenate(
+            [movable_np, np.zeros(B - movable_np.shape[0], dtype=movable_np.dtype)]
+        )
 
     bundle = _build_smooth_kernel(n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs)
     (
@@ -2242,6 +2263,7 @@ def mc_smooth_jax(
     nbr_valid_j = jnp.asarray(nbr_valid_np)
     is_L_j = jnp.asarray(is_L_np)
     n_active_j = jnp.int32(n_active_v)
+    n_movable_active_j = jnp.int32(n_movable_v)
     seed_offset: int = abs(hash(label)) % (2**31) if label else 0
 
     # ---- initial scores ----
@@ -2374,6 +2396,7 @@ def mc_smooth_jax(
         stop_successes,
         score_eps,
         n_active_j,
+        n_movable_active_j,
     )
 
     score_per_chain = np.asarray(ss_k + se_k + sh_k + so_k + sc_k)
