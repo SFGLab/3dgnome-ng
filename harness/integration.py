@@ -425,12 +425,17 @@ def write_config(
     if backend == "jax":
         # Route all three MC hot paths through the JAX backend.  The reference
         # binary never reads this section; only the Python pipeline does.
+        # jax_bucket_shapes is on so --jax-divergence doubles as the ensemble-
+        # level statistical check that shape bucketing stays equivalent to numba
+        # (bucketing is bit-identical at init; the per-step f32 chaos must wash
+        # out at the ensemble/KS level).
         cfg += (
             "\n[simulation_backend]\n"
             "mc_backend = jax\n"
             "mc_backend_apply_to_smooth = yes\n"
             "mc_backend_apply_to_arcs = yes\n"
             "mc_backend_apply_to_heatmap = yes\n"
+            "jax_bucket_shapes = yes\n"
         )
     path.write_text(cfg)
 
