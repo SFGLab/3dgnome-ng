@@ -43,8 +43,15 @@ def make_problem(n, seed=0):
 
 
 def make_orientation(fixed, half_window=4):
-    n_anchors = int(fixed.sum())
-    chars = ["L" if i % 2 == 0 else "R" for i in range(n_anchors)]
+    # char_orientations is BEAD-indexed (length n), matching production
+    # (solver.py builds char_orn = ["N"]*n, filled per anchor bead).  is_L =
+    # [c=="L" for c in chars] is therefore (n,), indexed by bead index.
+    n = len(fixed)
+    anchor_beads = np.where(fixed)[0]
+    n_anchors = len(anchor_beads)
+    chars = ["N"] * n
+    for ai, bi in enumerate(anchor_beads):
+        chars[int(bi)] = "L" if ai % 2 == 0 else "R"
     neighbors, weights = {}, {}
     for k in range(n_anchors):
         nb = [j for j in range(max(0, k - half_window), min(n_anchors, k + half_window + 1)) if j != k]
