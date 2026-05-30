@@ -31,6 +31,7 @@ Usage:
     python harness/integration.py --with-orientation       # enable CTCF motif orientation
     python harness/integration.py --with-anchor-heatmap    # enable anchor singleton heatmap
     python harness/integration.py --with-subanchor-heatmap # enable subanchor heat energy in smooth MC
+    python harness/integration.py --jax-divergence         # numba baseline vs JAX (arcs+smooth+heatmap+batch)
 """
 
 import argparse
@@ -368,6 +369,8 @@ def write_config(
     use_orientation: bool = False,
     use_anchor_heatmap: bool = False,
     use_subanchor_heatmap: bool = False,
+    backend: str = "numba",
+    batch_trials: bool = False,
 ) -> None:
     if fast:
         # Very fast: ~10 s per structure, low quality
@@ -411,6 +414,23 @@ def write_config(
         cfg = cfg.replace(
             "use_subanchor_heatmap = no",
             "use_subanchor_heatmap = yes",
+        )
+    if batch_trials:
+        # Opt-in batched IB heat-estimate (JAX only).  Lives in the existing
+        # [subanchor_heatmap] section (configparser forbids duplicate sections).
+        cfg = cfg.replace(
+            "heatmap_dist_weight = 0.01",
+            "heatmap_dist_weight = 0.01\nbatch_trials = yes",
+        )
+    if backend == "jax":
+        # Route all three MC hot paths through the JAX backend.  The reference
+        # binary never reads this section; only the Python pipeline does.
+        cfg += (
+            "\n[simulation_backend]\n"
+            "mc_backend = jax\n"
+            "mc_backend_apply_to_smooth = yes\n"
+            "mc_backend_apply_to_arcs = yes\n"
+            "mc_backend_apply_to_heatmap = yes\n"
         )
     path.write_text(cfg)
 
@@ -801,6 +821,143 @@ def _load_cache(path: Path) -> tuple:
     return structs, cached["raw_lines"]
 
 
+def _compare_and_report(ref_structs, test_structs, ref_name="Ref", test_name="Python") -> bool:
+    """Run the full distribution comparison between two ensembles and print the
+    PASS/FAIL table.  Shared by the reference-vs-Python path and the
+    backend-divergence (numba-vs-jax) path.  Returns all_ok."""
+    print("\n  [comparison]")
+    results = []
+
+    n_ref = len(ref_structs[0])
+    n_test = len(test_structs[0])
+    if n_ref != n_test:
+        print(f"  {FAIL_STR}  bead count mismatch: {ref_name}={n_ref}  {test_name}={n_test}")
+        results.append(False)
+    else:
+        print(f"  {PASS_STR}  bead count matches: {n_ref} (anchors + subanchors)")
+        results.append(True)
+
+    ref_stats = print_stats(ref_name, ref_structs)
+    test_stats = print_stats(test_name, test_structs)
+
+    # KS test on Rg distribution
+    d_rg, p_rg = ks_2samp(ref_stats["rg"], test_stats["rg"])
+    ok_rg = _ks_pass(d_rg, p_rg)
+    print(f"  {PASS_STR if ok_rg else FAIL_STR}  Rg distribution  KS d={d_rg:.3f}  p={p_rg:.3f}")
+    results.append(ok_rg)
+
+    # KS test on pooled pairwise distances (subsampled)
+    ref_pwd = _subsample(ref_stats["pwd"], KS_PWD_MAX_SAMPLES)
+    test_pwd = _subsample(test_stats["pwd"], KS_PWD_MAX_SAMPLES)
+    d_pw, p_pw = ks_2samp(ref_pwd, test_pwd)
+    ok_pw = _ks_pass(d_pw, p_pw)
+    print(
+        f"  {PASS_STR if ok_pw else FAIL_STR}  pairwise dist KS  d={d_pw:.3f}  p={p_pw:.3f}"
+        f"  (subsampled {len(ref_pwd):,}/{len(ref_stats['pwd']):,})"
+    )
+    results.append(ok_pw)
+
+    # KS test on bond lengths
+    d_bd, p_bd = ks_2samp(ref_stats["bond"], test_stats["bond"])
+    ok_bd = _ks_pass(d_bd, p_bd)
+    print(f"  {PASS_STR if ok_bd else FAIL_STR}  bond lengths KS   d={d_bd:.3f}  p={p_bd:.3f}")
+    results.append(ok_bd)
+
+    # Structural diversity (median inter-model distance ratio)
+    ref_sd = structural_distance_matrix(ref_structs)
+    test_sd = structural_distance_matrix(test_structs)
+    if ref_sd and test_sd:
+        ref_med = sorted(ref_sd)[len(ref_sd) // 2]
+        test_med = sorted(test_sd)[len(test_sd) // 2]
+        ratio = test_med / ref_med if ref_med > 1e-9 else float("nan")
+        ok_sd = math.isfinite(ratio) and abs(ratio - 1.0) <= STRUCT_DIST_RATIO_THRESHOLD
+        print(
+            f"  {PASS_STR if ok_sd else FAIL_STR}  struct diversity  median ratio={ratio:.3f}"
+            f"  ({ref_name} med={ref_med:.4f}  {test_name} med={test_med:.4f}"
+            f"  threshold=±{STRUCT_DIST_RATIO_THRESHOLD:.0%})"
+        )
+        results.append(ok_sd)
+
+    all_ok = all(results)
+    print(f"\n[integration] {PASS_STR if all_ok else FAIL_STR}")
+    return all_ok
+
+
+def run_backend_divergence(
+    args, region, region_label, use_orn, use_anchor_heatmap, use_subanchor_heatmap
+) -> None:
+    """JAX-backend divergence mode: generate a numba baseline ensemble and a JAX
+    ensemble (arcs + smooth + heatmap + batched IB) for the SAME region/seed
+    settings, then compare their distributions.
+
+    Compares against numba (not the reference) on purpose: numba is already
+    parity-validated against the reference, so numba-vs-jax isolates JAX-backend
+    divergence (f32 + the intentional batched-trials stop) from the known
+    numba<->reference differences."""
+    sys.path.insert(0, str(ROOT))
+    try:
+        from gnome3d import mc_jax
+
+        jax_ok = mc_jax.is_available()
+    except ImportError:
+        jax_ok = False
+    if not jax_ok:
+        sys.exit(
+            "[error] --jax-divergence requires JAX installed.\n"
+            "  pip install gnome3d-ng[jax]  (and a jax[cuda12]/jax[rocm6] for GPU)"
+        )
+
+    tmpdir = Path(tempfile.mkdtemp(prefix="gnome3d_jaxdiv_"))
+    try:
+        cfg_numba = tmpdir / "numba.ini"
+        cfg_jax = tmpdir / "jax.ini"
+        write_config(
+            cfg_numba,
+            fast=args.fast,
+            use_orientation=use_orn,
+            use_anchor_heatmap=use_anchor_heatmap,
+            use_subanchor_heatmap=use_subanchor_heatmap,
+            backend="numba",
+        )
+        write_config(
+            cfg_jax,
+            fast=args.fast,
+            use_orientation=use_orn,
+            use_anchor_heatmap=use_anchor_heatmap,
+            use_subanchor_heatmap=use_subanchor_heatmap,
+            backend="jax",
+            batch_trials=True,
+        )
+
+        print("\n[jax-divergence] generating numba baseline ensemble...")
+        numba_structs = try_python_ensemble(cfg_numba, args.n_structures, region)
+        if numba_structs is None:
+            sys.exit("[error] Python pipeline (gnome3d.simulate.run_region) unavailable")
+
+        print("\n[jax-divergence] generating JAX ensemble (arcs+smooth+heatmap+batch)...")
+        jax_structs = try_python_ensemble(cfg_jax, args.n_structures, region)
+        if jax_structs is None:
+            sys.exit("[error] Python pipeline (gnome3d.simulate.run_region) unavailable")
+
+        if args.output_dir:
+            save_cif_ensemble(numba_structs, "numba", Path(args.output_dir), region_label)
+            save_cif_ensemble(jax_structs, "jax", Path(args.output_dir), region_label)
+
+        all_ok = _compare_and_report(numba_structs, jax_structs, "numba", "jax")
+        print(
+            "\n[jax-divergence] NOTE: the JAX ensemble uses f32 and the intentional "
+            "batched-trials convergence stop; small KS within the pass gate is "
+            "expected divergence, not a regression."
+        )
+        if not all_ok:
+            sys.exit(1)
+    finally:
+        if args.keep:
+            print(f"\n[jax-divergence] output kept at: {tmpdir}")
+        else:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description="3dgnome-ng integration test")
     parser.add_argument(
@@ -854,12 +1011,22 @@ def main():
         help="enable subanchor heat energy in smooth MC (use_subanchor_heatmap=yes); "
         "implies --with-anchor-heatmap (both heatmaps are built together)",
     )
+    parser.add_argument(
+        "--jax-divergence",
+        action="store_true",
+        help="JAX-backend regression mode: generate a numba baseline ensemble and a "
+        "JAX ensemble (arcs+smooth+heatmap + batched IB) and compare their "
+        "distributions.  Isolates JAX divergence from the numba<->reference parity; "
+        "auto-enables subanchor heatmap to exercise the batch path.  Needs JAX installed.",
+    )
     args = parser.parse_args()
 
     if args.python_only and args.cpp_only:
         sys.exit("[error] --python-only and --cpp-only are mutually exclusive")
+    if args.jax_divergence and args.cpp_only:
+        sys.exit("[error] --jax-divergence and --cpp-only are mutually exclusive")
 
-    if not args.python_only and not CPP_BIN.exists():
+    if not args.python_only and not args.jax_divergence and not CPP_BIN.exists():
         sys.exit(f"[error] binary not found: {CPP_BIN}\n  run: make 3dnome")
 
     if not DATA_DIR.exists():
@@ -876,6 +1043,11 @@ def main():
     use_orn = getattr(args, "with_orientation", False)
     use_anchor_heatmap = getattr(args, "with_anchor_heatmap", False)
     use_subanchor_heatmap = getattr(args, "with_subanchor_heatmap", False)
+    # JAX-divergence mode exercises the batched IB path, which only runs when the
+    # subanchor heatmap is built — so auto-enable it (unless already requested).
+    if args.jax_divergence and not use_subanchor_heatmap:
+        use_subanchor_heatmap = True
+        print("[jax-divergence] auto-enabling subanchor heatmap to exercise the batch path")
     # subanchor heatmap always requires the anchor heatmap (both built together)
     if use_subanchor_heatmap:
         use_anchor_heatmap = True
@@ -900,6 +1072,15 @@ def main():
         print("[integration] anchor heatmap: ENABLED")
     if use_subanchor_heatmap:
         print("[integration] subanchor heatmap: ENABLED")
+
+    # JAX-backend divergence mode: self-contained (numba ensemble vs jax ensemble),
+    # no reference binary or cache needed.  Runs and exits.
+    if args.jax_divergence:
+        print("[integration] mode: JAX-backend divergence (numba baseline vs jax)")
+        run_backend_divergence(
+            args, region, region_label, use_orn, use_anchor_heatmap, use_subanchor_heatmap
+        )
+        return
 
     tmpdir = Path(tempfile.mkdtemp(prefix="gnome3d_integ_"))
     config = tmpdir / "config.ini"
@@ -969,73 +1150,7 @@ def main():
             save_cif_ensemble(py_structs, "python", Path(args.output_dir), region_label)
 
         # -- Compare distributions -----------------------------------------
-        print("\n  [comparison]")
-        results = []
-
-        # Bead count must match
-        n_cpp = len(cpp_structs[0])
-        n_py = len(py_structs[0])
-        if n_cpp != n_py:
-            print(f"  {FAIL_STR}  bead count mismatch: ref={n_cpp}  Python={n_py}")
-            results.append(False)
-        else:
-            print(f"  {PASS_STR}  bead count matches: {n_cpp} (anchors + subanchors)")
-            results.append(True)
-
-        cpp_stats = print_stats("Ref", cpp_structs)
-        py_stats = print_stats("Python", py_structs)
-
-        # KS test on Rg distribution
-        d_rg, p_rg = ks_2samp(cpp_stats["rg"], py_stats["rg"])
-        ok_rg = _ks_pass(d_rg, p_rg)
-        status = PASS_STR if ok_rg else FAIL_STR
-        print(f"  {status}  Rg distribution  KS d={d_rg:.3f}  p={p_rg:.3f}")
-        results.append(ok_rg)
-
-        # KS test on pooled pairwise distances (subsampled - raw pool is ~18M
-        # non-independent values that inflate KS power far beyond physical meaning)
-        cpp_pwd = _subsample(cpp_stats["pwd"], KS_PWD_MAX_SAMPLES)
-        py_pwd = _subsample(py_stats["pwd"], KS_PWD_MAX_SAMPLES)
-        d_pw, p_pw = ks_2samp(cpp_pwd, py_pwd)
-        ok_pw = _ks_pass(d_pw, p_pw)
-        status = PASS_STR if ok_pw else FAIL_STR
-        print(
-            f"  {status}  pairwise dist KS  d={d_pw:.3f}  p={p_pw:.3f}"
-            f"  (subsampled {len(cpp_pwd):,}/{len(cpp_stats['pwd']):,})"
-        )
-        results.append(ok_pw)
-
-        # KS test on bond lengths
-        d_bd, p_bd = ks_2samp(cpp_stats["bond"], py_stats["bond"])
-        ok_bd = _ks_pass(d_bd, p_bd)
-        status = PASS_STR if ok_bd else FAIL_STR
-        print(f"  {status}  bond lengths KS   d={d_bd:.3f}  p={p_bd:.3f}")
-        results.append(ok_bd)
-
-        # Structural distance benchmark (from cudaMMC_benchmark_analysis.ipynb)
-        # Mirrors the notebook's median ratio check (cells 50-51): compute the
-        # inter-model structural distance matrix for each ensemble and compare
-        # medians.  KS is intentionally not used - the n*(n-1) off-diagonal values
-        # are all correlated (each structure appears in n-1 pairs), so the test
-        # would be massively overpowered.
-        cpp_sd = structural_distance_matrix(cpp_structs)
-        py_sd = structural_distance_matrix(py_structs)
-        if cpp_sd and py_sd:
-            cpp_med = sorted(cpp_sd)[len(cpp_sd) // 2]
-            py_med = sorted(py_sd)[len(py_sd) // 2]
-            ratio = py_med / cpp_med if cpp_med > 1e-9 else float("nan")
-            ok_sd = math.isfinite(ratio) and abs(ratio - 1.0) <= STRUCT_DIST_RATIO_THRESHOLD
-            status = PASS_STR if ok_sd else FAIL_STR
-            print(
-                f"  {status}  struct diversity  median ratio={ratio:.3f}"
-                f"  (ref med={cpp_med:.4f}  Py med={py_med:.4f}"
-                f"  threshold=±{STRUCT_DIST_RATIO_THRESHOLD:.0%})"
-            )
-            results.append(ok_sd)
-
-        all_ok = all(results)
-        overall = PASS_STR if all_ok else FAIL_STR
-        print(f"\n[integration] {overall}")
+        all_ok = _compare_and_report(cpp_structs, py_structs, "Ref", "Python")
 
         # -- Per-step convergence comparison --------------------------------
         cpp_ms = _merge_milestones([cpp_ms_raw])
