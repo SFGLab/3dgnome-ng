@@ -6,10 +6,40 @@ from __future__ import annotations
 
 import math
 import random
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from .types import F32Array, F64Array
+
+if TYPE_CHECKING:
+    from .settings import Settings
+    from .solver import Solver
+
+
+# Solver factory — kept here (not in cli/simulate) so the entry points don't
+# depend on the concrete solver implementation; the GPU path is selected for
+# them without exposing it.
+
+
+def make_solver(settings: Settings) -> Solver:
+    """Return the right Solver for `settings`: a GPU region-batching `JaxSolver`
+    when `jax_region_batch` is enabled on the JAX smooth backend (and small-IB
+    boost is off — that varies springs per IB, which the batched kernel does not
+    yet take per-chain from the solver), else the base serial `Solver`.
+
+    Imports are function-local to avoid a util <-> solver import cycle."""
+    from .solver import Solver
+    from .solver_jax import JaxSolver
+
+    use_batch = (
+        str(settings.mc_backend).strip().lower() == "jax"
+        and bool(settings.mc_backend_apply_to_smooth)
+        and bool(getattr(settings, "jax_region_batch", False))
+        and not bool(settings.use_small_ib_boost)
+    )
+    return JaxSolver(settings) if use_batch else Solver(settings)
+
 
 # Distance conversion functions
 

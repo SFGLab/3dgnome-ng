@@ -19,8 +19,8 @@ from gnome3d import log
 from gnome3d.data import ContactData
 from gnome3d.io import parse_chrs_arg, write_cif
 from gnome3d.settings import Settings
-from gnome3d.solver import Solver
 from gnome3d.types import BedRegion
+from gnome3d.util import make_solver
 
 LOG = log.get("main")
 
@@ -47,7 +47,7 @@ def _run_structure(
     # structure the extra nesting just indents everything for no benefit.
     structure_ctx = log.step(LOG, f"structure {i + 1}/{n}") if n > 1 else contextlib.nullcontext()
     with structure_ctx:
-        solver = Solver(s)
+        solver = make_solver(s)
         solver.load(data, chrs_list, region)
         solver.reconstruct_heatmap()
         solver.reconstruct_arcs()

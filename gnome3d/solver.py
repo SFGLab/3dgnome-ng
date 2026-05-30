@@ -486,36 +486,42 @@ class Solver:
                     self.clusters[a_idx].pos = ib.pos.copy()
                 work.append((ib_i, ib_idx, ib_label, active_region))
 
-            n_workers = max(1, int(self.s.ib_workers))
-            if n_workers > 1 and len(work) > 1:
-                # IBs are independent (each owns a disjoint subset of cluster
-                # indices, per `_process_ib`'s docstring), so threading gives
-                # true parallelism with the nogil JIT kernels.  We preserve
-                # the original IB order in the output by collecting into a
-                # per-position bucket.  `log.parallel` switches the formatter to
-                # flat per-line scope tags so the interleaved IB output stays
-                # attributable to its worker.
-                from concurrent.futures import ThreadPoolExecutor
+            self._dispatch_ib_work(chr_, work)
 
-                results: list[list[BeadOut] | None] = [None] * len(work)
+    def _dispatch_ib_work(self, chr_: str, work: list[tuple[int, int, str, list[int]]]) -> None:
+        """Run smooth reconstruction for one chromosome's IBs and collect beads
+        into `self.dense_active_regions[chr_]`.
 
-                def _run(
-                    idx: int, _work: list[tuple[int, int, str, list[int]]] = work, _chr: str = chr_
-                ) -> tuple[int, list[BeadOut]]:
-                    _ib_i, ib_idx, ib_label, active_region = _work[idx]
-                    return idx, self._process_ib(ib_idx, ib_label, active_region, _chr)
+        Base implementation: process each IB independently (optionally across
+        `ib_workers` threads — IBs own disjoint cluster subsets, so the nogil
+        JIT kernels parallelise).  `JaxSolver` overrides this to anneal all IBs
+        in one batched GPU kernel instead.
+        """
+        n_workers = max(1, int(self.s.ib_workers))
+        if n_workers > 1 and len(work) > 1:
+            # `log.parallel` switches the formatter to flat per-line scope tags
+            # so interleaved IB output stays attributable to its worker.
+            from concurrent.futures import ThreadPoolExecutor
 
-                with log.parallel(), ThreadPoolExecutor(max_workers=n_workers) as ex:
-                    for idx, beads in ex.map(_run, range(len(work))):
-                        results[idx] = beads
+            results: list[list[BeadOut] | None] = [None] * len(work)
 
-                for beads in results:
-                    if beads:
-                        self.dense_active_regions.setdefault(chr_, []).extend(beads)
-            else:
-                for _ib_i, ib_idx, ib_label, active_region in work:
-                    beads = self._process_ib(ib_idx, ib_label, active_region, chr_)
+            def _run(
+                idx: int, _work: list[tuple[int, int, str, list[int]]] = work, _chr: str = chr_
+            ) -> tuple[int, list[BeadOut]]:
+                _ib_i, ib_idx, ib_label, active_region = _work[idx]
+                return idx, self._process_ib(ib_idx, ib_label, active_region, _chr)
+
+            with log.parallel(), ThreadPoolExecutor(max_workers=n_workers) as ex:
+                for idx, beads in ex.map(_run, range(len(work))):
+                    results[idx] = beads
+
+            for beads in results:
+                if beads:
                     self.dense_active_regions.setdefault(chr_, []).extend(beads)
+        else:
+            for _ib_i, ib_idx, ib_label, active_region in work:
+                beads = self._process_ib(ib_idx, ib_label, active_region, chr_)
+                self.dense_active_regions.setdefault(chr_, []).extend(beads)
 
     def _position_interaction_blocks(self, segs: list[int]) -> None:
         """
@@ -612,24 +618,39 @@ class Solver:
         settings copy is used so we never mutate self.s (thread-safe).
         """
         with log.step(LOG, ib_label, "(%d anchors)", len(active_region)):
-            s_ib = self._settings_for_ib(active_region)
+            prob = self._prepare_ib(ib_idx, active_region, chr_)
+            if prob is None:
+                return []
+            best_pos = self._run_smooth_serial(prob, prob["s"])
+            return self._apply_smooth_problem(prob, best_pos)
 
-            # Build singleton contact heatmaps if either feature is enabled.
-            # Both heatmaps are derived from a single singleton-binning pass so
-            # we do it here before any MC and pass results down.
-            anchor_heat: F64Array | None = None
-            subanchor_heat_raw: F64Array | None = None
-            if (self.s.use_anchor_heatmap or self.s.use_subanchor_heatmap) and self.singletons:
-                anchor_heat, subanchor_heat_raw = self._build_contact_heatmaps(active_region, chr_)
+    def _prepare_ib(
+        self, ib_idx: int, active_region: list[int], chr_: str
+    ) -> dict[str, Any] | None:
+        """All per-IB work that precedes the final smooth: arc MC (writes anchor
+        positions), singleton contact heatmaps, and the smooth-problem build
+        (densify + orientation + subanchor heat-dist estimate).  Returns the
+        smooth-problem dict (carrying the per-IB settings under ``"s"``) or None
+        for a too-small region.
 
-            exp_dist = self._calc_anchor_expected_distances(active_region, chr_, anchor_heat)
-            self._reconstruct_cluster_arcs(ib_idx, active_region, exp_dist, s_override=s_ib)
-            return self._reconstruct_cluster_smooth(
-                active_region,
-                chr_,
-                subanchor_heat_raw=subanchor_heat_raw,
-                s_override=s_ib,
-            )
+        Shared by the serial path (`_process_ib`) and JaxSolver's batched path,
+        which calls this for every IB and then anneals them together.  The
+        caller is responsible for the IB log scope.
+        """
+        s_ib = self._settings_for_ib(active_region)
+
+        # Singleton contact heatmaps (both derived from one binning pass).
+        anchor_heat: F64Array | None = None
+        subanchor_heat_raw: F64Array | None = None
+        if (self.s.use_anchor_heatmap or self.s.use_subanchor_heatmap) and self.singletons:
+            anchor_heat, subanchor_heat_raw = self._build_contact_heatmaps(active_region, chr_)
+
+        exp_dist = self._calc_anchor_expected_distances(active_region, chr_, anchor_heat)
+        self._reconstruct_cluster_arcs(ib_idx, active_region, exp_dist, s_override=s_ib)
+        prob = self._build_smooth_problem(active_region, chr_, subanchor_heat_raw, s_ib)
+        if prob is not None:
+            prob["s"] = s_ib
+        return prob
 
     def _settings_for_ib(self, active_region: list[int]) -> Settings:
         """Return self.s or a boosted copy if this IB qualifies as 'small'."""
@@ -965,8 +986,6 @@ class Solver:
 
         Returns (N, N) float64 target distance matrix or None if heatmap empty.
         """
-        import time
-
         s = self.s
         n = len(pos)
         n_reps = int(s.subanchor_estimate_replicates)
@@ -982,92 +1001,9 @@ class Solver:
             n_reps,
             n_steps,
         ):
-            avg_dist: F64Array = np.zeros((n, n), dtype=np.float64)
-            t_mc_total = 0.0
-
-            # Opt-in fast path: run all n_reps*n_steps independent anneals as ONE
-            # vmapped JAX kernel instead of the sequential python double-loop below.
-            # ~3-6x faster at large N on GPU (per-step kernel is latency-bound, GPU
-            # idle at chains=1).  Only when the JAX smooth backend is active AND
-            # installed; otherwise fall through to the reference-parity loop.
-            # Intentional divergence: batched trials share a best-of-K convergence
-            # stop instead of each running to its own.  Validated on avg_dist.
-            use_batch = bool(getattr(s, "subanchor_batch_trials", False)) and (
-                str(s.mc_backend).strip().lower() == "jax" and bool(s.mc_backend_apply_to_smooth)
+            avg_dist, t_mc_total = self._estimate_avg_dist(
+                pos, fixed, dtn, step_size, n_reps, n_steps
             )
-            if use_batch:
-                from . import mc_jax
-
-                use_batch = mc_jax.is_available()
-
-            if use_batch:
-                t_b = time.perf_counter()
-                n_trials = n_reps * n_steps
-                starts = np.empty((n_trials, n, 3), dtype=np.float32)
-                b = 0
-                for _rep in range(n_reps):
-                    for _step in range(n_steps):
-                        pt = pos.copy()
-                        for i in range(n):
-                            if not fixed[i]:
-                                pt[i] += random_vector_np(step_size)
-                        starts[b] = pt
-                        b += 1
-                # One kernel, K = n_trials independent anneals from the distinct starts.
-                with log.scope("est batched"):
-                    scores_flat, finals_flat = mc_jax.mc_smooth_jax(
-                        pos,
-                        dtn,
-                        fixed,
-                        step_size,
-                        s,
-                        pos_batch=starts,
-                        return_all=True,
-                    )
-                scores = np.asarray(scores_flat).reshape(n_reps, n_steps)
-                finals = np.asarray(finals_flat).reshape(n_reps, n_steps, n, 3)
-                for rep in range(n_reps):
-                    bt = int(np.argmin(scores[rep]))
-                    rep_best_pos = finals[rep, bt]
-                    diff = rep_best_pos[:, np.newaxis, :] - rep_best_pos[np.newaxis, :, :]
-                    avg_dist += np.sqrt((diff * diff).sum(axis=2))
-                    LOG.info("rep %d/%d: best_score=%.4f", rep + 1, n_reps, float(scores[rep, bt]))
-                avg_dist /= n_reps
-                t_mc_total = time.perf_counter() - t_b
-                LOG.info("batched %d trials in one kernel (%.2fs)", n_trials, t_mc_total)
-            else:
-                # Mirrors Reference: for each replicate, run n_steps MC passes from
-                # pos+noise, keep the best structure, then accumulate pairwise
-                # distances from it.  Each (rep, step) trial gets its own silent
-                # scope so the JAX backend keys a distinct RNG seed off the scope
-                # path (the old per-call label served that role).
-                for rep in range(n_reps):
-                    t_rep = time.perf_counter()
-                    rep_best_score = -1.0
-                    rep_best_pos = pos.copy()
-                    for step in range(n_steps):
-                        pos_trial: F32Array = pos.copy()
-                        for i in range(n):
-                            if not fixed[i]:
-                                pos_trial[i] += random_vector_np(step_size)
-                        with log.scope(f"est {rep + 1}/{n_reps} step {step + 1}/{n_steps}"):
-                            score = mc_smooth(pos_trial, dtn, fixed, step_size, s)
-                        if score < rep_best_score or rep_best_score < 0.0:
-                            rep_best_score = score
-                            rep_best_pos = pos_trial.copy()
-                    diff = rep_best_pos[:, np.newaxis, :] - rep_best_pos[np.newaxis, :, :]
-                    avg_dist += np.sqrt((diff * diff).sum(axis=2))
-                    t_rep = time.perf_counter() - t_rep
-                    t_mc_total += t_rep
-                    LOG.info(
-                        "rep %d/%d: best_score=%.4f  (%.2fs)",
-                        rep + 1,
-                        n_reps,
-                        rep_best_score,
-                        t_rep,
-                    )
-
-                avg_dist /= n_reps
 
             # Create expected distance matrix mirroring Reference
             # createExpectedDistSubanchorHeatmap().
@@ -1120,6 +1056,52 @@ class Solver:
                 )
 
             return heat_dist
+
+    def _estimate_avg_dist(
+        self,
+        pos: F32Array,
+        fixed: BoolArray,
+        dtn: F32Array,
+        step_size: float,
+        n_reps: int,
+        n_steps: int,
+    ) -> tuple[F64Array, float]:
+        """Average pairwise bead distances over dry smooth-MC passes — the
+        signal the subanchor heat target is built from.  Returns (avg_dist, wall).
+
+        Reference (sequential) path: for each replicate, run `n_steps` MC passes
+        from pos+noise, keep the best structure, accumulate its pairwise
+        distances.  Each (rep, step) trial gets its own silent scope so the
+        backend keys a distinct RNG seed off the scope path.  `JaxSolver`
+        overrides this to run all trials in one batched kernel.
+        """
+        import time
+
+        s = self.s
+        n = len(pos)
+        avg_dist: F64Array = np.zeros((n, n), dtype=np.float64)
+        t_mc_total = 0.0
+        for rep in range(n_reps):
+            t_rep = time.perf_counter()
+            rep_best_score = -1.0
+            rep_best_pos = pos.copy()
+            for step in range(n_steps):
+                pos_trial: F32Array = pos.copy()
+                for i in range(n):
+                    if not fixed[i]:
+                        pos_trial[i] += random_vector_np(step_size)
+                with log.scope(f"est {rep + 1}/{n_reps} step {step + 1}/{n_steps}"):
+                    score = mc_smooth(pos_trial, dtn, fixed, step_size, s)
+                if score < rep_best_score or rep_best_score < 0.0:
+                    rep_best_score = score
+                    rep_best_pos = pos_trial.copy()
+            diff = rep_best_pos[:, np.newaxis, :] - rep_best_pos[np.newaxis, :, :]
+            avg_dist += np.sqrt((diff * diff).sum(axis=2))
+            t_rep = time.perf_counter() - t_rep
+            t_mc_total += t_rep
+            LOG.info("rep %d/%d: best_score=%.4f  (%.2fs)", rep + 1, n_reps, rep_best_score, t_rep)
+        avg_dist /= n_reps
+        return avg_dist, t_mc_total
 
     def _densify_active_region(
         self, active_region: list[int]
@@ -1237,19 +1219,42 @@ class Solver:
           - builds target distance matrix
           - adds heat energy term to the final smooth MC
         """
+        s = s_override if s_override is not None else self.s
+        prob = self._build_smooth_problem(active_region, chr_, subanchor_heat_raw, s)
+        if prob is None:
+            return []
+
+        best_pos = self._run_smooth_serial(prob, s)
+        return self._apply_smooth_problem(prob, best_pos)
+
+    def _build_smooth_problem(
+        self,
+        active_region: list[int],
+        chr_: str,
+        subanchor_heat_raw: F64Array | None,
+        s: Settings,
+    ) -> dict[str, Any] | None:
+        """Phase 1 of smooth reconstruction: densify the active region, build
+        CTCF orientation arrays, and (if enabled) estimate the subanchor heat
+        target matrix.  Returns a self-contained "smooth problem" dict — the
+        inputs to mc_smooth plus the context needed to write the result back —
+        or None when the region is too small.
+
+        Split out from `_reconstruct_cluster_smooth` so JaxSolver can prepare
+        many IBs and then anneal them in one batched kernel.  Pure prep: no
+        final smooth MC, no cluster mutation.
+        """
         import math as _math
 
-        s = s_override if s_override is not None else self.s
         pos, fixed, starts, ends, gpos, dtn, anchor_map = self._densify_active_region(active_region)
         _ = gpos  # unused once start/end carry genomic info; keep for potential debug
         n = len(pos)
         if n <= 2:
-            return []
+            return None
 
         avg_dtn = float(dtn.mean())
         step_size = avg_dtn * s.noise_smooth
 
-        # Build CTCF orientation data if enabled
         char_orn: np.ndarray[Any, Any] | None = None
         anchor_neighbors: dict[int, list[int]] | None = None
         anchor_neighbor_weights: dict[int, list[float]] | None = None
@@ -1274,18 +1279,39 @@ class Solver:
                         anchor_neighbors[k].append(other_k)
                         anchor_neighbor_weights[k].append(_math.sqrt(max(arc.score, 0)))
 
-        # Build subanchor heat distance matrix if enabled.
-        # This runs N dry smooth MC passes without heat to estimate avg pairwise
-        # distances, then scales them down for high-contact pairs.
+        # Subanchor heat target matrix (itself a batch of dry smooth passes).
         heat_dist: F64Array | None = None
         if subanchor_heat_raw is not None and s.use_subanchor_heatmap:
             heat_dist = self._build_heat_dist_subanchor(
                 pos, fixed, dtn, subanchor_heat_raw, step_size
             )
 
+        return {
+            "pos": pos,
+            "fixed": fixed,
+            "dtn": dtn,
+            "step_size": step_size,
+            "char_orientations": char_orn,
+            "anchor_neighbors": anchor_neighbors,
+            "anchor_neighbor_weights": anchor_neighbor_weights,
+            "heat_dist": heat_dist,
+            "n": n,
+            # write-back context
+            "anchor_map": anchor_map,
+            "starts": starts,
+            "ends": ends,
+        }
+
+    def _run_smooth_serial(self, prob: dict[str, Any], s: Settings) -> F32Array:
+        """Phase 2 (base, serial): run `steps_smooth` smooth-MC restarts from
+        noised starts and keep the best.  Returns the best bead positions."""
+        pos = prob["pos"]
+        dtn = prob["dtn"]
+        fixed = prob["fixed"]
+        step_size = prob["step_size"]
+        n = prob["n"]
         best_score = -1.0
         best_pos: F32Array = pos.copy()
-
         for run in range(s.steps_smooth):
             with log.step(LOG, f"smooth run {run + 1}/{s.steps_smooth}"):
                 pos_run: F32Array = best_pos.copy()
@@ -1299,17 +1325,25 @@ class Solver:
                     fixed,
                     step_size,
                     s,
-                    char_orientations=char_orn,
-                    anchor_neighbors=anchor_neighbors,
-                    anchor_neighbor_weights=anchor_neighbor_weights,
-                    heat_dist=heat_dist,
+                    char_orientations=prob["char_orientations"],
+                    anchor_neighbors=prob["anchor_neighbors"],
+                    anchor_neighbor_weights=prob["anchor_neighbor_weights"],
+                    heat_dist=prob["heat_dist"],
                 )
 
                 if score < best_score or best_score < 0:
                     best_score = score
                     best_pos = pos_run.copy()
+        return best_pos
 
-        for bead_idx, cluster_idx in anchor_map:
+    def _apply_smooth_problem(self, prob: dict[str, Any], best_pos: F32Array) -> list[BeadOut]:
+        """Phase 4: write final anchor positions back to clusters and build the
+        BeadOut list for this IB.  Same logic for serial and batched paths."""
+        fixed = prob["fixed"]
+        starts = prob["starts"]
+        ends = prob["ends"]
+        n = prob["n"]
+        for bead_idx, cluster_idx in prob["anchor_map"]:
             self.clusters[cluster_idx].pos = best_pos[bead_idx].copy()
 
         # When drop_zero_length_subanchors is set, omit subanchor BeadOut entries

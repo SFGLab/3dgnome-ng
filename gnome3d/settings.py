@@ -146,6 +146,11 @@ class Settings:
     # When bucketing is on, compile every bucket up front (predictable one-time
     # warmup) instead of lazily on first hit.
     jax_precompile_buckets: bool
+    # Region batching: anneal many independent IBs in ONE vmapped kernel instead
+    # of one at a time (selects JaxSolver).  The GPU is ~99% idle at K=1, so this
+    # is the big throughput lever (measured ~8-11x on the smooth phase).  Opt-in;
+    # requires mc_backend=jax + mc_backend_apply_to_smooth.
+    jax_region_batch: bool
 
     # ---- MC arcs ----
     max_temp: float
@@ -346,6 +351,7 @@ class Settings:
         self.mc_backend_apply_to_heatmap = False
         self.jax_bucket_shapes = False
         self.jax_precompile_buckets = False
+        self.jax_region_batch = False
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -661,6 +667,9 @@ class Settings:
         )
         self.jax_bucket_shapes = getb(
             "simulation_backend", "jax_bucket_shapes", self.jax_bucket_shapes
+        )
+        self.jax_region_batch = getb(
+            "simulation_backend", "jax_region_batch", self.jax_region_batch
         )
         self.jax_precompile_buckets = getb(
             "simulation_backend", "jax_precompile_buckets", self.jax_precompile_buckets

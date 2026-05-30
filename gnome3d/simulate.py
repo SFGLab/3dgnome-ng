@@ -12,8 +12,8 @@ from . import log
 from .data import ContactData
 from .io import parse_chrs_arg, parse_region
 from .settings import Settings
-from .solver import Solver
 from .types import BeadOut, BedRegion
+from .util import make_solver
 
 LOG = log.get("simulate")
 
@@ -33,7 +33,7 @@ def simulate(
 
     Returns one dict[chr -> list[BeadOut]] per structure.
     """
-    solver = Solver(settings)
+    solver = make_solver(settings)
     solver.load(data, chrs_list, region)
 
     structures: list[dict[str, list[BeadOut]]] = []
