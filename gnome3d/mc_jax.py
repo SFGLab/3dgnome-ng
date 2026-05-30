@@ -1837,9 +1837,7 @@ def mc_smooth_jax(
 
     if pos_batch is not None:
         if pos_batch.ndim != 3 or pos_batch.shape[1:] != (n, 3):
-            raise ValueError(
-                f"pos_batch must have shape (B, {n}, 3); got {pos_batch.shape}"
-            )
+            raise ValueError(f"pos_batch must have shape (B, {n}, 3); got {pos_batch.shape}")
         K = int(pos_batch.shape[0])
     else:
         K = max(1, int(settings.mc_smooth_chains))

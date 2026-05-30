@@ -1035,8 +1035,7 @@ class Solver:
         # Intentional divergence: batched trials share a best-of-K convergence
         # stop instead of each running to its own.  Validated on avg_dist.
         use_batch = bool(getattr(s, "subanchor_batch_trials", False)) and (
-            str(s.mc_backend).strip().lower() == "jax"
-            and bool(s.mc_backend_apply_to_smooth)
+            str(s.mc_backend).strip().lower() == "jax" and bool(s.mc_backend_apply_to_smooth)
         )
         if use_batch:
             from . import mc_jax
