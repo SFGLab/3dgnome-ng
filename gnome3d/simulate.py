@@ -105,6 +105,11 @@ def run_region(
     if data_dir is not None:
         s.data_dir = str(data_dir)
 
+    # Honor output_level/log_file from the config — these file-config entry
+    # points own logging setup just like cli.main() does (simulate() stays the
+    # bare in-memory primitive so embedders keep control of their own logging).
+    log.setup(s.output_level, log_file=s.log_file or None)
+
     data = ContactData.from_files(s, chrs_list, bed_region)
     structures = simulate(s, data, chrs_list, n_structures, region=bed_region)
     return [per_chr[chrs_list[0]] for per_chr in structures]
@@ -161,6 +166,9 @@ def run_genome(
         raise RuntimeError(f"Failed to load config: {config_path!r}")
     if data_dir is not None:
         s.data_dir = str(data_dir)
+
+    # Honor output_level/log_file from the config (see run_region).
+    log.setup(s.output_level, log_file=s.log_file or None)
 
     data = ContactData.from_files(s, chrs_list, bed_region)
     return simulate(s, data, chrs_list, n_structures, region=bed_region)
