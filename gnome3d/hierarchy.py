@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from dataclasses import field
 
+from . import log
 from .types import *
+
+LOG = log.get("hierarchy")
 
 LVL_CHROMOSOME: int = 1
 LVL_SEGMENT: int = 2
@@ -258,7 +261,7 @@ def build_cluster_tree(
             clusters.append(root)
             chr_root[chr_] = root_idx
         else:
-            print(f"[hierarchy] warning: no root children for {chr_}")
+            LOG.warning("no root children for %s", chr_)
 
     return clusters, chr_root, chr_first_cluster
 

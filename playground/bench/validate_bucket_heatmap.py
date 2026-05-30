@@ -22,6 +22,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, ".")
+from gnome3d import log  # noqa: E402
 from gnome3d.mc_jax import _bucket_for, mc_heatmap_jax  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
 
@@ -46,13 +47,16 @@ def run(pos, exp_dist, diag_size, bucket: bool):
     s.mc_stop_steps_heatmap = 2000
     s.jax_bucket_shapes = bucket
     p = pos.copy()  # mc_heatmap_jax mutates in place
-    score = mc_heatmap_jax(p, exp_dist, diag_size, 0.5, s, label="val")
+    with log.scope("val"):
+        score = mc_heatmap_jax(p, exp_dist, diag_size, 0.5, s)
     return p, float(score)
 
 
 def main():
     diag_size = 2
-    print(f"{'N':>6} {'bucket':>7} {'max|Δpos|':>12} {'score off':>12} {'score on':>12} {'verdict':>8}")
+    print(
+        f"{'N':>6} {'bucket':>7} {'max|Δpos|':>12} {'score off':>12} {'score on':>12} {'verdict':>8}"
+    )
     print("-" * 62)
     all_ok = True
     for n in [200, 300, 500, 1000, 1500, 2011]:

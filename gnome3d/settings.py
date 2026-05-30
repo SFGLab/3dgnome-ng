@@ -11,6 +11,7 @@ from pathlib import Path
 class Settings:
     # ---- output / misc ----
     output_level: int
+    log_file: str
     random_walk: bool
     use_2d: bool
     loop_density: int
@@ -236,6 +237,11 @@ class Settings:
     def _set_defaults(self) -> None:
         # ---- output / misc ----
         self.output_level = 0
+        # Optional path for a full-detail (DEBUG) structured log sink, in
+        # addition to stdout.  Empty -> stdout only.  Handy for reconstructing
+        # parallel (ib_workers>1 / n_structures>1) runs after the fact.  The
+        # --log-file CLI flag overrides this.
+        self.log_file = ""
         self.random_walk = False
         self.use_2d = False
         self.loop_density = 5
@@ -500,6 +506,7 @@ class Settings:
 
         # [main]
         self.output_level = geti("main", "output_level", self.output_level)
+        self.log_file = gets("main", "log_file", self.log_file)
         self.random_walk = getb("main", "random_walk", self.random_walk)
         self.use_2d = getb("main", "use_2D", self.use_2d)
         self.loop_density = geti("main", "loop_density", self.loop_density)

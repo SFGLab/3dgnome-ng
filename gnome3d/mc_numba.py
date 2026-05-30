@@ -26,6 +26,7 @@ captures both numba and JAX paths uniformly — this module is profile-free.
 
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, TypeVar, cast
@@ -34,10 +35,13 @@ import numpy as np
 from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
+from . import log
 from .types import BoolArray, F64Array, I32Array, I64Array
 
 if TYPE_CHECKING:
     from .settings import Settings
+
+LOG = log.get("mc.numba")
 
 
 # Typed wrapper around numba.njit so pyright sees decorated functions
@@ -822,11 +826,8 @@ def _run_outer_loop(
     score_orn: float,
     score_excl: float,
     score_conf: float,
-    label: str,
-    verbose: bool,
 ) -> float:
     """Drive the unified kernel until convergence; return the final total score."""
-    prefix = f"    [{label}] " if label else "    "
     score = score_struct + score_heat + score_orn + score_excl + score_conf
     ms_score = score
     step_i = 0
@@ -888,12 +889,15 @@ def _run_outer_loop(
             or score < score_eps
             or ratio > stop_when_ratio_above
         )
-        if verbose:
-            print(
-                f"{prefix}step {step_i:>7,}  score={score:.4f}"
-                f"  ratio={ratio:.4f}  ok={n_ok}/{stop_steps}" + ("  [done]" if converged else ""),
-                flush=True,
-            )
+        LOG.debug(
+            "step %7s  score=%.4f  ratio=%.4f  ok=%d/%d%s",
+            f"{step_i:,}",
+            score,
+            ratio,
+            n_ok,
+            stop_steps,
+            "  [done]" if converged else "",
+        )
         if converged:
             return score
         ms_score = score
@@ -1007,8 +1011,6 @@ def _mc_heatmap_multichain(
     diag_size: int,
     step_size: float,
     settings: Settings,
-    label: str,
-    verbose: bool,
 ) -> float:
     """Run K independent MC chains via `@njit(parallel=True)` + prange, then
     pick the best.  All chains live in a single kernel launch, so per-thread
@@ -1033,9 +1035,7 @@ def _mc_heatmap_multichain(
     skip = np.ascontiguousarray(skip_np.astype(np.bool_))
     final_scores: F64Array = np.zeros(K, dtype=np.float64)
 
-    if verbose:
-        prefix = f"    [{label}] " if label else "    "
-        print(f"{prefix}K={K} N={n} (numba prange parallel)", flush=True)
+    LOG.debug("K=%d N=%d (numba prange parallel)", K, n)
 
     _mc_heatmap_kchains_nb(
         pos_k,
@@ -1054,13 +1054,11 @@ def _mc_heatmap_multichain(
 
     best_k: int = int(np.argmin(final_scores))
     pos[:] = pos_k[best_k].astype(pos.dtype)
-    if verbose:
-        prefix = f"    [{label}] " if label else "    "
-        print(
-            f"{prefix}scores: "
-            + ", ".join(f"{s:.2f}" for s in final_scores)
-            + f"  -> picked ch{best_k}",
-            flush=True,
+    if LOG.isEnabledFor(logging.DEBUG):
+        LOG.debug(
+            "scores: %s  -> picked ch%d",
+            ", ".join(f"{s:.2f}" for s in final_scores),
+            best_k,
         )
     return float(final_scores[best_k])
 
@@ -1218,8 +1216,6 @@ def _mc_smooth_multichain(
     step_size: float,
     settings: Settings,
     heat_dist: np.ndarray[Any, Any] | None,
-    label: str,
-    verbose: bool,
 ) -> float:
     """K-chain prange-parallel smooth MC.  Only supports the simple config
     (chain bonds + optional heat; no orientation/EV/confinement).  Callers
@@ -1244,9 +1240,7 @@ def _mc_smooth_multichain(
 
     final_scores: F64Array = np.zeros(K, dtype=np.float64)
 
-    if verbose:
-        prefix = f"    [{label}] " if label else "    "
-        print(f"{prefix}smooth K={K} N={n} (numba prange parallel)", flush=True)
+    LOG.debug("smooth K=%d N=%d (numba prange parallel)", K, n)
 
     _mc_smooth_kchains_nb(
         pos_k,
@@ -1273,13 +1267,11 @@ def _mc_smooth_multichain(
 
     best_k: int = int(np.argmin(final_scores))
     pos[:] = pos_k[best_k].astype(pos.dtype)
-    if verbose:
-        prefix = f"    [{label}] " if label else "    "
-        print(
-            f"{prefix}smooth scores: "
-            + ", ".join(f"{s:.2f}" for s in final_scores)
-            + f"  -> picked ch{best_k}",
-            flush=True,
+    if LOG.isEnabledFor(logging.DEBUG):
+        LOG.debug(
+            "smooth scores: %s  -> picked ch%d",
+            ", ".join(f"{s:.2f}" for s in final_scores),
+            best_k,
         )
     return float(final_scores[best_k])
 
@@ -1290,8 +1282,6 @@ def mc_heatmap_numba(
     diag_size: int,
     step_size: float,
     settings: Settings,
-    label: str = "",
-    verbose: bool = False,
 ) -> float:
     """Numba simulated-annealing implementation for heatmap-energy MC.
     Double-counted structure (delta factor 2). Mirrors Reference
@@ -1305,7 +1295,7 @@ def mc_heatmap_numba(
     n = pos.shape[0]
 
     if int(settings.mc_heatmap_chains) > 1:
-        return _mc_heatmap_multichain(pos, exp_dist, diag_size, step_size, settings, label, verbose)
+        return _mc_heatmap_multichain(pos, exp_dist, diag_size, step_size, settings)
 
     if n <= 1:
         return 0.0
@@ -1392,8 +1382,6 @@ def mc_heatmap_numba(
         score_orn=0.0,
         score_excl=score_excl,
         score_conf=0.0,
-        label=label,
-        verbose=verbose,
     )
     pos[:] = pw.astype(pos.dtype)
     return score
@@ -1404,8 +1392,6 @@ def mc_arcs_numba(
     exp_dist_mat: np.ndarray[Any, Any],
     step_size: float,
     settings: Settings,
-    label: str = "",
-    verbose: bool = False,
 ) -> float:
     """Numba simulated-annealing implementation for arc-MC.  Single-counted
     structure (delta factor 1). Mirrors Reference LooperSolver::MonteCarloArcs().
@@ -1518,8 +1504,6 @@ def mc_arcs_numba(
         score_orn=0.0,
         score_excl=score_excl,
         score_conf=score_conf,
-        label=label,
-        verbose=verbose,
     )
     pos[:] = pw.astype(pos.dtype)
     return score
@@ -1535,8 +1519,6 @@ def mc_smooth_numba(
     anchor_neighbors: dict[int, list[int]] | None = None,
     anchor_neighbor_weights: dict[int, list[float]] | None = None,
     heat_dist: np.ndarray[Any, Any] | None = None,
-    label: str = "",
-    verbose: bool = False,
 ) -> float:
     """Chain connectivity + angle MC.  Optionally adds CTCF orientation and/or
     subanchor heat. Anchor beads (fixed=True) never move. Single-counted
@@ -1563,9 +1545,7 @@ def mc_smooth_numba(
             and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
         )
         if simple_config:
-            return _mc_smooth_multichain(
-                pos, dtn, fixed, step_size, settings, heat_dist, label, verbose
-            )
+            return _mc_smooth_multichain(pos, dtn, fixed, step_size, settings, heat_dist)
 
     movable: I64Array = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
     if len(movable) == 0:
@@ -1725,8 +1705,6 @@ def mc_smooth_numba(
         score_orn=score_orn,
         score_excl=score_excl,
         score_conf=score_conf,
-        label=label,
-        verbose=verbose,
     )
     pos[:] = pw.astype(pos.dtype)
     return score
@@ -1737,8 +1715,6 @@ def mc_ib_numba(
     dtn: np.ndarray[Any, Any],
     step_size: float,
     settings: Settings,
-    label: str = "",
-    verbose: bool = False,
 ) -> float:
     """Numba simulated-annealing implementation for IB-centroid chain MC.
     Peer to mc_smooth (not a sub-mode of it).  Called by `gnome3d.mc.mc_ib`.
@@ -1852,8 +1828,6 @@ def mc_ib_numba(
         score_orn=0.0,
         score_excl=score_excl,
         score_conf=score_conf,
-        label=label,
-        verbose=verbose,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

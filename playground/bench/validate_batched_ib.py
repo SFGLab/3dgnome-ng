@@ -29,6 +29,7 @@ import numpy as np
 from scipy.stats import ks_2samp
 
 sys.path.insert(0, ".")
+from gnome3d import log  # noqa: E402
 from gnome3d.mc_jax import mc_smooth_jax  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
 from gnome3d.util import random_vector_np  # noqa: E402
@@ -56,12 +57,12 @@ def avg_dist_sequential(pos, dtn, fixed, step_size, s, n_reps, n_steps, run_tag=
             for i in range(n):
                 if not fixed[i]:
                     pt[i] += random_vector_np(step_size)
-            # Distinct label per trial => distinct seed_offset => distinct
-            # internal MC RNG, matching production (mc_smooth passes a unique
-            # "rep/step" label) AND the batched path's per-chain RNG diversity.
-            # run_tag makes run A vs run B independent in internal RNG too.
-            label = f"{run_tag} r{rep} s{step}"
-            score = mc_smooth_jax(pt, dtn, fixed, step_size, s, label=label)  # mutates pt
+            # Distinct scope per trial => distinct seed_offset => distinct
+            # internal MC RNG, matching production (the solver pushes a unique
+            # "est rep/step" scope) AND the batched path's per-chain RNG
+            # diversity.  run_tag makes run A vs run B independent in RNG too.
+            with log.scope(f"{run_tag} r{rep} s{step}"):
+                score = mc_smooth_jax(pt, dtn, fixed, step_size, s)  # mutates pt
             if score < best_score or best_score < 0.0:
                 best_score = score
                 best_pos = pt.copy()

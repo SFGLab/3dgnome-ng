@@ -17,6 +17,7 @@ import time
 
 import numpy as np
 
+from gnome3d import log
 from gnome3d.mc import mc_heatmap
 from gnome3d.settings import Settings
 
@@ -64,7 +65,8 @@ def bench(label: str, backend: str, device: str | None = None) -> tuple[float, f
 
     pw = pos.copy()
     t0 = time.perf_counter()
-    final = mc_heatmap(pw, exp_dist, diag_size, 0.5, s, label=label, verbose=False)
+    with log.scope(label):
+        final = mc_heatmap(pw, exp_dist, diag_size, 0.5, s)
     t1 = time.perf_counter()
 
     print(

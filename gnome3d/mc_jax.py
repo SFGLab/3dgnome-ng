@@ -25,16 +25,20 @@ cost across all runs on a machine.
 # type objects via decorators.  String-form annotations are fine elsewhere in
 # this file but the kernel definitions below are not annotation-sensitive.
 
+import logging
 import os
 import threading
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from . import log
 from .types import F32Array, I32Array, I64Array
 
 if TYPE_CHECKING:
     from .settings import Settings
+
+LOG = log.get("mc.jax")
 
 
 # ---------------------------------------------------------------------------
@@ -114,11 +118,12 @@ def _ensure_jax() -> bool:
             backend = "unknown"
             devices_str = "unknown"
         cache_str = cache_dir if cache_active else "disabled"
-        print(
-            f"[mc_jax] JAX backend ready: backend={backend} devices=[{devices_str}] "
-            f"cache={cache_str}",
-            file=__import__("sys").stderr,
-            flush=True,
+        log.status(
+            LOG,
+            "JAX backend ready: backend=%s devices=[%s] cache=%s",
+            backend,
+            devices_str,
+            cache_str,
         )
         return True
 
@@ -1105,7 +1110,9 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
         return total
 
-    def _init_confine(pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any, n_active: Any) -> Any:
+    def _init_confine(
+        pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any, n_active: Any
+    ) -> Any:
         # Sequential (lax.scan) so trailing pad beads don't perturb f32 order.
         def _body(carry: Any, i: Any) -> tuple[Any, None]:
             c = _local_confine_at(pos[i], cx, cy, cz, R, weight)
@@ -1336,7 +1343,6 @@ def _precompile_arcs(settings: "Settings") -> None:
     assert _jax is not None and _jnp is not None
     jax = _jax
     jnp = _jnp
-    sys = __import__("sys")
 
     K = 1  # arcs has no multichain in production
     excl_skip = int(settings.exclusion_skip_neighbors)
@@ -1367,27 +1373,37 @@ def _precompile_arcs(settings: "Settings") -> None:
                     pos_a, f32(0.0), f32(0.0), f32(0.0), f32(1.0), f32(0.0), jnp.int32(b)
                 ).compile()
                 kernel_full.lower(
-                    pos_a, kvec_a, kvec_a, kvec_a,  # pos, ss, se, sc
-                    T_a, exp_a,
+                    pos_a,
+                    kvec_a,
+                    kvec_a,
+                    kvec_a,  # pos, ss, se, sc
+                    T_a,
+                    exp_a,
                     f32(0.1),  # step_size (per-call: value irrelevant)
-                    dt_a, js_a, jc_a,
-                    f32(1.0), f32(1.0),  # stretch_k, squeeze_k
-                    f32(1.0), f32(0.0),  # r0, excl_w
-                    f32(0.0), f32(0.0), f32(0.0), f32(1.0), f32(0.0),  # conf_cx..conf_w
-                    key, impr_a, succ_a,
+                    dt_a,
+                    js_a,
+                    jc_a,
+                    f32(1.0),
+                    f32(1.0),  # stretch_k, squeeze_k
+                    f32(1.0),
+                    f32(0.0),  # r0, excl_w
+                    f32(0.0),
+                    f32(0.0),
+                    f32(0.0),
+                    f32(1.0),
+                    f32(0.0),  # conf_cx..conf_w
+                    key,
+                    impr_a,
+                    succ_a,
                     f32(1e-5),  # score_eps (matches mc_arcs_jax hardcode)
                     f32(0.9999),  # stop_when_ratio_above
                     jnp.int32(b),  # n_active
                 ).compile()
             except Exception as e:  # noqa: BLE001 - precompile is best-effort
-                print(f"[mc_jax] precompile arcs bucket {b} skipped: {e}", file=sys.stderr)
+                LOG.warning("precompile arcs bucket %d skipped: %s", b, e)
         _precompiled.add(sig)
         dt = __import__("time").perf_counter() - t0
-        print(
-            f"[mc_jax] precompiled arcs kernel for {len(_SHAPE_BUCKETS)} buckets in {dt:.1f}s",
-            file=sys.stderr,
-            flush=True,
-        )
+        log.status(LOG, "precompiled arcs kernel for %d buckets in %.1fs", len(_SHAPE_BUCKETS), dt)
 
 
 def mc_arcs_jax(
@@ -1395,8 +1411,6 @@ def mc_arcs_jax(
     exp_dist_mat: np.ndarray[Any, Any],
     step_size: float,
     settings: "Settings",
-    label: str = "",
-    verbose: bool = False,
 ) -> float:
     """JAX backend for mc_arcs.  Supports arc springs + EV + (optional)
     confinement.  Same contract as [mc.mc_arcs].
@@ -1526,7 +1540,9 @@ def mc_arcs_jax(
     stop_successes = jnp.int32(settings.mc_stop_successes)
     score_eps = jnp.float32(1e-5)
     stop_when_ratio_above = jnp.float32(0.9999)
-    seed_offset: int = abs(hash(label)) % (2**31) if label else 0
+    # Per-call RNG diversity keyed on the active scope path (was: the label).
+    _seed_src = log.current()
+    seed_offset: int = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
     pos_k, ss_k, se_k, sc_k, final_score_best, iter_count, converged_flag = kernel_full(
@@ -1560,13 +1576,14 @@ def mc_arcs_jax(
     score_per_chain = np.asarray(ss_k + se_k + sc_k)
     iter_n = int(iter_count)
     converged_v = bool(converged_flag)
-    if verbose:
-        prefix = f"    [{label}] " if label else "    "
+    if LOG.isEnabledFor(logging.DEBUG):
         tail = "[done]" if converged_v else "[max-iters reached]"
-        print(
-            f"{prefix}step {iter_n * n_steps_per_batch:>7,}  "
-            f"score={float(final_score_best):.4f}  batches={iter_n}  {tail}",
-            flush=True,
+        LOG.debug(
+            "step %7s  score=%.4f  batches=%d  %s",
+            f"{iter_n * n_steps_per_batch:,}",
+            float(final_score_best),
+            iter_n,
+            tail,
         )
 
     best_k: int = int(np.argmin(score_per_chain))
@@ -1846,7 +1863,6 @@ def _precompile_heatmap(settings: "Settings") -> None:
     assert _jax is not None and _jnp is not None
     jax = _jax
     jnp = _jnp
-    sys = __import__("sys")
 
     K = max(1, int(settings.mc_heatmap_chains))
     excl_skip = int(settings.exclusion_skip_neighbors)
@@ -1901,14 +1917,15 @@ def _precompile_heatmap(settings: "Settings") -> None:
                     jnp.int32(b),  # n_active
                 ).compile()
             except Exception as e:  # noqa: BLE001 - precompile is best-effort
-                print(f"[mc_jax] precompile heatmap bucket {b} skipped: {e}", file=sys.stderr)
+                LOG.warning("precompile heatmap bucket %d skipped: %s", b, e)
         _precompiled.add(sig)
         dt = __import__("time").perf_counter() - t0
-        print(
-            f"[mc_jax] precompiled heatmap kernel for {len(_SHAPE_BUCKETS)} buckets "
-            f"(K={K}) in {dt:.1f}s",
-            file=sys.stderr,
-            flush=True,
+        log.status(
+            LOG,
+            "precompiled heatmap kernel for %d buckets (K=%d) in %.1fs",
+            len(_SHAPE_BUCKETS),
+            K,
+            dt,
         )
 
 
@@ -2014,7 +2031,9 @@ def mc_heatmap_jax(
     stop_improvement = jnp.float32(settings.mc_stop_improvement_heatmap)
     stop_successes = jnp.int32(settings.mc_stop_successes_heatmap)
     score_eps = jnp.float32(1e-6)
-    seed_offset: int = abs(hash(label)) % (2**31) if label else 0
+    # Per-call RNG diversity keyed on the active scope path (was: the label).
+    _seed_src = log.current()
+    seed_offset: int = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
     pos_k, ss_k, se_k, final_score_best, iter_count, converged_flag = kernel_full(
@@ -2041,13 +2060,14 @@ def mc_heatmap_jax(
     score_per_chain = np.asarray(ss_k + se_k)
     iter_n = int(iter_count)
     converged_v = bool(converged_flag)
-    if verbose:
-        prefix = f"    [{label}] " if label else "    "
+    if LOG.isEnabledFor(logging.DEBUG):
         tail = "[done]" if converged_v else "[max-iters reached]"
-        print(
-            f"{prefix}step {iter_n * n_steps_per_batch:>7,}  "
-            f"score={float(final_score_best):.4f}  batches={iter_n}  {tail}",
-            flush=True,
+        LOG.debug(
+            "step %7s  score=%.4f  batches=%d  %s",
+            f"{iter_n * n_steps_per_batch:,}",
+            float(final_score_best),
+            iter_n,
+            tail,
         )
 
     best_k: int = int(np.argmin(score_per_chain))
@@ -2070,7 +2090,6 @@ def _precompile_smooth(
     assert _jax is not None and _jnp is not None
     jax = _jax
     jnp = _jnp
-    sys = __import__("sys")
 
     excl_skip = int(settings.exclusion_skip_neighbors)
     n_steps = int(settings.mc_stop_steps_smooth)
@@ -2098,7 +2117,11 @@ def _precompile_smooth(
             try:
                 kernel_full.lower(
                     sds((K, b, 3), np.float32),  # pos_k
-                    kvec, kvec, kvec, kvec, kvec,  # ss, se, sh, so, sc
+                    kvec,
+                    kvec,
+                    kvec,
+                    kvec,
+                    kvec,  # ss, se, sh, so, sc
                     sds((K, a, 3), np.float32),  # anchor_orn_k
                     T_a,
                     sds((b,), np.float32),  # dtn
@@ -2111,27 +2134,44 @@ def _precompile_smooth(
                     sds((a, M), np.bool_),  # nbr_valid
                     sds((b,), np.bool_),  # is_L
                     f32(0.1),  # step_size (value irrelevant)
-                    dt_a, js_a, jc_a,
-                    f32(1.0), f32(1.0), f32(0.1), f32(1.0), f32(1.0),  # stretch..ang_w
-                    f32(1.0), f32(0.0),  # r0, excl_w
+                    dt_a,
+                    js_a,
+                    jc_a,
+                    f32(1.0),
+                    f32(1.0),
+                    f32(0.1),
+                    f32(1.0),
+                    f32(1.0),  # stretch..ang_w
+                    f32(1.0),
+                    f32(0.0),  # r0, excl_w
                     f32(1.0),  # heat_weight
                     f32(1.0),  # motif_weight
                     jnp.bool_(True),  # symmetric
-                    f32(0.0), f32(0.0), f32(0.0), f32(1.0), f32(0.0),  # conf_cx..conf_w
-                    key, impr_a, succ_a,
+                    f32(0.0),
+                    f32(0.0),
+                    f32(0.0),
+                    f32(1.0),
+                    f32(0.0),  # conf_cx..conf_w
+                    key,
+                    impr_a,
+                    succ_a,
                     f32(1e-6),  # score_eps (matches mc_smooth_jax hardcode)
                     jnp.int32(b),  # n_active
                     jnp.int32(b),  # n_movable_active
                 ).compile()
             except Exception as e:  # noqa: BLE001 - precompile is best-effort
-                print(f"[mc_jax] precompile smooth B={b} A={a} skipped: {e}", file=sys.stderr)
+                LOG.warning("precompile smooth B=%d A=%d skipped: %s", b, a, e)
         _precompiled.add(sig)
         dt = __import__("time").perf_counter() - t0
-        print(
-            f"[mc_jax] precompiled smooth kernel: {len(_SHAPE_BUCKETS)} B-buckets "
-            f"(heat={use_heat} orn={use_orn} M={M} K={K}) in {dt:.1f}s",
-            file=sys.stderr,
-            flush=True,
+        log.status(
+            LOG,
+            "precompiled smooth kernel: %d B-buckets (heat=%s orn=%s M=%d K=%d) in %.1fs",
+            len(_SHAPE_BUCKETS),
+            use_heat,
+            use_orn,
+            M,
+            K,
+            dt,
         )
 
 
@@ -2150,8 +2190,6 @@ def mc_smooth_jax(
     anchor_neighbors: dict[int, list[int]] | None = None,
     anchor_neighbor_weights: dict[int, list[float]] | None = None,
     heat_dist: np.ndarray[Any, Any] | None = None,
-    label: str = "",
-    verbose: bool = False,
     pos_batch: np.ndarray[Any, Any] | None = None,
     return_all: bool = False,
 ) -> Any:
@@ -2368,7 +2406,9 @@ def mc_smooth_jax(
     is_L_j = jnp.asarray(is_L_np)
     n_active_j = jnp.int32(n_active_v)
     n_movable_active_j = jnp.int32(n_movable_v)
-    seed_offset: int = abs(hash(label)) % (2**31) if label else 0
+    # Per-call RNG diversity keyed on the active scope path (was: the label).
+    _seed_src = log.current()
+    seed_offset: int = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
 
     # ---- initial scores ----
     ss_k = init_smooth(
@@ -2507,14 +2547,14 @@ def mc_smooth_jax(
     iter_n = int(iter_count)
     converged_v = bool(converged_flag)
 
-    if verbose:
-        prefix = f"    [{label}] " if label else "    "
-        total_steps = iter_n * n_steps_per_batch
+    if LOG.isEnabledFor(logging.DEBUG):
         tail = "[done]" if converged_v else "[max-iters reached]"
-        print(
-            f"{prefix}step {total_steps:>7,}  score={float(final_score_best):.4f}"
-            f"  batches={iter_n}  {tail}",
-            flush=True,
+        LOG.debug(
+            "step %7s  score=%.4f  batches=%d  %s",
+            f"{iter_n * n_steps_per_batch:,}",
+            float(final_score_best),
+            iter_n,
+            tail,
         )
 
     if return_all:

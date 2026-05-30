@@ -37,13 +37,16 @@ The harness modules import a couple of numba helpers from this file
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from . import mc_numba
+from . import log, mc_numba
+
+LOG = log.get("mc")
 
 # Backward-compat re-exports for harness/compare.py and other consumers that
 # imported numba helpers from gnome3d.mc historically.  When adding new
@@ -72,16 +75,15 @@ if TYPE_CHECKING:
 _MC_PROFILE_PATH: str | None = os.environ.get("GNOME3D_MC_PROFILE")
 
 
-def _log_mc_call(
-    level: str, n: int, k: int, n_steps: int, wall_s: float, score: float, label: str
-) -> None:
+def _log_mc_call(level: str, n: int, k: int, n_steps: int, wall_s: float, score: float) -> None:
     if not _MC_PROFILE_PATH:
         return
     new_file = (not os.path.exists(_MC_PROFILE_PATH)) or os.path.getsize(_MC_PROFILE_PATH) == 0
     with open(_MC_PROFILE_PATH, "a") as f:
         if new_file:
             f.write("level,N,K,n_steps_per_batch,wall_s,score,label\n")
-        safe_label = label.replace('"', "'")
+        # The active scope path stands in for the old per-call label.
+        safe_label = log.current().replace('"', "'")
         f.write(f'{level},{n},{k},{n_steps},{wall_s:.6f},{score:.6f},"{safe_label}"\n')
 
 
@@ -112,8 +114,6 @@ def mc_heatmap(
     diag_size: int,
     step_size: float,
     settings: Settings,
-    label: str = "",
-    verbose: bool = False,
 ) -> float:
     """Heatmap-MC dispatch.  Routes to JAX iff `settings.mc_backend == "jax"`
     AND `settings.mc_backend_apply_to_heatmap == True` (defaults to False —
@@ -128,24 +128,19 @@ def mc_heatmap(
     if _use_jax_for_heatmap(settings):
         from . import mc_jax
 
-        if settings.output_level >= 1:
-            lbl = f"[{label}] " if label else ""
+        if LOG.isEnabledFor(logging.INFO):
             terms = ["heatmap"]
             if bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_heatmap):
                 terms.append("EV")
-            print(
-                f"    {lbl}mc_heatmap: backend=jax  N={n}  "
-                f"K={int(settings.mc_heatmap_chains)}  "
-                f"terms=[{'+'.join(terms)}]",
-                flush=True,
+            LOG.info(
+                "mc_heatmap: backend=jax  N=%d  K=%d  terms=[%s]",
+                n,
+                int(settings.mc_heatmap_chains),
+                "+".join(terms),
             )
-        score = mc_jax.mc_heatmap_jax(
-            pos, exp_dist, diag_size, step_size, settings, label=label, verbose=verbose
-        )
+        score = mc_jax.mc_heatmap_jax(pos, exp_dist, diag_size, step_size, settings)
     else:
-        score = mc_numba.mc_heatmap_numba(
-            pos, exp_dist, diag_size, step_size, settings, label=label, verbose=verbose
-        )
+        score = mc_numba.mc_heatmap_numba(pos, exp_dist, diag_size, step_size, settings)
 
     if _MC_PROFILE_PATH:
         _log_mc_call(
@@ -155,7 +150,6 @@ def mc_heatmap(
             int(settings.mc_stop_steps_heatmap),
             time.perf_counter() - _t0,
             score,
-            label,
         )
     return score
 
@@ -165,8 +159,6 @@ def mc_arcs(
     exp_dist_mat: np.ndarray[Any, Any],
     step_size: float,
     settings: Settings,
-    label: str = "",
-    verbose: bool = False,
 ) -> float:
     """Arc-MC dispatch.  Routes to JAX iff `settings.mc_backend == "jax"`
     AND `settings.mc_backend_apply_to_arcs == True` (defaults to False — JAX
@@ -180,24 +172,16 @@ def mc_arcs(
     if _use_jax_for_arcs(settings):
         from . import mc_jax
 
-        if settings.output_level >= 1:
-            lbl = f"[{label}] " if label else ""
+        if LOG.isEnabledFor(logging.INFO):
             terms = ["arcs"]
             if bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs):
                 terms.append("EV")
             if bool(settings.use_confinement) and bool(settings.confinement_apply_to_arcs):
                 terms.append("conf")
-            print(
-                f"    {lbl}mc_arcs: backend=jax  N={n}  terms=[{'+'.join(terms)}]",
-                flush=True,
-            )
-        score = mc_jax.mc_arcs_jax(
-            pos, exp_dist_mat, step_size, settings, label=label, verbose=verbose
-        )
+            LOG.info("mc_arcs: backend=jax  N=%d  terms=[%s]", n, "+".join(terms))
+        score = mc_jax.mc_arcs_jax(pos, exp_dist_mat, step_size, settings)
     else:
-        score = mc_numba.mc_arcs_numba(
-            pos, exp_dist_mat, step_size, settings, label=label, verbose=verbose
-        )
+        score = mc_numba.mc_arcs_numba(pos, exp_dist_mat, step_size, settings)
 
     if _MC_PROFILE_PATH:
         _log_mc_call(
@@ -207,7 +191,6 @@ def mc_arcs(
             int(settings.mc_stop_steps),
             time.perf_counter() - _t0,
             score,
-            label,
         )
     return score
 
@@ -222,8 +205,6 @@ def mc_smooth(
     anchor_neighbors: dict[int, list[int]] | None = None,
     anchor_neighbor_weights: dict[int, list[float]] | None = None,
     heat_dist: np.ndarray[Any, Any] | None = None,
-    label: str = "",
-    verbose: bool = False,
 ) -> float:
     """Smooth-MC dispatch.  Routes to JAX iff `settings.mc_backend == "jax"`
     AND `settings.mc_backend_apply_to_smooth == True` (defaults to True — JAX
@@ -238,8 +219,7 @@ def mc_smooth(
     if _use_jax_for_smooth(settings):
         from . import mc_jax
 
-        if settings.output_level >= 1:
-            lbl = f"[{label}] " if label else ""
+        if LOG.isEnabledFor(logging.INFO):
             terms: list[str] = ["chain"]
             if bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth):
                 terms.append("EV")
@@ -249,11 +229,11 @@ def mc_smooth(
                 terms.append("orient")
             if bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth):
                 terms.append("conf")
-            print(
-                f"    {lbl}mc_smooth: backend=jax  N={n}  "
-                f"K={int(settings.mc_smooth_chains)}  "
-                f"terms=[{'+'.join(terms)}]",
-                flush=True,
+            LOG.info(
+                "mc_smooth: backend=jax  N=%d  K=%d  terms=[%s]",
+                n,
+                int(settings.mc_smooth_chains),
+                "+".join(terms),
             )
         score = mc_jax.mc_smooth_jax(
             pos,
@@ -265,8 +245,6 @@ def mc_smooth(
             anchor_neighbors=anchor_neighbors,
             anchor_neighbor_weights=anchor_neighbor_weights,
             heat_dist=heat_dist,
-            label=label,
-            verbose=verbose,
         )
     else:
         score = mc_numba.mc_smooth_numba(
@@ -279,8 +257,6 @@ def mc_smooth(
             anchor_neighbors=anchor_neighbors,
             anchor_neighbor_weights=anchor_neighbor_weights,
             heat_dist=heat_dist,
-            label=label,
-            verbose=verbose,
         )
 
     if _MC_PROFILE_PATH:
@@ -291,7 +267,6 @@ def mc_smooth(
             int(settings.mc_stop_steps_smooth),
             time.perf_counter() - _t0,
             score,
-            label,
         )
     return score
 
@@ -301,8 +276,6 @@ def mc_ib(
     dtn: np.ndarray[Any, Any],
     step_size: float,
     settings: Settings,
-    label: str = "",
-    verbose: bool = False,
 ) -> float:
     """IB-centroid chain MC dispatch.  No JAX backend; always numba.
 
@@ -315,7 +288,7 @@ def mc_ib(
         return 0.0
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
-    score = mc_numba.mc_ib_numba(pos, dtn, step_size, settings, label=label, verbose=verbose)
+    score = mc_numba.mc_ib_numba(pos, dtn, step_size, settings)
 
     if _MC_PROFILE_PATH:
         _log_mc_call(
@@ -325,6 +298,5 @@ def mc_ib(
             int(settings.mc_stop_steps_ib),
             time.perf_counter() - _t0,
             score,
-            label,
         )
     return score

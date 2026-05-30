@@ -6,7 +6,10 @@ from __future__ import annotations
 
 import os
 
+from . import log
 from .types import *
+
+LOG = log.get("io")
 
 
 def parse_region(region_str: str) -> BedRegion | None:
@@ -106,7 +109,7 @@ def load_anchors(
     """
     anchors: AnchorMap = {}
     if not path or not os.path.exists(path):
-        print(f"[io] anchors file not found: {path}")
+        LOG.warning("anchors file not found: %s", path)
         return anchors
 
     with open(path) as f:
@@ -134,7 +137,7 @@ def load_anchors(
             anchors.setdefault(chr_, []).append(Anchor(chr_, start, end, orientation))
 
     for chr_, lst in anchors.items():
-        print(f"  anchors loaded: {chr_}: {len(lst)}")
+        LOG.info("anchors loaded: %s: %d", chr_, len(lst))
 
     return anchors
 
@@ -162,7 +165,7 @@ def load_arcs(
     long_arcs: RawArcMap = {}
 
     if not path or not os.path.exists(path):
-        print(f"[io] arcs file not found: {path}")
+        LOG.warning("arcs file not found: %s", path)
         return raw, long_arcs
 
     added = 0
@@ -207,7 +210,7 @@ def load_arcs(
             lst.insert(p, arc)
             added += 1
 
-    print(f"  arcs loaded: {added}, long arcs separated: {long_cnt}")
+    LOG.info("arcs loaded: %d, long arcs separated: %d", added, long_cnt)
     return raw, long_arcs
 
 
@@ -252,7 +255,7 @@ def load_singletons(
     """
     contacts: list[SingletonContact] = []
     if not path or not os.path.exists(path):
-        print(f"[data] singletons file not found: {path}")
+        LOG.warning("singletons file not found: %s", path)
         return contacts
 
     line_cnt = 0
@@ -260,7 +263,7 @@ def load_singletons(
         for line in f:
             line_cnt += 1
             if line_cnt % 1_000_000 == 0:
-                print(f"  . ({line_cnt} lines)")
+                LOG.info(". (%d lines)", line_cnt)
             parts = line.split()
             if len(parts) < 7:
                 continue
@@ -274,7 +277,7 @@ def load_singletons(
                 continue
             contacts.append((c1, p1, c2, p2, sc))
 
-    print(f"  singletons loaded: {len(contacts)}")
+    LOG.info("singletons loaded: %d", len(contacts))
     return contacts
 
 
@@ -320,7 +323,7 @@ def create_singleton_heatmap(
         h[ei][si] += sc
         ok_cnt += 1
 
-    print(f"  singleton heatmap: {ok_cnt} contacts binned, size {total_size}x{total_size}")
+    LOG.info("singleton heatmap: %d contacts binned, size %dx%d", ok_cnt, total_size, total_size)
 
     if bin_lengths_mb is not None:
         for i in range(total_size):

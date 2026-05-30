@@ -22,6 +22,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, ".")
+from gnome3d import log  # noqa: E402
 from gnome3d.mc_jax import _bucket_for, mc_smooth_jax  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
 
@@ -54,7 +55,9 @@ def make_orientation(fixed, half_window=4):
         chars[int(bi)] = "L" if ai % 2 == 0 else "R"
     neighbors, weights = {}, {}
     for k in range(n_anchors):
-        nb = [j for j in range(max(0, k - half_window), min(n_anchors, k + half_window + 1)) if j != k]
+        nb = [
+            j for j in range(max(0, k - half_window), min(n_anchors, k + half_window + 1)) if j != k
+        ]
         neighbors[k] = nb
         weights[k] = [1.0] * len(nb)
     return chars, neighbors, weights
@@ -75,7 +78,8 @@ def run(pos, dtn, fixed, heat, orn, bucket, step_size=0.5, label="val"):
         chars, nbrs, wts = make_orientation(fixed)
         kw = {"char_orientations": chars, "anchor_neighbors": nbrs, "anchor_neighbor_weights": wts}
     p = pos.copy()  # mutated in place
-    score = mc_smooth_jax(p, dtn, fixed, step_size, s, heat_dist=heat, label=label, **kw)
+    with log.scope(label):
+        score = mc_smooth_jax(p, dtn, fixed, step_size, s, heat_dist=heat, **kw)
     return p, float(score)
 
 

@@ -22,6 +22,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, ".")
+from gnome3d import log  # noqa: E402
 from gnome3d.mc_jax import _bucket_for, mc_arcs_jax  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
 
@@ -52,7 +53,8 @@ def run(pos, exp, bucket, step_size=0.5, label="val"):
     s.mc_stop_steps = 2000
     s.jax_bucket_shapes = bucket
     p = pos.copy()
-    score = mc_arcs_jax(p, exp, step_size, s, label=label)
+    with log.scope(label):
+        score = mc_arcs_jax(p, exp, step_size, s)
     return p, float(score)
 
 
@@ -82,7 +84,9 @@ def main():
             "Δtraj (if any) is f32 chaos, not a bug."
         )
     else:
-        print("INIT DIVERGES -> a bucketed arcs init reduction is not padding-insensitive; inspect.")
+        print(
+            "INIT DIVERGES -> a bucketed arcs init reduction is not padding-insensitive; inspect."
+        )
     sys.exit(0 if init_ok_all else 1)
 
 

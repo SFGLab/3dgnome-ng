@@ -9,16 +9,20 @@ Whole genome:    gnome3d-ng --config X.ini      (defaults to chr1-chr22,chrX)
 """
 
 import argparse
+import contextlib
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from gnome3d import log
 from gnome3d.data import ContactData
 from gnome3d.io import parse_chrs_arg, write_cif
 from gnome3d.settings import Settings
 from gnome3d.solver import Solver
 from gnome3d.types import BedRegion
+
+LOG = log.get("main")
 
 
 def _cif_name(entry_base: str, chr_: str, i: int, multi_chr: bool) -> str:
@@ -39,30 +43,33 @@ def _run_structure(
     entry_base: str,
 ) -> int:
     """Build and write one independent structure. Returns total bead count."""
-    print(f"\n[main] structure {i + 1}/{n}")
-    solver = Solver(s)
-    solver.load(data, chrs_list, region)
-    solver.reconstruct_heatmap()
-    solver.reconstruct_arcs()
+    # Scope per structure only when several run concurrently — for a single
+    # structure the extra nesting just indents everything for no benefit.
+    structure_ctx = log.step(LOG, f"structure {i + 1}/{n}") if n > 1 else contextlib.nullcontext()
+    with structure_ctx:
+        solver = Solver(s)
+        solver.load(data, chrs_list, region)
+        solver.reconstruct_heatmap()
+        solver.reconstruct_arcs()
 
-    multi_chr = len(chrs_list) > 1
-    total_beads = 0
-    for chr_ in chrs_list:
-        beads = solver.get_leaf_positions(chr_)
-        if not beads:
-            print(f"[main] {chr_}: no leaf beads (skipping)")
-            continue
+        multi_chr = len(chrs_list) > 1
+        total_beads = 0
+        for chr_ in chrs_list:
+            beads = solver.get_leaf_positions(chr_)
+            if not beads:
+                LOG.warning("%s: no leaf beads (skipping)", chr_)
+                continue
 
-        cif_path = out_dir / _cif_name(entry_base, chr_, i, multi_chr)
-        entry_id = cif_path.stem
-        write_cif(str(cif_path), beads, entry_id=entry_id)
-        print(f"[main] wrote {cif_path}  ({len(beads)} beads)")
-        total_beads += len(beads)
+            cif_path = out_dir / _cif_name(entry_base, chr_, i, multi_chr)
+            entry_id = cif_path.stem
+            write_cif(str(cif_path), beads, entry_id=entry_id)
+            LOG.info("wrote %s  (%d beads)", cif_path, len(beads))
+            total_beads += len(beads)
 
-    if total_beads == 0:
-        raise RuntimeError(f"Structure {i + 1}: no leaf beads from any chromosome")
+        if total_beads == 0:
+            raise RuntimeError(f"Structure {i + 1}: no leaf beads from any chromosome")
 
-    return total_beads
+        return total_beads
 
 
 def main() -> None:
@@ -87,6 +94,15 @@ def main() -> None:
     )
     parser.add_argument("--data-dir", default=None, help="Override data_dir from config")
     parser.add_argument("--out", default=".", help="Output directory (default: .)")
+    parser.add_argument(
+        "--log-file",
+        default=None,
+        help=(
+            "Write a full-detail (DEBUG) structured log here in addition to "
+            "stdout. Overrides [main] log_file. Handy for reconstructing "
+            "parallel (ib_workers>1 / -n>1) runs."
+        ),
+    )
     args = parser.parse_args()
 
     chrs_list, bed_region = parse_chrs_arg(args.region)
@@ -98,10 +114,15 @@ def main() -> None:
         sys.exit(f"Failed to load config: {args.config!r}")
     if args.data_dir:
         s.data_dir = args.data_dir
-    print(f"[main] config: {args.config}  data_dir: {s.data_dir}")
-    print(
-        f"[main] chromosomes ({len(chrs_list)}): {','.join(chrs_list)}"
-        + (f"  region={bed_region.chr}:{bed_region.start}-{bed_region.end}" if bed_region else "")
+
+    log.setup(s.output_level, log_file=args.log_file or s.log_file or None)
+    log.status(LOG, "config: %s  data_dir: %s", args.config, s.data_dir)
+    log.status(
+        LOG,
+        "chromosomes (%d): %s%s",
+        len(chrs_list),
+        ",".join(chrs_list),
+        f"  region={bed_region.chr}:{bed_region.start}-{bed_region.end}" if bed_region else "",
     )
 
     data = ContactData.from_files(s, chrs_list, bed_region)
@@ -121,7 +142,7 @@ def main() -> None:
     # Numba is also threading inside the MC kernels, so over-subscription here
     # only hurts throughput.
     if n_workers > 1 and s.ib_workers > 1:
-        print(f"[main] n_structures>1: forcing ib_workers=1 (was {s.ib_workers})")
+        log.status(LOG, "n_structures>1: forcing ib_workers=1 (was %d)", s.ib_workers)
         s.ib_workers = 1
     # JAX on a single GPU does not benefit from CPU-side threading — multiple
     # IB threads end up serialised on the device anyway, plus each pays JAX
@@ -129,25 +150,31 @@ def main() -> None:
     # a time.  Independent restarts can still be vmapped inside each call via
     # settings.mc_smooth_chains.
     if str(s.mc_backend).strip().lower() == "jax" and s.ib_workers > 1:
-        print(f"[main] mc_backend=jax: forcing ib_workers=1 (was {s.ib_workers})")
+        log.status(LOG, "mc_backend=jax: forcing ib_workers=1 (was %d)", s.ib_workers)
         s.ib_workers = 1
-    print(f"[main] running {n} structure(s) with {n_workers} worker(s)")
+    log.status(LOG, "running %d structure(s) with %d worker(s)", n, n_workers)
 
+    # Flat per-line scope tags when structures run concurrently, so their
+    # interleaved output stays attributable.  Enter the mode before submitting
+    # so workers never start while the flag is still off.
     pool = ThreadPoolExecutor(max_workers=n_workers)
-    futures = {
-        pool.submit(_run_structure, i, n, s, data, chrs_list, bed_region, out_dir, entry_base): i
-        for i in range(n)
-    }
     try:
-        for fut in as_completed(futures):
-            fut.result()
+        with log.parallel(n_workers > 1):
+            futures = {
+                pool.submit(
+                    _run_structure, i, n, s, data, chrs_list, bed_region, out_dir, entry_base
+                ): i
+                for i in range(n)
+            }
+            for fut in as_completed(futures):
+                fut.result()
     except KeyboardInterrupt:
         pool.shutdown(wait=False, cancel_futures=True)
         raise
     else:
         pool.shutdown(wait=True)
 
-    print(f"\n[main] {n} structure(s) written to {out_dir}/")
+    log.status(LOG, "%d structure(s) written to %s/", n, out_dir)
 
 
 if __name__ == "__main__":

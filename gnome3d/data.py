@@ -23,11 +23,14 @@ from __future__ import annotations
 from dataclasses import field
 from typing import TYPE_CHECKING, Any
 
+from . import log
 from .io import load_anchors, load_arcs, load_breakpoints, load_singletons
 from .types import *
 
 if TYPE_CHECKING:
     from .settings import Settings
+
+LOG = log.get("data")
 
 
 @dataclass
@@ -70,24 +73,24 @@ class ContactData:
         chr_set = set(chrs)
         s = settings
 
-        print("[data] load anchors")
+        LOG.info("load anchors")
         anchors = load_anchors(s.data_path(s.data_anchors), chr_set, region)
 
-        print("[data] load arcs")
+        LOG.info("load arcs")
         raw_arcs, long_arcs = load_arcs(
             s.data_path(s.data_pet_clusters), chr_set, region, s.max_pet_length
         )
 
-        print("[data] mark arcs")
-        arcs = mark_arcs(anchors, raw_arcs)
+        with log.step(LOG, "mark arcs"):
+            arcs = mark_arcs(anchors, raw_arcs)
 
-        print("[data] remove empty anchors")
-        anchors = remove_empty_anchors(anchors, arcs)
+        with log.step(LOG, "remove empty anchors"):
+            anchors = remove_empty_anchors(anchors, arcs)
 
-        print("[data] load breakpoints")
+        LOG.info("load breakpoints")
         breakpoints = load_breakpoints(s.data_path(s.data_segment_split), chrs)
 
-        print("[data] load singletons")
+        LOG.info("load singletons")
         singletons = load_singletons(s.data_path(s.data_singletons), chr_set, region)
 
         # Optional second file for inter-chromosomal singletons (matches the
@@ -95,7 +98,7 @@ class ContactData:
         # multi-chromosome runs - inter-chr contacts feed the chr-level MC.
         if s.data_singletons_inter and len(chrs) > 1:
             inter_path = s.data_path(s.data_singletons_inter)
-            print("[data] load inter-chr singletons")
+            LOG.info("load inter-chr singletons")
             inter = load_singletons(inter_path, chr_set, region)
             singletons.extend(inter)
 
@@ -315,7 +318,7 @@ def mark_arcs(
         flush(result)
 
         arcs[chr_] = result
-        print(f"  marked arcs {chr_}: {len(result)}")
+        LOG.info("marked arcs %s: %d", chr_, len(result))
 
     return arcs
 
@@ -359,7 +362,7 @@ def remove_empty_anchors(
                 new_list.append(anchor)
 
         removed = n - len(new_list)
-        print(f"  removed empty anchors {chr_}: {removed}")
+        LOG.info("removed empty anchors %s: %d", chr_, removed)
 
         new_anchors[chr_] = new_list
         index_maps[chr_] = idx_map
