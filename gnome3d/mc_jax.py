@@ -1427,8 +1427,9 @@ def _build_heatmap_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
       - Optional excluded volume.
       - No chain bonds, angles, heat, orientation, or confinement.
       - Acceptance: non-strict (`score_new <= score`).
-      - Convergence uses score_eps=1e-6 and the standard plateau check;
-        the `stop_when_ratio_above` clause is disabled (set to 2.0).
+      - Convergence uses score_eps=1e-6, the standard plateau check, AND the
+        `stop_when_ratio_above`=0.9999 guard (ported from the reference distance MC)
+        so sparse/disconnected inter-chr heatmaps can't loop forever.
 
     Cache key: ("heatmap", n_steps_per_batch, excl_skip).
     """
@@ -1598,6 +1599,7 @@ def _build_heatmap_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         stop_improvement: Any,
         stop_successes: Any,
         score_eps: Any,
+        stop_when_ratio_above: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -1628,11 +1630,19 @@ def _build_heatmap_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             best_idx = jnp.argmin(score_per_chain)
             score = score_per_chain[best_idx]
             n_ok_best = n_ok[best_idx]
+            ratio = score / jnp.maximum(ms_score, 1e-30)
             plateaued = jnp.logical_and(
                 score > stop_improvement * ms_score, n_ok_best < stop_successes
             )
             eps_done = score < score_eps
-            converged = jnp.logical_or(plateaued, eps_done)
+            # Plateau guard (ports the reference distance-MC guard to heatmap MC):
+            # exit when the batch-to-batch score ratio stalls above 0.9999, so
+            # sparse/disconnected inter-chr heatmaps don't loop forever (their
+            # frustrated components can't be mutually satisfied, so score never
+            # reaches score_eps and milestone_success never drops).  Intentional
+            # divergence from reference MonteCarloHeatmap.
+            ratio_done = ratio > stop_when_ratio_above
+            converged = jnp.logical_or(jnp.logical_or(plateaued, eps_done), ratio_done)
             return (pos, ss, se, T, score, iter_i + 1, n_ok_best, converged)
 
         init_state = (
@@ -1754,6 +1764,7 @@ def mc_heatmap_jax(
         stop_improvement,
         stop_successes,
         score_eps,
+        jnp.float32(0.9999),  # stop_when_ratio_above: plateau guard (see kernel docstring)
     )
 
     score_per_chain = np.asarray(ss_k + se_k)

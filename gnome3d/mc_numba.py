@@ -1386,7 +1386,7 @@ def mc_heatmap_numba(
         stop_successes=int(settings.mc_stop_successes_heatmap),
         strict_better=False,
         score_eps=1e-6,
-        stop_when_ratio_above=2.0,
+        stop_when_ratio_above=0.9999,
         score_struct=score_struct,
         score_heat=0.0,
         score_orn=0.0,

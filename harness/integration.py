@@ -256,12 +256,12 @@ def print_step_comparison(cpp_ms: dict, py_ms: dict, n_structs: int) -> None:
 BASE_CONFIG = """\
 [main]
 output_level = 2
-# Reference parity: C++ densifyActiveRegion always clamps overlapping anchors
+# Reference parity: reference densifyActiveRegion always clamps overlapping anchors
 # (LooperSolver.cpp:1830-1831), collapsing in-between subanchors to one point.
 # Python's default (overlap_anchor_strict=False) instead tiles the overlap with
 # real genomic spans, inflating chain rest lengths (dist_to_next) and producing
 # ~24% longer bonds / lower diversity than the reference.  Force strict mode so
-# the integration comparison is apples-to-apples.  (C++ ignores this unknown key.)
+# the integration comparison is apples-to-apples.  (reference ignores this unknown key.)
 overlap_anchor_strict = yes
 random_walk = no
 loop_density = 5
