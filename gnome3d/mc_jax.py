@@ -1379,7 +1379,6 @@ def _precompile_arcs(settings: "Settings") -> None:
                     f32(0.9999),  # stop_when_ratio_above
                     jnp.int32(b),  # n_active
                 ).compile()
-                print(f"[mc_jax] precompiled arcs bucket {b}")
             except Exception as e:  # noqa: BLE001 - precompile is best-effort
                 print(f"[mc_jax] precompile arcs bucket {b} skipped: {e}", file=sys.stderr)
         _precompiled.add(sig)
@@ -1901,7 +1900,6 @@ def _precompile_heatmap(settings: "Settings") -> None:
                     f32(0.9999),  # stop_when_ratio_above (matches hardcode)
                     jnp.int32(b),  # n_active
                 ).compile()
-                print(f"[mc_jax] precompiled heatmap bucket {b}")
             except Exception as e:  # noqa: BLE001 - precompile is best-effort
                 print(f"[mc_jax] precompile heatmap bucket {b} skipped: {e}", file=sys.stderr)
         _precompiled.add(sig)
@@ -2125,7 +2123,6 @@ def _precompile_smooth(
                     jnp.int32(b),  # n_active
                     jnp.int32(b),  # n_movable_active
                 ).compile()
-                print(f"[mc_jax] precompiled smooth bucket B={b} A={a} "f"(heat={use_heat} orn={use_orn} M={M} K={K})")
             except Exception as e:  # noqa: BLE001 - precompile is best-effort
                 print(f"[mc_jax] precompile smooth B={b} A={a} skipped: {e}", file=sys.stderr)
         _precompiled.add(sig)
