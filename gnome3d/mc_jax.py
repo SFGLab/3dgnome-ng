@@ -185,17 +185,22 @@ def _build_smooth_kernel(
         ang_k: Any,
         dist_w: Any,
         ang_w: Any,
+        n_active: Any,
     ) -> Any:
+        # `n` clips indices into the (possibly bucket-padded) array; `n_active`
+        # is the real chain length, so bonds/angles spanning a pad bead (index
+        # >= n_active) are masked out.  When unbucketed n_active == n, so this is
+        # a no-op.  Pad beads form a contiguous tail, hence a scalar boundary.
         n = pos.shape[0]
         a_pm1 = pos[jnp.maximum(p - 1, 0)]
-        bond_L_ok = jnp.logical_and(p - 1 >= 0, p - 1 < n - 1)
+        bond_L_ok = jnp.logical_and(p - 1 >= 0, p - 1 < n_active - 1)
         bond_L = jnp.where(
             bond_L_ok,
             _smooth_len(a_pm1, p_pos, dtn[jnp.maximum(p - 1, 0)], stretch_k, squeeze_k, dist_w),
             0.0,
         )
         a_pp1 = pos[jnp.minimum(p + 1, n - 1)]
-        bond_R_ok = jnp.logical_and(p >= 0, p < n - 1)
+        bond_R_ok = jnp.logical_and(p >= 0, p < n_active - 1)
         bond_R = jnp.where(
             bond_R_ok,
             _smooth_len(p_pos, a_pp1, dtn[jnp.minimum(p, n - 2)], stretch_k, squeeze_k, dist_w),
@@ -213,21 +218,23 @@ def _build_smooth_kernel(
             a0 = jnp.where(i == p, p_pos, a0)
             a1 = jnp.where(i + 1 == p, p_pos, a1)
             a2 = jnp.where(i + 2 == p, p_pos, a2)
-            valid = jnp.logical_and(i >= 0, i < n - 2)
+            valid = jnp.logical_and(i >= 0, i < n_active - 2)
             return jnp.where(valid, _smooth_ang(a0, a1, a2, ang_k, ang_w), 0.0)
 
         return bond_L + bond_R + angle_at(-2) + angle_at(-1) + angle_at(0)
 
     # ---- excluded volume helpers ----
 
-    def _local_excl_at(pos: Any, p_pos: Any, p: Any, r0: Any, weight: Any) -> Any:
+    def _local_excl_at(pos: Any, p_pos: Any, p: Any, r0: Any, weight: Any, n_active: Any) -> Any:
         n = pos.shape[0]
         diff = pos - p_pos
         d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
         rel = jnp.maximum(0.0, (r0 - d) / r0)
         contrib = weight * rel * rel
         idx = jnp.arange(n)
-        in_range = jnp.abs(idx - p) > excl_skip
+        # Exclude pad beads (idx >= n_active) from the pairwise sum.  Unbucketed
+        # n_active == n, so this is a no-op.
+        in_range = jnp.logical_and(jnp.abs(idx - p) > excl_skip, idx < n_active)
         return jnp.sum(jnp.where(in_range, contrib, 0.0))
 
     # ---- confinement helper ----
@@ -364,6 +371,8 @@ def _build_smooth_kernel(
         conf_w: Any,
         # RNG
         key: Any,
+        # real bead count (< pos length when bucket-padded; == otherwise)
+        n_active: Any,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         """One batch of `n_steps_per_batch` MC steps for ONE chain.  Returns
         (pos_f, ss_f, se_f, sh_f, so_f, sc_f, anchor_orn_f, T_f, n_ok)."""
@@ -392,16 +401,16 @@ def _build_smooth_kernel(
 
             # ---- struct (chain bonds + angles) ----
             loc_s_prev = _local_smooth_at(
-                pos, old_p, p, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w
+                pos, old_p, p, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w, n_active
             )
             loc_s_curr = _local_smooth_at(
-                pos, new_p, p, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w
+                pos, new_p, p, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w, n_active
             )
             ss_new = ss + (loc_s_curr - loc_s_prev)
 
             # ---- excluded volume ----
-            loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w)
-            loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w)
+            loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w, n_active)
+            loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w, n_active)
             se_new = se + 2.0 * (loc_e_curr - loc_e_prev)
 
             # ---- heat ----
@@ -540,6 +549,7 @@ def _build_smooth_kernel(
         None,
         None,  # conf_cx, conf_cy, conf_cz, conf_R, conf_w
         0,  # key
+        None,  # n_active (shared)
     )
     out_axes = (0, 0, 0, 0, 0, 0, 0, None, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
@@ -583,6 +593,7 @@ def _build_smooth_kernel(
         conf_R: Any,
         conf_w: Any,
         keys: Any,
+        n_active: Any,
     ) -> Any:
         return batched(
             pos_k,
@@ -622,6 +633,7 @@ def _build_smooth_kernel(
             conf_R,
             conf_w,
             keys,
+            n_active,
         )
 
     # ---- full convergence loop, on device ----
@@ -680,6 +692,7 @@ def _build_smooth_kernel(
         stop_improvement: Any,
         stop_successes: Any,
         score_eps: Any,
+        n_active: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -730,6 +743,7 @@ def _build_smooth_kernel(
                 conf_R,
                 conf_w,
                 keys,
+                n_active,
             )
             score_per_chain = ss + se + sh + so + sc
             best_idx = jnp.argmin(score_per_chain)
@@ -779,21 +793,32 @@ def _build_smooth_kernel(
     # ---- init helpers (one-shot per chain on entry) ----
 
     def _init_smooth_single(
-        pos: Any, dtn: Any, stretch_k: Any, squeeze_k: Any, ang_k: Any, dist_w: Any, ang_w: Any
+        pos: Any,
+        dtn: Any,
+        stretch_k: Any,
+        squeeze_k: Any,
+        ang_k: Any,
+        dist_w: Any,
+        ang_w: Any,
+        n_active: Any,
     ) -> Any:
         n = pos.shape[0]
 
+        # Mask bonds/angles that span a pad bead (index >= n_active).  Unbucketed
+        # n_active == n so every term is kept.
         def _bond_at(i: Any) -> Any:
-            return _smooth_len(pos[i], pos[i + 1], dtn[i], stretch_k, squeeze_k, dist_w)
+            val = _smooth_len(pos[i], pos[i + 1], dtn[i], stretch_k, squeeze_k, dist_w)
+            return jnp.where(i + 1 < n_active, val, 0.0)
 
         def _angle_at(i: Any) -> Any:
-            return _smooth_ang(pos[i], pos[i + 1], pos[i + 2], ang_k, ang_w)
+            val = _smooth_ang(pos[i], pos[i + 1], pos[i + 2], ang_k, ang_w)
+            return jnp.where(i + 2 < n_active, val, 0.0)
 
         bonds = jax.vmap(_bond_at)(jnp.arange(n - 1))
         angles = jax.vmap(_angle_at)(jnp.arange(n - 2))
         return jnp.sum(bonds) + jnp.sum(angles)
 
-    def _init_excl_single(pos: Any, r0: Any, weight: Any) -> Any:
+    def _init_excl_single(pos: Any, r0: Any, weight: Any, n_active: Any) -> Any:
         n = pos.shape[0]
         idx = jnp.arange(n)
 
@@ -802,8 +827,10 @@ def _build_smooth_kernel(
             d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
             rel = jnp.maximum(0.0, (r0 - d) / r0)
             contrib = weight * rel * rel
-            in_range = jnp.abs(idx - i) > excl_skip
-            return carry + jnp.sum(jnp.where(in_range, contrib, 0.0)), None
+            # Mask pad columns (idx >= n_active); zero the whole row if i is pad.
+            in_range = jnp.logical_and(jnp.abs(idx - i) > excl_skip, idx < n_active)
+            row = jnp.where(i < n_active, jnp.sum(jnp.where(in_range, contrib, 0.0)), 0.0)
+            return carry + row, None
 
         total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
         return total
@@ -825,14 +852,18 @@ def _build_smooth_kernel(
         total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
         return heat_weight * total
 
-    def _init_confine_single(pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any) -> Any:
+    def _init_confine_single(
+        pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any, n_active: Any
+    ) -> Any:
         """Sum of per-bead confinement contributions.
         Mirrors gnome3d.mc._init_confine_nb."""
 
         def per_bead(p_pos: Any) -> Any:
             return _local_confine_at(p_pos, cx, cy, cz, R, weight)
 
-        return jnp.sum(jax.vmap(per_bead)(pos))
+        contribs = jax.vmap(per_bead)(pos)
+        idx = jnp.arange(pos.shape[0])
+        return jnp.sum(jnp.where(idx < n_active, contribs, 0.0))
 
     def _init_anchor_orientations_single(
         pos: Any,
@@ -896,15 +927,15 @@ def _build_smooth_kernel(
     init_smooth = jax.jit(
         jax.vmap(
             _init_smooth_single,
-            in_axes=(0, None, None, None, None, None, None),
+            in_axes=(0, None, None, None, None, None, None, None),
         )
     )
-    init_excl = jax.jit(jax.vmap(_init_excl_single, in_axes=(0, None, None)))
+    init_excl = jax.jit(jax.vmap(_init_excl_single, in_axes=(0, None, None, None)))
     init_heat = jax.jit(jax.vmap(_init_heat_single, in_axes=(0, None, None)))
     init_confine = jax.jit(
         jax.vmap(
             _init_confine_single,
-            in_axes=(0, None, None, None, None, None),
+            in_axes=(0, None, None, None, None, None, None),
         )
     )
     init_anchor_orn = jax.jit(jax.vmap(_init_anchor_orientations_single, in_axes=(0, None, None)))
@@ -2065,6 +2096,25 @@ def mc_smooth_jax(
     else:
         heat_np = np.zeros((1, 1), dtype=np.float32)  # unused placeholder
 
+    # ---- shape bucketing: pad N up to a bucket so XLA reuses one compiled
+    # kernel across all similarly-sized regions.  Pad beads are fully inert:
+    # chain/EV/confinement are masked by `n_active` (real count), heat rows are
+    # zeroed, `movable` excludes them so they never move, and orientation arrays
+    # index only real beads.  So pad positions never matter and the result is
+    # bit-identical to the unbucketed run.  n_active == n when unbucketed.
+    n_active_v: int = n
+    B: int = _bucket_for(n) if bool(settings.jax_bucket_shapes) else n
+    if B > n:
+        n_pad = B - n
+        pos_k_np = np.concatenate(
+            [pos_k_np, np.zeros((pos_k_np.shape[0], n_pad, 3), dtype=np.float32)], axis=1
+        )
+        dtn_np = np.concatenate([dtn_np, np.ones(n_pad, dtype=np.float32)], axis=0)
+        if use_heat:
+            heat_pad = np.zeros((B, B), dtype=np.float32)
+            heat_pad[:n, :n] = heat_np
+            heat_np = heat_pad
+
     bundle = _build_smooth_kernel(n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs)
     (
         _kernel_one_batch,
@@ -2087,6 +2137,7 @@ def mc_smooth_jax(
     nbr_w_j = jnp.asarray(nbr_w_np)
     nbr_valid_j = jnp.asarray(nbr_valid_np)
     is_L_j = jnp.asarray(is_L_np)
+    n_active_j = jnp.int32(n_active_v)
     seed_offset: int = abs(hash(label)) % (2**31) if label else 0
 
     # ---- initial scores ----
@@ -2098,9 +2149,10 @@ def mc_smooth_jax(
         jnp.float32(settings.spring_angular),
         jnp.float32(settings.smooth_dist_weight),
         jnp.float32(settings.smooth_angle_weight),
+        n_active_j,
     )
     se_k = (
-        init_excl(pos_k, jnp.float32(excl_r0), jnp.float32(excl_w_v))
+        init_excl(pos_k, jnp.float32(excl_r0), jnp.float32(excl_w_v), n_active_j)
         if use_excl
         else jnp.zeros((K,), dtype=jnp.float32)
     )
@@ -2117,6 +2169,7 @@ def mc_smooth_jax(
             jnp.float32(conf_cz_v),
             jnp.float32(conf_R_v),
             jnp.float32(conf_w_v),
+            n_active_j,
         )
         if use_conf
         else jnp.zeros((K,), dtype=jnp.float32)
@@ -2216,6 +2269,7 @@ def mc_smooth_jax(
         stop_improvement,
         stop_successes,
         score_eps,
+        n_active_j,
     )
 
     score_per_chain = np.asarray(ss_k + se_k + sh_k + so_k + sc_k)
@@ -2234,9 +2288,14 @@ def mc_smooth_jax(
 
     if return_all:
         # Batched mode: hand back every chain's score + final positions; the
-        # caller selects per-trial.  Do NOT mutate `pos`.
-        return score_per_chain.astype(np.float64), np.asarray(pos_k).astype(np.float32)
+        # caller selects per-trial.  Slice off bucket padding (B -> n).  Do NOT
+        # mutate `pos`.
+        return (
+            score_per_chain.astype(np.float64),
+            np.asarray(pos_k[:, :n]).astype(np.float32),
+        )
 
     best_k: int = int(np.argmin(score_per_chain))
-    pos[:] = np.asarray(pos_k[best_k]).astype(pos.dtype)
+    # Slice off any bucket padding (pos is (n, 3); pos_k is (K, B, 3), B >= n).
+    pos[:] = np.asarray(pos_k[best_k][:n]).astype(pos.dtype)
     return float(score_per_chain[best_k])
