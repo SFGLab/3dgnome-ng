@@ -1317,6 +1317,70 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
     return bundle
 
 
+def _precompile_arcs(settings: "Settings") -> None:
+    """Eagerly compile the arcs kernel for every shape bucket.  Arcs is fully
+    N-bucketed (all kernel_full inputs are (K,B,3)/(B,B)/scalar), so one program
+    per bucket covers every region.  Same .lower(ShapeDtypeStruct).compile()
+    trick as _precompile_heatmap.  Idempotent."""
+    if not _ensure_jax():
+        return
+    assert _jax is not None and _jnp is not None
+    jax = _jax
+    jnp = _jnp
+    sys = __import__("sys")
+
+    K = 1  # arcs has no multichain in production
+    excl_skip = int(settings.exclusion_skip_neighbors)
+    n_steps = int(settings.mc_stop_steps)
+    sig = ("arcs", n_steps, excl_skip, K)
+    with _init_lock:
+        if sig in _precompiled:
+            return
+        kernel_full, init_arcs, init_excl, init_confine = _build_arcs_kernel(n_steps, excl_skip)
+        sds = jax.ShapeDtypeStruct
+        f32 = jnp.float32
+        key = jax.random.PRNGKey(0)
+        T_a = f32(settings.max_temp)
+        dt_a = f32(settings.dt_temp)
+        js_a = f32(settings.jump_scale)
+        jc_a = f32(settings.jump_coef)
+        impr_a = f32(settings.mc_stop_improvement)
+        succ_a = jnp.int32(settings.mc_stop_successes)
+        t0 = __import__("time").perf_counter()
+        for b in _SHAPE_BUCKETS:
+            pos_a = sds((K, b, 3), np.float32)
+            kvec_a = sds((K,), np.float32)
+            exp_a = sds((b, b), np.float32)
+            try:
+                init_arcs.lower(pos_a, exp_a, f32(1.0), f32(1.0)).compile()
+                init_excl.lower(pos_a, f32(1.0), f32(0.0), jnp.int32(b)).compile()
+                init_confine.lower(
+                    pos_a, f32(0.0), f32(0.0), f32(0.0), f32(1.0), f32(0.0), jnp.int32(b)
+                ).compile()
+                kernel_full.lower(
+                    pos_a, kvec_a, kvec_a, kvec_a,  # pos, ss, se, sc
+                    T_a, exp_a,
+                    f32(0.1),  # step_size (per-call: value irrelevant)
+                    dt_a, js_a, jc_a,
+                    f32(1.0), f32(1.0),  # stretch_k, squeeze_k
+                    f32(1.0), f32(0.0),  # r0, excl_w
+                    f32(0.0), f32(0.0), f32(0.0), f32(1.0), f32(0.0),  # conf_cx..conf_w
+                    key, impr_a, succ_a,
+                    f32(1e-5),  # score_eps (matches mc_arcs_jax hardcode)
+                    f32(0.9999),  # stop_when_ratio_above
+                    jnp.int32(b),  # n_active
+                ).compile()
+            except Exception as e:  # noqa: BLE001 - precompile is best-effort
+                print(f"[mc_jax] precompile arcs bucket {b} skipped: {e}", file=sys.stderr)
+        _precompiled.add(sig)
+        dt = __import__("time").perf_counter() - t0
+        print(
+            f"[mc_jax] precompiled arcs kernel for {len(_SHAPE_BUCKETS)} buckets in {dt:.1f}s",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 def mc_arcs_jax(
     pos: np.ndarray[Any, Any],
     exp_dist_mat: np.ndarray[Any, Any],
@@ -1389,7 +1453,12 @@ def mc_arcs_jax(
     # [0, n_active) so pad beads never move.  Result == unbucketed at init
     # (bit-identical); per-step f32 chaos only (arcs uses non-strict acceptance).
     n_active_v: int = n
-    B: int = _bucket_for(n) if bool(settings.jax_bucket_shapes) else n
+    if bool(settings.jax_bucket_shapes):
+        if settings.jax_precompile_buckets:
+            _precompile_arcs(settings)
+        B: int = _bucket_for(n)
+    else:
+        B = n
     pos_f32: F32Array = pos.astype(np.float32)
     exp_mat_np: F32Array = exp_dist_mat.astype(np.float32)
     if B > n:
