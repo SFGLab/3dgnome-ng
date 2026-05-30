@@ -966,6 +966,206 @@ def _build_smooth_kernel(
         )
     )
 
+    # ---- multi-problem variant: K DIFFERENT IBs in one kernel ----
+    #
+    # The single-problem path above vmaps K restarts of ONE problem (problem
+    # arrays shared, None in `in_axes`).  Region-batching instead wants K
+    # *different* IBs annealed together to fill the GPU (per profile, a K=1
+    # smooth at N=1607 is ~99% GPU-idle; K=8 costs ~the same wall).  Two
+    # differences from the single-problem path, nothing else:
+    #   (a) every per-IB array is vmapped (axis 0) instead of shared.
+    #   (b) convergence is PER-CHAIN — each IB stops on its own criterion and
+    #       the device while-loop runs until ALL chains have converged (or the
+    #       max-iters cap).  Smooth uses strict acceptance, so a chain that
+    #       converges early and keeps stepping can only hold or improve — never
+    #       drift worse — which makes run-to-all-converged safe.  Wall-clock of
+    #       a batch = its slowest IB, so the caller buckets IBs by size.
+    #
+    # The per-chain step body (`chain_batch`) and the init scores are reused
+    # verbatim — the caller computes per-IB init scores with the same init
+    # helpers and stacks them.  `batched_mp`/`kernel_full_mp` only compile when
+    # the region-batched entry actually calls them.
+    in_axes_mp = (
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,  # pos, ss, se, sh, so, sc  (per-chain)
+        0,  # anchor_orn (per-chain)
+        None,  # T0 (shared schedule start)
+        0,
+        0,  # dtn, movable (per-IB)
+        0,  # heat_dist (per-IB)
+        0,
+        0,  # anchor_ar, bead_to_anchor_k (per-IB)
+        0,
+        0,
+        0,  # nbr_idx, nbr_w, nbr_valid (per-IB)
+        0,  # is_L (per-IB)
+        0,  # step_size (per-IB)
+        None,
+        None,
+        None,  # dt, js, jc (shared schedule)
+        0,
+        0,
+        0,  # stretch_k, squeeze_k, ang_k (per-IB; small-IB boost varies)
+        None,
+        None,  # dist_w, ang_w (global weights)
+        0,  # r0 (per-IB auto excl radius)
+        None,  # excl_w (global)
+        None,  # heat_weight (global)
+        None,
+        None,  # motif_weight, symmetric (global)
+        0,
+        0,
+        0,
+        0,
+        0,  # conf_cx, conf_cy, conf_cz, conf_R, conf_w (per-IB)
+        0,  # keys (per-chain)
+        0,  # n_active (per-IB)
+        0,  # n_movable_active (per-IB)
+    )
+    batched_mp = jax.vmap(chain_batch, in_axes=in_axes_mp, out_axes=out_axes)
+
+    @jax.jit
+    def kernel_full_mp(
+        pos_k: Any,
+        ss_k: Any,
+        se_k: Any,
+        sh_k: Any,
+        so_k: Any,
+        sc_k: Any,
+        anchor_orn_k: Any,
+        T_init: Any,
+        dtn: Any,
+        movable: Any,
+        heat_dist: Any,
+        anchor_ar: Any,
+        bead_to_anchor_k: Any,
+        nbr_idx: Any,
+        nbr_w: Any,
+        nbr_valid: Any,
+        is_L: Any,
+        step_size: Any,
+        dt: Any,
+        js: Any,
+        jc: Any,
+        stretch_k: Any,
+        squeeze_k: Any,
+        ang_k: Any,
+        dist_w: Any,
+        ang_w: Any,
+        r0: Any,
+        excl_w: Any,
+        heat_weight: Any,
+        motif_weight: Any,
+        symmetric: Any,
+        conf_cx: Any,
+        conf_cy: Any,
+        conf_cz: Any,
+        conf_R: Any,
+        conf_w: Any,
+        base_key: Any,
+        stop_improvement: Any,
+        stop_successes: Any,
+        score_eps: Any,
+        n_active: Any,
+        n_movable_active: Any,
+    ) -> Any:
+        K = pos_k.shape[0]
+
+        def cond_fn(state: Any) -> Any:
+            iter_i = state[9]
+            converged = state[11]  # (K,) per-chain
+            return jnp.logical_and(jnp.logical_not(jnp.all(converged)), iter_i < _MAX_ITERS)
+
+        def body_fn(state: Any) -> Any:
+            pos, ss, se, sh, so, sc, anchor_orn, T, ms_score, iter_i, _, conv_prev = state
+            iter_key = jax.random.fold_in(base_key, iter_i + 1)
+            keys = jax.random.split(iter_key, K)
+            pos, ss, se, sh, so, sc, anchor_orn, T, n_ok = batched_mp(
+                pos,
+                ss,
+                se,
+                sh,
+                so,
+                sc,
+                anchor_orn,
+                T,
+                dtn,
+                movable,
+                heat_dist,
+                anchor_ar,
+                bead_to_anchor_k,
+                nbr_idx,
+                nbr_w,
+                nbr_valid,
+                is_L,
+                step_size,
+                dt,
+                js,
+                jc,
+                stretch_k,
+                squeeze_k,
+                ang_k,
+                dist_w,
+                ang_w,
+                r0,
+                excl_w,
+                heat_weight,
+                motif_weight,
+                symmetric,
+                conf_cx,
+                conf_cy,
+                conf_cz,
+                conf_R,
+                conf_w,
+                keys,
+                n_active,
+                n_movable_active,
+            )
+            score = ss + se + sh + so + sc  # (K,) per-chain total
+            # Per-chain plateau: improvement below threshold AND too few accepts
+            # this batch.  ms_score is the previous batch's per-chain score.
+            plateaued = jnp.logical_and(score > stop_improvement * ms_score, n_ok < stop_successes)
+            eps_done = score < score_eps
+            # Latch convergence: once a chain converges it stays converged, so
+            # `jnp.all` can terminate even if a cold chain's score wobbles.
+            converged = jnp.logical_or(jnp.logical_or(plateaued, eps_done), conv_prev)
+            return (pos, ss, se, sh, so, sc, anchor_orn, T, score, iter_i + 1, n_ok, converged)
+
+        init_state = (
+            pos_k,
+            ss_k,
+            se_k,
+            sh_k,
+            so_k,
+            sc_k,
+            anchor_orn_k,
+            T_init,
+            jnp.full((K,), 1e30, dtype=jnp.float32),  # ms_score per-chain
+            jnp.int32(0),  # iter_i
+            jnp.zeros((K,), dtype=jnp.int32),  # n_ok (filler)
+            jnp.zeros((K,), dtype=jnp.bool_),  # converged per-chain
+        )
+        final = jax.lax.while_loop(cond_fn, body_fn, init_state)
+        (
+            pos_f,
+            ss_f,
+            se_f,
+            sh_f,
+            so_f,
+            sc_f,
+            anchor_orn_f,
+            _T_f,
+            final_score,
+            iter_f,
+            _n_ok_f,
+            converged_f,
+        ) = final
+        return (pos_f, ss_f, se_f, sh_f, so_f, sc_f, anchor_orn_f, final_score, iter_f, converged_f)
+
     bundle = (
         kernel,  # per-batch (kept for diagnostics; unused in prod)
         kernel_full,  # full convergence on device — the production path
@@ -975,6 +1175,7 @@ def _build_smooth_kernel(
         init_confine,
         init_anchor_orn,
         init_orn_score,
+        kernel_full_mp,  # region-batched (K different IBs); per-chain convergence
     )
     _kernel_cache[cache_key] = bundle
     return bundle
@@ -2392,6 +2593,7 @@ def mc_smooth_jax(
         init_confine,
         init_anchor_orn,
         init_orn_score,
+        _kernel_full_mp,  # region-batched entry uses this; single-problem path ignores it
     ) = bundle
 
     pos_k = jnp.asarray(pos_k_np)
@@ -2570,3 +2772,391 @@ def mc_smooth_jax(
     # Slice off any bucket padding (pos is (n, 3); pos_k is (K, B, 3), B >= n).
     pos[:] = np.asarray(pos_k[best_k][:n]).astype(pos.dtype)
     return float(score_per_chain[best_k])
+
+
+# ---------------------------------------------------------------------------
+# Region-batched smooth-MC: anneal K DIFFERENT IBs in one vmapped kernel.
+#
+# Profile + kscan (playground/bench/bench_jax_grad_vs_mc.py --kscan) showed a
+# K=1 smooth at N~1600 leaves the GPU ~99% idle: total wall is flat from K=1
+# to K~16-32.  So instead of annealing hundreds of independent IBs one at a
+# time (the serial IB loop), we pad each to a common bucket and run a whole
+# group as one kernel — ~16-50x on the dominant phase, for free.
+#
+# Single-problem `mc_smooth_jax` shares the problem arrays across K restarts;
+# here every array is per-IB (stacked on axis 0) and convergence is per-chain
+# (kernel_full_mp).  This is a SEPARATE, additive path: the validated
+# single-problem prep above is untouched.
+# ---------------------------------------------------------------------------
+
+
+def _prep_smooth_problem_np(
+    pos: np.ndarray[Any, Any],
+    dtn: np.ndarray[Any, Any],
+    fixed: np.ndarray[Any, Any],
+    settings: "Settings",
+    char_orientations: np.ndarray[Any, Any] | None,
+    anchor_neighbors: dict[int, list[int]] | None,
+    anchor_neighbor_weights: dict[int, list[float]] | None,
+    heat_dist: np.ndarray[Any, Any] | None,
+    B: int,
+    A: int,
+    M: int,
+) -> dict[str, Any]:
+    """Build one IB's kernel inputs as numpy arrays, padded to a common bucket
+    (B beads, A anchors, M neighbours) so a batch of IBs has uniform shapes.
+
+    Pure numpy (no JAX) → unit-testable in isolation.  Mirrors the per-problem
+    prep inside `mc_smooth_jax` exactly; the only difference is that B/A/M are
+    passed in (the batch's common bucket) instead of derived per-region, and
+    arrays are always padded to them (the batched kernel needs uniform shapes
+    regardless of the `jax_bucket_shapes` flag).
+    """
+    n = int(pos.shape[0])
+    use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
+    use_heat = heat_dist is not None
+    use_orn = (
+        char_orientations is not None
+        and anchor_neighbors is not None
+        and anchor_neighbor_weights is not None
+    )
+    use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth)
+
+    # --- excluded-volume radius (auto-derived per IB if radius<=0) ---
+    excl_r0 = 1.0
+    if use_excl:
+        excl_r0 = float(settings.exclusion_radius_smooth)
+        if excl_r0 <= 0.0:
+            excl_r0 = float(settings.exclusion_auto_factor_smooth) * float(np.asarray(dtn).mean())
+
+    # --- confinement envelope (centroid + radius, per IB) ---
+    if use_conf:
+        conf_cx = float(pos[:, 0].mean())
+        conf_cy = float(pos[:, 1].mean())
+        conf_cz = float(pos[:, 2].mean())
+        conf_R = float(settings.confinement_radius_smooth)
+        if conf_R <= 0.0:
+            avg_bond = float(np.asarray(dtn).mean()) if dtn.size > 0 else 1.0
+            pf = float(settings.confinement_packing_factor_smooth)
+            conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
+        conf_w = float(settings.confinement_weight)
+    else:
+        conf_cx = conf_cy = conf_cz = 0.0
+        conf_R = 1.0
+        conf_w = 0.0
+
+    # --- orientation CSR (anchor-indexed), padded to (A, M) ---
+    if use_orn:
+        assert char_orientations is not None and anchor_neighbors is not None
+        assert anchor_neighbor_weights is not None
+        anchor_ar = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
+        n_anchors = int(len(anchor_ar))
+        nbr_lists = [list(anchor_neighbors.get(k, [])) for k in range(n_anchors)]
+        nbr_w_lists = [list(anchor_neighbor_weights.get(k, [])) for k in range(n_anchors)]
+        nbr_idx = np.zeros((n_anchors, M), dtype=np.int32)
+        nbr_w = np.zeros((n_anchors, M), dtype=np.float32)
+        nbr_valid = np.zeros((n_anchors, M), dtype=np.bool_)
+        for k_idx in range(n_anchors):
+            for m, (jn, wn) in enumerate(zip(nbr_lists[k_idx], nbr_w_lists[k_idx], strict=True)):
+                nbr_idx[k_idx, m] = int(jn)
+                nbr_w[k_idx, m] = float(wn)
+                nbr_valid[k_idx, m] = True
+        bead_to_anchor_k = np.full(n, -1, dtype=np.int32)
+        for k_idx in range(n_anchors):
+            ar = int(anchor_ar[k_idx])
+            if ar > 0:
+                bead_to_anchor_k[ar - 1] = k_idx
+            if ar + 1 < n:
+                bead_to_anchor_k[ar + 1] = k_idx
+        is_L = np.array([c == "L" for c in char_orientations], dtype=np.bool_)
+        # pad anchor-indexed arrays to A (pad anchors get nbr_valid=False -> 0 score)
+        if A > n_anchors:
+            ap = A - n_anchors
+            anchor_ar = np.concatenate([anchor_ar, np.zeros(ap, dtype=np.int32)])
+            nbr_idx = np.pad(nbr_idx, ((0, ap), (0, 0)))
+            nbr_w = np.pad(nbr_w, ((0, ap), (0, 0)))
+            nbr_valid = np.pad(nbr_valid, ((0, ap), (0, 0)))
+    else:
+        anchor_ar = np.zeros(A, dtype=np.int32)
+        nbr_idx = np.zeros((A, M), dtype=np.int32)
+        nbr_w = np.zeros((A, M), dtype=np.float32)
+        nbr_valid = np.zeros((A, M), dtype=np.bool_)
+        bead_to_anchor_k = np.full(n, -1, dtype=np.int32)
+        is_L = np.zeros(n, dtype=np.bool_)
+
+    # --- bead-indexed arrays, padded to B ---
+    movable = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    n_movable = int(movable.shape[0])
+    pos_pad = pos.astype(np.float32)
+    dtn_pad = dtn.astype(np.float32)
+    heat_pad = heat_dist.astype(np.float32) if use_heat else np.zeros((1, 1), dtype=np.float32)
+    if B > n:
+        n_pad = B - n
+        pos_pad = np.concatenate([pos_pad, np.zeros((n_pad, 3), dtype=np.float32)], axis=0)
+        dtn_pad = np.concatenate([dtn_pad, np.ones(n_pad, dtype=np.float32)], axis=0)
+        if use_heat:
+            hp = np.zeros((B, B), dtype=np.float32)
+            hp[:n, :n] = heat_pad
+            heat_pad = hp
+        bead_to_anchor_k = np.concatenate([bead_to_anchor_k, np.full(n_pad, -1, dtype=np.int32)])
+        is_L = np.concatenate([is_L, np.zeros(n_pad, dtype=np.bool_)])
+        movable = np.concatenate([movable, np.zeros(B - n_movable, dtype=movable.dtype)])
+
+    return {
+        "n": n,
+        "pos": pos_pad,  # (B, 3)
+        "dtn": dtn_pad,  # (B,)
+        "movable": movable,  # (B,)
+        "heat": heat_pad,  # (B, B) or (1, 1)
+        "anchor_ar": anchor_ar,  # (A,)
+        "bead_to_anchor_k": bead_to_anchor_k,  # (B,)
+        "nbr_idx": nbr_idx,  # (A, M)
+        "nbr_w": nbr_w,  # (A, M)
+        "nbr_valid": nbr_valid,  # (A, M)
+        "is_L": is_L,  # (B,)
+        "n_active": n,
+        "n_movable": n_movable,
+        "excl_r0": excl_r0,
+        "conf_cx": conf_cx,
+        "conf_cy": conf_cy,
+        "conf_cz": conf_cz,
+        "conf_R": conf_R,
+        "conf_w": conf_w,
+    }
+
+
+def mc_smooth_jax_batch(
+    problems: list[dict[str, Any]],
+    settings: "Settings",
+) -> list[tuple[float, np.ndarray[Any, Any]]]:
+    """Anneal K *different* IBs in one vmapped kernel (region batching).
+
+    `problems` is a list of dicts, each describing one IB's final smooth:
+        pos (n,3), dtn (n,), fixed (n,) bool, step_size (float),
+        and optionally heat_dist (n,n), char_orientations (n,),
+        anchor_neighbors, anchor_neighbor_weights.
+    All problems must share the same energy-term flags (use_heat/use_orn/...)
+    — the caller groups IBs by (terms, size bucket) before calling.
+
+    Returns one (score, final_pos (n_i, 3)) per problem, in input order.
+    Does not mutate the inputs.
+    """
+    if not _ensure_jax():
+        raise RuntimeError("settings.mc_backend='jax' but JAX is not installed.")
+    assert _jax is not None and _jnp is not None
+    jax = _jax
+    jnp = _jnp
+
+    K = len(problems)
+    if K == 0:
+        return []
+
+    # Common bucket across the group: pad every IB to the max (B, A, M) so the
+    # kernel sees one uniform shape.  Callers should pre-group by bucket so
+    # these maxes are tight (wall-clock = slowest IB in the batch).
+    bucket = bool(settings.jax_bucket_shapes)
+    use_orn = (
+        problems[0].get("char_orientations") is not None
+        and problems[0].get("anchor_neighbors") is not None
+        and problems[0].get("anchor_neighbor_weights") is not None
+    )
+    use_heat = problems[0].get("heat_dist") is not None
+    use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
+    use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth)
+
+    Bs, As, Ms = [], [], []
+    for p in problems:
+        n_i = int(p["pos"].shape[0])
+        Bs.append(_bucket_for(n_i) if bucket else n_i)
+        if use_orn:
+            anchors_i = int(np.count_nonzero(p["fixed"]))
+            nbrs_i = max(
+                (len(p["anchor_neighbors"].get(k, [])) for k in range(anchors_i)), default=1
+            )
+            nbrs_i = max(nbrs_i, 1)
+            As.append(_bucket_for(anchors_i, _ANCHOR_BUCKETS) if bucket else anchors_i)
+            Ms.append(_bucket_for(nbrs_i, _NBR_BUCKETS) if bucket else nbrs_i)
+        else:
+            As.append(1)
+            Ms.append(1)
+    B, A, M = max(Bs), max(As), max(Ms)
+
+    preps = [
+        _prep_smooth_problem_np(
+            p["pos"],
+            p["dtn"],
+            p["fixed"],
+            settings,
+            p.get("char_orientations"),
+            p.get("anchor_neighbors"),
+            p.get("anchor_neighbor_weights"),
+            p.get("heat_dist"),
+            B,
+            A,
+            M,
+        )
+        for p in problems
+    ]
+
+    # --- stack per-IB arrays -> (K, ...) ---
+    def stack(key: str) -> Any:
+        return jnp.asarray(np.stack([pr[key] for pr in preps], axis=0))
+
+    pos_k = stack("pos")  # (K, B, 3)
+    dtn_k = stack("dtn")
+    movable_k = stack("movable")
+    heat_k = stack("heat")
+    anchor_ar_k = stack("anchor_ar")
+    b2a_k = stack("bead_to_anchor_k")
+    nbr_idx_k = stack("nbr_idx")
+    nbr_w_k = stack("nbr_w")
+    nbr_valid_k = stack("nbr_valid")
+    is_L_k = stack("is_L")
+    n_active_k = jnp.asarray(np.array([pr["n_active"] for pr in preps], dtype=np.int32))
+    n_movable_k = jnp.asarray(np.array([pr["n_movable"] for pr in preps], dtype=np.int32))
+    excl_r0_k = jnp.asarray(np.array([pr["excl_r0"] for pr in preps], dtype=np.float32))
+    conf_cx_k = jnp.asarray(np.array([pr["conf_cx"] for pr in preps], dtype=np.float32))
+    conf_cy_k = jnp.asarray(np.array([pr["conf_cy"] for pr in preps], dtype=np.float32))
+    conf_cz_k = jnp.asarray(np.array([pr["conf_cz"] for pr in preps], dtype=np.float32))
+    conf_R_k = jnp.asarray(np.array([pr["conf_R"] for pr in preps], dtype=np.float32))
+    conf_w_k = jnp.asarray(np.array([pr["conf_w"] for pr in preps], dtype=np.float32))
+    step_size_k = jnp.asarray(np.array([float(p["step_size"]) for p in problems], dtype=np.float32))
+
+    # per-IB springs (uniform from settings for now; small-IB boost groups
+    # would carry their own — callers batch boosted IBs separately).
+    stretch_k = jnp.full((K,), jnp.float32(settings.spring_stretch))
+    squeeze_k = jnp.full((K,), jnp.float32(settings.spring_squeeze))
+    ang_k = jnp.full((K,), jnp.float32(settings.spring_angular))
+
+    # --- shared (global) schedule + weights ---
+    excl_skip = int(settings.exclusion_skip_neighbors)
+    n_steps_per_batch = int(settings.mc_stop_steps_smooth)
+    heat_weight_v = float(settings.subanchor_heatmap_dist_weight) if use_heat else 0.0
+    motif_weight_v = float(settings.motif_weight) if use_orn else 0.0
+    excl_w_v = float(settings.exclusion_weight) if use_excl else 0.0
+
+    bundle = _build_smooth_kernel(n_steps_per_batch, excl_skip, use_heat, use_orn, M)
+    (
+        _kb,
+        _kf,
+        init_smooth,
+        init_excl,
+        init_heat,
+        init_confine,
+        init_anchor_orn,
+        init_orn_score,
+        kernel_full_mp,
+    ) = bundle
+
+    # --- per-IB initial scores (one-shot; reuse the validated init helpers) ---
+    dist_w = jnp.float32(settings.smooth_dist_weight)
+    ang_w = jnp.float32(settings.smooth_angle_weight)
+    symmetric = jnp.bool_(bool(getattr(settings, "motifs_symmetric", True)))
+
+    def init_one(i: int) -> tuple[Any, Any, Any, Any, Any, Any]:
+        p1 = pos_k[i : i + 1]  # (1, B, 3)
+        na = jnp.int32(int(np.asarray(n_active_k[i])))
+        ss = init_smooth(p1, dtn_k[i], stretch_k[i], squeeze_k[i], ang_k[i], dist_w, ang_w, na)
+        se = (
+            init_excl(p1, excl_r0_k[i], jnp.float32(excl_w_v), na)
+            if use_excl
+            else jnp.zeros((1,), jnp.float32)
+        )
+        sh = (
+            init_heat(p1, heat_k[i], jnp.float32(heat_weight_v))
+            if use_heat
+            else jnp.zeros((1,), jnp.float32)
+        )
+        sc = (
+            init_confine(p1, conf_cx_k[i], conf_cy_k[i], conf_cz_k[i], conf_R_k[i], conf_w_k[i], na)
+            if use_conf
+            else jnp.zeros((1,), jnp.float32)
+        )
+        if use_orn:
+            ao = init_anchor_orn(p1, anchor_ar_k[i], is_L_k[i])
+            so = init_orn_score(
+                ao, nbr_idx_k[i], nbr_w_k[i], nbr_valid_k[i], jnp.float32(motif_weight_v), symmetric
+            )
+        else:
+            ao = jnp.zeros((1, A, 3), jnp.float32)
+            so = jnp.zeros((1,), jnp.float32)
+        return ss, se, sh, so, sc, ao
+
+    inits = [init_one(i) for i in range(K)]
+    ss_k = jnp.concatenate([x[0] for x in inits])
+    se_k = jnp.concatenate([x[1] for x in inits])
+    sh_k = jnp.concatenate([x[2] for x in inits])
+    so_k = jnp.concatenate([x[3] for x in inits])
+    sc_k = jnp.concatenate([x[4] for x in inits])
+    anchor_orn_k = jnp.concatenate([x[5] for x in inits])
+
+    _seed_src = log.current()
+    seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
+    base_key = jax.random.PRNGKey(seed_offset)
+
+    out = kernel_full_mp(
+        pos_k,
+        ss_k,
+        se_k,
+        sh_k,
+        so_k,
+        sc_k,
+        anchor_orn_k,
+        jnp.float32(settings.max_temp_smooth),
+        dtn_k,
+        movable_k,
+        heat_k,
+        anchor_ar_k,
+        b2a_k,
+        nbr_idx_k,
+        nbr_w_k,
+        nbr_valid_k,
+        is_L_k,
+        step_size_k,
+        jnp.float32(settings.dt_temp_smooth),
+        jnp.float32(settings.jump_scale_smooth),
+        jnp.float32(settings.jump_coef_smooth),
+        stretch_k,
+        squeeze_k,
+        ang_k,
+        dist_w,
+        ang_w,
+        excl_r0_k,
+        jnp.float32(excl_w_v),
+        jnp.float32(heat_weight_v),
+        jnp.float32(motif_weight_v),
+        symmetric,
+        conf_cx_k,
+        conf_cy_k,
+        conf_cz_k,
+        conf_R_k,
+        conf_w_k,
+        base_key,
+        jnp.float32(settings.mc_stop_improvement_smooth),
+        jnp.int32(settings.mc_stop_successes_smooth),
+        jnp.float32(1e-6),
+        n_active_k,
+        n_movable_k,
+    )
+    pos_f, ss_f, se_f, sh_f, so_f, sc_f, _ao_f, _final_score, iter_count, converged = out
+    score_per_chain = np.asarray(ss_f + se_f + sh_f + so_f + sc_f)
+    pos_f_np = np.asarray(pos_f)
+
+    if LOG.isEnabledFor(logging.DEBUG):
+        n_conv = int(np.asarray(converged).sum())
+        LOG.debug(
+            "region-batch: %d IBs, B=%d A=%d M=%d, %d batches, %d/%d converged",
+            K,
+            B,
+            A,
+            M,
+            int(iter_count),
+            n_conv,
+            K,
+        )
+
+    results: list[tuple[float, np.ndarray[Any, Any]]] = []
+    for i, pr in enumerate(preps):
+        n_i = pr["n"]
+        results.append((float(score_per_chain[i]), pos_f_np[i, :n_i].astype(np.float32)))
+    return results
