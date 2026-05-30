@@ -199,7 +199,7 @@ def setup(output_level: int, *, log_file: str | None = None) -> None:
     (handlers are replaced, not stacked).
 
     `output_level` maps to the console handler's level (0/1/2 ->
-    WARNING/INFO/DEBUG).  `log_file`, if given, adds a DEBUG file handler with
+    STATUS/INFO/DEBUG).  `log_file`, if given, adds a DEBUG file handler with
     the structured formatter — handy for reconstructing parallel runs.
     """
     level = _LEVELS.get(int(output_level), logging.INFO)
