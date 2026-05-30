@@ -2056,6 +2056,85 @@ def mc_heatmap_jax(
     return float(score_per_chain[best_k])
 
 
+def _precompile_smooth(
+    settings: "Settings", use_heat: bool, use_orn: bool, max_nbrs: int, anchor_frac: float, K: int
+) -> None:
+    """Eagerly compile the smooth kernel across N buckets for ONE
+    (use_heat, use_orn, max_nbrs->M, K) combo.  Smooth specializes on
+    (B, A, M, K, use_heat, use_orn); B and A both scale with region size, so we
+    compile the realistic (B, A) DIAGONAL: A = bucket(anchor_frac * B) per B
+    (use_orn=False has no anchor axis -> A=M=1).  Idempotent per combo via
+    _precompiled.  Uses .lower(ShapeDtypeStruct).compile() (no array alloc)."""
+    if not _ensure_jax():
+        return
+    assert _jax is not None and _jnp is not None
+    jax = _jax
+    jnp = _jnp
+    sys = __import__("sys")
+
+    excl_skip = int(settings.exclusion_skip_neighbors)
+    n_steps = int(settings.mc_stop_steps_smooth)
+    M = int(max_nbrs) if use_orn else 1
+    sig = ("smooth", n_steps, excl_skip, bool(use_heat), bool(use_orn), M, int(K))
+    with _init_lock:
+        if sig in _precompiled:
+            return
+        bundle = _build_smooth_kernel(n_steps, excl_skip, use_heat, use_orn, M)
+        kernel_full = bundle[1]
+        sds = jax.ShapeDtypeStruct
+        f32 = jnp.float32
+        key = jax.random.PRNGKey(0)
+        T_a = f32(settings.max_temp_smooth)
+        dt_a = f32(settings.dt_temp_smooth)
+        js_a = f32(settings.jump_scale_smooth)
+        jc_a = f32(settings.jump_coef_smooth)
+        impr_a = f32(settings.mc_stop_improvement_smooth)
+        succ_a = jnp.int32(settings.mc_stop_successes_smooth)
+        t0 = __import__("time").perf_counter()
+        for b in _SHAPE_BUCKETS:
+            a = _bucket_for(max(1, int(anchor_frac * b)), _ANCHOR_BUCKETS) if use_orn else 1
+            kvec = sds((K,), np.float32)
+            heat_a = sds((b, b), np.float32) if use_heat else sds((1, 1), np.float32)
+            try:
+                kernel_full.lower(
+                    sds((K, b, 3), np.float32),  # pos_k
+                    kvec, kvec, kvec, kvec, kvec,  # ss, se, sh, so, sc
+                    sds((K, a, 3), np.float32),  # anchor_orn_k
+                    T_a,
+                    sds((b,), np.float32),  # dtn
+                    sds((b,), np.int32),  # movable (int64 -> int32 under x64-off)
+                    heat_a,
+                    sds((a,), np.int32),  # anchor_ar
+                    sds((b,), np.int32),  # bead_to_anchor_k
+                    sds((a, M), np.int32),  # nbr_idx
+                    sds((a, M), np.float32),  # nbr_w
+                    sds((a, M), np.bool_),  # nbr_valid
+                    sds((b,), np.bool_),  # is_L
+                    f32(0.1),  # step_size (value irrelevant)
+                    dt_a, js_a, jc_a,
+                    f32(1.0), f32(1.0), f32(0.1), f32(1.0), f32(1.0),  # stretch..ang_w
+                    f32(1.0), f32(0.0),  # r0, excl_w
+                    f32(1.0),  # heat_weight
+                    f32(1.0),  # motif_weight
+                    jnp.bool_(True),  # symmetric
+                    f32(0.0), f32(0.0), f32(0.0), f32(1.0), f32(0.0),  # conf_cx..conf_w
+                    key, impr_a, succ_a,
+                    f32(1e-6),  # score_eps (matches mc_smooth_jax hardcode)
+                    jnp.int32(b),  # n_active
+                    jnp.int32(b),  # n_movable_active
+                ).compile()
+            except Exception as e:  # noqa: BLE001 - precompile is best-effort
+                print(f"[mc_jax] precompile smooth B={b} A={a} skipped: {e}", file=sys.stderr)
+        _precompiled.add(sig)
+        dt = __import__("time").perf_counter() - t0
+        print(
+            f"[mc_jax] precompiled smooth kernel: {len(_SHAPE_BUCKETS)} B-buckets "
+            f"(heat={use_heat} orn={use_orn} M={M} K={K}) in {dt:.1f}s",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Public entry: mirrors gnome3d.mc.mc_smooth signature
 # ---------------------------------------------------------------------------
@@ -2157,6 +2236,7 @@ def mc_smooth_jax(
         conf_w_v = 0.0
 
     # ---- prepare orientation arrays (padded CSR) ----
+    anchor_frac: float = 0.0  # real n_anchors/n; for the precompile (B,A) diagonal
     if use_orn:
         assert char_orientations is not None and anchor_neighbors is not None
         assert anchor_neighbor_weights is not None
@@ -2193,6 +2273,7 @@ def mc_smooth_jax(
         if bool(settings.jax_bucket_shapes):
             A = _bucket_for(n_anchors, _ANCHOR_BUCKETS)
             M = _bucket_for(max_nbrs, _NBR_BUCKETS)
+            anchor_frac = n_anchors / n  # real fraction, before reassignment below
             ap, mp = A - n_anchors, M - max_nbrs
             if ap > 0 or mp > 0:
                 anchor_ar_np = np.concatenate([anchor_ar_np, np.zeros(ap, dtype=np.int32)])
@@ -2236,7 +2317,12 @@ def mc_smooth_jax(
     # n_active == n and n_movable_active == len(movable) when unbucketed.
     n_active_v: int = n
     n_movable_v: int = int(movable_np.shape[0])
-    B: int = _bucket_for(n) if bool(settings.jax_bucket_shapes) else n
+    if bool(settings.jax_bucket_shapes):
+        if settings.jax_precompile_buckets:
+            _precompile_smooth(settings, use_heat, use_orn, max_nbrs, anchor_frac, K)
+        B: int = _bucket_for(n)
+    else:
+        B = n
     if B > n:
         n_pad = B - n
         pos_k_np = np.concatenate(
