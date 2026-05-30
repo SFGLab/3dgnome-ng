@@ -2900,6 +2900,13 @@ def _prep_smooth_problem_np(
             heat_pad = hp
         bead_to_anchor_k = np.concatenate([bead_to_anchor_k, np.full(n_pad, -1, dtype=np.int32)])
         is_L = np.concatenate([is_L, np.zeros(n_pad, dtype=np.bool_)])
+
+    # `movable` lists non-fixed beads, so its length is n_movable (not n) — pad
+    # it to B independently of the `B > n` bead-padding above, else an IB whose
+    # n lands exactly on the bucket (B == n) keeps a short movable and the
+    # batched (K, B) stack goes ragged.  Pad indices are 0 (a valid bead);
+    # n_movable bounds the kernel loop, so they're never read.
+    if B > n_movable:
         movable = np.concatenate([movable, np.zeros(B - n_movable, dtype=movable.dtype)])
 
     return {
