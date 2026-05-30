@@ -1030,14 +1030,15 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         contrib = jnp.where(is_repulse, rep, jnp.where(is_spring, spring, 0.0))
         return jnp.sum(contrib)
 
-    def _local_excl_at(pos: Any, p_pos: Any, p: Any, r0: Any, weight: Any) -> Any:
+    def _local_excl_at(pos: Any, p_pos: Any, p: Any, r0: Any, weight: Any, n_active: Any) -> Any:
         n = pos.shape[0]
         diff = pos - p_pos
         d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
         rel = jnp.maximum(0.0, (r0 - d) / r0)
         contrib = weight * rel * rel
         idx = jnp.arange(n)
-        in_range = jnp.abs(idx - p) > excl_skip
+        # Exclude pad beads (idx >= n_active); no-op when unbucketed (n_active==n).
+        in_range = jnp.logical_and(jnp.abs(idx - p) > excl_skip, idx < n_active)
         return jnp.sum(jnp.where(in_range, contrib, 0.0))
 
     def _local_confine_at(p_pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any) -> Any:
@@ -1078,7 +1079,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
         return total
 
-    def _init_excl(pos: Any, r0: Any, weight: Any) -> Any:
+    def _init_excl(pos: Any, r0: Any, weight: Any, n_active: Any) -> Any:
         n = pos.shape[0]
         idx = jnp.arange(n)
 
@@ -1087,17 +1088,22 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
             rel = jnp.maximum(0.0, (r0 - d) / r0)
             contrib = weight * rel * rel
-            in_range = jnp.abs(idx - i) > excl_skip
-            return carry + jnp.sum(jnp.where(in_range, contrib, 0.0)), None
+            # Mask pad columns (idx >= n_active); zero the whole row if i is pad.
+            in_range = jnp.logical_and(jnp.abs(idx - i) > excl_skip, idx < n_active)
+            row = jnp.where(i < n_active, jnp.sum(jnp.where(in_range, contrib, 0.0)), 0.0)
+            return carry + row, None
 
         total, _ = jax.lax.scan(scan_body, jnp.float32(0.0), idx)
         return total
 
-    def _init_confine(pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any) -> Any:
-        def per_bead(p_pos: Any) -> Any:
-            return _local_confine_at(p_pos, cx, cy, cz, R, weight)
+    def _init_confine(pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any, n_active: Any) -> Any:
+        # Sequential (lax.scan) so trailing pad beads don't perturb f32 order.
+        def _body(carry: Any, i: Any) -> tuple[Any, None]:
+            c = _local_confine_at(pos[i], cx, cy, cz, R, weight)
+            return carry + jnp.where(i < n_active, c, 0.0), None
 
-        return jnp.sum(jax.vmap(per_bead)(pos))
+        total, _ = jax.lax.scan(_body, jnp.float32(0.0), jnp.arange(pos.shape[0]))
+        return total
 
     def chain_batch(
         pos0: Any,
@@ -1120,11 +1126,13 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         conf_R: Any,
         conf_w: Any,
         key: Any,
+        n_active: Any,
     ) -> Any:
-        n = pos0.shape[0]
         k_p, k_d, k_a = jax.random.split(key, 3)
-        # Arcs: all beads are movable (mc.py uses np.arange(n)).
-        ps = jax.random.randint(k_p, (n_steps_per_batch,), 0, n)
+        # Arcs: all real beads movable (mc.py uses np.arange(n)).  Under bucketing
+        # pos0 is padded; n_active (dynamic) restricts moves to real beads so pad
+        # beads never move (arc term zeroed via exp_mat=0, EV via idx<n_active).
+        ps = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_active)
         disps = jax.random.uniform(
             k_d,
             (n_steps_per_batch, 3),
@@ -1149,8 +1157,8 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             # struct_delta_factor = 1 for arcs (single-counted)
             ss_new = ss + (loc_s_curr - loc_s_prev)
 
-            loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w)
-            loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w)
+            loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w, n_active)
+            loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w, n_active)
             se_new = se + 2.0 * (loc_e_curr - loc_e_prev)
 
             # Confinement: per-bead, delta factor 1.  When conf_w=0 the whole
@@ -1201,6 +1209,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         None,
         None,  # conf_cx..conf_w
         0,  # key
+        None,  # n_active (shared)
     )
     out_axes = (0, 0, 0, 0, None, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
@@ -1233,6 +1242,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         stop_successes: Any,
         score_eps: Any,
         stop_when_ratio_above: Any,
+        n_active: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -1265,6 +1275,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
                 conf_R,
                 conf_w,
                 keys,
+                n_active,
             )
             score_per_chain = ss + se + sc
             best_idx = jnp.argmin(score_per_chain)
@@ -1296,8 +1307,10 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         return pos_f, ss_f, se_f, sc_f, final_score, iter_f, converged_f
 
     init_arcs = jax.jit(jax.vmap(_init_arcs, in_axes=(0, None, None, None)))
-    init_excl_arcs = jax.jit(jax.vmap(_init_excl, in_axes=(0, None, None)))
-    init_confine_arcs = jax.jit(jax.vmap(_init_confine, in_axes=(0, None, None, None, None, None)))
+    init_excl_arcs = jax.jit(jax.vmap(_init_excl, in_axes=(0, None, None, None)))
+    init_confine_arcs = jax.jit(
+        jax.vmap(_init_confine, in_axes=(0, None, None, None, None, None, None))
+    )
 
     bundle = (kernel_full, init_arcs, init_excl_arcs, init_confine_arcs)
     _kernel_cache[cache_key] = bundle  # pyright: ignore[reportArgumentType]
@@ -1370,12 +1383,25 @@ def mc_arcs_jax(
     bundle = _build_arcs_kernel(n_steps_per_batch, excl_skip)
     kernel_full, init_arcs, init_excl, init_confine = bundle
 
+    # ---- shape bucketing: pad N up to a bucket.  Pad beads are inert: the arc
+    # term is zeroed by exp_mat=0 pad rows/cols (neither spring nor repulsion),
+    # EV/confine are masked by n_active, and the move sampler draws from
+    # [0, n_active) so pad beads never move.  Result == unbucketed at init
+    # (bit-identical); per-step f32 chaos only (arcs uses non-strict acceptance).
+    n_active_v: int = n
+    B: int = _bucket_for(n) if bool(settings.jax_bucket_shapes) else n
     pos_f32: F32Array = pos.astype(np.float32)
-    pos_k_np: F32Array = np.broadcast_to(pos_f32, (K, n, 3)).copy()
     exp_mat_np: F32Array = exp_dist_mat.astype(np.float32)
+    if B > n:
+        pos_f32 = np.concatenate([pos_f32, np.zeros((B - n, 3), dtype=np.float32)], axis=0)
+        exp_pad = np.zeros((B, B), dtype=np.float32)
+        exp_pad[:n, :n] = exp_mat_np
+        exp_mat_np = exp_pad
+    pos_k_np: F32Array = np.broadcast_to(pos_f32, (K, B, 3)).copy()
 
     pos_k = jnp.asarray(pos_k_np)
     exp_mat_j = jnp.asarray(exp_mat_np)
+    n_active_j = jnp.int32(n_active_v)
 
     stretch_k_v: float = float(settings.spring_stretch_arcs)
     squeeze_k_v: float = float(settings.spring_squeeze_arcs)
@@ -1386,7 +1412,7 @@ def mc_arcs_jax(
         jnp.float32(squeeze_k_v),
     )
     se_k = (
-        init_excl(pos_k, jnp.float32(excl_r0), jnp.float32(excl_w_v))
+        init_excl(pos_k, jnp.float32(excl_r0), jnp.float32(excl_w_v), n_active_j)
         if use_excl
         else jnp.zeros((K,), dtype=jnp.float32)
     )
@@ -1398,6 +1424,7 @@ def mc_arcs_jax(
             jnp.float32(conf_cz_v),
             jnp.float32(conf_R_v),
             jnp.float32(conf_w_v),
+            n_active_j,
         )
         if use_conf
         else jnp.zeros((K,), dtype=jnp.float32)
@@ -1449,6 +1476,7 @@ def mc_arcs_jax(
         stop_successes,
         score_eps,
         stop_when_ratio_above,
+        n_active_j,
     )
 
     score_per_chain = np.asarray(ss_k + se_k + sc_k)
@@ -1464,7 +1492,8 @@ def mc_arcs_jax(
         )
 
     best_k: int = int(np.argmin(score_per_chain))
-    pos[:] = np.asarray(pos_k[best_k]).astype(pos.dtype)
+    # Slice off any bucket padding (pos is (n, 3); pos_k is (K, B, 3), B >= n).
+    pos[:] = np.asarray(pos_k[best_k][:n]).astype(pos.dtype)
     return float(score_per_chain[best_k])
 
 
