@@ -162,11 +162,16 @@ class JaxSolver(Solver):
         per_ib = n_reps * n_steps
         bucket = bool(s.jax_bucket_shapes)
 
+        # Skip IBs whose heat is empty (mean<1e-6, discarded anyway) OR too sparse
+        # to move the structure (`subanchor_heat_min_reduction` early-out).  Those
+        # keep heat_dist=None, so Phase 2 smooths them without heat and we never
+        # pay for their dry-smooth trials here.
         need = [
             p
             for p in probs
             if p.get("subanchor_heat_raw") is not None
             and float(p["subanchor_heat_raw"].mean()) >= 1e-6
+            and not self._heat_signal_negligible(p["subanchor_heat_raw"], p["n"])
         ]
         if not need:
             return

@@ -51,6 +51,7 @@ class Settings:
     subanchor_estimate_steps: int
     subanchor_estimate_replicates: int
     subanchor_batch_trials: bool
+    subanchor_heat_min_reduction: float
 
     # ---- PET / arc length limits ----
     max_pet_length: int
@@ -291,6 +292,15 @@ class Settings:
         # leaving the GPU idle at chains=1).  JAX smooth backend only; falls back
         # to the sequential loop otherwise.  Diverges from the parity baseline.
         self.subanchor_batch_trials = False
+        # Opt-in (default 0.0 = off, parity preserved): skip an IB's subanchor
+        # heat-dist entirely when its signal is too sparse to matter.  The
+        # active-pair fraction (n_active / n_pairs) is a provable upper bound on
+        # the mean target-distance reduction the heat term can produce, and it is
+        # known from the raw heatmap BEFORE any dry-smooth trials.  When that
+        # bound is below this threshold, the (expensive) estimate trials are
+        # skipped and the IB smooths without heat.  E.g. 0.001 skips IBs whose
+        # heat could move mean pair distance by <0.1%.  Diverges from parity.
+        self.subanchor_heat_min_reduction = 0.0
 
         # ---- PET / arc length limits ----
         self.max_pet_length = 1_000_000
@@ -620,6 +630,9 @@ class Settings:
         )
         self.subanchor_batch_trials = getb(
             "subanchor_heatmap", "batch_trials", self.subanchor_batch_trials
+        )
+        self.subanchor_heat_min_reduction = getf(
+            "subanchor_heatmap", "heat_min_reduction", self.subanchor_heat_min_reduction
         )
 
         # [simulation_heatmap]

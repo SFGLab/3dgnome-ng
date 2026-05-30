@@ -1009,6 +1009,39 @@ class Solver:
             )
             return self._heat_dist_from_avg(avg_dist, subanchor_heat_raw, t_mc_total)
 
+    def _heat_signal_negligible(self, subanchor_heat_raw: F64Array, n: int) -> bool:
+        """True when an IB's subanchor heat is too sparse to affect the structure,
+        so the (expensive) heat-dist estimate can be skipped entirely.
+
+        The active-pair fraction ``n_active / n_pairs`` is a provable upper bound
+        on the mean target-distance reduction the heat term can produce: each
+        active pair's target is ``avg_dist * (1 - s_val)`` with ``s_val`` capped
+        at 1, so the mean reduction is at most the active fraction.  Crucially it
+        is known from the raw heatmap alone — no dry-smooth trials needed.  When
+        it falls below ``subanchor_heat_min_reduction`` the IB smooths without
+        heat.  Threshold 0.0 (default) disables this — full parity.  Opt-in
+        divergence for sparse-singleton data.
+        """
+        thresh = float(self.s.subanchor_heat_min_reduction)
+        if thresh <= 0.0:
+            return False
+        n_pairs = n * (n - 1) // 2
+        if n_pairs == 0:
+            return True
+        iu = np.triu_indices(n, k=1)
+        n_active = int(np.count_nonzero(subanchor_heat_raw[iu] > 0.0))
+        frac = n_active / n_pairs
+        if frac < thresh:
+            LOG.info(
+                "heat-dist skipped: %d/%d pairs active (%.3g < %.3g min reduction)",
+                n_active,
+                n_pairs,
+                frac,
+                thresh,
+            )
+            return True
+        return False
+
     def _heat_dist_from_avg(
         self,
         avg_dist: F64Array,
@@ -1306,6 +1339,8 @@ class Solver:
         # batch the estimate across IBs.
         heat_dist: F64Array | None = None
         wants_heat = subanchor_heat_raw is not None and s.use_subanchor_heatmap
+        if wants_heat and self._heat_signal_negligible(subanchor_heat_raw, n):
+            wants_heat = False  # too sparse to matter -> smooth without heat
         if wants_heat and not defer_heat:
             heat_dist = self._build_heat_dist_subanchor(
                 pos, fixed, dtn, subanchor_heat_raw, step_size
