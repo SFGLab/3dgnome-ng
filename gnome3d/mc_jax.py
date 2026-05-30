@@ -804,19 +804,24 @@ def _build_smooth_kernel(
     ) -> Any:
         n = pos.shape[0]
 
-        # Mask bonds/angles that span a pad bead (index >= n_active).  Unbucketed
-        # n_active == n so every term is kept.
-        def _bond_at(i: Any) -> Any:
+        # SEQUENTIAL (lax.scan) accumulation, matching _init_excl/_init_heat.
+        # A tree reduction (jnp.sum) groups differently for a bucket-padded
+        # length vs the real length, and that ULP difference gets chaos-amplified
+        # by the MC — so the chain init MUST be padding-insensitive.  Scan is:
+        # appending the masked-to-zero pad terms never changes the running sum,
+        # so bucketed == unbucketed bit-for-bit.  Mask spans a pad bead via
+        # n_active (no-op when unbucketed, n_active == n).
+        def _bond_body(carry: Any, i: Any) -> tuple[Any, None]:
             val = _smooth_len(pos[i], pos[i + 1], dtn[i], stretch_k, squeeze_k, dist_w)
-            return jnp.where(i + 1 < n_active, val, 0.0)
+            return carry + jnp.where(i + 1 < n_active, val, 0.0), None
 
-        def _angle_at(i: Any) -> Any:
+        def _angle_body(carry: Any, i: Any) -> tuple[Any, None]:
             val = _smooth_ang(pos[i], pos[i + 1], pos[i + 2], ang_k, ang_w)
-            return jnp.where(i + 2 < n_active, val, 0.0)
+            return carry + jnp.where(i + 2 < n_active, val, 0.0), None
 
-        bonds = jax.vmap(_bond_at)(jnp.arange(n - 1))
-        angles = jax.vmap(_angle_at)(jnp.arange(n - 2))
-        return jnp.sum(bonds) + jnp.sum(angles)
+        bonds_total, _ = jax.lax.scan(_bond_body, jnp.float32(0.0), jnp.arange(n - 1))
+        angles_total, _ = jax.lax.scan(_angle_body, jnp.float32(0.0), jnp.arange(n - 2))
+        return bonds_total + angles_total
 
     def _init_excl_single(pos: Any, r0: Any, weight: Any, n_active: Any) -> Any:
         n = pos.shape[0]
@@ -856,14 +861,15 @@ def _build_smooth_kernel(
         pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any, n_active: Any
     ) -> Any:
         """Sum of per-bead confinement contributions.
-        Mirrors gnome3d.mc._init_confine_nb."""
+        Mirrors gnome3d.mc._init_confine_nb.  Sequential (lax.scan) so trailing
+        pad beads (masked by n_active) don't perturb the f32 reduction order."""
 
-        def per_bead(p_pos: Any) -> Any:
-            return _local_confine_at(p_pos, cx, cy, cz, R, weight)
+        def _body(carry: Any, i: Any) -> tuple[Any, None]:
+            c = _local_confine_at(pos[i], cx, cy, cz, R, weight)
+            return carry + jnp.where(i < n_active, c, 0.0), None
 
-        contribs = jax.vmap(per_bead)(pos)
-        idx = jnp.arange(pos.shape[0])
-        return jnp.sum(jnp.where(idx < n_active, contribs, 0.0))
+        total, _ = jax.lax.scan(_body, jnp.float32(0.0), jnp.arange(pos.shape[0]))
+        return total
 
     def _init_anchor_orientations_single(
         pos: Any,
