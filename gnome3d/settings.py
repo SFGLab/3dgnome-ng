@@ -136,6 +136,15 @@ class Settings:
     mc_backend_apply_to_smooth: bool
     mc_backend_apply_to_arcs: bool
     mc_backend_apply_to_heatmap: bool
+    # Pad each JAX kernel's bead count up to a fixed bucket ladder so XLA
+    # compiles ~one kernel per bucket instead of one per distinct region size.
+    # Bounds total compiles regardless of how many distinct-N regions exist.
+    # Padding is inert (pad beads never move + contribute zero energy), so
+    # results are unchanged; this is a pure compile-time optimization.
+    jax_bucket_shapes: bool
+    # When bucketing is on, compile every bucket up front (predictable one-time
+    # warmup) instead of lazily on first hit.
+    jax_precompile_buckets: bool
 
     # ---- MC arcs ----
     max_temp: float
@@ -329,6 +338,8 @@ class Settings:
         self.mc_backend_apply_to_smooth = True
         self.mc_backend_apply_to_arcs = False
         self.mc_backend_apply_to_heatmap = False
+        self.jax_bucket_shapes = False
+        self.jax_precompile_buckets = False
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -640,6 +651,12 @@ class Settings:
         )
         self.mc_backend_apply_to_heatmap = getb(
             "simulation_backend", "mc_backend_apply_to_heatmap", self.mc_backend_apply_to_heatmap
+        )
+        self.jax_bucket_shapes = getb(
+            "simulation_backend", "jax_bucket_shapes", self.jax_bucket_shapes
+        )
+        self.jax_precompile_buckets = getb(
+            "simulation_backend", "jax_precompile_buckets", self.jax_precompile_buckets
         )
 
         # [simulation_arcs]

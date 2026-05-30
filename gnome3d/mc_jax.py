@@ -51,6 +51,24 @@ _kernel_cache: dict[tuple[int, int, bool, bool, int], Any] = {}
 # duplicate kernel-build work.
 _init_lock = threading.Lock()
 
+# Shape-bucket ladder.  When settings.jax_bucket_shapes is on, every kernel's
+# bead count N is padded up to the next bucket so XLA compiles ~one program per
+# bucket (8 total) instead of one per distinct region size.  Geometric x2 so
+# worst-case padding waste is <2x compute.  N above the top bucket compiles at
+# its exact size (rare).
+_SHAPE_BUCKETS: tuple[int, ...] = (256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
+# Tracks which (kind, bucket, signature) kernels have been eagerly precompiled,
+# so precompile passes are idempotent across regions / threads.
+_precompiled: set[Any] = set()
+
+
+def _bucket_for(n: int) -> int:
+    """Smallest ladder bucket >= n, or n itself if it exceeds the top bucket."""
+    for b in _SHAPE_BUCKETS:
+        if n <= b:
+            return b
+    return n
+
 
 def _ensure_jax() -> bool:
     """Lazy-import JAX.  Returns True on success, False if not installed.
@@ -1508,11 +1526,15 @@ def _build_heatmap_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         r0: Any,
         excl_w: Any,
         key: Any,
+        n_active: Any,
     ) -> Any:
-        n = pos0.shape[0]
+        # Heatmap: all beads movable (mc.py uses np.arange(n)).  Under shape
+        # bucketing pos0 is padded to a bucket size, but `n_active` (dynamic, so
+        # it does NOT add a compile axis) restricts moves to the real beads
+        # [0, n_active); pad beads never move, so they stay far away (EV=0) and
+        # their heat rows are masked (skip=True) — fully inert.
         k_p, k_d, k_a = jax.random.split(key, 3)
-        # Heatmap: all beads movable (mc.py uses np.arange(n)).
-        ps = jax.random.randint(k_p, (n_steps_per_batch,), 0, n)
+        ps = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_active)
         disps = jax.random.uniform(
             k_d,
             (n_steps_per_batch, 3),
@@ -1575,6 +1597,7 @@ def _build_heatmap_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         None,
         None,  # r0, excl_w
         0,  # key
+        None,  # n_active (shared)
     )
     out_axes = (0, 0, 0, None, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
@@ -1600,6 +1623,7 @@ def _build_heatmap_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         stop_successes: Any,
         score_eps: Any,
         stop_when_ratio_above: Any,
+        n_active: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -1625,6 +1649,7 @@ def _build_heatmap_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
                 r0,
                 excl_w,
                 keys,
+                n_active,
             )
             score_per_chain = ss + se
             best_idx = jnp.argmin(score_per_chain)
@@ -1665,6 +1690,82 @@ def _build_heatmap_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
     bundle = (kernel_full, init_heatmap, init_excl_heatmap)
     _kernel_cache[cache_key] = bundle  # pyright: ignore[reportArgumentType]
     return bundle
+
+
+def _precompile_heatmap(settings: "Settings") -> None:
+    """Eagerly compile the heatmap kernel (and its init fns) for every shape
+    bucket, so no XLA compile happens mid-run.  Uses .lower(...).compile() with
+    ShapeDtypeStruct for the B*B arrays -> compiles without allocating them (a
+    32768x32768 f32 would be 4 GB).  Idempotent across regions/threads."""
+    if not _ensure_jax():
+        return
+    assert _jax is not None and _jnp is not None
+    jax = _jax
+    jnp = _jnp
+    sys = __import__("sys")
+
+    K = max(1, int(settings.mc_heatmap_chains))
+    excl_skip = int(settings.exclusion_skip_neighbors)
+    n_steps = int(settings.mc_stop_steps_heatmap)
+    sig = ("heatmap", n_steps, excl_skip, K)
+    with _init_lock:
+        if sig in _precompiled:
+            return
+        kernel_full, init_heatmap, init_excl = _build_heatmap_kernel(n_steps, excl_skip)
+        sds = jax.ShapeDtypeStruct
+        sample_key = jax.random.PRNGKey(0)  # concrete -> exact key dtype match
+        # NB: only the *avals* (shape+dtype) of these scalars affect the compiled
+        # program / cache key — the values are runtime inputs, so the real call
+        # hits this cache regardless of value.  We pass settings-derived scalars
+        # anyway (matching mc_heatmap_jax) for clarity and to stay correct if a
+        # scalar ever becomes trace-relevant.  step_size/r0/excl_w have no settings
+        # source (per-call / auto-derived) so they keep dtype-correct placeholders.
+        f32 = jnp.float32
+        T_a = f32(settings.max_temp_heatmap)
+        dt_a = f32(settings.dt_temp_heatmap)
+        js_a = f32(settings.jump_scale_heatmap)
+        jc_a = f32(settings.jump_coef_heatmap)
+        impr_a = f32(settings.mc_stop_improvement_heatmap)
+        succ_a = jnp.int32(settings.mc_stop_successes_heatmap)
+        t0 = __import__("time").perf_counter()
+        for b in _SHAPE_BUCKETS:
+            pos_a = sds((K, b, 3), np.float32)
+            kvec_a = sds((K,), np.float32)
+            exp_a = sds((b, b), np.float32)
+            skip_a = sds((b, b), np.bool_)
+            try:
+                init_heatmap.lower(pos_a, exp_a, skip_a).compile()
+                init_excl.lower(pos_a, f32(1.0), f32(0.0)).compile()
+                kernel_full.lower(
+                    pos_a,
+                    kvec_a,  # ss
+                    kvec_a,  # se
+                    T_a,
+                    exp_a,
+                    skip_a,
+                    f32(0.1),  # step_size (per-call: value irrelevant to compile)
+                    dt_a,
+                    js_a,
+                    jc_a,
+                    f32(1.0),  # r0 (auto-derived: value irrelevant)
+                    f32(0.0),  # excl_w (per-region: value irrelevant)
+                    sample_key,  # base_key
+                    impr_a,  # stop_improvement
+                    succ_a,  # stop_successes
+                    f32(1e-6),  # score_eps (matches mc_heatmap_jax hardcode)
+                    f32(0.9999),  # stop_when_ratio_above (matches hardcode)
+                    jnp.int32(b),  # n_active
+                ).compile()
+            except Exception as e:  # noqa: BLE001 - precompile is best-effort
+                print(f"[mc_jax] precompile heatmap bucket {b} skipped: {e}", file=sys.stderr)
+        _precompiled.add(sig)
+        dt = __import__("time").perf_counter() - t0
+        print(
+            f"[mc_jax] precompiled heatmap kernel for {len(_SHAPE_BUCKETS)} buckets "
+            f"(K={K}) in {dt:.1f}s",
+            file=sys.stderr,
+            flush=True,
+        )
 
 
 def mc_heatmap_jax(
@@ -1720,12 +1821,37 @@ def mc_heatmap_jax(
     bundle = _build_heatmap_kernel(n_steps_per_batch, excl_skip)
     kernel_full, init_heatmap, init_excl = bundle
 
+    # --- shape bucketing: pad N up to a fixed bucket so XLA reuses one compiled
+    # kernel across all similarly-sized regions.  Pad beads are placed far apart
+    # (EV auto-zero: d >> r0 -> rel=0) with skip=True heat rows (heat auto-zero),
+    # and the kernel restricts moves to [0, n_active=n) so pad beads never move.
+    # Net contribution is exactly zero -> result identical to the unpadded run.
+    if bool(settings.jax_bucket_shapes):
+        if settings.jax_precompile_buckets:
+            _precompile_heatmap(settings)
+        B: int = _bucket_for(n)
+    else:
+        B = n
     pos_f32: F32Array = pos.astype(np.float32)
-    pos_k_np: F32Array = np.broadcast_to(pos_f32, (K, n, 3)).copy()
+    if B > n:
+        exp_safe_pad = np.ones((B, B), dtype=np.float32)
+        exp_safe_pad[:n, :n] = exp_safe_np
+        exp_safe_np = exp_safe_pad
+        skip_pad = np.ones((B, B), dtype=np.bool_)  # pad rows/cols skipped -> heat 0
+        skip_pad[:n, :n] = skip_np
+        skip_np = skip_pad
+        # Inert pad beads: base 1e6, spacing 1e4 -> all pad-pad and pad-real
+        # distances dwarf any r0 (real coords are O(1e2), r0 is O(1)).
+        pad_xyz = np.zeros((B - n, 3), dtype=np.float32)
+        pad_xyz[:, 0] = 1.0e6 + np.arange(B - n, dtype=np.float32) * 1.0e4
+        pos_f32 = np.concatenate([pos_f32, pad_xyz], axis=0)
+
+    pos_k_np: F32Array = np.broadcast_to(pos_f32, (K, B, 3)).copy()
 
     pos_k = jnp.asarray(pos_k_np)
     exp_safe_j = jnp.asarray(exp_safe_np)
     skip_j = jnp.asarray(skip_np.astype(np.bool_))
+    n_active_j = jnp.int32(n)
 
     ss_k = init_heatmap(pos_k, exp_safe_j, skip_j)
     se_k = (
@@ -1765,6 +1891,7 @@ def mc_heatmap_jax(
         stop_successes,
         score_eps,
         jnp.float32(0.9999),  # stop_when_ratio_above: plateau guard (see kernel docstring)
+        n_active_j,
     )
 
     score_per_chain = np.asarray(ss_k + se_k)
@@ -1780,7 +1907,8 @@ def mc_heatmap_jax(
         )
 
     best_k: int = int(np.argmin(score_per_chain))
-    pos[:] = np.asarray(pos_k[best_k]).astype(pos.dtype)
+    # Slice off any bucket padding (pos is (n, 3); pos_k is (K, B, 3), B >= n).
+    pos[:] = np.asarray(pos_k[best_k][:n]).astype(pos.dtype)
     return float(score_per_chain[best_k])
 
 
