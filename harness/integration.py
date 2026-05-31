@@ -901,9 +901,9 @@ def run_backend_divergence(
     numba<->reference differences."""
     sys.path.insert(0, str(ROOT))
     try:
-        from gnome3d import mc_jax
+        from gnome3d.mc import is_available
 
-        jax_ok = mc_jax.is_available()
+        jax_ok = is_available()
     except ImportError:
         jax_ok = False
     if not jax_ok:
