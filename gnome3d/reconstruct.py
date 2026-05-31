@@ -170,6 +170,8 @@ def reconstruct_ensemble(
         chain_nodes, chain_seeds = ib_chain_nodes(ibseeds, prefix=f"m{m} :: ")
         nodes.update({nd.id: nd for nd in chain_nodes})
         seeds.update(chain_seeds)
+
+    print(f"running ensemble DAG with {len(nodes)} nodes and {len(seeds)} seeds...")
     outputs = executor.run(Dag(nodes=nodes, seeds=seeds))  # type: ignore[arg-type]
 
     # Phase 3: collect each member's beads, sorted per chr.
