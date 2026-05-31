@@ -28,11 +28,13 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from typing import Protocol, runtime_checkable
 
+from gnome3d import log
 from gnome3d.pipeline.dag import Dag, Node, NodeId
 from gnome3d.pipeline.registry import runners_for
 from gnome3d.pipeline.stage import Result, StageKind
 from gnome3d.pipeline.state import State
 
+LOG = log.get("executor")
 
 @runtime_checkable
 class Executor(Protocol):
@@ -136,14 +138,17 @@ class MixedExecutor:
 
     def _dispatch(self, strat, kind, nodes, dag, outputs, done, pool):  # type: ignore[no-untyped-def]
         if strat == BATCH:
+            LOG.info(f"running {len(nodes)} {kind} nodes in batch...")
             self._run_batch(kind, nodes, dag, outputs, done)
         elif strat == THREADED and pool is not None:
+            LOG.info(f"running {len(nodes)} {kind} nodes across {self._max_workers} threads...")
             # Compute on the pool; finish (record + expand) on the main thread.
             jobs = [(n, dag.inputs_for(n, outputs)) for n in nodes]
             futures = [pool.submit(_run_node, n, inp) for n, inp in jobs]
             for (node, _inp), fut in zip(jobs, futures, strict=True):
                 _finish(dag, node, fut.result(), outputs, done)
         else:  # SERIAL (and the COARSE spine)
+            LOG.info(f"running {len(nodes)} {kind} nodes serially...")
             for node in nodes:
                 inputs = dag.inputs_for(node, outputs)
                 _finish(dag, node, _run_node(node, inputs), outputs, done)
@@ -171,7 +176,7 @@ class MixedExecutor:
 
 
 class SerialExecutor(MixedExecutor):
-    """Every kind serial — one node at a time (the deterministic baseline)."""
+    """Every kind serial with one node at a time (the deterministic baseline)."""
 
     def __init__(self) -> None:
         super().__init__({})
@@ -185,7 +190,7 @@ class ThreadedExecutor(MixedExecutor):
 
 
 class BatchExecutor(MixedExecutor):
-    """The kinds in ``batch_kinds`` batched on JAX, the rest serial.  ``None`` =
+    """The kinds in `batch_kinds` batched on JAX, the rest serial.  `None` =
     batch every kind that has a batch runner (validation)."""
 
     def __init__(self, batch_kinds: set[StageKind] | None = None) -> None:

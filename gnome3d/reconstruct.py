@@ -116,6 +116,8 @@ def reconstruct(
     RNG), so no external seeding is needed."""
     state = cb.build_state(settings, data, chrs, region)
     dag, ib_sink = build_coarse_dag(state, seed_offset)
+    
+    LOG.info(f"running DAG with {len(dag.nodes)} nodes and {len(dag.seeds)} seeds...")
     outputs = (executor or SerialExecutor()).run(dag)
 
     per_chr: dict[str, list[BeadOut]] = defaultdict(list)
@@ -161,7 +163,7 @@ def reconstruct_ensemble(
         SerialExecutor().run(spine)  # coarse positioning only — cheap, sequential
         member_seeds.append(skeleton.gather_all_ib_seeds(state, off))
     n_ib = sum(len(s) for s in member_seeds)
-    LOG.info("ensemble: %d members, %d IB chains total -> batched run", n, n_ib)
+    LOG.info(f"ensemble: {n} members, {n_ib} IB chains total")
 
     # Phase 2: one DAG over all members' IB chains, namespaced by member.
     nodes: dict[str, object] = {}
