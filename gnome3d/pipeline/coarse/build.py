@@ -26,7 +26,6 @@ field set, not of the positioned graph.
 from __future__ import annotations
 
 import copy
-import random
 from dataclasses import dataclass
 
 from gnome3d import log
@@ -43,7 +42,7 @@ from gnome3d.pipeline.coarse.heatmap import (
 )
 from gnome3d.settings import Settings
 from gnome3d.types import *
-from gnome3d.util import random_vector_np
+from gnome3d.util import random_vector_np, seed_rng
 
 LOG = log.get("coarse")
 
@@ -65,7 +64,7 @@ def seed_global_rng(seed_offset: int = 0) -> int:
     engine's single-stream order (keeping the layout byte-exact).
     """
     coarse_seed = (COARSE_SEED + seed_offset) & 0x7FFFFFFF
-    random.seed(coarse_seed)
+    seed_rng(coarse_seed)
     seed_numba(coarse_seed)
     return coarse_seed
 

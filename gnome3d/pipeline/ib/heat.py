@@ -12,7 +12,6 @@ Serial runner = numba dry smooth (`mc_smooth_numba` with no heat/orientation).
 
 from __future__ import annotations
 
-import random
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -20,7 +19,7 @@ import numpy as np
 from gnome3d.mc import numba as mc_numba
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Densified, HeatReady, State
-from gnome3d.util import random_vector_np
+from gnome3d.util import random_vector_np, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -39,7 +38,7 @@ def _estimate_avg_dist(
     n = len(pos)
     n_reps = int(s.subanchor_estimate_replicates)
     n_steps = int(s.subanchor_estimate_steps)
-    random.seed(seed)
+    seed_rng(seed)
     mc_numba.seed_numba(seed)
 
     avg_dist: F64Array = np.zeros((n, n), dtype=np.float64)
@@ -108,7 +107,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     spans: list[int] = []
     for prob in problems:
         spans.append(len(expanded))
-        random.seed(int(prob["seed"]))
+        seed_rng(int(prob["seed"]))
         pos = prob["pos"]
         fixed = prob["fixed"]
         step = float(prob["step_size"])

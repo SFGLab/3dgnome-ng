@@ -14,7 +14,6 @@ Serial runner = the numba backend (`mc_arcs_numba`).  The batched JAX runner
 
 from __future__ import annotations
 
-import random
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -22,7 +21,7 @@ import numpy as np
 from gnome3d.mc import numba as mc_numba
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Arced, Seeded, State
-from gnome3d.util import random_vector_np
+from gnome3d.util import random_vector_np, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.types import F32Array
@@ -41,7 +40,7 @@ def _run(problem: Problem) -> Result:
     seed = int(problem["seed"])
 
     # Deterministic per-IB RNG: Python `random` (initial noise) + numba (kernel).
-    random.seed(seed)
+    seed_rng(seed)
     mc_numba.seed_numba(seed)
 
     a = pos0.shape[0]
@@ -71,7 +70,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     expanded: list[Problem] = []
     owner: list[int] = []
     for gi, prob in enumerate(problems):
-        random.seed(int(prob["seed"]))  # deterministic restart noise for this IB
+        seed_rng(int(prob["seed"]))  # deterministic restart noise for this IB
         pos = prob["anchor_pos"]
         step = float(prob["step_size"])
         a = pos.shape[0]

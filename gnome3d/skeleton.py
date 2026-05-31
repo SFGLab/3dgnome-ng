@@ -1,22 +1,18 @@
 """
-Skeleton: the coupled preamble that produces per-IB ``Seeded`` states.
+Skeleton: per-IB ``Seeded`` input gathering off the positioned cluster graph.
 
-This is the sequential, cross-IB-coupled half of reconstruction — hierarchy,
-the inter-chromosomal + segment heatmaps, and IB-centroid positioning — plus the
-per-IB *input* gathering (expected-distance matrix, contact heatmaps, CTCF
-orientation/motif graph, anchor genomic spans).  Its output is a flat list of
-``Seeded`` states: everything an isolated IB needs to reconstruct itself, copied
-out as plain arrays so nothing downstream references the cluster graph.
+Once the coarse spine (`gnome3d.pipeline.coarse`) has positioned the cluster
+hierarchy, each interaction block becomes a *pure, isolated* reconstruction.
+This module reads the positioned graph and emits one ``Seeded`` per IB —
+everything an isolated IB needs (expected-distance matrix, contact heatmaps, CTCF
+orientation/motif graph, anchor seed positions + genomic spans), copied out as
+plain arrays so nothing downstream references the cluster graph.
 
-The expensive, *isolated* half — arcs -> densify -> heat -> smooth — lives in
-`pipeline.stages` and is driven by an executor over these seeds.
-
-The coarse engine itself is the free functions in `gnome3d.pipeline.coarse` over a
-`CoarseState` (hierarchy + inter-chr/segment heatmap MC + IB positioning); this
-module drives them and reads the positioned cluster graph to emit each IB's
-`Seeded` inputs.  The per-IB *gather* (`gather_ib_seeds` / `seed_for_ib`) is
-reused by the coarse pipeline's fan-out `expand` (`pipeline.coarse.stages`), so
-the legacy and unified-DAG paths build identical seeds.
+`gather_ib_seeds` / `seed_for_ib` are called by the coarse pipeline's fan-out
+`expand` (`pipeline.coarse.stages`) after the IB-positioning node runs; the
+expensive isolated half — arcs -> densify -> heat -> smooth — then runs as the
+per-IB stage chains.  `IBSeed.wants_heat` is the sparse-signal early-out that
+decides whether an IB's chain includes the HEAT_DIST stage.
 """
 
 from __future__ import annotations
@@ -27,13 +23,12 @@ from dataclasses import dataclass
 import numpy as np
 
 from gnome3d import log
-from gnome3d.data import ContactData
 from gnome3d.hierarchy import Level, set_level
 from gnome3d.pipeline import Orientation, Seeded
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
 from gnome3d.settings import Settings
-from gnome3d.types import BedRegion, F64Array, I8Array
+from gnome3d.types import F64Array, I8Array
 
 LOG = log.get("skeleton")
 
@@ -90,47 +85,15 @@ class IBSeed:
     wants_heat: bool
 
 
-def build_seeds(
-    settings: Settings,
-    data: ContactData,
-    chrs: list[str],
-    region: BedRegion | None = None,
-    seed_offset: int = 0,
-) -> list[IBSeed]:
-    """Build the hierarchy + coarse positioning, then emit one ``Seeded`` per IB.
-
-    Runs the coupled preamble (`coarse.build_state` +
-    `coarse.reconstruct_heatmap`), then walks each chromosome's positioned
-    IBs (positioning each segment's IB centroids and gathering its seeds).
-
-    `seed_offset` shifts every RNG seed (coarse + per-IB) so that distinct
-    ensemble members produce distinct structures from the same inputs — pass a
-    well-separated offset per member.  0 is the canonical single-structure run.
-    """
-    # Deterministic coarse engine: seed global RNG before any coarse MC runs, so
-    # anchor seed positions are reproducible run-to-run.  (The unified-DAG path
-    # seeds the same way, but from the root stage — see `coarse.seed_global_rng`.)
-    cb.seed_global_rng(seed_offset)
-
-    state = cb.build_state(settings, data, chrs, region)
-    cb.reconstruct_heatmap(state)
-
-    seeds: list[IBSeed] = []
-    for chr_ in state.chrs:
-        seeds.extend(_seeds_for_chr(state, chr_, seed_offset))
-    return seeds
-
-
-def _seeds_for_chr(state: CoarseState, chr_: str, seed_offset: int = 0) -> list[IBSeed]:
-    """Position this chromosome's IB centroids, then gather one ``Seeded`` per IB."""
+def gather_all_ib_seeds(state: CoarseState, seed_offset: int = 0) -> list[IBSeed]:
+    """Gather every IB's ``Seeded`` across all chromosomes of the *already
+    positioned* graph.  The whole-graph read-out used by both the coarse fan-out
+    `expand` and the ensemble driver (after their respective coarse spines run)."""
     seg_level = set_level(Level.SEGMENT - Level.CHROMOSOME, state.chr_root, state.clusters, state.chrs)
-    segs = seg_level.get(chr_, [])
-    if not segs:
-        return []
-
-    LOG.info("anchor level: %s", chr_)
-    cb.position_interaction_blocks(state, segs)
-    return gather_ib_seeds(state, chr_, seg_level, seed_offset)
+    out: list[IBSeed] = []
+    for chr_ in state.chrs:
+        out.extend(gather_ib_seeds(state, chr_, seg_level, seed_offset))
+    return out
 
 
 def gather_ib_seeds(

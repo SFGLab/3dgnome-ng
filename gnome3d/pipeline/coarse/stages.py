@@ -29,16 +29,14 @@ from typing import TYPE_CHECKING
 from gnome3d.hierarchy import Level, set_level
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.dag import Dag, Node, NodeId
+from gnome3d.pipeline.ib import ib_chain_nodes
 from gnome3d.pipeline.registry import register
 from gnome3d.pipeline.stage import Problem, Result, StageKind
-from gnome3d.pipeline.stages.arcs import ArcsStage
-from gnome3d.pipeline.stages.densify import DensifyStage
-from gnome3d.pipeline.stages.heat import HeatDistStage
-from gnome3d.pipeline.stages.smooth import SmoothStage
-from gnome3d.pipeline.state import CoarsePhase, Seeded, State
+from gnome3d.pipeline.state import CoarsePhase, State
 
 if TYPE_CHECKING:
     from gnome3d.pipeline.coarse import CoarseState
+    from gnome3d.pipeline.state import Seeded
     from gnome3d.skeleton import IBSeed
 
 
@@ -59,12 +57,6 @@ _COARSE = "coarse"
 
 def _coarse_id(level: str) -> NodeId:
     return f"{_COARSE} :: {level}"
-
-
-def ib_node_id(ib_id: str, stage_name: str) -> NodeId:
-    """The id of one per-IB chain node — must match `reconstruct.build_dag` so the
-    two paths address the same nodes."""
-    return f"{ib_id} :: {stage_name}"
 
 
 # --- coarse stages (work-in-apply graph transforms) -------------------------
@@ -168,38 +160,15 @@ def _seg_level(state: CoarseState) -> dict[str, list[int]]:
     return set_level(Level.SEGMENT - Level.CHROMOSOME, state.chr_root, state.clusters, state.chrs)
 
 
-# --- the per-IB chain (mirrors reconstruct.build_dag) -----------------------
-
-
-def _ib_chain_nodes(ibseeds: list[IBSeed]) -> tuple[list[Node], dict[NodeId, Seeded]]:
-    """One linear chain per IB: arcs -> densify -> [heat] -> smooth.  HEAT_DIST is
-    included only when the skeleton kept it (`IBSeed.wants_heat`)."""
-    nodes: list[Node] = []
-    seeds: dict[NodeId, Seeded] = {}
-    for ibs in ibseeds:
-        chain: list[tuple[StageKind, object]] = [
-            (StageKind.ARCS, ArcsStage()),
-            (StageKind.DENSIFY, DensifyStage()),
-        ]
-        if ibs.wants_heat:
-            chain.append((StageKind.HEAT_DIST, HeatDistStage()))
-        chain.append((StageKind.SMOOTH, SmoothStage()))
-
-        prev: NodeId | None = None
-        for kind, stage in chain:
-            nid = ib_node_id(ibs.ib_id, kind.value)
-            nodes.append(Node(nid, stage, () if prev is None else (prev,)))  # type: ignore[arg-type]
-            if prev is None:
-                seeds[nid] = ibs.seed
-            prev = nid
-    return nodes, seeds
+# --- the IB fan-out the expand hook spawns ----------------------------------
 
 
 def _expand_into_ib_chains(seed_offset: int, sink: list[IBSeed]) -> object:
     """Build the IB-positioning node's `expand` hook.  On completion it reads the
     positioned graph, gathers every IB's `Seeded` (via the shared
     `skeleton.gather_ib_seeds`), records them in `sink` (so the caller can map
-    smooth outputs back to chromosomes), and returns the per-IB chain nodes."""
+    smooth outputs back to chromosomes), and returns the per-IB chain nodes
+    (`ib.ib_chain_nodes` — the IB domain owns the chain shape)."""
 
     def expand(output: State) -> tuple[list[Node], dict[NodeId, Seeded]]:
         # Imported lazily to avoid an import cycle (skeleton -> coarse,
@@ -207,13 +176,9 @@ def _expand_into_ib_chains(seed_offset: int, sink: list[IBSeed]) -> object:
         from gnome3d import skeleton
 
         assert isinstance(output, CoarsePhase)
-        state = output.state
-        lvl = _seg_level(state)
-        ibseeds: list[IBSeed] = []
-        for chr_ in state.chrs:
-            ibseeds.extend(skeleton.gather_ib_seeds(state, chr_, lvl, seed_offset))
+        ibseeds = skeleton.gather_all_ib_seeds(output.state, seed_offset)
         sink.extend(ibseeds)
-        return _ib_chain_nodes(ibseeds)
+        return ib_chain_nodes(ibseeds)
 
     return expand
 
@@ -221,7 +186,9 @@ def _expand_into_ib_chains(seed_offset: int, sink: list[IBSeed]) -> object:
 # --- the unified coarse DAG -------------------------------------------------
 
 
-def build_coarse_dag(state: CoarseState, seed_offset: int = 0) -> tuple[Dag, list[IBSeed]]:
+def build_coarse_dag(
+    state: CoarseState, seed_offset: int = 0, *, fan_out: bool = True
+) -> tuple[Dag, list[IBSeed]]:
     """Assemble the coarse spine for `state` and return ``(dag, ib_sink)``.
 
     The spine branches exactly as `coarse.reconstruct_heatmap`:
@@ -230,10 +197,12 @@ def build_coarse_dag(state: CoarseState, seed_offset: int = 0) -> tuple[Dag, lis
       * multi-chromosome -> root -> chr     -> segment -> ib
       * single-chr/multi -> root -> segment -> ib
 
-    ``ib_sink`` is filled at run time by the IB node's `expand` with the gathered
-    `IBSeed`s (empty until the DAG runs) so the caller can group the terminal
-    smooth beads by chromosome.
-    """
+    With ``fan_out`` (default) the terminal IB node carries an `expand` hook that
+    spawns the per-IB chains at run time and fills ``ib_sink`` (so the caller can
+    group the terminal smooth beads by chromosome).  With ``fan_out=False`` the
+    spine runs the coarse positioning *only* (no IB chains); the ensemble driver
+    uses this to run E members' spines, gather their seeds, then batch all the IB
+    chains together (`reconstruct.reconstruct_ensemble`)."""
     lvl = _seg_level(state)
     total_segs = sum(len(v) for v in lvl.values())
     single_seg = len(state.chrs) == 1 and total_segs <= 1
@@ -258,6 +227,7 @@ def build_coarse_dag(state: CoarseState, seed_offset: int = 0) -> tuple[Dag, lis
         prev = chain(SegmentStage(), "segment", prev)
 
     ib_sink: list[IBSeed] = []
-    chain(IBPositionStage(), "ib", prev, _expand_into_ib_chains(seed_offset, ib_sink))
+    expand = _expand_into_ib_chains(seed_offset, ib_sink) if fan_out else None
+    chain(IBPositionStage(), "ib", prev, expand)
 
     return Dag(nodes=nodes, seeds={}), ib_sink

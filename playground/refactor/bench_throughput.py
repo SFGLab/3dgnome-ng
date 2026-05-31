@@ -1,12 +1,13 @@
 """Throughput harness for the task-DAG pipeline on real data (GPU or CPU).
 
 Times a `reconstruct` run on a region and breaks it down into:
-  * coarse   - skeleton.build_seeds (hierarchy + inter-chr/segment heatmap MC +
-               IB positioning) — the sequential preamble.
-  * stages   - per kind (ARCS / DENSIFY / HEAT_DIST / SMOOTH): wall, kernel
-               *launches*, and total *chains* (= IBs x restarts/trials).  The
-               launches-vs-chains ratio is the GPU-saturation signal: few wide
-               launches over many chains = the batching is doing its job.
+  * build    - `coarse.build_state` (hierarchy build) — the cheap preamble.
+  * stages   - per kind (COARSE / ARCS / DENSIFY / HEAT_DIST / SMOOTH): wall,
+               kernel *launches*, and total *chains* (= IBs x restarts/trials).
+               The coarse spine now runs *inside* the executor as the COARSE
+               kind; the launches-vs-chains ratio on the IB kinds is the
+               GPU-saturation signal: few wide launches over many chains = the
+               batching is doing its job.
   * assemble - bead collection.
 
 `GNOME3D_MC_PROFILE` does NOT capture the pipeline (the stages bypass the mc
@@ -30,12 +31,15 @@ import time
 from collections import defaultdict
 
 sys.path.insert(0, ".")
-from gnome3d import log, skeleton  # noqa: E402
+from gnome3d import log  # noqa: E402
 from gnome3d.data import ContactData  # noqa: E402
 from gnome3d.io import parse_region  # noqa: E402
 from gnome3d.pipeline import StageKind, registry  # noqa: E402
+from gnome3d.pipeline import coarse as cb  # noqa: E402
+from gnome3d.pipeline.coarse.stages import build_coarse_dag  # noqa: E402
 from gnome3d.pipeline.executor import Executor, SerialExecutor  # noqa: E402
-from gnome3d.reconstruct import _node_id, build_dag, pick_executor  # noqa: E402
+from gnome3d.pipeline.ib import ib_node_id  # noqa: E402
+from gnome3d.reconstruct import _beads, pick_executor  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
 
 _SMOOTH = StageKind.SMOOTH.value
@@ -84,28 +88,28 @@ def _run_timed(settings, data, chrs, region, executor: Executor, seed_offset: in
     stats, restore = _instrument()
     try:
         t0 = time.perf_counter()
-        ibseeds = skeleton.build_seeds(settings, data, chrs, region, seed_offset=seed_offset)
-        t_coarse = time.perf_counter() - t0
+        state = cb.build_state(settings, data, chrs, region)
+        dag, ib_sink = build_coarse_dag(state, seed_offset)
+        t_build = time.perf_counter() - t0
 
-        dag = build_dag(ibseeds)
         t1 = time.perf_counter()
-        outputs = executor.run(dag)
+        outputs = executor.run(dag)  # coarse spine (COARSE kind) + per-IB chains
         t_exec = time.perf_counter() - t1
 
         t2 = time.perf_counter()
         beads = 0
-        for ibs in ibseeds:
-            beads += len(outputs[_node_id(ibs.ib_id, _SMOOTH)].beads)
+        for ibs in ib_sink:
+            beads += len(_beads(outputs[ib_node_id(ibs.ib_id, _SMOOTH)]))
         t_assemble = time.perf_counter() - t2
     finally:
         restore()
     return {
-        "n_ibs": len(ibseeds),
+        "n_ibs": len(ib_sink),
         "beads": beads,
-        "coarse": t_coarse,
+        "build": t_build,
         "exec": t_exec,
         "assemble": t_assemble,
-        "total": t_coarse + t_exec + t_assemble,
+        "total": t_build + t_exec + t_assemble,
         "stats": dict(stats),
     }
 
@@ -113,7 +117,7 @@ def _run_timed(settings, data, chrs, region, executor: Executor, seed_offset: in
 def _report(label: str, r: dict) -> None:
     print(f"\n=== {label} ===")
     print(f"  IBs: {r['n_ibs']}   beads: {r['beads']}")
-    print(f"  coarse (skeleton):  {r['coarse']:8.2f}s")
+    print(f"  build_state:        {r['build']:8.2f}s")
     print(f"  stages (executor):  {r['exec']:8.2f}s")
     for (kind, mode), st in sorted(r["stats"].items()):
         sat = st["chains"] / max(st["launches"], 1)

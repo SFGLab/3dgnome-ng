@@ -6,12 +6,10 @@ Thin wrappers around the Settings / ContactData / Solver pipeline.
 
 from __future__ import annotations
 
-import contextlib
-
 from gnome3d import log
 from gnome3d.data import ContactData
 from gnome3d.io import parse_chrs_arg, parse_region
-from gnome3d.reconstruct import MEMBER_SEED_STRIDE, pick_executor, reconstruct
+from gnome3d.reconstruct import pick_executor, reconstruct_ensemble
 from gnome3d.settings import Settings
 from gnome3d.types import BeadOut, BedRegion
 
@@ -33,36 +31,25 @@ def simulate(
 
     Returns one dict[chr -> list[BeadOut]] per structure.
 
-    Runs the task-DAG pipeline (`reconstruct`) under the executor `pick_executor`
-    selects for the backend — `SerialExecutor` (numba) or `BatchExecutor` (JAX,
-    region-batched).  Each structure is a `reconstruct` with a distinct per-member
-    seed offset, so an ensemble varies despite deterministic per-IB seeding.
+    Runs the task-DAG pipeline under the executor `pick_executor` selects for the
+    backend — `SerialExecutor` (numba) or `BatchExecutor` (JAX).  The ensemble is
+    `reconstruct_ensemble`: each member's coarse spine runs sequentially (distinct
+    per-member seed), then *all* members' per-IB chains run in one batched pass so
+    same-shaped IBs across members fill one GPU launch.  Member i is byte-identical
+    to a standalone `reconstruct(seed_offset=i * MEMBER_SEED_STRIDE)`.
     """
     executor = pick_executor(settings)
+    with log.step(LOG, f"reconstruct {n_structures} structure(s)"):
+        raw = reconstruct_ensemble(
+            settings, data, chrs_list, region, n=n_structures, executor=executor
+        )
 
     structures: list[dict[str, list[BeadOut]]] = []
-    for i in range(n_structures):
-        # Scope per structure only when several run (matches cli); a single
-        # structure would just indent everything for no benefit.
-        ctx = (
-            log.step(LOG, f"structure {i + 1}/{n_structures}")
-            if n_structures > 1
-            else contextlib.nullcontext()
-        )
-        with ctx:
-            per_chr = reconstruct(
-                settings,
-                data,
-                chrs_list,
-                region,
-                executor=executor,
-                seed_offset=i * MEMBER_SEED_STRIDE,
-            )
-            per_chr = {chr_: beads for chr_, beads in per_chr.items() if beads}
-            if not per_chr:
-                raise RuntimeError(f"Structure {i + 1}: no leaf beads from any chromosome")
-            structures.append(per_chr)
-
+    for i, per_chr in enumerate(raw):
+        per_chr = {chr_: beads for chr_, beads in per_chr.items() if beads}
+        if not per_chr:
+            raise RuntimeError(f"Structure {i + 1}: no leaf beads from any chromosome")
+        structures.append(per_chr)
     return structures
 
 

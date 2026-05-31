@@ -6,10 +6,34 @@ from __future__ import annotations
 
 import math
 import random
+import threading
 
 import numpy as np
 
 from gnome3d.types import F32Array, F64Array
+
+# Thread-local RNG for the positioning noise.  The global `random` module is a
+# single `random.Random` instance shared across threads, so a `ThreadedExecutor`
+# running several stages at once would have them clobber each other's stream.  A
+# per-thread `random.Random` is byte-identical for a given seed (the global
+# module IS such an instance) but isolated per thread, so threaded stage
+# execution stays deterministic.  Seed it with `seed_rng`; draw via the helpers.
+_tls = threading.local()
+
+
+def _rng() -> random.Random:
+    r = getattr(_tls, "rng", None)
+    if r is None:
+        r = _tls.rng = random.Random()
+    return r
+
+
+def seed_rng(seed: int) -> None:
+    """Seed the calling thread's positioning RNG (used by `random_vector_np`).
+    Replaces a bare `random.seed`, so coarse seeding and per-stage seeding are
+    thread-isolated; same seed -> same stream as the old global `random`."""
+    _rng().seed(seed)
+
 
 # Distance conversion functions
 
@@ -42,11 +66,12 @@ def random_vector_np(step: float, in_2d: bool = False) -> F32Array:
     Mirrors Reference displace() in lib/common.cpp.  When in_2d is True, the
     z component is forced to 0 (matches `Settings::use2D` branch).
     """
-    z = 0.0 if in_2d else random.uniform(-step, step)
+    r = _rng()
+    z = 0.0 if in_2d else r.uniform(-step, step)
     return np.array(
         [
-            random.uniform(-step, step),
-            random.uniform(-step, step),
+            r.uniform(-step, step),
+            r.uniform(-step, step),
             z,
         ],
         dtype=np.float32,

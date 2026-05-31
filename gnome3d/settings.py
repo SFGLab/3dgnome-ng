@@ -138,6 +138,21 @@ class Settings:
     mc_backend_apply_to_smooth: bool
     mc_backend_apply_to_arcs: bool
     mc_backend_apply_to_heatmap: bool
+    # Per-stage executor: how each IB stage's nodes are scheduled AND which kernel
+    # runs them (the executor implies the backend).  One value per stage:
+    #   'serial'   — numba, one node at a time (deterministic baseline).
+    #   'threaded' — numba, independent nodes across `ib_workers` threads (kernels
+    #                are nogil + thread-local RNG, so byte-identical to serial).
+    #   'batch'    — JAX, same-(kind,bucket) nodes in one vmapped launch (GPU).
+    #   'auto'     — resolve from the legacy mc_backend/ib_workers: jax + the old
+    #                apply-flag -> batch; numba + ib_workers>1 -> threaded; else
+    #                serial.  (Keeps existing configs working until they migrate.)
+    # This replaces the old mc_backend_apply_to_* flags for executor selection;
+    # mc_backend now only selects the *coarse* MC kernel (heatmap/ib).
+    mc_executor_arcs: str
+    mc_executor_densify: str
+    mc_executor_heat: str
+    mc_executor_smooth: str
     # Pad each JAX kernel's bead count up to a fixed bucket ladder so XLA
     # compiles ~one kernel per bucket instead of one per distinct region size.
     # Bounds total compiles regardless of how many distinct-N regions exist.
@@ -359,6 +374,10 @@ class Settings:
         self.mc_backend_apply_to_smooth = True
         self.mc_backend_apply_to_arcs = False
         self.mc_backend_apply_to_heatmap = False
+        self.mc_executor_arcs = "auto"
+        self.mc_executor_densify = "auto"
+        self.mc_executor_heat = "auto"
+        self.mc_executor_smooth = "auto"
         self.jax_bucket_shapes = False
         self.jax_precompile_buckets = False
         self.jax_region_batch = False
@@ -669,6 +688,14 @@ class Settings:
         self.mc_smooth_chains = geti("simulation_backend", "smooth_chains", self.mc_smooth_chains)
         self.ib_workers = geti("simulation_backend", "ib_workers", self.ib_workers)
         self.mc_backend = gets("simulation_backend", "mc_backend", self.mc_backend)
+        self.mc_executor_arcs = gets("simulation_backend", "mc_executor_arcs", self.mc_executor_arcs)
+        self.mc_executor_densify = gets(
+            "simulation_backend", "mc_executor_densify", self.mc_executor_densify
+        )
+        self.mc_executor_heat = gets("simulation_backend", "mc_executor_heat", self.mc_executor_heat)
+        self.mc_executor_smooth = gets(
+            "simulation_backend", "mc_executor_smooth", self.mc_executor_smooth
+        )
         self.mc_backend_apply_to_smooth = getb(
             "simulation_backend", "mc_backend_apply_to_smooth", self.mc_backend_apply_to_smooth
         )

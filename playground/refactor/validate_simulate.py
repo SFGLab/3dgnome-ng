@@ -1,7 +1,9 @@
 """Validate the `simulate` entry point routes through the task-DAG pipeline on
 the numba backend and that ensembles vary.
 
-  1. executor selection — numba -> SerialExecutor, jax -> None (legacy Solver).
+  1. executor selection — pick_executor builds one MixedExecutor whose per-kind
+                          strategy follows the config: numba+ib_workers=1 -> all
+                          serial; jax (apply_to_smooth) -> smooth/heat batched.
   2. single structure  — simulate() produces the chr's beads, layout matching
                           the Solver path.
   3. ensemble varies   — n_structures=2 gives the SAME genomic layout but
@@ -33,16 +35,23 @@ def main() -> int:
     chrs = [bed.chr]
     ok = True
 
-    # 1) executor selection
-    from gnome3d.pipeline.executor import BatchExecutor, SerialExecutor
+    # 1) executor selection — pick_executor builds one MixedExecutor; check its
+    #    per-kind strategy follows the config.
+    from gnome3d.pipeline.executor import BATCH
+    from gnome3d.pipeline.stage import StageKind
 
-    sel_numba = pick_executor(s)
+    strat_numba = pick_executor(s)._strategy  # noqa: SLF001
     s_jax = type(s)()
     s_jax.load_ini("data/GM12878/config_dryrun.ini")
     s_jax.mc_backend = "jax"
-    routing = isinstance(sel_numba, SerialExecutor) and isinstance(pick_executor(s_jax), BatchExecutor)
+    strat_jax = pick_executor(s_jax)._strategy  # noqa: SLF001
+    routing = (
+        all(v != BATCH for v in strat_numba.values())  # numba never batches (no JAX kernel)
+        and strat_jax[StageKind.SMOOTH] == BATCH  # jax apply_to_smooth -> smooth batched
+        and strat_jax[StageKind.HEAT_DIST] == BATCH
+    )
     ok &= routing
-    print(f"  {'ok ' if routing else 'FAIL'} routing (numba->Serial, jax->Batch)")
+    print(f"  {'ok ' if routing else 'FAIL'} routing (numba->no batch, jax->smooth/heat batch)")
 
     # 2) simulate(n=1) matches a direct reconstruct (entry point adds nothing but
     #    the per-structure loop + empty-chr filtering)

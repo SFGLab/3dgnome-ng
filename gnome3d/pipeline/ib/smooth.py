@@ -17,7 +17,6 @@ terminal here, the beads ARE the output.  Serial runner = numba `mc_smooth_numba
 
 from __future__ import annotations
 
-import random
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -26,7 +25,7 @@ from gnome3d.mc import numba as mc_numba
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import AnchorMapEntry, Densified, Orientation, Smoothed, State
 from gnome3d.types import BeadOut
-from gnome3d.util import random_vector_np
+from gnome3d.util import random_vector_np, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -81,7 +80,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     expanded: list[Problem] = []
     owner: list[int] = []
     for gi, prob in enumerate(problems):
-        random.seed(int(prob["seed"]))  # deterministic restart noise for this IB
+        seed_rng(int(prob["seed"]))  # deterministic restart noise for this IB
         pos = prob["pos"]
         fixed = prob["fixed"]
         step = float(prob["step_size"])
@@ -117,7 +116,7 @@ def _run(problem: Problem) -> Result:
     nbr_w = problem["anchor_neighbor_weights"]
     heat = problem["heat_dist"]
 
-    random.seed(seed)
+    seed_rng(seed)
     mc_numba.seed_numba(seed)
 
     n = len(pos)

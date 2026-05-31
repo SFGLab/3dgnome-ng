@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 
 sys.path.insert(0, ".")
-from gnome3d import log, skeleton  # noqa: E402
+from gnome3d import log  # noqa: E402
 from gnome3d.data import ContactData  # noqa: E402
 from gnome3d.io import parse_region  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
@@ -20,7 +20,9 @@ DATA_DIR = "data/GM12878/"
 
 
 def load_region(output_level: int = 0):
-    """Settings + ContactData + skeleton seeds for the bundled test region."""
+    """Settings + ContactData for the bundled test region.  (Returns a 4-tuple
+    with a trailing ``None`` so existing callers' ``s, bed, data, _`` unpacking
+    keeps working.)"""
     log.setup(output_level)
     s = Settings()
     if not s.load_ini(CONFIG):
@@ -29,5 +31,4 @@ def load_region(output_level: int = 0):
     s.mc_backend = "numba"  # local, no GPU
     bed = parse_region(REGION)
     data = ContactData.from_files(s, [bed.chr], bed)
-    seeds = skeleton.build_seeds(s, data, [bed.chr], bed)
-    return s, bed, data, seeds
+    return s, bed, data, None
