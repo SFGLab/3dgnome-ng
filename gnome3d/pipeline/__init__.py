@@ -34,13 +34,14 @@ comparison (see `[[feedback_no_made_up_solutions]]`).
 
 from __future__ import annotations
 
-from .dag import Dag, Node, NodeId
-from .executor import Executor
-from .registry import BatchRunner, KindRunners, SerialRunner, register, runners_for
-from .stage import Problem, Result, Stage, StageKind
-from .state import (
+from gnome3d.pipeline.dag import Dag, Node, NodeId
+from gnome3d.pipeline.executor import Executor
+from gnome3d.pipeline.registry import BatchRunner, KindRunners, SerialRunner, register, runners_for
+from gnome3d.pipeline.stage import Problem, Result, Stage, StageKind
+from gnome3d.pipeline.state import (
     AnchorMapEntry,
     Arced,
+    CoarsePhase,
     Densified,
     HeatReady,
     Orientation,
@@ -53,6 +54,7 @@ __all__ = [
     "AnchorMapEntry",
     "Arced",
     "BatchRunner",
+    "CoarsePhase",
     "Dag",
     "Densified",
     "Executor",

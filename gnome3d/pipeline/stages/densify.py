@@ -16,12 +16,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ..stage import Problem, Result, StageKind
-from ..state import AnchorMapEntry, Arced, Densified, State
+from gnome3d.pipeline.stage import Problem, Result, StageKind
+from gnome3d.pipeline.state import AnchorMapEntry, Arced, Densified, State
 
 if TYPE_CHECKING:
-    from ...settings import Settings
-    from ...types import BoolArray, F32Array
+    from gnome3d.settings import Settings
+    from gnome3d.types import BoolArray, F32Array
 
 # (pos, fixed, starts, ends, dtn, anchor_map, step_size_smooth)
 DensifyResult = tuple[

@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import os
 
-from . import log
-from .types import *
+from gnome3d import log
+from gnome3d.types import *
 
 LOG = log.get("io")
 

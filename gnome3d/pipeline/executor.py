@@ -23,10 +23,10 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Protocol, runtime_checkable
 
-from .dag import Dag, Node, NodeId
-from .registry import runners_for
-from .stage import Result, StageKind
-from .state import State
+from gnome3d.pipeline.dag import Dag, Node, NodeId
+from gnome3d.pipeline.registry import runners_for
+from gnome3d.pipeline.stage import Result, StageKind
+from gnome3d.pipeline.state import State
 
 
 @runtime_checkable
@@ -45,6 +45,17 @@ def _ready_or_raise(dag: Dag, done: list[NodeId]) -> list[Node]:
     return ready
 
 
+def _finish(dag: Dag, node: Node, output: State, outputs: dict, done: list[NodeId]) -> None:
+    """Record a node's output, mark it done, and run its `expand` hook (if any) —
+    spawning new nodes into the DAG.  Newly added nodes are picked up by the next
+    `ready` pass, so the loops naturally drain the grown graph."""
+    outputs[node.id] = output
+    done.append(node.id)
+    if node.expand is not None:
+        new_nodes, new_seeds = node.expand(output)
+        dag.add(new_nodes, new_seeds)
+
+
 class SerialExecutor:
     """Run nodes one at a time through their kind's serial runner."""
 
@@ -58,8 +69,7 @@ class SerialExecutor:
                 if runner is None:
                     raise RuntimeError(f"no serial runner registered for {node.stage.kind}")
                 result: Result = runner(node.stage.to_problem(inputs))
-                outputs[node.id] = node.stage.apply(inputs, result)
-                done.append(node.id)
+                _finish(dag, node, node.stage.apply(inputs, result), outputs, done)
         return outputs
 
 
@@ -106,6 +116,5 @@ class BatchExecutor:
                 else:
                     raise RuntimeError(f"no runner registered for {kind}")
                 for (node, inputs), result in zip(members, results, strict=True):
-                    outputs[node.id] = node.stage.apply(inputs, result)
-                    done.append(node.id)
+                    _finish(dag, node, node.stage.apply(inputs, result), outputs, done)
         return outputs

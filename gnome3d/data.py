@@ -23,12 +23,12 @@ from __future__ import annotations
 from dataclasses import field
 from typing import TYPE_CHECKING, Any
 
-from . import log
-from .io import load_anchors, load_arcs, load_breakpoints, load_singletons
-from .types import *
+from gnome3d import log
+from gnome3d.io import load_anchors, load_arcs, load_breakpoints, load_singletons
+from gnome3d.types import *
 
 if TYPE_CHECKING:
-    from .settings import Settings
+    from gnome3d.settings import Settings
 
 LOG = log.get("data")
 

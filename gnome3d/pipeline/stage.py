@@ -13,13 +13,16 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Protocol, runtime_checkable
 
-from .state import State
+from gnome3d.pipeline.state import State
 
 
 class StageKind(Enum):
     """What a stage does.  The executor groups *ready* nodes by ``(kind, bucket)``
     to batch them and dispatches to the runner registered for the kind."""
 
+    # --- coarse positioning (the cluster-tree spine, upstream of IBs) ---
+    COARSE = "coarse"  # one cluster-graph level: build/position in place (serial)
+    # --- per-IB reconstruction ---
     ARCS = "arcs"  # position anchors via arc-spring MC        (anchor-shaped)
     DENSIFY = "densify"  # insert subanchor beads                     (CPU, reshapes)
     HEAT_DIST = "heat_dist"  # estimate subanchor distance target         (bead-shaped)

@@ -35,11 +35,11 @@ import numpy as np
 from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
-from .. import log
-from ..types import BoolArray, F64Array, I32Array, I64Array
+from gnome3d import log
+from gnome3d.types import BoolArray, F64Array, I32Array, I64Array
 
 if TYPE_CHECKING:
-    from ..settings import Settings
+    from gnome3d.settings import Settings
 
 LOG = log.get("mc.numba")
 
@@ -736,7 +736,7 @@ def _prepare_orientation(
     Returns (anchor_ar, nbr_offsets, nbr_indices, nbr_weights, orn_is_L,
              bead_to_anchor_k, anchor_orn, score_orn).
     """
-    from ..util import calc_orientation as _calc_orn
+    from gnome3d.util import calc_orientation as _calc_orn
 
     n = pw.shape[0]
     anchor_ar: I32Array = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)

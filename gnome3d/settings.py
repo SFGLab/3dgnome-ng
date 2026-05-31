@@ -857,26 +857,26 @@ class Settings:
         return True
 
     def genomic_length_to_distance(self, length_bp: int) -> float:
-        from .util import genomic_length_to_distance
+        from gnome3d.util import genomic_length_to_distance
 
         return genomic_length_to_distance(
             length_bp, self.genomic_dist_base, self.genomic_dist_scale, self.genomic_dist_power
         )
 
     def freq_to_dist_heatmap(self, freq: float) -> float:
-        from .util import freq_to_dist_heatmap
+        from gnome3d.util import freq_to_dist_heatmap
 
         return freq_to_dist_heatmap(freq, self.freq_dist_scale, self.freq_dist_power)
 
     def freq_to_dist_heatmap_inter(self, freq: float) -> float:
-        from .util import freq_to_dist_heatmap_inter
+        from gnome3d.util import freq_to_dist_heatmap_inter
 
         return freq_to_dist_heatmap_inter(
             freq, self.freq_dist_scale_inter, self.freq_dist_power_inter
         )
 
     def freq_to_distance(self, freq: int) -> float:
-        from .util import freq_to_distance
+        from gnome3d.util import freq_to_distance
 
         return freq_to_distance(
             freq,

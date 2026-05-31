@@ -17,7 +17,7 @@ import numpy as np
 
 sys.path.insert(0, ".")
 from gnome3d import log  # noqa: E402
-from gnome3d.coarse import CoarseModel  # noqa: E402
+from gnome3d.pipeline.coarse.heatmap import create_distance_heatmap, get_diagonal_size  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
 
 
@@ -67,7 +67,6 @@ def main() -> int:
     log.setup(0)
     s = Settings()
     s.load_ini("data/GM12878/config_dryrun.ini")
-    cm = CoarseModel(s)
 
     ok = True
     cases = [(n, sym, inter) for n in (1, 2, 7, 33, 128) for sym in (True, False) for inter in (False, True)]
@@ -76,9 +75,9 @@ def main() -> int:
         h = _make(n, seed=n * (2 if sym else 3) + int(inter), symmetric=sym)
         hl = h.tolist()
 
-        d_new, avg_new = cm._create_distance_heatmap(hl, n, inter=inter)  # pyright: ignore[reportPrivateUsage]
+        d_new, avg_new = create_distance_heatmap(s, hl, n, inter=inter)
         d_ref, avg_ref = _ref_distance(s, hl, n, inter)
-        diag_new = cm._get_diagonal_size(hl, n)  # pyright: ignore[reportPrivateUsage]
+        diag_new = get_diagonal_size(hl, n)
         diag_ref = _ref_diag(hl, n)
 
         d_ok = np.allclose(d_new, d_ref, rtol=0, atol=1e-9, equal_nan=True)

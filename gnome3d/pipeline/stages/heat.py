@@ -17,14 +17,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ...mc import numba as mc_numba
-from ...util import random_vector_np
-from ..stage import Problem, Result, StageKind
-from ..state import Densified, HeatReady, State
+from gnome3d.mc import numba as mc_numba
+from gnome3d.pipeline.stage import Problem, Result, StageKind
+from gnome3d.pipeline.state import Densified, HeatReady, State
+from gnome3d.util import random_vector_np
 
 if TYPE_CHECKING:
-    from ...settings import Settings
-    from ...types import BoolArray, F32Array, F64Array
+    from gnome3d.settings import Settings
+    from gnome3d.types import BoolArray, F32Array, F64Array
 
 _SEED_SALT = 1  # distinct from ARCS(0)/SMOOTH(2) so the noise streams don't correlate
 
@@ -97,7 +97,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     kernel (reusing `mc_smooth_jax_batch` — no heat/orientation), then build each
     IB's target matrix.  Mirrors `JaxSolver._batched_heat_dist`.  Returns one
     heat_dist (or None) per input problem, in order.  Lazy `mc_jax` import."""
-    from ...mc import jax as mc_jax
+    from gnome3d.mc import jax as mc_jax
 
     s = problems[0]["settings"]
     n_reps = int(s.subanchor_estimate_replicates)

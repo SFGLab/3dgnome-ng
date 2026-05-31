@@ -22,15 +22,15 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ...mc import numba as mc_numba
-from ...types import BeadOut
-from ...util import random_vector_np
-from ..stage import Problem, Result, StageKind
-from ..state import AnchorMapEntry, Densified, Orientation, Smoothed, State
+from gnome3d.mc import numba as mc_numba
+from gnome3d.pipeline.stage import Problem, Result, StageKind
+from gnome3d.pipeline.state import AnchorMapEntry, Densified, Orientation, Smoothed, State
+from gnome3d.types import BeadOut
+from gnome3d.util import random_vector_np
 
 if TYPE_CHECKING:
-    from ...settings import Settings
-    from ...types import BoolArray, F32Array, I8Array, StrArray
+    from gnome3d.settings import Settings
+    from gnome3d.types import BoolArray, F32Array, I8Array, StrArray
 
 _SEED_SALT = 2  # distinct from ARCS(0)/HEAT(1)
 _CODE_TO_CHAR = {int(Orientation.NONE): "N", int(Orientation.LEFT): "L", int(Orientation.RIGHT): "R"}
@@ -73,7 +73,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     mirroring `JaxSolver._batched_final_smooth`.  Returns one ``(score, pos)`` per
     input problem, in order.  `mc_jax` is imported lazily so the numba path never
     requires JAX."""
-    from ...mc import jax as mc_jax
+    from gnome3d.mc import jax as mc_jax
 
     s = problems[0]["settings"]
     n_restarts = max(1, int(s.steps_smooth))

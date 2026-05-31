@@ -20,8 +20,9 @@ from enum import IntEnum
 from typing import TYPE_CHECKING, TypeAlias
 
 if TYPE_CHECKING:
-    from ..settings import Settings
-    from ..types import BeadOut, BoolArray, F32Array, F64Array, I8Array
+    from gnome3d.pipeline.coarse import CoarseState
+    from gnome3d.settings import Settings
+    from gnome3d.types import BeadOut, BoolArray, F32Array, F64Array, I8Array
 
 # (bead_index_in_densified, anchor_index_in_ib) — abstract, no global cluster ref.
 AnchorMapEntry = tuple[int, int]
@@ -91,6 +92,29 @@ class Smoothed(HeatReady):
     beads: list[BeadOut]
 
 
-# The sealed set.  Subclasses ARE `Seeded`, so this union documents the legal
-# progression more than it constrains structurally.
-State: TypeAlias = Seeded | Arced | Densified | HeatReady | Smoothed
+@dataclass(frozen=True)
+class CoarsePhase:
+    """Carrier for the coarse positioning spine (hierarchy -> chr -> segment ->
+    ib), threaded as a *separate* payload from the Seeded IB progression.
+
+    It wraps the shared `CoarseState`: an immutable field set whose cluster
+    objects mutate in place as each coarse stage positions a level (a graph
+    algorithm — there is one graph, the stages write `.pos` into it).  A coarse
+    stage takes a `CoarsePhase`, mutates the graph, and returns a `CoarsePhase`
+    over the same state; the terminal IB-positioning node's `expand` reads the
+    positioned graph to fan out the per-IB `Seeded` chains.
+
+    `seed` is the coarse spine's RNG seed — the root stage seeds the global stream
+    from it and the spine *flows* that one stream in dependency order (it does not
+    re-seed per stage, unlike the per-IB `Seeded.seed`; the coarse levels are a
+    coupled linear sequence, never reordered).  Carried here so the seed is state
+    the pipeline owns, not a side-effect the caller applies before the run.
+    """
+
+    state: CoarseState
+    seed: int
+
+
+# The set of payloads that flow through the DAG.  The `Seeded` subclasses are the
+# per-IB progression; `CoarsePhase` is the upstream coarse spine's carrier.
+State: TypeAlias = Seeded | Arced | Densified | HeatReady | Smoothed | CoarsePhase

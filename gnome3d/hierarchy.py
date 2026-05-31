@@ -10,8 +10,8 @@ from __future__ import annotations
 from dataclasses import field
 from enum import IntEnum
 
-from . import log
-from .types import *
+from gnome3d import log
+from gnome3d.types import *
 
 LOG = log.get("hierarchy")
 

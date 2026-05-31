@@ -19,13 +19,13 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ...mc import numba as mc_numba
-from ...util import random_vector_np
-from ..stage import Problem, Result, StageKind
-from ..state import Arced, Seeded, State
+from gnome3d.mc import numba as mc_numba
+from gnome3d.pipeline.stage import Problem, Result, StageKind
+from gnome3d.pipeline.state import Arced, Seeded, State
+from gnome3d.util import random_vector_np
 
 if TYPE_CHECKING:
-    from ...types import F32Array
+    from gnome3d.types import F32Array
 
 
 def _run(problem: Problem) -> Result:
@@ -63,7 +63,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     kernel.  Each IB is fanned out to `steps_arcs` noised restarts (best kept),
     mirroring the serial loop.  Returns one ``(score, pos)`` per input problem.
     Lazy `mc_jax` import so the numba path never requires JAX."""
-    from ...mc import jax as mc_jax
+    from gnome3d.mc import jax as mc_jax
 
     s = problems[0]["settings"]
     n_restarts = max(1, int(s.steps_arcs))

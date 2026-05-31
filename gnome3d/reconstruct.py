@@ -14,16 +14,19 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
-from . import skeleton
-from .pipeline import Dag, Node
-from .pipeline.executor import BatchExecutor, Executor, SerialExecutor
-from .pipeline.stage import StageKind
-from .pipeline.stages import ArcsStage, DensifyStage, HeatDistStage, SmoothStage
+from gnome3d import skeleton
+from gnome3d.pipeline import Dag, Node
+from gnome3d.pipeline import coarse as cb
+from gnome3d.pipeline.coarse.stages import build_coarse_dag, ib_node_id
+from gnome3d.pipeline.executor import BatchExecutor, Executor, SerialExecutor
+from gnome3d.pipeline.stage import StageKind
+from gnome3d.pipeline.stages import ArcsStage, DensifyStage, HeatDistStage, SmoothStage
+from gnome3d.pipeline.state import Smoothed, State
 
 if TYPE_CHECKING:
-    from .data import ContactData
-    from .settings import Settings
-    from .types import BeadOut, BedRegion
+    from gnome3d.data import ContactData
+    from gnome3d.settings import Settings
+    from gnome3d.types import BeadOut, BedRegion
 
 _SMOOTH = StageKind.SMOOTH.value
 
@@ -56,6 +59,12 @@ def pick_executor(settings: Settings) -> Executor:
 
 def _node_id(ib_id: str, stage_name: str) -> str:
     return f"{ib_id} :: {stage_name}"
+
+
+def _beads(output: State) -> list[BeadOut]:
+    """The beads of a terminal smooth node, narrowed from the opaque output."""
+    assert isinstance(output, Smoothed)
+    return output.beads
 
 
 def build_dag(ibseeds: list[skeleton.IBSeed]) -> Dag:
@@ -103,5 +112,35 @@ def reconstruct(
 
     per_chr: dict[str, list[BeadOut]] = defaultdict(list)
     for ibs in ibseeds:
-        per_chr[ibs.chr_].extend(outputs[_node_id(ibs.ib_id, _SMOOTH)].beads)
+        per_chr[ibs.chr_].extend(_beads(outputs[_node_id(ibs.ib_id, _SMOOTH)]))
+    return {chr_: sorted(beads, key=lambda b: b.start) for chr_, beads in per_chr.items()}
+
+
+def reconstruct_unified(
+    settings: Settings,
+    data: ContactData,
+    chrs: list[str],
+    region: BedRegion | None = None,
+    executor: Executor | None = None,
+    seed_offset: int = 0,
+) -> dict[str, list[BeadOut]]:
+    """Reconstruct via the *single self-expanding DAG*: the coarse spine
+    (hierarchy -> chr -> segment -> ib) and the per-IB chains are one graph, with
+    the IB-positioning node's `expand` fanning out the chains at run time.
+
+    Byte-identical to `reconstruct` (the coarse spine consumes the same global RNG
+    stream in the same order; the IB chains re-seed per `Seeded.seed`), but with
+    the coarse half expressed as pipeline stages instead of a driver object.  This
+    is the path Step 4 makes the default; kept beside `reconstruct` so the two can
+    be diff-gated."""
+    # No external seeding: the spine's root stage seeds the global RNG from the
+    # seed it carries in `CoarsePhase` (build_state / build_coarse_dag use no RNG,
+    # so the first MC consumer sees the same stream as the legacy path).
+    state = cb.build_state(settings, data, chrs, region)
+    dag, ib_sink = build_coarse_dag(state, seed_offset)
+    outputs = (executor or SerialExecutor()).run(dag)
+
+    per_chr: dict[str, list[BeadOut]] = defaultdict(list)
+    for ibs in ib_sink:
+        per_chr[ibs.chr_].extend(_beads(outputs[ib_node_id(ibs.ib_id, _SMOOTH)]))
     return {chr_: sorted(beads, key=lambda b: b.start) for chr_, beads in per_chr.items()}

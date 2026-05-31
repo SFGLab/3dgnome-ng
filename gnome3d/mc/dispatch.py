@@ -44,8 +44,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .. import log
-from . import numba
+from gnome3d import log
+from gnome3d.mc import numba
 
 LOG = log.get("mc")
 
@@ -66,7 +66,7 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    from ..settings import Settings
+    from gnome3d.settings import Settings
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ def mc_heatmap(
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
     if _use_jax_for_heatmap(settings):
-        from . import jax
+        from gnome3d.mc import jax
 
         if LOG.isEnabledFor(logging.INFO):
             terms = ["heatmap"]
@@ -171,7 +171,7 @@ def mc_arcs(
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
     if _use_jax_for_arcs(settings):
-        from . import jax
+        from gnome3d.mc import jax
 
         if LOG.isEnabledFor(logging.INFO):
             terms = ["arcs"]
@@ -218,7 +218,7 @@ def mc_smooth(
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
     if _use_jax_for_smooth(settings):
-        from . import jax
+        from gnome3d.mc import jax
 
         if LOG.isEnabledFor(logging.INFO):
             terms: list[str] = ["chain"]

@@ -14,8 +14,8 @@ import-cheap (numba compiles on first call; JAX imports lazily in `_ensure_jax`)
 
 from __future__ import annotations
 
-from .dispatch import mc_arcs, mc_heatmap, mc_ib, mc_smooth
-from .jax import (
+from gnome3d.mc.dispatch import mc_arcs, mc_heatmap, mc_ib, mc_smooth
+from gnome3d.mc.jax import (
     _bucket_for,
     is_available,
     mc_arcs_jax,
@@ -24,7 +24,7 @@ from .jax import (
     mc_smooth_jax,
     mc_smooth_jax_batch,
 )
-from .numba import (
+from gnome3d.mc.numba import (
     mc_arcs_numba,
     mc_heatmap_numba,
     mc_ib_numba,

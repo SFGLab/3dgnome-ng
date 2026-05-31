@@ -13,19 +13,19 @@ as pure contract.
 
 from __future__ import annotations
 
-from ..registry import register
-from ..stage import StageKind
-from .arcs import ArcsStage
-from .arcs import _batch_run as _arcs_batch
-from .arcs import _run as _arcs_run
-from .densify import DensifyStage
-from .densify import _run as _densify_run
-from .heat import HeatDistStage
-from .heat import _batch_run as _heat_batch
-from .heat import _run as _heat_run
-from .smooth import SmoothStage
-from .smooth import _batch_run as _smooth_batch
-from .smooth import _run as _smooth_run
+from gnome3d.pipeline.registry import register
+from gnome3d.pipeline.stage import StageKind
+from gnome3d.pipeline.stages.arcs import ArcsStage
+from gnome3d.pipeline.stages.arcs import _batch_run as _arcs_batch
+from gnome3d.pipeline.stages.arcs import _run as _arcs_run
+from gnome3d.pipeline.stages.densify import DensifyStage
+from gnome3d.pipeline.stages.densify import _run as _densify_run
+from gnome3d.pipeline.stages.heat import HeatDistStage
+from gnome3d.pipeline.stages.heat import _batch_run as _heat_batch
+from gnome3d.pipeline.stages.heat import _run as _heat_run
+from gnome3d.pipeline.stages.smooth import SmoothStage
+from gnome3d.pipeline.stages.smooth import _batch_run as _smooth_batch
+from gnome3d.pipeline.stages.smooth import _run as _smooth_run
 
 register(StageKind.ARCS, serial=_arcs_run, batch=_arcs_batch)
 register(StageKind.DENSIFY, serial=_densify_run)

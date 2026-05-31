@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import contextlib
 
-from . import log
-from .data import ContactData
-from .io import parse_chrs_arg, parse_region
-from .reconstruct import MEMBER_SEED_STRIDE, pick_executor, reconstruct
-from .settings import Settings
-from .types import BeadOut, BedRegion
+from gnome3d import log
+from gnome3d.data import ContactData
+from gnome3d.io import parse_chrs_arg, parse_region
+from gnome3d.reconstruct import MEMBER_SEED_STRIDE, pick_executor, reconstruct
+from gnome3d.settings import Settings
+from gnome3d.types import BeadOut, BedRegion
 
 LOG = log.get("simulate")
 

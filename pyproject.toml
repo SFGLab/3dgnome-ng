@@ -67,16 +67,20 @@ skip-magic-trailing-comma = false
 # Start conservative: pycodestyle (E), pyflakes (F), pyupgrade (UP),
 # isort import sorting (I), bugbear-lite (B), and complexity (C4) checks.
 # Add more groups as the team gets comfortable.
-select = ["E", "F", "I", "UP", "B", "C4"]
+select = ["E", "F", "I", "UP", "B", "C4", "TID"]
 ignore = [
     "E501",  # line length - already enforced by formatter
     "E731",  # lambda assigns - used for tiny test helpers (Settings stand-ins)
 ]
 
+[tool.ruff.lint.flake8-tidy-imports]
+# Use absolute imports throughout (we have the gnome3d package) — no `from .x`.
+ban-relative-imports = "all"
+
 [tool.ruff.lint.per-file-ignores]
 # Star-imports of the public type aliases are intentional in these modules
 # (they re-export gnome3d.types as a flat namespace).
-"gnome3d/coarse.py" = ["F405", "F403"]
+"gnome3d/pipeline/coarse/build.py" = ["F405", "F403"]
 "gnome3d/io.py" = ["F405", "F403"]
 "gnome3d/data.py" = ["F405", "F403", "B023"]
 "gnome3d/hierarchy.py" = ["F405", "F403"]

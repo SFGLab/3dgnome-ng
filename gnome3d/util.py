@@ -9,7 +9,7 @@ import random
 
 import numpy as np
 
-from .types import F32Array, F64Array
+from gnome3d.types import F32Array, F64Array
 
 # Distance conversion functions
 

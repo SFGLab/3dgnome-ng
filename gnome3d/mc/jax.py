@@ -32,11 +32,11 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .. import log
-from ..types import F32Array, I32Array, I64Array
+from gnome3d import log
+from gnome3d.types import F32Array, I32Array, I64Array
 
 if TYPE_CHECKING:
-    from ..settings import Settings
+    from gnome3d.settings import Settings
 
 LOG = log.get("mc.jax")
 
