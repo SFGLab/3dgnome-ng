@@ -76,11 +76,10 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Star-imports of the public type aliases are intentional in these modules
 # (they re-export gnome3d.types as a flat namespace).
-"gnome3d/solver.py" = ["F405", "F403"]
+"gnome3d/coarse.py" = ["F405", "F403"]
 "gnome3d/io.py" = ["F405", "F403"]
 "gnome3d/data.py" = ["F405", "F403", "B023"]
 "gnome3d/hierarchy.py" = ["F405", "F403"]
-"gnome3d/mc.py" = ["F405", "F403"]
 # The harness uses tight one-liner stubs (lots of `;`), tuple short names like
 # `l` for length, and zip() without strict=. These are intentional for compact
 # test fixtures, not real code.

@@ -23,7 +23,7 @@ import numpy as np
 
 sys.path.insert(0, ".")
 from gnome3d import log  # noqa: E402
-from gnome3d.mc_jax import _bucket_for, mc_heatmap_jax  # noqa: E402
+from gnome3d.mc import _bucket_for, mc_heatmap_jax  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
 
 

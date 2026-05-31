@@ -32,11 +32,11 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from . import log
-from .types import F32Array, I32Array, I64Array
+from .. import log
+from ..types import F32Array, I32Array, I64Array
 
 if TYPE_CHECKING:
-    from .settings import Settings
+    from ..settings import Settings
 
 LOG = log.get("mc.jax")
 
@@ -1523,13 +1523,110 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         pos_f, ss_f, se_f, sc_f, _T_f, final_score, iter_f, _, converged_f = final
         return pos_f, ss_f, se_f, sc_f, final_score, iter_f, converged_f
 
+    # --- multi-problem (region-batched) variant: K DIFFERENT IBs in one kernel,
+    #     per-chain convergence (cf. the smooth kernel_full_mp).  Per-IB arrays
+    #     (exp_mat, step_size, r0, conf_*, n_active) move to axis 0; the schedule,
+    #     springs and weights stay shared.
+    #
+    #     Arcs uses NON-strict acceptance, so a chain that has converged would
+    #     DRIFT WORSE if it kept stepping while slower chains finish — so we
+    #     FREEZE converged chains (hold their pos/scores).  The strict smooth
+    #     path is safe to keep stepping and doesn't need this.
+    in_axes_mp = (
+        0, 0, 0, 0,  # pos, ss, se, sc (per-chain)
+        None,  # T0 (shared)
+        0,  # exp_mat (per-IB)
+        0,  # step_size (per-IB)
+        None, None, None,  # dt, js, jc (shared)
+        None, None,  # stretch_k, squeeze_k (shared; boosted IBs aren't batched)
+        0,  # r0 (per-IB auto excl radius)
+        None,  # excl_w (shared)
+        0, 0, 0, 0,  # conf_cx, conf_cy, conf_cz, conf_R (per-IB)
+        None,  # conf_w (shared)
+        0,  # key (per-chain)
+        0,  # n_active (per-IB)
+    )
+    batched_mp = jax.vmap(chain_batch, in_axes=in_axes_mp, out_axes=out_axes)
+
+    @jax.jit
+    def kernel_full_mp(
+        pos_k: Any,
+        ss_k: Any,
+        se_k: Any,
+        sc_k: Any,
+        T_init: Any,
+        exp_mat: Any,
+        step_size: Any,
+        dt: Any,
+        js: Any,
+        jc: Any,
+        stretch_k: Any,
+        squeeze_k: Any,
+        r0: Any,
+        excl_w: Any,
+        conf_cx: Any,
+        conf_cy: Any,
+        conf_cz: Any,
+        conf_R: Any,
+        conf_w: Any,
+        base_key: Any,
+        stop_improvement: Any,
+        stop_successes: Any,
+        score_eps: Any,
+        stop_when_ratio_above: Any,
+        n_active: Any,
+    ) -> Any:
+        K = pos_k.shape[0]
+
+        def cond_fn(state: Any) -> Any:
+            iter_i = state[6]
+            converged = state[8]  # (K,) per-chain
+            return jnp.logical_and(jnp.logical_not(jnp.all(converged)), iter_i < _MAX_ITERS)
+
+        def body_fn(state: Any) -> Any:
+            pos, ss, se, sc, T, ms_score, iter_i, _n_ok, conv_prev = state
+            iter_key = jax.random.fold_in(base_key, iter_i + 1)
+            keys = jax.random.split(iter_key, K)
+            npos, nss, nse, nsc, nT, n_ok = batched_mp(
+                pos, ss, se, sc, T, exp_mat, step_size, dt, js, jc,
+                stretch_k, squeeze_k, r0, excl_w,
+                conf_cx, conf_cy, conf_cz, conf_R, conf_w, keys, n_active,
+            )
+            # Freeze chains already converged (non-strict accept could worsen them).
+            frozen = conv_prev
+            pos = jnp.where(frozen[:, None, None], pos, npos)
+            ss = jnp.where(frozen, ss, nss)
+            se = jnp.where(frozen, se, nse)
+            sc = jnp.where(frozen, sc, nsc)
+
+            score = ss + se + sc  # (K,) per-chain total
+            ratio = score / jnp.maximum(ms_score, 1e-30)
+            plateaued = jnp.logical_and(score > stop_improvement * ms_score, n_ok < stop_successes)
+            eps_done = score < score_eps
+            ratio_done = ratio > stop_when_ratio_above
+            converged = jnp.logical_or(
+                jnp.logical_or(jnp.logical_or(plateaued, eps_done), ratio_done), conv_prev
+            )
+            return (pos, ss, se, sc, nT, score, iter_i + 1, n_ok, converged)
+
+        init_state = (
+            pos_k, ss_k, se_k, sc_k, T_init,
+            jnp.full((K,), 1e30, dtype=jnp.float32),  # ms_score per-chain
+            jnp.int32(0),
+            jnp.zeros((K,), dtype=jnp.int32),  # n_ok filler
+            jnp.zeros((K,), dtype=jnp.bool_),  # converged per-chain
+        )
+        final = jax.lax.while_loop(cond_fn, body_fn, init_state)
+        pos_f, ss_f, se_f, sc_f, _T_f, _score_f, iter_f, _nok_f, converged_f = final
+        return pos_f, ss_f, se_f, sc_f, iter_f, converged_f
+
     init_arcs = jax.jit(jax.vmap(_init_arcs, in_axes=(0, None, None, None)))
     init_excl_arcs = jax.jit(jax.vmap(_init_excl, in_axes=(0, None, None, None)))
     init_confine_arcs = jax.jit(
         jax.vmap(_init_confine, in_axes=(0, None, None, None, None, None, None))
     )
 
-    bundle = (kernel_full, init_arcs, init_excl_arcs, init_confine_arcs)
+    bundle = (kernel_full, init_arcs, init_excl_arcs, init_confine_arcs, kernel_full_mp)
     _kernel_cache[cache_key] = bundle  # pyright: ignore[reportArgumentType]
     return bundle
 
@@ -1669,7 +1766,7 @@ def mc_arcs_jax(
         conf_w_v = 0.0
 
     bundle = _build_arcs_kernel(n_steps_per_batch, excl_skip)
-    kernel_full, init_arcs, init_excl, init_confine = bundle
+    kernel_full, init_arcs, init_excl, init_confine, _kernel_full_mp = bundle
 
     # ---- shape bucketing: pad N up to a bucket.  Pad beads are inert: the arc
     # term is zeroed by exp_mat=0 pad rows/cols (neither spring nor repulsion),
@@ -3194,6 +3291,189 @@ def _mc_smooth_jax_batch_chunk(
             n_conv,
             K,
         )
+
+    results: list[tuple[float, np.ndarray[Any, Any]]] = []
+    for i, pr in enumerate(preps):
+        n_i = pr["n"]
+        results.append((float(score_per_chain[i]), pos_f_np[i, :n_i].astype(np.float32)))
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Region-batched arcs-MC: anneal K DIFFERENT IBs' anchors in one vmapped kernel.
+# Mirrors mc_smooth_jax_batch (per-chain convergence, shape bucketing, chunk/OOM
+# cap).  The one difference is the kernel freezes converged chains (arcs is
+# non-strict) — handled inside _build_arcs_kernel's kernel_full_mp.
+# ---------------------------------------------------------------------------
+
+
+def _prep_arcs_problem_np(
+    pos: np.ndarray[Any, Any],
+    exp_dist_mat: np.ndarray[Any, Any],
+    settings: "Settings",
+    B: int,
+) -> dict[str, Any]:
+    """One IB's arcs kernel inputs as numpy, padded to bucket B.  Pure numpy
+    mirror of the per-problem prep in `mc_arcs_jax` (per-IB excl radius +
+    confinement envelope); pad beads are inert (exp_mat=0 rows/cols, n_active
+    masks EV/confine)."""
+    n = int(pos.shape[0])
+    use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
+    excl_r0 = 1.0
+    if use_excl:
+        excl_r0 = float(settings.exclusion_radius_arcs)
+        if excl_r0 <= 0.0:
+            mask = np.asarray(exp_dist_mat) > 1e-6
+            factor = float(settings.exclusion_auto_factor_arcs)
+            excl_r0 = factor * float(np.asarray(exp_dist_mat)[mask].mean()) if mask.any() else 1.0
+
+    use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_arcs)
+    if use_conf:
+        conf_cx = float(pos[:, 0].mean())
+        conf_cy = float(pos[:, 1].mean())
+        conf_cz = float(pos[:, 2].mean())
+        conf_R = float(settings.confinement_radius_arcs)
+        if conf_R <= 0.0:
+            mask = np.asarray(exp_dist_mat) > 1e-6
+            avg_bond = float(np.asarray(exp_dist_mat)[mask].mean()) if mask.any() else 1.0
+            conf_R = float(settings.confinement_packing_factor_arcs) * avg_bond * (n ** (1.0 / 3.0))
+    else:
+        conf_cx = conf_cy = conf_cz = 0.0
+        conf_R = 1.0
+
+    pos_pad = pos.astype(np.float32)
+    exp_pad = exp_dist_mat.astype(np.float32)
+    if B > n:
+        pos_pad = np.concatenate([pos_pad, np.zeros((B - n, 3), dtype=np.float32)], axis=0)
+        ep = np.zeros((B, B), dtype=np.float32)
+        ep[:n, :n] = exp_pad
+        exp_pad = ep
+
+    return {
+        "n": n,
+        "pos": pos_pad,  # (B, 3)
+        "exp_mat": exp_pad,  # (B, B)
+        "excl_r0": excl_r0,
+        "conf_cx": conf_cx,
+        "conf_cy": conf_cy,
+        "conf_cz": conf_cz,
+        "conf_R": conf_R,
+        "n_active": n,
+    }
+
+
+def mc_arcs_jax_batch(
+    problems: list[dict[str, Any]],
+    settings: "Settings",
+) -> list[tuple[float, np.ndarray[Any, Any]]]:
+    """Anneal K *different* IBs' anchors in one vmapped kernel (region batching).
+
+    Each problem: ``pos`` (n,3), ``exp_dist`` (n,n), ``step_size`` (float).  All
+    share the energy-term flags (caller groups by terms + size bucket).  Returns
+    one ``(score, final_pos (n,3))`` per problem, in input order.
+
+    Caps the vmap width at ``max(1, 32768 // B)`` (saturation point + bounds the
+    stacked (K,B,B) exp tensor), running excess as sequential sub-batches — same
+    discipline as `mc_smooth_jax_batch`."""
+    if not problems:
+        return []
+    bucket = bool(settings.jax_bucket_shapes)
+    big_b = max((_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0])) for p in problems)
+    max_k = max(1, 32768 // max(1, big_b))
+    if len(problems) <= max_k:
+        return _mc_arcs_jax_batch_chunk(problems, settings)
+    out: list[tuple[float, np.ndarray[Any, Any]]] = []
+    for i in range(0, len(problems), max_k):
+        out.extend(_mc_arcs_jax_batch_chunk(problems[i : i + max_k], settings))
+    return out
+
+
+def _mc_arcs_jax_batch_chunk(
+    problems: list[dict[str, Any]],
+    settings: "Settings",
+) -> list[tuple[float, np.ndarray[Any, Any]]]:
+    """One vmapped arcs kernel launch for up to max_k IBs."""
+    if not _ensure_jax():
+        raise RuntimeError("settings.mc_backend='jax' but JAX is not installed.")
+    assert _jax is not None and _jnp is not None
+    jax = _jax
+    jnp = _jnp
+
+    K = len(problems)
+    if K == 0:
+        return []
+
+    bucket = bool(settings.jax_bucket_shapes)
+    B = max((_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0])) for p in problems)
+    preps = [_prep_arcs_problem_np(p["pos"], p["exp_dist"], settings, B) for p in problems]
+
+    def stack(key: str) -> Any:
+        return jnp.asarray(np.stack([pr[key] for pr in preps], axis=0))
+
+    pos_k = stack("pos")  # (K, B, 3)
+    exp_k = stack("exp_mat")  # (K, B, B)
+    n_active_k = jnp.asarray(np.array([pr["n_active"] for pr in preps], dtype=np.int32))
+    excl_r0_k = jnp.asarray(np.array([pr["excl_r0"] for pr in preps], dtype=np.float32))
+    conf_cx_k = jnp.asarray(np.array([pr["conf_cx"] for pr in preps], dtype=np.float32))
+    conf_cy_k = jnp.asarray(np.array([pr["conf_cy"] for pr in preps], dtype=np.float32))
+    conf_cz_k = jnp.asarray(np.array([pr["conf_cz"] for pr in preps], dtype=np.float32))
+    conf_R_k = jnp.asarray(np.array([pr["conf_R"] for pr in preps], dtype=np.float32))
+    step_size_k = jnp.asarray(np.array([float(p["step_size"]) for p in problems], dtype=np.float32))
+
+    # shared schedule / weights
+    excl_skip = int(settings.exclusion_skip_neighbors)
+    n_steps_per_batch = int(settings.mc_stop_steps)
+    use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
+    use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_arcs)
+    excl_w_v = float(settings.exclusion_weight) if use_excl else 0.0
+    conf_w_v = float(settings.confinement_weight) if use_conf else 0.0
+    stretch_v = float(settings.spring_stretch_arcs)
+    squeeze_v = float(settings.spring_squeeze_arcs)
+
+    bundle = _build_arcs_kernel(n_steps_per_batch, excl_skip)
+    _kf, init_arcs, init_excl, init_confine, kernel_full_mp = bundle
+
+    # per-IB initial scores (reuse the validated init helpers)
+    def init_one(i: int) -> tuple[Any, Any, Any]:
+        p1 = pos_k[i : i + 1]  # (1, B, 3)
+        na = jnp.int32(int(np.asarray(n_active_k[i])))
+        ss = init_arcs(p1, exp_k[i], jnp.float32(stretch_v), jnp.float32(squeeze_v))
+        se = (
+            init_excl(p1, excl_r0_k[i], jnp.float32(excl_w_v), na)
+            if use_excl
+            else jnp.zeros((1,), jnp.float32)
+        )
+        sc = (
+            init_confine(p1, conf_cx_k[i], conf_cy_k[i], conf_cz_k[i], conf_R_k[i], jnp.float32(conf_w_v), na)
+            if use_conf
+            else jnp.zeros((1,), jnp.float32)
+        )
+        return ss, se, sc
+
+    inits = [init_one(i) for i in range(K)]
+    ss_k = jnp.concatenate([x[0] for x in inits])
+    se_k = jnp.concatenate([x[1] for x in inits])
+    sc_k = jnp.concatenate([x[2] for x in inits])
+
+    _seed_src = log.current()
+    seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
+    base_key = jax.random.PRNGKey(seed_offset)
+
+    out = kernel_full_mp(
+        pos_k, ss_k, se_k, sc_k,
+        jnp.float32(settings.max_temp),
+        exp_k, step_size_k,
+        jnp.float32(settings.dt_temp), jnp.float32(settings.jump_scale), jnp.float32(settings.jump_coef),
+        jnp.float32(stretch_v), jnp.float32(squeeze_v),
+        excl_r0_k, jnp.float32(excl_w_v),
+        conf_cx_k, conf_cy_k, conf_cz_k, conf_R_k, jnp.float32(conf_w_v),
+        base_key,
+        jnp.float32(settings.mc_stop_improvement), jnp.int32(settings.mc_stop_successes),
+        jnp.float32(1e-5), jnp.float32(0.9999), n_active_k,
+    )
+    pos_f, ss_f, se_f, sc_f, _iter_f, _converged = out
+    score_per_chain = np.asarray(ss_f + se_f + sc_f)
+    pos_f_np = np.asarray(pos_f)
 
     results: list[tuple[float, np.ndarray[Any, Any]]] = []
     for i, pr in enumerate(preps):

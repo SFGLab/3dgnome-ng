@@ -516,7 +516,7 @@ def test_densify(reference_only=False):
         _root = str(ROOT)
         if _root not in sys.path:
             sys.path.insert(0, _root)
-        from gnome3d.hierarchy import LVL_ANCHOR, Cluster
+        from gnome3d.hierarchy import Cluster, Level
         from gnome3d.solver import Solver
     except ImportError as exc:
         for name in (
@@ -572,7 +572,7 @@ def test_densify(reference_only=False):
     solver.clusters = []
     active_region = []
     for i, (s, e, p) in enumerate(zip(anchor_starts, anchor_ends, pos3d)):
-        c = Cluster(start=s, end=e, level=LVL_ANCHOR)
+        c = Cluster(start=s, end=e, level=Level.ANCHOR)
         c.pos = p.copy()
         solver.clusters.append(c)
         active_region.append(i)
@@ -662,7 +662,7 @@ def test_densify(reference_only=False):
     dyn_solver.clusters = []
     dyn_ar = []
     for i, (st, en) in enumerate(dyn_specs):
-        c = Cluster(start=st, end=en, level=LVL_ANCHOR)
+        c = Cluster(start=st, end=en, level=Level.ANCHOR)
         c.pos = _np.zeros(3, dtype=_np.float32)
         dyn_solver.clusters.append(c)
         dyn_ar.append(i)

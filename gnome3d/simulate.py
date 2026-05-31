@@ -11,9 +11,9 @@ import contextlib
 from . import log
 from .data import ContactData
 from .io import parse_chrs_arg, parse_region
+from .reconstruct import MEMBER_SEED_STRIDE, pick_executor, reconstruct
 from .settings import Settings
 from .types import BeadOut, BedRegion
-from .util import make_solver
 
 LOG = log.get("simulate")
 
@@ -32,9 +32,13 @@ def simulate(
     file. For the config-file entry points see `run_region` / `run_genome`.
 
     Returns one dict[chr -> list[BeadOut]] per structure.
+
+    Runs the task-DAG pipeline (`reconstruct`) under the executor `pick_executor`
+    selects for the backend — `SerialExecutor` (numba) or `BatchExecutor` (JAX,
+    region-batched).  Each structure is a `reconstruct` with a distinct per-member
+    seed offset, so an ensemble varies despite deterministic per-IB seeding.
     """
-    solver = make_solver(settings)
-    solver.load(data, chrs_list, region)
+    executor = pick_executor(settings)
 
     structures: list[dict[str, list[BeadOut]]] = []
     for i in range(n_structures):
@@ -46,16 +50,16 @@ def simulate(
             else contextlib.nullcontext()
         )
         with ctx:
-            solver.reconstruct_heatmap()
-            solver.reconstruct_arcs()
-            per_chr: dict[str, list[BeadOut]] = {}
-            any_beads = False
-            for chr_ in chrs_list:
-                beads = solver.get_leaf_positions(chr_)
-                if beads:
-                    per_chr[chr_] = beads
-                    any_beads = True
-            if not any_beads:
+            per_chr = reconstruct(
+                settings,
+                data,
+                chrs_list,
+                region,
+                executor=executor,
+                seed_offset=i * MEMBER_SEED_STRIDE,
+            )
+            per_chr = {chr_: beads for chr_, beads in per_chr.items() if beads}
+            if not per_chr:
                 raise RuntimeError(f"Structure {i + 1}: no leaf beads from any chromosome")
             structures.append(per_chr)
 

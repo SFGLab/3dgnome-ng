@@ -383,7 +383,7 @@ def run_real(n, b_list, n_steps_per_batch=2000, with_orn=False):
     import sys as _sys
 
     _sys.path.insert(0, ".")
-    from gnome3d.mc_jax import mc_smooth_jax
+    from gnome3d.mc import mc_smooth_jax
     from gnome3d.settings import Settings
 
     s = Settings()

@@ -44,15 +44,16 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from . import log, mc_numba
+from .. import log
+from . import numba
 
 LOG = log.get("mc")
 
 # Backward-compat re-exports for harness/compare.py and other consumers that
 # imported numba helpers from gnome3d.mc historically.  When adding new
-# consumers, prefer importing directly from gnome3d.mc_numba.
-_as_f64 = mc_numba._as_f64  # pyright: ignore[reportPrivateUsage]
-_init_heat_nb = mc_numba._init_heat_nb  # pyright: ignore[reportPrivateUsage]
+# consumers, prefer importing directly from gnome3d.numba.
+_as_f64 = numba._as_f64  # pyright: ignore[reportPrivateUsage]
+_init_heat_nb = numba._init_heat_nb  # pyright: ignore[reportPrivateUsage]
 
 __all__ = [
     "mc_heatmap",
@@ -65,7 +66,7 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    from .settings import Settings
+    from ..settings import Settings
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +127,7 @@ def mc_heatmap(
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
     if _use_jax_for_heatmap(settings):
-        from . import mc_jax
+        from . import jax
 
         if LOG.isEnabledFor(logging.INFO):
             terms = ["heatmap"]
@@ -138,9 +139,9 @@ def mc_heatmap(
                 int(settings.mc_heatmap_chains),
                 "+".join(terms),
             )
-        score = mc_jax.mc_heatmap_jax(pos, exp_dist, diag_size, step_size, settings)
+        score = jax.mc_heatmap_jax(pos, exp_dist, diag_size, step_size, settings)
     else:
-        score = mc_numba.mc_heatmap_numba(pos, exp_dist, diag_size, step_size, settings)
+        score = numba.mc_heatmap_numba(pos, exp_dist, diag_size, step_size, settings)
 
     if _MC_PROFILE_PATH:
         _log_mc_call(
@@ -162,7 +163,7 @@ def mc_arcs(
 ) -> float:
     """Arc-MC dispatch.  Routes to JAX iff `settings.mc_backend == "jax"`
     AND `settings.mc_backend_apply_to_arcs == True` (defaults to False — JAX
-    arcs loses to numba at the production N range; see [mc_jax.py::mc_arcs_jax]).
+    arcs loses to numba at the production N range; see [jax.py::mc_arcs_jax]).
     Supported on JAX path: arc springs + EV + confinement."""
     n = pos.shape[0]
     if n <= 1:
@@ -170,7 +171,7 @@ def mc_arcs(
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
     if _use_jax_for_arcs(settings):
-        from . import mc_jax
+        from . import jax
 
         if LOG.isEnabledFor(logging.INFO):
             terms = ["arcs"]
@@ -179,9 +180,9 @@ def mc_arcs(
             if bool(settings.use_confinement) and bool(settings.confinement_apply_to_arcs):
                 terms.append("conf")
             LOG.info("mc_arcs: backend=jax  N=%d  terms=[%s]", n, "+".join(terms))
-        score = mc_jax.mc_arcs_jax(pos, exp_dist_mat, step_size, settings)
+        score = jax.mc_arcs_jax(pos, exp_dist_mat, step_size, settings)
     else:
-        score = mc_numba.mc_arcs_numba(pos, exp_dist_mat, step_size, settings)
+        score = numba.mc_arcs_numba(pos, exp_dist_mat, step_size, settings)
 
     if _MC_PROFILE_PATH:
         _log_mc_call(
@@ -217,7 +218,7 @@ def mc_smooth(
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
     if _use_jax_for_smooth(settings):
-        from . import mc_jax
+        from . import jax
 
         if LOG.isEnabledFor(logging.INFO):
             terms: list[str] = ["chain"]
@@ -235,7 +236,7 @@ def mc_smooth(
                 int(settings.mc_smooth_chains),
                 "+".join(terms),
             )
-        score = mc_jax.mc_smooth_jax(
+        score = jax.mc_smooth_jax(
             pos,
             dtn,
             fixed,
@@ -247,7 +248,7 @@ def mc_smooth(
             heat_dist=heat_dist,
         )
     else:
-        score = mc_numba.mc_smooth_numba(
+        score = numba.mc_smooth_numba(
             pos,
             dtn,
             fixed,
@@ -288,7 +289,7 @@ def mc_ib(
         return 0.0
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
-    score = mc_numba.mc_ib_numba(pos, dtn, step_size, settings)
+    score = numba.mc_ib_numba(pos, dtn, step_size, settings)
 
     if _MC_PROFILE_PATH:
         _log_mc_call(

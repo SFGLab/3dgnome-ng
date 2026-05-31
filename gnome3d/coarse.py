@@ -1,38 +1,42 @@
 """
-High-level LooperSolver analog for 3dgnome-ng.
+Coarse engine: the coupled, sequential half of reconstruction.
 
-Orchestrates data loading, hierarchy building, and MC reconstruction.
+`CoarseModel` builds the cluster hierarchy, runs the inter-chromosomal + segment
+heatmap MC, and positions interaction-block centroids — everything *up to* the
+per-IB seeds.  It is driven by `skeleton.build_seeds`, which reads its positioned
+cluster graph to emit each IB's `Seeded` state; the isolated per-IB
+reconstruction (arcs/densify/heat/smooth) then runs as the `pipeline` stages.
+
+This is the former `Solver` with its per-IB half removed — that half is now the
+task-DAG pipeline.  Kept as an internal engine behind the skeleton; it is not a
+public entry point (use `gnome3d.reconstruct` / `gnome3d.simulate`).
 """
 
 from __future__ import annotations
 
 import copy
-import logging
-from typing import Any
 
 from . import log
 from .data import ContactData
 from .hierarchy import (
-    LVL_ANCHOR,
-    LVL_CHROMOSOME,
-    LVL_SEGMENT,
     Cluster,
+    Level,
     build_cluster_tree,
     set_level,
 )
 from .io import create_singleton_heatmap
-from .mc import mc_arcs, mc_heatmap, mc_ib, mc_smooth
+from .mc import mc_heatmap, mc_ib
 from .settings import Settings
 from .types import *
 from .util import random_vector_np
 
-LOG = log.get("solver")
+LOG = log.get("coarse")
 
 # Anchor map entry produced by densification: (bead_index, cluster_index).
 AnchorMapEntry = tuple[int, ClusterIndex]
 
 
-class Solver:
+class CoarseModel:
     def __init__(self, settings: Settings) -> None:
         self.s: Settings = settings
         self.clusters: list[Cluster] = []
@@ -90,9 +94,9 @@ class Solver:
         a chained random walk instead of heatmap MC; subsequent levels still
         run normally.  Mirrors Reference LooperSolver.cpp lines 80-98.
         """
-        # setLevel(LVL_SEGMENT) -> current_level contains segment cluster indices
+        # setLevel(Level.SEGMENT) -> current_level contains segment cluster indices
         current_level = set_level(
-            LVL_SEGMENT - LVL_CHROMOSOME,  # steps down from root
+            Level.SEGMENT - Level.CHROMOSOME,  # steps down from root
             self.chr_root,
             self.clusters,
             self.chrs,
@@ -452,77 +456,6 @@ class Solver:
 
     # Anchor-level reconstruction (arc spring MC)
 
-    def reconstruct_arcs(self) -> None:
-        """
-        Position anchor beads using arc spring MC.
-        Mirrors Reference LooperSolver::reconstructClustersArcsDistances().
-        """
-        self.dense_active_regions = {}
-
-        seg_level = set_level(LVL_SEGMENT - LVL_CHROMOSOME, self.chr_root, self.clusters, self.chrs)
-
-        for chr_ in self.chrs:
-            segs = seg_level.get(chr_, [])
-            if not segs:
-                continue
-
-            LOG.info("anchor level: %s", chr_)
-            self._position_interaction_blocks(segs)
-
-            ibs: list[int] = []
-            for seg_idx in segs:
-                ibs.extend(self.clusters[seg_idx].children)
-            n_ibs = len(ibs)
-
-            work: list[tuple[int, int, str, list[int]]] = []
-            for ib_i, ib_idx in enumerate(ibs):
-                ib = self.clusters[ib_idx]
-                active_region = list(ib.children)
-                ib_label = f"{chr_} IB {ib_i + 1}/{n_ibs}"
-                if len(active_region) <= 1:
-                    LOG.info("%s  (%d anchors - skip)", ib_label, len(active_region))
-                    continue
-                for a_idx in active_region:
-                    self.clusters[a_idx].pos = ib.pos.copy()
-                work.append((ib_i, ib_idx, ib_label, active_region))
-
-            self._dispatch_ib_work(chr_, work)
-
-    def _dispatch_ib_work(self, chr_: str, work: list[tuple[int, int, str, list[int]]]) -> None:
-        """Run smooth reconstruction for one chromosome's IBs and collect beads
-        into `self.dense_active_regions[chr_]`.
-
-        Base implementation: process each IB independently (optionally across
-        `ib_workers` threads — IBs own disjoint cluster subsets, so the nogil
-        JIT kernels parallelise).  `JaxSolver` overrides this to anneal all IBs
-        in one batched GPU kernel instead.
-        """
-        n_workers = max(1, int(self.s.ib_workers))
-        if n_workers > 1 and len(work) > 1:
-            # `log.parallel` switches the formatter to flat per-line scope tags
-            # so interleaved IB output stays attributable to its worker.
-            from concurrent.futures import ThreadPoolExecutor
-
-            results: list[list[BeadOut] | None] = [None] * len(work)
-
-            def _run(
-                idx: int, _work: list[tuple[int, int, str, list[int]]] = work, _chr: str = chr_
-            ) -> tuple[int, list[BeadOut]]:
-                _ib_i, ib_idx, ib_label, active_region = _work[idx]
-                return idx, self._process_ib(ib_idx, ib_label, active_region, _chr)
-
-            with log.parallel(), ThreadPoolExecutor(max_workers=n_workers) as ex:
-                for idx, beads in ex.map(_run, range(len(work))):
-                    results[idx] = beads
-
-            for beads in results:
-                if beads:
-                    self.dense_active_regions.setdefault(chr_, []).extend(beads)
-        else:
-            for _ib_i, ib_idx, ib_label, active_region in work:
-                beads = self._process_ib(ib_idx, ib_label, active_region, chr_)
-                self.dense_active_regions.setdefault(chr_, []).extend(beads)
-
     def _position_interaction_blocks(self, segs: list[int]) -> None:
         """
         Position IB clusters between segment positions.
@@ -602,59 +535,6 @@ class Solver:
             for i, ib in enumerate(ibs):
                 self.clusters[ib].pos = pos[i].copy()
 
-    def _process_ib(
-        self,
-        ib_idx: int,
-        ib_label: str,
-        active_region: list[int],
-        chr_: str,
-    ) -> list[BeadOut]:
-        """
-        All work for one IB: arc MC + smooth MC.  Safe to call from a thread
-        because each IB owns a disjoint subset of cluster indices.
-
-        If small_ib_boost is enabled and this IB is below threshold, spring
-        constants are multiplied for the duration of this IB only - a local
-        settings copy is used so we never mutate self.s (thread-safe).
-        """
-        with log.step(LOG, ib_label, "(%d anchors)", len(active_region)):
-            prob = self._prepare_ib(ib_idx, active_region, chr_)
-            if prob is None:
-                return []
-            best_pos = self._run_smooth_serial(prob, prob["s"])
-            return self._apply_smooth_problem(prob, best_pos)
-
-    def _prepare_ib(
-        self, ib_idx: int, active_region: list[int], chr_: str, defer_heat: bool = False
-    ) -> dict[str, Any] | None:
-        """All per-IB work that precedes the final smooth: arc MC (writes anchor
-        positions), singleton contact heatmaps, and the smooth-problem build
-        (densify + orientation + subanchor heat-dist estimate).  Returns the
-        smooth-problem dict (carrying the per-IB settings under ``"s"``) or None
-        for a too-small region.
-
-        Shared by the serial path (`_process_ib`) and JaxSolver's batched path,
-        which calls this for every IB and then anneals them together.  The
-        caller is responsible for the IB log scope.  `defer_heat=True` skips the
-        per-IB heat-dist estimate so the caller can batch it across IBs.
-        """
-        s_ib = self._settings_for_ib(active_region)
-
-        # Singleton contact heatmaps (both derived from one binning pass).
-        anchor_heat: F64Array | None = None
-        subanchor_heat_raw: F64Array | None = None
-        if (self.s.use_anchor_heatmap or self.s.use_subanchor_heatmap) and self.singletons:
-            anchor_heat, subanchor_heat_raw = self._build_contact_heatmaps(active_region, chr_)
-
-        exp_dist = self._calc_anchor_expected_distances(active_region, chr_, anchor_heat)
-        self._reconstruct_cluster_arcs(ib_idx, active_region, exp_dist, s_override=s_ib)
-        prob = self._build_smooth_problem(
-            active_region, chr_, subanchor_heat_raw, s_ib, defer_heat=defer_heat
-        )
-        if prob is not None:
-            prob["s"] = s_ib
-        return prob
-
     def _settings_for_ib(self, active_region: list[int]) -> Settings:
         """Return self.s or a boosted copy if this IB qualifies as 'small'."""
         if not self.s.use_small_ib_boost:
@@ -732,56 +612,6 @@ class Solver:
                         mat[j, i] = mat[i, j]
 
         return mat
-
-    def _reconstruct_cluster_arcs(
-        self,
-        ib_idx: int,
-        active_region: list[int],
-        exp_dist: F64Array,
-        s_override: Settings | None = None,
-    ) -> None:
-        """
-        MC reconstruction for one interaction block (anchor level).
-        Mirrors Reference reconstructClusterArcsDistances().
-        """
-        s = s_override if s_override is not None else self.s
-        active_size = len(active_region)
-
-        # Arc-level uses a hardcoded noise size (matches Reference LooperSolver.cpp:2136
-        # which passes noise_size_small=0.005, ignoring noiseCoefficientLevelAnchor).
-        noise_size_small = 0.005
-
-        # Compute dist_to_next for each anchor
-        for i in range(active_size - 1):
-            d = abs(
-                self.clusters[active_region[i + 1]].genomic_pos
-                - self.clusters[active_region[i]].genomic_pos
-            )
-            self.clusters[active_region[i]].dist_to_next = s.genomic_length_to_distance(d)
-
-        # Store initial positions
-        initial_pos: F32Array = np.array(
-            [self.clusters[i].pos for i in active_region], dtype=np.float32
-        )
-
-        best_score = -1.0
-        best_pos: F32Array = initial_pos.copy()
-
-        for run in range(s.steps_arcs):
-            with log.step(LOG, f"arcs run {run + 1}/{s.steps_arcs}"):
-                pos: F32Array = initial_pos.copy()
-                for i in range(active_size):
-                    pos[i] += random_vector_np(noise_size_small)
-
-                score = mc_arcs(pos, exp_dist, noise_size_small, s)
-
-                if score < best_score or best_score < 0:
-                    best_score = score
-                    best_pos = pos.copy()
-
-        # Restore best anchor positions
-        for i, ci in enumerate(active_region):
-            self.clusters[ci].pos = best_pos[i].copy()
 
     def _subanchor_counts_per_arc(self, active_region: list[int]) -> list[int]:
         """
@@ -974,469 +804,17 @@ class Solver:
 
         return h_anchor, h_sub
 
-    def _build_heat_dist_subanchor(
-        self,
-        pos: F32Array,
-        fixed: BoolArray,
-        dtn: F32Array,
-        subanchor_heat_raw: F64Array,
-        step_size: float,
-    ) -> F64Array | None:
-        """
-        Estimate expected pairwise distances for subanchor heat energy.
-        Mirrors Reference pipeline: run N dry smooth MC passes, average pairwise
-        distances between all beads, then create target distance matrix.
-
-        Returns (N, N) float64 target distance matrix or None if heatmap empty.
-        """
-        s = self.s
-        n = len(pos)
-        n_reps = int(s.subanchor_estimate_replicates)
-        n_steps = int(s.subanchor_estimate_steps)
-        n_movable = int((~fixed).sum())
-
-        with log.step(
-            LOG,
-            "heat dist matrix",
-            "%d beads (%d movable), %d reps * %d steps",
-            n,
-            n_movable,
-            n_reps,
-            n_steps,
-        ):
-            avg_dist, t_mc_total = self._estimate_avg_dist(
-                pos, fixed, dtn, step_size, n_reps, n_steps
-            )
-            return self._heat_dist_from_avg(avg_dist, subanchor_heat_raw, t_mc_total)
-
-    def _heat_signal_negligible(self, subanchor_heat_raw: F64Array, n: int) -> bool:
-        """True when an IB's subanchor heat is too sparse to affect the structure,
-        so the (expensive) heat-dist estimate can be skipped entirely.
-
-        The active-pair fraction ``n_active / n_pairs`` is a provable upper bound
-        on the mean target-distance reduction the heat term can produce: each
-        active pair's target is ``avg_dist * (1 - s_val)`` with ``s_val`` capped
-        at 1, so the mean reduction is at most the active fraction.  Crucially it
-        is known from the raw heatmap alone — no dry-smooth trials needed.  When
-        it falls below ``subanchor_heat_min_reduction`` the IB smooths without
-        heat.  Threshold 0.0 (default) disables this — full parity.  Opt-in
-        divergence for sparse-singleton data.
-        """
-        thresh = float(self.s.subanchor_heat_min_reduction)
-        if thresh <= 0.0:
-            return False
-        n_pairs = n * (n - 1) // 2
-        if n_pairs == 0:
-            return True
-        iu = np.triu_indices(n, k=1)
-        n_active = int(np.count_nonzero(subanchor_heat_raw[iu] > 0.0))
-        frac = n_active / n_pairs
-        if frac < thresh:
-            LOG.info(
-                "heat-dist skipped: %d/%d pairs active (%.3g < %.3g min reduction)",
-                n_active,
-                n_pairs,
-                frac,
-                thresh,
-            )
-            return True
-        return False
-
-    def _heat_dist_from_avg(
-        self,
-        avg_dist: F64Array,
-        subanchor_heat_raw: F64Array,
-        t_mc_total: float = 0.0,
-    ) -> F64Array | None:
-        """Turn estimated average pairwise distances + the raw subanchor heat
-        into the expected-distance target matrix (Reference
-        createExpectedDistSubanchorHeatmap): high-contact pairs get their target
-        distance scaled down by `influence`.  Returns None when the heatmap is
-        empty.  Split from the estimate so JaxSolver can estimate `avg_dist` for
-        many IBs in one batched kernel and then build each matrix here.
-        """
-        s = self.s
-        n = avg_dist.shape[0]
-        avg_heat = float(subanchor_heat_raw.mean())
-        if avg_heat < 1e-6:
-            LOG.info("heat dist matrix: empty heatmap (mean<1e-6), skipped")
-            return None
-
-        influence = float(s.subanchor_heatmap_influence)
-        heat_dist: F64Array = np.zeros((n, n), dtype=np.float64)
-        n_pairs_active = 0
-        n_pairs_capped = 0
-
-        for i in range(n):
-            for j in range(i + 1, n):
-                s_val = (subanchor_heat_raw[i, j] / avg_heat) * influence
-                if s_val > 0.0:
-                    n_pairs_active += 1
-                if s_val > 1.0:
-                    s_val = 1.0
-                    n_pairs_capped += 1
-                target = avg_dist[i, j] * (1.0 - s_val)
-                heat_dist[i, j] = target
-                heat_dist[j, i] = target
-
-        if LOG.isEnabledFor(logging.INFO):
-            n_pairs_total = n * (n - 1) // 2
-            iu = np.triu_indices(n, k=1)
-            upper = heat_dist[iu]
-            avg_dist_upper = avg_dist[iu]
-            mean_reduction = (
-                (1.0 - upper.mean() / avg_dist_upper.mean()) * 100.0
-                if avg_dist_upper.mean() > 0
-                else 0.0
-            )
-            LOG.info(
-                "avg_pair_dist=%.3f  avg_heat=%.4g  influence=%s",
-                avg_dist_upper.mean(),
-                avg_heat,
-                influence,
-            )
-            LOG.info(
-                "%d/%d pairs active (%d capped at full reduction); "
-                "mean target reduction %.1f%%  (total MC time %.2fs)",
-                n_pairs_active,
-                n_pairs_total,
-                n_pairs_capped,
-                mean_reduction,
-                t_mc_total,
-            )
-
-        return heat_dist
-
-    def _estimate_avg_dist(
-        self,
-        pos: F32Array,
-        fixed: BoolArray,
-        dtn: F32Array,
-        step_size: float,
-        n_reps: int,
-        n_steps: int,
-    ) -> tuple[F64Array, float]:
-        """Average pairwise bead distances over dry smooth-MC passes — the
-        signal the subanchor heat target is built from.  Returns (avg_dist, wall).
-
-        Reference (sequential) path: for each replicate, run `n_steps` MC passes
-        from pos+noise, keep the best structure, accumulate its pairwise
-        distances.  Each (rep, step) trial gets its own silent scope so the
-        backend keys a distinct RNG seed off the scope path.  `JaxSolver`
-        overrides this to run all trials in one batched kernel.
-        """
-        import time
-
-        s = self.s
-        n = len(pos)
-        avg_dist: F64Array = np.zeros((n, n), dtype=np.float64)
-        t_mc_total = 0.0
-        for rep in range(n_reps):
-            t_rep = time.perf_counter()
-            rep_best_score = -1.0
-            rep_best_pos = pos.copy()
-            for step in range(n_steps):
-                pos_trial: F32Array = pos.copy()
-                for i in range(n):
-                    if not fixed[i]:
-                        pos_trial[i] += random_vector_np(step_size)
-                with log.scope(f"est {rep + 1}/{n_reps} step {step + 1}/{n_steps}"):
-                    score = mc_smooth(pos_trial, dtn, fixed, step_size, s)
-                if score < rep_best_score or rep_best_score < 0.0:
-                    rep_best_score = score
-                    rep_best_pos = pos_trial.copy()
-            diff = rep_best_pos[:, np.newaxis, :] - rep_best_pos[np.newaxis, :, :]
-            avg_dist += np.sqrt((diff * diff).sum(axis=2))
-            t_rep = time.perf_counter() - t_rep
-            t_mc_total += t_rep
-            LOG.info("rep %d/%d: best_score=%.4f  (%.2fs)", rep + 1, n_reps, rep_best_score, t_rep)
-        avg_dist /= n_reps
-        return avg_dist, t_mc_total
-
-    def _densify_active_region(
-        self, active_region: list[int]
-    ) -> tuple[
-        F32Array, BoolArray, list[int], list[int], list[int], F32Array, list[AnchorMapEntry]
-    ]:
-        """
-        Insert loop_density subanchor beads between each consecutive anchor pair.
-        Returns (pos, fixed, starts, ends, gpos, dtn, anchor_map) where:
-          pos        : (N, 3) float32 bead positions
-          fixed      : (N,) bool - True for original anchor beads
-          starts     : list[int] genomic start bp per bead
-          ends       : list[int] genomic end bp per bead (== start for subanchors)
-          gpos       : list[int] genomic midpoints
-          dtn        : (N-1,) float32 expected consecutive distances
-          anchor_map : list of (pos_index, cluster_index) for anchor beads
-        Mirrors Reference LooperSolver::densifyActiveRegion().
-        """
-        counts = self._subanchor_counts_per_arc(active_region)
-        bead_starts: list[int] = []
-        bead_ends: list[int] = []
-        bead_pos: list[F32Array] = []
-        bead_gpos: list[int] = []
-        bead_fixed: list[bool] = []
-        anchor_map: list[AnchorMapEntry] = []
-
-        for i in range(len(active_region) - 1):
-            ai = active_region[i]
-            aj = active_region[i + 1]
-            ca = self.clusters[ai]
-            cb = self.clusters[aj]
-            ld = counts[i]
-
-            k = len(bead_pos)
-            bead_starts.append(ca.start)
-            bead_ends.append(ca.end)
-            bead_pos.append(ca.pos.copy())
-            bead_gpos.append(ca.genomic_pos)
-            bead_fixed.append(True)
-            anchor_map.append((k, ai))
-
-            # Subanchor genomic span: the region between adjacent anchors.
-            # Subanchor j sits at midpoint (j+1)/(ld+1) of the in-between
-            # region and owns a slot of width d_bp centered on that midpoint
-            # (half-slot buffer at each end → starts/ends never coincide with
-            # ca.end or cb.start).
-            #
-            # The in-between region depends on `overlap_anchor_strict`:
-            #   - False (default, Python divergence): symmetric in gap/overlap.
-            #     Non-overlap → [ca.end, cb.start] (gap).
-            #     Overlap     → [cb.start, ca.end] (overlap; tiled with subanchors).
-            #     Touching    → span = 0 (degenerate, unavoidable).
-            #   - True (reference parity, LooperSolver.cpp:1829-1831):
-            #     `range = cb.start - ca.end` clamped to 0 below - overlap collapses
-            #     to a single point at ca.end; subanchors all degenerate there.
-            if self.s.overlap_anchor_strict:
-                boundary_lo = ca.end
-                span = max(cb.start - ca.end, 0)
-            else:
-                boundary_lo = min(ca.end, cb.start)
-                boundary_hi = max(ca.end, cb.start)
-                span = boundary_hi - boundary_lo  # >= 0
-            d_bp = span // (ld + 1)
-            half_lo = d_bp // 2
-            half_hi = d_bp - half_lo
-            for j in range(ld):
-                midpoint = boundary_lo + (j + 1) * d_bp
-                s_bp = midpoint - half_lo
-                e_bp = midpoint + half_hi
-                t = (j + 1.0) / (ld + 1)
-                sub_pos: F32Array = ((1.0 - t) * ca.pos + t * cb.pos).astype(np.float32)
-                bead_starts.append(s_bp)
-                bead_ends.append(e_bp)
-                bead_pos.append(sub_pos)
-                bead_gpos.append(midpoint)
-                bead_fixed.append(False)
-
-        last_ci = active_region[-1]
-        k = len(bead_pos)
-        cl = self.clusters[last_ci]
-        bead_starts.append(cl.start)
-        bead_ends.append(cl.end)
-        bead_pos.append(cl.pos.copy())
-        bead_gpos.append(cl.genomic_pos)
-        bead_fixed.append(True)
-        anchor_map.append((k, last_ci))
-
-        n = len(bead_pos)
-        pos_arr: F32Array = np.array(bead_pos, dtype=np.float32)
-        fixed_arr: BoolArray = np.array(bead_fixed, dtype=np.bool_)
-
-        dtn: F32Array = np.zeros(n - 1, dtype=np.float32)
-        for i in range(n - 1):
-            gap = max(bead_gpos[i + 1] - bead_gpos[i], 0)
-            dtn[i] = float(self.s.genomic_length_to_distance(gap))
-
-        return pos_arr, fixed_arr, bead_starts, bead_ends, bead_gpos, dtn, anchor_map
-
-    def _reconstruct_cluster_smooth(
-        self,
-        active_region: list[int],
-        chr_: str = "",
-        subanchor_heat_raw: F64Array | None = None,
-        s_override: Settings | None = None,
-    ) -> list[BeadOut]:
-        """
-        Densify active region, then run smooth MC (chain + angle energy).
-        Writes final anchor positions back to self.clusters.
-        Returns list of (genomic_start, genomic_end, x, y, z) for ALL beads
-        (anchors + subanchors). For subanchors start == end (point bin).
-        Mirrors Reference MonteCarloArcsSmooth loop in reconstructClustersArcsDistances().
-
-        When subanchor_heat_raw is provided and use_subanchor_heatmap is True:
-          - runs dry smooth MC passes to estimate avg pairwise distances
-          - builds target distance matrix
-          - adds heat energy term to the final smooth MC
-        """
-        s = s_override if s_override is not None else self.s
-        prob = self._build_smooth_problem(active_region, chr_, subanchor_heat_raw, s)
-        if prob is None:
-            return []
-
-        best_pos = self._run_smooth_serial(prob, s)
-        return self._apply_smooth_problem(prob, best_pos)
-
-    def _build_smooth_problem(
-        self,
-        active_region: list[int],
-        chr_: str,
-        subanchor_heat_raw: F64Array | None,
-        s: Settings,
-        defer_heat: bool = False,
-    ) -> dict[str, Any] | None:
-        """Phase 1 of smooth reconstruction: densify the active region, build
-        CTCF orientation arrays, and (if enabled) estimate the subanchor heat
-        target matrix.  Returns a self-contained "smooth problem" dict — the
-        inputs to mc_smooth plus the context needed to write the result back —
-        or None when the region is too small.
-
-        Split out from `_reconstruct_cluster_smooth` so JaxSolver can prepare
-        many IBs and then anneal them in one batched kernel.  Pure prep: no
-        final smooth MC, no cluster mutation.
-
-        `defer_heat=True` skips the (expensive) heat-dist estimate and instead
-        stashes `subanchor_heat_raw` in the problem so the caller can estimate
-        it for many IBs in one batched kernel (JaxSolver Pass 2).
-        """
-        import math as _math
-
-        pos, fixed, starts, ends, gpos, dtn, anchor_map = self._densify_active_region(active_region)
-        _ = gpos  # unused once start/end carry genomic info; keep for potential debug
-        n = len(pos)
-        if n <= 2:
-            return None
-
-        avg_dtn = float(dtn.mean())
-        step_size = avg_dtn * s.noise_smooth
-
-        char_orn: np.ndarray[Any, Any] | None = None
-        anchor_neighbors: dict[int, list[int]] | None = None
-        anchor_neighbor_weights: dict[int, list[float]] | None = None
-        if s.use_ctcf_motif and chr_:
-            char_orn = np.array(["N"] * n, dtype="<U1")
-            n_anchors_orn = len(anchor_map)
-            cluster_to_anchor_k = {ci: k for k, (_, ci) in enumerate(anchor_map)}
-            for _k, (bi, ci) in enumerate(anchor_map):
-                char_orn[bi] = self.clusters[ci].orientation or "N"
-
-            chr_arcs = self.arcs.get(chr_, [])
-            anchor_neighbors = {k: [] for k in range(n_anchors_orn)}
-            anchor_neighbor_weights = {k: [] for k in range(n_anchors_orn)}
-            for k, (_bi, ci) in enumerate(anchor_map):
-                for arc_local in self.clusters[ci].arcs:
-                    if arc_local >= len(chr_arcs):
-                        continue
-                    arc = chr_arcs[arc_local]
-                    other_ci = arc.end if arc.start == ci else arc.start
-                    if other_ci in cluster_to_anchor_k:
-                        other_k = cluster_to_anchor_k[other_ci]
-                        anchor_neighbors[k].append(other_k)
-                        anchor_neighbor_weights[k].append(_math.sqrt(max(arc.score, 0)))
-
-        # Subanchor heat target matrix (itself a batch of dry smooth passes).
-        # When deferred, leave it None and carry the raw heat so the caller can
-        # batch the estimate across IBs.
-        heat_dist: F64Array | None = None
-        wants_heat = subanchor_heat_raw is not None and s.use_subanchor_heatmap
-        if wants_heat and self._heat_signal_negligible(subanchor_heat_raw, n):
-            wants_heat = False  # too sparse to matter -> smooth without heat
-        if wants_heat and not defer_heat:
-            heat_dist = self._build_heat_dist_subanchor(
-                pos, fixed, dtn, subanchor_heat_raw, step_size
-            )
-
-        return {
-            "pos": pos,
-            "fixed": fixed,
-            "dtn": dtn,
-            "step_size": step_size,
-            "char_orientations": char_orn,
-            "anchor_neighbors": anchor_neighbors,
-            "anchor_neighbor_weights": anchor_neighbor_weights,
-            "heat_dist": heat_dist,
-            "n": n,
-            # heat-dist deferred to a batched phase (None when not deferred or
-            # when this IB has no subanchor signal)
-            "subanchor_heat_raw": subanchor_heat_raw if (wants_heat and defer_heat) else None,
-            # write-back context
-            "anchor_map": anchor_map,
-            "starts": starts,
-            "ends": ends,
-        }
-
-    def _run_smooth_serial(self, prob: dict[str, Any], s: Settings) -> F32Array:
-        """Phase 2 (base, serial): run `steps_smooth` smooth-MC restarts from
-        noised starts and keep the best.  Returns the best bead positions."""
-        pos = prob["pos"]
-        dtn = prob["dtn"]
-        fixed = prob["fixed"]
-        step_size = prob["step_size"]
-        n = prob["n"]
-        best_score = -1.0
-        best_pos: F32Array = pos.copy()
-        for run in range(s.steps_smooth):
-            with log.step(LOG, f"smooth run {run + 1}/{s.steps_smooth}"):
-                pos_run: F32Array = best_pos.copy()
-                for i in range(n):
-                    if not fixed[i]:
-                        pos_run[i] += random_vector_np(step_size)
-
-                score = mc_smooth(
-                    pos_run,
-                    dtn,
-                    fixed,
-                    step_size,
-                    s,
-                    char_orientations=prob["char_orientations"],
-                    anchor_neighbors=prob["anchor_neighbors"],
-                    anchor_neighbor_weights=prob["anchor_neighbor_weights"],
-                    heat_dist=prob["heat_dist"],
-                )
-
-                if score < best_score or best_score < 0:
-                    best_score = score
-                    best_pos = pos_run.copy()
-        return best_pos
-
-    def _apply_smooth_problem(self, prob: dict[str, Any], best_pos: F32Array) -> list[BeadOut]:
-        """Phase 4: write final anchor positions back to clusters and build the
-        BeadOut list for this IB.  Same logic for serial and batched paths."""
-        fixed = prob["fixed"]
-        starts = prob["starts"]
-        ends = prob["ends"]
-        n = prob["n"]
-        for bead_idx, cluster_idx in prob["anchor_map"]:
-            self.clusters[cluster_idx].pos = best_pos[bead_idx].copy()
-
-        # When drop_zero_length_subanchors is set, omit subanchor BeadOut entries
-        # with start == end from the output.  The MC chain still contains them
-        # (needed for chain smoothness); we only filter the externally visible
-        # bead list.  Anchors are always emitted regardless of width.
-        drop_zero = self.s.drop_zero_length_subanchors
-        return [
-            BeadOut(
-                start=starts[i],
-                end=ends[i],
-                x=float(best_pos[i, 0]),
-                y=float(best_pos[i, 1]),
-                z=float(best_pos[i, 2]),
-                kind="anchor" if bool(fixed[i]) else "subanchor",
-            )
-            for i in range(n)
-            if not (drop_zero and not bool(fixed[i]) and starts[i] == ends[i])
-        ]
-
-    # Heatmap normalisation helpers
-
     @staticmethod
-    def _get_diagonal_size(h: list[list[float]], n: int) -> int:
-        """Find smallest w such that any cell at distance w from diagonal is non-zero."""
-        for w in range(n):
-            for i in range(n - w):
-                if h[i][i + w] > 1e-6:
-                    return w
-        return 0
+    def _get_diagonal_size(h: list[list[float]] | F64Array, n: int) -> int:
+        """Smallest superdiagonal offset that holds a non-zero contact (the
+        ignored diagonal band).  Vectorized: min ``j - i`` over upper-triangle
+        cells > 1e-6 (was an O(N^2) Python double loop)."""
+        ha = np.asarray(h)
+        iu = np.triu_indices(n)
+        mask = ha[iu] > 1e-6
+        if not mask.any():
+            return 0
+        return int((iu[1] - iu[0])[mask].min())
 
     @staticmethod
     def _normalize_heatmap(h: list[list[float]], n: int) -> list[list[float]]:
@@ -1543,73 +921,42 @@ class Solver:
         h: list[list[float]],
         n: int,
         inter: bool = False,
-    ) -> tuple[list[list[float]], float]:
+    ) -> tuple[F64Array, float]:
         """
-        Convert normalized contact frequency heatmap to expected distance heatmap.
-        Mirrors Reference createDistanceHeatmap().
+        Convert a normalized contact-frequency heatmap to an expected-distance
+        heatmap.  Mirrors Reference createDistanceHeatmap(), per cell:
+          - freq < 1e-6           -> 0   (no contact)
+          - within diagonal band  -> -1  (ignored in scoring)
+          - else                  -> freq_to_dist(freq) = scale * freq^power
+        then clip distances above ``avg(>0) * heatmap_distance_stretching``.
 
-        Returns (dist_heatmap, avg_dist) where dist_heatmap is a 2D list.
-        Entries within diagonal_size are set to -1 (ignored in scoring).
+        Vectorized numpy (was an O(N^2) Python double loop over a list-of-list,
+        which blew up on large Hi-C matrices).  The reference uses the UPPER
+        triangle of `h` and mirrors it, so we symmetrize the result the same way
+        (matters only if `h` is asymmetric).
         """
         s = self.s
-        diag = self._get_diagonal_size(h, n)
+        ha = np.asarray(h, dtype=np.float64)
+        diag = self._get_diagonal_size(ha, n)
 
-        dist: list[list[float]] = [[0.0] * n for _ in range(n)]
-        for i in range(n):
-            for j in range(i, n):
-                val = h[i][j]
-                if val < 1e-6:
-                    dist[i][j] = 0.0
-                elif abs(i - j) < diag:
-                    dist[i][j] = -1.0
-                else:
-                    if inter:
-                        dist[i][j] = s.freq_to_dist_heatmap_inter(val)
-                    else:
-                        dist[i][j] = s.freq_to_dist_heatmap(val)
-                dist[j][i] = dist[i][j]
+        scale, power = (
+            (s.freq_dist_scale_inter, s.freq_dist_power_inter)
+            if inter
+            else (s.freq_dist_scale, s.freq_dist_power)
+        )
+        active = ha >= 1e-6
+        ii, jj = np.indices((n, n))
+        band = np.abs(ii - jj) < diag
+        # freq_to_dist on active cells; clamp inactive to 1.0 to avoid 0**power warnings.
+        fd = scale * np.power(np.where(active, ha, 1.0), power)
+        dist = np.where(active, np.where(band, -1.0, fd), 0.0)
+        # Mirror upper triangle into the lower (reference uses h[i][j], j>=i).
+        dist = np.triu(dist) + np.triu(dist, 1).T
 
-        # Clip large distances to avg * stretching
-        vals = [dist[i][j] for i in range(n) for j in range(n) if dist[i][j] > 0]
-        avg = sum(vals) / len(vals) if vals else 1.0
+        pos = dist[dist > 0.0]
+        avg = float(pos.mean()) if pos.size else 1.0
         max_d = avg * s.heatmap_distance_stretching
-
-        for i in range(n):
-            for j in range(n):
-                if dist[i][j] > max_d:
-                    dist[i][j] = max_d
-
+        dist = np.where(dist > max_d, max_d, dist)
         return dist, avg
 
     # Output helpers
-
-    def get_leaf_positions(self, chr_: str) -> list[BeadOut]:
-        """
-        Return all bead positions for chr_ as list of (start_bp, end_bp, x, y, z),
-        sorted by genomic start.  Includes subanchor beads when smooth MC
-        has been run; falls back to anchor-only otherwise.
-        """
-        dense = self.dense_active_regions.get(chr_)
-        if dense:
-            return sorted(dense, key=lambda b: b[0])
-        # Fallback: anchor-level beads only
-        result: list[BeadOut] = []
-        first = self.chr_first_cluster.get(chr_, -1)
-        if first < 0:
-            return result
-        for i in range(first, len(self.clusters)):
-            c = self.clusters[i]
-            if c.level != LVL_ANCHOR:
-                break
-            result.append(
-                BeadOut(
-                    start=c.start,
-                    end=c.end,
-                    x=float(c.pos[0]),
-                    y=float(c.pos[1]),
-                    z=float(c.pos[2]),
-                    kind="anchor",
-                )
-            )
-        result.sort(key=lambda b: b[0])
-        return result

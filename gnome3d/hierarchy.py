@@ -8,23 +8,31 @@ We replicate this numbering so that setLevel()/levelDown() work identically.
 from __future__ import annotations
 
 from dataclasses import field
+from enum import IntEnum
 
 from . import log
 from .types import *
 
 LOG = log.get("hierarchy")
 
-LVL_CHROMOSOME: int = 1
-LVL_SEGMENT: int = 2
-LVL_INTERACTION_BLOCK: int = 3
-LVL_ANCHOR: int = 4  # leaf level - original anchor clusters
+
+class Level(IntEnum):
+    """Cluster-tree depth, mirroring the Reference numbering (chr root at 1,
+    anchors the deepest leaves at 4) so that setLevel()/levelDown() depth
+    arithmetic — e.g. ``Level.SEGMENT - Level.CHROMOSOME`` steps — matches.
+    IntEnum so members behave as ints in that arithmetic and in comparisons."""
+
+    CHROMOSOME = 1
+    SEGMENT = 2
+    INTERACTION_BLOCK = 3
+    ANCHOR = 4  # leaf level - original anchor clusters
 
 
 @dataclass
 class Cluster:
     start: int
     end: int
-    level: int = LVL_ANCHOR
+    level: int = Level.ANCHOR
     parent: ClusterIndex = -1
 
     # Indices into the global Solver.clusters list.
@@ -81,7 +89,7 @@ def find_gaps(
 
     n_clusters = len(clusters)
     for i in range(chr_first, n_clusters):
-        if clusters[i].level != LVL_ANCHOR:
+        if clusters[i].level != Level.ANCHOR:
             break
         for arc_idx in clusters[i].arcs:
             other = _other_end(chr_arcs, arc_idx, i)
@@ -97,7 +105,7 @@ def find_gaps(
 
     # Ensure last anchor is in gaps
     last = n_clusters - 1
-    while last > chr_first and clusters[last].level != LVL_ANCHOR:
+    while last > chr_first and clusters[last].level != Level.ANCHOR:
         last -= 1
     if gaps[-1] != last:
         gaps.append(last)
@@ -183,7 +191,7 @@ def build_cluster_tree(
 
         # --- level 4: create one cluster per anchor ---
         for a in chr_anchors:
-            c = Cluster(start=a.start, end=a.end, level=LVL_ANCHOR, orientation=a.orientation)
+            c = Cluster(start=a.start, end=a.end, level=Level.ANCHOR, orientation=a.orientation)
             clusters.append(c)
 
         # Shift arc indices from local (0..n_anchors) to global (chr_first..)
@@ -219,7 +227,7 @@ def build_cluster_tree(
             start_pos = clusters[prev_gap].start
             end_pos = clusters[curr_gap].end
 
-            ib = Cluster(start=start_pos, end=end_pos, level=LVL_INTERACTION_BLOCK)
+            ib = Cluster(start=start_pos, end=end_pos, level=Level.INTERACTION_BLOCK)
             ib_idx: ClusterIndex = len(clusters)
 
             # Set anchors as children of IB
@@ -236,7 +244,7 @@ def build_cluster_tree(
                 seg_start_pos = clusters[current_seg_ib_start].start
                 seg_end_pos = clusters[seg_end_ib_idx].end
 
-                seg = Cluster(start=seg_start_pos, end=seg_end_pos, level=LVL_SEGMENT)
+                seg = Cluster(start=seg_start_pos, end=seg_end_pos, level=Level.SEGMENT)
                 seg_idx: ClusterIndex = len(clusters)
 
                 for k in range(current_seg_ib_start, seg_end_ib_idx + 1):
@@ -253,7 +261,7 @@ def build_cluster_tree(
         if root_children:
             root_start = clusters[root_children[0]].start
             root_end = clusters[root_children[-1]].end
-            root = Cluster(start=root_start, end=root_end, level=LVL_CHROMOSOME)
+            root = Cluster(start=root_start, end=root_end, level=Level.CHROMOSOME)
             root_idx: ClusterIndex = len(clusters)
             for k in root_children:
                 root.children.append(k)

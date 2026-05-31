@@ -25,7 +25,7 @@ import numpy as np
 
 sys.path.insert(0, ".")
 from gnome3d import log  # noqa: E402
-from gnome3d.mc_jax import mc_smooth_jax, mc_smooth_jax_batch  # noqa: E402
+from gnome3d.mc import mc_smooth_jax, mc_smooth_jax_batch  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
 
 

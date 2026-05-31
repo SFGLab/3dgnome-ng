@@ -35,11 +35,11 @@ import numpy as np
 from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
-from . import log
-from .types import BoolArray, F64Array, I32Array, I64Array
+from .. import log
+from ..types import BoolArray, F64Array, I32Array, I64Array
 
 if TYPE_CHECKING:
-    from .settings import Settings
+    from ..settings import Settings
 
 LOG = log.get("mc.numba")
 
@@ -60,6 +60,15 @@ def njit(**kwargs: Any) -> Callable[[F], F]:
 STRUCT_ARCS = 0
 STRUCT_CHAIN = 1
 STRUCT_HEATMAP = 2
+
+
+@njit(cache=True, nogil=True)
+def seed_numba(seed: int) -> None:
+    """Seed numba's per-thread RNG so the MC kernels are reproducible from a
+    given seed.  numba keeps its own RNG state, separate from numpy's global
+    and Python's `random`; this is the only way to make `np.random.*` calls
+    inside @njit deterministic.  Used by the pipeline's per-node seeding."""
+    np.random.seed(seed)
 
 
 # Smooth MC helpers
@@ -727,7 +736,7 @@ def _prepare_orientation(
     Returns (anchor_ar, nbr_offsets, nbr_indices, nbr_weights, orn_is_L,
              bead_to_anchor_k, anchor_orn, score_orn).
     """
-    from .util import calc_orientation as _calc_orn
+    from ..util import calc_orientation as _calc_orn
 
     n = pw.shape[0]
     anchor_ar: I32Array = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)

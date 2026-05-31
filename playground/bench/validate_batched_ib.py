@@ -30,7 +30,7 @@ from scipy.stats import ks_2samp
 
 sys.path.insert(0, ".")
 from gnome3d import log  # noqa: E402
-from gnome3d.mc_jax import mc_smooth_jax  # noqa: E402
+from gnome3d.mc import mc_smooth_jax  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
 from gnome3d.util import random_vector_np  # noqa: E402
 
