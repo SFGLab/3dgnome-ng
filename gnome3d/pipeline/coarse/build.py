@@ -404,8 +404,6 @@ def build_contact_heatmaps(
                            - normalized contact density at densified-bead resolution;
                            used for heat energy in smooth MC.
     """
-    import bisect
-
     clusters = state.clusters
     n_anchors = len(active_region)
     counts = subanchor_counts_per_arc(state, active_region)  # length n_anchors-1
@@ -456,81 +454,67 @@ def build_contact_heatmaps(
 
     breaks.append(region_end)
 
-    # Bin singleton contacts into subanchor heatmap.
-    # Note: Python filters by chromosome (c1 != chr_ or c2 != chr_). Reference's
-    # createSingletonSubanchorHeatmap does NOT filter by chromosome, so it
-    # bins cross-chromosomal contacts whose midpoints fall in the region.
-    # See [[project-singleton-chr-filter-divergence]] - this is intentional.
-    h_sub: F64Array = np.zeros((N, N), dtype=np.float64)
+    # Bin singleton contacts into the subanchor heatmap.  Kept as a `bisect` loop
+    # (NOT vectorized): `breaks` can be non-monotonic when consecutive anchors
+    # overlap (gap=0 -> cb_start < ca_end), and `np.searchsorted` (which assumes a
+    # sorted array) diverges from `bisect` exactly there.  The loop's bisect
+    # behavior on those breaks mirrors the reference, so it must be preserved; it's
+    # also cheap (O(#singletons in region), tiny next to the N^2 matrix work below).
+    #
+    # Note: Python filters by chromosome (both ends on chr_).  Reference's
+    # createSingletonSubanchorHeatmap does NOT — see
+    # [[project-singleton-chr-filter-divergence]] (intentional divergence).
+    import bisect
 
+    h_sub: F64Array = np.zeros((N, N), dtype=np.float64)
     for c1, p1, c2, p2, sc in state.singletons:
         if c1 != chr_ or c2 != chr_:
             continue
-        if p1 < region_start or p1 > region_end:
+        if p1 < region_start or p1 > region_end or p2 < region_start or p2 > region_end:
             continue
-        if p2 < region_start or p2 > region_end:
-            continue
-
         si = bisect.bisect_right(breaks, p1) - 1
         ei = bisect.bisect_right(breaks, p2) - 1
-
         if si < 0 or ei < 0 or si >= N or ei >= N or si == ei:
             continue
-
         h_sub[si, ei] += sc
         h_sub[ei, si] += sc
 
-    # Extract anchor heatmap from raw subanchor values (BEFORE normalization),
-    # normalized by anchor area in Mbp^2.  Mirrors Reference lines 1267-1273.
-    h_anchor: F64Array = np.zeros((n_anchors, n_anchors), dtype=np.float64)
-    for i in range(n_anchors):
-        ai = anchor_offsets[i]
-        al_i = max(anchor_lens[i], 1)
-        for j in range(i + 1, n_anchors):
-            aj = anchor_offsets[j]
-            al_j = max(anchor_lens[j], 1)
-            val = h_sub[ai, aj] / (al_i * al_j / 1e6)
-            h_anchor[i, j] = val
-            h_anchor[j, i] = val
+    # Anchor heatmap from raw subanchor values (BEFORE normalization), normalized
+    # by anchor area in Mbp^2.  Mirrors Reference lines 1267-1273; vectorized over
+    # the anchor bins (diagonal stays 0, off-diagonal symmetric).
+    anchor_off = np.asarray(anchor_offsets[:n_anchors], dtype=np.intp)
+    al = np.maximum(np.asarray(anchor_lens, dtype=np.float64), 1.0)  # (n_anchors,)
+    h_anchor: F64Array = h_sub[np.ix_(anchor_off, anchor_off)] / (np.outer(al, al) / 1e6)
+    np.fill_diagonal(h_anchor, 0.0)
 
-    # Per-bin metadata for the subanchor heatmap normalization step:
-    # which anchor/arc each bin belongs to, and whether it is an anchor bin.
-    bin_is_anchor: list[bool] = [False] * N
+    # Which arc each subanchor bin belongs to (-1 at anchor bins).
     bin_arc_idx: list[int] = [-1] * N
-    for k in range(n_anchors):
-        bin_is_anchor[anchor_offsets[k]] = True
     for i, c in enumerate(counts):
         base = anchor_offsets[i] + 1
         for j in range(c):
             bin_arc_idx[base + j] = i
 
-    # Normalize subanchor heatmap: divide by avg count, then by bin areas.
-    # Mirrors Reference lines 1294-1320.
+    # Normalize subanchor heatmap: divide by avg count, then by bin areas (kb^2).
+    # Mirrors Reference lines 1294-1320; vectorized.
     avg_count = float(h_sub.mean())
     if avg_count > 1e-6:
         h_sub /= avg_count
 
-        # Bin sizes in kb: anchor bins use the anchor's own length, subanchor
-        # bins use gap_len / counts[arc].
+        # Bin sizes in kb: anchor bins use the anchor's own length; subanchor bins
+        # use gap_len / count for their arc.
         bin_sizes: F64Array = np.empty(N, dtype=np.float64)
-        for k in range(N):
-            if bin_is_anchor[k]:
-                # Find which anchor index this bin corresponds to.
-                a_idx = anchor_offsets.index(k)
-                bin_sizes[k] = max(anchor_lens[a_idx], 1) / 1000.0
-            else:
-                arc_i = bin_arc_idx[k]
-                gl = gap_lens[arc_i] if 0 <= arc_i < len(gap_lens) else 1
-                c = counts[arc_i] if 0 <= arc_i < len(counts) else 1
-                bin_sizes[k] = max(gl / max(c, 1), 1) / 1000.0
+        bai = np.asarray(bin_arc_idx, dtype=np.intp)
+        gl = np.asarray(gap_lens, dtype=np.float64)
+        cnt = np.maximum(np.asarray(counts, dtype=np.float64), 1.0)
+        per_arc = np.maximum(gl / cnt, 1.0) / 1000.0  # (n_anchors-1,)
+        sub_mask = bai >= 0
+        bin_sizes[sub_mask] = per_arc[bai[sub_mask]]
+        bin_sizes[anchor_off] = al / 1000.0
 
-        for i in range(N):
-            for j in range(i + 1, N):
-                denom = bin_sizes[i] * bin_sizes[j]
-                if denom > 0.0:
-                    v = h_sub[i, j] / denom
-                    h_sub[i, j] = v
-                    h_sub[j, i] = v
+        denom = np.outer(bin_sizes, bin_sizes)
+        off = denom > 0.0
+        np.fill_diagonal(off, False)  # diagonal untouched (matches the i<j loop)
+        h_sub[off] = h_sub[off] / denom[off]
 
     return h_anchor, h_sub
 
