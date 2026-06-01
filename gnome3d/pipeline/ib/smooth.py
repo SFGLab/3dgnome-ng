@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from gnome3d.mc import numba as mc_numba
+from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import AnchorMapEntry, Densified, Orientation, Smoothed, State
 from gnome3d.types import BeadOut
@@ -141,6 +142,21 @@ class SmoothStage:
 
     def bucket(self, inputs: tuple[State, ...]) -> int:
         return int(inputs[0].pos.shape[0])  # type: ignore[attr-defined]
+
+    def batch_key(self, inputs: tuple[State, ...]) -> tuple[object, ...]:
+        """``(heat?, orn?, bead-bucket)`` — the exact signature
+        `mc_smooth_jax_batch` reads from ``problems[0]`` to pick its kernel.  A
+        batch MUST be uniform in these flags, so they are part of the key (else a
+        no-heat IB could land in a heat batch and get the wrong kernel)."""
+        st = inputs[0]
+        assert isinstance(st, Densified)
+        heat = getattr(st, "heat_dist", None) is not None
+        orn = (
+            st.orientations is not None
+            and st.anchor_neighbors is not None
+            and st.anchor_neighbor_weights is not None
+        )
+        return (heat, orn, batch_bucket(int(st.pos.shape[0]), st.settings))
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:
         st = inputs[0]

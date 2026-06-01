@@ -24,6 +24,7 @@ gate hold across executors.
 from __future__ import annotations
 
 import os
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from typing import Protocol, runtime_checkable
@@ -155,22 +156,36 @@ class MixedExecutor:
 
     @staticmethod
     def _run_batch(kind, nodes, dag, outputs, done):  # type: ignore[no-untyped-def]
-        """Group this kind's ready nodes by bucket and run each bucket through the
-        batch runner in one launch (serial fallback for kinds with no batch runner,
-        e.g. DENSIFY)."""
+        """Group this kind's ready nodes by their *batch key* and run each group
+        through the batch runner in one launch (serial fallback for kinds with no
+        batch runner, e.g. DENSIFY).
+
+        The key is the stage's ``batch_key`` — ``(energy-term signature,
+        shape-ladder bucket)`` — not the raw size.  Grouping by the ladder bucket
+        keeps one compiled kernel + one wide launch per bucket (vs one per distinct
+        size), and keeps each batch uniform in the flags ``mc_*_jax_batch`` reads
+        from ``problems[0]``.  Each group is timed and logged (always-on) so a slow
+        launch is never a silent stall."""
         runners = runners_for(kind)
-        buckets: dict[int, list[tuple[Node, tuple[State, ...]]]] = defaultdict(list)
+        groups: dict[object, list[tuple[Node, tuple[State, ...]]]] = defaultdict(list)
         for node in nodes:
             inputs = dag.inputs_for(node, outputs)
-            buckets[node.stage.bucket(inputs)].append((node, inputs))
-        for members in buckets.values():
+            key_fn = getattr(node.stage, "batch_key", None)
+            key = key_fn(inputs) if key_fn is not None else node.stage.bucket(inputs)
+            groups[key].append((node, inputs))
+        for key, members in groups.items():
             problems = [node.stage.to_problem(inp) for node, inp in members]
+            t0 = time.perf_counter()
             if runners.batch is not None:
                 results = runners.batch(problems)
             elif runners.serial is not None:
                 results = [runners.serial(p) for p in problems]
             else:
                 raise RuntimeError(f"no runner registered for {kind}")
+            log.status(
+                LOG, "  batch %s key=%s: %d IBs in %.1fs",
+                kind.value, key, len(members), time.perf_counter() - t0,
+            )
             for (node, inputs), result in zip(members, results, strict=True):
                 _finish(dag, node, node.stage.apply(inputs, result), outputs, done)
 

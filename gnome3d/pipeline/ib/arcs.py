@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from gnome3d.mc import numba as mc_numba
+from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Arced, Seeded, State
 from gnome3d.util import random_vector_np, seed_rng
@@ -97,6 +98,13 @@ class ArcsStage:
 
     def bucket(self, inputs: tuple[State, ...]) -> int:
         return int(inputs[0].anchor_seed_pos.shape[0])  # type: ignore[attr-defined]
+
+    def batch_key(self, inputs: tuple[State, ...]) -> tuple[object, ...]:
+        """Arcs has uniform energy terms, so the batch key is just the anchor
+        shape-ladder bucket — all IBs in a bucket share one compiled kernel."""
+        st = inputs[0]
+        assert isinstance(st, Seeded)
+        return (batch_bucket(int(st.anchor_seed_pos.shape[0]), st.settings),)
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:
         st = inputs[0]

@@ -28,6 +28,7 @@ cost across all runs on a machine.
 import logging
 import os
 import threading
+import time
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -3231,6 +3232,7 @@ def _mc_smooth_jax_batch_chunk(
     seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
+    t0 = time.perf_counter()
     out = kernel_full_mp(
         pos_k,
         ss_k,
@@ -3276,21 +3278,18 @@ def _mc_smooth_jax_batch_chunk(
         n_movable_k,
     )
     pos_f, ss_f, se_f, sh_f, so_f, sc_f, _ao_f, _final_score, iter_count, converged = out
-    score_per_chain = np.asarray(ss_f + se_f + sh_f + so_f + sc_f)
+    score_per_chain = np.asarray(ss_f + se_f + sh_f + so_f + sc_f)  # forces device sync
     pos_f_np = np.asarray(pos_f)
 
-    if LOG.isEnabledFor(logging.DEBUG):
-        n_conv = int(np.asarray(converged).sum())
-        LOG.debug(
-            "region-batch: %d IBs, B=%d A=%d M=%d, %d batches, %d/%d converged",
-            K,
-            B,
-            A,
-            M,
-            int(iter_count),
-            n_conv,
-            K,
-        )
+    n_steps_smooth = int(settings.mc_stop_steps_smooth)
+    log.status(
+        LOG,
+        "    smooth region-batch: K=%d B=%d A=%d M=%d (heat=%d orn=%d), "
+        "%d batches (%d steps), %d/%d converged, %.1fs",
+        K, B, A, M, int(use_heat), int(use_orn),
+        int(iter_count), int(iter_count) * n_steps_smooth,
+        int(np.asarray(converged).sum()), K, time.perf_counter() - t0,
+    )
 
     results: list[tuple[float, np.ndarray[Any, Any]]] = []
     for i, pr in enumerate(preps):
@@ -3459,6 +3458,7 @@ def _mc_arcs_jax_batch_chunk(
     seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
+    t0 = time.perf_counter()
     out = kernel_full_mp(
         pos_k, ss_k, se_k, sc_k,
         jnp.float32(settings.max_temp),
@@ -3471,9 +3471,14 @@ def _mc_arcs_jax_batch_chunk(
         jnp.float32(settings.mc_stop_improvement), jnp.int32(settings.mc_stop_successes),
         jnp.float32(1e-5), jnp.float32(0.9999), n_active_k,
     )
-    pos_f, ss_f, se_f, sc_f, _iter_f, _converged = out
-    score_per_chain = np.asarray(ss_f + se_f + sc_f)
+    pos_f, ss_f, se_f, sc_f, iter_f, converged = out
+    score_per_chain = np.asarray(ss_f + se_f + sc_f)  # forces device sync
     pos_f_np = np.asarray(pos_f)
+    log.status(
+        LOG, "    arcs region-batch: K=%d B=%d, %d batches (%d steps), %d/%d converged, %.1fs",
+        K, B, int(iter_f), int(iter_f) * n_steps_per_batch,
+        int(np.asarray(converged).sum()), K, time.perf_counter() - t0,
+    )
 
     results: list[tuple[float, np.ndarray[Any, Any]]] = []
     for i, pr in enumerate(preps):
