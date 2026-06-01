@@ -3173,60 +3173,69 @@ def _mc_smooth_jax_batch_chunk(
     motif_weight_v = float(settings.motif_weight) if use_orn else 0.0
     excl_w_v = float(settings.exclusion_weight) if use_excl else 0.0
 
-    bundle = _build_smooth_kernel(n_steps_per_batch, excl_skip, use_heat, use_orn, M)
-    (
-        _kb,
-        _kf,
-        init_smooth,
-        init_excl,
-        init_heat,
-        init_confine,
-        init_anchor_orn,
-        init_orn_score,
-        kernel_full_mp,
-    ) = bundle
-
-    # --- per-IB initial scores (one-shot; reuse the validated init helpers) ---
     dist_w = jnp.float32(settings.smooth_dist_weight)
     ang_w = jnp.float32(settings.smooth_angle_weight)
     symmetric = jnp.bool_(bool(getattr(settings, "motifs_symmetric", True)))
 
-    def init_one(i: int) -> tuple[Any, Any, Any, Any, Any, Any]:
-        p1 = pos_k[i : i + 1]  # (1, B, 3)
+    # Compose the smooth recipe into one generic kernel (gnome3d.mc.jax_driver) —
+    # byte-identical to the former hand-written `_build_smooth_kernel`
+    # (validate_driver_smooth).  Each optional term is included ONLY when its
+    # setting is on (CHAIN is the always-present structure term); the recipe thus
+    # reads as the active settings.  Order = the old ss+se+sh+so+sc sum order, and
+    # an omitted term is byte-exact (it contributed exactly 0 in the old kernel).
+    from gnome3d.mc.jax_driver import build_mc_kernel
+    from gnome3d.mc.terms import CHAIN, CONFINEMENT, EXCLUDED_VOLUME, ORIENTATION, SUBANCHOR_HEAT
+    from gnome3d.mc.terms.chain import ChainP
+    from gnome3d.mc.terms.confinement import ConfP
+    from gnome3d.mc.terms.excluded_volume import ExclP
+    from gnome3d.mc.terms.orientation import (
+        OrnP,
+        init_anchor_orientations_jax,
+        init_orientation_score_jax,
+    )
+    from gnome3d.mc.terms.subanchor_heat import HeatP
+
+    onesK = jnp.ones((K,), jnp.float32)
+    # Each spec: (Term, stacked per-IB params, per-IB init fn (na, i) -> score).
+    specs: list[tuple[Any, Any, Any]] = [
+        (CHAIN, ChainP(dtn_k, stretch_k, squeeze_k, ang_k, onesK * dist_w, onesK * ang_w),
+         lambda i, na: CHAIN.jax_init(pos_k[i], ChainP(dtn_k[i], stretch_k[i], squeeze_k[i], ang_k[i], dist_w, ang_w), na)),
+    ]
+    if use_excl:
+        specs.append((EXCLUDED_VOLUME, ExclP(excl_r0_k, onesK * jnp.float32(excl_w_v), (onesK * excl_skip).astype(jnp.int32)),
+                      lambda i, na: EXCLUDED_VOLUME.jax_init(pos_k[i], ExclP(excl_r0_k[i], jnp.float32(excl_w_v), jnp.int32(excl_skip)), na)))
+    if use_heat:
+        specs.append((SUBANCHOR_HEAT, HeatP(heat_k, onesK * jnp.float32(heat_weight_v)),
+                      lambda i, na: SUBANCHOR_HEAT.jax_init(pos_k[i], HeatP(heat_k[i], jnp.float32(heat_weight_v)), na)))
+    if use_orn:
+        specs.append((ORIENTATION, OrnP(b2a_k, anchor_ar_k, is_L_k, nbr_idx_k, nbr_w_k, nbr_valid_k,
+                                        onesK * jnp.float32(motif_weight_v), jnp.full((K,), symmetric)),
+                      lambda i, na: init_orientation_score_jax(
+                          init_anchor_orientations_jax(pos_k[i], anchor_ar_k[i], is_L_k[i]),
+                          nbr_idx_k[i], nbr_w_k[i], nbr_valid_k[i], jnp.float32(motif_weight_v), symmetric)))
+    if use_conf:
+        specs.append((CONFINEMENT, ConfP(conf_cx_k, conf_cy_k, conf_cz_k, conf_R_k, conf_w_k),
+                      lambda i, na: CONFINEMENT.jax_init(pos_k[i], ConfP(conf_cx_k[i], conf_cy_k[i], conf_cz_k[i], conf_R_k[i], conf_w_k[i]), na)))
+
+    recipe = [sp[0] for sp in specs]
+    term_params = tuple(sp[1] for sp in specs)
+    init_fns = [sp[2] for sp in specs]
+
+    # per-IB init: one score component per recipe term (verbatim term inits) + the
+    # anchor_orn cache the orientation term mutates (dummy when orientation is off).
+    def init_one(i: int) -> tuple[list[Any], Any]:
         na = jnp.int32(int(np.asarray(n_active_k[i])))
-        ss = init_smooth(p1, dtn_k[i], stretch_k[i], squeeze_k[i], ang_k[i], dist_w, ang_w, na)
-        se = (
-            init_excl(p1, excl_r0_k[i], jnp.float32(excl_w_v), na)
-            if use_excl
-            else jnp.zeros((1,), jnp.float32)
+        comps = [fn(i, na) for fn in init_fns]
+        ao = (
+            init_anchor_orientations_jax(pos_k[i], anchor_ar_k[i], is_L_k[i])
+            if use_orn
+            else jnp.zeros((A, 3), jnp.float32)
         )
-        sh = (
-            init_heat(p1, heat_k[i], jnp.float32(heat_weight_v))
-            if use_heat
-            else jnp.zeros((1,), jnp.float32)
-        )
-        sc = (
-            init_confine(p1, conf_cx_k[i], conf_cy_k[i], conf_cz_k[i], conf_R_k[i], conf_w_k[i], na)
-            if use_conf
-            else jnp.zeros((1,), jnp.float32)
-        )
-        if use_orn:
-            ao = init_anchor_orn(p1, anchor_ar_k[i], is_L_k[i])
-            so = init_orn_score(
-                ao, nbr_idx_k[i], nbr_w_k[i], nbr_valid_k[i], jnp.float32(motif_weight_v), symmetric
-            )
-        else:
-            ao = jnp.zeros((1, A, 3), jnp.float32)
-            so = jnp.zeros((1,), jnp.float32)
-        return ss, se, sh, so, sc, ao
+        return comps, ao
 
     inits = [init_one(i) for i in range(K)]
-    ss_k = jnp.concatenate([x[0] for x in inits])
-    se_k = jnp.concatenate([x[1] for x in inits])
-    sh_k = jnp.concatenate([x[2] for x in inits])
-    so_k = jnp.concatenate([x[3] for x in inits])
-    sc_k = jnp.concatenate([x[4] for x in inits])
-    anchor_orn_k = jnp.concatenate([x[5] for x in inits])
+    scores_k = tuple(jnp.asarray([inits[i][0][t] for i in range(K)]) for t in range(len(recipe)))
+    anchor_orn_k = jnp.stack([inits[i][1] for i in range(K)])
 
     _seed_src = log.current()
     seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
@@ -3238,53 +3247,19 @@ def _mc_smooth_jax_batch_chunk(
         "compiling/running (first call per shape compiles)...",
         K, B, A, M, int(use_heat), int(use_orn),
     )
+    kernel_full_mp = build_mc_kernel(recipe, n_steps_per_batch, strict_accept=True, freeze_converged=False)
     t0 = time.perf_counter()
     out = kernel_full_mp(
-        pos_k,
-        ss_k,
-        se_k,
-        sh_k,
-        so_k,
-        sc_k,
-        anchor_orn_k,
-        jnp.float32(settings.max_temp_smooth),
-        dtn_k,
-        movable_k,
-        heat_k,
-        anchor_ar_k,
-        b2a_k,
-        nbr_idx_k,
-        nbr_w_k,
-        nbr_valid_k,
-        is_L_k,
-        step_size_k,
-        jnp.float32(settings.dt_temp_smooth),
-        jnp.float32(settings.jump_scale_smooth),
-        jnp.float32(settings.jump_coef_smooth),
-        stretch_k,
-        squeeze_k,
-        ang_k,
-        dist_w,
-        ang_w,
-        excl_r0_k,
-        jnp.float32(excl_w_v),
-        jnp.float32(heat_weight_v),
-        jnp.float32(motif_weight_v),
-        symmetric,
-        conf_cx_k,
-        conf_cy_k,
-        conf_cz_k,
-        conf_R_k,
-        conf_w_k,
+        pos_k, scores_k, anchor_orn_k,
+        jnp.float32(settings.max_temp_smooth), tuple(term_params), movable_k, step_size_k,
+        jnp.float32(settings.dt_temp_smooth), jnp.float32(settings.jump_scale_smooth), jnp.float32(settings.jump_coef_smooth),
         base_key,
-        jnp.float32(settings.mc_stop_improvement_smooth),
-        jnp.int32(settings.mc_stop_successes_smooth),
-        jnp.float32(1e-6),
-        n_active_k,
-        n_movable_k,
+        jnp.float32(settings.mc_stop_improvement_smooth), jnp.int32(settings.mc_stop_successes_smooth),
+        jnp.float32(1e-6), jnp.float32(np.inf),  # score_eps; stop_ratio=inf disables the (smooth-absent) ratio guard
+        n_active_k, n_movable_k,
     )
-    pos_f, ss_f, se_f, sh_f, so_f, sc_f, _ao_f, _final_score, iter_count, converged = out
-    score_per_chain = np.asarray(ss_f + se_f + sh_f + so_f + sc_f)  # forces device sync
+    pos_f, scores_f, _ao_f, iter_count, converged = out
+    score_per_chain = np.asarray(sum(scores_f))  # forces device sync
     pos_f_np = np.asarray(pos_f)
 
     n_steps_smooth = int(settings.mc_stop_steps_smooth)
@@ -3435,53 +3410,73 @@ def _mc_arcs_jax_batch_chunk(
     stretch_v = float(settings.spring_stretch_arcs)
     squeeze_v = float(settings.spring_squeeze_arcs)
 
-    bundle = _build_arcs_kernel(n_steps_per_batch, excl_skip)
-    _kf, init_arcs, init_excl, init_confine, kernel_full_mp = bundle
+    # Compose the arcs recipe [arc_springs, excluded_volume, confinement] into one
+    # generic kernel (gnome3d.mc.jax_driver) — byte-identical to the former
+    # hand-written `_build_arcs_kernel` (validate_driver_arcs).  Per-IB params ride
+    # as each term's namedtuple (shared scalars broadcast to (K,)).
+    from gnome3d.mc.jax_driver import build_mc_kernel
+    from gnome3d.mc.terms import ARC_SPRINGS, CONFINEMENT, EXCLUDED_VOLUME
+    from gnome3d.mc.terms.arc_springs import ArcP
+    from gnome3d.mc.terms.confinement import ConfP
+    from gnome3d.mc.terms.excluded_volume import ExclP
 
-    # per-IB initial scores (reuse the validated init helpers)
+    onesK = jnp.ones((K,), jnp.float32)
+    term_params = (
+        ArcP(exp_k, onesK * stretch_v, onesK * squeeze_v),
+        ExclP(excl_r0_k, onesK * excl_w_v, (onesK * excl_skip).astype(jnp.int32)),
+        ConfP(conf_cx_k, conf_cy_k, conf_cz_k, conf_R_k, onesK * conf_w_v),
+    )
+
+    # per-IB initial scores (verbatim term inits — same values as the old bundle).
     def init_one(i: int) -> tuple[Any, Any, Any]:
-        p1 = pos_k[i : i + 1]  # (1, B, 3)
         na = jnp.int32(int(np.asarray(n_active_k[i])))
-        ss = init_arcs(p1, exp_k[i], jnp.float32(stretch_v), jnp.float32(squeeze_v))
+        ss = ARC_SPRINGS.jax_init(pos_k[i], ArcP(exp_k[i], jnp.float32(stretch_v), jnp.float32(squeeze_v)), na)
         se = (
-            init_excl(p1, excl_r0_k[i], jnp.float32(excl_w_v), na)
+            EXCLUDED_VOLUME.jax_init(pos_k[i], ExclP(excl_r0_k[i], jnp.float32(excl_w_v), jnp.int32(excl_skip)), na)
             if use_excl
-            else jnp.zeros((1,), jnp.float32)
+            else jnp.float32(0.0)
         )
         sc = (
-            init_confine(p1, conf_cx_k[i], conf_cy_k[i], conf_cz_k[i], conf_R_k[i], jnp.float32(conf_w_v), na)
+            CONFINEMENT.jax_init(
+                pos_k[i], ConfP(conf_cx_k[i], conf_cy_k[i], conf_cz_k[i], conf_R_k[i], jnp.float32(conf_w_v)), na
+            )
             if use_conf
-            else jnp.zeros((1,), jnp.float32)
+            else jnp.float32(0.0)
         )
         return ss, se, sc
 
     inits = [init_one(i) for i in range(K)]
-    ss_k = jnp.concatenate([x[0] for x in inits])
-    se_k = jnp.concatenate([x[1] for x in inits])
-    sc_k = jnp.concatenate([x[2] for x in inits])
+    ss_k = jnp.asarray([x[0] for x in inits])
+    se_k = jnp.asarray([x[1] for x in inits])
+    sc_k = jnp.asarray([x[2] for x in inits])
 
     _seed_src = log.current()
     seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
+    kernel_full_mp = build_mc_kernel(
+        [ARC_SPRINGS, EXCLUDED_VOLUME, CONFINEMENT],
+        n_steps_per_batch,
+        strict_accept=False,
+        freeze_converged=True,
+    )
+    # arcs moves any real bead: movable = arange(B), n_movable_active = n_active.
+    movable_k = jnp.broadcast_to(jnp.arange(B, dtype=jnp.int32), (K, B))
+    anchor_dummy = jnp.zeros((K, 1, 3), jnp.float32)  # no orientation term in the arcs recipe
     log.status(
         LOG, "    arcs kernel: K=%d B=%d, compiling/running (first call per shape compiles)...", K, B
     )
     t0 = time.perf_counter()
     out = kernel_full_mp(
-        pos_k, ss_k, se_k, sc_k,
-        jnp.float32(settings.max_temp),
-        exp_k, step_size_k,
+        pos_k, (ss_k, se_k, sc_k), anchor_dummy,
+        jnp.float32(settings.max_temp), term_params, movable_k, step_size_k,
         jnp.float32(settings.dt_temp), jnp.float32(settings.jump_scale), jnp.float32(settings.jump_coef),
-        jnp.float32(stretch_v), jnp.float32(squeeze_v),
-        excl_r0_k, jnp.float32(excl_w_v),
-        conf_cx_k, conf_cy_k, conf_cz_k, conf_R_k, jnp.float32(conf_w_v),
         base_key,
         jnp.float32(settings.mc_stop_improvement), jnp.int32(settings.mc_stop_successes),
-        jnp.float32(1e-5), jnp.float32(0.9999), n_active_k,
+        jnp.float32(1e-5), jnp.float32(0.9999), n_active_k, n_active_k,
     )
-    pos_f, ss_f, se_f, sc_f, iter_f, converged = out
-    score_per_chain = np.asarray(ss_f + se_f + sc_f)  # forces device sync
+    pos_f, scores_f, _anchor_f, iter_f, converged = out
+    score_per_chain = np.asarray(scores_f[0] + scores_f[1] + scores_f[2])  # forces device sync
     pos_f_np = np.asarray(pos_f)
     log.status(
         LOG, "    arcs region-batch: K=%d B=%d, %d batches (%d steps), %d/%d converged, %.1fs",

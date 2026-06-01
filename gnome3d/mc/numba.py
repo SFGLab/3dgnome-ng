@@ -36,6 +36,27 @@ from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
+from gnome3d.mc.terms.arc_springs import ArcP
+from gnome3d.mc.terms.arc_springs import arcs_init_nb as _arcs_init_nb
+from gnome3d.mc.terms.arc_springs import arcs_local_nb as _arcs_local_nb
+from gnome3d.mc.terms.chain import ChainP
+from gnome3d.mc.terms.chain import chain_init_nb as _chain_init_nb
+from gnome3d.mc.terms.chain import chain_local_nb as _chain_local_nb
+from gnome3d.mc.terms.confinement import ConfP
+from gnome3d.mc.terms.confinement import conf_init_nb as _conf_init_nb
+from gnome3d.mc.terms.confinement import conf_local_nb as _conf_local_nb
+from gnome3d.mc.terms.excluded_volume import ExclP
+from gnome3d.mc.terms.excluded_volume import ev_init_nb as _ev_init_nb
+from gnome3d.mc.terms.excluded_volume import ev_local_nb as _ev_local_nb
+from gnome3d.mc.terms.heatmap import HeatmapP
+from gnome3d.mc.terms.heatmap import heatmap_init_nb as _heatmap_init_nb
+from gnome3d.mc.terms.heatmap import heatmap_local_nb as _heatmap_local_nb
+from gnome3d.mc.terms.orientation import calc_orientation_nb as _calc_orientation_nb
+from gnome3d.mc.terms.orientation import local_score_orientation_nb as _local_score_orientation_nb
+from gnome3d.mc.terms.orientation import score_orientation_full_nb as _score_orientation_full_nb
+from gnome3d.mc.terms.subanchor_heat import HeatP
+from gnome3d.mc.terms.subanchor_heat import heat_init_nb as _heat_init_nb
+from gnome3d.mc.terms.subanchor_heat import heat_local_nb as _heat_local_nb
 from gnome3d.types import BoolArray, F64Array, I32Array, I64Array
 
 if TYPE_CHECKING:
@@ -71,49 +92,10 @@ def seed_numba(seed: int) -> None:
     np.random.seed(seed)
 
 
-# Smooth MC helpers
-
-
-@njit(cache=True, fastmath=True, nogil=True)
-def _smooth_len_nb(
-    pos: F64Array,
-    dtn: F64Array,
-    i: int,
-    stretch_k: float,
-    squeeze_k: float,
-    dist_w: float,
-) -> float:
-    dx = pos[i, 0] - pos[i + 1, 0]
-    dy = pos[i, 1] - pos[i + 1, 1]
-    dz = pos[i, 2] - pos[i + 1, 2]
-    d = math.sqrt(dx * dx + dy * dy + dz * dz)
-    e = dtn[i]
-    if e < 1e-6:
-        e = 1e-6
-    rel = (d - e) / e
-    k = stretch_k if rel >= 0.0 else squeeze_k
-    return rel * rel * k * dist_w
-
-
-@njit(cache=True, fastmath=True, nogil=True)
-def _smooth_ang_nb(pos: F64Array, i: int, ang_k: float, ang_w: float) -> float:
-    v1x = pos[i, 0] - pos[i + 1, 0]
-    v1y = pos[i, 1] - pos[i + 1, 1]
-    v1z = pos[i, 2] - pos[i + 1, 2]
-    v2x = pos[i + 1, 0] - pos[i + 2, 0]
-    v2y = pos[i + 1, 1] - pos[i + 2, 1]
-    v2z = pos[i + 1, 2] - pos[i + 2, 2]
-    n1 = math.sqrt(v1x * v1x + v1y * v1y + v1z * v1z)
-    n2 = math.sqrt(v2x * v2x + v2y * v2y + v2z * v2z)
-    if n1 < 1e-12 or n2 < 1e-12:
-        return 0.0
-    cos_a = (v1x * v2x + v1y * v2y + v1z * v2z) / (n1 * n2)
-    if cos_a > 1.0:
-        cos_a = 1.0
-    if cos_a < -1.0:
-        cos_a = -1.0
-    ang = 1.0 - (cos_a + 1.0) * 0.5
-    return ang * ang * ang * ang_k * ang_w
+# Chain structure energy (bonds + angles) now lives in `gnome3d.mc.terms.chain`,
+# shared with JAX and parity-pinned.  Thin njit wrappers keep the original flat
+# signatures (the kernel's `n` arg is redundant with pos.shape[0], which the term
+# derives) so all call sites are untouched and numba inlines → byte-identical.
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -128,17 +110,7 @@ def _local_smooth_nb(
     dist_w: float,
     ang_w: float,
 ) -> float:
-    sc = 0.0
-    i = p - 1
-    if 0 <= i < n - 1:
-        sc += _smooth_len_nb(pos, dtn, i, stretch_k, squeeze_k, dist_w)
-    if 0 <= p < n - 1:
-        sc += _smooth_len_nb(pos, dtn, p, stretch_k, squeeze_k, dist_w)
-    for off in range(-2, 1):
-        i = p + off
-        if 0 <= i < n - 2:
-            sc += _smooth_ang_nb(pos, i, ang_k, ang_w)
-    return sc
+    return _chain_local_nb(pos, p, ChainP(dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -151,341 +123,90 @@ def _init_smooth_nb(
     dist_w: float,
     ang_w: float,
 ) -> float:
-    n = pos.shape[0]
-    sc = 0.0
-    for i in range(n - 1):
-        sc += _smooth_len_nb(pos, dtn, i, stretch_k, squeeze_k, dist_w)
-    for i in range(n - 2):
-        sc += _smooth_ang_nb(pos, i, ang_k, ang_w)
-    return sc
+    return _chain_init_nb(pos, ChainP(dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
 
 
-# Confinement helpers (soft spherical envelope around a center)
-#
-#   E(p) = weight * ((|r_p - c| - R) / R)^2   if |r_p - c| > R
-#        = 0                                  otherwise
-#
-# Per-bead (not per-pair), single-counted globally. Delta is (curr - prev),
-# no factor of 2.
+# Confinement + excluded-volume energy now live in `gnome3d.mc.terms` — one source
+# shared with the JAX backend, pinned by per-term parity tests.  These thin njit
+# wrappers preserve the original flat call signatures so `_batch_mc_nb` and the
+# init paths below are untouched; numba inlines the delegate calls, so the math
+# stays byte-identical to the inline originals they replaced.
 
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _local_confine_nb(
     pos: F64Array, p: int, cx: float, cy: float, cz: float, R: float, weight: float
 ) -> float:
-    dx = pos[p, 0] - cx
-    dy = pos[p, 1] - cy
-    dz = pos[p, 2] - cz
-    r = math.sqrt(dx * dx + dy * dy + dz * dz)
-    if r <= R:
-        return 0.0
-    rel = (r - R) / R
-    return weight * rel * rel
+    return _conf_local_nb(pos, p, ConfP(cx, cy, cz, R, weight))
 
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _init_confine_nb(
     pos: F64Array, cx: float, cy: float, cz: float, R: float, weight: float
 ) -> float:
-    n = pos.shape[0]
-    err = 0.0
-    for p in range(n):
-        err += _local_confine_nb(pos, p, cx, cy, cz, R, weight)
-    return err
-
-
-# Excluded-volume helpers (harmonic soft repulsion, cutoff at r0)
-#
-#   E_pair(d) = weight * ((r0 - d) / r0)^2   if d < r0
-#             = 0                            otherwise
-#
-# Normalized by r0 so `weight` is dimensionally comparable to spring constants.
-# Global score double-counts pairs (matches the heat-energy convention):
-# sum_{i != j, |i-j| > skip} E_pair(d_ij). Delta is 2 * (local_curr - local_prev).
-
-
-@njit(cache=True, fastmath=True, nogil=True)
-def _excl_pair_nb(d: float, r0: float, weight: float) -> float:
-    if d >= r0:
-        return 0.0
-    rel = (r0 - d) / r0
-    return weight * rel * rel
+    return _conf_init_nb(pos, ConfP(cx, cy, cz, R, weight))
 
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -> float:
-    n = pos.shape[0]
-    err = 0.0
-    for i in range(n):
-        diff = i - p
-        if diff < 0:
-            diff = -diff
-        if diff <= skip:
-            continue
-        dx = pos[i, 0] - pos[p, 0]
-        dy = pos[i, 1] - pos[p, 1]
-        dz = pos[i, 2] - pos[p, 2]
-        d = math.sqrt(dx * dx + dy * dy + dz * dz)
-        err += _excl_pair_nb(d, r0, weight)
-    return err
+    return _ev_local_nb(pos, p, ExclP(r0, weight, skip))
 
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
-    n = pos.shape[0]
-    err = 0.0
-    for i in range(n):
-        row_err = 0.0
-        for j in range(n):
-            diff = i - j
-            if diff < 0:
-                diff = -diff
-            if diff <= skip:
-                continue
-            dx = pos[i, 0] - pos[j, 0]
-            dy = pos[i, 1] - pos[j, 1]
-            dz = pos[i, 2] - pos[j, 2]
-            d = math.sqrt(dx * dx + dy * dy + dz * dz)
-            row_err += _excl_pair_nb(d, r0, weight)
-        err += row_err
-    return err
+    return _ev_init_nb(pos, ExclP(r0, weight, skip))
 
 
-# Orientation MC helpers (smooth-only)
-
-
-@njit(cache=True, fastmath=True, nogil=True)
-def _calc_orientation_nb(
-    pos: F64Array, cind: int, n: int, is_L: bool
-) -> tuple[float, float, float]:
-    """Returns (ox, oy, oz) normalized orientation vector for anchor at cind."""
-    if cind == 0:
-        ox = pos[cind + 1, 0] - pos[cind, 0]
-        oy = pos[cind + 1, 1] - pos[cind, 1]
-        oz = pos[cind + 1, 2] - pos[cind, 2]
-    elif cind == n - 1:
-        ox = pos[cind, 0] - pos[cind - 1, 0]
-        oy = pos[cind, 1] - pos[cind - 1, 1]
-        oz = pos[cind, 2] - pos[cind - 1, 2]
-    else:
-        ox = pos[cind + 1, 0] - pos[cind - 1, 0]
-        oy = pos[cind + 1, 1] - pos[cind - 1, 1]
-        oz = pos[cind + 1, 2] - pos[cind - 1, 2]
-    if is_L:
-        ox = -ox
-        oy = -oy
-        oz = -oz
-    nm = math.sqrt(ox * ox + oy * oy + oz * oz)
-    if nm > 1e-12:
-        ox /= nm
-        oy /= nm
-        oz /= nm
-    return ox, oy, oz
-
-
-@njit(cache=True, fastmath=True, nogil=True)
-def _score_orientation_full_nb(
-    anchor_orn: F64Array,
-    nbr_offsets: I32Array,
-    nbr_indices: I32Array,
-    nbr_weights: F64Array,
-    motif_weight: float,
-    symmetric: bool,
-) -> float:
-    """Global orientation score with arc weights; used for initialisation only."""
-    n_anchors = anchor_orn.shape[0]
-    err = 0.0
-    for i in range(n_anchors):
-        for ki in range(nbr_offsets[i], nbr_offsets[i + 1]):
-            j = nbr_indices[ki]
-            w = nbr_weights[ki]
-            ax = anchor_orn[i, 0]
-            ay = anchor_orn[i, 1]
-            az = anchor_orn[i, 2]
-            bx = anchor_orn[j, 0]
-            by = anchor_orn[j, 1]
-            bz = anchor_orn[j, 2]
-            if not symmetric:
-                bx = -bx
-                by = -by
-                bz = -bz
-            dot = ax * bx + ay * by + az * bz
-            ang = 1.0 - (dot + 1.0) * 0.5
-            err += ang * ang * w
-    return err * motif_weight
-
-
-@njit(cache=True, fastmath=True, nogil=True)
-def _local_score_orientation_nb(
-    anchor_orn: F64Array,
-    k: int,
-    nbr_offsets: I32Array,
-    nbr_indices: I32Array,
-    nbr_weights: F64Array,
-    motif_weight: float,
-    symmetric: bool,
-) -> float:
-    """Local orientation score for anchor k, weighted by per-arc weights.
-    Used for the incremental update: score_orn += 2*(local_curr - local_prev).
-    The weights make this delta exact w.r.t. _score_orientation_full_nb - no drift.
-    Diverges from Reference calcScoreOrientation(orn, anchor_index), which is unweighted
-    and therefore drifts.
-    """
-    err = 0.0
-    for ki in range(nbr_offsets[k], nbr_offsets[k + 1]):
-        j = nbr_indices[ki]
-        w = nbr_weights[ki]
-        ax = anchor_orn[k, 0]
-        ay = anchor_orn[k, 1]
-        az = anchor_orn[k, 2]
-        bx = anchor_orn[j, 0]
-        by = anchor_orn[j, 1]
-        bz = anchor_orn[j, 2]
-        if not symmetric:
-            bx = -bx
-            by = -by
-            bz = -bz
-        dot = ax * bx + ay * by + az * bz
-        ang = 1.0 - (dot + 1.0) * 0.5
-        err += ang * ang * w
-    return err * motif_weight
+# Orientation MC energy (smooth-only) now lives in `gnome3d.mc.terms.orientation`,
+# imported above as `_calc_orientation_nb` / `_score_orientation_full_nb` /
+# `_local_score_orientation_nb` (same njit objects, signatures unchanged → call
+# sites untouched, byte-identical).
 
 
 # Heat MC helpers (smooth-only, subanchor heatmap)
 
 
+# Subanchor-heat + arc-springs energy now live in `gnome3d.mc.terms` (shared with
+# JAX, parity-pinned).  Thin njit wrappers keep the original flat signatures so
+# the kernel + init call sites are untouched; numba inlines → byte-identical.
+
+
 @njit(cache=True, fastmath=True, nogil=True)
 def _local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: float) -> float:
-    """Local heat score for bead p vs all others.
-    Mirrors Reference calcScoreSubanchorHeatmap(int moved) - sums all i != p.
-    """
-    n = pos.shape[0]
-    err = 0.0
-    for i in range(n):
-        if i == p:
-            continue
-        exp_d = heat_dist[i, p]
-        if exp_d < 1e-6:
-            continue
-        dx = pos[i, 0] - pos[p, 0]
-        dy = pos[i, 1] - pos[p, 1]
-        dz = pos[i, 2] - pos[p, 2]
-        d = math.sqrt(dx * dx + dy * dy + dz * dz)
-        rel = (d - exp_d) / exp_d
-        err += rel * rel
-    return err * heat_weight
+    return _heat_local_nb(pos, p, HeatP(heat_dist, heat_weight))
 
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> float:
-    """Global heat score (double-counts pairs, matching Reference calcScoreSubanchorHeatmap())."""
-    n = pos.shape[0]
-    err = 0.0
-    for i in range(n):
-        row_err = 0.0
-        for j in range(n):
-            if i == j:
-                continue
-            exp_d = heat_dist[i, j]
-            if exp_d < 1e-6:
-                continue
-            dx = pos[i, 0] - pos[j, 0]
-            dy = pos[i, 1] - pos[j, 1]
-            dz = pos[i, 2] - pos[j, 2]
-            d = math.sqrt(dx * dx + dy * dy + dz * dz)
-            rel = (d - exp_d) / exp_d
-            row_err += rel * rel
-        err += row_err
-    return err * heat_weight
-
-
-# Arcs MC helpers
+    return _heat_init_nb(pos, HeatP(heat_dist, heat_weight))
 
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _local_arcs_nb(
     pos: F64Array, exp: F64Array, p: int, stretch_k: float, squeeze_k: float
 ) -> float:
-    n = pos.shape[0]
-    sc = 0.0
-    for i in range(n):
-        if i == p:
-            continue
-        e = exp[i, p]
-        dx = pos[p, 0] - pos[i, 0]
-        dy = pos[p, 1] - pos[i, 1]
-        dz = pos[p, 2] - pos[i, 2]
-        d = math.sqrt(dx * dx + dy * dy + dz * dz)
-        if e < 0.0:
-            sc += 1.0 / (d if d > 1e-10 else 1e-10)
-        elif e >= 1e-6:
-            rel = (d - e) / e
-            sc += rel * rel * (stretch_k if rel >= 0.0 else squeeze_k)
-    return sc
+    return _arcs_local_nb(pos, p, ArcP(exp, stretch_k, squeeze_k))
 
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _init_arcs_nb(pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float) -> float:
-    n = pos.shape[0]
-    sc = 0.0
-    for i in range(n):
-        row_sc = 0.0
-        for j in range(i + 1, n):
-            e = exp[i, j]
-            if -1e-10 < e < 1e-6:
-                continue
-            dx = pos[i, 0] - pos[j, 0]
-            dy = pos[i, 1] - pos[j, 1]
-            dz = pos[i, 2] - pos[j, 2]
-            d = math.sqrt(dx * dx + dy * dy + dz * dz)
-            if e < 0.0:
-                row_sc += 1.0 / (d if d > 1e-10 else 1e-10)
-            else:
-                rel = (d - e) / e
-                row_sc += rel * rel * (stretch_k if rel >= 0.0 else squeeze_k)
-        sc += row_sc
-    return sc
+    return _arcs_init_nb(pos, ArcP(exp, stretch_k, squeeze_k))
 
 
-# Heatmap MC helpers
+# Heatmap structure energy now lives in `gnome3d.mc.terms.heatmap` (shared with
+# JAX, parity-pinned).  The local wrapper now takes the FULL skip matrix (the term
+# indexes skip[i, p] — identical bool to the old skip[:, p] column, minus the slice
+# copy); call sites updated accordingly.  numba inlines → byte-identical.
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p: int) -> float:
-    n = pos.shape[0]
-    sc = 0.0
-    for i in range(n):
-        if skip_col[i]:
-            continue
-        dx = pos[i, 0] - pos[p, 0]
-        dy = pos[i, 1] - pos[p, 1]
-        dz = pos[i, 2] - pos[p, 2]
-        d = math.sqrt(dx * dx + dy * dy + dz * dz)
-        e = exp_safe[i, p]
-        err = (d - e) / e
-        sc += err * err
-    return sc
+def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray, p: int) -> float:
+    return _heatmap_local_nb(pos, p, HeatmapP(exp_safe, skip))
 
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float:
-    """O(N^2) init - parallelised over rows; sum reduction is auto-handled."""
-    n = pos.shape[0]
-    sc = 0.0
-    for i in range(n):
-        row_sc = 0.0
-        for j in range(n):
-            if skip[i, j]:
-                continue
-            dx = pos[i, 0] - pos[j, 0]
-            dy = pos[i, 1] - pos[j, 1]
-            dz = pos[i, 2] - pos[j, 2]
-            d = math.sqrt(dx * dx + dy * dy + dz * dz)
-            e = exp_safe[i, j]
-            err = (d - e) / e
-            row_sc += err * err
-        sc += row_sc
-    return sc
+    return _heatmap_init_nb(pos, HeatmapP(exp_safe, skip))
 
 
 # Unified MC kernel
@@ -584,7 +305,7 @@ def _batch_mc_nb(
                 pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
             )
         else:  # STRUCT_HEATMAP
-            loc_struct_prev = _local_heatmap_nb(pos, exp_mat, skip_mat[:, p], p)
+            loc_struct_prev = _local_heatmap_nb(pos, exp_mat, skip_mat, p)
 
         loc_heat_prev = 0.0
         if use_heat:
@@ -634,7 +355,7 @@ def _batch_mc_nb(
                 pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
             )
         else:  # STRUCT_HEATMAP
-            loc_struct_curr = _local_heatmap_nb(pos, exp_mat, skip_mat[:, p], p)
+            loc_struct_curr = _local_heatmap_nb(pos, exp_mat, skip_mat, p)
         score_struct_new = score_struct + struct_delta_factor * (loc_struct_curr - loc_struct_prev)
 
         score_heat_new = score_heat
@@ -943,11 +664,11 @@ def _batch_heatmap_chain_nb(
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
 
-        loc_prev = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
+        loc_prev = _local_heatmap_nb(pos, exp_safe, skip, p)
         pos[p, 0] += dx
         pos[p, 1] += dy
         pos[p, 2] += dz
-        loc_curr = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
+        loc_curr = _local_heatmap_nb(pos, exp_safe, skip, p)
         score_new = score_hm + 2.0 * (loc_curr - loc_prev)
 
         ok = score_new <= score_hm
