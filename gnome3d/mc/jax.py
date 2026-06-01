@@ -3232,6 +3232,12 @@ def _mc_smooth_jax_batch_chunk(
     seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
+    log.status(
+        LOG,
+        "    smooth kernel: K=%d B=%d A=%d M=%d (heat=%d orn=%d), "
+        "compiling/running (first call per shape compiles)...",
+        K, B, A, M, int(use_heat), int(use_orn),
+    )
     t0 = time.perf_counter()
     out = kernel_full_mp(
         pos_k,
@@ -3458,6 +3464,9 @@ def _mc_arcs_jax_batch_chunk(
     seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
+    log.status(
+        LOG, "    arcs kernel: K=%d B=%d, compiling/running (first call per shape compiles)...", K, B
+    )
     t0 = time.perf_counter()
     out = kernel_full_mp(
         pos_k, ss_k, se_k, sc_k,

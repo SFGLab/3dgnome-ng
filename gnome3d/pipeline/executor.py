@@ -173,8 +173,15 @@ class MixedExecutor:
             key_fn = getattr(node.stage, "batch_key", None)
             key = key_fn(inputs) if key_fn is not None else node.stage.bucket(inputs)
             groups[key].append((node, inputs))
-        for key, members in groups.items():
+        for gi, (key, members) in enumerate(groups.items(), 1):
             problems = [node.stage.to_problem(inp) for node, inp in members]
+            # Log BEFORE the launch: a first-time bucket compiles the kernel (can
+            # be minutes on GPU), and the per-chunk result lines only print on
+            # completion — so without this a compiling batch looks like a stall.
+            log.status(
+                LOG, "  batch %s group %d/%d key=%s: %d IBs launching...",
+                kind.value, gi, len(groups), key, len(members),
+            )
             t0 = time.perf_counter()
             if runners.batch is not None:
                 results = runners.batch(problems)
@@ -183,8 +190,8 @@ class MixedExecutor:
             else:
                 raise RuntimeError(f"no runner registered for {kind}")
             log.status(
-                LOG, "  batch %s key=%s: %d IBs in %.1fs",
-                kind.value, key, len(members), time.perf_counter() - t0,
+                LOG, "  batch %s group %d/%d done: %d IBs in %.1fs",
+                kind.value, gi, len(groups), len(members), time.perf_counter() - t0,
             )
             for (node, inputs), result in zip(members, results, strict=True):
                 _finish(dag, node, node.stage.apply(inputs, result), outputs, done)
