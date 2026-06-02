@@ -27,6 +27,7 @@ from gnome3d.util import (
     _NBR_BUCKETS,
     _SHAPE_BUCKETS,
     jax_bucket_for,
+    jax_device_budget_bytes,
     jax_is_available,
 )
 
@@ -1716,6 +1717,25 @@ def _prep_smooth_problem_np(
     }
 
 
+def _resolve_smooth_max_k(big_b: int, use_heat: bool, settings: "Settings") -> tuple[int, str]:
+    """Resolve the smooth region-batch vmap width (IBs per launch).
+
+    `settings.mc_executor_jax_batch_width_smooth` is either an integer (a flat
+    cap) or "auto".  "auto" divides the device memory budget by the per-IB
+    footprint at bucket `big_b`: the stacked `(B, B)` heat tensor (f32, 4*B^2
+    bytes) dominates when heat is on, everything else is O(B).  When device memory
+    can't be queried (CPU backend), falls back to the legacy 32768/B heuristic.
+    Returns (max_k, basis) where basis is a short tag for logging."""
+    w = str(settings.mc_executor_jax_batch_width_smooth).strip().lower()
+    if w != "auto":
+        return max(1, int(w)), "explicit"
+    budget = jax_device_budget_bytes()
+    if budget is None:
+        return max(1, 32768 // max(1, big_b)), "auto-fallback"
+    per_ib = (4 * big_b * big_b if use_heat else 0) + 64 * big_b + 4096
+    return max(1, budget // per_ib), "auto-mem"
+
+
 def mc_smooth_jax_batch(
     problems: list[dict[str, Any]],
     settings: "Settings",
@@ -1732,26 +1752,28 @@ def mc_smooth_jax_batch(
     Returns one (score, final_pos (n_i, 3)) per problem, in input order.
     Does not mutate the inputs.
 
-    Caps the vmap width at `max(1, 32768 // B)` (the kscan saturation point:
-    wider is free, not faster) and runs any excess in sequential sub-batches.
-    That cap also bounds the stacked `(K, B, B)` heat tensor to <= ~131072*B
-    bytes (~4.3 GB at the largest bucket), so a dense, heat-carrying chromosome
-    can't OOM the GPU regardless of how many IBs land in one bucket.
+    Caps the vmap width (IBs per launch) via `settings.mc_executor_jax_batch_width_smooth`
+    — see `_resolve_smooth_max_k`.  Excess IBs run in sequential sub-batches.  The
+    cap is purely an OOM guard (a wider launch is never slower than more serial
+    sub-batches); "auto" sizes it to what device memory allows.
     """
     if not problems:
         return []
     bucket = bool(settings.mc_executor_jax_bucket_shapes)
     bsz = [int(p["pos"].shape[0]) for p in problems]
     big_b = max((jax_bucket_for(n) if bucket else n) for n in bsz)
-    max_k = max(1, 32768 // max(1, big_b))
+    use_heat = problems[0].get("heat_dist") is not None
+    max_k, basis = _resolve_smooth_max_k(big_b, use_heat, settings)
     if len(problems) <= max_k:
         return _mc_smooth_jax_batch_chunk(problems, settings)
     LOG.debug(
-        "region-batch: %d IBs > max_k=%d at B=%d; running %d sub-batches",
+        "region-batch[smooth]: %d IBs > max_k=%d (%s) at B=%d heat=%s; running %d sub-batches",
         len(problems),
         max_k,
+        basis,
         big_b,
-        len(problems) // max_k,
+        use_heat,
+        -(-len(problems) // max_k),
     )
     results: list[tuple[float, np.ndarray[Any, Any]]] = []
     for i in range(0, len(problems), max_k):

@@ -150,6 +150,31 @@ def jax_is_available() -> bool:
         return True
 
 
+def jax_device_budget_bytes(fraction: float = 0.95) -> int | None:
+    """Best-effort usable device memory (bytes) for sizing batched kernels.
+
+    Returns ``fraction`` * the primary device's reported byte limit, or ``None``
+    when it can't be determined — e.g. the CPU backend, or a platform whose
+    ``Device.memory_stats()`` is unavailable/empty.  Callers fall back to a fixed
+    heuristic on ``None``.  Uses the total limit (not free) since XLA preallocates
+    its pool; ``fraction`` leaves headroom for kernel scratch beyond the stacked
+    inputs."""
+    if not jax_is_available():
+        return None
+    try:
+        import jax  # type: ignore[import-not-found]
+
+        stats = jax.devices()[0].memory_stats()  # pyright: ignore[reportUnknownMemberType]
+    except Exception:  # noqa: BLE001 - any backend without memory_stats
+        return None
+    if not stats:
+        return None
+    limit = stats.get("bytes_limit")
+    if not limit:
+        return None
+    return int(int(limit) * fraction)
+
+
 # Shape-bucket ladder.  When settings.jax_bucket_shapes is on, every kernel's
 # bead count N is padded up to the next bucket so XLA compiles ~one program per
 # bucket (8 total) instead of one per distinct region size.  Geometric x2 so

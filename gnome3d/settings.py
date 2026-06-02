@@ -143,6 +143,14 @@ class Settings:
     # When bucketing is on, compile every bucket up front (predictable one-time
     # warmup) instead of lazily on first hit.
     mc_executor_jax_precompile_buckets: bool
+    # Cap on the region-batch vmap width (IBs per kernel launch) for the batched
+    # JAX kernels, per kernel.  Excess IBs run in sequential sub-batches.  The cap
+    # exists only to bound device memory (a wider launch is never slower than more
+    # serial sub-batches).  "auto" sizes it from the device's memory limit and the
+    # per-IB footprint at the group's bucket; an integer is a flat max IBs/launch.
+    # Falls back to a fixed heuristic when device memory can't be queried (CPU).
+    mc_executor_jax_batch_width_smooth: str
+    mc_executor_jax_batch_width_arcs: str
 
     # ---- MC arcs ----
     max_temp: float
@@ -347,6 +355,8 @@ class Settings:
         self.mc_executor_threaded_workers = 1
         self.mc_executor_jax_bucket_shapes = False
         self.mc_executor_jax_precompile_buckets = False
+        self.mc_executor_jax_batch_width_smooth = "auto"
+        self.mc_executor_jax_batch_width_arcs = "auto"
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -659,6 +669,12 @@ class Settings:
         )
         self.mc_executor_jax_precompile_buckets = getb(
             "simulation_backend", "jax_precompile_buckets", self.mc_executor_jax_precompile_buckets
+        )
+        self.mc_executor_jax_batch_width_smooth = gets(
+            "simulation_backend", "jax_batch_width_smooth", self.mc_executor_jax_batch_width_smooth
+        )
+        self.mc_executor_jax_batch_width_arcs = gets(
+            "simulation_backend", "jax_batch_width_arcs", self.mc_executor_jax_batch_width_arcs
         )
 
         # [simulation_arcs]

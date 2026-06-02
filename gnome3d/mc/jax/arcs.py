@@ -18,7 +18,7 @@ import numpy as np
 
 from gnome3d import log
 from gnome3d.types import F32Array
-from gnome3d.util import _SHAPE_BUCKETS, jax_bucket_for, jax_is_available
+from gnome3d.util import _SHAPE_BUCKETS, jax_bucket_for, jax_device_budget_bytes, jax_is_available
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -788,6 +788,24 @@ def _prep_arcs_problem_np(
     }
 
 
+def _resolve_arcs_max_k(big_b: int, settings: "Settings") -> tuple[int, str]:
+    """Resolve the arcs region-batch vmap width (IBs per launch).
+
+    `settings.mc_executor_jax_batch_width_arcs` is an integer (flat cap) or
+    "auto".  "auto" divides the device memory budget by the per-IB footprint at
+    bucket `big_b`: the stacked `(B, B)` exp tensor (f32, 4*B^2 bytes) dominates,
+    everything else is O(B).  Falls back to the legacy 32768/B heuristic when
+    device memory can't be queried (CPU).  Returns (max_k, basis)."""
+    w = str(settings.mc_executor_jax_batch_width_arcs).strip().lower()
+    if w != "auto":
+        return max(1, int(w)), "explicit"
+    budget = jax_device_budget_bytes()
+    if budget is None:
+        return max(1, 32768 // max(1, big_b)), "auto-fallback"
+    per_ib = 4 * big_b * big_b + 64 * big_b + 4096
+    return max(1, budget // per_ib), "auto-mem"
+
+
 def mc_arcs_jax_batch(
     problems: list[dict[str, Any]],
     settings: "Settings",
@@ -798,16 +816,26 @@ def mc_arcs_jax_batch(
     share the energy-term flags (caller groups by terms + size bucket).  Returns
     one ``(score, final_pos (n,3))`` per problem, in input order.
 
-    Caps the vmap width at ``max(1, 32768 // B)`` (saturation point + bounds the
-    stacked (K,B,B) exp tensor), running excess as sequential sub-batches — same
-    discipline as `mc_smooth_jax_batch`."""
+    Caps the vmap width (IBs per launch) via
+    `settings.mc_executor_jax_batch_width_arcs` — see `_resolve_arcs_max_k`.  The
+    stacked ``(B, B)`` exp tensor (4*B^2 bytes/IB) dominates the per-IB footprint.
+    Excess IBs run as sequential sub-batches — same discipline as
+    `mc_smooth_jax_batch`; the cap is purely an OOM guard."""
     if not problems:
         return []
     bucket = bool(settings.mc_executor_jax_bucket_shapes)
     big_b = max((jax_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0])) for p in problems)
-    max_k = max(1, 32768 // max(1, big_b))
+    max_k, basis = _resolve_arcs_max_k(big_b, settings)
     if len(problems) <= max_k:
         return _mc_arcs_jax_batch_chunk(problems, settings)
+    LOG.debug(
+        "region-batch[arcs]: %d IBs > max_k=%d (%s) at B=%d; running %d sub-batches",
+        len(problems),
+        max_k,
+        basis,
+        big_b,
+        -(-len(problems) // max_k),
+    )
     out: list[tuple[float, np.ndarray[Any, Any]]] = []
     for i in range(0, len(problems), max_k):
         out.extend(_mc_arcs_jax_batch_chunk(problems[i: i + max_k], settings))
