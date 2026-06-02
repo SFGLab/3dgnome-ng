@@ -78,8 +78,8 @@ def settings():
     s.confinement_apply_to_smooth = True
     s.use_subanchor_heatmap = True
     s.use_ctcf_motif = True
-    s.jax_bucket_shapes = True
-    s.jax_precompile_buckets = False  # skip eager precompile for the test
+    s.mc_executor_jax_bucket_shapes = True
+    s.mc_executor_jax_precompile_buckets = False  # skip eager precompile for the test
     s.mc_smooth_chains = 1
     s.mc_stop_steps_smooth = 500  # small batches -> fast convergence on CPU
     if not hasattr(s, "motif_weight"):

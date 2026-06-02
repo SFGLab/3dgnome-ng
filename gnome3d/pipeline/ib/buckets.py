@@ -25,7 +25,7 @@ def batch_bucket(n: int, settings: Settings) -> int:
     does: ``_bucket_for(n)`` when ``jax_bucket_shapes`` is on, else ``n`` itself
     (each distinct size its own group, as when bucketing is disabled).  Lazy JAX
     import so the numba-only path never pulls it in."""
-    if not bool(settings.jax_bucket_shapes):
+    if not bool(settings.mc_executor_jax_bucket_shapes):
         return int(n)
     from gnome3d.mc.jax import _bucket_for  # pyright: ignore[reportPrivateUsage]
 

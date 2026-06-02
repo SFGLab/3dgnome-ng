@@ -51,7 +51,7 @@ def run(pos, exp, bucket, step_size=0.5, label="val"):
     s.use_excluded_volume = True
     s.exclusion_apply_to_arcs = True
     s.mc_stop_steps = 2000
-    s.jax_bucket_shapes = bucket
+    s.mc_executor_jax_bucket_shapes = bucket
     p = pos.copy()
     with log.scope(label):
         score = mc_arcs_jax(p, exp, step_size, s)

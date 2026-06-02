@@ -38,7 +38,6 @@ from gnome3d.pipeline.coarse.build import (
     reconstruct_heatmap,
     reconstruct_segment_level,
     seed_global_rng,
-    settings_for_ib,
     subanchor_counts_per_arc,
 )
 
@@ -60,6 +59,5 @@ __all__ = [
     "reconstruct_heatmap",
     "reconstruct_segment_level",
     "seed_global_rng",
-    "settings_for_ib",
     "subanchor_counts_per_arc",
 ]

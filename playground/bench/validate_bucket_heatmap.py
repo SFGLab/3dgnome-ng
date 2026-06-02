@@ -45,7 +45,7 @@ def run(pos, exp_dist, diag_size, bucket: bool):
     s.use_excluded_volume = True
     s.exclusion_apply_to_heatmap = True
     s.mc_stop_steps_heatmap = 2000
-    s.jax_bucket_shapes = bucket
+    s.mc_executor_jax_bucket_shapes = bucket
     p = pos.copy()  # mc_heatmap_jax mutates in place
     with log.scope("val"):
         score = mc_heatmap_jax(p, exp_dist, diag_size, 0.5, s)

@@ -92,14 +92,6 @@ def _backend_is_jax(settings: Settings) -> bool:
     return str(settings.mc_backend).strip().lower() == "jax"
 
 
-def _use_jax_for_smooth(settings: Settings) -> bool:
-    return _backend_is_jax(settings) and bool(settings.mc_backend_apply_to_smooth)
-
-
-def _use_jax_for_arcs(settings: Settings) -> bool:
-    return _backend_is_jax(settings) and bool(settings.mc_backend_apply_to_arcs)
-
-
 def _use_jax_for_heatmap(settings: Settings) -> bool:
     return _backend_is_jax(settings) and bool(settings.mc_backend_apply_to_heatmap)
 
@@ -164,25 +156,14 @@ def mc_arcs(
     """Arc-MC dispatch.  Routes to JAX iff `settings.mc_backend == "jax"`
     AND `settings.mc_backend_apply_to_arcs == True` (defaults to False — JAX
     arcs loses to numba at the production N range; see [jax.py::mc_arcs_jax]).
-    Supported on JAX path: arc springs + EV + confinement."""
+    Numba-only: the JAX arcs path is the region-batched kernel reached via the
+    pipeline's IB stages (`mc_arcs_jax_batch`), not this per-IB dispatch."""
     n = pos.shape[0]
     if n <= 1:
         return 0.0
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
-    if _use_jax_for_arcs(settings):
-        from gnome3d.mc import jax
-
-        if LOG.isEnabledFor(logging.INFO):
-            terms = ["arcs"]
-            if bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs):
-                terms.append("EV")
-            if bool(settings.use_confinement) and bool(settings.confinement_apply_to_arcs):
-                terms.append("conf")
-            LOG.info("mc_arcs: backend=jax  N=%d  terms=[%s]", n, "+".join(terms))
-        score = jax.mc_arcs_jax(pos, exp_dist_mat, step_size, settings)
-    else:
-        score = numba.mc_arcs_numba(pos, exp_dist_mat, step_size, settings)
+    score = numba.mc_arcs_numba(pos, exp_dist_mat, step_size, settings)
 
     if _MC_PROFILE_PATH:
         _log_mc_call(
@@ -211,54 +192,26 @@ def mc_smooth(
     AND `settings.mc_backend_apply_to_smooth == True` (defaults to True — JAX
     wins big on smooth at production N).  Supported on JAX path: chain bonds
     + angles + EV + heat (subanchor heatmap) + CTCF orientation + confinement
-    (the full production energy combo)."""
+    (the full production energy combo).
+
+    Numba-only: the JAX smooth path is the region-batched kernel reached via the
+    pipeline's IB stages (`mc_smooth_jax_batch`), not this per-IB dispatch."""
     n = pos.shape[0]
     if n <= 2:
         return 0.0
     _t0 = time.perf_counter() if _MC_PROFILE_PATH else 0.0
 
-    if _use_jax_for_smooth(settings):
-        from gnome3d.mc import jax
-
-        if LOG.isEnabledFor(logging.INFO):
-            terms: list[str] = ["chain"]
-            if bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth):
-                terms.append("EV")
-            if heat_dist is not None:
-                terms.append("heat")
-            if char_orientations is not None:
-                terms.append("orient")
-            if bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth):
-                terms.append("conf")
-            LOG.info(
-                "mc_smooth: backend=jax  N=%d  K=%d  terms=[%s]",
-                n,
-                int(settings.mc_smooth_chains),
-                "+".join(terms),
-            )
-        score = jax.mc_smooth_jax(
-            pos,
-            dtn,
-            fixed,
-            step_size,
-            settings,
-            char_orientations=char_orientations,
-            anchor_neighbors=anchor_neighbors,
-            anchor_neighbor_weights=anchor_neighbor_weights,
-            heat_dist=heat_dist,
-        )
-    else:
-        score = numba.mc_smooth_numba(
-            pos,
-            dtn,
-            fixed,
-            step_size,
-            settings,
-            char_orientations=char_orientations,
-            anchor_neighbors=anchor_neighbors,
-            anchor_neighbor_weights=anchor_neighbor_weights,
-            heat_dist=heat_dist,
-        )
+    score = numba.mc_smooth_numba(
+        pos,
+        dtn,
+        fixed,
+        step_size,
+        settings,
+        char_orientations=char_orientations,
+        anchor_neighbors=anchor_neighbors,
+        anchor_neighbor_weights=anchor_neighbor_weights,
+        heat_dist=heat_dist,
+    )
 
     if _MC_PROFILE_PATH:
         _log_mc_call(
@@ -300,4 +253,5 @@ def mc_ib(
             time.perf_counter() - _t0,
             score,
         )
+
     return score

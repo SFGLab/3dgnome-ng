@@ -70,7 +70,7 @@ def run(pos, dtn, fixed, heat, orn, bucket, step_size=0.5, label="val"):
     s.use_excluded_volume = True
     s.exclusion_apply_to_smooth = True
     s.mc_stop_steps_smooth = 2000
-    s.jax_bucket_shapes = bucket
+    s.mc_executor_jax_bucket_shapes = bucket
     if not hasattr(s, "motif_weight"):
         s.motif_weight = 1.0
     kw = {}

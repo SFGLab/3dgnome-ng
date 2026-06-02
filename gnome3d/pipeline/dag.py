@@ -69,10 +69,12 @@ class Dag:
         if not node.deps:
             seed = self.seeds.get(node.id)
             return (seed,) if seed is not None else ()
+
         return tuple(outputs[d] for d in node.deps)
 
     def add(self, nodes: list[Node], seeds: dict[NodeId, Seeded]) -> None:
         """Merge runtime-spawned nodes (and their root seeds) into the DAG."""
         for n in nodes:
             self.nodes[n.id] = n
+
         self.seeds.update(seeds)

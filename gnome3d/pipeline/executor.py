@@ -2,8 +2,8 @@
 Executors: turn a Dag into per-node output states.
 
 All walk the DAG by repeatedly taking the *ready* set (`Dag.ready`) and running
-it; they differ only in how a ready set is dispatched.  `MixedExecutor` is the
-workhorse: it assigns each `StageKind` a strategy —
+it; they differ only in how a ready set is dispatched.  Each dispatch strategy
+is its own small class (`SerialStrategy`, `ThreadedStrategy`, `BatchStrategy`) —
 
   * serial   — run each node on its own via the kind's serial (numba) runner;
   * threaded — run the kind's independent ready nodes across a numba thread pool
@@ -11,9 +11,11 @@ workhorse: it assigns each `StageKind` a strategy —
   * batch    — group the kind's nodes by ``(kind, bucket)`` and run each group
     through its batch (JAX) runner in one shot (the `mc_*_jax_batch` entries).
 
-`SerialExecutor` / `ThreadedExecutor` / `BatchExecutor` are just `MixedExecutor`
-with a uniform strategy; `pick_executor` builds a per-stage mix from settings.
-The COARSE spine is always inline-serial (one RNG stream across its stages).
+`MixedExecutor` is the workhorse: it assigns each `StageKind` a strategy and
+delegates ready-set dispatch to that strategy.  `SerialExecutor` /
+`ThreadedExecutor` / `BatchExecutor` are uniform-strategy convenience
+constructors; `pick_executor` builds a per-stage mix from settings.  The COARSE
+spine is always inline-serial (one RNG stream across its stages).
 
 Result-equivalence note: a node's RNG seed lives in its `Seeded.seed`, not in
 scheduling order, so bead output is independent of strategy — serial, threaded,
@@ -26,7 +28,9 @@ from __future__ import annotations
 import os
 import time
 from collections import defaultdict
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
+from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from gnome3d import log
@@ -37,6 +41,7 @@ from gnome3d.pipeline.state import State
 
 LOG = log.get("executor")
 
+
 @runtime_checkable
 class Executor(Protocol):
     """Run every node in dependency order, returning each node's output state.
@@ -45,28 +50,41 @@ class Executor(Protocol):
     def run(self, dag: Dag) -> dict[NodeId, State]: ...
 
 
+class ExecutorStrategy(StrEnum):
+    """Strategies for running a DAG with a *per-kind* scheduling strategy."""
+
+    SERIAL = "serial"  # numba, one node at a time
+    THREADED = "threaded"  # numba, independent nodes across a thread pool
+    BATCH = "batch"  # JAX, same-(kind,bucket) nodes in one vmapped launch
+
+
+# --- helpers -----------------------------------------------------------------
+
+
 def _ready_or_raise(dag: Dag, done: list[NodeId]) -> list[Node]:
     ready = dag.ready(done)
     if not ready and len(done) < len(dag.nodes):
         missing = set(dag.nodes) - set(done)
-        raise RuntimeError(f"DAG stalled (cycle or missing dep) — unrun nodes: {sorted(missing)}")
+        raise ValueError(f"DAG stalled (cycle or missing dep) with unrun nodes: {sorted(missing)}")
+
     return ready
 
 
 def _finish(
     dag: Dag, node: Node, output: State, outputs: dict[NodeId, State], done: list[NodeId]
 ) -> None:
-    """Record a node's output, mark it done, and run its `expand` hook (if any) —
+    """Record a node's output, mark it done, and run its `expand` hook (if any),
     spawning new nodes into the DAG.  Newly added nodes are picked up by the next
     `ready` pass, so the loops naturally drain the grown graph."""
     outputs[node.id] = output
     done.append(node.id)
+
     if node.expand is not None:
         new_nodes, new_seeds = node.expand(output)
         dag.add(new_nodes, new_seeds)
 
 
-def _run_node(node: Node, inputs: tuple[State, ...]) -> State:
+def _run_serial(node: Node, inputs: tuple[State, ...]) -> State:
     """Compute one node's output (serial runner + apply) — the unit of work a
     serial step or a worker thread runs.
 
@@ -78,28 +96,167 @@ def _run_node(node: Node, inputs: tuple[State, ...]) -> State:
     runner = runners_for(node.stage.kind).serial
     if runner is None:
         raise RuntimeError(f"no serial runner registered for {node.stage.kind}")
+
     result: Result = runner(node.stage.to_problem(inputs))
     return node.stage.apply(inputs, result)
 
 
-# Per-kind scheduling strategies.
-SERIAL = "serial"  # numba, one node at a time
-THREADED = "threaded"  # numba, independent nodes across a thread pool
-BATCH = "batch"  # JAX, same-(kind,bucket) nodes in one vmapped launch
+# --- strategies --------------------------------------------------------------
 
-# The per-IB kinds (everything except the COARSE spine, which is always serial).
-_IB_KINDS = (StageKind.ARCS, StageKind.DENSIFY, StageKind.HEAT_DIST, StageKind.SMOOTH)
+
+@runtime_checkable
+class Strategy(Protocol):
+    """Dispatch one ready set of same-`kind` nodes.  Records outputs and runs
+    `expand` hooks on the main thread via `_finish`."""
+
+    def dispatch(
+        self,
+        kind: StageKind,
+        nodes: list[Node],
+        dag: Dag,
+        outputs: dict[NodeId, State],
+        done: list[NodeId],
+    ) -> None: ...
+
+    def close(self) -> None: ...
+
+
+class SerialStrategy:
+    """Run nodes one at a time on the calling thread (the deterministic baseline,
+    and the only legal strategy for the COARSE spine)."""
+
+    def dispatch(
+        self,
+        kind: StageKind,
+        nodes: list[Node],
+        dag: Dag,
+        outputs: dict[NodeId, State],
+        done: list[NodeId],
+    ) -> None:
+        LOG.info(f"running {len(nodes)} {kind} nodes serially...")
+        for node in nodes:
+            inputs = dag.inputs_for(node, outputs)
+            _finish(dag, node, _run_serial(node, inputs), outputs, done)
+
+    def close(self) -> None:
+        pass
+
+
+class ThreadedStrategy:
+    """Run independent ready nodes across a shared `ThreadPoolExecutor`.  The
+    pool is lazily created on first dispatch and torn down via `close()`."""
+
+    def __init__(self, max_workers: int) -> None:
+        self._max_workers = max_workers
+        self._pool: ThreadPoolExecutor | None = None
+
+    def _ensure_pool(self) -> ThreadPoolExecutor:
+        pool = self._pool
+        if pool is None:
+            pool = ThreadPoolExecutor(max_workers=self._max_workers)
+            self._pool = pool
+        return pool
+
+    def dispatch(
+        self,
+        kind: StageKind,
+        nodes: list[Node],
+        dag: Dag,
+        outputs: dict[NodeId, State],
+        done: list[NodeId],
+    ) -> None:
+        pool = self._ensure_pool()
+        LOG.info(f"running {len(nodes)} {kind} nodes across {self._max_workers} threads...")
+        # Compute on the pool; finish (record + expand) on the main thread.
+        jobs = [(n, dag.inputs_for(n, outputs)) for n in nodes]
+        futures = [pool.submit(_run_serial, n, inp) for n, inp in jobs]
+        for (node, _inp), fut in zip(jobs, futures, strict=True):
+            _finish(dag, node, fut.result(), outputs, done)
+
+    def close(self) -> None:
+        if self._pool is not None:
+            self._pool.shutdown()
+            self._pool = None
+
+
+class BatchStrategy:
+    """Group this kind's ready nodes by their *batch key* and run each group
+    through the batch runner in one launch (serial fallback for kinds with no
+    batch runner, e.g. DENSIFY).
+
+    The key is the stage's ``batch_key`` — ``(energy-term signature,
+    shape-ladder bucket)`` — not the raw size.  Grouping by the ladder bucket
+    keeps one compiled kernel + one wide launch per bucket (vs one per distinct
+    size), and keeps each batch uniform in the flags ``mc_*_jax_batch`` reads
+    from ``problems[0]``.  Each group is timed and logged (always-on) so a slow
+    launch is never a silent stall."""
+
+    def dispatch(
+        self,
+        kind: StageKind,
+        nodes: list[Node],
+        dag: Dag,
+        outputs: dict[NodeId, State],
+        done: list[NodeId],
+    ) -> None:
+        runners = runners_for(kind)
+        groups: dict[object, list[tuple[Node, tuple[State, ...]]]] = defaultdict(list)
+        for node in nodes:
+            inputs = dag.inputs_for(node, outputs)
+            key_fn = getattr(node.stage, "batch_key", None)
+            key = key_fn(inputs) if key_fn is not None else node.stage.bucket(inputs)
+            groups[key].append((node, inputs))
+
+        for gi, (key, members) in enumerate(groups.items(), 1):
+            problems = [node.stage.to_problem(inp) for node, inp in members]
+            log.status(
+                LOG,
+                "  batch %s group %d/%d key=%s: %d IBs launching...",
+                kind.value,
+                gi,
+                len(groups),
+                key,
+                len(members),
+            )
+
+            t0 = time.perf_counter()
+            if runners.batch is not None:
+                results = runners.batch(problems)
+            elif runners.serial is not None:
+                results = [runners.serial(p) for p in problems]
+            else:
+                raise RuntimeError(f"no runner registered for {kind}")
+
+            log.status(
+                LOG,
+                "  batch %s group %d/%d done: %d IBs in %.1fs",
+                kind.value,
+                gi,
+                len(groups),
+                len(members),
+                time.perf_counter() - t0,
+            )
+
+            for (node, inputs), result in zip(members, results, strict=True):
+                _finish(dag, node, node.stage.apply(inputs, result), outputs, done)
+
+    def close(self) -> None:
+        pass
+
+
+# --- executors ---------------------------------------------------------------
 
 
 class MixedExecutor:
     """Run the DAG with a *per-kind* scheduling strategy.
 
     ``strategy`` maps each `StageKind` to ``SERIAL`` | ``THREADED`` | ``BATCH``
-    (kinds absent default to serial).  This single executor subsumes the serial /
-    threaded / batch executors — they're just uniform-strategy cases — and lets
-    stages mix backends, e.g. smooth ``BATCH`` (JAX/GPU) while arcs ``THREADED``
-    (numba/CPU).  ``pick_executor`` builds it from the per-stage ``mc_executor_*``
-    settings.
+    (kinds absent default to serial).  Dispatch is delegated to a `Strategy`
+    instance per chosen value — `SerialStrategy`, `ThreadedStrategy`,
+    `BatchStrategy` — so this executor stays a thin scheduler over them; the
+    convenience subclasses (`SerialExecutor`, `ThreadedExecutor`, `BatchExecutor`)
+    are just uniform-strategy mixes.  ``pick_executor`` builds it from the
+    per-stage ``mc_executor_*`` settings.
 
     All three strategies are RNG-isolated per node (numba's RNG is per-OS-thread;
     the Python noise re-seeds a thread-local RNG), so the structures are
@@ -108,113 +265,102 @@ class MixedExecutor:
     flows one RNG stream across its stages without re-seeding (so it can't be
     threaded/batched) and carries the fan-out `expand`; it's a linear chain anyway."""
 
-    def __init__(self, strategy: dict[StageKind, str], max_workers: int | None = None) -> None:
-        self._strategy = dict(strategy)
-        self._max_workers = max_workers if max_workers and max_workers > 0 else (os.cpu_count() or 1)
+    def __init__(
+        self,
+        strategy: Mapping[StageKind, ExecutorStrategy],
+        max_workers: int | None = None,
+    ) -> None:
+        self._strategy_map: dict[StageKind, ExecutorStrategy] = dict(strategy)
+        self._max_workers: int = (max_workers if max_workers and max_workers > 0 else (os.cpu_count() or 1))
+        self._strategies: dict[ExecutorStrategy, Strategy] = {}
 
-    def _strat(self, kind: StageKind) -> str:
+    def _strat_for(self, kind: StageKind) -> ExecutorStrategy:
         if kind is StageKind.COARSE:
-            return SERIAL
-        return self._strategy.get(kind, SERIAL)
+            return ExecutorStrategy.SERIAL
+
+        return self._strategy_map.get(kind, ExecutorStrategy.SERIAL)
+
+    def _get_strategy(self, name: ExecutorStrategy) -> Strategy:
+        cached = self._strategies.get(name)
+        if cached is not None:
+            return cached
+
+        strat: Strategy
+        if name is ExecutorStrategy.SERIAL:
+            strat = SerialStrategy()
+        elif name is ExecutorStrategy.THREADED:
+            strat = ThreadedStrategy(self._max_workers)
+        elif name is ExecutorStrategy.BATCH:
+            strat = BatchStrategy()
+        else:
+            raise ValueError(f"unknown executor strategy: {name!r}")
+
+        self._strategies[name] = strat
+        return strat
 
     def run(self, dag: Dag) -> dict[NodeId, State]:
         outputs: dict[NodeId, State] = {}
         done: list[NodeId] = []
-        pool = (
-            ThreadPoolExecutor(max_workers=self._max_workers)
-            if any(v == THREADED for v in self._strategy.values())
-            else None
-        )
         try:
             while len(done) < len(dag.nodes):
                 by_kind: dict[StageKind, list[Node]] = defaultdict(list)
+
                 for node in _ready_or_raise(dag, done):
                     by_kind[node.stage.kind].append(node)
+
                 for kind, nodes in by_kind.items():
-                    self._dispatch(self._strat(kind), kind, nodes, dag, outputs, done, pool)
+                    self._get_strategy(self._strat_for(kind)).dispatch(kind, nodes, dag, outputs, done)
         finally:
-            if pool is not None:
-                pool.shutdown()
+            for strat in self._strategies.values():
+                strat.close()
+
+            self._strategies.clear()
+
         return outputs
-
-    def _dispatch(self, strat, kind, nodes, dag, outputs, done, pool):  # type: ignore[no-untyped-def]
-        if strat == BATCH:
-            LOG.info(f"running {len(nodes)} {kind} nodes in batch...")
-            self._run_batch(kind, nodes, dag, outputs, done)
-        elif strat == THREADED and pool is not None:
-            LOG.info(f"running {len(nodes)} {kind} nodes across {self._max_workers} threads...")
-            # Compute on the pool; finish (record + expand) on the main thread.
-            jobs = [(n, dag.inputs_for(n, outputs)) for n in nodes]
-            futures = [pool.submit(_run_node, n, inp) for n, inp in jobs]
-            for (node, _inp), fut in zip(jobs, futures, strict=True):
-                _finish(dag, node, fut.result(), outputs, done)
-        else:  # SERIAL (and the COARSE spine)
-            LOG.info(f"running {len(nodes)} {kind} nodes serially...")
-            for node in nodes:
-                inputs = dag.inputs_for(node, outputs)
-                _finish(dag, node, _run_node(node, inputs), outputs, done)
-
-    @staticmethod
-    def _run_batch(kind, nodes, dag, outputs, done):  # type: ignore[no-untyped-def]
-        """Group this kind's ready nodes by their *batch key* and run each group
-        through the batch runner in one launch (serial fallback for kinds with no
-        batch runner, e.g. DENSIFY).
-
-        The key is the stage's ``batch_key`` — ``(energy-term signature,
-        shape-ladder bucket)`` — not the raw size.  Grouping by the ladder bucket
-        keeps one compiled kernel + one wide launch per bucket (vs one per distinct
-        size), and keeps each batch uniform in the flags ``mc_*_jax_batch`` reads
-        from ``problems[0]``.  Each group is timed and logged (always-on) so a slow
-        launch is never a silent stall."""
-        runners = runners_for(kind)
-        groups: dict[object, list[tuple[Node, tuple[State, ...]]]] = defaultdict(list)
-        for node in nodes:
-            inputs = dag.inputs_for(node, outputs)
-            key_fn = getattr(node.stage, "batch_key", None)
-            key = key_fn(inputs) if key_fn is not None else node.stage.bucket(inputs)
-            groups[key].append((node, inputs))
-        for gi, (key, members) in enumerate(groups.items(), 1):
-            problems = [node.stage.to_problem(inp) for node, inp in members]
-            # Log BEFORE the launch: a first-time bucket compiles the kernel (can
-            # be minutes on GPU), and the per-chunk result lines only print on
-            # completion — so without this a compiling batch looks like a stall.
-            log.status(
-                LOG, "  batch %s group %d/%d key=%s: %d IBs launching...",
-                kind.value, gi, len(groups), key, len(members),
-            )
-            t0 = time.perf_counter()
-            if runners.batch is not None:
-                results = runners.batch(problems)
-            elif runners.serial is not None:
-                results = [runners.serial(p) for p in problems]
-            else:
-                raise RuntimeError(f"no runner registered for {kind}")
-            log.status(
-                LOG, "  batch %s group %d/%d done: %d IBs in %.1fs",
-                kind.value, gi, len(groups), len(members), time.perf_counter() - t0,
-            )
-            for (node, inputs), result in zip(members, results, strict=True):
-                _finish(dag, node, node.stage.apply(inputs, result), outputs, done)
 
 
 class SerialExecutor(MixedExecutor):
     """Every kind serial with one node at a time (the deterministic baseline)."""
 
     def __init__(self) -> None:
-        super().__init__({})
+        super().__init__(dict.fromkeys(StageKind, ExecutorStrategy.SERIAL))
 
 
 class ThreadedExecutor(MixedExecutor):
     """Every per-IB kind threaded across `max_workers` numba threads (CPU)."""
 
+    _PER_IB: frozenset[StageKind] = frozenset({
+        StageKind.ARCS,
+        StageKind.HEAT_DIST,
+        StageKind.SMOOTH,
+    })
+
     def __init__(self, max_workers: int | None = None) -> None:
-        super().__init__(dict.fromkeys(_IB_KINDS, THREADED), max_workers)
+        super().__init__(
+            strategy={
+                kind: (ExecutorStrategy.THREADED if kind in self._PER_IB else ExecutorStrategy.SERIAL)
+                for kind in StageKind
+            },
+            max_workers=max_workers,
+        )
 
 
 class BatchExecutor(MixedExecutor):
     """The kinds in `batch_kinds` batched on JAX, the rest serial.  `None` =
     batch every kind that has a batch runner (validation)."""
 
+    _BATCHABLE: frozenset[StageKind] = frozenset({
+        StageKind.ARCS,
+        StageKind.HEAT_DIST,
+        StageKind.SMOOTH,
+    })
+
     def __init__(self, batch_kinds: set[StageKind] | None = None) -> None:
-        kinds = _IB_KINDS if batch_kinds is None else batch_kinds
-        super().__init__(dict.fromkeys(kinds, BATCH))
+        def pick(kind: StageKind) -> ExecutorStrategy:
+            if kind not in self._BATCHABLE:
+                return ExecutorStrategy.SERIAL
+            if batch_kinds is None or kind in batch_kinds:
+                return ExecutorStrategy.BATCH
+            return ExecutorStrategy.SERIAL
+
+        super().__init__({kind: pick(kind) for kind in StageKind})

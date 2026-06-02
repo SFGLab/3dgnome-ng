@@ -25,10 +25,9 @@ if TYPE_CHECKING:
     from gnome3d.skeleton import IBSeed
 
 
-def ib_node_id(ib_id: str, stage_name: str) -> NodeId:
-    """The id of one per-IB chain node — `reconstruct` reads the terminal smooth
-    node by this id to collect beads, so both sides must agree on the format."""
-    return f"{ib_id} :: {stage_name}"
+def ib_node_id(ib_id: str, stage: StageKind) -> NodeId:
+    """The id of one per-IB chain node."""
+    return f"{ib_id} :: {stage.value}"
 
 
 def ib_chain_nodes(
@@ -43,6 +42,7 @@ def ib_chain_nodes(
     same prefix via `ib_node_id(prefix + ib_id, ...)`."""
     nodes: list[Node] = []
     seeds: dict[NodeId, Seeded] = {}
+
     for ibs in ibseeds:
         chain: list[tuple[StageKind, object]] = [
             (StageKind.ARCS, ArcsStage()),
@@ -54,9 +54,10 @@ def ib_chain_nodes(
 
         prev: NodeId | None = None
         for kind, stage in chain:
-            nid = ib_node_id(prefix + ibs.ib_id, kind.value)
+            nid = ib_node_id(prefix + ibs.ib_id, kind)
             nodes.append(Node(nid, stage, () if prev is None else (prev,)))  # type: ignore[arg-type]
             if prev is None:
                 seeds[nid] = ibs.seed
             prev = nid
+
     return nodes, seeds

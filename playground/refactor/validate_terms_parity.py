@@ -18,7 +18,6 @@ import numpy as np
 
 sys.path.insert(0, ".")
 
-from gnome3d.mc.terms import compose_init_nb, compose_local_nb  # noqa: E402
 from gnome3d.mc.terms.arc_springs import ARC_SPRINGS, ArcP  # noqa: E402
 from gnome3d.mc.terms.chain import CHAIN, ChainP  # noqa: E402
 from gnome3d.mc.terms.confinement import CONFINEMENT, ConfP  # noqa: E402
@@ -115,23 +114,6 @@ def main() -> int:
             f"  {'ok ' if init_ok else 'FAIL'} {term.name:16s} "
             f"local max|Δ|={worst_local:.2e}  init nb={nb_i:.5f} jax={jx_i:.5f} (Δ={abs(nb_i - jx_i):.2e})"
         )
-
-    print("\n=== numba composition (compose_*_nb == manual sum, exact) ===")
-    fx = {t.name: (t, prm) for t, prm in fixtures}
-    for label, names in (
-        ("scalar params [EV, confine]", ("excluded_volume", "confinement")),
-        ("array params  [chain, arc_springs, subanchor_heat]", ("chain", "arc_springs", "subanchor_heat")),
-    ):
-        terms = tuple(fx[nm][0] for nm in names)
-        prms = tuple(fx[nm][1] for nm in names)
-        comp_i = float(compose_init_nb(terms)(pos, prms))
-        man_i = sum(float(fx[nm][0].nb_init(pos, fx[nm][1])) for nm in names)
-        comp_l = float(compose_local_nb(terms)(pos, 5, prms))
-        man_l = sum(float(fx[nm][0].nb_local(pos, 5, fx[nm][1])) for nm in names)
-        ie, le = comp_i == man_i, comp_l == man_l
-        ok &= ie and le
-        print(f"  {'ok ' if ie else 'FAIL'} init  {label}: {comp_i:.6f} vs {man_i:.6f}")
-        print(f"  {'ok ' if le else 'FAIL'} local {label}: {comp_l:.6f} vs {man_l:.6f}")
 
     ok &= _orientation_parity(pos, pos32, n, rng, jnp)
 

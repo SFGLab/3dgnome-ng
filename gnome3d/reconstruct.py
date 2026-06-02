@@ -15,20 +15,19 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from gnome3d import log, skeleton
-from gnome3d.pipeline import Dag
+from gnome3d.pipeline import Dag, Node
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse.stages import build_coarse_dag
 from gnome3d.pipeline.executor import (
-    BATCH,
-    SERIAL,
-    THREADED,
     Executor,
+    ExecutorStrategy,
     MixedExecutor,
     SerialExecutor,
 )
 from gnome3d.pipeline.ib import ib_chain_nodes, ib_node_id
 from gnome3d.pipeline.stage import StageKind
-from gnome3d.pipeline.state import Smoothed, State
+from gnome3d.pipeline.state import Smoothed, State, Seeded
+from gnome3d.util import jax_is_available
 
 if TYPE_CHECKING:
     from gnome3d.data import ContactData
@@ -38,36 +37,42 @@ if TYPE_CHECKING:
 
 LOG = log.get("reconstruct")
 
-_SMOOTH = StageKind.SMOOTH.value
-
 # Well-separated RNG offset per ensemble member, so structure i's per-IB seeds
 # (and coarse seed) are distinct from structure j's.  See coarse.seed_global_rng.
 MEMBER_SEED_STRIDE = 2_000_003
 
 
-def _auto_strategy(kind: StageKind, settings: Settings) -> str:
-    """Resolve ``mc_executor_<stage> = auto`` from the legacy keys, so pre-migration
-    configs behave exactly as before: JAX (and not small-IB-boost) + the stage's
-    old apply-flag -> batch; else numba threaded when ``ib_workers>1``; else serial.
-    DENSIFY has no batch kernel, so it never auto-resolves to batch."""
-    jax = str(settings.mc_backend).strip().lower() == "jax" and not bool(settings.use_small_ib_boost)
-    if jax and kind in (StageKind.SMOOTH, StageKind.HEAT_DIST):
-        if bool(settings.mc_backend_apply_to_smooth):  # heat-dist is the dry smooth
-            return BATCH
-    elif jax and kind is StageKind.ARCS:
-        if bool(settings.mc_backend_apply_to_arcs):
-            return BATCH
-    return THREADED if int(settings.ib_workers) > 1 else SERIAL
+def _auto_strategy(kind: StageKind, settings: Settings) -> ExecutorStrategy:
+    """Resolve ``mc_executor_<stage> = auto``."""
+    prefer_jax = jax_is_available()
+    if prefer_jax and kind in (StageKind.SMOOTH, StageKind.HEAT_DIST):
+        return ExecutorStrategy.BATCH
+
+    return (
+        ExecutorStrategy.THREADED
+        if int(settings.mc_executor_threaded_workers) > 1
+        else ExecutorStrategy.SERIAL
+    )
 
 
-def _resolve_strategy(value: str, kind: StageKind, settings: Settings) -> str:
+def _resolve_strategy(value: str, kind: StageKind, settings: Settings) -> ExecutorStrategy:
     """One ``mc_executor_<stage>`` value (serial|threaded|batch|auto) -> strategy.
     A batch choice that can't run (small-IB-boost's per-IB springs aren't in the
     batched kernels; DENSIFY has no batch kernel) downgrades to threaded/serial."""
     v = str(value).strip().lower()
-    chosen = v if v in (SERIAL, THREADED, BATCH) else _auto_strategy(kind, settings)
-    if chosen == BATCH and (kind is StageKind.DENSIFY or bool(settings.use_small_ib_boost)):
-        chosen = THREADED if int(settings.ib_workers) > 1 else SERIAL
+    chosen = (
+        v
+        if v in (ExecutorStrategy.SERIAL, ExecutorStrategy.THREADED, ExecutorStrategy.BATCH)
+        else _auto_strategy(kind, settings)
+    )
+
+    if chosen == ExecutorStrategy.BATCH and (kind is StageKind.DENSIFY):
+        chosen = (
+            ExecutorStrategy.THREADED
+            if int(settings.mc_executor_threaded_workers) > 1
+            else ExecutorStrategy.SERIAL
+        )
+
     return chosen
 
 
@@ -75,20 +80,23 @@ def pick_executor(settings: Settings) -> Executor:
     """Build the executor from the per-stage ``mc_executor_*`` settings.
 
     Each IB stage names its executor (serial | threaded | batch | auto); this maps
-    them to a per-kind strategy and returns one `MixedExecutor`.  All strategies
-    yield byte-identical structures for a given seed (executor-equivalence) — the
-    choice is purely how stage-nodes are scheduled / which kernel runs them."""
+    them to a per-kind strategy and returns one `MixedExecutor`."""
     strategy = {
-        StageKind.ARCS: _resolve_strategy(settings.mc_executor_arcs, StageKind.ARCS, settings),
+        StageKind.ARCS: _resolve_strategy(
+            settings.mc_executor_arcs, StageKind.ARCS, settings
+        ),
         StageKind.DENSIFY: _resolve_strategy(
             settings.mc_executor_densify, StageKind.DENSIFY, settings
         ),
         StageKind.HEAT_DIST: _resolve_strategy(
             settings.mc_executor_heat, StageKind.HEAT_DIST, settings
         ),
-        StageKind.SMOOTH: _resolve_strategy(settings.mc_executor_smooth, StageKind.SMOOTH, settings),
+        StageKind.SMOOTH: _resolve_strategy(
+            settings.mc_executor_smooth, StageKind.SMOOTH, settings
+        ),
     }
-    return MixedExecutor(strategy, max_workers=int(settings.ib_workers))
+
+    return MixedExecutor(strategy, max_workers=int(settings.mc_executor_threaded_workers))
 
 
 def _beads(output: State) -> list[BeadOut]:
@@ -116,14 +124,19 @@ def reconstruct(
     RNG), so no external seeding is needed."""
     state = cb.build_state(settings, data, chrs, region)
     dag, ib_sink = build_coarse_dag(state, seed_offset)
-    
+
     LOG.info(f"running DAG with {len(dag.nodes)} nodes and {len(dag.seeds)} seeds...")
     outputs = (executor or SerialExecutor()).run(dag)
 
     per_chr: dict[str, list[BeadOut]] = defaultdict(list)
     for ibs in ib_sink:
-        per_chr[ibs.chr_].extend(_beads(outputs[ib_node_id(ibs.ib_id, _SMOOTH)]))
-    return {chr_: sorted(beads, key=lambda b: b.start) for chr_, beads in per_chr.items()}
+        beads = _beads(outputs[ib_node_id(ibs.ib_id, StageKind.SMOOTH)])
+        per_chr[ibs.chr_].extend(beads)
+
+    return {
+        chr_: sorted(beads, key=lambda b: b.start)
+        for chr_, beads in per_chr.items()
+    }
 
 
 def reconstruct_ensemble(
@@ -137,9 +150,7 @@ def reconstruct_ensemble(
 ) -> list[dict[str, list[BeadOut]]]:
     """Reconstruct an ensemble of `n` structures, batching the per-IB chains
     *across members* so same-shaped IBs from different members fill one kernel
-    launch — the ensemble batch-width win (see [[project_jax_throughput_gradient]]:
-    a single structure's size-diverse IBs land in distinct buckets, but IB *i* has
-    the same anchor count in every member, so member chains share a bucket).
+    launch.
 
     Two phases:
       1. Run each member's coarse spine *sequentially* and gather its IB seeds.
@@ -160,27 +171,31 @@ def reconstruct_ensemble(
         off = base_seed_offset + m * MEMBER_SEED_STRIDE
         state = cb.build_state(settings, data, chrs, region)
         spine, _ = build_coarse_dag(state, off, fan_out=False)
-        SerialExecutor().run(spine)  # coarse positioning only — cheap, sequential
+        executor.run(spine)
         member_seeds.append(skeleton.gather_all_ib_seeds(state, off))
+
     n_ib = sum(len(s) for s in member_seeds)
     LOG.info(f"ensemble: {n} members, {n_ib} IB chains total")
 
     # Phase 2: one DAG over all members' IB chains, namespaced by member.
-    nodes: dict[str, object] = {}
-    seeds: dict[str, object] = {}
+    nodes: dict[str, Node] = {}
+    seeds: dict[str, Seeded] = {}
     for m, ibseeds in enumerate(member_seeds):
         chain_nodes, chain_seeds = ib_chain_nodes(ibseeds, prefix=f"m{m} :: ")
         nodes.update({nd.id: nd for nd in chain_nodes})
         seeds.update(chain_seeds)
 
     LOG.info(f"running ensemble DAG with {len(nodes)} nodes and {len(seeds)} seeds...")
-    outputs = executor.run(Dag(nodes=nodes, seeds=seeds))  # type: ignore[arg-type]
+    outputs = executor.run(Dag(nodes=nodes, seeds=seeds))
 
     # Phase 3: collect each member's beads, sorted per chr.
     results: list[dict[str, list[BeadOut]]] = []
     for m, ibseeds in enumerate(member_seeds):
         per_chr: dict[str, list[BeadOut]] = defaultdict(list)
         for ibs in ibseeds:
-            per_chr[ibs.chr_].extend(_beads(outputs[ib_node_id(f"m{m} :: {ibs.ib_id}", _SMOOTH)]))
+            beads = _beads(outputs[ib_node_id(f"m{m} :: {ibs.ib_id}", StageKind.SMOOTH)])
+            per_chr[ibs.chr_].extend(beads)
+
         results.append({c: sorted(b, key=lambda x: x.start) for c, b in per_chr.items()})
+
     return results

@@ -10,23 +10,24 @@ batched backend for a kind is a registration, not a code change here.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
 
 from gnome3d.pipeline.state import State
 
 
-class StageKind(Enum):
+class StageKind(StrEnum):
     """What a stage does.  The executor groups *ready* nodes by ``(kind, bucket)``
     to batch them and dispatches to the runner registered for the kind."""
 
     # --- coarse positioning (the cluster-tree spine, upstream of IBs) ---
     COARSE = "coarse"  # one cluster-graph level: build/position in place (serial)
+
     # --- per-IB reconstruction ---
-    ARCS = "arcs"  # position anchors via arc-spring MC        (anchor-shaped)
-    DENSIFY = "densify"  # insert subanchor beads                     (CPU, reshapes)
-    HEAT_DIST = "heat_dist"  # estimate subanchor distance target         (bead-shaped)
-    SMOOTH = "smooth"  # final smooth MC                            (bead-shaped)
+    ARCS = "arcs"  # position anchors via arc-spring MC (anchor-shaped)
+    DENSIFY = "densify"  # insert subanchor beads (CPU, reshapes)
+    HEAT_DIST = "heat_dist"  # estimate subanchor distance target (bead-shaped)
+    SMOOTH = "smooth"  # final smooth MC (bead-shaped)
 
 
 # A stage's kernel input/output, opaque and kernel-shaped: a "problem" is the

@@ -49,7 +49,6 @@ def _coarse_identity(problem: Problem) -> Result:
 
 register(StageKind.COARSE, serial=_coarse_identity)
 
-
 # --- node id helpers --------------------------------------------------------
 
 _COARSE = "coarse"
@@ -191,8 +190,8 @@ def build_coarse_dag(
 ) -> tuple[Dag, list[IBSeed]]:
     """Assemble the coarse spine for `state` and return ``(dag, ib_sink)``.
 
-    The spine branches exactly as `coarse.reconstruct_heatmap`:
-      * ``random_walk``  -> root -> walk    -> ib
+    The spine branches as follows:
+      * random walk      -> root -> walk    -> ib
       * single segment   -> root -> origin  -> ib
       * multi-chromosome -> root -> chr     -> segment -> ib
       * single-chr/multi -> root -> segment -> ib
@@ -201,7 +200,7 @@ def build_coarse_dag(
     spawns the per-IB chains at run time and fills ``ib_sink`` (so the caller can
     group the terminal smooth beads by chromosome).  With ``fan_out=False`` the
     spine runs the coarse positioning *only* (no IB chains); the ensemble driver
-    uses this to run E members' spines, gather their seeds, then batch all the IB
+    uses this to run each members' spines, gather their seeds, then batch all the IB
     chains together (`reconstruct.reconstruct_ensemble`)."""
     lvl = _seg_level(state)
     total_segs = sum(len(v) for v in lvl.values())

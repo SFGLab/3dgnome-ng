@@ -9,7 +9,7 @@ or trace-time unrolling (JAX).  See `base` for the full contract.
 from __future__ import annotations
 
 from gnome3d.mc.terms.arc_springs import ARC_SPRINGS
-from gnome3d.mc.terms.base import Term, compose_init_nb, compose_local_nb
+from gnome3d.mc.terms.base import Term
 from gnome3d.mc.terms.chain import CHAIN
 from gnome3d.mc.terms.confinement import CONFINEMENT
 from gnome3d.mc.terms.excluded_volume import EXCLUDED_VOLUME
@@ -26,6 +26,4 @@ __all__ = [
     "ORIENTATION",
     "SUBANCHOR_HEAT",
     "Term",
-    "compose_init_nb",
-    "compose_local_nb",
 ]

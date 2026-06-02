@@ -133,7 +133,7 @@ def seed_for_ib(
 ) -> tuple[Seeded, bool]:
     """Gather one IB's ``Seeded`` inputs from the positioned cluster graph,
     copying everything out as plain arrays (no cluster references retained)."""
-    s = cb.settings_for_ib(state, active_region)
+    s = state.s
     clusters = state.clusters
     a = len(active_region)
 

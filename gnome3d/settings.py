@@ -118,26 +118,7 @@ class Settings:
     # `ib_workers > 1` processes IBs concurrently (each IB is an independent
     # subproblem). JIT kernels are nogil=True, so Python threading actually
     # parallelises here.
-    ib_workers: int
-    # `mc_backend` selects which compute backend handles the MC hot paths.
-    # 'numba' (default) is the production-tested CPU implementation.
-    # 'jax' routes per-level MC calls to a JAX/CUDA kernel — typically 5-30x
-    # faster than numba on smooth-MC at N>=2048.  Per-level apply flags below
-    # control which levels actually use JAX when mc_backend='jax'; flags have
-    # no effect when mc_backend='numba'.  Defaults reflect measured wins:
-    #   smooth:  yes (JAX wins big — chain+EV+heat+orient+conf, all dense O(N))
-    #   arcs:    no  (JAX loses — arc energy is SPARSE, numba's per-pair
-    #                early-continue beats JAX's dense kernel at production N)
-    #   heatmap: no  (per profile, heatmap is <0.1% of typical wall — chr-level
-    #                only fires at N=3-23 where JAX overhead dominates.
-    #                Enable for multi-chr workloads where segment-level
-    #                heatmap-MC can hit larger N.)
-    # mc_ib has no JAX implementation (also <1% of typical wall per profile),
-    # so no apply flag.
-    mc_backend: str
-    mc_backend_apply_to_smooth: bool
-    mc_backend_apply_to_arcs: bool
-    mc_backend_apply_to_heatmap: bool
+    mc_executor_threaded_workers: int
     # Per-stage executor: how each IB stage's nodes are scheduled AND which kernel
     # runs them (the executor implies the backend).  One value per stage:
     #   'serial'   — numba, one node at a time (deterministic baseline).
@@ -158,15 +139,10 @@ class Settings:
     # Bounds total compiles regardless of how many distinct-N regions exist.
     # Padding is inert (pad beads never move + contribute zero energy), so
     # results are unchanged; this is a pure compile-time optimization.
-    jax_bucket_shapes: bool
+    mc_executor_jax_bucket_shapes: bool
     # When bucketing is on, compile every bucket up front (predictable one-time
     # warmup) instead of lazily on first hit.
-    jax_precompile_buckets: bool
-    # Region batching: anneal many independent IBs in ONE vmapped kernel instead
-    # of one at a time (selects JaxSolver).  The GPU is ~99% idle at K=1, so this
-    # is the big throughput lever (measured ~8-11x on the smooth phase).  Opt-in;
-    # requires mc_backend=jax + mc_backend_apply_to_smooth.
-    jax_region_batch: bool
+    mc_executor_jax_precompile_buckets: bool
 
     # ---- MC arcs ----
     max_temp: float
@@ -225,11 +201,6 @@ class Settings:
     confinement_packing_factor_arcs: float
     confinement_packing_factor_smooth: float
     confinement_packing_factor_ib: float
-
-    # ---- small-IB spring boost ----
-    use_small_ib_boost: bool
-    small_ib_threshold: int
-    small_ib_spring_multiplier: float
 
     # ---- overlapping-anchor handling (densification) ----
     overlap_anchor_strict: bool
@@ -369,18 +340,13 @@ class Settings:
         # ---- MC backend ----
         self.mc_heatmap_chains = 1
         self.mc_smooth_chains = 1
-        self.ib_workers = 1
-        self.mc_backend = "numba"
-        self.mc_backend_apply_to_smooth = True
-        self.mc_backend_apply_to_arcs = False
-        self.mc_backend_apply_to_heatmap = False
         self.mc_executor_arcs = "auto"
         self.mc_executor_densify = "auto"
         self.mc_executor_heat = "auto"
         self.mc_executor_smooth = "auto"
-        self.jax_bucket_shapes = False
-        self.jax_precompile_buckets = False
-        self.jax_region_batch = False
+        self.mc_executor_threaded_workers = 1
+        self.mc_executor_jax_bucket_shapes = False
+        self.mc_executor_jax_precompile_buckets = False
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -461,13 +427,6 @@ class Settings:
         self.confinement_packing_factor_arcs = 1.5
         self.confinement_packing_factor_smooth = 1.5
         self.confinement_packing_factor_ib = 0.75
-
-        # ---- small-IB spring boost ----
-        # Multiplies spring constants when reconstructing IBs with few anchors,
-        # to keep loosely-constrained chains from stretching out of the model.
-        self.use_small_ib_boost = False
-        self.small_ib_threshold = 10  # IBs with anchors < this are "small"
-        self.small_ib_spring_multiplier = 5.0
 
         # ---- overlapping-anchor handling ----
         # overlap_anchor_strict controls span computation in densification:
@@ -686,8 +645,7 @@ class Settings:
             "simulation_backend", "heatmap_chains", self.mc_heatmap_chains
         )
         self.mc_smooth_chains = geti("simulation_backend", "smooth_chains", self.mc_smooth_chains)
-        self.ib_workers = geti("simulation_backend", "ib_workers", self.ib_workers)
-        self.mc_backend = gets("simulation_backend", "mc_backend", self.mc_backend)
+        self.mc_executor_threaded_workers = geti("simulation_backend", "ib_workers", self.mc_executor_threaded_workers)
         self.mc_executor_arcs = gets("simulation_backend", "mc_executor_arcs", self.mc_executor_arcs)
         self.mc_executor_densify = gets(
             "simulation_backend", "mc_executor_densify", self.mc_executor_densify
@@ -696,23 +654,11 @@ class Settings:
         self.mc_executor_smooth = gets(
             "simulation_backend", "mc_executor_smooth", self.mc_executor_smooth
         )
-        self.mc_backend_apply_to_smooth = getb(
-            "simulation_backend", "mc_backend_apply_to_smooth", self.mc_backend_apply_to_smooth
+        self.mc_executor_jax_bucket_shapes = getb(
+            "simulation_backend", "jax_bucket_shapes", self.mc_executor_jax_bucket_shapes
         )
-        self.mc_backend_apply_to_arcs = getb(
-            "simulation_backend", "mc_backend_apply_to_arcs", self.mc_backend_apply_to_arcs
-        )
-        self.mc_backend_apply_to_heatmap = getb(
-            "simulation_backend", "mc_backend_apply_to_heatmap", self.mc_backend_apply_to_heatmap
-        )
-        self.jax_bucket_shapes = getb(
-            "simulation_backend", "jax_bucket_shapes", self.jax_bucket_shapes
-        )
-        self.jax_region_batch = getb(
-            "simulation_backend", "jax_region_batch", self.jax_region_batch
-        )
-        self.jax_precompile_buckets = getb(
-            "simulation_backend", "jax_precompile_buckets", self.jax_precompile_buckets
+        self.mc_executor_jax_precompile_buckets = getb(
+            "simulation_backend", "jax_precompile_buckets", self.mc_executor_jax_precompile_buckets
         )
 
         # [simulation_arcs]
@@ -819,15 +765,6 @@ class Settings:
         )
         self.confinement_packing_factor_ib = getf(
             "confinement", "packing_factor_ib", self.confinement_packing_factor_ib
-        )
-
-        # [small_ib_boost]
-        self.use_small_ib_boost = getb(
-            "small_ib_boost", "use_small_ib_boost", self.use_small_ib_boost
-        )
-        self.small_ib_threshold = geti("small_ib_boost", "threshold", self.small_ib_threshold)
-        self.small_ib_spring_multiplier = getf(
-            "small_ib_boost", "spring_multiplier", self.small_ib_spring_multiplier
         )
 
         # [main] overlapping-anchor handling toggles (kept under [main] for simplicity).

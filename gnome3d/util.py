@@ -5,12 +5,16 @@ util functions for 3dgnome-ng.
 from __future__ import annotations
 
 import math
+import os
 import random
 import threading
 
 import numpy as np
 
+from gnome3d import log
 from gnome3d.types import F32Array, F64Array
+
+LOG = log.get("util")
 
 # Thread-local RNG for the positioning noise.  The global `random` module is a
 # single `random.Random` instance shared across threads, so a `ThreadedExecutor`
@@ -35,9 +39,6 @@ def seed_rng(seed: int) -> None:
     _rng().seed(seed)
 
 
-# Distance conversion functions
-
-
 def genomic_length_to_distance(length_bp: int, base: float, scale: float, power: float) -> float:
     """Reference: genomicLengthToDistance(length) = base + scale * (length/1000)^power"""
     return base + scale * (length_bp / 1000.0) ** power
@@ -45,12 +46,12 @@ def genomic_length_to_distance(length_bp: int, base: float, scale: float, power:
 
 def freq_to_dist_heatmap(freq: float, scale: float, power: float) -> float:
     """Reference: freqToDistanceHeatmap(freq) = scale * freq^power"""
-    return scale * (freq**power)
+    return scale * (freq ** power)
 
 
 def freq_to_dist_heatmap_inter(freq: float, scale_inter: float, power_inter: float) -> float:
     """Reference: freqToDistanceHeatmapInter(freq) = scale_inter * freq^power_inter"""
-    return scale_inter * (freq**power_inter)
+    return scale_inter * (freq ** power_inter)
 
 
 def freq_to_distance(freq: int, a: float, scale: float, shift: float, base_level: float) -> float:
@@ -93,4 +94,58 @@ def calc_orientation(pos: F64Array, cind: int, n: int, char_orientation: str) ->
     norm = float(np.linalg.norm(orn))
     if norm > 1e-12:
         orn = orn / norm
+
     return np.asarray(orn, dtype=np.float64).copy()
+
+
+_JAX_AVAILABLE: bool | None = None  # None = not yet probed
+_init_lock = threading.Lock()
+
+
+def jax_is_available() -> bool:
+    """Lazy-import JAX. Returns True on success, False if not installed."""
+    global _JAX_AVAILABLE
+    if _JAX_AVAILABLE is not None:
+        return _JAX_AVAILABLE
+
+    with _init_lock:
+        if _JAX_AVAILABLE is not None:
+            return _JAX_AVAILABLE
+        try:
+            import jax  # type: ignore[import-not-found]
+            import jax.numpy as jnp  # type: ignore[import-not-found]
+        except ImportError:
+            _JAX_AVAILABLE = False
+            return False
+
+        cache_dir = os.environ.get("GNOME3D_JAX_CACHE", os.path.expanduser("~/.cache/gnome3d/jax"))
+        cache_active = False
+        try:
+            from jax.experimental import compilation_cache  # type: ignore[import-not-found]
+
+            compilation_cache.compilation_cache.set_cache_dir(cache_dir)  # pyright: ignore[reportUnknownMemberType]
+            cache_active = True
+        except (ImportError, AttributeError):
+            pass
+
+        _JAX_AVAILABLE = True
+
+        try:
+            backend: str = str(jax.default_backend())
+            _dev = jax.devices()
+            devices_str: str = ", ".join(str(d) for d in _dev)
+        except Exception:  # noqa: BLE001
+            backend = "unknown"
+            devices_str = "unknown"
+
+        cache_str = cache_dir if cache_active else "disabled"
+
+        log.status(
+            LOG,
+            "JAX backend ready: backend=%s devices=[%s] cache=%s",
+            backend,
+            devices_str,
+            cache_str,
+        )
+
+        return True

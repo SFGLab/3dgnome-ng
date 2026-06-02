@@ -260,28 +260,6 @@ def add_long_pet_to_segment_heatmap(
     if n_added > 0:
         LOG.info("long-PET folded into segment heatmap: %d arcs", n_added)
 
-
-def settings_for_ib(state: CoarseState, active_region: list[int]) -> Settings:
-    """Return state.s or a boosted copy if this IB qualifies as 'small'."""
-    s = state.s
-    if not s.use_small_ib_boost:
-        return s
-    threshold = s.small_ib_threshold
-    if len(active_region) >= threshold:
-        return s
-    m = s.small_ib_spring_multiplier
-    if m == 1.0:
-        return s
-    s_boost: Settings = copy.copy(s)
-    s_boost.spring_stretch_arcs = s.spring_stretch_arcs * m
-    s_boost.spring_squeeze_arcs = s.spring_squeeze_arcs * m
-    s_boost.spring_stretch = s.spring_stretch * m
-    s_boost.spring_squeeze = s.spring_squeeze * m
-    s_boost.spring_angular = s.spring_angular * m
-    LOG.info("small-IB spring boost *%s", m)
-    return s_boost
-
-
 def calc_anchor_expected_distances(
     state: CoarseState,
     active_region: list[int],
@@ -846,7 +824,6 @@ __all__ = [
     "interpolate_children_linear",
     "compute_segment_bins",
     "add_long_pet_to_segment_heatmap",
-    "settings_for_ib",
     "calc_anchor_expected_distances",
     "subanchor_counts_per_arc",
     "build_contact_heatmaps",
