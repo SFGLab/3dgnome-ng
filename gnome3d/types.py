@@ -7,6 +7,7 @@ from numpy.typing import NDArray
 # Numpy array aliases used throughout the package.
 F32Array: TypeAlias = NDArray[np.float32]
 F64Array: TypeAlias = NDArray[np.float64]
+I8Array: TypeAlias = NDArray[np.int8]
 I32Array: TypeAlias = NDArray[np.int32]
 I64Array: TypeAlias = NDArray[np.int64]
 BoolArray: TypeAlias = NDArray[np.bool_]
@@ -25,7 +26,7 @@ class BeadOut(NamedTuple):
     (start+end)//2.  start is the first field so sorted(beads, key=lambda b: b.start)
     still yields left-to-right genomic order.
 
-    kind is "anchor" for original ChIA-PET loop-base beads (level=LVL_ANCHOR)
+    kind is "anchor" for original ChIA-PET loop-base beads (level=Level.ANCHOR)
     and "subanchor" for the loop_density beads inserted by densification.
 
     BeadOut is a NamedTuple so it iterates and unpacks like a regular 6-tuple
@@ -111,10 +112,10 @@ LocalArcIndex: TypeAlias = int
 # A genomic position in basepairs.
 GenomicPos: TypeAlias = int
 
-# Per-chromosome root cluster index (level = LVL_CHROMOSOME).
+# Per-chromosome root cluster index (level = Level.CHROMOSOME).
 ChrRootMap: TypeAlias = dict[str, ClusterIndex]
 
-# Per-chromosome index of the first anchor cluster (level = LVL_ANCHOR).
+# Per-chromosome index of the first anchor cluster (level = Level.ANCHOR).
 ChrFirstClusterMap: TypeAlias = dict[str, ClusterIndex]
 
 # A traversal "current level" snapshot: chr -> list of cluster indices at that depth.

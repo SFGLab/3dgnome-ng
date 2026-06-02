@@ -6,11 +6,14 @@ Thin wrappers around the Settings / ContactData / Solver pipeline.
 
 from __future__ import annotations
 
-from .data import ContactData
-from .io import parse_chrs_arg, parse_region
-from .settings import Settings
-from .solver import Solver
-from .types import BeadOut, BedRegion
+from gnome3d import log
+from gnome3d.data import ContactData
+from gnome3d.io import parse_chrs_arg, parse_region
+from gnome3d.reconstruct import pick_executor, reconstruct_ensemble
+from gnome3d.settings import Settings
+from gnome3d.types import BeadOut, BedRegion
+
+LOG = log.get("simulate")
 
 
 def simulate(
@@ -27,26 +30,26 @@ def simulate(
     file. For the config-file entry points see `run_region` / `run_genome`.
 
     Returns one dict[chr -> list[BeadOut]] per structure.
+
+    Runs the task-DAG pipeline under the executor `pick_executor` selects for the
+    backend — `SerialExecutor` (numba) or `BatchExecutor` (JAX).  The ensemble is
+    `reconstruct_ensemble`: each member's coarse spine runs sequentially (distinct
+    per-member seed), then *all* members' per-IB chains run in one batched pass so
+    same-shaped IBs across members fill one GPU launch.  Member i is byte-identical
+    to a standalone `reconstruct(seed_offset=i * MEMBER_SEED_STRIDE)`.
     """
-    solver = Solver(settings)
-    solver.load(data, chrs_list, region)
+    executor = pick_executor(settings)
+    with log.step(LOG, f"reconstruct {n_structures} structure(s)"):
+        raw = reconstruct_ensemble(
+            settings, data, chrs_list, region, n=n_structures, executor=executor
+        )
 
     structures: list[dict[str, list[BeadOut]]] = []
-    for i in range(n_structures):
-        print(f"\n[simulate] structure {i + 1}/{n_structures}")
-        solver.reconstruct_heatmap()
-        solver.reconstruct_arcs()
-        per_chr: dict[str, list[BeadOut]] = {}
-        any_beads = False
-        for chr_ in chrs_list:
-            beads = solver.get_leaf_positions(chr_)
-            if beads:
-                per_chr[chr_] = beads
-                any_beads = True
-        if not any_beads:
+    for i, per_chr in enumerate(raw):
+        per_chr = {chr_: beads for chr_, beads in per_chr.items() if beads}
+        if not per_chr:
             raise RuntimeError(f"Structure {i + 1}: no leaf beads from any chromosome")
         structures.append(per_chr)
-
     return structures
 
 
@@ -92,6 +95,11 @@ def run_region(
         raise RuntimeError(f"Failed to load config: {config_path!r}")
     if data_dir is not None:
         s.data_dir = str(data_dir)
+
+    # Honor output_level/log_file from the config — these file-config entry
+    # points own logging setup just like cli.main() does (simulate() stays the
+    # bare in-memory primitive so embedders keep control of their own logging).
+    log.setup(s.output_level, log_file=s.log_file or None)
 
     data = ContactData.from_files(s, chrs_list, bed_region)
     structures = simulate(s, data, chrs_list, n_structures, region=bed_region)
@@ -149,6 +157,9 @@ def run_genome(
         raise RuntimeError(f"Failed to load config: {config_path!r}")
     if data_dir is not None:
         s.data_dir = str(data_dir)
+
+    # Honor output_level/log_file from the config (see run_region).
+    log.setup(s.output_level, log_file=s.log_file or None)
 
     data = ContactData.from_files(s, chrs_list, bed_region)
     return simulate(s, data, chrs_list, n_structures, region=bed_region)

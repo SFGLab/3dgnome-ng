@@ -516,8 +516,9 @@ def test_densify(reference_only=False):
         _root = str(ROOT)
         if _root not in sys.path:
             sys.path.insert(0, _root)
-        from gnome3d.hierarchy import LVL_ANCHOR, Cluster
         from gnome3d.solver import Solver
+
+        from gnome3d.hierarchy import Cluster, Level
     except ImportError as exc:
         for name in (
             "densify.bead_count",
@@ -572,7 +573,7 @@ def test_densify(reference_only=False):
     solver.clusters = []
     active_region = []
     for i, (s, e, p) in enumerate(zip(anchor_starts, anchor_ends, pos3d)):
-        c = Cluster(start=s, end=e, level=LVL_ANCHOR)
+        c = Cluster(start=s, end=e, level=Level.ANCHOR)
         c.pos = p.copy()
         solver.clusters.append(c)
         active_region.append(i)
@@ -662,7 +663,7 @@ def test_densify(reference_only=False):
     dyn_solver.clusters = []
     dyn_ar = []
     for i, (st, en) in enumerate(dyn_specs):
-        c = Cluster(start=st, end=en, level=LVL_ANCHOR)
+        c = Cluster(start=st, end=en, level=Level.ANCHOR)
         c.pos = _np.zeros(3, dtype=_np.float32)
         dyn_solver.clusters.append(c)
         dyn_ar.append(i)
@@ -967,8 +968,9 @@ def test_contact_heatmaps(reference_only=False):
         _root = str(ROOT)
         if _root not in sys.path:
             sys.path.insert(0, _root)
-        from gnome3d.io import InteractionArc as _IA
         from gnome3d.solver import Solver as _Sv
+
+        from gnome3d.io import InteractionArc as _IA
     except ImportError as exc:
         for name in _test_names:
             print(f"  {SKIP}  {name}  ({exc})")
@@ -1127,8 +1129,9 @@ def test_subanchor_heat(reference_only=False):
         _root = str(ROOT)
         if _root not in sys.path:
             sys.path.insert(0, _root)
-        from gnome3d.mc import _as_f64, _init_heat_nb, mc_smooth
         from gnome3d.solver import Solver as _Sv
+
+        from gnome3d.mc import _as_f64, _init_heat_nb, mc_smooth
     except ImportError as exc:
         for name in _test_names:
             print(f"  {SKIP}  {name}  ({exc})")

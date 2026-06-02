@@ -11,6 +11,7 @@ from pathlib import Path
 class Settings:
     # ---- output / misc ----
     output_level: int
+    log_file: str
     random_walk: bool
     use_2d: bool
     loop_density: int
@@ -49,6 +50,8 @@ class Settings:
     subanchor_heatmap_dist_weight: float
     subanchor_estimate_steps: int
     subanchor_estimate_replicates: int
+    subanchor_batch_trials: bool
+    subanchor_heat_min_reduction: float
 
     # ---- PET / arc length limits ----
     max_pet_length: int
@@ -115,7 +118,39 @@ class Settings:
     # `ib_workers > 1` processes IBs concurrently (each IB is an independent
     # subproblem). JIT kernels are nogil=True, so Python threading actually
     # parallelises here.
-    ib_workers: int
+    mc_executor_threaded_workers: int
+    # Per-stage executor: how each IB stage's nodes are scheduled AND which kernel
+    # runs them (the executor implies the backend).  One value per stage:
+    #   'serial'   — numba, one node at a time (deterministic baseline).
+    #   'threaded' — numba, independent nodes across `ib_workers` threads (kernels
+    #                are nogil + thread-local RNG, so byte-identical to serial).
+    #   'batch'    — JAX, same-(kind,bucket) nodes in one vmapped launch (GPU).
+    #   'auto'     — resolve from the legacy mc_backend/ib_workers: jax + the old
+    #                apply-flag -> batch; numba + ib_workers>1 -> threaded; else
+    #                serial.  (Keeps existing configs working until they migrate.)
+    # This replaces the old mc_backend_apply_to_* flags for executor selection;
+    # mc_backend now only selects the *coarse* MC kernel (heatmap/ib).
+    mc_executor_arcs: str
+    mc_executor_densify: str
+    mc_executor_heat: str
+    mc_executor_smooth: str
+    # Pad each JAX kernel's bead count up to a fixed bucket ladder so XLA
+    # compiles ~one kernel per bucket instead of one per distinct region size.
+    # Bounds total compiles regardless of how many distinct-N regions exist.
+    # Padding is inert (pad beads never move + contribute zero energy), so
+    # results are unchanged; this is a pure compile-time optimization.
+    mc_executor_jax_bucket_shapes: bool
+    # When bucketing is on, compile every bucket up front (predictable one-time
+    # warmup) instead of lazily on first hit.
+    mc_executor_jax_precompile_buckets: bool
+    # Cap on the region-batch vmap width (IBs per kernel launch) for the batched
+    # JAX kernels, per kernel.  Excess IBs run in sequential sub-batches.  The cap
+    # exists only to bound device memory (a wider launch is never slower than more
+    # serial sub-batches).  "auto" sizes it from the device's memory limit and the
+    # per-IB footprint at the group's bucket; an integer is a flat max IBs/launch.
+    # Falls back to a fixed heuristic when device memory can't be queried (CPU).
+    mc_executor_jax_batch_width_smooth: str
+    mc_executor_jax_batch_width_arcs: str
 
     # ---- MC arcs ----
     max_temp: float
@@ -175,11 +210,6 @@ class Settings:
     confinement_packing_factor_smooth: float
     confinement_packing_factor_ib: float
 
-    # ---- small-IB spring boost ----
-    use_small_ib_boost: bool
-    small_ib_threshold: int
-    small_ib_spring_multiplier: float
-
     # ---- overlapping-anchor handling (densification) ----
     overlap_anchor_strict: bool
     drop_zero_length_subanchors: bool
@@ -207,6 +237,11 @@ class Settings:
     def _set_defaults(self) -> None:
         # ---- output / misc ----
         self.output_level = 0
+        # Optional path for a full-detail (DEBUG) structured log sink, in
+        # addition to stdout.  Empty -> stdout only.  Handy for reconstructing
+        # parallel (ib_workers>1 / n_structures>1) runs after the fact.  The
+        # --log-file CLI flag overrides this.
+        self.log_file = ""
         self.random_walk = False
         self.use_2d = False
         self.loop_density = 5
@@ -245,6 +280,21 @@ class Settings:
         self.subanchor_heatmap_dist_weight = 1.0
         self.subanchor_estimate_steps = 2
         self.subanchor_estimate_replicates = 5
+        # Opt-in (default off): run the IB estimate's n_reps*n_steps independent
+        # anneals as ONE vmapped JAX kernel instead of a sequential python loop.
+        # ~3-6x faster at large N on GPU (the per-step kernel is latency-bound,
+        # leaving the GPU idle at chains=1).  JAX smooth backend only; falls back
+        # to the sequential loop otherwise.  Diverges from the parity baseline.
+        self.subanchor_batch_trials = False
+        # Opt-in (default 0.0 = off, parity preserved): skip an IB's subanchor
+        # heat-dist entirely when its signal is too sparse to matter.  The
+        # active-pair fraction (n_active / n_pairs) is a provable upper bound on
+        # the mean target-distance reduction the heat term can produce, and it is
+        # known from the raw heatmap BEFORE any dry-smooth trials.  When that
+        # bound is below this threshold, the (expensive) estimate trials are
+        # skipped and the IB smooths without heat.  E.g. 0.001 skips IBs whose
+        # heat could move mean pair distance by <0.1%.  Diverges from parity.
+        self.subanchor_heat_min_reduction = 0.0
 
         # ---- PET / arc length limits ----
         self.max_pet_length = 1_000_000
@@ -298,7 +348,15 @@ class Settings:
         # ---- MC backend ----
         self.mc_heatmap_chains = 1
         self.mc_smooth_chains = 1
-        self.ib_workers = 1
+        self.mc_executor_arcs = "auto"
+        self.mc_executor_densify = "auto"
+        self.mc_executor_heat = "auto"
+        self.mc_executor_smooth = "auto"
+        self.mc_executor_threaded_workers = 1
+        self.mc_executor_jax_bucket_shapes = False
+        self.mc_executor_jax_precompile_buckets = False
+        self.mc_executor_jax_batch_width_smooth = "auto"
+        self.mc_executor_jax_batch_width_arcs = "auto"
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -380,13 +438,6 @@ class Settings:
         self.confinement_packing_factor_smooth = 1.5
         self.confinement_packing_factor_ib = 0.75
 
-        # ---- small-IB spring boost ----
-        # Multiplies spring constants when reconstructing IBs with few anchors,
-        # to keep loosely-constrained chains from stretching out of the model.
-        self.use_small_ib_boost = False
-        self.small_ib_threshold = 10  # IBs with anchors < this are "small"
-        self.small_ib_spring_multiplier = 5.0
-
         # ---- overlapping-anchor handling ----
         # overlap_anchor_strict controls span computation in densification:
         #   False (default): subanchors tile the overlap region with non-degenerate
@@ -459,6 +510,7 @@ class Settings:
 
         # [main]
         self.output_level = geti("main", "output_level", self.output_level)
+        self.log_file = gets("main", "log_file", self.log_file)
         self.random_walk = getb("main", "random_walk", self.random_walk)
         self.use_2d = getb("main", "use_2D", self.use_2d)
         self.loop_density = geti("main", "loop_density", self.loop_density)
@@ -564,6 +616,12 @@ class Settings:
         self.subanchor_estimate_replicates = geti(
             "subanchor_heatmap", "estimate_distances_replicates", self.subanchor_estimate_replicates
         )
+        self.subanchor_batch_trials = getb(
+            "subanchor_heatmap", "batch_trials", self.subanchor_batch_trials
+        )
+        self.subanchor_heat_min_reduction = getf(
+            "subanchor_heatmap", "heat_min_reduction", self.subanchor_heat_min_reduction
+        )
 
         # [simulation_heatmap]
         self.max_temp_heatmap = getf(
@@ -593,9 +651,31 @@ class Settings:
         )
 
         # [simulation_backend]
-        self.mc_heatmap_chains = geti("simulation_backend", "heatmap_chains", self.mc_heatmap_chains)
+        self.mc_heatmap_chains = geti(
+            "simulation_backend", "heatmap_chains", self.mc_heatmap_chains
+        )
         self.mc_smooth_chains = geti("simulation_backend", "smooth_chains", self.mc_smooth_chains)
-        self.ib_workers = geti("simulation_backend", "ib_workers", self.ib_workers)
+        self.mc_executor_threaded_workers = geti("simulation_backend", "ib_workers", self.mc_executor_threaded_workers)
+        self.mc_executor_arcs = gets("simulation_backend", "mc_executor_arcs", self.mc_executor_arcs)
+        self.mc_executor_densify = gets(
+            "simulation_backend", "mc_executor_densify", self.mc_executor_densify
+        )
+        self.mc_executor_heat = gets("simulation_backend", "mc_executor_heat", self.mc_executor_heat)
+        self.mc_executor_smooth = gets(
+            "simulation_backend", "mc_executor_smooth", self.mc_executor_smooth
+        )
+        self.mc_executor_jax_bucket_shapes = getb(
+            "simulation_backend", "jax_bucket_shapes", self.mc_executor_jax_bucket_shapes
+        )
+        self.mc_executor_jax_precompile_buckets = getb(
+            "simulation_backend", "jax_precompile_buckets", self.mc_executor_jax_precompile_buckets
+        )
+        self.mc_executor_jax_batch_width_smooth = gets(
+            "simulation_backend", "jax_batch_width_smooth", self.mc_executor_jax_batch_width_smooth
+        )
+        self.mc_executor_jax_batch_width_arcs = gets(
+            "simulation_backend", "jax_batch_width_arcs", self.mc_executor_jax_batch_width_arcs
+        )
 
         # [simulation_arcs]
         self.max_temp = getf("simulation_arcs", "max_temp", self.max_temp)
@@ -703,15 +783,6 @@ class Settings:
             "confinement", "packing_factor_ib", self.confinement_packing_factor_ib
         )
 
-        # [small_ib_boost]
-        self.use_small_ib_boost = getb(
-            "small_ib_boost", "use_small_ib_boost", self.use_small_ib_boost
-        )
-        self.small_ib_threshold = geti("small_ib_boost", "threshold", self.small_ib_threshold)
-        self.small_ib_spring_multiplier = getf(
-            "small_ib_boost", "spring_multiplier", self.small_ib_spring_multiplier
-        )
-
         # [main] overlapping-anchor handling toggles (kept under [main] for simplicity).
         self.overlap_anchor_strict = getb(
             "main", "overlap_anchor_strict", self.overlap_anchor_strict
@@ -766,26 +837,26 @@ class Settings:
         return True
 
     def genomic_length_to_distance(self, length_bp: int) -> float:
-        from .util import genomic_length_to_distance
+        from gnome3d.util import genomic_length_to_distance
 
         return genomic_length_to_distance(
             length_bp, self.genomic_dist_base, self.genomic_dist_scale, self.genomic_dist_power
         )
 
     def freq_to_dist_heatmap(self, freq: float) -> float:
-        from .util import freq_to_dist_heatmap
+        from gnome3d.util import freq_to_dist_heatmap
 
         return freq_to_dist_heatmap(freq, self.freq_dist_scale, self.freq_dist_power)
 
     def freq_to_dist_heatmap_inter(self, freq: float) -> float:
-        from .util import freq_to_dist_heatmap_inter
+        from gnome3d.util import freq_to_dist_heatmap_inter
 
         return freq_to_dist_heatmap_inter(
             freq, self.freq_dist_scale_inter, self.freq_dist_power_inter
         )
 
     def freq_to_distance(self, freq: int) -> float:
-        from .util import freq_to_distance
+        from gnome3d.util import freq_to_distance
 
         return freq_to_distance(
             freq,
