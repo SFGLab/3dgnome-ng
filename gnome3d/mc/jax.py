@@ -26,7 +26,6 @@ cost across all runs on a machine.
 # this file but the kernel definitions below are not annotation-sensitive.
 
 import logging
-import os
 import threading
 import time
 from typing import TYPE_CHECKING, Any
