@@ -25,14 +25,10 @@ field set, not of the positioned graph.
 
 from __future__ import annotations
 
-import copy
-from dataclasses import dataclass
-
 from gnome3d import log
 from gnome3d.data import ContactData
 from gnome3d.hierarchy import Cluster, Level, build_cluster_tree, set_level
 from gnome3d.io import create_singleton_heatmap
-from gnome3d.mc import mc_heatmap, mc_ib, seed_numba
 from gnome3d.pipeline.coarse.heatmap import (
     create_distance_heatmap,
     get_diagonal_size,
@@ -42,7 +38,7 @@ from gnome3d.pipeline.coarse.heatmap import (
 )
 from gnome3d.settings import Settings
 from gnome3d.types import *
-from gnome3d.util import random_vector_np, seed_rng
+from gnome3d.util import random_vector_np, seed_rng, seed_numpy
 
 LOG = log.get("coarse")
 
@@ -65,7 +61,7 @@ def seed_global_rng(seed_offset: int = 0) -> int:
     """
     coarse_seed = (COARSE_SEED + seed_offset) & 0x7FFFFFFF
     seed_rng(coarse_seed)
-    seed_numba(coarse_seed)
+    seed_numpy(coarse_seed)
     return coarse_seed
 
 
@@ -563,6 +559,8 @@ def reconstruct_chromosome_level(state: CoarseState) -> None:
     to optimize against, so chr roots are scattered randomly around the
     origin instead.
     """
+    from gnome3d.mc import numba as mc_numba
+
     s = state.s
     clusters = state.clusters
     n_chr = len(state.chrs)
@@ -614,7 +612,7 @@ def reconstruct_chromosome_level(state: CoarseState) -> None:
             for i in range(n_chr):
                 pos[i] = initial_pos[i] + random_vector_np(step_size, in_2d=s.use_2d)
 
-            score = mc_heatmap(pos, heatmap_dist, heatmap_dist_diag, step_size, s)
+            score = mc_numba.mc_heatmap_numba(pos, heatmap_dist, heatmap_dist_diag, step_size, s)
             if score < best_score or best_score < 0:
                 best_score = score
                 best_pos = pos.copy()
@@ -660,6 +658,8 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
     Reconstruct segment-level positions using singleton heatmap MC.
     Mirrors Reference reconstructClustersHeatmapSingleLevel(1) (segment level).
     """
+    from gnome3d.mc import numba as mc_numba
+
     s = state.s
     clusters = state.clusters
     bins, start_ind, total_size, bin_lengths_mb = compute_segment_bins(state, current_level)
@@ -715,7 +715,7 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
             for i in range(n):
                 pos[i] = clusters[active_region[i]].pos + random_vector_np(step_size)
 
-            score = mc_heatmap(pos, heatmap_dist, heatmap_dist_diag, step_size, s)
+            score = mc_numba.mc_heatmap_numba(pos, heatmap_dist, heatmap_dist_diag, step_size, s)
             if score < best_score or best_score < 0:
                 best_score = score
                 best_pos = pos.copy()
@@ -763,6 +763,8 @@ def ib_mc_refine(state: CoarseState, segs: list[int]) -> None:
     genomic_length_to_distance).  EV and confinement read their own
     IB-level settings (`*_ib`).  Opt-in via `use_ib_mc`.
     """
+    from gnome3d.mc import numba as mc_numba
+
     s = state.s
     clusters = state.clusters
     for seg_idx in segs:
@@ -806,7 +808,7 @@ def ib_mc_refine(state: CoarseState, segs: list[int]) -> None:
             conf_tag,
         ):
             gyr_before = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
-            mc_ib(pos, dtn, step_size, s)
+            mc_numba.mc_ib_numba(pos, dtn, step_size, s)
             gyr_after = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
             LOG.info("gyr %.2f -> %.2f", gyr_before, gyr_after)
 

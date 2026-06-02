@@ -16,7 +16,7 @@ This module implements the smooth-MC "production" energy combo:
 It does NOT support confinement yet — that's a future port.  The dispatch
 gate in [mc.py::mc_smooth] rejects confinement-enabled calls back to numba.
 
-JAX is an optional extras dep; `_ensure_jax()` lazy-imports.  The persistent
+JAX is an optional extras dep; `jax_is_available()` lazy-imports.  The persistent
 compile cache at `~/.cache/gnome3d/jax` makes per-shape compiles a one-time
 cost across all runs on a machine.
 """
@@ -35,6 +35,7 @@ import numpy as np
 
 from gnome3d import log
 from gnome3d.types import F32Array, I32Array, I64Array
+from gnome3d.util import jax_is_available, jax_bucket_for
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -51,88 +52,13 @@ _jnp: Any = None
 # Cache key: (n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs)
 _kernel_cache: dict[tuple[int, int, bool, bool, int], Any] = {}
 # Module-level lock — `ib_workers>1` may have multiple threads racing into
-# `_ensure_jax`/`_build_*` simultaneously, causing duplicate banner prints and
+# `jax_is_available`/`_build_*` simultaneously, causing duplicate banner prints and
 # duplicate kernel-build work.
 _init_lock = threading.Lock()
 
-# Shape-bucket ladder.  When settings.jax_bucket_shapes is on, every kernel's
-# bead count N is padded up to the next bucket so XLA compiles ~one program per
-# bucket (8 total) instead of one per distinct region size.  Geometric x2 so
-# worst-case padding waste is <2x compute.  N above the top bucket compiles at
-# its exact size (rare).
-_SHAPE_BUCKETS: tuple[int, ...] = (256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
-# Separate (finer/smaller) ladders for smooth orientation's anchor count and
-# neighbor width — these scale below N, so reusing _SHAPE_BUCKETS would waste a
-# lot at small sizes.
-_ANCHOR_BUCKETS: tuple[int, ...] = (16, 64, 256, 1024, 4096, 16384)
-_NBR_BUCKETS: tuple[int, ...] = (4, 8, 16, 32, 64)
 # Tracks which (kind, bucket, signature) kernels have been eagerly precompiled,
 # so precompile passes are idempotent across regions / threads.
 _precompiled: set[Any] = set()
-
-
-def _bucket_for(n: int, ladder: tuple[int, ...] = _SHAPE_BUCKETS) -> int:
-    """Smallest ladder bucket >= n, or n itself if it exceeds the top bucket."""
-    for b in ladder:
-        if n <= b:
-            return b
-    return n
-
-
-def _ensure_jax() -> bool:
-    """Lazy-import JAX.  Returns True on success, False if not installed.
-    Idempotent + thread-safe — first caller does the work, others wait."""
-    global _JAX_AVAILABLE, _jax, _jnp
-    if _JAX_AVAILABLE is not None:
-        return _JAX_AVAILABLE
-    with _init_lock:
-        if _JAX_AVAILABLE is not None:
-            return _JAX_AVAILABLE  # another thread won the race
-        try:
-            import jax  # type: ignore[import-not-found]
-            import jax.numpy as jnp  # type: ignore[import-not-found]
-        except ImportError:
-            _JAX_AVAILABLE = False
-            return False
-        # f32 is the production dtype — bench showed f64 is 2x slower on
-        # consumer GPUs (1/32 throughput) with no quality benefit at these
-        # run lengths.  We do NOT enable_x64.
-        cache_dir = os.environ.get("GNOME3D_JAX_CACHE", os.path.expanduser("~/.cache/gnome3d/jax"))
-        cache_active = False
-        try:
-            from jax.experimental import compilation_cache  # type: ignore[import-not-found]
-
-            compilation_cache.compilation_cache.set_cache_dir(cache_dir)  # pyright: ignore[reportUnknownMemberType]
-            cache_active = True
-        except (ImportError, AttributeError):
-            pass
-        _jax = jax
-        _jnp = jnp
-        _JAX_AVAILABLE = True
-        # Banner — once per process, on stderr so it doesn't mix with CIF stdout.
-        try:
-            backend: str = str(
-                jax.default_backend())  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
-            _dev = jax.devices()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-            devices_str: str = ", ".join(
-                str(d) for d in _dev)  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
-        except Exception:  # noqa: BLE001
-            backend = "unknown"
-            devices_str = "unknown"
-        cache_str = cache_dir if cache_active else "disabled"
-        log.status(
-            LOG,
-            "JAX backend ready: backend=%s devices=[%s] cache=%s",
-            backend,
-            devices_str,
-            cache_str,
-        )
-        return True
-
-
-def is_available() -> bool:
-    """Public: True if JAX is importable in the current environment."""
-    return _ensure_jax()
 
 
 # ---------------------------------------------------------------------------
@@ -1638,7 +1564,7 @@ def _precompile_arcs(settings: "Settings") -> None:
     N-bucketed (all kernel_full inputs are (K,B,3)/(B,B)/scalar), so one program
     per bucket covers every region.  Same .lower(ShapeDtypeStruct).compile()
     trick as _precompile_heatmap.  Idempotent."""
-    if not _ensure_jax():
+    if not jax_is_available():
         return
     assert _jax is not None and _jnp is not None
     jax = _jax
@@ -1718,7 +1644,7 @@ def mc_arcs_jax(
     Mutates `pos` in place (writes the best-chain final positions back) and
     returns the best chain's final score.
     """
-    if not _ensure_jax():
+    if not jax_is_available():
         raise RuntimeError(
             "settings.mc_backend='jax' but JAX is not installed.  "
             "Install with `pip install gnome3d-ng[jax]` or set mc_backend='numba'."
@@ -1776,10 +1702,10 @@ def mc_arcs_jax(
     # [0, n_active) so pad beads never move.  Result == unbucketed at init
     # (bit-identical); per-step f32 chaos only (arcs uses non-strict acceptance).
     n_active_v: int = n
-    if bool(settings.jax_bucket_shapes):
-        if settings.jax_precompile_buckets:
+    if bool(settings.mc_executor_jax_bucket_shapes):
+        if settings.mc_executor_jax_precompile_buckets:
             _precompile_arcs(settings)
-        B: int = _bucket_for(n)
+        B: int = jax_bucket_for(n)
     else:
         B = n
     pos_f32: F32Array = pos.astype(np.float32)
@@ -2158,7 +2084,7 @@ def _precompile_heatmap(settings: "Settings") -> None:
     bucket, so no XLA compile happens mid-run.  Uses .lower(...).compile() with
     ShapeDtypeStruct for the B*B arrays -> compiles without allocating them (a
     32768x32768 f32 would be 4 GB).  Idempotent across regions/threads."""
-    if not _ensure_jax():
+    if not jax_is_available():
         return
     assert _jax is not None and _jnp is not None
     jax = _jax
@@ -2243,7 +2169,7 @@ def mc_heatmap_jax(
 
     Mutates `pos` in place and returns the best chain's final score.
     """
-    if not _ensure_jax():
+    if not jax_is_available():
         raise RuntimeError(
             "settings.mc_backend='jax' but JAX is not installed.  "
             "Install with `pip install gnome3d-ng[jax]` or set mc_backend='numba'."
@@ -2287,10 +2213,10 @@ def mc_heatmap_jax(
     # (EV auto-zero: d >> r0 -> rel=0) with skip=True heat rows (heat auto-zero),
     # and the kernel restricts moves to [0, n_active=n) so pad beads never move.
     # Net contribution is exactly zero -> result identical to the unpadded run.
-    if bool(settings.jax_bucket_shapes):
-        if settings.jax_precompile_buckets:
+    if bool(settings.mc_executor_jax_bucket_shapes):
+        if settings.mc_executor_jax_precompile_buckets:
             _precompile_heatmap(settings)
-        B: int = _bucket_for(n)
+        B: int = jax_bucket_for(n)
     else:
         B = n
     pos_f32: F32Array = pos.astype(np.float32)
@@ -2385,7 +2311,7 @@ def _precompile_smooth(
     compile the realistic (B, A) DIAGONAL: A = bucket(anchor_frac * B) per B
     (use_orn=False has no anchor axis -> A=M=1).  Idempotent per combo via
     _precompiled.  Uses .lower(ShapeDtypeStruct).compile() (no array alloc)."""
-    if not _ensure_jax():
+    if not jax_is_available():
         return
     assert _jax is not None and _jnp is not None
     jax = _jax
@@ -2411,7 +2337,7 @@ def _precompile_smooth(
         succ_a = jnp.int32(settings.mc_stop_successes_smooth)
         t0 = __import__("time").perf_counter()
         for b in _SHAPE_BUCKETS:
-            a = _bucket_for(max(1, int(anchor_frac * b)), _ANCHOR_BUCKETS) if use_orn else 1
+            a = jax_bucket_for(max(1, int(anchor_frac * b)), _ANCHOR_BUCKETS) if use_orn else 1
             kvec = sds((K,), np.float32)
             heat_a = sds((b, b), np.float32) if use_heat else sds((1, 1), np.float32)
             try:
@@ -2507,7 +2433,7 @@ def mc_smooth_jax(
     `(scores: (B,), finals: (B, N, 3))` as numpy arrays and does NOT mutate
     `pos` — the caller does its own per-trial selection (see solver.py IB phase).
     """
-    if not _ensure_jax():
+    if not jax_is_available():
         raise RuntimeError(
             "settings.mc_backend='jax' but JAX is not installed.  "
             "Install with `pip install gnome3d-ng[jax]` or set mc_backend='numba'."
@@ -2608,9 +2534,9 @@ def mc_smooth_jax(
         # -> contribute exactly 0 to the (scan-summed) orientation score, so this
         # is bit-identical at init.  Pad anchor_ar=0 (its orn is computed but
         # never referenced since no valid edge points to it).
-        if bool(settings.jax_bucket_shapes):
-            A = _bucket_for(n_anchors, _ANCHOR_BUCKETS)
-            M = _bucket_for(max_nbrs, _NBR_BUCKETS)
+        if bool(settings.mc_executor_jax_bucket_shapes):
+            A = jax_bucket_for(n_anchors, _ANCHOR_BUCKETS)
+            M = jax_bucket_for(max_nbrs, _NBR_BUCKETS)
             anchor_frac = n_anchors / n  # real fraction, before reassignment below
             ap, mp = A - n_anchors, M - max_nbrs
             if ap > 0 or mp > 0:
@@ -2655,10 +2581,10 @@ def mc_smooth_jax(
     # n_active == n and n_movable_active == len(movable) when unbucketed.
     n_active_v: int = n
     n_movable_v: int = int(movable_np.shape[0])
-    if bool(settings.jax_bucket_shapes):
-        if settings.jax_precompile_buckets:
+    if bool(settings.mc_executor_jax_bucket_shapes):
+        if settings.mc_executor_jax_precompile_buckets:
             _precompile_smooth(settings, use_heat, use_orn, max_nbrs, anchor_frac, K)
-        B: int = _bucket_for(n)
+        B: int = jax_bucket_for(n)
     else:
         B = n
     if B > n:
@@ -2909,7 +2835,7 @@ def _prep_smooth_problem_np(
     prep inside `mc_smooth_jax` exactly; the only difference is that B/A/M are
     passed in (the batch's common bucket) instead of derived per-region, and
     arrays are always padded to them (the batched kernel needs uniform shapes
-    regardless of the `jax_bucket_shapes` flag).
+    regardless of the `mc_executor_jax_bucket_shapes` flag).
     """
     n = int(pos.shape[0])
     use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
@@ -3055,9 +2981,9 @@ def mc_smooth_jax_batch(
     """
     if not problems:
         return []
-    bucket = bool(settings.jax_bucket_shapes)
+    bucket = bool(settings.mc_executor_jax_bucket_shapes)
     bsz = [int(p["pos"].shape[0]) for p in problems]
-    big_b = max((_bucket_for(n) if bucket else n) for n in bsz)
+    big_b = max((jax_bucket_for(n) if bucket else n) for n in bsz)
     max_k = max(1, 32768 // max(1, big_b))
     if len(problems) <= max_k:
         return _mc_smooth_jax_batch_chunk(problems, settings)
@@ -3080,7 +3006,7 @@ def _mc_smooth_jax_batch_chunk(
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     """One vmapped kernel launch for up to `max_k` IBs. See `mc_smooth_jax_batch`,
     which chunks to this so the device tensors stay bounded."""
-    if not _ensure_jax():
+    if not jax_is_available():
         raise RuntimeError("settings.mc_backend='jax' but JAX is not installed.")
     assert _jax is not None and _jnp is not None
     jax = _jax
@@ -3093,7 +3019,7 @@ def _mc_smooth_jax_batch_chunk(
     # Common bucket across the group: pad every IB to the max (B, A, M) so the
     # kernel sees one uniform shape.  Callers should pre-group by bucket so
     # these maxes are tight (wall-clock = slowest IB in the batch).
-    bucket = bool(settings.jax_bucket_shapes)
+    bucket = bool(settings.mc_executor_jax_bucket_shapes)
     use_orn = (
         problems[0].get("char_orientations") is not None
         and problems[0].get("anchor_neighbors") is not None
@@ -3106,15 +3032,15 @@ def _mc_smooth_jax_batch_chunk(
     Bs, As, Ms = [], [], []
     for p in problems:
         n_i = int(p["pos"].shape[0])
-        Bs.append(_bucket_for(n_i) if bucket else n_i)
+        Bs.append(jax_bucket_for(n_i) if bucket else n_i)
         if use_orn:
             anchors_i = int(np.count_nonzero(p["fixed"]))
             nbrs_i = max(
                 (len(p["anchor_neighbors"].get(k, [])) for k in range(anchors_i)), default=1
             )
             nbrs_i = max(nbrs_i, 1)
-            As.append(_bucket_for(anchors_i, _ANCHOR_BUCKETS) if bucket else anchors_i)
-            Ms.append(_bucket_for(nbrs_i, _NBR_BUCKETS) if bucket else nbrs_i)
+            As.append(jax_bucket_for(anchors_i, _ANCHOR_BUCKETS) if bucket else anchors_i)
+            Ms.append(jax_bucket_for(nbrs_i, _NBR_BUCKETS) if bucket else nbrs_i)
         else:
             As.append(1)
             Ms.append(1)
@@ -3383,8 +3309,8 @@ def mc_arcs_jax_batch(
     discipline as `mc_smooth_jax_batch`."""
     if not problems:
         return []
-    bucket = bool(settings.jax_bucket_shapes)
-    big_b = max((_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0])) for p in problems)
+    bucket = bool(settings.mc_executor_jax_bucket_shapes)
+    big_b = max((jax_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0])) for p in problems)
     max_k = max(1, 32768 // max(1, big_b))
     if len(problems) <= max_k:
         return _mc_arcs_jax_batch_chunk(problems, settings)
@@ -3399,7 +3325,7 @@ def _mc_arcs_jax_batch_chunk(
     settings: "Settings",
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     """One vmapped arcs kernel launch for up to max_k IBs."""
-    if not _ensure_jax():
+    if not jax_is_available():
         raise RuntimeError("settings.mc_backend='jax' but JAX is not installed.")
     assert _jax is not None and _jnp is not None
     jax = _jax
@@ -3409,8 +3335,8 @@ def _mc_arcs_jax_batch_chunk(
     if K == 0:
         return []
 
-    bucket = bool(settings.jax_bucket_shapes)
-    B = max((_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0])) for p in problems)
+    bucket = bool(settings.mc_executor_jax_bucket_shapes)
+    B = max((jax_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0])) for p in problems)
     preps = [_prep_arcs_problem_np(p["pos"], p["exp_dist"], settings, B) for p in problems]
 
     def stack(key: str) -> Any:

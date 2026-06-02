@@ -31,6 +31,8 @@ def _rng() -> random.Random:
         r = _tls.rng = random.Random()
     return r
 
+def seed_numpy(seed: int) -> None:
+    np.random.seed(seed)
 
 def seed_rng(seed: int) -> None:
     """Seed the calling thread's positioning RNG (used by `random_vector_np`).
@@ -149,3 +151,25 @@ def jax_is_available() -> bool:
         )
 
         return True
+
+
+# Shape-bucket ladder.  When settings.jax_bucket_shapes is on, every kernel's
+# bead count N is padded up to the next bucket so XLA compiles ~one program per
+# bucket (8 total) instead of one per distinct region size.  Geometric x2 so
+# worst-case padding waste is <2x compute.  N above the top bucket compiles at
+# its exact size (rare).
+_SHAPE_BUCKETS: tuple[int, ...] = (256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
+
+# Separate (finer/smaller) ladders for smooth orientation's anchor count and
+# neighbor width — these scale below N, so reusing _SHAPE_BUCKETS would waste a
+# lot at small sizes.
+_ANCHOR_BUCKETS: tuple[int, ...] = (16, 64, 256, 1024, 4096, 16384)
+_NBR_BUCKETS: tuple[int, ...] = (4, 8, 16, 32, 64)
+
+
+def jax_bucket_for(n: int, ladder: tuple[int, ...] = _SHAPE_BUCKETS) -> int:
+    """Smallest ladder bucket >= n, or n itself if it exceeds the top bucket."""
+    for b in ladder:
+        if n <= b:
+            return b
+    return n

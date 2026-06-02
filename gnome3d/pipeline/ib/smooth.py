@@ -21,12 +21,11 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from gnome3d.mc import numba as mc_numba
 from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import AnchorMapEntry, Densified, Orientation, Smoothed, State
 from gnome3d.types import BeadOut
-from gnome3d.util import random_vector_np, seed_rng
+from gnome3d.util import random_vector_np, seed_rng, seed_numpy
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -106,6 +105,8 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
 def _run(problem: Problem) -> Result:
     """Serial runner: steps_smooth restarts from the running best; returns
     ``(best_score, best_pos)``.  Mirrors `Solver._run_smooth_serial`."""
+    from gnome3d.mc import numba as mc_numba
+
     pos: F32Array = problem["pos"]
     dtn = problem["dtn"]
     fixed = problem["fixed"]
@@ -118,7 +119,7 @@ def _run(problem: Problem) -> Result:
     heat = problem["heat_dist"]
 
     seed_rng(seed)
-    mc_numba.seed_numba(seed)
+    seed_numpy(seed)
 
     n = len(pos)
     best_score = -1.0
@@ -156,7 +157,7 @@ class SmoothStage:
             and st.anchor_neighbors is not None
             and st.anchor_neighbor_weights is not None
         )
-        return (heat, orn, batch_bucket(int(st.pos.shape[0]), st.settings))
+        return heat, orn, batch_bucket(int(st.pos.shape[0]), st.settings)
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:
         st = inputs[0]

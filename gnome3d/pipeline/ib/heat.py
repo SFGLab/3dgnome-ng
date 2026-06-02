@@ -16,11 +16,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from gnome3d.mc import numba as mc_numba
 from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Densified, HeatReady, State
-from gnome3d.util import random_vector_np, seed_rng
+from gnome3d.util import random_vector_np, seed_rng, seed_numpy
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -36,11 +35,13 @@ def _estimate_avg_dist(
     `Solver._estimate_avg_dist` (reference sequential path): per replicate, run
     `n_steps` dry passes from pos+noise, keep the best, accumulate its pairwise
     distances."""
+    from gnome3d.mc import numba as mc_numba
+
     n = len(pos)
     n_reps = int(s.subanchor_estimate_replicates)
     n_steps = int(s.subanchor_estimate_steps)
     seed_rng(seed)
-    mc_numba.seed_numba(seed)
+    seed_numpy(seed)
 
     avg_dist: F64Array = np.zeros((n, n), dtype=np.float64)
     for _rep in range(n_reps):
@@ -89,6 +90,7 @@ def _run(problem: Problem) -> Result:
         problem["pos"], problem["fixed"], problem["dtn"], problem["step_size"],
         problem["settings"], problem["seed"],
     )
+
     return _heat_dist_from_avg(avg, problem["subanchor_heat_raw"], problem["settings"])
 
 
@@ -139,7 +141,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
         base = spans[gi]
         avg_dist: F64Array = np.zeros((n, n), dtype=np.float64)
         for rep in range(n_reps):
-            rep_slice = results[base + rep * n_steps : base + (rep + 1) * n_steps]
+            rep_slice = results[base + rep * n_steps: base + (rep + 1) * n_steps]
             scores = [r[0] for r in rep_slice]
             best_pos = rep_slice[int(np.argmin(scores))][1]
             diff = best_pos[:, None, :] - best_pos[None, :, :]

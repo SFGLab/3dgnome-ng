@@ -16,17 +16,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from gnome3d.util import jax_bucket_for
+
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
 
 
 def batch_bucket(n: int, settings: Settings) -> int:
     """The shape-ladder bucket `n` pads up to, matching what the batched kernel
-    does: ``_bucket_for(n)`` when ``jax_bucket_shapes`` is on, else ``n`` itself
-    (each distinct size its own group, as when bucketing is disabled).  Lazy JAX
-    import so the numba-only path never pulls it in."""
+    does: ``jax_bucket_for(n)`` when ``jax_bucket_shapes`` is on, else ``n`` itself
+    (each distinct size its own group, as when bucketing is disabled)."""
     if not bool(settings.mc_executor_jax_bucket_shapes):
         return int(n)
-    from gnome3d.mc.jax import _bucket_for  # pyright: ignore[reportPrivateUsage]
 
-    return int(_bucket_for(int(n)))
+    return int(jax_bucket_for(int(n)))

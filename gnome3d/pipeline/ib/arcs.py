@@ -18,11 +18,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from gnome3d.mc import numba as mc_numba
 from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Arced, Seeded, State
-from gnome3d.util import random_vector_np, seed_rng
+from gnome3d.util import random_vector_np, seed_rng, seed_numpy
 
 if TYPE_CHECKING:
     from gnome3d.types import F32Array
@@ -34,6 +33,8 @@ def _run(problem: Problem) -> Result:
     Mirrors `Solver._reconstruct_cluster_arcs` exactly (initial per-anchor noise,
     `steps_arcs` restarts, best-of), with deterministic seeding added.
     """
+    from gnome3d.mc import numba as mc_numba
+
     pos0: F32Array = problem["anchor_pos"]
     exp_dist = problem["exp_dist"]
     step = float(problem["step_size"])
@@ -42,7 +43,7 @@ def _run(problem: Problem) -> Result:
 
     # Deterministic per-IB RNG: Python `random` (initial noise) + numba (kernel).
     seed_rng(seed)
-    mc_numba.seed_numba(seed)
+    seed_numpy(seed)
 
     a = pos0.shape[0]
     best_score = -1.0
