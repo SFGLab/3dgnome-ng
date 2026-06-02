@@ -41,6 +41,15 @@ STRUCT_CHAIN = 1
 STRUCT_HEATMAP = 2
 
 
+@njit(cache=True, nogil=True)
+def seed_numba(seed: int) -> None:
+    """Seed numba's per-thread RNG so the MC kernels are reproducible from a
+    given seed.  numba keeps its own RNG state, separate from numpy's global
+    and Python's `random`; this is the only way to make `np.random.*` calls
+    inside @njit deterministic.  Used by the pipeline's per-node seeding."""
+    np.random.seed(seed)
+
+
 # Smooth MC helpers
 
 @njit(cache=True, fastmath=True, nogil=True)

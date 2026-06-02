@@ -31,9 +31,6 @@ def _rng() -> random.Random:
         r = _tls.rng = random.Random()
     return r
 
-def seed_numpy(seed: int) -> None:
-    np.random.seed(seed)
-
 def seed_rng(seed: int) -> None:
     """Seed the calling thread's positioning RNG (used by `random_vector_np`).
     Replaces a bare `random.seed`, so coarse seeding and per-stage seeding are

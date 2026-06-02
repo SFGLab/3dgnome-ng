@@ -19,7 +19,7 @@ import numpy as np
 from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Densified, HeatReady, State
-from gnome3d.util import random_vector_np, seed_rng, seed_numpy
+from gnome3d.util import random_vector_np, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -41,7 +41,7 @@ def _estimate_avg_dist(
     n_reps = int(s.subanchor_estimate_replicates)
     n_steps = int(s.subanchor_estimate_steps)
     seed_rng(seed)
-    seed_numpy(seed)
+    mc_numba.seed_numba(seed)
 
     avg_dist: F64Array = np.zeros((n, n), dtype=np.float64)
     for _rep in range(n_reps):

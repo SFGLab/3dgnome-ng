@@ -38,7 +38,7 @@ from gnome3d.pipeline.coarse.heatmap import (
 )
 from gnome3d.settings import Settings
 from gnome3d.types import *
-from gnome3d.util import random_vector_np, seed_rng, seed_numpy
+from gnome3d.util import random_vector_np, seed_rng
 
 LOG = log.get("coarse")
 
@@ -59,9 +59,11 @@ def seed_global_rng(seed_offset: int = 0) -> int:
     reordered, so one seed is both deterministic and matches the reference
     engine's single-stream order (keeping the layout byte-exact).
     """
+    from gnome3d.mc import numba as mc_numba
+
     coarse_seed = (COARSE_SEED + seed_offset) & 0x7FFFFFFF
     seed_rng(coarse_seed)
-    seed_numpy(coarse_seed)
+    mc_numba.seed_numba(coarse_seed)
     return coarse_seed
 
 

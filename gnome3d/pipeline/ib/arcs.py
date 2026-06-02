@@ -21,7 +21,7 @@ import numpy as np
 from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Arced, Seeded, State
-from gnome3d.util import random_vector_np, seed_rng, seed_numpy
+from gnome3d.util import random_vector_np, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.types import F32Array
@@ -43,7 +43,7 @@ def _run(problem: Problem) -> Result:
 
     # Deterministic per-IB RNG: Python `random` (initial noise) + numba (kernel).
     seed_rng(seed)
-    seed_numpy(seed)
+    mc_numba.seed_numba(seed)
 
     a = pos0.shape[0]
     best_score = -1.0

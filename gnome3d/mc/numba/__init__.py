@@ -23,10 +23,12 @@ from gnome3d.mc.numba.arcs import mc_arcs_numba
 from gnome3d.mc.numba.heatmap import mc_heatmap_numba
 from gnome3d.mc.numba.ib import mc_ib_numba
 from gnome3d.mc.numba.smooth import mc_smooth_numba
+from gnome3d.mc.numba.terms import seed_numba
 
 __all__ = [
     "mc_arcs_numba",
     "mc_heatmap_numba",
     "mc_ib_numba",
     "mc_smooth_numba",
+    "seed_numba",
 ]
