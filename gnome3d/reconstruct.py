@@ -26,7 +26,7 @@ from gnome3d.pipeline.executor import (
 )
 from gnome3d.pipeline.ib import ib_chain_nodes, ib_node_id
 from gnome3d.pipeline.stage import StageKind
-from gnome3d.pipeline.state import Smoothed, State, Seeded
+from gnome3d.pipeline.state import Seeded, Smoothed, State
 from gnome3d.util import jax_is_available
 
 if TYPE_CHECKING:
@@ -45,7 +45,7 @@ MEMBER_SEED_STRIDE = 2_000_003
 def _auto_strategy(kind: StageKind, settings: Settings) -> ExecutorStrategy:
     """Resolve ``mc_executor_<stage> = auto``."""
     prefer_jax = jax_is_available()
-    if prefer_jax and kind in (StageKind.SMOOTH, StageKind.HEAT_DIST):
+    if prefer_jax and kind in (StageKind.SMOOTH, StageKind.ESTIMATE_DIST):
         return ExecutorStrategy.BATCH
 
     return (
@@ -88,8 +88,8 @@ def pick_executor(settings: Settings) -> Executor:
         StageKind.DENSIFY: _resolve_strategy(
             settings.mc_executor_densify, StageKind.DENSIFY, settings
         ),
-        StageKind.HEAT_DIST: _resolve_strategy(
-            settings.mc_executor_heat, StageKind.HEAT_DIST, settings
+        StageKind.ESTIMATE_DIST: _resolve_strategy(
+            settings.mc_executor_heat, StageKind.ESTIMATE_DIST, settings
         ),
         StageKind.SMOOTH: _resolve_strategy(
             settings.mc_executor_smooth, StageKind.SMOOTH, settings

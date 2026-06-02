@@ -331,7 +331,7 @@ class ThreadedExecutor(MixedExecutor):
 
     _PER_IB: frozenset[StageKind] = frozenset({
         StageKind.ARCS,
-        StageKind.HEAT_DIST,
+        StageKind.ESTIMATE_DIST,
         StageKind.SMOOTH,
     })
 
@@ -351,7 +351,7 @@ class BatchExecutor(MixedExecutor):
 
     _BATCHABLE: frozenset[StageKind] = frozenset({
         StageKind.ARCS,
-        StageKind.HEAT_DIST,
+        StageKind.ESTIMATE_DIST,
         StageKind.SMOOTH,
     })
 

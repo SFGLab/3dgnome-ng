@@ -4,7 +4,7 @@ Sealed state progression for an IB reconstruction.
 A task's data is a *closed chain of frozen states*, each adding exactly what its
 producing stage yields:
 
-    Seeded ──arcs──▶ Arced ──densify──▶ Densified ──heat──▶ HeatReady ──smooth──▶ Smoothed
+    Seeded ──arcs──▶ Arced ──densify──▶ Densified ──est_dist──▶ DistEstimated ──smooth──▶ Smoothed
 
 A stage is typed by the state it consumes and the state it produces, so you
 cannot reach for ``pos`` before densify — the type doesn't carry it.  States are
@@ -77,7 +77,7 @@ class Densified(Arced):
 
 
 @dataclass(frozen=True)
-class HeatReady(Densified):
+class DistEstimated(Densified):
     """After heat-dist estimate: the subanchor distance target (None when the
     sparse-signal early-out skipped it -> smooth runs without heat)."""
 
@@ -85,7 +85,7 @@ class HeatReady(Densified):
 
 
 @dataclass(frozen=True)
-class Smoothed(HeatReady):
+class Smoothed(DistEstimated):
     """Terminal: final positions and the write-back beads."""
 
     final_pos: F32Array  # (N, 3)
@@ -117,4 +117,4 @@ class CoarsePhase:
 
 # The set of payloads that flow through the DAG.  The `Seeded` subclasses are the
 # per-IB progression; `CoarsePhase` is the upstream coarse spine's carrier.
-State: TypeAlias = Seeded | Arced | Densified | HeatReady | Smoothed | CoarsePhase
+State: TypeAlias = Seeded | Arced | Densified | DistEstimated | Smoothed | CoarsePhase

@@ -885,7 +885,7 @@ def _mc_arcs_jax_batch_chunk(
     base_key = jax.random.PRNGKey(seed_offset)
 
     log.status(
-        LOG, "    arcs kernel: K=%d B=%d, compiling/running (first call per shape compiles)...", K, B
+        LOG, "    arcs kernel: K=%d B=%d, compiling/running...", K, B
     )
     t0 = time.perf_counter()
     out = kernel_full_mp(
@@ -904,7 +904,7 @@ def _mc_arcs_jax_batch_chunk(
     score_per_chain = np.asarray(ss_f + se_f + sc_f)  # forces device sync
     pos_f_np = np.asarray(pos_f)
     log.status(
-        LOG, "    arcs region-batch: K=%d B=%d, %d batches (%d steps), %d/%d converged, %.1fs",
+        LOG, "    arcs kernel: K=%d B=%d, %d batches (%d steps), %d/%d converged, %.1fs",
         K, B, int(iter_f), int(iter_f) * n_steps_per_batch,
         int(np.asarray(converged).sum()), K, time.perf_counter() - t0,
     )

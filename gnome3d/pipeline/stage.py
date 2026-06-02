@@ -26,7 +26,7 @@ class StageKind(StrEnum):
     # --- per-IB reconstruction ---
     ARCS = "arcs"  # position anchors via arc-spring MC (anchor-shaped)
     DENSIFY = "densify"  # insert subanchor beads (CPU, reshapes)
-    HEAT_DIST = "heat_dist"  # estimate subanchor distance target (bead-shaped)
+    ESTIMATE_DIST = "estimate_dist"  # estimate subanchor distance target (bead-shaped)
     SMOOTH = "smooth"  # final smooth MC (bead-shaped)
 
 
@@ -50,7 +50,7 @@ class Stage(Protocol):
 
     def bucket(self, inputs: tuple[State, ...]) -> int:
         """Shape class for batch grouping (anchor count for ARCS, bead count for
-        HEAT_DIST/SMOOTH) — computed from the input state(s)."""
+        ESTIMATE_DIST/SMOOTH) — computed from the input state(s)."""
         ...
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:

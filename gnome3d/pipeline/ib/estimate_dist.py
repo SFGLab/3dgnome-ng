@@ -1,5 +1,5 @@
 """
-HEAT_DIST stage: estimate the subanchor contact-distance target matrix.
+ESTIMATE_DIST stage: estimate the subanchor contact-distance target matrix.
 
 Pure port of `Solver._build_heat_dist_subanchor` = `_estimate_avg_dist` (dry
 smooth-MC passes to get average pairwise distances) + `_heat_dist_from_avg`
@@ -18,7 +18,7 @@ import numpy as np
 
 from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
-from gnome3d.pipeline.state import Densified, HeatReady, State
+from gnome3d.pipeline.state import Densified, DistEstimated, State
 from gnome3d.util import random_vector_np, seed_rng
 
 if TYPE_CHECKING:
@@ -151,10 +151,10 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     return out
 
 
-class HeatDistStage:
-    """`Densified -> HeatReady`."""
+class EstimateDistStage:
+    """`Densified -> DistEstimated`."""
 
-    kind = StageKind.HEAT_DIST
+    kind = StageKind.ESTIMATE_DIST
 
     def bucket(self, inputs: tuple[State, ...]) -> int:
         return int(inputs[0].pos.shape[0])  # type: ignore[attr-defined]
@@ -182,4 +182,4 @@ class HeatDistStage:
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
         st = inputs[0]
         assert isinstance(st, Densified)
-        return HeatReady(**vars(st), heat_dist=result)
+        return DistEstimated(**vars(st), heat_dist=result)

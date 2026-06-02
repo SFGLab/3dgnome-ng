@@ -3,13 +3,13 @@ SMOOTH stage: the final smooth-MC, producing positioned beads.
 
 Pure port of `Solver._run_smooth_serial` (steps_smooth restarts from the running
 best, keep best) + `_apply_smooth_problem` (assemble BeadOut), reading
-`Densified`/`HeatReady` and seeding deterministically from `Seeded.seed`.
+`Densified`/`DistEstimated` and seeding deterministically from `Seeded.seed`.
 
 Two boundary conversions live here:
   * orientation: the compact per-anchor `int8` ``Orientation`` codes are expanded
     to the per-bead ``"<U1"`` array the numba kernel expects, via `anchor_map`.
-  * heat: a chain without a HEAT_DIST stage arrives as `Densified` (no heat_dist)
-    rather than `HeatReady`; both are accepted (``getattr(..., None)``).
+  * heat: a chain without a ESTIMATE_DIST stage arrives as `Densified` (no heat_dist)
+    rather than `DistEstimated`; both are accepted (``getattr(..., None)``).
 
 The cluster write-back the old `_apply_smooth_problem` did is gone — IBs are
 terminal here, the beads ARE the output.  Serial runner = numba `mc_smooth_numba`.
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from gnome3d.settings import Settings
     from gnome3d.types import BoolArray, F32Array, I8Array, StrArray
 
-_SEED_SALT = 2  # distinct from ARCS(0)/HEAT(1)
+_SEED_SALT = 2  # distinct from ARCS(0)/EST_DIST(1)
 _CODE_TO_CHAR = {int(Orientation.NONE): "N", int(Orientation.LEFT): "L", int(Orientation.RIGHT): "R"}
 
 
@@ -137,7 +137,7 @@ def _run(problem: Problem) -> Result:
 
 
 class SmoothStage:
-    """`Densified | HeatReady -> Smoothed`."""
+    """`Densified | DistEstimated -> Smoothed`."""
 
     kind = StageKind.SMOOTH
 
@@ -161,7 +161,7 @@ class SmoothStage:
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:
         st = inputs[0]
-        assert isinstance(st, Densified)  # HeatReady is a Densified subclass
+        assert isinstance(st, Densified)  # DistEstimated is a Densified subclass
         char_orn = (
             _expand_orientations(st.orientations, st.anchor_map, st.pos.shape[0])
             if st.orientations is not None

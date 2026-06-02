@@ -23,9 +23,9 @@ from gnome3d.pipeline.ib.arcs import _run as _arcs_run
 from gnome3d.pipeline.ib.chain import ib_chain_nodes, ib_node_id
 from gnome3d.pipeline.ib.densify import DensifyStage
 from gnome3d.pipeline.ib.densify import _run as _densify_run
-from gnome3d.pipeline.ib.heat import HeatDistStage
-from gnome3d.pipeline.ib.heat import _batch_run as _heat_batch
-from gnome3d.pipeline.ib.heat import _run as _heat_run
+from gnome3d.pipeline.ib.estimate_dist import EstimateDistStage
+from gnome3d.pipeline.ib.estimate_dist import _batch_run as _est_dist_batch
+from gnome3d.pipeline.ib.estimate_dist import _run as _est_dist_run
 from gnome3d.pipeline.ib.smooth import SmoothStage
 from gnome3d.pipeline.ib.smooth import _batch_run as _smooth_batch
 from gnome3d.pipeline.ib.smooth import _run as _smooth_run
@@ -34,13 +34,13 @@ from gnome3d.pipeline.stage import StageKind
 
 register(StageKind.ARCS, serial=_arcs_run, batch=_arcs_batch)
 register(StageKind.DENSIFY, serial=_densify_run)
-register(StageKind.HEAT_DIST, serial=_heat_run, batch=_heat_batch)
+register(StageKind.ESTIMATE_DIST, serial=_est_dist_run, batch=_est_dist_batch)
 register(StageKind.SMOOTH, serial=_smooth_run, batch=_smooth_batch)
 
 __all__ = [
     "ArcsStage",
     "DensifyStage",
-    "HeatDistStage",
+    "EstimateDistStage",
     "SmoothStage",
     "ib_chain_nodes",
     "ib_node_id",

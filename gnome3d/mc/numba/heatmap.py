@@ -1,82 +1,282 @@
-"""Heatmap-energy MC (numba).
+"""Heatmap-energy MC (numba) — a fully self-contained kernel.
 
-`mc_heatmap_numba` is the public entry.  Single-chain runs go through the shared
-`common._run_outer_loop` (so excluded volume can be wired in); multi-chain runs
-(`mc_heatmap_chains > 1`) use the stripped-down prange-parallel K-chain kernel
-here (`_batch_heatmap_chain_nb` -> `_mc_heatmap_kchains_nb`) and keep the best.
+Unlike arcs/smooth/ib (which share the unified `_batch_mc_nb` + `terms` math),
+the heatmap kernel is deliberately standalone: it carries its OWN copies of the
+two energy terms it needs (heatmap distance-to-expected + excluded volume), its
+own MC inner loop (`_batch_heatmap_nb`), and its own convergence driver
+(`_run_heatmap_loop`).  The duplication is intentional — heatmap is the simplest
+energy (double-counted structure, optional EV, non-strict acceptance) and keeping
+it apart means the shared kernel never has to carry a heatmap branch.
+
+`mc_heatmap_numba` is the public entry.  Single-chain runs wire in excluded
+volume; multi-chain runs (`mc_heatmap_chains > 1`) run the same inner kernel with
+EV off across K prange-parallel chains and keep the best.
 """
 
 from __future__ import annotations
 
 import logging
 import math
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
+from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
-from gnome3d.mc.numba.common import _as_f64, _dummy_f64, _dummy_i32, _run_outer_loop
-from gnome3d.mc.numba.terms import (
-    STRUCT_HEATMAP,
-    _init_excl_nb,
-    _init_heatmap_nb,
-    _local_heatmap_nb,
-    njit,
-)
-from gnome3d.types import BoolArray, F64Array, I32Array, I64Array
+from gnome3d.types import BoolArray, F64Array, I64Array
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
 
 LOG = log.get("mc.numba")
 
+# Typed wrapper around numba.njit so pyright sees decorated functions with their
+# original signatures.  At runtime this is just numba.njit.  (Duplicated from
+# `terms` on purpose — this module shares no code with the unified kernel.)
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def njit(**kwargs: Any) -> Callable[[F], F]:
+    def decorator(fn: F) -> F:
+        return cast(F, _njit(**kwargs)(fn))
+
+    return decorator
+
+
+def _as_f64(arr: np.ndarray[Any, Any]) -> F64Array:
+    return np.ascontiguousarray(arr, dtype=np.float64)
+
+
+# ----- energy terms (heatmap distance-to-expected + excluded volume) -----
+
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _batch_heatmap_chain_nb(
+def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p: int) -> float:
+    n = pos.shape[0]
+    sc = 0.0
+    for i in range(n):
+        if skip_col[i]:
+            continue
+        dx = pos[i, 0] - pos[p, 0]
+        dy = pos[i, 1] - pos[p, 1]
+        dz = pos[i, 2] - pos[p, 2]
+        d = math.sqrt(dx * dx + dy * dy + dz * dz)
+        e = exp_safe[i, p]
+        err = (d - e) / e
+        sc += err * err
+    return sc
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float:
+    """O(N^2) init - row-at-a-time so the sum order is stable."""
+    n = pos.shape[0]
+    sc = 0.0
+    for i in range(n):
+        row_sc = 0.0
+        for j in range(n):
+            if skip[i, j]:
+                continue
+            dx = pos[i, 0] - pos[j, 0]
+            dy = pos[i, 1] - pos[j, 1]
+            dz = pos[i, 2] - pos[j, 2]
+            d = math.sqrt(dx * dx + dy * dy + dz * dz)
+            e = exp_safe[i, j]
+            err = (d - e) / e
+            row_sc += err * err
+        sc += row_sc
+    return sc
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def _excl_pair_nb(d: float, r0: float, weight: float) -> float:
+    if d >= r0:
+        return 0.0
+    rel = (r0 - d) / r0
+    return weight * rel * rel
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -> float:
+    n = pos.shape[0]
+    err = 0.0
+    for i in range(n):
+        diff = i - p
+        if diff < 0:
+            diff = -diff
+        if diff <= skip:
+            continue
+        dx = pos[i, 0] - pos[p, 0]
+        dy = pos[i, 1] - pos[p, 1]
+        dz = pos[i, 2] - pos[p, 2]
+        d = math.sqrt(dx * dx + dy * dy + dz * dz)
+        err += _excl_pair_nb(d, r0, weight)
+    return err
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def _init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
+    n = pos.shape[0]
+    err = 0.0
+    for i in range(n):
+        row_err = 0.0
+        for j in range(n):
+            diff = i - j
+            if diff < 0:
+                diff = -diff
+            if diff <= skip:
+                continue
+            dx = pos[i, 0] - pos[j, 0]
+            dy = pos[i, 1] - pos[j, 1]
+            dz = pos[i, 2] - pos[j, 2]
+            d = math.sqrt(dx * dx + dy * dy + dz * dz)
+            row_err += _excl_pair_nb(d, r0, weight)
+        err += row_err
+    return err
+
+
+# ----- MC inner loop + convergence driver -----
+#
+# Heatmap acceptance is NON-strict (score_new <= score); structure is
+# double-counted (delta factor 2), and so is excluded volume.  All beads move.
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def _batch_heatmap_nb(
     pos: F64Array,
     exp_safe: F64Array,
     skip: BoolArray,
+    use_excl: bool,
+    excl_r0: float,
+    excl_weight: float,
+    excl_skip: int,
     step_size: float,
     T: float,
     dt: float,
     jump_scale: float,
     jump_coef: float,
     n_steps: int,
-    score_hm: float,
-) -> tuple[float, float, int]:
-    """One batch of heatmap MC steps for a single chain.  Stripped-down vs
-    `_batch_mc_nb` (no EV, no other terms) so it can be called from a parallel
-    K-chain kernel without lugging 40+ args around.
-    """
+    score_struct: float,
+    score_excl: float,
+) -> tuple[float, float, float, int]:
+    """One batch of `n_steps` heatmap MC steps for a single chain (heatmap term +
+    optional excluded volume).  Returns (T, score_struct, score_excl, n_ok)."""
     n = pos.shape[0]
     n_ok = 0
+    score = score_struct + score_excl
+
     for _ in range(n_steps):
         p: int = int(np.random.randint(0, n))  # pyright: ignore[reportUnknownArgumentType]
         dx = np.random.uniform(-step_size, step_size)
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
 
-        loc_prev = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
+        loc_struct_prev = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
+        loc_excl_prev = 0.0
+        if use_excl:
+            loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+
         pos[p, 0] += dx
         pos[p, 1] += dy
         pos[p, 2] += dz
-        loc_curr = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
-        score_new = score_hm + 2.0 * (loc_curr - loc_prev)
 
-        ok = score_new <= score_hm
-        if not ok and T > 0.0 and score_hm > 0.0:
-            ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score_hm) / T)
+        loc_struct_curr = _local_heatmap_nb(pos, exp_safe, skip[:, p], p)
+        score_struct_new = score_struct + 2.0 * (loc_struct_curr - loc_struct_prev)
+
+        score_excl_new = score_excl
+        if use_excl:
+            loc_excl_curr = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+            score_excl_new = score_excl + 2.0 * (loc_excl_curr - loc_excl_prev)
+
+        score_new = score_struct_new + score_excl_new
+
+        ok = score_new <= score
+        if not ok and T > 0.0 and score > 0.0:
+            ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T)
 
         if ok:
             n_ok += 1
-            score_hm = score_new
+            score = score_new
+            score_struct = score_struct_new
+            score_excl = score_excl_new
         else:
             pos[p, 0] -= dx
             pos[p, 1] -= dy
             pos[p, 2] -= dz
         T *= dt
-    return T, score_hm, n_ok
+    return T, score_struct, score_excl, n_ok
+
+
+def _run_heatmap_loop(
+    pos: F64Array,
+    exp_safe: F64Array,
+    skip: BoolArray,
+    use_excl: bool,
+    excl_r0: float,
+    excl_weight: float,
+    excl_skip: int,
+    step_size: float,
+    T: float,
+    dt: float,
+    jump_scale: float,
+    jump_coef: float,
+    stop_steps: int,
+    stop_improvement: float,
+    stop_successes: int,
+    score_eps: float,
+    stop_when_ratio_above: float,
+    score_struct: float,
+    score_excl: float,
+) -> float:
+    """Drive `_batch_heatmap_nb` to convergence; return the final total score.
+    Same C++-style stop condition as the shared driver (plateau / score_eps /
+    ratio guard), specialised to the heatmap term set."""
+    score = score_struct + score_excl
+    ms_score = score
+    step_i = 0
+    while True:
+        T, score_struct, score_excl, n_ok = _batch_heatmap_nb(
+            pos,
+            exp_safe,
+            skip,
+            use_excl,
+            excl_r0,
+            excl_weight,
+            excl_skip,
+            float(step_size),
+            T,
+            dt,
+            jump_scale,
+            jump_coef,
+            stop_steps,
+            score_struct,
+            score_excl,
+        )
+        score = score_struct + score_excl
+        step_i += stop_steps
+        ratio = score / ms_score if ms_score > 0 else 1.0
+        converged = (
+            (score > stop_improvement * ms_score and n_ok < stop_successes)
+            or score < score_eps
+            or ratio > stop_when_ratio_above
+        )
+        LOG.debug(
+            "heatmap step %7s  score=%.4f  ratio=%.4f  ok=%d/%d%s",
+            f"{step_i:,}",
+            score,
+            ratio,
+            n_ok,
+            stop_steps,
+            "  [done]" if converged else "",
+        )
+        if converged:
+            return score
+        ms_score = score
+
+
+# ----- multi-chain (prange best-of-K restarts; EV off, as the reference) -----
 
 
 @njit(cache=True, parallel=True, nogil=True)
@@ -95,10 +295,9 @@ def _mc_heatmap_kchains_nb(
     final_scores: F64Array,  # (K,) output
 ) -> None:
     """Run K independent heatmap MC chains in parallel.  `for k in prange(K)`
-    gives each chain a thread-local execution context with its own RNG state,
-    so true parallelism is achievable - this is the cudaMMC-style "K parallel
-    chains, take the best" pattern expressed in pure numba.
-    """
+    gives each chain a thread-local execution context with its own RNG state -
+    the cudaMMC-style "K parallel chains, take the best" pattern in pure numba.
+    EV is off here (matches the reference multi-chain path)."""
     K = pos_k.shape[0]
     for k in prange(K):  # pyright: ignore[reportGeneralTypeIssues]
         pos = pos_k[k]  # view into the (k, :, :) slice
@@ -107,10 +306,14 @@ def _mc_heatmap_kchains_nb(
         ms_score = score
         # Outer convergence loop entirely inside the kernel.
         while True:
-            T, score, n_ok = _batch_heatmap_chain_nb(
+            T, score, _se, n_ok = _batch_heatmap_nb(
                 pos,
                 exp_safe,
                 skip,
+                False,  # use_excl
+                1.0,  # excl_r0 (unused)
+                0.0,  # excl_weight (unused)
+                0,  # excl_skip (unused)
                 step_size,
                 T,
                 dt,
@@ -118,6 +321,7 @@ def _mc_heatmap_kchains_nb(
                 jump_coef,
                 stop_steps,
                 score,
+                0.0,  # score_excl
             )
             converged = (
                             score > stop_improvement * ms_score and n_ok < stop_successes
@@ -225,7 +429,6 @@ def mc_heatmap_numba(
     pw = _as_f64(pos)
     es64 = _as_f64(exp_safe)
     skip_b: BoolArray = np.ascontiguousarray(skip, dtype=np.bool_)
-    movable: I64Array = np.arange(n, dtype=np.int64)
     score_struct = float(_init_heatmap_nb(pw, es64, skip_b))
     score_excl = (
         float(
@@ -240,42 +443,14 @@ def mc_heatmap_numba(
         else 0.0
     )
 
-    score = _run_outer_loop(
-        pw=pw,
-        movable=movable,
-        struct_type=STRUCT_HEATMAP,
-        exp_mat=es64,
-        dtn=_dummy_f64((1,)),
-        skip_mat=skip_b,
-        stretch_k=1.0,
-        squeeze_k=1.0,
-        ang_k=0.0,
-        dist_w=1.0,
-        ang_w=1.0,
-        struct_delta_factor=2.0,
-        use_heat=False,
-        heat_dist=_dummy_f64(),
-        heat_weight=0.0,
-        use_orn=False,
-        orn_is_L=np.zeros(1, dtype=np.bool_),
-        anchor_ar=_dummy_i32(),
-        nbr_offsets=np.zeros(2, dtype=np.int32),
-        nbr_indices=_dummy_i32(),
-        nbr_weights=np.zeros(1, dtype=np.float64),
-        anchor_orn=np.zeros((1, 3), dtype=np.float64),
-        bead_to_anchor_k=cast(I32Array, np.full(n, -1, dtype=np.int32)),
-        motif_weight=0.0,
-        motifs_symmetric=True,
+    score = _run_heatmap_loop(
+        pos=pw,
+        exp_safe=es64,
+        skip=skip_b,
         use_excl=use_excl,
         excl_r0=excl_r0,
         excl_weight=float(settings.exclusion_weight),
         excl_skip=int(settings.exclusion_skip_neighbors),
-        use_conf=False,
-        conf_cx=0.0,
-        conf_cy=0.0,
-        conf_cz=0.0,
-        conf_R=1.0,
-        conf_weight=0.0,
         step_size=step_size,
         T=float(settings.max_temp_heatmap),
         dt=float(settings.dt_temp_heatmap),
@@ -284,14 +459,10 @@ def mc_heatmap_numba(
         stop_steps=int(settings.mc_stop_steps_heatmap),
         stop_improvement=float(settings.mc_stop_improvement_heatmap),
         stop_successes=int(settings.mc_stop_successes_heatmap),
-        strict_better=False,
         score_eps=1e-6,
         stop_when_ratio_above=0.9999,
         score_struct=score_struct,
-        score_heat=0.0,
-        score_orn=0.0,
         score_excl=score_excl,
-        score_conf=0.0,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

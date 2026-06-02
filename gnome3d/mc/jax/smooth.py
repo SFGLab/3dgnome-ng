@@ -1751,7 +1751,7 @@ def mc_smooth_jax_batch(
         len(problems),
         max_k,
         big_b,
-        -(-len(problems) // max_k),
+        len(problems) // max_k,
     )
     results: list[tuple[float, np.ndarray[Any, Any]]] = []
     for i in range(0, len(problems), max_k):
@@ -1919,8 +1919,7 @@ def _mc_smooth_jax_batch_chunk(
 
     log.status(
         LOG,
-        "    smooth kernel: K=%d B=%d A=%d M=%d (heat=%d orn=%d), "
-        "compiling/running (first call per shape compiles)...",
+        "    smooth kernel: K=%d B=%d A=%d M=%d (heat=%d orn=%d), compiling/running...",
         K, B, A, M, int(use_heat), int(use_orn),
     )
     t0 = time.perf_counter()
@@ -1975,7 +1974,7 @@ def _mc_smooth_jax_batch_chunk(
     n_steps_smooth = int(settings.mc_stop_steps_smooth)
     log.status(
         LOG,
-        "    smooth region-batch: K=%d B=%d A=%d M=%d (heat=%d orn=%d), "
+        "    smooth kernel: K=%d B=%d A=%d M=%d (heat=%d orn=%d), "
         "%d batches (%d steps), %d/%d converged, %.1fs",
         K, B, A, M, int(use_heat), int(use_orn),
         int(iter_count), int(iter_count) * n_steps_smooth,

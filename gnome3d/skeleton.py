@@ -12,7 +12,7 @@ plain arrays so nothing downstream references the cluster graph.
 `expand` (`pipeline.coarse.stages`) after the IB-positioning node runs; the
 expensive isolated half — arcs -> densify -> heat -> smooth — then runs as the
 per-IB stage chains.  `IBSeed.wants_heat` is the sparse-signal early-out that
-decides whether an IB's chain includes the HEAT_DIST stage.
+decides whether an IB's chain includes the ESTIMATE_DIST stage.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ _ORN_CODE: dict[str, int] = {"L": Orientation.LEFT, "R": Orientation.RIGHT}
 
 def _heat_signal_negligible(settings: Settings, subanchor_heat_raw: F64Array, n: int) -> bool:
     """True when an IB's subanchor heat is too sparse to affect the structure, so
-    the (expensive) HEAT_DIST stage can be dropped from its chain.
+    the (expensive) ESTIMATE_DIST stage can be dropped from its chain.
 
     The active-pair fraction ``n_active / n_pairs`` is a provable upper bound on
     the mean target-distance reduction the heat term can produce (each active
@@ -76,7 +76,7 @@ def _heat_signal_negligible(settings: Settings, subanchor_heat_raw: F64Array, n:
 @dataclass(frozen=True)
 class IBSeed:
     """One IB's seed: its display id, chromosome, the ``Seeded`` inputs, and
-    whether its chain should include a HEAT_DIST stage (decided here, from the
+    whether its chain should include a ESTIMATE_DIST stage (decided here, from the
     raw heatmap, via the same sparse-signal early-out the smooth path uses)."""
 
     ib_id: str
@@ -137,7 +137,7 @@ def seed_for_ib(
     clusters = state.clusters
     a = len(active_region)
 
-    # Contact heatmaps (anchor-level scales exp_dist; subanchor feeds HEAT_DIST).
+    # Contact heatmaps (anchor-level scales exp_dist; subanchor feeds ESTIMATE_DIST).
     anchor_heat: F64Array | None = None
     subanchor_heat_raw: F64Array | None = None
     if (state.s.use_anchor_heatmap or state.s.use_subanchor_heatmap) and state.singletons:
@@ -175,7 +175,7 @@ def seed_for_ib(
                     anchor_neighbors[k].append(cluster_to_k[other_ci])
                     anchor_neighbor_weights[k].append(math.sqrt(max(arc.score, 0)))
 
-    # HEAT_DIST inclusion: same sparse-signal early-out as the engine — empty
+    # ESTIMATE_DIST inclusion: same sparse-signal early-out as the engine — empty
     # heatmap or active-fraction below threshold => no heat stage.
     wants_heat = (
         subanchor_heat_raw is not None
