@@ -61,7 +61,7 @@ def _resolve_strategy(value: str, kind: StageKind, settings: Settings) -> Execut
     batched kernels; DENSIFY has no batch kernel) downgrades to threaded/serial."""
     v = str(value).strip().lower()
     chosen = (
-        v
+        ExecutorStrategy(v)
         if v in (ExecutorStrategy.SERIAL, ExecutorStrategy.THREADED, ExecutorStrategy.BATCH)
         else _auto_strategy(kind, settings)
     )
