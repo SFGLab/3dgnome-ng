@@ -1,7 +1,7 @@
 """
 Stages: pure state->state transforms that adapt to/from a kernel.
 
-A stage never holds a kernel.  It declares its ``kind`` (what an executor groups
+A stage never holds a kernel.  It declares its `kind` (what an executor groups
 on to batch) and only knows how to turn its input state(s) into a kernel
 *problem* and fold the *result* into its output state.  The actual numba/JAX
 kernel comes from the per-kind runner registry (`registry.py`), so adding a
@@ -17,7 +17,7 @@ from gnome3d.pipeline.state import State
 
 
 class StageKind(StrEnum):
-    """What a stage does.  The executor groups *ready* nodes by ``(kind, bucket)``
+    """What a stage does.  The executor groups *ready* nodes by `(kind, bucket)`
     to batch them and dispatches to the runner registered for the kind."""
 
     # --- coarse positioning (the cluster-tree spine, upstream of IBs) ---
@@ -40,7 +40,7 @@ Result = Any
 @runtime_checkable
 class Stage(Protocol):
     """One node's transform.  Consumes its dependency states, turns them into a
-    kernel ``Problem``, and folds the ``Result`` into its output ``State``.
+    kernel `Problem`, and folds the `Result` into its output ``State``.
 
     Linear IB stages read a single upstream state (``inputs[0]``); the tuple form
     keeps the door open for fan-in (merge) nodes without reshaping this contract.
@@ -50,7 +50,7 @@ class Stage(Protocol):
 
     def bucket(self, inputs: tuple[State, ...]) -> int:
         """Shape class for batch grouping (anchor count for ARCS, bead count for
-        ESTIMATE_DIST/SMOOTH) — computed from the input state(s)."""
+        ESTIMATE_DIST/SMOOTH) - computed from the input state(s)."""
         ...
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:

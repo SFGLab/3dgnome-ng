@@ -153,8 +153,8 @@ def jax_is_available() -> bool:
 def jax_device_budget_bytes(fraction: float = 0.95) -> int | None:
     """Best-effort usable device memory (bytes) for sizing batched kernels.
 
-    Returns ``fraction`` * the primary device's reported byte limit, or ``None``
-    when it can't be determined — e.g. the CPU backend, or a platform whose
+    Returns `fraction` * the primary device's reported byte limit, or ``None``
+    when it can't be determined - e.g. the CPU backend, or a platform whose
     ``Device.memory_stats()`` is unavailable/empty.  Callers fall back to a fixed
     heuristic on ``None``.  Uses the total limit (not free) since XLA preallocates
     its pool; ``fraction`` leaves headroom for kernel scratch beyond the stacked
@@ -183,7 +183,7 @@ def jax_device_budget_bytes(fraction: float = 0.95) -> int | None:
 _SHAPE_BUCKETS: tuple[int, ...] = (256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
 
 # Separate (finer/smaller) ladders for smooth orientation's anchor count and
-# neighbor width — these scale below N, so reusing _SHAPE_BUCKETS would waste a
+# neighbor width - these scale below N, so reusing _SHAPE_BUCKETS would waste a
 # lot at small sizes.
 _ANCHOR_BUCKETS: tuple[int, ...] = (16, 64, 256, 1024, 4096, 16384)
 _NBR_BUCKETS: tuple[int, ...] = (4, 8, 16, 32, 64)

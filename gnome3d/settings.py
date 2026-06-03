@@ -121,11 +121,11 @@ class Settings:
     mc_executor_threaded_workers: int
     # Per-stage executor: how each IB stage's nodes are scheduled AND which kernel
     # runs them (the executor implies the backend).  One value per stage:
-    #   'serial'   — numba, one node at a time (deterministic baseline).
-    #   'threaded' — numba, independent nodes across `ib_workers` threads (kernels
+    #   'serial'   - numba, one node at a time (deterministic baseline).
+    #   'threaded' - numba, independent nodes across `ib_workers` threads (kernels
     #                are nogil + thread-local RNG, so byte-identical to serial).
-    #   'batch'    — JAX, same-(kind,bucket) nodes in one vmapped launch (GPU).
-    #   'auto'     — resolve from the legacy mc_backend/ib_workers: jax + the old
+    #   'batch'    - JAX, same-(kind,bucket) nodes in one vmapped launch (GPU).
+    #   'auto'     - resolve from the legacy mc_backend/ib_workers: jax + the old
     #                apply-flag -> batch; numba + ib_workers>1 -> threaded; else
     #                serial.  (Keeps existing configs working until they migrate.)
     # This replaces the old mc_backend_apply_to_* flags for executor selection;

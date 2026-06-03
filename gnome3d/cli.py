@@ -44,7 +44,7 @@ def _run_structure(
 ) -> int:
     """Reconstruct + write one independent structure via the task-DAG pipeline.
     Returns total bead count.  Per-member seed offset makes an ensemble vary."""
-    # Scope per structure only when several run — for a single structure the
+    # Scope per structure only when several run - for a single structure the
     # extra nesting just indents everything for no benefit.
     structure_ctx = log.step(LOG, f"structure {i + 1}/{n}") if n > 1 else contextlib.nullcontext()
     with structure_ctx:

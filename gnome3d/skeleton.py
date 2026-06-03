@@ -3,14 +3,14 @@ Skeleton: per-IB ``Seeded`` input gathering off the positioned cluster graph.
 
 Once the coarse spine (`gnome3d.pipeline.coarse`) has positioned the cluster
 hierarchy, each interaction block becomes a *pure, isolated* reconstruction.
-This module reads the positioned graph and emits one ``Seeded`` per IB —
+This module reads the positioned graph and emits one ``Seeded`` per IB -
 everything an isolated IB needs (expected-distance matrix, contact heatmaps, CTCF
 orientation/motif graph, anchor seed positions + genomic spans), copied out as
 plain arrays so nothing downstream references the cluster graph.
 
 `gather_ib_seeds` / `seed_for_ib` are called by the coarse pipeline's fan-out
 `expand` (`pipeline.coarse.stages`) after the IB-positioning node runs; the
-expensive isolated half — arcs -> densify -> heat -> smooth — then runs as the
+expensive isolated half - arcs -> densify -> heat -> smooth - then runs as the
 per-IB stage chains.  `IBSeed.wants_heat` is the sparse-signal early-out that
 decides whether an IB's chain includes the ESTIMATE_DIST stage.
 """
@@ -46,9 +46,9 @@ def _heat_signal_negligible(settings: Settings, subanchor_heat_raw: F64Array, n:
     The active-pair fraction ``n_active / n_pairs`` is a provable upper bound on
     the mean target-distance reduction the heat term can produce (each active
     pair's target is ``avg_dist * (1 - s_val)`` with ``s_val`` capped at 1), and
-    it's known from the raw heatmap alone — no dry-smooth trials needed.  Below
+    it's known from the raw heatmap alone - no dry-smooth trials needed.  Below
     ``subanchor_heat_min_reduction`` the IB smooths without heat.  Threshold 0.0
-    (default) disables this — full parity; opt-in divergence for sparse data.
+    (default) disables this - full parity; opt-in divergence for sparse data.
 
     (Lives here, not in coarse: it's the skeleton's chain-shape decision.)
     """
@@ -100,7 +100,7 @@ def gather_ib_seeds(
     state: CoarseState, chr_: str, seg_level: dict[str, list[int]], seed_offset: int = 0
 ) -> list[IBSeed]:
     """Gather one ``Seeded`` per IB of `chr_` from the *already positioned*
-    cluster graph.  Consumes no RNG — pure read-out — so it can run after all
+    cluster graph.  Consumes no RNG - pure read-out - so it can run after all
     coarse positioning (the unified-DAG fan-out) or interleaved per chr (the
     legacy path) with identical results."""
     clusters = state.clusters
@@ -175,7 +175,7 @@ def seed_for_ib(
                     anchor_neighbors[k].append(cluster_to_k[other_ci])
                     anchor_neighbor_weights[k].append(math.sqrt(max(arc.score, 0)))
 
-    # ESTIMATE_DIST inclusion: same sparse-signal early-out as the engine — empty
+    # ESTIMATE_DIST inclusion: same sparse-signal early-out as the engine - empty
     # heatmap or active-fraction below threshold => no heat stage.
     wants_heat = (
         subanchor_heat_raw is not None

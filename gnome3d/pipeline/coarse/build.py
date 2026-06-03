@@ -1,10 +1,10 @@
 """
 Coarse substrate: the cluster-graph state + its pure build helpers.
 
-`CoarseState` is the immutable carrier for the coarse half of reconstruction —
+`CoarseState` is the immutable carrier for the coarse half of reconstruction -
 the cluster hierarchy plus the contact data needed to position it.  The free
 functions here are the *build* helpers that read that state to produce heatmaps,
-expected-distance matrices, bin layouts and child interpolation — everything the
+expected-distance matrices, bin layouts and child interpolation - everything the
 coarse positioning stages consume but that holds no MC orchestration of its own.
 
 Splitting these out of the old `CoarseModel` god-object lets the coarse
@@ -12,14 +12,14 @@ positioning levels become small pipeline stages (in `pipeline.coarse.stages`)
 that call these helpers, instead of methods on one big class.  Two of them touch
 RNG and so must be called in a fixed order to keep the layout byte-exact:
 
-* ``interpolate_children_linear`` — its single-parent branch adds
-  ``random_vector_np(100.0)`` noise per child (and recurses), so it consumes the
+* `interpolate_children_linear` - its single-parent branch adds
+  `random_vector_np(100.0)` noise per child (and recurses), so it consumes the
   global stream; the coarse stages call it in the same order the old engine did.
 
 Everything else here is pure (no RNG): bin layout, heatmap binning/normalization,
 expected-distance and contact-heatmap construction, and the small-IB settings
-boost.  ``clusters`` is shared and its ``.pos`` mutates in place across the coarse
-stages — natural for a graph algorithm; the immutability is of the *state's*
+boost.  `clusters` is shared and its `.pos` mutates in place across the coarse
+stages - natural for a graph algorithm; the immutability is of the *state's*
 field set, not of the positioned graph.
 """
 
@@ -53,7 +53,7 @@ def seed_global_rng(seed_offset: int = 0) -> int:
     heatmap/IB kernels) for the coarse spine, and return the resolved seed.
 
     The coarse spine seeds *once* here and then flows the stream in dependency
-    order — it does NOT re-seed per stage.  That's the opposite of the per-IB
+    order - it does NOT re-seed per stage.  That's the opposite of the per-IB
     stages (which re-seed from `Seeded.seed` per node to be order-independent for
     batching): the coarse levels are a coupled linear sequence that is never
     reordered, so one seed is both deterministic and matches the reference
@@ -72,7 +72,7 @@ class CoarseState:
     """The cluster hierarchy + the contact data needed to position it.
 
     Immutable field set; the cluster objects it points at mutate in place (their
-    ``.pos`` is written by the coarse positioning stages — natural for a graph
+    `.pos` is written by the coarse positioning stages - natural for a graph
     algorithm).  Built once by `build_state`; threaded through the coarse stages.
     """
 
@@ -96,7 +96,7 @@ def build_state(
 ) -> CoarseState:
     """Build the cluster hierarchy from pre-loaded contact data.
 
-    Mirrors the old ``CoarseModel.load`` / Reference LooperSolver::setContactData().
+    Mirrors the old `CoarseModel.load` / Reference LooperSolver::setContactData().
     """
     with log.step(LOG, "build cluster hierarchy"):
         clusters, chr_root, chr_first_cluster = build_cluster_tree(
@@ -127,8 +127,8 @@ def interpolate_children_linear(state: CoarseState, parent_indices: list[int]) -
     Used for IBs between segments, and anchors within IBs.
     Simplified version of Reference interpolateChildrenPositionSpline().
 
-    RNG: the single-parent branch adds ``random_vector_np(100.0)`` per child and
-    recurses, so this consumes the global stream — call order matters for the
+    RNG: the single-parent branch adds `random_vector_np(100.0)` per child and
+    recurses, so this consumes the global stream - call order matters for the
     byte-exact layout.
     """
     clusters = state.clusters
@@ -438,7 +438,7 @@ def build_contact_heatmaps(
     # also cheap (O(#singletons in region), tiny next to the N^2 matrix work below).
     #
     # Note: Python filters by chromosome (both ends on chr_).  Reference's
-    # createSingletonSubanchorHeatmap does NOT — see
+    # createSingletonSubanchorHeatmap does NOT - see
     # [[project-singleton-chr-filter-divergence]] (intentional divergence).
     import bisect
 

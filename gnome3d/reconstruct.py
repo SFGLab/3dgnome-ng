@@ -6,7 +6,7 @@ coarse `CoarseState`, assembles the unified coarse DAG (`build_coarse_dag`) whos
 IB-positioning node `expand`s into the per-IB `arcs -> densify -> [heat] -> smooth`
 chains, runs it under an executor, and returns ``dict[chr -> list[BeadOut]]``.
 
-It is a leaf consumer — nothing imports it back, so there is no cycle.
+It is a leaf consumer - nothing imports it back, so there is no cycle.
 """
 
 from __future__ import annotations
@@ -157,7 +157,7 @@ def reconstruct_ensemble(
          The spine seeds + flows the global RNG, so members cannot interleave;
          the gather is RNG-free.
       2. Merge all members' IB chains into one DAG (node ids namespaced per member)
-         and run it under `executor` — a `BatchExecutor` then groups same-(kind,
+         and run it under `executor` - a `BatchExecutor` then groups same-(kind,
          bucket) chains across members into wide launches.
 
     Member m uses ``base_seed_offset + m * MEMBER_SEED_STRIDE``, so member m is

@@ -6,20 +6,20 @@ These wrap the RNG-ordered ops in `coarse` (the same functions the
 legacy `skeleton` path drives) as `COARSE`-kind stages over a `CoarsePhase`
 carrier.  Unlike the per-IB kernels, a coarse stage's *work is its `apply`*: it
 mutates the one shared cluster graph in place (positions a level), and the
-registered COARSE runner is a no-op passthrough.  That's deliberate — the coarse
+registered COARSE runner is a no-op passthrough.  That's deliberate - the coarse
 spine is a coupled serial sequence over one graph (never batched), so there's no
 kernel to fan a `to_problem` into; the kernel split / batching machinery is for
 the isolated IB fan-out downstream.
 
-`build_coarse_dag` assembles the spine — picking the branch (random-walk /
+`build_coarse_dag` assembles the spine - picking the branch (random-walk /
 single-segment / chr+segment) exactly as `coarse.reconstruct_heatmap`
-does — and gives the terminal IB-positioning node an `expand` hook that reads the
+does - and gives the terminal IB-positioning node an `expand` hook that reads the
 positioned graph and spawns each IB's `arcs -> densify -> [heat] -> smooth` chain.
 
-RNG note — exactness: the spine is a *linear chain* (one ready node at a time),
+RNG note - exactness: the spine is a *linear chain* (one ready node at a time),
 so the executor runs the ops in the same order the old engine did; the ops don't
 re-seed (they consume the one global stream seeded once upstream), so the coarse
-layout — and thus every IB seed and the final fold — is byte-preserved.
+layout - and thus every IB seed and the final fold - is byte-preserved.
 """
 
 from __future__ import annotations
@@ -88,8 +88,8 @@ class RootStage(_CoarseStage):
     `CoarseState` into the spine's first carrier.
 
     Seeding here (rather than in the caller before the run) makes the seed state
-    the pipeline owns.  It is safe to seed at this point — `build_state` and
-    `build_coarse_dag` consume no RNG — so the first real consumer (chr/segment)
+    the pipeline owns.  It is safe to seed at this point - `build_state` and
+    `build_coarse_dag` consume no RNG - so the first real consumer (chr/segment)
     sees the exact same stream state as the legacy path."""
 
     def __init__(self, state: CoarseState, seed_offset: int = 0) -> None:
@@ -167,7 +167,7 @@ def _expand_into_ib_chains(seed_offset: int, sink: list[IBSeed]) -> object:
     positioned graph, gathers every IB's `Seeded` (via the shared
     `skeleton.gather_ib_seeds`), records them in `sink` (so the caller can map
     smooth outputs back to chromosomes), and returns the per-IB chain nodes
-    (`ib.ib_chain_nodes` — the IB domain owns the chain shape)."""
+    (`ib.ib_chain_nodes` - the IB domain owns the chain shape)."""
 
     def expand(output: State) -> tuple[list[Node], dict[NodeId, Seeded]]:
         # Imported lazily to avoid an import cycle (skeleton -> coarse,
@@ -188,7 +188,7 @@ def _expand_into_ib_chains(seed_offset: int, sink: list[IBSeed]) -> object:
 def build_coarse_dag(
     state: CoarseState, seed_offset: int = 0, *, fan_out: bool = True
 ) -> tuple[Dag, list[IBSeed]]:
-    """Assemble the coarse spine for `state` and return ``(dag, ib_sink)``.
+    """Assemble the coarse spine for `state` and return `(dag, ib_sink)`.
 
     The spine branches as follows:
       * random walk      -> root -> walk    -> ib
@@ -196,7 +196,7 @@ def build_coarse_dag(
       * multi-chromosome -> root -> chr     -> segment -> ib
       * single-chr/multi -> root -> segment -> ib
 
-    With ``fan_out`` (default) the terminal IB node carries an `expand` hook that
+    With `fan_out` (default) the terminal IB node carries an `expand` hook that
     spawns the per-IB chains at run time and fills ``ib_sink`` (so the caller can
     group the terminal smooth beads by chromosome).  With ``fan_out=False`` the
     spine runs the coarse positioning *only* (no IB chains); the ensemble driver

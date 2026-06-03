@@ -1,10 +1,10 @@
-"""Heatmap-energy MC (numba) — a fully self-contained kernel.
+"""Heatmap-energy MC (numba) - a fully self-contained kernel.
 
 Unlike arcs/smooth/ib (which share the unified `_batch_mc_nb` + `terms` math),
 the heatmap kernel is deliberately standalone: it carries its OWN copies of the
 two energy terms it needs (heatmap distance-to-expected + excluded volume), its
 own MC inner loop (`_batch_heatmap_nb`), and its own convergence driver
-(`_run_heatmap_loop`).  The duplication is intentional — heatmap is the simplest
+(`_run_heatmap_loop`).  The duplication is intentional - heatmap is the simplest
 energy (double-counted structure, optional EV, non-strict acceptance) and keeping
 it apart means the shared kernel never has to carry a heatmap branch.
 
@@ -34,7 +34,7 @@ LOG = log.get("mc.numba")
 
 # Typed wrapper around numba.njit so pyright sees decorated functions with their
 # original signatures.  At runtime this is just numba.njit.  (Duplicated from
-# `terms` on purpose — this module shares no code with the unified kernel.)
+# `terms` on purpose - this module shares no code with the unified kernel.)
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -404,7 +404,7 @@ def mc_heatmap_numba(
 
     When `settings.mc_heatmap_chains > 1`, runs that many independent MC
     chains in parallel via numba threading and keeps the one with the best
-    final score — an embarrassingly-parallel restart strategy.
+    final score - an embarrassingly-parallel restart strategy.
     """
     n = pos.shape[0]
 

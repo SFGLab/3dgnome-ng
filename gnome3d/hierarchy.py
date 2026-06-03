@@ -19,7 +19,7 @@ LOG = log.get("hierarchy")
 class Level(IntEnum):
     """Cluster-tree depth, mirroring the Reference numbering (chr root at 1,
     anchors the deepest leaves at 4) so that setLevel()/levelDown() depth
-    arithmetic — e.g. ``Level.SEGMENT - Level.CHROMOSOME`` steps — matches.
+    arithmetic - e.g. ``Level.SEGMENT - Level.CHROMOSOME`` steps - matches.
     IntEnum so members behave as ints in that arithmetic and in comparisons."""
 
     CHROMOSOME = 1

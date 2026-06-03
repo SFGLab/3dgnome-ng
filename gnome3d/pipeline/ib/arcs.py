@@ -3,9 +3,9 @@ ARCS stage: position anchors via arc-spring MC.
 
 Pure port of `Solver._reconstruct_cluster_arcs`: the same restart loop (noise the
 anchor seeds, run `mc_arcs`, keep the best of `steps_arcs`), but reading the
-``Seeded`` state instead of the cluster graph and seeding the RNG deterministically
-from ``Seeded.seed`` (Python's `random` for the initial noise + numba's RNG for the
-kernel) so the result is reproducible and order-independent — the property the
+`Seeded` state instead of the cluster graph and seeding the RNG deterministically
+from `Seeded.seed` (Python's `random` for the initial noise + numba's RNG for the
+kernel) so the result is reproducible and order-independent - the property the
 batched/ensemble paths need.
 
 Serial runner = the numba backend (`mc_arcs_numba`).  The batched JAX runner
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 
 def _run(problem: Problem) -> Result:
-    """Serial runner: anneal one IB's anchors.  Returns ``(best_score, best_pos)``.
+    """Serial runner: anneal one IB's anchors.  Returns `(best_score, best_pos)`.
 
     Mirrors `Solver._reconstruct_cluster_arcs` exactly (initial per-anchor noise,
     `steps_arcs` restarts, best-of), with deterministic seeding added.
@@ -62,7 +62,7 @@ def _run(problem: Problem) -> Result:
 def _batch_run(problems: list[Problem]) -> list[Result]:
     """Batched (JAX) runner: anneal a whole bucket of IBs' arcs in one vmapped
     kernel.  Each IB is fanned out to `steps_arcs` noised restarts (best kept),
-    mirroring the serial loop.  Returns one ``(score, pos)`` per input problem.
+    mirroring the serial loop.  Returns one `(score, pos)` per input problem.
     Lazy `mc_jax` import so the numba path never requires JAX."""
     from gnome3d.mc import jax as mc_jax
 
@@ -102,7 +102,7 @@ class ArcsStage:
 
     def batch_key(self, inputs: tuple[State, ...]) -> tuple[object, ...]:
         """Arcs has uniform energy terms, so the batch key is just the anchor
-        shape-ladder bucket — all IBs in a bucket share one compiled kernel."""
+        shape-ladder bucket - all IBs in a bucket share one compiled kernel."""
         st = inputs[0]
         assert isinstance(st, Seeded)
         return (batch_bucket(int(st.anchor_seed_pos.shape[0]), st.settings),)

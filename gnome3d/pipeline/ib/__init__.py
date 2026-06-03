@@ -3,7 +3,7 @@ IB reconstruction domain: the per-interaction-block pipeline stages.
 
 Once the coarse spine (`gnome3d.pipeline.coarse`) has positioned the cluster
 graph, each interaction block reconstructs *independently* as a linear chain of
-stages — arcs (anchor positioning) -> densify (insert subanchors) -> [heat]
+stages - arcs (anchor positioning) -> densify (insert subanchors) -> [heat]
 (subanchor distance target) -> smooth (final MC).  Each stage wraps a validated
 kernel (numba `mc_arcs`/`mc_smooth` in `gnome3d.mc`, the densify arithmetic, the
 heat-dist estimate); the orchestration lives in the stage, the math does not.

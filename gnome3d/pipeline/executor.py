@@ -3,12 +3,12 @@ Executors: turn a Dag into per-node output states.
 
 All walk the DAG by repeatedly taking the *ready* set (`Dag.ready`) and running
 it; they differ only in how a ready set is dispatched.  Each dispatch strategy
-is its own small class (`SerialStrategy`, `ThreadedStrategy`, `BatchStrategy`) —
+is its own small class (`SerialStrategy`, `ThreadedStrategy`, `BatchStrategy`) -
 
-  * serial   — run each node on its own via the kind's serial (numba) runner;
-  * threaded — run the kind's independent ready nodes across a numba thread pool
+  * serial   - run each node on its own via the kind's serial (numba) runner;
+  * threaded - run the kind's independent ready nodes across a numba thread pool
     (the kernels are nogil + thread-local RNG, so CPU-parallel and deterministic);
-  * batch    — group the kind's nodes by ``(kind, bucket)`` and run each group
+  * batch    - group the kind's nodes by ``(kind, bucket)`` and run each group
     through its batch (JAX) runner in one shot (the `mc_*_jax_batch` entries).
 
 `MixedExecutor` is the workhorse: it assigns each `StageKind` a strategy and
@@ -18,7 +18,7 @@ constructors; `pick_executor` builds a per-stage mix from settings.  The COARSE
 spine is always inline-serial (one RNG stream across its stages).
 
 Result-equivalence note: a node's RNG seed lives in its `Seeded.seed`, not in
-scheduling order, so bead output is independent of strategy — serial, threaded,
+scheduling order, so bead output is independent of strategy - serial, threaded,
 and batched produce the same structures, which is what lets the fixed-seed-exact
 gate hold across executors.
 """
@@ -85,7 +85,7 @@ def _finish(
 
 
 def _run_serial(node: Node, inputs: tuple[State, ...]) -> State:
-    """Compute one node's output (serial runner + apply) — the unit of work a
+    """Compute one node's output (serial runner + apply) - the unit of work a
     serial step or a worker thread runs.
 
     Pure w.r.t. shared state: `to_problem`/`apply` only read the (already-extracted)
@@ -184,8 +184,8 @@ class BatchStrategy:
     through the batch runner in one launch (serial fallback for kinds with no
     batch runner, e.g. DENSIFY).
 
-    The key is the stage's ``batch_key`` — ``(energy-term signature,
-    shape-ladder bucket)`` — not the raw size.  Grouping by the ladder bucket
+    The key is the stage's ``batch_key`` - ``(energy-term signature,
+    shape-ladder bucket)`` - not the raw size.  Grouping by the ladder bucket
     keeps one compiled kernel + one wide launch per bucket (vs one per distinct
     size), and keeps each batch uniform in the flags ``mc_*_jax_batch`` reads
     from ``problems[0]``.  Each group is timed and logged (always-on) so a slow
@@ -252,15 +252,15 @@ class MixedExecutor:
 
     ``strategy`` maps each `StageKind` to ``SERIAL`` | ``THREADED`` | ``BATCH``
     (kinds absent default to serial).  Dispatch is delegated to a `Strategy`
-    instance per chosen value — `SerialStrategy`, `ThreadedStrategy`,
-    `BatchStrategy` — so this executor stays a thin scheduler over them; the
+    instance per chosen value - `SerialStrategy`, `ThreadedStrategy`,
+    `BatchStrategy` - so this executor stays a thin scheduler over them; the
     convenience subclasses (`SerialExecutor`, `ThreadedExecutor`, `BatchExecutor`)
     are just uniform-strategy mixes.  ``pick_executor`` builds it from the
     per-stage ``mc_executor_*`` settings.
 
     All three strategies are RNG-isolated per node (numba's RNG is per-OS-thread;
     the Python noise re-seeds a thread-local RNG), so the structures are
-    byte-identical no matter the strategy — the executor-equivalence the fixed-seed
+    byte-identical no matter the strategy - the executor-equivalence the fixed-seed
     gate relies on.  ``COARSE`` is always forced inline-serial: the coarse spine
     flows one RNG stream across its stages without re-seeding (so it can't be
     threaded/batched) and carries the fan-out `expand`; it's a linear chain anyway."""

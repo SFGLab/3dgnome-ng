@@ -2,13 +2,13 @@
 Runner registry: how a stage kind's work actually executes.
 
 Each kind registers one or both:
-  * ``serial`` — run ONE problem (numba, or JAX at K=1); used by SerialExecutor,
+  * ``serial`` - run ONE problem (numba, or JAX at K=1); used by SerialExecutor,
     one node at a time.
-  * ``batch``  — run a GROUP of same-(kind,bucket) problems in one shot (the JAX
+  * ``batch``  - run a GROUP of same-(kind,bucket) problems in one shot (the JAX
     ``mc_*_jax_batch`` entries); used by BatchExecutor.
 
 ``DENSIFY`` registers only ``serial`` (no GPU kernel); the batched executor just
-maps it.  Kept free of kernel imports so `pipeline` stays dependency-light — the
+maps it.  Kept free of kernel imports so `pipeline` stays dependency-light - the
 `mc_*` / wiring modules call `register`.
 """
 
