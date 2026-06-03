@@ -1,7 +1,7 @@
 """Numba backend for the Monte-Carlo loops, split one file per kernel.
 
-The four public entry points — `mc_heatmap_numba`, `mc_arcs_numba`,
-`mc_smooth_numba`, `mc_ib_numba` — are the production CPU kernels.  They all
+The four public entry points - `mc_heatmap_numba`, `mc_arcs_numba`,
+`mc_smooth_numba`, `mc_ib_numba` - are the production CPU kernels.  They all
 drive one unified inner kernel (`terms._batch_mc_nb`) via the shared driver
 (`common._run_outer_loop`); they differ only in which structure-energy variant
 and which optional terms (heat / orientation / EV / confinement) they wire up.

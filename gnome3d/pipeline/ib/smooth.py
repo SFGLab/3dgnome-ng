@@ -6,12 +6,12 @@ best, keep best) + `_apply_smooth_problem` (assemble BeadOut), reading
 `Densified`/`DistEstimated` and seeding deterministically from `Seeded.seed`.
 
 Two boundary conversions live here:
-  * orientation: the compact per-anchor `int8` ``Orientation`` codes are expanded
-    to the per-bead ``"<U1"`` array the numba kernel expects, via `anchor_map`.
+  * orientation: the compact per-anchor `int8` `Orientation` codes are expanded
+    to the per-bead `"<U1"` array the numba kernel expects, via `anchor_map`.
   * heat: a chain without a ESTIMATE_DIST stage arrives as `Densified` (no heat_dist)
-    rather than `DistEstimated`; both are accepted (``getattr(..., None)``).
+    rather than `DistEstimated`; both are accepted (`getattr(..., None)`).
 
-The cluster write-back the old `_apply_smooth_problem` did is gone — IBs are
+The cluster write-back the old `_apply_smooth_problem` did is gone - IBs are
 terminal here, the beads ARE the output.  Serial runner = numba `mc_smooth_numba`.
 """
 
@@ -36,7 +36,7 @@ _CODE_TO_CHAR = {int(Orientation.NONE): "N", int(Orientation.LEFT): "L", int(Ori
 
 
 def _expand_orientations(orientations: I8Array, anchor_map: list[AnchorMapEntry], n: int) -> StrArray:
-    """Per-anchor int8 codes -> per-bead ``"<U1"`` array ('N' for subanchors),
+    """Per-anchor int8 codes -> per-bead `"<U1"` array ('N' for subanchors),
     placing each anchor's orientation at its bead via `anchor_map`.  Mirrors the
     char_orn construction in `Solver._build_smooth_problem`."""
     char: StrArray = np.array(["N"] * n, dtype="<U1")
@@ -69,7 +69,7 @@ def _assemble_beads(
 def _batch_run(problems: list[Problem]) -> list[Result]:
     """Batched (JAX) runner: anneal a whole bucket of IBs' smooths in one vmapped
     kernel.  Each IB is fanned out to `steps_smooth` noised restarts (best kept),
-    mirroring `JaxSolver._batched_final_smooth`.  Returns one ``(score, pos)`` per
+    mirroring `JaxSolver._batched_final_smooth`.  Returns one `(score, pos)`` per
     input problem, in order.  `mc_jax` is imported lazily so the numba path never
     requires JAX."""
     from gnome3d.mc import jax as mc_jax
@@ -145,7 +145,7 @@ class SmoothStage:
         return int(inputs[0].pos.shape[0])  # type: ignore[attr-defined]
 
     def batch_key(self, inputs: tuple[State, ...]) -> tuple[object, ...]:
-        """``(heat?, orn?, bead-bucket)`` — the exact signature
+        """``(heat?, orn?, bead-bucket)`` - the exact signature
         `mc_smooth_jax_batch` reads from ``problems[0]`` to pick its kernel.  A
         batch MUST be uniform in these flags, so they are part of the key (else a
         no-heat IB could land in a heat batch and get the wrong kernel)."""

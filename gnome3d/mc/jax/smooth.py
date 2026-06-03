@@ -6,11 +6,11 @@ anneals K different IBs in one vmapped kernel (region batching).  Both build /
 compile through `_build_smooth_kernel` (memoised in `_kernel_cache`) and can
 eagerly precompile every shape bucket via `_precompile_smooth`.
 
-Confinement is not supported here — the dispatch gate in the pipeline routes
+Confinement is not supported here - the dispatch gate in the pipeline routes
 confinement-enabled smooth calls back to numba.
 """
 
-# NB: no `from __future__ import annotations` — the JAX kernels reflect on live
+# NB: no `from __future__ import annotations` - the JAX kernels reflect on live
 # type objects, so the kernel definitions below must see real annotations.
 
 import logging
@@ -52,12 +52,12 @@ def _build_smooth_kernel(
 ) -> Any:
     """Build (or look up cached) compiled smooth-MC kernel.
 
-    Returns (kernel, init_smooth, init_excl, init_heat, init_orn) — the four
+    Returns (kernel, init_smooth, init_excl, init_heat, init_orn) - the four
     init functions compute initial scores on-device, vmapped across K chains.
 
     Static-by-cache-key: n_steps_per_batch, excl_skip, use_heat, use_orn,
     max_nbrs (padding width for the orientation neighbor lists).  JAX further
-    shape-specialises on (N, K, n_anchors, n_movable) at runtime — those
+    shape-specialises on (N, K, n_anchors, n_movable) at runtime - those
     incur per-shape compile cost (cached persistently via
     jax.experimental.compilation_cache).
     """
@@ -559,13 +559,13 @@ def _build_smooth_kernel(
     #
     # Wraps the per-batch `batched` kernel with `lax.while_loop`.  Each
     # iteration of the while_loop = one MC batch across all K chains.  The
-    # entire annealing runs inside ONE JAX call — no Python sync between
+    # entire annealing runs inside ONE JAX call - no Python sync between
     # batches.  Replaces a Python loop that did one device->host copy per
     # batch (5-10ms × hundreds of batches per smooth call).
     #
     # max_iters is baked in as a static safety cap to prevent runaway loops
     # if convergence never triggers.  At n_steps_per_batch=2000 with
-    # max_iters=10000 we cap at 20M MC steps — comfortably above any
+    # max_iters=10000 we cap at 20M MC steps - comfortably above any
     # realistic convergence count.
     _MAX_ITERS: int = 10000
 
@@ -728,7 +728,7 @@ def _build_smooth_kernel(
         # SEQUENTIAL (lax.scan) accumulation, matching _init_excl/_init_heat.
         # A tree reduction (jnp.sum) groups differently for a bucket-padded
         # length vs the real length, and that ULP difference gets chaos-amplified
-        # by the MC — so the chain init MUST be padding-insensitive.  Scan is:
+        # by the MC - so the chain init MUST be padding-insensitive.  Scan is:
         # appending the masked-to-zero pad terms never changes the running sum,
         # so bucketed == unbucketed bit-for-bit.  Mask spans a pad bead via
         # n_active (no-op when unbucketed, n_active == n).
@@ -878,15 +878,15 @@ def _build_smooth_kernel(
     # smooth at N=1607 is ~99% GPU-idle; K=8 costs ~the same wall).  Two
     # differences from the single-problem path, nothing else:
     #   (a) every per-IB array is vmapped (axis 0) instead of shared.
-    #   (b) convergence is PER-CHAIN — each IB stops on its own criterion and
+    #   (b) convergence is PER-CHAIN - each IB stops on its own criterion and
     #       the device while-loop runs until ALL chains have converged (or the
     #       max-iters cap).  Smooth uses strict acceptance, so a chain that
-    #       converges early and keeps stepping can only hold or improve — never
-    #       drift worse — which makes run-to-all-converged safe.  Wall-clock of
+    #       converges early and keeps stepping can only hold or improve - never
+    #       drift worse - which makes run-to-all-converged safe.  Wall-clock of
     #       a batch = its slowest IB, so the caller buckets IBs by size.
     #
     # The per-chain step body (`chain_batch`) and the init scores are reused
-    # verbatim — the caller computes per-IB init scores with the same init
+    # verbatim - the caller computes per-IB init scores with the same init
     # helpers and stacks them.  `batched_mp`/`kernel_full_mp` only compile when
     # the region-batched entry actually calls them.
     in_axes_mp = (
@@ -1072,7 +1072,7 @@ def _build_smooth_kernel(
 
     bundle = (
         kernel,  # per-batch (kept for diagnostics; unused in prod)
-        kernel_full,  # full convergence on device — the production path
+        kernel_full,  # full convergence on device - the production path
         init_smooth,
         init_excl,
         init_heat,
@@ -1208,7 +1208,7 @@ def mc_smooth_jax(
     The shared while-loop stops when the BEST of the B chains converges (mc_jax
     convergence is best-of-K).  With `return_all=True` this returns
     `(scores: (B,), finals: (B, N, 3))` as numpy arrays and does NOT mutate
-    `pos` — the caller does its own per-trial selection (see solver.py IB phase).
+    `pos` - the caller does its own per-trial selection (see solver.py IB phase).
     """
     if not jax_is_available():
         raise RuntimeError(
@@ -1351,7 +1351,7 @@ def mc_smooth_jax(
     # chain/EV/confinement masked by `n_active`, heat rows zeroed, movement
     # restricted to the real movable set via `n_movable_active`.  ALL bead-indexed
     # kernel inputs are padded to B so the kernel's input shapes depend only on B
-    # (+ K, max_nbrs) — not on the per-region n/n_movable.  (Orientation's
+    # (+ K, max_nbrs) - not on the per-region n/n_movable.  (Orientation's
     # anchor-indexed arrays, shape n_anchors, are NOT yet bucketed -> with
     # use_orn=True the kernel still recompiles per region; that's phase 2.)
     # n_active == n and n_movable_active == len(movable) when unbucketed.
@@ -1686,7 +1686,7 @@ def _prep_smooth_problem_np(
         bead_to_anchor_k = np.concatenate([bead_to_anchor_k, np.full(n_pad, -1, dtype=np.int32)])
         is_L = np.concatenate([is_L, np.zeros(n_pad, dtype=np.bool_)])
 
-    # `movable` lists non-fixed beads, so its length is n_movable (not n) — pad
+    # `movable` lists non-fixed beads, so its length is n_movable (not n) - pad
     # it to B independently of the `B > n` bead-padding above, else an IB whose
     # n lands exactly on the bucket (B == n) keeps a short movable and the
     # batched (K, B) stack goes ragged.  Pad indices are 0 (a valid bead);
@@ -1747,13 +1747,13 @@ def mc_smooth_jax_batch(
         and optionally heat_dist (n,n), char_orientations (n,),
         anchor_neighbors, anchor_neighbor_weights.
     All problems must share the same energy-term flags (use_heat/use_orn/...)
-    — the caller groups IBs by (terms, size bucket) before calling.
+    - the caller groups IBs by (terms, size bucket) before calling.
 
     Returns one (score, final_pos (n_i, 3)) per problem, in input order.
     Does not mutate the inputs.
 
     Caps the vmap width (IBs per launch) via `settings.mc_executor_jax_batch_width_smooth`
-    — see `_resolve_smooth_max_k`.  Excess IBs run in sequential sub-batches.  The
+    - see `_resolve_smooth_max_k`.  Excess IBs run in sequential sub-batches.  The
     cap is purely an OOM guard (a wider launch is never slower than more serial
     sub-batches); "auto" sizes it to what device memory allows.
     """
@@ -1868,7 +1868,7 @@ def _mc_smooth_jax_batch_chunk(
     step_size_k = jnp.asarray(np.array([float(p["step_size"]) for p in problems], dtype=np.float32))
 
     # per-IB springs (uniform from settings for now; small-IB boost groups
-    # would carry their own — callers batch boosted IBs separately).
+    # would carry their own - callers batch boosted IBs separately).
     stretch_k = jnp.full((K,), jnp.float32(settings.spring_stretch))
     squeeze_k = jnp.full((K,), jnp.float32(settings.spring_squeeze))
     ang_k = jnp.full((K,), jnp.float32(settings.spring_angular))

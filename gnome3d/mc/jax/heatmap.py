@@ -3,10 +3,10 @@
 `mc_heatmap_jax` is the single entry; it builds/compiles through
 `_build_heatmap_kernel` (memoised in `_kernel_cache`) and can eagerly precompile
 every shape bucket via `_precompile_heatmap`.  No orientation / heat / confinement
-— double-counted structure plus optional excluded volume only.
+- double-counted structure plus optional excluded volume only.
 """
 
-# NB: no `from __future__ import annotations` — the JAX kernels reflect on live
+# NB: no `from __future__ import annotations` - the JAX kernels reflect on live
 # type objects, so the kernel definitions below must see real annotations.
 
 import logging
@@ -126,7 +126,7 @@ def _build_heatmap_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         # bucketing pos0 is padded to a bucket size, but `n_active` (dynamic, so
         # it does NOT add a compile axis) restricts moves to the real beads
         # [0, n_active); pad beads never move, so they stay far away (EV=0) and
-        # their heat rows are masked (skip=True) — fully inert.
+        # their heat rows are masked (skip=True) - fully inert.
         k_p, k_d, k_a = jax.random.split(key, 3)
         ps = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_active)
         disps = jax.random.uniform(
@@ -307,7 +307,7 @@ def _precompile_heatmap(settings: "Settings") -> None:
         sds = jax.ShapeDtypeStruct
         sample_key = jax.random.PRNGKey(0)  # concrete -> exact key dtype match
         # NB: only the *avals* (shape+dtype) of these scalars affect the compiled
-        # program / cache key — the values are runtime inputs, so the real call
+        # program / cache key - the values are runtime inputs, so the real call
         # hits this cache regardless of value.  We pass settings-derived scalars
         # anyway (matching mc_heatmap_jax) for clarity and to stay correct if a
         # scalar ever becomes trace-relevant.  step_size/r0/excl_w have no settings

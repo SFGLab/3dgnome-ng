@@ -96,7 +96,7 @@ def _run(problem: Problem) -> Result:
 
 def _batch_run(problems: list[Problem]) -> list[Result]:
     """Batched (JAX) runner: run every IB's dry-smooth trials in one vmapped
-    kernel (reusing `mc_smooth_jax_batch` — no heat/orientation), then build each
+    kernel (reusing `mc_smooth_jax_batch` - no heat/orientation), then build each
     IB's target matrix.  Mirrors `JaxSolver._batched_heat_dist`.  Returns one
     heat_dist (or None) per input problem, in order.  Lazy `mc_jax` import."""
     from gnome3d.mc import jax as mc_jax

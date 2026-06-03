@@ -6,7 +6,7 @@ IBs' anchors in one vmapped kernel (region batching).  Both build/compile throug
 batched kernel freezes converged chains once they stop improving.
 """
 
-# NB: no `from __future__ import annotations` — the JAX kernels reflect on live
+# NB: no `from __future__ import annotations` - the JAX kernels reflect on live
 # type objects, so the kernel definitions below must see real annotations.
 
 import logging
@@ -374,7 +374,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
     #     springs and weights stay shared.
     #
     #     Arcs uses NON-strict acceptance, so a chain that has converged would
-    #     DRIFT WORSE if it kept stepping while slower chains finish — so we
+    #     DRIFT WORSE if it kept stepping while slower chains finish - so we
     #     FREEZE converged chains (hold their pos/scores).  The strict smooth
     #     path is safe to keep stepping and doesn't need this.
     in_axes_mp = (
@@ -812,14 +812,14 @@ def mc_arcs_jax_batch(
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     """Anneal K *different* IBs' anchors in one vmapped kernel (region batching).
 
-    Each problem: ``pos`` (n,3), ``exp_dist`` (n,n), ``step_size`` (float).  All
+    Each problem: `pos` (n,3), ``exp_dist`` (n,n), ``step_size`` (float).  All
     share the energy-term flags (caller groups by terms + size bucket).  Returns
     one ``(score, final_pos (n,3))`` per problem, in input order.
 
     Caps the vmap width (IBs per launch) via
-    `settings.mc_executor_jax_batch_width_arcs` — see `_resolve_arcs_max_k`.  The
+    `settings.mc_executor_jax_batch_width_arcs` - see `_resolve_arcs_max_k`.  The
     stacked ``(B, B)`` exp tensor (4*B^2 bytes/IB) dominates the per-IB footprint.
-    Excess IBs run as sequential sub-batches — same discipline as
+    Excess IBs run as sequential sub-batches - same discipline as
     `mc_smooth_jax_batch`; the cap is purely an OOM guard."""
     if not problems:
         return []

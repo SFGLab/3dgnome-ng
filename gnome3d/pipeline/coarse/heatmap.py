@@ -2,8 +2,8 @@
 Heatmap matrix helpers: normalize a contact-frequency matrix and convert it to
 an expected-distance matrix.
 
-Pure numpy functions over an ``(n, n)`` matrix — no cluster graph, no MC.  Lifted
-out of the former ``CoarseModel`` (where they were O(N^2) Python list-of-list
+Pure numpy functions over an `(n, n)` matrix - no cluster graph, no MC.  Lifted
+out of the former `CoarseModel` (where they were O(N^2) Python list-of-list
 loops that blew up on large Hi-C matrices) so the coarse HEATMAP stages can build
 their distance targets from these, and any caller can reuse them.
 
@@ -27,7 +27,7 @@ Matrix: TypeAlias = "F64Array | list[list[float]]"
 
 def get_diagonal_size(h: Matrix, n: int) -> int:
     """Smallest superdiagonal offset holding a non-zero contact (the ignored
-    diagonal band): min ``j - i`` over upper-triangle cells > 1e-6."""
+    diagonal band): min `j - i` over upper-triangle cells > 1e-6."""
     ha = np.asarray(h)
     iu = np.triu_indices(n)
     mask = ha[iu] > 1e-6
@@ -52,7 +52,7 @@ def normalize_heatmap(h: Matrix, n: int) -> F64Array:
 
 def normalize_heatmap_diagonal_total(h: Matrix, n: int, val: float) -> F64Array:
     """Scale the whole matrix so the average of the first non-zero diagonal
-    equals ``val``.  Mirrors Reference normalizeHeatmapDiagonalTotal()."""
+    equals `val`.  Mirrors Reference normalizeHeatmapDiagonalTotal()."""
     ha = np.asarray(h, dtype=np.float64).copy()
     diag = get_diagonal_size(ha, n)
     count = n - diag
@@ -77,7 +77,7 @@ def normalize_heatmap_inter(h: Matrix, n: int, current_level: ChrLevel, scale: f
     for chr_ in chrs_in_order:
         block_starts.append(block_starts[-1] + len(current_level[chr_]))
     if block_starts[-1] != n:
-        return ha.copy()  # shape mismatch — leave untouched
+        return ha.copy()  # shape mismatch - leave untouched
     out = ha * scale
     for b in range(len(chrs_in_order)):
         lo, hi = block_starts[b], block_starts[b + 1]

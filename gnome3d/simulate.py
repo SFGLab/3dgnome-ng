@@ -32,7 +32,7 @@ def simulate(
     Returns one dict[chr -> list[BeadOut]] per structure.
 
     Runs the task-DAG pipeline under the executor `pick_executor` selects for the
-    backend — `SerialExecutor` (numba) or `BatchExecutor` (JAX).  The ensemble is
+    backend - `SerialExecutor` (numba) or `BatchExecutor` (JAX).  The ensemble is
     `reconstruct_ensemble`: each member's coarse spine runs sequentially (distinct
     per-member seed), then *all* members' per-IB chains run in one batched pass so
     same-shaped IBs across members fill one GPU launch.  Member i is byte-identical
@@ -96,7 +96,7 @@ def run_region(
     if data_dir is not None:
         s.data_dir = str(data_dir)
 
-    # Honor output_level/log_file from the config — these file-config entry
+    # Honor output_level/log_file from the config - these file-config entry
     # points own logging setup just like cli.main() does (simulate() stays the
     # bare in-memory primitive so embedders keep control of their own logging).
     log.setup(s.output_level, log_file=s.log_file or None)

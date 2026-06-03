@@ -7,8 +7,8 @@ skeleton fans out to every IB; an ensemble fans each IB into E seed-varied
 chains.  All of that is just graph shape over the same `Node`/`Dag`.
 
 Two scheduling primitives:
-  * `ready` — nodes whose deps are all done (executors build batching on top).
-  * dynamic expansion — a node may carry an `expand` hook that, on completion,
+  * `ready` - nodes whose deps are all done (executors build batching on top).
+  * dynamic expansion - a node may carry an `expand` hook that, on completion,
     spawns *new* nodes into the running DAG.  This is how the coarse positioning
     fans out: the IB chains aren't known until the hierarchy is built and the
     IB centroids positioned, so a fan-out node emits them at runtime.
@@ -32,10 +32,10 @@ ExpandFn: TypeAlias = Callable[[State], "tuple[list[Node], dict[NodeId, Seeded]]
 
 @dataclass(frozen=True)
 class Node:
-    """A unit of work: run ``stage`` once ``deps`` have produced their states.
+    """A unit of work: run `stage`` once ``deps`` have produced their states.
 
     A root node (no deps) takes its input from `Dag.seeds[id]` if present, else
-    no input (a true source — e.g. the coarse hierarchy builder).  ``expand``, if
+    no input (a true source - e.g. the coarse hierarchy builder).  ``expand``, if
     set, is called with this node's output state after it runs and spawns more
     nodes into the DAG (the coarse fan-out into per-IB chains)."""
 

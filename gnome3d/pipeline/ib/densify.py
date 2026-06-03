@@ -6,7 +6,7 @@ same arithmetic, same order, but parameterized on the `Arced` state (anchor
 positions + genomic spans) instead of reaching into the cluster graph.  No RNG,
 so this stage is byte-exact-validatable against the solver on its own.
 
-`anchor_map` here is local — ``(bead_index, anchor_index_in_ib)`` — never a
+`anchor_map` here is local - `(bead_index, anchor_index_in_ib)` - never a
 global cluster index, which is what lets the densified IB stay self-contained.
 """
 
@@ -120,7 +120,7 @@ def densify(anchor_pos: F32Array, anchor_genomic: list[tuple[int, int, int]], s:
 
 
 def _run(problem: Problem) -> Result:
-    """Serial runner: densify one IB.  (No GPU kernel — DENSIFY registers only a
+    """Serial runner: densify one IB.  (No GPU kernel - DENSIFY registers only a
     serial runner; the batched executor maps it.)"""
     return densify(problem["anchor_pos"], problem["anchor_genomic"], problem["settings"])
 

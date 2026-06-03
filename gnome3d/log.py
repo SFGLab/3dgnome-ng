@@ -6,14 +6,14 @@ module to a single handler configured once by `setup()`.
 
 Two render styles, chosen automatically by `parallel()`:
 
-  * SERIAL  (the common ``ib_workers=1`` case) — nested 2-space indentation,
+  * SERIAL  (the common `ib_workers=1` case) - nested 2-space indentation,
     the familiar look::
 
         [solver] chr1 IB 4/52  (2 anchors)
           arcs 1/1
             mc_arcs: jax  N=2  terms=[arcs+EV]
 
-  * PARALLEL (``ib_workers>1`` or ``n_structures>1``) — no indentation;
+  * PARALLEL (`ib_workers>1` or `n_structures>1`) - no indentation;
     every line is prefixed with its full scope path so interleaved workers
     stay attributable::
 
@@ -25,11 +25,11 @@ Thread model
 The scope stack is a `contextvars.ContextVar`, which is per-thread.
 `ThreadPoolExecutor` workers start with an empty stack, so each worker
 re-establishes its own root scope (the IB / structure label) at the top of
-its task — no inheritance needed, and no cross-thread scope bleed.  The
+its task - no inheritance needed, and no cross-thread scope bleed.  The
 stdlib handler locks around each `emit`, so whole lines never interleave.
 
-Visibility is driven by log level (mapped from the legacy ``output_level``
-config knob), not by passing ``log1``/``log2``/``verbose`` flags down the
+Visibility is driven by log level (mapped from the legacy `output_level`
+config knob), not by passing `log1`/`log2`/`verbose` flags down the
 call stack:
 
     output_level 0 -> STATUS    (quiet: run banner + warnings only)
@@ -37,7 +37,7 @@ call stack:
     output_level 2 -> DEBUG     (per-batch MC step lines)
 
 Backends that must do real work to log (e.g. a JAX device->host sync to read
-a score) should guard that work with ``LOG.isEnabledFor(logging.DEBUG)``.
+a score) should guard that work with `LOG.isEnabledFor(logging.DEBUG)`.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ _SEP = " ▸ "  # ▸  joins scope tags in the parallel/file path prefix
 
 # A tier between INFO and WARNING for the handful of top-level run milestones
 # (config banner, output paths, backend coercions) that should survive even
-# the quiet ``output_level=0`` default — these always printed unconditionally
+# the quiet `output_level=0`` default - these always printed unconditionally
 # before the migration.  output_level 0 maps the console to this threshold, so
 # STATUS shows while solver(INFO) and MC-step(DEBUG) detail stay hidden.
 STATUS = 25
@@ -113,10 +113,10 @@ def step(
     The announcement renders per mode (this is the one place that knows the
     difference, so call sites stay style-agnostic):
 
-      * SERIAL — emitted at the *parent* depth, with the tag shown inline:
+      * SERIAL - emitted at the *parent* depth, with the tag shown inline:
         ``<indent>[module?] <tag>[  <msg>]``.
-      * PARALLEL — emitted *inside* the scope (the path prefix already carries
-        the tag), so only `msg` is shown; with no `msg`, nothing is emitted —
+      * PARALLEL - emitted *inside* the scope (the path prefix already carries
+        the tag), so only `msg` is shown; with no `msg`, nothing is emitted -
         the next real line will carry the path anyway.
     """
     enabled = logger.isEnabledFor(level)
@@ -179,7 +179,7 @@ class _AdaptiveFormatter(logging.Formatter):
 class _FileFormatter(logging.Formatter):
     """Full-detail, parseable line for the optional file sink: timestamp,
     level, module, scope path, message.  Always emitted regardless of the
-    console level — the file is the after-the-fact record of a parallel run."""
+    console level - the file is the after-the-fact record of a parallel run."""
 
     def __init__(self) -> None:
         super().__init__(datefmt="%H:%M:%S")
@@ -195,12 +195,12 @@ _LEVELS = {0: STATUS, 1: logging.INFO, 2: logging.DEBUG}
 
 
 def setup(output_level: int, *, log_file: str | None = None) -> None:
-    """Configure the single ``gnome3d`` sink.  Idempotent — safe to call again
+    """Configure the single ``gnome3d`` sink.  Idempotent - safe to call again
     (handlers are replaced, not stacked).
 
     `output_level` maps to the console handler's level (0/1/2 ->
     STATUS/INFO/DEBUG).  `log_file`, if given, adds a DEBUG file handler with
-    the structured formatter — handy for reconstructing parallel runs.
+    the structured formatter - handy for reconstructing parallel runs.
     """
     level = _LEVELS.get(int(output_level), logging.INFO)
     root = logging.getLogger(_ROOT)
@@ -224,6 +224,6 @@ def setup(output_level: int, *, log_file: str | None = None) -> None:
 
 
 # Install a quiet default at import so the package always logs somewhere even
-# if an embedder (a script, a test) never calls setup() — STATUS + warnings to
+# if an embedder (a script, a test) never calls setup() - STATUS + warnings to
 # stdout, matching the output_level=0 default.  cli.setup() replaces this.
 setup(0)

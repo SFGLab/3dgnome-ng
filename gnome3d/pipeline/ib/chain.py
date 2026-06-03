@@ -2,7 +2,7 @@
 IB chain assembly: turn per-IB seeds into their `arcs -> densify -> [est_dist] -> smooth`
 node chains.
 
-This is the IB domain's answer to "what is one interaction block's pipeline?" —
+This is the IB domain's answer to "what is one interaction block's pipeline?" -
 the coarse domain decides *when* to fan out (its IB-positioning node's `expand`
 hook), and calls `ib_chain_nodes` to get the actual chain.  Keeping the chain
 shape here (not in `coarse`) means the coarse spine doesn't need to know the

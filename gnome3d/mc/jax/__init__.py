@@ -1,6 +1,6 @@
 """JAX backend for the Monte-Carlo loops, split one file per kernel.
 
-Each kernel family is self-contained — it lazily imports JAX (via
+Each kernel family is self-contained - it lazily imports JAX (via
 `jax_is_available`), builds and memoises its compiled kernel, and exposes a
 single-problem entry plus (for arcs/smooth) a region-batched entry that anneals K
 different IBs in one vmapped kernel.

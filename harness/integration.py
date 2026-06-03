@@ -1049,7 +1049,7 @@ def main():
     use_anchor_heatmap = getattr(args, "with_anchor_heatmap", False)
     use_subanchor_heatmap = getattr(args, "with_subanchor_heatmap", False)
     # JAX-divergence mode exercises the batched IB path, which only runs when the
-    # subanchor heatmap is built — so auto-enable it (unless already requested).
+    # subanchor heatmap is built - so auto-enable it (unless already requested).
     if args.jax_divergence and not use_subanchor_heatmap:
         use_subanchor_heatmap = True
         print("[jax-divergence] auto-enabling subanchor heatmap to exercise the batch path")

@@ -8,7 +8,7 @@ cluster state.  The third tangles through the second, which is why the GPU path
 had to re-implement the pipeline instead of just swapping a strategy.
 
 The structural fact this package is built on: once the skeleton has placed the
-IB seeds, **an IB reconstruction is a pure, isolated computation** —
+IB seeds, **an IB reconstruction is a pure, isolated computation** -
 ``(anchors, arcs, singletons, orientations, seed_pos, settings, rng) -> beads``,
 with no cross-IB shared state (which is why it already threads safely).  So we
 model the work as a dataflow DAG of typed stages and let an executor decide
@@ -19,15 +19,15 @@ model the work as a dataflow DAG of typed stages and let an executor decide
      sequential)    explicit deps)
 
 Layout:
-  * `state`    — sealed frozen state progression (Seeded..Smoothed) + Orientation
-  * `stage`    — StageKind, the Stage protocol, Problem/Result
-  * `dag`      — Node, Dag, NodeId (the dataflow graph + ready/inputs_for)
-  * `registry` — per-kind serial/batch runner wiring (no kernel imports)
-  * `executor` — the Executor protocol (+ Serial/Batch executors)
-  * `stages/`  — concrete stage implementations (added with the port)
+  * `state`    - sealed frozen state progression (Seeded..Smoothed) + Orientation
+  * `stage`    - StageKind, the Stage protocol, Problem/Result
+  * `dag`      - Node, Dag, NodeId (the dataflow graph + ready/inputs_for)
+  * `registry` - per-kind serial/batch runner wiring (no kernel imports)
+  * `executor` - the Executor protocol (+ Serial/Batch executors)
+  * `stages/`  - concrete stage implementations (added with the port)
 
 Authorized *structural* divergence from the reference's mutable ``LooperSolver``
-shape — NOT a numerical one: every stage calls the same validated kernel, so the
+shape - NOT a numerical one: every stage calls the same validated kernel, so the
 math per stage is unchanged and the divergence is gated by fixed-seed exact bead
 comparison (see `[[feedback_no_made_up_solutions]]`).
 """
