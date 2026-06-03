@@ -5,7 +5,12 @@ Mirrors Reference Settings class.  All defaults match Settings::init() in Settin
 """
 
 import configparser
+import difflib
 from pathlib import Path
+
+from gnome3d import log
+
+LOG = log.get("settings")
 
 
 class Settings:
@@ -484,7 +489,14 @@ class Settings:
         cfg = configparser.ConfigParser()
         cfg.read(path)
 
+        # Every (section, key) the loader below actually consults.  Used after
+        # all reads to flag unknown keys in sections we own (see
+        # `_warn_unknown_keys`).  Store keys as ConfigParser stores them
+        # (optionxform-normalised) so lookups match the file's options exactly.
+        consulted: dict[str, set[str]] = {}
+
         def get(section: str, key: str) -> str | None:
+            consulted.setdefault(section, set()).add(cfg.optionxform(key))
             try:
                 return cfg.get(section, key)
             except (configparser.NoSectionError, configparser.NoOptionError):
@@ -508,6 +520,11 @@ class Settings:
             v = get(section, key)
             return v.strip() if v is not None else default
 
+        def ignore(section: str, key: str) -> None:
+            """Declare a key we deliberately don't read, so the unknown-key
+            check below doesn't flag it (it's recognised, just unused)."""
+            consulted.setdefault(section, set()).add(cfg.optionxform(key))
+
         # [main]
         self.output_level = geti("main", "output_level", self.output_level)
         self.log_file = gets("main", "log_file", self.log_file)
@@ -523,7 +540,7 @@ class Settings:
         self.steps_smooth = geti("main", "steps_smooth", self.steps_smooth)
         self.noise_lvl1 = getf("main", "noise_lvl1", self.noise_lvl1)
         self.noise_lvl2 = getf("main", "noise_lvl2", self.noise_lvl2)
-        # noise_arcs intentionally ignored (see Settings class comment).
+        ignore("main", "noise_arcs")  # intentionally unused (see Settings class comment)
         self.noise_smooth = getf("main", "noise_smooth", self.noise_smooth)
         self.noise_ib = getf("main", "noise_ib", self.noise_ib)
 
@@ -842,7 +859,38 @@ class Settings:
             self.mc_stop_successes_smooth,
         )
 
+        self._warn_unknown_keys(cfg, consulted)
         return True
+
+    @staticmethod
+    def _warn_unknown_keys(
+        cfg: configparser.ConfigParser, consulted: dict[str, set[str]]
+    ) -> None:
+        """Warn about keys present in the file but never read by `load_ini`.
+
+        A "mistype" is any option the loader never asks for: a misspelling
+        (``mc_executor_jax_bukcet_shapes``), a wrong prefix
+        (``jax_bucket_shapes`` instead of ``mc_executor_jax_bucket_shapes``), a
+        stale/renamed name (``mc_executor_heat`` -> ``mc_executor_estimate_dist``),
+        or a key put under the wrong section.  Any of these is silently ignored
+        by ConfigParser, so the setting just doesn't take effect.
+
+        Scoped to sections the loader actually consults, so reference-binary-only
+        sections (e.g. ``[cuda]``) that the Python pipeline never reads don't
+        produce false positives.
+        """
+        for section in cfg.sections():
+            known = consulted.get(section)
+            if not known:  # section we don't own; skip to avoid false positives
+                continue
+            for key in cfg.options(section):
+                if key in known:
+                    continue
+                near = difflib.get_close_matches(key, known, n=1, cutoff=0.6)
+                hint = f" (did you mean '{near[0]}'?)" if near else ""
+                LOG.warning(
+                    "[%s] unknown key '%s' is ignored%s", section, key, hint
+                )
 
     def genomic_length_to_distance(self, length_bp: int) -> float:
         from gnome3d.util import genomic_length_to_distance
