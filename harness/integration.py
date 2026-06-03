@@ -435,7 +435,7 @@ def write_config(
             "mc_backend_apply_to_smooth = yes\n"
             "mc_backend_apply_to_arcs = yes\n"
             "mc_backend_apply_to_heatmap = yes\n"
-            "jax_bucket_shapes = yes\n"
+            "mc_executor_jax_bucket_shapes = yes\n"
         )
     path.write_text(cfg)
 
