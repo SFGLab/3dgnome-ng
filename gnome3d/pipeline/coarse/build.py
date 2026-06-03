@@ -367,7 +367,7 @@ def build_contact_heatmaps(
     state: CoarseState,
     active_region: list[int],
     chr_: str,
-) -> tuple[F64Array, F64Array]:
+) -> tuple[F64Array, F32Array]:
     """
     Build anchor-level and subanchor-level singleton contact heatmaps.
     Mirrors Reference createSingletonSubanchorHeatmap().
@@ -376,9 +376,12 @@ def build_contact_heatmaps(
       anchor_heatmap:      (n_anchors, n_anchors) float64 - normalized contact
                            density between anchor pairs; used for expected-distance
                            scaling in arc MC.
-      subanchor_heatmap_raw: (N, N) float64 where N = n_anchors + (n_anchors-1)*ld
+      subanchor_heatmap_raw: (N, N) float32 where N = n_anchors + (n_anchors-1)*ld
                            - normalized contact density at densified-bead resolution;
-                           used for heat energy in smooth MC.
+                           used for heat energy in smooth MC.  Built in float64 (the
+                           binning/normalization stay byte-exact) then stored float32:
+                           it's a dense (N,N) matrix held per-IB, ~8.6 GB at N=32768
+                           in f64, and the reference Heatmap is `float` anyway.
     """
     clusters = state.clusters
     n_anchors = len(active_region)
@@ -492,7 +495,7 @@ def build_contact_heatmaps(
         np.fill_diagonal(off, False)  # diagonal untouched (matches the i<j loop)
         h_sub[off] = h_sub[off] / denom[off]
 
-    return h_anchor, h_sub
+    return h_anchor, h_sub.astype(np.float32)
 
 
 # --- RNG-ordered positioning ops (the coarse MC spine) ----------------------

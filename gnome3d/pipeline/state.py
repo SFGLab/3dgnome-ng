@@ -51,7 +51,7 @@ class Seeded:
     orientations: I8Array | None  # (A,) Orientation codes, or None when motif off
     anchor_neighbors: dict[int, list[int]] | None  # CTCF motif graph (anchor-local)
     anchor_neighbor_weights: dict[int, list[float]] | None
-    subanchor_heat_raw: F64Array | None  # raw subanchor contact heatmap (or None)
+    subanchor_heat_raw: F32Array | None  # raw subanchor contact heatmap (or None); float32 (N,N)
     anchor_genomic: list[tuple[int, int, int]]  # (start_bp, end_bp, midpoint_bp) per anchor
     step_size_arcs: float
 
@@ -81,7 +81,7 @@ class DistEstimated(Densified):
     """After heat-dist estimate: the subanchor distance target (None when the
     sparse-signal early-out skipped it -> smooth runs without heat)."""
 
-    heat_dist: F64Array | None  # (N, N)
+    heat_dist: F32Array | None  # (N, N); float32 to match the reference float Heatmap
 
 
 @dataclass(frozen=True)

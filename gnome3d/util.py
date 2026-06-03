@@ -12,7 +12,7 @@ import threading
 import numpy as np
 
 from gnome3d import log
-from gnome3d.types import F32Array, F64Array
+from gnome3d.types import BoolArray, F32Array, F64Array
 
 LOG = log.get("util")
 
@@ -76,6 +76,35 @@ def random_vector_np(step: float, in_2d: bool = False) -> F32Array:
         ],
         dtype=np.float32,
     )
+
+
+def add_movable_noise_inplace(
+    pos: F32Array, fixed: BoolArray | None, step: float
+) -> None:
+    """Add a uniform-cube displacement (each component in [-step, step]) to every
+    non-`fixed` bead of `pos`, in place.  `fixed=None` noises every bead (the
+    arcs case, which has no fixed mask).
+
+    Vectorised, byte-identical replacement for the per-bead loop
+    ``for i in range(n): if not fixed[i]: pos[i] += random_vector_np(step)`` -
+    same Mersenne-Twister stream, same float32 result.  The equivalence rests on:
+      * the loop draws ``z, x, y`` per movable bead (index order), so a flat block
+        of ``3*m`` draws reshaped ``(m, 3)`` reproduces the exact sequence;
+      * ``r.uniform(-s, s) == -s + (2s)*r.random()``, and ``(2s)*x - s`` is the
+        same IEEE-754 value (add is commutative), then rounded to float32.
+    Draws the per-bead ``z`` component even though it lands in column 2, matching
+    the 3D (non-`in_2d`) `random_vector_np` the callers use.
+    """
+    idx = np.arange(pos.shape[0]) if fixed is None else np.flatnonzero(~fixed)
+    m = int(idx.size)
+    if m == 0:
+        return
+    draw = _rng().random
+    raw = np.fromiter((draw() for _ in range(3 * m)), dtype=np.float64, count=3 * m)
+    disp = (2.0 * step) * raw.reshape(m, 3) - step  # columns: [z, x, y]
+    pos[idx, 0] += disp[:, 1].astype(np.float32)
+    pos[idx, 1] += disp[:, 2].astype(np.float32)
+    pos[idx, 2] += disp[:, 0].astype(np.float32)
 
 
 def calc_orientation(pos: F64Array, cind: int, n: int, char_orientation: str) -> F64Array:

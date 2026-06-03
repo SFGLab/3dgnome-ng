@@ -21,7 +21,7 @@ import numpy as np
 from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Arced, Seeded, State
-from gnome3d.util import random_vector_np, seed_rng
+from gnome3d.util import add_movable_noise_inplace, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.types import F32Array
@@ -45,13 +45,11 @@ def _run(problem: Problem) -> Result:
     seed_rng(seed)
     mc_numba.seed_numba(seed)
 
-    a = pos0.shape[0]
     best_score = -1.0
     best: F32Array = pos0.copy()
     for _run_i in range(max(1, int(s.steps_arcs))):
         pos: F32Array = pos0.copy()
-        for i in range(a):
-            pos[i] += random_vector_np(step)
+        add_movable_noise_inplace(pos, None, step)  # arcs noises ALL anchors
         score = mc_numba.mc_arcs_numba(pos, exp_dist, step, s)  # mutates pos in place
         if score < best_score or best_score < 0.0:
             best_score = score
@@ -75,11 +73,9 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
         seed_rng(int(prob["seed"]))  # deterministic restart noise for this IB
         pos = prob["anchor_pos"]
         step = float(prob["step_size"])
-        a = pos.shape[0]
         for _ in range(n_restarts):
             start = pos.copy()
-            for i in range(a):  # arcs noises ALL anchors (no fixed mask)
-                start[i] += random_vector_np(step)
+            add_movable_noise_inplace(start, None, step)  # arcs noises ALL anchors
             expanded.append({"pos": start, "exp_dist": prob["exp_dist"], "step_size": step})
             owner.append(gi)
 

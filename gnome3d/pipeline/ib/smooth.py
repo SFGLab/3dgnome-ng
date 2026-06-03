@@ -25,7 +25,7 @@ from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import AnchorMapEntry, Densified, Orientation, Smoothed, State
 from gnome3d.types import BeadOut
-from gnome3d.util import random_vector_np, seed_rng
+from gnome3d.util import add_movable_noise_inplace, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -84,12 +84,9 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
         pos = prob["pos"]
         fixed = prob["fixed"]
         step = float(prob["step_size"])
-        n = len(pos)
         for _ in range(n_restarts):
             start = pos.copy()
-            for i in range(n):
-                if not fixed[i]:
-                    start[i] += random_vector_np(step)
+            add_movable_noise_inplace(start, fixed, step)
             expanded.append({**prob, "pos": start})
             owner.append(gi)
 
@@ -121,14 +118,11 @@ def _run(problem: Problem) -> Result:
     seed_rng(seed)
     mc_numba.seed_numba(seed)
 
-    n = len(pos)
     best_score = -1.0
     best_pos: F32Array = pos.copy()
     for _run_i in range(max(1, int(s.steps_smooth))):
         pos_run: F32Array = best_pos.copy()
-        for i in range(n):
-            if not fixed[i]:
-                pos_run[i] += random_vector_np(step)
+        add_movable_noise_inplace(pos_run, fixed, step)
         score = mc_numba.mc_smooth_numba(pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat)
         if score < best_score or best_score < 0.0:
             best_score = score

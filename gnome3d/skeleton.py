@@ -28,7 +28,7 @@ from gnome3d.pipeline import Orientation, Seeded
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
 from gnome3d.settings import Settings
-from gnome3d.types import F64Array, I8Array
+from gnome3d.types import F32Array, F64Array, I8Array
 
 LOG = log.get("skeleton")
 
@@ -39,7 +39,7 @@ _ARCS_NOISE: float = 0.005
 _ORN_CODE: dict[str, int] = {"L": Orientation.LEFT, "R": Orientation.RIGHT}
 
 
-def _heat_signal_negligible(settings: Settings, subanchor_heat_raw: F64Array, n: int) -> bool:
+def _heat_signal_negligible(settings: Settings, subanchor_heat_raw: F32Array, n: int) -> bool:
     """True when an IB's subanchor heat is too sparse to affect the structure, so
     the (expensive) ESTIMATE_DIST stage can be dropped from its chain.
 
@@ -139,7 +139,7 @@ def seed_for_ib(
 
     # Contact heatmaps (anchor-level scales exp_dist; subanchor feeds ESTIMATE_DIST).
     anchor_heat: F64Array | None = None
-    subanchor_heat_raw: F64Array | None = None
+    subanchor_heat_raw: F32Array | None = None
     if (state.s.use_anchor_heatmap or state.s.use_subanchor_heatmap) and state.singletons:
         anchor_heat, subanchor_heat_raw = cb.build_contact_heatmaps(state, active_region, chr_)
 
@@ -180,7 +180,7 @@ def seed_for_ib(
     wants_heat = (
         subanchor_heat_raw is not None
         and bool(state.s.use_subanchor_heatmap)
-        and float(subanchor_heat_raw.mean()) >= 1e-6
+        and float(subanchor_heat_raw.mean(dtype=np.float64)) >= 1e-6  # f64 accum on the f32 matrix
         and not _heat_signal_negligible(state.s, subanchor_heat_raw, a)
     )
 
