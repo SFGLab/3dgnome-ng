@@ -132,7 +132,7 @@ class Settings:
     # mc_backend now only selects the *coarse* MC kernel (heatmap/ib).
     mc_executor_arcs: str
     mc_executor_densify: str
-    mc_executor_heat: str
+    mc_executor_estimate_dist: str
     mc_executor_smooth: str
     # Pad each JAX kernel's bead count up to a fixed bucket ladder so XLA
     # compiles ~one kernel per bucket instead of one per distinct region size.
@@ -350,7 +350,7 @@ class Settings:
         self.mc_smooth_chains = 1
         self.mc_executor_arcs = "auto"
         self.mc_executor_densify = "auto"
-        self.mc_executor_heat = "auto"
+        self.mc_executor_estimate_dist = "auto"
         self.mc_executor_smooth = "auto"
         self.mc_executor_threaded_workers = 1
         self.mc_executor_jax_bucket_shapes = False
@@ -660,21 +660,29 @@ class Settings:
         self.mc_executor_densify = gets(
             "simulation_backend", "mc_executor_densify", self.mc_executor_densify
         )
-        self.mc_executor_heat = gets("simulation_backend", "mc_executor_heat", self.mc_executor_heat)
+        self.mc_executor_estimate_dist = gets(
+            "simulation_backend", "mc_executor_estimate_dist", self.mc_executor_estimate_dist
+        )
         self.mc_executor_smooth = gets(
             "simulation_backend", "mc_executor_smooth", self.mc_executor_smooth
         )
         self.mc_executor_jax_bucket_shapes = getb(
-            "simulation_backend", "jax_bucket_shapes", self.mc_executor_jax_bucket_shapes
+            "simulation_backend", "mc_executor_jax_bucket_shapes", self.mc_executor_jax_bucket_shapes
         )
         self.mc_executor_jax_precompile_buckets = getb(
-            "simulation_backend", "jax_precompile_buckets", self.mc_executor_jax_precompile_buckets
+            "simulation_backend",
+            "mc_executor_jax_precompile_buckets",
+            self.mc_executor_jax_precompile_buckets,
         )
         self.mc_executor_jax_batch_width_smooth = gets(
-            "simulation_backend", "jax_batch_width_smooth", self.mc_executor_jax_batch_width_smooth
+            "simulation_backend",
+            "mc_executor_jax_batch_width_smooth",
+            self.mc_executor_jax_batch_width_smooth,
         )
         self.mc_executor_jax_batch_width_arcs = gets(
-            "simulation_backend", "jax_batch_width_arcs", self.mc_executor_jax_batch_width_arcs
+            "simulation_backend",
+            "mc_executor_jax_batch_width_arcs",
+            self.mc_executor_jax_batch_width_arcs,
         )
 
         # [simulation_arcs]

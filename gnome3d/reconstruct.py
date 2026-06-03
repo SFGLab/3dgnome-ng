@@ -89,7 +89,7 @@ def pick_executor(settings: Settings) -> Executor:
             settings.mc_executor_densify, StageKind.DENSIFY, settings
         ),
         StageKind.ESTIMATE_DIST: _resolve_strategy(
-            settings.mc_executor_heat, StageKind.ESTIMATE_DIST, settings
+            settings.mc_executor_estimate_dist, StageKind.ESTIMATE_DIST, settings
         ),
         StageKind.SMOOTH: _resolve_strategy(
             settings.mc_executor_smooth, StageKind.SMOOTH, settings
