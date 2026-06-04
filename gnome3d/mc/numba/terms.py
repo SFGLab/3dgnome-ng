@@ -96,7 +96,7 @@ def _smooth_ang_nb(pos: F64Array, i: int, ang_k: float, ang_w: float) -> float:
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _local_smooth_nb(
+def local_smooth_nb(
     pos: F64Array,
     dtn: F64Array,
     p: int,
@@ -121,7 +121,7 @@ def _local_smooth_nb(
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _init_smooth_nb(
+def init_smooth_nb(
     pos: F64Array,
     dtn: F64Array,
     stretch_k: float,
@@ -163,7 +163,7 @@ def _local_confine_nb(
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _init_confine_nb(
+def init_confine_nb(
     pos: F64Array, cx: float, cy: float, cz: float, R: float, weight: float
 ) -> float:
     n = pos.shape[0]
@@ -210,7 +210,7 @@ def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
+def init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
     n = pos.shape[0]
     err = 0.0
     for i in range(n):
@@ -263,7 +263,7 @@ def _calc_orientation_nb(
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _score_orientation_full_nb(
+def score_orientation_full_nb(
     anchor_orn: F64Array,
     nbr_offsets: I32Array,
     nbr_indices: I32Array,
@@ -334,7 +334,7 @@ def _local_score_orientation_nb(
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: float) -> float:
+def local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: float) -> float:
     """Local heat score for bead p vs all others.
     Mirrors Reference calcScoreSubanchorHeatmap(int moved) - sums all i != p.
     """
@@ -356,7 +356,7 @@ def _local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: floa
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> float:
+def init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> float:
     """Global heat score (double-counts pairs, matching Reference calcScoreSubanchorHeatmap())."""
     n = pos.shape[0]
     err = 0.0
@@ -404,7 +404,7 @@ def _local_arcs_nb(
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _init_arcs_nb(pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float) -> float:
+def init_arcs_nb(pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float) -> float:
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
@@ -447,7 +447,7 @@ def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p:
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float:
+def init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float:
     """O(N^2) init - parallelised over rows; sum reduction is auto-handled."""
     n = pos.shape[0]
     sc = 0.0
@@ -488,7 +488,7 @@ def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> floa
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def _batch_mc_nb(
+def batch_mc_nb(
     pos: F64Array,
     movable: I64Array,
     # ---- Structure term ----
@@ -559,7 +559,7 @@ def _batch_mc_nb(
         if struct_type == STRUCT_ARCS:
             loc_struct_prev = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k)
         elif struct_type == STRUCT_CHAIN:
-            loc_struct_prev = _local_smooth_nb(
+            loc_struct_prev = local_smooth_nb(
                 pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
             )
         else:  # STRUCT_HEATMAP
@@ -567,7 +567,7 @@ def _batch_mc_nb(
 
         loc_heat_prev = 0.0
         if use_heat:
-            loc_heat_prev = _local_heat_nb(pos, heat_dist, p, heat_weight)
+            loc_heat_prev = local_heat_nb(pos, heat_dist, p, heat_weight)
 
         loc_excl_prev = 0.0
         if use_excl:
@@ -609,7 +609,7 @@ def _batch_mc_nb(
         if struct_type == STRUCT_ARCS:
             loc_struct_curr = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k)
         elif struct_type == STRUCT_CHAIN:
-            loc_struct_curr = _local_smooth_nb(
+            loc_struct_curr = local_smooth_nb(
                 pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
             )
         else:  # STRUCT_HEATMAP
@@ -618,7 +618,7 @@ def _batch_mc_nb(
 
         score_heat_new = score_heat
         if use_heat:
-            loc_heat_curr = _local_heat_nb(pos, heat_dist, p, heat_weight)
+            loc_heat_curr = local_heat_nb(pos, heat_dist, p, heat_weight)
             score_heat_new = score_heat + 2.0 * (loc_heat_curr - loc_heat_prev)
 
         score_excl_new = score_excl

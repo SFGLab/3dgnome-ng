@@ -12,17 +12,17 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 
 from gnome3d.mc.numba.common import (
-    _as_f64,
-    _dummy_bool,
-    _dummy_f64,
-    _dummy_i32,
-    _run_outer_loop,
+    as_f64,
+    dummy_bool,
+    dummy_f64,
+    dummy_i32,
+    run_outer_loop,
 )
 from gnome3d.mc.numba.terms import (
     STRUCT_ARCS,
-    _init_arcs_nb,
-    _init_confine_nb,
-    _init_excl_nb,
+    init_arcs_nb,
+    init_confine_nb,
+    init_excl_nb,
 )
 from gnome3d.types import I32Array, I64Array
 
@@ -44,8 +44,8 @@ def mc_arcs_numba(
     if n <= 1:
         return 0.0
 
-    pw = _as_f64(pos)
-    exp64 = _as_f64(exp_dist_mat)
+    pw = as_f64(pos)
+    exp64 = as_f64(exp_dist_mat)
 
     stretch_k = float(settings.spring_stretch_arcs)
     squeeze_k = float(settings.spring_squeeze_arcs)
@@ -72,10 +72,10 @@ def mc_arcs_numba(
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
     movable: I64Array = np.arange(n, dtype=np.int64)
-    score_struct = float(_init_arcs_nb(pw, exp64, stretch_k, squeeze_k))
+    score_struct = float(init_arcs_nb(pw, exp64, stretch_k, squeeze_k))
     score_excl = (
         float(
-            _init_excl_nb(
+            init_excl_nb(
                 pw,
                 excl_r0,
                 float(settings.exclusion_weight),
@@ -87,7 +87,7 @@ def mc_arcs_numba(
     )
     score_conf = (
         float(
-            _init_confine_nb(
+            init_confine_nb(
                 pw, conf_cx, conf_cy, conf_cz, conf_R, float(settings.confinement_weight)
             )
         )
@@ -95,13 +95,13 @@ def mc_arcs_numba(
         else 0.0
     )
 
-    score = _run_outer_loop(
+    score = run_outer_loop(
         pw=pw,
         movable=movable,
         struct_type=STRUCT_ARCS,
         exp_mat=exp64,
-        dtn=_dummy_f64((1,)),
-        skip_mat=_dummy_bool(),
+        dtn=dummy_f64((1,)),
+        skip_mat=dummy_bool(),
         stretch_k=stretch_k,
         squeeze_k=squeeze_k,
         ang_k=0.0,
@@ -109,13 +109,13 @@ def mc_arcs_numba(
         ang_w=1.0,
         struct_delta_factor=1.0,
         use_heat=False,
-        heat_dist=_dummy_f64(),
+        heat_dist=dummy_f64(),
         heat_weight=0.0,
         use_orn=False,
         orn_is_L=np.zeros(1, dtype=np.bool_),
-        anchor_ar=_dummy_i32(),
+        anchor_ar=dummy_i32(),
         nbr_offsets=np.zeros(2, dtype=np.int32),
-        nbr_indices=_dummy_i32(),
+        nbr_indices=dummy_i32(),
         nbr_weights=np.zeros(1, dtype=np.float64),
         anchor_orn=np.zeros((1, 3), dtype=np.float64),
         bead_to_anchor_k=cast(I32Array, np.full(n, -1, dtype=np.int32)),

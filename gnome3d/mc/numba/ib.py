@@ -12,17 +12,17 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 
 from gnome3d.mc.numba.common import (
-    _as_f64,
-    _dummy_bool,
-    _dummy_f64,
-    _dummy_i32,
-    _run_outer_loop,
+    as_f64,
+    dummy_bool,
+    dummy_f64,
+    dummy_i32,
+    run_outer_loop,
 )
 from gnome3d.mc.numba.terms import (
     STRUCT_CHAIN,
-    _init_confine_nb,
-    _init_excl_nb,
-    _init_smooth_nb,
+    init_confine_nb,
+    init_excl_nb,
+    init_smooth_nb,
 )
 from gnome3d.types import I32Array, I64Array
 
@@ -49,8 +49,8 @@ def mc_ib_numba(
     if n <= 1:
         return 0.0
 
-    pw = _as_f64(pos)
-    dtn64 = _as_f64(dtn)
+    pw = as_f64(pos)
+    dtn64 = as_f64(dtn)
     movable: I64Array = np.arange(n, dtype=np.int64)
 
     stretch_k = float(settings.spring_stretch_ib)
@@ -80,13 +80,13 @@ def mc_ib_numba(
             pf = float(settings.confinement_packing_factor_ib)
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
-    score_struct = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
+    score_struct = float(init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
     score_excl = (
-        float(_init_excl_nb(pw, excl_r0, float(settings.exclusion_weight), 1)) if use_excl else 0.0
+        float(init_excl_nb(pw, excl_r0, float(settings.exclusion_weight), 1)) if use_excl else 0.0
     )
     score_conf = (
         float(
-            _init_confine_nb(
+            init_confine_nb(
                 pw, conf_cx, conf_cy, conf_cz, conf_R, float(settings.confinement_weight)
             )
         )
@@ -94,13 +94,13 @@ def mc_ib_numba(
         else 0.0
     )
 
-    score = _run_outer_loop(
+    score = run_outer_loop(
         pw=pw,
         movable=movable,
         struct_type=STRUCT_CHAIN,
-        exp_mat=_dummy_f64(),
+        exp_mat=dummy_f64(),
         dtn=dtn64,
-        skip_mat=_dummy_bool(),
+        skip_mat=dummy_bool(),
         stretch_k=stretch_k,
         squeeze_k=squeeze_k,
         ang_k=ang_k,
@@ -108,13 +108,13 @@ def mc_ib_numba(
         ang_w=ang_w,
         struct_delta_factor=1.0,
         use_heat=False,
-        heat_dist=_dummy_f64(),
+        heat_dist=dummy_f64(),
         heat_weight=0.0,
         use_orn=False,
         orn_is_L=np.zeros(1, dtype=np.bool_),
-        anchor_ar=_dummy_i32(),
+        anchor_ar=dummy_i32(),
         nbr_offsets=np.zeros(2, dtype=np.int32),
-        nbr_indices=_dummy_i32(),
+        nbr_indices=dummy_i32(),
         nbr_weights=np.zeros(1, dtype=np.float64),
         anchor_orn=np.zeros((1, 3), dtype=np.float64),
         bead_to_anchor_k=cast(I32Array, np.full(n, -1, dtype=np.int32)),

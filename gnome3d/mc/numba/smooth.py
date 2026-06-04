@@ -18,21 +18,21 @@ from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
 from gnome3d.mc.numba.common import (
-    _as_f64,
-    _dummy_bool,
-    _dummy_f64,
-    _dummy_i32,
-    _prepare_orientation,
-    _run_outer_loop,
+    as_f64,
+    dummy_bool,
+    dummy_f64,
+    dummy_i32,
+    prepare_orientation,
+    run_outer_loop,
 )
 from gnome3d.mc.numba.terms import (
     STRUCT_CHAIN,
-    _init_confine_nb,
-    _init_excl_nb,
-    _init_heat_nb,
-    _init_smooth_nb,
-    _local_heat_nb,
-    _local_smooth_nb,
+    init_confine_nb,
+    init_excl_nb,
+    init_heat_nb,
+    init_smooth_nb,
+    local_heat_nb,
+    local_smooth_nb,
     njit,
 )
 from gnome3d.types import F64Array, I32Array, I64Array
@@ -79,25 +79,25 @@ def _batch_smooth_chain_nb(
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
 
-        loc_struct_prev = _local_smooth_nb(
+        loc_struct_prev = local_smooth_nb(
             pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
         )
         loc_heat_prev = 0.0
         if use_heat:
-            loc_heat_prev = _local_heat_nb(pos, heat_dist, p, heat_weight)
+            loc_heat_prev = local_heat_nb(pos, heat_dist, p, heat_weight)
 
         pos[p, 0] += dx
         pos[p, 1] += dy
         pos[p, 2] += dz
 
-        loc_struct_curr = _local_smooth_nb(
+        loc_struct_curr = local_smooth_nb(
             pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
         )
         score_struct_new = score_struct - loc_struct_prev + loc_struct_curr
 
         score_heat_new = score_heat
         if use_heat:
-            loc_heat_curr = _local_heat_nb(pos, heat_dist, p, heat_weight)
+            loc_heat_curr = local_heat_nb(pos, heat_dist, p, heat_weight)
             score_heat_new = score_heat + 2.0 * (loc_heat_curr - loc_heat_prev)
 
         score_new = score_struct_new + score_heat_new
@@ -150,8 +150,8 @@ def _mc_smooth_kchains_nb(
     for k in prange(K):  # pyright: ignore[reportGeneralTypeIssues]
         pos = pos_k[k]
         T = max_temp
-        score_struct = _init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
-        score_heat = _init_heat_nb(pos, heat_dist, heat_weight) if use_heat else 0.0
+        score_struct = init_smooth_nb(pos, dtn, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
+        score_heat = init_heat_nb(pos, heat_dist, heat_weight) if use_heat else 0.0
         score = score_struct + score_heat
         ms_score = score
         while True:
@@ -207,11 +207,11 @@ def _mc_smooth_multichain(
     pos_k: F64Array = np.ascontiguousarray(
         np.broadcast_to(pos.astype(np.float64), (K, n, 3)).copy()
     )
-    dtn64 = _as_f64(dtn)
+    dtn64 = as_f64(dtn)
     use_heat = heat_dist is not None
     if use_heat:
         assert heat_dist is not None
-        heat64 = _as_f64(heat_dist)
+        heat64 = as_f64(heat_dist)
     else:
         heat64 = np.zeros((1, 1), dtype=np.float64)
 
@@ -295,8 +295,8 @@ def mc_smooth_numba(
     if len(movable) == 0:
         return 0.0
 
-    pw = _as_f64(pos)
-    dtn64 = _as_f64(dtn)
+    pw = as_f64(pos)
+    dtn64 = as_f64(dtn)
 
     stretch_k = float(settings.spring_stretch)
     squeeze_k = float(settings.spring_squeeze)
@@ -336,10 +336,10 @@ def mc_smooth_numba(
 
     if use_heat:
         assert heat_dist is not None
-        heat64 = _as_f64(heat_dist)
-        score_heat = float(_init_heat_nb(pw, heat64, heat_weight))
+        heat64 = as_f64(heat_dist)
+        score_heat = float(init_heat_nb(pw, heat64, heat_weight))
     else:
-        heat64 = _dummy_f64()
+        heat64 = dummy_f64()
         score_heat = 0.0
 
     if use_orn:
@@ -355,7 +355,7 @@ def mc_smooth_numba(
             bead_to_anchor_k,
             anchor_orn,
             score_orn,
-        ) = _prepare_orientation(
+        ) = prepare_orientation(
             pw,
             fixed,
             char_orientations,
@@ -365,19 +365,19 @@ def mc_smooth_numba(
             motifs_symmetric,
         )
     else:
-        anchor_ar = _dummy_i32()
+        anchor_ar = dummy_i32()
         nbr_offsets = np.zeros(2, dtype=np.int32)
-        nbr_indices = _dummy_i32()
+        nbr_indices = dummy_i32()
         nbr_weights = np.zeros(1, dtype=np.float64)
         orn_is_L = np.zeros(1, dtype=np.bool_)
         bead_to_anchor_k = cast(I32Array, np.full(n, -1, dtype=np.int32))
         anchor_orn = np.zeros((1, 3), dtype=np.float64)
         score_orn = 0.0
 
-    score_struct = float(_init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
+    score_struct = float(init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
     score_excl = (
         float(
-            _init_excl_nb(
+            init_excl_nb(
                 pw,
                 excl_r0,
                 float(settings.exclusion_weight),
@@ -389,7 +389,7 @@ def mc_smooth_numba(
     )
     score_conf = (
         float(
-            _init_confine_nb(
+            init_confine_nb(
                 pw, conf_cx, conf_cy, conf_cz, conf_R, float(settings.confinement_weight)
             )
         )
@@ -397,13 +397,13 @@ def mc_smooth_numba(
         else 0.0
     )
 
-    score = _run_outer_loop(
+    score = run_outer_loop(
         pw=pw,
         movable=movable,
         struct_type=STRUCT_CHAIN,
-        exp_mat=_dummy_f64(),
+        exp_mat=dummy_f64(),
         dtn=dtn64,
-        skip_mat=_dummy_bool(),
+        skip_mat=dummy_bool(),
         stretch_k=stretch_k,
         squeeze_k=squeeze_k,
         ang_k=ang_k,

@@ -14,29 +14,29 @@ from typing import Any, cast
 import numpy as np
 
 from gnome3d import log
-from gnome3d.mc.numba.terms import _batch_mc_nb, _score_orientation_full_nb
+from gnome3d.mc.numba.terms import batch_mc_nb, score_orientation_full_nb
 from gnome3d.types import BoolArray, F64Array, I32Array, I64Array
 
 LOG = log.get("mc.numba")
 
 
-def _as_f64(arr: np.ndarray[Any, Any]) -> F64Array:
+def as_f64(arr: np.ndarray[Any, Any]) -> F64Array:
     return np.ascontiguousarray(arr, dtype=np.float64)
 
 
-def _dummy_f64(shape: tuple[int, ...] = (1, 1)) -> F64Array:
+def dummy_f64(shape: tuple[int, ...] = (1, 1)) -> F64Array:
     return np.zeros(shape, dtype=np.float64)
 
 
-def _dummy_bool(shape: tuple[int, ...] = (1, 1)) -> BoolArray:
+def dummy_bool(shape: tuple[int, ...] = (1, 1)) -> BoolArray:
     return np.zeros(shape, dtype=np.bool_)
 
 
-def _dummy_i32(shape: tuple[int, ...] = (1,)) -> I32Array:
+def dummy_i32(shape: tuple[int, ...] = (1,)) -> I32Array:
     return np.zeros(shape, dtype=np.int32)
 
 
-def _prepare_orientation(
+def prepare_orientation(
     pw: F64Array,
     fixed: np.ndarray[Any, Any],
     char_orientations: np.ndarray[Any, Any],
@@ -81,7 +81,7 @@ def _prepare_orientation(
         ar = int(anchor_ar[k])
         anchor_orn[k] = _calc_orn(pw, ar, n, char_orientations[ar])
     score_orn = float(
-        _score_orientation_full_nb(
+        score_orientation_full_nb(
             anchor_orn, nbr_offsets, nbr_indices, nbr_weights, motif_weight, motifs_symmetric
         )
     )
@@ -97,7 +97,7 @@ def _prepare_orientation(
     )
 
 
-def _run_outer_loop(
+def run_outer_loop(
     pw: F64Array,
     movable: I64Array,
     struct_type: int,
@@ -155,7 +155,7 @@ def _run_outer_loop(
     ms_score = score
     step_i = 0
     while True:
-        (T, score_struct, score_heat, score_orn, score_excl, score_conf, n_ok) = _batch_mc_nb(
+        (T, score_struct, score_heat, score_orn, score_excl, score_conf, n_ok) = batch_mc_nb(
             pw,
             movable,
             struct_type,
