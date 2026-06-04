@@ -178,8 +178,8 @@ def _mc_smooth_kchains_nb(
             )
             score = score_struct + score_heat
             converged = (
-                            score > stop_improvement * ms_score and n_ok < stop_successes
-                        ) or score < 1e-6
+                score > stop_improvement * ms_score and n_ok < stop_successes
+            ) or score < 1e-6
             if converged:
                 break
             ms_score = score
@@ -284,8 +284,8 @@ def mc_smooth_numba(
         simple_config = (
             char_orientations is None
             and not (
-            bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
-        )
+                bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
+            )
             and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
         )
         if simple_config:

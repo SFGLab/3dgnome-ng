@@ -53,7 +53,9 @@ def _accumulate_pairwise_dist(acc: F32Array, pos: F32Array) -> None:
 
 
 @njit(cache=True, parallel=True, nogil=True)  # no fastmath: keep bit-identical to the old loop
-def _fill_heat_dist_inplace(avg_dist: F32Array, heat_raw: F32Array, avg_heat: float, influence: float) -> None:
+def _fill_heat_dist_inplace(
+    avg_dist: F32Array, heat_raw: F32Array, avg_heat: float, influence: float
+) -> None:
     """Overwrite `avg_dist` in place with the expected-distance target, mirroring
     the reference `createExpectedDistSubanchorHeatmap`: high-contact pairs scaled
     down by `influence`.  Same arithmetic as the old pure-Python double loop
@@ -102,7 +104,9 @@ def _estimate_avg_dist(
     return avg_dist
 
 
-def _heat_dist_from_avg(avg_dist: F32Array, subanchor_heat_raw: F32Array, s: Settings) -> F32Array | None:
+def _heat_dist_from_avg(
+    avg_dist: F32Array, subanchor_heat_raw: F32Array, s: Settings
+) -> F32Array | None:
     """Turn avg distances + raw subanchor heat into the expected-distance target
     (Reference createExpectedDistSubanchorHeatmap): high-contact pairs scaled
     down by `influence`.  None when the heatmap is empty.  Port of
@@ -120,8 +124,12 @@ def _heat_dist_from_avg(avg_dist: F32Array, subanchor_heat_raw: F32Array, s: Set
 def _run(problem: Problem) -> Result:
     """Serial runner: estimate avg_dist (dry smooth) then build the target matrix."""
     avg = _estimate_avg_dist(
-        problem["pos"], problem["fixed"], problem["dtn"], problem["step_size"],
-        problem["settings"], problem["seed"],
+        problem["pos"],
+        problem["fixed"],
+        problem["dtn"],
+        problem["step_size"],
+        problem["settings"],
+        problem["seed"],
     )
 
     return _heat_dist_from_avg(avg, problem["subanchor_heat_raw"], problem["settings"])
@@ -171,7 +179,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
         base = spans[gi]
         avg_dist: F32Array = np.zeros((n, n), dtype=np.float32)
         for rep in range(n_reps):
-            rep_slice = results[base + rep * n_steps: base + (rep + 1) * n_steps]
+            rep_slice = results[base + rep * n_steps : base + (rep + 1) * n_steps]
             scores = [r[0] for r in rep_slice]
             best_pos = rep_slice[int(np.argmin(scores))][1]
             _accumulate_pairwise_dist(avg_dist, best_pos)

@@ -52,6 +52,7 @@ def seed_numba(seed: int) -> None:
 
 # Smooth MC helpers
 
+
 @njit(cache=True, fastmath=True, nogil=True)
 def _smooth_len_nb(
     pos: F64Array,

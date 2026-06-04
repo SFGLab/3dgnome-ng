@@ -6,9 +6,6 @@ IBs' anchors in one vmapped kernel (region batching).  Both build/compile throug
 batched kernel freezes converged chains once they stop improving.
 """
 
-# NB: no `from __future__ import annotations` - the JAX kernels reflect on live
-# type objects, so the kernel definitions below must see real annotations.
-
 import logging
 import threading
 import time
@@ -18,16 +15,20 @@ import numpy as np
 
 from gnome3d import log
 from gnome3d.mc.jax.memory import max_k_for_bytes
+from gnome3d.mc.jax.util import (
+    SHAPE_BUCKETS,
+    jax_bucket_for,
+    jax_device_budget_bytes,
+    jax_is_available,
+)
 from gnome3d.types import F32Array
-from gnome3d.util import _SHAPE_BUCKETS, jax_bucket_for, jax_device_budget_bytes, jax_is_available
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
 
 LOG = log.get("mc.jax")
 
-# Compiled-kernel cache (keyed by kernel signature), precompile-dedup set, and
-# the build lock (ib_workers>1 may race several threads into a kernel build).
+# Compiled-kernel cache (keyed by kernel signature)
 _kernel_cache: dict[Any, Any] = {}
 _precompiled: set[Any] = set()
 _init_lock = threading.Lock()
@@ -379,15 +380,24 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
     #     FREEZE converged chains (hold their pos/scores).  The strict smooth
     #     path is safe to keep stepping and doesn't need this.
     in_axes_mp = (
-        0, 0, 0, 0,  # pos, ss, se, sc (per-chain)
+        0,
+        0,
+        0,
+        0,  # pos, ss, se, sc (per-chain)
         None,  # T0 (shared)
         0,  # exp_mat (per-IB)
         0,  # step_size (per-IB)
-        None, None, None,  # dt, js, jc (shared)
-        None, None,  # stretch_k, squeeze_k (shared; boosted IBs aren't batched)
+        None,
+        None,
+        None,  # dt, js, jc (shared)
+        None,
+        None,  # stretch_k, squeeze_k (shared; boosted IBs aren't batched)
         0,  # r0 (per-IB auto excl radius)
         None,  # excl_w (shared)
-        0, 0, 0, 0,  # conf_cx, conf_cy, conf_cz, conf_R (per-IB)
+        0,
+        0,
+        0,
+        0,  # conf_cx, conf_cy, conf_cz, conf_R (per-IB)
         None,  # conf_w (shared)
         0,  # key (per-chain)
         0,  # n_active (per-IB)
@@ -434,9 +444,27 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             iter_key = jax.random.fold_in(base_key, iter_i + 1)
             keys = jax.random.split(iter_key, K)
             npos, nss, nse, nsc, nT, n_ok = batched_mp(
-                pos, ss, se, sc, T, exp_mat, step_size, dt, js, jc,
-                stretch_k, squeeze_k, r0, excl_w,
-                conf_cx, conf_cy, conf_cz, conf_R, conf_w, keys, n_active,
+                pos,
+                ss,
+                se,
+                sc,
+                T,
+                exp_mat,
+                step_size,
+                dt,
+                js,
+                jc,
+                stretch_k,
+                squeeze_k,
+                r0,
+                excl_w,
+                conf_cx,
+                conf_cy,
+                conf_cz,
+                conf_R,
+                conf_w,
+                keys,
+                n_active,
             )
             # Freeze chains already converged (non-strict accept could worsen them).
             frozen = conv_prev
@@ -456,7 +484,11 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             return (pos, ss, se, sc, nT, score, iter_i + 1, n_ok, converged)
 
         init_state = (
-            pos_k, ss_k, se_k, sc_k, T_init,
+            pos_k,
+            ss_k,
+            se_k,
+            sc_k,
+            T_init,
             jnp.full((K,), 1e30, dtype=jnp.float32),  # ms_score per-chain
             jnp.int32(0),
             jnp.zeros((K,), dtype=jnp.int32),  # n_ok filler
@@ -505,7 +537,7 @@ def _precompile_arcs(settings: "Settings") -> None:
         impr_a = f32(settings.mc_stop_improvement)
         succ_a = jnp.int32(settings.mc_stop_successes)
         t0 = __import__("time").perf_counter()
-        for b in _SHAPE_BUCKETS:
+        for b in SHAPE_BUCKETS:
             pos_a = sds((K, b, 3), np.float32)
             kvec_a = sds((K,), np.float32)
             exp_a = sds((b, b), np.float32)
@@ -546,7 +578,7 @@ def _precompile_arcs(settings: "Settings") -> None:
                 LOG.warning("precompile arcs bucket %d skipped: %s", b, e)
         _precompiled.add(sig)
         dt = __import__("time").perf_counter() - t0
-        log.status(LOG, "precompiled arcs kernel for %d buckets in %.1fs", len(_SHAPE_BUCKETS), dt)
+        log.status(LOG, "precompiled arcs kernel for %d buckets in %.1fs", len(SHAPE_BUCKETS), dt)
 
 
 def mc_arcs_jax(
@@ -684,7 +716,7 @@ def mc_arcs_jax(
     stop_when_ratio_above = jnp.float32(0.9999)
     # Per-call RNG diversity keyed on the active scope path (was: the label).
     _seed_src = log.current()
-    seed_offset: int = abs(hash(_seed_src)) % (2 ** 31) if _seed_src else 0
+    seed_offset: int = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
     pos_k, ss_k, se_k, sc_k, final_score_best, iter_count, converged_flag = kernel_full(
@@ -845,7 +877,10 @@ def mc_arcs_jax_batch(
     if not problems:
         return []
     bucket = bool(settings.mc_executor_jax_bucket_shapes)
-    big_b = max((jax_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0])) for p in problems)
+    big_b = max(
+        (jax_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0]))
+        for p in problems
+    )
     max_k, basis = _resolve_arcs_max_k(big_b, settings)
     if len(problems) <= max_k:
         return _mc_arcs_jax_batch_chunk(problems, settings)
@@ -859,7 +894,7 @@ def mc_arcs_jax_batch(
     )
     out: list[tuple[float, np.ndarray[Any, Any]]] = []
     for i in range(0, len(problems), max_k):
-        out.extend(_mc_arcs_jax_batch_chunk(problems[i: i + max_k], settings))
+        out.extend(_mc_arcs_jax_batch_chunk(problems[i : i + max_k], settings))
     return out
 
 
@@ -878,7 +913,10 @@ def _mc_arcs_jax_batch_chunk(
         return []
 
     bucket = bool(settings.mc_executor_jax_bucket_shapes)
-    B = max((jax_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0])) for p in problems)
+    B = max(
+        (jax_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0]))
+        for p in problems
+    )
     preps = [_prep_arcs_problem_np(p["pos"], p["exp_dist"], settings, B) for p in problems]
 
     def stack(key: str) -> Any:
@@ -909,7 +947,7 @@ def _mc_arcs_jax_batch_chunk(
 
     # per-IB initial scores (reuse the validated init helpers)
     def init_one(i: int) -> tuple[Any, Any, Any]:
-        p1 = pos_k[i: i + 1]  # (1, B, 3)
+        p1 = pos_k[i : i + 1]  # (1, B, 3)
         na = jnp.int32(int(np.asarray(n_active_k[i])))
         ss = init_arcs(p1, exp_k[i], jnp.float32(stretch_v), jnp.float32(squeeze_v))
         se = (
@@ -918,7 +956,9 @@ def _mc_arcs_jax_batch_chunk(
             else jnp.zeros((1,), jnp.float32)
         )
         sc = (
-            init_confine(p1, conf_cx_k[i], conf_cy_k[i], conf_cz_k[i], conf_R_k[i], jnp.float32(conf_w_v), na)
+            init_confine(
+                p1, conf_cx_k[i], conf_cy_k[i], conf_cz_k[i], conf_R_k[i], jnp.float32(conf_w_v), na
+            )
             if use_conf
             else jnp.zeros((1,), jnp.float32)
         )
@@ -930,32 +970,51 @@ def _mc_arcs_jax_batch_chunk(
     sc_k = jnp.concatenate([x[2] for x in inits])
 
     _seed_src = log.current()
-    seed_offset = abs(hash(_seed_src)) % (2 ** 31) if _seed_src else 0
+    seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
-    log.status(
-        LOG, "    arcs kernel: K=%d B=%d, compiling/running...", K, B
-    )
+    log.status(LOG, "    arcs kernel: K=%d B=%d, compiling/running...", K, B)
     t0 = time.perf_counter()
     out = kernel_full_mp(
-        pos_k, ss_k, se_k, sc_k,
+        pos_k,
+        ss_k,
+        se_k,
+        sc_k,
         jnp.float32(settings.max_temp),
-        exp_k, step_size_k,
-        jnp.float32(settings.dt_temp), jnp.float32(settings.jump_scale), jnp.float32(settings.jump_coef),
-        jnp.float32(stretch_v), jnp.float32(squeeze_v),
-        excl_r0_k, jnp.float32(excl_w_v),
-        conf_cx_k, conf_cy_k, conf_cz_k, conf_R_k, jnp.float32(conf_w_v),
+        exp_k,
+        step_size_k,
+        jnp.float32(settings.dt_temp),
+        jnp.float32(settings.jump_scale),
+        jnp.float32(settings.jump_coef),
+        jnp.float32(stretch_v),
+        jnp.float32(squeeze_v),
+        excl_r0_k,
+        jnp.float32(excl_w_v),
+        conf_cx_k,
+        conf_cy_k,
+        conf_cz_k,
+        conf_R_k,
+        jnp.float32(conf_w_v),
         base_key,
-        jnp.float32(settings.mc_stop_improvement), jnp.int32(settings.mc_stop_successes),
-        jnp.float32(1e-5), jnp.float32(0.9999), n_active_k,
+        jnp.float32(settings.mc_stop_improvement),
+        jnp.int32(settings.mc_stop_successes),
+        jnp.float32(1e-5),
+        jnp.float32(0.9999),
+        n_active_k,
     )
     pos_f, ss_f, se_f, sc_f, iter_f, converged = out
     score_per_chain = np.asarray(ss_f + se_f + sc_f)  # forces device sync
     pos_f_np = np.asarray(pos_f)
     log.status(
-        LOG, "    arcs kernel: K=%d B=%d, %d batches (%d steps), %d/%d converged, %.1fs",
-        K, B, int(iter_f), int(iter_f) * n_steps_per_batch,
-        int(np.asarray(converged).sum()), K, time.perf_counter() - t0,
+        LOG,
+        "    arcs kernel: K=%d B=%d, %d batches (%d steps), %d/%d converged, %.1fs",
+        K,
+        B,
+        int(iter_f),
+        int(iter_f) * n_steps_per_batch,
+        int(np.asarray(converged).sum()),
+        K,
+        time.perf_counter() - t0,
     )
 
     results: list[tuple[float, np.ndarray[Any, Any]]] = []

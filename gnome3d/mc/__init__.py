@@ -17,7 +17,6 @@ from __future__ import annotations
 from gnome3d.mc.jax import (
     mc_arcs_jax,
     mc_arcs_jax_batch,
-    mc_heatmap_jax,
     mc_smooth_jax,
     mc_smooth_jax_batch,
 )
@@ -32,7 +31,6 @@ __all__ = [
     "mc_arcs_jax",
     "mc_arcs_jax_batch",
     "mc_arcs_numba",
-    "mc_heatmap_jax",
     "mc_heatmap_numba",
     "mc_ib_numba",
     "mc_smooth_jax",

@@ -16,8 +16,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from gnome3d.util import jax_bucket_for
-
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
 
@@ -28,5 +26,7 @@ def batch_bucket(n: int, settings: Settings) -> int:
     (each distinct size its own group, as when bucketing is disabled)."""
     if not bool(settings.mc_executor_jax_bucket_shapes):
         return int(n)
+
+    from gnome3d.mc.jax.util import jax_bucket_for
 
     return int(jax_bucket_for(int(n)))

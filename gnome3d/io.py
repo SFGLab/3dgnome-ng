@@ -15,7 +15,6 @@ LOG = log.get("io")
 def parse_region(region_str: str) -> BedRegion | None:
     """
     Parse 'chr:start-end' string.  Returns None on failure.
-    Reference BedRegion::tryParse uses sscanf(str, "%30[^:]:%d-%d", ...).
     """
     try:
         chr_part, range_part = region_str.split(":", 1)

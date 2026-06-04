@@ -10,9 +10,6 @@ Confinement is not supported here - the dispatch gate in the pipeline routes
 confinement-enabled smooth calls back to numba.
 """
 
-# NB: no `from __future__ import annotations` - the JAX kernels reflect on live
-# type objects, so the kernel definitions below must see real annotations.
-
 import logging
 import threading
 import time
@@ -22,23 +19,22 @@ import numpy as np
 
 from gnome3d import log
 from gnome3d.mc.jax.memory import max_k_for_bytes
-from gnome3d.types import F32Array, I32Array, I64Array
-from gnome3d.util import (
-    _ANCHOR_BUCKETS,
-    _NBR_BUCKETS,
-    _SHAPE_BUCKETS,
+from gnome3d.mc.jax.util import (
+    ANCHOR_BUCKETS,
+    NBR_BUCKETS,
+    SHAPE_BUCKETS,
     jax_bucket_for,
     jax_device_budget_bytes,
     jax_is_available,
 )
+from gnome3d.types import F32Array, I32Array, I64Array
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
 
 LOG = log.get("mc.jax")
 
-# Compiled-kernel cache (keyed by kernel signature), precompile-dedup set, and
-# the build lock (ib_workers>1 may race several threads into a kernel build).
+# Compiled-kernel cache (keyed by kernel signature)
 _kernel_cache: dict[Any, Any] = {}
 _precompiled: set[Any] = set()
 _init_lock = threading.Lock()
@@ -1119,8 +1115,8 @@ def _precompile_smooth(
         impr_a = f32(settings.mc_stop_improvement_smooth)
         succ_a = jnp.int32(settings.mc_stop_successes_smooth)
         t0 = __import__("time").perf_counter()
-        for b in _SHAPE_BUCKETS:
-            a = jax_bucket_for(max(1, int(anchor_frac * b)), _ANCHOR_BUCKETS) if use_orn else 1
+        for b in SHAPE_BUCKETS:
+            a = jax_bucket_for(max(1, int(anchor_frac * b)), ANCHOR_BUCKETS) if use_orn else 1
             kvec = sds((K,), np.float32)
             heat_a = sds((b, b), np.float32) if use_heat else sds((1, 1), np.float32)
             try:
@@ -1175,7 +1171,7 @@ def _precompile_smooth(
         log.status(
             LOG,
             "precompiled smooth kernel: %d B-buckets (heat=%s orn=%s M=%d K=%d) in %.1fs",
-            len(_SHAPE_BUCKETS),
+            len(SHAPE_BUCKETS),
             use_heat,
             use_orn,
             M,
@@ -1312,8 +1308,8 @@ def mc_smooth_jax(
         # is bit-identical at init.  Pad anchor_ar=0 (its orn is computed but
         # never referenced since no valid edge points to it).
         if bool(settings.mc_executor_jax_bucket_shapes):
-            A = jax_bucket_for(n_anchors, _ANCHOR_BUCKETS)
-            M = jax_bucket_for(max_nbrs, _NBR_BUCKETS)
+            A = jax_bucket_for(n_anchors, ANCHOR_BUCKETS)
+            M = jax_bucket_for(max_nbrs, NBR_BUCKETS)
             anchor_frac = n_anchors / n  # real fraction, before reassignment below
             ap, mp = A - n_anchors, M - max_nbrs
             if ap > 0 or mp > 0:
@@ -1412,7 +1408,7 @@ def mc_smooth_jax(
     n_movable_active_j = jnp.int32(n_movable_v)
     # Per-call RNG diversity keyed on the active scope path (was: the label).
     _seed_src = log.current()
-    seed_offset: int = abs(hash(_seed_src)) % (2 ** 31) if _seed_src else 0
+    seed_offset: int = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
 
     # ---- initial scores ----
     ss_k = init_smooth(
@@ -1810,8 +1806,8 @@ def mc_smooth_jax_batch(
             nbrs_i = max(
                 (len(p["anchor_neighbors"].get(k, [])) for k in range(anchors_i)), default=1
             )
-            a_list.append(jax_bucket_for(anchors_i, _ANCHOR_BUCKETS) if bucket else anchors_i)
-            m_list.append(jax_bucket_for(max(nbrs_i, 1), _NBR_BUCKETS) if bucket else max(nbrs_i, 1))
+            a_list.append(jax_bucket_for(anchors_i, ANCHOR_BUCKETS) if bucket else anchors_i)
+            m_list.append(jax_bucket_for(max(nbrs_i, 1), NBR_BUCKETS) if bucket else max(nbrs_i, 1))
         big_a, big_m = max(a_list), max(m_list)
     max_k, basis = _resolve_smooth_max_k(big_b, big_a, big_m, use_heat, use_orn, settings)
     if len(problems) <= max_k:
@@ -1827,7 +1823,7 @@ def mc_smooth_jax_batch(
     )
     results: list[tuple[float, np.ndarray[Any, Any]]] = []
     for i in range(0, len(problems), max_k):
-        results.extend(_mc_smooth_jax_batch_chunk(problems[i: i + max_k], settings))
+        results.extend(_mc_smooth_jax_batch_chunk(problems[i : i + max_k], settings))
     return results
 
 
@@ -1869,8 +1865,8 @@ def _mc_smooth_jax_batch_chunk(
                 (len(p["anchor_neighbors"].get(k, [])) for k in range(anchors_i)), default=1
             )
             nbrs_i = max(nbrs_i, 1)
-            As.append(jax_bucket_for(anchors_i, _ANCHOR_BUCKETS) if bucket else anchors_i)
-            Ms.append(jax_bucket_for(nbrs_i, _NBR_BUCKETS) if bucket else nbrs_i)
+            As.append(jax_bucket_for(anchors_i, ANCHOR_BUCKETS) if bucket else anchors_i)
+            Ms.append(jax_bucket_for(nbrs_i, NBR_BUCKETS) if bucket else nbrs_i)
         else:
             As.append(1)
             Ms.append(1)
@@ -1949,7 +1945,7 @@ def _mc_smooth_jax_batch_chunk(
     symmetric = jnp.bool_(bool(getattr(settings, "motifs_symmetric", True)))
 
     def init_one(i: int) -> tuple[Any, Any, Any, Any, Any, Any]:
-        p1 = pos_k[i: i + 1]  # (1, B, 3)
+        p1 = pos_k[i : i + 1]  # (1, B, 3)
         na = jnp.int32(int(np.asarray(n_active_k[i])))
         ss = init_smooth(p1, dtn_k[i], stretch_k[i], squeeze_k[i], ang_k[i], dist_w, ang_w, na)
         se = (
@@ -1986,13 +1982,18 @@ def _mc_smooth_jax_batch_chunk(
     anchor_orn_k = jnp.concatenate([x[5] for x in inits])
 
     _seed_src = log.current()
-    seed_offset = abs(hash(_seed_src)) % (2 ** 31) if _seed_src else 0
+    seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
     log.status(
         LOG,
         "    smooth kernel: K=%d B=%d A=%d M=%d (heat=%d orn=%d), compiling/running...",
-        K, B, A, M, int(use_heat), int(use_orn),
+        K,
+        B,
+        A,
+        M,
+        int(use_heat),
+        int(use_orn),
     )
     t0 = time.perf_counter()
     out = kernel_full_mp(
@@ -2048,9 +2049,17 @@ def _mc_smooth_jax_batch_chunk(
         LOG,
         "    smooth kernel: K=%d B=%d A=%d M=%d (heat=%d orn=%d), "
         "%d batches (%d steps), %d/%d converged, %.1fs",
-        K, B, A, M, int(use_heat), int(use_orn),
-        int(iter_count), int(iter_count) * n_steps_smooth,
-        int(np.asarray(converged).sum()), K, time.perf_counter() - t0,
+        K,
+        B,
+        A,
+        M,
+        int(use_heat),
+        int(use_orn),
+        int(iter_count),
+        int(iter_count) * n_steps_smooth,
+        int(np.asarray(converged).sum()),
+        K,
+        time.perf_counter() - t0,
     )
 
     results: list[tuple[float, np.ndarray[Any, Any]]] = []
@@ -2058,5 +2067,3 @@ def _mc_smooth_jax_batch_chunk(
         n_i = pr["n"]
         results.append((float(score_per_chain[i]), pos_f_np[i, :n_i].astype(np.float32)))
     return results
-
-

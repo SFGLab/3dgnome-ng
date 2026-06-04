@@ -15,6 +15,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from gnome3d import log, skeleton
+from gnome3d.mc.jax.util import jax_is_available
 from gnome3d.pipeline import Dag, Node
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse.stages import build_coarse_dag
@@ -27,7 +28,6 @@ from gnome3d.pipeline.executor import (
 from gnome3d.pipeline.ib import ib_chain_nodes, ib_node_id
 from gnome3d.pipeline.stage import StageKind
 from gnome3d.pipeline.state import Seeded, Smoothed, State
-from gnome3d.util import jax_is_available
 
 if TYPE_CHECKING:
     from gnome3d.data import ContactData
@@ -82,9 +82,7 @@ def pick_executor(settings: Settings) -> Executor:
     Each IB stage names its executor (serial | threaded | batch | auto); this maps
     them to a per-kind strategy and returns one `MixedExecutor`."""
     strategy = {
-        StageKind.ARCS: _resolve_strategy(
-            settings.mc_executor_arcs, StageKind.ARCS, settings
-        ),
+        StageKind.ARCS: _resolve_strategy(settings.mc_executor_arcs, StageKind.ARCS, settings),
         StageKind.DENSIFY: _resolve_strategy(
             settings.mc_executor_densify, StageKind.DENSIFY, settings
         ),
@@ -133,10 +131,7 @@ def reconstruct(
         beads = _beads(outputs[ib_node_id(ibs.ib_id, StageKind.SMOOTH)])
         per_chr[ibs.chr_].extend(beads)
 
-    return {
-        chr_: sorted(beads, key=lambda b: b.start)
-        for chr_, beads in per_chr.items()
-    }
+    return {chr_: sorted(beads, key=lambda b: b.start) for chr_, beads in per_chr.items()}
 
 
 def reconstruct_ensemble(

@@ -32,10 +32,16 @@ if TYPE_CHECKING:
     from gnome3d.types import BoolArray, F32Array, I8Array, StrArray
 
 _SEED_SALT = 2  # distinct from ARCS(0)/EST_DIST(1)
-_CODE_TO_CHAR = {int(Orientation.NONE): "N", int(Orientation.LEFT): "L", int(Orientation.RIGHT): "R"}
+_CODE_TO_CHAR = {
+    int(Orientation.NONE): "N",
+    int(Orientation.LEFT): "L",
+    int(Orientation.RIGHT): "R",
+}
 
 
-def _expand_orientations(orientations: I8Array, anchor_map: list[AnchorMapEntry], n: int) -> StrArray:
+def _expand_orientations(
+    orientations: I8Array, anchor_map: list[AnchorMapEntry], n: int
+) -> StrArray:
     """Per-anchor int8 codes -> per-bead `"<U1"` array ('N' for subanchors),
     placing each anchor's orientation at its bead via `anchor_map`.  Mirrors the
     char_orn construction in `Solver._build_smooth_problem`."""

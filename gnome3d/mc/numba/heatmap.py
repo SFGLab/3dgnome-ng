@@ -324,8 +324,8 @@ def _mc_heatmap_kchains_nb(
                 0.0,  # score_excl
             )
             converged = (
-                            score > stop_improvement * ms_score and n_ok < stop_successes
-                        ) or score < 1e-6
+                score > stop_improvement * ms_score and n_ok < stop_successes
+            ) or score < 1e-6
             if converged:
                 break
             ms_score = score

@@ -89,7 +89,9 @@ def gather_all_ib_seeds(state: CoarseState, seed_offset: int = 0) -> list[IBSeed
     """Gather every IB's ``Seeded`` across all chromosomes of the *already
     positioned* graph.  The whole-graph read-out used by both the coarse fan-out
     `expand` and the ensemble driver (after their respective coarse spines run)."""
-    seg_level = set_level(Level.SEGMENT - Level.CHROMOSOME, state.chr_root, state.clusters, state.chrs)
+    seg_level = set_level(
+        Level.SEGMENT - Level.CHROMOSOME, state.chr_root, state.clusters, state.chrs
+    )
     out: list[IBSeed] = []
     for chr_ in state.chrs:
         out.extend(gather_ib_seeds(state, chr_, seg_level, seed_offset))
@@ -158,7 +160,10 @@ def seed_for_ib(
     anchor_neighbor_weights: dict[int, list[float]] | None = None
     if state.s.use_ctcf_motif and chr_:
         orientations = np.array(
-            [_ORN_CODE.get(clusters[ci].orientation or "N", Orientation.NONE) for ci in active_region],
+            [
+                _ORN_CODE.get(clusters[ci].orientation or "N", Orientation.NONE)
+                for ci in active_region
+            ],
             dtype=np.int8,
         )
         cluster_to_k = {ci: k for k, ci in enumerate(active_region)}

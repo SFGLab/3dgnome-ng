@@ -672,8 +672,12 @@ class Settings:
             "simulation_backend", "heatmap_chains", self.mc_heatmap_chains
         )
         self.mc_smooth_chains = geti("simulation_backend", "smooth_chains", self.mc_smooth_chains)
-        self.mc_executor_threaded_workers = geti("simulation_backend", "ib_workers", self.mc_executor_threaded_workers)
-        self.mc_executor_arcs = gets("simulation_backend", "mc_executor_arcs", self.mc_executor_arcs)
+        self.mc_executor_threaded_workers = geti(
+            "simulation_backend", "ib_workers", self.mc_executor_threaded_workers
+        )
+        self.mc_executor_arcs = gets(
+            "simulation_backend", "mc_executor_arcs", self.mc_executor_arcs
+        )
         self.mc_executor_densify = gets(
             "simulation_backend", "mc_executor_densify", self.mc_executor_densify
         )
@@ -684,7 +688,9 @@ class Settings:
             "simulation_backend", "mc_executor_smooth", self.mc_executor_smooth
         )
         self.mc_executor_jax_bucket_shapes = getb(
-            "simulation_backend", "mc_executor_jax_bucket_shapes", self.mc_executor_jax_bucket_shapes
+            "simulation_backend",
+            "mc_executor_jax_bucket_shapes",
+            self.mc_executor_jax_bucket_shapes,
         )
         self.mc_executor_jax_precompile_buckets = getb(
             "simulation_backend",
@@ -863,9 +869,7 @@ class Settings:
         return True
 
     @staticmethod
-    def _warn_unknown_keys(
-        cfg: configparser.ConfigParser, consulted: dict[str, set[str]]
-    ) -> None:
+    def _warn_unknown_keys(cfg: configparser.ConfigParser, consulted: dict[str, set[str]]) -> None:
         """Warn about keys present in the file but never read by `load_ini`.
 
         A "mistype" is any option the loader never asks for: a misspelling
@@ -888,9 +892,7 @@ class Settings:
                     continue
                 near = difflib.get_close_matches(key, known, n=1, cutoff=0.6)
                 hint = f" (did you mean '{near[0]}'?)" if near else ""
-                LOG.warning(
-                    "[%s] unknown key '%s' is ignored%s", section, key, hint
-                )
+                LOG.warning("[%s] unknown key '%s' is ignored%s", section, key, hint)
 
     def genomic_length_to_distance(self, length_bp: int) -> float:
         from gnome3d.util import genomic_length_to_distance

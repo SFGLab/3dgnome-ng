@@ -258,6 +258,7 @@ def add_long_pet_to_segment_heatmap(
     if n_added > 0:
         LOG.info("long-PET folded into segment heatmap: %d arcs", n_added)
 
+
 def calc_anchor_expected_distances(
     state: CoarseState,
     active_region: list[int],

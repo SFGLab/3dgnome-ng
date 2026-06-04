@@ -334,7 +334,7 @@ def remove_empty_anchors(
     Remove anchors that are not endpoints of any arc.
     Mirrors Reference InteractionArcs::removeEmptyAnchors().
 
-    Returns new anchors dict (original is not modified).
+    Returns new anchors dict.
     Also updates arc start/end indices to reflect removed anchors.
     """
     new_anchors: AnchorMap = {}

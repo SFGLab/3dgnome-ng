@@ -49,7 +49,9 @@ def _subanchor_counts(anchor_genomic: list[tuple[int, int, int]], s: Settings) -
     return counts
 
 
-def densify(anchor_pos: F32Array, anchor_genomic: list[tuple[int, int, int]], s: Settings) -> DensifyResult:
+def densify(
+    anchor_pos: F32Array, anchor_genomic: list[tuple[int, int, int]], s: Settings
+) -> DensifyResult:
     """Insert subanchor beads between each consecutive anchor pair.  Byte-exact
     port of `Solver._densify_active_region` (see its docstring for the overlap /
     span / midpoint conventions)."""

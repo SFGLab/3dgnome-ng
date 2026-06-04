@@ -271,7 +271,9 @@ class MixedExecutor:
         max_workers: int | None = None,
     ) -> None:
         self._strategy_map: dict[StageKind, ExecutorStrategy] = dict(strategy)
-        self._max_workers: int = (max_workers if max_workers and max_workers > 0 else (os.cpu_count() or 1))
+        self._max_workers: int = (
+            max_workers if max_workers and max_workers > 0 else (os.cpu_count() or 1)
+        )
         self._strategies: dict[ExecutorStrategy, Strategy] = {}
 
     def _strat_for(self, kind: StageKind) -> ExecutorStrategy:
@@ -309,7 +311,9 @@ class MixedExecutor:
                     by_kind[node.stage.kind].append(node)
 
                 for kind, nodes in by_kind.items():
-                    self._get_strategy(self._strat_for(kind)).dispatch(kind, nodes, dag, outputs, done)
+                    self._get_strategy(self._strat_for(kind)).dispatch(
+                        kind, nodes, dag, outputs, done
+                    )
         finally:
             for strat in self._strategies.values():
                 strat.close()
@@ -329,16 +333,20 @@ class SerialExecutor(MixedExecutor):
 class ThreadedExecutor(MixedExecutor):
     """Every per-IB kind threaded across `max_workers` numba threads (CPU)."""
 
-    _PER_IB: frozenset[StageKind] = frozenset({
-        StageKind.ARCS,
-        StageKind.ESTIMATE_DIST,
-        StageKind.SMOOTH,
-    })
+    _PER_IB: frozenset[StageKind] = frozenset(
+        {
+            StageKind.ARCS,
+            StageKind.ESTIMATE_DIST,
+            StageKind.SMOOTH,
+        }
+    )
 
     def __init__(self, max_workers: int | None = None) -> None:
         super().__init__(
             strategy={
-                kind: (ExecutorStrategy.THREADED if kind in self._PER_IB else ExecutorStrategy.SERIAL)
+                kind: (
+                    ExecutorStrategy.THREADED if kind in self._PER_IB else ExecutorStrategy.SERIAL
+                )
                 for kind in StageKind
             },
             max_workers=max_workers,
@@ -349,11 +357,13 @@ class BatchExecutor(MixedExecutor):
     """The kinds in `batch_kinds` batched on JAX, the rest serial.  `None` =
     batch every kind that has a batch runner (validation)."""
 
-    _BATCHABLE: frozenset[StageKind] = frozenset({
-        StageKind.ARCS,
-        StageKind.ESTIMATE_DIST,
-        StageKind.SMOOTH,
-    })
+    _BATCHABLE: frozenset[StageKind] = frozenset(
+        {
+            StageKind.ARCS,
+            StageKind.ESTIMATE_DIST,
+            StageKind.SMOOTH,
+        }
+    )
 
     def __init__(self, batch_kinds: set[StageKind] | None = None) -> None:
         def pick(kind: StageKind) -> ExecutorStrategy:
