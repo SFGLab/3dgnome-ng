@@ -136,11 +136,6 @@ class Settings:
     # This replaces the old mc_backend_apply_to_* flags for executor selection;
     # mc_backend now only selects the *coarse* MC kernel (heatmap/ib).
     mc_executor_arcs: str
-    # Arc solver: "mc" (reference single-bead Monte Carlo) or "smacof" (stress
-    # majorization + basin-hopping + gradient polish; ~40x faster at parity energy,
-    # a deliberate divergence from the MC trajectory).  Applies to the serial/
-    # threaded arcs runner.
-    mc_executor_jax_arcs_solver: str
     mc_executor_densify: str
     mc_executor_estimate_dist: str
     mc_executor_smooth: str
@@ -359,7 +354,6 @@ class Settings:
         self.mc_heatmap_chains = 1
         self.mc_smooth_chains = 1
         self.mc_executor_arcs = "auto"
-        self.mc_executor_jax_arcs_solver = "mc"
         self.mc_executor_densify = "auto"
         self.mc_executor_estimate_dist = "auto"
         self.mc_executor_smooth = "auto"
@@ -683,9 +677,6 @@ class Settings:
         )
         self.mc_executor_arcs = gets(
             "simulation_backend", "mc_executor_arcs", self.mc_executor_arcs
-        )
-        self.mc_executor_jax_arcs_solver = gets(
-            "simulation_backend", "mc_executor_jax_arcs_solver", self.mc_executor_jax_arcs_solver
         )
         self.mc_executor_densify = gets(
             "simulation_backend", "mc_executor_densify", self.mc_executor_densify

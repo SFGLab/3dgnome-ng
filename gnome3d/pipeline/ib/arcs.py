@@ -41,14 +41,6 @@ def _run(problem: Problem) -> Result:
     s = problem["settings"]
     seed = int(problem["seed"])
 
-    # Opt-in fast solver: SMACOF (stress majorization) + basin-hopping + polish,
-    # ~40x faster than the MC at parity energy.  Deliberate divergence from the MC
-    # trajectory (minimises the same energy); ensemble-parity check before default.
-    if str(getattr(s, "mc_executor_jax_arcs_solver", "mc")).strip().lower() == "smacof":
-        from gnome3d.mc.jax.arcs_smacof import solve_arcs
-
-        return solve_arcs(pos0.copy(), exp_dist, step, s, seed)
-
     # Deterministic per-IB RNG: Python `random` (initial noise) + numba (kernel).
     seed_rng(seed)
     mc_numba.seed_numba(seed)
