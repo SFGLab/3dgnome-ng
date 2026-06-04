@@ -12,13 +12,12 @@ batched kernel freezes converged chains once they stop improving.
 import logging
 import threading
 import time
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from gnome3d import log
-from gnome3d.mc.jax.memory import compiled_peak_bytes, measured_max_k
+from gnome3d.mc.jax.memory import max_k_for_bytes
 from gnome3d.types import F32Array
 from gnome3d.util import _SHAPE_BUCKETS, jax_bucket_for, jax_device_budget_bytes, jax_is_available
 
@@ -790,82 +789,42 @@ def _prep_arcs_problem_np(
     }
 
 
-# (per_ib_bytes, fixed_bytes) of the affine device-memory model, keyed by
-# (n_steps, excl_skip, B).  Filled lazily by measuring the compiled kernel.
-_arcs_footprint_cache: dict[tuple[Any, ...], tuple[int, int]] = {}
+def _arcs_tensor_bytes(B: int) -> int:
+    """Exact device-tensor bytes for ONE IB of the arcs kernel at bucket B.
 
-
-def _arcs_mp_lower_args(settings: "Settings", B: int, K: int) -> tuple[Any, ...]:
-    """Positional args for `kernel_full_mp.lower(...)` at shape (B, K).  Per-IB
-    arrays are abstract `ShapeDtypeStruct` (no allocation); scalars concrete.
-    Mirrors the `kernel_full_mp(...)` call in `_mc_arcs_jax_batch_chunk` so it can
-    be lowered+compiled purely to read `memory_analysis()`."""
-    import jax
-    import jax.numpy as jnp
-
-    sds = jax.ShapeDtypeStruct
-    f32 = jnp.float32
-    kf32 = sds((K,), np.float32)
-    return (
-        sds((K, B, 3), np.float32),  # pos_k
-        kf32, kf32, kf32,  # ss/se/sc
-        f32(settings.max_temp),
-        sds((K, B, B), np.float32),  # exp_k
-        kf32,  # step_size_k
-        f32(settings.dt_temp), f32(settings.jump_scale), f32(settings.jump_coef),
-        f32(settings.spring_stretch_arcs), f32(settings.spring_squeeze_arcs),
-        kf32,  # excl_r0_k
-        f32(0.0),  # excl_w
-        kf32, kf32, kf32, kf32,  # conf_cx/cy/cz/R
-        f32(0.0),  # conf_w
-        jax.random.PRNGKey(0),
-        f32(settings.mc_stop_improvement),
-        jnp.int32(settings.mc_stop_successes),
-        f32(1e-5), f32(0.9999),
-        sds((K,), np.int32),  # n_active_k
+    Sums every input/output array of `kernel_full_mp` (each stacked on axis 0, so
+    the batch is K times this); dominated by the (B, B) exp-distance tensor.  Used
+    by `_resolve_arcs_max_k` with `memory.XLA_PEAK_OVERHEAD` to bound the peak."""
+    f4, i4, b1 = 4, 4, 1  # bytes: float32 / int32 / bool
+    inp = (
+        B * 3 * f4  # pos_k
+        + 3 * f4  # ss/se/sc
+        + B * B * f4  # exp_k
+        + f4  # step_size_k
+        + f4  # excl_r0_k
+        + 4 * f4  # conf cx,cy,cz,R
+        + i4  # n_active_k
     )
-
-
-def _arcs_peak_at(settings: "Settings", B: int) -> Callable[[int], int | None]:
-    """`peak_at(K)` for the arcs kernel at bucket B: lower+compile
-    `kernel_full_mp` at width K and read its real peak device bytes."""
-    n_steps = int(settings.mc_stop_steps)
-    excl_skip = int(settings.exclusion_skip_neighbors)
-
-    def peak_at(K: int) -> int | None:
-        if not jax_is_available():
-            return None
-        try:
-            kf = _build_arcs_kernel(n_steps, excl_skip)[-1]
-            compiled = kf.lower(*_arcs_mp_lower_args(settings, B, K)).compile()
-        except Exception as e:  # noqa: BLE001 - measurement is best-effort
-            LOG.debug("arcs footprint measure failed (B=%d K=%d): %s", B, K, e)
-            return None
-        return compiled_peak_bytes(compiled)
-
-    return peak_at
+    out = B * 3 * f4 + 3 * f4 + b1  # pos_f, scores, converged
+    return inp + out
 
 
 def _resolve_arcs_max_k(big_b: int, settings: "Settings") -> tuple[int, str]:
     """Resolve the arcs region-batch vmap width (IBs per launch).
 
     `settings.mc_executor_jax_batch_width_arcs` is an integer (flat cap) or
-    "auto".  "auto" fits the largest K whose measured peak device memory fits the
-    budget (the shared `memory.measured_max_k` over `_arcs_peak_at`, basis
-    "auto-xla").  When device memory can't be measured - no queryable budget
-    (CPU), or lowering/`memory_analysis` unavailable - it falls back to the
-    conservative `32768/B` shape heuristic (basis "auto-fallback"); there is no
-    hand-tuned byte model.  Returns (max_k, basis)."""
+    "auto".  "auto" computes the kernel's exact per-IB device-tensor bytes
+    (`_arcs_tensor_bytes`), applies `memory.XLA_PEAK_OVERHEAD`, and solves the
+    largest K within the device budget (basis "auto-bytes").  When the budget
+    can't be queried (CPU) it falls back to the conservative `32768/B` shape
+    heuristic (basis "auto-fallback").  Returns (max_k, basis)."""
     w = str(settings.mc_executor_jax_batch_width_arcs).strip().lower()
     if w != "auto":
         return max(1, int(w)), "explicit"
     budget = jax_device_budget_bytes()
-    if budget is not None:
-        key = (int(settings.mc_stop_steps), int(settings.exclusion_skip_neighbors), int(big_b))
-        measured = measured_max_k(_arcs_peak_at(settings, big_b), budget, _arcs_footprint_cache, key)
-        if measured is not None:
-            return measured, "auto-xla"
-    return max(1, 32768 // max(1, big_b)), "auto-fallback"
+    if budget is None:
+        return max(1, 32768 // max(1, big_b)), "auto-fallback"
+    return max_k_for_bytes(_arcs_tensor_bytes(big_b), 0, budget), "auto-bytes"
 
 
 def mc_arcs_jax_batch(

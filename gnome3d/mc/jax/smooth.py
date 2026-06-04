@@ -16,13 +16,12 @@ confinement-enabled smooth calls back to numba.
 import logging
 import threading
 import time
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from gnome3d import log
-from gnome3d.mc.jax.memory import compiled_peak_bytes, measured_max_k
+from gnome3d.mc.jax.memory import max_k_for_bytes
 from gnome3d.types import F32Array, I32Array, I64Array
 from gnome3d.util import (
     _ANCHOR_BUCKETS,
@@ -1719,86 +1718,33 @@ def _prep_smooth_problem_np(
     }
 
 
-# (per_ib_bytes, fixed_bytes) of the affine device-memory model, keyed by
-# (n_steps, excl_skip, use_heat, use_orn, B, A, M).  Filled lazily by measuring
-# the compiled kernel; reused across every group of the same shape/term signature.
-_smooth_footprint_cache: dict[tuple[Any, ...], tuple[int, int]] = {}
+def _smooth_tensor_bytes(B: int, A: int, M: int, use_heat: bool, use_orn: bool) -> int:
+    """Exact device-tensor bytes for ONE IB of the smooth kernel at (B, A, M).
 
-
-def _smooth_mp_lower_args(
-    settings: "Settings", B: int, A: int, M: int, K: int, use_heat: bool
-) -> tuple[Any, ...]:
-    """Positional args for `kernel_full_mp.lower(...)` at shape (B, A, M, K).
-
-    Every per-IB array is a `ShapeDtypeStruct` (abstract -> lowering allocates
-    nothing); shared scalars are concrete.  Mirrors the `kernel_full_mp(...)` call
-    in `_mc_smooth_jax_batch_chunk` exactly, so it can be lowered+compiled purely
-    to read its `memory_analysis()`.  Shared with no one else - the signature
-    lives here so the measurement tracks the real kernel."""
-    import jax
-    import jax.numpy as jnp
-
-    sds = jax.ShapeDtypeStruct
-    f32 = jnp.float32
-    kf32 = sds((K,), np.float32)
-    heat = sds((K, B, B), np.float32) if use_heat else sds((K, 1, 1), np.float32)
-    return (
-        sds((K, B, 3), np.float32),  # pos_k
-        kf32, kf32, kf32, kf32, kf32,  # ss/se/sh/so/sc
-        sds((K, A, 3), np.float32),  # anchor_orn_k
-        f32(settings.max_temp_smooth),
-        sds((K, B), np.float32),  # dtn_k
-        sds((K, B), np.int32),  # movable_k
-        heat,  # heat_k (K,B,B)
-        sds((K, A), np.int32),  # anchor_ar_k
-        sds((K, B), np.int32),  # b2a_k
-        sds((K, A, M), np.int32),  # nbr_idx_k
-        sds((K, A, M), np.float32),  # nbr_w_k
-        sds((K, A, M), np.bool_),  # nbr_valid_k
-        sds((K, B), np.bool_),  # is_L_k
-        kf32,  # step_size_k
-        f32(settings.dt_temp_smooth),
-        f32(settings.jump_scale_smooth),
-        f32(settings.jump_coef_smooth),
-        kf32, kf32, kf32,  # stretch/squeeze/ang
-        f32(settings.smooth_dist_weight),
-        f32(settings.smooth_angle_weight),
-        kf32,  # excl_r0_k
-        f32(0.0),  # excl_w
-        f32(1.0),  # heat_weight
-        f32(1.0),  # motif_weight
-        jnp.bool_(True),  # symmetric
-        kf32, kf32, kf32, kf32, kf32,  # conf_cx..conf_w
-        jax.random.PRNGKey(0),
-        f32(settings.mc_stop_improvement_smooth),
-        jnp.int32(settings.mc_stop_successes_smooth),
-        f32(1e-6),  # score_eps
-        sds((K,), np.int32),  # n_active_k
-        sds((K,), np.int32),  # n_movable_k
+    Sums every input and output array of `kernel_full_mp` (each is stacked on
+    axis 0, so the whole batch is K times this).  Dominated by the (B, B) heat
+    tensor when heat is on; orn adds the (A, *) anchor/neighbor arrays.  Used by
+    `_resolve_smooth_max_k` with `memory.XLA_PEAK_OVERHEAD` to bound the peak."""
+    f4, i4, b1 = 4, 4, 1  # bytes: float32 / int32 / bool
+    A_ = A if use_orn else 1
+    M_ = M if use_orn else 1
+    inp = (
+        B * 3 * f4  # pos_k
+        + 5 * f4  # ss/se/sh/so/sc
+        + A_ * 3 * f4  # anchor_orn_k
+        + B * f4  # dtn_k
+        + B * i4  # movable_k
+        + (B * B * f4 if use_heat else f4)  # heat_k
+        + A_ * i4  # anchor_ar_k
+        + B * i4  # bead_to_anchor_k
+        + A_ * M_ * (i4 + f4 + b1)  # nbr idx / w / valid
+        + B * b1  # is_L_k
+        + f4  # step_size_k
+        + 6 * f4  # excl_r0 + conf cx,cy,cz,R,w
+        + 2 * i4  # n_active / n_movable
     )
-
-
-def _smooth_peak_at(
-    settings: "Settings", B: int, A: int, M: int, use_heat: bool, use_orn: bool
-) -> Callable[[int], int | None]:
-    """`peak_at(K)` for the smooth kernel at shape/terms (B, A, M, heat, orn):
-    lower+compile `kernel_full_mp` at width K and read its real peak device bytes
-    (`memory_analysis`).  Plugs into `measured_max_k`."""
-    n_steps = int(settings.mc_stop_steps_smooth)
-    excl_skip = int(settings.exclusion_skip_neighbors)
-
-    def peak_at(K: int) -> int | None:
-        if not jax_is_available():
-            return None
-        try:
-            kf = _build_smooth_kernel(n_steps, excl_skip, use_heat, use_orn, M)[-1]
-            compiled = kf.lower(*_smooth_mp_lower_args(settings, B, A, M, K, use_heat)).compile()
-        except Exception as e:  # noqa: BLE001 - measurement is best-effort
-            LOG.debug("smooth footprint measure failed (B=%d A=%d M=%d K=%d): %s", B, A, M, K, e)
-            return None
-        return compiled_peak_bytes(compiled)
-
-    return peak_at
+    out = B * 3 * f4 + 5 * f4 + A_ * 3 * f4 + b1  # pos_f, scores, anchor_orn, converged
+    return inp + out
 
 
 def _resolve_smooth_max_k(
@@ -1807,28 +1753,19 @@ def _resolve_smooth_max_k(
     """Resolve the smooth region-batch vmap width (IBs per launch).
 
     `settings.mc_executor_jax_batch_width_smooth` is either an integer (a flat
-    cap) or "auto".  "auto" fits the largest K whose measured peak device memory
-    fits the budget (the shared `memory.measured_max_k` over `_smooth_peak_at`,
-    basis "auto-xla").  When the device memory can't be measured - no queryable
-    budget (CPU backend), or lowering/`memory_analysis` unavailable - it falls
-    back to the conservative `32768/B` shape heuristic (basis "auto-fallback");
-    there is no hand-tuned byte model.  Returns (max_k, basis)."""
+    cap) or "auto".  "auto" computes the kernel's exact per-IB device-tensor bytes
+    (`_smooth_tensor_bytes`), applies `memory.XLA_PEAK_OVERHEAD`, and solves the
+    largest K within the device budget (basis "auto-bytes").  When the budget
+    can't be queried (CPU backend) it falls back to the conservative `32768/B`
+    shape heuristic (basis "auto-fallback").  Returns (max_k, basis)."""
     w = str(settings.mc_executor_jax_batch_width_smooth).strip().lower()
     if w != "auto":
         return max(1, int(w)), "explicit"
     budget = jax_device_budget_bytes()
-    if budget is not None:
-        key = (
-            int(settings.mc_stop_steps_smooth), int(settings.exclusion_skip_neighbors),
-            bool(use_heat), bool(use_orn), int(big_b), int(big_a), int(big_m),
-        )
-        measured = measured_max_k(
-            _smooth_peak_at(settings, big_b, big_a, big_m, use_heat, use_orn),
-            budget, _smooth_footprint_cache, key,
-        )
-        if measured is not None:
-            return measured, "auto-xla"
-    return max(1, 32768 // max(1, big_b)), "auto-fallback"
+    if budget is None:
+        return max(1, 32768 // max(1, big_b)), "auto-fallback"
+    per_ib = _smooth_tensor_bytes(big_b, big_a, big_m, use_heat, use_orn)
+    return max_k_for_bytes(per_ib, 0, budget), "auto-bytes"
 
 
 def mc_smooth_jax_batch(

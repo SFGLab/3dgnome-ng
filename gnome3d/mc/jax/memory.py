@@ -1,72 +1,44 @@
 """Device-memory sizing for the region-batched JAX kernels (smooth, arcs).
 
-Each kernel vmaps K independent IBs on axis 0, so its peak device memory is
-~affine in K: `peak(K) = fixed + per_ib*K`.  Rather than hand-model the bytes -
-the (K,B,B) heat/exp tensor plus whatever XLA duplicates and scratches, a
-multiple that varies by shape and backend - we MEASURE the compiled executable:
-lower+compile at K=1 and K=2 (abstract `ShapeDtypeStruct` shapes, so nothing is
-allocated), read XLA's `memory_analysis()`, fit the line, and solve for the
-largest K within budget.
+We size the vmap width K so the kernel's peak device memory fits the budget.
+The peak cannot be predicted exactly, and we learned why the hard way:
 
-A kernel plugs in by supplying `peak_at(K) -> int | None` (build its lowering
-args at width K, lower, compile, then `compiled_peak_bytes`).  The fit + budget
-solve + caching live here, shared across kernels; only the arg-builder, which is
-necessarily specific to each kernel's signature, lives in the kernel module.
+  * XLA's static `compiled.memory_analysis()` UNDERREPORTS the runtime peak - it
+    omits the compute scratch and the internal buffer duplication XLA does, so
+    sizing off it picked a K that OOM'd (it saw ~1x the tensor bytes; the kernel
+    needed ~3x).
+  * Summing the tensor shapes by hand also can't match XLA: its own scheduler
+    counts the input/output arguments at ~2x the exact tensor bytes (buffer
+    duplication), and then allocates compute scratch on top.
+
+What IS exactly computable is the total bytes of every input/output tensor (their
+shapes are known).  XLA's overhead on top of that is an empirical constant,
+`XLA_PEAK_OVERHEAD`, calibrated from a measured OOM.  Each kernel reports its
+exact per-IB / fixed tensor bytes; `max_k_for_bytes` applies the overhead and
+solves for K.  No per-tensor fudge, no guessed `B^2` model - one honest factor on
+an exact byte count.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any
+# Real peak device bytes / exact tensor bytes.  Calibrated from an observed OOM:
+# a K=16, B=16384 heat+orn smooth launch had 16 GiB of tensors, but XLA's
+# scheduler counted 32 GiB of I/O args (2x: buffer duplication) and the runtime
+# then tried a further 16 GiB of scratch -> ~48 GiB real peak = 2.99x the tensor
+# bytes.  Rounded up to 3.5 for margin (fragmentation, the smaller terms).  This
+# is a pure OOM guard: too-low K only adds serial sub-batches; an OOM kills the
+# run.  If a heat group still OOMs, this is the one number to raise.
+XLA_PEAK_OVERHEAD = 3.5
 
 
-def compiled_peak_bytes(compiled: Any) -> int | None:
-    """Peak device bytes of a compiled XLA executable, from its
-    `memory_analysis()`: input arguments + outputs + temporary scratch, less the
-    aliased buffers that are shared between input and output (donated).  `None`
-    when the analysis is unavailable (older jaxlib / backend)."""
-    try:
-        ma = compiled.memory_analysis()
-    except Exception:  # noqa: BLE001 - any backend without memory_analysis
-        return None
-    if ma is None:
-        return None
+def max_k_for_bytes(per_ib: int, fixed: int, budget: int) -> int:
+    """Largest K with `(fixed + per_ib*K) * XLA_PEAK_OVERHEAD <= budget`.
 
-    def g(name: str) -> int:
-        return int(getattr(ma, name, 0) or 0)
-
-    return (
-        g("argument_size_in_bytes")
-        + g("output_size_in_bytes")
-        + g("temp_size_in_bytes")
-        - g("alias_size_in_bytes")
-    )
-
-
-def measured_max_k(
-    peak_at: Callable[[int], int | None],
-    budget: int,
-    cache: dict[Any, tuple[int, int]],
-    key: Any,
-) -> int | None:
-    """Largest vmap width K whose measured peak device memory fits `budget`.
-
-    Measures `peak_at` at K=1 and K=2, fits `peak(K) = fixed + per_ib*K`, and
-    returns `max(1, (budget - fixed) // per_ib)`.  The two coefficients are
-    cached by `key` so each shape/term signature is measured once.  `None` if
-    measurement fails (so the caller can fall back to an analytic model)."""
-    coeffs = cache.get(key)
-    if coeffs is None:
-        m1 = peak_at(1)
-        m2 = peak_at(2)
-        if m1 is None or m2 is None:
-            return None
-        per_ib = max(1, m2 - m1)  # marginal bytes per added IB
-        fixed = max(0, m1 - per_ib)  # K-independent overhead
-        coeffs = (per_ib, fixed)
-        cache[key] = coeffs
-    per_ib, fixed = coeffs
-    avail = budget - fixed
+    `per_ib` / `fixed` are the exact device-tensor bytes that do / don't scale
+    with the vmap width K (a kernel computes them from its known shapes)."""
+    if per_ib <= 0:
+        return 1
+    avail = budget / XLA_PEAK_OVERHEAD - fixed
     if avail <= 0:
         return 1
     return max(1, int(avail // per_ib))
