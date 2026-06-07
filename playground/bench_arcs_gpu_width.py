@@ -28,6 +28,7 @@ profile with the real config.ini budget (50000).  See the arcs-gpu instrumentati
 
 from __future__ import annotations
 
+import logging
 import os
 import pickle
 import time
@@ -105,9 +106,20 @@ def capture_chr1_ibs() -> list[tuple[np.ndarray, float]]:
 
     from gnome3d.simulate import run_genome
 
-    run_genome(DRYRUN_CFG, "chr1", 1, data_dir=DATA_DIR)
-    nbarcs.mc_arcs_numba = _orig
-    mc_numba.mc_arcs_numba = _orig
+    # The dryrun config sets output_level=2 and run_genome re-runs log.setup(2),
+    # which would flood the console with [mc.numba] per-batch "step N score=..."
+    # DEBUG lines (thousands per slow IB).  Pin the mc.numba child logger to WARNING
+    # for the capture: child levels survive log.setup() (it only touches the gnome3d
+    # root + handlers), so the per-step spam is dropped at the source either way.
+    nb_log = logging.getLogger("gnome3d.mc.numba")
+    prev_level = nb_log.level
+    nb_log.setLevel(logging.WARNING)
+    try:
+        run_genome(DRYRUN_CFG, "chr1", 1, data_dir=DATA_DIR)
+    finally:
+        nb_log.setLevel(prev_level)
+        nbarcs.mc_arcs_numba = _orig
+        mc_numba.mc_arcs_numba = _orig
 
     # dedup by (N, rounded exp sum)
     seen: set[tuple[int, float]] = set()
