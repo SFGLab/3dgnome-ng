@@ -49,6 +49,11 @@ _arcs_profile: dict[tuple[int, int], dict[str, float]] = {}
 _arcs_seen_shapes: set[tuple[int, int]] = set()
 _arcs_profile_lock = threading.Lock()
 _last_batch_diag: dict[str, Any] = {}  # last region-batch diagnostics (read by bench scripts)
+# Profiling hook (bench only): when set, overrides the arcs score_eps so the kernel
+# "converges" after ~1 outer iter.  Lets the width K-scan measure PER-ITER wall
+# without running each launch to full convergence (thousands of iters for a big IB).
+# Per-iter compute is constant across iters, so 1 iter is a faithful sample.
+_ARCS_FORCE_SCORE_EPS: float | None = None
 
 
 def _profile_kernel(
@@ -1105,7 +1110,7 @@ def _mc_arcs_jax_batch_chunk(
         base_key,
         jnp.float32(settings.mc_stop_improvement),
         jnp.int32(settings.mc_stop_successes),
-        jnp.float32(1e-5),
+        jnp.float32(_ARCS_FORCE_SCORE_EPS if _ARCS_FORCE_SCORE_EPS is not None else 1e-5),
         jnp.float32(0.9999),
         n_active_k,
     )

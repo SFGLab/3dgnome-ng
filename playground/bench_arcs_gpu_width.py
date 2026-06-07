@@ -180,8 +180,12 @@ def largest_batch(probs: list[tuple[np.ndarray, float]], s: Settings, n_big: int
 # ----------------------------------------------------------------------------------
 def width_scan(probs: list[tuple[np.ndarray, float]], s: Settings) -> None:
     """Replicate the SINGLE largest IB into K copies and sweep K to see whether the
-    per-outer-iter wall stays flat (spare GPU width) or grows (compute/mem bound).
-    Question (d).  Reads arcs._last_batch_diag for iter_f/run_ms after each launch."""
+    PER-ITER wall stays flat (spare GPU width) or grows (compute/mem bound). (d)
+
+    FAST: forces the kernel to stop after ~1 outer iter (A._ARCS_FORCE_SCORE_EPS)
+    instead of running each launch to full convergence (~thousands of iters for a big
+    IB - that's what made this take ~days).  Per-iter compute is constant across
+    iters, so one iter is a faithful per-iter-wall sample; we take the min of a few."""
     exp, step = max(probs, key=lambda x: x[0].shape[0])
     n = exp.shape[0]
     b = jax_bucket_for(n) if s.mc_executor_jax_bucket_shapes else n
@@ -190,52 +194,55 @@ def width_scan(probs: list[tuple[np.ndarray, float]], s: Settings) -> None:
     with A._arcs_profile_lock:
         A._arcs_profile.clear()
 
-    # cap K to the device memory budget (auto basis), then scan powers of two
+    # cap K to the device memory budget (auto basis), then scan powers of two.
+    # 1-iter launches are cheap, so we can probe the full budget edge (max_k).
     s.mc_executor_jax_batch_width_arcs = "auto"
     max_k, basis = A._resolve_arcs_max_k(b, s)
-    ks = [k for k in (1, 2, 4, 8, 16, 32, 64, 128, 256) if k <= max(1, max_k)]
-    # also probe the exact budget edge, but don't launch hundreds of replicas (slow
-    # and redundant for the flatness trend) - only when the cap is modest.
-    if 1 < max_k <= 256 and max_k not in ks:
+    ks = [k for k in (1, 2, 4, 8, 16, 32, 64, 128, 256, 512) if k <= max(1, max_k)]
+    if max_k > 1 and max_k not in ks:
         ks.append(max_k)
-    print(f"\n=== (d) WIDTH K-scan on largest IB: N={n} B={b}  (max_k={max_k} {basis}) ===")
-    print(f"{'K':>5} {'iter_f':>7} {'run_ms':>9} {'ms/iter':>9} {'us/step':>9} {'vs K=1':>7} {'convp50/max':>12} {'never':>6}")
-
-    base_ms_per_iter = None
     n_steps = int(s.mc_stop_steps)
-    for k in ks:
-        s.mc_executor_jax_batch_width_arcs = str(k)  # force a single chunk of K
-        problems = [
-            {"pos": seed_pos(exp, step, j), "exp_dist": exp, "step_size": step} for j in range(k)
-        ]
-        # warm this (K,B) shape (compile), then take the best of a few timed runs:
-        # min run_ms is the cleanest latency estimate (drops one-off stalls).
-        A.mc_arcs_jax_batch(problems, s)
-        samples: list[float] = []
-        it = 0
-        d: dict = {}
-        for _ in range(3):
-            A.mc_arcs_jax_batch(problems, s)
-            with A._arcs_profile_lock:
-                d = dict(A._last_batch_diag)
-            samples.append(d["run_ms"] if d["run_ms"] > 0 else d["elapsed_s"] * 1e3)
-            it = d["iter_f"]
-        run_ms = min(samples)
-        ms_iter = run_ms / max(it, 1)
-        us_step = ms_iter * 1e3 / max(n_steps, 1)
-        if base_ms_per_iter is None:
-            base_ms_per_iter = ms_iter
-        ratio = ms_iter / max(base_ms_per_iter, 1e-9)
-        print(
-            f"{k:>5} {it:>7} {run_ms:>9.0f} {ms_iter:>9.2f} {us_step:>9.2f} "
-            f"{ratio:>6.2f}x {str(d['p50'])+'/'+str(d['max']):>12} {d['never']:>6}"
-        )
+    print(f"\n=== (d) WIDTH K-scan on largest IB: N={n} B={b}  (max_k={max_k} {basis}) ===")
+    print(f"    forced ~1 outer iter/launch; wall_ms = one batch of K chains x {n_steps} steps")
+    print(f"{'K':>5} {'wall_ms':>9} {'us/step':>9} {'vs K=1':>8} {'Mstep/s':>9}")
+
+    base = None
+    warned = False
+    A._ARCS_FORCE_SCORE_EPS = 1e30  # converge after 1 outer iter (per-iter-wall probe)
+    try:
+        for k in ks:
+            s.mc_executor_jax_batch_width_arcs = str(k)  # force a single chunk of K
+            problems = [
+                {"pos": seed_pos(exp, step, j), "exp_dist": exp, "step_size": step}
+                for j in range(k)
+            ]
+            A.mc_arcs_jax_batch(problems, s)  # warm (compile) this (K,B)
+            samples: list[float] = []
+            it = 0
+            for _ in range(3):
+                A.mc_arcs_jax_batch(problems, s)
+                with A._arcs_profile_lock:
+                    d = dict(A._last_batch_diag)
+                samples.append(d["run_ms"] if d["run_ms"] > 0 else d["elapsed_s"] * 1e3)
+                it = d["iter_f"]
+            if it != 1 and not warned:
+                print(f"    [warn] K={k} ran {it} iters (force-eps not applied); wall_ms is {it}x per-iter")
+                warned = True
+            wall_ms = min(samples) / max(it, 1)
+            us_step = wall_ms * 1e3 / max(n_steps, 1)  # per-chain step latency (chains parallel)
+            mstep_s = (k * n_steps) / max(wall_ms / 1e3, 1e-9) / 1e6  # total throughput
+            if base is None:
+                base = wall_ms
+            print(f"{k:>5} {wall_ms:>9.1f} {us_step:>9.2f} {wall_ms / max(base, 1e-9):>7.2f}x {mstep_s:>9.1f}")
+    finally:
+        A._ARCS_FORCE_SCORE_EPS = None
+
     print(
-        "[width] ms/iter ~flat across K  => latency-bound, spare GPU width "
-        "(batch the large IBs wider / run replicate-restarts for free)."
+        "[width] wall_ms ~flat across K  => latency-bound, spare GPU width "
+        "(batch the large IBs + restarts wide for ~free)."
     )
     print(
-        "[width] ms/iter grows with K     => compute/memory bound, width won't help "
+        "[width] wall_ms grows ~linearly => compute/memory bound, width won't help "
         "(lever is fewer steps / intra-chain parallelism)."
     )
 
@@ -265,10 +272,16 @@ def main() -> None:
           f"bucket_shapes={s.mc_executor_jax_bucket_shapes}")
 
     inventory(probs, s)
-    largest_batch(probs, s)
-    print("\n=== (c) per-(K,B) aggregate for the largest-IB batch ===")
-    A.dump_arcs_profile()
-    width_scan(probs, s)  # clears _arcs_profile at its start
+    # (a,b,c) runs the largest IBs to FULL convergence (~the slowest IB's wall, can be
+    # ~1-2h) - skip it on re-runs when you only want the fast (d) width curve.
+    if os.environ.get("GNOME3D_BENCH_SKIP_LARGEST", "").strip().lower() in ("1", "true", "yes", "on"):
+        print("\n[main] skipping (a,b,c) largest-IB full-convergence batch "
+              "(GNOME3D_BENCH_SKIP_LARGEST set)")
+    else:
+        largest_batch(probs, s)
+        print("\n=== (c) per-(K,B) aggregate for the largest-IB batch ===")
+        A.dump_arcs_profile()
+    width_scan(probs, s)  # clears _arcs_profile at its start; fast (forced 1-iter)
     print("\n=== (c) per-(K,B) aggregate for the width scan ===")
     A.dump_arcs_profile()
     print("=" * 84)
