@@ -179,7 +179,7 @@ def _build_smooth_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> An
     @jax.jit
     def kernel_mp(pos_k, score_k, T_init, dtn_k, heat_k, movable_k, step_k, dt, js, jc,
                   sk, qk, ak, dw, aw, hw, r0_k, ew, cx_k, cy_k, cz_k, R_k, cw, n_active_k,
-                  base_key, stop_improvement, stop_successes, score_eps, stop_ratio):
+                  base_key, stop_improvement, stop_successes_k, score_eps, stop_ratio):
         K = pos_k.shape[0]
 
         def cond_fn(state):
@@ -195,7 +195,7 @@ def _build_smooth_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> An
             pos = jnp.where(frozen[:, None, None], pos, npos)
             score = jnp.where(frozen, score, nscore)
             ratio = score / jnp.maximum(ms, 1e-30)
-            plateaued = jnp.logical_and(score > stop_improvement * ms, nok < stop_successes)
+            plateaued = jnp.logical_and(score > stop_improvement * ms, nok < stop_successes_k)
             converged = jnp.logical_or(jnp.logical_or(jnp.logical_or(plateaued, score < score_eps), ratio > stop_ratio), conv_prev)
             conv_iter = jnp.where(jnp.logical_and(converged, jnp.logical_not(conv_prev)), iter_i + 1, conv_iter)
             return pos, score, nT, score, iter_i + 1, nok, converged, conv_iter
@@ -303,7 +303,18 @@ def _chunk(problems: list[dict[str, Any]], settings: "Settings") -> list[tuple[f
     dw, aw = jnp.float32(settings.smooth_dist_weight), jnp.float32(settings.smooth_angle_weight)
     hw = jnp.float32(settings.subanchor_heatmap_dist_weight)
     maxc = max(8, B // 8)  # 24-colour parity => ~B/24 per colour, B/8 = ~3x safety
-    n_sweeps = max(1, int(settings.mc_stop_steps_smooth) // B)
+    # >=4 sweeps/check so a single sweep's tiny score change doesn't trip ratio prematurely
+    # (n_sweeps=mc_stop_steps//B was 1 whenever B>mc_stop_steps -> premature stop, long bonds).
+    stop_steps = max(int(settings.mc_stop_steps_smooth), 1)
+    n_sweeps = max(4, stop_steps // B)
+
+    # Scale the plateau accept-threshold per IB to the checker's proposals/outer-iter
+    # (n_sweeps * #movable beads) so `n_ok < successes` fires at the SAME accept rate as
+    # the numba sequential (else the parallel checker over- or under-converges vs numba).
+    movable_cnt = np.array([int(pr["movable"].sum()) for pr in preps], np.float64)
+    succ_k = jnp.asarray(
+        np.maximum(1.0, settings.mc_stop_successes_smooth * n_sweeps * movable_cnt / stop_steps).astype(np.float32)
+    )
 
     kernel_mp, init_energy = _build_smooth_checker_kernel(n_sweeps, excl_skip, maxc)
     score_k = init_energy(pos_k, dtn_k, heat_k, sk, qk, ak, dw, aw, hw, r0_k, ew, cx_k, cy_k, cz_k, R_k, cw, n_active_k)
@@ -319,7 +330,7 @@ def _chunk(problems: list[dict[str, Any]], settings: "Settings") -> list[tuple[f
         pos_k, score_k, T_init, dtn_k, heat_k, movable_k, step_k,
         jnp.float32(settings.dt_temp_smooth), jnp.float32(settings.jump_scale_smooth), jnp.float32(settings.jump_coef_smooth),
         sk, qk, ak, dw, aw, hw, r0_k, ew, cx_k, cy_k, cz_k, R_k, cw, n_active_k, base_key,
-        jnp.float32(settings.mc_stop_improvement_smooth), jnp.int32(settings.mc_stop_successes_smooth),
+        jnp.float32(settings.mc_stop_improvement_smooth), succ_k,
         jnp.float32(1e-6), jnp.float32(0.9999))
     score = np.asarray(score_f)
     pos_np = np.asarray(pos_f)

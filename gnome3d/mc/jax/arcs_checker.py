@@ -98,12 +98,18 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
         d0 = jnp.where((idx_all[:, None] == idx_all[None, :]) | jnp.logical_not(active[None, :]), big, d0)
         nn = jnp.where(active, jnp.min(d0, axis=1), big)
         med_nn = jnp.sort(nn)[jnp.maximum(n_active // 2, 0)]
-        cell = jnp.maximum(4.0 * med_nn, 1e-10)
+        # mod-3 (27-color) needs >=3 cells/dim; a 2x-nn cell keeps that even for small,
+        # barely-expanded IBs while same-colour anchors stay >=2*cell apart.
+        cell = jnp.maximum(2.0 * med_nn, 1e-10)
 
         def sweep_body(_sw: Any, carry: Any) -> Any:
             pos, score, T, n_ok, mx = carry
             cellidx = jnp.floor(pos / cell).astype(jnp.int32)
-            color = (cellidx[:, 0] & 1) * 4 + (cellidx[:, 1] & 1) * 2 + (cellidx[:, 2] & 1)
+            # 27-colour mod-3 spatial parity (vs 8-colour mod-2): cuts the same-colour
+            # (stale-repulsion) partner fraction ~1/8 -> ~1/27, removing the compaction
+            # bias the all-pairs 1/d repulsion staleness causes on dense structures.
+            m3 = jnp.mod(cellidx, 3)
+            color = m3[:, 0] * 9 + m3[:, 1] * 3 + m3[:, 2]
             k_m, k_u = jax.random.split(jax.random.fold_in(key, _sw + 1))
             move = jax.random.uniform(k_m, (b, 3), minval=-step, maxval=step, dtype=pos.dtype)
             u = jax.random.uniform(k_u, (b,), dtype=pos.dtype)
@@ -143,7 +149,7 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
                 T = T * dt ** count_c
                 return pos, score, T, n_ok, jnp.maximum(mx, count_c.astype(jnp.int32))
 
-            return jax.lax.fori_loop(0, 8, color_body, (pos, score, T, n_ok, mx))
+            return jax.lax.fori_loop(0, 27, color_body, (pos, score, T, n_ok, mx))
 
         init = (pos0, score0, T0, jnp.int32(0), jnp.int32(0))
         pos, _score, T, n_ok, mx = jax.lax.fori_loop(0, n_sweeps, sweep_body, init)
@@ -167,7 +173,7 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
         pos_k: Any, score_k: Any, T_init: Any, exp_k: Any, step_k: Any,
         dt: Any, js: Any, jc: Any, stretch: Any, squeeze: Any, r0_k: Any, excl_w: Any,
         cx_k: Any, cy_k: Any, cz_k: Any, R_k: Any, conf_w: Any, base_key: Any,
-        stop_improvement: Any, stop_successes: Any, score_eps: Any, stop_ratio: Any, n_active_k: Any,
+        stop_improvement: Any, stop_successes_k: Any, score_eps: Any, stop_ratio: Any, n_active_k: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -187,7 +193,7 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
             pos = jnp.where(frozen[:, None, None], pos, npos)
             score = jnp.where(frozen, score, nscore)
             ratio = score / jnp.maximum(ms_score, 1e-30)
-            plateaued = jnp.logical_and(score > stop_improvement * ms_score, nok < stop_successes)
+            plateaued = jnp.logical_and(score > stop_improvement * ms_score, nok < stop_successes_k)
             converged = jnp.logical_or(
                 jnp.logical_or(jnp.logical_or(plateaued, score < score_eps), ratio > stop_ratio),
                 conv_prev,
@@ -271,8 +277,20 @@ def _checker_chunk(
     conf_w = jnp.float32(settings.confinement_weight if use_conf else 0.0)
     stretch = jnp.float32(settings.spring_stretch_arcs)
     squeeze = jnp.float32(settings.spring_squeeze_arcs)
-    maxc = max(8, B // 4)  # 8-color parity => ~B/8 per color; B/4 = 2x safety (no overflow)
-    n_sweeps = max(1, int(settings.mc_stop_steps) // B)  # ~mc_stop_steps bead-moves / outer-iter
+    maxc = max(8, B // 9)  # 27-color parity => ~B/27 per color; B/9 = 3x safety (no overflow)
+    # >=4 sweeps/outer-iter so each convergence check spans a meaningful batch (else a
+    # single sweep's tiny score change trips ratio>stop_ratio prematurely).
+    stop_steps = max(int(settings.mc_stop_steps), 1)
+    n_sweeps = max(4, stop_steps // B)
+
+    # Scale the plateau accept-threshold per IB to the checker's proposals/outer-iter
+    # (n_sweeps * n_active movable beads) so `n_ok < successes` fires at the SAME accept
+    # RATE as the numba sequential (mc_stop_successes per mc_stop_steps proposals) -
+    # without this the parallel checker never plateaus and over-optimizes the structure.
+    n_active_arr = np.array([pr["n_active"] for pr in preps], np.float64)
+    succ_k = jnp.asarray(
+        np.maximum(1.0, settings.mc_stop_successes * n_sweeps * n_active_arr / stop_steps).astype(np.float32)
+    )
 
     kernel_checker_mp, init_energy = _build_checker_kernel(n_sweeps, excl_skip, maxc)
 
@@ -289,7 +307,7 @@ def _checker_chunk(
         pos_k, score_k, T_init, exp_k, step_k,
         jnp.float32(settings.dt_temp), jnp.float32(settings.jump_scale), jnp.float32(settings.jump_coef),
         stretch, squeeze, r0_k, excl_w, cx_k, cy_k, cz_k, R_k, conf_w, base_key,
-        jnp.float32(settings.mc_stop_improvement), jnp.int32(settings.mc_stop_successes),
+        jnp.float32(settings.mc_stop_improvement), succ_k,
         jnp.float32(1e-5), jnp.float32(0.9999), n_active_k,
     )
     score = np.asarray(score_f)  # device sync
