@@ -371,6 +371,7 @@ def write_config(
     use_subanchor_heatmap: bool = False,
     backend: str = "numba",
     batch_trials: bool = False,
+    kernel: str = "mc",
 ) -> None:
     if fast:
         # Very fast: ~10 s per structure, low quality
@@ -437,6 +438,16 @@ def write_config(
             "mc_backend_apply_to_heatmap = yes\n"
             "mc_executor_jax_bucket_shapes = yes\n"
         )
+        if kernel == "checker":
+            # Route arcs+smooth through the JAX BATCH path (where the checker kernel
+            # dispatches; arcs auto-resolves to threaded otherwise) and select the
+            # approximate spatial-checkerboard kernels.
+            cfg += (
+                "mc_executor_arcs = batch\n"
+                "mc_executor_smooth = batch\n"
+                "mc_executor_jax_arcs_kernel = checker\n"
+                "mc_executor_jax_smooth_kernel = checker\n"
+            )
     path.write_text(cfg)
 
 
@@ -889,7 +900,7 @@ def _compare_and_report(ref_structs, test_structs, ref_name="Ref", test_name="Py
 
 
 def run_backend_divergence(
-    args, region, region_label, use_orn, use_anchor_heatmap, use_subanchor_heatmap
+    args, region, region_label, use_orn, use_anchor_heatmap, use_subanchor_heatmap, kernel="mc"
 ) -> None:
     """JAX-backend divergence mode: generate a numba baseline ensemble and a JAX
     ensemble (arcs + smooth + heatmap + batched IB) for the SAME region/seed
@@ -901,17 +912,19 @@ def run_backend_divergence(
     numba<->reference differences."""
     sys.path.insert(0, str(ROOT))
     try:
-        from gnome3d.mc import is_available
+        from gnome3d.mc.jax.util import jax_is_available
 
-        jax_ok = is_available()
+        jax_ok = jax_is_available()
     except ImportError:
         jax_ok = False
     if not jax_ok:
         sys.exit(
-            "[error] --jax-divergence requires JAX installed.\n"
+            "[error] divergence mode requires JAX installed.\n"
             "  pip install gnome3d-ng[jax]  (and a jax[cuda12]/jax[rocm6] for GPU)"
         )
 
+    tag = "checker-divergence" if kernel == "checker" else "jax-divergence"
+    test_name = "jax+checker" if kernel == "checker" else "jax"
     tmpdir = Path(tempfile.mkdtemp(prefix="gnome3d_jaxdiv_"))
     try:
         cfg_numba = tmpdir / "numba.ini"
@@ -932,33 +945,41 @@ def run_backend_divergence(
             use_subanchor_heatmap=use_subanchor_heatmap,
             backend="jax",
             batch_trials=True,
+            kernel=kernel,
         )
 
-        print("\n[jax-divergence] generating numba baseline ensemble...")
+        print(f"\n[{tag}] generating numba baseline ensemble...")
         numba_structs = try_python_ensemble(cfg_numba, args.n_structures, region)
         if numba_structs is None:
             sys.exit("[error] Python pipeline (gnome3d.simulate.run_region) unavailable")
 
-        print("\n[jax-divergence] generating JAX ensemble (arcs+smooth+heatmap+batch)...")
+        print(f"\n[{tag}] generating {test_name} ensemble (arcs+smooth+heatmap+batch)...")
         jax_structs = try_python_ensemble(cfg_jax, args.n_structures, region)
         if jax_structs is None:
             sys.exit("[error] Python pipeline (gnome3d.simulate.run_region) unavailable")
 
         if args.output_dir:
             save_cif_ensemble(numba_structs, "numba", Path(args.output_dir), region_label)
-            save_cif_ensemble(jax_structs, "jax", Path(args.output_dir), region_label)
+            save_cif_ensemble(jax_structs, test_name, Path(args.output_dir), region_label)
 
-        all_ok = _compare_and_report(numba_structs, jax_structs, "numba", "jax")
-        print(
-            "\n[jax-divergence] NOTE: the JAX ensemble uses f32 and the intentional "
-            "batched-trials convergence stop; small KS within the pass gate is "
-            "expected divergence, not a regression."
-        )
+        all_ok = _compare_and_report(numba_structs, jax_structs, "numba", test_name)
+        if kernel == "checker":
+            print(
+                f"\n[{tag}] NOTE: the checker kernels are an APPROXIMATE spatial-checkerboard MC "
+                "(a deliberate divergence from the sequential dynamics, ~1-2% energy); passing "
+                "the KS/structural gates proves it produces statistically similar models."
+            )
+        else:
+            print(
+                f"\n[{tag}] NOTE: the JAX ensemble uses f32 and the intentional "
+                "batched-trials convergence stop; small KS within the pass gate is "
+                "expected divergence, not a regression."
+            )
         if not all_ok:
             sys.exit(1)
     finally:
         if args.keep:
-            print(f"\n[jax-divergence] output kept at: {tmpdir}")
+            print(f"\n[{tag}] output kept at: {tmpdir}")
         else:
             shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -1024,14 +1045,23 @@ def main():
         "distributions.  Isolates JAX divergence from the numba<->reference parity; "
         "auto-enables subanchor heatmap to exercise the batch path.  Needs JAX installed.",
     )
+    parser.add_argument(
+        "--checker-divergence",
+        action="store_true",
+        help="Like --jax-divergence but the JAX ensemble uses the approximate "
+        "spatial-checkerboard arcs+smooth kernels (mc_executor_jax_{arcs,smooth}_kernel="
+        "checker on the batch path).  Proves the checker produces statistically similar "
+        "models vs numba.  Needs JAX installed.",
+    )
     args = parser.parse_args()
 
+    divergence = args.jax_divergence or args.checker_divergence
     if args.python_only and args.cpp_only:
         sys.exit("[error] --python-only and --cpp-only are mutually exclusive")
-    if args.jax_divergence and args.cpp_only:
-        sys.exit("[error] --jax-divergence and --cpp-only are mutually exclusive")
+    if divergence and args.cpp_only:
+        sys.exit("[error] --jax-divergence/--checker-divergence and --cpp-only are mutually exclusive")
 
-    if not args.python_only and not args.jax_divergence and not CPP_BIN.exists():
+    if not args.python_only and not divergence and not CPP_BIN.exists():
         sys.exit(f"[error] binary not found: {CPP_BIN}\n  run: make 3dnome")
 
     if not DATA_DIR.exists():
@@ -1050,9 +1080,9 @@ def main():
     use_subanchor_heatmap = getattr(args, "with_subanchor_heatmap", False)
     # JAX-divergence mode exercises the batched IB path, which only runs when the
     # subanchor heatmap is built - so auto-enable it (unless already requested).
-    if args.jax_divergence and not use_subanchor_heatmap:
+    if divergence and not use_subanchor_heatmap:
         use_subanchor_heatmap = True
-        print("[jax-divergence] auto-enabling subanchor heatmap to exercise the batch path")
+        print("[divergence] auto-enabling subanchor heatmap to exercise the batch path")
     # subanchor heatmap always requires the anchor heatmap (both built together)
     if use_subanchor_heatmap:
         use_anchor_heatmap = True
@@ -1080,10 +1110,13 @@ def main():
 
     # JAX-backend divergence mode: self-contained (numba ensemble vs jax ensemble),
     # no reference binary or cache needed.  Runs and exits.
-    if args.jax_divergence:
-        print("[integration] mode: JAX-backend divergence (numba baseline vs jax)")
+    if divergence:
+        kernel = "checker" if args.checker_divergence else "mc"
+        mode = "checker-kernel divergence (numba vs jax+checker)" if args.checker_divergence \
+            else "JAX-backend divergence (numba baseline vs jax)"
+        print(f"[integration] mode: {mode}")
         run_backend_divergence(
-            args, region, region_label, use_orn, use_anchor_heatmap, use_subanchor_heatmap
+            args, region, region_label, use_orn, use_anchor_heatmap, use_subanchor_heatmap, kernel
         )
         return
 
