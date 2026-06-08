@@ -267,7 +267,6 @@ def main() -> None:
     s = Settings()
     s.load_ini(REAL_CFG)  # real MC budget (stop_condition_steps -> mc_stop_steps=50000)
     s.mc_executor_jax_bucket_shapes = True
-    s.mc_executor_jax_precompile_buckets = False  # precompile path is K=1 only; keep off
     print(f"[settings] mc_stop_steps={s.mc_stop_steps} steps_arcs={s.steps_arcs} "
           f"bucket_shapes={s.mc_executor_jax_bucket_shapes}")
 

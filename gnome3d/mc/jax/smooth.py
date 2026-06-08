@@ -3,15 +3,13 @@
 This is the dominant MC hot path (mc_smooth is 89-96% of MC wall time at
 N=2000-10000).  `mc_smooth_jax` is the single-problem entry; `mc_smooth_jax_batch`
 anneals K different IBs in one vmapped kernel (region batching).  Both build /
-compile through `_build_smooth_kernel` (memoised in `_kernel_cache`) and can
-eagerly precompile every shape bucket via `_precompile_smooth`.
+compile through `_build_smooth_kernel` (memoised in `_kernel_cache`).
 
 Confinement is not supported here - the dispatch gate in the pipeline routes
 confinement-enabled smooth calls back to numba.
 """
 
 import logging
-import threading
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -22,7 +20,6 @@ from gnome3d.mc.jax.memory import max_k_for_bytes
 from gnome3d.mc.jax.util import (
     ANCHOR_BUCKETS,
     NBR_BUCKETS,
-    SHAPE_BUCKETS,
     jax_bucket_for,
     jax_device_budget_bytes,
     jax_is_available,
@@ -36,8 +33,6 @@ LOG = log.get("mc.jax")
 
 # Compiled-kernel cache (keyed by kernel signature)
 _kernel_cache: dict[Any, Any] = {}
-_precompiled: set[Any] = set()
-_init_lock = threading.Lock()
 
 
 def _build_smooth_kernel(
@@ -1082,104 +1077,6 @@ def _build_smooth_kernel(
     return bundle
 
 
-def _precompile_smooth(
-    settings: "Settings", use_heat: bool, use_orn: bool, max_nbrs: int, anchor_frac: float, K: int
-) -> None:
-    """Eagerly compile the smooth kernel across N buckets for ONE
-    (use_heat, use_orn, max_nbrs->M, K) combo.  Smooth specializes on
-    (B, A, M, K, use_heat, use_orn); B and A both scale with region size, so we
-    compile the realistic (B, A) DIAGONAL: A = bucket(anchor_frac * B) per B
-    (use_orn=False has no anchor axis -> A=M=1).  Idempotent per combo via
-    _precompiled.  Uses .lower(ShapeDtypeStruct).compile() (no array alloc)."""
-    if not jax_is_available():
-        return
-    import jax
-    import jax.numpy as jnp
-
-    excl_skip = int(settings.exclusion_skip_neighbors)
-    n_steps = int(settings.mc_stop_steps_smooth)
-    M = int(max_nbrs) if use_orn else 1
-    sig = ("smooth", n_steps, excl_skip, bool(use_heat), bool(use_orn), M, int(K))
-    with _init_lock:
-        if sig in _precompiled:
-            return
-        bundle = _build_smooth_kernel(n_steps, excl_skip, use_heat, use_orn, M)
-        kernel_full = bundle[1]
-        sds = jax.ShapeDtypeStruct
-        f32 = jnp.float32
-        key = jax.random.PRNGKey(0)
-        T_a = f32(settings.max_temp_smooth)
-        dt_a = f32(settings.dt_temp_smooth)
-        js_a = f32(settings.jump_scale_smooth)
-        jc_a = f32(settings.jump_coef_smooth)
-        impr_a = f32(settings.mc_stop_improvement_smooth)
-        succ_a = jnp.int32(settings.mc_stop_successes_smooth)
-        t0 = __import__("time").perf_counter()
-        for b in SHAPE_BUCKETS:
-            a = jax_bucket_for(max(1, int(anchor_frac * b)), ANCHOR_BUCKETS) if use_orn else 1
-            kvec = sds((K,), np.float32)
-            heat_a = sds((b, b), np.float32) if use_heat else sds((1, 1), np.float32)
-            try:
-                kernel_full.lower(
-                    sds((K, b, 3), np.float32),  # pos_k
-                    kvec,
-                    kvec,
-                    kvec,
-                    kvec,
-                    kvec,  # ss, se, sh, so, sc
-                    sds((K, a, 3), np.float32),  # anchor_orn_k
-                    T_a,
-                    sds((b,), np.float32),  # dtn
-                    sds((b,), np.int32),  # movable (int64 -> int32 under x64-off)
-                    heat_a,
-                    sds((a,), np.int32),  # anchor_ar
-                    sds((b,), np.int32),  # bead_to_anchor_k
-                    sds((a, M), np.int32),  # nbr_idx
-                    sds((a, M), np.float32),  # nbr_w
-                    sds((a, M), np.bool_),  # nbr_valid
-                    sds((b,), np.bool_),  # is_L
-                    f32(0.1),  # step_size (value irrelevant)
-                    dt_a,
-                    js_a,
-                    jc_a,
-                    f32(1.0),
-                    f32(1.0),
-                    f32(0.1),
-                    f32(1.0),
-                    f32(1.0),  # stretch..ang_w
-                    f32(1.0),
-                    f32(0.0),  # r0, excl_w
-                    f32(1.0),  # heat_weight
-                    f32(1.0),  # motif_weight
-                    jnp.bool_(True),  # symmetric
-                    f32(0.0),
-                    f32(0.0),
-                    f32(0.0),
-                    f32(1.0),
-                    f32(0.0),  # conf_cx..conf_w
-                    key,
-                    impr_a,
-                    succ_a,
-                    f32(1e-6),  # score_eps (matches mc_smooth_jax hardcode)
-                    jnp.int32(b),  # n_active
-                    jnp.int32(b),  # n_movable_active
-                ).compile()
-            except Exception as e:  # noqa: BLE001 - precompile is best-effort
-                LOG.warning("precompile smooth B=%d A=%d skipped: %s", b, a, e)
-        _precompiled.add(sig)
-        dt = __import__("time").perf_counter() - t0
-        log.status(
-            LOG,
-            "precompiled smooth kernel: %d B-buckets (heat=%s orn=%s M=%d K=%d) in %.1fs",
-            len(SHAPE_BUCKETS),
-            use_heat,
-            use_orn,
-            M,
-            K,
-            dt,
-        )
-
-
 def mc_smooth_jax(
     pos: np.ndarray[Any, Any],
     dtn: np.ndarray[Any, Any],
@@ -1273,7 +1170,6 @@ def mc_smooth_jax(
         conf_w_v = 0.0
 
     # ---- prepare orientation arrays (padded CSR) ----
-    anchor_frac: float = 0.0  # real n_anchors/n; for the precompile (B,A) diagonal
     if use_orn:
         assert char_orientations is not None and anchor_neighbors is not None
         assert anchor_neighbor_weights is not None
@@ -1310,7 +1206,6 @@ def mc_smooth_jax(
         if bool(settings.mc_executor_jax_bucket_shapes):
             A = jax_bucket_for(n_anchors, ANCHOR_BUCKETS)
             M = jax_bucket_for(max_nbrs, NBR_BUCKETS)
-            anchor_frac = n_anchors / n  # real fraction, before reassignment below
             ap, mp = A - n_anchors, M - max_nbrs
             if ap > 0 or mp > 0:
                 anchor_ar_np = np.concatenate([anchor_ar_np, np.zeros(ap, dtype=np.int32)])
@@ -1355,8 +1250,6 @@ def mc_smooth_jax(
     n_active_v: int = n
     n_movable_v: int = int(movable_np.shape[0])
     if bool(settings.mc_executor_jax_bucket_shapes):
-        if settings.mc_executor_jax_precompile_buckets:
-            _precompile_smooth(settings, use_heat, use_orn, max_nbrs, anchor_frac, K)
         B: int = jax_bucket_for(n)
     else:
         B = n
