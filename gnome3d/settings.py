@@ -161,6 +161,9 @@ class Settings:
     # port); "checker" = approximate color-gather spatial-checkerboard MC (much faster on
     # GPU for large IBs; a deliberate divergence from sequential dynamics, equal-energy).
     mc_executor_jax_arcs_kernel: str
+    # Smooth JAX kernel, same choices.  The "checker" path OMITS the (constant) CTCF
+    # orientation term from the score; the produced structures are correct.
+    mc_executor_jax_smooth_kernel: str
 
     # ---- MC arcs ----
     max_temp: float
@@ -368,6 +371,7 @@ class Settings:
         self.mc_executor_jax_batch_width_smooth = "auto"
         self.mc_executor_jax_batch_width_arcs = "auto"
         self.mc_executor_jax_arcs_kernel = "mc"
+        self.mc_executor_jax_smooth_kernel = "mc"
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -717,6 +721,11 @@ class Settings:
             "simulation_backend",
             "mc_executor_jax_arcs_kernel",
             self.mc_executor_jax_arcs_kernel,
+        )
+        self.mc_executor_jax_smooth_kernel = gets(
+            "simulation_backend",
+            "mc_executor_jax_smooth_kernel",
+            self.mc_executor_jax_smooth_kernel,
         )
 
         # [simulation_arcs]

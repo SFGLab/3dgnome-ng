@@ -96,7 +96,14 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
             expanded.append({**prob, "pos": start})
             owner.append(gi)
 
-    results = mc_jax.mc_smooth_jax_batch(expanded, s)
+    # Kernel select: "checker" = approximate 24-colour checkerboard MC (much faster on GPU
+    # for large IBs; omits the constant CTCF-orientation score term).  Default "mc".
+    if str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")).strip().lower() == "checker":
+        from gnome3d.mc.jax.smooth_checker import mc_smooth_checker_jax_batch
+
+        results = mc_smooth_checker_jax_batch(expanded, s)
+    else:
+        results = mc_jax.mc_smooth_jax_batch(expanded, s)
 
     best: dict[int, Result] = {}
     for (score, final_pos), gi in zip(results, owner, strict=True):
