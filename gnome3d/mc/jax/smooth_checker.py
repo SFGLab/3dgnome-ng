@@ -134,13 +134,21 @@ def _build_smooth_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> An
         idx_all = jnp.arange(b)
         chainc = (idx_all % 3) * 8
         eargs = (sk, qk, ak, dw, aw, hw, r0, ew, cx, cy, cz, R, cw, n_active)
-        # robust cell = 4 * median nn over active beads
-        d0 = jnp.sqrt(jnp.sum((pos0[:, None, :] - pos0[None, :, :]) ** 2, axis=-1))
+        # cell = 4 * mean nn over S PROBE beads (subset).  The full (B,B) distance + jnp.sort
+        # made XLA compile pathologically / fail ptxas at large B (up to 32k) or large batch
+        # widths; the cell is only a heuristic scale, so a subsampled mean is fine.
         big = jnp.float32(1e30)
         active = idx_all < n_active
-        d0 = jnp.where((idx_all[:, None] == idx_all[None, :]) | jnp.logical_not(active[None, :]), big, d0)
-        nn = jnp.where(active, jnp.min(d0, axis=1), big)
-        cell = jnp.maximum(4.0 * jnp.sort(nn)[jnp.maximum(n_active // 2, 0)], 1e-10)
+        S = 64
+        stride = jnp.maximum(n_active // S, 1)
+        probe = jnp.minimum(jnp.arange(S) * stride, jnp.maximum(n_active - 1, 0))
+        pp = pos0[probe]
+        dpr = jnp.sqrt(jnp.sum((pp[:, None, :] - pos0[None, :, :]) ** 2, axis=-1))  # (S, B)
+        mask = (probe[:, None] == idx_all[None, :]) | jnp.logical_not(active[None, :])
+        nn_pr = jnp.min(jnp.where(mask, big, dpr), axis=1)
+        valid = jnp.arange(S) < n_active
+        mean_nn = jnp.sum(jnp.where(valid, nn_pr, 0.0)) / jnp.maximum(jnp.sum(valid), 1.0)
+        cell = jnp.maximum(4.0 * mean_nn, 1e-10)
 
         def sweep_body(sw, carry):
             pos, score, T, n_ok, mx = carry

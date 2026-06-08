@@ -93,15 +93,22 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
         expT = exp.T
         eargs = (r0, excl_w, cx, cy, cz, R, conf_w, n_active)
 
-        # --- robust cell = 4 * median nearest-neighbour distance over active anchors ---
-        d0 = jnp.sqrt(jnp.sum((pos0[:, None, :] - pos0[None, :, :]) ** 2, axis=-1))
+        # --- cell = 2 * mean nearest-neighbour distance over S probe anchors ---
+        # Probe a SUBSET (not all (B,B) pairs) and use the MEAN (not a sort-median): the full
+        # (B,B) distance + jnp.sort made XLA compile pathologically (20+min) and FAIL ptxas at
+        # large batch widths.  The cell is only a heuristic scale, so the estimate is fine.
+        # mod-3 (27-colour) needs >=3 cells/dim; the 2x keeps that for small/collapsed IBs.
         big = jnp.float32(1e30)
-        d0 = jnp.where((idx_all[:, None] == idx_all[None, :]) | jnp.logical_not(active[None, :]), big, d0)
-        nn = jnp.where(active, jnp.min(d0, axis=1), big)
-        med_nn = jnp.sort(nn)[jnp.maximum(n_active // 2, 0)]
-        # mod-3 (27-color) needs >=3 cells/dim; a 2x-nn cell keeps that even for small,
-        # barely-expanded IBs while same-colour anchors stay >=2*cell apart.
-        cell = jnp.maximum(2.0 * med_nn, 1e-10)
+        S = 64
+        stride = jnp.maximum(n_active // S, 1)
+        probe = jnp.minimum(jnp.arange(S) * stride, jnp.maximum(n_active - 1, 0))  # (S,) probe idx
+        pp = pos0[probe]                                                           # (S, 3)
+        dpr = jnp.sqrt(jnp.sum((pp[:, None, :] - pos0[None, :, :]) ** 2, axis=-1))  # (S, B)
+        mask = (probe[:, None] == idx_all[None, :]) | jnp.logical_not(active[None, :])
+        nn_pr = jnp.min(jnp.where(mask, big, dpr), axis=1)                         # (S,) per-probe nn
+        valid = jnp.arange(S) < n_active
+        mean_nn = jnp.sum(jnp.where(valid, nn_pr, 0.0)) / jnp.maximum(jnp.sum(valid), 1.0)
+        cell = jnp.maximum(2.0 * mean_nn, 1e-10)
 
         def sweep_body(_sw: Any, carry: Any) -> Any:
             pos, score, T, n_ok, mx = carry
