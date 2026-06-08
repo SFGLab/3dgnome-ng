@@ -86,6 +86,13 @@ def jax_is_available() -> bool:
             cache_str,
         )
 
+        try:  # one-time dump - reveals which memory_stats key holds the true device total
+            _ms = jax.devices()[0].memory_stats()
+            if _ms:
+                log.status(LOG, "device memory_stats: %s", _ms)
+        except Exception:  # noqa: BLE001 - introspection only
+            pass
+
         return True
 
 
@@ -108,7 +115,14 @@ def jax_device_budget_bytes(fraction: float = 0.95) -> int | None:
         return None
     if not stats:
         return None
-    limit = stats.get("bytes_limit")
+    # BFC preallocates a fixed pool, so bytes_limit IS the usable budget.  vmm / platform grow on
+    # demand, so bytes_limit is only the CURRENT (small, early-run) pool - sizing batches off it
+    # starves them (719 -> 128 IBs).  Fall back to the device's total reservable memory there.
+    alloc = os.environ.get("XLA_PYTHON_CLIENT_ALLOCATOR", "").lower()
+    if alloc in ("vmm", "platform"):
+        limit = stats.get("bytes_reservable_limit") or stats.get("bytes_limit")
+    else:
+        limit = stats.get("bytes_limit")
     if not limit:
         return None
     return int(int(limit) * fraction)
