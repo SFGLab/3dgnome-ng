@@ -89,11 +89,9 @@ def run_smooth_batch(expanded: list[Problem], s: Settings, kernel: str) -> list[
             # Re-noise the checker output before the polish: the checker converges to a
             # consistent attractor that homogenizes the ensemble (lowers diversity ~0.09); fresh
             # per-restart noise here re-diversifies the polish's starting points while the
-            # sequential polish still relaxes to correct bonds.  HYBRID_POLISH_RENOISE = noise
-            # as a fraction of step (0 = off, default; promote to a Settings field once tuned).
-            import os
-
-            rn = float(os.environ.get("HYBRID_POLISH_RENOISE", "0.0"))
+            # sequential polish still relaxes to correct bonds.  Noise as a fraction of step;
+            # tuned default 1.0 -> diversity 0.99 + clean bonds at n=50.
+            rn = float(getattr(s, "hybrid_polish_renoise", 1.0))
             polish = []
             for p, (_, pc) in zip(expanded, res, strict=True):
                 start = np.asarray(pc, np.float32).copy()

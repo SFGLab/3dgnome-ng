@@ -178,6 +178,7 @@ class Settings:
     # orientation term from the score; the produced structures are correct.
     mc_executor_jax_smooth_kernel: str
     mc_executor_jax_estimate_kernel: str
+    hybrid_polish_renoise: float
 
     # ---- MC arcs ----
     max_temp: float
@@ -387,6 +388,7 @@ class Settings:
         self.mc_executor_jax_arcs_kernel = "mc"
         self.mc_executor_jax_smooth_kernel = "mc"
         self.mc_executor_jax_estimate_kernel = "auto"  # auto = follow smooth (hybrid->hybrid)
+        self.hybrid_polish_renoise = 1.0  # re-noise (x step) on hybrid-smooth polish init; recovers diversity
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -752,6 +754,9 @@ class Settings:
             "simulation_backend",
             "mc_executor_jax_estimate_kernel",
             self.mc_executor_jax_estimate_kernel,
+        )
+        self.hybrid_polish_renoise = getf(
+            "simulation_backend", "hybrid_polish_renoise", self.hybrid_polish_renoise
         )
 
         # [simulation_arcs]
