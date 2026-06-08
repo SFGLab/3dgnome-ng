@@ -372,6 +372,8 @@ def write_config(
     backend: str = "numba",
     batch_trials: bool = False,
     kernel: str = "mc",
+    kernel_arcs: str | None = None,
+    kernel_smooth: str | None = None,
 ) -> None:
     if fast:
         # Very fast: ~10 s per structure, low quality
@@ -438,15 +440,20 @@ def write_config(
             "mc_backend_apply_to_heatmap = yes\n"
             "mc_executor_jax_bucket_shapes = yes\n"
         )
-        if kernel == "checker":
+        ka = kernel_arcs or kernel
+        ks = kernel_smooth or kernel
+        if ka == "checker" or ks == "checker":
             # Route arcs+smooth through the JAX BATCH path (where the checker kernel
             # dispatches; arcs auto-resolves to threaded otherwise) and select the
-            # approximate spatial-checkerboard kernels.
+            # approximate spatial-checkerboard kernels.  Per-stage (ka/ks) so a single
+            # stage can be isolated: arcs=checker+smooth=mc attributes any divergence to
+            # arcs; the "mc" stage runs the sequential JAX kernel (not numba) so only the
+            # checker ALGORITHM differs, not the backend.
             cfg += (
                 "mc_executor_arcs = batch\n"
                 "mc_executor_smooth = batch\n"
-                "mc_executor_jax_arcs_kernel = checker\n"
-                "mc_executor_jax_smooth_kernel = checker\n"
+                f"mc_executor_jax_arcs_kernel = {ka}\n"
+                f"mc_executor_jax_smooth_kernel = {ks}\n"
             )
     path.write_text(cfg)
 
@@ -968,6 +975,8 @@ def run_backend_divergence(
             backend="jax",
             batch_trials=True,
             kernel=kernel,
+            kernel_arcs=getattr(args, "kernel_arcs", None),
+            kernel_smooth=getattr(args, "kernel_smooth", None),
         )
 
         print(f"\n[{tag}] generating numba baseline ensemble...")
@@ -1089,6 +1098,20 @@ def main():
         "spatial-checkerboard arcs+smooth kernels (mc_executor_jax_{arcs,smooth}_kernel="
         "checker on the batch path).  Proves the checker produces statistically similar "
         "models vs numba.  Needs JAX installed.",
+    )
+    parser.add_argument(
+        "--kernel-arcs",
+        choices=["mc", "checker"],
+        default=None,
+        help="Override the arcs kernel in --checker-divergence (default: follow the mode). "
+        "Use with --kernel-smooth to ISOLATE a stage, e.g. --kernel-arcs checker "
+        "--kernel-smooth mc attributes any divergence to arcs alone.",
+    )
+    parser.add_argument(
+        "--kernel-smooth",
+        choices=["mc", "checker"],
+        default=None,
+        help="Override the smooth kernel in --checker-divergence (default: follow the mode).",
     )
     args = parser.parse_args()
 
