@@ -176,11 +176,12 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     # 0.965 -> 0.890 at B=1024).  Only "hybrid" (checker init + sequential polish) yields a
     # CORRECT target, so estimation upgrades checker->hybrid and is otherwise sequential -
     # never plain checker.  See docs/arcs-gpu-acceleration.md.
-    est_kernel = (
-        "hybrid"
-        if str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")).strip().lower() == "hybrid"
-        else "mc"
-    )
+    est_setting = str(getattr(s, "mc_executor_jax_estimate_kernel", "auto")).strip().lower()
+    if est_setting in ("mc", "hybrid"):
+        est_kernel = est_setting  # explicit override (never plain checker - it compounds)
+    else:  # "auto": follow the final-smooth kernel (hybrid -> hybrid), else sequential
+        smooth_k = str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")).strip().lower()
+        est_kernel = "hybrid" if smooth_k == "hybrid" else "mc"
     results = run_smooth_batch(expanded, s, est_kernel)
 
     out: list[Result] = []

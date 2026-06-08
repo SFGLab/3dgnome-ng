@@ -177,6 +177,7 @@ class Settings:
     # Smooth JAX kernel, same choices.  The "checker" path OMITS the (constant) CTCF
     # orientation term from the score; the produced structures are correct.
     mc_executor_jax_smooth_kernel: str
+    mc_executor_jax_estimate_kernel: str
 
     # ---- MC arcs ----
     max_temp: float
@@ -385,6 +386,7 @@ class Settings:
         self.mc_executor_jax_batch_width_arcs = "auto"
         self.mc_executor_jax_arcs_kernel = "mc"
         self.mc_executor_jax_smooth_kernel = "mc"
+        self.mc_executor_jax_estimate_kernel = "auto"  # auto = follow smooth (hybrid->hybrid)
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -745,6 +747,11 @@ class Settings:
             "simulation_backend",
             "mc_executor_jax_smooth_kernel",
             self.mc_executor_jax_smooth_kernel,
+        )
+        self.mc_executor_jax_estimate_kernel = gets(
+            "simulation_backend",
+            "mc_executor_jax_estimate_kernel",
+            self.mc_executor_jax_estimate_kernel,
         )
 
         # [simulation_arcs]

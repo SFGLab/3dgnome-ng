@@ -374,6 +374,7 @@ def write_config(
     kernel: str = "mc",
     kernel_arcs: str | None = None,
     kernel_smooth: str | None = None,
+    hybrid_estimate: bool = True,
 ) -> None:
     if fast:
         # Very fast: ~10 s per structure, low quality
@@ -455,6 +456,8 @@ def write_config(
                 f"mc_executor_jax_arcs_kernel = {ka}\n"
                 f"mc_executor_jax_smooth_kernel = {ks}\n"
             )
+            if not hybrid_estimate:
+                cfg += "mc_executor_jax_estimate_kernel = mc\n"
     path.write_text(cfg)
 
 
@@ -977,6 +980,7 @@ def run_backend_divergence(
             kernel=kernel,
             kernel_arcs=getattr(args, "kernel_arcs", None),
             kernel_smooth=getattr(args, "kernel_smooth", None),
+            hybrid_estimate=not getattr(args, "no_hybrid_estimate", False),
         )
 
         print(f"\n[{tag}] generating numba baseline ensemble...")
@@ -1115,6 +1119,12 @@ def main():
         help="Override the smooth kernel in --checker-divergence (default: follow the mode). "
         "'hybrid' = checker init + sequential polish (corrects the checker's mild bond drift); "
         "also drives ESTIMATE_DIST (upgraded checker->hybrid there).",
+    )
+    parser.add_argument(
+        "--no-hybrid-estimate",
+        action="store_true",
+        help="With --kernel-smooth hybrid, keep ESTIMATE_DIST sequential (isolates whether "
+        "the estimation hybrid is what trims ensemble diversity).",
     )
     args = parser.parse_args()
 
