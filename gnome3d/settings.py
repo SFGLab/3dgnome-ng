@@ -6,11 +6,21 @@ Mirrors Reference Settings class.  All defaults match Settings::init() in Settin
 
 import configparser
 import difflib
+import os
 from pathlib import Path
 
 from gnome3d import log
 
 LOG = log.get("settings")
+
+
+def _all_cores() -> int:
+    """Usable CPU count for ``auto`` worker settings - honours cgroup / CPU-affinity
+    limits on Linux, falls back to the logical core count elsewhere."""
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return os.cpu_count() or 1
 
 
 class Settings:
@@ -57,6 +67,12 @@ class Settings:
     subanchor_estimate_replicates: int
     subanchor_batch_trials: bool
     subanchor_heat_min_reduction: float
+    # Threads building per-IB contact heatmaps during seed gathering (skeleton).  The
+    # build is O(N^2) numpy per IB and embarrassingly parallel across IBs.  >1 parallelises
+    # it; `auto` uses all usable CPU cores.  NB the (N,N) f32 matrices are large (N up to
+    # ~32k -> ~4 GB each), so keep this modest if you have very large IBs (peak memory
+    # ~= workers * largest matrix; `auto` can be a lot of memory there).
+    heatmap_workers: int
 
     # ---- PET / arc length limits ----
     max_pet_length: int
@@ -122,7 +138,7 @@ class Settings:
     mc_smooth_chains: int
     # `ib_workers > 1` processes IBs concurrently (each IB is an independent
     # subproblem). JIT kernels are nogil=True, so Python threading actually
-    # parallelises here.
+    # parallelises here.  `ib_workers = auto` uses all usable CPU cores.
     mc_executor_threaded_workers: int
     # Per-stage executor: how each IB stage's nodes are scheduled AND which kernel
     # runs them (the executor implies the backend).  One value per stage:
@@ -308,6 +324,7 @@ class Settings:
         # skipped and the IB smooths without heat.  E.g. 0.001 skips IBs whose
         # heat could move mean pair distance by <0.1%.  Diverges from parity.
         self.subanchor_heat_min_reduction = 0.0
+        self.heatmap_workers = 1
 
         # ---- PET / arc length limits ----
         self.max_pet_length = 1_000_000
@@ -530,6 +547,14 @@ class Settings:
             v = get(section, key)
             return v.strip() if v is not None else default
 
+        def getworkers(section: str, key: str, default: int) -> int:
+            """Worker-count getter: ``auto`` -> all usable CPU cores, else an int."""
+            v = get(section, key)
+            if v is None:
+                return default
+            v = v.strip().lower()
+            return _all_cores() if v == "auto" else int(v)
+
         def ignore(section: str, key: str) -> None:
             """Declare a key we deliberately don't read, so the unknown-key
             check below doesn't flag it (it's recognised, just unused)."""
@@ -649,6 +674,9 @@ class Settings:
         self.subanchor_heat_min_reduction = getf(
             "subanchor_heatmap", "heat_min_reduction", self.subanchor_heat_min_reduction
         )
+        self.heatmap_workers = getworkers(
+            "subanchor_heatmap", "heatmap_workers", self.heatmap_workers
+        )
 
         # [simulation_heatmap]
         self.max_temp_heatmap = getf(
@@ -682,7 +710,7 @@ class Settings:
             "simulation_backend", "heatmap_chains", self.mc_heatmap_chains
         )
         self.mc_smooth_chains = geti("simulation_backend", "smooth_chains", self.mc_smooth_chains)
-        self.mc_executor_threaded_workers = geti(
+        self.mc_executor_threaded_workers = getworkers(
             "simulation_backend", "ib_workers", self.mc_executor_threaded_workers
         )
         self.mc_executor_arcs = gets(
