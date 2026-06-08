@@ -171,7 +171,19 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
                 }
             )
 
-    results = mc_jax.mc_smooth_jax_batch(expanded, s)
+    # Kernel select: "checker" runs the dry-smooth trials on the 24-colour checkerboard
+    # MC (fast on GPU), the SAME toggle as the final SMOOTH stage.  The dry case has no
+    # heat (-> the heat term's mask is all-false, vanishes) and no orientation, so the
+    # checker drops in; EV+confinement still apply from settings.  Measured on real IBs
+    # (playground/estimate_checker_ab.py): the estimated target does NOT systematically
+    # compact - the kernel delta is within estimation's own best-of-N noise (+-~3%, both
+    # directions), so it does not compound with the final smooth's compaction.  Default "mc".
+    if str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")).strip().lower() == "checker":
+        from gnome3d.mc.jax.smooth_checker import mc_smooth_checker_jax_batch
+
+        results = mc_smooth_checker_jax_batch(expanded, s)
+    else:
+        results = mc_jax.mc_smooth_jax_batch(expanded, s)
 
     out: list[Result] = []
     for gi, prob in enumerate(problems):
