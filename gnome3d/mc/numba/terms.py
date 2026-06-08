@@ -383,7 +383,12 @@ def init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> floa
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _local_arcs_nb(
-    pos: F64Array, exp: F64Array, p: int, stretch_k: float, squeeze_k: float, rep_inv_cutoff: float = 0.0
+    pos: F64Array,
+    exp: F64Array,
+    p: int,
+    stretch_k: float,
+    squeeze_k: float,
+    rep_inv_cutoff: float = 0.0,
 ) -> float:
     n = pos.shape[0]
     sc = 0.0

@@ -52,15 +52,27 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
     import jax.numpy as jnp
 
     def _arc_E(d: Any, e: Any, stretch: Any, squeeze: Any, rep_inv_cutoff: Any = 0.0) -> Any:
-        rep = jnp.maximum(0.0, 1.0 / jnp.maximum(d, 1e-10) - rep_inv_cutoff)  # truncate 1/d (0 => unbounded)
+        rep = jnp.maximum(
+            0.0, 1.0 / jnp.maximum(d, 1e-10) - rep_inv_cutoff
+        )  # truncate 1/d (0 => unbounded)
         e_safe = jnp.maximum(e, 1e-6)
         rel = (d - e_safe) / e_safe
         k = jnp.where(rel >= 0.0, stretch, squeeze)
         return jnp.where(e < 0.0, rep, jnp.where(e >= 1e-6, rel * rel * k, 0.0))
 
     def _energy_total(
-        pos: Any, exp: Any, stretch: Any, squeeze: Any,
-        r0: Any, excl_w: Any, cx: Any, cy: Any, cz: Any, R: Any, conf_w: Any, n_active: Any,
+        pos: Any,
+        exp: Any,
+        stretch: Any,
+        squeeze: Any,
+        r0: Any,
+        excl_w: Any,
+        cx: Any,
+        cy: Any,
+        cz: Any,
+        R: Any,
+        conf_w: Any,
+        n_active: Any,
         rep_inv_cutoff: Any = 0.0,
     ) -> Any:
         """Total arcs energy (arcs single-count + excl double-count + confine), pad-masked."""
@@ -70,7 +82,9 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
         eye = idx[:, None] == idx[None, :]
         upper = idx[:, None] < idx[None, :]
         d = jnp.sqrt(jnp.sum((pos[:, None, :] - pos[None, :, :]) ** 2, axis=-1))
-        tot = jnp.sum(jnp.where(upper, _arc_E(d, exp, stretch, squeeze, rep_inv_cutoff), 0.0))  # pad exp=0
+        tot = jnp.sum(
+            jnp.where(upper, _arc_E(d, exp, stretch, squeeze, rep_inv_cutoff), 0.0)
+        )  # pad exp=0
         far = jnp.abs(idx[:, None] - idx[None, :]) > excl_skip
         far = far & jnp.logical_not(eye) & active[:, None] & active[None, :]
         rel = jnp.maximum(0.0, (r0 - d) / r0)
@@ -81,9 +95,25 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
         return tot + jnp.sum(conf)
 
     def chain_checker(
-        pos0: Any, score0: Any, T0: Any, exp: Any, step: Any, dt: Any, js: Any, jc: Any,
-        stretch: Any, squeeze: Any, r0: Any, excl_w: Any,
-        cx: Any, cy: Any, cz: Any, R: Any, conf_w: Any, n_active: Any, key: Any,
+        pos0: Any,
+        score0: Any,
+        T0: Any,
+        exp: Any,
+        step: Any,
+        dt: Any,
+        js: Any,
+        jc: Any,
+        stretch: Any,
+        squeeze: Any,
+        r0: Any,
+        excl_w: Any,
+        cx: Any,
+        cy: Any,
+        cz: Any,
+        R: Any,
+        conf_w: Any,
+        n_active: Any,
+        key: Any,
         rep_inv_cutoff: Any,
     ) -> Any:
         """One outer-iter for ONE chain: pick a median-nn cell, run n_sweeps colored sweeps,
@@ -107,10 +137,10 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
         S = 64
         stride = jnp.maximum(n_active // S, 1)
         probe = jnp.minimum(jnp.arange(S) * stride, jnp.maximum(n_active - 1, 0))  # (S,) probe idx
-        pp = pos0[probe]                                                           # (S, 3)
+        pp = pos0[probe]  # (S, 3)
         dpr = jnp.sqrt(jnp.sum((pp[:, None, :] - pos0[None, :, :]) ** 2, axis=-1))  # (S, B)
         mask = (probe[:, None] == idx_all[None, :]) | jnp.logical_not(active[None, :])
-        nn_pr = jnp.min(jnp.where(mask, big, dpr), axis=1)                         # (S,) per-probe nn
+        nn_pr = jnp.min(jnp.where(mask, big, dpr), axis=1)  # (S,) per-probe nn
         valid = jnp.arange(S) < n_active
         nn_sorted = jnp.sort(jnp.where(valid, nn_pr, big))  # invalid -> big, sorted to the end
         median_nn = nn_sorted[jnp.maximum(jnp.sum(valid), 1) // 2]
@@ -136,31 +166,43 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
                 valid = jnp.arange(maxc) < count_c
                 pos_c = pos[idx_c]
                 new_c = pos_c + move[idx_c]
-                exp_c = expT[idx_c]                            # (maxc, B); pad cols exp=0
+                exp_c = expT[idx_c]  # (maxc, B); pad cols exp=0
                 self_m = idx_c[:, None] == idx_all[None, :]
                 d_old = jnp.sqrt(jnp.sum((pos_c[:, None, :] - pos[None, :, :]) ** 2, axis=-1))
                 d_mov = jnp.sqrt(jnp.sum((new_c[:, None, :] - pos[None, :, :]) ** 2, axis=-1))
-                a_old = jnp.where(self_m, 0.0, _arc_E(d_old, exp_c, stretch, squeeze, rep_inv_cutoff))
-                a_mov = jnp.where(self_m, 0.0, _arc_E(d_mov, exp_c, stretch, squeeze, rep_inv_cutoff))
+                a_old = jnp.where(
+                    self_m, 0.0, _arc_E(d_old, exp_c, stretch, squeeze, rep_inv_cutoff)
+                )
+                a_mov = jnp.where(
+                    self_m, 0.0, _arc_E(d_mov, exp_c, stretch, squeeze, rep_inv_cutoff)
+                )
                 delta = jnp.sum(a_mov - a_old, axis=1)
                 far = jnp.abs(idx_c[:, None] - idx_all[None, :]) > excl_skip
                 far = far & jnp.logical_not(self_m) & active[None, :]  # mask pad cols out of EV
                 rel_o = jnp.maximum(0.0, (r0 - d_old) / r0)
                 rel_m = jnp.maximum(0.0, (r0 - d_mov) / r0)
-                delta = delta + 2.0 * jnp.sum(jnp.where(far, excl_w * (rel_m * rel_m - rel_o * rel_o), 0.0), axis=1)
+                delta = delta + 2.0 * jnp.sum(
+                    jnp.where(far, excl_w * (rel_m * rel_m - rel_o * rel_o), 0.0), axis=1
+                )
                 ro = jnp.sqrt(jnp.sum((pos_c - ctr) ** 2, axis=-1))
                 rn = jnp.sqrt(jnp.sum((new_c - ctr) ** 2, axis=-1))
                 co = jnp.where(ro > R, conf_w * ((ro - R) / R) ** 2, 0.0)
                 cn = jnp.where(rn > R, conf_w * ((rn - R) / R) ** 2, 0.0)
                 delta = delta + (cn - co)
                 can_jump = jnp.logical_and(T > 0.0, score > 0.0)
-                expo = jnp.clip(-jc * ((score + delta) / jnp.maximum(score, 1e-30)) / jnp.maximum(T, 1e-30), -80.0, 80.0)
-                ok = jnp.logical_or(delta <= 0.0, jnp.logical_and(can_jump, u[idx_c] < js * jnp.exp(expo)))
+                expo = jnp.clip(
+                    -jc * ((score + delta) / jnp.maximum(score, 1e-30)) / jnp.maximum(T, 1e-30),
+                    -80.0,
+                    80.0,
+                )
+                ok = jnp.logical_or(
+                    delta <= 0.0, jnp.logical_and(can_jump, u[idx_c] < js * jnp.exp(expo))
+                )
                 ok = jnp.logical_and(ok, valid)
                 pos = pos.at[idx_c].add(jnp.where(ok[:, None], move[idx_c], 0.0))
                 score = score + jnp.sum(jnp.where(ok, delta, 0.0))
                 n_ok = n_ok + jnp.sum(ok)
-                T = T * dt ** count_c
+                T = T * dt**count_c
                 return pos, score, T, n_ok, jnp.maximum(mx, count_c.astype(jnp.int32))
 
             return jax.lax.fori_loop(0, 27, color_body, (pos, score, T, n_ok, mx))
@@ -170,30 +212,58 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
         return pos, _energy_total(pos, exp, stretch, squeeze, *eargs, rep_inv_cutoff), T, n_ok, mx
 
     in_axes = (
-        0, 0, 0,        # pos, score, T (per-chain)
-        0,              # exp (per-IB)
-        0,              # step (per-IB)
-        None, None, None,  # dt, js, jc (shared)
-        None, None,     # stretch, squeeze (shared)
-        0, None,        # r0 (per-IB), excl_w (shared)
-        0, 0, 0, 0,     # cx, cy, cz, R (per-IB)
-        None,           # conf_w (shared)
-        0, 0,           # n_active (per-IB), key (per-chain)
-        0,              # rep_inv_cutoff (per-IB)
+        0,
+        0,
+        0,  # pos, score, T (per-chain)
+        0,  # exp (per-IB)
+        0,  # step (per-IB)
+        None,
+        None,
+        None,  # dt, js, jc (shared)
+        None,
+        None,  # stretch, squeeze (shared)
+        0,
+        None,  # r0 (per-IB), excl_w (shared)
+        0,
+        0,
+        0,
+        0,  # cx, cy, cz, R (per-IB)
+        None,  # conf_w (shared)
+        0,
+        0,  # n_active (per-IB), key (per-chain)
+        0,  # rep_inv_cutoff (per-IB)
     )
     batched = jax.vmap(chain_checker, in_axes=in_axes, out_axes=(0, 0, 0, 0, 0))
 
     @jax.jit
     def kernel_chunk(
-        carry: Any, problem: Any, scalars: Any, base_key: Any, max_iters: Any, iter_base: Any,
+        carry: Any,
+        problem: Any,
+        scalars: Any,
+        base_key: Any,
+        max_iters: Any,
+        iter_base: Any,
     ) -> Any:
         """Run the batched checker on this (possibly-shrunk + padded) set of chains until
         all converge OR ``max_iters`` outer-iters elapse; returns the carry + iters run.
         ``iter_base`` continues the RNG stream + conv-iter numbering across chunks."""
         pos, score, T, ms0, conv0, ci0 = carry
-        exp_k, step_k, r0_k, cx_k, cy_k, cz_k, R_k, n_active_k, rep_inv_cutoff_k, succ_k, chain_id = problem
-        (dt, js, jc, stretch, squeeze, excl_w, conf_w,
-         stop_improvement, score_eps, stop_ratio) = scalars
+        (
+            exp_k,
+            step_k,
+            r0_k,
+            cx_k,
+            cy_k,
+            cz_k,
+            R_k,
+            n_active_k,
+            rep_inv_cutoff_k,
+            succ_k,
+            chain_id,
+        ) = problem
+        (dt, js, jc, stretch, squeeze, excl_w, conf_w, stop_improvement, score_eps, stop_ratio) = (
+            scalars
+        )
 
         def cond_fn(state: Any) -> Any:
             conv, li = state[4], state[6]
@@ -208,8 +278,26 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
                 lambda cid: jax.random.fold_in(jax.random.fold_in(base_key, cid), giter)
             )(chain_id)
             npos, nscore, nT, nok, _mcnt = batched(
-                pos, score, T, exp_k, step_k, dt, js, jc, stretch, squeeze, r0_k, excl_w,
-                cx_k, cy_k, cz_k, R_k, conf_w, n_active_k, keys, rep_inv_cutoff_k,
+                pos,
+                score,
+                T,
+                exp_k,
+                step_k,
+                dt,
+                js,
+                jc,
+                stretch,
+                squeeze,
+                r0_k,
+                excl_w,
+                cx_k,
+                cy_k,
+                cz_k,
+                R_k,
+                conf_w,
+                n_active_k,
+                keys,
+                rep_inv_cutoff_k,
             )
             # freeze converged chains (non-strict accept could drift them worse)
             frozen = conv_prev
@@ -229,8 +317,9 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
         pos, score, T, ms, conv, ci, li = jax.lax.while_loop(cond_fn, body_fn, init)
         return (pos, score, T, ms, conv, ci), li
 
-    init_energy = jax.jit(jax.vmap(
-        _energy_total, in_axes=(0, 0, None, None, 0, None, 0, 0, 0, 0, None, 0, 0)))
+    init_energy = jax.jit(
+        jax.vmap(_energy_total, in_axes=(0, 0, None, None, 0, None, 0, 0, 0, 0, None, 0, 0))
+    )
 
     bundle = (kernel_chunk, init_energy)
     _kernel_cache[cache_key] = bundle
@@ -238,7 +327,8 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
 
 
 def mc_arcs_checker_jax_batch(
-    problems: list[dict[str, Any]], settings: "Settings",
+    problems: list[dict[str, Any]],
+    settings: "Settings",
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     """Checkerboard analogue of `mc_arcs_jax_batch`: anneal K IBs' anchors in one vmapped
     colored-sweep kernel.  Same signature / return ((score, pos(n,3)) per problem)."""
@@ -261,7 +351,8 @@ def mc_arcs_checker_jax_batch(
 
 
 def _checker_chunk(
-    problems: list[dict[str, Any]], settings: "Settings",
+    problems: list[dict[str, Any]],
+    settings: "Settings",
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     import jax
     import jax.numpy as jnp
@@ -277,11 +368,15 @@ def _checker_chunk(
     def stack(key: str, dtype: Any) -> Any:
         return jnp.asarray(np.array([pr[key] for pr in preps], dtype=dtype))
 
-    pos_k = jnp.asarray(np.stack([pr["pos"] for pr in preps], axis=0))          # (K,B,3)
-    exp_k = jnp.asarray(np.stack([pr["exp_mat"] for pr in preps], axis=0))      # (K,B,B)
+    pos_k = jnp.asarray(np.stack([pr["pos"] for pr in preps], axis=0))  # (K,B,3)
+    exp_k = jnp.asarray(np.stack([pr["exp_mat"] for pr in preps], axis=0))  # (K,B,B)
     n_active_k = stack("n_active", np.int32)
     r0_k = stack("excl_r0", np.float32)
-    cx_k, cy_k, cz_k = stack("conf_cx", np.float32), stack("conf_cy", np.float32), stack("conf_cz", np.float32)
+    cx_k, cy_k, cz_k = (
+        stack("conf_cx", np.float32),
+        stack("conf_cy", np.float32),
+        stack("conf_cz", np.float32),
+    )
     R_k = stack("conf_R", np.float32)
     step_k = jnp.asarray(np.array([float(p["step_size"]) for p in problems], dtype=np.float32))
     rep_inv_cutoff_k = stack("rep_inv_cutoff", np.float32)
@@ -305,13 +400,27 @@ def _checker_chunk(
     # without this the parallel checker never plateaus and over-optimizes the structure.
     n_active_arr = np.array([pr["n_active"] for pr in preps], np.float64)
     succ_k = jnp.asarray(
-        np.maximum(1.0, settings.mc_stop_successes * n_sweeps * n_active_arr / stop_steps).astype(np.float32)
+        np.maximum(1.0, settings.mc_stop_successes * n_sweeps * n_active_arr / stop_steps).astype(
+            np.float32
+        )
     )
 
     kernel_chunk, init_energy = _build_checker_kernel(n_sweeps, excl_skip, maxc)
 
     score_k = init_energy(
-        pos_k, exp_k, stretch, squeeze, r0_k, excl_w, cx_k, cy_k, cz_k, R_k, conf_w, n_active_k, rep_inv_cutoff_k
+        pos_k,
+        exp_k,
+        stretch,
+        squeeze,
+        r0_k,
+        excl_w,
+        cx_k,
+        cy_k,
+        cz_k,
+        R_k,
+        conf_w,
+        n_active_k,
+        rep_inv_cutoff_k,
     )
 
     _seed_src = log.current()
@@ -319,28 +428,59 @@ def _checker_chunk(
     base_key = jax.random.PRNGKey(seed_offset)
 
     carry = (
-        pos_k, score_k, jnp.full((K,), jnp.float32(settings.max_temp)),
-        jnp.full((K,), jnp.float32(1e30)), jnp.zeros((K,), jnp.bool_), jnp.zeros((K,), jnp.int32),
+        pos_k,
+        score_k,
+        jnp.full((K,), jnp.float32(settings.max_temp)),
+        jnp.full((K,), jnp.float32(1e30)),
+        jnp.zeros((K,), jnp.bool_),
+        jnp.zeros((K,), jnp.int32),
     )
-    problem = (exp_k, step_k, r0_k, cx_k, cy_k, cz_k, R_k, n_active_k, rep_inv_cutoff_k, succ_k,
-               jnp.arange(K, dtype=jnp.int32))
+    problem = (
+        exp_k,
+        step_k,
+        r0_k,
+        cx_k,
+        cy_k,
+        cz_k,
+        R_k,
+        n_active_k,
+        rep_inv_cutoff_k,
+        succ_k,
+        jnp.arange(K, dtype=jnp.int32),
+    )
     scalars = (
-        jnp.float32(settings.dt_temp), jnp.float32(settings.jump_scale), jnp.float32(settings.jump_coef),
-        stretch, squeeze, excl_w, conf_w,
-        jnp.float32(settings.mc_stop_improvement), jnp.float32(1e-5), jnp.float32(0.9999),
+        jnp.float32(settings.dt_temp),
+        jnp.float32(settings.jump_scale),
+        jnp.float32(settings.jump_coef),
+        stretch,
+        squeeze,
+        excl_w,
+        conf_w,
+        jnp.float32(settings.mc_stop_improvement),
+        jnp.float32(1e-5),
+        jnp.float32(0.9999),
     )
 
-    log_kernel_start(LOG, "arcs", "checker", K, B,
-                     f"27-colour gather, <={maxc}/colour, {n_sweeps} sweeps/round")
+    log_kernel_start(
+        LOG, "arcs", "checker", K, B, f"27-colour gather, <={maxc}/colour, {n_sweeps} sweeps/round"
+    )
     t0 = time.perf_counter()
     out_pos, out_score, out_ci, total = run_shrinking(
-        kernel_chunk, carry, problem, scalars, base_key, max_total=_MAX_ITERS)
+        kernel_chunk, carry, problem, scalars, base_key, max_total=_MAX_ITERS
+    )
     ci = out_ci[out_ci > 0]
     med = int(np.median(ci)) if ci.size else 0
     slow = int(ci.max()) if ci.size else 0
     log_kernel_done(
-        LOG, "arcs", "checker", K, time.perf_counter() - t0,
+        LOG,
+        "arcs",
+        "checker",
+        K,
+        time.perf_counter() - t0,
         f"{total} rounds, {ci.size}/{K} converged (median {med}, slowest {slow})",
     )
 
-    return [(float(out_score[i]), out_pos[i][: pr["n"]].astype(np.float32)) for i, pr in enumerate(preps)]
+    return [
+        (float(out_score[i]), out_pos[i][: pr["n"]].astype(np.float32))
+        for i, pr in enumerate(preps)
+    ]

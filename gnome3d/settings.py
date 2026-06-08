@@ -389,7 +389,9 @@ class Settings:
         self.mc_executor_jax_arcs_kernel = "mc"
         self.mc_executor_jax_smooth_kernel = "mc"
         self.mc_executor_jax_estimate_kernel = "auto"  # auto = follow smooth (hybrid->hybrid)
-        self.hybrid_polish_renoise = 1.0  # re-noise (x step) on hybrid-smooth polish init; recovers diversity
+        self.hybrid_polish_renoise = (
+            1.0  # re-noise (x step) on hybrid-smooth polish init; recovers diversity
+        )
 
         # ---- MC arcs ----
         self.max_temp = 20.0
