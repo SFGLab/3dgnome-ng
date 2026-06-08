@@ -79,12 +79,23 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
             expanded.append({"pos": start, "exp_dist": prob["exp_dist"], "step_size": step})
             owner.append(gi)
 
-    # Kernel select: "checker" = approximate color-gather spatial-checkerboard MC (much
-    # faster on GPU for large IBs); default "mc" = the byte-exact sequential region-batch.
-    if str(getattr(s, "mc_executor_jax_arcs_kernel", "mc")).strip().lower() == "checker":
+    # Kernel select.  "mc" (default) = byte-exact sequential region-batch.  "checker" =
+    # approximate spatial-checkerboard MC: fast on GPU but converges to a ~15-26% over-compact
+    # minimum from a collapsed seed (see project_arcs_checker_fromscratch_compaction).  "hybrid"
+    # = checker as a fast initializer + a sequential re-anneal that escapes the compact basin
+    # and reaches the CORRECT min in ~40% of the from-collapsed steps - most of the checker's
+    # GPU speed with full correctness.
+    kernel = str(getattr(s, "mc_executor_jax_arcs_kernel", "mc")).strip().lower()
+    if kernel in ("checker", "hybrid"):
         from gnome3d.mc.jax.arcs_checker import mc_arcs_checker_jax_batch
 
         results = mc_arcs_checker_jax_batch(expanded, s)
+        if kernel == "hybrid":
+            polish = [
+                {"pos": pc, "exp_dist": p["exp_dist"], "step_size": p["step_size"]}
+                for p, (_, pc) in zip(expanded, results, strict=True)
+            ]
+            results = mc_jax.mc_arcs_jax_batch(polish, s)
     else:
         results = mc_jax.mc_arcs_jax_batch(expanded, s)
 

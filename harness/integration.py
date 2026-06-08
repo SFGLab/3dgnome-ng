@@ -442,7 +442,7 @@ def write_config(
         )
         ka = kernel_arcs or kernel
         ks = kernel_smooth or kernel
-        if ka == "checker" or ks == "checker":
+        if ka in ("checker", "hybrid") or ks == "checker":
             # Route arcs+smooth through the JAX BATCH path (where the checker kernel
             # dispatches; arcs auto-resolves to threaded otherwise) and select the
             # approximate spatial-checkerboard kernels.  Per-stage (ka/ks) so a single
@@ -1101,11 +1101,12 @@ def main():
     )
     parser.add_argument(
         "--kernel-arcs",
-        choices=["mc", "checker"],
+        choices=["mc", "checker", "hybrid"],
         default=None,
         help="Override the arcs kernel in --checker-divergence (default: follow the mode). "
         "Use with --kernel-smooth to ISOLATE a stage, e.g. --kernel-arcs checker "
-        "--kernel-smooth mc attributes any divergence to arcs alone.",
+        "--kernel-smooth mc attributes any divergence to arcs alone.  'hybrid' = checker "
+        "init + sequential polish (fast + correct).",
     )
     parser.add_argument(
         "--kernel-smooth",
