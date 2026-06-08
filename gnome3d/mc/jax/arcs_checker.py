@@ -313,18 +313,18 @@ def _checker_chunk(
         jnp.float32(settings.mc_stop_improvement), jnp.float32(1e-5), jnp.float32(0.9999),
     )
 
-    log.status(LOG, "    arcs[checker] kernel: K=%d B=%d maxc=%d n_sweeps=%d, running (shrinking)...",
-               K, B, maxc, n_sweeps)
+    log.status(LOG, "    arcs[checker]: annealing %d IBs (%d beads each; 27-colour spatial gather, "
+               "<=%d beads/colour, %d sweeps/round)...", K, B, maxc, n_sweeps)
     t0 = time.perf_counter()
     out_pos, out_score, out_ci, total = run_shrinking(
         kernel_chunk, carry, problem, scalars, base_key, max_total=_MAX_ITERS)
     ci = out_ci[out_ci > 0]
     log.status(
         LOG,
-        "    arcs[checker] kernel: K=%d B=%d, %d iters (~%d sweeps), conv p50/max=%d/%d, %.1fs",
-        K, B, total, total * n_sweeps,
+        "    arcs[checker]: %d IBs done in %.1fs - %d rounds; IBs converged at round: "
+        "median %d, slowest %d",
+        K, time.perf_counter() - t0, total,
         int(np.median(ci)) if ci.size else 0, int(ci.max()) if ci.size else 0,
-        time.perf_counter() - t0,
     )
 
     return [(float(out_score[i]), out_pos[i][: pr["n"]].astype(np.float32)) for i, pr in enumerate(preps)]

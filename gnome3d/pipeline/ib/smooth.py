@@ -166,6 +166,12 @@ class SmoothStage:
         )
         return heat, orn, batch_bucket(int(st.pos.shape[0]), st.settings)
 
+    @staticmethod
+    def describe_batch_key(key: tuple[object, ...]) -> str:
+        """Human-readable form of the ``(heat?, orn?, bucket)`` batch key for logs."""
+        heat, orn, bucket = key
+        return f"heat={'yes' if heat else 'no'} orn={'yes' if orn else 'no'} {bucket}-bead bucket"
+
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:
         st = inputs[0]
         assert isinstance(st, Densified)  # DistEstimated is a Densified subclass

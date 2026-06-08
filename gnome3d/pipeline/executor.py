@@ -209,13 +209,19 @@ class BatchStrategy:
 
         for gi, (key, members) in enumerate(groups.items(), 1):
             problems = [node.stage.to_problem(inp) for node, inp in members]
+            stage0 = members[0][0].stage
+            key_desc = (
+                stage0.describe_batch_key(key)
+                if hasattr(stage0, "describe_batch_key")
+                else f"key={key}"
+            )
             log.status(
                 LOG,
-                "  batch %s group %d/%d key=%s: %d IBs launching...",
+                "  batch %s group %d/%d (%s): %d IBs launching...",
                 kind.value,
                 gi,
                 len(groups),
-                key,
+                key_desc,
                 len(members),
             )
 

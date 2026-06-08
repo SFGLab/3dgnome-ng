@@ -1985,15 +1985,15 @@ def _mc_smooth_jax_batch_chunk(
     seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
 
+    _desc = ("" if not use_heat else ", heat") + (
+        "" if not use_orn else f", orientation ({A} anchors, <={M} motif-nbrs/anchor)"
+    )
     log.status(
         LOG,
-        "    smooth kernel: K=%d B=%d A=%d M=%d (heat=%d orn=%d), compiling/running...",
+        "    smooth: %d IBs x %d beads%s, compiling/running...",
         K,
         B,
-        A,
-        M,
-        int(use_heat),
-        int(use_orn),
+        _desc,
     )
     t0 = time.perf_counter()
     out = kernel_full_mp(
@@ -2047,14 +2047,10 @@ def _mc_smooth_jax_batch_chunk(
     n_steps_smooth = int(settings.mc_stop_steps_smooth)
     log.status(
         LOG,
-        "    smooth kernel: K=%d B=%d A=%d M=%d (heat=%d orn=%d), "
-        "%d batches (%d steps), %d/%d converged, %.1fs",
+        "    smooth: %d IBs x %d beads%s done - %d batches (%d steps), %d/%d converged, %.1fs",
         K,
         B,
-        A,
-        M,
-        int(use_heat),
-        int(use_orn),
+        _desc,
         int(iter_count),
         int(iter_count) * n_steps_smooth,
         int(np.asarray(converged).sum()),
