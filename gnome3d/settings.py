@@ -201,6 +201,7 @@ class Settings:
     # of that level's natural bond / expected distance.  Each level has its
     # own factor (default 0.5 - half the typical bead-bead target).
     exclusion_radius_arcs: float
+    arcs_repulsion_cutoff_factor: float
     exclusion_radius_smooth: float
     exclusion_radius_heatmap: float
     exclusion_radius_ib: float
@@ -418,6 +419,9 @@ class Settings:
         self.exclusion_radius_smooth = 0.0
         self.exclusion_radius_heatmap = 0.0
         self.exclusion_radius_ib = 0.0
+        # Truncate the arcs non-arc 1/d repulsion at factor x mean-arc-distance (0 = off =
+        # unbounded, faithful to C++; ~2.5 fixes small/sparse IBs blowing up to huge Rg).
+        self.arcs_repulsion_cutoff_factor = 0.0
         # Per-level auto factor: used only when the matching radius is 0.0.
         # 0.5 means "EV kicks in once beads get closer than half the typical
         # bond distance at this level".
@@ -795,6 +799,9 @@ class Settings:
         # Per-level radii.  Key naming: radius_<level>.  0 = auto.
         self.exclusion_radius_arcs = getf(
             "excluded_volume", "radius_arcs", self.exclusion_radius_arcs
+        )
+        self.arcs_repulsion_cutoff_factor = getf(
+            "excluded_volume", "arcs_repulsion_cutoff_factor", self.arcs_repulsion_cutoff_factor
         )
         self.exclusion_radius_smooth = getf(
             "excluded_volume", "radius_smooth", self.exclusion_radius_smooth

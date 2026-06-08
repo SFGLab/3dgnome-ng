@@ -149,6 +149,7 @@ def run_outer_loop(
     score_orn: float,
     score_excl: float,
     score_conf: float,
+    rep_inv_cutoff: float = 0.0,
 ) -> float:
     """Drive the unified kernel until convergence; return the final total score."""
     score = score_struct + score_heat + score_orn + score_excl + score_conf
@@ -203,6 +204,7 @@ def run_outer_loop(
             score_orn,
             score_excl,
             score_conf,
+            rep_inv_cutoff,
         )
         score = score_struct + score_heat + score_orn + score_excl + score_conf
         step_i += stop_steps

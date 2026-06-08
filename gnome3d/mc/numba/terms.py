@@ -383,7 +383,7 @@ def init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> floa
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _local_arcs_nb(
-    pos: F64Array, exp: F64Array, p: int, stretch_k: float, squeeze_k: float
+    pos: F64Array, exp: F64Array, p: int, stretch_k: float, squeeze_k: float, rep_inv_cutoff: float = 0.0
 ) -> float:
     n = pos.shape[0]
     sc = 0.0
@@ -396,7 +396,7 @@ def _local_arcs_nb(
         dz = pos[p, 2] - pos[i, 2]
         d = math.sqrt(dx * dx + dy * dy + dz * dz)
         if e < 0.0:
-            sc += 1.0 / (d if d > 1e-10 else 1e-10)
+            sc += max(0.0, 1.0 / (d if d > 1e-10 else 1e-10) - rep_inv_cutoff)
         elif e >= 1e-6:
             rel = (d - e) / e
             sc += rel * rel * (stretch_k if rel >= 0.0 else squeeze_k)
@@ -404,7 +404,9 @@ def _local_arcs_nb(
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def init_arcs_nb(pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float) -> float:
+def init_arcs_nb(
+    pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float, rep_inv_cutoff: float = 0.0
+) -> float:
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
@@ -418,7 +420,7 @@ def init_arcs_nb(pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: floa
             dz = pos[i, 2] - pos[j, 2]
             d = math.sqrt(dx * dx + dy * dy + dz * dz)
             if e < 0.0:
-                row_sc += 1.0 / (d if d > 1e-10 else 1e-10)
+                row_sc += max(0.0, 1.0 / (d if d > 1e-10 else 1e-10) - rep_inv_cutoff)
             else:
                 rel = (d - e) / e
                 row_sc += rel * rel * (stretch_k if rel >= 0.0 else squeeze_k)
@@ -543,6 +545,7 @@ def batch_mc_nb(
     score_orn: float,
     score_excl: float,
     score_conf: float,
+    rep_inv_cutoff: float = 0.0,
 ) -> tuple[float, float, float, float, float, float, int]:
     n = pos.shape[0]
     n_mov = movable.shape[0]
@@ -557,7 +560,7 @@ def batch_mc_nb(
 
         # --- prev local scores ---
         if struct_type == STRUCT_ARCS:
-            loc_struct_prev = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k)
+            loc_struct_prev = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff)
         elif struct_type == STRUCT_CHAIN:
             loc_struct_prev = local_smooth_nb(
                 pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
@@ -607,7 +610,7 @@ def batch_mc_nb(
 
         # --- new local scores ---
         if struct_type == STRUCT_ARCS:
-            loc_struct_curr = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k)
+            loc_struct_curr = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff)
         elif struct_type == STRUCT_CHAIN:
             loc_struct_curr = local_smooth_nb(
                 pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
