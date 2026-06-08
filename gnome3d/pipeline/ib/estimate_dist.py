@@ -137,10 +137,10 @@ def _run(problem: Problem) -> Result:
 
 def _batch_run(problems: list[Problem]) -> list[Result]:
     """Batched (JAX) runner: run every IB's dry-smooth trials in one vmapped
-    kernel (reusing `mc_smooth_jax_batch` - no heat/orientation), then build each
-    IB's target matrix.  Mirrors `JaxSolver._batched_heat_dist`.  Returns one
-    heat_dist (or None) per input problem, in order.  Lazy `mc_jax` import."""
-    from gnome3d.mc import jax as mc_jax
+    kernel (no heat/orientation), then build each IB's target matrix.  Mirrors
+    `JaxSolver._batched_heat_dist`.  Returns one heat_dist (or None) per input
+    problem, in order."""
+    from gnome3d.pipeline.ib.smooth import run_smooth_batch
 
     s = problems[0]["settings"]
     n_reps = int(s.subanchor_estimate_replicates)
@@ -171,14 +171,17 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
                 }
             )
 
-    # NOTE: estimation deliberately stays on the sequential JAX kernel, NOT the checker.
-    # Estimation's output is the dense distance TARGET the final smooth chases; the checker's
-    # ~3.5% stale-EV compaction (which grows with B) shrinks that target, and the final smooth
-    # (also checker) then double-compacts.  Measured end-to-end at B=1024/n=50: routing this
-    # through the checker pushed Rg from ~0.965 to 0.890 (11%, 3x the accepted cost) plus a
-    # diversity regression.  The final SMOOTH stage can absorb the checker (one-time output
-    # cost); the estimation TARGET cannot (it compounds).  See docs/arcs-gpu-acceleration.md.
-    results = mc_jax.mc_smooth_jax_batch(expanded, s)
+    # Plain "checker" double-compacts here: estimation's output is the dense distance TARGET
+    # the final smooth chases, and the checker's stale-EV compaction shrinks it (measured Rg
+    # 0.965 -> 0.890 at B=1024).  Only "hybrid" (checker init + sequential polish) yields a
+    # CORRECT target, so estimation upgrades checker->hybrid and is otherwise sequential -
+    # never plain checker.  See docs/arcs-gpu-acceleration.md.
+    est_kernel = (
+        "hybrid"
+        if str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")).strip().lower() == "hybrid"
+        else "mc"
+    )
+    results = run_smooth_batch(expanded, s, est_kernel)
 
     out: list[Result] = []
     for gi, prob in enumerate(problems):

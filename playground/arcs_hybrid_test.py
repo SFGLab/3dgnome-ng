@@ -33,10 +33,18 @@ def rg(res):
     return float(np.mean([gyr(np.asarray(p)) for _, p in res]))
 
 
+def bnd(res):
+    out = []
+    for _, p in res:
+        p = np.asarray(p)
+        out.append(float(np.mean(np.sqrt(((p[1:] - p[:-1]) ** 2).sum(1)))))
+    return float(np.mean(out))
+
+
 print("=== [1] full sequential from the collapsed seed (baseline) ===", flush=True)
 t = time.perf_counter()
 res_full = mc_jax.mc_arcs_jax_batch(expanded, s)
-print(f"    full sequential: Rg={rg(res_full):.3f}  ({time.perf_counter() - t:.1f}s)", flush=True)
+print(f"    full sequential: Rg={rg(res_full):.3f} bond={bnd(res_full):.3f}  ({time.perf_counter() - t:.1f}s)", flush=True)
 
 print("=== [2] checker from the collapsed seed (fast init) ===", flush=True)
 t = time.perf_counter()
@@ -50,10 +58,12 @@ polish_in = [
 ]
 t = time.perf_counter()
 res_pol = mc_jax.mc_arcs_jax_batch(polish_in, s)
-print(f"    polish: Rg={rg(res_pol):.3f}  ({time.perf_counter() - t:.1f}s)", flush=True)
+print(f"    polish: Rg={rg(res_pol):.3f} bond={bnd(res_pol):.3f}  ({time.perf_counter() - t:.1f}s)", flush=True)
 
 rg_full, rg_pol = rg(res_full), rg(res_pol)
 print("\n--- VERDICT ---")
 print(f"correctness: rg_polish/rg_full = {rg_pol / max(rg_full, 1e-9):.3f}  (want ~1.0)")
+print(f"bonds:       bond_polish/bond_full = {bnd(res_pol) / max(bnd(res_full), 1e-9):.3f}  "
+      f"(want ~1.0; >1 => polish over-expands arcs bonds; ~1 => the bond-KS is the smooth checker)")
 print("speed: compare the 'N steps' in the [1] full vs [3] polish logs above")
 print("       (steps x latency = GPU cost; polish << full => hybrid wins)")

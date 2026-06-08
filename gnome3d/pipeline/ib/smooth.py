@@ -72,14 +72,31 @@ def _assemble_beads(
     ]
 
 
+def run_smooth_batch(expanded: list[Problem], s: Settings, kernel: str) -> list[Result]:
+    """Dispatch one smooth batch by kernel.  'mc' = sequential region-batch; 'checker' =
+    approximate 24-colour checkerboard MC (fast on GPU, mild bond drift); 'hybrid' = checker
+    as a fast initializer + a sequential re-anneal that corrects the drift (the same pattern
+    that fixes arcs - see project_arcs_checker_fromscratch_compaction).  Shared by the SMOOTH
+    stage and the dry-smooth ESTIMATE_DIST trials."""
+    from gnome3d.mc import jax as mc_jax
+
+    k = str(kernel).strip().lower()
+    if k in ("checker", "hybrid"):
+        from gnome3d.mc.jax.smooth_checker import mc_smooth_checker_jax_batch
+
+        res = mc_smooth_checker_jax_batch(expanded, s)
+        if k == "hybrid":
+            polish = [{**p, "pos": pc} for p, (_, pc) in zip(expanded, res, strict=True)]
+            res = mc_jax.mc_smooth_jax_batch(polish, s)
+        return res
+    return mc_jax.mc_smooth_jax_batch(expanded, s)
+
+
 def _batch_run(problems: list[Problem]) -> list[Result]:
     """Batched (JAX) runner: anneal a whole bucket of IBs' smooths in one vmapped
     kernel.  Each IB is fanned out to `steps_smooth` noised restarts (best kept),
     mirroring `JaxSolver._batched_final_smooth`.  Returns one `(score, pos)`` per
-    input problem, in order.  `mc_jax` is imported lazily so the numba path never
-    requires JAX."""
-    from gnome3d.mc import jax as mc_jax
-
+    input problem, in order."""
     s = problems[0]["settings"]
     n_restarts = max(1, int(s.steps_smooth))
 
@@ -96,14 +113,8 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
             expanded.append({**prob, "pos": start})
             owner.append(gi)
 
-    # Kernel select: "checker" = approximate 24-colour checkerboard MC (much faster on GPU
-    # for large IBs; omits the constant CTCF-orientation score term).  Default "mc".
-    if str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")).strip().lower() == "checker":
-        from gnome3d.mc.jax.smooth_checker import mc_smooth_checker_jax_batch
-
-        results = mc_smooth_checker_jax_batch(expanded, s)
-    else:
-        results = mc_jax.mc_smooth_jax_batch(expanded, s)
+    # Kernel select (mc | checker | hybrid), shared with ESTIMATE_DIST via run_smooth_batch.
+    results = run_smooth_batch(expanded, s, str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")))
 
     best: dict[int, Result] = {}
     for (score, final_pos), gi in zip(results, owner, strict=True):
