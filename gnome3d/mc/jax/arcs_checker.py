@@ -28,6 +28,7 @@ import numpy as np
 
 from gnome3d import log
 from gnome3d.mc.jax.arcs import _prep_arcs_problem_np, _resolve_arcs_max_k
+from gnome3d.mc.jax.shrink import run_shrinking
 from gnome3d.mc.jax.util import jax_bucket_for, jax_is_available
 
 if TYPE_CHECKING:
@@ -169,21 +170,29 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
     batched = jax.vmap(chain_checker, in_axes=in_axes, out_axes=(0, 0, 0, 0, 0))
 
     @jax.jit
-    def kernel_checker_mp(
-        pos_k: Any, score_k: Any, T_init: Any, exp_k: Any, step_k: Any,
-        dt: Any, js: Any, jc: Any, stretch: Any, squeeze: Any, r0_k: Any, excl_w: Any,
-        cx_k: Any, cy_k: Any, cz_k: Any, R_k: Any, conf_w: Any, base_key: Any,
-        stop_improvement: Any, stop_successes_k: Any, score_eps: Any, stop_ratio: Any, n_active_k: Any,
+    def kernel_chunk(
+        carry: Any, problem: Any, scalars: Any, base_key: Any, max_iters: Any, iter_base: Any,
     ) -> Any:
-        K = pos_k.shape[0]
+        """Run the batched checker on this (possibly-shrunk + padded) set of chains until
+        all converge OR ``max_iters`` outer-iters elapse; returns the carry + iters run.
+        ``iter_base`` continues the RNG stream + conv-iter numbering across chunks."""
+        pos, score, T, ms0, conv0, ci0 = carry
+        exp_k, step_k, r0_k, cx_k, cy_k, cz_k, R_k, n_active_k, succ_k, chain_id = problem
+        (dt, js, jc, stretch, squeeze, excl_w, conf_w,
+         stop_improvement, score_eps, stop_ratio) = scalars
 
         def cond_fn(state: Any) -> Any:
-            iter_i, converged = state[4], state[6]
-            return jnp.logical_and(jnp.logical_not(jnp.all(converged)), iter_i < _MAX_ITERS)
+            conv, li = state[4], state[6]
+            return jnp.logical_and(jnp.logical_not(jnp.all(conv)), li < max_iters)
 
         def body_fn(state: Any) -> Any:
-            pos, score, T, ms_score, iter_i, _n_ok, conv_prev, conv_iter = state
-            keys = jax.random.split(jax.random.fold_in(base_key, iter_i + 1), K)
+            pos, score, T, ms_score, conv_prev, conv_iter, li = state
+            # Per-chain RNG keyed on the chain's GLOBAL id (not its batch lane), so a chain's
+            # random stream is invariant to which others share its (shrinking) batch.
+            giter = iter_base + li + 1
+            keys = jax.vmap(
+                lambda cid: jax.random.fold_in(jax.random.fold_in(base_key, cid), giter)
+            )(chain_id)
             npos, nscore, nT, nok, _mcnt = batched(
                 pos, score, T, exp_k, step_k, dt, js, jc, stretch, squeeze, r0_k, excl_w,
                 cx_k, cy_k, cz_k, R_k, conf_w, n_active_k, keys,
@@ -193,31 +202,23 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
             pos = jnp.where(frozen[:, None, None], pos, npos)
             score = jnp.where(frozen, score, nscore)
             ratio = score / jnp.maximum(ms_score, 1e-30)
-            plateaued = jnp.logical_and(score > stop_improvement * ms_score, nok < stop_successes_k)
+            plateaued = jnp.logical_and(score > stop_improvement * ms_score, nok < succ_k)
             converged = jnp.logical_or(
                 jnp.logical_or(jnp.logical_or(plateaued, score < score_eps), ratio > stop_ratio),
                 conv_prev,
             )
             newly = jnp.logical_and(converged, jnp.logical_not(conv_prev))
-            conv_iter = jnp.where(newly, iter_i + 1, conv_iter)
-            return pos, score, nT, score, iter_i + 1, nok, converged, conv_iter
+            conv_iter = jnp.where(newly, iter_base + li + 1, conv_iter)
+            return pos, score, nT, score, converged, conv_iter, li + 1
 
-        init = (
-            pos_k, score_k, T_init,
-            jnp.full((K,), 1e30, dtype=jnp.float32),
-            jnp.int32(0),
-            jnp.zeros((K,), dtype=jnp.int32),
-            jnp.zeros((K,), dtype=jnp.bool_),
-            jnp.zeros((K,), dtype=jnp.int32),
-        )
-        final = jax.lax.while_loop(cond_fn, body_fn, init)
-        pos_f, score_f, _T, _ms, iter_f, _nok, conv_f, conviter_f = final
-        return pos_f, score_f, iter_f, conv_f, conviter_f
+        init = (pos, score, T, ms0, conv0, ci0, jnp.int32(0))
+        pos, score, T, ms, conv, ci, li = jax.lax.while_loop(cond_fn, body_fn, init)
+        return (pos, score, T, ms, conv, ci), li
 
     init_energy = jax.jit(jax.vmap(
         _energy_total, in_axes=(0, 0, None, None, 0, None, 0, 0, 0, 0, None, 0)))
 
-    bundle = (kernel_checker_mp, init_energy)
+    bundle = (kernel_chunk, init_energy)
     _kernel_cache[cache_key] = bundle
     return bundle
 
@@ -292,39 +293,38 @@ def _checker_chunk(
         np.maximum(1.0, settings.mc_stop_successes * n_sweeps * n_active_arr / stop_steps).astype(np.float32)
     )
 
-    kernel_checker_mp, init_energy = _build_checker_kernel(n_sweeps, excl_skip, maxc)
+    kernel_chunk, init_energy = _build_checker_kernel(n_sweeps, excl_skip, maxc)
 
     score_k = init_energy(pos_k, exp_k, stretch, squeeze, r0_k, excl_w, cx_k, cy_k, cz_k, R_k, conf_w, n_active_k)
 
     _seed_src = log.current()
     seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
     base_key = jax.random.PRNGKey(seed_offset)
-    T_init = jnp.full((K,), jnp.float32(settings.max_temp))
 
-    log.status(LOG, "    arcs[checker] kernel: K=%d B=%d maxc=%d n_sweeps=%d, running...", K, B, maxc, n_sweeps)
-    t0 = time.perf_counter()
-    pos_f, score_f, iter_f, conv_f, conviter_f = kernel_checker_mp(
-        pos_k, score_k, T_init, exp_k, step_k,
-        jnp.float32(settings.dt_temp), jnp.float32(settings.jump_scale), jnp.float32(settings.jump_coef),
-        stretch, squeeze, r0_k, excl_w, cx_k, cy_k, cz_k, R_k, conf_w, base_key,
-        jnp.float32(settings.mc_stop_improvement), succ_k,
-        jnp.float32(1e-5), jnp.float32(0.9999), n_active_k,
+    carry = (
+        pos_k, score_k, jnp.full((K,), jnp.float32(settings.max_temp)),
+        jnp.full((K,), jnp.float32(1e30)), jnp.zeros((K,), jnp.bool_), jnp.zeros((K,), jnp.int32),
     )
-    score = np.asarray(score_f)  # device sync
-    pos_np = np.asarray(pos_f)
-    it = int(iter_f)
-    ci = np.asarray(conviter_f)
-    done = ci > 0
-    p50 = int(np.median(ci[done])) if done.any() else 0
+    problem = (exp_k, step_k, r0_k, cx_k, cy_k, cz_k, R_k, n_active_k, succ_k,
+               jnp.arange(K, dtype=jnp.int32))
+    scalars = (
+        jnp.float32(settings.dt_temp), jnp.float32(settings.jump_scale), jnp.float32(settings.jump_coef),
+        stretch, squeeze, excl_w, conf_w,
+        jnp.float32(settings.mc_stop_improvement), jnp.float32(1e-5), jnp.float32(0.9999),
+    )
+
+    log.status(LOG, "    arcs[checker] kernel: K=%d B=%d maxc=%d n_sweeps=%d, running (shrinking)...",
+               K, B, maxc, n_sweeps)
+    t0 = time.perf_counter()
+    out_pos, out_score, out_ci, total = run_shrinking(
+        kernel_chunk, carry, problem, scalars, base_key, max_total=_MAX_ITERS)
+    ci = out_ci[out_ci > 0]
     log.status(
         LOG,
-        "    arcs[checker] kernel: K=%d B=%d, %d iters (~%d sweeps), %d/%d converged, "
-        "conv p50/max=%d/%d, %.1fs",
-        K, B, it, it * n_sweeps, int(np.asarray(conv_f).sum()), K,
-        p50, int(ci.max()) if ci.size else 0, time.perf_counter() - t0,
+        "    arcs[checker] kernel: K=%d B=%d, %d iters (~%d sweeps), conv p50/max=%d/%d, %.1fs",
+        K, B, total, total * n_sweeps,
+        int(np.median(ci)) if ci.size else 0, int(ci.max()) if ci.size else 0,
+        time.perf_counter() - t0,
     )
 
-    results: list[tuple[float, np.ndarray[Any, Any]]] = []
-    for i, pr in enumerate(preps):
-        results.append((float(score[i]), pos_np[i, : pr["n"]].astype(np.float32)))
-    return results
+    return [(float(out_score[i]), out_pos[i][: pr["n"]].astype(np.float32)) for i, pr in enumerate(preps)]
