@@ -357,6 +357,7 @@ def _checker_chunk(
                         "conv_round": int(_sci[_idx]),
                         "all_conv": _sci.astype(int).tolist(),
                         "n": int(preps[_idx]["n"]),
+                        "settings": settings,
                     },
                     _f,
                 )

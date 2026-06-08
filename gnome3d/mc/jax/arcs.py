@@ -530,13 +530,14 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         score_eps: Any,
         stop_when_ratio_above: Any,
         n_active: Any,
+        max_iters: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
         def cond_fn(state: Any) -> Any:
             iter_i = state[6]
             converged = state[8]  # (K,) per-chain
-            return jnp.logical_and(jnp.logical_not(jnp.all(converged)), iter_i < _MAX_ITERS)
+            return jnp.logical_and(jnp.logical_not(jnp.all(converged)), iter_i < max_iters)
 
         def body_fn(state: Any) -> Any:
             pos, ss, se, sc, T, ms_score, iter_i, _n_ok, conv_prev, conv_iter = state
@@ -894,8 +895,12 @@ def _resolve_arcs_max_k(big_b: int, settings: "Settings") -> tuple[int, str]:
 def mc_arcs_jax_batch(
     problems: list[dict[str, Any]],
     settings: "Settings",
+    max_iters: int | None = None,
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     """Anneal K *different* IBs' anchors in one vmapped kernel (region batching).
+
+    `max_iters` caps the outer round budget (default `_MAX_ITERS`=10000); the
+    hybrid polish passes a low value to bound a slow-to-expand outlier IB.
 
     Each problem: `pos` (n,3), ``exp_dist`` (n,n), ``step_size`` (float).  All
     share the energy-term flags (caller groups by terms + size bucket).  Returns
@@ -915,7 +920,7 @@ def mc_arcs_jax_batch(
     )
     max_k, basis = _resolve_arcs_max_k(big_b, settings)
     if len(problems) <= max_k:
-        return _mc_arcs_jax_batch_chunk(problems, settings)
+        return _mc_arcs_jax_batch_chunk(problems, settings, max_iters)
     LOG.debug(
         "region-batch[arcs]: %d IBs > max_k=%d (%s) at B=%d; running %d sub-batches",
         len(problems),
@@ -926,15 +931,17 @@ def mc_arcs_jax_batch(
     )
     out: list[tuple[float, np.ndarray[Any, Any]]] = []
     for i in range(0, len(problems), max_k):
-        out.extend(_mc_arcs_jax_batch_chunk(problems[i : i + max_k], settings))
+        out.extend(_mc_arcs_jax_batch_chunk(problems[i : i + max_k], settings, max_iters))
     return out
 
 
 def _mc_arcs_jax_batch_chunk(
     problems: list[dict[str, Any]],
     settings: "Settings",
+    max_iters: int | None = None,
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
-    """One vmapped arcs kernel launch for up to max_k IBs."""
+    """One vmapped arcs kernel launch for up to max_k IBs.  `max_iters` caps the
+    outer round budget (``None`` => 10000); used by the polish to bound an outlier."""
     if not jax_is_available():
         raise RuntimeError("settings.mc_backend='jax' but JAX is not installed.")
     import jax
@@ -1036,6 +1043,7 @@ def _mc_arcs_jax_batch_chunk(
         jnp.float32(_ARCS_FORCE_SCORE_EPS if _ARCS_FORCE_SCORE_EPS is not None else 1e-5),
         jnp.float32(0.9999),
         n_active_k,
+        jnp.int32(max_iters if max_iters is not None else 10000),
     )
 
     log_kernel_start(LOG, "arcs", "mc", K, B, "sequential single-bead")
