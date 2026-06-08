@@ -4,16 +4,6 @@ import threading
 
 from gnome3d import log
 
-# --- JAX GPU allocator preinit (MUST run before the first `import jax`, which is lazy in
-# jax_is_available below) ---------------------------------------------------------------
-# The genome runs dozens of differently-shaped kernels (arcs/smooth/checker at B=256..16384),
-# which fragments JAX's default BFC pool: large-B allocations then OOM on a GPU with plenty
-# of free-but-non-contiguous memory.  cuda_malloc_async coalesces (sidesteps BFC
-# fragmentation); the 0.95 fraction gives more pool headroom.  setdefault so an explicit
-# shell env still overrides.
-os.environ.setdefault("TF_GPU_ALLOCATOR", "cuda_malloc_async")
-os.environ.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.95")
-
 LOG = log.get("mc.jax.util")
 
 _JAX_AVAILABLE: bool | None = None  # None = not yet probed
