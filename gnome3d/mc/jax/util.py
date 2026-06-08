@@ -1,3 +1,4 @@
+import logging
 import os
 import threading
 
@@ -20,6 +21,21 @@ SHAPE_BUCKETS: tuple[int, ...] = (256, 512, 1024, 2048, 4096, 8192, 16384, 32768
 # lot at small sizes.
 ANCHOR_BUCKETS: tuple[int, ...] = (16, 64, 256, 1024, 4096, 16384)
 NBR_BUCKETS: tuple[int, ...] = (4, 8, 16, 32, 64)
+
+
+def log_kernel_start(
+    logger: logging.Logger, stage: str, kernel: str, k: int, b: int, detail: str
+) -> None:
+    """Standard JAX-kernel START line - one format for every mc/checker/hybrid kernel (arcs +
+    smooth): ``arcs[checker]: 719 IBs x 256 beads - <detail>, running...``."""
+    log.status(logger, "    %s[%s]: %d IBs x %d beads - %s, running...", stage, kernel, k, b, detail)
+
+
+def log_kernel_done(
+    logger: logging.Logger, stage: str, kernel: str, k: int, secs: float, summary: str
+) -> None:
+    """Standard JAX-kernel DONE line: ``arcs[checker]: 719 IBs in 268.1s - <summary>``."""
+    log.status(logger, "    %s[%s]: %d IBs in %.1fs - %s", stage, kernel, k, secs, summary)
 
 
 def jax_is_available() -> bool:

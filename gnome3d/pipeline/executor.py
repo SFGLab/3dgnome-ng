@@ -42,6 +42,17 @@ from gnome3d.pipeline.state import State
 LOG = log.get("executor")
 
 
+def _log_dispatch_start(kind: StageKind, strategy: str, n: int, detail: str = "") -> None:
+    """Standard executor dispatch START line, matching the JAX-kernel format:
+    ``arcs[batch]: 50 nodes (group 1/1, ...), running...``."""
+    log.status(LOG, "  %s[%s]: %d nodes%s, running...", kind.value, strategy, n, detail)
+
+
+def _log_dispatch_done(kind: StageKind, strategy: str, n: int, secs: float) -> None:
+    """Standard executor dispatch DONE line: ``arcs[batch]: 50 nodes in 11.2s``."""
+    log.status(LOG, "  %s[%s]: %d nodes in %.1fs", kind.value, strategy, n, secs)
+
+
 @runtime_checkable
 class Executor(Protocol):
     """Run every node in dependency order, returning each node's output state.
@@ -133,10 +144,12 @@ class SerialStrategy:
         outputs: dict[NodeId, State],
         done: list[NodeId],
     ) -> None:
-        LOG.info(f"running {len(nodes)} {kind} nodes serially...")
+        _log_dispatch_start(kind, "serial", len(nodes))
+        t0 = time.perf_counter()
         for node in nodes:
             inputs = dag.inputs_for(node, outputs)
             _finish(dag, node, _run_serial(node, inputs), outputs, done)
+        _log_dispatch_done(kind, "serial", len(nodes), time.perf_counter() - t0)
 
     def close(self) -> None:
         pass
@@ -166,12 +179,14 @@ class ThreadedStrategy:
         done: list[NodeId],
     ) -> None:
         pool = self._ensure_pool()
-        LOG.info(f"running {len(nodes)} {kind} nodes across {self._max_workers} threads...")
+        _log_dispatch_start(kind, "threaded", len(nodes), f" ({self._max_workers} workers)")
+        t0 = time.perf_counter()
         # Compute on the pool; finish (record + expand) on the main thread.
         jobs = [(n, dag.inputs_for(n, outputs)) for n in nodes]
         futures = [pool.submit(_run_serial, n, inp) for n, inp in jobs]
         for (node, _inp), fut in zip(jobs, futures, strict=True):
             _finish(dag, node, fut.result(), outputs, done)
+        _log_dispatch_done(kind, "threaded", len(nodes), time.perf_counter() - t0)
 
     def close(self) -> None:
         if self._pool is not None:
@@ -215,15 +230,7 @@ class BatchStrategy:
                 if hasattr(stage0, "describe_batch_key")
                 else f"key={key}"
             )
-            log.status(
-                LOG,
-                "  batch %s group %d/%d (%s): %d IBs launching...",
-                kind.value,
-                gi,
-                len(groups),
-                key_desc,
-                len(members),
-            )
+            _log_dispatch_start(kind, "batch", len(members), f" (group {gi}/{len(groups)}, {key_desc})")
 
             t0 = time.perf_counter()
             if runners.batch is not None:
@@ -233,15 +240,7 @@ class BatchStrategy:
             else:
                 raise RuntimeError(f"no runner registered for {kind}")
 
-            log.status(
-                LOG,
-                "  batch %s group %d/%d done: %d IBs in %.1fs",
-                kind.value,
-                gi,
-                len(groups),
-                len(members),
-                time.perf_counter() - t0,
-            )
+            _log_dispatch_done(kind, "batch", len(members), time.perf_counter() - t0)
 
             for (node, inputs), result in zip(members, results, strict=True):
                 _finish(dag, node, node.stage.apply(inputs, result), outputs, done)

@@ -26,7 +26,13 @@ import numpy as np
 from gnome3d import log
 from gnome3d.mc.jax.memory import max_k_for_bytes
 from gnome3d.mc.jax.shrink import run_shrinking
-from gnome3d.mc.jax.util import jax_bucket_for, jax_device_budget_bytes, jax_is_available
+from gnome3d.mc.jax.util import (
+    jax_bucket_for,
+    jax_device_budget_bytes,
+    jax_is_available,
+    log_kernel_done,
+    log_kernel_start,
+)
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -352,13 +358,16 @@ def _chunk(problems: list[dict[str, Any]], settings: "Settings") -> list[tuple[f
         jnp.float32(settings.mc_stop_improvement_smooth), jnp.float32(1e-6), jnp.float32(0.9999),
     )
 
-    log.status(LOG, "    smooth[checker]: annealing %d IBs (%d beads each; 24-colour gather, "
-               "<=%d beads/colour, %d sweeps/round)...", K, B, maxc, n_sweeps)
+    log_kernel_start(LOG, "smooth", "checker", K, B,
+                     f"24-colour gather, <={maxc}/colour, {n_sweeps} sweeps/round")
     t0 = time.perf_counter()
     out_pos, out_score, out_ci, total = run_shrinking(
         kernel_chunk, carry, problem, scalars, base_key, max_total=_MAX_ITERS)
     ci = out_ci[out_ci > 0]
-    log.status(LOG, "    smooth[checker]: %d IBs done in %.1fs - %d rounds; IBs converged at round: "
-               "median %d, slowest %d", K, time.perf_counter() - t0, total,
-               int(np.median(ci)) if ci.size else 0, int(ci.max()) if ci.size else 0)
+    med = int(np.median(ci)) if ci.size else 0
+    slow = int(ci.max()) if ci.size else 0
+    log_kernel_done(
+        LOG, "smooth", "checker", K, time.perf_counter() - t0,
+        f"{total} rounds, {ci.size}/{K} converged (median {med}, slowest {slow})",
+    )
     return [(float(out_score[i]), out_pos[i][: pr["n"]].astype(np.float32)) for i, pr in enumerate(preps)]

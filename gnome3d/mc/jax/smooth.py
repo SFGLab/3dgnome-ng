@@ -23,6 +23,8 @@ from gnome3d.mc.jax.util import (
     jax_bucket_for,
     jax_device_budget_bytes,
     jax_is_available,
+    log_kernel_done,
+    log_kernel_start,
 )
 from gnome3d.types import F32Array, I32Array, I64Array
 
@@ -1881,13 +1883,7 @@ def _mc_smooth_jax_batch_chunk(
     _desc = ("" if not use_heat else ", heat") + (
         "" if not use_orn else f", orientation ({A} anchors, <={M} motif-nbrs/anchor)"
     )
-    log.status(
-        LOG,
-        "    smooth: %d IBs x %d beads%s, compiling/running...",
-        K,
-        B,
-        _desc,
-    )
+    log_kernel_start(LOG, "smooth", "mc", K, B, f"sequential single-bead{_desc}")
     t0 = time.perf_counter()
     out = kernel_full_mp(
         pos_k,
@@ -1938,17 +1934,10 @@ def _mc_smooth_jax_batch_chunk(
     pos_f_np = np.asarray(pos_f)
 
     n_steps_smooth = int(settings.mc_stop_steps_smooth)
-    log.status(
-        LOG,
-        "    smooth: %d IBs x %d beads%s done - %d batches (%d steps), %d/%d converged, %.1fs",
-        K,
-        B,
-        _desc,
-        int(iter_count),
-        int(iter_count) * n_steps_smooth,
-        int(np.asarray(converged).sum()),
-        K,
-        time.perf_counter() - t0,
+    it_s, n_conv_s = int(iter_count), int(np.asarray(converged).sum())
+    log_kernel_done(
+        LOG, "smooth", "mc", K, time.perf_counter() - t0,
+        f"{it_s} rounds ({it_s * n_steps_smooth} steps), {n_conv_s}/{K} converged",
     )
 
     results: list[tuple[float, np.ndarray[Any, Any]]] = []

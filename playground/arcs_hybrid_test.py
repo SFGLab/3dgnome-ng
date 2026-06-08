@@ -58,7 +58,8 @@ polish_in = [
 ]
 t = time.perf_counter()
 res_pol = mc_jax.mc_arcs_jax_batch(polish_in, s)
-print(f"    polish: Rg={rg(res_pol):.3f} bond={bnd(res_pol):.3f}  ({time.perf_counter() - t:.1f}s)", flush=True)
+print(f"    polish: Rg={rg(res_pol):.3f} bond={bnd(res_pol):.3f}  "
+      f"({time.perf_counter() - t:.1f}s)", flush=True)
 
 rg_full, rg_pol = rg(res_full), rg(res_pol)
 print("\n--- VERDICT ---")

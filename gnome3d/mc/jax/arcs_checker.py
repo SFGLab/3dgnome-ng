@@ -29,7 +29,7 @@ import numpy as np
 from gnome3d import log
 from gnome3d.mc.jax.arcs import _prep_arcs_problem_np, _resolve_arcs_max_k
 from gnome3d.mc.jax.shrink import run_shrinking
-from gnome3d.mc.jax.util import jax_bucket_for, jax_is_available
+from gnome3d.mc.jax.util import jax_bucket_for, jax_is_available, log_kernel_done, log_kernel_start
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -39,6 +39,7 @@ LOG = log.get("mc.jax")
 _kernel_cache: dict[Any, Any] = {}
 _init_lock = threading.Lock()
 _MAX_ITERS: int = 10000
+_SLOW_DUMP_MAX: int = 0  # TEMP investigation: global-slowest tracker for ARCS_SLOW_DUMP
 
 
 def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
@@ -324,18 +325,41 @@ def _checker_chunk(
         jnp.float32(settings.mc_stop_improvement), jnp.float32(1e-5), jnp.float32(0.9999),
     )
 
-    log.status(LOG, "    arcs[checker]: annealing %d IBs (%d beads each; 27-colour spatial gather, "
-               "<=%d beads/colour, %d sweeps/round)...", K, B, maxc, n_sweeps)
+    log_kernel_start(LOG, "arcs", "checker", K, B,
+                     f"27-colour gather, <={maxc}/colour, {n_sweeps} sweeps/round")
     t0 = time.perf_counter()
     out_pos, out_score, out_ci, total = run_shrinking(
         kernel_chunk, carry, problem, scalars, base_key, max_total=_MAX_ITERS)
     ci = out_ci[out_ci > 0]
-    log.status(
-        LOG,
-        "    arcs[checker]: %d IBs done in %.1fs - %d rounds; IBs converged at round: "
-        "median %d, slowest %d",
-        K, time.perf_counter() - t0, total,
-        int(np.median(ci)) if ci.size else 0, int(ci.max()) if ci.size else 0,
+    med = int(np.median(ci)) if ci.size else 0
+    slow = int(ci.max()) if ci.size else 0
+    log_kernel_done(
+        LOG, "arcs", "checker", K, time.perf_counter() - t0,
+        f"{total} rounds, {ci.size}/{K} converged (median {med}, slowest {slow})",
     )
 
+    import os as _os_dump  # TEMP investigation: dump the slowest-converging IB (ARCS_SLOW_DUMP=path)
+
+    _dp = _os_dump.environ.get("ARCS_SLOW_DUMP")
+    if _dp:
+        global _SLOW_DUMP_MAX
+        _sci = np.asarray(out_ci)
+        _idx = int(np.argmax(_sci))
+        if int(_sci[_idx]) > _SLOW_DUMP_MAX:
+            _SLOW_DUMP_MAX = int(_sci[_idx])
+            import pickle as _pk
+
+            with open(_dp, "wb") as _f:
+                _pk.dump(
+                    {
+                        "input": problems[_idx],
+                        "checker_out": np.asarray(out_pos[_idx])[: preps[_idx]["n"]].astype(np.float32),
+                        "conv_round": int(_sci[_idx]),
+                        "all_conv": _sci.astype(int).tolist(),
+                        "n": int(preps[_idx]["n"]),
+                    },
+                    _f,
+                )
+            log.status(LOG, "    [ARCS_SLOW_DUMP] slowest IB so far: conv_round=%d n=%d -> %s",
+                       int(_sci[_idx]), int(preps[_idx]["n"]), _dp)
     return [(float(out_score[i]), out_pos[i][: pr["n"]].astype(np.float32)) for i, pr in enumerate(preps)]

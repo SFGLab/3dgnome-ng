@@ -20,6 +20,8 @@ from gnome3d.mc.jax.util import (
     jax_bucket_for,
     jax_device_budget_bytes,
     jax_is_available,
+    log_kernel_done,
+    log_kernel_start,
 )
 from gnome3d.types import F32Array
 
@@ -1036,7 +1038,7 @@ def _mc_arcs_jax_batch_chunk(
         n_active_k,
     )
 
-    log.status(LOG, "    arcs kernel: K=%d B=%d, compiling/running...", K, B)
+    log_kernel_start(LOG, "arcs", "mc", K, B, "sequential single-bead")
     t0 = time.perf_counter()
     if _ARCS_PROFILE:
         out, compile_ms, run_ms, cold, cost = _profile_kernel(kernel_full_mp, _kf_args, K, B)
@@ -1126,25 +1128,10 @@ def _mc_arcs_jax_batch_chunk(
             f" [compile={compile_ms:.0f}ms run={run_ms:.0f}ms "
             f"init={init_ms:.0f}ms {warm_str}{flops_str}]"
         )
-    log.status(
-        LOG,
-        "    arcs kernel: K=%d B=%d, %d batches (%d steps), %d/%d converged, "
-        "conv p50/p90/max=%d/%d/%d never=%d wasted=%d (%.0f%%) %.0fus/iter, %.1fs%s",
-        K,
-        B,
-        it,
-        it * n_steps_per_batch,
-        n_conv,
-        K,
-        p50,
-        p90,
-        mx,
-        never,
-        wasted,
-        wasted_frac,
-        us_per_iter,
-        elapsed,
-        prof_tail,
+    log_kernel_done(
+        LOG, "arcs", "mc", K, elapsed,
+        f"{it} rounds ({it * n_steps_per_batch} steps), {n_conv}/{K} converged "
+        f"(median {p50}, slowest {mx}); {wasted_frac:.0f}% wasted{prof_tail}",
     )
 
     results: list[tuple[float, np.ndarray[Any, Any]]] = []
