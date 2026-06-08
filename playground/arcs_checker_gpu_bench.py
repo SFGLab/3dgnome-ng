@@ -3,11 +3,13 @@
 Quality is already validated (E_chk/E_seq=1.00 on real IBs, CPU). This measures the
 WALL-CLOCK win on the GPU before we wire it into production. Run on the CUDA box:
 
-    GNOME3D_ARCS_PROFILE=1 .venv/bin/python /tmp/arcs_checker_gpu_bench.py
+    .venv/bin/python playground/arcs_checker_gpu_bench.py
 
-For each large IB it runs the checkerboard to a few budgets (warm then timed) and prints
-wall + final energy + effective bead-moves/s. Compare wall against your sequential GPU
-baseline (e.g. N=1555 single chain ~3900s at K=1) and energy against a production arcs run.
+For each large IB it runs, at a fixed bead-move budget: the FULL (N,N) kernel (baseline)
+then the COLOR-GATHER (maxc,N) kernel at maxc=N//4 (safe) and N//5 (tight). Prints wall,
+final energy (gather must equal full), speedup vs full, bead-moves/s, and max_cnt +
+overflow guard (gather silently drops a color's anchors if max_cnt>maxc -> energy diverges).
+Compare wall against your sequential GPU baseline (N=1555 single chain ~3900s at K=1).
 """
 
 from __future__ import annotations
@@ -42,8 +44,22 @@ def main() -> None:
     T0, dt, js, jc = float(s.max_temp), float(s.dt_temp), float(s.jump_scale), float(s.jump_coef)
 
     sizes = [n for n in (664, 1146, 1227, 1555) if n in by_n]
-    budgets = (10_000_000, 40_000_000, 80_000_000)  # bead-moves (sweeps = budget // N)
-    print(f"{'N':>5} {'budget':>12} {'sweeps':>8} {'wall_s':>8} {'final_E':>11} {'Mmoves/s':>9}")
+    B = 80_000_000  # bead-moves (~near convergence); sweeps = B // N
+    key = jax.random.PRNGKey(0)
+
+    def timed(fn):
+        """warm (compile) then time one call; returns (wall_s, *outputs_as_python)."""
+        out = fn()
+        jax.block_until_ready(out)
+        t = time.perf_counter()
+        out = fn()
+        jax.block_until_ready(out)
+        return time.perf_counter() - t, out
+
+    print(f"\nbudget={B:,} bead-moves per IB.  full = run_checker (N,N) delta; "
+          f"gather = run_checker_gather (maxc,N) delta.")
+    print(f"{'N':>5} {'kernel':>8} {'maxc':>5} {'wall_s':>8} {'final_E':>11} "
+          f"{'speedup':>8} {'Mmoves/s':>9} {'max_cnt':>8} {'overflow':>9}")
     for N in sizes:
         pos0, exp, step = by_n[N]
         pos = np.asarray(pos0, np.float32)
@@ -54,21 +70,24 @@ def main() -> None:
         d = np.sqrt(((pos[:, None, :] - pos[None, :, :]) ** 2).sum(-1))
         np.fill_diagonal(d, 1e30)
         cell = float(4.0 * np.median(d.min(1)))
-        posj = jnp.asarray(pos)
-        expj = jnp.asarray(exp)
-        for B in budgets:
-            nsw = max(1, B // N)
-            # warm (compile this shape), then timed
-            p, _ = cj.run_checker(posj, expj, nsw, step, T0, dt, js, jc, sk, qk,
-                                  *num, cell, jax.random.PRNGKey(0), 50)
-            p.block_until_ready()
-            t = time.perf_counter()
-            p, E = cj.run_checker(posj, expj, nsw, step, T0, dt, js, jc, sk, qk,
-                                  *num, cell, jax.random.PRNGKey(0), 50)
-            p.block_until_ready()
-            wall = time.perf_counter() - t
-            moves = nsw * N  # one proposal per anchor per sweep
-            print(f"{N:>5} {B:>12,} {nsw:>8} {wall:>8.1f} {float(E):>11.1f} {moves/max(wall,1e-9)/1e6:>9.1f}", flush=True)
+        posj, expj = jnp.asarray(pos), jnp.asarray(exp)
+        nsw = max(1, B // N)
+        moves = nsw * N
+
+        # full (N,N) baseline
+        w_full, (p, E) = timed(lambda: cj.run_checker(
+            posj, expj, nsw, step, T0, dt, js, jc, sk, qk, *num, cell, key, 50))
+        print(f"{N:>5} {'full':>8} {'-':>5} {w_full:>8.1f} {float(E):>11.1f} "
+              f"{1.0:>7.1f}x {moves/max(w_full,1e-9)/1e6:>9.1f} {'-':>8} {'-':>9}", flush=True)
+
+        # color-gather (maxc, N): N//4 is the safe margin, N//5 is tighter
+        for maxc in (N // 4, N // 5):
+            w, (p, E, mx) = timed(lambda mc=maxc: cj.run_checker_gather(
+                posj, expj, nsw, step, T0, dt, js, jc, sk, qk, *num, cell, key, 50, mc))
+            mx = int(mx)
+            print(f"{N:>5} {'gather':>8} {maxc:>5} {w:>8.1f} {float(E):>11.1f} "
+                  f"{w_full/max(w,1e-9):>7.1f}x {moves/max(w,1e-9)/1e6:>9.1f} {mx:>8} "
+                  f"{('OVERFLOW' if mx > maxc else 'ok'):>9}", flush=True)
 
 
 if __name__ == "__main__":

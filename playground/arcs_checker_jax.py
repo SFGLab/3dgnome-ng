@@ -15,6 +15,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import pickle
+from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -119,6 +120,68 @@ def run_checker(pos, exp, n_sweeps, step, T0, dt, js, jc, stretch, squeeze,
     return pos, _energy(pos, exp, stretch, squeeze, *args)
 
 
+@partial(jax.jit, static_argnames=("maxc",))
+def run_checker_gather(pos, exp, n_sweeps, step, T0, dt, js, jc, stretch, squeeze,
+                       r0, excl_w, skip, cx, cy, cz, R, conf_w, cell, base_key, recompute_period, maxc):
+    """COLOR-GATHER checkerboard: per color, gather only that color's <=maxc anchors
+    (jnp.nonzero static size) and compute the (maxc, N) delta instead of the full
+    (N, N).  ~N/maxc less work than run_checker.  Returns (pos, final_E, max_color_cnt)
+    so the caller can verify maxc was big enough (no silent drops)."""
+    n = pos.shape[0]
+    args = (r0, excl_w, skip, cx, cy, cz, R, conf_w)
+    expT = exp.T
+    idx_all = jnp.arange(n)
+    ctr = jnp.array([cx, cy, cz])
+    score0 = _energy(pos, exp, stretch, squeeze, *args)
+
+    def sweep_body(sw, carry):
+        pos, score, T, mx = carry
+        score = jnp.where(sw % recompute_period == 0, _energy(pos, exp, stretch, squeeze, *args), score)
+        cellidx = jnp.floor(pos / cell).astype(jnp.int32)
+        color = (cellidx[:, 0] & 1) * 4 + (cellidx[:, 1] & 1) * 2 + (cellidx[:, 2] & 1)
+        k_m, k_u = jax.random.split(jax.random.fold_in(base_key, sw + 1))
+        move = jax.random.uniform(k_m, (n, 3), minval=-step, maxval=step, dtype=pos.dtype)
+        u = jax.random.uniform(k_u, (n,), dtype=pos.dtype)
+
+        def color_body(c, c2):
+            pos, score, T, mx = c2
+            mask_c = color == c
+            count_c = jnp.sum(mask_c)
+            idx_c = jnp.nonzero(mask_c, size=maxc, fill_value=0)[0]   # (maxc,) real idx + pad 0
+            valid = jnp.arange(maxc) < count_c                        # real slots
+            pos_c = pos[idx_c]                                        # (maxc, 3)
+            new_c = pos_c + move[idx_c]
+            exp_c = expT[idx_c]                                       # (maxc, N) = exp[i, mover]
+            self_m = idx_c[:, None] == idx_all[None, :]              # (maxc, N)
+            d_old = jnp.sqrt(jnp.sum((pos_c[:, None, :] - pos[None, :, :]) ** 2, axis=-1))
+            d_mov = jnp.sqrt(jnp.sum((new_c[:, None, :] - pos[None, :, :]) ** 2, axis=-1))
+            a_old = jnp.where(self_m, 0.0, _arc_E(d_old, exp_c, stretch, squeeze))
+            a_mov = jnp.where(self_m, 0.0, _arc_E(d_mov, exp_c, stretch, squeeze))
+            delta = jnp.sum(a_mov - a_old, axis=1)
+            far = jnp.logical_and(jnp.abs(idx_c[:, None] - idx_all[None, :]) > skip, jnp.logical_not(self_m))
+            rel_o = jnp.maximum(0.0, (r0 - d_old) / r0)
+            rel_m = jnp.maximum(0.0, (r0 - d_mov) / r0)
+            delta = delta + 2.0 * jnp.sum(jnp.where(far, excl_w * (rel_m * rel_m - rel_o * rel_o), 0.0), axis=1)
+            ro = jnp.sqrt(jnp.sum((pos_c - ctr) ** 2, axis=-1))
+            rn = jnp.sqrt(jnp.sum((new_c - ctr) ** 2, axis=-1))
+            co = jnp.where(ro > R, conf_w * ((ro - R) / R) ** 2, 0.0)
+            cn = jnp.where(rn > R, conf_w * ((rn - R) / R) ** 2, 0.0)
+            delta = delta + (cn - co)
+            can_jump = jnp.logical_and(T > 0.0, score > 0.0)
+            expo = jnp.clip(-jc * ((score + delta) / jnp.maximum(score, 1e-30)) / jnp.maximum(T, 1e-30), -80.0, 80.0)
+            ok = jnp.logical_or(delta <= 0.0, jnp.logical_and(can_jump, u[idx_c] < js * jnp.exp(expo)))
+            ok = jnp.logical_and(ok, valid)
+            pos = pos.at[idx_c].add(jnp.where(ok[:, None], move[idx_c], 0.0))
+            score = score + jnp.sum(jnp.where(ok, delta, 0.0))
+            T = T * dt ** count_c
+            return pos, score, T, jnp.maximum(mx, count_c.astype(jnp.int32))
+
+        return jax.lax.fori_loop(0, 8, color_body, (pos, score, T, mx))
+
+    pos, _s, _T, mx = jax.lax.fori_loop(0, n_sweeps, sweep_body, (pos, score0, T0, jnp.int32(0)))
+    return pos, _energy(pos, exp, stretch, squeeze, *args), mx
+
+
 def _numeric_prm(prm):
     """prm=(use_excl,r0,excl_w,skip,use_conf,cx,cy,cz,R,conf_w) -> traced-safe numerics
     (weight 0 + safe r0/R when a term is off)."""
@@ -172,6 +235,29 @@ def main() -> None:
         Ej = float(Ej)
         print(f"{N:>6} {budget:>12,} {En:>11.1f} {Ej:>11.1f} {Ej/max(En,1e-9):>10.2f}")
     print("PASS if jax/numba ~ 1.0 (same algorithm, different RNG -> near-equal energy)")
+
+    print("\n=== STEP 3: color-gather parity (gather vs full, same RNG) + max color count ===")
+    print(f"{'N':>6} {'maxc':>6} {'full_E':>11} {'gather_E':>11} {'g/full':>8} {'max_cnt':>8} {'overflow?':>9}")
+    for N in (462, 664, 1146):
+        pos0, exp, step = by_n[N]
+        pos = np.asarray(pos0, np.float64)
+        exp = np.asarray(exp, np.float64)
+        step = float(step)
+        prm = cbnb.arc_params(s, pos, exp)
+        d = np.sqrt(((pos[:, None, :] - pos[None, :, :]) ** 2).sum(-1))
+        np.fill_diagonal(d, 1e30)
+        cell = 4.0 * float(np.median(d.min(1)))
+        nsw = 2_000_000 // N
+        num = _numeric_prm(prm)
+        _, Ef = run_checker(jnp.asarray(pos), jnp.asarray(exp), nsw, step, T0, dt, js, jc, sk, qk,
+                            *num, cell, jax.random.PRNGKey(0), 50)
+        maxc = int(N // 4)  # gamble: 8-color parity => ~N/8 per color; N/4 = 2x margin
+        _, Eg, mx = run_checker_gather(jnp.asarray(pos), jnp.asarray(exp), nsw, step, T0, dt, js, jc, sk, qk,
+                                       *num, cell, jax.random.PRNGKey(0), 50, maxc)
+        Ef, Eg, mx = float(Ef), float(Eg), int(mx)
+        print(f"{N:>6} {maxc:>6} {Ef:>11.1f} {Eg:>11.1f} {Eg/max(Ef,1e-9):>8.2f} {mx:>8} "
+              f"{'OVERFLOW' if mx > maxc else 'ok':>9}")
+    print("PASS if g/full ~ 1.0 AND max_cnt <= maxc (no silent drops).")
 
 
 if __name__ == "__main__":
