@@ -79,7 +79,14 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
             expanded.append({"pos": start, "exp_dist": prob["exp_dist"], "step_size": step})
             owner.append(gi)
 
-    results = mc_jax.mc_arcs_jax_batch(expanded, s)
+    # Kernel select: "checker" = approximate color-gather spatial-checkerboard MC (much
+    # faster on GPU for large IBs); default "mc" = the byte-exact sequential region-batch.
+    if str(getattr(s, "mc_executor_jax_arcs_kernel", "mc")).strip().lower() == "checker":
+        from gnome3d.mc.jax.arcs_checker import mc_arcs_checker_jax_batch
+
+        results = mc_arcs_checker_jax_batch(expanded, s)
+    else:
+        results = mc_jax.mc_arcs_jax_batch(expanded, s)
 
     best: dict[int, Result] = {}
     for (score, final_pos), gi in zip(results, owner, strict=True):

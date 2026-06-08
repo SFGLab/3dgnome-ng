@@ -132,12 +132,17 @@ def run_checker_gather(pos, exp, n_sweeps, step, T0, dt, js, jc, stretch, squeez
     expT = exp.T
     idx_all = jnp.arange(n)
     ctr = jnp.array([cx, cy, cz])
+    n13 = jnp.float32(n) ** (1.0 / 3.0)
     score0 = _energy(pos, exp, stretch, squeeze, *args)
 
     def sweep_body(sw, carry):
         pos, score, T, mx = carry
         score = jnp.where(sw % recompute_period == 0, _energy(pos, exp, stretch, squeeze, *args), score)
-        cellidx = jnp.floor(pos / cell).astype(jnp.int32)
+        # cell>0 = fixed; cell<=0 = ADAPTIVE: 4 * mean axis-extent / n^(1/3) (~4*mean_nn),
+        # recomputed each sweep so it tracks the structure as it expands from the collapsed seed.
+        ext = jnp.mean(jnp.max(pos, axis=0) - jnp.min(pos, axis=0))
+        eff_cell = jnp.where(cell > 0.0, cell, 4.0 * ext / n13)
+        cellidx = jnp.floor(pos / eff_cell).astype(jnp.int32)
         color = (cellidx[:, 0] & 1) * 4 + (cellidx[:, 1] & 1) * 2 + (cellidx[:, 2] & 1)
         k_m, k_u = jax.random.split(jax.random.fold_in(base_key, sw + 1))
         move = jax.random.uniform(k_m, (n, 3), minval=-step, maxval=step, dtype=pos.dtype)
