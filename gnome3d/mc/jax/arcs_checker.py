@@ -93,11 +93,14 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
         expT = exp.T
         eargs = (r0, excl_w, cx, cy, cz, R, conf_w, n_active)
 
-        # --- cell = 2 * mean nearest-neighbour distance over S probe anchors ---
-        # Probe a SUBSET (not all (B,B) pairs) and use the MEAN (not a sort-median): the full
-        # (B,B) distance + jnp.sort made XLA compile pathologically (20+min) and FAIL ptxas at
-        # large batch widths.  The cell is only a heuristic scale, so the estimate is fine.
-        # mod-3 (27-colour) needs >=3 cells/dim; the 2x keeps that for small/collapsed IBs.
+        # --- cell = 2 * MEDIAN nearest-neighbour distance over S probe anchors ---
+        # Probe a SUBSET (not all (B,B) pairs): the full (B,B) distance made XLA compile
+        # pathologically (20+min) at large batch widths.  Take the MEDIAN of the S probe nn
+        # (a sort of S=64, cheap to compile - NOT a sort of all B, which was the slow part).
+        # The mean was outlier-sensitive: IBs with a few sparse-region anchors inflated the
+        # cell -> coarser colouring -> stale-repulsion compaction (Rg 0.85 vs numba in the
+        # full pipeline).  mod-3 (27-colour) needs >=3 cells/dim; the 2x keeps that for small/
+        # collapsed IBs.
         big = jnp.float32(1e30)
         S = 64
         stride = jnp.maximum(n_active // S, 1)
@@ -107,8 +110,9 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
         mask = (probe[:, None] == idx_all[None, :]) | jnp.logical_not(active[None, :])
         nn_pr = jnp.min(jnp.where(mask, big, dpr), axis=1)                         # (S,) per-probe nn
         valid = jnp.arange(S) < n_active
-        mean_nn = jnp.sum(jnp.where(valid, nn_pr, 0.0)) / jnp.maximum(jnp.sum(valid), 1.0)
-        cell = jnp.maximum(2.0 * mean_nn, 1e-10)
+        nn_sorted = jnp.sort(jnp.where(valid, nn_pr, big))  # invalid -> big, sorted to the end
+        median_nn = nn_sorted[jnp.maximum(jnp.sum(valid), 1) // 2]
+        cell = jnp.maximum(2.0 * median_nn, 1e-10)
 
         def sweep_body(_sw: Any, carry: Any) -> Any:
             pos, score, T, n_ok, mx = carry
