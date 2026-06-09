@@ -257,15 +257,15 @@ playground/protected
 playground/derived
 
 # data from playground
-playground/*.mcool
-playground/*.cool
-playground/*.fa
-playground/*.fasta
-playground/*.fastq
-playground/*.fq
-playground/*.fai
-playground/*.bed
-playground/*.gz
+playground/**/*.mcool
+playground/**/*.cool
+playground/**/*.fa
+playground/**/*.fasta
+playground/**/*.fastq
+playground/**/*.fq
+playground/**/*.fai
+playground/**/*.bed
+playground/**/*.gz
 
 # data 
 data/**/*.mcool
