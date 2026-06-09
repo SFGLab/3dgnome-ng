@@ -358,15 +358,19 @@ def mc_arcs_checker_jax_batch(
     max_k, _basis = _resolve_arcs_max_k(big_b, settings)
     if len(problems) <= max_k:
         return _checker_chunk(problems, settings)
+    # More IBs than one launch holds: chunk + tag i/N so the run count is self-explanatory (a batch
+    # of nodes can expand to replicates, then chunk - so these lines are NOT the node count).
     out: list[tuple[float, np.ndarray[Any, Any]]] = []
-    for i in range(0, len(problems), max_k):
-        out.extend(_checker_chunk(problems[i : i + max_k], settings))
+    n_chunks = (len(problems) + max_k - 1) // max_k
+    for ci, i in enumerate(range(0, len(problems), max_k), start=1):
+        out.extend(_checker_chunk(problems[i : i + max_k], settings, f", chunk {ci}/{n_chunks}"))
     return out
 
 
 def _checker_chunk(
     problems: list[dict[str, Any]],
     settings: "Settings",
+    chunk_tag: str = "",
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     import jax
     import jax.numpy as jnp
@@ -476,7 +480,12 @@ def _checker_chunk(
     )
 
     log_kernel_start(
-        LOG, "arcs", "checker", K, B, f"27-colour gather, <={maxc}/colour, {n_sweeps} sweeps/round"
+        LOG,
+        "arcs",
+        "checker",
+        K,
+        B,
+        f"27-colour gather, <={maxc}/colour, {n_sweeps} sweeps/round{chunk_tag}",
     )
     t0 = time.perf_counter()
     out_pos, out_score, out_ci, total = run_shrinking(

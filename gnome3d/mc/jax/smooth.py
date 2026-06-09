@@ -1717,14 +1717,20 @@ def mc_smooth_jax_batch(
         -(-len(problems) // max_k),
     )
     results: list[tuple[float, np.ndarray[Any, Any]]] = []
-    for i in range(0, len(problems), max_k):
-        results.extend(_mc_smooth_jax_batch_chunk(problems[i : i + max_k], settings))
+    n_chunks = (len(problems) + max_k - 1) // max_k
+    for ci, i in enumerate(range(0, len(problems), max_k), start=1):
+        results.extend(
+            _mc_smooth_jax_batch_chunk(
+                problems[i : i + max_k], settings, f", chunk {ci}/{n_chunks}"
+            )
+        )
     return results
 
 
 def _mc_smooth_jax_batch_chunk(
     problems: list[dict[str, Any]],
     settings: "Settings",
+    chunk_tag: str = "",
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     """One vmapped kernel launch for up to `max_k` IBs. See `mc_smooth_jax_batch`,
     which chunks to this so the device tensors stay bounded."""
@@ -1883,7 +1889,7 @@ def _mc_smooth_jax_batch_chunk(
     _desc = ("" if not use_heat else ", heat") + (
         "" if not use_orn else f", orientation ({A} anchors, <={M} motif-nbrs/anchor)"
     )
-    log_kernel_start(LOG, "smooth", "mc", K, B, f"sequential single-bead{_desc}")
+    log_kernel_start(LOG, "smooth", "mc", K, B, f"sequential single-bead{_desc}{chunk_tag}")
     t0 = time.perf_counter()
     out = kernel_full_mp(
         pos_k,
@@ -1936,7 +1942,11 @@ def _mc_smooth_jax_batch_chunk(
     n_steps_smooth = int(settings.mc_stop_steps_smooth)
     it_s, n_conv_s = int(iter_count), int(np.asarray(converged).sum())
     log_kernel_done(
-        LOG, "smooth", "mc", K, time.perf_counter() - t0,
+        LOG,
+        "smooth",
+        "mc",
+        K,
+        time.perf_counter() - t0,
         f"{it_s} rounds ({it_s * n_steps_smooth} steps), {n_conv_s}/{K} converged",
     )
 

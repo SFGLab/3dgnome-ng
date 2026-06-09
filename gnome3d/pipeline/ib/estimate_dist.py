@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numba import njit, prange  # type: ignore[reportMissingTypeStubs]
 
+from gnome3d import log
 from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Densified, DistEstimated, State
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from gnome3d.types import BoolArray, F32Array
 
 _SEED_SALT = 1  # distinct from ARCS(0)/SMOOTH(2) so the noise streams don't correlate
+_LOG = log.get("mc.jax")
 
 
 @njit(cache=True, parallel=True, nogil=True, fastmath=True)
@@ -182,6 +184,15 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     else:  # "auto": follow the final-smooth kernel (hybrid -> hybrid), else sequential
         smooth_k = str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")).strip().lower()
         est_kernel = "hybrid" if smooth_k == "hybrid" else "mc"
+    # Make the fan-out explicit: a batch of N estimate nodes expands to N x (reps*steps) dry-smooth
+    # IBs, which the kernel then chunks - so the smooth[checker]/[mc] line count is NOT the node count.
+    log.status(
+        _LOG,
+        "    estimate: %d nodes x %d reps = %d dry-smooth IBs",
+        len(problems),
+        per_ib,
+        len(expanded),
+    )
     results = run_smooth_batch(expanded, s, est_kernel)
 
     out: list[Result] = []

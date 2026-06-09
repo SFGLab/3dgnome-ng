@@ -35,6 +35,7 @@ from typing import Protocol, runtime_checkable
 
 from gnome3d import log
 from gnome3d.pipeline.dag import Dag, Node, NodeId
+from gnome3d.pipeline.multigpu import run_sharded, visible_devices
 from gnome3d.pipeline.registry import runners_for
 from gnome3d.pipeline.stage import Result, StageKind
 from gnome3d.pipeline.state import State
@@ -204,7 +205,20 @@ class BatchStrategy:
     keeps one compiled kernel + one wide launch per bucket (vs one per distinct
     size), and keeps each batch uniform in the flags ``mc_*_jax_batch`` reads
     from ``problems[0]``.  Each group is timed and logged (always-on) so a slow
-    launch is never a silent stall."""
+    launch is never a silent stall.
+
+    Multi-GPU: each group's independent IBs are sharded across the visible JAX devices
+    (`multigpu.run_sharded`), concurrently.  Output is statistically-equivalent (valid) but NOT
+    byte-identical to single-device - the per-IB RNG keys on launch position, so a different GPU
+    count is a different random draw; the fixed-seed reproducibility gate runs single-GPU."""
+
+    def __init__(self) -> None:
+        self._devices: list[object] | None = None  # visible JAX devices (lazy, jax-only)
+
+    def _shard_devices(self) -> list[object]:
+        if self._devices is None:
+            self._devices = visible_devices()
+        return self._devices
 
     def dispatch(
         self,
@@ -230,11 +244,15 @@ class BatchStrategy:
                 if hasattr(stage0, "describe_batch_key")
                 else f"key={key}"
             )
-            _log_dispatch_start(kind, "batch", len(members), f" (group {gi}/{len(groups)}, {key_desc})")
+            devices = self._shard_devices() if runners.batch is not None else []
+            gpu_tag = f", {len(devices)} GPUs" if len(devices) > 1 else ""
+            _log_dispatch_start(
+                kind, "batch", len(members), f" (group {gi}/{len(groups)}, {key_desc}{gpu_tag})"
+            )
 
             t0 = time.perf_counter()
             if runners.batch is not None:
-                results = runners.batch(problems)
+                results = run_sharded(runners.batch, problems, devices)
             elif runners.serial is not None:
                 results = [runners.serial(p) for p in problems]
             else:

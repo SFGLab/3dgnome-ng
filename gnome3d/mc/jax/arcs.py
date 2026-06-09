@@ -969,8 +969,13 @@ def mc_arcs_jax_batch(
         -(-len(problems) // max_k),
     )
     out: list[tuple[float, np.ndarray[Any, Any]]] = []
-    for i in range(0, len(problems), max_k):
-        out.extend(_mc_arcs_jax_batch_chunk(problems[i : i + max_k], settings, max_iters))
+    n_chunks = (len(problems) + max_k - 1) // max_k
+    for ci, i in enumerate(range(0, len(problems), max_k), start=1):
+        out.extend(
+            _mc_arcs_jax_batch_chunk(
+                problems[i : i + max_k], settings, max_iters, f", chunk {ci}/{n_chunks}"
+            )
+        )
     return out
 
 
@@ -978,6 +983,7 @@ def _mc_arcs_jax_batch_chunk(
     problems: list[dict[str, Any]],
     settings: "Settings",
     max_iters: int | None = None,
+    chunk_tag: str = "",
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     """One vmapped arcs kernel launch for up to max_k IBs.  `max_iters` caps the
     outer round budget (``None`` => 10000); used by the polish to bound an outlier."""
@@ -1091,7 +1097,7 @@ def _mc_arcs_jax_batch_chunk(
         jnp.int32(max_iters if max_iters is not None else 10000),
     )
 
-    log_kernel_start(LOG, "arcs", "mc", K, B, "sequential single-bead")
+    log_kernel_start(LOG, "arcs", "mc", K, B, f"sequential single-bead{chunk_tag}")
     t0 = time.perf_counter()
     if _ARCS_PROFILE:
         out, compile_ms, run_ms, cold, cost = _profile_kernel(kernel_full_mp, _kf_args, K, B)

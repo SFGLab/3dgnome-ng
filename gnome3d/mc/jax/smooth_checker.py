@@ -472,14 +472,18 @@ def mc_smooth_checker_jax_batch(
         max_k = max(1, 16384 // max(1, big_b))
     if len(problems) <= max_k:
         return _chunk(problems, settings)
+    # More IBs than fit one launch (the B-memory cap): chunk them.  Tag each chunk i/N so the run
+    # count is self-explanatory - a batch of K nodes can expand (estimate replicates) and then chunk,
+    # so the number of these lines is NOT the node count.
     out: list[tuple[float, np.ndarray[Any, Any]]] = []
-    for i in range(0, len(problems), max_k):
-        out.extend(_chunk(problems[i : i + max_k], settings))
+    n_chunks = (len(problems) + max_k - 1) // max_k
+    for ci, i in enumerate(range(0, len(problems), max_k), start=1):
+        out.extend(_chunk(problems[i : i + max_k], settings, f", chunk {ci}/{n_chunks}"))
     return out
 
 
 def _chunk(
-    problems: list[dict[str, Any]], settings: "Settings"
+    problems: list[dict[str, Any]], settings: "Settings", chunk_tag: str = ""
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     import jax
     import jax.numpy as jnp
@@ -595,7 +599,7 @@ def _chunk(
         "checker",
         K,
         B,
-        f"24-colour gather, <={maxc}/colour, {n_sweeps} sweeps/round",
+        f"24-colour gather, <={maxc}/colour, {n_sweeps} sweeps/round{chunk_tag}",
     )
     t0 = time.perf_counter()
     out_pos, out_score, out_ci, total = run_shrinking(
