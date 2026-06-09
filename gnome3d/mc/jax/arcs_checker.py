@@ -75,20 +75,34 @@ def _build_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> Any:
         n_active: Any,
         rep_inv_cutoff: Any = 0.0,
     ) -> Any:
-        """Total arcs energy (arcs single-count + excl double-count + confine), pad-masked."""
+        """Total arcs energy (arcs single-count + excl double-count + confine), pad-masked.
+
+        Springs (upper triangle) + EV are summed over ROW STRIPS instead of forming the full
+        (B,B) distance - numerically equal (only summation order differs), but the per-outer-iter
+        peak drops from (B,B) to (BLOCK,B).  Same fix as smooth_checker._energy."""
         b = pos.shape[0]
         idx = jnp.arange(b)
         active = idx < n_active
-        eye = idx[:, None] == idx[None, :]
-        upper = idx[:, None] < idx[None, :]
-        d = jnp.sqrt(jnp.sum((pos[:, None, :] - pos[None, :, :]) ** 2, axis=-1))
-        tot = jnp.sum(
-            jnp.where(upper, _arc_E(d, exp, stretch, squeeze, rep_inv_cutoff), 0.0)
-        )  # pad exp=0
-        far = jnp.abs(idx[:, None] - idx[None, :]) > excl_skip
-        far = far & jnp.logical_not(eye) & active[:, None] & active[None, :]
-        rel = jnp.maximum(0.0, (r0 - d) / r0)
-        tot = tot + jnp.sum(jnp.where(far, excl_w * rel * rel, 0.0))  # double-counted
+        block = min(512, b)
+        n_strips = (b + block - 1) // block
+
+        def _strip(s: Any, acc: Any) -> Any:
+            ridx = s * block + jnp.arange(block)
+            rmask = ridx < n_active
+            rg = jnp.clip(ridx, 0, b - 1)  # clamp tail strip; upper/rmask zero those rows out
+            d = jnp.sqrt(jnp.sum((pos[rg][:, None, :] - pos[None, :, :]) ** 2, axis=-1))
+            erow = exp[rg]
+            upper = ridx[:, None] < idx[None, :]  # single-count; pad exp=0 keeps it pad-safe
+            arc = jnp.sum(jnp.where(upper, _arc_E(d, erow, stretch, squeeze, rep_inv_cutoff), 0.0))
+            far = (jnp.abs(ridx[:, None] - idx[None, :]) > excl_skip) & (
+                ridx[:, None] != idx[None, :]
+            )
+            far = far & rmask[:, None] & active[None, :]
+            rel = jnp.maximum(0.0, (r0 - d) / r0)
+            ev = jnp.sum(jnp.where(far, excl_w * rel * rel, 0.0))  # double-counted
+            return acc + arc + ev
+
+        tot = jax.lax.fori_loop(0, n_strips, _strip, jnp.float32(0.0))
         ctr = jnp.array([cx, cy, cz])
         r = jnp.sqrt(jnp.sum((pos - ctr) ** 2, axis=-1))
         conf = jnp.where(jnp.logical_and(active, r > R), conf_w * ((r - R) / R) ** 2, 0.0)

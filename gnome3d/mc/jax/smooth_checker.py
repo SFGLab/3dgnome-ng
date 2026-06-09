@@ -126,24 +126,33 @@ def _build_smooth_checker_kernel(n_sweeps: int, excl_skip: int, maxc: int) -> An
         b = pos.shape[0]
         idx = jnp.arange(b)
         active = idx < n_active
-        eye = idx[:, None] == idx[None, :]
-        d = jnp.sqrt(jnp.sum((pos[:, None, :] - pos[None, :, :]) ** 2, axis=-1))
         diff = pos[:-1] - pos[1:]
         bonds = _len_E(jnp.sqrt(jnp.sum(diff * diff, axis=-1)), dtn[: b - 1], sk, qk, dw)
         tot = jnp.sum(jnp.where(jnp.arange(b - 1) < n_active - 1, bonds, 0.0))
         angs = _ang_E(diff[:-1], diff[1:], ak, aw)
         tot = tot + jnp.sum(jnp.where(jnp.arange(b - 2) < n_active - 2, angs, 0.0))
-        hmask = jnp.logical_and(
-            jnp.logical_and(heat > 1e-6, jnp.logical_not(eye)), active[:, None] & active[None, :]
-        )
-        rel = (d - jnp.maximum(heat, 1e-6)) / jnp.maximum(heat, 1e-6)
-        tot = tot + hw * jnp.sum(jnp.where(hmask, rel * rel, 0.0))
-        far = jnp.logical_and(
-            jnp.abs(idx[:, None] - idx[None, :]) > excl_skip, jnp.logical_not(eye)
-        )
-        far = jnp.logical_and(far, active[:, None] & active[None, :])
-        rl = jnp.maximum(0.0, (r0 - d) / r0)
-        tot = tot + jnp.sum(jnp.where(far, ew * rl * rl, 0.0))
+        # Heat + EV summed over ROW STRIPS instead of forming the full (B,B) distance matrix.  The
+        # all-pairs sum partitions exactly by row, so this equals the dense version (only the
+        # summation ORDER differs, <~1e-5).  That dense (B,B) distance was the smooth checker's
+        # memory peak - a (bk,B,B) tensor built EVERY outer-iter; strips shrink it to (BLOCK,B).
+        block = min(512, b)
+        n_strips = (b + block - 1) // block
+
+        def _strip(s, acc):
+            ridx = s * block + jnp.arange(block)
+            rmask = ridx < n_active
+            rg = jnp.clip(ridx, 0, b - 1)  # clamp the tail strip; rmask zeroes those rows out
+            d = jnp.sqrt(jnp.sum((pos[rg][:, None, :] - pos[None, :, :]) ** 2, axis=-1))
+            hrow = heat[rg]
+            pair = rmask[:, None] & active[None, :] & (ridx[:, None] != idx[None, :])
+            rel = (d - jnp.maximum(hrow, 1e-6)) / jnp.maximum(hrow, 1e-6)
+            e = hw * jnp.sum(jnp.where(jnp.logical_and(hrow > 1e-6, pair), rel * rel, 0.0))
+            far = jnp.logical_and(jnp.abs(ridx[:, None] - idx[None, :]) > excl_skip, pair)
+            rl = jnp.maximum(0.0, (r0 - d) / r0)
+            e = e + jnp.sum(jnp.where(far, ew * rl * rl, 0.0))
+            return acc + e
+
+        tot = tot + jax.lax.fori_loop(0, n_strips, _strip, jnp.float32(0.0))
         ctr = jnp.array([cx, cy, cz])
         rr = jnp.sqrt(jnp.sum((pos - ctr) ** 2, axis=-1))
         return tot + jnp.sum(
