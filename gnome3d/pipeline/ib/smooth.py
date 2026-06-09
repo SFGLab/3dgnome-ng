@@ -72,14 +72,42 @@ def _assemble_beads(
     ]
 
 
+def run_smooth_batch(expanded: list[Problem], s: Settings, kernel: str) -> list[Result]:
+    """Dispatch one smooth batch by kernel.  'mc' = sequential region-batch; 'checker' =
+    approximate 24-colour checkerboard MC (fast on GPU, mild bond drift); 'hybrid' = checker
+    as a fast initializer + a sequential re-anneal that corrects the drift (the same pattern
+    that fixes arcs - see project_arcs_checker_fromscratch_compaction).  Shared by the SMOOTH
+    stage and the dry-smooth ESTIMATE_DIST trials."""
+    from gnome3d.mc import jax as mc_jax
+
+    k = str(kernel).strip().lower()
+    if k in ("checker", "hybrid"):
+        from gnome3d.mc.jax.smooth_checker import mc_smooth_checker_jax_batch
+
+        res = mc_smooth_checker_jax_batch(expanded, s)
+        if k == "hybrid":
+            # Re-noise the checker output before the polish: the checker converges to a
+            # consistent attractor that homogenizes the ensemble (lowers diversity ~0.09); fresh
+            # per-restart noise here re-diversifies the polish's starting points while the
+            # sequential polish still relaxes to correct bonds.  Noise as a fraction of step;
+            # tuned default 1.0 -> diversity 0.99 + clean bonds at n=50.
+            rn = float(getattr(s, "hybrid_polish_renoise", 1.0))
+            polish = []
+            for p, (_, pc) in zip(expanded, res, strict=True):
+                start = np.asarray(pc, np.float32).copy()
+                if rn > 0.0:
+                    add_movable_noise_inplace(start, p["fixed"], rn * float(p["step_size"]))
+                polish.append({**p, "pos": start})
+            res = mc_jax.mc_smooth_jax_batch(polish, s)
+        return res
+    return mc_jax.mc_smooth_jax_batch(expanded, s)
+
+
 def _batch_run(problems: list[Problem]) -> list[Result]:
     """Batched (JAX) runner: anneal a whole bucket of IBs' smooths in one vmapped
     kernel.  Each IB is fanned out to `steps_smooth` noised restarts (best kept),
     mirroring `JaxSolver._batched_final_smooth`.  Returns one `(score, pos)`` per
-    input problem, in order.  `mc_jax` is imported lazily so the numba path never
-    requires JAX."""
-    from gnome3d.mc import jax as mc_jax
-
+    input problem, in order."""
     s = problems[0]["settings"]
     n_restarts = max(1, int(s.steps_smooth))
 
@@ -96,7 +124,8 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
             expanded.append({**prob, "pos": start})
             owner.append(gi)
 
-    results = mc_jax.mc_smooth_jax_batch(expanded, s)
+    # Kernel select (mc | checker | hybrid), shared with ESTIMATE_DIST via run_smooth_batch.
+    results = run_smooth_batch(expanded, s, str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")))
 
     best: dict[int, Result] = {}
     for (score, final_pos), gi in zip(results, owner, strict=True):
@@ -158,6 +187,12 @@ class SmoothStage:
             and st.anchor_neighbor_weights is not None
         )
         return heat, orn, batch_bucket(int(st.pos.shape[0]), st.settings)
+
+    @staticmethod
+    def describe_batch_key(key: tuple[object, ...]) -> str:
+        """Human-readable form of the ``(heat?, orn?, bucket)`` batch key for logs."""
+        heat, orn, bucket = key
+        return f"heat={'yes' if heat else 'no'} orn={'yes' if orn else 'no'} {bucket}-bead bucket"
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:
         st = inputs[0]

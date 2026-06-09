@@ -18,6 +18,7 @@ decides whether an IB's chain includes the ESTIMATE_DIST stage.
 from __future__ import annotations
 
 import math
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 import numpy as np
@@ -39,7 +40,9 @@ _ARCS_NOISE: float = 0.005
 _ORN_CODE: dict[str, int] = {"L": Orientation.LEFT, "R": Orientation.RIGHT}
 
 
-def _heat_signal_negligible(settings: Settings, subanchor_heat_raw: F32Array, n: int) -> bool:
+def _heat_signal_negligible(
+    settings: Settings, subanchor_heat_raw: F32Array, n: int, ib_label: str = ""
+) -> bool:
     """True when an IB's subanchor heat is too sparse to affect the structure, so
     the (expensive) ESTIMATE_DIST stage can be dropped from its chain.
 
@@ -63,7 +66,8 @@ def _heat_signal_negligible(settings: Settings, subanchor_heat_raw: F32Array, n:
     frac = n_active / n_pairs
     if frac < thresh:
         LOG.info(
-            "heat-dist skipped: %d/%d pairs active (%.3g < %.3g min reduction)",
+            "%sheat-dist skipped: %d/%d pairs active (%.3g < %.3g min reduction)",
+            f"{ib_label}  " if ib_label else "",
             n_active,
             n_pairs,
             frac,
@@ -85,26 +89,13 @@ class IBSeed:
     wants_heat: bool
 
 
-def gather_all_ib_seeds(state: CoarseState, seed_offset: int = 0) -> list[IBSeed]:
-    """Gather every IB's ``Seeded`` across all chromosomes of the *already
-    positioned* graph.  The whole-graph read-out used by both the coarse fan-out
-    `expand` and the ensemble driver (after their respective coarse spines run)."""
-    seg_level = set_level(
-        Level.SEGMENT - Level.CHROMOSOME, state.chr_root, state.clusters, state.chrs
-    )
-    out: list[IBSeed] = []
-    for chr_ in state.chrs:
-        out.extend(gather_ib_seeds(state, chr_, seg_level, seed_offset))
-    return out
-
-
-def gather_ib_seeds(
-    state: CoarseState, chr_: str, seg_level: dict[str, list[int]], seed_offset: int = 0
-) -> list[IBSeed]:
-    """Gather one ``Seeded`` per IB of `chr_` from the *already positioned*
-    cluster graph.  Consumes no RNG - pure read-out - so it can run after all
-    coarse positioning (the unified-DAG fan-out) or interleaved per chr (the
-    legacy path) with identical results."""
+def _collect_ib_work(
+    state: CoarseState, chr_: str, seg_level: dict[str, list[int]]
+) -> list[tuple[str, int, list[int]]]:
+    """Serial, cheap pass: list one chr's buildable IBs (skipping <=1-anchor ones) and seed
+    each anchor at its IB centroid.  Returns ``(ib_id, ib_idx, active_region)`` tuples for
+    the (parallel) heatmap build.  Separating this out keeps the only shared-graph writes
+    (the centroid seeding) up front, before any build thread reads the graph."""
     clusters = state.clusters
     segs = seg_level.get(chr_, [])
     ibs: list[int] = []
@@ -112,7 +103,7 @@ def gather_ib_seeds(
         ibs.extend(clusters[seg_idx].children)
     n_ibs = len(ibs)
 
-    out: list[IBSeed] = []
+    work: list[tuple[str, int, list[int]]] = []
     for ib_i, ib_idx in enumerate(ibs):
         ib = clusters[ib_idx]
         active_region = list(ib.children)
@@ -120,18 +111,66 @@ def gather_ib_seeds(
         if len(active_region) <= 1:
             LOG.info("%s  (%d anchors - skip)", ib_id, len(active_region))
             continue
-        # Each anchor seeds at the IB centroid (matches the arc stage's
-        # initial_pos before its per-anchor noise).
+        # Each anchor seeds at the IB centroid (matches the arc stage's initial_pos before
+        # its per-anchor noise).  IBs partition the anchors, so these writes never overlap.
         for a_idx in active_region:
             clusters[a_idx].pos = ib.pos.copy()
+        work.append((ib_id, ib_idx, active_region))
+    return work
 
-        seed, wants_heat = seed_for_ib(state, chr_, ib_idx, active_region, seed_offset)
-        out.append(IBSeed(ib_id=ib_id, chr_=chr_, seed=seed, wants_heat=wants_heat))
-    return out
+
+def _build_ib_seed(
+    state: CoarseState, chr_: str, item: tuple[str, int, list[int]], seed_offset: int
+) -> IBSeed:
+    """Build one IB's ``Seeded`` (the O(N^2) contact-heatmap work).  Read-only on the
+    shared graph, so it is safe to run concurrently across threads."""
+    ib_id, ib_idx, active_region = item
+    seed, wants_heat = seed_for_ib(state, chr_, ib_idx, active_region, seed_offset, ib_id)
+    return IBSeed(ib_id=ib_id, chr_=chr_, seed=seed, wants_heat=wants_heat)
+
+
+def gather_all_ib_seeds(state: CoarseState, seed_offset: int = 0) -> list[IBSeed]:
+    """Gather every IB's ``Seeded`` across all chromosomes of the *already positioned*
+    graph.  The whole-graph read-out used by both the coarse fan-out `expand` and the
+    ensemble driver (after their respective coarse spines run).
+
+    Phase 1 (serial, cheap) lists the IBs and seeds anchors at their centroids; phase 2
+    builds the per-IB contact heatmaps, fanned out across ``settings.heatmap_workers``
+    threads (the build is O(N^2) numpy and releases the GIL).  Output order is preserved
+    regardless of worker count."""
+    seg_level = set_level(
+        Level.SEGMENT - Level.CHROMOSOME, state.chr_root, state.clusters, state.chrs
+    )
+    items: list[tuple[str, tuple[str, int, list[int]]]] = [
+        (chr_, w) for chr_ in state.chrs for w in _collect_ib_work(state, chr_, seg_level)
+    ]
+    workers = max(1, int(getattr(state.s, "heatmap_workers", 1)))
+    if workers > 1 and len(items) > 1:
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="heatbuild") as ex:
+            return list(ex.map(lambda it: _build_ib_seed(state, it[0], it[1], seed_offset), items))
+    return [_build_ib_seed(state, chr_, w, seed_offset) for chr_, w in items]
+
+
+def gather_ib_seeds(
+    state: CoarseState, chr_: str, seg_level: dict[str, list[int]], seed_offset: int = 0
+) -> list[IBSeed]:
+    """Gather one ``Seeded`` per IB of `chr_` from the *already positioned* cluster graph
+    (serial).  Consumes no RNG - pure read-out - so it runs after all coarse positioning
+    (the unified-DAG fan-out) or interleaved per chr (the legacy path) with identical
+    results.  ``gather_all_ib_seeds`` is the parallel whole-graph entry point."""
+    return [
+        _build_ib_seed(state, chr_, w, seed_offset)
+        for w in _collect_ib_work(state, chr_, seg_level)
+    ]
 
 
 def seed_for_ib(
-    state: CoarseState, chr_: str, ib_idx: int, active_region: list[int], seed_offset: int = 0
+    state: CoarseState,
+    chr_: str,
+    ib_idx: int,
+    active_region: list[int],
+    seed_offset: int = 0,
+    ib_label: str = "",
 ) -> tuple[Seeded, bool]:
     """Gather one IB's ``Seeded`` inputs from the positioned cluster graph,
     copying everything out as plain arrays (no cluster references retained)."""
@@ -186,7 +225,7 @@ def seed_for_ib(
         subanchor_heat_raw is not None
         and bool(state.s.use_subanchor_heatmap)
         and float(subanchor_heat_raw.mean(dtype=np.float64)) >= 1e-6  # f64 accum on the f32 matrix
-        and not _heat_signal_negligible(state.s, subanchor_heat_raw, a)
+        and not _heat_signal_negligible(state.s, subanchor_heat_raw, a, ib_label)
     )
 
     seed = Seeded(

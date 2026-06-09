@@ -55,7 +55,10 @@ reportConstantRedefinition = "none"
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-extend-exclude = ["3dnome", ".venv", "build", "dist", "out", "data"]
+extend-exclude = ["3dnome", ".venv", "build", "dist", "out", "data", "playground"]
+# Honor the excludes even when a path is passed explicitly (e.g. pre-commit / editors),
+# so playground/ scratch scripts are never linted.
+force-exclude = true
 
 [tool.ruff.format]
 quote-style = "double"

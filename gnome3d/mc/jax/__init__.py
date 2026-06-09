@@ -16,13 +16,11 @@ extras dep, imported lazily on first kernel use.
 """
 
 from gnome3d.mc.jax.arcs import mc_arcs_jax, mc_arcs_jax_batch
-from gnome3d.mc.jax.heatmap import mc_heatmap_jax
 from gnome3d.mc.jax.smooth import mc_smooth_jax, mc_smooth_jax_batch
 
 __all__ = [
     "mc_arcs_jax",
     "mc_arcs_jax_batch",
-    "mc_heatmap_jax",
     "mc_smooth_jax",
     "mc_smooth_jax_batch",
 ]

@@ -737,7 +737,7 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
             interpolate_children_linear(state, segs)
 
 
-def position_interaction_blocks(state: CoarseState, segs: list[int]) -> None:
+def position_interaction_blocks(state: CoarseState, segs: list[int], chr_: str) -> None:
     """
     Position IB clusters between segment positions.
     Mirrors Reference positionInteractionBlocks().
@@ -758,10 +758,10 @@ def position_interaction_blocks(state: CoarseState, segs: list[int]) -> None:
             clusters[ib_idx].pos = pos.copy()
 
     if state.s.use_ib_mc:
-        ib_mc_refine(state, segs)
+        ib_mc_refine(state, segs, chr_)
 
 
-def ib_mc_refine(state: CoarseState, segs: list[int]) -> None:
+def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
     """
     Refine IB centroid positions with a small chain-bond + EV + confinement
     MC pass.  Calls mc_ib directly - no settings clone, no field renaming.
@@ -803,9 +803,10 @@ def ib_mc_refine(state: CoarseState, segs: list[int]) -> None:
             else ""
         )
 
+        seg = clusters[seg_idx]
         with log.step(
             LOG,
-            f"IB-MC seg{seg_idx}",
+            f"IB-MC {chr_} seg{seg_idx} ({seg.start / 1e6:.2f}-{seg.end / 1e6:.2f}Mb)",
             "%d IBs, avg_bond=%.2f, ev_r0=%.3f, step=%.3f%s",
             len(ibs),
             avg_dtn,

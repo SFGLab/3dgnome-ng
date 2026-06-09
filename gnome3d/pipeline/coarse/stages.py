@@ -151,7 +151,7 @@ class IBPositionStage(_CoarseStage):
         for chr_ in state.chrs:
             segs = lvl.get(chr_, [])
             if segs:
-                cb.position_interaction_blocks(state, segs)
+                cb.position_interaction_blocks(state, segs, chr_)
         return phase
 
 

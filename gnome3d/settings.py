@@ -6,11 +6,21 @@ Mirrors Reference Settings class.  All defaults match Settings::init() in Settin
 
 import configparser
 import difflib
+import os
 from pathlib import Path
 
 from gnome3d import log
 
 LOG = log.get("settings")
+
+
+def _all_cores() -> int:
+    """Usable CPU count for ``auto`` worker settings - honours cgroup / CPU-affinity
+    limits on Linux, falls back to the logical core count elsewhere."""
+    try:
+        return len(os.sched_getaffinity(0))
+    except AttributeError:
+        return os.cpu_count() or 1
 
 
 class Settings:
@@ -57,6 +67,12 @@ class Settings:
     subanchor_estimate_replicates: int
     subanchor_batch_trials: bool
     subanchor_heat_min_reduction: float
+    # Threads building per-IB contact heatmaps during seed gathering (skeleton).  The
+    # build is O(N^2) numpy per IB and embarrassingly parallel across IBs.  >1 parallelises
+    # it; `auto` uses all usable CPU cores.  NB the (N,N) f32 matrices are large (N up to
+    # ~32k -> ~4 GB each), so keep this modest if you have very large IBs (peak memory
+    # ~= workers * largest matrix; `auto` can be a lot of memory there).
+    heatmap_workers: int
 
     # ---- PET / arc length limits ----
     max_pet_length: int
@@ -122,7 +138,7 @@ class Settings:
     mc_smooth_chains: int
     # `ib_workers > 1` processes IBs concurrently (each IB is an independent
     # subproblem). JIT kernels are nogil=True, so Python threading actually
-    # parallelises here.
+    # parallelises here.  `ib_workers = auto` uses all usable CPU cores.
     mc_executor_threaded_workers: int
     # Per-stage executor: how each IB stage's nodes are scheduled AND which kernel
     # runs them (the executor implies the backend).  One value per stage:
@@ -145,9 +161,6 @@ class Settings:
     # Padding is inert (pad beads never move + contribute zero energy), so
     # results are unchanged; this is a pure compile-time optimization.
     mc_executor_jax_bucket_shapes: bool
-    # When bucketing is on, compile every bucket up front (predictable one-time
-    # warmup) instead of lazily on first hit.
-    mc_executor_jax_precompile_buckets: bool
     # Cap on the region-batch vmap width (IBs per kernel launch) for the batched
     # JAX kernels, per kernel.  Excess IBs run in sequential sub-batches.  The cap
     # exists only to bound device memory (a wider launch is never slower than more
@@ -156,6 +169,16 @@ class Settings:
     # Falls back to a fixed heuristic when device memory can't be queried (CPU).
     mc_executor_jax_batch_width_smooth: str
     mc_executor_jax_batch_width_arcs: str
+
+    # Arcs JAX kernel: "mc" = sequential single-bead region-batch (default, byte-exact
+    # port); "checker" = approximate color-gather spatial-checkerboard MC (much faster on
+    # GPU for large IBs; a deliberate divergence from sequential dynamics, equal-energy).
+    mc_executor_jax_arcs_kernel: str
+    # Smooth JAX kernel, same choices.  The "checker" path OMITS the (constant) CTCF
+    # orientation term from the score; the produced structures are correct.
+    mc_executor_jax_smooth_kernel: str
+    mc_executor_jax_estimate_kernel: str
+    hybrid_polish_renoise: float
 
     # ---- MC arcs ----
     max_temp: float
@@ -178,6 +201,7 @@ class Settings:
     # of that level's natural bond / expected distance.  Each level has its
     # own factor (default 0.5 - half the typical bead-bead target).
     exclusion_radius_arcs: float
+    arcs_repulsion_cutoff_factor: float
     exclusion_radius_smooth: float
     exclusion_radius_heatmap: float
     exclusion_radius_ib: float
@@ -300,6 +324,7 @@ class Settings:
         # skipped and the IB smooths without heat.  E.g. 0.001 skips IBs whose
         # heat could move mean pair distance by <0.1%.  Diverges from parity.
         self.subanchor_heat_min_reduction = 0.0
+        self.heatmap_workers = 1
 
         # ---- PET / arc length limits ----
         self.max_pet_length = 1_000_000
@@ -359,9 +384,14 @@ class Settings:
         self.mc_executor_smooth = "auto"
         self.mc_executor_threaded_workers = 1
         self.mc_executor_jax_bucket_shapes = False
-        self.mc_executor_jax_precompile_buckets = False
         self.mc_executor_jax_batch_width_smooth = "auto"
         self.mc_executor_jax_batch_width_arcs = "auto"
+        self.mc_executor_jax_arcs_kernel = "mc"
+        self.mc_executor_jax_smooth_kernel = "mc"
+        self.mc_executor_jax_estimate_kernel = "auto"  # auto = follow smooth (hybrid->hybrid)
+        self.hybrid_polish_renoise = (
+            1.0  # re-noise (x step) on hybrid-smooth polish init; recovers diversity
+        )
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -391,6 +421,9 @@ class Settings:
         self.exclusion_radius_smooth = 0.0
         self.exclusion_radius_heatmap = 0.0
         self.exclusion_radius_ib = 0.0
+        # Truncate the arcs non-arc 1/d repulsion at factor x mean-arc-distance (0 = off =
+        # unbounded, faithful to C++; ~2.5 fixes small/sparse IBs blowing up to huge Rg).
+        self.arcs_repulsion_cutoff_factor = 0.0
         # Per-level auto factor: used only when the matching radius is 0.0.
         # 0.5 means "EV kicks in once beads get closer than half the typical
         # bond distance at this level".
@@ -520,6 +553,14 @@ class Settings:
             v = get(section, key)
             return v.strip() if v is not None else default
 
+        def getworkers(section: str, key: str, default: int) -> int:
+            """Worker-count getter: ``auto`` -> all usable CPU cores, else an int."""
+            v = get(section, key)
+            if v is None:
+                return default
+            v = v.strip().lower()
+            return _all_cores() if v == "auto" else int(v)
+
         def ignore(section: str, key: str) -> None:
             """Declare a key we deliberately don't read, so the unknown-key
             check below doesn't flag it (it's recognised, just unused)."""
@@ -639,6 +680,9 @@ class Settings:
         self.subanchor_heat_min_reduction = getf(
             "subanchor_heatmap", "heat_min_reduction", self.subanchor_heat_min_reduction
         )
+        self.heatmap_workers = getworkers(
+            "subanchor_heatmap", "heatmap_workers", self.heatmap_workers
+        )
 
         # [simulation_heatmap]
         self.max_temp_heatmap = getf(
@@ -672,7 +716,7 @@ class Settings:
             "simulation_backend", "heatmap_chains", self.mc_heatmap_chains
         )
         self.mc_smooth_chains = geti("simulation_backend", "smooth_chains", self.mc_smooth_chains)
-        self.mc_executor_threaded_workers = geti(
+        self.mc_executor_threaded_workers = getworkers(
             "simulation_backend", "ib_workers", self.mc_executor_threaded_workers
         )
         self.mc_executor_arcs = gets(
@@ -692,11 +736,6 @@ class Settings:
             "mc_executor_jax_bucket_shapes",
             self.mc_executor_jax_bucket_shapes,
         )
-        self.mc_executor_jax_precompile_buckets = getb(
-            "simulation_backend",
-            "mc_executor_jax_precompile_buckets",
-            self.mc_executor_jax_precompile_buckets,
-        )
         self.mc_executor_jax_batch_width_smooth = gets(
             "simulation_backend",
             "mc_executor_jax_batch_width_smooth",
@@ -706,6 +745,24 @@ class Settings:
             "simulation_backend",
             "mc_executor_jax_batch_width_arcs",
             self.mc_executor_jax_batch_width_arcs,
+        )
+        self.mc_executor_jax_arcs_kernel = gets(
+            "simulation_backend",
+            "mc_executor_jax_arcs_kernel",
+            self.mc_executor_jax_arcs_kernel,
+        )
+        self.mc_executor_jax_smooth_kernel = gets(
+            "simulation_backend",
+            "mc_executor_jax_smooth_kernel",
+            self.mc_executor_jax_smooth_kernel,
+        )
+        self.mc_executor_jax_estimate_kernel = gets(
+            "simulation_backend",
+            "mc_executor_jax_estimate_kernel",
+            self.mc_executor_jax_estimate_kernel,
+        )
+        self.hybrid_polish_renoise = getf(
+            "simulation_backend", "hybrid_polish_renoise", self.hybrid_polish_renoise
         )
 
         # [simulation_arcs]
@@ -744,6 +801,9 @@ class Settings:
         # Per-level radii.  Key naming: radius_<level>.  0 = auto.
         self.exclusion_radius_arcs = getf(
             "excluded_volume", "radius_arcs", self.exclusion_radius_arcs
+        )
+        self.arcs_repulsion_cutoff_factor = getf(
+            "excluded_volume", "arcs_repulsion_cutoff_factor", self.arcs_repulsion_cutoff_factor
         )
         self.exclusion_radius_smooth = getf(
             "excluded_volume", "radius_smooth", self.exclusion_radius_smooth

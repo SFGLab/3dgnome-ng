@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from numba import njit, prange  # type: ignore[reportMissingTypeStubs]
 
+from gnome3d import log
 from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Densified, DistEstimated, State
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
     from gnome3d.types import BoolArray, F32Array
 
 _SEED_SALT = 1  # distinct from ARCS(0)/SMOOTH(2) so the noise streams don't correlate
+_LOG = log.get("mc.jax")
 
 
 @njit(cache=True, parallel=True, nogil=True, fastmath=True)
@@ -137,10 +139,10 @@ def _run(problem: Problem) -> Result:
 
 def _batch_run(problems: list[Problem]) -> list[Result]:
     """Batched (JAX) runner: run every IB's dry-smooth trials in one vmapped
-    kernel (reusing `mc_smooth_jax_batch` - no heat/orientation), then build each
-    IB's target matrix.  Mirrors `JaxSolver._batched_heat_dist`.  Returns one
-    heat_dist (or None) per input problem, in order.  Lazy `mc_jax` import."""
-    from gnome3d.mc import jax as mc_jax
+    kernel (no heat/orientation), then build each IB's target matrix.  Mirrors
+    `JaxSolver._batched_heat_dist`.  Returns one heat_dist (or None) per input
+    problem, in order."""
+    from gnome3d.pipeline.ib.smooth import run_smooth_batch
 
     s = problems[0]["settings"]
     n_reps = int(s.subanchor_estimate_replicates)
@@ -171,7 +173,27 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
                 }
             )
 
-    results = mc_jax.mc_smooth_jax_batch(expanded, s)
+    # Plain "checker" double-compacts here: estimation's output is the dense distance TARGET
+    # the final smooth chases, and the checker's stale-EV compaction shrinks it (measured Rg
+    # 0.965 -> 0.890 at B=1024).  Only "hybrid" (checker init + sequential polish) yields a
+    # CORRECT target, so estimation upgrades checker->hybrid and is otherwise sequential -
+    # never plain checker.  See docs/arcs-gpu-acceleration.md.
+    est_setting = str(getattr(s, "mc_executor_jax_estimate_kernel", "auto")).strip().lower()
+    if est_setting in ("mc", "hybrid"):
+        est_kernel = est_setting  # explicit override (never plain checker - it compounds)
+    else:  # "auto": follow the final-smooth kernel (hybrid -> hybrid), else sequential
+        smooth_k = str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")).strip().lower()
+        est_kernel = "hybrid" if smooth_k == "hybrid" else "mc"
+    # Make the fan-out explicit: a batch of N estimate nodes expands to N x (reps*steps) dry-smooth
+    # IBs, which the kernel then chunks - so the smooth[checker]/[mc] line count is NOT the node count.
+    log.status(
+        _LOG,
+        "    estimate: %d nodes x %d reps = %d dry-smooth IBs",
+        len(problems),
+        per_ib,
+        len(expanded),
+    )
+    results = run_smooth_batch(expanded, s, est_kernel)
 
     out: list[Result] = []
     for gi, prob in enumerate(problems):

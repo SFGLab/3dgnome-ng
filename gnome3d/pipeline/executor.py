@@ -35,11 +35,23 @@ from typing import Protocol, runtime_checkable
 
 from gnome3d import log
 from gnome3d.pipeline.dag import Dag, Node, NodeId
+from gnome3d.pipeline.multigpu import run_sharded, visible_devices
 from gnome3d.pipeline.registry import runners_for
 from gnome3d.pipeline.stage import Result, StageKind
 from gnome3d.pipeline.state import State
 
 LOG = log.get("executor")
+
+
+def _log_dispatch_start(kind: StageKind, strategy: str, n: int, detail: str = "") -> None:
+    """Standard executor dispatch START line, matching the JAX-kernel format:
+    ``arcs[batch]: 50 nodes (group 1/1, ...), running...``."""
+    log.status(LOG, "  %s[%s]: %d nodes%s, running...", kind.value, strategy, n, detail)
+
+
+def _log_dispatch_done(kind: StageKind, strategy: str, n: int, secs: float) -> None:
+    """Standard executor dispatch DONE line: ``arcs[batch]: 50 nodes in 11.2s``."""
+    log.status(LOG, "  %s[%s]: %d nodes in %.1fs", kind.value, strategy, n, secs)
 
 
 @runtime_checkable
@@ -133,10 +145,12 @@ class SerialStrategy:
         outputs: dict[NodeId, State],
         done: list[NodeId],
     ) -> None:
-        LOG.info(f"running {len(nodes)} {kind} nodes serially...")
+        _log_dispatch_start(kind, "serial", len(nodes))
+        t0 = time.perf_counter()
         for node in nodes:
             inputs = dag.inputs_for(node, outputs)
             _finish(dag, node, _run_serial(node, inputs), outputs, done)
+        _log_dispatch_done(kind, "serial", len(nodes), time.perf_counter() - t0)
 
     def close(self) -> None:
         pass
@@ -166,12 +180,14 @@ class ThreadedStrategy:
         done: list[NodeId],
     ) -> None:
         pool = self._ensure_pool()
-        LOG.info(f"running {len(nodes)} {kind} nodes across {self._max_workers} threads...")
+        _log_dispatch_start(kind, "threaded", len(nodes), f" ({self._max_workers} workers)")
+        t0 = time.perf_counter()
         # Compute on the pool; finish (record + expand) on the main thread.
         jobs = [(n, dag.inputs_for(n, outputs)) for n in nodes]
         futures = [pool.submit(_run_serial, n, inp) for n, inp in jobs]
         for (node, _inp), fut in zip(jobs, futures, strict=True):
             _finish(dag, node, fut.result(), outputs, done)
+        _log_dispatch_done(kind, "threaded", len(nodes), time.perf_counter() - t0)
 
     def close(self) -> None:
         if self._pool is not None:
@@ -189,7 +205,20 @@ class BatchStrategy:
     keeps one compiled kernel + one wide launch per bucket (vs one per distinct
     size), and keeps each batch uniform in the flags ``mc_*_jax_batch`` reads
     from ``problems[0]``.  Each group is timed and logged (always-on) so a slow
-    launch is never a silent stall."""
+    launch is never a silent stall.
+
+    Multi-GPU: each group's independent IBs are sharded across the visible JAX devices
+    (`multigpu.run_sharded`), concurrently.  Output is statistically-equivalent (valid) but NOT
+    byte-identical to single-device - the per-IB RNG keys on launch position, so a different GPU
+    count is a different random draw; the fixed-seed reproducibility gate runs single-GPU."""
+
+    def __init__(self) -> None:
+        self._devices: list[object] | None = None  # visible JAX devices (lazy, jax-only)
+
+    def _shard_devices(self) -> list[object]:
+        if self._devices is None:
+            self._devices = visible_devices()
+        return self._devices
 
     def dispatch(
         self,
@@ -209,33 +238,27 @@ class BatchStrategy:
 
         for gi, (key, members) in enumerate(groups.items(), 1):
             problems = [node.stage.to_problem(inp) for node, inp in members]
-            log.status(
-                LOG,
-                "  batch %s group %d/%d key=%s: %d IBs launching...",
-                kind.value,
-                gi,
-                len(groups),
-                key,
-                len(members),
+            stage0 = members[0][0].stage
+            key_desc = (
+                stage0.describe_batch_key(key)
+                if hasattr(stage0, "describe_batch_key")
+                else f"key={key}"
+            )
+            devices = self._shard_devices() if runners.batch is not None else []
+            gpu_tag = f", {len(devices)} GPUs" if len(devices) > 1 else ""
+            _log_dispatch_start(
+                kind, "batch", len(members), f" (group {gi}/{len(groups)}, {key_desc}{gpu_tag})"
             )
 
             t0 = time.perf_counter()
             if runners.batch is not None:
-                results = runners.batch(problems)
+                results = run_sharded(runners.batch, problems, devices)
             elif runners.serial is not None:
                 results = [runners.serial(p) for p in problems]
             else:
                 raise RuntimeError(f"no runner registered for {kind}")
 
-            log.status(
-                LOG,
-                "  batch %s group %d/%d done: %d IBs in %.1fs",
-                kind.value,
-                gi,
-                len(groups),
-                len(members),
-                time.perf_counter() - t0,
-            )
+            _log_dispatch_done(kind, "batch", len(members), time.perf_counter() - t0)
 
             for (node, inputs), result in zip(members, results, strict=True):
                 _finish(dag, node, node.stage.apply(inputs, result), outputs, done)

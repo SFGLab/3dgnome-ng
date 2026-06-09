@@ -1,3 +1,4 @@
+import logging
 import os
 import threading
 
@@ -20,6 +21,23 @@ SHAPE_BUCKETS: tuple[int, ...] = (256, 512, 1024, 2048, 4096, 8192, 16384, 32768
 # lot at small sizes.
 ANCHOR_BUCKETS: tuple[int, ...] = (16, 64, 256, 1024, 4096, 16384)
 NBR_BUCKETS: tuple[int, ...] = (4, 8, 16, 32, 64)
+
+
+def log_kernel_start(
+    logger: logging.Logger, stage: str, kernel: str, k: int, b: int, detail: str
+) -> None:
+    """Standard JAX-kernel START line - one format for every mc/checker/hybrid kernel (arcs +
+    smooth): ``arcs[checker]: 719 IBs x 256 beads - <detail>, running...``."""
+    log.status(
+        logger, "    %s[%s]: %d IBs x %d beads - %s, running...", stage, kernel, k, b, detail
+    )
+
+
+def log_kernel_done(
+    logger: logging.Logger, stage: str, kernel: str, k: int, secs: float, summary: str
+) -> None:
+    """Standard JAX-kernel DONE line: ``arcs[checker]: 719 IBs in 268.1s - <summary>``."""
+    log.status(logger, "    %s[%s]: %d IBs in %.1fs - %s", stage, kernel, k, secs, summary)
 
 
 def jax_is_available() -> bool:
@@ -71,29 +89,78 @@ def jax_is_available() -> bool:
         return True
 
 
+_DEVICE_TOTAL_BYTES: int | None = None
+_DEVICE_PROBED: bool = False
+_BUDGET_LOGGED: bool = False
+
+
+def _physical_device_total_bytes() -> int | None:
+    """Total physical bytes of GPU 0, independent of the XLA allocator.  vmm / platform expose an
+    EMPTY ``memory_stats()``, so the only reliable budget source under them is the device itself -
+    read it via NVML, then nvidia-smi.  Cached; ``None`` if neither is available."""
+    global _DEVICE_TOTAL_BYTES, _DEVICE_PROBED
+    if _DEVICE_PROBED:
+        return _DEVICE_TOTAL_BYTES
+    _DEVICE_PROBED = True
+    try:
+        import pynvml  # type: ignore[import-not-found]
+
+        pynvml.nvmlInit()
+        h = pynvml.nvmlDeviceGetHandleByIndex(0)
+        _DEVICE_TOTAL_BYTES = int(pynvml.nvmlDeviceGetMemoryInfo(h).total)
+        return _DEVICE_TOTAL_BYTES
+    except Exception:  # noqa: BLE001 - NVML missing / no GPU
+        pass
+    try:
+        import subprocess
+
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits", "-i", "0"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        ).stdout.split()
+        if out:
+            _DEVICE_TOTAL_BYTES = int(float(out[0])) * 1024 * 1024  # MiB -> bytes
+    except Exception:  # noqa: BLE001 - nvidia-smi missing / unparseable
+        pass
+    return _DEVICE_TOTAL_BYTES
+
+
 def jax_device_budget_bytes(fraction: float = 0.95) -> int | None:
     """Best-effort usable device memory (bytes) for sizing batched kernels.
 
-    Returns `fraction` * the primary device's reported byte limit, or ``None``
-    when it can't be determined - e.g. the CPU backend, or a platform whose
-    ``Device.memory_stats()`` is unavailable/empty.  Callers fall back to a fixed
-    heuristic on ``None``.  Uses the total limit (not free) since XLA preallocates
-    its pool; ``fraction`` leaves headroom for kernel scratch beyond the stacked
-    inputs."""
+    BFC preallocates a fixed pool, so ``memory_stats()['bytes_limit']`` IS the usable budget.
+    vmm / platform grow on demand and expose an EMPTY ``memory_stats()``, so we read the physical
+    device total (NVML / nvidia-smi) instead - allocator-independent.  Returns ``fraction`` * the
+    total, or ``None`` (CPU backend / nothing queryable) so callers fall back to a fixed heuristic.
+    ``fraction`` leaves headroom for kernel scratch beyond the stacked inputs."""
     if not jax_is_available():
         return None
     try:
         import jax  # type: ignore[import-not-found]
 
-        stats = jax.devices()[0].memory_stats()  # pyright: ignore[reportUnknownMemberType]
+        stats = jax.devices()[0].memory_stats() or {}  # pyright: ignore[reportUnknownMemberType]
     except Exception:  # noqa: BLE001 - any backend without memory_stats
+        stats = {}
+    alloc = os.environ.get("XLA_PYTHON_CLIENT_ALLOCATOR", "").lower()
+    if alloc in ("vmm", "platform"):
+        total = stats.get("bytes_reservable_limit") or _physical_device_total_bytes()
+    else:
+        total = stats.get("bytes_limit")
+    if not total:
         return None
-    if not stats:
-        return None
-    limit = stats.get("bytes_limit")
-    if not limit:
-        return None
-    return int(int(limit) * fraction)
+    budget = int(int(total) * fraction)
+    global _BUDGET_LOGGED
+    if not _BUDGET_LOGGED:
+        _BUDGET_LOGGED = True
+        log.status(
+            LOG,
+            "JAX kernel-batch budget: %.1f GiB (allocator=%s)",
+            budget / 2**30,
+            alloc or "default",
+        )
+    return budget
 
 
 def jax_bucket_for(n: int, ladder: tuple[int, ...] = SHAPE_BUCKETS) -> int:
