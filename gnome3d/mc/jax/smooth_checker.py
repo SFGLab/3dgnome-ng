@@ -17,7 +17,6 @@ structures are correct, but the returned score excludes that constant offset.  V
 equal-energy to sequential single-bead smooth on real chr1 IBs.  See playground/smooth_checker_*.py.
 """
 
-import os
 import threading
 import time
 from typing import TYPE_CHECKING, Any
@@ -25,7 +24,6 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from gnome3d import log
-from gnome3d.mc.jax.memory import max_k_for_bytes
 from gnome3d.mc.jax.shrink import run_shrinking
 from gnome3d.mc.jax.util import (
     jax_bucket_for,
@@ -427,9 +425,12 @@ def _prep(p: dict[str, Any], settings: "Settings", B: int) -> dict[str, Any]:
     }
 
 
-def _bytes(B: int) -> int:
-    f4 = 4
-    return B * B * f4 + B * 3 * f4 + B * f4 + B  # heat (B,B) dominates
+def _peak_bytes_per_padded_ib(B: int) -> int:
+    """Peak device bytes ONE padded chain contributes to a chunk launch.  The full-energy pass
+    holds ~4 simultaneous (B,B) f32 tensors (coord-diff distance + heat input + EV/mask
+    intermediates), and the (B,B) term dominates - a chunk's peak is this * bk, where bk is the
+    power-of-two-padded chunk size that run_shrinking actually launches."""
+    return 4 * B * B * 4 + B * 3 * 4
 
 
 def mc_smooth_checker_jax_batch(
@@ -448,20 +449,18 @@ def mc_smooth_checker_jax_batch(
         for p in problems
     )
     budget = jax_device_budget_bytes()
-    max_k = max_k_for_bytes(_bytes(big_b), 0, budget) if budget else max(1, 16384 // max(1, big_b))
-    # Bound the SINGLE largest device allocation, not just the total.  run_shrinking pads the
-    # active batch up to the next power of two (shrink._ceil_pow2), so one launch materialises a
-    # CONTIGUOUS (pow2(max_k), big_b, big_b) energy tensor.  At big_b=16384 that reached 8 GiB and
-    # OOM'd a fragmented BFC pool that still had ample *total* free memory (the budget above only
-    # bounds the total, not the largest contiguous block).  Cap max_k so that padded tensor stays
-    # <= ~1/8 of the pool, floored to a power of two so _ceil_pow2 can't round past the cap.
-    # ONLY for the fragmenting BFC pool: vmm (CUDA virtual memory) and platform back a large
-    # logical tensor with non-contiguous physical pages, so they place it fine - skip the cap
-    # there (XLA_PYTHON_CLIENT_ALLOCATOR selects the allocator) to keep full batch width.
-    alloc = os.environ.get("XLA_PYTHON_CLIENT_ALLOCATOR", "").lower()
-    if budget and alloc not in ("vmm", "platform"):
-        single = max(1, int(0.125 * budget) // (big_b * big_b * 4))
-        max_k = max(1, min(max_k, 1 << (single.bit_length() - 1)))
+    if budget:
+        # run_shrinking pads a chunk to bk = next power of two, and a launch's PEAK device memory
+        # is _peak_bytes_per_padded_ib * bk - so pick the largest POW2 chunk whose peak fits the
+        # budget.  The old 1x(B,B) estimate under-counted the ~4 simultaneous (B,B) tensors AND
+        # ignored the pow2 padding (a 6-IB chunk launches bk=8), so a B=16384 chunk needed ~18 GiB
+        # and OOM'd even vmm.  A small POW2 max_k also keeps the single (bk,B,B) tensor small, so
+        # this subsumes the old BFC fragmentation cap.
+        max_k = max(
+            1, 1 << max(0, int(budget // _peak_bytes_per_padded_ib(big_b)).bit_length() - 1)
+        )
+    else:
+        max_k = max(1, 16384 // max(1, big_b))
     if len(problems) <= max_k:
         return _chunk(problems, settings)
     out: list[tuple[float, np.ndarray[Any, Any]]] = []
