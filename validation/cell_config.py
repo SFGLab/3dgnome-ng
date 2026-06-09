@@ -1,0 +1,179 @@
+"""Canonical 3dgnome modelling config, baked in — no .ini needed.
+
+The shipped ``data/<cell>/config.ini`` files all share the same modelling parameters (distance,
+springs, template, motif, heatmap, MC schedule, and EV/confinement ON at weight 0.1); only the
+data filenames and ``data_dir`` differ (and ``data_dir`` points at an absolute ``/Projects/``
+path that doesn't exist outside the authors' box). Rather than make the validation harness take
+``--config`` + ``--data-dir``, we encode those canonical params here and build a ``Settings``
+with ``Settings.from_dict`` — the harness wires its own config for any cell line.
+
+``settings_for_cell("GM12878")`` returns a ready Settings; the sweep/validate CLIs then toggle
+the EV/confinement knobs they're testing on top.
+"""
+
+from __future__ import annotations
+
+import copy
+from pathlib import Path
+
+from gnome3d.settings import Settings
+
+# Canonical modelling params (from data/GM12878/config.ini, shared across cell lines). Excludes
+# [data] (built per cell) and [cuda] (reference-binary only). EV/confinement are ON at weight
+# 0.1 here — the real default; the sweep overrides them per config.
+CANONICAL: dict[str, dict[str, object]] = {
+    "main": {
+        "output_level": 2,
+        "random_walk": "no",
+        "loop_density": 5,
+        "use_2D": "no",
+        "max_pet_length": 1000000,
+        "long_pet_power": 2.0,
+        "long_pet_scale": 1.0,
+        "steps_lvl1": 1,
+        "steps_lvl2": 1,
+        "steps_arcs": 1,
+        "steps_smooth": 1,
+        "noise_lvl1": 0.5,
+        "noise_lvl2": 0.5,
+        "noise_smooth": 5.0,
+        "overlap_anchor_strict": "no",
+        "drop_zero_length_subanchors": "yes",
+        "use_dynamic_loop_density": "yes",
+        "target_bp_per_subanchor": 1000,
+        "min_subanchors_per_arc": 0,
+        "max_subanchors_per_arc": 100,
+    },
+    "distance": {
+        "genomic_dist_power": 0.75,
+        "genomic_dist_scale": 0.5,
+        "genomic_dist_base": 1.0,
+        "freq_dist_scale": 25.0,
+        "freq_dist_power": -0.6,
+        "freq_dist_scale_inter": 120.0,
+        "freq_dist_power_inter": -1.0,
+        "count_dist_a": 0.2,
+        "count_dist_scale": 1.8,
+        "count_dist_shift": 8,
+        "count_dist_base_level": 0.2,
+    },
+    "template": {"template_scale": 7.0, "dist_heatmap_scale": 15.0},
+    "motif_orientation": {"use_motif_orientation": "yes", "weight": 50.0},
+    "anchor_heatmap": {"use_anchor_heatmap": "yes", "heatmap_influence": 0.1},
+    "subanchor_heatmap": {
+        "use_subanchor_heatmap": "yes",
+        "estimate_distances_steps": 4,
+        "estimate_distances_replicates": 4,
+        "heatmap_influence": 0.1,
+        "heatmap_dist_weight": 0.01,
+    },
+    "heatmaps": {"inter_scaling": 1.0, "distance_heatmap_stretching": 2.5},
+    "springs": {
+        "stretch_constant": 0.1,
+        "squeeze_constant": 0.1,
+        "angular_constant": 0.1,
+        "stretch_constant_arcs": 1.0,
+        "squeeze_constant_arcs": 1.0,
+    },
+    "simulation_backend": {"ib_workers": 8, "heatmap_chains": 1, "smooth_chains": 1},
+    "simulation_ib": {
+        "use_ib_mc": "yes",
+        "max_temp": 5.0,
+        "jump_temp_scale": 50.0,
+        "jump_temp_coef": 20.0,
+        "delta_temp": 0.9999,
+        "stop_condition_improvement_threshold": 0.999,
+        "stop_condition_successes_threshold": 100,
+        "stop_condition_steps": 50000,
+    },
+    "simulation_heatmap": {
+        "max_temp_heatmap": 5.0,
+        "delta_temp_heatmap": 0.9999,
+        "jump_temp_scale_heatmap": 50.0,
+        "jump_temp_coef_heatmap": 20.0,
+        "stop_condition_improvement_threshold_heatmap": 0.999,
+        "stop_condition_successes_threshold_heatmap": 10,
+        "stop_condition_steps_heatmap": 50000,
+    },
+    "simulation_arcs": {
+        "max_temp": 5.0,
+        "jump_temp_scale": 50.0,
+        "jump_temp_coef": 20.0,
+        "delta_temp": 0.9999,
+        "stop_condition_improvement_threshold": 0.999,
+        "stop_condition_successes_threshold": 100,
+        "stop_condition_steps": 50000,
+    },
+    "simulation_arcs_smooth": {
+        "dist_weight": 1.0,
+        "angle_weight": 1.0,
+        "max_temp": 5.0,
+        "jump_temp_scale": 50.0,
+        "jump_temp_coef": 20.0,
+        "delta_temp": 0.9999,
+        "stop_condition_improvement_threshold": 0.999,
+        "stop_condition_successes_threshold": 50,
+        "stop_condition_steps": 50000,
+    },
+    "excluded_volume": {
+        "use_excluded_volume": "yes",
+        "weight": 0.1,
+        "apply_to_heatmap": "yes",
+        "apply_to_arcs": "yes",
+        "apply_to_smooth": "yes",
+    },
+    "confinement": {
+        "use_confinement": "yes",
+        "weight": 0.1,
+        "apply_to_arcs": "yes",
+        "apply_to_smooth": "yes",
+        "apply_to_ib": "yes",
+        "packing_factor_ib": 0.15,
+    },
+    "small_ib_boost": {"use_small_ib_boost": "no"},
+}
+
+# Per-stage stop_condition_steps by quality. None / "full" keeps the canonical 50000.
+_QUALITY_STEPS = {"fast": 1000, "balanced": 5000, "full": 50000}
+
+
+def cell_data_section(cell: str, data_root: str = "data") -> dict[str, object]:
+    """The [data] section for a cell line, by 3dgnome file-naming convention."""
+    return {
+        "data_dir": str(Path(data_root) / cell),
+        "anchors": f"{cell}_anchors_3+_oriented.bed",
+        "clusters": f"{cell}_clusters_3+.bedpe",
+        "factors": "CTCF",
+        "singletons": f"{cell}_singletons_lessthan3.bedpe",
+        "split_singleton_files_by_chr": "no",
+        "singletons_inter": "",
+        "segment_split": f"ccds_all_hg38_merged100k_{cell}.breakpoints.bed",
+        "centromeres": "hg38_centromeres.bed",
+    }
+
+
+def settings_for_cell(
+    cell: str,
+    data_root: str = "data",
+    quality: str | None = None,
+    overrides: dict[str, dict[str, object]] | None = None,
+) -> Settings:
+    """Build a ready ``Settings`` for ``cell`` from the canonical params + conventional data
+    paths, with no .ini. ``quality`` in {fast, balanced, full} rescales every stage's
+    stop_condition_steps (None = full/canonical). ``overrides`` deep-merges extra
+    {section: {key: value}} on top (e.g. feature-flag tweaks)."""
+    params = copy.deepcopy(CANONICAL)
+    params["data"] = cell_data_section(cell, data_root)
+
+    if quality and quality in _QUALITY_STEPS and quality != "full":
+        steps = _QUALITY_STEPS[quality]
+        params["simulation_heatmap"]["stop_condition_steps_heatmap"] = steps
+        params["simulation_arcs"]["stop_condition_steps"] = steps
+        params["simulation_arcs_smooth"]["stop_condition_steps"] = steps
+        params["simulation_ib"]["stop_condition_steps"] = steps
+
+    if overrides:
+        for section, kv in overrides.items():
+            params.setdefault(section, {}).update(kv)
+
+    return Settings.from_dict(params)

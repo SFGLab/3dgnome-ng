@@ -1,0 +1,13 @@
+{
+  "_note": "Declarative source list for one cell line. Resolve+download with: python -m validation.dataloader --manifest validation/manifests/GM12878.json --out data/_epigenome. Each assay: {name, source(encode|4dn), accession, output_type?}. ENCSR... (dataset) accessions resolve to a released bigWig (preferring output_type, default 'fold change over control'); ENCFF... resolve directly. Add contacts/imaging from 4DN as {\"name\":\"CTCF_ChIA-PET\",\"source\":\"4dn\",\"accession\":\"4DNFI...\"} (4DN's expired cert is handled automatically). DN_KEY/DN_SECRET env for access-controlled 4DN files.",
+  "cell_line": "GM12878",
+  "assembly": "GRCh38",
+  "assays": [
+    {"name": "CTCF", "source": "encode", "accession": "ENCSR000DZN", "output_type": "fold change over control"},
+    {"name": "RAD21", "source": "encode", "accession": "ENCSR000EAC", "output_type": "fold change over control"},
+    {"name": "ATAC", "source": "encode", "accession": "ENCSR095QNB"},
+    {"name": "H3K27ac", "source": "encode", "accession": "ENCSR000AKC", "output_type": "fold change over control"},
+    {"name": "H3K4me3", "source": "encode", "accession": "ENCSR057BWO", "output_type": "fold change over control"},
+    {"name": "RNAseq", "source": "encode", "accession": "ENCSR820PHH"}
+  ]
+}

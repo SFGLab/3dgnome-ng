@@ -7,6 +7,7 @@ Mirrors Reference Settings class.  All defaults match Settings::init() in Settin
 import configparser
 import difflib
 import os
+from collections.abc import Mapping
 from pathlib import Path
 
 from gnome3d import log
@@ -519,9 +520,42 @@ class Settings:
         self.smooth_angle_weight = 1.0
 
     def load_ini(self, path: str) -> bool:
+        """Load settings from an .ini file, overriding defaults in place."""
         cfg = configparser.ConfigParser()
         cfg.read(path)
+        return self._load_from_parser(cfg)
 
+    @classmethod
+    def from_dict(cls, config: Mapping[str, Mapping[str, object]]) -> "Settings":
+        """Build a Settings from a nested ``{section: {key: value}}`` mapping,
+        mirroring the .ini layout — e.g.::
+
+            Settings.from_dict({
+                "data": {"data_dir": "data/GM12878/", "anchors": "...bed"},
+                "excluded_volume": {"use_excluded_volume": True},
+            })
+
+        Section and key names are exactly those used in the .ini files. Any key
+        not provided keeps its default. Values may be native Python types
+        (bool/int/float/str); they are stringified into the same ConfigParser the
+        .ini path uses, so parsing, type-coercion and unknown-key warnings are
+        identical to ``load_ini``. Use this for notebooks, sweeps, and the
+        validation harness instead of writing temporary .ini files.
+        """
+        cfg = configparser.ConfigParser()
+        cfg.read_dict(
+            {
+                str(section): {str(k): str(v) for k, v in keys.items()}
+                for section, keys in config.items()
+            }
+        )
+        s = cls()
+        s._load_from_parser(cfg)
+        return s
+
+    def _load_from_parser(self, cfg: configparser.ConfigParser) -> bool:
+        """Apply settings from a populated ConfigParser, overriding defaults in
+        place. Shared by `load_ini` (file) and `from_dict` (mapping)."""
         # Every (section, key) the loader below actually consults.  Used after
         # all reads to flag unknown keys in sections we own (see
         # `_warn_unknown_keys`).  Store keys as ConfigParser stores them
