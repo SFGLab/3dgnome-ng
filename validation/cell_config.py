@@ -82,7 +82,7 @@ CANONICAL: dict[str, dict[str, object]] = {
         "mc_executor_arcs": "threaded",
         "mc_executor_densify": "threaded",
         "mc_executor_estimate_dist": "threaded",
-        "mc_executor_smooth": "threaded",
+        "mc_executor_smooth": "batch",
     },
     "simulation_ib": {
         "use_ib_mc": "yes",
