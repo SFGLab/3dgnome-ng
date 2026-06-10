@@ -23,7 +23,7 @@ from gnome3d.settings import Settings
 # 0.1 here — the real default; the sweep overrides them per config.
 CANONICAL: dict[str, dict[str, object]] = {
     "main": {
-        "output_level": 2,
+        "output_level": 1,
         "random_walk": "no",
         "loop_density": 5,
         "use_2D": "no",
@@ -75,7 +75,15 @@ CANONICAL: dict[str, dict[str, object]] = {
         "stretch_constant_arcs": 1.0,
         "squeeze_constant_arcs": 1.0,
     },
-    "simulation_backend": {"ib_workers": 8, "heatmap_chains": 1, "smooth_chains": 1},
+    "simulation_backend": {
+        "ib_workers": "auto", 
+        "heatmap_chains": 1, 
+        "smooth_chains": 1,
+        "mc_executor_arcs": "threaded",
+        "mc_executor_densify": "threaded",
+        "mc_executor_estimate_dist": "threaded",
+        "mc_executor_smooth": "threaded",
+    },
     "simulation_ib": {
         "use_ib_mc": "yes",
         "max_temp": 5.0,
