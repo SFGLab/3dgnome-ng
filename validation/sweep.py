@@ -8,12 +8,13 @@ ensemble through the public gnome3d API, scores it with the structure metrics
 max-SCC**: maximise median Hi-C SCC among configs whose overlaps don't exceed the no-feature
 baseline and whose polymer scaling stays sane.
 
-Results are cached per (cell_line, region, config) so the sweep is resumable and re-scoring is
-free — extend the same cache on a CUDA box for the full run.
+Results are cached per (config, region, budget) so the sweep is resumable and re-scoring is
+free. Prefer ``--search`` (successive halving: cheap screen of all configs -> expand the top
+survivors -> validate the winner at full x n=100), which is ~7x cheaper than the flat grid.
 
-    python -m validation.sweep --config data/GM12878/config_dryrun.ini --data-dir data/GM12878 \\
-        --hic data/_hic/GM12878/4DNFIQ32RWCQ.mcool --chrom chr1 --n-regions 4 \\
-        --binsize 25000 -n 3 --out out/sweep/GM12878.json
+    python -m validation.sweep --cell GM12878 --search \\
+        --hic data/_hic/GM12878/hic.4DNFIQ32RWCQ.mcool --chrom chr1 --n-regions 20 \\
+        --binsize 10000 --out out/sweep/GM12878_search.json
 """
 
 from __future__ import annotations
@@ -132,81 +133,44 @@ def score_config(
     return m
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(description="EV/confinement sweep scored by Hi-C correlation")
-    p.add_argument(
-        "--cell",
-        required=True,
-        help="cell line (e.g. GM12878) — settings wired from canonical params",
-    )
-    p.add_argument("--data-root", default="data", help="root holding <cell>/ data (default: data)")
-    p.add_argument(
-        "--quality",
-        default="full",
-        choices=["fast", "balanced", "full"],
-        help="MC schedule: fast/balanced for quick local checks, full for real runs",
-    )
-    p.add_argument("--hic", required=True, help="4DN .mcool path (observed Hi-C)")
-    p.add_argument("--chrom", default="chr1")
-    p.add_argument("--n-regions", type=int, default=4)
-    p.add_argument("--binsize", type=int, default=25000, help="Hi-C bin size for correlation")
-    p.add_argument(
-        "-n",
-        "--n-structures",
-        type=int,
-        default=100,
-        help="ensemble size — 3dgnome ensembles need >=100 (2016 paper); use small n only for "
-        "quick pipeline checks, not real verdicts",
-    )
-    p.add_argument(
-        "--max-configs",
-        type=int,
-        default=None,
-        help="use only the first N grid configs (lean pass)",
-    )
-    p.add_argument("--skip-neighbors", type=int, default=1)
-    p.add_argument("--out", default="out/sweep/sweep.json", help="resumable results cache (JSON)")
-    args = p.parse_args()
+def _key(name: str, region: str, tag: str | None) -> str:
+    return f"{name}::{region}::{tag}" if tag else f"{name}::{region}"
 
-    base = settings_for_cell(args.cell, args.data_root, args.quality)
 
-    bp = base.data_path(base.data_segment_split)
-    regions = enumerate_regions(bp, args.chrom, args.n_regions)
-    if not regions:
-        sys.exit(f"[error] no regions found on {args.chrom} in size band")
-    grid = GRID[: args.max_configs] if args.max_configs else GRID
-    print(f"[sweep] {len(regions)} regions x {len(grid)} configs x n={args.n_structures}")
-    print(f"[sweep] regions: {regions}")
-
-    out_path = Path(args.out)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    cache: dict[str, dict[str, float]] = {}
-    if out_path.exists():
-        cache = json.loads(out_path.read_text())
-        print(f"[sweep] resuming: {len(cache)} cached (config,region) results")
-
+def run_budget(
+    base: Settings,
+    configs: list[dict[str, object]],
+    regions: list[str],
+    n: int,
+    tag: str | None,
+    args: argparse.Namespace,
+    cache: dict[str, dict[str, float]],
+    out_path: Path,
+) -> None:
+    """Run every (config, region) at one budget (``base`` already built for the budget's
+    quality; ``n`` its ensemble size). Results cached under tag-scoped keys so different
+    budgets don't collide and the whole thing is resumable."""
     for region in regions:
         chrs_list, bed_region = _chrs_and_region(region)
         data = ContactData.from_files(base, chrs_list, bed_region)
         clist = load_contacts(base, chrs_list, bed_region)
-        # radius fixed per region from a defaults run (fair across configs)
-        radius_key = f"__radius__::{region}"
+        radius_key = f"__radius__::{region}"  # budget-independent (bead spacing ~ constant)
         if radius_key in cache:
             radius = cache[radius_key]["radius"]
         else:
             ens0 = run_ensemble(base, data, chrs_list, bed_region, 1)
-            coords0, _ = metrics.to_arrays(ens0[0])
-            radius = float(np.median(metrics.bond_lengths(coords0)))
+            radius = float(np.median(metrics.bond_lengths(metrics.to_arrays(ens0[0])[0])))
             cache[radius_key] = {"radius": radius}
             out_path.write_text(json.dumps(cache, indent=2))
-        print(f"\n[sweep] region {region}  radius={radius:.2f}  contacts={len(clist)}")
-
-        for cfg in grid:
+        todo = [c for c in configs if _key(str(c["_name"]), region, tag) not in cache]
+        if not todo:
+            print(f"[sweep] region {region} ({tag or 'flat'}): all cached")
+            continue
+        print(
+            f"\n[sweep] region {region} ({tag or 'flat'}) radius={radius:.2f} contacts={len(clist)}"
+        )
+        for cfg in todo:
             name = str(cfg["_name"])
-            key = f"{name}::{region}"
-            if key in cache:
-                print(f"  [cached] {name}")
-                continue
             flags = {k: v for k, v in cfg.items() if k != "_name"}
             s = _apply_flags(base, flags)  # type: ignore[arg-type]
             m = score_config(
@@ -215,31 +179,28 @@ def main() -> None:
                 chrs_list,
                 bed_region,
                 clist,
-                args.n_structures,
+                n,
                 radius,
                 args.skip_neighbors,
                 args.hic,
                 region,
                 args.binsize,
             )
-            cache[key] = m
+            cache[_key(name, region, tag)] = m
             out_path.write_text(json.dumps(cache, indent=2))
             print(
                 f"  [done] {name:<16} SCC={m['hic_scc']:+.3f} pear={m['hic_pearson']:+.3f} "
                 f"overlap={m['overlap_frac']:.4f} dscale={m['dist_scaling_exp']:+.3f}"
             )
 
-    report(cache, regions, grid)
 
-
-def report(
-    cache: dict[str, dict[str, float]], regions: list[str], grid: list[dict[str, object]]
-) -> None:
-    """Aggregate per config across regions; pick winner by constrained max-SCC."""
-    names = [str(c["_name"]) for c in grid]
+def _aggregate(
+    cache: dict[str, dict[str, float]], names: list[str], regions: list[str], tag: str | None
+) -> dict[str, dict[str, float]]:
+    """Median of each metric per config across the regions that completed (at this budget)."""
     agg: dict[str, dict[str, float]] = {}
     for name in names:
-        rows = [cache[f"{name}::{r}"] for r in regions if f"{name}::{r}" in cache]
+        rows = [cache[_key(name, r, tag)] for r in regions if _key(name, r, tag) in cache]
         if not rows:
             continue
         med = lambda k, rows=rows: float(np.nanmedian([row[k] for row in rows]))
@@ -251,38 +212,167 @@ def report(
             "cprob": med("contact_prob_exp"),
             "diversity": med("diversity_dab"),
         }
+    return agg
+
+
+def _constraints_ok(a: dict[str, float], base_overlap: float) -> bool:
+    return (
+        a["overlap"] <= base_overlap + 1e-9
+        and 0.0 <= a["dscale"] <= 1.0
+        and -2.5 <= a["cprob"] <= -0.05
+        and a["diversity"] > 1e-6
+    )
+
+
+def report(agg: dict[str, dict[str, float]], names: list[str], title: str) -> str | None:
+    """Print the per-config table; return the constrained-max-SCC winner (excl. baseline)."""
     base_overlap = agg.get("baseline", {}).get("overlap", float("inf"))
-    print(f"\n{'=' * 78}\n  SWEEP RESULTS (median over {len(regions)} regions)\n{'=' * 78}")
+    print(f"\n{'=' * 78}\n  {title}\n{'=' * 78}")
     print(
         f"  {'config':<16}{'HiC SCC':>9}{'Pearson':>9}{'overlap':>9}{'dscale':>8}"
         f"{'cprob':>8}{'divers':>8}  ok?"
     )
-    winner, best_scc = None, -2.0
+    winner, best = None, -2.0
     for name in names:
         if name not in agg:
             continue
         a = agg[name]
-        ok = (
-            a["overlap"] <= base_overlap + 1e-9
-            and 0.0 <= a["dscale"] <= 1.0
-            and -2.5 <= a["cprob"] <= -0.05
-            and a["diversity"] > 1e-6
-        )
-        flag = "✓" if ok else "·"
+        ok = _constraints_ok(a, base_overlap)
         print(
             f"  {name:<16}{a['scc']:>9.3f}{a['pearson']:>9.3f}{a['overlap']:>9.4f}"
-            f"{a['dscale']:>8.3f}{a['cprob']:>8.3f}{a['diversity']:>8.3f}   {flag}"
+            f"{a['dscale']:>8.3f}{a['cprob']:>8.3f}{a['diversity']:>8.3f}   {'✓' if ok else '·'}"
         )
-        if ok and np.isfinite(a["scc"]) and a["scc"] > best_scc and name != "baseline":
-            winner, best_scc = name, a["scc"]
-    print(f"\n  baseline SCC = {agg.get('baseline', {}).get('scc', float('nan')):.3f}")
+        if ok and name != "baseline" and np.isfinite(a["scc"]) and a["scc"] > best:
+            winner, best = name, a["scc"]
+    bl = agg.get("baseline", {}).get("scc", float("nan"))
+    print(f"\n  baseline SCC = {bl:.3f}")
     if winner:
-        print(
-            f"  WINNER (constrained max-SCC): {winner}  SCC={best_scc:.3f} "
-            f"(vs baseline {agg['baseline']['scc']:+.3f})"
-        )
+        print(f"  winner (constrained max-SCC): {winner}  SCC={best:.3f} (vs baseline {bl:+.3f})")
     else:
-        print("  no feature config satisfied the constraints with SCC > baseline")
+        print("  no feature config beat baseline under the constraints")
+    return winner
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description="EV/confinement sweep scored by Hi-C correlation")
+    p.add_argument("--cell", required=True, help="cell line — settings wired from canonical params")
+    p.add_argument("--data-root", default="data", help="root holding <cell>/ data (default: data)")
+    p.add_argument(
+        "--quality",
+        default="full",
+        choices=["fast", "balanced", "full"],
+        help="flat-mode MC schedule (ignored in --search)",
+    )
+    p.add_argument("--hic", required=True, help="4DN .mcool path (observed Hi-C)")
+    p.add_argument("--chrom", default="chr1")
+    p.add_argument("--n-regions", type=int, default=20)
+    p.add_argument("--binsize", type=int, default=25000, help="Hi-C bin size for correlation")
+    p.add_argument(
+        "-n",
+        "--n-structures",
+        type=int,
+        default=100,
+        help="flat-mode ensemble size (search uses --search-n / --final-n)",
+    )
+    p.add_argument("--max-configs", type=int, default=None, help="flat mode: first N grid configs")
+    p.add_argument("--skip-neighbors", type=int, default=1)
+    p.add_argument("--out", default="out/sweep/sweep.json", help="resumable results cache (JSON)")
+    # --- successive-halving search (cheap screen -> expand top-K -> validate winner full x100) ---
+    p.add_argument(
+        "--search",
+        action="store_true",
+        help="3-tier search: screen all configs cheap, expand survivors, validate winner",
+    )
+    p.add_argument("--screen-regions", type=int, default=5, help="tier-1 region subset")
+    p.add_argument("--search-n", type=int, default=30, help="tier-1/2 ensemble size")
+    p.add_argument(
+        "--search-quality",
+        default="balanced",
+        choices=["fast", "balanced", "full"],
+        help="tier-1/2 MC schedule",
+    )
+    p.add_argument("--keep", type=int, default=4, help="configs surviving tier 1")
+    p.add_argument("--final-n", type=int, default=100, help="tier-3 winner ensemble size")
+    p.add_argument(
+        "--final-quality",
+        default="full",
+        choices=["fast", "balanced", "full"],
+        help="tier-3 winner MC schedule",
+    )
+    args = p.parse_args()
+
+    grid = GRID[: args.max_configs] if args.max_configs else GRID
+    names = [str(c["_name"]) for c in grid]
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    cache: dict[str, dict[str, float]] = {}
+    if out_path.exists():
+        cache = json.loads(out_path.read_text())
+        print(f"[sweep] resuming: {len(cache)} cached results")
+
+    # region enumeration uses the breakpoints file (schedule-independent)
+    s_meta = settings_for_cell(args.cell, args.data_root)
+    bp = s_meta.data_path(s_meta.data_segment_split)
+    regions = enumerate_regions(bp, args.chrom, args.n_regions)
+    if not regions:
+        sys.exit(f"[error] no regions found on {args.chrom} in size band")
+
+    if not args.search:
+        base = settings_for_cell(args.cell, args.data_root, args.quality)
+        print(f"[sweep] flat: {len(regions)} regions x {len(grid)} configs x n={args.n_structures}")
+        run_budget(base, grid, regions, args.n_structures, None, args, cache, out_path)
+        report(
+            _aggregate(cache, names, regions, None),
+            names,
+            f"SWEEP RESULTS (median over {len(regions)} regions)",
+        )
+        return
+
+    # --- search mode ---
+    screen = regions[: args.screen_regions]
+    search_tag = f"n{args.search_n}_{args.search_quality}"
+    final_tag = f"n{args.final_n}_{args.final_quality}"
+    base_search = settings_for_cell(args.cell, args.data_root, args.search_quality)
+    print(f"[search] tier1: {len(grid)} configs x {len(screen)} regions @ {search_tag}")
+    run_budget(base_search, grid, screen, args.search_n, search_tag, args, cache, out_path)
+    agg1 = _aggregate(cache, names, screen, search_tag)
+    report(agg1, names, f"TIER 1 — screen ({len(screen)} regions, {search_tag})")
+
+    base_ov = agg1.get("baseline", {}).get("overlap", float("inf"))
+    ok_sorted = sorted(
+        [
+            (n, a)
+            for n, a in agg1.items()
+            if n != "baseline" and _constraints_ok(a, base_ov) and np.isfinite(a["scc"])
+        ],
+        key=lambda x: -x[1]["scc"],
+    )
+    survivors = ["baseline"] + [n for n, _ in ok_sorted[: args.keep]]
+    survivor_cfgs = [c for c in grid if str(c["_name"]) in survivors]
+    print(f"\n[search] survivors -> tier2: {survivors}")
+
+    print(f"[search] tier2: {len(survivor_cfgs)} configs x {len(regions)} regions @ {search_tag}")
+    run_budget(
+        base_search, survivor_cfgs, regions, args.search_n, search_tag, args, cache, out_path
+    )
+    agg2 = _aggregate(cache, survivors, regions, search_tag)
+    winner = report(agg2, survivors, f"TIER 2 — expand ({len(regions)} regions, {search_tag})")
+    if not winner:
+        sys.exit("[search] no config beat baseline under constraints; nothing to validate")
+
+    final_cfgs = [c for c in grid if str(c["_name"]) in (winner, "baseline")]
+    base_final = settings_for_cell(args.cell, args.data_root, args.final_quality)
+    print(
+        f"\n[search] tier3: validate '{winner}' vs baseline x {len(regions)} regions @ {final_tag}"
+    )
+    run_budget(base_final, final_cfgs, regions, args.final_n, final_tag, args, cache, out_path)
+    aggf = _aggregate(cache, [winner, "baseline"], regions, final_tag)
+    report(
+        aggf,
+        [winner, "baseline"],
+        f"TIER 3 — VALIDATE winner ({len(regions)} regions, {final_tag})",
+    )
+    print(f"\n[search] FINAL WINNER for {args.cell}: {winner}")
 
 
 if __name__ == "__main__":

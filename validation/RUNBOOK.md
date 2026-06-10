@@ -37,34 +37,48 @@ accession resolves to Pol II). Enzyme/depth differs per line (a cross-cell cavea
 ## 2. Per-cell-line commands
 
 Settings are wired from canonical params (`validation/cell_config.py`) — **no config file or
-`--data-dir`**; just `--cell`. `--quality full` is the default (real schedule, 50 000 steps);
-use `fast`/`balanced` only for quick checks.
+`--data-dir`**; just `--cell`.
+
+**Use `--search` (successive halving), not the flat sweep.** A flat 15-config × 20-region ×
+n=100 × full-schedule grid is ~30 000 models (days). `--search` does it in three rungs:
+
+1. **screen** — all 15 configs × `--screen-regions` (5) × `--search-n` (30) at `--search-quality`
+   (balanced) → rank, keep top `--keep` (4);
+2. **expand** — survivors × all `--n-regions` (20) at the search budget → pick the winner;
+3. **validate** — winner + baseline × all regions at `--final-n` (100) × `--final-quality`
+   (full). Only this rung pays the full-schedule × n=100 cost, on 2 configs.
+
+That's ~7× cheaper than the flat grid (≈ days → ≈ half a day) and surfaces the likely winner
+in the first hour.
 
 ```bash
 # --- GM12878 ---
 python -m validation.dataloader --manifest validation/manifests/GM12878_hic.json --out data/_hic
-python -m validation.sweep --cell GM12878 \
+python -m validation.sweep --cell GM12878 --search \
     --hic data/_hic/GM12878/hic.4DNFIQ32RWCQ.mcool \
-    --chrom chr1 --n-regions 20 --binsize 10000 -n 100 --out out/sweep/GM12878.json
+    --chrom chr1 --n-regions 20 --binsize 10000 --out out/sweep/GM12878_search.json
 
 # --- H1ESC ---
 python -m validation.dataloader --manifest validation/manifests/H1ESC_hic.json --out data/_hic
-python -m validation.sweep --cell H1ESC \
+python -m validation.sweep --cell H1ESC --search \
     --hic data/_hic/H1ESC/hic.4DNFIHO3CXUQ.mcool \
-    --chrom chr1 --n-regions 20 --binsize 10000 -n 100 --out out/sweep/H1ESC.json
+    --chrom chr1 --n-regions 20 --binsize 10000 --out out/sweep/H1ESC_search.json
 
 # --- HFFC6 ---
 python -m validation.dataloader --manifest validation/manifests/HFFC6_hic.json --out data/_hic
-python -m validation.sweep --cell HFFC6 \
+python -m validation.sweep --cell HFFC6 --search \
     --hic data/_hic/HFFC6/hic.4DNFIDKNBPC3.mcool \
-    --chrom chr1 --n-regions 20 --binsize 10000 -n 100 --out out/sweep/HFFC6.json
+    --chrom chr1 --n-regions 20 --binsize 10000 --out out/sweep/HFFC6_search.json
 ```
 
-Each sweep is **resumable** (its `--out` JSON caches per (config, region)); re-running continues
-where it stopped. The grid (`validation/sweep.py::GRID`, 15 configs) spans EV weight from the
-real default 0.1 up to 2.0, confinement at engaging packing factors {1.0, 0.75, 0.5}, combos,
-and two EV-radius probes. To bump cell-wide flags (e.g. CUDA JAX backend), edit
-`validation/cell_config.py::CANONICAL["simulation_backend"]`.
+Each run is **resumable** (its `--out` JSON caches per (config, region, budget)); re-running
+continues where it stopped. Tune `--screen-regions / --search-n / --search-quality / --keep /
+--final-n / --final-quality` to trade speed vs rigor. The 15-config grid
+(`validation/sweep.py::GRID`) spans EV weight 0.1→2.0, confinement packing {1.0,0.75,0.5},
+combos, and two EV-radius probes. To force the CUDA JAX backend cell-wide, edit
+`validation/cell_config.py::CANONICAL["simulation_backend"]` (see §0).
+
+> Drop `--search` for the legacy flat sweep (all configs × all regions at one `--quality`/`-n`).
 
 ## 3. Also worth running at n=100
 
