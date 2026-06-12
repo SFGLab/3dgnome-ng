@@ -60,26 +60,30 @@ def _cfg(
     return d
 
 
-# EV/confinement search grid. Spans the REAL default weight (0.1) up through 2.0 — the lean pass
-# suggested EV correlation peaks well below 2.0. Confinement sampled at engaging packing factors
-# (1.5 was inactive). Plus combos and two EV-radius probes. Big-N / multi-region / 3-cell-line
-# search runs on CUDA (see validation/RUNBOOK.md); --max-configs subsets for a quick local pass.
+# EV/confinement search grid, aimed at MINIMISING overlaps (the lever that actually moves;
+# validation showed Hi-C SCC is insensitive to these knobs). Axes that reduce overlaps: EV
+# weight ↑, EV radius (auto_factor) ↑ (EV acts at larger separation). Confinement compacts
+# (adds overlaps) but is searched in combos since EV can soak its overlaps up. The min-overlap
+# objective's Rg/Hi-C guardrails keep over-strong EV from "winning" by inflating the structure.
+# Big-N / multi-region / 3-cell search runs on CUDA (validation/RUNBOOK.md); --max-configs subsets.
 GRID: list[dict[str, object]] = [
     _cfg("baseline"),
-    _cfg("ev0.1", ev=0.1),
-    _cfg("ev0.25", ev=0.25),
+    # EV weight scan (default radius)
     _cfg("ev0.5", ev=0.5),
     _cfg("ev1.0", ev=1.0),
     _cfg("ev2.0", ev=2.0),
-    _cfg("conf_p1.0", conf=1.0),
+    _cfg("ev4.0", ev=4.0),
+    # EV radius scan (auto_factor ↑ => EV active farther => fewer overlaps) at w=2.0
+    _cfg("ev2.0_r0.7", ev=2.0, ev_radius=0.7),
+    _cfg("ev2.0_r1.0", ev=2.0, ev_radius=1.0),
+    # confinement-only (compacts; usually adds overlaps — kept for contrast)
     _cfg("conf_p0.75", conf=0.75),
     _cfg("conf_p0.5", conf=0.5),
-    _cfg("ev0.1+conf0.75", ev=0.1, conf=0.75),
-    _cfg("ev0.5+conf1.0", ev=0.5, conf=1.0),
-    _cfg("ev1.0+conf1.0", ev=1.0, conf=1.0),
+    # EV + confinement combos (compaction + de-clash) — the user's target space
     _cfg("ev1.0+conf0.75", ev=1.0, conf=0.75),
-    _cfg("ev1.0_r0.3", ev=1.0, ev_radius=0.3),
-    _cfg("ev1.0_r0.7", ev=1.0, ev_radius=0.7),
+    _cfg("ev2.0+conf0.75", ev=2.0, conf=0.75),
+    _cfg("ev2.0+conf0.5", ev=2.0, conf=0.5),
+    _cfg("ev4.0+conf0.5", ev=4.0, conf=0.5),
 ]
 
 
@@ -208,6 +212,7 @@ def _aggregate(
             "scc": med("hic_scc"),
             "pearson": med("hic_pearson"),
             "overlap": med("overlap_frac"),
+            "rg": med("rg"),
             "dscale": med("dist_scaling_exp"),
             "cprob": med("contact_prob_exp"),
             "diversity": med("diversity_dab"),
@@ -215,41 +220,73 @@ def _aggregate(
     return agg
 
 
-def _constraints_ok(a: dict[str, float], base_overlap: float) -> bool:
-    return (
-        a["overlap"] <= base_overlap + 1e-9
-        and 0.0 <= a["dscale"] <= 1.0
-        and -2.5 <= a["cprob"] <= -0.05
-        and a["diversity"] > 1e-6
-    )
+def _passes(a: dict[str, float], base: dict[str, float], objective: str, rg_tol: float) -> bool:
+    """Guardrails a config must clear to be eligible. Always: sane polymer scaling + non-collapsed
+    diversity. For the **overlap** objective, additionally: the structure must not blow up
+    (Rg ≤ baseline × (1+rg_tol)) — else EV could 'win' by simply expanding the chain to de-clash.
+    Hi-C SCC is deliberately NOT gated (validation showed it's noise w.r.t. these knobs). For the
+    **scc** objective: overlaps ≤ baseline."""
+    if not (0.0 <= a["dscale"] <= 1.0 and -2.5 <= a["cprob"] <= -0.05 and a["diversity"] > 1e-6):
+        return False
+    if objective == "overlap":
+        return not (
+            np.isfinite(base["rg"]) and np.isfinite(a["rg"]) and a["rg"] > base["rg"] * (1 + rg_tol)
+        )
+    return a["overlap"] <= base["overlap"] + 1e-9  # scc objective: overlaps gated, scc maximised
 
 
-def report(agg: dict[str, dict[str, float]], names: list[str], title: str) -> str | None:
-    """Print the per-config table; return the constrained-max-SCC winner (excl. baseline)."""
-    base_overlap = agg.get("baseline", {}).get("overlap", float("inf"))
-    print(f"\n{'=' * 78}\n  {title}\n{'=' * 78}")
+def _obj_value(a: dict[str, float], objective: str) -> float:
+    """Sort key (smaller = better): overlap directly; scc as its negation."""
+    return a["overlap"] if objective == "overlap" else -a["scc"]
+
+
+def select(
+    agg: dict[str, dict[str, float]], objective: str, rg_tol: float
+) -> tuple[list[str], str | None]:
+    """Non-baseline configs passing the guardrails, ordered best-first by the objective; winner."""
+    base = agg.get("baseline", {"scc": float("nan"), "rg": float("nan"), "overlap": float("inf")})
+    passers = [n for n, a in agg.items() if n != "baseline" and _passes(a, base, objective, rg_tol)]
+    passers.sort(key=lambda n: _obj_value(agg[n], objective))
+    return passers, (passers[0] if passers else None)
+
+
+def report(
+    agg: dict[str, dict[str, float]],
+    names: list[str],
+    title: str,
+    objective: str,
+    rg_tol: float,
+) -> str | None:
+    """Print the per-config table; return the winner by ``objective`` under the guardrails."""
+    base = agg.get("baseline")
+    print(f"\n{'=' * 84}\n  {title}   [objective: {objective}]\n{'=' * 84}")
     print(
-        f"  {'config':<16}{'HiC SCC':>9}{'Pearson':>9}{'overlap':>9}{'dscale':>8}"
-        f"{'cprob':>8}{'divers':>8}  ok?"
+        f"  {'config':<16}{'overlap':>9}{'HiC SCC':>9}{'Pearson':>9}{'Rg':>8}"
+        f"{'dscale':>8}{'divers':>8}  ok?"
     )
-    winner, best = None, -2.0
     for name in names:
         if name not in agg:
             continue
         a = agg[name]
-        ok = _constraints_ok(a, base_overlap)
+        ok = name == "baseline" or (base is not None and _passes(a, base, objective, rg_tol))
         print(
-            f"  {name:<16}{a['scc']:>9.3f}{a['pearson']:>9.3f}{a['overlap']:>9.4f}"
-            f"{a['dscale']:>8.3f}{a['cprob']:>8.3f}{a['diversity']:>8.3f}   {'✓' if ok else '·'}"
+            f"  {name:<16}{a['overlap']:>9.4f}{a['scc']:>9.3f}{a['pearson']:>9.3f}{a['rg']:>8.2f}"
+            f"{a['dscale']:>8.3f}{a['diversity']:>8.3f}   {'✓' if ok else '·'}"
         )
-        if ok and name != "baseline" and np.isfinite(a["scc"]) and a["scc"] > best:
-            winner, best = name, a["scc"]
-    bl = agg.get("baseline", {}).get("scc", float("nan"))
-    print(f"\n  baseline SCC = {bl:.3f}")
+    _, winner = select(agg, objective, rg_tol)
+    if base is not None:
+        print(
+            f"\n  baseline: overlap={base['overlap']:.4f}  SCC={base['scc']:.3f}  Rg={base['rg']:.2f}"
+        )
     if winner:
-        print(f"  winner (constrained max-SCC): {winner}  SCC={best:.3f} (vs baseline {bl:+.3f})")
+        w = agg[winner]
+        print(
+            f"  winner ({'min-overlap' if objective == 'overlap' else 'max-SCC'}): {winner}  "
+            f"overlap={w['overlap']:.4f}  SCC={w['scc']:.3f}  Rg={w['rg']:.2f}"
+            + (f"  (baseline overlap {base['overlap']:.4f})" if base else "")
+        )
     else:
-        print("  no feature config beat baseline under the constraints")
+        print("  no feature config cleared the guardrails")
     return winner
 
 
@@ -299,6 +336,20 @@ def main() -> None:
         choices=["fast", "balanced", "full"],
         help="tier-3 winner MC schedule",
     )
+    # --- objective ---
+    p.add_argument(
+        "--objective",
+        default="overlap",
+        choices=["overlap", "scc"],
+        help="overlap = minimise overlaps s.t. Rg not inflating (default; Hi-C NOT gated — it's "
+        "noise w.r.t. these knobs); scc = maximise Hi-C SCC s.t. overlaps <= baseline",
+    )
+    p.add_argument(
+        "--rg-tol",
+        type=float,
+        default=0.10,
+        help="overlap objective: max allowed Rg inflation vs baseline (blocks 'expand to de-clash')",
+    )
     args = p.parse_args()
 
     grid = GRID[: args.max_configs] if args.max_configs else GRID
@@ -325,6 +376,8 @@ def main() -> None:
             _aggregate(cache, names, regions, None),
             names,
             f"SWEEP RESULTS (median over {len(regions)} regions)",
+            args.objective,
+            args.rg_tol,
         )
         return
 
@@ -336,18 +389,16 @@ def main() -> None:
     print(f"[search] tier1: {len(grid)} configs x {len(screen)} regions @ {search_tag}")
     run_budget(base_search, grid, screen, args.search_n, search_tag, args, cache, out_path)
     agg1 = _aggregate(cache, names, screen, search_tag)
-    report(agg1, names, f"TIER 1 — screen ({len(screen)} regions, {search_tag})")
-
-    base_ov = agg1.get("baseline", {}).get("overlap", float("inf"))
-    ok_sorted = sorted(
-        [
-            (n, a)
-            for n, a in agg1.items()
-            if n != "baseline" and _constraints_ok(a, base_ov) and np.isfinite(a["scc"])
-        ],
-        key=lambda x: -x[1]["scc"],
+    report(
+        agg1,
+        names,
+        f"TIER 1 — screen ({len(screen)} regions, {search_tag})",
+        args.objective,
+        args.rg_tol,
     )
-    survivors = ["baseline"] + [n for n, _ in ok_sorted[: args.keep]]
+
+    ranked1, _ = select(agg1, args.objective, args.rg_tol)
+    survivors = ["baseline"] + ranked1[: args.keep]
     survivor_cfgs = [c for c in grid if str(c["_name"]) in survivors]
     print(f"\n[search] survivors -> tier2: {survivors}")
 
@@ -356,9 +407,15 @@ def main() -> None:
         base_search, survivor_cfgs, regions, args.search_n, search_tag, args, cache, out_path
     )
     agg2 = _aggregate(cache, survivors, regions, search_tag)
-    winner = report(agg2, survivors, f"TIER 2 — expand ({len(regions)} regions, {search_tag})")
+    winner = report(
+        agg2,
+        survivors,
+        f"TIER 2 — expand ({len(regions)} regions, {search_tag})",
+        args.objective,
+        args.rg_tol,
+    )
     if not winner:
-        sys.exit("[search] no config beat baseline under constraints; nothing to validate")
+        sys.exit("[search] no config cleared the guardrails; nothing to validate")
 
     final_cfgs = [c for c in grid if str(c["_name"]) in (winner, "baseline")]
     base_final = settings_for_cell(args.cell, args.data_root, args.final_quality)
@@ -371,6 +428,8 @@ def main() -> None:
         aggf,
         [winner, "baseline"],
         f"TIER 3 — VALIDATE winner ({len(regions)} regions, {final_tag})",
+        args.objective,
+        args.rg_tol,
     )
     print(f"\n[search] FINAL WINNER for {args.cell}: {winner}")
 

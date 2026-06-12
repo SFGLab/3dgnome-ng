@@ -91,13 +91,21 @@ python -m validation.validate --cell GM12878 \
     --region chr1:18288319-20307135 -n 100 --prove all
 ```
 
-## 4. Reading the output
+## 4. Objective & reading the output
 
-The sweep prints a per-config median table (Hi-C SCC, Pearson, overlap, scaling, diversity) and
-the **constrained max-SCC winner** (max median SCC among configs with overlaps ≤ baseline and
-sane scaling). Compare winners across the 3 cell lines for a **generalizing** EV/confinement
-default. At n=100 the SCC deltas should clear the noise floor the lean n=2 pass could not.
+**Default objective: `--objective overlap`** — minimise median overlap fraction (the physical-
+sanity lever) subject to guardrails: Rg must not inflate (`--rg-tol`, default 0.10, so EV can't
+"win" by just expanding the chain), plus sane polymer scaling and non-collapsed diversity. **Hi-C
+SCC is deliberately NOT gated** — the n=100 validation showed it's insensitive to EV/confinement
+(per-region ΔSCC is a coin flip, ≪ region-to-region variance), so gating on it only injects noise.
+EV, meanwhile, reduces overlaps consistently (20/20, 14/14 regions). SCC/Pearson are still printed
+as info.
 
-> Cross-cell-line note: the three Hi-C files use different enzymes/depths, so absolute SCC isn't
-> comparable across lines — but the *winning config* (relative ranking within each line) should
-> agree if the recommendation generalizes.
+`--objective scc` keeps the old behaviour (max median SCC s.t. overlaps ≤ baseline) if you want it.
+
+The sweep prints a per-config median table (overlap, SCC, Pearson, Rg, scaling, diversity) and
+the winner under the objective. Compare winners across the 3 cell lines for a **generalizing**
+default; the min-overlap objective gives far more consistent winners than SCC (which chased noise).
+
+> Cross-cell note: the three Hi-C files differ in enzyme/depth, so absolute SCC isn't comparable
+> across lines — but the *winning config* should agree if the recommendation generalizes.
