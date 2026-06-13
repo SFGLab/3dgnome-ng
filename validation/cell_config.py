@@ -79,9 +79,9 @@ CANONICAL: dict[str, dict[str, object]] = {
         "ib_workers": "auto", 
         "heatmap_chains": 1, 
         "smooth_chains": 1,
-        "mc_executor_arcs": "threaded",
+        "mc_executor_arcs": "batch",
         "mc_executor_densify": "threaded",
-        "mc_executor_estimate_dist": "threaded",
+        "mc_executor_estimate_dist": "batch",
         "mc_executor_smooth": "batch",
     },
     "simulation_ib": {
