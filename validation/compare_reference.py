@@ -30,8 +30,16 @@ import numpy as np
 
 from gnome3d.data import ContactData
 from gnome3d.settings import Settings
-from validation import metrics
-from validation.validate import (
+
+# Make `validation` importable when run as a script (`python validation/compare_reference.py`),
+# not only as a module (`python -m validation.compare_reference`). Must precede the first-party
+# imports below (which are therefore E402-exempt).
+ROOT = Path(__file__).resolve().parent.parent
+if __package__ in (None, ""):
+    sys.path.insert(0, str(ROOT))
+
+from validation import metrics  # noqa: E402
+from validation.validate import (  # noqa: E402
     FAIL,
     PASS,
     _apply_flags,
@@ -42,7 +50,6 @@ from validation.validate import (
     summarize,
 )
 
-ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "harness"))
 import integration as ig  # noqa: E402  (dev tooling; harness is not a package)
 

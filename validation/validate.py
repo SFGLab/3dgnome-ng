@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import copy
 import sys
+from pathlib import Path
 
 import numpy as np
 
@@ -35,8 +36,14 @@ from gnome3d.data import ContactData
 from gnome3d.io import load_singletons, parse_region
 from gnome3d.settings import Settings
 from gnome3d.types import BeadOut, BedRegion
-from validation import metrics
-from validation.cell_config import settings_for_cell
+
+# Make `validation` importable when run as a script (`python validation/validate.py`), not only
+# as a module (`python -m validation.validate`). Must precede the first-party imports below.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from validation import metrics  # noqa: E402
+from validation.cell_config import settings_for_cell  # noqa: E402
 
 GREEN, RED, YELLOW, RESET = "\033[32m", "\033[31m", "\033[33m", "\033[0m"
 PASS, FAIL, WARN = f"{GREEN}PASS{RESET}", f"{RED}FAIL{RESET}", f"{YELLOW}WARN{RESET}"

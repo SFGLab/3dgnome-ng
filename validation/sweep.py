@@ -28,9 +28,15 @@ import numpy as np
 
 from gnome3d.data import ContactData
 from gnome3d.settings import Settings
-from validation import contacts, metrics
-from validation.cell_config import settings_for_cell
-from validation.validate import (
+
+# Make `validation` importable when run as a script (`python validation/sweep.py`), not only as a
+# module (`python -m validation.sweep`). Must precede the first-party imports below.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from validation import contacts, metrics  # noqa: E402
+from validation.cell_config import settings_for_cell  # noqa: E402
+from validation.validate import (  # noqa: E402
     _apply_flags,
     _chrs_and_region,
     load_contacts,
