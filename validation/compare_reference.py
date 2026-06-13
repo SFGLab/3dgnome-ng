@@ -7,12 +7,12 @@ on the same metrics (``validation/metrics.py``):
   * reference         — the C++ 3dnome binary (the algorithmic source of truth, NO EV /
                         confinement; the 2016 paper admitted it makes overlapping loops)
   * python (parity)   — our port, feature flags OFF — should MATCH the reference (faithful)
-  * python (+EV+conf) — our port with excluded volume + confinement ON — should have FEWER
-                        overlaps than the reference while preserving self-consistency/scaling
+  * python (+tuned)   — the TUNED production set: EV (weight 2.0, smooth radius 0.7) + confinement
+                        + dynamic sub-anchor count — should have FEWER overlaps than the reference
 
-All three share one parity config + region (so bead counts match and overlap fractions are
-apples-to-apples; EV/confinement don't change N). "Do dynamic subanchors help?" changes N, so
-it is answered separately by ``validate.py --prove dynamic``.
+Reference & parity are N-matched (same parity config) for the faithfulness check. The tuned
+variant turns on dynamic sub-anchors, so its bead count differs — it is scored at its own
+bond-scale radius and its overlap fraction is self-relative (see the radius note in main()).
 
 Reuses the proven reference runner from ``harness/integration.py``.
 
@@ -99,32 +99,48 @@ def main() -> None:
     print("[compare] running python (parity, flags off)...")
     base_structs = run_ensemble(s_base, data, chrs_list, bed_region, args.n_structures)
 
-    print("[compare] running python (+EV +confinement)...")
+    # The TUNED production feature set (validation/RUNBOOK.md): EV at the sweep winner (weight 2.0,
+    # smooth radius 0.7) + confinement + dynamic sub-anchor count. NOT the default EV (0.5/0.5) —
+    # that barely moved overlaps. Dynamic changes the bead count, so this variant is scored with
+    # its OWN bond-scale radius (below); its N differs from the reference.
+    print("[compare] running python (+EV[2.0,r0.7] +confinement +dynamic)...")
     s_feat = _apply_flags(
         s_base,
         {
             "use_excluded_volume": True,
             "exclusion_apply_to_smooth": True,
+            "exclusion_weight": 2.0,
+            "exclusion_auto_factor_smooth": 0.7,
             "use_confinement": True,
             "confinement_apply_to_smooth": True,
+            "use_dynamic_loop_density": True,
+            "target_bp_per_subanchor": 1000,
         },
     )
     feat_structs = run_ensemble(s_feat, data, chrs_list, bed_region, args.n_structures)
 
-    # --- score all three identically ---
-    radius = args.contact_radius
-    if radius is None:
-        coords, _ = metrics.to_arrays(base_structs[0])
-        radius = float(np.median(metrics.bond_lengths(coords)))
-    print(f"[compare] contact/overlap radius = {radius:.3f}  (contacts={len(contacts)})")
+    # --- score ---
+    # Reference & parity share one radius (N-matched, same bond scale). The dynamic feat variant
+    # has finer beads / shorter bonds — scoring it with the coarse parity radius would over-count
+    # overlaps, so it gets its OWN median-bond radius (overlap fraction is then self-relative).
+    def _radius(structs: list[list]) -> float:  # type: ignore[type-arg]
+        coords, _ = metrics.to_arrays(structs[0])
+        return float(np.median(metrics.bond_lengths(coords)))
+
+    radius = args.contact_radius if args.contact_radius is not None else _radius(base_structs)
+    radius_feat = args.contact_radius if args.contact_radius is not None else _radius(feat_structs)
+    print(
+        f"[compare] radius: ref/parity={radius:.3f}  +features={radius_feat:.3f}  "
+        f"(contacts={len(contacts)})"
+    )
 
     ref_m = summarize(ref_structs, contacts, radius, args.skip_neighbors)
     base_m = summarize(base_structs, contacts, radius, args.skip_neighbors)
-    feat_m = summarize(feat_structs, contacts, radius, args.skip_neighbors)
+    feat_m = summarize(feat_structs, contacts, radius_feat, args.skip_neighbors)
 
     print_single("reference (C++)", ref_m)
     print_single("python parity (flags off)", base_m)
-    print_single("python +EV +confinement", feat_m)
+    print_single("python +EV[2.0,r0.7]+conf+dynamic", feat_m)
 
     # --- verdicts ---
     print(f"\n{'=' * 70}\n  ANSWERS\n{'=' * 70}")
@@ -138,11 +154,14 @@ def main() -> None:
         f"(Δ={d_overlap:.4f}), N {int(ref_m['n_beads'])} vs {int(base_m['n_beads'])}"
     )
 
-    # Q1b: does adding EV+confinement beat the reference on physical sanity?
+    # Q1b: does the tuned feature set beat the reference on physical sanity (overlaps)?
+    # NOTE: dynamic changes N (feat N != ref N), so each is scored at its own bond-scale radius;
+    # the overlap fraction is self-relative (fraction of non-bonded pairs within ~1 local bond).
     better = feat_m["overlap_frac"] < ref_m["overlap_frac"] - 1e-9
     print(
-        f"  {PASS if better else FAIL}  +EV+confinement BETTER than reference on overlaps: "
-        f"ref={ref_m['overlap_frac']:.4f} -> py+feat={feat_m['overlap_frac']:.4f}"
+        f"  {PASS if better else FAIL}  +tuned features BETTER than reference on overlaps: "
+        f"ref={ref_m['overlap_frac']:.4f} (N={int(ref_m['n_beads'])}) -> "
+        f"py+feat={feat_m['overlap_frac']:.4f} (N={int(feat_m['n_beads'])})"
     )
 
     # Sanity preserved (self-consistency + scaling not worse than reference by much)
