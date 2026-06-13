@@ -20,7 +20,9 @@ survivors -> validate the winner at full x n=100), which is ~7x cheaper than the
 from __future__ import annotations
 
 import argparse
+import collections
 import json
+import random
 import sys
 from pathlib import Path
 
@@ -94,24 +96,67 @@ GRID: list[dict[str, object]] = [
 
 
 def enumerate_regions(
-    breakpoints_path: str, chrom: str, n: int, lo_mb: float = 1.5, hi_mb: float = 3.0
+    breakpoints_path: str,
+    n: int,
+    chroms: list[str] | None = None,
+    min_ibs: int = 2,
+    max_ibs: int = 6,
+    max_mb: float = 6.0,
+    seed: int = 0,
 ) -> list[str]:
-    """Consecutive-breakpoint segments on ``chrom`` within [lo_mb, hi_mb] Mb → 'chr:start-end'."""
-    pts: list[int] = []
+    """Sample ``n`` regions each **spanning multiple segments (≈ interaction blocks)**, with a
+    varied IB count, across chromosomes — so inter-IB packing (excluded volume / confinement /
+    IB-MC) is actually exercised. A single-segment region is one IB and gives those features
+    almost nothing to do (that was the old selection's flaw).
+
+    A region spans ``k`` consecutive breakpoint-segments (k ≈ #IBs), k ∈ [min_ibs, max_ibs],
+    capped at ``max_mb``. Stratified by k (IB-count spread), shuffled within (chromosome spread),
+    and chosen greedily non-overlapping per chromosome. Deterministic given ``seed``.
+    ``chroms=None`` uses every chromosome in the breakpoints file.
+    """
+    pts_by_chr: dict[str, list[int]] = collections.defaultdict(list)
     with open(breakpoints_path) as f:
         for line in f:
             p = line.split()
-            if len(p) >= 2 and p[0] == chrom:
-                pts.append(int(p[1]))
-    pts.sort()
-    out: list[str] = []
-    for a, b in zip(pts, pts[1:], strict=False):
-        span = (b - a) / 1e6
-        if lo_mb <= span <= hi_mb:
-            out.append(f"{chrom}:{a}-{b}")
-        if len(out) >= n:
-            break
-    return out
+            if len(p) >= 2:
+                pts_by_chr[p[0]].append(int(p[1]))
+    targets = chroms if chroms else sorted(pts_by_chr)
+    by_k: dict[int, list[tuple[str, int, int, int]]] = collections.defaultdict(list)
+    for c in targets:
+        ps = sorted(pts_by_chr.get(c, []))
+        for i in range(len(ps)):
+            for k in range(min_ibs, max_ibs + 1):
+                j = i + k
+                if j >= len(ps):
+                    break
+                if (ps[j] - ps[i]) / 1e6 > max_mb:  # bigger k only grows; stop scanning
+                    break
+                by_k[k].append((c, ps[i], ps[j], k))
+    if not by_k:
+        return []
+    rng = random.Random(seed)
+    for v in by_k.values():
+        rng.shuffle(v)  # chromosome spread within an IB-count class
+    chosen: list[tuple[str, int, int, int]] = []
+    used: dict[str, list[tuple[int, int]]] = collections.defaultdict(list)
+    order = sorted(by_k)
+    pos = dict.fromkeys(order, 0)
+    progressed = True
+    while len(chosen) < n and progressed:
+        progressed = False
+        for k in order:  # round-robin across IB-count classes -> even IB-count spread
+            while pos[k] < len(by_k[k]):
+                c, a, b, kk = by_k[k][pos[k]]
+                pos[k] += 1
+                if not any(a < ub and lb < b for lb, ub in used[c]):  # non-overlapping per chrom
+                    chosen.append((c, a, b, kk))
+                    used[c].append((a, b))
+                    progressed = True
+                    break
+            if len(chosen) >= n:
+                break
+    chosen.sort(key=lambda s: (s[0], s[1]))
+    return [f"{c}:{a}-{b}" for c, a, b, _ in chosen]
 
 
 def score_config(
@@ -307,8 +352,12 @@ def main() -> None:
         help="flat-mode MC schedule (ignored in --search)",
     )
     p.add_argument("--hic", required=True, help="4DN .mcool path (observed Hi-C)")
-    p.add_argument("--chrom", default="chr1")
+    p.add_argument("--chroms", default=None,
+                   help="comma-separated chromosomes (default: all in the breakpoints file)")
     p.add_argument("--n-regions", type=int, default=20)
+    p.add_argument("--min-ibs", type=int, default=2, help="min segments (≈IBs) a region spans")
+    p.add_argument("--max-ibs", type=int, default=6, help="max segments (≈IBs) a region spans")
+    p.add_argument("--max-mb", type=float, default=6.0, help="cap region size (Mb)")
     p.add_argument("--binsize", type=int, default=25000, help="Hi-C bin size for correlation")
     p.add_argument(
         "-n",
@@ -370,7 +419,11 @@ def main() -> None:
     # region enumeration uses the breakpoints file (schedule-independent)
     s_meta = settings_for_cell(args.cell, args.data_root)
     bp = s_meta.data_path(s_meta.data_segment_split)
-    regions = enumerate_regions(bp, args.chrom, args.n_regions)
+    chroms = args.chroms.split(",") if args.chroms else None
+    regions = enumerate_regions(
+        bp, args.n_regions, chroms=chroms, min_ibs=args.min_ibs, max_ibs=args.max_ibs,
+        max_mb=args.max_mb,
+    )
     if not regions:
         sys.exit(f"[error] no regions found on {args.chrom} in size band")
 

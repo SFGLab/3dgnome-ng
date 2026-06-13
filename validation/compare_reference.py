@@ -22,6 +22,7 @@ Reuses the proven reference runner from ``harness/integration.py``.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 import tempfile
 from pathlib import Path
@@ -39,13 +40,13 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(ROOT))
 
 from validation import metrics  # noqa: E402
+from validation.sweep import enumerate_regions  # noqa: E402
 from validation.validate import (  # noqa: E402
     FAIL,
     PASS,
     _apply_flags,
     _chrs_and_region,
     load_contacts,
-    print_single,
     run_ensemble,
     summarize,
 )
@@ -115,6 +116,7 @@ def main() -> None:
             "confinement_apply_to_smooth": True,
             "use_dynamic_loop_density": True,
             "target_bp_per_subanchor": 1000,
+            "use_ib_mc": True,  # inter-IB centroid MC — only bites in multi-IB regions
         },
     )
     feat_structs = run_ensemble(s_feat, data, chrs_list, bed_region, args.n_structures)
