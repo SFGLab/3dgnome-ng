@@ -125,7 +125,12 @@ CANONICAL: dict[str, dict[str, object]] = {
     },
     "excluded_volume": {
         "use_excluded_volume": "yes",
-        "weight": 0.1,
+        # Tuned by the 3-cell min-overlap sweep (validation/RUNBOOK.md): weight 2.0 + a larger
+        # smooth-stage radius (auto_factor 0.7, up from 0.5) ~halves physically-impossible
+        # overlaps across GM12878/H1ESC/HFFC6 (−41..−54%) with SCC/diversity preserved and Rg
+        # inflation <3%. The radius is the dominant lever. (Was weight 0.1.)
+        "weight": 2.0,
+        "auto_factor_smooth": 0.7,
         "apply_to_heatmap": "yes",
         "apply_to_arcs": "yes",
         "apply_to_smooth": "yes",
