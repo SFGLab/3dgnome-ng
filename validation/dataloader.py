@@ -46,10 +46,12 @@ DN_BASE = "https://data.4dnucleome.org"
 class AssaySpec:
     """One requested file: which assay, which portal, which accession."""
 
-    name: str  # logical track name, e.g. "CTCF", "H3K27ac", "ATAC"
-    source: str  # "encode" | "4dn"
-    accession: str  # ENCFF.../ENCSR... or 4DNFI...
+    name: str  # logical track name, e.g. "CTCF", "H3K27ac", "ATAC", "gencode", "enhancers"
+    source: str  # "encode" | "4dn" | "url"
+    accession: str = ""  # ENCFF.../ENCSR... or 4DNFI... (empty for a "url" source)
     output_type: str | None = None  # preferred ENCODE output_type (disambiguates a dataset)
+    url: str | None = None  # direct download URL (for source="url": GENCODE, EnhancerAtlas, ...)
+    md5: str | None = None  # optional expected md5 for a "url" source
 
 
 @dataclass
@@ -173,12 +175,31 @@ def resolve_4dn(spec: AssaySpec, ctx: ssl.SSLContext) -> FileRef:
     )
 
 
+def resolve_url(spec: AssaySpec) -> FileRef:
+    """A direct download URL — for sources without an accession API: GENCODE gene annotation
+    (ftp.ebi.ac.uk), EnhancerAtlas enhancer BEDs, etc. The manifest gives the literal ``url``."""
+    if not spec.url:
+        raise ValueError(f"url source {spec.name!r} needs a 'url' field")
+    fmt = spec.url.split("?")[0].rstrip("/").rsplit(".", 1)[-1]
+    return FileRef(
+        assay=spec.name,
+        source="url",
+        accession=spec.accession or spec.name,
+        url=spec.url,
+        md5=spec.md5,
+        file_format=fmt,
+        output_type=None,
+    )
+
+
 def resolve(spec: AssaySpec, ctx: ssl.SSLContext) -> FileRef:
     if spec.source == "encode":
         return resolve_encode(spec, ctx)
     if spec.source == "4dn":
         return resolve_4dn(spec, ctx)
-    raise ValueError(f"unknown source {spec.source!r} (expected 'encode' or '4dn')")
+    if spec.source == "url":
+        return resolve_url(spec)
+    raise ValueError(f"unknown source {spec.source!r} (expected 'encode', '4dn', or 'url')")
 
 
 def _md5(path: Path) -> str:

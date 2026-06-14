@@ -68,30 +68,31 @@ def _cfg(
     return d
 
 
-# EV/confinement search grid, aimed at MINIMISING overlaps (the lever that actually moves;
-# validation showed Hi-C SCC is insensitive to these knobs). Axes that reduce overlaps: EV
-# weight ↑, EV radius (auto_factor) ↑ (EV acts at larger separation). Confinement compacts
-# (adds overlaps) but is searched in combos since EV can soak its overlaps up. The min-overlap
-# objective's Rg/Hi-C guardrails keep over-strong EV from "winning" by inflating the structure.
-# Big-N / multi-region / 3-cell search runs on CUDA (validation/RUNBOOK.md); --max-configs subsets.
+# EV/confinement search grid — GENTLE-CENTERED. The multi-IB sweep showed strong EV (≥2.0,
+# radius≥1.0) reduces overlaps mostly by EXPANDING the structure (Rg +12–30%, and outright blow-up
+# at 20 Mb), so those are dropped: EV removes overlaps via smart rearrangement (cheap, low Rg) vs
+# expansion (Rg cost), and we want the rearrangement regime. The min-overlap objective's Rg guard
+# (--rg-tol, default 0.30 = moderate de-compaction; the reference is over-compact so some is
+# legitimate) keeps the winner physical. Re-centred on EV {0.25,0.5,1.0,1.5} + modest radius +
+# gentle combos. Big-N / multi-region / 3-cell search runs on CUDA (RUNBOOK); --max-configs subsets.
 GRID: list[dict[str, object]] = [
     _cfg("baseline"),
-    # EV weight scan (default radius)
+    # EV weight span: gentle → moderate. The Rg guard (--rg-tol 0.30) selects; ev4.0 and
+    # ev2.0_r1.0 are excluded as the demonstrated over-expanders/blow-up regime (Rg +30% / Rg→2896
+    # at 20 Mb). ev2.0 sits at ~+12% Rg on multi-IB — inside the moderate budget.
+    _cfg("ev0.25", ev=0.25),
     _cfg("ev0.5", ev=0.5),
     _cfg("ev1.0", ev=1.0),
+    _cfg("ev1.5", ev=1.5),
     _cfg("ev2.0", ev=2.0),
-    _cfg("ev4.0", ev=4.0),
-    # EV radius scan (auto_factor ↑ => EV active farther => fewer overlaps) at w=2.0
+    # EV-radius bumps (more de-clash reach, watched by the Rg guard)
+    _cfg("ev1.0_r0.7", ev=1.0, ev_radius=0.7),
     _cfg("ev2.0_r0.7", ev=2.0, ev_radius=0.7),
-    _cfg("ev2.0_r1.0", ev=2.0, ev_radius=1.0),
-    # confinement-only (compacts; usually adds overlaps — kept for contrast)
+    # confinement-only (compacts; for contrast)
     _cfg("conf_p0.75", conf=0.75),
-    _cfg("conf_p0.5", conf=0.5),
-    # EV + confinement combos (compaction + de-clash) — the user's target space
+    # EV + confinement combos
+    _cfg("ev0.5+conf0.75", ev=0.5, conf=0.75),
     _cfg("ev1.0+conf0.75", ev=1.0, conf=0.75),
-    _cfg("ev2.0+conf0.75", ev=2.0, conf=0.75),
-    _cfg("ev2.0+conf0.5", ev=2.0, conf=0.5),
-    _cfg("ev4.0+conf0.5", ev=4.0, conf=0.5),
 ]
 
 
@@ -352,8 +353,11 @@ def main() -> None:
         help="flat-mode MC schedule (ignored in --search)",
     )
     p.add_argument("--hic", required=True, help="4DN .mcool path (observed Hi-C)")
-    p.add_argument("--chroms", default=None,
-                   help="comma-separated chromosomes (default: all in the breakpoints file)")
+    p.add_argument(
+        "--chroms",
+        default=None,
+        help="comma-separated chromosomes (default: all in the breakpoints file)",
+    )
     p.add_argument("--n-regions", type=int, default=20)
     p.add_argument("--min-ibs", type=int, default=2, help="min segments (≈IBs) a region spans")
     p.add_argument("--max-ibs", type=int, default=6, help="max segments (≈IBs) a region spans")
@@ -402,8 +406,9 @@ def main() -> None:
     p.add_argument(
         "--rg-tol",
         type=float,
-        default=0.10,
-        help="overlap objective: max allowed Rg inflation vs baseline (blocks 'expand to de-clash')",
+        default=0.30,
+        help="overlap objective: max allowed Rg inflation vs baseline (0.30 = moderate "
+        "de-compaction; the reference is over-compact so some EV-driven expansion is legitimate)",
     )
     args = p.parse_args()
 
@@ -421,7 +426,11 @@ def main() -> None:
     bp = s_meta.data_path(s_meta.data_segment_split)
     chroms = args.chroms.split(",") if args.chroms else None
     regions = enumerate_regions(
-        bp, args.n_regions, chroms=chroms, min_ibs=args.min_ibs, max_ibs=args.max_ibs,
+        bp,
+        args.n_regions,
+        chroms=chroms,
+        min_ibs=args.min_ibs,
+        max_ibs=args.max_ibs,
         max_mb=args.max_mb,
     )
     if not regions:

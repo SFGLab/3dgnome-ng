@@ -141,6 +141,108 @@ def contact_probability(
     return _loglog_bins(sep, contact, n_bins)
 
 
+# --------------------------------------------------------------------------- genome-structure laws
+#
+# Polymer-physics scaling laws every chromatin model must reproduce (3dgnome 2016 Fig.; MultiMM
+# 2024 Fig. 2; Lieberman-Aiden 2009 fractal globule). We fit each as a power law on log-log
+# bin-means over the SCALING WINDOW only — excluding (a) sub-resolution small separations (a
+# single CCD blob is flat there) and (b) the saturated tail — and report the exponent AND the
+# log-log R² (a "law holds" = power-law, i.e. high R², with the exponent in the biological band).
+# NOTE: canonical values (β≈1/3, α≈1) appear over large / multi-IB / whole-chromosome ranges; a
+# small single-IB region is one globule and legitimately reads flatter.
+
+# (lo, hi, target): biologically plausible band + canonical value for the power-law exponent.
+LAW_BANDS: dict[str, tuple[float, float, float]] = {
+    "dist_exp": (0.15, 0.60, 0.33),  # R(s) ~ s^β: fractal globule 1/3, ideal chain 1/2
+    "contact_exp": (0.50, 1.60, 1.00),  # P(s) ~ s^-α: chromatin ≈ 1.0
+}
+
+
+def _loglog_fit(
+    sep: F64Array, val: F64Array, n_bins: int, lo_bp: float, hi_frac: float
+) -> tuple[float, float]:
+    """Power-law slope + log-log R² of ``val`` vs ``sep`` over the scaling window
+    [lo_bp, hi_frac·max_sep], on log-spaced bin means. Returns (slope, r2); NaN if too few bins."""
+    pos = sep > 0
+    sep, val = sep[pos], val[pos]
+    if sep.size < 4:
+        return float("nan"), float("nan")
+    win = (sep >= lo_bp) & (sep <= hi_frac * sep.max())
+    if win.sum() < 10:
+        return float("nan"), float("nan")
+    sep, val = sep[win], val[win]
+    edges = np.logspace(np.log10(sep.min()), np.log10(sep.max() + 1), n_bins + 1)
+    idx = np.clip(np.digitize(sep, edges) - 1, 0, n_bins - 1)
+    bs, bv = [], []
+    for b in range(n_bins):
+        m = idx == b
+        if m.sum() >= 5 and val[m].mean() > 0:
+            bs.append(float(sep[m].mean()))
+            bv.append(float(val[m].mean()))
+    if len(bs) < 3:
+        return float("nan"), float("nan")
+    lx, ly = np.log10(np.array(bs)), np.log10(np.array(bv))
+    slope, intercept = np.polyfit(lx, ly, 1)
+    pred = slope * lx + intercept
+    sstot = float(((ly - ly.mean()) ** 2).sum())
+    r2 = 1.0 - float(((ly - pred) ** 2).sum()) / sstot if sstot > 0 else float("nan")
+    return float(slope), r2
+
+
+def scaling_laws(
+    coords: F64Array,
+    mids: I64Array,
+    radius: float,
+    n_bins: int = 15,
+    min_sep_bp: float = 30_000.0,
+    hi_frac: float = 0.6,
+) -> dict[str, float]:
+    """Genome-structure scaling laws for one structure: mean-distance R(s)~s^β and
+    contact-probability P(s)~s^-α power laws (exponent + log-log R²), plus Rg and the chain
+    bond-length CV. ``contact_exp`` is reported as the positive α."""
+    n = len(coords)
+    iu, ju = np.triu_indices(n, k=1)
+    d = _pairwise(coords)[iu, ju]
+    sep = np.abs(mids[iu] - mids[ju]).astype(np.float64)
+    b_dist, r2_dist = _loglog_fit(sep, d, n_bins, min_sep_bp, hi_frac)
+    b_con, r2_con = _loglog_fit(sep, (d < radius).astype(np.float64), n_bins, min_sep_bp, hi_frac)
+    bonds = bond_lengths(coords)
+    bond_mean = float(np.mean(bonds)) if bonds.size else float("nan")
+    return {
+        "dist_exp": b_dist,
+        "dist_r2": r2_dist,
+        "contact_exp": -b_con,  # report α > 0
+        "contact_r2": r2_con,
+        "rg": radius_of_gyration(coords),
+        "bond_cv": float(np.std(bonds) / bond_mean)
+        if bond_mean and bond_mean > 0
+        else float("nan"),
+    }
+
+
+def ensemble_scaling_laws(
+    ensemble: Sequence[F64Array], mids: I64Array, radius: float
+) -> dict[str, float]:
+    """``scaling_laws`` averaged (nan-mean) across an ensemble."""
+    rows = [scaling_laws(c, mids, radius) for c in ensemble]
+    keys = rows[0].keys()
+    return {k: float(np.nanmean([r[k] for r in rows])) for k in keys}
+
+
+def check_law(name: str, exp: float, r2: float, r2_min: float = 0.80) -> tuple[bool, str]:
+    """Does a fitted exponent satisfy its literature band AND look power-law (R² ≥ r2_min)?
+    Returns (ok, reason). NaN exponent (region too small / no scaling window) -> (False, 'n/a')."""
+    if name not in LAW_BANDS or not np.isfinite(exp):
+        return False, "n/a (no scaling window — region too small?)"
+    lo, hi, target = LAW_BANDS[name]
+    in_band = lo <= exp <= hi
+    powerlaw = np.isfinite(r2) and r2 >= r2_min
+    reason = (
+        f"exp={exp:.2f} (band {lo}-{hi}, ~{target}); R²={r2:.2f}{' <min' if not powerlaw else ''}"
+    )
+    return (in_band and powerlaw), reason
+
+
 # --------------------------------------------------------------------------- V1 self-consistency
 
 

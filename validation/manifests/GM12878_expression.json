@@ -1,0 +1,10 @@
+{
+  "_note": "Structure-function (expression) validation inputs — see docs/expression-validation.md. GENCODE genes (TSS) + ENCODE RNA-seq gene quantifications + ChromHMM 15-state segmentation (active-region filter AND enhancer states). Enhancers: EnhancerAtlas's host is currently down (404/502); the chromHMM Enh/EnhG states serve as enhancers by default. To use EnhancerAtlas or ENCODE cCRE instead, add an entry like {\"name\":\"enhancers\",\"source\":\"url\",\"url\":\"<EnhancerAtlas GM12878 bed>\"} (may need --insecure) or resolve an ENCODE cCRE bed (e.g. annotation ENCSR398LKB). Fetch: python -m validation.dataloader --manifest validation/manifests/GM12878_expression.json --out data/_expr",
+  "cell_line": "GM12878",
+  "assembly": "GRCh38",
+  "assays": [
+    {"name": "gencode_genes", "source": "url", "url": "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_46/gencode.v46.basic.annotation.gtf.gz"},
+    {"name": "rnaseq", "source": "encode", "accession": "ENCFF321GYW", "output_type": "gene quantifications (GRCh38)"},
+    {"name": "chromhmm", "source": "encode", "accession": "ENCFF140VIG", "output_type": "ChromHMM 15-state (active filter + enhancer states)"}
+  ]
+}

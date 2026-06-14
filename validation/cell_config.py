@@ -76,8 +76,8 @@ CANONICAL: dict[str, dict[str, object]] = {
         "squeeze_constant_arcs": 1.0,
     },
     "simulation_backend": {
-        "ib_workers": "auto", 
-        "heatmap_chains": 1, 
+        "ib_workers": "auto",
+        "heatmap_chains": 1,
         "smooth_chains": 1,
         "mc_executor_arcs": "batch",
         "mc_executor_densify": "threaded",

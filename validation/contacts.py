@@ -29,7 +29,20 @@ def observed_hic(
     """
     import cooler
 
-    c = cooler.Cooler(f"{mcool_path}::/resolutions/{binsize}")
+    # Snap to the nearest resolution actually present in the .mcool (not every binsize exists —
+    # e.g. mcools often have 25 kb but not 20 kb). Single-resolution coolers open directly.
+    avail = sorted(
+        int(p.rsplit("/", 1)[-1])
+        for p in cooler.fileops.list_coolers(mcool_path)
+        if p.rsplit("/", 1)[-1].isdigit()
+    )
+    if avail:
+        res = binsize if binsize in avail else min(avail, key=lambda r: abs(r - binsize))
+        if res != binsize:
+            print(f"[contacts] binsize {binsize} absent in mcool; using nearest available {res}")
+        c = cooler.Cooler(f"{mcool_path}::/resolutions/{res}")
+    else:
+        c = cooler.Cooler(mcool_path)
     mat = np.asarray(c.matrix(balance=balance).fetch(region), dtype=np.float64)
     starts = c.bins().fetch(region)["start"].to_numpy().astype(np.int64)
     return np.nan_to_num(mat), starts
@@ -133,8 +146,62 @@ def hic_correlation(
 ) -> dict[str, float]:
     """End-to-end for ONE structure: simulated contacts vs observed Hi-C -> metrics."""
     c_obs, bin_starts = observed_hic(mcool_path, region, binsize, balance=balance)
-    c_sim = simulated_contacts(coords, mids, bin_starts, binsize, contact_radius)
+    eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize
+    c_sim = simulated_contacts(coords, mids, bin_starts, eff, contact_radius)
     return contact_correlation(c_sim, c_obs)
+
+
+def inverse_distance_heatmap(
+    coords_list: list[F64Array],
+    mids: I64Array,
+    bin_starts: I64Array,
+    binsize: int,
+    eps: float = 1e-6,
+) -> F64Array:
+    """Ensemble-mean **inverse-distance** heat map on the Hi-C bin grid: per bin-pair, the mean of
+    1/d over all bead-pairs (and ensemble members) whose midpoints fall in those bins. This is the
+    MultiMM contact surrogate (a smooth, dense 1/d map, vs the sparse hard-radius contact count).
+    Computed via a one-hot bin matrix B so the binning is a BLAS matmul (Bᵀ·(1/d)·B)."""
+    nbins = len(bin_starts)
+    last_edge = int(bin_starts[-1]) + binsize
+    bidx = np.searchsorted(bin_starts, mids, side="right") - 1
+    in_grid = (bidx >= 0) & (bidx < nbins) & (mids < last_edge)
+    bi = bidx[in_grid]
+    n = bi.size
+    if n < 2:
+        return np.zeros((nbins, nbins))
+    onehot = np.zeros((n, nbins))
+    onehot[np.arange(n), bi] = 1.0
+    counts = onehot.sum(0)
+    pair_cnt = np.outer(counts, counts)  # bead-pairs per bin-pair (off-diagonal exact; diag unused)
+    acc = np.zeros((nbins, nbins))
+    for coords in coords_list:
+        c = coords[in_grid]
+        diff = c[:, None, :] - c[None, :, :]
+        inv = 1.0 / np.maximum(np.sqrt((diff * diff).sum(axis=2)), eps)
+        np.fill_diagonal(inv, 0.0)
+        acc += onehot.T @ inv @ onehot
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.where(pair_cnt > 0, acc / (pair_cnt * len(coords_list)), 0.0)
+
+
+def multimm_pearson(
+    inv_map: F64Array, c_obs: F64Array, min_sep_bins: int = 1, sim_power: float = 1.5
+) -> float:
+    """MultiMM-style Hi-C correlation: Pearson of the simulated inverse-distance heat map (raised
+    to ``sim_power`` = 3/2, per the paper) vs observed Hi-C, **main diagonal excluded but the
+    genomic distance-decay retained**. MultiMM reports ≈0.70 here (random structures <0.40). This
+    is the literature-comparable metric — unlike SCC, which strips the decay (see docs/validation.md
+    §1bis)."""
+    n = c_obs.shape[0]
+    if n < 4:
+        return float("nan")
+    iu = np.triu_indices(n, min_sep_bins)
+    a = np.power(np.maximum(inv_map[iu], 0.0), sim_power)
+    b = c_obs[iu]
+    if a.std() < 1e-12 or b.std() < 1e-12:
+        return float("nan")
+    return float(np.corrcoef(a, b)[0, 1])
 
 
 def ensemble_hic_correlation(
@@ -146,14 +213,17 @@ def ensemble_hic_correlation(
     contact_radius: float,
     balance: bool = False,
 ) -> dict[str, float]:
-    """Correlate the ENSEMBLE-summed simulated contact map vs observed Hi-C.
-
-    Hi-C is a population average over cells, so the right comparison aggregates the simulated
-    contacts over the whole ensemble (our "cells") into one map, then correlates once — more
-    faithful and far less noisy than averaging per-structure correlations.
+    """Correlate the ENSEMBLE simulated maps vs observed Hi-C. Hi-C is a population average, so we
+    aggregate over the whole ensemble (our "cells") before correlating. Returns the strict hicrep
+    **SCC** + decay-free Pearson/insulation (``contact_correlation``) AND the literature-comparable
+    MultiMM **inverse-distance Pearson** (decay retained) under ``multimm_pearson``.
     """
     c_obs, bin_starts = observed_hic(mcool_path, region, binsize, balance=balance)
+    eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize  # actual res used
     c_sim = np.zeros_like(c_obs)
     for coords, mids in zip(coords_list, mids_list, strict=True):
-        c_sim += simulated_contacts(coords, mids, bin_starts, binsize, contact_radius)
-    return contact_correlation(c_sim, c_obs)
+        c_sim += simulated_contacts(coords, mids, bin_starts, eff, contact_radius)
+    out = contact_correlation(c_sim, c_obs)
+    inv = inverse_distance_heatmap(coords_list, mids_list[0], bin_starts, eff)
+    out["multimm_pearson"] = multimm_pearson(inv, c_obs)
+    return out

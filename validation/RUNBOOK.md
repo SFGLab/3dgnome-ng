@@ -83,8 +83,18 @@ combos, and two EV-radius probes. To force the CUDA JAX backend cell-wide, edit
 ## 3. Also worth running at n=100
 
 ```bash
-# vs-reference (faithful port + EV/confinement beat reference on overlaps)
-python -m validation.compare_reference --region chr1:18288319-20307135 -n 100
+# vs-reference: reference vs python-parity vs python-tuned across several MULTI-IB regions,
+# paired per region with a sign-test (tuned should have fewer overlaps in most/all regions).
+# Also reports the genome-structure scaling laws (R(s)~s^β, P(s)~s^-α with log-log R² vs the
+# literature bands) and — with --hic — Hi-C SCC + MultiMM inverse-distance Pearson (ref vs tuned).
+python -m validation.compare_reference -n 100 --n-regions 8 --chroms chr1,chr2,chr8,chr17 \
+    --hic data/_hic/GM12878/hic.4DNFIQ32RWCQ.mcool --binsize 25000
+
+# Quotable-against-MultiMM number: --multimm-mode fixes the geometry to MultiMM's (≈20 Mb regions,
+# 20 kb bins, ~20 kb/bead) so our MultiMM inverse-distance Pearson is directly comparable to their
+# ≈0.70 (random <0.40). Coarse beads => tractable even at 20 Mb.
+python -m validation.compare_reference --multimm-mode -n 100 --n-regions 8 \
+    --hic data/_hic/GM12878/hic.4DNFIQ32RWCQ.mcool
 
 # isolate each divergence (overlaps for EV, extent for confinement, scaling for dynamic)
 python -m validation.validate --cell GM12878 \
@@ -94,8 +104,11 @@ python -m validation.validate --cell GM12878 \
 ## 4. Objective & reading the output
 
 **Default objective: `--objective overlap`** — minimise median overlap fraction (the physical-
-sanity lever) subject to guardrails: Rg must not inflate (`--rg-tol`, default 0.10, so EV can't
-"win" by just expanding the chain), plus sane polymer scaling and non-collapsed diversity. **Hi-C
+sanity lever) subject to guardrails: Rg must not inflate beyond `--rg-tol` (default **0.30** =
+moderate de-compaction — strong EV reduces overlaps mostly by *expanding* an over-compact
+structure, which the guard bounds; the grid is gentle-centred {0.25,0.5,1.0,1.5} so the winner is
+in the smart-rearrangement regime, not the blow-up regime), plus sane scaling + non-collapsed
+diversity. **Hi-C
 SCC is deliberately NOT gated** — the n=100 validation showed it's insensitive to EV/confinement
 (per-region ΔSCC is a coin flip, ≪ region-to-region variance), so gating on it only injects noise.
 EV, meanwhile, reduces overlaps consistently (20/20, 14/14 regions). SCC/Pearson are still printed
