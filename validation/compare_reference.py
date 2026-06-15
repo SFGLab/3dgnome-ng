@@ -162,6 +162,57 @@ def score_region(
     return ref_m, base_m, feat_m
 
 
+def score_law_region(region: str, config: Path, tmp: Path, args: argparse.Namespace) -> dict:
+    """Scaling-law pass on ONE large region: reference (C++) vs python +tuned, both fit for
+    R(s)~s^β and P(s)~s^-α. The python side is COARSENED (~20 kb/bead) so a ≥20 Mb region is
+    tractable; the reference runs at its native resolution. At this scale there are several
+    decades of genomic separation, so a real power-law window (high log-log R²) exists — unlike
+    the small overlap/Hi-C regions. Returns {'ref': laws, 'feat': laws, 'n_ref', 'n_feat'}."""
+    chrs_list, bed_region = _chrs_and_region(region)
+    outdir = tmp / ("law_" + region.replace(":", "_").replace("-", "_"))
+    outdir.mkdir(parents=True, exist_ok=True)
+    n = args.law_n if args.law_n > 0 else args.n_structures
+    workers = getattr(args, "ref_workers", 0)
+
+    print(f"  [laws @ {region}] reference binary ({n} structures, native res)...")
+    ref_structs, _ = ig.run_cpp_ensemble_parallel(
+        outdir, config, n, MAX_LEVEL, region, "law", workers=workers
+    )
+
+    s_base = Settings()
+    s_base.load_ini(str(config))
+    s_base.mc_executor_arcs = "threaded"
+    s_base.mc_executor_threaded_workers = args.py_workers if args.py_workers > 0 else (os.cpu_count() or 1)
+    coarsen = {"use_dynamic_loop_density": True, "target_bp_per_subanchor": 20000}  # ~20 kb/bead
+    data = ContactData.from_files(s_base, chrs_list, bed_region)
+    print(f"  [laws @ {region}] python +tuned (coarsened ~20 kb/bead)...")
+    feat_structs = run_ensemble(
+        _apply_flags(s_base, {**TUNED_FEATURES, **coarsen}), data, chrs_list, bed_region, n
+    )
+
+    def laws_of(structs: list) -> dict:
+        cl, ml = [], []
+        for beads in structs:
+            c, mm = metrics.to_arrays(beads)
+            cl.append(c)
+            ml.append(mm)
+        rad = float(np.median(metrics.bond_lengths(cl[0])))
+        return metrics.ensemble_scaling_laws(cl, ml[0], rad)
+
+    return {
+        "ref": laws_of(ref_structs),
+        "feat": laws_of(feat_structs),
+        "n_ref": len(ref_structs[0]),
+        "n_feat": len(feat_structs[0]),
+    }
+
+
+def _span(region: str) -> int:
+    """Genomic span (bp) of a 'chr:a-b' region string."""
+    a, b = region.split(":")[1].split("-")
+    return int(b) - int(a)
+
+
 def _sign_test(k: int, m: int) -> float:
     """One-sided sign test: P(≥ k of m 'wins' under a fair coin). Small p ⇒ a real effect."""
     if m == 0:
@@ -216,6 +267,22 @@ def main() -> None:
     )
     p.add_argument("--contact-radius", type=float, default=None)
     p.add_argument("--skip-neighbors", type=int, default=1)
+    p.add_argument(
+        "--law-region",
+        default=None,
+        help="region for the scaling-law pass; default = auto-pick one large (≥--law-mb) region. "
+        "The fractal-globule laws (β≈1/3, α≈1) only have a power-law window at this scale — they "
+        "are NOT meaningful on the small overlap/Hi-C regions, so they are measured separately here.",
+    )
+    p.add_argument("--law-mb", type=float, default=20.0, help="min size (Mb) of the law region")
+    p.add_argument(
+        "--law-n",
+        type=int,
+        default=20,
+        help="ensemble size for the law pass (exponents need far fewer structures than overlaps); "
+        "0 = reuse -n",
+    )
+    p.add_argument("--no-laws", action="store_true", help="skip the large-region scaling-law pass")
     args = p.parse_args()
 
     # MultiMM geometry preset: ≈20 Mb regions, 20 kb Hi-C bins, and ~20 kb/bead coarsening of the
@@ -310,21 +377,10 @@ def main() -> None:
         f"(median Δ={float(np.median(d_overlaps)):+.4f}, sign-test p={p_better:.4f})"
     )
     print(f"  {PASS if sc_ok == m else FAIL}  self-consistency preserved: {sc_ok}/{m} regions")
-
-    # Genome-structure scaling laws (3dgnome / MultiMM): R(s)~s^β, P(s)~s^-α. A "law holds" =
-    # power-law (log-log R² high) with exponent in the biological band. Canonical β≈1/3, α≈1
-    # appear over LARGE / multi-IB ranges; small single-IB regions read flatter (low R²).
-    print("\n  Genome-structure laws (median; β=dist R(s)~s^β, α=contact P(s)~s^-α):")
-    print(f"    {'variant':<20}{'β (R²)':>14}{'α (R²)':>14}{'bond CV':>9}  laws?")
-    for label, var in [("reference (C++)", 0), ("python +tuned", 2)]:
-        de, dr = med("law_dist_exp", var), med("law_dist_r2", var)
-        ce, cr = med("law_contact_exp", var), med("law_contact_r2", var)
-        d_ok, _ = metrics.check_law("dist_exp", de, dr)
-        c_ok, _ = metrics.check_law("contact_exp", ce, cr)
-        print(
-            f"    {label:<20}{de:>7.2f} ({dr:>4.2f}){ce:>7.2f} ({cr:>4.2f}){med('law_bond_cv', var):>9.2f}"
-            f"   {'✓' if d_ok and c_ok else '·'}"
-        )
+    print(
+        "  (scaling laws are NOT gated here — the fractal-globule regime needs a large region; "
+        "see the dedicated law pass below)"
+    )
 
     if args.hic:
         print(f"\n  Hi-C correlation vs {Path(args.hic).name} ({args.binsize // 1000}kb):")
@@ -349,6 +405,42 @@ def main() -> None:
             print(
                 "    (note: MultiMM reports ≈0.70 on 20 Mb regions; NOT comparable at this region "
                 "size — use --multimm-mode for an apples-to-apples number)"
+            )
+
+    # --- scaling-law pass on ONE large region (where the fractal-globule regime exists) ---
+    if not args.no_laws:
+        law_region = args.law_region
+        if not law_region:
+            bp_law = ig.DATA_DIR / "ccds_all_hg38_merged100k_GM12878.breakpoints.bed"
+            chroms_law = args.chroms.split(",") if args.chroms else None
+            cands = enumerate_regions(
+                str(bp_law), 40, chroms=chroms_law, min_ibs=6, max_ibs=400, max_mb=args.law_mb
+            )
+            law_region = max(cands, key=_span) if cands else None
+        if not law_region:
+            print(f"\n  [laws] no region up to {args.law_mb} Mb found — pass --law-region explicitly")
+        else:
+            print(
+                f"\n{'=' * 74}\n  SCALING LAWS @ {law_region} ({_span(law_region) / 1e6:.1f} Mb — "
+                f"large enough for the power-law window)\n{'=' * 74}"
+            )
+            lw = score_law_region(law_region, config, tmp, args)
+            print(f"  {'variant':<22}{'β (R²)':>14}{'α (R²)':>14}{'bond CV':>9}{'beads':>8}  laws?")
+            for label, key, nkey in [
+                ("reference (C++)", "ref", "n_ref"),
+                ("python +tuned", "feat", "n_feat"),
+            ]:
+                lo = lw[key]
+                d_ok, _ = metrics.check_law("dist_exp", lo["dist_exp"], lo["dist_r2"])
+                c_ok, _ = metrics.check_law("contact_exp", lo["contact_exp"], lo["contact_r2"])
+                print(
+                    f"  {label:<22}{lo['dist_exp']:>7.2f} ({lo['dist_r2']:>4.2f})"
+                    f"{lo['contact_exp']:>7.2f} ({lo['contact_r2']:>4.2f}){lo['bond_cv']:>9.2f}"
+                    f"{lw[nkey]:>8d}   {'✓' if d_ok and c_ok else '·'}"
+                )
+            print(
+                "  (β: fractal globule ~1/3, band 0.15–0.60; α: chromatin ~1.0, band 0.50–1.60; "
+                "'laws hold' = in-band AND log-log R² ≥ 0.80)"
             )
 
     if m == 1:

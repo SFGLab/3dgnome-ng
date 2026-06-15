@@ -88,8 +88,12 @@ combos, and two EV-radius probes. To force the CUDA JAX backend cell-wide, edit
 ```bash
 # vs-reference: reference vs python-parity vs python-tuned across several MULTI-IB regions,
 # paired per region with a sign-test (tuned should have fewer overlaps in most/all regions).
-# Also reports the genome-structure scaling laws (R(s)~s^β, P(s)~s^-α with log-log R² vs the
-# literature bands) and — with --hic — Hi-C SCC + MultiMM inverse-distance Pearson (ref vs tuned).
+# With --hic also reports Hi-C SCC + MultiMM inverse-distance Pearson (ref vs tuned).
+# Genome-structure scaling laws (R(s)~s^β, P(s)~s^-α with log-log R² vs the literature bands) are
+# measured in a SEPARATE pass on one large (≥--law-mb, default 20 Mb) auto-picked region — the
+# only scale where the fractal-globule power-law window exists; they are NOT gated on the small
+# overlap/Hi-C regions (the reference fails them there too). Tune with --law-region / --law-mb /
+# --law-n (default 20; exponents need few structures); --no-laws skips the pass.
 # The C++ reference ensemble is parallelised across cores (--ref-workers, default auto =
 # min(n, cpu_count)); each worker generates a chunk with a distinct -r seed, so the n=100
 # reference is ~cpu_count× faster and statistically equivalent (not byte-identical) to the serial
