@@ -58,18 +58,22 @@ MAX_LEVEL = 2  # heatmap + arc + smooth MC (same as the integration test)
 
 
 TUNED_FEATURES: dict[str, object] = {
-    # The TUNED production set (validation/RUNBOOK.md): EV at the sweep winner (weight 2.0, smooth
+    # The TUNED production set (validation/RUNBOOK.md): EV at the sweep winner (weight 1.0, smooth
     # radius 0.7) + confinement + dynamic sub-anchor count + IB-MC. NOT default EV (0.5/0.5) —
     # that barely moved overlaps. IB-MC and inter-IB de-clashing only bite in MULTI-IB regions.
+    # weight 1.0 (not 2.0): ~90% of the overlap reduction at the lowest Rg cost, scale-safe.
     "use_excluded_volume": True,
     "exclusion_apply_to_smooth": True,
-    "exclusion_weight": 2.0,
+    "exclusion_weight": 1.0,
     "exclusion_auto_factor_smooth": 0.7,
     "use_confinement": True,
     "confinement_apply_to_smooth": True,
     "use_dynamic_loop_density": True,
     "target_bp_per_subanchor": 1000,
     "use_ib_mc": True,
+    # Truncate the unbounded non-arc 1/d repulsion (3x mean arc distance) so sparse sub-IBs don't
+    # explode / hang in arcs polish. TUNED-only: parity stays unbounded to mirror C++ faithfully.
+    "arcs_repulsion_cutoff_factor": 3.0,
 }
 
 

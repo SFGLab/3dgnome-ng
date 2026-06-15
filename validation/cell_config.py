@@ -125,15 +125,21 @@ CANONICAL: dict[str, dict[str, object]] = {
     },
     "excluded_volume": {
         "use_excluded_volume": "yes",
-        # Tuned by the 3-cell min-overlap sweep (validation/RUNBOOK.md): weight 2.0 + a larger
-        # smooth-stage radius (auto_factor 0.7, up from 0.5) ~halves physically-impossible
-        # overlaps across GM12878/H1ESC/HFFC6 (−41..−54%) with SCC/diversity preserved and Rg
-        # inflation <3%. The radius is the dominant lever. (Was weight 0.1.)
-        "weight": 2.0,
+        # Tuned by the multi-IB min-overlap sweep (validation/RUNBOOK.md): weight 1.0 + a larger
+        # smooth-stage radius (auto_factor 0.7, up from 0.5) cuts physically-impossible overlaps
+        # ~36% across the multi-IB regions with SCC/diversity preserved. 1.0 captures ~90% of the
+        # overlap benefit of 2.0 at the lowest Rg cost (median +11% vs +14%) and is the safest at
+        # scale (2.0/r0.7 blew up at 20 Mb). The radius is the dominant lever. (Was weight 2.0.)
+        "weight": 1.0,
         "auto_factor_smooth": 0.7,
         "apply_to_heatmap": "yes",
         "apply_to_arcs": "yes",
         "apply_to_smooth": "yes",
+        # Truncate the non-arc 1/d repulsion beyond factor*mean-arc-distance. 0.0 = unbounded
+        # (faithful to C++ LooperSolver.cpp:1533), which explodes small/sparse arcs IBs (target
+        # 0.4 -> Rg 515) and causes the multi-hour arcs polish. Capping the long-range tail at 3x
+        # the natural arc scale keeps local de-clashing while killing the runaway expansion.
+        "arcs_repulsion_cutoff_factor": 3.0,
     },
     "confinement": {
         "use_confinement": "yes",
