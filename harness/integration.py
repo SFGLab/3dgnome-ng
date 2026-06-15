@@ -49,6 +49,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 CPP_BIN = ROOT / "3dnome" / "3dnome"
+
+
+def _cpp_env() -> dict:
+    """Environment for invoking 3dnome: make sure the loader finds ``lib3dnome.so``, which sits
+    next to the binary. The makefile links with rpath ``@executable_path`` (a macOS token that's
+    meaningless on Linux), so on Linux the shared lib isn't found unless we add its directory to
+    ``LD_LIBRARY_PATH`` (``DYLD_LIBRARY_PATH`` on macOS). Prepended, so an existing value wins."""
+    env = os.environ.copy()
+    libdir = str(CPP_BIN.parent)
+    for var in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"):
+        env[var] = libdir + (os.pathsep + env[var] if env.get(var) else "")
+    return env
 DATA_DIR = ROOT / "data" / "GM12878"
 REGION = "chr1:18288319-20307135"
 REGION_LABEL = f"integration_test_region_{REGION.replace(':', '_').replace('-', '_')}"
@@ -645,6 +657,7 @@ def run_cpp_ensemble(
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
+        env=_cpp_env(),
     )
     raw_lines = []
     for line in proc.stdout:
@@ -719,7 +732,9 @@ def run_cpp_ensemble_parallel(
         ]  # fmt: skip
         print(f"[cpp] worker {c}: {sz} structs, seed={seed}")
         fh = open(log, "w")
-        procs.append((c, sz, wd, log, fh, subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT)))
+        procs.append(
+            (c, sz, wd, log, fh, subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT, env=_cpp_env()))
+        )
 
     structures: list = []
     raw_lines: list = []
