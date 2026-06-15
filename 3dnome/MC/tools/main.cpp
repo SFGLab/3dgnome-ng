@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string>
 #include <sstream>
 #include <time.h>
@@ -471,17 +472,21 @@ int main(int argc, char** argv) {
 	printf("start\n");
 	setbuf(stdout, NULL);
 
-	long int *tmp = NULL;
-	srand((unsigned int)time(tmp));
-
 	opterr = 0;
 	int opt = 0;
 
-	while ((opt = getopt(argc,argv,"s:a:o:c:n:l:u:t:d:p:b:e:m:i:v:")) != EOF) {
+	while ((opt = getopt(argc,argv,"s:a:o:c:n:l:u:t:d:p:b:e:m:i:v:r:")) != EOF) {
 		if (optarg == NULL) optarg = (char*)"";
 		printf("opt = [%c %s]\n", opt, optarg);
 		args[opt] = optarg;
 	}
+
+	// RNG seed: opt-in via -r for reproducible / parallel ensembles (each worker a distinct
+	// seed); absent -> time() as before, so behaviour is byte-identical when -r is not passed.
+	unsigned int rng_seed = flag_set('r') ? (unsigned int)strtoul(get_arg('r').c_str(), NULL, 10)
+	                                      : (unsigned int)time(NULL);
+	srand(rng_seed);
+	printf("rng seed = %u\n", rng_seed);
 
 	if (!flag_set('a') || args['a'] == "c" || args['a'] == "create") {
 

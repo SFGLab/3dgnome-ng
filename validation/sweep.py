@@ -184,7 +184,8 @@ def score_config(
         mids_list.append(mids)
     r = contacts.ensemble_hic_correlation(coords_list, mids_list, hic_path, region, binsize, radius)
     m["hic_scc"] = r["scc"]
-    m["hic_pearson"] = r["pearson"]
+    m["hic_pearson"] = r["pearson"]  # decay-stripped (off-diagonal log1p)
+    m["hic_multimm"] = r["multimm_pearson"]  # decay-retained, comparable to MultiMM's ≈0.70
     m["hic_insulation"] = r["insulation"]
     return m
 
@@ -260,9 +261,13 @@ def _aggregate(
         if not rows:
             continue
         med = lambda k, rows=rows: float(np.nanmedian([row[k] for row in rows]))
+        medg = lambda k, rows=rows: float(  # tolerant of older caches missing the key
+            np.nanmedian([row.get(k, float("nan")) for row in rows])
+        )
         agg[name] = {
             "scc": med("hic_scc"),
             "pearson": med("hic_pearson"),
+            "multimm": medg("hic_multimm"),
             "overlap": med("overlap_frac"),
             "rg": med("rg"),
             "dscale": med("dist_scaling_exp"),
@@ -313,7 +318,7 @@ def report(
     base = agg.get("baseline")
     print(f"\n{'=' * 84}\n  {title}   [objective: {objective}]\n{'=' * 84}")
     print(
-        f"  {'config':<16}{'overlap':>9}{'HiC SCC':>9}{'Pearson':>9}{'Rg':>8}"
+        f"  {'config':<16}{'overlap':>9}{'HiC SCC':>9}{'Pearson':>9}{'MultiMM':>9}{'Rg':>8}"
         f"{'dscale':>8}{'divers':>8}  ok?"
     )
     for name in names:
@@ -322,7 +327,8 @@ def report(
         a = agg[name]
         ok = name == "baseline" or (base is not None and _passes(a, base, objective, rg_tol))
         print(
-            f"  {name:<16}{a['overlap']:>9.4f}{a['scc']:>9.3f}{a['pearson']:>9.3f}{a['rg']:>8.2f}"
+            f"  {name:<16}{a['overlap']:>9.4f}{a['scc']:>9.3f}{a['pearson']:>9.3f}"
+            f"{a.get('multimm', float('nan')):>9.3f}{a['rg']:>8.2f}"
             f"{a['dscale']:>8.3f}{a['diversity']:>8.3f}   {'✓' if ok else '·'}"
         )
     _, winner = select(agg, objective, rg_tol)

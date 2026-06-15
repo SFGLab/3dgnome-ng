@@ -96,9 +96,13 @@ def score_region(
     chrs_list, bed_region = _chrs_and_region(region)
     outdir = tmp / label
     outdir.mkdir(parents=True, exist_ok=True)
-    print(f"  [{region}] reference binary ({args.n_structures} structures)...")
-    ref_structs, _ = ig.run_cpp_ensemble(
-        outdir, config, args.n_structures, MAX_LEVEL, region, label
+    workers = getattr(args, "ref_workers", 0)
+    print(
+        f"  [{region}] reference binary ({args.n_structures} structures, "
+        f"{'auto' if workers <= 0 else workers} workers)..."
+    )
+    ref_structs, _ = ig.run_cpp_ensemble_parallel(
+        outdir, config, args.n_structures, MAX_LEVEL, region, label, workers=workers
     )
 
     s_base = Settings()
@@ -188,6 +192,14 @@ def main() -> None:
         help="ensemble size — 3dgnome ensembles need >=100; small n only for quick checks",
     )
     p.add_argument("--fast", action="store_true", help="fast (low-quality) MC schedule")
+    p.add_argument(
+        "--ref-workers",
+        type=int,
+        default=0,
+        help="parallelize the C++ reference ensemble across this many cores (each worker a chunk "
+        "with a distinct seed); 0 = auto (min(n, cpu_count)), 1 = serial. Needs `make 3dnome` "
+        "(the -r seed flag).",
+    )
     p.add_argument("--contact-radius", type=float, default=None)
     p.add_argument("--skip-neighbors", type=int, default=1)
     args = p.parse_args()

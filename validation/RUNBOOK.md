@@ -8,6 +8,9 @@ why this is a GPU job. Plan: [../docs/validation-sweep-plan.md](../docs/validati
 
 ```bash
 pip install -e ".[validation,jax]" "jax[cuda12]"     # validation deps + JAX CUDA backend
+make -C 3dnome                                        # (re)build the C++ reference — REQUIRED:
+                                                      # adds the -r seed flag the parallel
+                                                      # reference ensemble uses (see §3)
 ```
 
 The JAX backend is per-stage via `mc_executor_<stage>` (`batch` = JAX/GPU, `serial`/`threaded` =
@@ -87,6 +90,10 @@ combos, and two EV-radius probes. To force the CUDA JAX backend cell-wide, edit
 # paired per region with a sign-test (tuned should have fewer overlaps in most/all regions).
 # Also reports the genome-structure scaling laws (R(s)~s^β, P(s)~s^-α with log-log R² vs the
 # literature bands) and — with --hic — Hi-C SCC + MultiMM inverse-distance Pearson (ref vs tuned).
+# The C++ reference ensemble is parallelised across cores (--ref-workers, default auto =
+# min(n, cpu_count)); each worker generates a chunk with a distinct -r seed, so the n=100
+# reference is ~cpu_count× faster and statistically equivalent (not byte-identical) to the serial
+# run. Needs the rebuilt binary (`make -C 3dnome`). Use --ref-workers 1 for the old serial path.
 python -m validation.compare_reference -n 100 --n-regions 8 --chroms chr1,chr2,chr8,chr17 \
     --hic data/_hic/GM12878/hic.4DNFIQ32RWCQ.mcool --binsize 25000
 
