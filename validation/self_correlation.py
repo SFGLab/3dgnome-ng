@@ -175,6 +175,10 @@ def run_self_correlation(region: str, args: argparse.Namespace, tmp: Path) -> di
     """One region: feed Hi-C TRAIN singletons (replace or augment ChIA-PET) into the tuned model,
     run the ensemble, and correlate the structure against the HELD-OUT Hi-C contacts."""
     tuned = _apply_flags(settings_for_cell(args.cell, args.data_root, args.quality), TUNED_FEATURES)
+    if args.coarsen_bp > 0:  # ~20kb/bead keeps a 20 Mb region tractable (MultiMM-comparable geom)
+        tuned = _apply_flags(
+            tuned, {"use_dynamic_loop_density": True, "target_bp_per_subanchor": args.coarsen_bp}
+        )
     chrs_list, bed_region = _chrs_and_region(region)
     chr_set = set(chrs_list)
 
@@ -254,6 +258,13 @@ def main() -> None:
     p.add_argument("--seed", type=int, default=0, help="held-out split seed")
     p.add_argument(
         "--holdout-frac", type=float, default=0.5, help="fraction of bin-pairs held out for testing"
+    )
+    p.add_argument(
+        "--coarsen-bp",
+        type=int,
+        default=0,
+        help="bp/bead coarsening (0=off); set ~20000 with --min-ibs 12 --max-mb 24 for a 20 Mb "
+        "MultiMM-comparable geometry that stays tractable",
     )
     p.add_argument("--region", default=None, help="single region override")
     p.add_argument("--out", required=True)
