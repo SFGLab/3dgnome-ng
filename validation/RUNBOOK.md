@@ -76,10 +76,12 @@ python -m validation.sweep --cell HFFC6 --search \
 
 Each run is **resumable** (its `--out` JSON caches per (config, region, budget)); re-running
 continues where it stopped. Tune `--screen-regions / --search-n / --search-quality / --keep /
---final-n / --final-quality` to trade speed vs rigor. The 15-config grid
-(`validation/sweep.py::GRID`) spans EV weight 0.1→2.0, confinement packing {1.0,0.75,0.5},
-combos, and two EV-radius probes. To force the CUDA JAX backend cell-wide, edit
-`validation/cell_config.py::CANONICAL["simulation_backend"]` (see §0).
+--final-n / --final-quality` to trade speed vs rigor. The grid (`validation/sweep.py::GRID`) spans
+the **subordinate EV range {0.05, 0.1, 0.2, 0.3, 0.5}** (all ≤ `dist_weight = 1.0`, so EV stays a
+gentle correction, not a dominant/exploding term), a radius probe, and gentle confinement combos.
+All variants run the **unified canonical config** (`cell_config.py`); the JAX/GPU backend is
+already in `CANONICAL["simulation_backend"]` (see §0). **The canonical EV stays at 0.05 until this
+sweep picks the winner** — then set it in `cell_config.py`.
 
 > Drop `--search` for the legacy flat sweep (all configs × all regions at one `--quality`/`-n`).
 
@@ -114,16 +116,15 @@ python -m validation.validate --cell GM12878 \
 
 ## 4. Objective & reading the output
 
-**Default objective: `--objective overlap`** — minimise median overlap fraction (the physical-
-sanity lever) subject to guardrails: Rg must not inflate beyond `--rg-tol` (default **0.30** =
-moderate de-compaction — strong EV reduces overlaps mostly by *expanding* an over-compact
-structure, which the guard bounds; the grid is gentle-centred {0.25,0.5,1.0,1.5} so the winner is
-in the smart-rearrangement regime, not the blow-up regime), plus sane scaling + non-collapsed
-diversity. **Hi-C
-SCC is deliberately NOT gated** — the n=100 validation showed it's insensitive to EV/confinement
-(per-region ΔSCC is a coin flip, ≪ region-to-region variance), so gating on it only injects noise.
-EV, meanwhile, reduces overlaps consistently (20/20, 14/14 regions). SCC/Pearson are still printed
-as info.
+**Default objective: `--objective overlap`** — minimise the median **resolution-normalized** overlap
+(`overlap_frac_norm`: structures coarse-grained to a common bp grid before counting, so it isn't
+inflated by the tuned config's finer dynamic-subanchor beads) subject to guardrails: Rg must not
+inflate beyond `--rg-tol` (default **0.30** — EV cuts overlaps partly by *expanding* an over-compact
+structure, which the guard bounds; the grid is subordinate {0.05–0.5} so EV never dominates the
+distance restraint). **Hi-C SCC is deliberately NOT gated** — it's insensitive to EV/confinement
+(per-region ΔSCC ≪ region-to-region variance). The MultiMM column is the **faithful** inverse-
+distance Pearson ((d+1)^-3 vs ICE-balanced), consistent with compare_reference. SCC/Pearson/MultiMM
+are printed as info; `overlap` is normalized, `overlap_raw` also retained.
 
 `--objective scc` keeps the old behaviour (max median SCC s.t. overlaps ≤ baseline) if you want it.
 

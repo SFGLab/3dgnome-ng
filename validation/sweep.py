@@ -180,8 +180,15 @@ def score_config(
     r = contacts.ensemble_hic_correlation(coords_list, mids_list, hic_path, region, binsize, radius)
     m["hic_scc"] = r["scc"]
     m["hic_pearson"] = r["pearson"]  # decay-stripped (off-diagonal log1p)
-    m["hic_multimm"] = r["multimm_pearson"]  # decay-retained, comparable to MultiMM's ≈0.70
     m["hic_insulation"] = r["insulation"]
+    # MultiMM's metric approach (faithful (d+1)^-3 vs ICE-balanced observed) — consistent with
+    # compare_reference / hic_tune (replaces the old 1/d^1.5 multimm_pearson).
+    try:
+        cobs_bal, bstarts = contacts.observed_hic(hic_path, region, binsize, balance=True)
+    except Exception:  # noqa: BLE001 (mcool may lack balance weights)
+        cobs_bal, bstarts = contacts.observed_hic(hic_path, region, binsize)
+    eff = int(bstarts[1] - bstarts[0]) if len(bstarts) > 1 else binsize
+    m["hic_multimm"] = contacts.multimm_faithful_pearson(coords_list, mids_list[0], cobs_bal, bstarts, eff)
     return m
 
 
@@ -263,7 +270,8 @@ def _aggregate(
             "scc": med("hic_scc"),
             "pearson": med("hic_pearson"),
             "multimm": medg("hic_multimm"),
-            "overlap": med("overlap_frac"),
+            "overlap": medg("overlap_frac_norm"),  # resolution-normalized (the objective)
+            "overlap_raw": med("overlap_frac"),
             "rg": med("rg"),
             "dscale": med("dist_scaling_exp"),
             "cprob": med("contact_prob_exp"),
