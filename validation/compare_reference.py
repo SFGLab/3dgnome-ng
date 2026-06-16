@@ -108,12 +108,15 @@ def score_region(
 
     s_base = Settings()
     s_base.load_ini(str(config))
-    # Run the python ensembles' arcs stage threaded (numba threading is byte-exact via thread-local
-    # RNG, so parity stays faithful) instead of serial — the n=100 arcs nodes parallelise across
-    # cores. Applies to both parity and tuned (they share s_base).
-    workers = getattr(args, "py_workers", 0)
-    s_base.mc_executor_arcs = "threaded"
-    s_base.mc_executor_threaded_workers = workers if workers > 0 else (os.cpu_count() or 1)
+    # Arcs-stage executor for the python ensembles (both parity & tuned share s_base):
+    #   batch    = JAX/GPU region-batch the n=100 arcs nodes (default; use on a CUDA box)
+    #   threaded = numba across `--py-workers` cores (byte-exact via thread-local RNG)
+    #   serial   = one node at a time
+    # Both batch and threaded preserve parity (the kernels are the same MC); pick per hardware.
+    s_base.mc_executor_arcs = args.py_arcs
+    if args.py_arcs == "threaded":
+        workers = getattr(args, "py_workers", 0)
+        s_base.mc_executor_threaded_workers = workers if workers > 0 else (os.cpu_count() or 1)
     data = ContactData.from_files(s_base, chrs_list, bed_region)
     contacts_list = load_contacts(s_base, chrs_list, bed_region)
     # --multimm-mode coarsens the python beads (~20 kb/bead) so a ~20 Mb region stays tractable
@@ -181,8 +184,9 @@ def score_law_region(region: str, config: Path, tmp: Path, args: argparse.Namesp
 
     s_base = Settings()
     s_base.load_ini(str(config))
-    s_base.mc_executor_arcs = "threaded"
-    s_base.mc_executor_threaded_workers = args.py_workers if args.py_workers > 0 else (os.cpu_count() or 1)
+    s_base.mc_executor_arcs = args.py_arcs
+    if args.py_arcs == "threaded":
+        s_base.mc_executor_threaded_workers = args.py_workers if args.py_workers > 0 else (os.cpu_count() or 1)
     coarsen = {"use_dynamic_loop_density": True, "target_bp_per_subanchor": 20000}  # ~20 kb/bead
     data = ContactData.from_files(s_base, chrs_list, bed_region)
     print(f"  [laws @ {region}] python +tuned (coarsened ~20 kb/bead)...")
@@ -259,11 +263,18 @@ def main() -> None:
         "(the -r seed flag).",
     )
     p.add_argument(
+        "--py-arcs",
+        choices=["batch", "threaded", "serial"],
+        default="batch",
+        help="executor for the python ensembles' arcs stage: batch = JAX/GPU (default, for a CUDA "
+        "box), threaded = numba across --py-workers cores, serial = one node at a time. smooth + "
+        "estimate_dist already use the GPU batch path automatically when JAX is present.",
+    )
+    p.add_argument(
         "--py-workers",
         type=int,
         default=0,
-        help="threads for the python ensembles' arcs stage (numba threading is byte-exact); "
-        "0 = auto (cpu_count). The arcs nodes run threaded instead of serial.",
+        help="threads for --py-arcs threaded (numba, byte-exact); 0 = auto (cpu_count)",
     )
     p.add_argument("--contact-radius", type=float, default=None)
     p.add_argument("--skip-neighbors", type=int, default=1)
