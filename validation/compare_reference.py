@@ -7,12 +7,12 @@ on the same metrics (``validation/metrics.py``):
   * reference         — the C++ 3dnome binary (the algorithmic source of truth, NO EV /
                         confinement; the 2016 paper admitted it makes overlapping loops)
   * python (parity)   — our port, feature flags OFF — should MATCH the reference (faithful)
-  * python (+tuned)   — the TUNED production set: EV (weight 2.0, smooth radius 0.7) + confinement
-                        + dynamic sub-anchor count — should have FEWER overlaps than the reference
+  * python (+tuned)   — the UNIFIED canonical config (validation/cell_config.py): EV + confinement
+                        + dynamic sub-anchors + IB-MC, the SAME config sweep/hic_tune use
 
-Reference & parity are N-matched (same parity config) for the faithfulness check. The tuned
-variant turns on dynamic sub-anchors, so its bead count differs — it is scored at its own
-bond-scale radius and its overlap fraction is self-relative (see the radius note in main()).
+Reference & parity share the parity.ini base (C++-faithfulness check); the tuned variant is the
+canonical config and turns on dynamic sub-anchors, so its bead count differs — it is scored at its
+own bond-scale radius and its overlap fraction is self-relative (see the radius note in main()).
 
 Reuses the proven reference runner from ``harness/integration.py``.
 
@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import argparse
 import math
-import os
 import sys
 import tempfile
 from pathlib import Path
@@ -41,11 +40,11 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(ROOT))
 
 from validation import contacts, metrics  # noqa: E402
+from validation.cell_config import settings_for_cell, with_arcs_executor  # noqa: E402
 from validation.sweep import enumerate_regions  # noqa: E402
 from validation.validate import (  # noqa: E402
     FAIL,
     PASS,
-    _apply_flags,
     _chrs_and_region,
     load_contacts,
     run_ensemble,
@@ -58,24 +57,21 @@ import integration as ig  # noqa: E402  (dev tooling; harness is not a package)
 MAX_LEVEL = 2  # heatmap + arc + smooth MC (same as the integration test)
 
 
-TUNED_FEATURES: dict[str, object] = {
-    # The TUNED production set (validation/RUNBOOK.md): EV at the sweep winner (weight 1.0, smooth
-    # radius 0.7) + confinement + dynamic sub-anchor count + IB-MC. NOT default EV (0.5/0.5) —
-    # that barely moved overlaps. IB-MC and inter-IB de-clashing only bite in MULTI-IB regions.
-    # weight 1.0 (not 2.0): ~90% of the overlap reduction at the lowest Rg cost, scale-safe.
-    "use_excluded_volume": True,
-    "exclusion_apply_to_smooth": True,
-    "exclusion_weight": 1.0,
-    "exclusion_auto_factor_smooth": 0.7,
-    "use_confinement": True,
-    "confinement_apply_to_smooth": True,
-    "use_dynamic_loop_density": True,
-    "target_bp_per_subanchor": 1000,
-    "use_ib_mc": True,
-    # Truncate the unbounded non-arc 1/d repulsion (3x mean arc distance) so sparse sub-IBs don't
-    # explode / hang in arcs polish. TUNED-only: parity stays unbounded to mirror C++ faithfully.
-    "arcs_repulsion_cutoff_factor": 3.0,
-}
+# UNIFIED CONFIG: the "tuned" production settings are the SINGLE canonical config from
+# validation/cell_config.py (settings_for_cell) — the same config sweep / hic_tune /
+# self_correlation use. There is no separate TUNED_FEATURES flag-overlay any more: layering a
+# partial overlay on the bare parity.ini base left confinement/EV at wrong defaults and exploded
+# at scale. The C++ reference and the python "parity" variant keep the parity.ini base (their job
+# is C++ faithfulness, features OFF); only the "tuned" variant uses the full canonical config.
+
+
+def _tuned_settings(args: argparse.Namespace):  # type: ignore[no-untyped-def]
+    """The unified production config (canonical) for the tuned variant, with the arcs executor
+    honoured. Coarsening is NEVER applied to the MC — it happens after the fact on the binned
+    contact/distance matrices in the metrics."""
+    quality = "fast" if args.fast else "full"
+    s = settings_for_cell(args.cell, args.data_root, quality)
+    return with_arcs_executor(s, args.py_arcs, getattr(args, "py_workers", 0))
 
 
 def _radius(structs: list, fixed: float | None) -> float:  # type: ignore[type-arg]
@@ -113,26 +109,13 @@ def score_region(
     #   threaded = numba across `--py-workers` cores (byte-exact via thread-local RNG)
     #   serial   = one node at a time
     # Both batch and threaded preserve parity (the kernels are the same MC); pick per hardware.
-    s_base.mc_executor_arcs = args.py_arcs
-    if args.py_arcs == "threaded":
-        workers = getattr(args, "py_workers", 0)
-        s_base.mc_executor_threaded_workers = workers if workers > 0 else (os.cpu_count() or 1)
+    s_base = with_arcs_executor(s_base, args.py_arcs, getattr(args, "py_workers", 0))
     data = ContactData.from_files(s_base, chrs_list, bed_region)
     contacts_list = load_contacts(s_base, chrs_list, bed_region)
-    # --multimm-mode coarsens the python beads (~20 kb/bead) so a ~20 Mb region stays tractable
-    # AND matches MultiMM's resolution; empty dict otherwise.
-    coarsen: dict[str, object] = getattr(args, "_coarsen", {})
-    s_par = _apply_flags(s_base, coarsen) if coarsen else s_base
-    print(f"  [{region}] python parity...")
-    base_structs = run_ensemble(s_par, data, chrs_list, bed_region, args.n_structures)
-    print(f"  [{region}] python +tuned (EV2.0/r0.7+conf+dynamic+ib_mc)...")
-    feat_structs = run_ensemble(
-        _apply_flags(s_base, {**TUNED_FEATURES, **coarsen}),
-        data,
-        chrs_list,
-        bed_region,
-        args.n_structures,
-    )
+    print(f"  [{region}] python parity (parity.ini, features off)...")
+    base_structs = run_ensemble(s_base, data, chrs_list, bed_region, args.n_structures)
+    print(f"  [{region}] python +tuned (unified canonical config)...")
+    feat_structs = run_ensemble(_tuned_settings(args), data, chrs_list, bed_region, args.n_structures)
 
     radius = _radius(base_structs, args.contact_radius)
     radius_feat = _radius(feat_structs, args.contact_radius)
@@ -161,7 +144,14 @@ def score_region(
         if args.hic:
             hr = contacts.ensemble_hic_correlation(cl, ml, args.hic, region, args.binsize, rad)
             met["hic_scc"] = hr["scc"]
-            met["hic_multimm"] = hr["multimm_pearson"]
+            # Hi-C correlation via MultiMM's APPROACH (faithful (d+1)^-3 vs ICE-balanced observed);
+            # reported as our standard Hi-C number, NOT chased against their 0.70.
+            try:
+                cobs_bal, bstarts = contacts.observed_hic(args.hic, region, args.binsize, balance=True)
+            except Exception:  # noqa: BLE001 (mcool may lack balance weights)
+                cobs_bal, bstarts = contacts.observed_hic(args.hic, region, args.binsize)
+            eff = int(bstarts[1] - bstarts[0]) if len(bstarts) > 1 else args.binsize
+            met["hic_multimm"] = contacts.multimm_faithful_pearson(cl, ml[0], cobs_bal, bstarts, eff)
     return ref_m, base_m, feat_m
 
 
@@ -183,16 +173,13 @@ def score_law_region(region: str, config: Path, tmp: Path, args: argparse.Namesp
     )
 
     s_base = Settings()
-    s_base.load_ini(str(config))
-    s_base.mc_executor_arcs = args.py_arcs
-    if args.py_arcs == "threaded":
-        s_base.mc_executor_threaded_workers = args.py_workers if args.py_workers > 0 else (os.cpu_count() or 1)
-    coarsen = {"use_dynamic_loop_density": True, "target_bp_per_subanchor": 20000}  # ~20 kb/bead
+    s_base.load_ini(str(config))  # parity.ini base only for loading the region's contact data
     data = ContactData.from_files(s_base, chrs_list, bed_region)
-    print(f"  [laws @ {region}] python +tuned (coarsened ~20 kb/bead)...")
-    feat_structs = run_ensemble(
-        _apply_flags(s_base, {**TUNED_FEATURES, **coarsen}), data, chrs_list, bed_region, n
-    )
+    # tuned = the unified canonical config, run at NATIVE resolution (no coarsening). Scaling-law
+    # exponents are resolution-robust (the windowed fit excludes sub-resolution), so comparing the
+    # tuned (fine) vs reference (coarse) exponents is valid; coarsening the MC is never done.
+    print(f"  [laws @ {region}] python +tuned (unified canonical config, native res)...")
+    feat_structs = run_ensemble(_tuned_settings(args), data, chrs_list, bed_region, n)
 
     def laws_of(structs: list) -> dict:
         cl, ml = [], []
@@ -226,6 +213,8 @@ def _sign_test(k: int, m: int) -> float:
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Score 3dgnome output vs the C++ reference")
+    p.add_argument("--cell", default="GM12878", help="cell line for the unified tuned config")
+    p.add_argument("--data-root", default="data")
     p.add_argument(
         "--region", default=None, help="single region override (default: multi-IB sample)"
     )
@@ -237,15 +226,10 @@ def main() -> None:
     p.add_argument(
         "--hic",
         default=None,
-        help="4DN .mcool path; if given, also report Hi-C SCC + MultiMM inverse-distance Pearson",
+        help="4DN .mcool path; if given, also report Hi-C SCC + the faithful inverse-distance "
+        "Pearson (MultiMM's metric approach, (d+1)^-3 vs ICE-balanced observed)",
     )
     p.add_argument("--binsize", type=int, default=25000, help="Hi-C bin size for correlation")
-    p.add_argument(
-        "--multimm-mode",
-        action="store_true",
-        help="fix the geometry to MultiMM's (≈20 Mb regions, 20 kb bins, ~20 kb/bead coarsening) so "
-        "the MultiMM inverse-distance Pearson is directly quotable against their ≈0.70 (random <0.40)",
-    )
     p.add_argument(
         "-n",
         "--n-structures",
@@ -296,16 +280,9 @@ def main() -> None:
     p.add_argument("--no-laws", action="store_true", help="skip the large-region scaling-law pass")
     args = p.parse_args()
 
-    # MultiMM geometry preset: ≈20 Mb regions, 20 kb Hi-C bins, and ~20 kb/bead coarsening of the
-    # python variants (so a 20 Mb region is ~1000 beads — MultiMM's resolution, and tractable).
+    # No coarsening — all variants run at native resolution (coarsening to a different resolution
+    # made comparisons meaningless and exploded at full schedule).
     args._coarsen: dict[str, object] = {}
-    if args.multimm_mode:
-        if not args.hic:
-            sys.exit("[error] --multimm-mode needs --hic (it's a Hi-C-correlation comparison)")
-        args.binsize = 25000  # ≈MultiMM's 20 kb; 25 kb is a standard mcool resolution
-        args.min_ibs, args.max_ibs, args.max_mb = 12, 24, 24.0
-        args._coarsen = {"use_dynamic_loop_density": True, "target_bp_per_subanchor": 20000}
-        print("[compare] MultiMM mode: ≈20 Mb regions, 25 kb bins, ~20 kb/bead (vs MultiMM ≈0.70)")
 
     if not ig.CPP_BIN.exists():
         sys.exit(f"[error] reference binary not found: {ig.CPP_BIN}\n  run: make 3dnome")
@@ -349,8 +326,10 @@ def main() -> None:
         and r[2]["n_beads"] == r[1]["n_beads"]
         for r in rows
     )
-    feat_wins = sum(r[3]["overlap_frac"] < r[1]["overlap_frac"] - 1e-9 for r in rows)
-    d_overlaps = [r[1]["overlap_frac"] - r[3]["overlap_frac"] for r in rows]  # ref - feat (>0 good)
+    # tuned vs ref overlap uses the RESOLUTION-NORMALIZED metric (tuned has finer beads → raw
+    # overlap is density-inflated and not comparable). Parity-vs-ref above stays raw (N-matched).
+    feat_wins = sum(r[3]["overlap_frac_norm"] < r[1]["overlap_frac_norm"] - 1e-9 for r in rows)
+    d_overlaps = [r[1]["overlap_frac_norm"] - r[3]["overlap_frac_norm"] for r in rows]  # >0 good
     sc_ok = sum(
         np.isfinite(r[3]["selfconsistency_rho"])
         and r[3]["selfconsistency_rho"] <= r[1]["selfconsistency_rho"] + 0.15
@@ -359,11 +338,15 @@ def main() -> None:
     p_better = _sign_test(feat_wins, m)
 
     print(f"\n{'=' * 74}\n  ANSWERS  (median over {m} region(s); paired per region)\n{'=' * 74}")
-    print(f"  {'variant':<26}{'overlap':>9}{'HiC SCC':>9}{'Rg':>8}{'dscale':>8}{'divers':>8}")
+    print(
+        f"  {'variant':<26}{'overlap':>9}{'ovlp_norm':>10}{'HiC SCC':>9}{'Rg':>8}"
+        f"{'dscale':>8}{'divers':>8}"
+    )
     for label, var in [("reference (C++)", 0), ("python parity", 1), ("python +tuned", 2)]:
         print(
-            f"  {label:<26}{med('overlap_frac', var):>9.4f}{med('selfconsistency_rho', var):>9.3f}"
-            f"{med('rg', var):>8.2f}{med('dist_scaling_exp', var):>8.3f}{med('diversity_dab', var):>8.3f}"
+            f"  {label:<26}{med('overlap_frac', var):>9.4f}{med('overlap_frac_norm', var):>10.4f}"
+            f"{med('selfconsistency_rho', var):>9.3f}{med('rg', var):>8.2f}"
+            f"{med('dist_scaling_exp', var):>8.3f}{med('diversity_dab', var):>8.3f}"
         )
     print()
     # Degeneracy guard: strong EV can BLOW THE STRUCTURE UP (chain shredded — Rg explodes, bonds
@@ -384,7 +367,7 @@ def main() -> None:
     )
     print(
         f"  {PASS if feat_wins == m else (FAIL if feat_wins == 0 else PASS)}  +tuned has FEWER "
-        f"overlaps than reference: {feat_wins}/{m} regions  "
+        f"overlaps than reference (resolution-normalized): {feat_wins}/{m} regions  "
         f"(median Δ={float(np.median(d_overlaps)):+.4f}, sign-test p={p_better:.4f})"
     )
     print(f"  {PASS if sc_ok == m else FAIL}  self-consistency preserved: {sc_ok}/{m} regions")
@@ -395,7 +378,7 @@ def main() -> None:
 
     if args.hic:
         print(f"\n  Hi-C correlation vs {Path(args.hic).name} ({args.binsize // 1000}kb):")
-        print(f"    {'variant':<26}{'SCC':>9}{'MultiMM Pearson':>18}")
+        print(f"    {'variant':<26}{'SCC':>9}{'invdist Pearson':>18}")
         for label, var in [("reference (C++)", 0), ("python +tuned", 2)]:
             print(f"    {label:<26}{med('hic_scc', var):>9.3f}{med('hic_multimm', var):>18.3f}")
         ref_mm, feat_mm = med("hic_multimm", 0), med("hic_multimm", 2)
@@ -403,20 +386,11 @@ def main() -> None:
             not np.isfinite(ref_mm) or feat_mm >= ref_mm - 0.02
         )
         print(
-            f"    {PASS if non_inferior else FAIL}  +tuned Hi-C (MultiMM) ≥ reference: "
+            f"    {PASS if non_inferior else FAIL}  +tuned Hi-C (inv-dist Pearson) ≥ reference: "
             f"ref={ref_mm:.3f} vs +tuned={feat_mm:.3f}"
         )
-        if args.multimm_mode:
-            hit = np.isfinite(feat_mm) and feat_mm >= 0.40
-            print(
-                f"    {PASS if hit else FAIL}  vs MultiMM paper: +tuned={feat_mm:.3f}  "
-                f"(MultiMM ≈0.70, random <0.40 — MultiMM geometry, directly comparable)"
-            )
-        else:
-            print(
-                "    (note: MultiMM reports ≈0.70 on 20 Mb regions; NOT comparable at this region "
-                "size — use --multimm-mode for an apples-to-apples number)"
-            )
+        print("    (faithful (d+1)^-3 vs ICE-balanced Hi-C — MultiMM's metric approach; "
+              "value scales with region size, compared ref-vs-tuned at the SAME geometry)")
 
     # --- scaling-law pass on ONE large region (where the fractal-globule regime exists) ---
     if not args.no_laws:
@@ -444,14 +418,18 @@ def main() -> None:
                 lo = lw[key]
                 d_ok, _ = metrics.check_law("dist_exp", lo["dist_exp"], lo["dist_r2"])
                 c_ok, _ = metrics.check_law("contact_exp", lo["contact_exp"], lo["contact_r2"])
+                # bond CV >> 1 => the chain is shredded (uneven bonds), so β/α are meaningless.
+                degenerate = lo["bond_cv"] > 3.0
+                verdict = "DEGENERATE" if degenerate else ("✓" if d_ok and c_ok else "·")
                 print(
                     f"  {label:<22}{lo['dist_exp']:>7.2f} ({lo['dist_r2']:>4.2f})"
                     f"{lo['contact_exp']:>7.2f} ({lo['contact_r2']:>4.2f}){lo['bond_cv']:>9.2f}"
-                    f"{lw[nkey]:>8d}   {'✓' if d_ok and c_ok else '·'}"
+                    f"{lw[nkey]:>8d}   {verdict}"
                 )
             print(
                 "  (β: fractal globule ~1/3, band 0.15–0.60; α: chromatin ~1.0, band 0.50–1.60; "
-                "'laws hold' = in-band AND log-log R² ≥ 0.80)"
+                "'laws hold' = in-band AND log-log R² ≥ 0.80; bond CV > 3 = DEGENERATE/exploded, "
+                "β/α invalid)"
             )
 
     if m == 1:

@@ -80,6 +80,37 @@ def overlap_fraction(
     return n_over / pair_d.size, n_over, int(pair_d.size)
 
 
+def overlap_fraction_binned(
+    coords: F64Array,
+    mids: I64Array,
+    resolution_bp: int,
+    radius_factor: float = 0.5,
+    skip_neighbors: int = 1,
+) -> tuple[float, int, int]:
+    """Resolution-NORMALIZED overlap fraction: coarse-grain the structure to fixed ``resolution_bp``
+    genomic bins (centroid per occupied bin, in genomic order) BEFORE counting overlaps, so
+    structures at different bead resolutions (C++ reference ~4.5 kb vs dynamic-subanchor ~1 kb)
+    are compared on the SAME footing. Without this, the finer structure has more, denser beads and
+    its raw ``overlap_fraction`` is inflated purely by bead density — not by worse physics.
+
+    The contact radius is ``radius_factor`` × the median adjacent-centroid spacing (so it scales
+    with the common resolution, not the native bead size). Returns (fraction, n_over, n_pairs)."""
+    coords = np.asarray(coords)
+    mids = np.asarray(mids)
+    if len(coords) < 2:
+        return 0.0, 0, 0
+    binidx = (mids // resolution_bp).astype(np.int64)
+    uniq = np.unique(binidx)  # sorted -> centroids stay in genomic order
+    if uniq.size < 2:
+        return 0.0, 0, 0
+    cent = np.array([coords[binidx == b].mean(axis=0) for b in uniq])
+    step = np.linalg.norm(np.diff(cent, axis=0), axis=1)
+    med = float(np.median(step[step > 0])) if np.any(step > 0) else 0.0
+    if med <= 0:
+        return 0.0, 0, 0
+    return overlap_fraction(cent, radius_factor * med, skip_neighbors)
+
+
 def max_extent(coords: F64Array) -> float:
     """Max distance of any bead from the centroid — confinement should bound this."""
     c = coords - coords.mean(axis=0)

@@ -31,9 +31,8 @@ from gnome3d.data import ContactData  # noqa: E402
 from gnome3d.io import load_singletons  # noqa: E402
 from gnome3d.types import F64Array, I64Array  # noqa: E402
 from validation import metrics  # noqa: E402
-from validation.cell_config import settings_for_cell  # noqa: E402
-from validation.compare_reference import TUNED_FEATURES  # noqa: E402
-from validation.validate import _apply_flags, _chrs_and_region, run_ensemble  # noqa: E402
+from validation.cell_config import settings_for_cell, with_singletons  # noqa: E402
+from validation.validate import _chrs_and_region, run_ensemble  # noqa: E402
 
 
 def _stable_holdout(i: int, j: int, seed: int, frac: float = 0.5) -> bool:
@@ -174,11 +173,7 @@ def _chiapet_median_and_rows(
 def run_self_correlation(region: str, args: argparse.Namespace, tmp: Path) -> dict:
     """One region: feed Hi-C TRAIN singletons (replace or augment ChIA-PET) into the tuned model,
     run the ensemble, and correlate the structure against the HELD-OUT Hi-C contacts."""
-    tuned = _apply_flags(settings_for_cell(args.cell, args.data_root, args.quality), TUNED_FEATURES)
-    if args.coarsen_bp > 0:  # ~20kb/bead keeps a 20 Mb region tractable (MultiMM-comparable geom)
-        tuned = _apply_flags(
-            tuned, {"use_dynamic_loop_density": True, "target_bp_per_subanchor": args.coarsen_bp}
-        )
+    tuned = settings_for_cell(args.cell, args.data_root, args.quality)  # unified canonical config
     chrs_list, bed_region = _chrs_and_region(region)
     chr_set = set(chrs_list)
 
@@ -203,14 +198,15 @@ def run_self_correlation(region: str, args: argparse.Namespace, tmp: Path) -> di
             for c1, p1, c2, p2, sc in chiapet_rows:
                 f.write(f"{c1}\t{p1}\t{p1 + 1}\t{c2}\t{p2}\t{p2 + 1}\t{sc}\n")
             f.write(hic_bedpe.read_text())
-        tuned.data_singletons = str(combined)
+        singletons_path = combined
         print(f"[self_corr] augment: ChIA-PET median {med_c:.0f}, Hi-C scaled ×{count_scale:.3g}")
     else:  # replace
         bal, bin_starts, test_mask, train_mask = hic_to_singleton_bedpe(
             args.hic, region, args.binsize, hic_bedpe, **conv
         )
-        tuned.data_singletons = str(hic_bedpe)
-    tuned.data_singletons_inter = ""  # intra-chromosomal region
+        singletons_path = hic_bedpe
+    # centralized config modification (no inline Settings mutation)
+    tuned = with_singletons(tuned, str(singletons_path), singletons_inter="")
 
     data = ContactData.from_files(tuned, chrs_list, bed_region)
     ens = run_ensemble(tuned, data, chrs_list, bed_region, args.n)
@@ -258,13 +254,6 @@ def main() -> None:
     p.add_argument("--seed", type=int, default=0, help="held-out split seed")
     p.add_argument(
         "--holdout-frac", type=float, default=0.5, help="fraction of bin-pairs held out for testing"
-    )
-    p.add_argument(
-        "--coarsen-bp",
-        type=int,
-        default=0,
-        help="bp/bead coarsening (0=off); set ~20000 with --min-ibs 12 --max-mb 24 for a 20 Mb "
-        "MultiMM-comparable geometry that stays tractable",
     )
     p.add_argument("--region", default=None, help="single region override")
     p.add_argument("--out", required=True)

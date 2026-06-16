@@ -125,12 +125,11 @@ CANONICAL: dict[str, dict[str, object]] = {
     },
     "excluded_volume": {
         "use_excluded_volume": "yes",
-        # Tuned by the multi-IB min-overlap sweep (validation/RUNBOOK.md): weight 1.0 + a larger
-        # smooth-stage radius (auto_factor 0.7, up from 0.5) cuts physically-impossible overlaps
-        # ~36% across the multi-IB regions with SCC/diversity preserved. 1.0 captures ~90% of the
-        # overlap benefit of 2.0 at the lowest Rg cost (median +11% vs +14%) and is the safest at
-        # scale (2.0/r0.7 blew up at 20 Mb). The radius is the dominant lever. (Was weight 2.0.)
-        "weight": 1.0,
+        # EV is a GENTLE correction, NOT a dominant term — it must weigh far less than the bond /
+        # heatmap / loop energies, or it distorts and (at full-schedule MC on large regions) blows
+        # the structure up. The original 3dgnome config used ~0.05; we keep that magnitude. Earlier
+        # sweep weights (1.0–2.0) over-reduced overlaps by over-expanding and exploded at scale.
+        "weight": 0.05,
         "auto_factor_smooth": 0.7,
         "apply_to_heatmap": "yes",
         "apply_to_arcs": "yes",
@@ -196,3 +195,35 @@ def settings_for_cell(
             params.setdefault(section, {}).update(kv)
 
     return Settings.from_dict(params)
+
+
+# --- THE single place that modifies a built Settings -------------------------------------------
+# All validation tools must go through these helpers (or settings_for_cell's `overrides`) — no tool
+# should set Settings attributes inline. Keeps config logic in one auditable place.
+
+
+def apply_flags(s: Settings, flags: dict[str, object]) -> Settings:
+    """Return a deep copy of ``s`` with the given public attributes set (the canonical post-build
+    config modifier — e.g. feature flags, executor, data paths). Moved here from validate so every
+    config tweak lives in cell_config."""
+    out = copy.deepcopy(s)
+    for attr, val in flags.items():
+        setattr(out, attr, val)
+    return out
+
+
+def with_arcs_executor(s: Settings, executor: str, workers: int = 0) -> Settings:
+    """Set the arcs-stage MC executor (batch=GPU / threaded / serial); threaded uses ``workers``
+    (0 = cpu_count)."""
+    import os
+
+    flags: dict[str, object] = {"mc_executor_arcs": executor}
+    if executor == "threaded":
+        flags["mc_executor_threaded_workers"] = workers if workers > 0 else (os.cpu_count() or 1)
+    return apply_flags(s, flags)
+
+
+def with_singletons(s: Settings, singletons_path: str, singletons_inter: str = "") -> Settings:
+    """Point the model at a custom singletons BEDPE (e.g. Hi-C-derived for the self-correlation
+    study). Absolute paths override the data_dir prefix (pathlib join)."""
+    return apply_flags(s, {"data_singletons": singletons_path, "data_singletons_inter": singletons_inter})

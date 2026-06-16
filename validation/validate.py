@@ -25,7 +25,6 @@ Settings can also be built from scratch with ``Settings.from_dict`` (no .ini) â€
 from __future__ import annotations
 
 import argparse
-import copy
 import sys
 from pathlib import Path
 
@@ -67,12 +66,9 @@ def _chrs_and_region(region: str) -> tuple[list[str], BedRegion | None]:
     return [bed.chr], bed
 
 
-def _apply_flags(s: Settings, flags: dict[str, bool]) -> Settings:
-    """Return a deep copy of ``s`` with the given public flag attributes set."""
-    out = copy.deepcopy(s)
-    for attr, val in flags.items():
-        setattr(out, attr, val)
-    return out
+# Config modification is centralized in cell_config; re-exported here under the existing name so
+# validate's callers (and sweep) keep working without touching Settings attributes directly.
+from validation.cell_config import apply_flags as _apply_flags  # noqa: E402
 
 
 def run_ensemble(
@@ -103,9 +99,13 @@ def summarize(
     contacts: list[tuple[int, int, float]],
     radius: float,
     skip: int,
+    overlap_norm_bp: int = 5000,
 ) -> dict[str, float]:
-    """Average the per-structure metrics across the ensemble (+ V3 diversity)."""
-    rgs, bonds, overlaps, rhos, dscals, cprobs, extents = [], [], [], [], [], [], []
+    """Average the per-structure metrics across the ensemble (+ V3 diversity). Reports BOTH the raw
+    ``overlap_frac`` (bead-density-dependent) and ``overlap_frac_norm`` â€” overlaps after coarse-
+    graining to ``overlap_norm_bp`` bins, so structures at different bead resolutions are
+    comparable (use the _norm one for ref-vs-tuned overlap claims)."""
+    rgs, bonds, overlaps, ov_norm, rhos, dscals, cprobs, extents = [], [], [], [], [], [], [], []
     coords_list = []
     for beads in ensemble:
         coords, mids = metrics.to_arrays(beads)
@@ -113,6 +113,7 @@ def summarize(
         rgs.append(metrics.radius_of_gyration(coords))
         bonds.append(float(np.median(metrics.bond_lengths(coords))))
         overlaps.append(metrics.overlap_fraction(coords, radius, skip)[0])
+        ov_norm.append(metrics.overlap_fraction_binned(coords, mids, overlap_norm_bp, skip_neighbors=skip)[0])
         extents.append(metrics.max_extent(coords))
         rho, _ = metrics.self_consistency(coords, mids, contacts)
         rhos.append(rho)
@@ -125,6 +126,7 @@ def summarize(
         "rg": nanmean(rgs),
         "bond": nanmean(bonds),
         "overlap_frac": nanmean(overlaps),
+        "overlap_frac_norm": nanmean(ov_norm),
         "max_extent": nanmean(extents),
         "selfconsistency_rho": nanmean(rhos),
         "dist_scaling_exp": nanmean(dscals),

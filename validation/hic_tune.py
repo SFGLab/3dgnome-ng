@@ -13,8 +13,8 @@ the readout parameters for free on the saved coords:
     the number directly comparable to MultiMM's ≈0.70 (random <0.40).
 
 It then picks the **single** contact-radius factor that maximises the *median* SCC across all
-regions (a generalizing readout, not per-region cherry-picking) and prints how the MultiMM Pearson
-compares to 0.70. Tuned config = ``compare_reference.TUNED_FEATURES`` (EV 1.0 + confinement +
+regions (a generalizing readout, not per-region cherry-picking). Tuned config = the unified
+canonical config (``validation/cell_config.py::settings_for_cell`` — EV 0.05 + confinement +
 dynamic sub-anchors + IB-MC + arcs repulsion cutoff). Resumable: per-region results are cached.
 
     python -m validation.hic_tune --cell GM12878 \\
@@ -39,12 +39,10 @@ if __package__ in (None, ""):
 
 from validation import contacts, metrics  # noqa: E402
 from validation.cell_config import settings_for_cell  # noqa: E402
-from validation.compare_reference import TUNED_FEATURES  # noqa: E402
 from validation.sweep import enumerate_regions  # noqa: E402
-from validation.validate import _apply_flags, _chrs_and_region, run_ensemble  # noqa: E402
+from validation.validate import _chrs_and_region, run_ensemble  # noqa: E402
 
 DEFAULT_FACTORS = [0.4, 0.5, 0.6, 0.75, 1.0, 1.25, 1.5, 2.0]  # SCC peaks at small radius; probe low
-MULTIMM_TARGET = 0.70  # MultiMM's reported inverse-distance Pearson (random structures < 0.40)
 
 
 def _npz_path(out_path: Path, region: str) -> Path:
@@ -62,7 +60,7 @@ def load_or_generate(region: str, args: argparse.Namespace, npz_path: Path) -> t
         coords = d["coords"]
         print(f"  [cache] {coords.shape[0]} structures from {npz_path.name} (no MC)")
         return [coords[i] for i in range(coords.shape[0])], d["mids"]
-    tuned = _apply_flags(settings_for_cell(args.cell, args.data_root, args.quality), TUNED_FEATURES)
+    tuned = settings_for_cell(args.cell, args.data_root, args.quality)  # unified canonical config
     chrs_list, bed_region = _chrs_and_region(region)
     data = ContactData.from_files(tuned, chrs_list, bed_region)
     ens = run_ensemble(tuned, data, chrs_list, bed_region, args.n)  # expensive
@@ -144,11 +142,9 @@ def report(cache: dict[str, dict], regions: list[str], factors: list[float]) -> 
     mm_legacy = _median([row.get("multimm_legacy", float("nan")) for row in rows])
     print(f"\nBest contact-radius factor (max median SCC): {best_f:g}  -> SCC {best_scc:.4f}")
     print(f"{'-'*64}")
-    print(f"MultiMM Pearson (FAITHFUL: (d+1)^-3, ±5 diag, ICE-balanced): {mm:.4f}")
-    delta = mm - MULTIMM_TARGET
-    verdict = "AT/ABOVE" if delta >= -0.02 else "below"
-    print(f"  vs MultiMM target ~{MULTIMM_TARGET:.2f}: {verdict} (Δ {delta:+.3f}); random < 0.40")
-    print(f"  (legacy 1/d^1.5 metric, for reference only — NOT MultiMM's: {mm_legacy:.4f})")
+    print(f"Inverse-distance Pearson (MultiMM's metric approach: (d+1)^-3, ±5 diag, ICE): {mm:.4f}")
+    print("  (our standard Hi-C correlation; scales with region size — compare like-for-like,")
+    print(f"   not against MultiMM's 0.70. legacy 1/d^1.5 for reference: {mm_legacy:.4f})")
     print(f"{'='*64}")
 
 

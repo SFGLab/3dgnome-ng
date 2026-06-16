@@ -68,31 +68,26 @@ def _cfg(
     return d
 
 
-# EV/confinement search grid — GENTLE-CENTERED. The multi-IB sweep showed strong EV (≥2.0,
-# radius≥1.0) reduces overlaps mostly by EXPANDING the structure (Rg +12–30%, and outright blow-up
-# at 20 Mb), so those are dropped: EV removes overlaps via smart rearrangement (cheap, low Rg) vs
-# expansion (Rg cost), and we want the rearrangement regime. The min-overlap objective's Rg guard
-# (--rg-tol, default 0.30 = moderate de-compaction; the reference is over-compact so some is
-# legitimate) keeps the winner physical. Re-centred on EV {0.25,0.5,1.0,1.5} + modest radius +
-# gentle combos. Big-N / multi-region / 3-cell search runs on CUDA (RUNBOOK); --max-configs subsets.
+# EV/confinement search grid — SUBORDINATE-CENTERED. EV must stay BELOW the distance restraint
+# (dist_weight = 1.0) so it's a gentle correction, not a dominant term that over-expands /
+# distorts; the original 3dgnome used ~0.05. So the grid spans the subordinate range
+# {0.05,0.1,0.2,0.3,0.5} (all ≤ 0.5 < 1.0). The min-overlap objective's Rg guard (--rg-tol)
+# rejects any config that reduces overlaps by over-expanding. Overlap is scored
+# resolution-normalized (overlap_frac_norm) so it's not confounded by bead density. Big-N /
+# multi-region / 3-cell search runs on CUDA (RUNBOOK); --max-configs subsets.
 GRID: list[dict[str, object]] = [
     _cfg("baseline"),
-    # EV weight span: gentle → moderate. The Rg guard (--rg-tol 0.30) selects; ev4.0 and
-    # ev2.0_r1.0 are excluded as the demonstrated over-expanders/blow-up regime (Rg +30% / Rg→2896
-    # at 20 Mb). ev2.0 sits at ~+12% Rg on multi-IB — inside the moderate budget.
-    _cfg("ev0.25", ev=0.25),
-    _cfg("ev0.5", ev=0.5),
-    _cfg("ev1.0", ev=1.0),
-    _cfg("ev1.5", ev=1.5),
-    _cfg("ev2.0", ev=2.0),
-    # EV-radius bumps (more de-clash reach, watched by the Rg guard)
-    _cfg("ev1.0_r0.7", ev=1.0, ev_radius=0.7),
-    _cfg("ev2.0_r0.7", ev=2.0, ev_radius=0.7),
-    # confinement-only (compacts; for contrast)
+    _cfg("ev0.05", ev=0.05),  # original 3dgnome magnitude
+    _cfg("ev0.1", ev=0.1),
+    _cfg("ev0.2", ev=0.2),
+    _cfg("ev0.3", ev=0.3),
+    _cfg("ev0.5", ev=0.5),  # top of the subordinate range
+    # EV-radius bump (more de-clash reach at fixed weight; watched by the Rg guard)
+    _cfg("ev0.3_r0.7", ev=0.3, ev_radius=0.7),
+    # confinement-only (compacts; for contrast) + gentle EV+confinement combos
     _cfg("conf_p0.75", conf=0.75),
-    # EV + confinement combos
+    _cfg("ev0.2+conf0.75", ev=0.2, conf=0.75),
     _cfg("ev0.5+conf0.75", ev=0.5, conf=0.75),
-    _cfg("ev1.0+conf0.75", ev=1.0, conf=0.75),
 ]
 
 
