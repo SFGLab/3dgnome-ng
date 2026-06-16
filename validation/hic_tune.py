@@ -43,59 +43,76 @@ from validation.compare_reference import TUNED_FEATURES  # noqa: E402
 from validation.sweep import enumerate_regions  # noqa: E402
 from validation.validate import _apply_flags, _chrs_and_region, run_ensemble  # noqa: E402
 
-DEFAULT_FACTORS = [0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0]
+DEFAULT_FACTORS = [0.4, 0.5, 0.6, 0.75, 1.0, 1.25, 1.5, 2.0]  # SCC peaks at small radius; probe low
 MULTIMM_TARGET = 0.70  # MultiMM's reported inverse-distance Pearson (random structures < 0.40)
 
 
-def tune_region(
-    region: str,
-    cell: str,
-    data_root: str,
-    quality: str,
-    n: int,
-    hic_path: str,
-    binsize: int,
-    factors: list[float],
-) -> dict[str, object]:
-    """Generate ONE tuned ensemble for ``region`` and sweep the Hi-C readout on its coords.
+def _npz_path(out_path: Path, region: str) -> Path:
+    """Per-region coordinate cache sidecar next to the results JSON."""
+    safe = region.replace(":", "_").replace("-", "_")
+    return out_path.with_name(f"{out_path.stem}__{safe}.npz")
 
-    Returns {base_radius, multimm, n_bins, scc:{factor->val}, pearson:{factor->val}}.
-    """
-    tuned = _apply_flags(settings_for_cell(cell, data_root, quality), TUNED_FEATURES)
+
+def load_or_generate(region: str, args: argparse.Namespace, npz_path: Path) -> tuple[list, object]:
+    """Return (coords_list, mids) for the tuned ensemble — loaded from the npz coord cache if
+    present (NO MC), else generated (the only expensive step) and cached. Mids are shared across
+    the ensemble (bead genomic layout is seeded once), so one array is stored."""
+    if npz_path.exists():
+        d = np.load(npz_path)
+        coords = d["coords"]
+        print(f"  [cache] {coords.shape[0]} structures from {npz_path.name} (no MC)")
+        return [coords[i] for i in range(coords.shape[0])], d["mids"]
+    tuned = _apply_flags(settings_for_cell(args.cell, args.data_root, args.quality), TUNED_FEATURES)
     chrs_list, bed_region = _chrs_and_region(region)
     data = ContactData.from_files(tuned, chrs_list, bed_region)
-    ens = run_ensemble(tuned, data, chrs_list, bed_region, n)  # the only expensive step
-
-    coords_list, mids_list = [], []
-    bond_meds = []
+    ens = run_ensemble(tuned, data, chrs_list, bed_region, args.n)  # expensive
+    coords_list, mids_l = [], []
     for beads in ens:
-        coords, mids = metrics.to_arrays(beads)
-        coords_list.append(coords)
-        mids_list.append(mids)
-        bond_meds.append(float(np.median(metrics.bond_lengths(coords))))
-    base_radius = float(np.median(bond_meds))
+        c, mm = metrics.to_arrays(beads)
+        coords_list.append(c)
+        mids_l.append(mm)
+    mids = mids_l[0]
+    if len({len(c) for c in coords_list}) == 1:
+        np.savez_compressed(
+            npz_path, coords=np.stack(coords_list).astype(np.float32), mids=np.asarray(mids)
+        )
+        print(f"  [cache] saved {len(coords_list)} structures -> {npz_path.name}")
+    else:
+        print("  [cache] variable bead count across ensemble — not caching coords")
+    return coords_list, mids
 
-    c_obs, bin_starts = contacts.observed_hic(hic_path, region, binsize)
+
+def score_coords(
+    region: str, coords_list: list, mids: object, hic_path: str, binsize: int, factors: list[float]
+) -> dict[str, object]:
+    """Score a (cached or fresh) ensemble against the Hi-C — a cheap readout, no MC. Returns the
+    faithful MultiMM Pearson + the legacy one + the contact-radius SCC sweep."""
+    base_radius = float(np.median([float(np.median(metrics.bond_lengths(c))) for c in coords_list]))
+    c_obs, bin_starts = contacts.observed_hic(hic_path, region, binsize)  # raw counts -> SCC
     eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize
+    try:  # ICE/balance-normalised -> the faithful MultiMM metric (they use ICE-norm)
+        c_obs_bal, _ = contacts.observed_hic(hic_path, region, binsize, balance=True)
+    except Exception as e:  # noqa: BLE001 (mcool may lack balance weights)
+        print(f"  [warn] balanced fetch failed ({e}); MultiMM metric on raw counts")
+        c_obs_bal = c_obs
 
-    # MultiMM Pearson: decay-retained inverse-distance map, radius-free -> computed ONCE.
-    inv = contacts.inverse_distance_heatmap(coords_list, mids_list[0], bin_starts, eff)
-    multimm = contacts.multimm_pearson(inv, c_obs)
+    multimm = contacts.multimm_faithful_pearson(coords_list, mids, c_obs_bal, bin_starts, eff)
+    inv = contacts.inverse_distance_heatmap(coords_list, mids, bin_starts, eff)
+    multimm_legacy = contacts.multimm_pearson(inv, c_obs)
 
-    # SCC / decay-stripped Pearson: rebuild the hard-radius contact map per factor (cheap).
     scc: dict[str, float] = {}
     pear: dict[str, float] = {}
     for f in factors:
-        radius = f * base_radius
         c_sim = np.zeros_like(c_obs)
-        for coords, mids in zip(coords_list, mids_list, strict=True):
-            c_sim += contacts.simulated_contacts(coords, mids, bin_starts, eff, radius)
+        for coords in coords_list:
+            c_sim += contacts.simulated_contacts(coords, mids, bin_starts, eff, f * base_radius)
         cc = contacts.contact_correlation(c_sim, c_obs)
         scc[f"{f:g}"] = cc["scc"]
         pear[f"{f:g}"] = cc["pearson"]
     return {
         "base_radius": base_radius,
         "multimm": multimm,
+        "multimm_legacy": multimm_legacy,
         "n_bins": int(len(bin_starts)),
         "scc": scc,
         "pearson": pear,
@@ -124,12 +141,14 @@ def report(cache: dict[str, dict], regions: list[str], factors: list[float]) -> 
             best_scc, best_f = msc, f
         print(f"{f:>14g} {msc:>12.4f} {mpe:>16.4f}{flag}")
     mm = _median([row["multimm"] for row in rows])
+    mm_legacy = _median([row.get("multimm_legacy", float("nan")) for row in rows])
     print(f"\nBest contact-radius factor (max median SCC): {best_f:g}  -> SCC {best_scc:.4f}")
     print(f"{'-'*64}")
-    print(f"MultiMM inverse-distance Pearson (decay retained, sim_power 3/2): {mm:.4f}")
+    print(f"MultiMM Pearson (FAITHFUL: (d+1)^-3, ±5 diag, ICE-balanced): {mm:.4f}")
     delta = mm - MULTIMM_TARGET
     verdict = "AT/ABOVE" if delta >= -0.02 else "below"
     print(f"  vs MultiMM target ~{MULTIMM_TARGET:.2f}: {verdict} (Δ {delta:+.3f}); random < 0.40")
+    print(f"  (legacy 1/d^1.5 metric, for reference only — NOT MultiMM's: {mm_legacy:.4f})")
     print(f"{'='*64}")
 
 
@@ -167,17 +186,23 @@ def main() -> None:
         sys.exit("[error] no regions found in size band")
 
     for region in regions:
-        if region in cache:
-            print(f"[hic_tune] {region}: cached")
-            continue
-        print(f"\n[hic_tune] {region}: generating n={args.n} tuned ensemble ({args.quality})...")
-        cache[region] = tune_region(
-            region, args.cell, args.data_root, args.quality, args.n, args.hic, args.binsize, factors
-        )
+        # Coords are cached as an npz sidecar: the MC runs once; the Hi-C metrics (faithful MultiMM,
+        # legacy, SCC sweep) are a cheap readout RECOMPUTED every run, so iterating the metric is
+        # free (no MC rerun). Only ensemble generation is skipped when the npz exists.
+        npz = _npz_path(out_path, region)
+        print(f"\n[hic_tune] {region} (n={args.n}, {args.quality}):")
+        coords_list, mids = load_or_generate(region, args, npz)
+        cache[region] = score_coords(region, coords_list, mids, args.hic, args.binsize, factors)
         out_path.write_text(json.dumps(cache, indent=2))
         r = cache[region]
-        best = max(r["scc"].items(), key=lambda kv: (kv[1] if kv[1] is not None and np.isfinite(kv[1]) else -np.inf))
-        print(f"  [done] best SCC {best[1]:.3f} @ factor {best[0]} | MultiMM {r['multimm']:.3f}")
+        best = max(
+            r["scc"].items(),
+            key=lambda kv: (kv[1] if kv[1] is not None and np.isfinite(kv[1]) else -np.inf),
+        )
+        print(
+            f"  [done] best SCC {best[1]:.3f} @ {best[0]} | MultiMM(faithful) {r['multimm']:.3f} "
+            f"(legacy {r['multimm_legacy']:.3f})"
+        )
 
     report(cache, regions, factors)
 

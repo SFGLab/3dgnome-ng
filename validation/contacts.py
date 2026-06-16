@@ -204,6 +204,77 @@ def multimm_pearson(
     return float(np.corrcoef(a, b)[0, 1])
 
 
+def remove_diagonals(matrix: F64Array, n_diag: int) -> F64Array:
+    """MultiMM's diagonal neutralizer (src/multimm/validation.py::remove_diagonals): set the main
+    diagonal AND its ``n_diag`` neighbours (both sides) to the matrix MEAN, so the dominant
+    near-diagonal band can't drive the Pearson. Returns a copy."""
+    m = matrix.copy()
+    n = m.shape[0]
+    mean = float(m.mean())
+    for d in range(n_diag + 1):
+        idx = np.arange(n - d)
+        m[idx, idx + d] = mean
+        m[idx + d, idx] = mean
+    return m
+
+
+def _bin_centroids(
+    coords: F64Array, mids: I64Array, bin_starts: I64Array, binsize: int
+) -> F64Array:
+    """Mean 3D position of the beads whose genomic midpoint falls in each Hi-C bin; NaN row for an
+    empty bin. MultiMM ``mean_downsample``s the bead array to the matrix size — binning by genomic
+    midpoint is the correct analogue for our non-uniformly-spaced subanchor beads."""
+    nbins = len(bin_starts)
+    last_edge = int(bin_starts[-1]) + binsize
+    bidx = np.searchsorted(bin_starts, mids, side="right") - 1
+    in_grid = (bidx >= 0) & (bidx < nbins) & (mids < last_edge)
+    cent = np.full((nbins, 3), np.nan)
+    bi, cg = bidx[in_grid], coords[in_grid]
+    for b in range(nbins):
+        sel = bi == b
+        if sel.any():
+            cent[b] = cg[sel].mean(0)
+    return cent
+
+
+def multimm_faithful_pearson(
+    coords_list: list[F64Array],
+    mids: I64Array,
+    c_obs: F64Array,
+    bin_starts: I64Array,
+    binsize: int,
+    n_diag: int = 5,
+) -> float:
+    """MultiMM's *actual* Hi-C correlation, reproduced faithfully (per ``src/multimm/validation.py``,
+    NOT the paper's loose "^3/2" wording). The simulated heatmap is **1/(d+1)³** between per-bin
+    structure centroids — note: ``structure_to_heatmap`` is ``1/(d+1)**3/2`` which by Python
+    precedence is ``1/(2·(d+1)³)``, i.e. a CUBE with a +1 offset, the ½ a constant. Distances are
+    scaled so the median genomically-adjacent centroid step = 1 (so the +1 offset is one bead-step,
+    matching their bead-spacing units). Averaged over the ensemble. Main + ``n_diag`` diagonals set
+    to the mean on BOTH maps (they use 5), then plain Pearson over the full matrix. ``c_obs`` should
+    be ICE/balance-normalised (they use ICE-norm). Empty bins dropped from both."""
+    cent0 = _bin_centroids(coords_list[0], mids, bin_starts, binsize)
+    valid = ~np.isnan(cent0[:, 0])
+    nv = int(valid.sum())
+    if nv < 4:
+        return float("nan")
+    sim = np.zeros((nv, nv))
+    for coords in coords_list:
+        cent = _bin_centroids(coords, mids, bin_starts, binsize)[valid]
+        step = np.linalg.norm(np.diff(cent, axis=0), axis=1)
+        scale = float(np.median(step[step > 0])) if np.any(step > 0) else 1.0
+        diff = cent[:, None, :] - cent[None, :, :]
+        d = np.sqrt((diff * diff).sum(-1)) / scale
+        sim += 1.0 / (d + 1.0) ** 3
+    sim /= len(coords_list)
+    obs = np.asarray(c_obs)[np.ix_(valid, valid)]
+    a = remove_diagonals(sim, n_diag).flatten()
+    b = remove_diagonals(obs, n_diag).flatten()
+    if a.std() < 1e-12 or b.std() < 1e-12:
+        return float("nan")
+    return float(np.corrcoef(a, b)[0, 1])
+
+
 def ensemble_hic_correlation(
     coords_list: list[F64Array],
     mids_list: list[I64Array],

@@ -133,3 +133,30 @@ default; the min-overlap objective gives far more consistent winners than SCC (w
 
 > Cross-cell note: the three Hi-C files differ in enzyme/depth, so absolute SCC isn't comparable
 > across lines — but the *winning config* should agree if the recommendation generalizes.
+
+## 5. Hi-C self-correlation study (Hi-C as singletons → held-out correlation)
+
+A self-reproduction study in the spirit of the original 3D-GNOME Fig. 2 (ChIA-PET≈Hi-C, ρ≈0.67–0.88)
+and Suppl. S7 (same engine on Hi-C input), and of other engines (e.g. MultiMM is Hi-C-driven). We
+feed the experimental Hi-C into 3dgnome as **singleton contacts** (the engine turns singleton
+frequencies into target distances), then correlate the reconstructed structure against **held-out**
+Hi-C bin-pairs — a genuine generalisation check, not memorisation (correlating against the fed-in
+contacts would be circular/inflated by construction). `validation/self_correlation.py`.
+
+```bash
+# pure Hi-C-driven (clean baseline, directly comparable to MultiMM):
+python -m validation.self_correlation --cell GM12878 \
+    --hic data/_hic/GM12878/4DNFIQ32RWCQ.mcool --hic-singletons replace \
+    --n 100 --n-regions 4 --binsize 25000 --out out/sweep/GM12878_selfcorr_replace.json
+
+# augment: ChIA-PET + Hi-C (Hi-C counts scaled to the ChIA-PET singleton median so neither swamps
+# the other) — tests whether adding Hi-C IMPROVES the ChIA-PET-driven model:
+python -m validation.self_correlation --cell GM12878 \
+    --hic data/_hic/GM12878/4DNFIQ32RWCQ.mcool --hic-singletons augment \
+    --n 100 --n-regions 4 --binsize 25000 --out out/sweep/GM12878_selfcorr_augment.json
+```
+
+The held-out split is a deterministic per-bin-pair hash (50/50; `--seed` to vary). The score is the
+faithful MultiMM metric ((d+1)⁻³ vs ICE-balanced observed) restricted to the **TEST** pairs only.
+Contrast with `compare_reference` (ChIA-PET-driven vs INDEPENDENT Hi-C) — the cross-assay test is
+strictly harder and remains the headline; this self-correlation is the MultiMM-comparable companion.
