@@ -125,11 +125,13 @@ CANONICAL: dict[str, dict[str, object]] = {
     },
     "excluded_volume": {
         "use_excluded_volume": "yes",
-        # EV is a GENTLE correction, NOT a dominant term — it must weigh far less than the bond /
-        # heatmap / loop energies, or it distorts and (at full-schedule MC on large regions) blows
-        # the structure up. The original 3dgnome config used ~0.05; we keep that magnitude. Earlier
-        # sweep weights (1.0–2.0) over-reduced overlaps by over-expanding and exploded at scale.
-        "weight": 0.05,
+        # EV is a GENTLE correction, NOT a dominant term — it weighs far less than the distance /
+        # heatmap / loop energies (dist_weight = 1.0). Picked by the subordinate-grid sweep on the
+        # unified config: 0.1 cut resolution-normalized overlaps in 20/20 GM12878 regions (−23% vs
+        # baseline) at +17% Rg (within the 0.30 guard); higher weights don't lower overlaps further
+        # but cost more Rg. (Earlier 1.0–2.0 over-expanded; the old "explosion" was a config-
+        # divergence bug, not EV — see [[project_config_unification]].)
+        "weight": 0.1,
         "auto_factor_smooth": 0.7,
         "apply_to_heatmap": "yes",
         "apply_to_arcs": "yes",
