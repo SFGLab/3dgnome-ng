@@ -50,9 +50,13 @@ def bond_lengths(coords: F64Array) -> F64Array:
 
 
 def _pairwise(coords: F64Array) -> F64Array:
-    """Full (N,N) Euclidean distance matrix."""
-    diff = coords[:, None, :] - coords[None, :, :]
-    return np.sqrt((diff * diff).sum(axis=2))
+    """Full (N,N) Euclidean distance matrix via the gram-matrix form (BLAS matmul, only an N×N
+    temp — not the (N,N,3) broadcast, which is ~3× the memory and far slower at N≈thousands)."""
+    g = coords @ coords.T
+    sq = np.einsum("ii->i", g)  # squared norms (diagonal of the gram matrix)
+    d2 = sq[:, None] + sq[None, :] - 2.0 * g
+    np.maximum(d2, 0.0, out=d2)  # clip tiny negatives from round-off
+    return np.sqrt(d2)
 
 
 # --------------------------------------------------------------------------- EV / confinement
@@ -100,10 +104,12 @@ def overlap_fraction_binned(
     if len(coords) < 2:
         return 0.0, 0, 0
     binidx = (mids // resolution_bp).astype(np.int64)
-    uniq = np.unique(binidx)  # sorted -> centroids stay in genomic order
+    uniq, inv = np.unique(binidx, return_inverse=True)  # sorted -> genomic order; inv maps bead->bin
     if uniq.size < 2:
         return 0.0, 0, 0
-    cent = np.array([coords[binidx == b].mean(axis=0) for b in uniq])
+    k = uniq.size
+    cnt = np.bincount(inv, minlength=k).astype(np.float64)  # centroid per bin via bincount (no loop)
+    cent = np.stack([np.bincount(inv, weights=coords[:, a], minlength=k) / cnt for a in range(3)], axis=1)
     step = np.linalg.norm(np.diff(cent, axis=0), axis=1)
     med = float(np.median(step[step > 0])) if np.any(step > 0) else 0.0
     if med <= 0:
@@ -130,14 +136,13 @@ def _loglog_bins(sep: F64Array, val: F64Array, n_bins: int) -> tuple[F64Array, F
         return np.array([]), np.array([]), float("nan")
     edges = np.logspace(np.log10(sep.min()), np.log10(sep.max() + 1), n_bins + 1)
     idx = np.clip(np.digitize(sep, edges) - 1, 0, n_bins - 1)
-    bin_sep, bin_val = [], []
-    for b in range(n_bins):
-        m = idx == b
-        if m.sum() == 0:
-            continue
-        bin_sep.append(float(sep[m].mean()))
-        bin_val.append(float(val[m].mean()))
-    bs, bv = np.array(bin_sep), np.array(bin_val)
+    # per-bin means via bincount (single C pass) instead of an n_bins × N python loop — the
+    # arrays here are the full ~N²/2 condensed pairs, so this is the post-MC hotspot.
+    cnt = np.bincount(idx, minlength=n_bins).astype(np.float64)
+    sep_sum = np.bincount(idx, weights=sep, minlength=n_bins)
+    val_sum = np.bincount(idx, weights=val, minlength=n_bins)
+    nz = cnt > 0
+    bs, bv = sep_sum[nz] / cnt[nz], val_sum[nz] / cnt[nz]
     ok = (bs > 0) & (bv > 0)
     if ok.sum() < 2:
         return bs, bv, float("nan")
@@ -334,7 +339,9 @@ def self_consistency(
 # --------------------------------------------------------------------------- V3 ensemble
 
 
-def dab_matrix(ensemble: Sequence[F64Array], expected: F64Array | None = None) -> F64Array:
+def dab_matrix(
+    ensemble: Sequence[F64Array], expected: F64Array | None = None, max_structures: int = 24
+) -> F64Array:
     """V3: Szałaj-2016 inter-structure distance matrix.
 
         d_AB = (1/M) * sum_{i,j} [ (D_A(i,j) - D_B(i,j)) / E(D(i,j)) ]^2
@@ -347,19 +354,31 @@ def dab_matrix(ensemble: Sequence[F64Array], expected: F64Array | None = None) -
 
     Returns the (n_structures, n_structures) symmetric matrix; diagonal 0.
     """
-    mats = [_pairwise(c) for c in ensemble]
-    n = len(mats)
-    if n == 0:
+    from scipy.spatial.distance import pdist, squareform
+
+    ens = list(ensemble)
+    if not ens:
         return np.zeros((0, 0))
+    # The diversity SCALAR (median off-diagonal d_AB) is well-estimated from a sample of structures
+    # — we don't need all 100²/2 pairs × full N×N matrices (that's ~20 GB / O(n²N²) at N≈5000 beads,
+    # the post-MC bottleneck). Subsample evenly to `max_structures`, and use CONDENSED upper-triangle
+    # distances in float32 (pdist; same (i<j) ordering across structures, so the subtraction is valid).
+    if len(ens) > max_structures:
+        idx = np.unique(np.linspace(0, len(ens) - 1, max_structures).round().astype(int))
+        ens = [ens[i] for i in idx]
+    mats = [pdist(c).astype(np.float32) for c in ens]
+    n = len(mats)
     if expected is None:
-        expected = np.mean(np.stack(mats), axis=0)
-    e = np.where(np.abs(expected) < 1e-9, 1.0, expected)
+        e = np.mean(np.stack(mats), axis=0)
+    else:
+        e = squareform(np.asarray(expected, dtype=np.float64), checks=False).astype(np.float32)
+    e = np.where(np.abs(e) < 1e-9, np.float32(1.0), e)
     npairs = mats[0].size
     out = np.zeros((n, n), dtype=np.float64)
     for a in range(n):
         for b in range(a + 1, n):
             r = (mats[a] - mats[b]) / e
-            val = float((r * r).sum() / npairs)
+            val = float(np.dot(r, r) / npairs)
             out[a, b] = out[b, a] = val
     return out
 

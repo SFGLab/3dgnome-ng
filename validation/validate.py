@@ -101,10 +101,24 @@ def summarize(
     skip: int,
     overlap_norm_bp: int = 5000,
 ) -> dict[str, float]:
-    """Average the per-structure metrics across the ensemble (+ V3 diversity). Reports BOTH the raw
-    ``overlap_frac`` (bead-density-dependent) and ``overlap_frac_norm`` — overlaps after coarse-
-    graining to ``overlap_norm_bp`` bins, so structures at different bead resolutions are
-    comparable (use the _norm one for ref-vs-tuned overlap claims)."""
+    """Average the per-structure metrics across the FULL ensemble (+ V3 diversity). Reports BOTH the
+    raw ``overlap_frac`` (bead-density-dependent) and ``overlap_frac_norm`` — overlaps after coarse-
+    graining to ``overlap_norm_bp`` bins, so structures at different bead resolutions are comparable
+    (use the _norm one for ref-vs-tuned overlap claims).
+
+    PERF: the overlap / distance-scaling / contact-probability metrics all reduce the SAME
+    upper-triangle pairwise distances, and the genomic separations are constant across the ensemble
+    (shared mids). So we compute the separations ONCE and one ``pdist`` per structure (condensed, in
+    triu(n,1) order), then derive all three by reduction — instead of 3 full O(N²) ``_pairwise``
+    passes per structure. Exact, all structures kept (no subsampling)."""
+    from scipy.spatial.distance import pdist
+
+    coords0, mids0 = metrics.to_arrays(ensemble[0])
+    n = len(coords0)
+    iu, ju = np.triu_indices(n, k=1)
+    sep = np.abs(mids0[iu] - mids0[ju]).astype(np.float64)  # constant across ensemble
+    nonbond = (ju - iu) > skip  # exclude |i-j| <= skip (bonded neighbours), matches overlap_fraction
+
     rgs, bonds, overlaps, ov_norm, rhos, dscals, cprobs, extents = [], [], [], [], [], [], [], []
     coords_list = []
     for beads in ensemble:
@@ -112,13 +126,14 @@ def summarize(
         coords_list.append(coords)
         rgs.append(metrics.radius_of_gyration(coords))
         bonds.append(float(np.median(metrics.bond_lengths(coords))))
-        overlaps.append(metrics.overlap_fraction(coords, radius, skip)[0])
+        d = pdist(coords)  # condensed upper-tri distances, SAME order as triu(n,1) — computed ONCE
+        overlaps.append(float((d[nonbond] < radius).mean()) if nonbond.any() else 0.0)
         ov_norm.append(metrics.overlap_fraction_binned(coords, mids, overlap_norm_bp, skip_neighbors=skip)[0])
         extents.append(metrics.max_extent(coords))
         rho, _ = metrics.self_consistency(coords, mids, contacts)
         rhos.append(rho)
-        dscals.append(metrics.distance_scaling(coords, mids)[2])
-        cprobs.append(metrics.contact_probability(coords, mids, radius)[2])
+        dscals.append(metrics._loglog_bins(sep, d, 20)[2])
+        cprobs.append(metrics._loglog_bins(sep, (d < radius).astype(np.float64), 20)[2])
     dab = metrics.dab_matrix(coords_list)
     nanmean = lambda xs: float(np.nanmean(xs)) if xs else float("nan")
     return {

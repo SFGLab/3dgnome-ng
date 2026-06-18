@@ -95,8 +95,6 @@ def score_coords(
         c_obs_bal = c_obs
 
     multimm = contacts.multimm_faithful_pearson(coords_list, mids, c_obs_bal, bin_starts, eff)
-    inv = contacts.inverse_distance_heatmap(coords_list, mids, bin_starts, eff)
-    multimm_legacy = contacts.multimm_pearson(inv, c_obs)
 
     scc: dict[str, float] = {}
     pear: dict[str, float] = {}
@@ -110,7 +108,6 @@ def score_coords(
     return {
         "base_radius": base_radius,
         "multimm": multimm,
-        "multimm_legacy": multimm_legacy,
         "n_bins": int(len(bin_starts)),
         "scc": scc,
         "pearson": pear,
@@ -139,12 +136,11 @@ def report(cache: dict[str, dict], regions: list[str], factors: list[float]) -> 
             best_scc, best_f = msc, f
         print(f"{f:>14g} {msc:>12.4f} {mpe:>16.4f}{flag}")
     mm = _median([row["multimm"] for row in rows])
-    mm_legacy = _median([row.get("multimm_legacy", float("nan")) for row in rows])
     print(f"\nBest contact-radius factor (max median SCC): {best_f:g}  -> SCC {best_scc:.4f}")
     print(f"{'-'*64}")
     print(f"Inverse-distance Pearson (MultiMM's metric approach: (d+1)^-3, ±5 diag, ICE): {mm:.4f}")
     print("  (our standard Hi-C correlation; scales with region size — compare like-for-like,")
-    print(f"   not against MultiMM's 0.70. legacy 1/d^1.5 for reference: {mm_legacy:.4f})")
+    print("   not against MultiMM's 0.70)")
     print(f"{'='*64}")
 
 
@@ -195,10 +191,7 @@ def main() -> None:
             r["scc"].items(),
             key=lambda kv: (kv[1] if kv[1] is not None and np.isfinite(kv[1]) else -np.inf),
         )
-        print(
-            f"  [done] best SCC {best[1]:.3f} @ {best[0]} | MultiMM(faithful) {r['multimm']:.3f} "
-            f"(legacy {r['multimm_legacy']:.3f})"
-        )
+        print(f"  [done] best SCC {best[1]:.3f} @ {best[0]} | MultiMM(faithful) {r['multimm']:.3f}")
 
     report(cache, regions, factors)
 

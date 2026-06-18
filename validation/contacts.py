@@ -54,19 +54,25 @@ def simulated_contacts(
     """Simulated contact map on the Hi-C bin grid: count bead-pairs within ``contact_radius``
     (3D), aggregated by the bins their genomic midpoints fall in. Mirrors how Hi-C tallies
     ligations between loci. Symmetric, zero diagonal-self (a bead with itself)."""
+    from scipy.spatial import cKDTree
+
     nbins = len(bin_starts)
     last_edge = int(bin_starts[-1]) + binsize
     bidx = np.searchsorted(bin_starts, mids, side="right") - 1
     in_grid = (bidx >= 0) & (bidx < nbins) & (mids < last_edge)
 
-    diff = coords[:, None, :] - coords[None, :, :]
-    d = np.sqrt((diff * diff).sum(axis=2))
-    close = d < contact_radius
-    np.fill_diagonal(close, False)
-    ii, jj = np.where(close)
-    ok = in_grid[ii] & in_grid[jj]
     C = np.zeros((nbins, nbins), dtype=np.float64)
-    np.add.at(C, (bidx[ii][ok], bidx[jj][ok]), 1.0)
+    # Only the within-radius pairs matter, so a KD-tree finds them in ~O(N log N) instead of the
+    # full O(N²) distance matrix (the post-MC Hi-C hotspot). query_pairs gives unordered i<j; we
+    # add both directions to keep C symmetric, matching the old np.where(close) tally.
+    pairs = cKDTree(coords).query_pairs(contact_radius, output_type="ndarray")
+    if pairs.size == 0:
+        return C
+    ii, jj = pairs[:, 0], pairs[:, 1]
+    ok = in_grid[ii] & in_grid[jj]
+    bi, bj = bidx[ii][ok], bidx[jj][ok]
+    np.add.at(C, (bi, bj), 1.0)
+    np.add.at(C, (bj, bi), 1.0)
     return C
 
 
@@ -295,6 +301,8 @@ def ensemble_hic_correlation(
     for coords, mids in zip(coords_list, mids_list, strict=True):
         c_sim += simulated_contacts(coords, mids, bin_starts, eff, contact_radius)
     out = contact_correlation(c_sim, c_obs)
-    inv = inverse_distance_heatmap(coords_list, mids_list[0], bin_starts, eff)
-    out["multimm_pearson"] = multimm_pearson(inv, c_obs)
+    # The decay-retained inverse-distance Pearson is now `multimm_faithful_pearson` (callers compute
+    # it directly); the old `inverse_distance_heatmap`-based one is O(n·N²) and unused, so it's not
+    # computed here. nan placeholder kept for any legacy reader.
+    out["multimm_pearson"] = float("nan")
     return out
