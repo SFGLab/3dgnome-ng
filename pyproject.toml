@@ -35,6 +35,7 @@ jax = [
 validation = [
     "scipy>=1.10",
     "cooler>=0.9",
+    "cooltools>=0.7",
     "hicrep>=0.2.6",
 ]
 

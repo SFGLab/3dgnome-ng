@@ -31,7 +31,8 @@ from gnome3d.data import ContactData  # noqa: E402
 from gnome3d.io import load_singletons  # noqa: E402
 from gnome3d.types import F64Array, I64Array  # noqa: E402
 from validation import metrics  # noqa: E402
-from validation.cell_config import settings_for_cell, with_singletons  # noqa: E402
+from validation.cell_config import apply_flags, settings_for_cell, with_singletons  # noqa: E402
+from validation.hic_boundaries import write_breakpoints  # noqa: E402
 from validation.validate import _chrs_and_region, run_ensemble  # noqa: E402
 
 
@@ -174,6 +175,9 @@ def run_self_correlation(region: str, args: argparse.Namespace, tmp: Path) -> di
     """One region: feed Hi-C TRAIN singletons (replace or augment ChIA-PET) into the tuned model,
     run the ensemble, and correlate the structure against the HELD-OUT Hi-C contacts."""
     tuned = settings_for_cell(args.cell, args.data_root, args.quality)  # unified canonical config
+    # Segment by Hi-C-derived TAD boundaries (not CTCF/CCD) so the model's IBs align with the TADs
+    # we score against — the right segmentation for a Hi-C-driven self-correlation study.
+    tuned = apply_flags(tuned, {"data_segment_split": str(args.hic_breakpoints)})
     chrs_list, bed_region = _chrs_and_region(region)
     chr_set = set(chrs_list)
 
@@ -255,27 +259,46 @@ def main() -> None:
     p.add_argument(
         "--holdout-frac", type=float, default=0.5, help="fraction of bin-pairs held out for testing"
     )
+    p.add_argument(
+        "--window", type=int, default=250_000, help="cooltools insulation window for TAD boundaries"
+    )
+    p.add_argument(
+        "--hic-breakpoints",
+        default=None,
+        help="precomputed Hi-C TAD breakpoints BED; default = derive from --hic (cooltools)",
+    )
     p.add_argument("--region", default=None, help="single region override")
     p.add_argument("--out", required=True)
     args = p.parse_args()
 
     from validation.sweep import enumerate_regions
 
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    chroms = (
+        args.chroms.split(",")
+        if args.chroms
+        else ([args.region.split(":")[0]] if args.region else None)
+    )
+    # Hi-C TAD boundaries drive BOTH region selection and the model segmentation (self-HiC: the
+    # model's IBs align with the Hi-C TADs we score against, instead of CTCF/CCD boundaries).
+    if args.hic_breakpoints:
+        args.hic_breakpoints = Path(args.hic_breakpoints)
+    else:
+        args.hic_breakpoints = out_path.with_name(f"{out_path.stem}__hic_tad_breaks.bed")
+        if not args.hic_breakpoints.exists():
+            write_breakpoints(args.hic, args.hic_breakpoints, chroms, args.window, args.binsize)
+
     if args.region:
         regions = [args.region]
     else:
-        s_meta = settings_for_cell(args.cell, args.data_root)
-        bp = s_meta.data_path(s_meta.data_segment_split)
-        chroms = args.chroms.split(",") if args.chroms else None
         regions = enumerate_regions(
-            bp, args.n_regions, chroms=chroms, min_ibs=args.min_ibs, max_ibs=args.max_ibs,
-            max_mb=args.max_mb,
+            str(args.hic_breakpoints), args.n_regions, chroms=chroms,
+            min_ibs=args.min_ibs, max_ibs=args.max_ibs, max_mb=args.max_mb,
         )
     if not regions:
         sys.exit("[error] no regions found")
 
-    out_path = Path(args.out)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(prefix="gnome3d_selfcorr_"))
     results = []
     for region in regions:
