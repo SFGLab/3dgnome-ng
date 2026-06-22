@@ -181,6 +181,9 @@ def score_law_region(region: str, config: Path, tmp: Path, args: argparse.Namesp
     print(f"  [laws @ {region}] python +tuned (unified canonical config, native res)...")
     feat_structs = run_ensemble(_tuned_settings(args), data, chrs_list, bed_region, n)
 
+    # Resolution-normalize the β/α fit to a common bp grid so ref (~4.5 kb beads) and tuned
+    # (dynamic ~1 kb) are compared at the SAME resolution (P(s)/α is bead-density-dependent
+    # otherwise — the same confound we fixed for overlap). Rg/bond_cv stay native (per scaling_laws).
     def laws_of(structs: list) -> dict:
         cl, ml = [], []
         for beads in structs:
@@ -188,7 +191,7 @@ def score_law_region(region: str, config: Path, tmp: Path, args: argparse.Namesp
             cl.append(c)
             ml.append(mm)
         rad = float(np.median(metrics.bond_lengths(cl[0])))
-        return metrics.ensemble_scaling_laws(cl, ml[0], rad)
+        return metrics.ensemble_scaling_laws(cl, ml[0], rad, resolution_bp=args.law_resolution_bp)
 
     return {
         "ref": laws_of(ref_structs),
@@ -270,6 +273,13 @@ def main() -> None:
         "are NOT meaningful on the small overlap/Hi-C regions, so they are measured separately here.",
     )
     p.add_argument("--law-mb", type=float, default=20.0, help="min size (Mb) of the law region")
+    p.add_argument(
+        "--law-resolution-bp",
+        type=int,
+        default=25000,
+        help="coarse-grain both variants to this bp grid before fitting β/α, so different bead "
+        "resolutions (ref vs tuned) are comparable; 0 = native (confounded by bead density)",
+    )
     p.add_argument(
         "--law-n",
         type=int,

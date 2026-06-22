@@ -232,35 +232,64 @@ def scaling_laws(
     n_bins: int = 15,
     min_sep_bp: float = 30_000.0,
     hi_frac: float = 0.6,
+    resolution_bp: int = 0,
+    contact_radius_factor: float = 0.5,
 ) -> dict[str, float]:
     """Genome-structure scaling laws for one structure: mean-distance R(s)~s^β and
     contact-probability P(s)~s^-α power laws (exponent + log-log R²), plus Rg and the chain
-    bond-length CV. ``contact_exp`` is reported as the positive α."""
-    n = len(coords)
-    iu, ju = np.triu_indices(n, k=1)
-    d = _pairwise(coords)[iu, ju]
-    sep = np.abs(mids[iu] - mids[ju]).astype(np.float64)
-    b_dist, r2_dist = _loglog_fit(sep, d, n_bins, min_sep_bp, hi_frac)
-    b_con, r2_con = _loglog_fit(sep, (d < radius).astype(np.float64), n_bins, min_sep_bp, hi_frac)
+    bond-length CV. ``contact_exp`` is reported as the positive α.
+
+    ``resolution_bp`` > 0 RESOLUTION-NORMALIZES the fit: coarse-grain to one centroid per
+    ``resolution_bp`` bin BEFORE fitting, so structures at different bead resolutions (C++ ref ~4.5
+    kb vs dynamic-subanchor ~1 kb) give comparable exponents — P(s)/α in particular is otherwise
+    bead-density-dependent (same confound as raw overlap). The contact radius then scales with the
+    centroid spacing (``contact_radius_factor`` × median step). Rg and bond CV are ALWAYS measured
+    on the native chain (they describe the real structure and flag degeneracy)."""
     bonds = bond_lengths(coords)
     bond_mean = float(np.mean(bonds)) if bonds.size else float("nan")
-    return {
-        "dist_exp": b_dist,
-        "dist_r2": r2_dist,
-        "contact_exp": -b_con,  # report α > 0
-        "contact_r2": r2_con,
-        "rg": radius_of_gyration(coords),
+    out = {
+        "dist_exp": float("nan"),
+        "dist_r2": float("nan"),
+        "contact_exp": float("nan"),
+        "contact_r2": float("nan"),
+        "rg": radius_of_gyration(coords),  # native chain
         "bond_cv": float(np.std(bonds) / bond_mean)
         if bond_mean and bond_mean > 0
         else float("nan"),
     }
+    fit_c, fit_m, fit_r = coords, np.asarray(mids), radius
+    if resolution_bp > 0:  # coarse-grain to centroids at a common resolution
+        binidx = (np.asarray(mids) // resolution_bp).astype(np.int64)
+        uniq, inv = np.unique(binidx, return_inverse=True)
+        if uniq.size < 3:
+            return out
+        k = uniq.size
+        cnt = np.bincount(inv, minlength=k).astype(np.float64)
+        fit_c = np.stack(
+            [np.bincount(inv, weights=coords[:, a], minlength=k) / cnt for a in range(3)], axis=1
+        )
+        fit_m = np.bincount(inv, weights=np.asarray(mids, dtype=np.float64), minlength=k) / cnt
+        step = np.linalg.norm(np.diff(fit_c, axis=0), axis=1)
+        fit_r = contact_radius_factor * float(np.median(step[step > 0])) if np.any(step > 0) else radius
+    n = len(fit_c)
+    if n < 3:
+        return out
+    iu, ju = np.triu_indices(n, k=1)
+    d = _pairwise(fit_c)[iu, ju]
+    sep = np.abs(fit_m[iu] - fit_m[ju]).astype(np.float64)
+    b_dist, r2_dist = _loglog_fit(sep, d, n_bins, min_sep_bp, hi_frac)
+    b_con, r2_con = _loglog_fit(sep, (d < fit_r).astype(np.float64), n_bins, min_sep_bp, hi_frac)
+    out["dist_exp"], out["dist_r2"] = b_dist, r2_dist
+    out["contact_exp"], out["contact_r2"] = -b_con, r2_con  # report α > 0
+    return out
 
 
 def ensemble_scaling_laws(
-    ensemble: Sequence[F64Array], mids: I64Array, radius: float
+    ensemble: Sequence[F64Array], mids: I64Array, radius: float, resolution_bp: int = 0
 ) -> dict[str, float]:
-    """``scaling_laws`` averaged (nan-mean) across an ensemble."""
-    rows = [scaling_laws(c, mids, radius) for c in ensemble]
+    """``scaling_laws`` averaged (nan-mean) across an ensemble. ``resolution_bp`` > 0 normalizes
+    the β/α fit to a common bp resolution (see ``scaling_laws``)."""
+    rows = [scaling_laws(c, mids, radius, resolution_bp=resolution_bp) for c in ensemble]
     keys = rows[0].keys()
     return {k: float(np.nanmean([r[k] for r in rows])) for k in keys}
 

@@ -94,8 +94,10 @@ sweep picks the winner** — then set it in `cell_config.py`.
 # Genome-structure scaling laws (R(s)~s^β, P(s)~s^-α with log-log R² vs the literature bands) are
 # measured in a SEPARATE pass on one large (≥--law-mb, default 20 Mb) auto-picked region — the
 # only scale where the fractal-globule power-law window exists; they are NOT gated on the small
-# overlap/Hi-C regions (the reference fails them there too). Tune with --law-region / --law-mb /
-# --law-n (default 20; exponents need few structures); --no-laws skips the pass.
+# overlap/Hi-C regions (the reference fails them there too). β/α are RESOLUTION-NORMALIZED
+# (--law-resolution-bp, default 25000): both variants coarse-grained to a common bp grid before
+# fitting, so ref (~4.5kb beads) vs tuned (dynamic ~1kb) are comparable (P(s)/α is otherwise
+# bead-density-confounded). Tune --law-region / --law-mb / --law-n (default 20); --no-laws skips.
 # The C++ reference ensemble is parallelised across cores (--ref-workers, default auto =
 # min(n, cpu_count)); each worker generates a chunk with a distinct -r seed, so the n=100
 # reference is ~cpu_count× faster and statistically equivalent (not byte-identical) to the serial
