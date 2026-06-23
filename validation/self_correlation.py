@@ -18,14 +18,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import tempfile
 from pathlib import Path
 
 import numpy as np
 
+_ROOT = Path(__file__).resolve().parent.parent
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(_ROOT))
 
 from gnome3d.data import ContactData  # noqa: E402
 from gnome3d.io import load_singletons  # noqa: E402
@@ -34,6 +36,46 @@ from validation import metrics  # noqa: E402
 from validation.cell_config import apply_flags, settings_for_cell, with_singletons  # noqa: E402
 from validation.hic_boundaries import write_breakpoints  # noqa: E402
 from validation.validate import _chrs_and_region, run_ensemble  # noqa: E402
+
+sys.path.insert(0, str(_ROOT / "harness"))
+import integration as ig  # noqa: E402  (the C++ reference runner; harness is not a package)
+
+MAX_LEVEL = 2  # heatmap + arc + smooth MC (same as compare_reference / the integration test)
+# Feature flags that distinguish our TUNED config from the reference baseline (turned OFF for parity).
+_FEATURES_OFF = {
+    "use_excluded_volume": False,
+    "use_confinement": False,
+    "use_dynamic_loop_density": False,
+    "use_ib_mc": False,
+}
+
+
+def _cpp_selfhic_config(
+    cell: str, data_root: str, singletons_abs: Path, segments_abs: Path, tmp: Path, fast: bool
+) -> Path:
+    """Write a 3dnome .ini for the C++ reference's self-HiC run: CTCF anchors/clusters (the loops
+    are still CTCF) + the **Hi-C** singletons + **Hi-C TAD** segment-split. Uses an EMPTY data_dir
+    so every path is absolute (the C++ does ``data_dir + filename``, so empty + abs = abs)."""
+    base = tmp / "selfhic_base.ini"
+    ig.write_config(base, fast=fast)  # all the simulation params, parity-faithful
+    s = settings_for_cell(cell, data_root)
+    abspath = lambda fn: str(Path(s.data_path(fn)).resolve())
+    block = (
+        "[data]\n"
+        "data_dir = \n"  # empty -> the absolute paths below are used as-is
+        f"anchors = {abspath(s.data_anchors)}\n"
+        f"clusters = {abspath(s.data_pet_clusters)}\n"
+        "factors = CTCF\n"
+        f"singletons = {Path(singletons_abs).resolve()}\n"
+        "split_singleton_files_by_chr = no\n"
+        "singletons_inter = \n"
+        f"segment_split = {Path(segments_abs).resolve()}\n"
+        f"centromeres = {abspath(s.data_centromeres)}"
+    )
+    text = re.sub(r"\[data\].*?(?=\n\[)", block, base.read_text(), count=1, flags=re.DOTALL)
+    cfg = tmp / "selfhic_cpp.ini"
+    cfg.write_text(text)
+    return cfg
 
 
 def _stable_holdout(i: int, j: int, seed: int, frac: float = 0.5) -> bool:
@@ -212,25 +254,47 @@ def run_self_correlation(region: str, args: argparse.Namespace, tmp: Path) -> di
     # centralized config modification (no inline Settings mutation)
     tuned = with_singletons(tuned, str(singletons_path), singletons_inter="")
 
-    data = ContactData.from_files(tuned, chrs_list, bed_region)
-    ens = run_ensemble(tuned, data, chrs_list, bed_region, args.n)
-    coords_list, mids_l = [], []
-    for beads in ens:
-        c, mm = metrics.to_arrays(beads)
-        coords_list.append(c)
-        mids_l.append(mm)
     eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else args.binsize
-    rho = faithful_on_masks(
-        coords_list, mids_l[0], bal, bin_starts, eff, {"test": test_mask, "train": train_mask}
-    )
-    return {
+    masks = {"test": test_mask, "train": train_mask}
+    data = ContactData.from_files(tuned, chrs_list, bed_region)
+
+    def score_python(settings: object) -> dict:
+        ens = run_ensemble(settings, data, chrs_list, bed_region, args.n)  # type: ignore[arg-type]
+        cl = [metrics.to_arrays(b)[0] for b in ens]
+        return faithful_on_masks(cl, metrics.to_arrays(ens[0])[1], bal, bin_starts, eff, masks)
+
+    out: dict = {
         "region": region,
-        "heldout_pearson": rho["test"],
-        "train_pearson": rho["train"],
+        "mode": args.hic_singletons,
         "n_test_pairs": int(np.asarray(test_mask).sum() // 2),
         "n_train_pairs": int(np.asarray(train_mask).sum() // 2),
-        "mode": args.hic_singletons,
     }
+    # All three variants get the SAME Hi-C singletons + Hi-C TAD segmentation; only the model
+    # differs — reference (C++ baseline), parity (our port, features OFF), tuned (features ON).
+    # The reference baseline tells us whether a modest train/test number is OUR doing or the
+    # metric/data/region ceiling; parity-vs-tuned isolates the feature contribution.
+    print(f"  [{region}] python +tuned ...")
+    out["tuned"] = score_python(tuned)
+    print(f"  [{region}] python parity (features off) ...")
+    out["parity"] = score_python(apply_flags(tuned, _FEATURES_OFF))
+    if not args.no_reference and ig.CPP_BIN.exists():
+        print(f"  [{region}] C++ reference ...")
+        cfg = _cpp_selfhic_config(
+            args.cell, args.data_root, Path(singletons_path), Path(args.hic_breakpoints),
+            tmp, args.quality == "fast",
+        )
+        rdir = tmp / f"cpp_{safe}"
+        rdir.mkdir(parents=True, exist_ok=True)
+        ref_structs, _ = ig.run_cpp_ensemble_parallel(
+            rdir, cfg, args.n, MAX_LEVEL, region, "selfhic", workers=getattr(args, "ref_workers", 0)
+        )
+        rcl = [metrics.to_arrays(b)[0] for b in ref_structs]
+        out["reference"] = faithful_on_masks(
+            rcl, metrics.to_arrays(ref_structs[0])[1], bal, bin_starts, eff, masks
+        )
+    else:
+        out["reference"] = {"test": float("nan"), "train": float("nan")}
+    return out
 
 
 def main() -> None:
@@ -268,6 +332,12 @@ def main() -> None:
         help="precomputed Hi-C TAD breakpoints BED; default = derive from --hic (cooltools)",
     )
     p.add_argument("--region", default=None, help="single region override")
+    p.add_argument(
+        "--no-reference", action="store_true", help="skip the C++ reference + parity baselines"
+    )
+    p.add_argument(
+        "--ref-workers", type=int, default=0, help="cores for the C++ reference (0 = auto)"
+    )
     p.add_argument("--out", required=True)
     args = p.parse_args()
 
@@ -300,25 +370,27 @@ def main() -> None:
         sys.exit("[error] no regions found")
 
     tmp = Path(tempfile.mkdtemp(prefix="gnome3d_selfcorr_"))
+    variants = ["reference", "parity", "tuned"]
     results = []
     for region in regions:
         print(f"\n[self_corr] {region} ({args.hic_singletons}, n={args.n}, {args.quality}):")
         r = run_self_correlation(region, args, tmp)
         results.append(r)
         out_path.write_text(json.dumps(results, indent=2))
-        print(
-            f"  [done] train Pearson = {r['train_pearson']:.4f} | held-out = "
-            f"{r['heldout_pearson']:.4f}  ({r['n_train_pairs']}/{r['n_test_pairs']} pairs)"
-        )
+        cells = "  ".join(f"{v}:{r[v]['train']:+.3f}/{r[v]['test']:+.3f}" for v in variants)
+        print(f"  [done] (train/test)  {cells}")
 
-    fin = lambda k: [r[k] for r in results if r[k] == r[k]]  # drop NaN
-    med_tr = float(np.median(fin("train_pearson"))) if fin("train_pearson") else float("nan")
-    med_te = float(np.median(fin("heldout_pearson"))) if fin("heldout_pearson") else float("nan")
+    def med(variant: str, key: str) -> float:
+        xs = [r[variant][key] for r in results if r[variant][key] == r[variant][key]]
+        return float(np.median(xs)) if xs else float("nan")
+
     print(f"\n{'=' * 70}\nHi-C SELF-CORRELATION ({args.hic_singletons}) — median over {len(results)} regions")
-    print(f"  TRAIN  Pearson (fed-in contacts):    {med_tr:.4f}")
-    print(f"  TEST   Pearson (HELD-OUT contacts):  {med_te:.4f}   <- generalisation")
-    print("  Read: train≈test≫0 = fits & generalises; train≫test = no generalisation;")
-    print("        both≈0 = model isn't reproducing even the contacts it was given.")
+    print(f"  {'variant':<22}{'TRAIN (fed-in)':>16}{'TEST (held-out)':>17}")
+    for v in variants:
+        print(f"  {v:<22}{med(v, 'train'):>16.4f}{med(v, 'test'):>17.4f}")
+    print("  Read: TEST is the generalisation number. If reference≈tuned, a modest value is the")
+    print("        metric/data/region ceiling, not our model; tuned≫parity = our features help,")
+    print("        tuned≪parity = they hurt. train≫test (any variant) = fits but doesn't generalise.")
     print("=" * 70)
 
 
