@@ -380,18 +380,30 @@ def main() -> None:
         cells = "  ".join(f"{v}:{r[v]['train']:+.3f}/{r[v]['test']:+.3f}" for v in variants)
         print(f"  [done] (train/test)  {cells}")
 
-    def med(variant: str, key: str) -> float:
-        xs = [r[variant][key] for r in results if r[variant][key] == r[variant][key]]
+    def _fin(r: dict, v: str, key: str) -> bool:
+        return r[v][key] == r[v][key]  # not NaN
+
+    def med(rows: list, variant: str, key: str) -> float:
+        xs = [r[variant][key] for r in rows if _fin(r, variant, key)]
         return float(np.median(xs)) if xs else float("nan")
 
-    print(f"\n{'=' * 70}\nHi-C SELF-CORRELATION ({args.hic_singletons}) — median over {len(results)} regions")
-    print(f"  {'variant':<22}{'TRAIN (fed-in)':>16}{'TEST (held-out)':>17}")
+    # NaN = a variant's structure collapsed on a region (features-off models with no EV can, on
+    # underdetermined regions) → its per-variant median would be over a DIFFERENT region set than
+    # tuned's. So also report the PAIRED median over regions where ALL variants are finite.
+    matched = [r for r in results if all(_fin(r, v, "test") for v in variants)]
+    print(f"\n{'=' * 74}\nHi-C SELF-CORRELATION ({args.hic_singletons}) — {len(results)} regions")
+    print(f"  {'variant':<14}{'TRAIN':>9}{'TEST':>9}{'finite':>8}    {'TRAIN(paired)':>14}{'TEST(paired)':>13}")
     for v in variants:
-        print(f"  {v:<22}{med(v, 'train'):>16.4f}{med(v, 'test'):>17.4f}")
-    print("  Read: TEST is the generalisation number. If reference≈tuned, a modest value is the")
-    print("        metric/data/region ceiling, not our model; tuned≫parity = our features help,")
-    print("        tuned≪parity = they hurt. train≫test (any variant) = fits but doesn't generalise.")
-    print("=" * 70)
+        nfin = sum(_fin(r, v, "test") for r in results)
+        flag = "  <- collapsed on some regions" if nfin < len(results) else ""
+        print(
+            f"  {v:<14}{med(results, v, 'train'):>9.3f}{med(results, v, 'test'):>9.3f}{nfin:>6}/{len(results)}"
+            f"    {med(matched, v, 'train'):>14.3f}{med(matched, v, 'test'):>13.3f}{flag}"
+        )
+    print(f"  (paired = median over the {len(matched)} regions where ALL variants are finite)")
+    print("  Read TEST: reference≈tuned ⇒ modest value is the metric/region ceiling, not our model;")
+    print("  tuned≫parity ⇒ features help (incl. EV preventing the collapse that NaNs the baselines).")
+    print("=" * 74)
 
 
 if __name__ == "__main__":
