@@ -94,6 +94,22 @@ def load_contacts(
     return [(p1, p2, float(sc)) for _c1, p1, _c2, p2, sc in raw]
 
 
+def load_chiapet_contacts(
+    s: Settings, chrs_list: list[str], region: BedRegion | None
+) -> list[tuple[int, int, float]]:
+    """FULL input ChIA-PET contacts (singleton weak contacts + cluster loop-arcs) as
+    (pos_a, pos_b, score) — the model's input heat map, for the V4 cross-data (ChIA-PET vs Hi-C)
+    check. Loops (arcs) are the strong PET clusters; singletons the dense Hi-C-like background."""
+    from gnome3d.io import load_arcs
+
+    chr_set = set(chrs_list)
+    out = load_contacts(s, chrs_list, region)  # singletons
+    arcs, _long = load_arcs(s.data_path(s.data_pet_clusters), chr_set, region)
+    for chrom in chrs_list:
+        out.extend((a.start, a.end, float(a.score)) for a in arcs.get(chrom, []))
+    return out
+
+
 def summarize(
     ensemble: list[list[BeadOut]],
     contacts: list[tuple[int, int, float]],

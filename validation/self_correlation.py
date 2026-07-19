@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Hi-C self-correlation study: feed the experimental Hi-C into 3dgnome as additional singleton
-contacts, then correlate the reconstructed structure against HELD-OUT Hi-C contacts.
+"""Hi-C self-correlation study: feed the experimental Hi-C into 3dgnome as singleton contacts
+(``replace`` = pure Hi-C-driven, or ``augment`` = added to ChIA-PET), then correlate the
+reconstructed structure against HELD-OUT Hi-C contacts — for THREE variants (C++ reference,
+python parity with features off, python tuned) so the result is diagnosable.
 
 Why held-out: 3dgnome turns singleton contact frequencies into target distances the MC minimises
 toward (``io.load_singletons`` -> ``create_singleton_heatmap`` -> ``util.freq_to_dist_heatmap``).
@@ -10,8 +12,9 @@ singletons) and TEST (held out) and correlate only against TEST — a genuine ge
 This mirrors the original 3D-GNOME paper, which both showed ChIA-PET≈Hi-C (ρ≈0.67–0.88, Fig. 2) and
 ran the same engine on Hi-C input (Suppl. S7).
 
-This module provides the converter + split + held-out scorer; the run driver (override
-``data_singletons`` -> run ensemble -> score) is wired in ``run_self_correlation``.
+Segmentation uses **Hi-C TAD boundaries** (``hic_boundaries``, cooltools insulation), not CTCF/CCD,
+so the model's IBs align with the TADs we score against. The run driver (override
+``data_singletons`` + ``data_segment_split`` -> run each variant -> score) is ``run_self_correlation``.
 """
 
 from __future__ import annotations
@@ -257,11 +260,27 @@ def run_self_correlation(region: str, args: argparse.Namespace, tmp: Path) -> di
     eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else args.binsize
     masks = {"test": test_mask, "train": train_mask}
     data = ContactData.from_files(tuned, chrs_list, bed_region)
+    # The fed-in Hi-C train contacts (pos_a, pos_b, score) are the V1 "input heat-map IFs": V1 asks
+    # how well the structure reflects their imposed distance ordering (3dgnome 2016 Suppl. Spearman).
+    hic_train_contacts = [
+        (int(p[1]), int(p[4]), float(p[6]))
+        for p in (ln.split() for ln in hic_bedpe.read_text().splitlines())
+        if len(p) >= 7
+    ]
+
+    def score(cl: list, mids0: object) -> dict:
+        d = faithful_on_masks(cl, mids0, bal, bin_starts, eff, masks)
+        # V1 (faithful, per 3dgnome papers): mean Spearman(input IF, model 3D distance) over the
+        # ensemble; ρ < 0 = high-frequency contacts placed close = good self-consistency.
+        d["v1"] = float(
+            np.nanmean([metrics.self_consistency(c, mids0, hic_train_contacts)[0] for c in cl])
+        )
+        return d
 
     def score_python(settings: object) -> dict:
         ens = run_ensemble(settings, data, chrs_list, bed_region, args.n)  # type: ignore[arg-type]
         cl = [metrics.to_arrays(b)[0] for b in ens]
-        return faithful_on_masks(cl, metrics.to_arrays(ens[0])[1], bal, bin_starts, eff, masks)
+        return score(cl, metrics.to_arrays(ens[0])[1])
 
     out: dict = {
         "region": region,
@@ -289,11 +308,9 @@ def run_self_correlation(region: str, args: argparse.Namespace, tmp: Path) -> di
             rdir, cfg, args.n, MAX_LEVEL, region, "selfhic", workers=getattr(args, "ref_workers", 0)
         )
         rcl = [metrics.to_arrays(b)[0] for b in ref_structs]
-        out["reference"] = faithful_on_masks(
-            rcl, metrics.to_arrays(ref_structs[0])[1], bal, bin_starts, eff, masks
-        )
+        out["reference"] = score(rcl, metrics.to_arrays(ref_structs[0])[1])
     else:
-        out["reference"] = {"test": float("nan"), "train": float("nan")}
+        out["reference"] = {"test": float("nan"), "train": float("nan"), "v1": float("nan")}
     return out
 
 
@@ -392,17 +409,18 @@ def main() -> None:
     # tuned's. So also report the PAIRED median over regions where ALL variants are finite.
     matched = [r for r in results if all(_fin(r, v, "test") for v in variants)]
     print(f"\n{'=' * 74}\nHi-C SELF-CORRELATION ({args.hic_singletons}) — {len(results)} regions")
-    print(f"  {'variant':<14}{'TRAIN':>9}{'TEST':>9}{'finite':>8}    {'TRAIN(paired)':>14}{'TEST(paired)':>13}")
+    print(f"  {'variant':<14}{'TRAIN':>9}{'TEST':>9}{'V1(ρ)':>9}{'finite':>8}    {'TEST(paired)':>13}")
     for v in variants:
         nfin = sum(_fin(r, v, "test") for r in results)
         flag = "  <- collapsed on some regions" if nfin < len(results) else ""
         print(
-            f"  {v:<14}{med(results, v, 'train'):>9.3f}{med(results, v, 'test'):>9.3f}{nfin:>6}/{len(results)}"
-            f"    {med(matched, v, 'train'):>14.3f}{med(matched, v, 'test'):>13.3f}{flag}"
+            f"  {v:<14}{med(results, v, 'train'):>9.3f}{med(results, v, 'test'):>9.3f}"
+            f"{med(results, v, 'v1'):>9.3f}{nfin:>6}/{len(results)}    {med(matched, v, 'test'):>13.3f}{flag}"
         )
     print(f"  (paired = median over the {len(matched)} regions where ALL variants are finite)")
-    print("  Read TEST: reference≈tuned ⇒ modest value is the metric/region ceiling, not our model;")
-    print("  tuned≫parity ⇒ features help (incl. EV preventing the collapse that NaNs the baselines).")
+    print("  TEST = held-out Hi-C generalisation; V1(ρ) = 3dgnome-paper self-consistency Spearman")
+    print("         (input Hi-C IF vs model 3D distance; want < 0 — high-freq contacts placed close).")
+    print("  reference≈tuned ⇒ ceiling not our model; tuned≫parity ⇒ features help (EV stops collapse).")
     print("=" * 74)
 
 

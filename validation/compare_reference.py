@@ -46,6 +46,7 @@ from validation.validate import (  # noqa: E402
     FAIL,
     PASS,
     _chrs_and_region,
+    load_chiapet_contacts,
     load_contacts,
     run_ensemble,
     summarize,
@@ -318,10 +319,17 @@ def main() -> None:
     config = tmp / "parity.ini"
     ig.write_config(config, fast=args.fast)  # parity settings, GM12878 data paths
 
+    s_v4 = Settings()
+    s_v4.load_ini(str(config))  # parity data paths, for the V4 ChIA-PET input contacts
     rows: list[tuple[str, dict[str, float], dict[str, float], dict[str, float]]] = []
+    v4_rows: list[dict[str, float]] = []
     for region in regions:
         ref_m, base_m, feat_m = score_region(region, config, tmp, args)
         rows.append((region, ref_m, base_m, feat_m))
+        if args.hic:  # V4 (data-level): input ChIA-PET heatmap vs Hi-C — no structure involved
+            chrs_list, bed_region = _chrs_and_region(region)
+            chia = load_chiapet_contacts(s_v4, chrs_list, bed_region)
+            v4_rows.append(contacts.cross_data_correlation(chia, args.hic, region, args.binsize))
         print(
             f"  -> {region}: overlap ref={ref_m['overlap_frac']:.4f} "
             f"parity={base_m['overlap_frac']:.4f} +tuned={feat_m['overlap_frac']:.4f} "
@@ -401,6 +409,15 @@ def main() -> None:
         )
         print("    (faithful (d+1)^-3 vs ICE-balanced Hi-C — MultiMM's metric approach; "
               "value scales with region size, compared ref-vs-tuned at the SAME geometry)")
+
+        # V4 (3dgnome 2016 Fig. 2): input ChIA-PET heatmap vs Hi-C — data-level, no structure.
+        if v4_rows:
+            v4med = lambda k: float(np.nanmedian([r[k] for r in v4_rows]))
+            print("\n  V4 cross-data — input ChIA-PET heatmap vs Hi-C (data-level, no structure):")
+            print(
+                f"    Pearson(log1p) = {v4med('pearson'):.3f}   SCC = {v4med('scc'):.3f}   "
+                f"(paper Fig. 2: ρ ≈ 0.67–0.73)"
+            )
 
     # --- scaling-law pass on ONE large region (where the fractal-globule regime exists) ---
     if not args.no_laws:
