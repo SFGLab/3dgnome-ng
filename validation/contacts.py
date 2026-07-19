@@ -182,20 +182,78 @@ def contact_list_heatmap(
     return C
 
 
+def observed_over_expected(matrix: F64Array, min_sep_bins: int = 1) -> F64Array:
+    """Distance-decay-normalized map (observed/expected): each entry divided by the MEAN of its
+    genomic-distance diagonal, so the monotone distance-decay both Hi-C and ChIA-PET share is
+    stripped and what's left is *structure* (loops/compartments). This is the standard confound
+    removal — without it a raw Pearson mostly measures "both fall off with distance". Diagonals
+    with no signal → 0; entries within ``min_sep_bins`` of the diagonal are left at 0. Copy."""
+    m = np.asarray(matrix, dtype=np.float64)
+    n = m.shape[0]
+    oe = np.zeros_like(m)
+    for d in range(max(min_sep_bins, 1), n):
+        idx = np.arange(n - d)
+        diag = m[idx, idx + d]
+        pos = diag > 0
+        if not pos.any():
+            continue
+        v = diag / float(diag[pos].mean())
+        oe[idx, idx + d] = v
+        oe[idx + d, idx] = v
+    return oe
+
+
+def _oe_correlation(a_oe: F64Array, b_oe: F64Array, min_sep_bins: int) -> dict[str, float]:
+    """Pearson(log O/E) + Spearman(O/E) over the upper-triangle bin-pairs where BOTH maps have
+    signal (the informative overlap of a sparse ChIA-PET map and dense Hi-C). ``n_pairs`` reports
+    how many survive — a small count is itself the finding (data too sparse to correlate)."""
+    out = {"pearson_oe": float("nan"), "spearman_oe": float("nan"), "n_pairs_oe": 0.0}
+    n = a_oe.shape[0]
+    if n < 4:
+        return out
+    iu = np.triu_indices(n, max(min_sep_bins, 1))
+    a, b = a_oe[iu], b_oe[iu]
+    both = (a > 0) & (b > 0)
+    out["n_pairs_oe"] = float(both.sum())
+    if both.sum() >= 4:
+        la, lb = np.log(a[both]), np.log(b[both])
+        if la.std() > 1e-12 and lb.std() > 1e-12:
+            out["pearson_oe"] = float(np.corrcoef(la, lb)[0, 1])
+        try:
+            from scipy.stats import spearmanr
+
+            out["spearman_oe"] = float(spearmanr(a[both], b[both]).statistic)
+        except ImportError:
+            pass
+    return out
+
+
 def cross_data_correlation(
     chiapet_contacts: list[tuple[int, int, float]],
     mcool_path: str,
     region: str,
     binsize: int,
     balance: bool = True,
+    min_sep_bins: int = 1,
 ) -> dict[str, float]:
     """V4 (3dgnome 2016, Fig. 2): correlate the model's INPUT ChIA-PET contact heatmap against the
-    observed Hi-C on a common bin grid — a data-level check (no structure). Returns SCC + the
-    decay-retained log1p Pearson (the paper reports ρ≈0.67–0.73). Hi-C is ICE-balanced by default."""
+    observed Hi-C on a common bin grid — a data-level check (no structure). Returns the raw
+    decay-retained log1p Pearson + SCC AND the decay-stripped O/E correlation (``pearson_oe``,
+    ``spearman_oe``, ``n_pairs_oe``): the raw number is confounded by shared distance-decay, the
+    O/E number is the structure-vs-structure agreement the paper's ρ≈0.67–0.73 is really about.
+    Hi-C is ICE-balanced by default (needed for a meaningful O/E)."""
     c_obs, bin_starts = observed_hic(mcool_path, region, binsize, balance=balance)
     eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize
     c_chia = contact_list_heatmap(chiapet_contacts, bin_starts, eff)
-    return contact_correlation(c_chia, c_obs)
+    out = contact_correlation(c_chia, c_obs, min_sep_bins=min_sep_bins)
+    out.update(
+        _oe_correlation(
+            observed_over_expected(c_chia, min_sep_bins),
+            observed_over_expected(c_obs, min_sep_bins),
+            min_sep_bins,
+        )
+    )
+    return out
 
 
 def remove_diagonals(matrix: F64Array, n_diag: int) -> F64Array:

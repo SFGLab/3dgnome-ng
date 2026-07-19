@@ -215,6 +215,21 @@ def _sign_test(k: int, m: int) -> float:
     return sum(math.comb(m, i) for i in range(k, m + 1)) / 2.0**m
 
 
+def _wilcoxon(deltas: list[float]) -> float:
+    """One-sided Wilcoxon signed-rank p for H1: paired deltas > 0. Uses the delta MAGNITUDES (not
+    just their signs like the sign test), so it resolves an effect with far fewer regions. NaN if
+    scipy is missing or too few non-zero deltas."""
+    d = [x for x in deltas if np.isfinite(x) and abs(x) > 1e-12]
+    if len(d) < 6:
+        return float("nan")
+    try:
+        from scipy.stats import wilcoxon
+
+        return float(wilcoxon(d, alternative="greater").pvalue)
+    except (ImportError, ValueError):
+        return float("nan")
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Score 3dgnome output vs the C++ reference")
     p.add_argument("--cell", default="GM12878", help="cell line for the unified tuned config")
@@ -386,7 +401,8 @@ def main() -> None:
     print(
         f"  {PASS if feat_wins == m else (FAIL if feat_wins == 0 else PASS)}  +tuned has FEWER "
         f"overlaps than reference (resolution-normalized): {feat_wins}/{m} regions  "
-        f"(median Δ={float(np.median(d_overlaps)):+.4f}, sign-test p={p_better:.4f})"
+        f"(median Δ={float(np.median(d_overlaps)):+.4f}, sign-test p={p_better:.4f}, "
+        f"Wilcoxon p={_wilcoxon(d_overlaps):.4f})"
     )
     print(f"  {PASS if sc_ok == m else FAIL}  self-consistency preserved: {sc_ok}/{m} regions")
     print(
@@ -415,8 +431,16 @@ def main() -> None:
             v4med = lambda k: float(np.nanmedian([r[k] for r in v4_rows]))
             print("\n  V4 cross-data — input ChIA-PET heatmap vs Hi-C (data-level, no structure):")
             print(
-                f"    Pearson(log1p) = {v4med('pearson'):.3f}   SCC = {v4med('scc'):.3f}   "
-                f"(paper Fig. 2: ρ ≈ 0.67–0.73)"
+                f"    raw  Pearson(log1p) = {v4med('pearson'):.3f}   SCC = {v4med('scc'):.3f}"
+            )
+            print(
+                f"    O/E  Pearson(logO/E) = {v4med('pearson_oe'):.3f}   Spearman(O/E) = "
+                f"{v4med('spearman_oe'):.3f}   (median {v4med('n_pairs_oe'):.0f} shared pairs/region)"
+            )
+            print(
+                "    (O/E strips shared distance-decay → the structure-vs-structure agreement the "
+                "paper's ρ≈0.67–0.73 measures; raw is decay-confounded. Low n_pairs ⇒ ChIA-PET too "
+                "sparse to correlate — a data ceiling, not a model fault.)"
             )
 
     # --- scaling-law pass on ONE large region (where the fractal-globule regime exists) ---
