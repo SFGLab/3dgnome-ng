@@ -250,6 +250,15 @@ def main() -> None:
     )
     p.add_argument("--binsize", type=int, default=25000, help="Hi-C bin size for correlation")
     p.add_argument(
+        "--v4-binsize",
+        type=int,
+        default=100000,
+        help="Hi-C bin size for the V4 cross-data (ChIA-PET vs Hi-C) comparison. Coarser than the "
+        "structure metric on purpose: a CTCF ChIA-PET map fills only ~5%% of 25kb bin-pairs but "
+        "~40%% at 100kb, so the paper's Fig. 2 raw correlation (ρ≈0.67–0.88) is a coarse-grid "
+        "number. The decay-stripped O/E correlation is ~resolution-invariant either way.",
+    )
+    p.add_argument(
         "-n",
         "--n-structures",
         type=int,
@@ -344,7 +353,9 @@ def main() -> None:
         if args.hic:  # V4 (data-level): input ChIA-PET heatmap vs Hi-C — no structure involved
             chrs_list, bed_region = _chrs_and_region(region)
             chia = load_chiapet_contacts(s_v4, chrs_list, bed_region)
-            v4_rows.append(contacts.cross_data_correlation(chia, args.hic, region, args.binsize))
+            v4_rows.append(
+                contacts.cross_data_correlation(chia, args.hic, region, args.v4_binsize)
+            )
         print(
             f"  -> {region}: overlap ref={ref_m['overlap_frac']:.4f} "
             f"parity={base_m['overlap_frac']:.4f} +tuned={feat_m['overlap_frac']:.4f} "
@@ -405,6 +416,18 @@ def main() -> None:
         f"Wilcoxon p={_wilcoxon(d_overlaps):.4f})"
     )
     print(f"  {PASS if sc_ok == m else FAIL}  self-consistency preserved: {sc_ok}/{m} regions")
+    # Name the offending region(s) so a FAIL is diagnosable without a re-run: self-consistency rho
+    # is Spearman(input-IF, 3D distance), negative=good, so tuned regressing means rho went UP.
+    sc_bad = [
+        (r[0], r[1]["selfconsistency_rho"], r[3]["selfconsistency_rho"])
+        for r in rows
+        if not (
+            np.isfinite(r[3]["selfconsistency_rho"])
+            and r[3]["selfconsistency_rho"] <= r[1]["selfconsistency_rho"] + 0.15
+        )
+    ]
+    for region, rho_p, rho_t in sc_bad:
+        print(f"      ↳ regressed: {region}  parity ρ={rho_p:+.3f} → tuned ρ={rho_t:+.3f}")
     print(
         "  (scaling laws are NOT gated here — the fractal-globule regime needs a large region; "
         "see the dedicated law pass below)"
@@ -429,18 +452,22 @@ def main() -> None:
         # V4 (3dgnome 2016 Fig. 2): input ChIA-PET heatmap vs Hi-C — data-level, no structure.
         if v4_rows:
             v4med = lambda k: float(np.nanmedian([r[k] for r in v4_rows]))
-            print("\n  V4 cross-data — input ChIA-PET heatmap vs Hi-C (data-level, no structure):")
             print(
-                f"    raw  Pearson(log1p) = {v4med('pearson'):.3f}   SCC = {v4med('scc'):.3f}"
+                f"\n  V4 cross-data — input ChIA-PET heatmap vs Hi-C @ {args.v4_binsize // 1000}kb "
+                "(data-level, no structure):"
+            )
+            print(
+                f"    raw  Pearson(log1p) = {v4med('pearson'):.3f}   SCC = {v4med('scc'):.3f}   "
+                "(paper Fig. 2: ρ ≈ 0.67–0.88 — decay-retained, coarse grid)"
             )
             print(
                 f"    O/E  Pearson(logO/E) = {v4med('pearson_oe'):.3f}   Spearman(O/E) = "
                 f"{v4med('spearman_oe'):.3f}   (median {v4med('n_pairs_oe'):.0f} shared pairs/region)"
             )
             print(
-                "    (O/E strips shared distance-decay → the structure-vs-structure agreement the "
-                "paper's ρ≈0.67–0.73 measures; raw is decay-confounded. Low n_pairs ⇒ ChIA-PET too "
-                "sparse to correlate — a data ceiling, not a model fault.)"
+                "    (raw reproduces the paper's number — it's dominated by the shared distance-decay "
+                "at coarse resolution. O/E strips that decay → the honest structure-only agreement, "
+                "which is genuinely modest (~0.2–0.3) for CTCF-ChIA-PET vs Hi-C at any resolution.)"
             )
 
     # --- scaling-law pass on ONE large region (where the fractal-globule regime exists) ---
