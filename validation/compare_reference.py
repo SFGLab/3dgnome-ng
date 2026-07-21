@@ -47,7 +47,6 @@ from validation.validate import (  # noqa: E402
     PASS,
     _chrs_and_region,
     load_chiapet_contacts,
-    load_contacts,
     run_ensemble,
     summarize,
 )
@@ -112,7 +111,13 @@ def score_region(
     # Both batch and threaded preserve parity (the kernels are the same MC); pick per hardware.
     s_base = with_arcs_executor(s_base, args.py_arcs, getattr(args, "py_workers", 0))
     data = ContactData.from_files(s_base, chrs_list, bed_region)
-    contacts_list = load_contacts(s_base, chrs_list, bed_region)
+    # V1 self-consistency correlates INPUT interaction frequency vs 3D distance. The real IF signal
+    # is the cluster loop strengths (PET counts ~3–61828); singletons-only is scores 1–2, a near-
+    # binary rank signal that goes to noise on small regions and spuriously "regresses" when a
+    # tighter (healthier) structure narrows the distance spread. Use the FULL ChIA-PET so V1
+    # measures loop reproduction as the paper intends. (Only feeds self_consistency; overlap/Rg/Hi-C
+    # are structure-derived and unaffected.)
+    contacts_list = load_chiapet_contacts(s_base, chrs_list, bed_region)
     print(f"  [{region}] python parity (parity.ini, features off)...")
     base_structs = run_ensemble(s_base, data, chrs_list, bed_region, args.n_structures)
     print(f"  [{region}] python +tuned (unified canonical config)...")
