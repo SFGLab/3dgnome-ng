@@ -1,5 +1,5 @@
 {
-  "_note": "Plain Hi-C (AluI) for HFFc6 — smallest plain Hi-C (920MB; HFFc6 Micro-C is 6-22GB). CTCF-inclusive, NOT RNA Pol II / CTCF-HiChIP. Fetch: python -m validation.dataloader --manifest validation/manifests/HFFC6_hic.json --out data/_hic  ->  data/_hic/HFFC6/hic.4DNFIDKNBPC3.mcool",
+  "_note": "Plain Hi-C (AluI) for HFFc6 — smallest plain Hi-C (920MB; HFFc6 Micro-C is 6-22GB). CTCF-inclusive, NOT RNA Pol II / CTCF-HiChIP. Fetch: python -m validation fetch --manifest validation/manifests/HFFC6_hic.json --out data/_hic  ->  data/_hic/HFFC6/hic.4DNFIDKNBPC3.mcool",
   "cell_line": "HFFC6",
   "assembly": "GRCh38",
   "assays": [

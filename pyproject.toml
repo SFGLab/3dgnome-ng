@@ -93,6 +93,7 @@ ban-relative-imports = "all"
 "gnome3d/hierarchy.py" = ["F405", "F403"]
 "gnome3d/pipeline/coarse/build.py" = ["F405", "F403"]
 "gnome3d/mc/jax/util.py" = ["F401"]
+"validation/metrics/__init__.py" = ["F405", "F403"]
 
 # The harness uses tight one-liner stubs (lots of `;`), tuple short names like
 # `l` for length, and zip() without strict=. These are intentional for compact

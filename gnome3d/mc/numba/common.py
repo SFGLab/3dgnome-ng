@@ -1,7 +1,7 @@
 """Shared numba driver + array helpers.
 
 `_run_outer_loop` is the Python-side convergence loop every public entry uses:
-it runs `terms._batch_mc_nb` for `stop_steps` at a time and checks the C++-style
+it runs `terms._batch_mc_nb` for `stop_steps` at a time and checks the reference-style
 stop condition.  `_prepare_orientation` builds the CSR orientation arrays the
 kernel needs from the Python neighbour dicts.  `_as_f64` / `_dummy_*` produce the
 contiguous / placeholder arrays the kernel's fixed signature expects.

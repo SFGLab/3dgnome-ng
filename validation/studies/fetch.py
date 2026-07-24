@@ -1,27 +1,28 @@
-#!/usr/bin/env python3
-"""Experiment data loader — fetch 4DN / ENCODE files from a declarative manifest.
+"""Experiment data loader. Fetch 4DN and ENCODE files from a declarative manifest.
 
-Sources the data families ``docs/epigenome-to-structure.md`` §7 needs, reproducibly:
+Sources the data families docs/epigenome-to-structure.md §7 needs, reproducibly.
 
-  * **epigenomic tracks** (CTCF, RAD21, ATAC/DNase, histone ChIP, RNA-seq) — ENCODE
-  * **contacts / imaging** (ChIA-PET, Hi-C, MERFISH) — 4DN
+  * epigenomic tracks such as CTCF, RAD21, ATAC/DNase, histone ChIP, RNA-seq, from ENCODE
+  * contacts and imaging such as ChIA-PET, Hi-C, MERFISH, from 4DN
 
-A *manifest* (one JSON per cell line; see ``validation/manifests/``) lists, per assay, a
-``{source, accession}``. The loader resolves each accession to a concrete file URL + md5 via
-the portal REST API, downloads it (cached, checksum-verified, skip-if-present), and writes a
-**lockfile** pinning the resolved accession + md5 + url so a rebuild is byte-identical.
+A manifest is one JSON per cell line, see validation/manifests/. It lists a {source, accession}
+per assay. The loader resolves each accession to a concrete file URL and md5 via the portal REST
+API, downloads it with caching, checksum verification, and skip-if-present, and writes a lockfile
+pinning the resolved accession, md5, and url so a rebuild is byte-identical.
 
-Binning bigWig signal onto a bead grid (the conditioning "epitensor") is a *downstream*
-transform that belongs with the ML model (epigenome-to-structure Phase 0 step 3) — out of
-scope here; this module's job is reproducible acquisition.
+Binning bigWig signal onto a bead grid, the conditioning epitensor, is a downstream transform
+that belongs with the ML model at epigenome-to-structure Phase 0 step 3. That is out of scope
+here. This module's job is reproducible acquisition.
 
-    python -m validation.dataloader --manifest validation/manifests/GM12878.json --out data/_epigenome
-    python -m validation.dataloader --manifest ... --dry-run     # resolve + print plan, no download
+    python -m validation fetch --manifest validation/manifests/GM12878.json --out data/_epigenome
+    python -m validation fetch --manifest ... --dry-run     # resolve and print plan, no download
 
-stdlib only (urllib/json/hashlib). 4DN files behind access control need DN_KEY/DN_SECRET env
-vars (HTTP basic). NOTE: 4DN's portal TLS certificate is currently expired *server-side*, so a
-CA bundle can't fix it — 4DN requests therefore skip TLS verification automatically (with a
-warning), while ENCODE stays verified. ``--insecure`` forces skip-verify for *all* sources.
+fetch does not reconstruct, so it ignores the shared reconstruction args and needs only --manifest.
+
+stdlib only, urllib/json/hashlib. 4DN files behind access control need DN_KEY/DN_SECRET env vars
+over HTTP basic auth. The 4DN portal TLS certificate is currently expired server-side, so a CA
+bundle cannot fix it. 4DN requests therefore skip TLS verification automatically, with a warning,
+while ENCODE stays verified. --insecure forces skip-verify for all sources.
 """
 
 from __future__ import annotations
@@ -38,19 +39,21 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 
+from validation.studies import Context, Study, register
+
 ENCODE_BASE = "https://www.encodeproject.org"
 DN_BASE = "https://data.4dnucleome.org"
 
 
 @dataclass
 class AssaySpec:
-    """One requested file: which assay, which portal, which accession."""
+    """One requested file. Which assay, which portal, which accession."""
 
     name: str  # logical track name, e.g. "CTCF", "H3K27ac", "ATAC", "gencode", "enhancers"
-    source: str  # "encode" | "4dn" | "url"
-    accession: str = ""  # ENCFF.../ENCSR... or 4DNFI... (empty for a "url" source)
-    output_type: str | None = None  # preferred ENCODE output_type (disambiguates a dataset)
-    url: str | None = None  # direct download URL (for source="url": GENCODE, EnhancerAtlas, ...)
+    source: str  # one of "encode", "4dn", "url"
+    accession: str = ""  # ENCFF.../ENCSR... or 4DNFI..., empty for a "url" source
+    output_type: str | None = None  # preferred ENCODE output_type, disambiguates a dataset
+    url: str | None = None  # direct download URL for source="url", e.g. GENCODE, EnhancerAtlas
     md5: str | None = None  # optional expected md5 for a "url" source
 
 
@@ -100,9 +103,9 @@ def _get_json(url: str, ctx: ssl.SSLContext, auth: tuple[str, str] | None = None
 def resolve_encode(spec: AssaySpec, ctx: ssl.SSLContext) -> FileRef:
     """Resolve an ENCODE accession to a concrete file.
 
-    A file accession (ENCFF...) resolves directly. An experiment/dataset accession
-    (ENCSR...) is searched for a released file matching ``output_type`` (default: the
-    first released bigWig / signal file).
+    A file accession, ENCFF..., resolves directly. An experiment or dataset accession, ENCSR...,
+    is searched for a released file matching output_type. The default is the first released
+    bigWig or signal file.
     """
     acc = spec.accession
     if acc.startswith("ENCFF"):
@@ -116,7 +119,7 @@ def resolve_encode(spec: AssaySpec, ctx: ssl.SSLContext) -> FileRef:
             file_format=meta.get("file_format"),
             output_type=meta.get("output_type"),
         )
-    # Dataset: pick a released file (preferring the requested output_type).
+    # Dataset. Pick a released file, preferring the requested output_type.
     meta = _get_json(f"{ENCODE_BASE}/experiments/{acc}/?format=json", ctx)
     files = [f for f in meta.get("files", []) if f.get("status") == "released"]
     want = spec.output_type or "fold change over control"
@@ -137,14 +140,14 @@ def resolve_encode(spec: AssaySpec, ctx: ssl.SSLContext) -> FileRef:
 
 
 def resolve_4dn(spec: AssaySpec, ctx: ssl.SSLContext) -> FileRef:
-    """Resolve a 4DN accession (4DNFI...) to a concrete file. Honors DN_KEY/DN_SECRET."""
+    """Resolve a 4DN accession, 4DNFI..., to a concrete file. Honors DN_KEY/DN_SECRET."""
     auth = None
     key, secret = os.environ.get("DN_KEY"), os.environ.get("DN_SECRET")
     if key and secret:
         auth = (key, secret)
     meta = _get_json(f"{DN_BASE}/{spec.accession}/?format=json", ctx, auth=auth)
-    # Prefer open_data_url: the public 4dn-open-data S3 mirror (valid cert, no auth). The gated
-    # @@download href 403s for open files and the portal cert is expired — open_data_url avoids both.
+    # Prefer open_data_url, the public 4dn-open-data S3 mirror with a valid cert and no auth. The
+    # gated @@download href 403s for open files and the portal cert is expired. open_data_url avoids both.
     url = meta.get("open_data_url")
     if not url:
         href = meta.get("href")
@@ -152,15 +155,15 @@ def resolve_4dn(spec: AssaySpec, ctx: ssl.SSLContext) -> FileRef:
             raise ValueError(f"4DN {spec.accession}: no open_data_url or href in metadata")
         url = href if href.startswith("http") else DN_BASE + href
     # 3dgnome models CTCF-mediated architecture, so the validation contact target must be
-    # CTCF-relevant (plain Hi-C, or CTCF ChIA-PET) — NOT RNA Pol II ChIA-PET/HiChIP, whose
+    # CTCF-relevant, plain Hi-C or CTCF ChIA-PET, not RNA Pol II ChIA-PET or HiChIP, whose
     # transcription-driven loops are the wrong ground truth. Flag a bad pick loudly.
     assay = (
         (meta.get("track_and_facet_info") or {}).get("assay_info") or meta.get("file_type") or ""
     )
     if any(t in assay for t in ("Pol II", "RNA Pol", "POLR2")):
         print(
-            f"  [WARN ] {spec.name} ({spec.accession}) assay='{assay}' is RNA Pol II — "
-            "WRONG contact type for a CTCF-driven model; pick plain Hi-C or CTCF ChIA-PET."
+            f"  [WARN ] {spec.name} ({spec.accession}) assay='{assay}' is RNA Pol II. "
+            "wrong contact type for a CTCF-driven model. pick plain Hi-C or CTCF ChIA-PET."
         )
     return FileRef(
         assay=spec.name,
@@ -176,8 +179,8 @@ def resolve_4dn(spec: AssaySpec, ctx: ssl.SSLContext) -> FileRef:
 
 
 def resolve_url(spec: AssaySpec) -> FileRef:
-    """A direct download URL — for sources without an accession API: GENCODE gene annotation
-    (ftp.ebi.ac.uk), EnhancerAtlas enhancer BEDs, etc. The manifest gives the literal ``url``."""
+    """A direct download URL for sources without an accession API, such as GENCODE gene
+    annotation at ftp.ebi.ac.uk or EnhancerAtlas enhancer BEDs. The manifest gives the literal url."""
     if not spec.url:
         raise ValueError(f"url source {spec.name!r} needs a 'url' field")
     fmt = spec.url.split("?")[0].rstrip("/").rsplit(".", 1)[-1]
@@ -211,8 +214,8 @@ def _md5(path: Path) -> str:
 
 
 def download(ref: FileRef, dest: Path, ctx: ssl.SSLContext) -> bool:
-    """Download ``ref`` to ``dest`` (skip if present and md5 matches). Returns True if a
-    download happened, False if the cached file was reused. Verifies md5 when known."""
+    """Download ref to dest, skipping if present and md5 matches. Returns True if a download
+    happened, False if the cached file was reused. Verifies md5 when known."""
     ext = Path(ref.url.split("?")[0]).suffix
     out = dest / f"{ref.assay}.{ref.accession}{ext}"
     if out.exists() and (ref.md5 is None or _md5(out) == ref.md5):
@@ -235,7 +238,7 @@ def download(ref: FileRef, dest: Path, ctx: ssl.SSLContext) -> bool:
 
 
 def write_lockfile(manifest: Manifest, refs: list[FileRef], dest: Path) -> None:
-    """Pin resolved accessions + md5 + url so a rebuild is byte-identical."""
+    """Pin resolved accessions, md5, and url so a rebuild is byte-identical."""
     lock = {
         "cell_line": manifest.cell_line,
         "assembly": manifest.assembly,
@@ -247,76 +250,76 @@ def write_lockfile(manifest: Manifest, refs: list[FileRef], dest: Path) -> None:
     print(f"  [lock  ] {path}")
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(description="Fetch 4DN/ENCODE experiment files from a manifest")
-    p.add_argument("--manifest", required=True, help="path to a cell-line manifest JSON")
-    p.add_argument("--out", default="data/_epigenome", help="output root (default data/_epigenome)")
-    p.add_argument("--dry-run", action="store_true", help="resolve + print plan, do not download")
-    p.add_argument(
-        "--insecure",
-        action="store_true",
-        help="skip TLS verification (opt-in; for portals with cert issues in your env)",
-    )
-    args = p.parse_args()
+class Fetch(Study):
+    name = "fetch"
+    help = "fetch 4DN/ENCODE experiment files from a manifest"
 
-    if not Path(args.manifest).exists():
-        sys.exit(f"[error] manifest not found: {args.manifest}")
-    manifest = Manifest.from_json(args.manifest)
-    dest = Path(args.out) / manifest.cell_line
-
-    secure = ssl.create_default_context()
-    insecure = ssl.create_default_context()
-    insecure.check_hostname = False
-    insecure.verify_mode = ssl.CERT_NONE
-    if args.insecure:
-        print("[dataloader] WARNING: TLS verification disabled for ALL sources (--insecure)")
-    _warned_4dn = [False]
-
-    def ctx_for(source: str) -> ssl.SSLContext:
-        # 4DN's portal cert is expired server-side; verify would always fail, so we work
-        # over it (skip verify for 4DN only). ENCODE stays verified unless --insecure.
-        if args.insecure:
-            return insecure
-        if source == "4dn":
-            if not _warned_4dn[0]:
-                print(
-                    "[dataloader] NOTE: 4DN TLS cert is expired server-side; skipping verify for 4DN"
-                )
-                _warned_4dn[0] = True
-            return insecure
-        return secure
-
-    print(f"[dataloader] {manifest.cell_line} ({manifest.assembly}): {len(manifest.assays)} assays")
-    refs: list[FileRef] = []
-    failures = 0
-    for spec in manifest.assays:
-        try:
-            ref = resolve(spec, ctx_for(spec.source))
-        except (HTTPError, URLError, ValueError, KeyError) as e:
-            print(
-                f"  [ERROR ] {spec.name} ({spec.source}:{spec.accession}): {type(e).__name__}: {e}"
-            )
-            failures += 1
-            continue
-        refs.append(ref)
-        md5s = (ref.md5 or "?")[:8]
-        print(
-            f"  [resolve] {ref.assay:<10} {ref.accession}  fmt={ref.file_format}  "
-            f"assay={ref.output_type}  md5={md5s}"
+    def add_args(self, p: argparse.ArgumentParser) -> None:
+        p.add_argument("--manifest", required=True, help="path to a cell-line manifest JSON")
+        p.add_argument("--out", default="data/_epigenome", help="output root (default data/_epigenome)")
+        p.add_argument("--dry-run", action="store_true", help="resolve + print plan, do not download")
+        p.add_argument(
+            "--insecure",
+            action="store_true",
+            help="skip TLS verification (opt-in; for portals with cert issues in your env)",
         )
-        if not args.dry_run:
+
+    def run(self, ctx: Context, args: argparse.Namespace) -> None:
+        if not Path(args.manifest).exists():
+            sys.exit(f"[error] manifest not found: {args.manifest}")
+        manifest = Manifest.from_json(args.manifest)
+        dest = Path(args.out) / manifest.cell_line
+
+        secure = ssl.create_default_context()
+        insecure = ssl.create_default_context()
+        insecure.check_hostname = False
+        insecure.verify_mode = ssl.CERT_NONE
+        if args.insecure:
+            print("[fetch] WARNING: TLS verification disabled for ALL sources (--insecure)")
+        _warned_4dn = [False]
+
+        def ctx_for(source: str) -> ssl.SSLContext:
+            # 4DN's portal cert is expired server-side and verify would always fail, so we skip
+            # verify for 4DN. ENCODE stays verified unless --insecure.
+            if args.insecure:
+                return insecure
+            if source == "4dn":
+                if not _warned_4dn[0]:
+                    print("[fetch] NOTE: 4DN TLS cert is expired server-side; skipping verify for 4DN")
+                    _warned_4dn[0] = True
+                return insecure
+            return secure
+
+        print(f"[fetch] {manifest.cell_line} ({manifest.assembly}): {len(manifest.assays)} assays")
+        refs: list[FileRef] = []
+        failures = 0
+        for spec in manifest.assays:
             try:
-                download(ref, dest, ctx_for(ref.source))
-            except (HTTPError, URLError, ValueError) as e:
-                print(f"  [ERROR ] download {ref.assay}: {type(e).__name__}: {e}")
+                ref = resolve(spec, ctx_for(spec.source))
+            except (HTTPError, URLError, ValueError, KeyError) as e:
+                print(
+                    f"  [ERROR ] {spec.name} ({spec.source}:{spec.accession}): {type(e).__name__}: {e}"
+                )
                 failures += 1
+                continue
+            refs.append(ref)
+            md5s = (ref.md5 or "?")[:8]
+            print(
+                f"  [resolve] {ref.assay:<10} {ref.accession}  fmt={ref.file_format}  "
+                f"assay={ref.output_type}  md5={md5s}"
+            )
+            if not args.dry_run:
+                try:
+                    download(ref, dest, ctx_for(ref.source))
+                except (HTTPError, URLError, ValueError) as e:
+                    print(f"  [ERROR ] download {ref.assay}: {type(e).__name__}: {e}")
+                    failures += 1
 
-    if refs and not args.dry_run:
-        write_lockfile(manifest, refs, dest)
-    if failures:
-        sys.exit(f"[dataloader] {failures} failure(s)")
-    print("[dataloader] done")
+        if refs and not args.dry_run:
+            write_lockfile(manifest, refs, dest)
+        if failures:
+            sys.exit(f"[fetch] {failures} failure(s)")
+        print("[fetch] done")
 
 
-if __name__ == "__main__":
-    main()
+register(Fetch())

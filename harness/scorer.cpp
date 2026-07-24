@@ -396,7 +396,7 @@ void mode_heat_score(int argc, char** argv) {
 // ---------------------------------------------------------------------------
 // anchor_scale mode
 // Usage: ./scorer anchor_scale <influence> <base_dist_file> <heatmap_file>
-// Applies C++ anchor heatmap scaling (LooperSolver.cpp lines 2990-3015).
+// Applies reference anchor heatmap scaling (LooperSolver.cpp lines 2990-3015).
 // Output: "<i> <j> <scaled_val>" for every (i,j) pair.
 
 void mode_anchor_scale(int argc, char** argv) {

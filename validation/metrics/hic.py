@@ -1,17 +1,18 @@
 """Hi-C contact-map correlation metrics.
 
-Does a reconstructed structure reproduce the experimental contact map? We build a *simulated*
-contact map from the 3D structure (bead-pairs within a contact radius, binned to the Hi-C grid)
-and correlate it with the *observed* Hi-C (a 4DN ``.mcool`` read via cooler), using:
+These check whether a reconstructed structure reproduces the experimental contact map. We build a
+simulated contact map from the 3D structure by counting bead-pairs within a contact radius and
+binning them to the Hi-C grid, then correlate it with the observed Hi-C, a 4DN .mcool read via
+cooler. The metrics are:
 
-  * **SCC** — stratum-adjusted correlation coefficient (hicrep-style; distance-decay-aware).
-  * Pearson (on log1p contacts) and Spearman — secondary.
-  * insulation-score correlation — domain-boundary agreement.
-  * ``multimm_faithful_pearson`` — decay-retained inverse-distance ((d+1)^-3) Pearson, MultiMM's
-    metric approach reproduced faithfully (see docs/multimm/README.md).
+  * SCC, the stratum-adjusted correlation coefficient. Hicrep-style and distance-decay-aware.
+  * Pearson on log1p contacts and Spearman, both secondary.
+  * insulation-score correlation, for domain-boundary agreement.
+  * multimm_faithful_pearson, the decay-retained inverse-distance (d+1)^-3 Pearson. MultiMM's
+    metric approach reproduced faithfully. See docs/multimm/README.md.
 
-Both maps are binned on the SAME genomic grid (the cooler's), so the comparison is exact.
-Needs the ``validation`` extra (``pip install -e .[validation]`` — cooler + cooltools + scipy).
+Both maps are binned on the same genomic grid, the cooler's, so the comparison is exact.
+Needs the validation extra via pip install -e .[validation], which is cooler, cooltools and scipy.
 """
 
 from __future__ import annotations
@@ -24,14 +25,16 @@ from gnome3d.types import F64Array, I64Array
 def observed_hic(
     mcool_path: str, region: str, binsize: int, balance: bool = False
 ) -> tuple[F64Array, I64Array]:
-    """Read the observed Hi-C submatrix for ``region`` at ``binsize`` from a .mcool.
+    """Read the observed Hi-C submatrix for region at binsize from a .mcool.
 
-    Returns (matrix (B,B) float64, bin_start_bp (B,)). NaNs (unmappable bins) -> 0.
+    Returns a tuple of the (B,B) float64 matrix and the (B,) bin_start_bp array. NaNs from
+    unmappable bins become 0.
     """
     import cooler
 
-    # Snap to the nearest resolution actually present in the .mcool (not every binsize exists —
-    # e.g. mcools often have 25 kb but not 20 kb). Single-resolution coolers open directly.
+    # Snap to the nearest resolution actually present in the .mcool, since not every binsize
+    # exists. For example mcools often have 25 kb but not 20 kb. Single-resolution coolers open
+    # directly.
     avail = sorted(
         int(p.rsplit("/", 1)[-1])
         for p in cooler.fileops.list_coolers(mcool_path)
@@ -52,9 +55,9 @@ def observed_hic(
 def simulated_contacts(
     coords: F64Array, mids: I64Array, bin_starts: I64Array, binsize: int, contact_radius: float
 ) -> F64Array:
-    """Simulated contact map on the Hi-C bin grid: count bead-pairs within ``contact_radius``
-    (3D), aggregated by the bins their genomic midpoints fall in. Mirrors how Hi-C tallies
-    ligations between loci. Symmetric, zero diagonal-self (a bead with itself)."""
+    """Simulated contact map on the Hi-C bin grid. Count bead-pairs within contact_radius in 3D,
+    aggregated by the bins their genomic midpoints fall in. This mirrors how Hi-C tallies ligations
+    between loci. Symmetric with a zero self-diagonal."""
     from scipy.spatial import cKDTree
 
     nbins = len(bin_starts)
@@ -63,9 +66,9 @@ def simulated_contacts(
     in_grid = (bidx >= 0) & (bidx < nbins) & (mids < last_edge)
 
     C = np.zeros((nbins, nbins), dtype=np.float64)
-    # Only the within-radius pairs matter, so a KD-tree finds them in ~O(N log N) instead of the
-    # full O(N²) distance matrix (the post-MC Hi-C hotspot). query_pairs gives unordered i<j; we
-    # add both directions to keep C symmetric, matching the old np.where(close) tally.
+    # Only the within-radius pairs matter, so a KD-tree finds them in about O(N log N) instead of
+    # the full O(N²) distance matrix, which is the post-MC Hi-C hotspot. query_pairs gives
+    # unordered i<j, so we add both directions to keep C symmetric.
     pairs = cKDTree(coords).query_pairs(contact_radius, output_type="ndarray")
     if pairs.size == 0:
         return C
@@ -78,8 +81,9 @@ def simulated_contacts(
 
 
 def _scc(A: F64Array, B: F64Array, max_sep_bins: int) -> float:
-    """Stratum-adjusted correlation coefficient (hicrep / Wang et al.): per genomic-distance
-    stratum (matrix diagonal d), Pearson r_d weighted by N_d * std(A_d) * std(B_d)."""
+    """Stratum-adjusted correlation coefficient from hicrep and Wang et al. For each
+    genomic-distance stratum, that is matrix diagonal d, the Pearson r_d is weighted by
+    N_d * std(A_d) * std(B_d)."""
     num = den = 0.0
     n = A.shape[0]
     for dd in range(1, min(max_sep_bins, n - 1) + 1):
@@ -99,8 +103,8 @@ def _scc(A: F64Array, B: F64Array, max_sep_bins: int) -> float:
 
 
 def _insulation(C: F64Array, window_bins: int) -> F64Array:
-    """Per-bin insulation score: mean cross-contacts in the square straddling each bin
-    (low = boundary). NaN where the window runs off the edge."""
+    """Per-bin insulation score. Mean cross-contacts in the square straddling each bin, where a low
+    value marks a boundary. NaN where the window runs off the edge."""
     n = C.shape[0]
     ins = np.full(n, np.nan)
     for i in range(window_bins, n - window_bins):
@@ -111,9 +115,10 @@ def _insulation(C: F64Array, window_bins: int) -> F64Array:
 def contact_correlation(
     c_sim: F64Array, c_obs: F64Array, min_sep_bins: int = 1, insulation_window: int = 5
 ) -> dict[str, float]:
-    """Correlate simulated vs observed contact maps. Returns SCC (primary), Pearson (log1p),
-    Spearman, and insulation-profile Pearson. Off-diagonal only (genomic-decay-dominated
-    diagonals add no information). NaN-safe; returns nan for a metric that can't be computed."""
+    """Correlate simulated against observed contact maps. Returns SCC as the primary, Pearson on
+    log1p, Spearman, and insulation-profile Pearson. Off-diagonal only, since the genomic-decay
+    dominated diagonals add no information. NaN-safe, returning nan for a metric that cannot be
+    computed."""
     n = c_obs.shape[0]
     out: dict[str, float] = {
         "scc": float("nan"),
@@ -151,21 +156,22 @@ def hic_correlation(
     contact_radius: float,
     balance: bool = False,
 ) -> dict[str, float]:
-    """End-to-end for ONE structure: simulated contacts vs observed Hi-C -> metrics."""
+    """End-to-end for one structure. Simulated contacts against observed Hi-C give the metrics."""
     c_obs, bin_starts = observed_hic(mcool_path, region, binsize, balance=balance)
     eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize
     c_sim = simulated_contacts(coords, mids, bin_starts, eff, contact_radius)
     return contact_correlation(c_sim, c_obs)
 
 
-# --------------------------------------------------------------------------- V4 cross-data (ChIA-PET vs Hi-C)
+# --------------------------------------------------------------------------- cross-data correlation (ChIA-PET vs Hi-C)
 
 
 def contact_list_heatmap(
     contacts: list[tuple[int, int, float]], bin_starts: I64Array, binsize: int
 ) -> F64Array:
-    """Bin a list of ``(pos_a, pos_b, score)`` genomic contacts into a symmetric frequency heatmap
-    on the given bin grid — e.g. the input ChIA-PET contact map (clusters + singletons) for V4."""
+    """Bin a list of (pos_a, pos_b, score) genomic contacts into a symmetric frequency heatmap on
+    the given bin grid. For example the input ChIA-PET contact map of clusters and singletons for
+    the cross-data correlation check."""
     nbins = len(bin_starts)
     last_edge = int(bin_starts[-1]) + binsize
     C = np.zeros((nbins, nbins))
@@ -183,11 +189,12 @@ def contact_list_heatmap(
 
 
 def observed_over_expected(matrix: F64Array, min_sep_bins: int = 1) -> F64Array:
-    """Distance-decay-normalized map (observed/expected): each entry divided by the MEAN of its
-    genomic-distance diagonal, so the monotone distance-decay both Hi-C and ChIA-PET share is
-    stripped and what's left is *structure* (loops/compartments). This is the standard confound
-    removal — without it a raw Pearson mostly measures "both fall off with distance". Diagonals
-    with no signal → 0; entries within ``min_sep_bins`` of the diagonal are left at 0. Copy."""
+    """Distance-decay-normalized map, observed over expected. Each entry is divided by the mean of
+    its genomic-distance diagonal, so the monotone distance-decay both Hi-C and ChIA-PET share is
+    stripped and what remains is structure, meaning loops and compartments. This is the standard
+    confound removal. Without it a raw Pearson mostly measures that both fall off with distance.
+    Diagonals with no signal become 0. Entries within min_sep_bins of the diagonal are left at 0.
+    Returns a copy."""
     m = np.asarray(matrix, dtype=np.float64)
     n = m.shape[0]
     oe = np.zeros_like(m)
@@ -204,9 +211,10 @@ def observed_over_expected(matrix: F64Array, min_sep_bins: int = 1) -> F64Array:
 
 
 def _oe_correlation(a_oe: F64Array, b_oe: F64Array, min_sep_bins: int) -> dict[str, float]:
-    """Pearson(log O/E) + Spearman(O/E) over the upper-triangle bin-pairs where BOTH maps have
-    signal (the informative overlap of a sparse ChIA-PET map and dense Hi-C). ``n_pairs`` reports
-    how many survive — a small count is itself the finding (data too sparse to correlate)."""
+    """Pearson of log O/E and Spearman of O/E over the upper-triangle bin-pairs where both maps
+    have signal, the informative overlap of a sparse ChIA-PET map and dense Hi-C. n_pairs_oe
+    reports how many survive. A small count is itself the finding, meaning the data is too sparse
+    to correlate."""
     out = {"pearson_oe": float("nan"), "spearman_oe": float("nan"), "n_pairs_oe": 0.0}
     n = a_oe.shape[0]
     if n < 4:
@@ -236,12 +244,12 @@ def cross_data_correlation(
     balance: bool = True,
     min_sep_bins: int = 1,
 ) -> dict[str, float]:
-    """V4 (3dgnome 2016, Fig. 2): correlate the model's INPUT ChIA-PET contact heatmap against the
-    observed Hi-C on a common bin grid — a data-level check (no structure). Returns the raw
-    decay-retained log1p Pearson + SCC AND the decay-stripped O/E correlation (``pearson_oe``,
-    ``spearman_oe``, ``n_pairs_oe``): the raw number is confounded by shared distance-decay, the
-    O/E number is the structure-vs-structure agreement the paper's ρ≈0.67–0.73 is really about.
-    Hi-C is ICE-balanced by default (needed for a meaningful O/E)."""
+    """Cross-data correlation from 3dgnome 2016, Fig. 2. Correlate the model's input ChIA-PET contact heatmap against
+    the observed Hi-C on a common bin grid, a data-level check with no structure. Returns the raw
+    decay-retained log1p Pearson and SCC together with the decay-stripped O/E correlation, namely
+    pearson_oe, spearman_oe and n_pairs_oe. The raw number is confounded by shared distance-decay.
+    The O/E number is the structure-vs-structure agreement the paper's ρ≈0.67–0.73 is really about.
+    Hi-C is ICE-balanced by default, which is needed for a meaningful O/E."""
     c_obs, bin_starts = observed_hic(mcool_path, region, binsize, balance=balance)
     eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize
     c_chia = contact_list_heatmap(chiapet_contacts, bin_starts, eff)
@@ -257,9 +265,9 @@ def cross_data_correlation(
 
 
 def remove_diagonals(matrix: F64Array, n_diag: int) -> F64Array:
-    """MultiMM's diagonal neutralizer (src/multimm/validation.py::remove_diagonals): set the main
-    diagonal AND its ``n_diag`` neighbours (both sides) to the matrix MEAN, so the dominant
-    near-diagonal band can't drive the Pearson. Returns a copy."""
+    """MultiMM's diagonal neutralizer, per src/multimm/validation.py::remove_diagonals. Set the
+    main diagonal and its n_diag neighbours on both sides to the matrix mean, so the dominant
+    near-diagonal band cannot drive the Pearson. Returns a copy."""
     m = matrix.copy()
     n = m.shape[0]
     mean = float(m.mean())
@@ -273,9 +281,9 @@ def remove_diagonals(matrix: F64Array, n_diag: int) -> F64Array:
 def _bin_centroids(
     coords: F64Array, mids: I64Array, bin_starts: I64Array, binsize: int
 ) -> F64Array:
-    """Mean 3D position of the beads whose genomic midpoint falls in each Hi-C bin; NaN row for an
-    empty bin. MultiMM ``mean_downsample``s the bead array to the matrix size — binning by genomic
-    midpoint is the correct analogue for our non-uniformly-spaced subanchor beads."""
+    """Mean 3D position of the beads whose genomic midpoint falls in each Hi-C bin, with a NaN row
+    for an empty bin. MultiMM mean_downsamples the bead array to the matrix size. Binning by
+    genomic midpoint is the correct analogue for our non-uniformly-spaced subanchor beads."""
     nbins = len(bin_starts)
     last_edge = int(bin_starts[-1]) + binsize
     bidx = np.searchsorted(bin_starts, mids, side="right") - 1
@@ -297,14 +305,15 @@ def multimm_faithful_pearson(
     binsize: int,
     n_diag: int = 5,
 ) -> float:
-    """MultiMM's *actual* Hi-C correlation, reproduced faithfully (per ``src/multimm/validation.py``,
-    NOT the paper's loose "^3/2" wording). The simulated heatmap is **1/(d+1)³** between per-bin
-    structure centroids — note: ``structure_to_heatmap`` is ``1/(d+1)**3/2`` which by Python
-    precedence is ``1/(2·(d+1)³)``, i.e. a CUBE with a +1 offset, the ½ a constant. Distances are
-    scaled so the median genomically-adjacent centroid step = 1 (so the +1 offset is one bead-step,
-    matching their bead-spacing units). Averaged over the ensemble. Main + ``n_diag`` diagonals set
-    to the mean on BOTH maps (they use 5), then plain Pearson over the full matrix. ``c_obs`` should
-    be ICE/balance-normalised (they use ICE-norm). Empty bins dropped from both."""
+    """MultiMM's actual Hi-C correlation, reproduced faithfully per src/multimm/validation.py,
+    rather than the paper's loose "^3/2" wording. The simulated heatmap is 1/(d+1)³ between per-bin
+    structure centroids. Note that structure_to_heatmap writes 1/(d+1)**3/2, which by Python
+    precedence is 1/(2·(d+1)³), that is a cube with a +1 offset and the ½ a constant. Distances are
+    scaled so the median genomically-adjacent centroid step is 1, so the +1 offset is one bead-step
+    and matches their bead-spacing units. Averaged over the ensemble. The main and n_diag diagonals
+    are set to the mean on both maps, and they use 5, then plain Pearson over the full matrix.
+    c_obs should be ICE or balance-normalised, and they use ICE-norm. Empty bins are dropped from
+    both."""
     cent0 = _bin_centroids(coords_list[0], mids, bin_starts, binsize)
     valid = ~np.isnan(cent0[:, 0])
     nv = int(valid.sum())
@@ -336,13 +345,13 @@ def ensemble_hic_correlation(
     contact_radius: float,
     balance: bool = False,
 ) -> dict[str, float]:
-    """Correlate the ENSEMBLE simulated maps vs observed Hi-C. Hi-C is a population average, so we
-    aggregate over the whole ensemble (our "cells") before correlating. Returns the strict hicrep
-    **SCC** + decay-free Pearson/insulation (``contact_correlation``). The decay-retained
-    inverse-distance Pearson is a separate metric, ``multimm_faithful_pearson``.
+    """Correlate the ensemble simulated maps against observed Hi-C. Hi-C is a population average, so
+    we aggregate over the whole ensemble, our cells, before correlating. Returns the strict hicrep
+    SCC plus decay-free Pearson and insulation from contact_correlation. The decay-retained
+    inverse-distance Pearson is a separate metric, multimm_faithful_pearson.
     """
     c_obs, bin_starts = observed_hic(mcool_path, region, binsize, balance=balance)
-    eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize  # actual res used
+    eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize  # actual resolution used
     c_sim = np.zeros_like(c_obs)
     for coords, mids in zip(coords_list, mids_list, strict=True):
         c_sim += simulated_contacts(coords, mids, bin_starts, eff, contact_radius)

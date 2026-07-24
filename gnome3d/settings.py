@@ -423,7 +423,7 @@ class Settings:
         self.exclusion_radius_heatmap = 0.0
         self.exclusion_radius_ib = 0.0
         # Truncate the arcs non-arc 1/d repulsion at factor x mean-arc-distance (0 = off =
-        # unbounded, faithful to C++; ~2.5 fixes small/sparse IBs blowing up to huge Rg).
+        # unbounded, faithful to the reference; ~2.5 fixes small/sparse IBs blowing up to huge Rg).
         self.arcs_repulsion_cutoff_factor = 0.0
         # Per-level auto factor: used only when the matching radius is 0.0.
         # 0.5 means "EV kicks in once beads get closer than half the typical

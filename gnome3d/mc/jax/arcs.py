@@ -862,7 +862,7 @@ def _prep_arcs_problem_np(
         conf_R = 1.0
 
     # Non-arc 1/d repulsion cutoff: truncate at factor x mean arc distance so sparse/small IBs
-    # don't blow up (the unbounded 1/d has no minimum).  0 => unbounded (faithful to C++).
+    # don't blow up (the unbounded 1/d has no minimum).  0 => unbounded (faithful to the reference).
     rep_factor = float(getattr(settings, "arcs_repulsion_cutoff_factor", 0.0))
     rep_inv_cutoff = 0.0
     if rep_factor > 0.0:

@@ -2,7 +2,7 @@
 
 ## Project Goal
 
-Python reimplementation of the Monte Carlo (MC) core of **3dgnome**. The reference implementation (`3dnome/MC/`) is a ~6,400-line simulation that predicts 3D chromosome structure from Hi-C contact frequency data. The reimplementation lives in `gnome3d/` and reproduced the reference algorithm as its starting point. MC loops run on CPU via Numba JIT; torch is used only for GPU device detection and the reference scoring functions in `gnome3d/energy.py`.
+Python reimplementation of the Monte Carlo core of **3dgnome**. The reference implementation in `3dnome/MC/` is a ~6,400 line simulation that predicts 3D chromosome structure from ChIA-PET and Hi-C contact frequency data. The reimplementation lives in `gnome3d/` and reproduced the reference algorithm as its starting point. MC kernels run on CPU via Numba. A jax path batches regions on the GPU for the genome scale run. Torch is used for GPU device detection and the reference scoring functions in `gnome3d/energy.py`.
 
 Do **not** modify anything inside `3dnome/`. That directory is the reference implementation - read it, never change it.
 
@@ -28,29 +28,31 @@ Rules for new feature work:
 ```
 3dgnome-torch/
 ├── 3dnome/MC/                  # Reference implementation (READ ONLY)
-│   ├── LooperSolver.cpp/h      # Main solver - all MC loops live here
-│   ├── Chromosome.cpp/h        # 3D structure (list of bead positions)
+│   ├── LooperSolver.cpp/h      # Main solver, all MC loops live here
+│   ├── Chromosome.cpp/h        # 3D structure, a list of bead positions
 │   ├── HierarchicalChromosome.cpp/h  # Multi-level representation
 │   ├── Heatmap.cpp/h           # 2D contact/frequency matrices
 │   ├── InteractionArcs.cpp/h   # Pairwise arc/interaction management
 │   ├── Cluster.cpp/h           # Single bead definition
 │   └── lib/                    # mtxlib (vec3/mat44), RNG, RMSD utilities
-├── src/                        # New PyTorch implementation (write here)
-├── data/                       # Input datasets (GM12878, H1ESC, HFFC6)
-│   └── GM12878/config.ini      # Example config with all parameters
-├── pyproject.toml              # gnome3d-torch, entry point: main:main
+├── gnome3d/                    # Python implementation. MC kernels run on CPU via Numba
+│   ├── simulate.py             # Public reconstruction entry point
+│   ├── reconstruct.py          # The self-expanding task DAG
+│   ├── pipeline/               # Per-stage kernels (coarse, ib)
+│   ├── mc/                     # Composable MC terms, numba and jax kernels
+│   ├── settings.py data.py hierarchy.py io.py util.py types.py energy.py
+├── validation/                 # Validation package, see docs/validation-metrics.md
+├── harness/
+│   ├── scorer.cpp              # Reference scorer compiled against real 3dnome sources
+│   ├── compare.py              # Unit-level correctness harness for energy functions
+│   └── integration.py          # Full-MC integration test and the reference runner
+├── data/                       # Input datasets (GM12878, H1ESC, HFFC6). _hic holds 4DN mcools
+├── docs/                       # Design docs, papers, validation writeups
+├── pyproject.toml              # gnome3d-torch, [validation] extra for the validation package
 └── AGENTS.md                   # This file
 ```
 
-Python environment: `.venv/bin/python` (Python 3.11, torch >= 2.0, numpy >= 1.24).
-
-```
-3dgnome-torch/
-├── harness/
-│   ├── scorer.cpp      # reference scorer compiled against real 3dnome sources
-│   ├── compare.py      # Unit-level correctness harness (energy functions)
-│   └── integration.py  # Integration test: run full MC on a region, compare distributions
-```
+Python environment: `.venv/bin/python`. Use it rather than the system python.
 
 ---
 
@@ -213,31 +215,11 @@ Full list: `3dnome/MC/Settings.cpp` and example `data/GM12878/config.ini`.
 
 ---
 
-## Implementation Plan for `src/`
+## Implementation notes
 
-Suggested module layout:
-
-```
-src/
-├── __init__.py
-├── data_structures.py   # Cluster, Heatmap, InteractionArc dataclasses
-├── io.py                # Load anchors, singletons, arcs from files
-├── distance.py          # genomicLengthToDistance() and heatmap -> expected distance
-├── energy.py            # All five scoring functions as torch operations
-├── moves.py             # Random displacement sampling
-├── mc.py                # MC loop (simulated annealing), convergence logic
-├── hierarchy.py         # Multi-level orchestration: chr -> seg -> anchor -> subanchor
-├── densify.py           # Bead densification between anchors
-└── main.py              # Entry point (gnome3d CLI)
-```
-
-### PyTorch notes
-
-- Store all bead positions as a `(N, 3)` float32 tensor on the target device.
-- Energy functions should operate on tensor slices for the *active region* only (not all N beads), matching the reference local-score pattern.
-- The inner MC loop is inherently sequential (each step depends on the previous accept/reject), so do **not** try to batch proposals within a single chain. Batch across independent MC chains instead (ensemble generation).
-- `torch.no_grad()` everywhere in the MC loop - we are doing stochastic search, not gradient descent.
-- Use `torch.compile` or keep operations simple to avoid recompilation overhead inside the loop.
+- Bead positions are `(N, 3)` float64 arrays. Energy functions score the active region only, not all N beads, matching the reference local-score pattern.
+- The inner MC loop is sequential. Each step depends on the previous accept or reject, so a single chain cannot batch its proposals. Parallelism comes from running independent chains or regions at once. The numba path runs one chain per thread with a thread local RNG and stays byte exact. The jax path in `gnome3d/mc/` batches many regions on the GPU for the genome scale run.
+- The MC does stochastic search, not gradient descent. There are no gradients in the loop.
 
 ---
 
@@ -316,6 +298,18 @@ Per-file ignores in `pyproject.toml`:
 - For numpy arrays in non-kernel code, use the aliases (`F32Array`, etc.).
 - Inside `@njit` kernels, parameter and local annotations are advisory only (numba ignores them) but still required for pyright. Keep them realistic — they document the contract.
 
+### Documentation and comments
+
+Write doc strings and comments as short plain sentences. Where a dash or colon would open a clause, start a new sentence instead. Do not use dashes, colons or semicolons as sentence punctuation. Do not emphasise words by writing them in capitals. Keep backtick quotes for identifiers that need them, plain names read fine on their own. Avoid parenthetical asides. Turn an aside into its own sentence or drop it. State plainly what the code does. Do not reach for metaphors.
+
+A doc describes what the thing is now. It does not record what it used to be, what it is not, or where related code moved. Migration history and cross references to relocated code belong in the commit message or in project memory, not in the source. Memory style [[links]] to related notes are fine.
+
+Keep docs short and non redundant. When one fact holds for every function in a file, state it once at the module or class level and let each function doc stay brief. Keep the parameter and return descriptions. When a doc is too long, tighten the sentences rather than deleting the contract.
+
+Do not restate what the line below already shows. A comment earns its place by carrying a constraint or a reason the code cannot express. A comment that paraphrases a visible type or repeats the called function's own doc is noise and should go.
+
+A style pass is also a correctness pass. While rewriting a doc, confirm the claim still holds and fix drift such as a description of removed behaviour or a stale module name. See [[feedback_doc_comment_style]].
+
 ---
 
 ## Correctness Harness
@@ -331,7 +325,7 @@ python harness/compare.py --build-only
 # Print reference values only - no Python impl needed
 python harness/compare.py --reference
 
-# Run all tests (skips anything not yet in src/)
+# Run all tests (skips anything not yet in gnome3d/)
 python harness/compare.py
 
 # Run a specific test group
@@ -341,7 +335,7 @@ python harness/compare.py heatmap arcs smooth
 
 ### What is tested
 
-| Group | What it checks | Python hook (src/energy.py) |
+| Group | What it checks | Python hook (gnome3d/energy.py) |
 |-------|---------------|-----------------------------|
 | `angle` | Custom angle metric (`1 - (dot+1)/2`, NOT acos) | `angle_metric(v1, v2)` |
 | `distfns` | `genomicLengthToDistance`, `freqToDistanceHeatmap`, `freqToDistance` | `genomic_length_to_distance`, `freq_to_dist_heatmap`, `freq_to_distance` |
@@ -377,7 +371,7 @@ PASS criteria: KS statistic ≤ 0.3 and p-value ≥ 0.05 for both pairwise and b
 ### Interface Python must expose
 
 ```python
-# src/simulate.py
+# gnome3d/simulate.py
 def run_region(config_path: str, region: str, n_structures: int) -> list:
     """
     Run MC for the given region and return n_structures conformations.
@@ -402,7 +396,7 @@ python harness/integration.py --fast -n 3
 python harness/integration.py --keep
 ```
 
-The test auto-skips the Python comparison if `src/simulate.py` is missing or raises `NotImplementedError` - it never fails just because Python is not yet implemented.
+The test auto-skips the Python comparison if `gnome3d/simulate.py` is missing or raises `NotImplementedError`. It never fails just because the Python side is absent.
 
 ---
 

@@ -1,5 +1,5 @@
 {
-  "_note": "Plain Hi-C (AluI) for H1-hESC — CTCF-inclusive contact target, NOT RNA Pol II. Fetch: python -m validation.dataloader --manifest validation/manifests/H1ESC_hic.json --out data/_hic  ->  data/_hic/H1ESC/hic.4DNFIHO3CXUQ.mcool",
+  "_note": "Plain Hi-C (AluI) for H1-hESC — CTCF-inclusive contact target, NOT RNA Pol II. Fetch: python -m validation fetch --manifest validation/manifests/H1ESC_hic.json --out data/_hic  ->  data/_hic/H1ESC/hic.4DNFIHO3CXUQ.mcool",
   "cell_line": "H1ESC",
   "assembly": "GRCh38",
   "assays": [

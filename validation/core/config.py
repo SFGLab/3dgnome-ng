@@ -1,14 +1,14 @@
-"""Canonical 3dgnome modelling config, baked in — no .ini needed.
+"""Canonical 3dgnome modelling config, baked in so no .ini is needed.
 
-The shipped ``data/<cell>/config.ini`` files all share the same modelling parameters (distance,
-springs, template, motif, heatmap, MC schedule, and EV/confinement ON at weight 0.1); only the
-data filenames and ``data_dir`` differ (and ``data_dir`` points at an absolute ``/Projects/``
-path that doesn't exist outside the authors' box). Rather than make the validation harness take
-``--config`` + ``--data-dir``, we encode those canonical params here and build a ``Settings``
-with ``Settings.from_dict`` — the harness wires its own config for any cell line.
+The shipped data/<cell>/config.ini files all share the same modelling parameters. Those are
+distance, springs, template, motif, heatmap, MC schedule, and EV and confinement on at weight
+0.1. Only the data filenames and data_dir differ. data_dir points at an absolute /Projects/
+path that does not exist outside the authors' box. Rather than make the validation harness take
+--config and --data-dir, we encode those canonical params here and build a Settings with
+Settings.from_dict. The harness wires its own config for any cell line.
 
-``settings_for_cell("GM12878")`` returns a ready Settings; the sweep/validate CLIs then toggle
-the EV/confinement knobs they're testing on top.
+settings_for_cell("GM12878") returns a ready Settings. The sweep and validate CLIs then toggle
+the EV and confinement knobs they are testing on top.
 """
 
 from __future__ import annotations
@@ -18,9 +18,10 @@ from pathlib import Path
 
 from gnome3d.settings import Settings
 
-# Canonical modelling params (from data/GM12878/config.ini, shared across cell lines). Excludes
-# [data] (built per cell) and [cuda] (reference-binary only). EV/confinement are ON at weight
-# 0.1 here — the real default; the sweep overrides them per config.
+# Canonical modelling params from data/GM12878/config.ini, shared across cell lines. Excludes
+# the data section, which is built per cell, and the cuda section, which is reference-binary
+# only. EV and confinement are on at weight 0.1 here, the real default. The sweep overrides
+# them per config.
 CANONICAL: dict[str, dict[str, object]] = {
     "main": {
         "output_level": 1,
@@ -125,21 +126,22 @@ CANONICAL: dict[str, dict[str, object]] = {
     },
     "excluded_volume": {
         "use_excluded_volume": "yes",
-        # EV is a GENTLE correction, NOT a dominant term — it weighs far less than the distance /
-        # heatmap / loop energies (dist_weight = 1.0). Picked by the subordinate-grid sweep on the
-        # unified config: 0.1 cut resolution-normalized overlaps in 20/20 GM12878 regions (−23% vs
-        # baseline) at +17% Rg (within the 0.30 guard); higher weights don't lower overlaps further
-        # but cost more Rg. (Earlier 1.0–2.0 over-expanded; the old "explosion" was a config-
-        # divergence bug, not EV — see [[project_config_unification]].)
+        # EV is a gentle correction, not a dominant term. It weighs far less than the distance,
+        # heatmap, and loop energies at dist_weight 1.0. Picked by the subordinate-grid sweep on
+        # the unified config. 0.1 cut resolution-normalized overlaps in 20 of 20 GM12878 regions,
+        # down 23% vs baseline, at +17% Rg, within the 0.30 guard. Higher weights do not lower
+        # overlaps further but cost more Rg. Earlier weights of 1.0 to 2.0 over-expanded. The old
+        # explosion was a config divergence bug, not EV. See [[project_config_unification]].
         "weight": 0.1,
         "auto_factor_smooth": 0.7,
         "apply_to_heatmap": "yes",
         "apply_to_arcs": "yes",
         "apply_to_smooth": "yes",
-        # Truncate the non-arc 1/d repulsion beyond factor*mean-arc-distance. 0.0 = unbounded
-        # (faithful to C++ LooperSolver.cpp:1533), which explodes small/sparse arcs IBs (target
-        # 0.4 -> Rg 515) and causes the multi-hour arcs polish. Capping the long-range tail at 3x
-        # the natural arc scale keeps local de-clashing while killing the runaway expansion.
+        # Truncate the non-arc 1/d repulsion beyond factor times mean-arc-distance. 0.0 means
+        # unbounded, faithful to LooperSolver.cpp:1533, which explodes small or sparse arcs
+        # IBs from target 0.4 to Rg 515 and causes the multi-hour arcs polish. Capping the
+        # long-range tail at 3x the natural arc scale keeps local de-clashing while stopping the
+        # excess expansion.
         "arcs_repulsion_cutoff_factor": 3.0,
     },
     "confinement": {
@@ -153,12 +155,12 @@ CANONICAL: dict[str, dict[str, object]] = {
     "small_ib_boost": {"use_small_ib_boost": "no"},
 }
 
-# Per-stage stop_condition_steps by quality. None / "full" keeps the canonical 50000.
+# Per-stage stop_condition_steps by quality. None or "full" keeps the canonical 50000.
 _QUALITY_STEPS = {"fast": 1000, "balanced": 5000, "full": 50000}
 
 
 def cell_data_section(cell: str, data_root: str = "data") -> dict[str, object]:
-    """The [data] section for a cell line, by 3dgnome file-naming convention."""
+    """The data section for a cell line, by 3dgnome file-naming convention."""
     return {
         "data_dir": str(Path(data_root) / cell),
         "anchors": f"{cell}_anchors_3+_oriented.bed",
@@ -178,10 +180,10 @@ def settings_for_cell(
     quality: str | None = None,
     overrides: dict[str, dict[str, object]] | None = None,
 ) -> Settings:
-    """Build a ready ``Settings`` for ``cell`` from the canonical params + conventional data
-    paths, with no .ini. ``quality`` in {fast, balanced, full} rescales every stage's
-    stop_condition_steps (None = full/canonical). ``overrides`` deep-merges extra
-    {section: {key: value}} on top (e.g. feature-flag tweaks)."""
+    """Build a ready Settings for a cell from the canonical params and conventional data paths,
+    with no .ini. quality is one of fast, balanced, full and rescales each stage's
+    stop_condition_steps. None means full and canonical. overrides deep-merges extra
+    {section: {key: value}} on top, for example feature-flag tweaks."""
     params = copy.deepcopy(CANONICAL)
     params["data"] = cell_data_section(cell, data_root)
 
@@ -199,15 +201,14 @@ def settings_for_cell(
     return Settings.from_dict(params)
 
 
-# --- THE single place that modifies a built Settings -------------------------------------------
-# All validation tools must go through these helpers (or settings_for_cell's `overrides`) — no tool
+# --- The single place that modifies a built Settings -------------------------------------------
+# All validation tools must go through these helpers, or settings_for_cell's overrides. No tool
 # should set Settings attributes inline. Keeps config logic in one auditable place.
 
 
 def apply_flags(s: Settings, flags: dict[str, object]) -> Settings:
-    """Return a deep copy of ``s`` with the given public attributes set (the canonical post-build
-    config modifier — e.g. feature flags, executor, data paths). Moved here from validate so every
-    config tweak lives in cell_config."""
+    """Return a deep copy of s with the given public attributes set. This is the canonical
+    post-build config modifier for feature flags, executor, and data paths."""
     out = copy.deepcopy(s)
     for attr, val in flags.items():
         setattr(out, attr, val)
@@ -215,8 +216,8 @@ def apply_flags(s: Settings, flags: dict[str, object]) -> Settings:
 
 
 def with_arcs_executor(s: Settings, executor: str, workers: int = 0) -> Settings:
-    """Set the arcs-stage MC executor (batch=GPU / threaded / serial); threaded uses ``workers``
-    (0 = cpu_count)."""
+    """Set the arcs-stage MC executor, one of batch for GPU, threaded, or serial. threaded uses
+    workers, where 0 means cpu_count."""
     import os
 
     flags: dict[str, object] = {"mc_executor_arcs": executor}
@@ -226,6 +227,6 @@ def with_arcs_executor(s: Settings, executor: str, workers: int = 0) -> Settings
 
 
 def with_singletons(s: Settings, singletons_path: str, singletons_inter: str = "") -> Settings:
-    """Point the model at a custom singletons BEDPE (e.g. Hi-C-derived for the self-correlation
-    study). Absolute paths override the data_dir prefix (pathlib join)."""
+    """Point the model at a custom singletons BEDPE, for example Hi-C-derived for the
+    self-correlation study. Absolute paths override the data_dir prefix via pathlib join."""
     return apply_flags(s, {"data_singletons": singletons_path, "data_singletons_inter": singletons_inter})

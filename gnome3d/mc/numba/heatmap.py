@@ -231,7 +231,7 @@ def _run_heatmap_loop(
     score_excl: float,
 ) -> float:
     """Drive `_batch_heatmap_nb` to convergence; return the final total score.
-    Same C++-style stop condition as the shared driver (plateau / score_eps /
+    Same reference-style stop condition as the shared driver (plateau / score_eps /
     ratio guard), specialised to the heatmap term set."""
     score = score_struct + score_excl
     ms_score = score
