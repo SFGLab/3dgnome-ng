@@ -348,13 +348,21 @@ class SelfCorr(Study):
         p.add_argument(
             "--no-reference", action="store_true", help="skip the reference + parity baselines"
         )
-        p.add_argument("--out", required=True, help="results JSON output path")
+        p.add_argument(
+            "--out",
+            default=None,
+            help="results JSON output path. Default out/self_corr_<cell>_<mode>.json",
+        )
 
     def run(self, ctx: Context, args: argparse.Namespace) -> None:
         if ctx.hic is None:
             sys.exit("[error] self-corr requires --hic, an observed Hi-C .mcool")
 
-        out_path = Path(args.out)
+        out_path = (
+            Path(args.out)
+            if args.out
+            else Path(f"out/self_corr_{ctx.cell}_{args.hic_singletons}.json")
+        )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         chroms = (
             args.chroms.split(",")
