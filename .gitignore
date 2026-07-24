@@ -255,6 +255,7 @@ out/
 # playground
 playground/protected
 playground/derived
+playground/*.out
 
 # data from playground
 playground/**/*.mcool
@@ -270,3 +271,6 @@ playground/**/*.gz
 # data 
 data/**/*.mcool
 data/**/*.cool
+
+# superpowers
+.superpowers/
