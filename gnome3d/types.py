@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import Literal, NamedTuple, TypeAlias
 
 import numpy as np
@@ -132,6 +133,64 @@ class BedRegion:
         return self.start <= pos <= self.end
 
 
+# Epigenomic track types.  See docs/epigenome-energy-terms.md.
+
+
+class Compartment(IntEnum):
+    """A/B compartment call for one bead, stored as int8.
+
+    The encoding follows MultiMM.  Positive codes are A, negative are B, and the
+    magnitude is the subcompartment rank.  A bare `A` label reads as `A2` and a
+    bare `B` label as `B1`, so an A/B-only track occupies `-1`, `0`, `+1` and a
+    subcompartment track needs no separate representation.
+    """
+
+    B2 = -2
+    B1 = -1
+    NONE = 0
+    A2 = 1
+    A1 = 2
+
+    @property
+    def is_a(self) -> bool:
+        return self.value > 0
+
+    @property
+    def is_b(self) -> bool:
+        return self.value < 0
+
+
+@dataclass
+class CompartmentInterval:
+    """One compartment call over a genomic range.
+
+    `score` is the signed compartment strength in [-1, 1], positive for A.  It
+    is 0.0 when the source carried only a label, and `cls` is `NONE` when the
+    source carried only a value that has not been phased yet.
+    """
+
+    chr: str
+    start: int
+    end: int
+    cls: int = int(Compartment.NONE)
+    score: float = 0.0
+
+
+@dataclass
+class SignalInterval:
+    """One binned value of a continuous track such as ATAC-seq."""
+
+    chr: str
+    start: int
+    end: int
+    value: float
+
+
+CompartmentMap: TypeAlias = dict[str, list["CompartmentInterval"]]
+
+SignalMap: TypeAlias = dict[str, list["SignalInterval"]]
+
+
 # Empty initializers
 
 
@@ -153,6 +212,14 @@ def empty_breakpoint_map() -> BreakpointMap:
 
 def empty_singleton_list() -> list[SingletonContact]:
     return []
+
+
+def empty_compartment_map() -> CompartmentMap:
+    return {}
+
+
+def empty_signal_map() -> SignalMap:
+    return {}
 
 
 def zero_pos() -> F32Array:

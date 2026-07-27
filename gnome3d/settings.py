@@ -43,6 +43,9 @@ class Settings:
     data_centromeres: str
     data_segment_split: str
     data_segment_heatmap: str
+    data_compartments: str
+    data_accessibility: str
+    data_phasing_track: str
 
     # ---- template ----
     template_segment: str
@@ -240,6 +243,48 @@ class Settings:
     confinement_packing_factor_smooth: float
     confinement_packing_factor_ib: float
 
+    # ---- A/B compartments ----
+    use_compartments: bool
+    compartment_weight: float
+    compartment_energy_a: float
+    compartment_energy_b: float
+    compartment_apply_to_heatmap: bool
+    compartment_apply_to_ib: bool
+    compartment_apply_to_smooth: bool
+    compartment_radius_heatmap: float
+    compartment_radius_ib: float
+    compartment_radius_smooth: float
+    compartment_auto_factor_heatmap: float
+    compartment_auto_factor_ib: float
+    compartment_auto_factor_smooth: float
+
+    # ---- chromatin accessibility ----
+    use_bridging: bool
+    bridging_weight: float
+    bridging_apply_to_heatmap: bool
+    bridging_apply_to_ib: bool
+    bridging_apply_to_smooth: bool
+    bridging_radius_heatmap: float
+    bridging_radius_ib: float
+    bridging_radius_smooth: float
+    bridging_auto_factor_heatmap: float
+    bridging_auto_factor_ib: float
+    bridging_auto_factor_smooth: float
+    use_fibre_compaction: bool
+    fibre_compaction: float
+
+    # ---- nuclear forces ----
+    use_lamina: bool
+    lamina_weight: float
+    use_central_force: bool
+    central_weight: float
+    use_chromosomal_blocks: bool
+    chrom_block_kc: float
+    chrom_block_weight: float
+    nucleus_radius: float
+    nucleus_packing_factor: float
+    nucleus_inner_fraction: float
+
     # ---- overlapping-anchor handling (densification) ----
     overlap_anchor_strict: bool
     drop_zero_length_subanchors: bool
@@ -287,6 +332,9 @@ class Settings:
         self.data_centromeres = ""
         self.data_segment_split = ""
         self.data_segment_heatmap = ""
+        self.data_compartments = ""
+        self.data_accessibility = ""
+        self.data_phasing_track = ""
 
         # ---- template ----
         self.template_segment = ""
@@ -477,6 +525,67 @@ class Settings:
         self.confinement_packing_factor_smooth = 1.5
         self.confinement_packing_factor_ib = 0.75
 
+        # ---- A/B compartments ----
+        # Block-copolymer segregation over a per-bead compartment call, ported
+        # from MultiMM's compartment blocks.  The well is written non-negative
+        # (see docs/epigenome-energy-terms.md) because 3dgnome's Metropolis rule
+        # reads a score ratio and needs a positive total.  Requires a
+        # compartment track under [data]; inert when none is loaded.
+        self.use_compartments = False
+        self.compartment_weight = 1.0
+        self.compartment_energy_a = 1.0  # MultiMM COB_EA
+        self.compartment_energy_b = 2.0  # MultiMM COB_EB
+        self.compartment_apply_to_heatmap = True
+        self.compartment_apply_to_ib = True
+        self.compartment_apply_to_smooth = True
+        # Interaction range: 0.0 = auto = factor * mean(bond) at that level.
+        # MultiMM uses r_comp = 1.5 * b0, which is the default factor.
+        self.compartment_radius_heatmap = 0.0
+        self.compartment_radius_ib = 0.0
+        self.compartment_radius_smooth = 0.0
+        self.compartment_auto_factor_heatmap = 1.5
+        self.compartment_auto_factor_ib = 1.5
+        self.compartment_auto_factor_smooth = 1.5
+
+        # ---- chromatin accessibility ----
+        # Bridging: accessible beads attract each other, HiP-HoP's diffusing
+        # bridges integrated out into an effective pairwise well.  Defaults to
+        # smooth only because accessibility varies bead-to-bead at subanchor
+        # scale and is near-constant over a coarse bead.
+        # Fibre compaction: closed chromatin shortens the chain bond target,
+        # standing in for HiP-HoP's extra i,i+2 springs.
+        self.use_bridging = False
+        self.bridging_weight = 1.0
+        self.bridging_apply_to_heatmap = False
+        self.bridging_apply_to_ib = False
+        self.bridging_apply_to_smooth = True
+        self.bridging_radius_heatmap = 0.0
+        self.bridging_radius_ib = 0.0
+        self.bridging_radius_smooth = 0.0
+        self.bridging_auto_factor_heatmap = 1.5
+        self.bridging_auto_factor_ib = 1.5
+        self.bridging_auto_factor_smooth = 1.5
+        self.use_fibre_compaction = False
+        self.fibre_compaction = 0.3  # 0 = off, 1 = fully collapse closed chromatin
+
+        # ---- nuclear forces ----
+        # Lamina, nucleolar attraction and chromosome territories, from MultiMM.
+        # All three read the shared nuclear frame and run at coarse levels only:
+        # a single IB is far smaller than the shell width, so the terms carry no
+        # gradient there.  Lamina needs a compartment track.
+        self.use_lamina = False
+        self.lamina_weight = 400.0  # MultiMM IBL_SCALE
+        self.use_central_force = False
+        self.central_weight = 20.0  # MultiMM CF_STRENGTH
+        self.use_chromosomal_blocks = False
+        self.chrom_block_kc = 0.3  # MultiMM CHB_KC
+        self.chrom_block_weight = 1e-4  # MultiMM CHB_DE
+        # Nuclear frame: 0.0 = auto = packing * mean(bond) * N^(1/3), MultiMM's
+        # constant-density rule.  R1 = R2 * inner_fraction^(1/3).
+        self.nucleus_radius = 0.0
+        self.nucleus_packing_factor = 1.0
+        self.nucleus_inner_fraction = 0.2
+
         # ---- overlapping-anchor handling ----
         # overlap_anchor_strict controls span computation in densification:
         #   False (default): subanchors tile the overlap region with non-degenerate
@@ -632,6 +741,9 @@ class Settings:
         self.data_centromeres = gets("data", "centromeres", self.data_centromeres)
         self.data_segment_split = gets("data", "segment_split", self.data_segment_split)
         self.data_segment_heatmap = gets("data", "segment_heatmap", self.data_segment_heatmap)
+        self.data_compartments = gets("data", "compartments", self.data_compartments)
+        self.data_accessibility = gets("data", "accessibility", self.data_accessibility)
+        self.data_phasing_track = gets("data", "phasing_track", self.data_phasing_track)
 
         # [template]
         self.template_segment = gets("template", "template_segment", self.template_segment)
@@ -907,6 +1019,82 @@ class Settings:
         self.confinement_packing_factor_ib = getf(
             "confinement", "packing_factor_ib", self.confinement_packing_factor_ib
         )
+
+        # [compartments]
+        self.use_compartments = getb("compartments", "use_compartments", self.use_compartments)
+        self.compartment_weight = getf("compartments", "weight", self.compartment_weight)
+        self.compartment_energy_a = getf("compartments", "energy_a", self.compartment_energy_a)
+        self.compartment_energy_b = getf("compartments", "energy_b", self.compartment_energy_b)
+        self.compartment_apply_to_heatmap = getb(
+            "compartments", "apply_to_heatmap", self.compartment_apply_to_heatmap
+        )
+        self.compartment_apply_to_ib = getb(
+            "compartments", "apply_to_ib", self.compartment_apply_to_ib
+        )
+        self.compartment_apply_to_smooth = getb(
+            "compartments", "apply_to_smooth", self.compartment_apply_to_smooth
+        )
+        self.compartment_radius_heatmap = getf(
+            "compartments", "radius_heatmap", self.compartment_radius_heatmap
+        )
+        self.compartment_radius_ib = getf("compartments", "radius_ib", self.compartment_radius_ib)
+        self.compartment_radius_smooth = getf(
+            "compartments", "radius_smooth", self.compartment_radius_smooth
+        )
+        self.compartment_auto_factor_heatmap = getf(
+            "compartments", "auto_factor_heatmap", self.compartment_auto_factor_heatmap
+        )
+        self.compartment_auto_factor_ib = getf(
+            "compartments", "auto_factor_ib", self.compartment_auto_factor_ib
+        )
+        self.compartment_auto_factor_smooth = getf(
+            "compartments", "auto_factor_smooth", self.compartment_auto_factor_smooth
+        )
+
+        # [accessibility]
+        self.use_bridging = getb("accessibility", "use_bridging", self.use_bridging)
+        self.bridging_weight = getf("accessibility", "bridging_weight", self.bridging_weight)
+        self.bridging_apply_to_heatmap = getb(
+            "accessibility", "apply_to_heatmap", self.bridging_apply_to_heatmap
+        )
+        self.bridging_apply_to_ib = getb("accessibility", "apply_to_ib", self.bridging_apply_to_ib)
+        self.bridging_apply_to_smooth = getb(
+            "accessibility", "apply_to_smooth", self.bridging_apply_to_smooth
+        )
+        self.bridging_radius_heatmap = getf(
+            "accessibility", "radius_heatmap", self.bridging_radius_heatmap
+        )
+        self.bridging_radius_ib = getf("accessibility", "radius_ib", self.bridging_radius_ib)
+        self.bridging_radius_smooth = getf(
+            "accessibility", "radius_smooth", self.bridging_radius_smooth
+        )
+        self.bridging_auto_factor_heatmap = getf(
+            "accessibility", "auto_factor_heatmap", self.bridging_auto_factor_heatmap
+        )
+        self.bridging_auto_factor_ib = getf(
+            "accessibility", "auto_factor_ib", self.bridging_auto_factor_ib
+        )
+        self.bridging_auto_factor_smooth = getf(
+            "accessibility", "auto_factor_smooth", self.bridging_auto_factor_smooth
+        )
+        self.use_fibre_compaction = getb(
+            "accessibility", "use_fibre_compaction", self.use_fibre_compaction
+        )
+        self.fibre_compaction = getf("accessibility", "fibre_compaction", self.fibre_compaction)
+
+        # [nucleus]
+        self.use_lamina = getb("nucleus", "use_lamina", self.use_lamina)
+        self.lamina_weight = getf("nucleus", "lamina_weight", self.lamina_weight)
+        self.use_central_force = getb("nucleus", "use_central_force", self.use_central_force)
+        self.central_weight = getf("nucleus", "central_weight", self.central_weight)
+        self.use_chromosomal_blocks = getb(
+            "nucleus", "use_chromosomal_blocks", self.use_chromosomal_blocks
+        )
+        self.chrom_block_kc = getf("nucleus", "chrom_block_kc", self.chrom_block_kc)
+        self.chrom_block_weight = getf("nucleus", "chrom_block_weight", self.chrom_block_weight)
+        self.nucleus_radius = getf("nucleus", "radius", self.nucleus_radius)
+        self.nucleus_packing_factor = getf("nucleus", "packing_factor", self.nucleus_packing_factor)
+        self.nucleus_inner_fraction = getf("nucleus", "inner_fraction", self.nucleus_inner_fraction)
 
         # [main] overlapping-anchor handling toggles (kept under [main] for simplicity).
         self.overlap_anchor_strict = getb(

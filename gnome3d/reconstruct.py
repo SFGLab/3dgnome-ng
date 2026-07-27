@@ -58,13 +58,32 @@ def _auto_strategy(kind: StageKind, settings: Settings) -> ExecutorStrategy:
 def _resolve_strategy(value: str, kind: StageKind, settings: Settings) -> ExecutorStrategy:
     """One ``mc_executor_<stage>`` value (serial|threaded|batch|auto) -> strategy.
     A batch choice that can't run (small-IB-boost's per-IB springs aren't in the
-    batched kernels; DENSIFY has no batch kernel) downgrades to threaded/serial."""
+    batched kernels; DENSIFY has no batch kernel; the JAX smooth kernel carries no
+    affinity terms) downgrades to threaded/serial."""
     v = str(value).strip().lower()
     chosen = (
         ExecutorStrategy(v)
         if v in (ExecutorStrategy.SERIAL, ExecutorStrategy.THREADED, ExecutorStrategy.BATCH)
         else _auto_strategy(kind, settings)
     )
+
+    # The JAX smooth kernel has no compartment or bridging term.  Running it with
+    # one enabled would drop that energy without saying so, so the smooth stage
+    # falls back to the numba kernels instead.
+    if (
+        chosen == ExecutorStrategy.BATCH
+        and kind is StageKind.SMOOTH
+        and (settings.use_compartments or settings.use_bridging)
+    ):
+        LOG.info(
+            "smooth: compartment/bridging terms are numba-only, using %s instead of batch",
+            "threaded" if int(settings.mc_executor_threaded_workers) > 1 else "serial",
+        )
+        chosen = (
+            ExecutorStrategy.THREADED
+            if int(settings.mc_executor_threaded_workers) > 1
+            else ExecutorStrategy.SERIAL
+        )
 
     if chosen == ExecutorStrategy.BATCH and (kind is StageKind.DENSIFY):
         chosen = (

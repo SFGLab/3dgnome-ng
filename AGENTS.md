@@ -2,7 +2,7 @@
 
 ## Project Goal
 
-Python reimplementation of the Monte Carlo core of **3dgnome**. The reference implementation in `3dnome/MC/` is a ~6,400 line simulation that predicts 3D chromosome structure from ChIA-PET and Hi-C contact frequency data. The reimplementation lives in `gnome3d/` and reproduced the reference algorithm as its starting point. MC kernels run on CPU via Numba. A jax path batches regions on the GPU for the genome scale run. Torch is used for GPU device detection and the reference scoring functions in `gnome3d/energy.py`.
+Python reimplementation of the Monte Carlo core of **3dgnome**. The reference implementation in `3dnome/MC/` is a ~6,400 line simulation that predicts 3D chromosome structure from ChIA-PET and Hi-C contact frequency data. The reimplementation lives in `gnome3d/` and reproduced the reference algorithm as its starting point. MC kernels run on CPU via Numba. A jax path batches regions on the GPU for the genome scale run. Torch is used for GPU device detection.
 
 Do **not** modify anything inside `3dnome/`. That directory is the reference implementation - read it, never change it.
 
@@ -18,7 +18,8 @@ Rules for new feature work:
 
 - **All new features must be opt-in via `gnome3d/settings.py`.** Default-off so existing configs continue to reproduce the parity-era behavior.
 - **Document divergences** in the "Python divergences from reference" section below — what changed, why, and which setting toggles it.
-- The reference and `harness/compare.py` / `harness/integration.py` remain authoritative for the **parity baseline** (feature flags off). They are not authoritative for new features.
+- The reference and `harness/integration.py` remain authoritative for the **parity baseline** (feature flags off). They are not authoritative for new features.
+- The parity gate is a byte-exactness diff of a real reconstruction, not a unit harness. See [Parity gate](#parity-gate).
 - Inside a feature's own code, document any non-obvious behavior; project memory (`[[…]]` links) carries the longer-form rationale.
 
 ---
@@ -39,12 +40,10 @@ Rules for new feature work:
 │   ├── simulate.py             # Public reconstruction entry point
 │   ├── reconstruct.py          # The self-expanding task DAG
 │   ├── pipeline/               # Per-stage kernels (coarse, ib)
-│   ├── mc/                     # Composable MC terms, numba and jax kernels
-│   ├── settings.py data.py hierarchy.py io.py util.py types.py energy.py
+│   ├── mc/                     # numba and jax MC kernels (numba/, jax/)
+│   ├── settings.py data.py hierarchy.py io.py util.py types.py tracks.py skeleton.py
 ├── validation/                 # Validation package, see docs/validation-metrics.md
 ├── harness/
-│   ├── scorer.cpp              # Reference scorer compiled against real 3dnome sources
-│   ├── compare.py              # Unit-level correctness harness for energy functions
 │   └── integration.py          # Full-MC integration test and the reference runner
 ├── data/                       # Input datasets (GM12878, H1ESC, HFFC6). _hic holds 4DN mcools
 ├── docs/                       # Design docs, papers, validation writeups
@@ -247,10 +246,12 @@ The whole `gnome3d/` package is type-checked under **pyright strict mode**. Conf
 
 ```bash
 .venv/bin/pyright              # check all of gnome3d/
-.venv/bin/pyright gnome3d/mc.py  # check one file
+.venv/bin/pyright gnome3d/mc/numba/terms.py  # check one file
 ```
 
-Current state: **0 errors, 0 warnings**. New code is expected to maintain that. Run pyright before committing changes to `gnome3d/`.
+Run pyright before committing changes to `gnome3d/`. The tree currently reports errors that
+predate the pipeline refactor; the rule for new work is **do not increase the count**. Check the
+baseline with `git stash && .venv/bin/pyright | tail -1` before and after a change.
 
 ### Conventions
 
@@ -262,7 +263,7 @@ Current state: **0 errors, 0 warnings**. New code is expected to maintain that. 
 
 ### Numba interop
 
-`@njit` from numba has no type stubs, which would otherwise force every JIT-compiled function to be typed as `Any`. [gnome3d/mc.py](gnome3d/mc.py) wraps it with a typed identity decorator:
+`@njit` from numba has no type stubs, which would otherwise force every JIT-compiled function to be typed as `Any`. [gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py) wraps it with a typed identity decorator:
 
 ```python
 def njit(**kwargs: Any) -> Callable[[F], F]:
@@ -289,7 +290,6 @@ Current state: **0 lint issues, all files formatted**. Lint groups enabled: `E F
 Per-file ignores in `pyproject.toml`:
 - `gnome3d/{solver,io,data,hierarchy,mc}.py`: F403/F405 — these modules re-export `gnome3d.types` via `from .types import *`.
 - `gnome3d/data.py`: also B023 — `mark_arcs` uses an intentional closure pattern over loop locals.
-- `harness/compare.py`: E702, E703, E741, B007, B905 — the test stubs use compact one-liners with `;`, ambiguous names like `l`, and `zip()` without `strict=`.
 
 ### Adding new code
 
@@ -312,47 +312,46 @@ A style pass is also a correctness pass. While rewriting a doc, confirm the clai
 
 ---
 
-## Correctness Harness
+## Parity gate
 
-The harness compiles `harness/scorer.cpp` directly against the real 3dnome MC sources (`3dnome/MC/*.cpp`). It uses `#define private public` before including `LooperSolver.h` to expose private methods - access control is compile-time only, so the object layout and compiled method bodies are identical to production. The result is that every comparison runs the actual `calcScoreHeatmapActiveRegion()`, `calcScoreStructureSmooth()`, etc. - not a reimplementation.
+`harness/compare.py` and `harness/scorer.cpp` were **removed**.  They compiled a scorer against
+the real 3dnome sources and compared it against `gnome3d/energy.py` and `gnome3d/solver.py`, both
+of which the pipeline refactor deleted.  Every one of the 51 checks had been silently skipping on
+`ImportError` since then, so the harness reported `0 passed, 0 failed, 51 skipped` while looking
+green.  A gate that cannot fail is worse than no gate.  The reference binary itself is untouched
+and `harness/integration.py` still uses it.
 
-### Quick start
+**The parity gate for flag-off changes is a byte-exactness diff of a real reconstruction.**
+Reconstruct one region at the previous commit and again on the working tree, then compare bead
+coordinates exactly:
 
 ```bash
-# First build (auto-runs on first comparison too)
-python harness/compare.py --build-only
-
-# Print reference values only - no Python impl needed
-python harness/compare.py --reference
-
-# Run all tests (skips anything not yet in gnome3d/)
-python harness/compare.py
-
-# Run a specific test group
-python harness/compare.py distfns
-python harness/compare.py heatmap arcs smooth
+git worktree add --detach /tmp/g3d_head HEAD
+ln -s "$PWD/data" /tmp/g3d_head/data
+# run the same region in both trees, then compare the coordinates
+PYTHONHASHSEED=0 .venv/bin/python <driver> /tmp/g3d_head  head.npz
+PYTHONHASHSEED=0 .venv/bin/python <driver> "$PWD"         wip.npz
 ```
 
-### What is tested
+where `<driver>` calls `gnome3d.simulate.run_region` and dumps `(start, end, x, y, z)` per bead.
+`PYTHONHASHSEED=0` is required whenever a JAX kernel runs - see the JAX seeding bug noted with the
+JAX backend below.  Any new opt-in feature must leave this diff byte-identical with its flag off.
 
-| Group | What it checks | Python hook (gnome3d/energy.py) |
-|-------|---------------|-----------------------------|
-| `angle` | Custom angle metric (`1 - (dot+1)/2`, NOT acos) | `angle_metric(v1, v2)` |
-| `distfns` | `genomicLengthToDistance`, `freqToDistanceHeatmap`, `freqToDistance` | `genomic_length_to_distance`, `freq_to_dist_heatmap`, `freq_to_distance` |
-| `heatmap` | Full double-counted heatmap score | `score_heatmap(pos, exp_dist, diag)` |
-| `arcs` | Arc spring score with repulsion branch | `score_arcs(pos, arcs, stretch_k, squeeze_k)` |
-| `smooth` | Chain length + cubic angle penalty | `score_smooth(pos, dtn, stretch_k, squeeze_k, angular_k, w_dist, w_angle)` |
-| `metropolis` | Acceptance probability `jump_scale * exp(-jump_coef * ratio / T)` | `metropolis_prob(js, jc, sc, sp, T)` |
+For the *behaviour* of a new energy term, unit-test it directly:
 
-### Non-obvious details captured in scorer.cpp
+```bash
+python harness/test_terms.py
+```
 
-- **`angle()` is NOT `acos`**: `3dnome/MC/lib/common.cpp:40` defines it as `1 - (dot(norm(v1), norm(v2)) + 1) / 2`, a linear dissimilarity in [0, 1]. The smooth score's cubic penalty uses this.
-- **Heatmap score double-counts**: the reference computes `sum_moved sum_i err(i, moved)`, which counts every pair (i,j) twice. The Python must match this convention exactly so that the MC delta `2*(local_curr - local_prev)` is consistent.
-- **Global score update**: `score_curr += 2.0 * (local_score_curr - local_score_prev)`. The factor 2 comes from the double-counting above.
-- **Metropolis uses ratio, not difference**: acceptance probability is `jump_scale * exp(-jump_coef * (score_curr / score_prev) / T)`, and `jump_scale` (default 50) can push the probability above 1.
-- **Random displacement is uniform in a cube**: `random_vector(step)` returns `(rand(±step), rand(±step), rand(±step))`, not a sphere or Gaussian.
+That file covers the epigenome terms and is the template for the next one. Three properties per
+term. A hand-built configuration whose energy is computable in closed form. A check that the
+per-bead local scores sum to the full score, which is the contract the incremental MC update
+depends on. And a check that the term stays non-negative over random configurations, which the
+Metropolis rule requires because it divides by the running score. Plus whatever behavioural claim
+the term makes that a closed form cannot express.
 
 ---
+
 
 ## Integration Test
 
@@ -400,30 +399,65 @@ The test auto-skips the Python comparison if `gnome3d/simulate.py` is missing or
 
 ---
 
+## Epigenomic tracks
+
+The compartment and accessibility energy terms read plain-text tracks derived from data the
+repo already fetches.  Build them once per cell line:
+
+```bash
+python -m validation fetch  --manifest validation/manifests/<CELL>_hic.json --out data/_hic
+python -m validation fetch  --manifest validation/manifests/<CELL>_accessibility.json \
+                            --out data/_epigenome
+python -m validation tracks --cell <CELL>
+```
+
+That writes `data/<CELL>/<CELL>_compartments.bedGraph` and `<CELL>_atac.bedGraph` plus a
+lockfile recording resolution, source file and a per-chromosome quality number.  It is
+idempotent, so re-running is free.
+
+Then ablate the terms against that cell line's own Hi-C:
+
+```bash
+python -m validation epigenome --cell <CELL> --hic data/_hic/<CELL>/<file>.mcool \
+                               --region chr1:20000000-40000000
+```
+
+Accessibility assay differs by cell line.  ENCODE has ATAC-seq for GM12878 only; H1 and HFFc6
+use DNase-seq, which is what HiP-HoP itself used, so it is the intended input rather than a
+substitute.  The manifests record which is which.
+
+Two traps, both of which produce a silently wrong answer.  Pick the deepest contact file when a
+cell line has several, since a shallow one yields a compartment eigenvector that is pure noise.
+And pass `clip_percentile=99.9` when calling `cooltools`' `cis_eig` directly, because it is not
+that function's default and without it outlier pixels dominate the decomposition.  Both are
+written up in [docs/epigenome-energy-terms.md](docs/epigenome-energy-terms.md).
+
+---
+
 ## Python divergences from reference
 
 Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diverges, why, and how to toggle/restore parity. Keep this list current — new entries must be added when introducing diverging behavior, and removed when behavior is brought back into parity.
 
 ### Settings hygiene
 
-- **`noise_arcs` removed.** The reference declares `noiseCoefficientLevelAnchor` (read as `noise_arcs` in `[main]`) and multiplies it into a local `noise_size` variable in `LooperSolver.cpp:2085`, but the arc-MC call site on line 2136 passes a hardcoded `noise_size_small=0.005` instead — making the setting effectively dead in the reference. Python uses the same 0.005 hardcoded constant in [solver.py::_reconstruct_cluster_arcs](gnome3d/solver.py); the setting was dropped to avoid implying configurability.
-- **`random_walk` ported.** Previously loaded-but-unused; now drives [solver.py::_random_walk_segment_level](gnome3d/solver.py), mirroring `LooperSolver.cpp:80-98` (chained 50.0-step walk per chromosome instead of segment-level heatmap MC). Honors `use_2d`.
-- **`long_pet_*` ported.** Long-range arcs (gap > `max_pet_length`) are no longer discarded by [io.load_arcs](gnome3d/io.py) — they are carried on `ContactData.long_arcs` and folded into the segment heatmap by [solver.py::_add_long_pet_to_segment_heatmap](gnome3d/solver.py) as `long_pet_scale * arc.score ** long_pet_power`. Mirrors `LooperSolver.cpp:1069-1104`, including the asymmetric `h[st][end] += val` pattern (the downstream symmetrize step in `_normalize_heatmap` averages it to `val` on each side).
-- **Chromosome-level MC ported.** Previously `steps_lvl1` / `noise_lvl1` were inert because Python had no chr-level reconstruction. Now [solver.py::_reconstruct_chromosome_level](gnome3d/solver.py) builds an n_chr × n_chr inter-chromosomal singleton heatmap, normalizes its first non-zero diagonal to 1.0, converts to expected distances, and runs `mc_heatmap` with `steps_lvl1` runs at `noise_lvl1 × avg_dist` step size. Mirrors `LooperSolver.cpp` lines 119-160 and 265-322. Triggered only when `len(chrs) > 1`; single-chr runs are unaffected. If the singleton input has no inter-chr contacts the chr roots are scattered randomly instead.
-- **`normalizeHeatmapInter` ported.** [solver.py::_normalize_heatmap_inter](gnome3d/solver.py) was previously a no-op stub; now it multiplies the segment heatmap by `heatmap_inter_scaling` and divides intra-chromosome blocks back, matching `LooperSolver.cpp:1422-1459`. Net effect: intra-chr unchanged, inter-chr × scale. Active only on multi-chr runs (length-1 `current_level` short-circuits).
+- **`noise_arcs` removed.** The reference declares `noiseCoefficientLevelAnchor` (read as `noise_arcs` in `[main]`) and multiplies it into a local `noise_size` variable in `LooperSolver.cpp:2085`, but the arc-MC call site on line 2136 passes a hardcoded `noise_size_small=0.005` instead — making the setting effectively dead in the reference. Python uses the same 0.005 hardcoded constant in [pipeline/ib/arcs.py](gnome3d/pipeline/ib/arcs.py); the setting was dropped to avoid implying configurability.
+- **`random_walk` ported.** Previously loaded-but-unused; now drives [pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py), mirroring `LooperSolver.cpp:80-98` (chained 50.0-step walk per chromosome instead of segment-level heatmap MC). Honors `use_2d`.
+- **`long_pet_*` ported.** Long-range arcs (gap > `max_pet_length`) are no longer discarded by [io.load_arcs](gnome3d/io.py) — they are carried on `ContactData.long_arcs` and folded into the segment heatmap by [pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) as `long_pet_scale * arc.score ** long_pet_power`. Mirrors `LooperSolver.cpp:1069-1104`, including the asymmetric `h[st][end] += val` pattern (the downstream symmetrize step in `_normalize_heatmap` averages it to `val` on each side).
+- **Chromosome-level MC ported.** Previously `steps_lvl1` / `noise_lvl1` were inert because Python had no chr-level reconstruction. Now [pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) builds an n_chr × n_chr inter-chromosomal singleton heatmap, normalizes its first non-zero diagonal to 1.0, converts to expected distances, and runs `mc_heatmap` with `steps_lvl1` runs at `noise_lvl1 × avg_dist` step size. Mirrors `LooperSolver.cpp` lines 119-160 and 265-322. Triggered only when `len(chrs) > 1`; single-chr runs are unaffected. If the singleton input has no inter-chr contacts the chr roots are scattered randomly instead.
+- **`normalizeHeatmapInter` ported.** [pipeline/coarse/heatmap.py](gnome3d/pipeline/coarse/heatmap.py) was previously a no-op stub; now it multiplies the segment heatmap by `heatmap_inter_scaling` and divides intra-chromosome blocks back, matching `LooperSolver.cpp:1422-1459`. Net effect: intra-chr unchanged, inter-chr × scale. Active only on multi-chr runs (length-1 `current_level` short-circuits).
 - **Multi-chromosome CLI / API surface.** [cli.py](gnome3d/cli.py) and [simulate.py::run_genome](gnome3d/simulate.py) accept the same syntax as the reference's `-c` flag: single chromosome, comma-separated list, `chrN-chrM` numeric range, or single sub-chromosomal region. Default (empty string) matches the reference: `chr1-chr22,chrX`. Parsing is centralized in [io.py::parse_chrs_arg](gnome3d/io.py). The CLI now writes one CIF per chromosome when more than one chr was requested (using a `_<chr>_` suffix in the filename); single-chr/region runs keep the old single-CIF behavior. `run_region` keeps its original single-region semantics for backward compatibility; `run_genome` returns `list[dict[str, list[BeadOut]]]` so per-chromosome bead lists are preserved.
 - **`data_singletons_inter` loaded.** [data.py::ContactData.from_files](gnome3d/data.py) reads the optional second singletons file (config key `[data] singletons_inter`) and appends to `singletons` whenever `len(chrs) > 1`. Mirrors `LooperSolver.cpp:970` which adds inter-chromosomal singleton files for multi-chr runs. Single-chr runs skip this file (per-chr contacts in the main file are sufficient and the inter file is often a sparse stub).
 
 ### Refactors (no behavior change at parity settings)
 
-- **Unified smooth-MC kernel** ([gnome3d/mc.py](gnome3d/mc.py))
-  The reference has separate `MonteCarloArcsSmooth` branches per feature combo. Python collapses the four prior specialized kernels (`_batch_smooth_nb`, `_batch_smooth_heat_nb`, `_batch_smooth_orientation_nb`, `_batch_smooth_orientation_heat_nb`) into one `_batch_smooth_kernel_nb` driven by `use_heat`/`use_orn` flags. Energy terms (struct, heat, orn) are tracked as independent components (`score_struct`, `score_orn`, `score_heat`) and combined per step.
+- **Unified smooth-MC kernel** ([gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py))
+  The reference has separate `MonteCarloArcsSmooth` branches per feature combo. Python collapses the four prior specialized kernels (`_batch_smooth_nb`, `_batch_smooth_heat_nb`, `_batch_smooth_orientation_nb`, `_batch_smooth_orientation_heat_nb`) into one `batch_mc_nb` driven by `use_heat`/`use_orn` flags. Energy terms (struct, heat, orn) are tracked as independent components (`score_struct`, `score_orn`, `score_heat`) and combined per step.
   Side benefit: heat/orn paths previously did a full O(N) structure recompute every MC step — now incremental like the pure-smooth path. Verified drift stays at float-noise (~1e-9) under the codebase's reciprocal-neighbor invariant.
 
 ### Algorithm divergences
 
 - **Orientation MC: weighted local scorer**
-  Python uses a weighted local delta in `_local_score_orientation_nb` ([gnome3d/mc.py](gnome3d/mc.py)) so the incremental update is exact w.r.t. `_score_orientation_full_nb`. The reference uses an unweighted local scorer that drifts over many steps. See `[[project-orientation-mc-fix]]`. The reference scorer in `gnome3d/energy.py` stays unweighted so `harness/compare.py` still passes.
+  Python uses a weighted local delta in `_local_score_orientation_nb` ([gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py)) so the incremental update is exact w.r.t. `_score_orientation_full_nb`. The reference uses an unweighted local scorer that drifts over many steps. See `[[project-orientation-mc-fix]]`. The reference scorer stayed unweighted for the old unit harness, which has since been removed.
 
 - **Singleton chr filter** (data loading)
   The reference bins inter-chromosomal singletons by position; Python correctly filters by chromosome. Smooth-MC heat scores diverge 3-5× as a result, but final structures still match. See `[[project-singleton-chr-filter-divergence]]`.
@@ -431,7 +465,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 - **`BeadOut` is a NamedTuple with a `kind` field** ([gnome3d/types.py](gnome3d/types.py))
   Output beads were widened from a 5-tuple `(start, end, x, y, z)` to a 6-field NamedTuple `(start, end, x, y, z, kind)` where `kind: Literal["anchor", "subanchor"]`. Iteration / positional unpacking still works (NamedTuple subclasses tuple) but consumers must expect length 6, not 5. Named access also available: `b.start`, `b.kind`, plus convenience properties `b.midpoint` and `b.span`. The CIF writer emits `kind` via a non-standard `_atom_site.gnome_bead_kind` column and additionally distinguishes anchors (`label_comp_id = ALA`) from subanchors (`label_comp_id = GLY`) so default mmCIF viewers color-code them automatically.
 
-- **Subanchor densification: centered slots instead of single points** ([gnome3d/solver.py::_densify_active_region](gnome3d/solver.py))
+- **Subanchor densification: centered slots instead of single points** ([pipeline/ib/densify.py::densify](gnome3d/pipeline/ib/densify.py))
   The reference places each subanchor at a single genomic point `ca.end + (j+1) * gap_bp / (ld+1)`, so each subanchor bead has zero genomic width and adjacent anchors collapse all ld subanchors into one point when overlapping. Python keeps the same midpoint positions but gives each subanchor j a slot of width `d_bp = span // (ld+1)` centered on its midpoint. Properties:
     - Subanchor midpoints, 3D position interpolation (`t = (j+1)/(ld+1)`), and `dtn` are unchanged versus the reference's point scheme.
     - Each subanchor has a non-degenerate genomic range whenever the in-between region is at least `ld+1` bp wide.
@@ -447,9 +481,9 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
       - `False`: every densified subanchor appears in the `BeadOut` output, even when `start == end`.
       - `True`: subanchor entries with `start == end` are filtered out of the externally visible bead list. The MC chain still contains them (needed for chain smoothness); only the output is cleaned. Useful in combination with `overlap_anchor_strict = True` to suppress the collapsed-overlap zero-length entries the reference would otherwise emit.
 
-  The `densify.subanchor_inside` and `densify.unique_starts` checks in `harness/compare.py` enforce the default-mode invariants.
+  The invariants are that every subanchor falls inside its gap and that bead starts are unique.
 
-- **Dynamic loop density** — `settings.use_dynamic_loop_density = True` to enable. ([gnome3d/solver.py::_subanchor_counts_per_arc](gnome3d/solver.py))
+- **Dynamic loop density** — `settings.use_dynamic_loop_density = True` to enable. ([pipeline/ib/densify.py::_subanchor_counts](gnome3d/pipeline/ib/densify.py))
   The reference (and Python's default) inserts a fixed `loop_density` subanchor count between every adjacent anchor pair, regardless of arc span. With arcs spanning anything from a few hundred bp to hundreds of kb in real ChIA-PET data, this gives **>100× imbalance** in genomic-bp-per-bead between short and long arcs. Dynamic mode picks the count per arc so the *chain segments connecting beads* are roughly `target_bp_per_subanchor` long:
 
     `n_subanchors = round(span / target) − 1`  (clamped to `[min, max]`)
@@ -460,11 +494,52 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     - `min_subanchors_per_arc` (int, default `0`) — set to `1` to force at least one subanchor between every pair regardless of span.
     - `max_subanchors_per_arc` (int, default `50`) — cap to avoid runaway counts on huge gaps (a 444 kb arc at 5 kb target would otherwise insert 88 subanchors).
 
-  Both [_densify_active_region](gnome3d/solver.py) and [_build_contact_heatmaps](gnome3d/solver.py) consume the same `_subanchor_counts_per_arc` output, so the densified bead chain and the subanchor contact heatmap stay in sync — `use_subanchor_heatmap` remains compatible with dynamic mode. For arcs with `count == 0` the contact heatmap merges that gap's half into each flanking anchor's bin (midpoint break); the smooth-MC chain just links the two anchors directly.
+  Both [densify](gnome3d/pipeline/ib/densify.py) and [build_contact_heatmaps](gnome3d/pipeline/coarse/build.py) consume the same subanchor-count output, so the densified bead chain and the subanchor contact heatmap stay in sync — `use_subanchor_heatmap` remains compatible with dynamic mode. For arcs with `count == 0` the contact heatmap merges that gap's half into each flanking anchor's bin (midpoint break); the smooth-MC chain just links the two anchors directly.
 
-  Default behavior (`use_dynamic_loop_density = False`) is unchanged.  The `densify.dynamic_counts_match` and `densify.dynamic_total_beads` checks in `harness/compare.py` exercise the dynamic path.
+  Default behavior (`use_dynamic_loop_density = False`) is unchanged.
 
 ### New features (opt-in via settings, default-off)
+
+- **Epigenome energy terms** — A/B compartments and chromatin accessibility.
+  Full specification in [docs/epigenome-energy-terms.md](docs/epigenome-energy-terms.md);
+  sources are [docs/multimm/README.md](docs/multimm/README.md) for the compartment family and
+  [docs/hiphop/README.md](docs/hiphop/README.md) for accessibility. Six flags, all default off:
+  `use_compartments`, `use_bridging`, `use_fibre_compaction`, `use_lamina`,
+  `use_central_force`, `use_chromosomal_blocks`, under `[compartments]`, `[accessibility]` and
+  `[nucleus]`. New `[data]` keys `compartments`, `accessibility`, `phasing_track`;
+  `ContactData.from_dataframes` gains the matching frames.
+
+  Divergences worth knowing:
+  - **Attractive terms are written shifted and non-negative.** MultiMM and HiP-HoP write them
+    as negative energies, which 3dgnome cannot use: the Metropolis rule divides by the running
+    score and is guarded on `score > 0`, so a negative-definite term would silently disable the
+    temperature branch. The shift changes an additive constant, not the minimum or the gradient.
+  - **The pairwise affinity is divided by `N - 1`.** Not in MultiMM. Without it the term's
+    strength grows with region size, because it sums over all partners while springs act per
+    bond, and a weight tuned on a small region collapses a large one.
+  - **ATAC drives both HiP-HoP mechanisms.** HiP-HoP uses H3K27ac for fibre compaction and ATAC
+    for bridging; we drive both from accessibility because the pipeline loads one track.
+    Compaction scales the existing `dtn` instead of adding i,i+2 springs.
+  - **Bridging is an effective pairwise attraction.** HiP-HoP's explicit diffusing bridge
+    particles are integrated out rather than simulated.
+  - **Lamina, central and chromosomal blocks run at segment-level heatmap MC only.** They need a
+    nuclear frame shared across the whole active region, and that is the one MC call spanning it.
+  - **Compartment input is source-agnostic.** CALDER2 reads Juicer `.hic` only, and this repo's
+    Hi-C is 4DN mcool, so a CALDER BED is one supported format rather than the required source.
+    A signed eigenvector track is the recommended input. Eigenvector sign is arbitrary, so
+    phasing is mandatory and explicit; an unphaseable chromosome is left unassigned rather than
+    segregated backwards.
+  - **The JAX smooth kernel does not carry these terms.** With either affinity flag on, the
+    smooth stage falls back from `batch` to numba and logs it
+    ([reconstruct.py::_resolve_strategy](gnome3d/reconstruct.py)), and `_batch_run` raises rather
+    than dropping an enabled term silently.
+  - **The estimate-dist dry pass excludes them.** They are attractive, so including them would
+    shrink the estimated distances that become the heat target and the real smooth pass would
+    then compact against an already-compacted target.
+
+  These terms are purely attractive and need excluded volume or confinement enabled alongside
+  them, both of which also default off. See the doc.
+
 
 - **Excluded volume** — `settings.use_excluded_volume = true` to enable.
   Soft harmonic repulsion preventing bead overlap. For pairs `(i, j)` with `|i - j| > exclusion_skip_neighbors` and `d_ij < r₀`, contributes `exclusion_weight * ((r0 - d)/r0)²` to the score. Implemented as an independent score component with the same `2 * (local_curr - local_prev)` incremental pattern as the heat term.
@@ -493,9 +568,9 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Ini key names under `[excluded_volume]`: `use_excluded_volume`, `weight`, `apply_to_arcs`, `apply_to_smooth`, `apply_to_heatmap`, `apply_to_ib`, `skip_neighbors`, `radius_arcs`, `radius_smooth`, `radius_heatmap`, `radius_ib`, `auto_factor_arcs`, `auto_factor_smooth`, `auto_factor_heatmap`, `auto_factor_ib`.
 
-  Why not in the reference: 3dnome uses an inverse-distance repulsion only on pairs where the input arc matrix is marked negative — a sparse, conditional repulsion. This adds a global polymer-physics excluded-volume term independent of input data. Touches arc-MC (`_batch_arcs_nb`), smooth-MC (`_batch_smooth_kernel_nb`), and heatmap-MC (`_batch_heatmap_nb`).
+  Why not in the reference: 3dnome uses an inverse-distance repulsion only on pairs where the input arc matrix is marked negative — a sparse, conditional repulsion. This adds a global polymer-physics excluded-volume term independent of input data. Touches arc-MC, smooth-MC and IB-MC through the shared `batch_mc_nb`, and heatmap-MC through its own `_batch_heatmap_nb`.
 
-- **IB-level MC pass** — `settings.use_ib_mc = true` to enable. ([gnome3d/solver.py::_ib_mc_refine](gnome3d/solver.py))
+- **IB-level MC pass** — `settings.use_ib_mc = true` to enable. ([pipeline/coarse/build.py::ib_mc_refine](gnome3d/pipeline/coarse/build.py))
   Address the "central blob" pathology in full-chromosome runs (very visible with `use_dynamic_loop_density = true` + small `target_bp_per_subanchor`): the reference / Python default places IB centroids by random walk or linear interpolation with no MC, so when each IB's smooth-MC fills a fat sphere of beads the spheres overlap into a tangle around the origin.
 
   This pass runs `mc_ib` over each segment's child IB centroids with chain-bond targets from `genomic_length_to_distance` between consecutive IB midpoints, plus optional excluded volume so IBs push each other apart and optional confinement so the chain doesn't stretch out. `mc_ib` is a **peer stage** to `mc_smooth` — *not* a sub-mode of it. It owns its own MC schedule, chain spring constants, step noise, and EV/confinement knobs. Both stages share only the unified `_batch_mc_nb` kernel; neither extends the other.
@@ -547,7 +622,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Motivation: at the IB level, EV pushes IBs apart but only nearest-neighbor chain bonds pull them back, so the segment stretches out into a long sausage. The IB tether (small packing factor → tight sphere around the segment centroid) softly holds the chain together while EV still keeps IB spheres from overlapping. At arc / smooth levels, confinement instead acts as a nuclear-like envelope for under-constrained small IBs.
 
-- **Small-IB spring boost** — `settings.use_small_ib_boost = true` to enable.
+- **Small-IB spring boost** — described below but **not currently implemented**: `use_small_ib_boost`, `small_ib_threshold` and `small_ib_spring_multiplier` are not fields of `Settings`, and `solver.py` no longer exists. Kept as a design note.
   When an IB has fewer anchors than `small_ib_threshold`, multiplies `spring_stretch_arcs`, `spring_squeeze_arcs`, `spring_stretch`, `spring_squeeze`, `spring_angular` by `small_ib_spring_multiplier` for that IB only. No kernel changes — implemented in `solver.py::_settings_for_ib()` by passing a `copy.copy(self.s)` clone with boosted values to `_reconstruct_cluster_arcs` / `_reconstruct_cluster_smooth` via an `s_override` parameter. Thread-safe (never mutates `self.s`). Settings:
     - `use_small_ib_boost`
     - `small_ib_threshold` (anchor count below which an IB is "small"; default 10)
@@ -555,11 +630,11 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: complements confinement to prevent under-constrained small IBs from stretching out. The boost tightens chain and bond springs so the chain compresses against any repulsive/heatmap forces. Targeted: only affects small IBs, doesn't change behavior of large well-constrained IBs.
 
-- **JAX/CUDA backend** — `settings.mc_backend = "jax"` to enable. ([gnome3d/mc_jax.py](gnome3d/mc_jax.py))
+- **JAX/CUDA backend** — selected per stage via `mc_executor_<stage> = batch`. ([gnome3d/mc/jax/](gnome3d/mc/jax/))
 
   Routes selected MC levels to a JAX/CUDA kernel instead of the default numba CPU implementation. Measured ~2× total speedup on chr22 dryrun (21 min → 10:26), peak ~6× per-kernel on the largest smooth-MC call (N=10116: 570s numba → 100s JAX). The win compounds with chromosome size since smooth-MC is ~90% of total wall time.
 
-  Architecture: `gnome3d/mc.py` is a thin dispatcher. `gnome3d/mc_numba.py` holds the production numba implementations. `gnome3d/mc_jax.py` holds the JAX kernels. Both backends share the same public signatures (`mc_heatmap`, `mc_arcs`, `mc_smooth`, `mc_ib`); the dispatcher routes by setting.
+  Architecture: `gnome3d/mc/numba/` holds the production numba implementations (`mc_heatmap_numba`, `mc_arcs_numba`, `mc_smooth_numba`, `mc_ib_numba`) and `gnome3d/mc/jax/` the JAX peers (`mc_smooth_jax`, `mc_smooth_jax_batch`, `mc_arcs_jax`, `mc_arcs_jax_batch`). There is no dispatcher module: the backend follows from the executor strategy resolved in [reconstruct.py::pick_executor](gnome3d/reconstruct.py), so `batch` means JAX and `serial`/`threaded` mean numba.
 
   Each MC level has its own JAX-routing flag, defaulting to the regime where JAX is measured to win:
 
@@ -570,11 +645,9 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   | heatmap | heatmap distance + EV                                 | off                | chr-level fires once at N=3-23, below JAX overhead floor; enable for multi-chr |
   | ib      | not ported                                            | n/a                | <1% of typical wall                                          |
 
-  Settings (under `[simulation_backend]`):
-  - `mc_backend` (`"numba"` | `"jax"`; default `"numba"`)
-  - `mc_backend_apply_to_smooth` (default `yes`)
-  - `mc_backend_apply_to_arcs` (default `no`)
-  - `mc_backend_apply_to_heatmap` (default `no`)
+  Settings (under `[simulation_backend]`): the per-stage `mc_executor_<stage>` values
+  (`serial` | `threaded` | `batch` | `auto`). `batch` selects JAX. The old
+  `mc_backend_apply_to_*` flags no longer exist.
 
   Install: `pip install gnome3d-ng[jax] "jax[cuda12]"` (NVIDIA) or `"jax[rocm6]"` (AMD). Without JAX installed, the dispatcher raises a clear error if `mc_backend="jax"` is set; otherwise it never imports JAX. The `[jax]` extras dep in `pyproject.toml` is **optional** — base install is numba-only.
 
@@ -584,6 +657,14 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   - **Float32 throughout the JAX path** — bench showed f64 is 2× slower on consumer GPUs (1/32 throughput) with no quality benefit at production run lengths.
   - **`cli.py` auto-forces `ib_workers=1` when `mc_backend=jax`** — multiple Python threads contending for a single GPU is net-negative; restarts go inside JAX via `mc_smooth_chains` (vmap), not via thread pools.
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
+
+  **Known bug: the JAX kernels are not reproducible across processes.** Both
+  `mc/jax/smooth.py:1306` and `:1886` derive the kernel's PRNG seed as
+  `abs(hash(log.current())) % 2**31`, and `hash()` on a `str` is salted per process by
+  `PYTHONHASHSEED`. Two runs of the same config with the same seed therefore produce
+  different structures whenever a JAX kernel is used. Export `PYTHONHASHSEED=0` to compare
+  runs; the real fix is to derive the seed from the node's own `Seeded.seed`, the way the numba
+  path already does.
 
   Why not in the reference: 3dgnome is CPU-only. The JAX port is a Python-side acceleration of the same algorithm; numerical results agree with numba within float32 RNG-trajectory noise. Harness/parity tests run with default settings (`mc_backend=numba`), so the new backend doesn't affect the parity baseline.
 
@@ -595,7 +676,7 @@ These rules apply to the **parity baseline** (all new feature flags off). New fe
 
 1. When working on or near parity code, verify algorithmic choices against the reference source. Do not invent behavior on the parity path.
 2. If behavior in the reference source is ambiguous or surprising, document it explicitly rather than working around it.
-3. **Run `python harness/compare.py` after touching parity-baseline scoring code.** A function is not done until the harness reports PASS for its group.
+3. **Run the byte-exactness parity gate after touching parity-baseline scoring code.** See [Parity gate](#parity-gate). A flag-off change is not done until the diff is byte-identical.
 4. **Run `python harness/integration.py` after touching parity-baseline MC code.** Bead-position distributions of reference and Python ensembles must remain statistically compatible.
 5. Parity-baseline scoring functions must produce numerically equivalent results to the reference on the same inputs (within 1e-6 absolute tolerance).
 6. New features are allowed and encouraged to diverge from the reference. They must be opt-in via `gnome3d/settings.py`, documented in the divergences section above, and must not change behavior when their flag is off.

@@ -37,6 +37,7 @@ validation = [
     "cooler>=0.9",
     "cooltools>=0.7",
     "hicrep>=0.2.6",
+    "pyBigWig>=0.3.18",
 ]
 
 [project.scripts]
@@ -98,5 +99,4 @@ ban-relative-imports = "all"
 # The harness uses tight one-liner stubs (lots of `;`), tuple short names like
 # `l` for length, and zip() without strict=. These are intentional for compact
 # test fixtures, not real code.
-"harness/compare.py" = ["E702", "E703", "E741", "B007", "B905"]
 "harness/integration.py" = ["B007", "B905"]

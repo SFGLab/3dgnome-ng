@@ -12,10 +12,12 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 
 from gnome3d.mc.numba.common import (
+    affinity_params,
     as_f64,
     dummy_bool,
     dummy_f64,
     dummy_i32,
+    init_affinity_scores,
     run_outer_loop,
 )
 from gnome3d.mc.numba.terms import (
@@ -35,6 +37,8 @@ def mc_ib_numba(
     dtn: np.ndarray[Any, Any],
     step_size: float,
     settings: Settings,
+    compartment: np.ndarray[Any, Any] | None = None,
+    accessibility: np.ndarray[Any, Any] | None = None,
 ) -> float:
     """Numba simulated-annealing implementation for IB-centroid chain MC.
     Peer to mc_smooth (not a sub-mode of it).  Called by `gnome3d.mc.mc_ib`.
@@ -79,6 +83,15 @@ def mc_ib_numba(
             avg_bond = float(dtn64.mean()) if dtn64.size > 0 else 1.0
             pf = float(settings.confinement_packing_factor_ib)
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
+
+    aff = affinity_params(
+        settings,
+        "ib",
+        float(dtn64.mean()) if dtn64.size > 0 else 1.0,
+        compartment,
+        accessibility,
+    )
+    score_comp, score_brdg = init_affinity_scores(pw, aff)
 
     score_struct = float(init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
     score_excl = (
@@ -148,6 +161,18 @@ def mc_ib_numba(
         score_orn=0.0,
         score_excl=score_excl,
         score_conf=score_conf,
+        use_comp=aff.use_comp,
+        comp_cls=aff.comp_cls,
+        comp_r0=aff.comp_r0,
+        comp_weight=aff.comp_weight,
+        comp_ea=aff.comp_ea,
+        comp_eb=aff.comp_eb,
+        use_brdg=aff.use_brdg,
+        brdg_a=aff.brdg_a,
+        brdg_r0=aff.brdg_r0,
+        brdg_weight=aff.brdg_weight,
+        score_comp=score_comp,
+        score_brdg=score_brdg,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

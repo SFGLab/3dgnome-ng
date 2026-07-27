@@ -36,7 +36,7 @@ from validation.core.data import load_chiapet_contacts
 from validation.core.ensemble import summarize
 from validation.core.regions import enumerate_regions
 from validation.core.regions import parse_region_arg as _chrs_and_region
-from validation.core.report import FAIL, PASS
+from validation.core.report import FAIL, PASS, WARN
 from validation.metrics import hic as contacts
 from validation.studies import Context, Study, register
 
@@ -311,7 +311,7 @@ class Compare(Study):
 
         print(f"\n{'=' * 74}\n  answers, median over {m} region(s), paired per region\n{'=' * 74}")
         print(
-            f"  {'variant':<26}{'overlap':>9}{'ovlp_norm':>10}{'HiC SCC':>9}{'Rg':>8}"
+            f"  {'variant':<26}{'overlap':>9}{'ovlp_norm':>10}{'selfcons':>9}{'Rg':>8}"
             f"{'dscale':>8}{'divers':>8}"
         )
         for label, var in [("reference", 0), ("python parity", 1), ("python +tuned", 2)]:
@@ -394,10 +394,21 @@ class Compare(Study):
                     f"    O/E  Pearson(logO/E) = {v4med('pearson_oe'):.3f}   Spearman(O/E) = "
                     f"{v4med('spearman_oe'):.3f}   (median {v4med('n_pairs_oe'):.0f} shared pairs/region)"
                 )
+                # A region only spans span/binsize bins, so a coarse bin size on a small region
+                # leaves very few bin pairs and the correlation stops being meaningful. Warn rather
+                # than let a confident-looking number stand on a handful of points.
+                npairs = v4med("n_pairs_oe")
+                if npairs < 50:
+                    print(
+                        f"    {WARN}  only {npairs:.0f} shared bin-pairs per region at "
+                        f"{args.cross_data_binsize // 1000}kb. The correlation is unreliable at this "
+                        "count. Use larger regions with --max-mb and --min-ibs, or a finer "
+                        "--cross-data-binsize, so a region spans enough bins"
+                    )
                 print(
-                    "    compared at the paper's own 1Mb Fig.2B resolution. 100kb is 93% empty and "
-                    "underpowered. Median ~0.76 across GM12878 regions matches/beats the paper's 0.67. "
-                    "O/E strips the shared decay for the honest structure-only agreement of about 0.2 to 0.3"
+                    "    compared at the paper's own 1Mb Fig.2B resolution, where a region needs to "
+                    "span many 1Mb bins to be meaningful. O/E strips the shared decay for the "
+                    "structure-only agreement"
                 )
 
         # --- scaling-law pass on ONE large region (where the fractal-globule regime exists) ---

@@ -18,14 +18,29 @@ import numpy as np
 
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import AnchorMapEntry, Arced, Densified, State
+from gnome3d.tracks import bin_compartments, bin_signal
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
-    from gnome3d.types import BoolArray, F32Array
+    from gnome3d.types import (
+        BoolArray,
+        CompartmentInterval,
+        F32Array,
+        I8Array,
+        SignalInterval,
+    )
 
-# (pos, fixed, starts, ends, dtn, anchor_map, step_size_smooth)
+# (pos, fixed, starts, ends, dtn, anchor_map, step_size_smooth, compartment, accessibility)
 DensifyResult = tuple[
-    "F32Array", "BoolArray", list[int], list[int], "F32Array", list[AnchorMapEntry], float
+    "F32Array",
+    "BoolArray",
+    list[int],
+    list[int],
+    "F32Array",
+    list[AnchorMapEntry],
+    float,
+    "I8Array | None",
+    "F32Array | None",
 ]
 
 
@@ -50,11 +65,21 @@ def _subanchor_counts(anchor_genomic: list[tuple[int, int, int]], s: Settings) -
 
 
 def densify(
-    anchor_pos: F32Array, anchor_genomic: list[tuple[int, int, int]], s: Settings
+    anchor_pos: F32Array,
+    anchor_genomic: list[tuple[int, int, int]],
+    s: Settings,
+    track_compartments: list[CompartmentInterval] | None = None,
+    track_accessibility: list[SignalInterval] | None = None,
 ) -> DensifyResult:
     """Insert subanchor beads between each consecutive anchor pair.  Byte-exact
     port of `Solver._densify_active_region` (see its docstring for the overlap /
-    span / midpoint conventions)."""
+    span / midpoint conventions).
+
+    Epigenomic tracks are binned onto the bead ranges produced here, so a
+    subanchor reads the track over its own genomic slot rather than inheriting
+    from a neighbouring anchor.  When `use_fibre_compaction` is on, accessibility
+    also shortens the chain bond targets: closed chromatin is locally compact,
+    which is what HiP-HoP's extra i,i+2 springs do."""
     counts = _subanchor_counts(anchor_genomic, s)
     bead_starts: list[int] = []
     bead_ends: list[int] = []
@@ -117,14 +142,45 @@ def densify(
         gap = max(bead_gpos[i + 1] - bead_gpos[i], 0)
         dtn[i] = float(s.genomic_length_to_distance(gap))
 
+    compartment: I8Array | None = None
+    if track_compartments:
+        compartment, _score = bin_compartments(track_compartments, bead_starts, bead_ends)
+
+    accessibility: F32Array | None = None
+    if track_accessibility:
+        accessibility = bin_signal(track_accessibility, bead_starts, bead_ends)
+        if s.use_fibre_compaction and s.fibre_compaction > 0.0:
+            # A bond spans beads i and i+1, so it compacts by their mean openness.
+            a_bond = 0.5 * (accessibility[:-1] + accessibility[1:])
+            scale = 1.0 - s.fibre_compaction * (1.0 - np.clip(a_bond, 0.0, 1.0))
+            # Never let a bond target collapse to zero: a zero target makes the
+            # chain spring's relative error undefined.
+            dtn *= np.maximum(scale, 1e-3).astype(np.float32)
+
     step_size_smooth = float(dtn.mean()) * s.noise_smooth
-    return pos_arr, fixed_arr, bead_starts, bead_ends, dtn, anchor_map, step_size_smooth
+    return (
+        pos_arr,
+        fixed_arr,
+        bead_starts,
+        bead_ends,
+        dtn,
+        anchor_map,
+        step_size_smooth,
+        compartment,
+        accessibility,
+    )
 
 
 def _run(problem: Problem) -> Result:
     """Serial runner: densify one IB.  (No GPU kernel - DENSIFY registers only a
     serial runner; the batched executor maps it.)"""
-    return densify(problem["anchor_pos"], problem["anchor_genomic"], problem["settings"])
+    return densify(
+        problem["anchor_pos"],
+        problem["anchor_genomic"],
+        problem["settings"],
+        problem["track_compartments"],
+        problem["track_accessibility"],
+    )
 
 
 class DensifyStage:
@@ -143,12 +199,14 @@ class DensifyStage:
             "anchor_pos": st.anchor_pos,
             "anchor_genomic": st.anchor_genomic,
             "settings": st.settings,
+            "track_compartments": st.track_compartments,
+            "track_accessibility": st.track_accessibility,
         }
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
         st = inputs[0]
         assert isinstance(st, Arced)
-        pos, fixed, starts, ends, dtn, anchor_map, step = result
+        pos, fixed, starts, ends, dtn, anchor_map, step, compartment, accessibility = result
         return Densified(
             **vars(st),
             pos=pos,
@@ -158,4 +216,6 @@ class DensifyStage:
             bead_starts=starts,
             bead_ends=ends,
             step_size_smooth=step,
+            bead_compartment=compartment,
+            bead_accessibility=accessibility,
         )

@@ -18,6 +18,8 @@ STUDY_MODULES = [
     "validation.studies.report",
     "validation.studies.boundaries",
     "validation.studies.fetch",
+    "validation.studies.tracks",
+    "validation.studies.epigenome",
 ]
 BATTERY = ["compare", "synthetic", "self-corr", "model-hic"]
 

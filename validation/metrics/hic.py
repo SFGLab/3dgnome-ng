@@ -351,8 +351,96 @@ def ensemble_hic_correlation(
     inverse-distance Pearson is a separate metric, multimm_faithful_pearson.
     """
     c_obs, bin_starts = observed_hic(mcool_path, region, binsize, balance=balance)
-    eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize  # actual resolution used
+    eff = (
+        int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize
+    )  # actual resolution used
     c_sim = np.zeros_like(c_obs)
     for coords, mids in zip(coords_list, mids_list, strict=True):
         c_sim += simulated_contacts(coords, mids, bin_starts, eff, contact_radius)
     return contact_correlation(c_sim, c_obs)
+
+
+# --- A/B compartments -------------------------------------------------------
+#
+# MultiMM's second validation: the first eigenvector of the structure-derived
+# correlation matrix against the eigenvector of the experimental Hi-C. See
+# docs/multimm/README.md and docs/epigenome-energy-terms.md.
+
+
+def compartment_eigenvector(contacts: F64Array, phasing: F64Array | None = None) -> F64Array:
+    """First compartment eigenvector of a dense cis contact map.
+
+    Delegates to `cooltools.api.eigdecomp.cis_eig`, the same routine `eigs_cis`
+    runs on experimental Hi-C. Using it for the simulated map too means both sides
+    of a comparison get identical treatment, which is the only way the correlation
+    between them means anything. A hand-rolled O/E-and-PCA reimplementation agreed
+    with cooltools at only |r| = 0.39 on real chr1.
+
+    `clip_percentile=99.9` matters and is not optional. It is `eigs_cis`'s own
+    default, and without it a handful of outlier pixels dominate the decomposition:
+    the top three eigenvalues come out nearly degenerate and the leading vector
+    correlates with the real one at only |r| = 0.41. With it, |r| = 1.0000.
+
+    The sign is arbitrary unless `phasing` is given, so callers compare on absolute
+    correlation. Unmappable bins come back as 0.
+    """
+    from cooltools.api import eigdecomp
+
+    n = contacts.shape[0]
+    if n < 8:
+        return np.zeros(n, dtype=np.float64)
+
+    a = np.asarray(contacts, dtype=np.float64).copy()
+    # cis_eig expects a balanced map with unmappable bins as NaN, not zero.
+    dead = a.sum(axis=1) <= 0.0
+    a[dead, :] = np.nan
+    a[:, dead] = np.nan
+
+    try:
+        _eigvals, eigvecs = eigdecomp.cis_eig(
+            a, n_eigs=1, phasing_track=phasing, clip_percentile=99.9
+        )
+    except (ValueError, np.linalg.LinAlgError):
+        return np.zeros(n, dtype=np.float64)
+
+    out = np.nan_to_num(np.asarray(eigvecs[0], dtype=np.float64))
+    return out
+
+
+def compartment_correlation(
+    c_sim: F64Array, c_obs: F64Array, track: F64Array | None = None
+) -> dict[str, float]:
+    """Compare the structure's compartment eigenvector against the observed one.
+
+    Both eigenvector signs are arbitrary, so the headline number is the absolute
+    Pearson correlation. `agreement` is the fraction of bins the two put in the
+    same compartment after orienting them to agree on average, which is the more
+    interpretable figure.
+
+    `track` optionally supplies the input compartment call, so a run can be checked
+    against what it was told rather than only against the Hi-C it never saw.
+    """
+    e_sim = compartment_eigenvector(c_sim)
+    e_obs = compartment_eigenvector(c_obs)
+    both = (e_sim != 0.0) & (e_obs != 0.0)
+    out: dict[str, float] = {"n_bins": float(int(both.sum()))}
+    if int(both.sum()) < 3:
+        return {**out, "eig_pearson_abs": float("nan"), "agreement": float("nan")}
+
+    a, b = e_sim[both], e_obs[both]
+    r = float(np.corrcoef(a, b)[0, 1]) if a.std() > 1e-12 and b.std() > 1e-12 else float("nan")
+    out["eig_pearson_abs"] = abs(r) if r == r else float("nan")
+    # Orient sim to obs before scoring per-bin agreement.
+    sgn = 1.0 if (r == r and r >= 0) else -1.0
+    out["agreement"] = float(np.mean(np.sign(sgn * a) == np.sign(b)))
+
+    if track is not None:
+        t = np.asarray(track, dtype=np.float64)
+        m = both & (t != 0.0)
+        if int(m.sum()) >= 3 and e_sim[m].std() > 1e-12 and t[m].std() > 1e-12:
+            rt = float(np.corrcoef(e_sim[m], t[m])[0, 1])
+            out["eig_vs_input_abs"] = abs(rt)
+            out["input_agreement"] = float(
+                np.mean(np.sign((1.0 if rt >= 0 else -1.0) * e_sim[m]) == np.sign(t[m]))
+            )
+    return out
