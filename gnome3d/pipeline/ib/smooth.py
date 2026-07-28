@@ -111,15 +111,6 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     s = problems[0]["settings"]
     n_restarts = max(1, int(s.steps_smooth))
 
-    # The JAX smooth kernel does not carry the affinity terms yet.  Refuse the
-    # batch rather than drop an enabled energy term without saying so.
-    if problems[0].get("compartment") is not None or problems[0].get("accessibility") is not None:
-        raise NotImplementedError(
-            "compartment / accessibility energy terms are not implemented in the JAX "
-            "smooth kernel. Set mc_executor_smooth = serial (or threaded) under "
-            "[simulation_backend] to run them on the numba kernel."
-        )
-
     expanded: list[Problem] = []
     owner: list[int] = []
     for gi, prob in enumerate(problems):

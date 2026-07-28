@@ -295,11 +295,71 @@ def test_behaviour() -> None:
     )
 
 
+def test_jax_agrees() -> None:
+    """The JAX kernel must carry the same affinity energy as numba.
+
+    Skipped when JAX is absent. Tolerance is float32: the JAX path is f32
+    throughout while numba is f64, so exact equality is not the bar.
+    """
+    print("\n[jax] affinity agreement with numba")
+    try:
+        import jax.numpy as jnp  # noqa: PLC0415
+
+        from gnome3d.mc.jax.smooth import _build_smooth_kernel, mc_smooth_jax  # noqa: PLC0415
+    except ImportError:
+        print("  SKIP  jax not installed")
+        return
+
+    n = 64
+    r = np.random.default_rng(4)
+    pos = (r.normal(size=(n, 3)) * 4).astype(np.float32)
+    dtn = np.full(n - 1, 2.0, dtype=np.float32)
+    fixed = np.zeros(n, dtype=np.bool_)
+    fixed[0] = fixed[-1] = True
+    comp = np.where((np.arange(n) // 8) % 2 == 0, 1, -1).astype(np.int8)
+    acc = r.random(n).astype(np.float32)
+
+    s = Settings()
+    s.use_compartments = s.use_bridging = True
+    s.compartment_weight, s.bridging_weight = 1.5, 0.8
+    aff = affinity_params(s, "smooth", float(dtn.mean()), comp, acc)
+    nb = sum(init_affinity_scores(np.ascontiguousarray(pos, dtype=np.float64), aff))
+
+    init_affinity = _build_smooth_kernel(
+        500, int(s.exclusion_skip_neighbors), False, False, 1, True
+    )[9]
+    jx = float(
+        init_affinity(
+            jnp.asarray(pos[None]),
+            jnp.asarray(comp),
+            jnp.asarray(acc),
+            jnp.float32(aff.comp_r0),
+            jnp.float32(aff.comp_weight),
+            jnp.float32(aff.comp_ea),
+            jnp.float32(aff.comp_eb),
+            jnp.float32(aff.brdg_r0),
+            jnp.float32(aff.brdg_weight),
+            jnp.int32(n),
+        )[0]
+    )
+    rel = abs(jx - nb) / max(abs(nb), 1e-9)
+    check("initial affinity energy matches numba", rel < 2e-5, f"rel diff {rel:.1e}")
+
+    s_off = Settings()
+    pa = np.asarray(mc_smooth_jax(pos.copy(), dtn, fixed, 0.3, s_off) or pos)
+    p1, p2 = pos.copy(), pos.copy()
+    mc_smooth_jax(p1, dtn, fixed, 0.3, s_off)
+    mc_smooth_jax(p2, dtn, fixed, 0.3, s_off, None, None, None, None, comp, acc)
+    check("flags off: JAX ignores the tracks", np.array_equal(np.asarray(p1), np.asarray(p2)))
+    del pa
+
+
 def main() -> int:
     print("epigenome energy-term checks")
     test_affinity()
     test_nuclear()
     test_behaviour()
+    test_jax_agrees()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

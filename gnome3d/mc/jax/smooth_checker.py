@@ -11,6 +11,11 @@ dependency with a 24-colour checkerboard:
   - per colour it gathers that colour's <= maxc movable beads and computes the (maxc, B) heat/EV
     delta + a small (maxc, 5) structural window — instead of the full (B, B).
 
+The COMPARTMENT and BRIDGING terms are not implemented here and this kernel refuses to run
+with either enabled, rather than dropping them silently.  Unlike orientation they are not
+constant during smooth, so omitting them would change the structures.  Use the sequential
+`mc` kernel for those.
+
 Fixed anchor beads never move (masked like pad beads).  ORIENTATION (CTCF) is OMITTED: during
 smooth it only updates on anchor moves and anchors are fixed, so it's a constant — the produced
 structures are correct, but the returned score excludes that constant offset.  Validated
@@ -452,6 +457,17 @@ def mc_smooth_checker_jax_batch(
         return []
     if not jax_is_available():
         raise RuntimeError("settings.mc_backend='jax' but JAX is not installed.")
+    # The compartment and bridging terms are not in this kernel.  Orientation is
+    # omitted here too, but that one is a constant during smooth so the structures
+    # stay correct; affinity is not constant and dropping it would change them.
+    if (
+        problems[0].get("compartment") is not None or problems[0].get("accessibility") is not None
+    ) and (bool(settings.use_compartments) or bool(settings.use_bridging)):
+        raise NotImplementedError(
+            "the checkerboard smooth kernel does not carry the compartment or bridging "
+            "terms. Set mc_executor_jax_smooth_kernel = mc to use the sequential JAX "
+            "kernel, which does."
+        )
     bucket = bool(settings.mc_executor_jax_bucket_shapes)
     big_b = max(
         (jax_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0]))

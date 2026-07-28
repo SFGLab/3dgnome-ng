@@ -36,33 +36,17 @@ from validation.metrics import hic as contacts
 from validation.metrics import structure as smetrics
 from validation.studies import Context, Study, register
 
-# Each arm names the flags it turns on.  "off" is the baseline every other arm is
-# compared against.  Excluded volume is on everywhere except the baseline, because
-# the affinity terms are attractive and need something pushing back.
+# Each arm names the flags it turns on, on top of the canonical config.
+#
+# CANONICAL already enables excluded volume and confinement, so the baseline is
+# not a bare polymer and there is no point in an EV-only arm. That matters here:
+# the affinity terms are attractive and need that repulsion to push back against.
 ARMS: dict[str, dict[str, object]] = {
     "off": {},
-    "ev-only": {
-        "use_excluded_volume": True,
-        "exclusion_apply_to_smooth": True,
-    },
-    "compartments": {
-        "use_excluded_volume": True,
-        "exclusion_apply_to_smooth": True,
-        "use_compartments": True,
-    },
-    "bridging": {
-        "use_excluded_volume": True,
-        "exclusion_apply_to_smooth": True,
-        "use_bridging": True,
-    },
-    "fibre": {
-        "use_excluded_volume": True,
-        "exclusion_apply_to_smooth": True,
-        "use_fibre_compaction": True,
-    },
+    "compartments": {"use_compartments": True},
+    "bridging": {"use_bridging": True},
+    "fibre": {"use_fibre_compaction": True},
     "all": {
-        "use_excluded_volume": True,
-        "exclusion_apply_to_smooth": True,
         "use_compartments": True,
         "use_bridging": True,
         "use_fibre_compaction": True,
@@ -71,7 +55,10 @@ ARMS: dict[str, dict[str, object]] = {
 
 
 def _track_paths(cell: str, data_root: str) -> tuple[str, str]:
-    d = Path(data_root) / cell
+    """Absolute paths.  `Settings.data_path` joins a relative name onto `data_dir`,
+    which for these tracks is already `<data_root>/<cell>`, so a repo-relative path
+    would resolve to `data/<cell>/data/<cell>/...` and silently load nothing."""
+    d = (Path(data_root) / cell).resolve()
     return (
         str(d / f"{cell}_compartments.bedGraph"),
         str(d / f"{cell}_atac.bedGraph"),
@@ -139,6 +126,12 @@ class Epigenome(Study):
                 from gnome3d.data import ContactData
 
                 data = ContactData.from_files(s, chrs, region)
+                # A mistyped or double-prefixed path loads nothing, and every arm
+                # then reports the baseline while looking like it ran. Fail loudly.
+                if flags.get("use_compartments") and not data.compartments:
+                    raise RuntimeError(f"no compartment intervals loaded from {comp_path}")
+                if flags.get("use_bridging") and not data.accessibility:
+                    raise RuntimeError(f"no accessibility bins loaded from {acc_path}")
                 ens = ens_mod.run_ensemble(s, data, chrs, region, ctx.n)
                 cl, ml = ens_mod.to_arrays_list(ens)
 
@@ -153,7 +146,7 @@ class Epigenome(Study):
                 rg = float(np.mean([smetrics.radius_of_gyration(c) for c in cl]))
                 bl = smetrics.bond_lengths(cl[0])
                 cv = float(bl.std() / bl.mean()) if bl.mean() > 0 else float("nan")
-                ov = float(smetrics.overlap_fraction(cl[0]))
+                ov = float(smetrics.overlap_fraction(cl[0], radius)[0])
 
                 row = {"eig": cc["eig_pearson_abs"], "agree": cc["agreement"], "rg": rg}
                 if name == "off":

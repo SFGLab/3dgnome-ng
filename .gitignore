@@ -267,10 +267,15 @@ playground/**/*.fq
 playground/**/*.fai
 playground/**/*.bed
 playground/**/*.gz
+playground/**/*.html
+playground/**/*.pdf
 
 # data 
 data/**/*.mcool
 data/**/*.cool
+data/**/*.bigWig
+data/**/*.bedGraph
+data/**/*.lock.json
 
 # superpowers
 .superpowers/

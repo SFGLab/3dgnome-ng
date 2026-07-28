@@ -529,10 +529,17 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     A signed eigenvector track is the recommended input. Eigenvector sign is arbitrary, so
     phasing is mandatory and explicit; an unphaseable chromosome is left unassigned rather than
     segregated backwards.
-  - **The JAX smooth kernel does not carry these terms.** With either affinity flag on, the
-    smooth stage falls back from `batch` to numba and logs it
-    ([reconstruct.py::_resolve_strategy](gnome3d/reconstruct.py)), and `_batch_run` raises rather
-    than dropping an enabled term silently.
+  - **The JAX smooth kernel carries the affinity terms; the checkerboard kernel does not.**
+    `mc_smooth_jax` and `mc_smooth_jax_batch` implement compartment and bridging, agreeing with
+    numba on initial energy to 1.2e-07 relative. `use_aff` is a static cache-key entry rather
+    than a weight gate, because the term costs an extra O(N) pass per step and making it
+    structural keeps that off runs that do not use it. The scores ride the excluded-volume
+    accumulator: all three terms are pairwise, double counted and share the factor-2 delta, so
+    the sum is exact for both the Metropolis ratio and the final score, and only the per-term
+    breakdown is lost. The opt-in checkerboard kernel
+    ([smooth_checker.py](gnome3d/mc/jax/smooth_checker.py)) does **not** implement them and
+    raises rather than dropping them; unlike orientation they are not constant during smooth,
+    so omitting them would change the structures.
   - **The estimate-dist dry pass excludes them.** They are attractive, so including them would
     shrink the estimated distances that become the heat target and the real smooth pass would
     then compact against an already-compacted target.
