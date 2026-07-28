@@ -1060,6 +1060,8 @@ def _build_smooth_kernel(
         0,  # dtn, movable (per-IB)
         0,  # heat_dist (per-IB)
         0,
+        0,  # comp_cls, brdg_a (per-IB)
+        0,
         0,  # anchor_ar, bead_to_anchor_k (per-IB)
         0,
         0,
@@ -1084,6 +1086,12 @@ def _build_smooth_kernel(
         0,
         0,
         0,  # conf_cx, conf_cy, conf_cz, conf_R, conf_w (per-IB)
+        0,  # comp_r0 (per-IB auto radius)
+        None,  # comp_w (global)
+        None,
+        None,  # comp_ea, comp_eb (global)
+        0,  # brdg_r0 (per-IB auto radius)
+        None,  # brdg_w (global)
         0,  # keys (per-chain)
         0,  # n_active (per-IB)
         0,  # n_movable_active (per-IB)
