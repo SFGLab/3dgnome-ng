@@ -17,6 +17,8 @@ Needs the validation extra via pip install -e .[validation], which is cooler, co
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 
 from gnome3d.types import F64Array, I64Array
@@ -444,3 +446,77 @@ def compartment_correlation(
                 np.mean(np.sign((1.0 if rt >= 0 else -1.0) * e_sim[m]) == np.sign(t[m]))
             )
     return out
+
+
+def compartment_saddle(
+    contacts: F64Array, track: F64Array, n_quantiles: int = 5
+) -> dict[str, float]:
+    """Compartment enrichment, the saddle statistic.
+
+    Sorts bins by `track`, a signed compartment value, into quantiles, then
+    averages observed-over-expected contact within each quantile pair. Strength is
+    the enrichment of same-compartment contact over cross-compartment contact,
+    using the extreme quantiles:
+
+        strength = (AA + BB) / (2 * AB)
+
+    Above 1 means A sits near A and B near B. This is what the compartment energy
+    term acts on directly, so it is a far more sensitive probe of that term than a
+    whole-region eigenvector correlation, where the baseline varies by 0.445 across
+    regions of one chromosome while the term moves it by 0.007.
+
+    `track` sorts the bins and is normally the input compartment call, the thing
+    the model was told. Passing the same track for every arm keeps the quantile
+    definition fixed, so a difference in strength is a difference in the structure
+    rather than in the binning.
+
+    Two properties to know before reading a number from this.
+
+    It measures *distal* compartmentalization only. The observed-over-expected step
+    divides out distance decay, so bringing together same-compartment beads that are
+    already close along the chain shows up as nothing. That is the intended
+    behaviour, and it means a term acting only at short range will score zero here
+    however strongly it acts.
+
+    It returns nan on a degenerate map. A structure compact enough that every pair
+    is in contact gives an all-ones O/E and no usable cross-compartment block. Check
+    that the contact map is not saturated before trusting a nan, or a strength of
+    exactly 1.0.
+
+    Returns strength plus the three raw enrichments, and `n_bins` actually used.
+    """
+    n = contacts.shape[0]
+    t = np.asarray(track, dtype=np.float64)
+    if t.shape[0] != n:
+        raise ValueError(f"track length {t.shape[0]} != contact matrix size {n}")
+
+    oe = observed_over_expected(contacts, min_sep_bins=1)
+    usable = (t != 0.0) & np.isfinite(t) & (contacts.sum(axis=1) > 0)
+    if int(usable.sum()) < 2 * n_quantiles:
+        return {
+            "strength": float("nan"),
+            "aa": float("nan"),
+            "bb": float("nan"),
+            "ab": float("nan"),
+            "n_bins": float(int(usable.sum())),
+        }
+
+    idx = np.flatnonzero(usable)
+    order = idx[np.argsort(t[idx])]
+    groups = np.array_split(order, n_quantiles)
+    lo, hi = groups[0], groups[-1]  # most B, most A
+
+    def mean_block(a: np.ndarray[Any, Any], b: np.ndarray[Any, Any]) -> float:
+        blk = oe[np.ix_(a, b)]
+        vals = blk[blk > 0.0]
+        return float(vals.mean()) if vals.size else float("nan")
+
+    aa, bb, ab = mean_block(hi, hi), mean_block(lo, lo), mean_block(hi, lo)
+    strength = (aa + bb) / (2.0 * ab) if ab and ab == ab and ab > 0 else float("nan")
+    return {
+        "strength": strength,
+        "aa": aa,
+        "bb": bb,
+        "ab": ab,
+        "n_bins": float(len(idx)),
+    }
