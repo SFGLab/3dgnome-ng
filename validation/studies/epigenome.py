@@ -3,8 +3,9 @@
 Reconstructs one region several times, each with a different subset of the
 compartment and accessibility terms enabled, and reports for each:
 
-  * compartment eigenvector agreement with that cell line's own Hi-C, the
-    question the terms exist to improve.  This is MultiMM's second validation.
+  * compartment eigenvector correlation with that cell line's own Hi-C, plus
+    Cohen's kappa on the per-bin compartment calls.  This is MultiMM's second
+    validation.
   * radius of gyration, bond-length spread and overlap fraction, the polymer
     sanity numbers that must not regress while the compartment score improves.
 
@@ -145,7 +146,7 @@ def _run_arm(
     return {
         "saddle": sad["strength"],
         "eig": cc["eig_pearson_abs"],
-        "agree": cc["agreement"],
+        "kappa": cc["agreement_kappa"],
         "rg": float(np.mean([smetrics.radius_of_gyration(c) for c in cl])),
         "cv": float(bl.std() / bl.mean()) if bl.mean() > 0 else float("nan"),
         "overlap": float(smetrics.overlap_fraction(cl[0], radius)[0]),
@@ -218,7 +219,7 @@ class Epigenome(Study):
             f"over {int(obs_saddle['n_bins'])} bins  (1.0 = no compartmentalization)\n"
         )
         header = (
-            f"  {'arm':<14}{'saddle':>9}{'eig |r|':>9}{'agree':>8}"
+            f"  {'arm':<14}{'saddle':>9}{'eig |r|':>9}{'kappa':>8}"
             f"{'Rg':>9}{'bondCV':>9}{'overlap':>9}"
         )
         print(header)
@@ -279,7 +280,7 @@ class Epigenome(Study):
                         sigma = abs(d_eig) / floor if floor > 0 else 0.0
                         mark += f"  ({sigma:.1f} sd eig)" + ("" if sigma >= 2.0 else " = noise")
                 print(
-                    f"  {name:<14}{row['saddle']:>9.3f}{row['eig']:>9.3f}{row['agree']:>8.3f}"
+                    f"  {name:<14}{row['saddle']:>9.3f}{row['eig']:>9.3f}{row['kappa']:>8.3f}"
                     f"{row['rg']:>9.2f}{row['cv']:>9.3f}{row['overlap']:>9.3f}{mark}"
                 )
             except Exception as e:  # noqa: BLE001
@@ -291,8 +292,10 @@ class Epigenome(Study):
             "  measure of what the compartment term acts on, and unlike the eigenvector\n"
             "  correlation it does not depend on the region's own baseline architecture.\n"
             "  eig |r| is the absolute correlation of the structure's compartment eigenvector\n"
-            "  with the experimental one; agree is the fraction of bins put in the same\n"
-            "  compartment. A gain there only counts if Rg and bondCV hold: these terms are\n"
+            "  with the experimental one; kappa is Cohen's kappa on the per-bin compartment\n"
+            "  calls, which is 0 at chance. The raw same-compartment fraction is not chance\n"
+            "  corrected and sits near 0.6 on an unbalanced region even with no signal, so it\n"
+            "  is not reported. A gain only counts if Rg and bondCV hold: these terms are\n"
             "  attractive and can raise the score by collapsing the structure.\n"
             "  Pass --baseline-repeats to print the noise floor; an effect under 2 sd of it\n"
             "  is not a result."

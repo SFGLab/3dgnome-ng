@@ -415,9 +415,18 @@ def compartment_correlation(
     """Compare the structure's compartment eigenvector against the observed one.
 
     Both eigenvector signs are arbitrary, so the headline number is the absolute
-    Pearson correlation. `agreement` is the fraction of bins the two put in the
-    same compartment after orienting them to agree on average, which is the more
-    interpretable figure.
+    Pearson correlation.
+
+    `agreement` is the fraction of bins the two put in the same compartment after
+    orienting them to agree on average. Read it against `agreement_chance`, never
+    on its own. It is not chance corrected, so its null level is the majority class
+    fraction rather than 0.5, and on an unbalanced region that is 0.6 or higher. A
+    structure carrying no compartment signal at all scores about that much, which
+    can exceed what a structure with weak real signal scores, so `agreement` moves
+    opposite to `eig_pearson_abs` whenever the model sits near the floor.
+
+    `agreement_kappa` is Cohen's kappa on the same two labellings: 0 at chance, 1
+    for a perfect match, negative for worse than chance. Prefer it.
 
     `track` optionally supplies the input compartment call, so a run can be checked
     against what it was told rather than only against the Hi-C it never saw.
@@ -434,7 +443,14 @@ def compartment_correlation(
     out["eig_pearson_abs"] = abs(r) if r == r else float("nan")
     # Orient sim to obs before scoring per-bin agreement.
     sgn = 1.0 if (r == r and r >= 0) else -1.0
-    out["agreement"] = float(np.mean(np.sign(sgn * a) == np.sign(b)))
+    x, y = np.sign(sgn * a), np.sign(b)
+    po = float(np.mean(x == y))
+    out["agreement"] = po
+    # Chance level for two independent labellings with these marginals, and the
+    # kappa that removes it.
+    pe = float(np.mean(x > 0) * np.mean(y > 0) + np.mean(x < 0) * np.mean(y < 0))
+    out["agreement_chance"] = pe
+    out["agreement_kappa"] = (po - pe) / (1.0 - pe) if pe < 1.0 else float("nan")
 
     if track is not None:
         t = np.asarray(track, dtype=np.float64)
@@ -503,8 +519,14 @@ def compartment_saddle(
 
     idx = np.flatnonzero(usable)
     order = idx[np.argsort(t[idx])]
-    groups = np.array_split(order, n_quantiles)
-    lo, hi = groups[0], groups[-1]  # most B, most A
+    # Equal-size extreme groups taken from each end, not np.array_split. A compartment
+    # eigenvector's sign is arbitrary, so negating the track must leave strength
+    # unchanged: it swaps the A and B blocks, which (aa + bb) / 2ab is symmetric in.
+    # array_split gives the remainder to the leading groups, so under a negated track
+    # the extreme quantiles held a different number of bins and strength moved by about
+    # two percent, comparable to the effects this is used to measure.
+    m = len(order) // n_quantiles
+    lo, hi = order[:m], order[-m:]  # most B, most A
 
     def mean_block(a: np.ndarray[Any, Any], b: np.ndarray[Any, Any]) -> float:
         blk = oe[np.ix_(a, b)]
