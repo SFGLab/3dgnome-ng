@@ -42,6 +42,10 @@ from validation.studies import Context, Study, register
 # CANONICAL already enables excluded volume and confinement, so the baseline is
 # not a bare polymer and there is no point in an EV-only arm. That matters here:
 # the affinity terms are attractive and need that repulsion to push back against.
+# Stride between independent ensembles, matching reconstruct.MEMBER_SEED_STRIDE's
+# intent: far enough apart that two repeats share no member seeds.
+_SEED_STRIDE = 50_000_003
+
 ARMS: dict[str, dict[str, object]] = {
     "off": {},
     "compartments": {"use_compartments": True},
@@ -105,6 +109,7 @@ def _run_arm(
     c_obs: F64Array,
     bin_starts: I64Array,
     sort_track: F64Array,
+    seed_offset: int = 0,
 ) -> dict[str, float]:
     """Reconstruct one arm and score it. Returns the metric row.
 
@@ -121,7 +126,7 @@ def _run_arm(
     if flags.get("use_bridging") and not data.accessibility:
         raise RuntimeError(f"no accessibility bins loaded from {flags.get('data_accessibility')}")
 
-    ens = ens_mod.run_ensemble(s, data, chrs, region, ctx.n)
+    ens = ens_mod.run_ensemble(s, data, chrs, region, ctx.n, seed_offset=seed_offset)
     cl, ml = ens_mod.to_arrays_list(ens)
 
     radius = float(np.median(smetrics.bond_lengths(cl[0])))
@@ -212,24 +217,38 @@ class Epigenome(Study):
         print(header)
         print("  " + "-" * (len(header) - 2))
 
-        # Measuring the detection floor is not optional.  An earlier run reported
-        # treatment effects of 0.003 to 0.010 while three identical baselines spanned
-        # 0.039, so every one of those "effects" was noise.  Repeating the baseline
-        # here makes that visible in the same table instead of needing three separate
-        # invocations to notice.
+        # Measuring the detection floor is not optional.  Each repeat must use a
+        # different ensemble seed: the pipeline is deterministic, so repeating the
+        # same call gives byte-identical structures and a floor of exactly zero,
+        # which measures nothing.  (An earlier apparent run-to-run spread of 0.020
+        # came from the JAX kernels seeding off `hash()` of a string, which is
+        # salted per process - that is a bug, not sampling noise.)
         floor: float | None = None
         if args.baseline_repeats > 1:
             off_flags = _arm_flags("off", args, comp_path, acc_path)
-            eigs = [
-                _run_arm(ctx, args, off_flags, chrs, region, c_obs, bin_starts, sort_track)["eig"]
-                for _ in range(args.baseline_repeats)
+            reps = [
+                _run_arm(
+                    ctx,
+                    args,
+                    off_flags,
+                    chrs,
+                    region,
+                    c_obs,
+                    bin_starts,
+                    sort_track,
+                    seed_offset=i * _SEED_STRIDE,
+                )
+                for i in range(args.baseline_repeats)
             ]
+            eigs = [r["eig"] for r in reps]
+            sads = [r["saddle"] for r in reps]
             if len(eigs) > 1:
                 floor = float(np.std(eigs, ddof=1))
+                sad_floor = float(np.std(sads, ddof=1))
                 print(
                     f"  {'off x' + str(len(eigs)):<14}"
-                    f"{np.mean(eigs):>9.3f}{'':>8}{'':>9}{'':>9}{'':>9}"
-                    f"   noise floor sd={floor:.3f}  range={max(eigs) - min(eigs):.3f}"
+                    f"{np.mean(sads):>9.3f}{np.mean(eigs):>9.3f}{'':>8}{'':>9}{'':>9}{'':>9}"
+                    f"   floor: saddle sd={sad_floor:.3f}  eig sd={floor:.3f}"
                 )
 
         base: dict[str, float] = {}

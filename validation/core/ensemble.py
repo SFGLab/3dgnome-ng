@@ -16,11 +16,17 @@ def run_ensemble(
     chrs_list: list[str],
     region: BedRegion | None,
     n: int,
+    seed_offset: int = 0,
 ) -> list[list[BeadOut]]:
-    """One ensemble via the public simulate API. Returns beads for the single region's chr."""
+    """One ensemble via the public simulate API. Returns beads for the single region's chr.
+
+    `seed_offset` selects an independent ensemble from the same settings. The
+    pipeline is deterministic, so two calls with the same offset give byte-identical
+    structures; measuring run-to-run spread requires varying it.
+    """
     from gnome3d.simulate import simulate
 
-    structures = simulate(s, data, chrs_list, n, region=region)
+    structures = simulate(s, data, chrs_list, n, region=region, seed_offset=seed_offset)
     return [per_chr[chrs_list[0]] for per_chr in structures]
 
 
@@ -61,7 +67,9 @@ def summarize(
     n = len(coords0)
     iu, ju = np.triu_indices(n, k=1)
     sep = np.abs(mids0[iu] - mids0[ju]).astype(np.float64)  # constant across ensemble
-    nonbond = (ju - iu) > skip  # exclude |i-j| <= skip as bonded neighbours, matches overlap_fraction
+    nonbond = (
+        ju - iu
+    ) > skip  # exclude |i-j| <= skip as bonded neighbours, matches overlap_fraction
 
     rgs, bonds, overlaps, ov_norm, rhos, dscals, cprobs, extents = [], [], [], [], [], [], [], []
     coords_list = []
@@ -72,7 +80,9 @@ def summarize(
         bonds.append(float(np.median(metrics.bond_lengths(coords))))
         d = pdist(coords)  # condensed upper-tri distances in triu(n,1) order, computed once
         overlaps.append(float((d[nonbond] < radius).mean()) if nonbond.any() else 0.0)
-        ov_norm.append(metrics.overlap_fraction_binned(coords, mids, overlap_norm_bp, skip_neighbors=skip)[0])
+        ov_norm.append(
+            metrics.overlap_fraction_binned(coords, mids, overlap_norm_bp, skip_neighbors=skip)[0]
+        )
         extents.append(metrics.max_extent(coords))
         rho, _ = metrics.self_consistency(coords, mids, contacts)
         rhos.append(rho)
