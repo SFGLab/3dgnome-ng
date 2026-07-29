@@ -163,6 +163,28 @@ def jax_device_budget_bytes(fraction: float = 0.95) -> int | None:
     return budget
 
 
+def stable_seed_offset(src: str, base: int | None = None) -> int:
+    """PRNG offset for a JAX kernel, stable across processes.
+
+    Two runs of one config with one seed must produce one structure. Deriving the
+    offset from `hash()` of a string broke that, because Python salts string
+    hashing per process, so every run of a JAX-backed stage silently explored a
+    different trajectory and `PYTHONHASHSEED=0` was needed to compare two runs.
+    blake2b is stable across processes and machines.
+
+    `src` distinguishes concurrent kernels, normally the active scope path.
+    `base` mixes in the seed the DAG node carries, so the offset follows from
+    `Seeded.seed` the way the numba path's already does. The odd multiplier
+    spreads nearby seeds across the output range before the modulo.
+    """
+    import hashlib
+
+    v = int.from_bytes(hashlib.blake2b(src.encode("utf-8"), digest_size=8).digest(), "big")
+    if base is not None:
+        v ^= (int(base) & 0xFFFFFFFFFFFFFFFF) * 0x9E3779B97F4A7C15
+    return int(v % (2**31))
+
+
 def jax_bucket_for(n: int, ladder: tuple[int, ...] = SHAPE_BUCKETS) -> int:
     """Smallest ladder bucket >= n, or n itself if it exceeds the top bucket."""
     for b in ladder:

@@ -29,7 +29,13 @@ import numpy as np
 from gnome3d import log
 from gnome3d.mc.jax.arcs import _prep_arcs_problem_np, _resolve_arcs_max_k
 from gnome3d.mc.jax.shrink import run_shrinking
-from gnome3d.mc.jax.util import jax_bucket_for, jax_is_available, log_kernel_done, log_kernel_start
+from gnome3d.mc.jax.util import (
+    jax_bucket_for,
+    jax_is_available,
+    log_kernel_done,
+    log_kernel_start,
+    stable_seed_offset,
+)
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -441,8 +447,10 @@ def _checker_chunk(
         rep_inv_cutoff_k,
     )
 
-    _seed_src = log.current()
-    seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
+    # Scope path distinguishes concurrent kernels; the node seed makes the draw
+    # follow from Seeded.seed. Chains within a batch are separated by the kernel's
+    # own per-index fold, so grouping still shifts which chain gets which stream.
+    seed_offset = stable_seed_offset(log.current(), problems[0].get("seed"))
     base_key = jax.random.PRNGKey(seed_offset)
 
     carry = (

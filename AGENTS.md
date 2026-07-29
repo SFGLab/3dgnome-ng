@@ -329,13 +329,13 @@ coordinates exactly:
 git worktree add --detach /tmp/g3d_head HEAD
 ln -s "$PWD/data" /tmp/g3d_head/data
 # run the same region in both trees, then compare the coordinates
-PYTHONHASHSEED=0 .venv/bin/python <driver> /tmp/g3d_head  head.npz
-PYTHONHASHSEED=0 .venv/bin/python <driver> "$PWD"         wip.npz
+.venv/bin/python <driver> /tmp/g3d_head  head.npz
+.venv/bin/python <driver> "$PWD"         wip.npz
 ```
 
 where `<driver>` calls `gnome3d.simulate.run_region` and dumps `(start, end, x, y, z)` per bead.
-`PYTHONHASHSEED=0` is required whenever a JAX kernel runs - see the JAX seeding bug noted with the
-JAX backend below.  Any new opt-in feature must leave this diff byte-identical with its flag off.
+Any new opt-in feature must leave this diff byte-identical with its flag off.  Both runs must use
+the same executor settings, since batch grouping selects which chain gets which RNG stream.
 
 For the *behaviour* of a new energy term, unit-test it directly:
 
@@ -665,13 +665,17 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   - **`cli.py` auto-forces `ib_workers=1` when `mc_backend=jax`** — multiple Python threads contending for a single GPU is net-negative; restarts go inside JAX via `mc_smooth_chains` (vmap), not via thread pools.
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
 
-  **Known bug: the JAX kernels are not reproducible across processes.** Both
-  `mc/jax/smooth.py:1306` and `:1886` derive the kernel's PRNG seed as
-  `abs(hash(log.current())) % 2**31`, and `hash()` on a `str` is salted per process by
-  `PYTHONHASHSEED`. Two runs of the same config with the same seed therefore produce
-  different structures whenever a JAX kernel is used. Export `PYTHONHASHSEED=0` to compare
-  runs; the real fix is to derive the seed from the node's own `Seeded.seed`, the way the numba
-  path already does.
+  **Kernel seeding is process-stable.** Every JAX kernel takes its PRNG offset from
+  `util.stable_seed_offset(log.current(), problems[0]["seed"])`, a blake2b digest of the
+  active scope path mixed with the seed the DAG node carries. The scope path separates
+  concurrent kernels and the node seed ties the draw to `Seeded.seed`, matching what the
+  numba path does. `PYTHONHASHSEED` no longer affects results, so comparing two runs needs
+  no environment override.
+
+  Chains inside one batch are separated by the kernel's own per-index fold rather than by
+  their own seeds, so changing how IBs group into batches still shifts which chain gets
+  which stream. Grouping is deterministic for a given config, so a run reproduces; runs
+  compared across different executor settings do not.
 
   Why not in the reference: 3dgnome is CPU-only. The JAX port is a Python-side acceleration of the same algorithm; numerical results agree with numba within float32 RNG-trajectory noise. Harness/parity tests run with default settings (`mc_backend=numba`), so the new backend doesn't affect the parity baseline.
 

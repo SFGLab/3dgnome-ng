@@ -36,6 +36,7 @@ from gnome3d.mc.jax.util import (
     jax_is_available,
     log_kernel_done,
     log_kernel_start,
+    stable_seed_offset,
 )
 
 if TYPE_CHECKING:
@@ -566,8 +567,10 @@ def _chunk(
         n_active_k,
     )
 
-    _seed_src = log.current()
-    seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
+    # Scope path distinguishes concurrent kernels; the node seed makes the draw
+    # follow from Seeded.seed. Chains within a batch are separated by the kernel's
+    # own per-index fold, so grouping still shifts which chain gets which stream.
+    seed_offset = stable_seed_offset(log.current(), problems[0].get("seed"))
     base_key = jax.random.PRNGKey(seed_offset)
 
     carry = (

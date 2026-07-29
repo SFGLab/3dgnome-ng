@@ -77,8 +77,12 @@ def run_shrinking(
         n = len(active)
         bk = _ceil_pow2(n)
         ncarry, ran = chunk_fn(
-            _pad(carry, bk, True), _pad(problem, bk, False), scalars, base_key,
-            jnp.int32(cap), jnp.int32(iter_base),
+            _pad(carry, bk, True),
+            _pad(problem, bk, False),
+            scalars,
+            base_key,
+            jnp.int32(cap),
+            jnp.int32(iter_base),
         )
         ran = int(ran)
         iter_base += ran
@@ -100,7 +104,7 @@ def run_shrinking(
             break
         surv_j = jnp.asarray(surv)
         carry = tuple(a[surv_j] for a in ncarry[:6])  # gather survivors from padded output
-        problem = tuple(a[surv_j] for a in problem)   # problem is size n (pre-pad); surv < n
+        problem = tuple(a[surv_j] for a in problem)  # problem is size n (pre-pad); surv < n
         active = [active[int(li)] for li in surv]
         cap = min(cap * 2, max_cap)
 

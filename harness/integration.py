@@ -61,6 +61,8 @@ def _cpp_env() -> dict:
     for var in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"):
         env[var] = libdir + (os.pathsep + env[var] if env.get(var) else "")
     return env
+
+
 DATA_DIR = ROOT / "data" / "GM12878"
 REGION = "chr1:18288319-20307135"
 REGION_LABEL = f"integration_test_region_{REGION.replace(':', '_').replace('-', '_')}"
@@ -733,7 +735,14 @@ def run_cpp_ensemble_parallel(
         print(f"[cpp] worker {c}: {sz} structs, seed={seed}")
         fh = open(log, "w")
         procs.append(
-            (c, sz, wd, log, fh, subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT, env=_cpp_env()))
+            (
+                c,
+                sz,
+                wd,
+                log,
+                fh,
+                subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT, env=_cpp_env()),
+            )
         )
 
     structures: list = []
@@ -976,13 +985,21 @@ def _compare_and_report(
     # Rg: KS (byte-faithful) or bounded mean-ratio (checker mode)
     d_rg, p_rg = ks_2samp(ref_stats["rg"], test_stats["rg"])
     if size_ratio_tol is not None:
-        rg_ratio = _mean(test_stats["rg"]) / _mean(ref_stats["rg"]) if _mean(ref_stats["rg"]) else float("nan")
+        rg_ratio = (
+            _mean(test_stats["rg"]) / _mean(ref_stats["rg"])
+            if _mean(ref_stats["rg"])
+            else float("nan")
+        )
         ok_rg = math.isfinite(rg_ratio) and abs(rg_ratio - 1.0) <= size_ratio_tol
-        print(f"  {PASS_STR if ok_rg else FAIL_STR}  Rg size       ratio={rg_ratio:.3f}"
-              f"  (KS d={d_rg:.3f}; tol=±{size_ratio_tol:.0%})")
+        print(
+            f"  {PASS_STR if ok_rg else FAIL_STR}  Rg size       ratio={rg_ratio:.3f}"
+            f"  (KS d={d_rg:.3f}; tol=±{size_ratio_tol:.0%})"
+        )
     else:
         ok_rg = _ks_pass(d_rg, p_rg)
-        print(f"  {PASS_STR if ok_rg else FAIL_STR}  Rg distribution  KS d={d_rg:.3f}  p={p_rg:.3f}")
+        print(
+            f"  {PASS_STR if ok_rg else FAIL_STR}  Rg distribution  KS d={d_rg:.3f}  p={p_rg:.3f}"
+        )
     results.append(ok_rg)
 
     # pooled pairwise distances: KS (byte-faithful) or bounded mean-ratio (checker mode)
@@ -990,10 +1007,16 @@ def _compare_and_report(
     test_pwd = _subsample(test_stats["pwd"], KS_PWD_MAX_SAMPLES)
     d_pw, p_pw = ks_2samp(ref_pwd, test_pwd)
     if size_ratio_tol is not None:
-        pw_ratio = _mean(test_stats["pwd"]) / _mean(ref_stats["pwd"]) if _mean(ref_stats["pwd"]) else float("nan")
+        pw_ratio = (
+            _mean(test_stats["pwd"]) / _mean(ref_stats["pwd"])
+            if _mean(ref_stats["pwd"])
+            else float("nan")
+        )
         ok_pw = math.isfinite(pw_ratio) and abs(pw_ratio - 1.0) <= size_ratio_tol
-        print(f"  {PASS_STR if ok_pw else FAIL_STR}  pairwise size ratio={pw_ratio:.3f}"
-              f"  (KS d={d_pw:.3f}; tol=±{size_ratio_tol:.0%})")
+        print(
+            f"  {PASS_STR if ok_pw else FAIL_STR}  pairwise size ratio={pw_ratio:.3f}"
+            f"  (KS d={d_pw:.3f}; tol=±{size_ratio_tol:.0%})"
+        )
     else:
         ok_pw = _ks_pass(d_pw, p_pw)
         print(
@@ -1105,7 +1128,10 @@ def run_backend_divergence(
                 "Use n>=50 (a quick GPU job) to be sure."
             )
         all_ok = _compare_and_report(
-            numba_structs, jax_structs, "numba", test_name,
+            numba_structs,
+            jax_structs,
+            "numba",
+            test_name,
             size_ratio_tol=0.10 if kernel == "checker" else None,
         )
         if kernel == "checker":
@@ -1229,7 +1255,9 @@ def main():
     if args.python_only and args.cpp_only:
         sys.exit("[error] --python-only and --cpp-only are mutually exclusive")
     if divergence and args.cpp_only:
-        sys.exit("[error] --jax-divergence/--checker-divergence and --cpp-only are mutually exclusive")
+        sys.exit(
+            "[error] --jax-divergence/--checker-divergence and --cpp-only are mutually exclusive"
+        )
 
     if not args.python_only and not divergence and not CPP_BIN.exists():
         sys.exit(f"[error] binary not found: {CPP_BIN}\n  run: make 3dnome")
@@ -1282,8 +1310,11 @@ def main():
     # no reference binary or cache needed.  Runs and exits.
     if divergence:
         kernel = "checker" if args.checker_divergence else "mc"
-        mode = "checker-kernel divergence (numba vs jax+checker)" if args.checker_divergence \
+        mode = (
+            "checker-kernel divergence (numba vs jax+checker)"
+            if args.checker_divergence
             else "JAX-backend divergence (numba baseline vs jax)"
+        )
         print(f"[integration] mode: {mode}")
         run_backend_divergence(
             args, region, region_label, use_orn, use_anchor_heatmap, use_subanchor_heatmap, kernel

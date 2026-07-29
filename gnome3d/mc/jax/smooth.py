@@ -25,6 +25,7 @@ from gnome3d.mc.jax.util import (
     jax_is_available,
     log_kernel_done,
     log_kernel_start,
+    stable_seed_offset,
 )
 from gnome3d.types import F32Array, I32Array, I64Array
 
@@ -1533,9 +1534,7 @@ def mc_smooth_jax(
     comp_eb_j = jnp.float32(_aff.comp_eb)
     brdg_r0_j = jnp.float32(_aff.brdg_r0)
     brdg_w_j = jnp.float32(_aff.brdg_weight if _aff.use_brdg else 0.0)
-    # Per-call RNG diversity keyed on the active scope path (was: the label).
-    _seed_src = log.current()
-    seed_offset: int = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
+    seed_offset: int = stable_seed_offset(log.current())
 
     # ---- initial scores ----
     ss_k = init_smooth(
@@ -2194,8 +2193,10 @@ def _mc_smooth_jax_batch_chunk(
     sc_k = jnp.concatenate([x[4] for x in inits])
     anchor_orn_k = jnp.concatenate([x[5] for x in inits])
 
-    _seed_src = log.current()
-    seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
+    # Scope path distinguishes concurrent kernels; the node seed makes the draw
+    # follow from Seeded.seed. Chains within a batch are separated by the kernel's
+    # own per-index fold, so grouping still shifts which chain gets which stream.
+    seed_offset = stable_seed_offset(log.current(), problems[0].get("seed"))
     base_key = jax.random.PRNGKey(seed_offset)
 
     _desc = ("" if not use_heat else ", heat") + (
