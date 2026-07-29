@@ -212,6 +212,60 @@ def observed_over_expected(matrix: F64Array, min_sep_bins: int = 1) -> F64Array:
     return oe
 
 
+def block_enrichment(
+    contacts: F64Array, block_id: I64Array, min_sep_bins: int = 1
+) -> dict[str, float]:
+    """Contact enrichment within a block against across blocks, on the O/E map.
+
+    Written to ask whether a reconstruction's large scale organization follows the
+    interaction blocks it was built from rather than anything in the data. Each IB
+    is positioned by the coarse step and then folded independently, so a region
+    that splits into many IBs can end up as several separated lumps. Because
+    compartment identity runs in long runs along the genome, separated lumps read
+    as compartmentalization to `compartment_saddle` without any compartment
+    physics being involved.
+
+    A model ratio far above the same ratio on the experimental map is that
+    artifact. A model ratio near the experimental one means the blocks are not
+    driving the structure.
+
+    Unlike `compartment_saddle` this averages every finite entry rather than the
+    positive ones. Conditioning on a contact being present biases sparse maps, and
+    a ratio of two means taken the same way is unaffected by the overall scale.
+
+    `block_id` labels each bin; negative labels are dropped. Pairs within
+    `min_sep_bins` of the diagonal are excluded, as they are in the O/E itself.
+    Returns the two means, their ratio, and the block count.
+    """
+    n = contacts.shape[0]
+    b = np.asarray(block_id, dtype=np.int64)
+    if b.shape[0] != n:
+        raise ValueError(f"block_id length {b.shape[0]} != contact matrix size {n}")
+
+    oe = observed_over_expected(contacts, min_sep_bins=min_sep_bins)
+    keep = b >= 0
+    idx = np.flatnonzero(keep)
+    nan = {"within": float("nan"), "between": float("nan"), "ratio": float("nan")}
+    if idx.size < 4 or np.unique(b[idx]).size < 2:
+        return {**nan, "n_blocks": float(np.unique(b[idx]).size if idx.size else 0)}
+
+    ii, jj = np.meshgrid(idx, idx, indexing="ij")
+    far = np.abs(ii - jj) > min_sep_bins
+    same = (b[ii] == b[jj]) & far
+    diff = (b[ii] != b[jj]) & far
+    blk = oe[ii, jj]
+
+    within = float(blk[same].mean()) if same.any() else float("nan")
+    between = float(blk[diff].mean()) if diff.any() else float("nan")
+    ratio = within / between if between and between == between and between > 0 else float("nan")
+    return {
+        "within": within,
+        "between": between,
+        "ratio": ratio,
+        "n_blocks": float(np.unique(b[idx]).size),
+    }
+
+
 def _oe_correlation(a_oe: F64Array, b_oe: F64Array, min_sep_bins: int) -> dict[str, float]:
     """Pearson of log O/E and Spearman of O/E over the upper-triangle bin-pairs where both maps
     have signal, the informative overlap of a sparse ChIA-PET map and dense Hi-C. n_pairs_oe

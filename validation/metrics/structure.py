@@ -192,13 +192,23 @@ def contact_probability(
 
 # --------------------------------------------------------------------------- genome-structure laws
 #
-# Polymer-physics scaling laws every chromatin model must reproduce. See 3dgnome 2016 figures,
-# MultiMM 2024 Fig. 2, and the Lieberman-Aiden 2009 fractal globule. We fit each as a power law on
-# log-log bin-means over the scaling window only. That excludes sub-resolution small separations,
-# where a single CCD blob is flat, and the saturated tail. We report the exponent and the log-log
-# R². A law holds when the fit is a power law, meaning high R², with the exponent in the biological
-# band. Canonical values β≈1/3 and α≈1 appear over large, multi-IB or whole-chromosome ranges. A
-# small single-IB region is one globule and legitimately reads flatter.
+# Polymer-physics scaling laws every chromatin model should reproduce. These come from the Hi-C
+# literature, not from the 3dgnome papers. Lieberman-Aiden 2009 measured contact probability
+# decaying as P(s) ~ s^-1 over roughly 500 kb to 7 Mb and proposed the fractal globule, whose
+# size scales as R(s) ~ s^(1/3). An equilibrium or ideal chain instead gives 1/2.
+#
+# The 3dgnome 2016 paper does not validate these exponents. It uses power laws as model inputs.
+# Methods, Subloop level, sets the preferred distance between consecutive subanchors to
+# d = N^a for genomic span N, which is the genomic_dist_power setting. Methods, heat map
+# normalization, converts frequency to distance as d = c·f^-α with α = 0.6 from a ranking analysis
+# citing Rousseau 2011, which is the freq_dist_power setting. Neither is the exponent measured here.
+# The paper's α and the contact-decay α below are different quantities that share a letter.
+#
+# We fit each law as a power law on log-log bin-means over the scaling window only. That excludes
+# sub-resolution small separations, where a single CCD blob is flat, and the saturated tail. We
+# report the exponent and the log-log R². A law holds when the fit is a power law, meaning high R²,
+# with the exponent in the biological band. Canonical values appear over large, multi-IB or
+# whole-chromosome ranges. A small single-IB region is one globule and legitimately reads flatter.
 
 # (lo, hi, target) is the plausible band and canonical value for the power-law exponent.
 LAW_BANDS: dict[str, tuple[float, float, float]] = {

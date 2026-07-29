@@ -31,7 +31,8 @@ from pathlib import Path
 
 import numpy as np
 
-from gnome3d.types import F64Array
+from gnome3d.types import F64Array, I64Array
+from validation.core import config as cfgmod
 from validation.metrics import hic as contacts
 from validation.studies import Context, Study, register
 from validation.studies.epigenome import _arm_flags, _run_arm, _track_on_bins, _track_paths
@@ -47,6 +48,7 @@ _PREDICTORS: dict[str, str] = {
     "n_beads": "bead count. a size effect points at the MC schedule, not the physics",
     "rg": "radius of gyration. compaction confounds the contact map",
     "density": "simulated map density. a saturated map cannot express enrichment",
+    "ib_over_obs": "how much more block-organized the model is than the experiment",
 }
 
 
@@ -78,6 +80,27 @@ def _windows(sizes: dict[str, int], chroms: list[str], width: int, per_chrom: in
         starts = [lo] if per_chrom == 1 else np.linspace(lo, hi, per_chrom).astype(int)
         for st in np.atleast_1d(starts):
             out.append(f"{chrom}:{int(st)}-{int(st) + width}")
+    return out
+
+
+def _ib_ids(settings: object, chrs: list[str], region: object, bin_starts: I64Array) -> I64Array:
+    """Which interaction block each Hi-C bin falls in, or -1 for none.
+
+    Built from the coarse cluster tree, so it reflects the blocks the
+    reconstruction actually used rather than a re-derived guess. Level 3 is the
+    interaction block level.
+    """
+    from gnome3d.data import ContactData
+    from gnome3d.pipeline import coarse as cb
+
+    data = ContactData.from_files(settings, chrs, region)  # pyright: ignore[reportArgumentType]
+    st = cb.build_state(settings, data, chrs, region)  # pyright: ignore[reportArgumentType]
+    ibs = [c for c in st.clusters if int(c.level) == 3]
+
+    out = np.full(len(bin_starts), -1, dtype=np.int64)
+    for k, c in enumerate(ibs):
+        hit = (bin_starts >= int(c.start)) & (bin_starts <= int(c.end))
+        out[hit] = k
     return out
 
 
@@ -178,7 +201,8 @@ class SaddleSurvey(Study):
         print(f"  scored against {Path(ctx.hic).name} @ {args.binsize // 1000}kb\n")
         header = (
             f"  {'region':<26}{'exp':>7}{'model':>8}{'gap':>8}"
-            f"{'trk sd':>8}{'A frac':>8}{'beads':>8}{'Rg':>8}{'dens':>7}"
+            f"{'ibE mdl':>9}{'ibE obs':>9}{'ratio':>7}"
+            f"{'beads':>8}{'Rg':>8}{'dens':>7}"
         )
         print(header)
         print("  " + "-" * (len(header) - 2))
@@ -197,7 +221,16 @@ class SaddleSurvey(Study):
                     print(f"  {region:<26}  skipped: {int(obs['n_bins'])} usable bins")
                     continue
 
-                row = _run_arm(ctx, args, flags, chrs, bed, c_obs, bin_starts, track)
+                blocks = _ib_ids(
+                    cfgmod.settings_for_cell(ctx.cell, ctx.data_root, ctx.quality),
+                    chrs,
+                    bed,
+                    bin_starts,
+                )
+                ib_obs = contacts.block_enrichment(c_obs, blocks)["ratio"]
+                row = _run_arm(
+                    ctx, args, flags, chrs, bed, c_obs, bin_starts, track, block_id=blocks
+                )
                 if not np.isfinite(row["saddle"]):
                     print(f"  {region:<26}  skipped: model saddle is nan (map saturated?)")
                     continue
@@ -212,12 +245,15 @@ class SaddleSurvey(Study):
                     "n_beads": row["n_beads"],
                     "rg": row["rg"],
                     "density": row["density"],
+                    "ib_model": float(row["ib_ratio"]),
+                    "ib_obs": float(ib_obs),
+                    "ib_over_obs": float(row["ib_ratio"] / ib_obs) if ib_obs > 0 else float("nan"),
                 }
                 rows.append(rec)
                 print(
                     f"  {region:<26}{rec['exp_sad']:>7.3f}{rec['model']:>8.3f}{rec['gap']:>+8.3f}"
-                    f"{rec['trk_sd']:>8.3f}{rec['a_frac']:>8.2f}{rec['n_beads']:>8.0f}"
-                    f"{rec['rg']:>8.2f}{rec['density']:>7.2f}"
+                    f"{rec['ib_model']:>9.3f}{rec['ib_obs']:>9.3f}{rec['ib_over_obs']:>7.2f}"
+                    f"{rec['n_beads']:>8.0f}{rec['rg']:>8.2f}{rec['density']:>7.2f}"
                 )
             except Exception as e:  # noqa: BLE001
                 print(f"  {region:<26}  ERROR: {type(e).__name__}: {e}")
@@ -228,6 +264,11 @@ class SaddleSurvey(Study):
         _summarize(rows)
         _report_correlations(rows)
         print(
+            "\n  ibE is within-block over between-block contact enrichment on the O/E map,\n"
+            "  for the model and for the experiment, and ratio is the first over the second.\n"
+            "  A ratio well above 1 means the structure is organized by the interaction blocks\n"
+            "  it was built from rather than by the data, which reads as compartmentalization\n"
+            "  because compartment identity runs in long blocks along the genome.\n"
             "\n  A gap near zero everywhere would mean the baseline already reproduces\n"
             "  compartmentalization and the terms have nothing to add. A consistent sign\n"
             "  means one global weight can correct it. Mixed signs mean it cannot, and\n"

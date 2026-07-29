@@ -111,6 +111,7 @@ def _run_arm(
     bin_starts: I64Array,
     sort_track: F64Array,
     seed_offset: int = 0,
+    block_id: I64Array | None = None,
 ) -> dict[str, float]:
     """Reconstruct one arm and score it. Returns the metric row.
 
@@ -143,7 +144,16 @@ def _run_arm(
     # nan rather than a measurement. Reporting the density makes that visible instead of
     # leaving a saturated run looking like a real null.
     off_diag = c_sim.size - c_sim.shape[0]
+    # Does the structure organize by interaction block rather than by data? Only
+    # meaningful against the same ratio on the experimental map, which the caller
+    # computes once per region.
+    ib_ratio = (
+        contacts.block_enrichment(c_sim, block_id)["ratio"]
+        if block_id is not None
+        else float("nan")
+    )
     return {
+        "ib_ratio": ib_ratio,
         "saddle": sad["strength"],
         "eig": cc["eig_pearson_abs"],
         "kappa": cc["agreement_kappa"],
