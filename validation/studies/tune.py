@@ -43,7 +43,16 @@ from validation.core.regions import parse_region_arg as _chrs_and_region
 from validation.metrics import hic as contacts
 from validation.studies import Context, Study, register
 
-DEFAULT_FACTORS = [0.4, 0.5, 0.6, 0.75, 1.0, 1.25, 1.5, 2.0]  # SCC peaks at small radius, so probe low
+DEFAULT_FACTORS = [
+    0.4,
+    0.5,
+    0.6,
+    0.75,
+    1.0,
+    1.25,
+    1.5,
+    2.0,
+]  # SCC peaks at small radius, so probe low
 
 
 def _npz_path(out_path: Path, region: str) -> Path:
@@ -90,7 +99,9 @@ def score_coords(
     """Score a cached or fresh ensemble against the Hi-C. A cheap readout with no MC. Returns the
     faithful MultiMM Pearson, the legacy one, and the contact-radius SCC sweep."""
     base_radius = float(np.median([float(np.median(metrics.bond_lengths(c))) for c in coords_list]))
-    c_obs, bin_starts = contacts.observed_hic(hic_path, region, binsize)  # raw counts for the SCC sweep
+    c_obs, bin_starts = contacts.observed_hic(
+        hic_path, region, binsize
+    )  # raw counts for the SCC sweep
     eff = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize
     try:  # ICE/balance-normalised, for the faithful MultiMM metric, which uses ICE-norm
         c_obs_bal, _ = contacts.observed_hic(hic_path, region, binsize, balance=True)
@@ -128,7 +139,7 @@ def report(cache: dict[str, dict], regions: list[str], factors: list[float]) -> 
     if not rows:
         print("[tune] no results yet")
         return
-    print(f"\n{'='*64}\nHi-C readout tuning, median over {len(rows)} regions\n{'='*64}")
+    print(f"\n{'=' * 64}\nHi-C readout tuning, median over {len(rows)} regions\n{'=' * 64}")
     print(f"{'radius_factor':>14} {'median_SCC':>12} {'median_pearson':>16}")
     best_f, best_scc = None, -np.inf
     for f in factors:
@@ -141,11 +152,11 @@ def report(cache: dict[str, dict], regions: list[str], factors: list[float]) -> 
         print(f"{f:>14g} {msc:>12.4f} {mpe:>16.4f}{flag}")
     mm = _median([row["multimm"] for row in rows])
     print(f"\nBest contact-radius factor, max median SCC, {best_f:g}  -> SCC {best_scc:.4f}")
-    print(f"{'-'*64}")
+    print(f"{'-' * 64}")
     print(f"Inverse-distance Pearson, MultiMM's metric approach, (d+1)^-3, ±5 diag, ICE, {mm:.4f}")
     print("  our standard Hi-C correlation. scales with region size, compare like-for-like,")
     print("   not against MultiMM's 0.70")
-    print(f"{'='*64}")
+    print(f"{'=' * 64}")
 
 
 class Tune(Study):
@@ -153,13 +164,17 @@ class Tune(Study):
     help = "fast Hi-C readout tuning on a fixed tuned ensemble, no MC re-run per config"
 
     def add_args(self, p: argparse.ArgumentParser) -> None:
-        p.add_argument("--chroms", default=None, help="comma-separated; default all in breakpoints file")
+        p.add_argument(
+            "--chroms", default=None, help="comma-separated; default all in breakpoints file"
+        )
         p.add_argument("--n-regions", type=int, default=8)
         p.add_argument("--binsize", type=int, default=25000)
         p.add_argument("--min-ibs", type=int, default=2)
         p.add_argument("--max-ibs", type=int, default=6)
         p.add_argument("--max-mb", type=float, default=6.0)
-        p.add_argument("--factors", default=None, help="comma-separated radius factors (× median bond)")
+        p.add_argument(
+            "--factors", default=None, help="comma-separated radius factors (× median bond)"
+        )
         p.add_argument("--out", required=True, help="results cache JSON (resumable)")
 
     def run(self, ctx: Context, args: argparse.Namespace) -> None:
@@ -200,9 +215,11 @@ class Tune(Study):
             r = cache[region]
             best = max(
                 r["scc"].items(),
-                key=lambda kv: (kv[1] if kv[1] is not None and np.isfinite(kv[1]) else -np.inf),
+                key=lambda kv: kv[1] if kv[1] is not None and np.isfinite(kv[1]) else -np.inf,
             )
-            print(f"  [done] best SCC {best[1]:.3f} @ {best[0]} | MultiMM(faithful) {r['multimm']:.3f}")
+            print(
+                f"  [done] best SCC {best[1]:.3f} @ {best[0]} | MultiMM(faithful) {r['multimm']:.3f}"
+            )
 
         report(cache, regions, factors)
 

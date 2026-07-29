@@ -31,7 +31,9 @@ class Boundaries(Study):
         p.add_argument("--chroms", default=None, help="comma-separated; default all in the mcool")
         p.add_argument("--window", type=int, default=250_000, help="insulation diamond window (bp)")
         p.add_argument("--binsize", type=int, default=25_000)
-        p.add_argument("--min-strength", type=float, default=0.0, help="min boundary strength to keep")
+        p.add_argument(
+            "--min-strength", type=float, default=0.0, help="min boundary strength to keep"
+        )
 
     def run(self, ctx: Context, args: argparse.Namespace) -> None:
         if ctx.hic is None:

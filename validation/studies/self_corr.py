@@ -115,7 +115,11 @@ def hic_to_singleton_bedpe(
         for p in cooler.fileops.list_coolers(mcool_path)
         if p.rsplit("/", 1)[-1].isdigit()
     )
-    res = (binsize if binsize in avail else min(avail, key=lambda r: abs(r - binsize))) if avail else binsize
+    res = (
+        (binsize if binsize in avail else min(avail, key=lambda r: abs(r - binsize)))
+        if avail
+        else binsize
+    )
     uri = f"{mcool_path}::/resolutions/{res}" if avail else mcool_path
     c = cooler.Cooler(uri)
     raw = np.nan_to_num(np.asarray(c.matrix(balance=False).fetch(region), dtype=np.float64))
@@ -301,8 +305,12 @@ def _run_region(
     if not args.no_reference and ig.CPP_BIN.exists():
         print(f"  [{region}] reference ...")
         cfg = _cpp_selfhic_config(
-            ctx.cell, ctx.data_root, Path(singletons_path), hic_breakpoints,
-            tmp, ctx.quality == "fast",
+            ctx.cell,
+            ctx.data_root,
+            Path(singletons_path),
+            hic_breakpoints,
+            tmp,
+            ctx.quality == "fast",
         )
         ref_structs = variants.run_reference(
             cfg, region, ctx.n, ref_workers=ctx.ref_workers, label="selfhic"
@@ -310,7 +318,11 @@ def _run_region(
         rcl = [metrics.to_arrays(b)[0] for b in ref_structs]
         out["reference"] = score(rcl, metrics.to_arrays(ref_structs[0])[1])
     else:
-        out["reference"] = {"test": float("nan"), "train": float("nan"), "self_consistency": float("nan")}
+        out["reference"] = {
+            "test": float("nan"),
+            "train": float("nan"),
+            "self_consistency": float("nan"),
+        }
     return out
 
 
@@ -326,7 +338,9 @@ class SelfCorr(Study):
             help="replace = pure Hi-C-driven (clean, MultiMM-comparable); augment = ChIA-PET + Hi-C "
             "(count-scaled to match), tests whether Hi-C improves the model",
         )
-        p.add_argument("--chroms", default=None, help="comma-separated; default all in the breakpoints")
+        p.add_argument(
+            "--chroms", default=None, help="comma-separated; default all in the breakpoints"
+        )
         p.add_argument(
             "--hic-breakpoints",
             default=None,
@@ -334,15 +348,25 @@ class SelfCorr(Study):
         )
         p.add_argument("--n-regions", type=int, default=4)
         p.add_argument("--binsize", type=int, default=25000)
-        p.add_argument("--min-ibs", type=int, default=2, help="minimum interaction-block count per region")
-        p.add_argument("--max-ibs", type=int, default=6, help="maximum interaction-block count per region")
+        p.add_argument(
+            "--min-ibs", type=int, default=2, help="minimum interaction-block count per region"
+        )
+        p.add_argument(
+            "--max-ibs", type=int, default=6, help="maximum interaction-block count per region"
+        )
         p.add_argument("--max-mb", type=float, default=6.0, help="maximum region span in megabases")
         p.add_argument(
-            "--holdout-frac", type=float, default=0.5, help="fraction of bin-pairs held out for testing"
+            "--holdout-frac",
+            type=float,
+            default=0.5,
+            help="fraction of bin-pairs held out for testing",
         )
         p.add_argument("--seed", type=int, default=0, help="held-out split seed")
         p.add_argument(
-            "--window", type=int, default=250_000, help="cooltools insulation window for TAD boundaries"
+            "--window",
+            type=int,
+            default=250_000,
+            help="cooltools insulation window for TAD boundaries",
         )
         p.add_argument("--region", default=None, help="single region override")
         p.add_argument(
@@ -383,8 +407,12 @@ class SelfCorr(Study):
             regions = [args.region]
         else:
             regions = enumerate_regions(
-                str(hic_breakpoints), args.n_regions, chroms=chroms,
-                min_ibs=args.min_ibs, max_ibs=args.max_ibs, max_mb=args.max_mb,
+                str(hic_breakpoints),
+                args.n_regions,
+                chroms=chroms,
+                min_ibs=args.min_ibs,
+                max_ibs=args.max_ibs,
+                max_mb=args.max_mb,
             )
         if not regions:
             sys.exit("[error] no regions found")
@@ -397,7 +425,9 @@ class SelfCorr(Study):
             r = _run_region(region, ctx, args, hic_breakpoints, tmp)
             results.append(r)
             out_path.write_text(json.dumps(results, indent=2))
-            cells = "  ".join(f"{v}:{r[v]['train']:+.3f}/{r[v]['test']:+.3f}" for v in variant_names)
+            cells = "  ".join(
+                f"{v}:{r[v]['train']:+.3f}/{r[v]['test']:+.3f}" for v in variant_names
+            )
             print(f"  [done] (train/test)  {cells}")
 
         def _fin(r: dict, v: str, key: str) -> bool:
@@ -413,7 +443,9 @@ class SelfCorr(Study):
         # finite.
         matched = [r for r in results if all(_fin(r, v, "test") for v in variant_names)]
         print(f"\n{'=' * 74}\nHi-C self-correlation {args.hic_singletons}, {len(results)} regions")
-        print(f"  {'variant':<14}{'train':>9}{'test':>9}{'consist(ρ)':>10}{'finite':>8}    {'test(paired)':>13}")
+        print(
+            f"  {'variant':<14}{'train':>9}{'test':>9}{'consist(ρ)':>10}{'finite':>8}    {'test(paired)':>13}"
+        )
         for v in variant_names:
             nfin = sum(_fin(r, v, "test") for r in results)
             flag = "  collapsed on some regions" if nfin < len(results) else ""
@@ -421,10 +453,16 @@ class SelfCorr(Study):
                 f"  {v:<14}{med(results, v, 'train'):>9.3f}{med(results, v, 'test'):>9.3f}"
                 f"{med(results, v, 'self_consistency'):>10.3f}{nfin:>6}/{len(results)}    {med(matched, v, 'test'):>13.3f}{flag}"
             )
-        print(f"  paired is the median over the {len(matched)} regions where all variants are finite")
+        print(
+            f"  paired is the median over the {len(matched)} regions where all variants are finite"
+        )
         print("  test is held-out Hi-C generalisation. consist(ρ) is the self-consistency Spearman")
-        print("         input Hi-C IF vs model 3D distance, want < 0, high-freq contacts placed close")
-        print("  reference ≈ tuned means the ceiling is not our model. tuned ≫ parity means features help, EV stops collapse.")
+        print(
+            "         input Hi-C IF vs model 3D distance, want < 0, high-freq contacts placed close"
+        )
+        print(
+            "  reference ≈ tuned means the ceiling is not our model. tuned ≫ parity means features help, EV stops collapse."
+        )
         print("=" * 74)
 
 

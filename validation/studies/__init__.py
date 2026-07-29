@@ -13,6 +13,7 @@ from typing import Any, Protocol, runtime_checkable
 class Context:
     """Shared knobs every study receives. config and data are filled per region by the study or the
     reconstruction helpers. label names the reference output files."""
+
     cell: str
     data_root: str
     hic: str | None
@@ -31,6 +32,7 @@ class Context:
 class Study(Protocol):
     name: str
     help: str
+
     def add_args(self, p: ArgumentParser) -> None: ...
     def run(self, ctx: Context, args: Namespace) -> None: ...
 

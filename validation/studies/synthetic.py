@@ -82,9 +82,9 @@ def write_synthetic_inputs(
     g = start + np.arange(n) * binsize + binsize // 2
     with open(tmp / "anchors.bed", "w") as fa, open(tmp / "clusters.bedpe", "w") as fc:
         for m in g:
-            fa.write(f"{chrom}\t{m-3000}\t{m-1000}\tN\n")
-            fa.write(f"{chrom}\t{m+1000}\t{m+3000}\tN\n")
-            fc.write(f"{chrom}\t{m-3000}\t{m-1000}\t{chrom}\t{m+1000}\t{m+3000}\t50\n")
+            fa.write(f"{chrom}\t{m - 3000}\t{m - 1000}\tN\n")
+            fa.write(f"{chrom}\t{m + 1000}\t{m + 3000}\tN\n")
+            fc.write(f"{chrom}\t{m - 3000}\t{m - 1000}\t{chrom}\t{m + 1000}\t{m + 3000}\t50\n")
     (tmp / "breaks.bed").write_text("")
     D = np.zeros((n, n))
     iu = np.triu_indices(n, 1)
@@ -95,7 +95,7 @@ def write_synthetic_inputs(
         rng = np.random.default_rng(seed)
         counts[iu] = counts[iu] + rng.normal(scale=noise * counts[iu].mean(), size=counts[iu].shape)
     rows = [
-        f"{chrom}\t{g[i]}\t{g[i]+1}\t{chrom}\t{g[j]}\t{g[j]+1}\t{int(round(counts[i, j]))}"
+        f"{chrom}\t{g[i]}\t{g[i] + 1}\t{chrom}\t{g[j]}\t{g[j] + 1}\t{int(round(counts[i, j]))}"
         for i, j in zip(*iu, strict=True)
         if round(counts[i, j]) >= 1
     ]
@@ -161,8 +161,9 @@ def _to_centroids(beads: list, edges: np.ndarray) -> np.ndarray:
     return cent
 
 
-def reconstruct(variant: str, tmp: Path, region: str, edges: np.ndarray, n: int,
-                 ref_workers: int, fast: bool) -> list[np.ndarray]:
+def reconstruct(
+    variant: str, tmp: Path, region: str, edges: np.ndarray, n: int, ref_workers: int, fast: bool
+) -> list[np.ndarray]:
     """Reconstruct n structures for a variant. Return per-structure per-bin centroid arrays.
 
     parity and tuned build their own custom Settings pointing at the synthetic anchors, clusters,
@@ -209,7 +210,9 @@ class Synthetic(Study):
     help = "synthetic ground-truth reconstruction and noise robustness, 3 variants"
 
     def add_args(self, p: argparse.ArgumentParser) -> None:
-        p.add_argument("--nodes", type=int, default=50, help="synthetic structure size (paper: 50, 100)")
+        p.add_argument(
+            "--nodes", type=int, default=50, help="synthetic structure size (paper: 50, 100)"
+        )
         p.add_argument("--seed", type=int, default=1, help="ground-truth structure seed")
         p.add_argument(
             "--noise",
@@ -226,8 +229,10 @@ class Synthetic(Study):
         noise_levels = [float(x) for x in args.noise.split(",")]
         variant_names = args.variants.split(",")
         truth = synthetic_structure(args.nodes, args.seed)
-        print(f"synthetic ground truth: {args.nodes} nodes (seed {args.seed}), "
-              f"ensemble n={ctx.n} per variant\n")
+        print(
+            f"synthetic ground truth: {args.nodes} nodes (seed {args.seed}), "
+            f"ensemble n={ctx.n} per variant\n"
+        )
         print(f"  {'noise':>6} | " + " | ".join(f"{v:^21}" for v in variant_names))
         print(f"  {'':>6} | " + " | ".join(f"{'RMSD':>9} {'contact':>10}" for _ in variant_names))
         print("  " + "-" * (9 + len(variant_names) * 24))
@@ -254,8 +259,10 @@ class Synthetic(Study):
                     metrics.rmsd_superpose(truth, rnd),
                     metrics.contact_measure(truth, rnd, expected=pdist(truth)),
                 )
-        print(f"\n  random-structure baseline: RMSD {baseline_random[0]:.3f}  "
-              f"contact {baseline_random[1]:.4f}  (any real reconstruction must be far below)")
+        print(
+            f"\n  random-structure baseline: RMSD {baseline_random[0]:.3f}  "
+            f"contact {baseline_random[1]:.4f}  (any real reconstruction must be far below)"
+        )
         print("  lower = better; RMSD & contact both scale-matched to the truth (arbitrary units).")
 
 

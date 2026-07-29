@@ -49,7 +49,10 @@ class Report(Study):
             help="overlap / contact-prob radius (default: median baseline bond length)",
         )
         p.add_argument(
-            "--skip-neighbors", type=int, default=1, help="exclude |i-j|<=this as bonded (default 1)"
+            "--skip-neighbors",
+            type=int,
+            default=1,
+            help="exclude |i-j|<=this as bonded (default 1)",
         )
 
     def run(self, ctx: Context, args: argparse.Namespace) -> None:

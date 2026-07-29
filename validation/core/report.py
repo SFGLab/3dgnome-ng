@@ -51,9 +51,7 @@ def print_comparison(target: str, base: dict[str, float], treat: dict[str, float
             f"  {'reduced' if ext_t < ext_b else 'not reduced'}. confinement should compact"
         )
         results.append(ok)
-        print(
-            f"  {WARN}  overlaps {ov_b:.4f} -> {ov_t:.4f}. confinement alone need not cut these"
-        )
+        print(f"  {WARN}  overlaps {ov_b:.4f} -> {ov_t:.4f}. confinement alone need not cut these")
     elif target in ("ev", "all"):
         ok = ov_t <= ov_b + 1e-9
         print(

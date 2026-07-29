@@ -74,6 +74,16 @@ def _up_to_date(out: Path, key: str, entry: dict[str, Any] | None, force: bool) 
     return not force and out.exists() and entry is not None and entry.get("input") == key
 
 
+def _cache_key(source: Path, resolution: int, chroms: list[str] | None) -> str:
+    """What a cached track is keyed on.
+
+    The chromosome selection belongs in the key.  Without it, widening `--chroms`
+    reads as up to date against a track built for one chromosome, and every
+    downstream region outside it silently scores as unassigned rather than failing.
+    """
+    return f"{_hash_head(source)}@{resolution}@{','.join(chroms) if chroms else 'all'}"
+
+
 def _write_bedgraph(path: Path, rows: list[tuple[str, int, int, float]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
@@ -280,7 +290,7 @@ class TracksStudy:
                 )
             else:
                 out = out_dir / f"{cell}_compartments.bedGraph"
-                key = f"{_hash_head(mcool)}@{args.resolution}"
+                key = _cache_key(mcool, args.resolution, chroms)
                 if _up_to_date(out, key, lock.get("compartments"), args.force):
                     print(f"[tracks] compartments up to date: {out}")
                 else:
@@ -311,7 +321,7 @@ class TracksStudy:
                 )
             else:
                 out = out_dir / f"{cell}_atac.bedGraph"
-                key = f"{_hash_head(bw)}@{args.signal_resolution}"
+                key = _cache_key(bw, args.signal_resolution, chroms)
                 if _up_to_date(out, key, lock.get("atac"), args.force):
                     print(f"[tracks] atac up to date: {out}")
                 else:

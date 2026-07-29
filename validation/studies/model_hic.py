@@ -66,7 +66,9 @@ class ModelHiC(Study):
         cfg = variants.write_parity_ini(tmp, fast=ctx.fast)  # reference and parity base
 
         print(f"model-vs-Hi-C @ {args.binsize // 1000}kb  region {args.region}  n={ctx.n}")
-        print("  paper Fig. 2B intra-chromosomal @ 1Mb has ρ=0.67, but that is data-level ChIA-PET↔Hi-C.")
+        print(
+            "  paper Fig. 2B intra-chromosomal @ 1Mb has ρ=0.67, but that is data-level ChIA-PET↔Hi-C."
+        )
         print("   this is the harder model structure↔Hi-C correlation\n")
         print(f"  {'variant':<16}{'Pearson(log1p)':>16}{'SCC':>9}")
         for v in variant_names:
@@ -88,14 +90,22 @@ class ModelHiC(Study):
                 )
                 cl, ml = _arrays(ens)
                 rad = _radius(cl)
-                hc = contacts.ensemble_hic_correlation(cl, ml, ctx.hic, args.region, args.binsize, rad)
+                hc = contacts.ensemble_hic_correlation(
+                    cl, ml, ctx.hic, args.region, args.binsize, rad
+                )
                 print(f"  {v:<16}{hc['pearson']:>16.3f}{hc['scc']:>9.3f}")
             except Exception as e:  # noqa: BLE001
                 print(f"  {v:<16}  ERROR: {e}")
 
-        print("\n  Scale A, inter-chromosomal, paper Fig. 2A ρ=0.73, is not available. The GM12878 ChIA-PET")
-        print("  has 0 inter-chromosomal contacts, so no whole-genome inter-chr model can be built.")
-        print("  Pearson on log1p simulated against observed contacts, off-diagonal, ensemble-aggregated.")
+        print(
+            "\n  Scale A, inter-chromosomal, paper Fig. 2A ρ=0.73, is not available. The GM12878 ChIA-PET"
+        )
+        print(
+            "  has 0 inter-chromosomal contacts, so no whole-genome inter-chr model can be built."
+        )
+        print(
+            "  Pearson on log1p simulated against observed contacts, off-diagonal, ensemble-aggregated."
+        )
 
 
 register(ModelHiC())

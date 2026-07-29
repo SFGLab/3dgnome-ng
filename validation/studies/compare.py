@@ -120,11 +120,15 @@ def _score_region(
             # Hi-C correlation via MultiMM's approach, faithful (d+1)^-3 against ICE-balanced
             # observed. Reported as our standard Hi-C number, not chased against their 0.70.
             try:
-                cobs_bal, bstarts = contacts.observed_hic(ctx.hic, region, args.binsize, balance=True)
+                cobs_bal, bstarts = contacts.observed_hic(
+                    ctx.hic, region, args.binsize, balance=True
+                )
             except Exception:  # noqa: BLE001  mcool may lack balance weights
                 cobs_bal, bstarts = contacts.observed_hic(ctx.hic, region, args.binsize)
             eff = int(bstarts[1] - bstarts[0]) if len(bstarts) > 1 else args.binsize
-            met["hic_multimm"] = contacts.multimm_faithful_pearson(cl, ml[0], cobs_bal, bstarts, eff)
+            met["hic_multimm"] = contacts.multimm_faithful_pearson(
+                cl, ml[0], cobs_bal, bstarts, eff
+            )
     return ref_m, base_m, feat_m
 
 
@@ -246,7 +250,9 @@ class Compare(Study):
             help="ensemble size for the law pass (exponents need far fewer structures than overlaps); "
             "0 = reuse -n",
         )
-        p.add_argument("--no-laws", action="store_true", help="skip the large-region scaling-law pass")
+        p.add_argument(
+            "--no-laws", action="store_true", help="skip the large-region scaling-law pass"
+        )
 
     def run(self, ctx: Context, args: argparse.Namespace) -> None:
         if not ig.CPP_BIN.exists():
@@ -270,9 +276,13 @@ class Compare(Study):
         print(f"[compare] {len(regions)} region(s), n={ctx.n}: {regions}")
 
         tmp = Path(tempfile.mkdtemp(prefix="gnome3d_cmp_"))
-        ctx.config = variants.write_parity_ini(tmp, fast=ctx.fast)  # parity settings, GM12878 data paths
+        ctx.config = variants.write_parity_ini(
+            tmp, fast=ctx.fast
+        )  # parity settings, GM12878 data paths
 
-        s_v4 = variants.parity_settings(ctx.config, ctx.py_arcs, ctx.py_workers)  # for the cross-data correlation ChIA-PET input contacts
+        s_v4 = variants.parity_settings(
+            ctx.config, ctx.py_arcs, ctx.py_workers
+        )  # for the cross-data correlation ChIA-PET input contacts
         rows: list[tuple[str, dict[str, float], dict[str, float], dict[str, float]]] = []
         v4_rows: list[dict[str, float]] = []
         for region in regions:
@@ -301,7 +311,9 @@ class Compare(Study):
         # tuned vs ref overlap uses the resolution-normalized metric. Tuned has finer beads, so raw
         # overlap is density-inflated and not comparable. Parity vs ref above stays raw and N-matched.
         feat_wins = sum(r[3]["overlap_frac_norm"] < r[1]["overlap_frac_norm"] - 1e-9 for r in rows)
-        d_overlaps = [r[1]["overlap_frac_norm"] - r[3]["overlap_frac_norm"] for r in rows]  # positive is good
+        d_overlaps = [
+            r[1]["overlap_frac_norm"] - r[3]["overlap_frac_norm"] for r in rows
+        ]  # positive is good
         sc_ok = sum(
             np.isfinite(r[3]["selfconsistency_rho"])
             and r[3]["selfconsistency_rho"] <= r[1]["selfconsistency_rho"] + 0.15
@@ -326,7 +338,9 @@ class Compare(Study):
         # laws are meaningless.
         feat_rg, ref_rg = med("rg", 2), med("rg", 0)
         feat_bcv = med("law_bond_cv", 2)
-        degenerate = (ref_rg > 0 and feat_rg > 3 * ref_rg) or (np.isfinite(feat_bcv) and feat_bcv > 3.0)
+        degenerate = (ref_rg > 0 and feat_rg > 3 * ref_rg) or (
+            np.isfinite(feat_bcv) and feat_bcv > 3.0
+        )
         if degenerate:
             print(
                 f"  {FAIL}  +tuned structure degenerate. Rg={feat_rg:.0f} vs ref {ref_rg:.1f} "
@@ -376,8 +390,10 @@ class Compare(Study):
                 f"    {PASS if non_inferior else FAIL}  +tuned Hi-C (inv-dist Pearson) ≥ reference: "
                 f"ref={ref_mm:.3f} vs +tuned={feat_mm:.3f}"
             )
-            print("    faithful (d+1)^-3 vs ICE-balanced Hi-C, MultiMM's metric approach. "
-                  "Value scales with region size, compared ref against tuned at the same geometry")
+            print(
+                "    faithful (d+1)^-3 vs ICE-balanced Hi-C, MultiMM's metric approach. "
+                "Value scales with region size, compared ref against tuned at the same geometry"
+            )
 
             # Cross-data correlation from 3dgnome 2016 Fig. 2. Input ChIA-PET heatmap against Hi-C, data-level, no structure.
             if v4_rows:
@@ -422,14 +438,18 @@ class Compare(Study):
                 )
                 law_region = max(cands, key=_span) if cands else None
             if not law_region:
-                print(f"\n  [laws] no region up to {args.law_mb} Mb found. Pass --law-region explicitly")
+                print(
+                    f"\n  [laws] no region up to {args.law_mb} Mb found. Pass --law-region explicitly"
+                )
             else:
                 print(
                     f"\n{'=' * 74}\n  scaling laws @ {law_region}, {_span(law_region) / 1e6:.1f} Mb, "
                     f"large enough for the power-law window\n{'=' * 74}"
                 )
                 lw = _score_law_region(law_region, ctx, args)
-                print(f"  {'variant':<22}{'β (R²)':>14}{'α (R²)':>14}{'bond CV':>9}{'beads':>8}  laws?")
+                print(
+                    f"  {'variant':<22}{'β (R²)':>14}{'α (R²)':>14}{'bond CV':>9}{'beads':>8}  laws?"
+                )
                 for label, key, nkey in [
                     ("reference", "ref", "n_ref"),
                     ("python +tuned", "feat", "n_feat"),

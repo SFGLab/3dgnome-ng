@@ -229,4 +229,6 @@ def with_arcs_executor(s: Settings, executor: str, workers: int = 0) -> Settings
 def with_singletons(s: Settings, singletons_path: str, singletons_inter: str = "") -> Settings:
     """Point the model at a custom singletons BEDPE, for example Hi-C-derived for the
     self-correlation study. Absolute paths override the data_dir prefix via pathlib join."""
-    return apply_flags(s, {"data_singletons": singletons_path, "data_singletons_inter": singletons_inter})
+    return apply_flags(
+        s, {"data_singletons": singletons_path, "data_singletons_inter": singletons_inter}
+    )

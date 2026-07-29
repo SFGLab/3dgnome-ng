@@ -137,6 +137,11 @@ def _run_arm(
     sad = contacts.compartment_saddle(c_sim, sort_track)
 
     bl = smetrics.bond_lengths(cl[0])
+    # Density of the simulated map. compartment_saddle divides out distance decay, so a
+    # map where nearly every bin pair is in contact returns a strength of exactly 1.0 or
+    # nan rather than a measurement. Reporting the density makes that visible instead of
+    # leaving a saturated run looking like a real null.
+    off_diag = c_sim.size - c_sim.shape[0]
     return {
         "saddle": sad["strength"],
         "eig": cc["eig_pearson_abs"],
@@ -144,6 +149,8 @@ def _run_arm(
         "rg": float(np.mean([smetrics.radius_of_gyration(c) for c in cl])),
         "cv": float(bl.std() / bl.mean()) if bl.mean() > 0 else float("nan"),
         "overlap": float(smetrics.overlap_fraction(cl[0], radius)[0]),
+        "density": float((c_sim > 0).sum() - np.count_nonzero(np.diag(c_sim))) / max(off_diag, 1),
+        "n_beads": float(len(cl[0])),
     }
 
 

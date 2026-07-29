@@ -118,7 +118,9 @@ def score_config(
     except Exception:  # noqa: BLE001  mcool may lack balance weights
         cobs_bal, bstarts = contacts.observed_hic(hic_path, region, binsize)
     eff = int(bstarts[1] - bstarts[0]) if len(bstarts) > 1 else binsize
-    m["hic_multimm"] = contacts.multimm_faithful_pearson(coords_list, mids_list[0], cobs_bal, bstarts, eff)
+    m["hic_multimm"] = contacts.multimm_faithful_pearson(
+        coords_list, mids_list[0], cobs_bal, bstarts, eff
+    )
     return m
 
 
@@ -144,7 +146,9 @@ def run_budget(
         chrs_list, bed_region = _chrs_and_region(region)
         data = ContactData.from_files(base, chrs_list, bed_region)
         clist = load_contacts(base, chrs_list, bed_region)
-        radius_key = f"__radius__::{region}"  # budget-independent since bead spacing is roughly constant
+        radius_key = (
+            f"__radius__::{region}"  # budget-independent since bead spacing is roughly constant
+        )
         if radius_key in cache:
             radius = cache[radius_key]["radius"]
         else:
@@ -300,9 +304,13 @@ class Sweep(Study):
         p.add_argument("--max-ibs", type=int, default=6, help="max segments (≈IBs) a region spans")
         p.add_argument("--max-mb", type=float, default=6.0, help="cap region size (Mb)")
         p.add_argument("--binsize", type=int, default=25000, help="Hi-C bin size for correlation")
-        p.add_argument("--max-configs", type=int, default=None, help="flat mode: first N grid configs")
+        p.add_argument(
+            "--max-configs", type=int, default=None, help="flat mode: first N grid configs"
+        )
         p.add_argument("--skip-neighbors", type=int, default=1)
-        p.add_argument("--out", default="out/sweep/sweep.json", help="resumable results cache (JSON)")
+        p.add_argument(
+            "--out", default="out/sweep/sweep.json", help="resumable results cache (JSON)"
+        )
         # successive-halving search that screens all configs cheap, expands top-K, then validates the
         # winner at full quality with n=100
         p.add_argument(
@@ -404,9 +412,19 @@ class Sweep(Study):
         survivor_cfgs = [c for c in grid if str(c["_name"]) in survivors]
         print(f"\n[search] survivors -> tier2: {survivors}")
 
-        print(f"[search] tier2: {len(survivor_cfgs)} configs x {len(regions)} regions @ {search_tag}")
+        print(
+            f"[search] tier2: {len(survivor_cfgs)} configs x {len(regions)} regions @ {search_tag}"
+        )
         run_budget(
-            base_search, survivor_cfgs, regions, args.search_n, search_tag, ctx, args, cache, out_path
+            base_search,
+            survivor_cfgs,
+            regions,
+            args.search_n,
+            search_tag,
+            ctx,
+            args,
+            cache,
+            out_path,
         )
         agg2 = _aggregate(cache, survivors, regions, search_tag)
         winner = report(
@@ -424,7 +442,9 @@ class Sweep(Study):
         print(
             f"\n[search] tier3: validate '{winner}' vs baseline x {len(regions)} regions @ {final_tag}"
         )
-        run_budget(base_final, final_cfgs, regions, args.final_n, final_tag, ctx, args, cache, out_path)
+        run_budget(
+            base_final, final_cfgs, regions, args.final_n, final_tag, ctx, args, cache, out_path
+        )
         aggf = _aggregate(cache, [winner, "baseline"], regions, final_tag)
         report(
             aggf,

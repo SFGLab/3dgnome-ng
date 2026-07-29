@@ -34,7 +34,11 @@ def call_boundaries(
         for p in cooler.fileops.list_coolers(mcool_path)
         if p.rsplit("/", 1)[-1].isdigit()
     )
-    res = (binsize if binsize in avail else min(avail, key=lambda r: abs(r - binsize))) if avail else binsize
+    res = (
+        (binsize if binsize in avail else min(avail, key=lambda r: abs(r - binsize)))
+        if avail
+        else binsize
+    )
     uri = f"{mcool_path}::/resolutions/{res}" if avail else mcool_path
     clr = cooler.Cooler(uri)
     if window % res != 0:  # cooltools requires window to be a multiple of the resolution

@@ -47,13 +47,29 @@ def parity_settings(config_path, py_arcs="batch", py_workers=0) -> Settings:
     return with_arcs_executor(s, py_arcs, py_workers)
 
 
-def reconstruct(variant, region, *, cell, data_root, quality, config, data=None,
-                n, py_arcs="batch", py_workers=0, ref_workers=0, fast=False, label="v"):
+def reconstruct(
+    variant,
+    region,
+    *,
+    cell,
+    data_root,
+    quality,
+    config,
+    data=None,
+    n,
+    py_arcs="batch",
+    py_workers=0,
+    ref_workers=0,
+    fast=False,
+    label="v",
+):
     """Reconstruct n structures for one variant on one region."""
     chrs_list, bed = parse_region_arg(region)
     if variant == "reference":
         rdir = Path(tempfile.mkdtemp(prefix="ref_"))
-        ens, _ = ig.run_cpp_ensemble_parallel(rdir, config, n, MAX_LEVEL, region, label, workers=ref_workers)
+        ens, _ = ig.run_cpp_ensemble_parallel(
+            rdir, config, n, MAX_LEVEL, region, label, workers=ref_workers
+        )
         return ens
     if variant == "parity":
         s = parity_settings(config, py_arcs, py_workers)
@@ -68,10 +84,19 @@ def reconstruct_all(variants, region, ctx) -> dict:
     out = {}
     for v in variants:
         out[v] = reconstruct(
-            v, region, cell=ctx.cell, data_root=ctx.data_root, quality=ctx.quality,
-            config=ctx.config, data=(ctx.data if v != "reference" else None), n=ctx.n,
-            py_arcs=ctx.py_arcs, py_workers=ctx.py_workers, ref_workers=ctx.ref_workers,
-            fast=ctx.fast, label=ctx.label,
+            v,
+            region,
+            cell=ctx.cell,
+            data_root=ctx.data_root,
+            quality=ctx.quality,
+            config=ctx.config,
+            data=(ctx.data if v != "reference" else None),
+            n=ctx.n,
+            py_arcs=ctx.py_arcs,
+            py_workers=ctx.py_workers,
+            ref_workers=ctx.ref_workers,
+            fast=ctx.fast,
+            label=ctx.label,
         )
     return out
 
@@ -82,5 +107,7 @@ def run_reference(config, region, n, *, ref_workers=0, label="v"):
     Shared by studies that build their own reference .ini for custom data, so the dispatch to
     run_cpp_ensemble_parallel stays in one place even when the config is not the parity.ini base."""
     rdir = Path(tempfile.mkdtemp(prefix="ref_"))
-    ens, _ = ig.run_cpp_ensemble_parallel(rdir, config, n, MAX_LEVEL, region, label, workers=ref_workers)
+    ens, _ = ig.run_cpp_ensemble_parallel(
+        rdir, config, n, MAX_LEVEL, region, label, workers=ref_workers
+    )
     return ens

@@ -111,12 +111,18 @@ def overlap_fraction_binned(
     if len(coords) < 2:
         return 0.0, 0, 0
     binidx = (mids // resolution_bp).astype(np.int64)
-    uniq, inv = np.unique(binidx, return_inverse=True)  # uniq is genomic-sorted, inv maps bead to bin
+    uniq, inv = np.unique(
+        binidx, return_inverse=True
+    )  # uniq is genomic-sorted, inv maps bead to bin
     if uniq.size < 2:
         return 0.0, 0, 0
     k = uniq.size
-    cnt = np.bincount(inv, minlength=k).astype(np.float64)  # per-bin counts for the centroid average
-    cent = np.stack([np.bincount(inv, weights=coords[:, a], minlength=k) / cnt for a in range(3)], axis=1)
+    cnt = np.bincount(inv, minlength=k).astype(
+        np.float64
+    )  # per-bin counts for the centroid average
+    cent = np.stack(
+        [np.bincount(inv, weights=coords[:, a], minlength=k) / cnt for a in range(3)], axis=1
+    )
     step = np.linalg.norm(np.diff(cent, axis=0), axis=1)
     med = float(np.median(step[step > 0])) if np.any(step > 0) else 0.0
     if med <= 0:
@@ -278,7 +284,9 @@ def scaling_laws(
         )
         fit_m = np.bincount(inv, weights=np.asarray(mids, dtype=np.float64), minlength=k) / cnt
         step = np.linalg.norm(np.diff(fit_c, axis=0), axis=1)
-        fit_r = contact_radius_factor * float(np.median(step[step > 0])) if np.any(step > 0) else radius
+        fit_r = (
+            contact_radius_factor * float(np.median(step[step > 0])) if np.any(step > 0) else radius
+        )
     n = len(fit_c)
     if n < 3:
         return out

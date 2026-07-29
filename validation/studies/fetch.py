@@ -256,8 +256,12 @@ class Fetch(Study):
 
     def add_args(self, p: argparse.ArgumentParser) -> None:
         p.add_argument("--manifest", required=True, help="path to a cell-line manifest JSON")
-        p.add_argument("--out", default="data/_epigenome", help="output root (default data/_epigenome)")
-        p.add_argument("--dry-run", action="store_true", help="resolve + print plan, do not download")
+        p.add_argument(
+            "--out", default="data/_epigenome", help="output root (default data/_epigenome)"
+        )
+        p.add_argument(
+            "--dry-run", action="store_true", help="resolve + print plan, do not download"
+        )
         p.add_argument(
             "--insecure",
             action="store_true",
@@ -285,7 +289,9 @@ class Fetch(Study):
                 return insecure
             if source == "4dn":
                 if not _warned_4dn[0]:
-                    print("[fetch] NOTE: 4DN TLS cert is expired server-side; skipping verify for 4DN")
+                    print(
+                        "[fetch] NOTE: 4DN TLS cert is expired server-side; skipping verify for 4DN"
+                    )
                     _warned_4dn[0] = True
                 return insecure
             return secure
