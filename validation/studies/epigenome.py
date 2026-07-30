@@ -101,6 +101,27 @@ def _track_paths(cell: str, data_root: str) -> tuple[str, str]:
     )
 
 
+def _ib_ids(settings: object, chrs: list[str], region: object, bin_starts: I64Array) -> I64Array:
+    """Which interaction block each Hi-C bin falls in, or -1 for none.
+
+    Built from the coarse cluster tree, so it reflects the blocks the
+    reconstruction actually used rather than a re-derived guess. Level 3 is the
+    interaction block level.
+    """
+    from gnome3d.data import ContactData
+    from gnome3d.pipeline import coarse as cb
+
+    data = ContactData.from_files(settings, chrs, region)  # pyright: ignore[reportArgumentType]
+    st = cb.build_state(settings, data, chrs, region)  # pyright: ignore[reportArgumentType]
+    ibs = [c for c in st.clusters if int(c.level) == 3]
+
+    out = np.full(len(bin_starts), -1, dtype=np.int64)
+    for k, c in enumerate(ibs):
+        hit = (bin_starts >= int(c.start)) & (bin_starts <= int(c.end))
+        out[hit] = k
+    return out
+
+
 def _run_arm(
     ctx: Context,
     args: argparse.Namespace,
@@ -219,6 +240,16 @@ class Epigenome(Study):
         c_obs, bin_starts = contacts.observed_hic(ctx.hic, args.region, args.binsize, balance=True)
         sort_track = _track_on_bins(comp_path, chrs[0], bin_starts)
         obs_saddle = contacts.compartment_saddle(c_obs, sort_track)
+        # Interaction-block labels, so every arm reports how block-organized its
+        # structure is next to how block-organized the experiment is. A saddle gain
+        # that arrives with a rising block ratio is the fragmentation artifact.
+        blocks = _ib_ids(
+            cfgmod.settings_for_cell(ctx.cell, ctx.data_root, ctx.quality),
+            chrs,
+            region,
+            bin_starts,
+        )
+        obs_ib = contacts.block_enrichment(c_obs, blocks)["ratio"]
 
         print(f"epigenome ablation  {ctx.cell}  {args.region}  n={ctx.n}")
         print(f"  compartments: {comp_path}")
@@ -227,9 +258,10 @@ class Epigenome(Study):
         print(
             f"  experimental saddle = {obs_saddle['strength']:.3f} "
             f"over {int(obs_saddle['n_bins'])} bins  (1.0 = no compartmentalization)\n"
+            f"  experimental within-block enrichment = {obs_ib:.3f}\n"
         )
         header = (
-            f"  {'arm':<14}{'saddle':>9}{'eig |r|':>9}{'kappa':>8}"
+            f"  {'arm':<14}{'saddle':>9}{'ibE':>9}{'eig |r|':>9}{'kappa':>8}"
             f"{'Rg':>9}{'bondCV':>9}{'overlap':>9}"
         )
         print(header)
@@ -255,6 +287,7 @@ class Epigenome(Study):
                     bin_starts,
                     sort_track,
                     seed_offset=i * _SEED_STRIDE,
+                    block_id=blocks,
                 )
                 for i in range(args.baseline_repeats)
             ]
@@ -277,7 +310,17 @@ class Epigenome(Study):
                 continue
             flags = _arm_flags(name, args, comp_path, acc_path)
             try:
-                row = _run_arm(ctx, args, flags, chrs, region, c_obs, bin_starts, sort_track)
+                row = _run_arm(
+                    ctx,
+                    args,
+                    flags,
+                    chrs,
+                    region,
+                    c_obs,
+                    bin_starts,
+                    sort_track,
+                    block_id=blocks,
+                )
                 if name == "off":
                     base = row
                 mark = ""
@@ -290,7 +333,8 @@ class Epigenome(Study):
                         sigma = abs(d_eig) / floor if floor > 0 else 0.0
                         mark += f"  ({sigma:.1f} sd eig)" + ("" if sigma >= 2.0 else " = noise")
                 print(
-                    f"  {name:<14}{row['saddle']:>9.3f}{row['eig']:>9.3f}{row['kappa']:>8.3f}"
+                    f"  {name:<14}{row['saddle']:>9.3f}{row['ib_ratio']:>9.3f}"
+                    f"{row['eig']:>9.3f}{row['kappa']:>8.3f}"
                     f"{row['rg']:>9.2f}{row['cv']:>9.3f}{row['overlap']:>9.3f}{mark}"
                 )
             except Exception as e:  # noqa: BLE001

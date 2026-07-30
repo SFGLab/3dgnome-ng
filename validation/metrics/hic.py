@@ -257,11 +257,22 @@ def block_enrichment(
 
     within = float(blk[same].mean()) if same.any() else float("nan")
     between = float(blk[diff].mean()) if diff.any() else float("nan")
-    ratio = within / between if between and between == between and between > 0 else float("nan")
+    # A between-block mean of exactly zero means the blocks share no contact at
+    # all, which is the strongest form of the artifact this function looks for,
+    # not a failure to measure. Reporting it as inf keeps it distinct from the nan
+    # returned when there are too few blocks to compare.
+    if between == between and between == 0.0 and within == within and within > 0.0:
+        ratio = float("inf")
+    elif between == between and between > 0.0:
+        ratio = within / between
+    else:
+        ratio = float("nan")
     return {
         "within": within,
         "between": between,
         "ratio": ratio,
+        "n_between_pairs": float(int(diff.sum())),
+        "n_within_pairs": float(int(same.sum())),
         "n_blocks": float(np.unique(b[idx]).size),
     }
 

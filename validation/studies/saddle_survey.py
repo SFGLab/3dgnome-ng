@@ -31,11 +31,17 @@ from pathlib import Path
 
 import numpy as np
 
-from gnome3d.types import F64Array, I64Array
+from gnome3d.types import F64Array
 from validation.core import config as cfgmod
 from validation.metrics import hic as contacts
 from validation.studies import Context, Study, register
-from validation.studies.epigenome import _arm_flags, _run_arm, _track_on_bins, _track_paths
+from validation.studies.epigenome import (
+    _arm_flags,
+    _ib_ids,
+    _run_arm,
+    _track_on_bins,
+    _track_paths,
+)
 
 # Region-level columns correlated against the gap, and what each one would mean.
 # Each is a candidate explanation for why a region's model compartmentalization
@@ -80,27 +86,6 @@ def _windows(sizes: dict[str, int], chroms: list[str], width: int, per_chrom: in
         starts = [lo] if per_chrom == 1 else np.linspace(lo, hi, per_chrom).astype(int)
         for st in np.atleast_1d(starts):
             out.append(f"{chrom}:{int(st)}-{int(st) + width}")
-    return out
-
-
-def _ib_ids(settings: object, chrs: list[str], region: object, bin_starts: I64Array) -> I64Array:
-    """Which interaction block each Hi-C bin falls in, or -1 for none.
-
-    Built from the coarse cluster tree, so it reflects the blocks the
-    reconstruction actually used rather than a re-derived guess. Level 3 is the
-    interaction block level.
-    """
-    from gnome3d.data import ContactData
-    from gnome3d.pipeline import coarse as cb
-
-    data = ContactData.from_files(settings, chrs, region)  # pyright: ignore[reportArgumentType]
-    st = cb.build_state(settings, data, chrs, region)  # pyright: ignore[reportArgumentType]
-    ibs = [c for c in st.clusters if int(c.level) == 3]
-
-    out = np.full(len(bin_starts), -1, dtype=np.int64)
-    for k, c in enumerate(ibs):
-        hit = (bin_starts >= int(c.start)) & (bin_starts <= int(c.end))
-        out[hit] = k
     return out
 
 
@@ -248,6 +233,7 @@ class SaddleSurvey(Study):
                     "ib_model": float(row["ib_ratio"]),
                     "ib_obs": float(ib_obs),
                     "ib_over_obs": float(row["ib_ratio"] / ib_obs) if ib_obs > 0 else float("nan"),
+                    "ib_between_zero": float(row["ib_ratio"] == float("inf")),
                 }
                 rows.append(rec)
                 print(
