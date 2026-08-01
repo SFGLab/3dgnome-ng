@@ -226,7 +226,20 @@ class Epigenome(Study):
         from gnome3d.io import parse_chrs_arg
 
         comp_path, acc_path = _track_paths(ctx.cell, ctx.data_root)
-        for path, what in ((comp_path, "compartments"), (acc_path, "accessibility")):
+        # Only the tracks some selected arm actually reads are required. Demanding
+        # both refuses a compartments-only run on a machine that has no
+        # accessibility bigWig, which is a precondition the run does not have.
+        wanted = [ARMS[a.strip()] for a in args.arms.split(",") if a.strip() in ARMS]
+        need_comp = any(f.get("use_compartments") for f in wanted)
+        need_acc = any(f.get("use_bridging") or f.get("use_fibre_compaction") for f in wanted)
+        required = ([(comp_path, "compartments")] if need_comp else []) + (
+            [(acc_path, "accessibility")] if need_acc else []
+        )
+        # The saddle sorting track is the compartment call, so it is needed for the
+        # report even when no arm switches the compartment term on.
+        if not need_comp:
+            required.append((comp_path, "compartments (for the saddle sorting track)"))
+        for path, what in required:
             if not Path(path).exists():
                 print(f"[epigenome] missing {what} track: {path}")
                 print(f"[epigenome] build it: python -m validation tracks --cell {ctx.cell}")
