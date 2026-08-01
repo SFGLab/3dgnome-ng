@@ -136,7 +136,12 @@ class ContactData:
             phasing = load_signal(s.data_path(s.data_phasing_track), chr_set, region)
 
         compartments, accessibility = _finalize_tracks(
-            compartments, accessibility, phasing, anchors
+            compartments,
+            accessibility,
+            phasing,
+            anchors,
+            mode=s.accessibility_mode,
+            percentile=s.accessibility_percentile,
         )
 
         return cls(
@@ -162,6 +167,8 @@ class ContactData:
         compartments_df: Any | None = None,
         accessibility_df: Any | None = None,
         phasing_df: Any | None = None,
+        accessibility_mode: str = "log",
+        accessibility_percentile: float = 80.0,
     ) -> ContactData:
         """
         Build ContactData from pandas DataFrames.
@@ -259,7 +266,12 @@ class ContactData:
         accessibility = _signal_from_df(accessibility_df, chr_set, region)
         phasing = _signal_from_df(phasing_df, chr_set, region)
         compartments, accessibility = _finalize_tracks(
-            compartments, accessibility, phasing, anchors
+            compartments,
+            accessibility,
+            phasing,
+            anchors,
+            mode=accessibility_mode,
+            percentile=accessibility_percentile,
         )
 
         return cls(
@@ -281,6 +293,8 @@ def _finalize_tracks(
     accessibility: SignalMap,
     phasing: SignalMap,
     anchors: AnchorMap,
+    mode: str = "log",
+    percentile: float = 80.0,
 ) -> tuple[CompartmentMap, SignalMap]:
     """
     Phase the compartment track and rescale accessibility onto [0, 1].
@@ -297,7 +311,7 @@ def _finalize_tracks(
         signal = accessibility if accessibility else phasing
         compartments = phase_compartments(compartments, signal or None, anchors)
     if accessibility:
-        accessibility = normalize_signal_map(accessibility)
+        accessibility = normalize_signal_map(accessibility, mode=mode, percentile=percentile)
     return compartments, accessibility
 
 

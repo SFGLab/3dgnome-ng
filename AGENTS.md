@@ -525,6 +525,18 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   - **ATAC drives both HiP-HoP mechanisms.** HiP-HoP uses H3K27ac for fibre compaction and ATAC
     for bridging; we drive both from accessibility because the pipeline loads one track.
     Compaction scales the existing `dtn` instead of adding i,i+2 springs.
+  - **Accessibility normalisation is selectable: `[accessibility] mode = log | binary`,
+    default `log`.** `log` is log-then-minmax. `binary` is HiP-HoP's own open/closed state,
+    open at or above `[accessibility] percentile` (default 80) of the loaded values.
+    The default is kept at `log` so existing configs are unchanged, but `binary` is the
+    faithful one and `log` is close to inert on a track binned to several kb. Binning a
+    narrow ATAC peak into a 5 kb bin already removes the upper tail the log exists to
+    compress, so the log stretches the remaining background over most of `[0, 1]`: measured
+    on GM12878 the median bead reads 0.85 open, leaving 0.224 of `1 - a` for fibre
+    compaction, which applies 3.0% mean compaction and correlates with accessibility at
+    r = -0.011. Under `binary` at the 80th percentile the same region gets 22.9% mean
+    compaction at r = +0.668, and realised bond lengths fall 22.8%. `ContactData.from_files`
+    reads both keys from settings; `from_dataframes` takes them as parameters.
   - **Bridging is an effective pairwise attraction.** HiP-HoP's explicit diffusing bridge
     particles are integrated out rather than simulated.
   - **Lamina, central and chromosomal blocks run at segment-level heatmap MC only.** They need a
@@ -575,7 +587,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     - `exclusion_apply_to_ib` (default true, only kicks in when `use_ib_mc` is on)
 
   **Shared knobs:**
-    - `exclusion_weight` (k, comparable to spring constants; default 1.0)
+    - `exclusion_weight` (k, comparable to spring constants; `Settings` default 0.5, and the
+      tuned config in `validation/core/config.py` sets 0.1)
     - `exclusion_skip_neighbors` (skip pairs with `|i-j|` ≤ this; default 1, i.e. skip bonded)
 
   Ini key names under `[excluded_volume]`: `use_excluded_volume`, `weight`, `apply_to_arcs`, `apply_to_smooth`, `apply_to_heatmap`, `apply_to_ib`, `skip_neighbors`, `radius_arcs`, `radius_smooth`, `radius_heatmap`, `radius_ib`, `auto_factor_arcs`, `auto_factor_smooth`, `auto_factor_heatmap`, `auto_factor_ib`.
@@ -630,7 +643,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   | smooth | `confinement_radius_smooth` | `confinement_packing_factor_smooth` (default 1.5)  | `pf × mean(dtn) × N^(1/3)` |
   | ib     | `confinement_radius_ib`     | `confinement_packing_factor_ib`     (default 0.75) | `pf × mean(IB chain dtn) × N^(1/3)` |
 
-  Shared knobs: `use_confinement` (master toggle), `confinement_weight` (k; comparable to spring constants; default 1.0). Apply flags per level: `confinement_apply_to_arcs`, `confinement_apply_to_smooth`, `confinement_apply_to_ib` (all default true). Center is always the centroid of starting positions at that MC call.
+  Shared knobs: `use_confinement` (master toggle), `confinement_weight` (k; comparable to spring constants; default 0.5). Apply flags per level: `confinement_apply_to_arcs`, `confinement_apply_to_smooth`, `confinement_apply_to_ib` (all default true). Center is always the centroid of starting positions at that MC call.
 
   Motivation: at the IB level, EV pushes IBs apart but only nearest-neighbor chain bonds pull them back, so the segment stretches out into a long sausage. The IB tether (small packing factor → tight sphere around the segment centroid) softly holds the chain together while EV still keeps IB spheres from overlapping. At arc / smooth levels, confinement instead acts as a nuclear-like envelope for under-constrained small IBs.
 

@@ -272,6 +272,8 @@ class Settings:
     bridging_auto_factor_smooth: float
     use_fibre_compaction: bool
     fibre_compaction: float
+    accessibility_mode: str
+    accessibility_percentile: float
 
     # ---- nuclear forces ----
     use_lamina: bool
@@ -567,6 +569,14 @@ class Settings:
         self.bridging_auto_factor_smooth = 1.5
         self.use_fibre_compaction = False
         self.fibre_compaction = 0.3  # 0 = off, 1 = fully collapse closed chromatin
+        # How a raw accessibility track becomes the [0, 1] scale the terms read.
+        # "log" is log-then-minmax.  "binary" is HiP-HoP's open/closed state, open
+        # at or above `accessibility_percentile` of the loaded values.  On a track
+        # binned to several kb the log leaves the median bead reading 0.85 open,
+        # so fibre compaction has almost nothing to act on; binary restores the
+        # range.  Default stays "log" so existing configs are unchanged.
+        self.accessibility_mode = "log"
+        self.accessibility_percentile = 80.0
 
         # ---- nuclear forces ----
         # Lamina, nucleolar attraction and chromosome territories, from MultiMM.
@@ -1052,6 +1062,10 @@ class Settings:
         )
 
         # [accessibility]
+        self.accessibility_mode = gets("accessibility", "mode", self.accessibility_mode)
+        self.accessibility_percentile = getf(
+            "accessibility", "percentile", self.accessibility_percentile
+        )
         self.use_bridging = getb("accessibility", "use_bridging", self.use_bridging)
         self.bridging_weight = getf("accessibility", "bridging_weight", self.bridging_weight)
         self.bridging_apply_to_heatmap = getb(

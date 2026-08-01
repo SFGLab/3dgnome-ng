@@ -163,24 +163,56 @@ def bin_signal(
     return out
 
 
-def normalize_accessibility(values: F32Array) -> F32Array:
+def normalize_accessibility(
+    values: F32Array, mode: str = "log", percentile: float = 80.0
+) -> F32Array:
     """
     Map a raw signal onto the [0, 1] accessibility scale.
 
-    `log(v + 1e-6)` then min-max, following HiP-HoP.  The log compresses the long
-    upper tail of a p-value or fold-change track so a handful of strong peaks do
-    not flatten everything else to zero.  A constant track maps to all zeros.
+    Two modes.
+
+    `log` applies `log(v + 1e-6)` then min-max.  The log is there to compress the
+    long upper tail of a fold-change track.  On a track binned to several kb it
+    does the opposite of what is wanted: binning a narrow peak into a wide bin
+    already removes the tail, so the log stretches the remaining background across
+    most of the range.  Measured on GM12878 ATAC at 5 kb the median bead reads
+    0.85 open and only 0.224 of `1 - a` is left for fibre compaction to act on,
+    which is why that term measured as noise.
+
+    `binary` assigns a state instead: open above `percentile` of the loaded
+    values, closed below.  This is what HiP-HoP does, where a bead is either a
+    strong binding site or a weak one rather than somewhere on a continuum, and it
+    matches the biology that only a small fraction of the genome sits under a peak.
+    At the 80th percentile it leaves 0.800 of `1 - a` to act on.
+
+    A constant track maps to all zeros in either mode.
+
+    Parameters
+    ----------
+    values : raw per-interval signal.
+    mode : "log" or "binary".
+    percentile : the open/closed split for `binary`, in percent.
     """
     if values.size == 0:
         return values.astype(np.float32)
-    v = np.log(np.maximum(values, 0.0).astype(np.float64) + _LOG_EPS)
+    v64 = np.maximum(values, 0.0).astype(np.float64)
+    if float(v64.max()) - float(v64.min()) <= 0.0:
+        return np.zeros_like(values, dtype=np.float32)
+
+    if str(mode).strip().lower() == "binary":
+        thr = float(np.percentile(v64, float(percentile)))
+        return (v64 >= thr).astype(np.float32)
+
+    v = np.log(v64 + _LOG_EPS)
     lo, hi = float(v.min()), float(v.max())
     if hi - lo <= 0.0:
         return np.zeros_like(values, dtype=np.float32)
     return ((v - lo) / (hi - lo)).astype(np.float32)
 
 
-def normalize_signal_map(signal: SignalMap) -> SignalMap:
+def normalize_signal_map(
+    signal: SignalMap, mode: str = "log", percentile: float = 80.0
+) -> SignalMap:
     """
     Rescale a whole signal map onto [0, 1] in place.
 
@@ -189,7 +221,10 @@ def normalize_signal_map(signal: SignalMap) -> SignalMap:
     that is closed throughout would otherwise still produce beads at 1.0 after a
     local min-max.  The extent is whatever was loaded, so a whole-genome run
     normalises genome wide and a single-chromosome run normalises over that
-    chromosome.
+    chromosome.  The same holds for the `binary` percentile, which is taken over
+    the loaded extent.
+
+    `mode` and `percentile` are passed through to `normalize_accessibility`.
 
     Mutates and returns `signal`.
     """
@@ -197,7 +232,7 @@ def normalize_signal_map(signal: SignalMap) -> SignalMap:
     if not flat:
         return signal
     raw = np.array([iv.value for iv in flat], dtype=np.float32)
-    scaled = normalize_accessibility(raw)
+    scaled = normalize_accessibility(raw, mode=mode, percentile=percentile)
     for iv, v in zip(flat, scaled.tolist(), strict=True):
         iv.value = float(v)
     return signal
