@@ -14,7 +14,6 @@ for the parity-era terms:
 Plus the two behavioural checks that a closed form cannot express: the compartment
 term actually segregates A from B, and every term is inert when its flag is off.
 
-See docs/epigenome-energy-terms.md.
 """
 
 from __future__ import annotations

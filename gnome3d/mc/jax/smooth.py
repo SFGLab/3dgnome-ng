@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from gnome3d import log
-from gnome3d.mc.jax.memory import max_k_for_bytes
+from gnome3d.mc.jax.memory import max_k_for_bytes, max_k_for_host
 from gnome3d.mc.jax.util import (
     ANCHOR_BUCKETS,
     NBR_BUCKETS,
@@ -1743,9 +1743,16 @@ def _prep_smooth_problem_np(
     M: int,
     compartment: np.ndarray[Any, Any] | None = None,
     accessibility: np.ndarray[Any, Any] | None = None,
+    heat_out: np.ndarray[Any, Any] | None = None,
 ) -> dict[str, Any]:
     """Build one IB's kernel inputs as numpy arrays, padded to a common bucket
     (B beads, A anchors, M neighbours) so a batch of IBs has uniform shapes.
+
+    `heat_out` is an optional caller-owned (B, B) buffer to write the padded heat
+    into. The heat tensor is the only quadratic input, so a batch that lets every
+    IB allocate its own and then stacks them holds the same bytes twice. Passing a
+    slice of the batch's (K, B, B) array writes it once. The buffer must be zeroed
+    by the caller, since only the [:n, :n] block is filled.
 
     Pure numpy (no JAX) → unit-testable in isolation.  Mirrors the per-problem
     prep inside `mc_smooth_jax` exactly; the only difference is that B/A/M are
@@ -1830,12 +1837,18 @@ def _prep_smooth_problem_np(
     n_movable = int(movable.shape[0])
     pos_pad = pos.astype(np.float32)
     dtn_pad = dtn.astype(np.float32)
-    heat_pad = heat_dist.astype(np.float32) if use_heat else np.zeros((1, 1), dtype=np.float32)
+    if not use_heat:
+        heat_pad = np.zeros((1, 1), dtype=np.float32)
+    elif heat_out is not None:
+        heat_out[:n, :n] = heat_dist  # caller pre-zeroed the pad region
+        heat_pad = heat_out
+    else:
+        heat_pad = heat_dist.astype(np.float32)
     if B > n:
         n_pad = B - n
         pos_pad = np.concatenate([pos_pad, np.zeros((n_pad, 3), dtype=np.float32)], axis=0)
         dtn_pad = np.concatenate([dtn_pad, np.ones(n_pad, dtype=np.float32)], axis=0)
-        if use_heat:
+        if use_heat and heat_out is None:
             hp = np.zeros((B, B), dtype=np.float32)
             hp[:n, :n] = heat_pad
             heat_pad = hp
@@ -1919,11 +1932,20 @@ def _resolve_smooth_max_k(
     w = str(settings.mc_executor_jax_batch_width_smooth).strip().lower()
     if w != "auto":
         return max(1, int(w)), "explicit"
+    per_ib = _smooth_tensor_bytes(big_b, big_a, big_m, use_heat, use_orn)
+    # The host stages one (K, B, B) heat buffer before the transfer, so a K that
+    # fits the device can still exhaust host RAM. Bound by both.
+    k_host = max_k_for_host(big_b * big_b * 4 if use_heat else per_ib)
     budget = jax_device_budget_bytes()
     if budget is None:
-        return max(1, 32768 // max(1, big_b)), "auto-fallback"
-    per_ib = _smooth_tensor_bytes(big_b, big_a, big_m, use_heat, use_orn)
-    return max_k_for_bytes(per_ib, 0, budget), "auto-bytes"
+        k = max(1, 32768 // max(1, big_b))
+        basis = "auto-fallback"
+    else:
+        k = max_k_for_bytes(per_ib, 0, budget)
+        basis = "auto-bytes"
+    if k_host is not None and k_host < k:
+        return k_host, basis + "+host"
+    return k, basis
 
 
 def mc_smooth_jax_batch(
@@ -2045,6 +2067,15 @@ def _mc_smooth_jax_batch_chunk(
             Ms.append(1)
     B, A, M = max(Bs), max(As), max(Ms)
 
+    # Heat is (B, B) and is the only input that grows quadratically, so it is
+    # written straight into one (K, B, B) buffer. Letting each prep allocate its
+    # own and stacking afterwards holds every byte twice, which on a large IB is
+    # tens of gigabytes of host memory for nothing.
+    heat_all = (
+        np.zeros((len(problems), B, B), dtype=np.float32)
+        if use_heat
+        else np.zeros((len(problems), 1, 1), dtype=np.float32)
+    )
     preps = [
         _prep_smooth_problem_np(
             p["pos"],
@@ -2060,8 +2091,9 @@ def _mc_smooth_jax_batch_chunk(
             M,
             p.get("compartment"),
             p.get("accessibility"),
+            heat_all[i] if use_heat else None,
         )
-        for p in problems
+        for i, p in enumerate(problems)
     ]
 
     # --- stack per-IB arrays -> (K, ...) ---
@@ -2073,7 +2105,7 @@ def _mc_smooth_jax_batch_chunk(
     brdg_a_k = stack("brdg_a")  # (K, B)
     dtn_k = stack("dtn")
     movable_k = stack("movable")
-    heat_k = stack("heat")
+    heat_k = jnp.asarray(heat_all)  # already (K, B, B); prep wrote into it
     anchor_ar_k = stack("anchor_ar")
     b2a_k = stack("bead_to_anchor_k")
     nbr_idx_k = stack("nbr_idx")

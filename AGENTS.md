@@ -42,11 +42,11 @@ Rules for new feature work:
 │   ├── pipeline/               # Per-stage kernels (coarse, ib)
 │   ├── mc/                     # numba and jax MC kernels (numba/, jax/)
 │   ├── settings.py data.py hierarchy.py io.py util.py types.py tracks.py skeleton.py
-├── validation/                 # Validation package, see docs/validation-metrics.md
+├── validation/                 # Validation package (studies, metrics, manifests)
 ├── harness/
 │   └── integration.py          # Full-MC integration test and the reference runner
 ├── data/                       # Input datasets (GM12878, H1ESC, HFFC6). _hic holds 4DN mcools
-├── docs/                       # Design docs, papers, validation writeups
+├── docs/                       # Local-only notes, gitignored and not part of the repo
 ├── pyproject.toml              # gnome3d-torch, [validation] extra for the validation package
 └── AGENTS.md                   # This file
 ```
@@ -426,11 +426,14 @@ Accessibility assay differs by cell line.  ENCODE has ATAC-seq for GM12878 only;
 use DNase-seq, which is what HiP-HoP itself used, so it is the intended input rather than a
 substitute.  The manifests record which is which.
 
-Two traps, both of which produce a silently wrong answer.  Pick the deepest contact file when a
-cell line has several, since a shallow one yields a compartment eigenvector that is pure noise.
-And pass `clip_percentile=99.9` when calling `cooltools`' `cis_eig` directly, because it is not
-that function's default and without it outlier pixels dominate the decomposition.  Both are
-written up in [docs/epigenome-energy-terms.md](docs/epigenome-energy-terms.md).
+Three traps, each of which produces a silently wrong answer.  Pick the deepest contact file when
+a cell line has several, since a shallow one yields a compartment eigenvector that is pure noise;
+`validation/studies/tracks.py::_find_one` takes the largest file for this reason, and a lag-1
+autocorrelation below 0.3 warns that the result is noise.  Pass `clip_percentile=99.9` when
+calling `cooltools`' `cis_eig` directly, because it is not that function's default and without it
+outlier pixels dominate the decomposition.  And the eigenvector sign is arbitrary and differs
+between machines for the same input, so a derived track is not reproducible up to sign; anything
+consuming it must either phase it or be invariant to a global flip.
 
 ---
 
@@ -501,9 +504,11 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 ### New features (opt-in via settings, default-off)
 
 - **Epigenome energy terms** — A/B compartments and chromatin accessibility.
-  Full specification in [docs/epigenome-energy-terms.md](docs/epigenome-energy-terms.md);
-  sources are [docs/multimm/README.md](docs/multimm/README.md) for the compartment family and
-  [docs/hiphop/README.md](docs/hiphop/README.md) for accessibility. Six flags, all default off:
+  The compartment family is ported from MultiMM (`add_compartment_blocks`,
+  `add_Blamina_interaction`, `add_central_force`, `add_chromosomal_blocks`); accessibility from
+  HiP-HoP (Buckle et al., Mol Cell 72(4):786-797, 2018, doi:10.1016/j.molcel.2018.09.016), which
+  embeds ATAC-seq at 1 kbp beads, the same scale as our subanchors.  MultiMM has no ATAC energy
+  term at all, so the two families come from different papers.  Six flags, all default off:
   `use_compartments`, `use_bridging`, `use_fibre_compaction`, `use_lamina`,
   `use_central_force`, `use_chromosomal_blocks`, under `[compartments]`, `[accessibility]` and
   `[nucleus]`. New `[data]` keys `compartments`, `accessibility`, `phasing_track`;

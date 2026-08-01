@@ -9,8 +9,6 @@ into the accessibility scale HiP-HoP uses.
 Bead ranges are inclusive, so a bead spanning `[s, e]` covers `e - s + 1` bases
 and a zero-length subanchor still covers one.  Track intervals are half open,
 matching BED.
-
-See docs/epigenome-energy-terms.md.
 """
 
 from __future__ import annotations

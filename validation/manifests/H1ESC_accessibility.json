@@ -1,5 +1,5 @@
 {
-  "_note": "Chromatin accessibility for H1ESC, the input to the HiP-HoP bridging and fibre-compaction terms (docs/epigenome-energy-terms.md). DNase-seq. ENCODE has no ATAC-seq for H1. DNase is the assay HiP-HoP itself used for accessibility, so it is the right substitute rather than a compromise. Fetch: python -m validation fetch --manifest validation/manifests/H1ESC_accessibility.json --out data/_epigenome  ->  data/_epigenome/H1ESC/. Then bin it onto a bedGraph with: python -m validation tracks --cell H1ESC",
+  "_note": "Chromatin accessibility for H1ESC, the input to the HiP-HoP bridging and fibre-compaction terms. DNase-seq. ENCODE has no ATAC-seq for H1. DNase is the assay HiP-HoP itself used for accessibility, so it is the right substitute rather than a compromise. Fetch: python -m validation fetch --manifest validation/manifests/H1ESC_accessibility.json --out data/_epigenome  ->  data/_epigenome/H1ESC/. Then bin it onto a bedGraph with: python -m validation tracks --cell H1ESC",
   "cell_line": "H1ESC",
   "assembly": "GRCh38",
   "assays": [

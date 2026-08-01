@@ -528,7 +528,7 @@ class Settings:
         # ---- A/B compartments ----
         # Block-copolymer segregation over a per-bead compartment call, ported
         # from MultiMM's compartment blocks.  The well is written non-negative
-        # (see docs/epigenome-energy-terms.md) because 3dgnome's Metropolis rule
+        # because 3dgnome's Metropolis rule
         # reads a score ratio and needs a positive total.  Requires a
         # compartment track under [data]; inert when none is loaded.
         self.use_compartments = False

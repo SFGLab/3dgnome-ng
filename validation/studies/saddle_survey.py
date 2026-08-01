@@ -21,7 +21,6 @@ those terms modify.
     python -m validation saddle-survey --cell GM12878 \\
         --hic data/_hic/GM12878/<file>.mcool --chroms chr1,chr2,chr5 -n 20
 
-See docs/epigenome-energy-terms.md.
 """
 
 from __future__ import annotations
@@ -186,7 +185,7 @@ class SaddleSurvey(Study):
         print(f"  scored against {Path(ctx.hic).name} @ {args.binsize // 1000}kb\n")
         header = (
             f"  {'region':<26}{'exp':>7}{'model':>8}{'gap':>8}"
-            f"{'ibE mdl':>9}{'ibE obs':>9}{'ratio':>7}"
+            f"{'ibE mdl':>11}{'ibE obs':>9}{'ratio':>10}"
             f"{'beads':>8}{'Rg':>8}{'dens':>7}"
         )
         print(header)
@@ -238,7 +237,7 @@ class SaddleSurvey(Study):
                 rows.append(rec)
                 print(
                     f"  {region:<26}{rec['exp_sad']:>7.3f}{rec['model']:>8.3f}{rec['gap']:>+8.3f}"
-                    f"{rec['ib_model']:>9.3f}{rec['ib_obs']:>9.3f}{rec['ib_over_obs']:>7.2f}"
+                    f"{rec['ib_model']:>11.4g}{rec['ib_obs']:>9.3f}{rec['ib_over_obs']:>10.4g}"
                     f"{rec['n_beads']:>8.0f}{rec['rg']:>8.2f}{rec['density']:>7.2f}"
                 )
             except Exception as e:  # noqa: BLE001

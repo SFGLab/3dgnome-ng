@@ -23,7 +23,6 @@ A lockfile records resolution, phasing decision and input hash per output, so a
 rebuild is reproducible and an accidental re-derivation at a different resolution
 is visible.
 
-See docs/epigenome-energy-terms.md.
 """
 
 from __future__ import annotations

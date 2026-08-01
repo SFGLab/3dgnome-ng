@@ -21,7 +21,6 @@ Needs tracks built first:
     python -m validation tracks --cell <CELL>
     python -m validation epigenome --cell <CELL> --region chr1:20000000-40000000
 
-See docs/epigenome-energy-terms.md.
 """
 
 from __future__ import annotations

@@ -42,3 +42,41 @@ def max_k_for_bytes(per_ib: int, fixed: int, budget: int) -> int:
     if avail <= 0:
         return 1
     return max(1, int(avail // per_ib))
+
+
+# Fraction of currently-available host RAM a single batch may claim.  The host
+# side holds one (K, B, B) staging buffer before the transfer, plus whatever the
+# rest of the pipeline is holding, so this leaves most of the machine alone.
+HOST_BUDGET_FRACTION = 0.5
+
+
+def host_available_bytes() -> int | None:
+    """Available host RAM, or None when it cannot be read.
+
+    `MemAvailable` rather than `MemFree`, since reclaimable page cache is usable.
+    Linux only; other platforms return None and callers fall back to the device
+    bound alone.
+    """
+    try:
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) * 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
+def max_k_for_host(per_ib_host: int) -> int | None:
+    """Largest K whose host staging buffer fits `HOST_BUDGET_FRACTION` of RAM.
+
+    Device sizing alone is not enough. The batch stages its inputs on the host
+    before transfer, and the quadratic heat tensor makes that staging larger than
+    the GPU allocation it feeds. A run sized only against a 16 GB device happily
+    tried to stage tens of gigabytes on a 60 GB host. Returns None when host
+    memory cannot be read, meaning no host bound.
+    """
+    avail = host_available_bytes()
+    if avail is None or per_ib_host <= 0:
+        return None
+    return max(1, int((avail * HOST_BUDGET_FRACTION) // per_ib_host))

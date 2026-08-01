@@ -9,7 +9,7 @@ cooler. The metrics are:
   * Pearson on log1p contacts and Spearman, both secondary.
   * insulation-score correlation, for domain-boundary agreement.
   * multimm_faithful_pearson, the decay-retained inverse-distance (d+1)^-3 Pearson. MultiMM's
-    metric approach reproduced faithfully. See docs/multimm/README.md.
+    metric approach reproduced faithfully.
 
 Both maps are binned on the same genomic grid, the cooler's, so the comparison is exact.
 Needs the validation extra via pip install -e .[validation], which is cooler, cooltools and scipy.
@@ -431,7 +431,7 @@ def ensemble_hic_correlation(
 #
 # MultiMM's second validation: the first eigenvector of the structure-derived
 # correlation matrix against the eigenvector of the experimental Hi-C. See
-# docs/multimm/README.md and docs/epigenome-energy-terms.md.
+# the compartment and accessibility energy terms.
 
 
 def compartment_eigenvector(contacts: F64Array, phasing: F64Array | None = None) -> F64Array:

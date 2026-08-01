@@ -242,7 +242,7 @@ def init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
 # 3dgnome cannot use - its Metropolis rule divides by the running score and is
 # guarded on `score > 0`, so a negative-definite term would silently disable the
 # temperature branch.  Shifting by the well depth changes only an additive
-# constant, not the minimum or the gradient.  See docs/epigenome-energy-terms.md.
+# constant, not the minimum or the gradient.
 #
 # Every pair participates, matching MultiMM's CustomNonbondedForce, which sets up
 # no bonded exclusions.  A bonded pair sits near the bottom of the well and so

@@ -1,5 +1,5 @@
 {
-  "_note": "Chromatin accessibility for GM12878, the input to the HiP-HoP bridging and fibre-compaction terms (docs/epigenome-energy-terms.md). ATAC-seq. ENCODE has ATAC for GM12878 but not for H1 or HFFc6, which use DNase-seq instead. Fetch: python -m validation fetch --manifest validation/manifests/GM12878_accessibility.json --out data/_epigenome  ->  data/_epigenome/GM12878/. Then bin it onto a bedGraph with: python -m validation tracks --cell GM12878",
+  "_note": "Chromatin accessibility for GM12878, the input to the HiP-HoP bridging and fibre-compaction terms. ATAC-seq. ENCODE has ATAC for GM12878 but not for H1 or HFFc6, which use DNase-seq instead. Fetch: python -m validation fetch --manifest validation/manifests/GM12878_accessibility.json --out data/_epigenome  ->  data/_epigenome/GM12878/. Then bin it onto a bedGraph with: python -m validation tracks --cell GM12878",
   "cell_line": "GM12878",
   "assembly": "GRCh38",
   "assays": [
