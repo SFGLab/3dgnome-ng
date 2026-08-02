@@ -44,6 +44,12 @@ DEFAULT_RESOLUTION = 100_000
 # ATAC varies bead to bead at subanchor scale, which is the scale HiP-HoP works at.
 DEFAULT_SIGNAL_RESOLUTION = 5_000
 
+# TAD calling. 10 kb resolves boundaries without the map going too sparse, and the
+# insulation window has to be several times the bin or the score is dominated by
+# noise rather than by domain structure.
+DEFAULT_TAD_RESOLUTION = 10_000
+DEFAULT_TAD_WINDOW = 200_000
+
 
 def _hash_head(path: Path, n_bytes: int = 1 << 20) -> str:
     """Cheap identity for a large input. First megabyte plus size."""
@@ -195,6 +201,63 @@ def derive_compartments(
 # --- signal from a bigWig ----------------------------------------------------
 
 
+def derive_tad_boundaries(
+    mcool: Path,
+    out: Path,
+    resolution: int,
+    window: int,
+    chroms: list[str] | None,
+) -> dict[str, Any]:
+    """mcool -> TAD boundary BED, via cooltools insulation.
+
+    Written in the `chr pos pos` form `gnome3d.io.load_breakpoints` reads, so the
+    result can be pointed at `[data] segment_split` with no code change.
+
+    The pipeline's own blocks come from ChIA-PET arc-coverage gaps, which is a
+    property of that assay's depth rather than of domain structure. These come
+    from the contact map instead. Measured on GM12878, a TAD partition separates
+    contacts better than the arc-gap partition on the same experimental map in
+    every region tried, which is what makes the swap worth testing.
+
+    Returns the per-chromosome boundary counts and the calling parameters.
+    """
+    import cooltools  # noqa: PLC0415
+
+    uri = f"{mcool}::resolutions/{resolution}"
+    clr = _ensure_balanced(uri)
+    avail = list(clr.chromnames)
+    want = [c for c in (chroms or avail) if c in avail]
+    if not want:
+        raise SystemExit(f"none of the requested chromosomes are in {mcool}: have {avail[:5]}...")
+
+    ins = cooltools.insulation(clr, [window], verbose=False)
+    flag, strength = f"is_boundary_{window}", f"boundary_strength_{window}"
+    if flag not in ins.columns:
+        raise SystemExit(f"cooltools returned no {flag}; check the window against the resolution")
+
+    rows: list[tuple[str, int, int, float]] = []
+    per_chr: dict[str, int] = {}
+    for c in want:
+        sub = ins[(ins["chrom"] == c) & ins[flag].fillna(False) & ins[strength].notna()]
+        starts = sorted(int(x) for x in sub["start"].to_numpy())
+        per_chr[c] = len(starts)
+        rows.extend((c, s, s, 0.0) for s in starts)
+        if len(starts) < 2:
+            print(f"[tracks]   WARNING {c}: {len(starts)} boundaries called, too few to segment")
+
+    # `chr pos pos`, matching the existing breakpoints files.
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "w") as f:
+        for chr_, s, e, _v in rows:
+            f.write(f"{chr_}\t{s}\t{e}\n")
+    return {
+        "resolution": resolution,
+        "window": window,
+        "boundaries": len(rows),
+        "chroms": per_chr,
+    }
+
+
 def derive_signal(
     bigwig: Path, out: Path, resolution: int, chroms: list[str] | None
 ) -> dict[str, Any]:
@@ -267,7 +330,10 @@ class TracksStudy:
         p.add_argument("--signal-resolution", type=int, default=DEFAULT_SIGNAL_RESOLUTION)
         p.add_argument("--chroms", default=None, help="comma list; default every chromosome")
         p.add_argument("--force", action="store_true", help="rebuild even when up to date")
+        p.add_argument("--tad-resolution", type=int, default=DEFAULT_TAD_RESOLUTION)
+        p.add_argument("--tad-window", type=int, default=DEFAULT_TAD_WINDOW)
         p.add_argument("--skip-compartments", action="store_true")
+        p.add_argument("--skip-tads", action="store_true")
         p.add_argument("--skip-signal", action="store_true")
 
     def run(self, ctx: Context, args: Namespace) -> None:
@@ -302,6 +368,31 @@ class TracksStudy:
                         **meta,
                     }
                     print(f"[tracks]   wrote {meta['bins']} bins -> {out}")
+
+        if not args.skip_tads:
+            mcool = Path(args.mcool) if args.mcool else _find_one(root / "_hic" / cell, ["*.mcool"])
+            if mcool is None or not mcool.exists():
+                print(f"[tracks] no mcool for {cell}, skipping TAD boundaries")
+            else:
+                out = out_dir / f"{cell}_tads.bed"
+                key = _cache_key(mcool, args.tad_resolution, chroms) + f"@w{args.tad_window}"
+                if _up_to_date(out, key, lock.get("tads"), args.force):
+                    print(f"[tracks] TAD boundaries up to date: {out}")
+                else:
+                    print(
+                        f"[tracks] calling TADs from {mcool.name} @ {args.tad_resolution} "
+                        f"window {args.tad_window}"
+                    )
+                    meta = derive_tad_boundaries(
+                        mcool, out, args.tad_resolution, args.tad_window, chroms
+                    )
+                    lock["tads"] = {
+                        "input": key,
+                        "source": str(mcool),
+                        "out": str(out),
+                        **meta,
+                    }
+                    print(f"[tracks]   wrote {meta['boundaries']} boundaries -> {out}")
 
         if not args.skip_signal:
             bw = (

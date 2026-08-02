@@ -89,6 +89,38 @@ def _track_on_bins(comp_path: str, chrom: str, bin_starts: I64Array) -> F64Array
     return out
 
 
+def _signal_on_bins(path: str, chrom: str, bin_starts: I64Array, binsize: int) -> F64Array:
+    """A signal bedGraph averaged onto the Hi-C bin grid.
+
+    Averaging rather than sampling, because the accessibility track is finer than
+    the contact grid (5 kb against 10 kb or more) and taking one sub-interval per
+    bin would discard half the signal and add noise the metric would read as
+    structure. Bins with no covering interval stay at zero.
+    """
+    sums: dict[int, float] = {}
+    counts: dict[int, int] = {}
+    lo, hi = int(bin_starts[0]), int(bin_starts[-1]) + binsize
+    with open(path) as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) < 4 or parts[0] != chrom:
+                continue
+            try:
+                s0, v = int(parts[1]), float(parts[3])
+            except ValueError:
+                continue
+            if s0 < lo or s0 >= hi:
+                continue
+            b = (s0 - lo) // binsize
+            sums[b] = sums.get(b, 0.0) + v
+            counts[b] = counts.get(b, 0) + 1
+    out = np.zeros(len(bin_starts), dtype=np.float64)
+    for b, tot in sums.items():
+        if 0 <= b < len(out):
+            out[b] = tot / counts[b]
+    return out
+
+
 def _track_paths(cell: str, data_root: str) -> tuple[str, str]:
     """Absolute paths.  `Settings.data_path` joins a relative name onto `data_dir`,
     which for these tracks is already `<data_root>/<cell>`, so a repo-relative path
@@ -132,6 +164,7 @@ def _run_arm(
     sort_track: F64Array,
     seed_offset: int = 0,
     block_id: I64Array | None = None,
+    acc_track: F64Array | None = None,
 ) -> dict[str, float]:
     """Reconstruct one arm and score it. Returns the metric row.
 
@@ -172,8 +205,16 @@ def _run_arm(
         if block_id is not None
         else float("nan")
     )
+    # Saddle sorted by accessibility rather than compartment. Bridging clusters
+    # accessible beads, and nothing else measured that directly.
+    acc_sad = (
+        contacts.compartment_saddle(c_sim, contacts.signed_track(acc_track))["strength"]
+        if acc_track is not None
+        else float("nan")
+    )
     return {
         "ib_ratio": ib_ratio,
+        "acc_saddle": acc_sad,
         "saddle": sad["strength"],
         "eig": cc["eig_pearson_abs"],
         "kappa": cc["agreement_kappa"],
@@ -198,6 +239,10 @@ def _arm_flags(
     # The tracks are always pointed at; only the flags decide whether a term reads them.
     flags["data_compartments"] = comp_path
     flags["data_accessibility"] = acc_path
+    # Applied to every arm including off, so the baseline reads the same track the
+    # treated arms do and a difference is the term rather than the normalisation.
+    flags["accessibility_mode"] = args.accessibility_mode
+    flags["accessibility_percentile"] = args.accessibility_percentile
     return flags
 
 
@@ -214,6 +259,13 @@ class Epigenome(Study):
         p.add_argument("--compartment-weight", type=float, default=2.0)
         p.add_argument("--bridging-weight", type=float, default=1.0)
         p.add_argument("--fibre", type=float, default=0.2)
+        p.add_argument(
+            "--accessibility-mode",
+            default="log",
+            choices=["log", "binary"],
+            help="how the raw ATAC track maps to [0,1]; binary is HiP-HoP's open/closed state",
+        )
+        p.add_argument("--accessibility-percentile", type=float, default=80.0)
         p.add_argument(
             "--baseline-repeats",
             type=int,
@@ -262,6 +314,9 @@ class Epigenome(Study):
             bin_starts,
         )
         obs_ib = contacts.block_enrichment(c_obs, blocks)["ratio"]
+        # Accessibility on the same grid, for the accessibility-sorted saddle.
+        acc_track = _signal_on_bins(acc_path, chrs[0], bin_starts, args.binsize)
+        obs_acc = contacts.compartment_saddle(c_obs, contacts.signed_track(acc_track))["strength"]
 
         print(f"epigenome ablation  {ctx.cell}  {args.region}  n={ctx.n}")
         print(f"  compartments: {comp_path}")
@@ -271,9 +326,10 @@ class Epigenome(Study):
             f"  experimental saddle = {obs_saddle['strength']:.3f} "
             f"over {int(obs_saddle['n_bins'])} bins  (1.0 = no compartmentalization)\n"
             f"  experimental within-block enrichment = {obs_ib:.3f}\n"
+            f"  experimental accessibility saddle    = {obs_acc:.3f}\n"
         )
         header = (
-            f"  {'arm':<14}{'saddle':>9}{'ibE':>9}{'eig |r|':>9}{'kappa':>8}"
+            f"  {'arm':<14}{'saddle':>9}{'accE':>9}{'ibE':>9}{'eig |r|':>9}{'kappa':>8}"
             f"{'Rg':>9}{'bondCV':>9}{'overlap':>9}"
         )
         print(header)
@@ -300,6 +356,7 @@ class Epigenome(Study):
                     sort_track,
                     seed_offset=i * _SEED_STRIDE,
                     block_id=blocks,
+                    acc_track=acc_track,
                 )
                 for i in range(args.baseline_repeats)
             ]
@@ -332,6 +389,7 @@ class Epigenome(Study):
                     bin_starts,
                     sort_track,
                     block_id=blocks,
+                    acc_track=acc_track,
                 )
                 if name == "off":
                     base = row
@@ -345,7 +403,8 @@ class Epigenome(Study):
                         sigma = abs(d_eig) / floor if floor > 0 else 0.0
                         mark += f"  ({sigma:.1f} sd eig)" + ("" if sigma >= 2.0 else " = noise")
                 print(
-                    f"  {name:<14}{row['saddle']:>9.3f}{row['ib_ratio']:>9.3f}"
+                    f"  {name:<14}{row['saddle']:>9.3f}{row['acc_saddle']:>9.3f}"
+                    f"{row['ib_ratio']:>9.3f}"
                     f"{row['eig']:>9.3f}{row['kappa']:>8.3f}"
                     f"{row['rg']:>9.2f}{row['cv']:>9.3f}{row['overlap']:>9.3f}{mark}"
                 )
