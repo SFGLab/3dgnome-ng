@@ -156,6 +156,13 @@ class SaddleSurvey(Study):
         p.add_argument("--per-chrom", type=int, default=3)
         p.add_argument("--binsize", type=int, default=100_000)
         p.add_argument(
+            "--ib-split-source",
+            default="arcs",
+            choices=["arcs", "tads", "both"],
+            help="where interaction block boundaries come from; tads/both need --ib-split-file",
+        )
+        p.add_argument("--ib-split-file", default=None, help="boundary BED for tads/both")
+        p.add_argument(
             "--min-bins",
             type=int,
             default=40,
@@ -192,6 +199,13 @@ class SaddleSurvey(Study):
         print("  " + "-" * (len(header) - 2))
 
         flags = _arm_flags("off", args, comp_path, acc_path)
+        if args.ib_split_source != "arcs":
+            if not args.ib_split_file:
+                print("[saddle-survey] --ib-split-source needs --ib-split-file")
+                return
+            flags["ib_split_source"] = args.ib_split_source
+            flags["data_ib_split"] = str(Path(args.ib_split_file).resolve())
+            print(f"  interaction blocks from: {args.ib_split_source} ({args.ib_split_file})\n")
         rows: list[dict[str, float]] = []
         for region in regions:
             try:

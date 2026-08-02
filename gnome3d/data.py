@@ -60,6 +60,7 @@ class ContactData:
     anchors: AnchorMap = field(default_factory=empty_anchor_map)
     arcs: ArcMap = field(default_factory=empty_arc_map)
     breakpoints: BreakpointMap = field(default_factory=empty_breakpoint_map)
+    ib_splits: BreakpointMap = field(default_factory=empty_breakpoint_map)
     singletons: list[SingletonContact] = field(default_factory=empty_singleton_list)
     # Long-range arcs (gap > max_pet_length): not anchor-mapped, folded into the
     # segment heatmap by Solver. Mirrors Reference InteractionArcs::long_arcs.
@@ -107,6 +108,14 @@ class ContactData:
 
         LOG.info("load breakpoints")
         breakpoints = load_breakpoints(s.data_path(s.data_segment_split), chrs)
+        ib_splits: BreakpointMap = {}
+        if s.data_ib_split and str(s.ib_split_source).strip().lower() != "arcs":
+            ib_splits = load_breakpoints(s.data_path(s.data_ib_split), chrs)
+            if not ib_splits:
+                raise RuntimeError(
+                    f"ib_split_source={s.ib_split_source} but no boundaries loaded from "
+                    f"{s.data_ib_split}; a silently empty file would fall back to arc gaps"
+                )
 
         LOG.info("load singletons")
         singletons = load_singletons(s.data_path(s.data_singletons), chr_set, region)
@@ -148,6 +157,7 @@ class ContactData:
             anchors=anchors,
             arcs=arcs,
             breakpoints=breakpoints,
+            ib_splits=ib_splits,
             singletons=singletons,
             long_arcs=long_arcs,
             compartments=compartments,

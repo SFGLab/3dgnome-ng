@@ -107,7 +107,12 @@ def build_state(
     """
     with log.step(LOG, "build cluster hierarchy"):
         clusters, chr_root, chr_first_cluster = build_cluster_tree(
-            data.anchors, data.arcs, data.breakpoints, chrs_list
+            data.anchors,
+            data.arcs,
+            data.breakpoints,
+            chrs_list,
+            ib_splits=data.ib_splits,
+            ib_split_source=settings.ib_split_source,
         )
         LOG.info("total clusters: %d", len(clusters))
 

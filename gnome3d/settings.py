@@ -42,6 +42,8 @@ class Settings:
     data_split_singletons_by_chr: bool
     data_centromeres: str
     data_segment_split: str
+    data_ib_split: str
+    ib_split_source: str
     data_segment_heatmap: str
     data_compartments: str
     data_accessibility: str
@@ -333,6 +335,12 @@ class Settings:
         self.data_split_singletons_by_chr = False
         self.data_centromeres = ""
         self.data_segment_split = ""
+        # Where interaction block boundaries come from. "arcs" is the reference
+        # behaviour, splitting where ChIA-PET arc coverage falls to zero, which is
+        # partly a property of that library's depth. "tads" uses `data_ib_split`
+        # instead and "both" unions them. A boundary file is required for either.
+        self.data_ib_split = ""
+        self.ib_split_source = "arcs"
         self.data_segment_heatmap = ""
         self.data_compartments = ""
         self.data_accessibility = ""
@@ -750,6 +758,8 @@ class Settings:
         )
         self.data_centromeres = gets("data", "centromeres", self.data_centromeres)
         self.data_segment_split = gets("data", "segment_split", self.data_segment_split)
+        self.data_ib_split = gets("data", "ib_split", self.data_ib_split)
+        self.ib_split_source = gets("data", "ib_split_source", self.ib_split_source)
         self.data_segment_heatmap = gets("data", "segment_heatmap", self.data_segment_heatmap)
         self.data_compartments = gets("data", "compartments", self.data_compartments)
         self.data_accessibility = gets("data", "accessibility", self.data_accessibility)
