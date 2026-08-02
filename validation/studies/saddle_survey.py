@@ -219,8 +219,15 @@ class SaddleSurvey(Study):
                     print(f"  {region:<26}  skipped: {int(obs['n_bins'])} usable bins")
                     continue
 
+                # The same flags the arm runs with, so the labels describe the
+                # blocks the reconstruction actually used. Building settings fresh
+                # here would always label with the default arc-gap blocks, and a
+                # run with `--ib-split-source tads` would then be scored against a
+                # partition it never used.
                 blocks = _ib_ids(
-                    cfgmod.settings_for_cell(ctx.cell, ctx.data_root, ctx.quality),
+                    cfgmod.apply_flags(
+                        cfgmod.settings_for_cell(ctx.cell, ctx.data_root, ctx.quality), flags
+                    ),
                     chrs,
                     bed,
                     bin_starts,

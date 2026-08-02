@@ -252,8 +252,11 @@ def _arm_flags(
     flags["data_accessibility"] = acc_path
     # Applied to every arm including off, so the baseline reads the same track the
     # treated arms do and a difference is the term rather than the normalisation.
-    flags["accessibility_mode"] = args.accessibility_mode
-    flags["accessibility_percentile"] = args.accessibility_percentile
+    # `getattr` because this helper is shared with studies that do not offer these
+    # options; the fallbacks are the `Settings` defaults, and a study with no
+    # accessibility term reads the track but never scores against it.
+    flags["accessibility_mode"] = getattr(args, "accessibility_mode", "log")
+    flags["accessibility_percentile"] = float(getattr(args, "accessibility_percentile", 80.0))
     return flags
 
 
@@ -318,8 +321,14 @@ class Epigenome(Study):
         # Interaction-block labels, so every arm reports how block-organized its
         # structure is next to how block-organized the experiment is. A saddle gain
         # that arrives with a rising block ratio is the fragmentation artifact.
+        # Labelled with the baseline arm's settings, which carry any block-source
+        # override, so the labels match the blocks every arm is built from. Fresh
+        # settings here would silently label with the default arc-gap blocks.
         blocks = _ib_ids(
-            cfgmod.settings_for_cell(ctx.cell, ctx.data_root, ctx.quality),
+            cfgmod.apply_flags(
+                cfgmod.settings_for_cell(ctx.cell, ctx.data_root, ctx.quality),
+                _arm_flags("off", args, comp_path, acc_path),
+            ),
             chrs,
             region,
             bin_starts,
