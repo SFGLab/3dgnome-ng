@@ -165,6 +165,7 @@ def _run_arm(
     seed_offset: int = 0,
     block_id: I64Array | None = None,
     acc_track: F64Array | None = None,
+    contact_radius: float | None = None,
 ) -> dict[str, float]:
     """Reconstruct one arm and score it. Returns the metric row.
 
@@ -184,7 +185,15 @@ def _run_arm(
     ens = ens_mod.run_ensemble(s, data, chrs, region, ctx.n, seed_offset=seed_offset)
     cl, ml = ens_mod.to_arrays_list(ens)
 
-    radius = float(np.median(smetrics.bond_lengths(cl[0])))
+    # The contact radius must be the SAME for every arm. Deriving it per arm from
+    # that arm's own median bond length means a term which shortens bonds also
+    # shrinks the radius, so its contact map is built at a different effective
+    # resolution and every contact metric shifts for that reason alone. Fibre
+    # compaction shortens bonds by about a fifth, which is enough to move accE and
+    # overlap on its own. The caller passes the baseline's radius; `None` keeps the
+    # self-derived value for standalone use.
+    own_radius = float(np.median(smetrics.bond_lengths(cl[0])))
+    radius = own_radius if contact_radius is None else float(contact_radius)
     c_sim = np.zeros_like(c_obs)
     for coords, mids in zip(cl, ml, strict=True):
         c_sim += contacts.simulated_contacts(coords, mids, bin_starts, args.binsize, radius)
@@ -223,6 +232,8 @@ def _run_arm(
         "overlap": float(smetrics.overlap_fraction(cl[0], radius)[0]),
         "density": float((c_sim > 0).sum() - np.count_nonzero(np.diag(c_sim))) / max(off_diag, 1),
         "n_beads": float(len(cl[0])),
+        "radius": radius,
+        "own_radius": own_radius,
     }
 
 
@@ -362,17 +373,33 @@ class Epigenome(Study):
             ]
             eigs = [r["eig"] for r in reps]
             sads = [r["saddle"] for r in reps]
+            accs = [r["acc_saddle"] for r in reps]
             if len(eigs) > 1:
                 floor = float(np.std(eigs, ddof=1))
                 sad_floor = float(np.std(sads, ddof=1))
+                acc_floor = (
+                    float(np.std(accs, ddof=1)) if np.all(np.isfinite(accs)) else float("nan")
+                )
                 print(
                     f"  {'off x' + str(len(eigs)):<14}"
                     f"{np.mean(sads):>9.3f}{np.mean(eigs):>9.3f}{'':>8}{'':>9}{'':>9}{'':>9}"
-                    f"   floor: saddle sd={sad_floor:.3f}  eig sd={floor:.3f}"
+                    f"   floor: saddle sd={sad_floor:.3f}  accE sd={acc_floor:.3f}  eig sd={floor:.3f}"
                 )
 
         base: dict[str, float] = {}
-        for name in args.arms.split(","):
+        # Every arm is scored at the same contact radius, taken from the baseline,
+        # so a term that changes bond length cannot move the contact metrics by
+        # changing the map's effective resolution.
+        shared_radius: float | None = None
+        # `off` must run first, since it supplies that radius. Reordering rather
+        # than trusting the caller: an arms list starting with a treated arm would
+        # otherwise score that arm at its own radius and the rest at the baseline's,
+        # which is the inconsistency this is meant to remove.
+        names = [n.strip() for n in args.arms.split(",") if n.strip()]
+        if "off" in names and names[0] != "off":
+            names = ["off"] + [n for n in names if n != "off"]
+            print("  (running `off` first: it supplies the shared contact radius)\n")
+        for name in names:
             name = name.strip()
             if name not in ARMS:
                 print(f"  {name:<14}  unknown arm")
@@ -390,9 +417,11 @@ class Epigenome(Study):
                     sort_track,
                     block_id=blocks,
                     acc_track=acc_track,
+                    contact_radius=shared_radius,
                 )
                 if name == "off":
                     base = row
+                    shared_radius = row["own_radius"]
                 mark = ""
                 if base and name != "off":
                     d_sad = row["saddle"] - base["saddle"]
