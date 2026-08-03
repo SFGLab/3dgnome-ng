@@ -251,17 +251,13 @@ def build_cluster_tree(
         # can add or substitute boundaries taken from the contact map, so a block
         # edge reflects measured insulation rather than the depth of the ChIA-PET
         # library. "arcs" is the reference behaviour.
-        src = str(ib_split_source).strip().lower()
-        if src != "arcs" and ib_splits:
+        if str(ib_split_source).strip().lower() == "tads" and ib_splits:
             extra = find_boundary_gaps(clusters, chr_first, ib_splits.get(chr_, []))
-            if src == "tads":
-                # Keep the first and last, which bound the chromosome rather than
-                # marking a gap, or the block list loses its endpoints.
-                keep = {gaps[0], gaps[-1]} if gaps else set()
-                merged = sorted(keep | set(extra))
-                gaps = merged if len(merged) > 1 else gaps
-            else:  # "both": union
-                gaps = sorted(set(gaps) | set(extra))
+            # Keep the first and last, which bound the chromosome rather than
+            # marking a gap, or the block list loses its endpoints.
+            keep = {gaps[0], gaps[-1]} if gaps else set()
+            merged = sorted(keep | set(extra))
+            gaps = merged if len(merged) > 1 else gaps
 
         chr_bp = breakpoints.get(chr_, [])
         if chr_bp:

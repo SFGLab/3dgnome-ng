@@ -912,19 +912,23 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
     """
     Refine IB centroid positions with a small chain-bond + EV + confinement
     MC pass.  Calls mc_ib directly - no settings clone, no field renaming.
-    Each segment's IB centroids form a chain (bond targets from
-    genomic_length_to_distance).  EV and confinement read their own
-    IB-level settings (`*_ib`).  Opt-in via `use_ib_mc`.
+    EV and confinement read their own IB-level settings (`*_ib`).  Opt-in via
+    `use_ib_mc`.
+
+    The blocks of a chromosome form one chain, so they are refined as one chain.
+    Refining each segment separately instead made placement depend on how blocks
+    happen to be grouped: a segment holding a single block was skipped entirely,
+    so denser segment boundaries left more blocks sitting wherever interpolation
+    put them.  Segment grouping is a property of the tree, not a constraint on
+    where blocks belong, and it should not decide which blocks get placed.
     """
     from gnome3d.mc import numba as mc_numba
 
     s = state.s
     clusters = state.clusters
-    for seg_idx in segs:
-        ibs = list(clusters[seg_idx].children)
-        if len(ibs) <= 1:
-            continue
-
+    ibs = [ib for seg_idx in segs for ib in clusters[seg_idx].children]
+    ibs.sort(key=lambda i: clusters[i].genomic_pos)
+    if len(ibs) > 1:
         pos: F32Array = np.array([clusters[ib].pos for ib in ibs], dtype=np.float32)
         dtn: F32Array = np.zeros(len(ibs) - 1, dtype=np.float32)
         for i in range(len(ibs) - 1):
@@ -950,10 +954,9 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
             else ""
         )
 
-        seg = clusters[seg_idx]
         with log.step(
             LOG,
-            f"IB-MC {chr_} seg{seg_idx} ({seg.start / 1e6:.2f}-{seg.end / 1e6:.2f}Mb)",
+            f"IB-MC {chr_} ({len(segs)} segments)",
             "%d IBs, avg_bond=%.2f, ev_r0=%.3f, step=%.3f%s",
             len(ibs),
             avg_dtn,

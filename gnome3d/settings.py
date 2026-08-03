@@ -337,8 +337,11 @@ class Settings:
         self.data_segment_split = ""
         # Where interaction block boundaries come from. "arcs" is the reference
         # behaviour, splitting where ChIA-PET arc coverage falls to zero, which is
-        # partly a property of that library's depth. "tads" uses `data_ib_split`
-        # instead and "both" unions them. A boundary file is required for either.
+        # partly a property of that library's depth. "tads" reads `data_ib_split`
+        # instead, and requires it. That file is separate from `data_segment_split`
+        # because block granularity and segment granularity are independent: point
+        # both at one boundary set and every segment ends up holding a single
+        # block, which collapses the coarse level rather than refining it.
         self.data_ib_split = ""
         self.ib_split_source = "arcs"
         self.data_segment_heatmap = ""

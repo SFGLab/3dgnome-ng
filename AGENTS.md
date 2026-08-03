@@ -459,6 +459,25 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
 ### Algorithm divergences
 
+- **Interaction block boundaries: `[data] ib_split_source = arcs | tads | both`, default `arcs`.**
+  The reference splits blocks at `hierarchy.py::find_gaps`, where ChIA-PET arc coverage falls to
+  zero. That is partly a property of the library's depth rather than of the chromatin: where the
+  assay is shallow no arc spans, a boundary appears, and the pipeline folds and places the two
+  sides as independent objects. `tads` takes boundaries from a contact-map call supplied by
+  `[data] ib_split` instead, `both` unions the two. A missing or empty boundary file raises rather
+  than falling back to arc gaps, since a silent fallback would look like a `tads` run and behave
+  like the baseline. `python -m validation tracks` writes the boundary file via
+  `cooltools.insulation` at 10 kb with a 200 kb window.
+
+  Measured on four GM12878 regions, baseline arm, ten structures at full quality: within-block
+  over between-block contact enrichment relative to the same ratio on experimental Hi-C went from
+  2.60, 11.16, 28160 and unbounded down to 1.86, 0.68, 4.26 and 1.90, and the mean absolute
+  compartment-saddle gap fell from 1.664 to 0.373. The experimental enrichment itself rises under
+  the TAD partition in all four regions, which is evidence from the data alone that TAD blocks are
+  domains and arc-gap blocks are not. Caveat: bead count falls about 27 percent because more
+  boundaries mean fewer inter-anchor gaps receive subanchors, so model resolution moves alongside
+  block definition.
+
 - **Orientation MC: weighted local scorer**
   Python uses a weighted local delta in `_local_score_orientation_nb` ([gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py)) so the incremental update is exact w.r.t. `_score_orientation_full_nb`. The reference uses an unweighted local scorer that drifts over many steps. See `[[project-orientation-mc-fix]]`. The reference scorer stayed unweighted for the old unit harness, which has since been removed.
 

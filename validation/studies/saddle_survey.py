@@ -158,10 +158,16 @@ class SaddleSurvey(Study):
         p.add_argument(
             "--ib-split-source",
             default="arcs",
-            choices=["arcs", "tads", "both"],
-            help="where interaction block boundaries come from; tads/both need --ib-split-file",
+            choices=["arcs", "tads"],
+            help="where interaction block boundaries come from; tads needs --ib-split-file",
         )
-        p.add_argument("--ib-split-file", default=None, help="boundary BED for tads/both")
+        p.add_argument("--ib-split-file", default=None, help="boundary BED for tads")
+        p.add_argument(
+            "--segment-split-file",
+            default=None,
+            help="override the segment boundary BED; pointing this and --ib-split-file at the "
+            "same file collapses segments onto blocks, which is worth measuring not assuming",
+        )
         p.add_argument(
             "--min-bins",
             type=int,
@@ -205,7 +211,11 @@ class SaddleSurvey(Study):
                 return
             flags["ib_split_source"] = args.ib_split_source
             flags["data_ib_split"] = str(Path(args.ib_split_file).resolve())
-            print(f"  interaction blocks from: {args.ib_split_source} ({args.ib_split_file})\n")
+            print(f"  interaction blocks from: {args.ib_split_source} ({args.ib_split_file})")
+        if args.segment_split_file:
+            flags["data_segment_split"] = str(Path(args.segment_split_file).resolve())
+            print(f"  segments from: {args.segment_split_file}")
+        print()
         rows: list[dict[str, float]] = []
         for region in regions:
             try:
