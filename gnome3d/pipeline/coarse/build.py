@@ -915,20 +915,39 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
     EV and confinement read their own IB-level settings (`*_ib`).  Opt-in via
     `use_ib_mc`.
 
-    The blocks of a chromosome form one chain, so they are refined as one chain.
-    Refining each segment separately instead made placement depend on how blocks
-    happen to be grouped: a segment holding a single block was skipped entirely,
-    so denser segment boundaries left more blocks sitting wherever interpolation
-    put them.  Segment grouping is a property of the tree, not a constraint on
-    where blocks belong, and it should not decide which blocks get placed.
+    `ib_refine_scope` chooses what forms one chain.
+
+    "segment", the default, refines each segment's blocks separately and skips a
+    segment holding one block or fewer.  Placement then depends on how blocks are
+    grouped, which is a property of the tree rather than of the chromatin, and
+    denser segment boundaries leave more blocks wherever interpolation put them.
+
+    "chromosome" refines every block on the chromosome as one chain, which removes
+    that dependency.  It is not the default because it also puts every block pair
+    inside the excluded-volume term, and the structures inflate: measured over four
+    GM12878 regions the mean simulated contact density fell from 0.087 to 0.035 and
+    within-block over between-block enrichment worsened about threefold.  The
+    compartment saddle improves, but sparsity alone drags that statistic toward 1.0,
+    so the gain is not separable from the inflation.  Using this scope means
+    re-tuning the IB-level excluded-volume and confinement settings.
     """
     from gnome3d.mc import numba as mc_numba
 
     s = state.s
     clusters = state.clusters
-    ibs = [ib for seg_idx in segs for ib in clusters[seg_idx].children]
-    ibs.sort(key=lambda i: clusters[i].genomic_pos)
-    if len(ibs) > 1:
+    if str(getattr(s, "ib_refine_scope", "segment")).strip().lower() == "chromosome":
+        groups = [
+            sorted(
+                (ib for seg_idx in segs for ib in clusters[seg_idx].children),
+                key=lambda i: clusters[i].genomic_pos,
+            )
+        ]
+    else:
+        groups = [list(clusters[seg_idx].children) for seg_idx in segs]
+
+    for ibs in groups:
+        if len(ibs) <= 1:
+            continue
         pos: F32Array = np.array([clusters[ib].pos for ib in ibs], dtype=np.float32)
         dtn: F32Array = np.zeros(len(ibs) - 1, dtype=np.float32)
         for i in range(len(ibs) - 1):

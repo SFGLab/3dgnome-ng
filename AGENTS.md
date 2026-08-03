@@ -459,12 +459,12 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
 ### Algorithm divergences
 
-- **Interaction block boundaries: `[data] ib_split_source = arcs | tads | both`, default `arcs`.**
+- **Interaction block boundaries: `[data] ib_split_source = arcs | tads`, default `arcs`.**
   The reference splits blocks at `hierarchy.py::find_gaps`, where ChIA-PET arc coverage falls to
   zero. That is partly a property of the library's depth rather than of the chromatin: where the
   assay is shallow no arc spans, a boundary appears, and the pipeline folds and places the two
   sides as independent objects. `tads` takes boundaries from a contact-map call supplied by
-  `[data] ib_split` instead, `both` unions the two. A missing or empty boundary file raises rather
+  `[data] ib_split` instead. A missing or empty boundary file raises rather
   than falling back to arc gaps, since a silent fallback would look like a `tads` run and behave
   like the baseline. `python -m validation tracks` writes the boundary file via
   `cooltools.insulation` at 10 kb with a 200 kb window.
@@ -477,6 +477,24 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   domains and arc-gap blocks are not. Caveat: bead count falls about 27 percent because more
   boundaries mean fewer inter-anchor gaps receive subanchors, so model resolution moves alongside
   block definition.
+
+- **IB placement scope: `[simulation_ib] refine_scope = segment | chromosome`, default `segment`.**
+  `segment` is the prior behaviour: each segment's blocks are refined as a separate chain and any
+  segment holding one block or fewer is skipped, so segment grouping decides which blocks get
+  placed at all. `chromosome` refines every block on the chromosome as one chain and removes that
+  dependency.
+
+  `chromosome` is not the default despite being the more principled scoping. It also puts every
+  block pair inside the excluded-volume term and the structures inflate: over four GM12878 regions
+  mean simulated contact density fell 0.087 to 0.035 and within-block over between-block
+  enrichment worsened about threefold. The compartment saddle improves, but sparsity alone drags
+  that statistic toward 1.0, so the gain is not separable from the inflation. Adopting this scope
+  means re-tuning `exclusion_*_ib` and `confinement_*_ib` first.
+
+  This also decides whether `[data] ib_split` can share a file with `[data] segment_split`. Under
+  `chromosome` they are interchangeable, measured as a wash. Under the default `segment` they are
+  not: one shared file gives 16 segments holding 17 blocks, so nearly every segment holds a single
+  block and placement skips it.
 
 - **Orientation MC: weighted local scorer**
   Python uses a weighted local delta in `_local_score_orientation_nb` ([gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py)) so the incremental update is exact w.r.t. `_score_orientation_full_nb`. The reference uses an unweighted local scorer that drifts over many steps. See `[[project-orientation-mc-fix]]`. The reference scorer stayed unweighted for the old unit harness, which has since been removed.

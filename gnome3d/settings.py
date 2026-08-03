@@ -44,6 +44,7 @@ class Settings:
     data_segment_split: str
     data_ib_split: str
     ib_split_source: str
+    ib_refine_scope: str
     data_segment_heatmap: str
     data_compartments: str
     data_accessibility: str
@@ -344,6 +345,14 @@ class Settings:
         # block, which collapses the coarse level rather than refining it.
         self.data_ib_split = ""
         self.ib_split_source = "arcs"
+        # What forms one chain in the IB placement MC. "segment" refines each
+        # segment's blocks separately, which is the prior behaviour and the
+        # default. "chromosome" refines them all together, removing the dependency
+        # on segment grouping but coupling every block pair through excluded
+        # volume; measured over four GM12878 regions that dropped mean simulated
+        # contact density from 0.087 to 0.035 and worsened block cohesion about
+        # threefold, so it needs its own EV and confinement tuning.
+        self.ib_refine_scope = "segment"
         self.data_segment_heatmap = ""
         self.data_compartments = ""
         self.data_accessibility = ""
@@ -763,6 +772,7 @@ class Settings:
         self.data_segment_split = gets("data", "segment_split", self.data_segment_split)
         self.data_ib_split = gets("data", "ib_split", self.data_ib_split)
         self.ib_split_source = gets("data", "ib_split_source", self.ib_split_source)
+        self.ib_refine_scope = gets("simulation_ib", "refine_scope", self.ib_refine_scope)
         self.data_segment_heatmap = gets("data", "segment_heatmap", self.data_segment_heatmap)
         self.data_compartments = gets("data", "compartments", self.data_compartments)
         self.data_accessibility = gets("data", "accessibility", self.data_accessibility)
