@@ -1,0 +1,8 @@
+{
+  "_note": "Plain (restriction-enzyme) Hi-C for the validation sweep's contact-correlation target. 3dgnome models CTCF-mediated architecture, so this is plain Hi-C (CTCF-inclusive) — NOT RNA Pol II ChIA-PET/HiChIP (wrong, transcription-driven). Fetch: python -m validation fetch --manifest validation/manifests/GM12878_hic.json --out data/_hic  ->  data/_hic/GM12878/hic.4DNFIQ32RWCQ.mcool",
+  "cell_line": "GM12878",
+  "assembly": "GRCh38",
+  "assays": [
+    {"name": "hic", "source": "4dn", "accession": "4DNFIQ32RWCQ", "output_type": "in situ Hi-C (MboI)"}
+  ]
+}

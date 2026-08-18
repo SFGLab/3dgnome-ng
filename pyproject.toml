@@ -28,6 +28,18 @@ jax = [
     "jax>=0.4.30",
 ]
 
+# Validation harness (validation/): structure-quality metrics, Hi-C correlation,
+# and the EV/confinement hyperparameter sweep. Needs SciPy for stats, cooler to
+# read 4DN Hi-C .mcool matrices, and hicrep for the stratum-adjusted SCC.
+#     pip install -e .[validation]
+validation = [
+    "scipy>=1.10",
+    "cooler>=0.9",
+    "cooltools>=0.7",
+    "hicrep>=0.2.6",
+    "pyBigWig>=0.3.18",
+]
+
 [project.scripts]
 gnome3d-ng = "gnome3d.cli:main"
 
@@ -82,9 +94,9 @@ ban-relative-imports = "all"
 "gnome3d/hierarchy.py" = ["F405", "F403"]
 "gnome3d/pipeline/coarse/build.py" = ["F405", "F403"]
 "gnome3d/mc/jax/util.py" = ["F401"]
+"validation/metrics/__init__.py" = ["F405", "F403"]
 
 # The harness uses tight one-liner stubs (lots of `;`), tuple short names like
 # `l` for length, and zip() without strict=. These are intentional for compact
 # test fixtures, not real code.
-"harness/compare.py" = ["E702", "E703", "E741", "B007", "B905"]
 "harness/integration.py" = ["B007", "B905"]

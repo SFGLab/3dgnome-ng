@@ -255,14 +255,27 @@ out/
 # playground
 playground/protected
 playground/derived
+playground/*.out
 
 # data from playground
-playground/*.mcool
-playground/*.cool
-playground/*.fa
-playground/*.fasta
-playground/*.fastq
-playground/*.fq
-playground/*.fai
-playground/*.bed
-playground/*.gz
+playground/**/*.mcool
+playground/**/*.cool
+playground/**/*.fa
+playground/**/*.fasta
+playground/**/*.fastq
+playground/**/*.fq
+playground/**/*.fai
+playground/**/*.bed
+playground/**/*.gz
+playground/**/*.html
+playground/**/*.pdf
+
+# data 
+data/**/*.mcool
+data/**/*.cool
+data/**/*.bigWig
+data/**/*.bedGraph
+data/**/*.lock.json
+
+# superpowers
+.superpowers/

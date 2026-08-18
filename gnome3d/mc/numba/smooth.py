@@ -18,10 +18,12 @@ from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
 from gnome3d.mc.numba.common import (
+    affinity_params,
     as_f64,
     dummy_bool,
     dummy_f64,
     dummy_i32,
+    init_affinity_scores,
     prepare_orientation,
     run_outer_loop,
 )
@@ -263,6 +265,8 @@ def mc_smooth_numba(
     anchor_neighbors: dict[int, list[int]] | None = None,
     anchor_neighbor_weights: dict[int, list[float]] | None = None,
     heat_dist: np.ndarray[Any, Any] | None = None,
+    compartment: np.ndarray[Any, Any] | None = None,
+    accessibility: np.ndarray[Any, Any] | None = None,
 ) -> float:
     """Chain connectivity + angle MC.  Optionally adds CTCF orientation and/or
     subanchor heat. Anchor beads (fixed=True) never move. Single-counted
@@ -287,6 +291,8 @@ def mc_smooth_numba(
                 bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
             )
             and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
+            and compartment is None
+            and accessibility is None
         )
         if simple_config:
             return _mc_smooth_multichain(pos, dtn, fixed, step_size, settings, heat_dist)
@@ -333,6 +339,15 @@ def mc_smooth_numba(
             avg_bond = float(dtn64.mean()) if dtn64.size > 0 else 1.0
             pf = float(settings.confinement_packing_factor_smooth)
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
+
+    aff = affinity_params(
+        settings,
+        "smooth",
+        float(dtn64.mean()) if dtn64.size > 0 else 1.0,
+        compartment,
+        accessibility,
+    )
+    score_comp, score_brdg = init_affinity_scores(pw, aff)
 
     if use_heat:
         assert heat_dist is not None
@@ -449,6 +464,18 @@ def mc_smooth_numba(
         score_orn=score_orn,
         score_excl=score_excl,
         score_conf=score_conf,
+        use_comp=aff.use_comp,
+        comp_cls=aff.comp_cls,
+        comp_r0=aff.comp_r0,
+        comp_weight=aff.comp_weight,
+        comp_ea=aff.comp_ea,
+        comp_eb=aff.comp_eb,
+        use_brdg=aff.use_brdg,
+        brdg_a=aff.brdg_a,
+        brdg_r0=aff.brdg_r0,
+        brdg_weight=aff.brdg_weight,
+        score_comp=score_comp,
+        score_brdg=score_brdg,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

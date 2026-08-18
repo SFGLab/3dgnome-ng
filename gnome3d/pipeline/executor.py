@@ -43,14 +43,26 @@ from gnome3d.pipeline.state import State
 LOG = log.get("executor")
 
 
+# Single-node dispatches (e.g. the coarse chr/segment/ib seeding stages) finish near-instantly and
+# spam two lines each; stay quiet for them unless they turn out slow. Multi-node dispatches and any
+# slow node still log. Heavy single-node stages (arcs/smooth) print their own kernel progress.
+_QUIET_MAX_NODES = 1
+_QUIET_MAX_SECS = 0.2
+
+
 def _log_dispatch_start(kind: StageKind, strategy: str, n: int, detail: str = "") -> None:
     """Standard executor dispatch START line, matching the JAX-kernel format:
-    ``arcs[batch]: 50 nodes (group 1/1, ...), running...``."""
+    ``arcs[batch]: 50 nodes (group 1/1, ...), running...``. Suppressed for single trivial nodes."""
+    if n <= _QUIET_MAX_NODES:
+        return
     log.status(LOG, "  %s[%s]: %d nodes%s, running...", kind.value, strategy, n, detail)
 
 
 def _log_dispatch_done(kind: StageKind, strategy: str, n: int, secs: float) -> None:
-    """Standard executor dispatch DONE line: ``arcs[batch]: 50 nodes in 11.2s``."""
+    """Standard executor dispatch DONE line: ``arcs[batch]: 50 nodes in 11.2s``. Suppressed for a
+    single node that finished fast (keeps the line if it was actually slow)."""
+    if n <= _QUIET_MAX_NODES and secs < _QUIET_MAX_SECS:
+        return
     log.status(LOG, "  %s[%s]: %d nodes in %.1fs", kind.value, strategy, n, secs)
 
 

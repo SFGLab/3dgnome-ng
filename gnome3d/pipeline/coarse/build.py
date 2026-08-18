@@ -25,6 +25,8 @@ field set, not of the positioned graph.
 
 from __future__ import annotations
 
+from dataclasses import field
+
 from gnome3d import log
 from gnome3d.data import ContactData
 from gnome3d.hierarchy import Cluster, Level, build_cluster_tree, set_level
@@ -37,6 +39,7 @@ from gnome3d.pipeline.coarse.heatmap import (
     normalize_heatmap_inter,
 )
 from gnome3d.settings import Settings
+from gnome3d.tracks import bin_compartments, bin_signal, normalize_accessibility
 from gnome3d.types import *
 from gnome3d.util import random_vector_np, seed_rng
 
@@ -86,6 +89,10 @@ class CoarseState:
     singletons: list[SingletonContact]
     long_arcs: RawArcMap
     selected_region: BedRegion | None = None
+    # Epigenomic tracks for the opt-in compartment and accessibility terms.
+    # Empty when no track is configured, which leaves those terms inert.
+    compartments: CompartmentMap = field(default_factory=empty_compartment_map)
+    accessibility: SignalMap = field(default_factory=empty_signal_map)
 
 
 def build_state(
@@ -100,7 +107,12 @@ def build_state(
     """
     with log.step(LOG, "build cluster hierarchy"):
         clusters, chr_root, chr_first_cluster = build_cluster_tree(
-            data.anchors, data.arcs, data.breakpoints, chrs_list
+            data.anchors,
+            data.arcs,
+            data.breakpoints,
+            chrs_list,
+            ib_splits=data.ib_splits,
+            ib_split_source=settings.ib_split_source,
         )
         LOG.info("total clusters: %d", len(clusters))
 
@@ -115,7 +127,126 @@ def build_state(
         singletons=data.singletons,
         long_arcs=data.long_arcs,
         selected_region=region,
+        compartments=data.compartments,
+        accessibility=data.accessibility,
     )
+
+
+# --- epigenomic track lookup ------------------------------------------------
+
+
+def compartment_for_clusters(
+    state: CoarseState, indices: list[ClusterIndex], chr_: str
+) -> I8Array | None:
+    """
+    Compartment call per cluster, or None when no track covers this chromosome.
+
+    Clusters carry inclusive genomic ranges, which is what `bin_compartments`
+    expects.
+    """
+    ivs = state.compartments.get(chr_, [])
+    if not ivs or not indices:
+        return None
+    clusters = state.clusters
+    starts = [clusters[ci].start for ci in indices]
+    ends = [clusters[ci].end for ci in indices]
+    cls, _score = bin_compartments(ivs, starts, ends)
+    return cls
+
+
+def coarse_track_arrays(
+    state: CoarseState, active_region: list[ClusterIndex], chr_of: list[str]
+) -> tuple[I8Array | None, F32Array | None, I32Array | None, F64Array | None]:
+    """Per-cluster track arrays for a multi-chromosome active region.
+
+    `active_region` and `chr_of` are parallel, so each cluster is binned against
+    its own chromosome's track.  Returns
+    (compartment, accessibility, chromosome id, chromosome weight), each None
+    when the term that reads it is off or its data is missing.
+
+    The chromosome weight drives the nucleolar pull.  It is the mean chromosome
+    span over this chromosome's span, so a smaller chromosome gets a larger
+    weight and sits nearer the centre, which is the bias MultiMM's central force
+    encodes.
+    """
+    s = state.s
+    if not active_region:
+        return None, None, None, None
+
+    want_comp = s.use_compartments or s.use_lamina
+    want_acc = s.use_bridging
+    want_chrom = s.use_central_force or s.use_chromosomal_blocks
+
+    n = len(active_region)
+    clusters = state.clusters
+    by_chr: dict[str, list[int]] = {}
+    for i, c in enumerate(chr_of):
+        by_chr.setdefault(c, []).append(i)
+
+    comp: I8Array | None = np.zeros(n, dtype=np.int8) if want_comp else None
+    acc: F32Array | None = np.zeros(n, dtype=np.float32) if want_acc else None
+    got_comp = False
+    got_acc = False
+
+    for chr_, rows in by_chr.items():
+        idx = [active_region[i] for i in rows]
+        starts = [clusters[ci].start for ci in idx]
+        ends = [clusters[ci].end for ci in idx]
+        if comp is not None:
+            ivs = state.compartments.get(chr_, [])
+            if ivs:
+                cls, _score = bin_compartments(ivs, starts, ends)
+                comp[rows] = cls
+                got_comp = True
+        if acc is not None:
+            sig = state.accessibility.get(chr_, [])
+            if sig:
+                acc[rows] = bin_signal(sig, starts, ends)
+                got_acc = True
+
+    chrom_id: I32Array | None = None
+    chrom_w: F64Array | None = None
+    if want_chrom:
+        order = {c: k for k, c in enumerate(sorted(by_chr))}
+        chrom_id = np.array([order[c] for c in chr_of], dtype=np.int32)
+        spans = {
+            c: max(
+                max(clusters[active_region[i]].end for i in rows)
+                - min(clusters[active_region[i]].start for i in rows),
+                1,
+            )
+            for c, rows in by_chr.items()
+        }
+        mean_span = float(sum(spans.values())) / len(spans)
+        chrom_w = np.array([mean_span / spans[c] for c in chr_of], dtype=np.float64)
+
+    return (
+        comp if got_comp else None,
+        acc if got_acc else None,
+        chrom_id,
+        chrom_w,
+    )
+
+
+def accessibility_for_clusters(
+    state: CoarseState, indices: list[ClusterIndex], chr_: str
+) -> F32Array | None:
+    """
+    Normalised accessibility per cluster, or None when no track covers this
+    chromosome.
+
+    The normalisation is done over the clusters handed in rather than genome
+    wide, so `a` spans [0, 1] within whatever region is being scored.  That keeps
+    the bridging strength comparable across regions of very different signal
+    depth.
+    """
+    ivs = state.accessibility.get(chr_, [])
+    if not ivs or not indices:
+        return None
+    clusters = state.clusters
+    starts = [clusters[ci].start for ci in indices]
+    ends = [clusters[ci].end for ci in indices]
+    return normalize_accessibility(bin_signal(ivs, starts, ends))
 
 
 # --- RNG-ordered shared subroutine ------------------------------------------
@@ -701,15 +832,21 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
         for seg_idx in segs:
             clusters[seg_idx].pos = origin.copy()
 
-    # Concatenate all segment indices into active_region
+    # Concatenate all segment indices into active_region, keeping a parallel
+    # chromosome list so the epigenomic tracks can be binned per chromosome.
     active_region: list[int] = []
+    chr_of: list[str] = []
     for chr_ in state.chrs:
-        active_region.extend(current_level.get(chr_, []))
+        segs_here = current_level.get(chr_, [])
+        active_region.extend(segs_here)
+        chr_of.extend([chr_] * len(segs_here))
 
     if len(active_region) <= 1:
         return
 
     step_size = avg_dist * s.noise_lvl2
+
+    seg_comp, seg_acc, seg_chrom_id, seg_chrom_w = coarse_track_arrays(state, active_region, chr_of)
 
     pos: F32Array = np.array([clusters[i].pos for i in active_region], dtype=np.float32)
     n = len(active_region)
@@ -721,7 +858,17 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
             for i in range(n):
                 pos[i] = clusters[active_region[i]].pos + random_vector_np(step_size)
 
-            score = mc_numba.mc_heatmap_numba(pos, heatmap_dist, heatmap_dist_diag, step_size, s)
+            score = mc_numba.mc_heatmap_numba(
+                pos,
+                heatmap_dist,
+                heatmap_dist_diag,
+                step_size,
+                s,
+                seg_comp,
+                seg_acc,
+                seg_chrom_id,
+                seg_chrom_w,
+            )
             if score < best_score or best_score < 0:
                 best_score = score
                 best_pos = pos.copy()
@@ -765,19 +912,42 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
     """
     Refine IB centroid positions with a small chain-bond + EV + confinement
     MC pass.  Calls mc_ib directly - no settings clone, no field renaming.
-    Each segment's IB centroids form a chain (bond targets from
-    genomic_length_to_distance).  EV and confinement read their own
-    IB-level settings (`*_ib`).  Opt-in via `use_ib_mc`.
+    EV and confinement read their own IB-level settings (`*_ib`).  Opt-in via
+    `use_ib_mc`.
+
+    `ib_refine_scope` chooses what forms one chain.
+
+    "segment", the default, refines each segment's blocks separately and skips a
+    segment holding one block or fewer.  Placement then depends on how blocks are
+    grouped, which is a property of the tree rather than of the chromatin, and
+    denser segment boundaries leave more blocks wherever interpolation put them.
+
+    "chromosome" refines every block on the chromosome as one chain, which removes
+    that dependency.  It is not the default because it also puts every block pair
+    inside the excluded-volume term, and the structures inflate: measured over four
+    GM12878 regions the mean simulated contact density fell from 0.087 to 0.035 and
+    within-block over between-block enrichment worsened about threefold.  The
+    compartment saddle improves, but sparsity alone drags that statistic toward 1.0,
+    so the gain is not separable from the inflation.  Using this scope means
+    re-tuning the IB-level excluded-volume and confinement settings.
     """
     from gnome3d.mc import numba as mc_numba
 
     s = state.s
     clusters = state.clusters
-    for seg_idx in segs:
-        ibs = list(clusters[seg_idx].children)
+    if str(getattr(s, "ib_refine_scope", "segment")).strip().lower() == "chromosome":
+        groups = [
+            sorted(
+                (ib for seg_idx in segs for ib in clusters[seg_idx].children),
+                key=lambda i: clusters[i].genomic_pos,
+            )
+        ]
+    else:
+        groups = [list(clusters[seg_idx].children) for seg_idx in segs]
+
+    for ibs in groups:
         if len(ibs) <= 1:
             continue
-
         pos: F32Array = np.array([clusters[ib].pos for ib in ibs], dtype=np.float32)
         dtn: F32Array = np.zeros(len(ibs) - 1, dtype=np.float32)
         for i in range(len(ibs) - 1):
@@ -803,10 +973,9 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
             else ""
         )
 
-        seg = clusters[seg_idx]
         with log.step(
             LOG,
-            f"IB-MC {chr_} seg{seg_idx} ({seg.start / 1e6:.2f}-{seg.end / 1e6:.2f}Mb)",
+            f"IB-MC {chr_} ({len(segs)} segments)",
             "%d IBs, avg_bond=%.2f, ev_r0=%.3f, step=%.3f%s",
             len(ibs),
             avg_dtn,
@@ -815,7 +984,14 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
             conf_tag,
         ):
             gyr_before = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
-            mc_numba.mc_ib_numba(pos, dtn, step_size, s)
+            mc_numba.mc_ib_numba(
+                pos,
+                dtn,
+                step_size,
+                s,
+                compartment_for_clusters(state, ibs, chr_),
+                accessibility_for_clusters(state, ibs, chr_),
+            )
             gyr_after = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
             LOG.info("gyr %.2f -> %.2f", gyr_before, gyr_after)
 

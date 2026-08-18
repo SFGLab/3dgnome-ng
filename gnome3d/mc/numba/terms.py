@@ -21,7 +21,7 @@ from typing import Any, TypeVar, cast
 import numpy as np
 from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
 
-from gnome3d.types import BoolArray, F64Array, I32Array, I64Array
+from gnome3d.types import BoolArray, F64Array, I8Array, I32Array, I64Array
 
 # Typed wrapper around numba.njit so pyright sees decorated functions
 # with their original signatures.  At runtime this is just numba.njit.
@@ -227,6 +227,247 @@ def init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
             d = math.sqrt(dx * dx + dy * dy + dz * dz)
             row_err += _excl_pair_nb(d, r0, weight)
         err += row_err
+    return err
+
+
+# Affinity helpers (A/B compartment segregation + accessibility bridging)
+#
+#   E_pair(d) = weight * g * (1 - exp(-d^2 / (2 r0^2)))
+#
+#     compartment : g = Ea when both beads are A, Eb when both are B, else 0
+#     bridging    : g = a_i * a_j
+#
+# Both are attractions: the energy is 0 at contact and rises to `weight * g` far
+# apart.  MultiMM and HiP-HoP write the same well as a negative energy, which
+# 3dgnome cannot use - its Metropolis rule divides by the running score and is
+# guarded on `score > 0`, so a negative-definite term would silently disable the
+# temperature branch.  Shifting by the well depth changes only an additive
+# constant, not the minimum or the gradient.
+#
+# Every pair participates, matching MultiMM's CustomNonbondedForce, which sets up
+# no bonded exclusions.  A bonded pair sits near the bottom of the well and so
+# contributes almost no gradient.
+#
+# Both terms double-count pairs like excluded volume, so the delta is
+# 2 * (local_curr - local_prev).  They share one distance loop because they are
+# usually enabled together and the loop is the cost.
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def _comp_strength_nb(ci: int, cj: int, ea: float, eb: float) -> float:
+    """Compartment pair strength.  Positive codes are A, negative are B."""
+    if ci > 0 and cj > 0:
+        return ea
+    if ci < 0 and cj < 0:
+        return eb
+    return 0.0
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def local_affinity_nb(
+    pos: F64Array,
+    p: int,
+    use_comp: bool,
+    comp_cls: I8Array,
+    comp_r0: float,
+    comp_weight: float,
+    comp_ea: float,
+    comp_eb: float,
+    use_brdg: bool,
+    brdg_a: F64Array,
+    brdg_r0: float,
+    brdg_weight: float,
+) -> tuple[float, float]:
+    """Both affinity energies for bead `p` against every other bead."""
+    n = pos.shape[0]
+    e_comp = 0.0
+    e_brdg = 0.0
+    # Per-partner normalisation.  Without it the term sums over N partners while
+    # the chain springs act per bond, so its relative strength would grow with
+    # the region and a weight tuned on a small region would collapse a large one.
+    inv_n = 1.0 / (n - 1) if n > 1 else 1.0
+    comp_den = 2.0 * comp_r0 * comp_r0
+    brdg_den = 2.0 * brdg_r0 * brdg_r0
+    ci = int(comp_cls[p]) if use_comp else 0
+    ap = brdg_a[p] if use_brdg else 0.0
+    for i in range(n):
+        if i == p:
+            continue
+        g_comp = 0.0
+        if use_comp:
+            g_comp = _comp_strength_nb(ci, int(comp_cls[i]), comp_ea, comp_eb)
+        g_brdg = ap * brdg_a[i] if use_brdg else 0.0
+        if g_comp == 0.0 and g_brdg == 0.0:
+            continue
+        dx = pos[i, 0] - pos[p, 0]
+        dy = pos[i, 1] - pos[p, 1]
+        dz = pos[i, 2] - pos[p, 2]
+        d2 = dx * dx + dy * dy + dz * dz
+        if g_comp != 0.0:
+            e_comp += comp_weight * g_comp * (1.0 - math.exp(-d2 / comp_den)) * inv_n
+        if g_brdg != 0.0:
+            e_brdg += brdg_weight * g_brdg * (1.0 - math.exp(-d2 / brdg_den)) * inv_n
+    return e_comp, e_brdg
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def init_affinity_nb(
+    pos: F64Array,
+    use_comp: bool,
+    comp_cls: I8Array,
+    comp_r0: float,
+    comp_weight: float,
+    comp_ea: float,
+    comp_eb: float,
+    use_brdg: bool,
+    brdg_a: F64Array,
+    brdg_r0: float,
+    brdg_weight: float,
+) -> tuple[float, float]:
+    """Full double-counted affinity energies over every ordered pair."""
+    n = pos.shape[0]
+    e_comp = 0.0
+    e_brdg = 0.0
+    for p in range(n):
+        c, b = local_affinity_nb(
+            pos,
+            p,
+            use_comp,
+            comp_cls,
+            comp_r0,
+            comp_weight,
+            comp_ea,
+            comp_eb,
+            use_brdg,
+            brdg_a,
+            brdg_r0,
+            brdg_weight,
+        )
+        e_comp += c
+        e_brdg += b
+    return e_comp, e_brdg
+
+
+# Nuclear-frame helpers (lamina shell + nucleolar pull), coarse levels only
+#
+#   lamina (B-compartment beads only, MultiMM add_Blamina_interaction):
+#     E(p) = weight * (1 - sin^8(pi * (r - R1) / (R2 - R1)))   for R1 <= r <= R2
+#          = weight                                            outside the shell
+#
+#   central (MultiMM add_central_force, harmonic mode):
+#     E(p) = weight * w_chr(p) * (r - R1)^2
+#
+# `r` is the distance from the nuclear center.  Both are per bead and single
+# counted, so the delta is (curr - prev) with no factor of 2, like confinement.
+# The lamina form is MultiMM's shifted to be non-negative; see the affinity note
+# above for why that shift is required.
+#
+# These need a nuclear frame shared across the whole active region, so they only
+# run where one MC call spans the nucleus.  That is the segment-level heatmap MC.
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def local_nuclear_nb(
+    pos: F64Array,
+    p: int,
+    comp_cls: I8Array,
+    chrom_w: F64Array,
+    use_lam: bool,
+    lam_weight: float,
+    use_cen: bool,
+    cen_weight: float,
+    cx: float,
+    cy: float,
+    cz: float,
+    R1: float,
+    R2: float,
+) -> tuple[float, float]:
+    """Lamina and central energies for bead `p`."""
+    dx = pos[p, 0] - cx
+    dy = pos[p, 1] - cy
+    dz = pos[p, 2] - cz
+    r = math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    e_lam = 0.0
+    if use_lam and comp_cls[p] < 0:
+        if r < R1 or r > R2 or R2 <= R1:
+            e_lam = lam_weight
+        else:
+            sn = math.sin(math.pi * (r - R1) / (R2 - R1))
+            s2 = sn * sn
+            s8 = s2 * s2 * s2 * s2
+            e_lam = lam_weight * (1.0 - s8)
+
+    e_cen = 0.0
+    if use_cen:
+        rel = r - R1
+        e_cen = cen_weight * chrom_w[p] * rel * rel
+
+    return e_lam, e_cen
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def init_nuclear_nb(
+    pos: F64Array,
+    comp_cls: I8Array,
+    chrom_w: F64Array,
+    use_lam: bool,
+    lam_weight: float,
+    use_cen: bool,
+    cen_weight: float,
+    cx: float,
+    cy: float,
+    cz: float,
+    R1: float,
+    R2: float,
+) -> tuple[float, float]:
+    n = pos.shape[0]
+    e_lam = 0.0
+    e_cen = 0.0
+    for p in range(n):
+        a, b = local_nuclear_nb(
+            pos, p, comp_cls, chrom_w, use_lam, lam_weight, use_cen, cen_weight, cx, cy, cz, R1, R2
+        )
+        e_lam += a
+        e_cen += b
+    return e_lam, e_cen
+
+
+# Chromosomal-block helper (same-chromosome self-attraction, territories)
+#
+#   E_pair(d) = weight * (kc * d^4 - d^3 + d^2)   when i and j share a chromosome
+#
+# MultiMM add_chromosomal_blocks, polynomial mode, taken unchanged.  The
+# polynomial is d^2 (kc d^2 - d + 1), which has no real root for the default
+# kc = 0.3, so the term is already non-negative and needs no shift.  Pairwise and
+# double counted, so the delta is 2 * (curr - prev).
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def local_chrom_block_nb(
+    pos: F64Array, p: int, chrom_id: I32Array, kc: float, weight: float
+) -> float:
+    n = pos.shape[0]
+    cp = chrom_id[p]
+    err = 0.0
+    for i in range(n):
+        if i == p or chrom_id[i] != cp:
+            continue
+        dx = pos[i, 0] - pos[p, 0]
+        dy = pos[i, 1] - pos[p, 1]
+        dz = pos[i, 2] - pos[p, 2]
+        d = math.sqrt(dx * dx + dy * dy + dz * dz)
+        d2 = d * d
+        err += weight * (kc * d2 * d2 - d2 * d + d2)
+    return err
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def init_chrom_block_nb(pos: F64Array, chrom_id: I32Array, kc: float, weight: float) -> float:
+    n = pos.shape[0]
+    err = 0.0
+    for p in range(n):
+        err += local_chrom_block_nb(pos, p, chrom_id, kc, weight)
     return err
 
 
@@ -489,6 +730,8 @@ def init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float
 #   * orientation: score += 2 * (curr - prev)
 #   * excluded   : score += 2 * (curr - prev)
 #   * confinement: score += 1 * (curr - prev)
+#   * compartment: score += 2 * (curr - prev)
+#   * bridging   : score += 2 * (curr - prev)
 #
 # Acceptance: ok = (score_new < score) if strict_better else (score_new <= score)
 # Smooth uses strict (preserves prior behaviour); arcs/heatmap use non-strict.
@@ -536,6 +779,17 @@ def batch_mc_nb(
     conf_cz: float,
     conf_R: float,
     conf_weight: float,
+    # ---- Affinity terms (compartment + bridging) ----
+    use_comp: bool,
+    comp_cls: I8Array,
+    comp_r0: float,
+    comp_weight: float,
+    comp_ea: float,
+    comp_eb: float,
+    use_brdg: bool,
+    brdg_a: F64Array,
+    brdg_r0: float,
+    brdg_weight: float,
     # ---- MC schedule ----
     step_size: float,
     T: float,
@@ -550,12 +804,17 @@ def batch_mc_nb(
     score_orn: float,
     score_excl: float,
     score_conf: float,
+    score_comp: float,
+    score_brdg: float,
     rep_inv_cutoff: float = 0.0,
-) -> tuple[float, float, float, float, float, float, int]:
+) -> tuple[float, float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
     n_mov = movable.shape[0]
     n_ok = 0
-    score = score_struct + score_heat + score_orn + score_excl + score_conf
+    use_aff = use_comp or use_brdg
+    score = (
+        score_struct + score_heat + score_orn + score_excl + score_conf + score_comp + score_brdg
+    )
 
     for _ in range(n_steps):
         p: int = int(movable[np.random.randint(0, n_mov)])
@@ -585,6 +844,24 @@ def batch_mc_nb(
         if use_conf:
             loc_conf_prev = _local_confine_nb(
                 pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight
+            )
+
+        loc_comp_prev = 0.0
+        loc_brdg_prev = 0.0
+        if use_aff:
+            loc_comp_prev, loc_brdg_prev = local_affinity_nb(
+                pos,
+                p,
+                use_comp,
+                comp_cls,
+                comp_r0,
+                comp_weight,
+                comp_ea,
+                comp_eb,
+                use_brdg,
+                brdg_a,
+                brdg_r0,
+                brdg_weight,
             )
 
         orn_k: int = -1
@@ -641,6 +918,26 @@ def batch_mc_nb(
             )
             score_conf_new = score_conf + (loc_conf_curr - loc_conf_prev)
 
+        score_comp_new = score_comp
+        score_brdg_new = score_brdg
+        if use_aff:
+            loc_comp_curr, loc_brdg_curr = local_affinity_nb(
+                pos,
+                p,
+                use_comp,
+                comp_cls,
+                comp_r0,
+                comp_weight,
+                comp_ea,
+                comp_eb,
+                use_brdg,
+                brdg_a,
+                brdg_r0,
+                brdg_weight,
+            )
+            score_comp_new = score_comp + 2.0 * (loc_comp_curr - loc_comp_prev)
+            score_brdg_new = score_brdg + 2.0 * (loc_brdg_curr - loc_brdg_prev)
+
         score_orn_new = score_orn
         if use_orn and orn_k >= 0:
             ar: int = int(anchor_ar[orn_k])
@@ -660,7 +957,13 @@ def batch_mc_nb(
             score_orn_new = score_orn + 2.0 * (loc_orn_curr - loc_orn_prev)
 
         score_new = (
-            score_struct_new + score_heat_new + score_orn_new + score_excl_new + score_conf_new
+            score_struct_new
+            + score_heat_new
+            + score_orn_new
+            + score_excl_new
+            + score_conf_new
+            + score_comp_new
+            + score_brdg_new
         )
 
         if strict_better:
@@ -678,6 +981,8 @@ def batch_mc_nb(
             score_orn = score_orn_new
             score_excl = score_excl_new
             score_conf = score_conf_new
+            score_comp = score_comp_new
+            score_brdg = score_brdg_new
         else:
             pos[p, 0] -= dx
             pos[p, 1] -= dy
@@ -687,4 +992,14 @@ def batch_mc_nb(
                 anchor_orn[orn_k, 1] = prev_oy
                 anchor_orn[orn_k, 2] = prev_oz
         T *= dt
-    return T, score_struct, score_heat, score_orn, score_excl, score_conf, n_ok
+    return (
+        T,
+        score_struct,
+        score_heat,
+        score_orn,
+        score_excl,
+        score_conf,
+        score_comp,
+        score_brdg,
+        n_ok,
+    )

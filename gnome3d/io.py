@@ -241,6 +241,131 @@ def load_breakpoints(path: str, chrs: list[str]) -> BreakpointMap:
     return bp
 
 
+# Load epigenomic tracks
+
+
+def compartment_from_label(label: str) -> int:
+    """
+    Map a compartment label to a `Compartment` code.
+
+    Accepts CALDER hierarchical labels such as `A.1.1` or `B.2.2.2`, the compact
+    `A1` and `B2` spellings, and the bare `A` and `B`.  Matching is on the first
+    one or two levels, so the deeper CALDER ranks collapse onto the same code.
+    Anything unrecognised reads as `NONE`.
+    """
+    t = label.strip().upper()
+    if t.startswith("A.1") or t.startswith("A1"):
+        return int(Compartment.A1)
+    if t.startswith("A"):
+        return int(Compartment.A2)
+    if t.startswith("B.2") or t.startswith("B2"):
+        return int(Compartment.B2)
+    if t.startswith("B"):
+        return int(Compartment.B1)
+    return int(Compartment.NONE)
+
+
+def _overlaps(start: int, end: int, region: BedRegion | None) -> bool:
+    if region is None:
+        return True
+    return start <= region.end and end >= region.start
+
+
+def load_compartments(
+    path: str,
+    chr_set: set[str],
+    region: BedRegion | None = None,
+) -> CompartmentMap:
+    """
+    Load compartment calls.  Format: chr start end value_or_label
+
+    The fourth column is read as a signed eigenvector value when it parses as a
+    float, otherwise as a compartment label.  A value-only track leaves `cls` at
+    `NONE` until it is phased, since the sign of a Hi-C eigenvector is arbitrary.
+    Intervals are kept sorted by start so binning can bisect.
+
+    Returns dict[chr -> list[CompartmentInterval]] for chromosomes in chr_set.
+    """
+    out: CompartmentMap = {}
+    if not path or not os.path.exists(path):
+        LOG.warning("compartments file not found: %s", path)
+        return out
+
+    with open(path) as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            chr_ = parts[0]
+            if chr_ not in chr_set:
+                continue
+            try:
+                start, end = int(parts[1]), int(parts[2])
+            except ValueError:
+                continue
+            if not _overlaps(start, end, region):
+                continue
+            try:
+                score = float(parts[3])
+            except ValueError:
+                cls = compartment_from_label(parts[3])
+                score = 0.0
+            else:
+                if score != score:  # NaN rows are gaps in an eigenvector track
+                    continue
+                cls = int(Compartment.NONE)
+            out.setdefault(chr_, []).append(CompartmentInterval(chr_, start, end, cls, score))
+
+    for chr_, lst in out.items():
+        lst.sort(key=lambda iv: iv.start)
+        LOG.info("compartments loaded: %s: %d", chr_, len(lst))
+
+    return out
+
+
+def load_signal(
+    path: str,
+    chr_set: set[str],
+    region: BedRegion | None = None,
+) -> SignalMap:
+    """
+    Load a continuous track such as ATAC-seq.  Format: chr start end value
+
+    Intervals are kept sorted by start so binning can bisect.
+
+    Returns dict[chr -> list[SignalInterval]] for chromosomes in chr_set.
+    """
+    out: SignalMap = {}
+    if not path or not os.path.exists(path):
+        LOG.warning("signal file not found: %s", path)
+        return out
+
+    with open(path) as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            chr_ = parts[0]
+            if chr_ not in chr_set:
+                continue
+            try:
+                start, end = int(parts[1]), int(parts[2])
+                value = float(parts[3])
+            except ValueError:
+                continue
+            if value != value:
+                continue
+            if not _overlaps(start, end, region):
+                continue
+            out.setdefault(chr_, []).append(SignalInterval(chr_, start, end, value))
+
+    for chr_, lst in out.items():
+        lst.sort(key=lambda iv: iv.start)
+        LOG.info("signal loaded: %s: %d", chr_, len(lst))
+
+    return out
+
+
 # Load singletons
 
 

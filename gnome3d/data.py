@@ -9,10 +9,13 @@ ContactData.from_files(settings, chrs, region)
 ContactData.from_dataframes(anchors_df, arcs_df, ...)
     Converts pandas DataFrames into the same internal representation.
     Expected columns:
-        anchors_df:     chr, start, end[, orientation]
-        arcs_df:        chr_a, start_a, end_a, chr_b, start_b, end_b, score
-        breakpoints_df: chr, pos
-        singletons_df:  chr1, pos1, chr2, pos2, score
+        anchors_df:       chr, start, end[, orientation]
+        arcs_df:          chr_a, start_a, end_a, chr_b, start_b, end_b, score
+        breakpoints_df:   chr, pos
+        singletons_df:    chr1, pos1, chr2, pos2, score
+        compartments_df:  chr, start, end[, label][, value]
+        accessibility_df: chr, start, end, value
+        phasing_df:       chr, start, end, value
 
 Once constructed, a ContactData instance is file-independent and can be
 passed directly to Solver.load().
@@ -24,7 +27,16 @@ from dataclasses import field
 from typing import TYPE_CHECKING, Any
 
 from gnome3d import log
-from gnome3d.io import load_anchors, load_arcs, load_breakpoints, load_singletons
+from gnome3d.io import (
+    compartment_from_label,
+    load_anchors,
+    load_arcs,
+    load_breakpoints,
+    load_compartments,
+    load_signal,
+    load_singletons,
+)
+from gnome3d.tracks import normalize_signal_map, phase_compartments
 from gnome3d.types import *
 
 if TYPE_CHECKING:
@@ -41,15 +53,22 @@ class ContactData:
     breakpoints: dict[chr -> list[int]] - segment boundary positions
     singletons:  list of (chr1, pos1, chr2, pos2, score) contacts
                  used to build the segment-level heatmap
+    compartments: dict[chr -> list[CompartmentInterval]] - A/B calls, already phased
+    accessibility: dict[chr -> list[SignalInterval]] - ATAC-seq, rescaled to [0, 1]
     """
 
     anchors: AnchorMap = field(default_factory=empty_anchor_map)
     arcs: ArcMap = field(default_factory=empty_arc_map)
     breakpoints: BreakpointMap = field(default_factory=empty_breakpoint_map)
+    ib_splits: BreakpointMap = field(default_factory=empty_breakpoint_map)
     singletons: list[SingletonContact] = field(default_factory=empty_singleton_list)
     # Long-range arcs (gap > max_pet_length): not anchor-mapped, folded into the
     # segment heatmap by Solver. Mirrors Reference InteractionArcs::long_arcs.
     long_arcs: RawArcMap = field(default_factory=empty_raw_arc_map)
+    # Epigenomic tracks driving the opt-in compartment and accessibility energy
+    # terms.  Empty when no track is configured, which leaves those terms inert.
+    compartments: CompartmentMap = field(default_factory=empty_compartment_map)
+    accessibility: SignalMap = field(default_factory=empty_signal_map)
 
     @classmethod
     def from_files(
@@ -89,6 +108,14 @@ class ContactData:
 
         LOG.info("load breakpoints")
         breakpoints = load_breakpoints(s.data_path(s.data_segment_split), chrs)
+        ib_splits: BreakpointMap = {}
+        if s.data_ib_split and str(s.ib_split_source).strip().lower() != "arcs":
+            ib_splits = load_breakpoints(s.data_path(s.data_ib_split), chrs)
+            if not ib_splits:
+                raise RuntimeError(
+                    f"ib_split_source={s.ib_split_source} but no boundaries loaded from "
+                    f"{s.data_ib_split}; a silently empty file would fall back to arc gaps"
+                )
 
         LOG.info("load singletons")
         singletons = load_singletons(s.data_path(s.data_singletons), chr_set, region)
@@ -102,12 +129,39 @@ class ContactData:
             inter = load_singletons(inter_path, chr_set, region)
             singletons.extend(inter)
 
+        compartments: CompartmentMap = {}
+        if s.data_compartments:
+            LOG.info("load compartments")
+            compartments = load_compartments(s.data_path(s.data_compartments), chr_set, region)
+
+        accessibility: SignalMap = {}
+        if s.data_accessibility:
+            LOG.info("load accessibility")
+            accessibility = load_signal(s.data_path(s.data_accessibility), chr_set, region)
+
+        phasing: SignalMap = {}
+        if s.data_phasing_track:
+            LOG.info("load phasing track")
+            phasing = load_signal(s.data_path(s.data_phasing_track), chr_set, region)
+
+        compartments, accessibility = _finalize_tracks(
+            compartments,
+            accessibility,
+            phasing,
+            anchors,
+            mode=s.accessibility_mode,
+            percentile=s.accessibility_percentile,
+        )
+
         return cls(
             anchors=anchors,
             arcs=arcs,
             breakpoints=breakpoints,
+            ib_splits=ib_splits,
             singletons=singletons,
             long_arcs=long_arcs,
+            compartments=compartments,
+            accessibility=accessibility,
         )
 
     @classmethod
@@ -120,6 +174,11 @@ class ContactData:
         chrs: list[str] | None = None,
         region: BedRegion | None = None,
         max_pet_length: int = 1_000_000,
+        compartments_df: Any | None = None,
+        accessibility_df: Any | None = None,
+        phasing_df: Any | None = None,
+        accessibility_mode: str = "log",
+        accessibility_percentile: float = 80.0,
     ) -> ContactData:
         """
         Build ContactData from pandas DataFrames.
@@ -140,6 +199,14 @@ class ContactData:
             Genomic window filter.
         max_pet_length : int
             Arcs longer than this are discarded.
+        compartments_df : DataFrame or None
+            Columns: chr, start, end[, label][, value].  `label` wins when both
+            are present.  A value-only frame is phased the same way a file is.
+        accessibility_df : DataFrame or None
+            Columns: chr, start, end, value
+        phasing_df : DataFrame or None
+            Columns: chr, start, end, value.  Used to orient a value-only
+            compartment frame when no accessibility frame is given.
         """
         chr_set: set[str] = (
             set(chrs) if chrs is not None else {str(c) for c in anchors_df["chr"].unique()}
@@ -205,13 +272,106 @@ class ContactData:
                     continue
                 singletons.append((c1, p1, c2, p2, sc))
 
+        compartments = _compartments_from_df(compartments_df, chr_set, region)
+        accessibility = _signal_from_df(accessibility_df, chr_set, region)
+        phasing = _signal_from_df(phasing_df, chr_set, region)
+        compartments, accessibility = _finalize_tracks(
+            compartments,
+            accessibility,
+            phasing,
+            anchors,
+            mode=accessibility_mode,
+            percentile=accessibility_percentile,
+        )
+
         return cls(
             anchors=anchors,
             arcs=arcs,
             breakpoints=breakpoints,
             singletons=singletons,
             long_arcs=long_arcs,
+            compartments=compartments,
+            accessibility=accessibility,
         )
+
+
+# Epigenomic track assembly, shared by both factories
+
+
+def _finalize_tracks(
+    compartments: CompartmentMap,
+    accessibility: SignalMap,
+    phasing: SignalMap,
+    anchors: AnchorMap,
+    mode: str = "log",
+    percentile: float = 80.0,
+) -> tuple[CompartmentMap, SignalMap]:
+    """
+    Phase the compartment track and rescale accessibility onto [0, 1].
+
+    Phasing uses accessibility ahead of a dedicated phasing track, because A is
+    the open compartment by definition, so that correlation is the one the model
+    actually means.  It runs on the raw signal, before rescaling, since a
+    monotone rescale cannot change the sign of the correlation.
+
+    Both factories go through here so the file and frame paths cannot pick
+    different rules.
+    """
+    if compartments:
+        signal = accessibility if accessibility else phasing
+        compartments = phase_compartments(compartments, signal or None, anchors)
+    if accessibility:
+        accessibility = normalize_signal_map(accessibility, mode=mode, percentile=percentile)
+    return compartments, accessibility
+
+
+def _compartments_from_df(df: Any, chr_set: set[str], region: BedRegion | None) -> CompartmentMap:
+    """Build a CompartmentMap from a DataFrame with chr/start/end[/label][/value]."""
+    out: CompartmentMap = {}
+    if df is None:
+        return out
+    for _, row in df.iterrows():
+        c = str(row["chr"])
+        if c not in chr_set:
+            continue
+        st, en = int(row["start"]), int(row["end"])
+        if region is not None and (st > region.end or en < region.start):
+            continue
+        if "label" in row.index:
+            cls = compartment_from_label(str(row["label"]))
+            score = 0.0
+        else:
+            cls = int(Compartment.NONE)
+            score = float(row["value"])
+            if score != score:
+                continue
+        out.setdefault(c, []).append(CompartmentInterval(c, st, en, cls, score))
+
+    for lst in out.values():
+        lst.sort(key=lambda iv: iv.start)
+    return out
+
+
+def _signal_from_df(df: Any, chr_set: set[str], region: BedRegion | None) -> SignalMap:
+    """Build a SignalMap from a DataFrame with chr/start/end/value."""
+    out: SignalMap = {}
+    if df is None:
+        return out
+    for _, row in df.iterrows():
+        c = str(row["chr"])
+        if c not in chr_set:
+            continue
+        st, en = int(row["start"]), int(row["end"])
+        if region is not None and (st > region.end or en < region.start):
+            continue
+        value = float(row["value"])
+        if value != value:
+            continue
+        out.setdefault(c, []).append(SignalInterval(c, st, en, value))
+
+    for lst in out.values():
+        lst.sort(key=lambda iv: iv.start)
+    return out
 
 
 # map RawArcs -> anchor-indexed InteractionArcs

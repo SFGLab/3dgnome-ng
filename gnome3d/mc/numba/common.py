@@ -1,7 +1,7 @@
 """Shared numba driver + array helpers.
 
 `_run_outer_loop` is the Python-side convergence loop every public entry uses:
-it runs `terms._batch_mc_nb` for `stop_steps` at a time and checks the C++-style
+it runs `terms._batch_mc_nb` for `stop_steps` at a time and checks the reference-style
 stop condition.  `_prepare_orientation` builds the CSR orientation arrays the
 kernel needs from the Python neighbour dicts.  `_as_f64` / `_dummy_*` produce the
 contiguous / placeholder arrays the kernel's fixed signature expects.
@@ -9,13 +9,17 @@ contiguous / placeholder arrays the kernel's fixed signature expects.
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 import numpy as np
 
 from gnome3d import log
-from gnome3d.mc.numba.terms import batch_mc_nb, score_orientation_full_nb
-from gnome3d.types import BoolArray, F64Array, I32Array, I64Array
+from gnome3d.mc.numba.terms import (
+    batch_mc_nb,
+    init_affinity_nb,
+    score_orientation_full_nb,
+)
+from gnome3d.types import BoolArray, F64Array, I8Array, I32Array, I64Array
 
 LOG = log.get("mc.numba")
 
@@ -34,6 +38,112 @@ def dummy_bool(shape: tuple[int, ...] = (1, 1)) -> BoolArray:
 
 def dummy_i32(shape: tuple[int, ...] = (1,)) -> I32Array:
     return np.zeros(shape, dtype=np.int32)
+
+
+# Placeholders for disabled optional-term arrays.  A disabled term is never
+# indexed, so these exist only to give numba a concrete type.  Never written to.
+NO_I8: I8Array = np.zeros(1, dtype=np.int8)
+NO_F64: F64Array = np.zeros(1, dtype=np.float64)
+
+
+class AffinityParams(NamedTuple):
+    """Resolved compartment + bridging kernel arguments for one MC level."""
+
+    use_comp: bool
+    comp_cls: I8Array
+    comp_r0: float
+    comp_weight: float
+    comp_ea: float
+    comp_eb: float
+    use_brdg: bool
+    brdg_a: F64Array
+    brdg_r0: float
+    brdg_weight: float
+
+    @property
+    def any_on(self) -> bool:
+        return self.use_comp or self.use_brdg
+
+
+def affinity_params(
+    settings: Any,
+    level: str,
+    bond_scale: float,
+    compartment: np.ndarray[Any, Any] | None,
+    accessibility: np.ndarray[Any, Any] | None,
+) -> AffinityParams:
+    """Resolve the affinity terms for one MC level.
+
+    A term is on only when its master flag, its per-level apply flag and its
+    track are all present, so a missing track silently leaves it off rather than
+    scoring against zeros.  A radius of 0 auto-derives as
+    `auto_factor * bond_scale`, matching the excluded-volume convention.
+
+    Parameters
+    ----------
+    level : str
+        One of "smooth", "ib", "heatmap".  Selects the per-level settings.
+    bond_scale : float
+        This level's mean bead-bead target distance, the auto-radius base.
+    """
+    have_c = compartment is not None and compartment.size > 0
+    use_comp = (
+        bool(settings.use_compartments)
+        and bool(getattr(settings, f"compartment_apply_to_{level}"))
+        and have_c
+    )
+    comp_r0 = float(getattr(settings, f"compartment_radius_{level}"))
+    if use_comp and comp_r0 <= 0.0:
+        comp_r0 = float(getattr(settings, f"compartment_auto_factor_{level}")) * bond_scale
+    comp_r0 = comp_r0 if comp_r0 > 0.0 else 1.0
+
+    have_a = accessibility is not None and accessibility.size > 0
+    use_brdg = (
+        bool(settings.use_bridging)
+        and bool(getattr(settings, f"bridging_apply_to_{level}"))
+        and have_a
+    )
+    brdg_r0 = float(getattr(settings, f"bridging_radius_{level}"))
+    if use_brdg and brdg_r0 <= 0.0:
+        brdg_r0 = float(getattr(settings, f"bridging_auto_factor_{level}")) * bond_scale
+    brdg_r0 = brdg_r0 if brdg_r0 > 0.0 else 1.0
+
+    return AffinityParams(
+        use_comp=use_comp,
+        comp_cls=(
+            np.ascontiguousarray(compartment, dtype=np.int8)
+            if use_comp and compartment is not None
+            else NO_I8
+        ),
+        comp_r0=comp_r0,
+        comp_weight=float(settings.compartment_weight),
+        comp_ea=float(settings.compartment_energy_a),
+        comp_eb=float(settings.compartment_energy_b),
+        use_brdg=use_brdg,
+        brdg_a=(as_f64(accessibility) if use_brdg and accessibility is not None else NO_F64),
+        brdg_r0=brdg_r0,
+        brdg_weight=float(settings.bridging_weight),
+    )
+
+
+def init_affinity_scores(pw: F64Array, aff: AffinityParams) -> tuple[float, float]:
+    """Full compartment and bridging scores for the starting positions."""
+    if not aff.any_on:
+        return 0.0, 0.0
+    c, b = init_affinity_nb(
+        pw,
+        aff.use_comp,
+        aff.comp_cls,
+        aff.comp_r0,
+        aff.comp_weight,
+        aff.comp_ea,
+        aff.comp_eb,
+        aff.use_brdg,
+        aff.brdg_a,
+        aff.brdg_r0,
+        aff.brdg_weight,
+    )
+    return float(c), float(b)
 
 
 def prepare_orientation(
@@ -150,13 +260,39 @@ def run_outer_loop(
     score_excl: float,
     score_conf: float,
     rep_inv_cutoff: float = 0.0,
+    # Affinity terms default to off so a stage that never uses them (arcs) needs
+    # no extra arguments.  The dummy arrays are only there to fix numba's types.
+    use_comp: bool = False,
+    comp_cls: I8Array = NO_I8,
+    comp_r0: float = 1.0,
+    comp_weight: float = 0.0,
+    comp_ea: float = 0.0,
+    comp_eb: float = 0.0,
+    use_brdg: bool = False,
+    brdg_a: F64Array = NO_F64,
+    brdg_r0: float = 1.0,
+    brdg_weight: float = 0.0,
+    score_comp: float = 0.0,
+    score_brdg: float = 0.0,
 ) -> float:
     """Drive the unified kernel until convergence; return the final total score."""
-    score = score_struct + score_heat + score_orn + score_excl + score_conf
+    score = (
+        score_struct + score_heat + score_orn + score_excl + score_conf + score_comp + score_brdg
+    )
     ms_score = score
     step_i = 0
     while True:
-        (T, score_struct, score_heat, score_orn, score_excl, score_conf, n_ok) = batch_mc_nb(
+        (
+            T,
+            score_struct,
+            score_heat,
+            score_orn,
+            score_excl,
+            score_conf,
+            score_comp,
+            score_brdg,
+            n_ok,
+        ) = batch_mc_nb(
             pw,
             movable,
             struct_type,
@@ -192,6 +328,16 @@ def run_outer_loop(
             conf_cz,
             conf_R,
             conf_weight,
+            use_comp,
+            comp_cls,
+            comp_r0,
+            comp_weight,
+            comp_ea,
+            comp_eb,
+            use_brdg,
+            brdg_a,
+            brdg_r0,
+            brdg_weight,
             float(step_size),
             T,
             dt,
@@ -204,9 +350,19 @@ def run_outer_loop(
             score_orn,
             score_excl,
             score_conf,
+            score_comp,
+            score_brdg,
             rep_inv_cutoff,
         )
-        score = score_struct + score_heat + score_orn + score_excl + score_conf
+        score = (
+            score_struct
+            + score_heat
+            + score_orn
+            + score_excl
+            + score_conf
+            + score_comp
+            + score_brdg
+        )
         step_i += stop_steps
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (

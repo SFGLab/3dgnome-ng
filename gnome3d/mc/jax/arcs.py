@@ -22,6 +22,7 @@ from gnome3d.mc.jax.util import (
     jax_is_available,
     log_kernel_done,
     log_kernel_start,
+    stable_seed_offset,
 )
 from gnome3d.types import F32Array
 
@@ -774,9 +775,7 @@ def mc_arcs_jax(
     stop_successes = jnp.int32(settings.mc_stop_successes)
     score_eps = jnp.float32(1e-5)
     stop_when_ratio_above = jnp.float32(0.9999)
-    # Per-call RNG diversity keyed on the active scope path (was: the label).
-    _seed_src = log.current()
-    seed_offset: int = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
+    seed_offset: int = stable_seed_offset(log.current())
     base_key = jax.random.PRNGKey(seed_offset)
 
     pos_k, ss_k, se_k, sc_k, final_score_best, iter_count, converged_flag = kernel_full(
@@ -862,7 +861,7 @@ def _prep_arcs_problem_np(
         conf_R = 1.0
 
     # Non-arc 1/d repulsion cutoff: truncate at factor x mean arc distance so sparse/small IBs
-    # don't blow up (the unbounded 1/d has no minimum).  0 => unbounded (faithful to C++).
+    # don't blow up (the unbounded 1/d has no minimum).  0 => unbounded (faithful to the reference).
     rep_factor = float(getattr(settings, "arcs_repulsion_cutoff_factor", 0.0))
     rep_inv_cutoff = 0.0
     if rep_factor > 0.0:
@@ -1063,8 +1062,10 @@ def _mc_arcs_jax_batch_chunk(
         jax.block_until_ready((ss_k, se_k, sc_k))  # force the O(N^2) init scans
         init_ms = (time.perf_counter() - t_init) * 1e3
 
-    _seed_src = log.current()
-    seed_offset = abs(hash(_seed_src)) % (2**31) if _seed_src else 0
+    # Scope path distinguishes concurrent kernels; the node seed makes the draw
+    # follow from Seeded.seed. Chains within a batch are separated by the kernel's
+    # own per-index fold, so grouping still shifts which chain gets which stream.
+    seed_offset = stable_seed_offset(log.current(), problems[0].get("seed"))
     base_key = jax.random.PRNGKey(seed_offset)
 
     _kf_args = (

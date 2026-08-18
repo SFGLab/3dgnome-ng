@@ -38,6 +38,7 @@ import argparse
 import io
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -48,6 +49,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 CPP_BIN = ROOT / "3dnome" / "3dnome"
+
+
+def _cpp_env() -> dict:
+    """Environment for invoking 3dnome: make sure the loader finds ``lib3dnome.so``, which sits
+    next to the binary. The makefile links with rpath ``@executable_path`` (a macOS token that's
+    meaningless on Linux), so on Linux the shared lib isn't found unless we add its directory to
+    ``LD_LIBRARY_PATH`` (``DYLD_LIBRARY_PATH`` on macOS). Prepended, so an existing value wins."""
+    env = os.environ.copy()
+    libdir = str(CPP_BIN.parent)
+    for var in ("LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"):
+        env[var] = libdir + (os.pathsep + env[var] if env.get(var) else "")
+    return env
+
+
 DATA_DIR = ROOT / "data" / "GM12878"
 REGION = "chr1:18288319-20307135"
 REGION_LABEL = f"integration_test_region_{REGION.replace(':', '_').replace('-', '_')}"
@@ -644,6 +659,7 @@ def run_cpp_ensemble(
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
+        env=_cpp_env(),
     )
     raw_lines = []
     for line in proc.stdout:
@@ -669,6 +685,96 @@ def run_cpp_ensemble(
             sys.exit(f"[cpp] no leaf beads parsed from {hcm}")
         structures.append(beads)
 
+    return structures, raw_lines
+
+
+def run_cpp_ensemble_parallel(
+    outdir: Path,
+    config: Path,
+    n: int,
+    max_level: int,
+    region: str,
+    region_label: str,
+    workers: int = 0,
+    base_seed: int = 0,
+) -> tuple[list, list]:
+    """Like ``run_cpp_ensemble`` but split the n structures across ``workers`` concurrent
+    processes on separate cores. Each worker generates a chunk in its own output dir with a
+    DISTINCT RNG seed (``-r``), so the chunks are independent. ``workers<=0`` -> auto
+    (min(n, cpu_count)); ``workers==1`` falls back to the serial single call.
+
+    Statistically equivalent to the serial ``-m n`` run (a sample of independent structures),
+    NOT byte-identical to it. Requires a 3dnome built with the ``-r`` seed flag (``make 3dnome``);
+    warns loudly if the binary doesn't echo ``rng seed =`` (an old binary would silently produce
+    identical structures across workers). Reproducible given ``base_seed``.
+
+    Worker stdout is redirected to a per-worker log file (not a PIPE) to avoid the classic
+    fill-the-pipe-buffer deadlock when many processes run unattended.
+    """
+    if workers is None or workers <= 0:
+        workers = min(n, os.cpu_count() or 1)
+    workers = max(1, min(workers, n))
+    if workers == 1:
+        return run_cpp_ensemble(outdir, config, n, max_level, region, region_label)
+
+    base, rem = divmod(n, workers)
+    sizes = [base + (1 if i < rem else 0) for i in range(workers)]  # balanced, sums to n
+    print(f"[cpp] parallel ensemble: {n} structures across {workers} workers (sizes {sizes})")
+
+    procs = []
+    for c, sz in enumerate(sizes):
+        wd = outdir / f"_par{c}"
+        wd.mkdir(parents=True, exist_ok=True)
+        seed = (base_seed + 1 + c * 2654435761) & 0x7FFFFFFF  # distinct, well-spaced per worker
+        log = wd / "cpp.log"
+        cmd = [
+            str(CPP_BIN), "-a", "create", "-s", str(config), "-n", region_label,
+            "-c", region, "-o", str(wd) + "/", "-m", str(sz), "-v", str(max_level),
+            "-r", str(seed),
+        ]  # fmt: skip
+        print(f"[cpp] worker {c}: {sz} structs, seed={seed}")
+        fh = open(log, "w")
+        procs.append(
+            (
+                c,
+                sz,
+                wd,
+                log,
+                fh,
+                subprocess.Popen(cmd, stdout=fh, stderr=subprocess.STDOUT, env=_cpp_env()),
+            )
+        )
+
+    structures: list = []
+    raw_lines: list = []
+    seed_flag_seen = False
+    for c, sz, wd, log, fh, proc in procs:
+        proc.wait()
+        fh.close()
+        text = log.read_text(errors="replace")
+        raw_lines.extend(text.splitlines())
+        if "rng seed =" in text:
+            seed_flag_seen = True
+        if proc.returncode != 0:
+            sys.exit(f"[cpp] parallel worker {c} exited with code {proc.returncode} (see {log})")
+        for i in range(sz):
+            hcm = (
+                (wd / f"loops_{region_label}.hcm")
+                if sz == 1
+                else (wd / f"loops_{region_label}_{i}.hcm")
+            )
+            if not hcm.exists():
+                sys.exit(f"[cpp] parallel worker {c}: expected output not found: {hcm}")
+            beads = parse_hcm(hcm)
+            if not beads:
+                sys.exit(f"[cpp] parallel worker {c}: no leaf beads parsed from {hcm}")
+            structures.append(beads)
+
+    if not seed_flag_seen:
+        print(
+            "[cpp][WARN] binary never echoed 'rng seed =' — it likely lacks the -r flag, so the "
+            "parallel workers may have produced IDENTICAL structures. Rebuild it: make 3dnome"
+        )
     return structures, raw_lines
 
 
@@ -879,13 +985,21 @@ def _compare_and_report(
     # Rg: KS (byte-faithful) or bounded mean-ratio (checker mode)
     d_rg, p_rg = ks_2samp(ref_stats["rg"], test_stats["rg"])
     if size_ratio_tol is not None:
-        rg_ratio = _mean(test_stats["rg"]) / _mean(ref_stats["rg"]) if _mean(ref_stats["rg"]) else float("nan")
+        rg_ratio = (
+            _mean(test_stats["rg"]) / _mean(ref_stats["rg"])
+            if _mean(ref_stats["rg"])
+            else float("nan")
+        )
         ok_rg = math.isfinite(rg_ratio) and abs(rg_ratio - 1.0) <= size_ratio_tol
-        print(f"  {PASS_STR if ok_rg else FAIL_STR}  Rg size       ratio={rg_ratio:.3f}"
-              f"  (KS d={d_rg:.3f}; tol=±{size_ratio_tol:.0%})")
+        print(
+            f"  {PASS_STR if ok_rg else FAIL_STR}  Rg size       ratio={rg_ratio:.3f}"
+            f"  (KS d={d_rg:.3f}; tol=±{size_ratio_tol:.0%})"
+        )
     else:
         ok_rg = _ks_pass(d_rg, p_rg)
-        print(f"  {PASS_STR if ok_rg else FAIL_STR}  Rg distribution  KS d={d_rg:.3f}  p={p_rg:.3f}")
+        print(
+            f"  {PASS_STR if ok_rg else FAIL_STR}  Rg distribution  KS d={d_rg:.3f}  p={p_rg:.3f}"
+        )
     results.append(ok_rg)
 
     # pooled pairwise distances: KS (byte-faithful) or bounded mean-ratio (checker mode)
@@ -893,10 +1007,16 @@ def _compare_and_report(
     test_pwd = _subsample(test_stats["pwd"], KS_PWD_MAX_SAMPLES)
     d_pw, p_pw = ks_2samp(ref_pwd, test_pwd)
     if size_ratio_tol is not None:
-        pw_ratio = _mean(test_stats["pwd"]) / _mean(ref_stats["pwd"]) if _mean(ref_stats["pwd"]) else float("nan")
+        pw_ratio = (
+            _mean(test_stats["pwd"]) / _mean(ref_stats["pwd"])
+            if _mean(ref_stats["pwd"])
+            else float("nan")
+        )
         ok_pw = math.isfinite(pw_ratio) and abs(pw_ratio - 1.0) <= size_ratio_tol
-        print(f"  {PASS_STR if ok_pw else FAIL_STR}  pairwise size ratio={pw_ratio:.3f}"
-              f"  (KS d={d_pw:.3f}; tol=±{size_ratio_tol:.0%})")
+        print(
+            f"  {PASS_STR if ok_pw else FAIL_STR}  pairwise size ratio={pw_ratio:.3f}"
+            f"  (KS d={d_pw:.3f}; tol=±{size_ratio_tol:.0%})"
+        )
     else:
         ok_pw = _ks_pass(d_pw, p_pw)
         print(
@@ -1008,7 +1128,10 @@ def run_backend_divergence(
                 "Use n>=50 (a quick GPU job) to be sure."
             )
         all_ok = _compare_and_report(
-            numba_structs, jax_structs, "numba", test_name,
+            numba_structs,
+            jax_structs,
+            "numba",
+            test_name,
             size_ratio_tol=0.10 if kernel == "checker" else None,
         )
         if kernel == "checker":
@@ -1132,7 +1255,9 @@ def main():
     if args.python_only and args.cpp_only:
         sys.exit("[error] --python-only and --cpp-only are mutually exclusive")
     if divergence and args.cpp_only:
-        sys.exit("[error] --jax-divergence/--checker-divergence and --cpp-only are mutually exclusive")
+        sys.exit(
+            "[error] --jax-divergence/--checker-divergence and --cpp-only are mutually exclusive"
+        )
 
     if not args.python_only and not divergence and not CPP_BIN.exists():
         sys.exit(f"[error] binary not found: {CPP_BIN}\n  run: make 3dnome")
@@ -1185,8 +1310,11 @@ def main():
     # no reference binary or cache needed.  Runs and exits.
     if divergence:
         kernel = "checker" if args.checker_divergence else "mc"
-        mode = "checker-kernel divergence (numba vs jax+checker)" if args.checker_divergence \
+        mode = (
+            "checker-kernel divergence (numba vs jax+checker)"
+            if args.checker_divergence
             else "JAX-backend divergence (numba baseline vs jax)"
+        )
         print(f"[integration] mode: {mode}")
         run_backend_divergence(
             args, region, region_label, use_orn, use_anchor_heatmap, use_subanchor_heatmap, kernel

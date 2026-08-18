@@ -1,0 +1,13 @@
+{
+  "_note": "Chromatin accessibility for HFFC6, the input to the HiP-HoP bridging and fibre-compaction terms. DNase-seq. ENCODE has no ATAC-seq for HFFc6, and ENCSR647WPA is archived, so the released ENCSR672EWY is used. Fetch: python -m validation fetch --manifest validation/manifests/HFFC6_accessibility.json --out data/_epigenome  ->  data/_epigenome/HFFC6/. Then bin it onto a bedGraph with: python -m validation tracks --cell HFFC6",
+  "cell_line": "HFFC6",
+  "assembly": "GRCh38",
+  "assays": [
+    {
+      "name": "ATAC",
+      "source": "encode",
+      "accession": "ENCSR672EWY",
+      "output_type": "read-depth normalized signal"
+    }
+  ]
+}

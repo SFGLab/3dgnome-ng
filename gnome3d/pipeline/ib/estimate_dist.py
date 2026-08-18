@@ -97,7 +97,12 @@ def _estimate_avg_dist(
         for _step in range(n_steps):
             pos_trial: F32Array = pos.copy()
             add_movable_noise_inplace(pos_trial, fixed, step)
-            score = mc_numba.mc_smooth_numba(pos_trial, dtn, fixed, step, s)  # dry: no heat/orn
+            # Dry pass: no heat, no orientation, and no affinity either.  The
+            # affinity terms are attractive, so including them here would shrink
+            # the estimated pairwise distances that become the heat target, and
+            # the real smooth pass would then compact against an already-compacted
+            # target.  EV and confinement stay because they push outward.
+            score = mc_numba.mc_smooth_numba(pos_trial, dtn, fixed, step, s)
             if score < rep_best_score or rep_best_score < 0.0:
                 rep_best_score = score
                 rep_best_pos = pos_trial.copy()

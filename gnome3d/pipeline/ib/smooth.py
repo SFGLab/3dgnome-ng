@@ -149,6 +149,8 @@ def _run(problem: Problem) -> Result:
     nbrs = problem["anchor_neighbors"]
     nbr_w = problem["anchor_neighbor_weights"]
     heat = problem["heat_dist"]
+    comp = problem["compartment"]
+    acc = problem["accessibility"]
 
     seed_rng(seed)
     mc_numba.seed_numba(seed)
@@ -158,7 +160,9 @@ def _run(problem: Problem) -> Result:
     for _run_i in range(max(1, int(s.steps_smooth))):
         pos_run: F32Array = best_pos.copy()
         add_movable_noise_inplace(pos_run, fixed, step)
-        score = mc_numba.mc_smooth_numba(pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat)
+        score = mc_numba.mc_smooth_numba(
+            pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat, comp, acc
+        )
         if score < best_score or best_score < 0.0:
             best_score = score
             best_pos = pos_run.copy()
@@ -174,7 +178,7 @@ class SmoothStage:
         return int(inputs[0].pos.shape[0])  # type: ignore[attr-defined]
 
     def batch_key(self, inputs: tuple[State, ...]) -> tuple[object, ...]:
-        """``(heat?, orn?, bead-bucket)`` - the exact signature
+        """``(heat?, orn?, comp?, brdg?, bead-bucket)`` - the exact signature
         `mc_smooth_jax_batch` reads from ``problems[0]`` to pick its kernel.  A
         batch MUST be uniform in these flags, so they are part of the key (else a
         no-heat IB could land in a heat batch and get the wrong kernel)."""
@@ -186,13 +190,19 @@ class SmoothStage:
             and st.anchor_neighbors is not None
             and st.anchor_neighbor_weights is not None
         )
-        return heat, orn, batch_bucket(int(st.pos.shape[0]), st.settings)
+        comp = st.bead_compartment is not None
+        brdg = st.bead_accessibility is not None
+        return heat, orn, comp, brdg, batch_bucket(int(st.pos.shape[0]), st.settings)
 
     @staticmethod
     def describe_batch_key(key: tuple[object, ...]) -> str:
-        """Human-readable form of the ``(heat?, orn?, bucket)`` batch key for logs."""
-        heat, orn, bucket = key
-        return f"heat={'yes' if heat else 'no'} orn={'yes' if orn else 'no'} {bucket}-bead bucket"
+        """Human-readable form of the batch key for logs."""
+        heat, orn, comp, brdg, bucket = key
+        return (
+            f"heat={'yes' if heat else 'no'} orn={'yes' if orn else 'no'} "
+            f"comp={'yes' if comp else 'no'} brdg={'yes' if brdg else 'no'} "
+            f"{bucket}-bead bucket"
+        )
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:
         st = inputs[0]
@@ -213,6 +223,8 @@ class SmoothStage:
             "anchor_neighbors": st.anchor_neighbors,
             "anchor_neighbor_weights": st.anchor_neighbor_weights,
             "heat_dist": getattr(st, "heat_dist", None),
+            "compartment": st.bead_compartment,
+            "accessibility": st.bead_accessibility,
         }
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:

@@ -22,6 +22,7 @@ def simulate(
     chrs_list: list[str],
     n_structures: int = 1,
     region: BedRegion | None = None,
+    seed_offset: int = 0,
 ) -> list[dict[str, list[BeadOut]]]:
     """
     Core MC reconstruction loop. Takes pre-built Settings and ContactData;
@@ -41,7 +42,13 @@ def simulate(
     executor = pick_executor(settings)
     with log.step(LOG, f"reconstruct {n_structures} structure(s)"):
         raw = reconstruct_ensemble(
-            settings, data, chrs_list, region, n=n_structures, executor=executor
+            settings,
+            data,
+            chrs_list,
+            region,
+            n=n_structures,
+            executor=executor,
+            base_seed_offset=seed_offset,
         )
 
     structures: list[dict[str, list[BeadOut]]] = []

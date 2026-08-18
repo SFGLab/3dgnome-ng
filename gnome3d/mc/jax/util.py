@@ -10,11 +10,33 @@ _JAX_AVAILABLE: bool | None = None  # None = not yet probed
 _init_lock = threading.Lock()
 
 # Shape-bucket ladder.  When settings.jax_bucket_shapes is on, every kernel's
-# bead count N is padded up to the next bucket so XLA compiles ~one program per
-# bucket (8 total) instead of one per distinct region size.  Geometric x2 so
-# worst-case padding waste is <2x compute.  N above the top bucket compiles at
-# its exact size (rare).
-SHAPE_BUCKETS: tuple[int, ...] = (256, 512, 1024, 2048, 4096, 8192, 16384, 32768)
+# bead count N is padded up to the next bucket so XLA compiles one program per
+# bucket instead of one per distinct region size.
+#
+# The ladder is geometric x2 up to 4096 and roughly x1.25 above it.  The smooth
+# kernel's heat tensor is (N, N), so padding costs the square of the ratio: on a
+# x2 ladder an N just above a boundary wasted 4x on the single largest array,
+# which reached tens of gigabytes of host memory on a whole chromosome.  Above
+# 8192, where that array is 0.27 GB or more, the finer steps cut worst-case waste
+# from 4.00x to 1.64x and mean waste from 2.00x to 1.26x.  Below 4096 the arrays
+# are small enough that x2 is free, and keeping it there holds the compile count
+# down.  N above the top bucket compiles at its exact size (rare).
+SHAPE_BUCKETS: tuple[int, ...] = (
+    256,
+    512,
+    1024,
+    2048,
+    4096,
+    5120,
+    6400,
+    8192,
+    10240,
+    12800,
+    16384,
+    20480,
+    25600,
+    32768,
+)
 
 # Separate (finer/smaller) ladders for smooth orientation's anchor count and
 # neighbor width - these scale below N, so reusing _SHAPE_BUCKETS would waste a
@@ -161,6 +183,28 @@ def jax_device_budget_bytes(fraction: float = 0.95) -> int | None:
             alloc or "default",
         )
     return budget
+
+
+def stable_seed_offset(src: str, base: int | None = None) -> int:
+    """PRNG offset for a JAX kernel, stable across processes.
+
+    Two runs of one config with one seed must produce one structure. Deriving the
+    offset from `hash()` of a string broke that, because Python salts string
+    hashing per process, so every run of a JAX-backed stage silently explored a
+    different trajectory and `PYTHONHASHSEED=0` was needed to compare two runs.
+    blake2b is stable across processes and machines.
+
+    `src` distinguishes concurrent kernels, normally the active scope path.
+    `base` mixes in the seed the DAG node carries, so the offset follows from
+    `Seeded.seed` the way the numba path's already does. The odd multiplier
+    spreads nearby seeds across the output range before the modulo.
+    """
+    import hashlib
+
+    v = int.from_bytes(hashlib.blake2b(src.encode("utf-8"), digest_size=8).digest(), "big")
+    if base is not None:
+        v ^= (int(base) & 0xFFFFFFFFFFFFFFFF) * 0x9E3779B97F4A7C15
+    return int(v % (2**31))
 
 
 def jax_bucket_for(n: int, ladder: tuple[int, ...] = SHAPE_BUCKETS) -> int:

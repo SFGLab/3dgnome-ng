@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import field
 from enum import IntEnum
 
+import numpy as np
+
 from gnome3d import log
 from gnome3d.types import *
 
@@ -113,6 +115,42 @@ def find_gaps(
     return gaps
 
 
+def find_boundary_gaps(
+    clusters: list[Cluster],
+    chr_first: ClusterIndex,
+    boundaries: list[int],
+) -> list[ClusterIndex]:
+    """Anchor indices whose following inter-anchor gap contains a boundary.
+
+    The companion to `find_gaps`, which splits where ChIA-PET arc coverage falls
+    to zero. That is a property of the assay's depth: where the library is shallow
+    no arc spans, a block boundary appears, and the reconstruction then folds and
+    places the two sides independently. These boundaries come from the contact map
+    instead, so a block edge means the data shows insulation there.
+
+    `boundaries` is sorted genomic positions for this chromosome. Returns global
+    cluster indices, in the same form `find_gaps` uses, so the two can be merged.
+    """
+    out: list[ClusterIndex] = []
+    if not boundaries:
+        return out
+
+    n_clusters = len(clusters)
+    bp = np.asarray(boundaries, dtype=np.int64)
+    for i in range(chr_first, n_clusters - 1):
+        if clusters[i].level != Level.ANCHOR:
+            break
+        if clusters[i + 1].level != Level.ANCHOR:
+            break
+        lo, hi = clusters[i].end, clusters[i + 1].start
+        if hi < lo:
+            lo, hi = hi, lo
+        j = int(np.searchsorted(bp, lo, side="left"))
+        if j < bp.size and bp[j] <= hi:
+            out.append(i)
+    return out
+
+
 def find_split_predefined(
     gaps: list[ClusterIndex],
     clusters: list[Cluster],
@@ -159,6 +197,8 @@ def build_cluster_tree(
     arcs: ArcMap,
     breakpoints: BreakpointMap,
     chrs: list[str],
+    ib_splits: BreakpointMap | None = None,
+    ib_split_source: str = "arcs",
 ) -> tuple[list[Cluster], ChrRootMap, ChrFirstClusterMap]:
     """
     Build the full cluster hierarchy for all chromosomes.
@@ -206,6 +246,18 @@ def build_cluster_tree(
 
         # --- find gaps and splits ---
         gaps = find_gaps(clusters, chr_first, chr_arcs)
+
+        # Interaction blocks normally end where arc coverage does. `ib_split_source`
+        # can add or substitute boundaries taken from the contact map, so a block
+        # edge reflects measured insulation rather than the depth of the ChIA-PET
+        # library. "arcs" is the reference behaviour.
+        if str(ib_split_source).strip().lower() == "tads" and ib_splits:
+            extra = find_boundary_gaps(clusters, chr_first, ib_splits.get(chr_, []))
+            # Keep the first and last, which bound the chromosome rather than
+            # marking a gap, or the block list loses its endpoints.
+            keep = {gaps[0], gaps[-1]} if gaps else set()
+            merged = sorted(keep | set(extra))
+            gaps = merged if len(merged) > 1 else gaps
 
         chr_bp = breakpoints.get(chr_, [])
         if chr_bp:

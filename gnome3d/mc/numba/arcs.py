@@ -50,7 +50,7 @@ def mc_arcs_numba(
     stretch_k = float(settings.spring_stretch_arcs)
     squeeze_k = float(settings.spring_squeeze_arcs)
 
-    # Non-arc 1/d repulsion cutoff (mirror of _prep_arcs_problem_np): 0 => unbounded (faithful to C++).
+    # Non-arc 1/d repulsion cutoff (mirror of _prep_arcs_problem_np): 0 => unbounded (faithful to the reference).
     rep_factor = float(getattr(settings, "arcs_repulsion_cutoff_factor", 0.0))
     rep_inv_cutoff = 0.0
     if rep_factor > 0.0:
