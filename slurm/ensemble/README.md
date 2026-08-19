@@ -5,16 +5,53 @@ subanchors and excluded volume. The epigenome terms are off.
 
 ## One-time setup on the cluster
 
-`data/` is gitignored, so a fresh checkout has neither the Hi-C nor the derived tracks.
+`data/` is gitignored, so a fresh checkout has no inputs at all.
+
+**1. Copy the ChIA-PET inputs (~12 MB).** The manifests under `validation/manifests/` cover
+Hi-C and epigenomic signal only, so the anchors, loop clusters, segment breakpoints and
+centromeres have no download path. This is the one step no script can do for you:
 
 ```bash
-python -m validation fetch --manifest validation/manifests/GM12878_hic.json --out data/_hic
-python -m validation tracks --cell GM12878          # writes GM12878_tads.bed
-python slurm/ensemble/prep_singletons.py \
-    --mcool data/_hic/GM12878/hic.4DNFIQ32RWCQ.mcool \
-    --region chr1 --binsize 25000 \
-    --out data/GM12878/GM12878_chr1_hic_25kb_singletons.bedpe
+rsync -av --progress \
+    "data/GM12878/GM12878_anchors_3+_oriented.bed" \
+    "data/GM12878/GM12878_clusters_3+.bedpe" \
+    data/GM12878/ccds_all_hg38_merged100k_GM12878.breakpoints.bed \
+    data/GM12878/hg38_centromeres.bed \
+    <cluster>:/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/data/GM12878/
 ```
+
+**2. Run the setup job.** It installs the environment, fetches the Hi-C, calls TADs, builds the
+singletons and verifies every path the array job will open.
+
+```bash
+sbatch slurm/ensemble/setup.sh
+```
+
+Wait for it to finish before submitting the array. Everything it does is idempotent, so rerun
+it after a partial failure; `SKIP_INSTALL=1` reruns only the data half.
+
+### Why setup is a job and not a few login-node commands
+
+Installing on the login node fails with
+
+```
+RuntimeError: NumPy was built with baseline optimizations: (X86_V2)
+              but your machine doesn't support: (X86_V2)
+```
+
+The login node's CPU predates the x86-64-v2 baseline that current NumPy wheels are built
+against, so NumPy cannot import there at all. That rules the login node out for the data
+preparation as well as the install. A GPU compute node is new enough; `setup.sh` prints the
+node's microarchitecture level so a repeat of this is readable rather than cryptic.
+
+The install is also deliberately not `pip install -e ".[validation]"`. That extra pulls
+`hicrep` and `pyBigWig`, which build from sdists whose `setup.py` imports numpy, and that build
+is what died. Neither is needed: `hicrep` is declared in `pyproject.toml` but never imported
+anywhere in `validation/`, and `pyBigWig` is imported lazily by the ATAC signal path this
+ensemble skips. `scipy`, `cooler` and `cooltools` are the real requirements.
+
+Setup is a separate job rather than a branch inside the array because up to 100 array tasks
+share one venv, and concurrent pip installs into a shared prefix corrupt it.
 
 ## Submitting
 

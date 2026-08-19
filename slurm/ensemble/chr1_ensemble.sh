@@ -59,13 +59,17 @@ FIRST=$((TASK * PER_TASK))
 LAST=$((FIRST + PER_TASK - 1))
 MEMBERS="${FIRST}-${LAST}"
 
-# Fail before the allocation is burnt rather than minutes in. A missing singleton file is the
-# likely one: data/ is gitignored, so it does not travel with the checkout.
-if [ ! -f "$SINGLETONS" ]; then
-  echo "[guard] missing $SINGLETONS" >&2
-  echo "[guard] build it once with:" >&2
-  echo "  python slurm/ensemble/prep_singletons.py --mcool $MCOOL \\" >&2
-  echo "      --region chr1 --binsize 25000 --out $SINGLETONS" >&2
+# Fail before the allocation is burnt rather than minutes in. data/ is gitignored, so a fresh
+# checkout has none of this and every one of these is a hard requirement.
+missing=0
+for f in "$SINGLETONS" \
+         "$ROOT/data/GM12878/GM12878_tads.bed" \
+         "$ROOT/data/GM12878/GM12878_anchors_3+_oriented.bed" \
+         "$ROOT/data/GM12878/GM12878_clusters_3+.bedpe"; do
+  [ -s "$f" ] || { echo "[guard] missing $f" >&2; missing=1; }
+done
+if [ "$missing" = "1" ]; then
+  echo "[guard] run the one-time setup first: sbatch slurm/ensemble/setup.sh" >&2
   exit 1
 fi
 
