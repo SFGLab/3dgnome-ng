@@ -11,9 +11,15 @@ back would only weaken a production ensemble, so ``holdout=False`` here.
 """
 
 import argparse
+import sys
 from pathlib import Path
 
-from validation.studies.self_corr import hic_to_singleton_bedpe
+# pyproject installs gnome3d* only, so validation/ is importable from the repo root and nowhere
+# else. Running this file by path puts its own directory on sys.path rather than the root, so
+# the root goes on explicitly and the script works from any working directory.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from validation.studies.self_corr import hic_to_singleton_bedpe  # noqa: E402
 
 
 def main() -> None:
