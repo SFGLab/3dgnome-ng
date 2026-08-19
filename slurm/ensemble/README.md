@@ -1,124 +1,114 @@
-# chr1 conformational ensembles on SLURM
+# Conformational ensembles on eden
 
-GM12878 chr1 with TAD blocks, CTCF anchors, Hi-C singletons, the distance-map terms, dynamic
-subanchors and excluded volume. The epigenome terms are off.
+TAD blocks, CTCF anchors, Hi-C singletons, the distance-map terms, dynamic subanchors and
+excluded volume. Epigenome terms off. Shape bucketing and `heat_min_reduction` on.
 
-## One-time setup on the cluster
+Two entry points:
 
-`data/` is gitignored, so a fresh checkout has no inputs at all.
+| what | setup | run |
+|---|---|---|
+| chr1, GM12878 (the pilot) | `setup.sh` | `chr1_ensemble.sh` |
+| whole genome, any of the three lines | `setup_cell.sh <CELL>` | `genome_ensemble.sh` |
 
-**1. Copy the ChIA-PET inputs (~12 MB).** The manifests under `validation/manifests/` cover
-Hi-C and epigenomic signal only, so the anchors, loop clusters, segment breakpoints and
+Configs are generated, not hand-written. `make_configs.py` builds one `.ini` per cell line from
+`validation.core.config.CANONICAL`, so the cluster runs and the validation harness cannot drift
+apart. Change CANONICAL and regenerate.
+
+## One-time setup per cell line
+
+**1. Copy the ChIA-PET inputs (~12 MB per line).** The manifests under `validation/manifests/`
+cover Hi-C and epigenomic signal only, so the anchors, loop clusters, segment breakpoints and
 centromeres have no download path. This is the one step no script can do for you:
 
 ```bash
-rsync -av --progress \
-    "data/GM12878/GM12878_anchors_3+_oriented.bed" \
-    "data/GM12878/GM12878_clusters_3+.bedpe" \
-    data/GM12878/ccds_all_hg38_merged100k_GM12878.breakpoints.bed \
-    data/GM12878/hg38_centromeres.bed \
-    <cluster>:/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/data/GM12878/
+for C in GM12878 H1ESC HFFC6; do
+  rsync -av --progress \
+      "data/$C/${C}_anchors_3+_oriented.bed" \
+      "data/$C/${C}_clusters_3+.bedpe" \
+      "data/$C/ccds_all_hg38_merged100k_${C}.breakpoints.bed" \
+      data/$C/hg38_centromeres.bed \
+      eden:/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/data/$C/
+done
 ```
 
-**2. Run the setup job.** It installs the environment, fetches the Hi-C, calls TADs, builds the
-singletons and verifies every path the array job will open.
+**2. Run the setup job per line.** Installs the environment, fetches the Hi-C, calls TADs and
+builds the genome-wide Hi-C singletons, then verifies every path the array will open.
 
 ```bash
-sbatch slurm/ensemble/setup.sh
+mkdir -p slurm/ensemble/logs          # once, before the first submit
+sbatch slurm/ensemble/setup_cell.sh GM12878
+SKIP_INSTALL=1 sbatch slurm/ensemble/setup_cell.sh H1ESC
+SKIP_INSTALL=1 sbatch slurm/ensemble/setup_cell.sh HFFC6
 ```
 
-Wait for it to finish before submitting the array. Everything it does is idempotent, so rerun
-it after a partial failure; `SKIP_INSTALL=1` reruns only the data half.
+The three are independent and can run at once; only the first needs the install. Everything is
+idempotent, so rerun after a partial failure. The singleton step is the long one, roughly 20-40
+minutes for a genome at 25 kb, because it reads a dense contact matrix per chromosome.
 
-### Why setup is a job and not a few login-node commands
-
-Installing on the login node fails with
-
-```
-RuntimeError: NumPy was built with baseline optimizations: (X86_V2)
-              but your machine doesn't support: (X86_V2)
-```
-
-The login node's CPU predates the x86-64-v2 baseline that current NumPy wheels are built
-against, so NumPy cannot import there at all. That rules the login node out for the data
-preparation as well as the install. A GPU compute node is new enough; `setup.sh` prints the
-node's microarchitecture level so a repeat of this is readable rather than cryptic.
-
-The install is also deliberately not `pip install -e ".[validation]"`. That extra pulls
-`hicrep` and `pyBigWig`, which build from sdists whose `setup.py` imports numpy, and that build
-is what died. Neither is needed: `hicrep` is declared in `pyproject.toml` but never imported
-anywhere in `validation/`, and `pyBigWig` is imported lazily by the ATAC signal path this
-ensemble skips. `scipy`, `cooler` and `cooltools` are the real requirements.
-
-Setup is a separate job rather than a branch inside the array because up to 100 array tasks
-share one venv, and concurrent pip installs into a shared prefix corrupt it.
-
-## Submitting
-
-Both scripts are `sbatch` jobs. Running one with `bash` executes it on the login node, where
-NumPy cannot import, and the `#SBATCH` lines are only comments so it would get no GPU either.
+## Running
 
 ```bash
-cd /mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng
-git pull                                   # branch atac
-mkdir -p slurm/ensemble/logs               # once, before the first submit
-
-sbatch slurm/ensemble/setup.sh             # wait for this to finish
-sbatch --array=0-99%20 slurm/ensemble/chr1_ensemble.sh
+CELL=GM12878 sbatch --array=0-229%6 slurm/ensemble/genome_ensemble.sh
+CELL=H1ESC   sbatch --array=0-229%6 slurm/ensemble/genome_ensemble.sh
+CELL=HFFC6   sbatch --array=0-229%6 slurm/ensemble/genome_ensemble.sh
 ```
 
-The log directory has to exist first: slurm opens the job's output file before the script runs,
-so the `mkdir` inside the script is too late for slurm's own log.
+One array task is one chromosome by a block of `PER_TASK` conformations, so the array length is
+`n_chroms * ceil(N_MODELS / PER_TASK)`. With the defaults (`N_MODELS=100`, `PER_TASK=10`, 23
+chromosomes) that is **230**. The script prints the length it expects at startup and refuses a
+task past the end, naming the right `--array`.
 
-Watching them:
+Fewer conformations, or a different shard size:
 
 ```bash
-squeue -u "$USER"
-tail -f slurm/ensemble/logs/setup_<jobid>.out
-ls out/chr1_ensemble/*.cif | wc -l          # conformations finished so far
-sacct -j <arrayjobid> --format=JobID,State,Elapsed,MaxRSS
+N_MODELS=20 PER_TASK=5 CELL=H1ESC sbatch --array=0-91%6 slurm/ensemble/genome_ensemble.sh
 ```
 
-Variants:
+Check the mapping without an allocation:
 
 ```bash
-PER_TASK=4 sbatch --array=0-24 slurm/ensemble/chr1_ensemble.sh   # 4 conformations per task
-SKIP_INSTALL=1 sbatch slurm/ensemble/setup.sh                    # redo data only
-ROOT=$HOME/3dgnome-ng sbatch \
-  --output=$HOME/3dgnome-ng/slurm/ensemble/logs/chr1_%A_%a.out \
-  --array=0-9 slurm/ensemble/chr1_ensemble.sh
+DRY_RUN=1 CELL=GM12878 SLURM_ARRAY_TASK_ID=57 bash slurm/ensemble/genome_ensemble.sh
 ```
 
-`ROOT` defaults to `/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng`. Set it to run from another
-checkout, but pass `--output` too: `#SBATCH` directives are parsed before the shell runs, so
-the log path cannot follow `ROOT`.
+Output lands in `out/<cell>_genome/<chrom>/<chrom>_s<N>.cif`. A member whose `.cif` exists is
+skipped, so resubmitting the same array fills gaps and a requeued task resumes.
 
-A member whose `.cif` exists is skipped, so resubmitting the same array fills in whatever is
-missing and a requeued task resumes.
+## Cost
 
-## Sizing
+Measured: one chr1 GM12878 conformation is about 17 minutes on an A100 at 93,492 beads. Scaling
+by anchor count gives roughly
 
-One conformation measured 5 h 09 m at these settings on an RTX 4060 Ti, producing 93,492 beads.
-Time splits roughly 58% `estimate_dist`, 39% `smooth`, 2% `arcs`. `--time` is 8 h per task;
-raise it with `PER_TASK`.
+| cell line | anchors | per conformation | 100 conformations |
+|---|---|---|---|
+| GM12878 | 243,848 | ~2.6 GPU-h | ~260 GPU-h |
+| H1ESC | 150,158 | ~1.6 GPU-h | ~160 GPU-h |
+| HFFC6 | 121,402 | ~1.3 GPU-h | ~130 GPU-h |
+| **all three** | | **~5.5 GPU-h** | **~550 GPU-h** |
 
-`estimate_dist` is a dry pass that exists to set the heat targets, not the MC that produces the
-structure, and it is the largest single cost. `[subanchor_heatmap] heat_min_reduction` skips it
-where the achievable reduction is provably small. It is off by default and untested at this
-scale, so it is worth measuring on one conformation before committing an allocation.
+At 6 concurrent GPUs that is about **3.8 days** for 100 conformations of all three lines, or
+about 18 hours for 20 each. Sharding does not change the total, only how it packs; raise the
+`%N` throttle to whatever the cluster will give you, since `sacctmgr` shows no per-user cap.
 
-## One GPU per task, not one job across many
+## Per chromosome, not one genome job
 
-Conformations are independent, so a fixed pool of GPUs yields the most conformations per hour
-when each GPU owns a whole conformation. Splitting one conformation over N GPUs shortens that
-conformation without raising throughput, and loses a little to load imbalance.
+Each task reconstructs one chromosome. The downstream enhancer3D analysis is intra-chromosomal
+(enhancer-promoter distances within a chromosome) and its published models are per-chromosome,
+so nothing consumes inter-chromosomal placement. Sharding this way turns one ~2.6 h genome run
+into 23 short independent tasks that backfill into free GPUs, and a failure costs one chromosome
+rather than a whole genome.
 
-Ask for several GPUs when latency on a single structure matters. `multigpu_mode=groups` in the
-ini then runs whole batch groups side by side, projected 7.96x on 8 GPUs from the chr1 profile,
-and it costs nothing on one GPU. See the multi-GPU entry in AGENTS.md.
+The cost is that chromosomes are placed independently, with no chromosome-level MC between them,
+so the output is not a single coherent nucleus. If you need that, run one task with
+`--region ""` instead; the total GPU time is the same.
 
-## Config
+## Install note
 
-`gm12878_chr1_hic_tads.ini` is generated from `validation.core.config.CANONICAL` plus the TAD,
-Hi-C-singleton and multi-GPU overrides. Change the canonical params there rather than editing
-the ini, so the validation harness and the cluster runs cannot drift apart.
+The setup job deliberately avoids `pip install -e ".[validation]"`. That extra pulls `hicrep` and
+`pyBigWig`, which build from sdists whose `setup.py` imports numpy, and that build fails. Neither
+is needed: `hicrep` is declared in `pyproject.toml` but never imported anywhere in `validation/`,
+and `pyBigWig` is used only by the ATAC signal path, which these runs skip. `scipy`, `cooler` and
+`cooltools` are the real requirements.
+
+Setup is a job rather than login-node commands because eden's login node CPU is below the
+x86-64-v2 baseline current NumPy wheels need, so NumPy cannot import there at all. A dgx node is
+fine; `setup_cell.sh` prints the node's microarchitecture level so a repeat is readable.
