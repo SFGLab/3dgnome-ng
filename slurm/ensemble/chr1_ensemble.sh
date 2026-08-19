@@ -59,6 +59,7 @@ source .venv/bin/activate
 export GNOME3D_JAX_CACHE="${GNOME3D_JAX_CACHE:-$ROOT/.cache/gnome3d-jax}"
 mkdir -p "$GNOME3D_JAX_CACHE"
 export PYTHONFAULTHANDLER=1
+export PYTHONUNBUFFERED=1
 
 TASK="${SLURM_ARRAY_TASK_ID:-0}"
 FIRST=$((TASK * PER_TASK))

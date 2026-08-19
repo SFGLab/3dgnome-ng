@@ -53,6 +53,9 @@ SKIP_INSTALL="${SKIP_INSTALL:-0}"
 cd "$ROOT"
 mkdir -p slurm/ensemble/logs
 source .venv/bin/activate
+# Long stages print progress with plain print(); block-buffered into a slurm
+# log that makes a working job look hung for many minutes.
+export PYTHONUNBUFFERED=1
 
 echo "[setup] node=$(hostname) python=$(python -V 2>&1)"
 # x86-64 microarchitecture level, the thing the NumPy failure above is really about.

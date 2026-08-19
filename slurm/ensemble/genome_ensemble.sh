@@ -84,6 +84,7 @@ source .venv/bin/activate
 export GNOME3D_JAX_CACHE="${GNOME3D_JAX_CACHE:-$ROOT/.cache/gnome3d-jax}"
 mkdir -p "$GNOME3D_JAX_CACHE"
 export PYTHONFAULTHANDLER=1
+export PYTHONUNBUFFERED=1
 
 # Fail before the allocation is burnt. data/ is gitignored, so a fresh checkout has none of this.
 missing=0

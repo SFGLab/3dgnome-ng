@@ -51,7 +51,7 @@ def main() -> None:
 
     out = Path(args.out)
     if out.exists():
-        print(f"[prep] {out} exists, leaving it alone")
+        print(f"[prep] {out} exists, leaving it alone", flush=True)
         return
 
     regions = [args.region] if args.region else parse_chrs_arg(args.chroms)[0]
@@ -76,7 +76,7 @@ def main() -> None:
                         min_count=args.min_count,
                     )
                 except Exception as exc:  # noqa: BLE001 - a chromosome absent from the cooler
-                    print(f"[prep] {region}: skipped ({exc})")
+                    print(f"[prep] {region}: skipped ({exc})", flush=True)
                     continue
                 rows = 0
                 with part.open() as fh:
@@ -86,13 +86,14 @@ def main() -> None:
                 part.unlink()
                 total += rows
                 print(
-                    f"[prep] {region}: {rows} rows over {len(starts)} bins (running total {total})"
+                    f"[prep] {region}: {rows} rows over {len(starts)} bins (running total {total})",
+                    flush=True,
                 )
         tmp_path.replace(out)
     finally:
         tmp_path.unlink(missing_ok=True)
 
-    print(f"[prep] {out}: {total} singleton rows across {len(regions)} regions")
+    print(f"[prep] {out}: {total} singleton rows across {len(regions)} regions", flush=True)
 
 
 if __name__ == "__main__":

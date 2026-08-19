@@ -51,6 +51,9 @@ SINGLETONS="$ROOT/data/$CELL/${CELL}_hic_$((BINSIZE / 1000))kb_singletons.bedpe"
 cd "$ROOT"
 mkdir -p slurm/ensemble/logs
 source .venv/bin/activate
+# Long stages print progress with plain print(); block-buffered into a slurm
+# log that makes a working job look hung for many minutes.
+export PYTHONUNBUFFERED=1
 
 echo "[setup:$CELL] node=$(hostname)"
 LEVEL=$(awk '/^flags/{if(/avx512f/) print "v4"; else if(/avx2/) print "v3";
