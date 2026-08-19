@@ -55,14 +55,43 @@ share one venv, and concurrent pip installs into a shared prefix corrupt it.
 
 ## Submitting
 
+Both scripts are `sbatch` jobs. Running one with `bash` executes it on the login node, where
+NumPy cannot import, and the `#SBATCH` lines are only comments so it would get no GPU either.
+
 ```bash
-sbatch --array=0-99%20 slurm/ensemble/chr1_ensemble.sh      # 100 conformations, 20 at a time
-PER_TASK=4 sbatch --array=0-24 slurm/ensemble/chr1_ensemble.sh
-ROOT=$HOME/3dgnome-ng sbatch --array=0-9 slurm/ensemble/chr1_ensemble.sh
+cd /mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng
+git pull                                   # branch atac
+mkdir -p slurm/ensemble/logs               # once, before the first submit
+
+sbatch slurm/ensemble/setup.sh             # wait for this to finish
+sbatch --array=0-99%20 slurm/ensemble/chr1_ensemble.sh
+```
+
+The log directory has to exist first: slurm opens the job's output file before the script runs,
+so the `mkdir` inside the script is too late for slurm's own log.
+
+Watching them:
+
+```bash
+squeue -u "$USER"
+tail -f slurm/ensemble/logs/setup_<jobid>.out
+ls out/chr1_ensemble/*.cif | wc -l          # conformations finished so far
+sacct -j <arrayjobid> --format=JobID,State,Elapsed,MaxRSS
+```
+
+Variants:
+
+```bash
+PER_TASK=4 sbatch --array=0-24 slurm/ensemble/chr1_ensemble.sh   # 4 conformations per task
+SKIP_INSTALL=1 sbatch slurm/ensemble/setup.sh                    # redo data only
+ROOT=$HOME/3dgnome-ng sbatch \
+  --output=$HOME/3dgnome-ng/slurm/ensemble/logs/chr1_%A_%a.out \
+  --array=0-9 slurm/ensemble/chr1_ensemble.sh
 ```
 
 `ROOT` defaults to `/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng`. Set it to run from another
-checkout, for example a worktree or the homestation box.
+checkout, but pass `--output` too: `#SBATCH` directives are parsed before the shell runs, so
+the log path cannot follow `ROOT`.
 
 A member whose `.cif` exists is skipped, so resubmitting the same array fills in whatever is
 missing and a requeued task resumes.

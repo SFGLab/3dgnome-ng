@@ -31,9 +31,15 @@
 #SBATCH --partition=short
 #SBATCH --time=04:00:00
 #SBATCH --account=sfglab
+# --output/--error are absolute and cannot use $ROOT: sbatch parses #SBATCH lines before
+# the shell runs, and a relative path would resolve against whatever directory you
+# submitted from. The directory must already exist, because slurm opens these files
+# before the script's own mkdir would run. Create it once:
+#   mkdir -p $ROOT/slurm/ensemble/logs
+# Running from a different checkout means also passing --output/--error to sbatch.
 #SBATCH --open-mode=append
-#SBATCH --output=slurm/ensemble/logs/setup_%j.out
-#SBATCH --error=slurm/ensemble/logs/setup_%j.out
+#SBATCH --output=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/setup_%j.out
+#SBATCH --error=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/setup_%j.out
 
 set -euo pipefail
 
