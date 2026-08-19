@@ -101,6 +101,30 @@ else
   python -m validation tracks --cell "$CELL" --skip-compartments --skip-signal
 fi
 
+# The singleton reader fetches the balanced matrix as well as the raw counts, so the resolution
+# it reads must carry balancing weights. GM12878's mcool ships with them at 25 kb; H1ESC's does
+# not, and every chromosome then fails with "No column 'bins/weight' found" leaving an empty
+# file. `validation tracks` already does this for the 10 kb level it calls TADs from, so this is
+# the same one-time step at the resolution the singletons use.
+BINURI="$MCOOL::/resolutions/$BINSIZE"
+if python -c "
+import sys
+import cooler
+sys.exit(0 if 'weight' in cooler.Cooler('$BINURI').bins().columns else 1)
+" 2>/dev/null; then
+  echo "[setup:$CELL] $BINSIZE already balanced"
+else
+  echo "[setup:$CELL] balancing $BINSIZE (one time)"
+  cooler balance -p "${SLURM_CPUS_PER_TASK:-8}" "$BINURI"
+fi
+
+# A previous failed run leaves a zero-row file, and prep_singletons treats any existing output as
+# done, so it would skip regeneration for ever.
+if [ -f "$SINGLETONS" ] && [ ! -s "$SINGLETONS" ]; then
+  echo "[setup:$CELL] removing empty $SINGLETONS from an earlier failure"
+  rm -f "$SINGLETONS"
+fi
+
 python slurm/ensemble/prep_singletons.py \
   --mcool "$MCOOL" --chroms "$CHROMS" --binsize "$BINSIZE" --out "$SINGLETONS"
 
