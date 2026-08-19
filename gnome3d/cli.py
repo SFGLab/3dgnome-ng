@@ -49,6 +49,7 @@ def _cif_name(entry_base: str, chr_: str, i: int, multi_chr: bool) -> str:
 
 def _run_structure(
     i: int,
+    pos: int,
     n: int,
     s: Settings,
     data: ContactData,
@@ -59,10 +60,15 @@ def _run_structure(
     executor: Executor,
 ) -> int:
     """Reconstruct + write one independent structure via the task-DAG pipeline.
+
+    ``i`` is the member index, which fixes the seed offset and the output filename. ``pos`` is
+    this structure's 1-based place in the run, which is what the progress label counts: under
+    ``--members`` the two differ, and labelling with ``i`` produced lines like "structure 13/10".
     Returns total bead count.  Per-member seed offset makes an ensemble vary."""
     # Scope per structure only when several run - for a single structure the
     # extra nesting just indents everything for no benefit.
-    structure_ctx = log.step(LOG, f"structure {i + 1}/{n}") if n > 1 else contextlib.nullcontext()
+    label = f"structure {pos}/{n}" + (f" (member {i + 1})" if pos != i + 1 else "")
+    structure_ctx = log.step(LOG, label) if n > 1 else contextlib.nullcontext()
     with structure_ctx:
         per_chr = reconstruct(
             s, data, chrs_list, region, executor=executor, seed_offset=i * MEMBER_SEED_STRIDE
@@ -176,13 +182,13 @@ def main() -> None:
 
     multi_chr = len(chrs_list) > 1
     written = 0
-    for i in members:
+    for pos, i in enumerate(members, 1):
         if args.members and all(
             (out_dir / _cif_name(entry_base, c, i, multi_chr)).exists() for c in chrs_list
         ):
             log.status(LOG, "structure %d already written, skipping", i + 1)
             continue
-        _run_structure(i, n, s, data, chrs_list, bed_region, out_dir, entry_base, executor)
+        _run_structure(i, pos, n, s, data, chrs_list, bed_region, out_dir, entry_base, executor)
         written += 1
 
     log.status(LOG, "%d structure(s) written to %s/", written, out_dir)
