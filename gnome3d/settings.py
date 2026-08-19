@@ -187,6 +187,12 @@ class Settings:
     mc_executor_jax_estimate_kernel: str
     hybrid_polish_renoise: float
 
+    # How the batch strategy uses several visible GPUs.  "groups" runs whole batch groups
+    # side by side, one group per device, which keeps each group's launch intact and so draws
+    # the same RNG as a one-device run.  "within" splits one group across devices, which only
+    # pays off while groups hold more IBs than there are devices.  "off" pins to one device.
+    mc_multigpu_mode: str
+
     # ---- MC arcs ----
     max_temp: float
     dt_temp: float
@@ -463,6 +469,7 @@ class Settings:
         self.hybrid_polish_renoise = (
             1.0  # re-noise (x step) on hybrid-smooth polish init; recovers diversity
         )
+        self.mc_multigpu_mode = "groups"
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -943,6 +950,7 @@ class Settings:
         self.hybrid_polish_renoise = getf(
             "simulation_backend", "hybrid_polish_renoise", self.hybrid_polish_renoise
         )
+        self.mc_multigpu_mode = gets("simulation_backend", "multigpu_mode", self.mc_multigpu_mode)
 
         # [simulation_arcs]
         self.max_temp = getf("simulation_arcs", "max_temp", self.max_temp)

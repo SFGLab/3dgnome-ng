@@ -93,3 +93,67 @@ def run_sharded(
     for r in results:
         out.extend(r or [])
     return out
+
+
+def run_group_parallel(
+    group_fn: Callable[[int], None],
+    n_groups: int,
+    devices: Sequence[Any],
+) -> None:
+    """Run ``group_fn(gi)`` for every group index concurrently across ``devices``.
+
+    One worker thread per device pulls the next unclaimed group off a shared counter and runs it
+    with that device as ``jax.default_device``, so a device starts its next group as soon as it
+    frees up rather than waiting on a barrier.  Groups are independent launches, so this is pure
+    data-parallelism with no cross-device communication.
+
+    Unlike ``run_sharded`` this keeps each group's problem list intact on one device.  The batched
+    kernels key each IB's per-step RNG on its position within the launch, so an unsplit group draws
+    exactly what it draws single-device.  Results are therefore byte-identical to a one-device run
+    whatever the device count, which is not true of ``run_sharded``.
+
+    ``group_fn`` must be safe to call from a worker thread and must not touch shared scheduler
+    state.  Ordering of side effects is the caller's problem; the caller applies results in group
+    order afterwards.
+    """
+    import jax
+
+    n_dev = min(len(devices), n_groups)
+    if n_dev <= 1:
+        for gi in range(n_groups):
+            group_fn(gi)
+        return
+
+    next_gi = 0
+    lock = threading.Lock()
+    errors: list[BaseException] = []
+
+    def _worker(dev: Any) -> None:
+        nonlocal next_gi
+        while True:
+            with lock:
+                if next_gi >= n_groups or errors:
+                    return
+                gi = next_gi
+                next_gi += 1
+            try:
+                with jax.default_device(dev):
+                    group_fn(gi)
+            except BaseException as exc:  # noqa: BLE001 - surfaced on the main thread below
+                with lock:
+                    errors.append(exc)
+                return
+
+    threads = [
+        threading.Thread(
+            target=contextvars.copy_context().run, args=(_worker, devices[i]), name=f"mgpu-g{i}"
+        )
+        for i in range(n_dev)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    if errors:
+        raise errors[0]

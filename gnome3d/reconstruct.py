@@ -94,7 +94,11 @@ def pick_executor(settings: Settings) -> Executor:
         ),
     }
 
-    return MixedExecutor(strategy, max_workers=int(settings.mc_executor_threaded_workers))
+    return MixedExecutor(
+        strategy,
+        max_workers=int(settings.mc_executor_threaded_workers),
+        multigpu_mode=settings.mc_multigpu_mode,
+    )
 
 
 def _beads(output: State) -> list[BeadOut]:

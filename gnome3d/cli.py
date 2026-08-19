@@ -24,6 +24,22 @@ from gnome3d.types import BedRegion
 LOG = log.get("main")
 
 
+def parse_members(spec: str) -> list[int]:
+    """Structure indices from a comma list of numbers and ``lo-hi`` ranges, in the given
+    order and de-duplicated."""
+    out: list[int] = []
+    for part in spec.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part.lstrip("-"):
+            lo, hi = part.split("-", 1)
+            out.extend(range(int(lo), int(hi) + 1))
+        else:
+            out.append(int(part))
+    return list(dict.fromkeys(out))
+
+
 def _cif_name(entry_base: str, chr_: str, i: int, multi_chr: bool) -> str:
     """Per-structure CIF filename. Disambiguate per-chr when more than one chr."""
     if multi_chr:
@@ -92,6 +108,18 @@ def main() -> None:
         default=1,
         help="Number of independent structures to generate (default 1)",
     )
+    parser.add_argument(
+        "--members",
+        default="",
+        help=(
+            "Explicit structure indices instead of -n, as a comma list of numbers and "
+            "ranges, e.g. '0-9' or '0,4,7-9'. One ensemble can then be split over several "
+            "jobs by giving each a disjoint set, and a member whose .cif already exists is "
+            "skipped, so a requeued job resumes instead of redoing its work. Index i keeps "
+            "the seed offset it would have had under -n, so the ensemble is the same "
+            "however it was split."
+        ),
+    )
     parser.add_argument("--data-dir", default=None, help="Override data_dir from config")
     parser.add_argument("--out", default=".", help="Output directory (default: .)")
     parser.add_argument(
@@ -138,14 +166,26 @@ def main() -> None:
     # reconstruct (IB batching on the JAX BatchExecutor), and its deterministic
     # global-RNG seeding can't be threaded across structures safely.  Each
     # structure gets a distinct per-member seed offset, so an ensemble varies.
-    n = args.n_structures
+    members = parse_members(args.members) if args.members else list(range(args.n_structures))
+    if not members:
+        sys.exit(f"No structures selected: --members {args.members!r}")
+
     executor = pick_executor(s)
+    n = len(members)
     log.status(LOG, "running %d structure(s)  [%s]", n, type(executor).__name__)
 
-    for i in range(n):
+    multi_chr = len(chrs_list) > 1
+    written = 0
+    for i in members:
+        if args.members and all(
+            (out_dir / _cif_name(entry_base, c, i, multi_chr)).exists() for c in chrs_list
+        ):
+            log.status(LOG, "structure %d already written, skipping", i + 1)
+            continue
         _run_structure(i, n, s, data, chrs_list, bed_region, out_dir, entry_base, executor)
+        written += 1
 
-    log.status(LOG, "%d structure(s) written to %s/", n, out_dir)
+    log.status(LOG, "%d structure(s) written to %s/", written, out_dir)
 
 
 if __name__ == "__main__":

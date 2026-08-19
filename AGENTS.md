@@ -734,6 +734,30 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: 3dgnome is CPU-only. The JAX port is a Python-side acceleration of the same algorithm; numerical results agree with numba within float32 RNG-trajectory noise. Harness/parity tests run with default settings (`mc_backend=numba`), so the new backend doesn't affect the parity baseline.
 
+- **Multi-GPU sharding unit: `[simulation_backend] multigpu_mode = groups | within | off`,
+  default `groups`.**
+  The batch strategy splits a dispatch into groups by batch key, then runs the groups. `groups`
+  makes the group the unit of parallelism, keeping each one whole on one device and running
+  different groups side by side. `within` is the older behaviour, splitting one group's IBs
+  across devices. `off` pins to a single device.
+
+  `within` scales only as far as groups are wide, and they are not. A chr1 smooth dispatch is
+  252 groups, 58% of its time in groups holding a single IB, and the estimate-dist dispatch is
+  252 groups with 69% of its time single-IB, because the shape ladder puts differently sized
+  IBs in different buckets. Measured on the chr1 profile, `within` tops out at 1.26x however
+  many GPUs it is given, while whole-group sharding projects 7.96x on 8 and 15.84x on 16.
+
+  `groups` is also the byte-exact one. The kernels key each IB's per-step RNG on its position
+  within the launch, so an unsplit group draws what it would have drawn on one device and the
+  output is identical whatever the device count. `within` changes the draw. Verified two ways
+  on a chr1:1-8000000 TAD-block run: 4 devices against 1 agree on all 3390 beads, and a
+  1-device run on this code is byte-identical to the same run at the previous commit.
+
+  Results are applied in group order on the calling thread however the groups interleaved, so
+  DAG growth stays deterministic.
+
+  Why not in the reference: 3dgnome is CPU-only and single-process.
+
 ---
 
 ## Correctness Rules
