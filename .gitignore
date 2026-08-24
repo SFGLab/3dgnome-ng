@@ -270,12 +270,18 @@ playground/**/*.gz
 playground/**/*.html
 playground/**/*.pdf
 
-# data 
-data/**/*.mcool
-data/**/*.cool
-data/**/*.bigWig
-data/**/*.bedGraph
-data/**/*.lock.json
+# data
+data/
+
+*.hic
+*.mcool
+*.cool
+*.bigWig
+*.bw
+*.fa
+*.fasta
+*.fai
+*.2bit
 
 # superpowers
 .superpowers/
