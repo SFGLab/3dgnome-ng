@@ -33,9 +33,24 @@
 set -euo pipefail
 
 S="${1:?usage: sbatch slurm/ensemble/trio_setup.sh <SAMPLE>}"
-# Derived from this script's own location, so the checkout can live anywhere. Override
-# with ROOT=... if the job is launched from a copy outside the tree.
-ROOT="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+# Where the checkout is. Slurm copies the batch script into a spool directory before running
+# it, so BASH_SOURCE points at that copy rather than at the tree and cannot locate the root.
+# SLURM_SUBMIT_DIR is the directory sbatch was run from, which is also what the relative
+# --output paths above resolve against, so submitting from the repo root makes both agree.
+# Outside Slurm the script's own location is correct. Override with ROOT=... for anything else.
+if [ -n "${ROOT:-}" ]; then
+  :
+elif [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
+  ROOT="$SLURM_SUBMIT_DIR"
+else
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+fi
+# A wrong root shows up as a permission error on the first mkdir, several lines from the cause.
+[ -f "$ROOT/pyproject.toml" ] && [ -d "$ROOT/gnome3d" ] || {
+  echo "[error] ROOT=$ROOT is not the 3dgnome checkout." >&2
+  echo "[error] submit from the repo root, or pass ROOT=/path/to/3dgnome-ng" >&2
+  exit 1
+}
 BINSIZE="${BINSIZE:-25000}"
 CHROMS="${CHROMS:-chr1-chr22,chrX}"
 MCOOL="$ROOT/data/_hic/$S/$S.mcool"
