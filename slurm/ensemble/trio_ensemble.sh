@@ -49,12 +49,14 @@
 #SBATCH --time=24:00:00
 #SBATCH --account=sfglab
 #SBATCH --open-mode=append
-#SBATCH --output=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/trio_%x_%A_%a.out
-#SBATCH --error=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/trio_%x_%A_%a.out
+#SBATCH --output=slurm/ensemble/logs/trio_%x_%A_%a.out
+#SBATCH --error=slurm/ensemble/logs/trio_%x_%A_%a.out
 
 set -euo pipefail
 
-ROOT="${ROOT:-/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng}"
+# Derived from this script's own location, so the checkout can live anywhere. Override
+# with ROOT=... if the job is launched from a copy outside the tree.
+ROOT="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 OUT="${OUT:-$ROOT/out/trio}"
 N_MODELS="${N_MODELS:-100}"
 PER_TASK="${PER_TASK:-10}"

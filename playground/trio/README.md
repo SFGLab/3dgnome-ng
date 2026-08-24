@@ -42,16 +42,41 @@ python playground/trio/trio_configs.py --samples HG00512
 The anchors and clusters are built on the laptop, because the motif track they need matches
 `playground/**/*.gz` in .gitignore and does not travel. Everything heavier runs on eden.
 
+Give the cluster a name in `~/.ssh/config` first, so the jump host is implicit and rsync can
+address it. Holding an `ssh -J ...` string in a shell variable does not work under zsh, which
+unlike bash does not word split an unquoted parameter.
+
+```
+Host cluster
+  HostName <cluster host>
+  User <cluster user>
+  ProxyJump <jump user>@<jump host>
+  ServerAliveInterval 30
+  ServerAliveCountMax 6
+```
+
+The sample list is written out in every loop rather than held in a variable. Under zsh a bare
+`$SAMPLES` is one word, not nine, so a loop over it runs once with the whole string, and the
+failure is quiet: rsync reports one missing path and transfers nothing.
+
 ```bash
-# on the laptop, once per sample
+ROOT=<checkout path on the cluster>
+
+# on the laptop, once
 python playground/trio/trio_fetch.py --inventory trio_inventory.json
+python playground/trio/trio_downsample.py
 python playground/trio/trio_prepare.py --skip-hic
 
-# copy the text inputs and the raw contact file
+# rsync does not create intermediate parents, so make them first. Single quoted, so the loop
+# runs on eden under bash rather than expanding here.
+ssh cluster "for S in HG00512 HG00513 HG00514 HG00731 HG00732 HG00733 GM19238 GM19239 GM19240; do
+              mkdir -p '$ROOT'/data/\$S '$ROOT'/data/_trio/\$S; done"
+
+# the text inputs and the raw contact file. Singletons are left out because the cluster rebuilds
+# them in about half an hour, against 800 MB per sample to upload.
 for S in HG00512 HG00513 HG00514 HG00731 HG00732 HG00733 GM19238 GM19239 GM19240; do
-  rsync -av "data/$S/" "eden:/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/data/$S/"
-  rsync -av "data/_trio/$S/${S}_allres.hic" \
-        "eden:/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/data/_trio/$S/"
+  rsync -av --exclude '*singletons*' "data/$S/" "cluster:$ROOT/data/$S/"
+  rsync -av "data/_trio/$S/${S}_allres.hic" "cluster:$ROOT/data/_trio/$S/"
 done
 
 # on eden, once per sample. Idempotent, so rerun after any failure

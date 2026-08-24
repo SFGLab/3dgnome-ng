@@ -27,13 +27,15 @@
 #SBATCH --time=06:00:00
 #SBATCH --account=sfglab
 #SBATCH --open-mode=append
-#SBATCH --output=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/trio_setup_%x_%j.out
-#SBATCH --error=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/trio_setup_%x_%j.out
+#SBATCH --output=slurm/ensemble/logs/trio_setup_%x_%j.out
+#SBATCH --error=slurm/ensemble/logs/trio_setup_%x_%j.out
 
 set -euo pipefail
 
 S="${1:?usage: sbatch slurm/ensemble/trio_setup.sh <SAMPLE>}"
-ROOT="${ROOT:-/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng}"
+# Derived from this script's own location, so the checkout can live anywhere. Override
+# with ROOT=... if the job is launched from a copy outside the tree.
+ROOT="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 BINSIZE="${BINSIZE:-25000}"
 CHROMS="${CHROMS:-chr1-chr22,chrX}"
 MCOOL="$ROOT/data/_hic/$S/$S.mcool"
