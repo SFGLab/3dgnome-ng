@@ -81,6 +81,36 @@ python playground/trio/trio_status.py --resubmit     # just the --array spec
 sbatch --array=$(python playground/trio/trio_status.py --resubmit)%6 slurm/ensemble/trio_ensemble.sh
 ```
 
+### Sizing a job
+
+The `long` partition allows 5 days, so wall clock is not the binding constraint and PER_TASK is
+free to be large. Two things bound it instead.
+
+Total time does not change with PER_TASK. Nine samples by 100 conformations on one chromosome is
+900 conformations however they are grouped, and at a throttle of `%6` that is 900 times the per
+conformation time divided by 6 either way. PER_TASK only trades job count against how easily a
+job is scheduled, since a short job backfills into gaps a long one cannot.
+
+Overrunning is cheap. gnome3d.cli writes each structure as it finishes, so a job killed at the
+wall keeps everything already done and loses only the one in flight. `trio_status.py --resubmit`
+then asks for exactly the gap.
+
+Per conformation time scales with a chromosome's anchor count. GM12878 chr1 measured 17.6
+minutes at 26,603 anchors, and the depth matched trio samples hold 21,688 to 32,243 there, so
+chr1 lands near 15 to 21 minutes if the contact singletons prune anchors the way GM12878's 4DN
+Hi-C did. This contact map is far denser and will prune less, so treat 60 minutes as the
+pessimistic end until one run measures it.
+
+chr1 carries about 11% of a sample's anchors, so one PER_TASK for every chromosome leaves most
+of the limit unused on the small ones. Submission is per chromosome anyway, so vary it:
+
+```bash
+CHROMS=chr1  PER_TASK=10 sbatch --array=0-89%6 --time=24:00:00 slurm/ensemble/trio_ensemble.sh
+CHROMS=chr21 PER_TASK=50 sbatch --array=0-17%6 --time=24:00:00 slurm/ensemble/trio_ensemble.sh
+```
+
+`--time` on the command line overrides the script's directive.
+
 ### Why chromosome first
 
 One array task is one chromosome by one sample by a block of conformations, and the chromosome

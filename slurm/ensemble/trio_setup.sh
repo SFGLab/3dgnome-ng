@@ -46,6 +46,18 @@ export PYTHONUNBUFFERED=1
 
 echo "[trio_setup:$S] node=$(hostname)"
 
+# hic2cool converts the juicer .hic these samples ship. It is not a project dependency because
+# only this path needs it, so it is installed here. Both checks are import based and therefore
+# idempotent, and they run before any long stage, because hic2cool is imported lazily inside
+# trio_prepare and would otherwise fail after the text stages rather than before them.
+python -c "import hic2cool" 2>/dev/null || pip install hic2cool
+python -c "import cooler, cooltools, scipy" 2>/dev/null \
+  || pip install "scipy>=1.10" "cooler>=0.9" "cooltools>=0.7"
+python -c "
+import cooler, cooltools, hic2cool
+print(f'[trio_setup] cooler {cooler.__version__} cooltools {cooltools.__version__} hic2cool ok')
+"
+
 # The text inputs are built on the laptop. Without them the mcool would still convert and the
 # run would then fail hours later at load time, so fail here instead.
 for f in "data/$S/${S}_anchors_3+_oriented.bed" "data/$S/${S}_clusters_3+.bedpe" \

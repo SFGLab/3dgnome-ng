@@ -22,6 +22,22 @@
 # block is already present exits before requesting any GPU work. So a cancelled array, a dead
 # node or a preempted job all resume by resubmitting. Ask for exactly the gaps with
 # `python playground/trio/trio_status.py --resubmit`.
+#
+# Sizing a task. gnome3d.cli writes each structure as it finishes, so a job killed at the wall
+# clock keeps every conformation already done and loses only the one in flight. That makes a
+# long task cheap to overrun and PER_TASK safe to raise. The partition allows 5 days, so the
+# limit is scheduling rather than capacity: a short job backfills into gaps that a long one
+# cannot, so the smallest PER_TASK that keeps the job count reasonable is the right one.
+#
+# Wall clock is PER_TASK times the per conformation time, which scales with a chromosome's
+# anchor count. chr1 holds about 11% of the genome's anchors, so a fixed PER_TASK leaves most of
+# the limit unused on the small chromosomes. Since submission is per chromosome anyway, pass a
+# different PER_TASK and --time for each:
+#
+#   CHROMS=chr1  PER_TASK=10 sbatch --array=0-89%6 --time=24:00:00 ...
+#   CHROMS=chr21 PER_TASK=50 sbatch --array=0-17%6 --time=24:00:00 ...
+#
+# --time on the command line overrides the directive above, so the file needs no edit.
 
 #SBATCH --job-name=trio_ens
 #SBATCH --nodes=1
@@ -30,7 +46,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=64G
 #SBATCH --partition=long
-#SBATCH --time=08:00:00
+#SBATCH --time=24:00:00
 #SBATCH --account=sfglab
 #SBATCH --open-mode=append
 #SBATCH --output=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/trio_%x_%A_%a.out
@@ -63,13 +79,19 @@ CONFIG="${CONFIG:-$ROOT/slurm/ensemble/${LOWER}_trio.ini}"
 DEST="$OUT/$SAMPLE/$CHROM"
 
 echo "[trio_ens] array length needed = $TOTAL"
+# Printed so an overrun is diagnosable from the log rather than only from sacct.
+if [ -n "${SLURM_JOB_ID:-}" ]; then
+  LIMIT=$(squeue -h -j "$SLURM_JOB_ID" -o "%l" 2>/dev/null || echo unknown)
+  echo "[trio_ens] time limit $LIMIT for $((LAST - FIRST + 1)) conformations"
+fi
 echo "[trio_ens] task=$TASK chrom=$CHROM sample=$SAMPLE members=$MEMBERS out=$DEST"
 
 # Skip before asking for a GPU. A resubmitted array is mostly finished tasks, and starting the
 # python stack for each of them wastes an allocation slot that another chromosome could use.
 HAVE=0
+# gnome3d.cli writes member i as <region>_s<i+1>.cif, so member 0 is chr1_s1.cif.
 for m in $(seq "$FIRST" "$LAST"); do
-  [ -s "$DEST/${CHROM}_s${m}.cif" ] && HAVE=$((HAVE + 1))
+  [ -s "$DEST/${CHROM}_s$((m + 1)).cif" ] && HAVE=$((HAVE + 1))
 done
 WANT=$((LAST - FIRST + 1))
 echo "[trio_ens] $HAVE/$WANT members already present"

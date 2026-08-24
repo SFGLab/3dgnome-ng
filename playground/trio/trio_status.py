@@ -72,7 +72,12 @@ def table(rows: list[list[str]], head: list[str]) -> None:
 
 
 def done_members(out: Path, sample: str, chrom: str) -> set[int]:
-    """Member ids with a finished .cif. A .part or a zero byte file does not count."""
+    """Member ids with a finished .cif. A zero byte file does not count.
+
+    gnome3d.cli names a structure `<region>_s<i+1>.cif`, so member 0 is `chr1_s1.cif`. The
+    suffix is turned back into the member index here, because that is what the array shard
+    ranges are expressed in.
+    """
     d = out / sample / chrom
     if not d.is_dir():
         return set()
@@ -82,7 +87,7 @@ def done_members(out: Path, sample: str, chrom: str) -> set[int]:
             continue
         stem = f.stem.rsplit("_s", 1)[-1]
         if stem.isdigit():
-            found.add(int(stem))
+            found.add(int(stem) - 1)
     return found
 
 
