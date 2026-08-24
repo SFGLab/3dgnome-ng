@@ -63,13 +63,20 @@ export PYTHONUNBUFFERED=1
 
 echo "[trio_setup:$S] node=$(hostname)"
 
-# hic2cool converts the juicer .hic these samples ship. It is not a project dependency because
-# only this path needs it, so it is installed here. Both checks are import based and therefore
-# idempotent, and they run before any long stage, because hic2cool is imported lazily inside
-# trio_prepare and would otherwise fail after the text stages rather than before them.
-python -c "import hic2cool" 2>/dev/null || pip install hic2cool
-python -c "import cooler, cooltools, scipy" 2>/dev/null \
-  || pip install "scipy>=1.10" "cooler>=0.9" "cooltools>=0.7"
+# Checked, never installed. These jobs run one per sample and therefore nine at a time against
+# one shared .venv, and concurrent pip installs into a single environment interleave their
+# temporary files, so one process deletes what another is still writing. That surfaces as
+# "OSError: [Errno 2] No such file or directory" inside site-packages.
+#
+# hic2cool is imported lazily inside trio_prepare, so without this check a missing dependency
+# would fail at the mcool stage rather than here.
+python -c "import cooler, cooltools, scipy, hic2cool" 2>/dev/null || {
+  echo "[error] missing dependencies. Install them ONCE, from a login shell, before submitting:" >&2
+  echo "        source .venv/bin/activate" >&2
+  echo "        pip install hic2cool 'scipy>=1.10' 'cooler>=0.9' 'cooltools>=0.7'" >&2
+  echo "[error] do not let the array install them, nine jobs racing on one venv is what breaks." >&2
+  exit 1
+}
 python -c "
 import cooler, cooltools, hic2cool
 print(f'[trio_setup] cooler {cooler.__version__} cooltools {cooltools.__version__} hic2cool ok')

@@ -79,7 +79,13 @@ for S in HG00512 HG00513 HG00514 HG00731 HG00732 HG00733 GM19238 GM19239 GM19240
   rsync -av "data/_trio/$S/${S}_allres.hic" "cluster:$ROOT/data/_trio/$S/"
 done
 
-# on eden, once per sample. Idempotent, so rerun after any failure
+# on the cluster, ONCE, from a login shell before submitting anything. The setup jobs run nine
+# at a time against one .venv, and concurrent pip installs into a single environment corrupt
+# each other, so the array checks these and refuses rather than installing them.
+source .venv/bin/activate
+pip install hic2cool 'scipy>=1.10' 'cooler>=0.9' 'cooltools>=0.7'
+
+# once per sample. Idempotent, so rerun after any failure
 mkdir -p slurm/ensemble/logs
 for S in HG00512 HG00513 HG00514 HG00731 HG00732 HG00733 GM19238 GM19239 GM19240; do
   sbatch slurm/ensemble/trio_setup.sh $S
