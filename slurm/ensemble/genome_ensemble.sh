@@ -86,19 +86,6 @@ mkdir -p "$GNOME3D_JAX_CACHE"
 export PYTHONFAULTHANDLER=1
 export PYTHONUNBUFFERED=1
 
-# Fail before the allocation is burnt. data/ is gitignored, so a fresh checkout has none of this.
-missing=0
-for f in "data/$CELL/${CELL}_hic_25kb_singletons.bedpe" \
-         "data/$CELL/${CELL}_tads.bed" \
-         "data/$CELL/${CELL}_anchors_3+_oriented.bed" \
-         "data/$CELL/${CELL}_clusters_3+.bedpe"; do
-  [ -s "$f" ] || { echo "[guard] missing $f" >&2; missing=1; }
-done
-if [ "$missing" = "1" ] && [ "${DRY_RUN:-0}" != "1" ]; then
-  echo "[guard] run the one-time setup first: sbatch slurm/ensemble/setup_cell.sh $CELL" >&2
-  exit 1
-fi
-
 python - "$CONFIG" "$CELL" <<'PYCHECK'
 import sys
 
@@ -108,18 +95,30 @@ s = Settings()
 assert s.load_ini(sys.argv[1]), f"cannot load {sys.argv[1]}"
 cell = sys.argv[2]
 
-# Each of these fails silently rather than loudly if unset: arc-gap blocks instead of TADs,
-# ChIA-PET singletons instead of Hi-C, or epigenome terms left on from another run all produce a
-# plausible structure that answers a different question.
+# Each of these fails silently rather than loudly if unset: arc-gap blocks instead of TADs, or
+# epigenome terms left on from another run, both produce a plausible structure that answers a
+# different question. The singleton source is deliberately NOT constrained here, since Hi-C,
+# ChIA-PET and the blend are all legitimate arms; what is checked is that the file exists.
 assert s.ib_split_source == "tads", f"ib_split_source={s.ib_split_source!r}"
 assert cell in s.data_anchors, f"config is not for {cell}: anchors={s.data_anchors!r}"
-assert "hic" in s.data_singletons, f"singletons={s.data_singletons!r} does not look Hi-C derived"
 assert s.use_ctcf_motif and s.use_excluded_volume and s.use_dynamic_loop_density
 assert s.use_anchor_heatmap and s.use_subanchor_heatmap
 assert s.mc_executor_jax_bucket_shapes, "shape bucketing is off; this run would be ~5x slower"
 for flag in ("use_compartments", "use_bridging", "use_fibre_compaction", "use_lamina"):
     assert not getattr(s, flag), f"{flag} is on; these runs exclude epigenome terms"
-print(f"[guard] {cell} config ok, bucketing on, heat_min_reduction={s.subanchor_heat_min_reduction}")
+# Every input the run will open, resolved through the config rather than assumed by name.
+from pathlib import Path  # noqa: E402
+
+for field in ("data_anchors", "data_pet_clusters", "data_singletons", "data_ib_split",
+              "data_segment_split", "data_centromeres"):
+    name = getattr(s, field)
+    assert name, f"{field} is unset"
+    path = Path(s.data_path(name))
+    assert path.is_file() and path.stat().st_size > 0, (
+        f"{field}: missing or empty {path}; run sbatch slurm/ensemble/setup_cell.sh {cell}")
+
+print(f"[guard] {cell} ok, singletons={s.data_singletons}, bucketing on, "
+      f"heat_min_reduction={s.subanchor_heat_min_reduction}")
 PYCHECK
 
 # DRY_RUN prints the resolved shard and stops, so the array mapping can be checked without
