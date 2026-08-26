@@ -671,6 +671,38 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why a peer (not a child of smooth): smooth-MC operates on per-IB sub-anchor chains with CTCF orientations, heat maps, and angle springs; IB-MC operates on inter-IB centroids — no orientations, no heat target, no angle term, different spatial scale and tolerance. Conflating their settings makes both stages harder to tune independently.
 
+- **Cross-block arc targets in IB placement** — `[simulation_ib] use_ib_arcs = yes`, weight
+  `arcs_weight` (default 1.0). Default off.
+
+  `mc_ib` scores chain bonds between consecutive block centroids, excluded volume and
+  confinement, and nothing else. Every arc whose two anchors fall in different blocks is
+  discarded, so two blocks joined by forty CTCF loops are placed no closer than two joined by
+  none. That is a large hole under TAD blocks: chr1 has 726 TAD boundaries against 51 arc-gap
+  boundaries, and TAD blocks sever 33% of enhancer-promoter pairs beyond 60 kb where arc gaps
+  sever 1%. Severed pairs are positioned by centroid placement alone rather than by the smooth
+  MC that acts within a block.
+
+  When on, [pipeline/coarse/build.py::ib_arc_target_distances](gnome3d/pipeline/coarse/build.py)
+  sums each cross-block arc's `eff_score` into its block pair, normalises the matrix so adjacent
+  blocks sit at unit frequency, and maps it through `freq_to_dist_heatmap`. The result rides the
+  kernel's existing pairwise distance term, whose skip rule is a target below 1e-6, so
+  unconnected block pairs cost nothing and no kernel code changed.
+
+  The normalisation is the load-bearing part. `freq_to_distance`, the anchor-level law, is
+  calibrated for one arc's PET count between two anchors; feeding it a sum over hundreds of arcs
+  pins it to the `count_dist_base_level` floor, which produced targets of 0.20 against chain
+  bonds of 32 to 60 and would have collapsed every linked pair. Normalising against adjacent-
+  block support and using the coarse-level law puts targets at 0.4 to 5.8 times the chain bond,
+  which is the same convention the segment heatmap uses one level up.
+
+  Measured on chr1:20000000-40000000, GM12878: Spearman between a block pair's target distance
+  and its realised centroid distance goes from -0.242 with the term off to +0.760 with it on, so
+  placement follows arc support instead of ignoring it. Flag-off output is byte-identical to the
+  previous commit on the same region (13484 beads).
+
+  Why not in the reference: 3dgnome has no IB-level MC at all, so it has no cross-block arc
+  handling to port. See `[[project_enhancer3d_chr1_analysis]]` for why this matters downstream.
+
 - **Spherical confinement** — `settings.use_confinement = true` to enable.
   Soft envelope mimicking a nuclear boundary. For each bead at distance `r` from the per-MC-call centroid, contributes `confinement_weight * ((r - R)/R)²` if `r > R`, else 0. Per-bead (single-counted) — delta is `(local_curr - local_prev)` with no factor of 2. Each MC level has its own radius and packing factor (the spatial scale differs across levels):
 
