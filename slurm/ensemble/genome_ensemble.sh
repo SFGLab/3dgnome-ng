@@ -99,7 +99,11 @@ cell = sys.argv[2]
 # epigenome terms left on from another run, both produce a plausible structure that answers a
 # different question. The singleton source is deliberately NOT constrained here, since Hi-C,
 # ChIA-PET and the blend are all legitimate arms; what is checked is that the file exists.
-assert s.ib_split_source == "tads", f"ib_split_source={s.ib_split_source!r}"
+# Both block sources are legitimate arms. What must hold is that "tads" actually has a boundary
+# file, since gnome3d raises on an empty one rather than silently falling back to arc gaps.
+assert s.ib_split_source in ("tads", "arcs"), f"ib_split_source={s.ib_split_source!r}"
+if s.ib_split_source == "tads":
+    assert s.data_ib_split, "ib_split_source=tads but ib_split is empty"
 assert cell in s.data_anchors, f"config is not for {cell}: anchors={s.data_anchors!r}"
 assert s.use_ctcf_motif and s.use_excluded_volume and s.use_dynamic_loop_density
 assert s.use_anchor_heatmap and s.use_subanchor_heatmap
@@ -109,8 +113,11 @@ for flag in ("use_compartments", "use_bridging", "use_fibre_compaction", "use_la
 # Every input the run will open, resolved through the config rather than assumed by name.
 from pathlib import Path  # noqa: E402
 
-for field in ("data_anchors", "data_pet_clusters", "data_singletons", "data_ib_split",
-              "data_segment_split", "data_centromeres"):
+required = ["data_anchors", "data_pet_clusters", "data_singletons", "data_segment_split",
+            "data_centromeres"]
+if s.ib_split_source == "tads":
+    required.append("data_ib_split")   # empty under arcs, where boundaries are derived not read
+for field in required:
     name = getattr(s, field)
     assert name, f"{field} is unset"
     path = Path(s.data_path(name))

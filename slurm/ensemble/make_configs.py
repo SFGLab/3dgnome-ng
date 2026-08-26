@@ -45,12 +45,17 @@ HEADER = """\
 """
 
 
-def build(cell: str, singletons: str, ev_weight: float | None) -> configparser.ConfigParser:
+def build(
+    cell: str, singletons: str, ev_weight: float | None, blocks: str
+) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
     params["data"] = cell_data_section(cell, "data")
-    params["data"]["ib_split"] = f"{cell}_tads.bed"
-    params["data"]["ib_split_source"] = "tads"
+    # Block boundaries decide which loci the smooth MC couples directly. TAD blocks are far
+    # denser than arc gaps (726 against 51 on chr1) and sever a third of enhancer-promoter pairs
+    # beyond 60 kb, where arc gaps sever 1%. A severed pair is positioned only by IB placement.
+    params["data"]["ib_split_source"] = blocks
+    params["data"]["ib_split"] = f"{cell}_tads.bed" if blocks == "tads" else ""
     params["data"]["singletons"] = SINGLETONS[singletons].format(cell=cell, kb=BINSIZE // 1000)
     # The inter-chromosomal singleton file is a ChIA-PET artefact and would not match a Hi-C or
     # blended source. Per-chromosome runs never read it anyway.
@@ -74,6 +79,12 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--singletons", choices=sorted(SINGLETONS), default="hic")
     ap.add_argument(
+        "--blocks",
+        choices=["tads", "arcs"],
+        default="tads",
+        help="interaction-block boundaries: TAD calls, or arc-coverage gaps",
+    )
+    ap.add_argument(
         "--ev-weight",
         type=float,
         default=None,
@@ -83,9 +94,9 @@ def main() -> None:
 
     out_dir = Path(__file__).resolve().parent
     for cell in CELLS:
-        cfg = build(cell, args.singletons, args.ev_weight)
+        cfg = build(cell, args.singletons, args.ev_weight, args.blocks)
         tag = "" if args.ev_weight is None else f"_ev{args.ev_weight:g}".replace(".", "p")
-        path = out_dir / f"{cell.lower()}_{args.singletons}_tads{tag}.ini"
+        path = out_dir / f"{cell.lower()}_{args.singletons}_{args.blocks}{tag}.ini"
         with path.open("w") as fh:
             fh.write(HEADER.format(cell=cell, singletons=args.singletons))
             cfg.write(fh)
