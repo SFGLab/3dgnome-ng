@@ -45,7 +45,7 @@ HEADER = """\
 """
 
 
-def build(cell: str, singletons: str) -> configparser.ConfigParser:
+def build(cell: str, singletons: str, ev_weight: float | None) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
     params["data"] = cell_data_section(cell, "data")
@@ -58,6 +58,12 @@ def build(cell: str, singletons: str) -> configparser.ConfigParser:
     params["simulation_backend"]["multigpu_mode"] = "groups"
     params["simulation_backend"]["mc_executor_jax_bucket_shapes"] = "yes"
     params["subanchor_heatmap"]["heat_min_reduction"] = "0.001"
+    if ev_weight is not None:
+        # Excluded volume is a tradeoff, not a nuisance: weight 0.1 was picked because it
+        # cut resolution-normalised overlaps 23% in 20 of 20 GM12878 regions. Lowering it
+        # lets pairs with strong attractive drivers approach while random pairs still do
+        # not, which is why weight is swept here rather than the radius.
+        params["excluded_volume"]["weight"] = str(ev_weight)
 
     for sec, kv in params.items():
         cfg[sec] = {str(k): str(v) for k, v in kv.items()}
@@ -67,12 +73,19 @@ def build(cell: str, singletons: str) -> configparser.ConfigParser:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--singletons", choices=sorted(SINGLETONS), default="hic")
+    ap.add_argument(
+        "--ev-weight",
+        type=float,
+        default=None,
+        help="override [excluded_volume] weight; names the file accordingly",
+    )
     args = ap.parse_args()
 
     out_dir = Path(__file__).resolve().parent
     for cell in CELLS:
-        cfg = build(cell, args.singletons)
-        path = out_dir / f"{cell.lower()}_{args.singletons}_tads.ini"
+        cfg = build(cell, args.singletons, args.ev_weight)
+        tag = "" if args.ev_weight is None else f"_ev{args.ev_weight:g}".replace(".", "p")
+        path = out_dir / f"{cell.lower()}_{args.singletons}_tads{tag}.ini"
         with path.open("w") as fh:
             fh.write(HEADER.format(cell=cell, singletons=args.singletons))
             cfg.write(fh)
