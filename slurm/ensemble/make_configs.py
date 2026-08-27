@@ -51,9 +51,13 @@ def build(
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
     params["data"] = cell_data_section(cell, "data")
-    # Block boundaries decide which loci the smooth MC couples directly. TAD blocks are far
-    # denser than arc gaps (726 against 51 on chr1) and sever a third of enhancer-promoter pairs
-    # beyond 60 kb, where arc gaps sever 1%. A severed pair is positioned only by IB placement.
+    # Block boundaries decide which loci the smooth MC couples directly, and a pair severed by a
+    # boundary is positioned only by IB placement. TAD blocks are far denser than arc gaps (726
+    # against 51 on chr1) and sever a third of enhancer-promoter pairs beyond 60 kb where arc
+    # gaps sever 1%. Measured on a 20 Mb region, that costs a cross-block distance penalty of
+    # 3.1 against 1.0. Arc gaps are the default until IB placement can hold severed pairs
+    # together; TAD blocks buy better within-block contact enrichment and compartment saddle, so
+    # the choice is a tradeoff rather than a fix.
     params["data"]["ib_split_source"] = blocks
     params["data"]["ib_split"] = f"{cell}_tads.bed" if blocks == "tads" else ""
     params["data"]["singletons"] = SINGLETONS[singletons].format(cell=cell, kb=BINSIZE // 1000)
@@ -81,8 +85,8 @@ def main() -> None:
     ap.add_argument(
         "--blocks",
         choices=["tads", "arcs"],
-        default="tads",
-        help="interaction-block boundaries: TAD calls, or arc-coverage gaps",
+        default="arcs",
+        help="interaction-block boundaries: arc-coverage gaps (default), or TAD calls",
     )
     ap.add_argument(
         "--ev-weight",
