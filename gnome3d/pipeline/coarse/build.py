@@ -908,72 +908,6 @@ def position_interaction_blocks(state: CoarseState, segs: list[int], chr_: str) 
         ib_mc_refine(state, segs, chr_)
 
 
-def ib_arc_target_distances(state: CoarseState, ibs: list[int], chr_: str) -> F64Array | None:
-    """Target distances between block centroids, from the arcs that cross block boundaries.
-
-    IB placement otherwise sees only the chain bonds between consecutive centroids, so two blocks
-    joined by many CTCF loops are placed no closer than two joined by none. Every arc whose two
-    anchors sit in different blocks is summed into that block pair, giving an aggregate contact
-    count per pair of centroids.
-
-    That aggregate is converted the way the segment level converts its own contact counts, not the
-    way the anchor level converts a single arc. `freq_to_distance` is calibrated for one arc's PET
-    count between two anchors; feeding it a sum over hundreds of arcs drives it straight to the
-    `count_dist_base_level` floor, which put targets at 0.20 against chain bonds of 32 to 60 and
-    would have collapsed every linked pair. Instead the matrix is normalised so adjacent blocks
-    sit at unit frequency and then mapped through `freq_to_dist_heatmap`, so an adjacent pair
-    lands at the same scale as its chain bond and a pair with more arc support than adjacency
-    implies is pulled closer.
-
-    Returns an (n, n) matrix aligned with `ibs`, zero where a pair shares no arc. Zero is the
-    kernel's own skip value for its pairwise distance term, so unconnected pairs cost nothing.
-    Returns None when no cross-block arc exists, which leaves the term inert.
-    """
-    clusters = state.clusters
-    chr_arcs = state.arcs.get(chr_, [])
-    if not chr_arcs:
-        return None
-
-    # anchor cluster -> position of its block within this group
-    anchor_to_slot: dict[int, int] = {}
-    for slot, ib in enumerate(ibs):
-        for anchor in clusters[ib].children:
-            anchor_to_slot[anchor] = slot
-
-    n = len(ibs)
-    score: F64Array = np.zeros((n, n), dtype=np.float64)
-    for anchor, slot in anchor_to_slot.items():
-        for arc_local in clusters[anchor].arcs:
-            if arc_local >= len(chr_arcs):
-                continue
-            arc = chr_arcs[arc_local]
-            other = arc.end if arc.start == anchor else arc.start
-            other_slot = anchor_to_slot.get(other)
-            # Each arc is reached from both ends; the ordering keeps it counted once.
-            if other_slot is None or other_slot <= slot:
-                continue
-            w = float(arc.eff_score or arc.score)
-            score[slot, other_slot] += w
-            score[other_slot, slot] += w
-
-    if not score.any():
-        return None
-
-    if n < 2:
-        return None
-    # Adjacent blocks are the reference: whatever arc support neighbours typically have becomes
-    # frequency 1.0, so freq_to_dist_heatmap puts them at the natural neighbour distance.
-    adjacent = np.diagonal(score, 1)
-    ref = float(adjacent[adjacent > 0].mean()) if (adjacent > 0).any() else float(score.max())
-    if ref <= 0.0:
-        return None
-
-    out: F64Array = np.zeros((n, n), dtype=np.float64)
-    for i, j in zip(*np.nonzero(score > 0.0), strict=True):
-        out[i, j] = state.s.freq_to_dist_heatmap(float(score[i, j]) / ref)
-    return out
-
-
 def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
     """
     Refine IB centroid positions with a small chain-bond + EV + confinement
@@ -1050,9 +984,6 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
             conf_tag,
         ):
             gyr_before = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
-            arc_dist = ib_arc_target_distances(state, ibs, chr_) if s.use_ib_arcs else None
-            if arc_dist is not None:
-                LOG.info("IB arc targets: %d block pairs", int((arc_dist > 0).sum() // 2))
             mc_numba.mc_ib_numba(
                 pos,
                 dtn,
@@ -1060,7 +991,6 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
                 s,
                 compartment_for_clusters(state, ibs, chr_),
                 accessibility_for_clusters(state, ibs, chr_),
-                arc_dist,
             )
             gyr_after = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
             LOG.info("gyr %.2f -> %.2f", gyr_before, gyr_after)
@@ -1091,5 +1021,4 @@ __all__ = [
     "reconstruct_segment_level",
     "position_interaction_blocks",
     "ib_mc_refine",
-    "ib_arc_target_distances",
 ]

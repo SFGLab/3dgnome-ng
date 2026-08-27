@@ -193,14 +193,6 @@ class Settings:
     # pays off while groups hold more IBs than there are devices.  "off" pins to one device.
     mc_multigpu_mode: str
 
-    # IB placement currently scores chain bonds between consecutive block centroids, excluded
-    # volume and confinement, and nothing else. Every arc whose two anchors fall in different
-    # blocks is discarded, so two blocks joined by forty CTCF loops are placed no closer than two
-    # joined by none. With TAD blocks that is a third of enhancer-promoter pairs beyond 60 kb.
-    # When on, those cross-block arcs become a pairwise distance target between block centroids.
-    use_ib_arcs: bool
-    ib_arcs_weight: float
-
     # ---- MC arcs ----
     max_temp: float
     dt_temp: float
@@ -478,8 +470,6 @@ class Settings:
             1.0  # re-noise (x step) on hybrid-smooth polish init; recovers diversity
         )
         self.mc_multigpu_mode = "groups"
-        self.use_ib_arcs = False
-        self.ib_arcs_weight = 1.0
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -1030,8 +1020,6 @@ class Settings:
         self.jump_scale_ib = getf("simulation_ib", "jump_temp_scale", self.jump_scale_ib)
         self.jump_coef_ib = getf("simulation_ib", "jump_temp_coef", self.jump_coef_ib)
         self.mc_stop_steps_ib = geti("simulation_ib", "stop_condition_steps", self.mc_stop_steps_ib)
-        self.use_ib_arcs = getb("simulation_ib", "use_ib_arcs", self.use_ib_arcs)
-        self.ib_arcs_weight = getf("simulation_ib", "arcs_weight", self.ib_arcs_weight)
         self.mc_stop_improvement_ib = getf(
             "simulation_ib",
             "stop_condition_improvement_threshold",
