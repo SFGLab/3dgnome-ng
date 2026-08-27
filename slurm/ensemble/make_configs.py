@@ -46,7 +46,11 @@ HEADER = """\
 
 
 def build(
-    cell: str, singletons: str, ev_weight: float | None, blocks: str
+    cell: str,
+    singletons: str,
+    ev_weight: float | None,
+    blocks: str,
+    ib_arcs: float | None,
 ) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
@@ -67,6 +71,11 @@ def build(
     params["simulation_backend"]["multigpu_mode"] = "groups"
     params["simulation_backend"]["mc_executor_jax_bucket_shapes"] = "yes"
     params["subanchor_heatmap"]["heat_min_reduction"] = "0.001"
+    if ib_arcs is not None:
+        # Attraction only: a block pair gets a target solely where its arc support implies a
+        # shorter distance than its genomic separation already does.
+        params["simulation_ib"]["use_ib_arcs"] = "yes"
+        params["simulation_ib"]["arcs_weight"] = str(ib_arcs)
     if ev_weight is not None:
         # Excluded volume is a tradeoff, not a nuisance: weight 0.1 was picked because it
         # cut resolution-normalised overlaps 23% in 20 of 20 GM12878 regions. Lowering it
@@ -94,12 +103,21 @@ def main() -> None:
         default=None,
         help="override [excluded_volume] weight; names the file accordingly",
     )
+    ap.add_argument(
+        "--ib-arcs",
+        type=float,
+        default=None,
+        metavar="WEIGHT",
+        help="attraction-only cross-block arc targets in IB placement, at this weight",
+    )
     args = ap.parse_args()
 
     out_dir = Path(__file__).resolve().parent
     for cell in CELLS:
-        cfg = build(cell, args.singletons, args.ev_weight, args.blocks)
+        cfg = build(cell, args.singletons, args.ev_weight, args.blocks, args.ib_arcs)
         tag = "" if args.ev_weight is None else f"_ev{args.ev_weight:g}".replace(".", "p")
+        if args.ib_arcs is not None:
+            tag += f"_ibarc{args.ib_arcs:g}".replace(".", "p")
         path = out_dir / f"{cell.lower()}_{args.singletons}_{args.blocks}{tag}.ini"
         with path.open("w") as fh:
             fh.write(HEADER.format(cell=cell, singletons=args.singletons))
