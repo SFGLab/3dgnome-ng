@@ -908,6 +908,80 @@ def position_interaction_blocks(state: CoarseState, segs: list[int], chr_: str) 
         ib_mc_refine(state, segs, chr_)
 
 
+def ib_arc_target_distances(state: CoarseState, ibs: list[int], chr_: str) -> F64Array | None:
+    """Attraction-only distance targets between block centroids, from arcs crossing boundaries.
+
+    IB placement otherwise sees only the chain bonds between consecutive centroids, so two blocks
+    joined by many CTCF loops are placed no closer than two joined by none.
+
+    Two things this deliberately does not do, both learned from a version that failed.
+
+    It does not feed the summed arc support to `freq_to_distance`. That law is calibrated for one
+    arc's PET count between two anchors, and a sum over hundreds of arcs pins it to the
+    `count_dist_base_level` floor: targets came out at 0.20 against chain bonds of 32 to 60. The
+    support matrix is instead normalised so adjacent blocks sit at unit frequency and mapped
+    through `freq_to_dist_heatmap`, the law the segment level uses for its own aggregate counts.
+
+    And it does not keep every pair that normalisation produces. Normalising against adjacency
+    encodes distance decay, so a non-adjacent pair with ordinary support gets a target LONGER
+    than its genomic separation implies and the term pushes it apart. Long-range
+    enhancer-promoter pairs live in exactly that population, and the first version made them
+    worse in proportion to its weight. Only pairs whose arc support implies a distance shorter
+    than `genomic_length_to_distance` of their separation are kept, so the term can pull blocks
+    together and never drive them apart.
+
+    Returns an (n, n) matrix aligned with `ibs`, zero for every pair without a kept target. Zero
+    is the kernel's own skip value for its pairwise distance term, so those pairs cost nothing.
+    Returns None when nothing survives, which leaves the term inert.
+    """
+    clusters = state.clusters
+    chr_arcs = state.arcs.get(chr_, [])
+    n = len(ibs)
+    if not chr_arcs or n < 2:
+        return None
+
+    anchor_to_slot: dict[int, int] = {}
+    for slot, ib in enumerate(ibs):
+        for anchor in clusters[ib].children:
+            anchor_to_slot[anchor] = slot
+
+    support: F64Array = np.zeros((n, n), dtype=np.float64)
+    for anchor, slot in anchor_to_slot.items():
+        for arc_local in clusters[anchor].arcs:
+            if arc_local >= len(chr_arcs):
+                continue
+            arc = chr_arcs[arc_local]
+            other = arc.end if arc.start == anchor else arc.start
+            other_slot = anchor_to_slot.get(other)
+            # Each arc is reachable from both ends; the ordering counts it once.
+            if other_slot is None or other_slot <= slot:
+                continue
+            w = float(arc.eff_score or arc.score)
+            support[slot, other_slot] += w
+            support[other_slot, slot] += w
+
+    if not support.any():
+        return None
+
+    adjacent = np.diagonal(support, 1)
+    ref = float(adjacent[adjacent > 0].mean()) if (adjacent > 0).any() else float(support.max())
+    if ref <= 0.0:
+        return None
+
+    gpos = [clusters[ib].genomic_pos for ib in ibs]
+    out: F64Array = np.zeros((n, n), dtype=np.float64)
+    kept = 0
+    for i, j in zip(*np.nonzero(np.triu(support, 1) > 0.0), strict=True):
+        target = state.s.freq_to_dist_heatmap(float(support[i, j]) / ref)
+        natural = state.s.genomic_length_to_distance(abs(int(gpos[j]) - int(gpos[i])))
+        if target >= natural:
+            continue  # no more attraction than the chain already provides: leave it alone
+        out[i, j] = target
+        out[j, i] = target
+        kept += 1
+    return out if kept else None
+
+
 def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
     """
     Refine IB centroid positions with a small chain-bond + EV + confinement
@@ -984,6 +1058,9 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
             conf_tag,
         ):
             gyr_before = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
+            arc_dist = ib_arc_target_distances(state, ibs, chr_) if s.use_ib_arcs else None
+            if arc_dist is not None:
+                LOG.info("IB arc targets: %d block pairs pulled in", int((arc_dist > 0).sum() // 2))
             mc_numba.mc_ib_numba(
                 pos,
                 dtn,
@@ -991,6 +1068,7 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
                 s,
                 compartment_for_clusters(state, ibs, chr_),
                 accessibility_for_clusters(state, ibs, chr_),
+                arc_dist,
             )
             gyr_after = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
             LOG.info("gyr %.2f -> %.2f", gyr_before, gyr_after)
@@ -1021,4 +1099,5 @@ __all__ = [
     "reconstruct_segment_level",
     "position_interaction_blocks",
     "ib_mc_refine",
+    "ib_arc_target_distances",
 ]
