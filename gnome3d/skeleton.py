@@ -100,7 +100,7 @@ def _collect_ib_work(
     state: CoarseState, chr_: str, seg_level: dict[str, list[int]]
 ) -> list[tuple[str, int, list[int]]]:
     """Serial, cheap pass: list one chr's buildable IBs (skipping <=1-anchor ones) and seed
-    each anchor at its IB centroid.  Returns ``(ib_id, ib_idx, active_region)`` tuples for
+    each anchor at its IB centroid, unless a segment-scope arc pass already placed them.  Returns ``(ib_id, ib_idx, active_region)`` tuples for
     the (parallel) heatmap build.  Separating this out keeps the only shared-graph writes
     (the centroid seeding) up front, before any build thread reads the graph."""
     clusters = state.clusters
@@ -120,8 +120,12 @@ def _collect_ib_work(
             continue
         # Each anchor seeds at the IB centroid (matches the arc stage's initial_pos before
         # its per-anchor noise).  IBs partition the anchors, so these writes never overlap.
-        for a_idx in active_region:
-            clusters[a_idx].pos = ib.pos.copy()
+        # Skipped under `use_segment_arcs`, where a segment-scope pass has already placed every
+        # anchor jointly: resetting them here would discard exactly the cross-block information
+        # that pass exists to add.
+        if not state.s.use_segment_arcs:
+            for a_idx in active_region:
+                clusters[a_idx].pos = ib.pos.copy()
         work.append((ib_id, ib_idx, active_region))
     return work
 

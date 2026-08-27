@@ -41,7 +41,7 @@ from gnome3d.pipeline.coarse.heatmap import (
 from gnome3d.settings import Settings
 from gnome3d.tracks import bin_compartments, bin_signal, normalize_accessibility
 from gnome3d.types import *
-from gnome3d.util import random_vector_np, seed_rng
+from gnome3d.util import add_movable_noise_inplace, random_vector_np, seed_rng
 
 LOG = log.get("coarse")
 
@@ -907,6 +907,11 @@ def position_interaction_blocks(state: CoarseState, segs: list[int], chr_: str) 
     if state.s.use_ib_mc:
         ib_mc_refine(state, segs, chr_)
 
+    # After block centroids are placed and before the skeleton reads anchor positions, so the
+    # per-block arc MC starts from jointly placed anchors rather than from a centroid.
+    if state.s.use_segment_arcs:
+        arcs_segment_refine(state, segs, chr_)
+
 
 def ib_arc_target_distances(state: CoarseState, ibs: list[int], chr_: str) -> F64Array | None:
     """Attraction-only distance targets between block centroids, from arcs crossing boundaries.
@@ -980,6 +985,62 @@ def ib_arc_target_distances(state: CoarseState, ibs: list[int], chr_: str) -> F6
         out[j, i] = target
         kept += 1
     return out if kept else None
+
+
+def arcs_segment_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
+    """Place every anchor of a segment in one arc MC, so cross-block arcs actually constrain.
+
+    Anchors enter the per-block arc MC collapsed on their block's centroid, verified as a spread
+    of exactly zero, and that MC sees only the arcs internal to its own block. An arc whose two
+    anchors sit in different blocks therefore constrains nothing at anchor resolution: the only
+    thing holding those blocks together is the chain bond between their centroids. Under TAD
+    blocks that is a third of enhancer-promoter pairs beyond 60 kb.
+
+    Refining a whole segment at once makes those arcs ordinary in-chain arcs, with no special
+    handling anywhere. Afterwards the per-block MC refines from these positions rather than from
+    a centroid, and smooth MC holds anchors fixed, so the joint placement carries through to the
+    output.
+
+    Cost is affordable because arcs is a small share of a run: measured on chr1 it was 2% of a
+    conformation against smooth's 39%. The work is the same anchors either way, grouped
+    differently, so only the chain length changes.
+    """
+    from gnome3d.mc import numba as mc_numba
+
+    s = state.s
+    clusters = state.clusters
+
+    for seg_idx in segs:
+        anchors = [a for ib in clusters[seg_idx].children for a in clusters[ib].children]
+        anchors.sort(key=lambda ci: clusters[ci].genomic_pos)
+        if len(anchors) <= 1:
+            continue
+
+        anchor_heat: F64Array | None = None
+        if (s.use_anchor_heatmap or s.use_subanchor_heatmap) and state.singletons:
+            anchor_heat, _ = build_contact_heatmaps(state, anchors, chr_)
+        exp_dist = calc_anchor_expected_distances(state, anchors, chr_, anchor_heat)
+        if not (exp_dist > 0.0).any():
+            continue
+
+        pos: F32Array = np.array([clusters[ci].pos for ci in anchors], dtype=np.float32)
+        # Anchors arrive collapsed on their block centroid, so an identical starting point gives
+        # the MC nothing to work with. Spread them by the arc scale before annealing.
+        scale = float(exp_dist[exp_dist > 0.0].mean())
+        add_movable_noise_inplace(pos, np.zeros(len(anchors), dtype=np.bool_), scale)
+
+        with log.step(
+            LOG,
+            f"segment-arcs {chr_} seg {seg_idx}",
+            "%d anchors over %d blocks, arc scale %.2f",
+            len(anchors),
+            len(clusters[seg_idx].children),
+            scale,
+        ):
+            mc_numba.mc_arcs_numba(pos, exp_dist, scale * float(s.noise_lvl2), s)
+
+        for i, ci in enumerate(anchors):
+            clusters[ci].pos = pos[i].copy()
 
 
 def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
@@ -1100,4 +1161,5 @@ __all__ = [
     "position_interaction_blocks",
     "ib_mc_refine",
     "ib_arc_target_distances",
+    "arcs_segment_refine",
 ]

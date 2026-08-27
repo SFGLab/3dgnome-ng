@@ -196,11 +196,19 @@ class Settings:
     # IB placement scores chain bonds between block centroids, excluded volume and confinement,
     # and discards every arc crossing a block boundary, so two blocks joined by many CTCF loops
     # are placed no closer than two joined by none. When on, cross-block arcs become a pairwise
-    # target between centroids. The term is attraction only: a pair is given a target solely when
-    # its arc support implies a distance SHORTER than its genomic separation already does, so a
-    # weakly linked pair is left untouched rather than pushed apart.
+    # target between centroids. Attraction only: a pair is given a target solely when its arc
+    # support implies a distance SHORTER than its genomic separation already does. Measured on a
+    # 20 Mb region it closes about a fifth of the cross-block distance penalty, because a
+    # centroid is a coarse handle on where a block's edge anchors actually sit.
     use_ib_arcs: bool
     ib_arcs_weight: float
+
+    # Anchors enter the per-block arc MC collapsed on their block's centroid, and that MC sees
+    # only arcs internal to its block, so a cross-block arc never constrains anything. When on, a
+    # segment-scope anchor pass runs first: every anchor of every block in a segment is placed in
+    # one arc MC, where cross-block arcs are ordinary in-chain arcs. The per-block MC then refines
+    # from those positions, and smooth MC holds anchors fixed, so the joint placement survives.
+    use_segment_arcs: bool
 
     # ---- MC arcs ----
     max_temp: float
@@ -481,6 +489,7 @@ class Settings:
         self.mc_multigpu_mode = "groups"
         self.use_ib_arcs = False
         self.ib_arcs_weight = 1.0
+        self.use_segment_arcs = False
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -1033,6 +1042,7 @@ class Settings:
         self.mc_stop_steps_ib = geti("simulation_ib", "stop_condition_steps", self.mc_stop_steps_ib)
         self.use_ib_arcs = getb("simulation_ib", "use_ib_arcs", self.use_ib_arcs)
         self.ib_arcs_weight = getf("simulation_ib", "arcs_weight", self.ib_arcs_weight)
+        self.use_segment_arcs = getb("simulation_arcs", "use_segment_arcs", self.use_segment_arcs)
         self.mc_stop_improvement_ib = getf(
             "simulation_ib",
             "stop_condition_improvement_threshold",

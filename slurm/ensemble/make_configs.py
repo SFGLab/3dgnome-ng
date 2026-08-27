@@ -51,6 +51,7 @@ def build(
     ev_weight: float | None,
     blocks: str,
     ib_arcs: float | None,
+    segment_arcs: bool,
 ) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
@@ -71,6 +72,10 @@ def build(
     params["simulation_backend"]["multigpu_mode"] = "groups"
     params["simulation_backend"]["mc_executor_jax_bucket_shapes"] = "yes"
     params["subanchor_heatmap"]["heat_min_reduction"] = "0.001"
+    if segment_arcs:
+        # Anchors otherwise enter the per-block arc MC collapsed on their block centroid, so a
+        # cross-block arc constrains nothing at anchor resolution.
+        params["simulation_arcs"]["use_segment_arcs"] = "yes"
     if ib_arcs is not None:
         # Attraction only: a block pair gets a target solely where its arc support implies a
         # shorter distance than its genomic separation already does.
@@ -110,14 +115,23 @@ def main() -> None:
         metavar="WEIGHT",
         help="attraction-only cross-block arc targets in IB placement, at this weight",
     )
+    ap.add_argument(
+        "--segment-arcs",
+        action="store_true",
+        help="place every anchor of a segment in one arc MC before the per-block MC",
+    )
     args = ap.parse_args()
 
     out_dir = Path(__file__).resolve().parent
     for cell in CELLS:
-        cfg = build(cell, args.singletons, args.ev_weight, args.blocks, args.ib_arcs)
+        cfg = build(
+            cell, args.singletons, args.ev_weight, args.blocks, args.ib_arcs, args.segment_arcs
+        )
         tag = "" if args.ev_weight is None else f"_ev{args.ev_weight:g}".replace(".", "p")
         if args.ib_arcs is not None:
             tag += f"_ibarc{args.ib_arcs:g}".replace(".", "p")
+        if args.segment_arcs:
+            tag += "_segarc"
         path = out_dir / f"{cell.lower()}_{args.singletons}_{args.blocks}{tag}.ini"
         with path.open("w") as fh:
             fh.write(HEADER.format(cell=cell, singletons=args.singletons))
