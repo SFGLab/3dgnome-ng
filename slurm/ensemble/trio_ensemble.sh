@@ -92,7 +92,11 @@ SHARD=$(python playground/trio/trio_shard.py --task "$TASK" --n-models "$N_MODEL
 read -r CHROM SAMPLE FIRST LAST TOTAL <<< "$SHARD"
 MEMBERS="${FIRST}-${LAST}"
 LOWER=$(echo "$SAMPLE" | tr '[:upper:]' '[:lower:]')
-CONFIG="${CONFIG:-$ROOT/slurm/ensemble/${LOWER}_trio.ini}"
+# CONFIG_TAG picks which per-sample config the whole array uses. CONFIG itself cannot serve
+# that purpose: the array spans several samples and a single override would point every
+# task at one sample's file. Use _trio_fixed for the segment-scope-anchor arm.
+CONFIG_TAG="${CONFIG_TAG:-_trio}"
+CONFIG="${CONFIG:-$ROOT/slurm/ensemble/${LOWER}${CONFIG_TAG}.ini}"
 DEST="$OUT/$SAMPLE/$CHROM"
 
 echo "[trio_ens] array length needed = $TOTAL"
