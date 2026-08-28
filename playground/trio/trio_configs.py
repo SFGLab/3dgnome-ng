@@ -39,7 +39,9 @@ HEADER = """\
 """
 
 
-def build(sample: trio_samples.Sample, binsize: int) -> configparser.ConfigParser:
+def build(
+    sample: trio_samples.Sample, binsize: int, segment_arcs: bool = True
+) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
     name = sample.name
@@ -52,6 +54,14 @@ def build(sample: trio_samples.Sample, binsize: int) -> configparser.ConfigParse
     params["simulation_backend"]["multigpu_mode"] = "groups"
     params["simulation_backend"]["mc_executor_jax_bucket_shapes"] = "yes"
     params["subanchor_heatmap"]["heat_min_reduction"] = "0.001"
+    if segment_arcs:
+        # On by default here, unlike the cell line arm, because these blocks are the densest in
+        # the project: 543 boundaries on HG00512 chr1. Without it anchors enter the per-block arc
+        # MC collapsed on their block centroid and no cross-block arc constrains anything, and
+        # the 2026-08-24 run measured the consequence directly on HG00512 chr1 over nine
+        # structures: between-block contact of exactly zero, block enrichment 152.6, Rg 225.9.
+        # Those structures encode the block partition rather than chromatin.
+        params["simulation_arcs"]["use_segment_arcs"] = "yes"
     for sec, kv in params.items():
         cfg[sec] = {str(k): str(v) for k, v in kv.items()}
     return cfg
@@ -62,12 +72,20 @@ def main() -> None:
     ap.add_argument("--samples")
     ap.add_argument("--out-dir", default="slurm/ensemble")
     ap.add_argument("--binsize", type=int, default=BINSIZE)
+    ap.add_argument(
+        "--no-segment-arcs",
+        action="store_true",
+        help="omit segment-scope anchor placement, reproducing the 2026-08-24 arm",
+    )
     args = ap.parse_args()
     out_dir = ROOT / args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     for s in trio_samples.resolve(args.samples):
-        cfg = build(s, args.binsize)
-        path = out_dir / f"{s.name.lower()}_trio.ini"
+        cfg = build(s, args.binsize, not args.no_segment_arcs)
+        # Distinct name so the fixed arm cannot be confused with, or overwrite, the
+        # 2026-08-24 configs whose structures had zero between-block contact.
+        tag = "_trio" if args.no_segment_arcs else "_trio_fixed"
+        path = out_dir / f"{s.name.lower()}{tag}.ini"
         with path.open("w") as fh:
             fh.write(HEADER.format(name=s.name, role=s.role, pop=s.pop))
             cfg.write(fh)
