@@ -1,11 +1,10 @@
-"""Spike. Derive block and segment boundary files from called TAD boundaries.
+"""Spike. Derive the segment boundary file from called TAD boundaries.
 
-`validation tracks` writes TAD boundaries as `chr pos pos`, which is the format both
-`[data] ib_split` and `[data] segment_split` read. They need different scales.
+`validation tracks` writes TAD boundaries as `chr pos pos`, which is the format
+`[data] segment_split` reads. Blocks are not derived here. They come from arc gaps, as on the
+cell lines, because a TAD boundary knows nothing about the arcs and cuts through them.
 
-Blocks are TADs, thinned only enough to merge TADs smaller than --min-tad into a neighbour.
-
-Segments are the grouping above blocks, and they must be much coarser. Under the default
+Segments are the grouping above blocks, and they must be much coarser than a TAD. Under the default
 `refine_scope = segment` a segment holding one block or fewer is skipped, so segments at TAD
 scale would skip placement for most of the genome without reporting anything. On GM12878,
 thinning at 2 Mb gives 1292 boundaries against the 1298 of the CCDS breakpoints file the

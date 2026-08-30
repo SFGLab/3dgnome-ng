@@ -257,9 +257,6 @@ def _arm_flags(
     # accessibility term reads the track but never scores against it.
     # Applied to every arm, so the baseline is built from the same blocks the
     # treated arms are and a difference is the term rather than the partition.
-    if getattr(args, "ib_split_source", "arcs") != "arcs":
-        flags["ib_split_source"] = args.ib_split_source
-        flags["data_ib_split"] = str(Path(args.ib_split_file).resolve())
     flags["accessibility_mode"] = getattr(args, "accessibility_mode", "log")
     flags["accessibility_percentile"] = float(getattr(args, "accessibility_percentile", 80.0))
     return flags
@@ -285,13 +282,6 @@ class Epigenome(Study):
             help="how the raw ATAC track maps to [0,1]; binary is HiP-HoP's open/closed state",
         )
         p.add_argument("--accessibility-percentile", type=float, default=80.0)
-        p.add_argument(
-            "--ib-split-source",
-            default="arcs",
-            choices=["arcs", "tads"],
-            help="where interaction block boundaries come from; tads needs --ib-split-file",
-        )
-        p.add_argument("--ib-split-file", default=None, help="boundary BED for tads")
         p.add_argument(
             "--baseline-repeats",
             type=int,
@@ -325,11 +315,6 @@ class Epigenome(Study):
         if not ctx.hic:
             print("[epigenome] --hic is required; it is the target the arms are scored against")
             return
-        if args.ib_split_source != "arcs" and not args.ib_split_file:
-            print("[epigenome] --ib-split-source needs --ib-split-file")
-            return
-        if args.ib_split_source != "arcs":
-            print(f"  interaction blocks from: {args.ib_split_source} ({args.ib_split_file})")
 
         chrs, region = parse_chrs_arg(args.region)
         c_obs, bin_starts = contacts.observed_hic(ctx.hic, args.region, args.binsize, balance=True)

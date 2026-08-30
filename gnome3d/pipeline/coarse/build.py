@@ -111,8 +111,6 @@ def build_state(
             data.arcs,
             data.breakpoints,
             chrs_list,
-            ib_splits=data.ib_splits,
-            ib_split_source=settings.ib_split_source,
         )
         LOG.info("total clusters: %d", len(clusters))
 

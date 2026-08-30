@@ -459,35 +459,6 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
 ### Algorithm divergences
 
-- **Interaction block boundaries: `[data] ib_split_source = arcs | tads`, default `arcs`.**
-  The reference splits blocks at `hierarchy.py::find_gaps`, where ChIA-PET arc coverage falls to
-  zero. That is partly a property of the library's depth rather than of the chromatin: where the
-  assay is shallow no arc spans, a boundary appears, and the pipeline folds and places the two
-  sides as independent objects. `tads` takes boundaries from a contact-map call supplied by
-  `[data] ib_split` instead. A missing or empty boundary file raises rather
-  than falling back to arc gaps, since a silent fallback would look like a `tads` run and behave
-  like the baseline. `python -m validation tracks` writes the boundary file via
-  `cooltools.insulation` at 10 kb with a 200 kb window.
-
-  **`tads` is not in use. Prefer `arcs`, the default.** A TAD boundary comes from an insulation
-  call that knows nothing about the arcs, so it cuts through them: measured on GM12878 chr1,
-  5437 of 12474 arcs, 43.6 percent, have their two anchors in different blocks under `tads`
-  against exactly 0 under `arcs`. An arc whose anchors sit in different blocks constrains
-  nothing at anchor resolution, because the per-block arc MC only sees arcs internal to its own
-  block and the blocks are held together by the chain bond between their centroids alone. So a
-  `tads` run discards nearly half its arc data. Arc-gap boundaries cannot do this by
-  construction, since they are placed where arc coverage is already zero. Reproduce with
-  `playground/blockscope_cost.py`.
-
-  The earlier case for `tads` was within-block over between-block contact enrichment on four
-  GM12878 regions, 2.60, 11.16, 28160 and unbounded falling to 1.86, 0.68, 4.26 and 1.90, with
-  the mean absolute compartment-saddle gap falling 1.664 to 0.373. Those numbers are real but
-  do not carry: enrichment is strongly span and bin-size dependent, reading 44.2 on a 20 Mb
-  region against 5.75 for the same pipeline on full chr1, so it ranks configurations only
-  within one fixed span. Bead count also falls about 27 percent under `tads`, because more
-  boundaries mean fewer inter-anchor gaps receive subanchors, so model resolution moves
-  alongside block definition. See [[project_trio_expansion_artifact]].
-
 - **IB placement scope: `[simulation_ib] refine_scope = segment | chromosome`, default `segment`.**
   `segment` is the prior behaviour: each segment's blocks are refined as a separate chain and any
   segment holding one block or fewer is skipped, so segment grouping decides which blocks get
@@ -500,11 +471,6 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   enrichment worsened about threefold. The compartment saddle improves, but sparsity alone drags
   that statistic toward 1.0, so the gain is not separable from the inflation. Adopting this scope
   means re-tuning `exclusion_*_ib` and `confinement_*_ib` first.
-
-  This also decides whether `[data] ib_split` can share a file with `[data] segment_split`. Under
-  `chromosome` they are interchangeable, measured as a wash. Under the default `segment` they are
-  not: one shared file gives 16 segments holding 17 blocks, so nearly every segment holds a single
-  block and placement skips it.
 
 - **Orientation MC: weighted local scorer**
   Python uses a weighted local delta in `_local_score_orientation_nb` ([gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py)) so the incremental update is exact w.r.t. `_score_orientation_full_nb`. The reference uses an unweighted local scorer that drifts over many steps. See `[[project-orientation-mc-fix]]`. The reference scorer stayed unweighted for the old unit harness, which has since been removed.

@@ -156,17 +156,9 @@ class SaddleSurvey(Study):
         p.add_argument("--per-chrom", type=int, default=3)
         p.add_argument("--binsize", type=int, default=100_000)
         p.add_argument(
-            "--ib-split-source",
-            default="arcs",
-            choices=["arcs", "tads"],
-            help="where interaction block boundaries come from; tads needs --ib-split-file",
-        )
-        p.add_argument("--ib-split-file", default=None, help="boundary BED for tads")
-        p.add_argument(
             "--segment-split-file",
             default=None,
-            help="override the segment boundary BED; pointing this and --ib-split-file at the "
-            "same file collapses segments onto blocks, which is worth measuring not assuming",
+            help="override the segment boundary BED",
         )
         p.add_argument(
             "--min-bins",
@@ -205,13 +197,6 @@ class SaddleSurvey(Study):
         print("  " + "-" * (len(header) - 2))
 
         flags = _arm_flags("off", args, comp_path, acc_path)
-        if args.ib_split_source != "arcs":
-            if not args.ib_split_file:
-                print("[saddle-survey] --ib-split-source needs --ib-split-file")
-                return
-            flags["ib_split_source"] = args.ib_split_source
-            flags["data_ib_split"] = str(Path(args.ib_split_file).resolve())
-            print(f"  interaction blocks from: {args.ib_split_source} ({args.ib_split_file})")
         if args.segment_split_file:
             flags["data_segment_split"] = str(Path(args.segment_split_file).resolve())
             print(f"  segments from: {args.segment_split_file}")

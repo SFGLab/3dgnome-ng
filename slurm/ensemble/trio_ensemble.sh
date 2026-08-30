@@ -146,7 +146,6 @@ sample = sys.argv[2]
 
 # Each of these fails silently rather than loudly if unset, producing a plausible structure that
 # answers a different question.
-assert s.ib_split_source == "tads", f"ib_split_source={s.ib_split_source!r}"
 assert sample in s.data_anchors, f"config is not for {sample}: anchors={s.data_anchors!r}"
 assert "hic" in s.data_singletons, f"singletons={s.data_singletons!r} does not look contact derived"
 assert s.use_ctcf_motif and s.use_excluded_volume and s.use_dynamic_loop_density

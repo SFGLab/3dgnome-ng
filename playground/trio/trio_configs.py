@@ -47,12 +47,6 @@ def build(
     name = sample.name
     params["data"] = cell_data_section(name, "data")
     params["data"]["segment_split"] = f"{name}_segments.bed"
-    # Blocks come from arc gaps, as in the cell line arm. A TAD boundary is an insulation call
-    # that knows nothing about the arcs, so it cuts through them and the anchors either side stop
-    # constraining each other. Segments stay TAD derived because the trio samples have no CCDS
-    # breakpoints file and segments are not interaction blocks.
-    params["data"]["ib_split"] = ""
-    params["data"]["ib_split_source"] = "arcs"
     params["data"]["singletons"] = f"{name}_hic_{binsize // 1000}kb_singletons.bedpe"
     params["data"]["singletons_inter"] = ""
     params["simulation_backend"]["multigpu_mode"] = "groups"

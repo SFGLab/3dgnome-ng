@@ -141,7 +141,7 @@ from gnome3d.settings import Settings
 
 s = Settings()
 assert s.load_ini(sys.argv[1]), f"cannot load {sys.argv[1]}"
-for field in ("data_anchors", "data_pet_clusters", "data_singletons", "data_ib_split",
+for field in ("data_anchors", "data_pet_clusters", "data_singletons",
               "data_segment_split", "data_centromeres"):
     name = getattr(s, field)          # attribute, not .get - a typo here must fail loudly
     assert name, f"{field} is unset in the config"

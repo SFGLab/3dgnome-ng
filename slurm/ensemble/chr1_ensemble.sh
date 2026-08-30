@@ -89,11 +89,8 @@ s = Settings()
 assert s.load_ini(sys.argv[1]), f"cannot load {sys.argv[1]}"
 
 # Each of these is a requirement of this ensemble, and each fails silently rather than loudly
-# if it is not set: arc-gap blocks instead of TADs, ChIA-PET singletons instead of Hi-C, or the
-# epigenome terms left on from another run all produce a plausible structure that answers a
-# different question.
-assert s.ib_split_source == "tads", f"ib_split_source={s.ib_split_source!r}, expected tads"
-assert s.data_ib_split, "ib_split is empty; tads mode would raise at load"
+# if it is not set: ChIA-PET singletons instead of Hi-C, or the epigenome terms left on from
+# another run, both produce a plausible structure that answers a different question.
 assert "hic" in s.data_singletons, f"singletons={s.data_singletons!r} does not look Hi-C derived"
 assert s.use_ctcf_motif, "CTCF orientation term is off"
 assert s.use_excluded_volume, "excluded volume is off"
@@ -101,7 +98,7 @@ assert s.use_dynamic_loop_density, "dynamic subanchors are off"
 assert s.use_anchor_heatmap and s.use_subanchor_heatmap, "distance-map terms are off"
 for flag in ("use_compartments", "use_bridging", "use_fibre_compaction", "use_lamina"):
     assert not getattr(s, flag), f"{flag} is on; this ensemble runs without epigenome terms"
-print(f"[guard] config ok: {s.ib_split_source} blocks, singletons={s.data_singletons}")
+print(f"[guard] config ok: singletons={s.data_singletons}")
 PYCHECK
 
 echo "[launch] node=$(hostname) task=${TASK} members=${MEMBERS} gpus=${SLURM_GPUS_ON_NODE:-?}"

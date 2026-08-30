@@ -42,8 +42,6 @@ class Settings:
     data_split_singletons_by_chr: bool
     data_centromeres: str
     data_segment_split: str
-    data_ib_split: str
-    ib_split_source: str
     ib_refine_scope: str
     data_segment_heatmap: str
     data_compartments: str
@@ -358,15 +356,6 @@ class Settings:
         self.data_split_singletons_by_chr = False
         self.data_centromeres = ""
         self.data_segment_split = ""
-        # Where interaction block boundaries come from. "arcs" is the reference
-        # behaviour, splitting where ChIA-PET arc coverage falls to zero, which is
-        # partly a property of that library's depth. "tads" reads `data_ib_split`
-        # instead, and requires it. That file is separate from `data_segment_split`
-        # because block granularity and segment granularity are independent: point
-        # both at one boundary set and every segment ends up holding a single
-        # block, which collapses the coarse level rather than refining it.
-        self.data_ib_split = ""
-        self.ib_split_source = "arcs"
         # What forms one chain in the IB placement MC. "segment" refines each
         # segment's blocks separately, which is the prior behaviour and the
         # default. "chromosome" refines them all together, removing the dependency
@@ -795,8 +784,6 @@ class Settings:
         )
         self.data_centromeres = gets("data", "centromeres", self.data_centromeres)
         self.data_segment_split = gets("data", "segment_split", self.data_segment_split)
-        self.data_ib_split = gets("data", "ib_split", self.data_ib_split)
-        self.ib_split_source = gets("data", "ib_split_source", self.ib_split_source)
         self.ib_refine_scope = gets("simulation_ib", "refine_scope", self.ib_refine_scope)
         self.data_segment_heatmap = gets("data", "segment_heatmap", self.data_segment_heatmap)
         self.data_compartments = gets("data", "compartments", self.data_compartments)
