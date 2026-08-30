@@ -11,10 +11,24 @@ This compares the inputs that set the folding, per config, without running any M
   arcs per anchor      constraint density; a sparser graph folds less
   dtn                  chain bond targets from genomic_length_to_distance, the local scale
   arc expected dist    pairwise arc targets from freq_to_distance
-  ratio                arc target over median dtn. This is the load-bearing number: an arc
-                       target far above the bond scale asks the chain to stay extended, while
-                       one below it pulls the chain together. Two runs with matched bond
-                       lengths can still differ five-fold in Rg through this ratio alone.
+  arc_over_dtn         arc target over median dtn, the local folding scale
+
+Measured on chr1 the arc geometry is the same in both, 0.213 against 0.201, so the arcs are not
+what inflates the trio. The input that does differ is the singleton count, 1.54M against 30.5k,
+because the trio feeds Hi-C at 25 kb where the cell line feeds ChIA-PET singletons. Those
+singletons build the segment heatmap, and `create_distance_heatmap` leaves a pair unconstrained
+when its frequency is below 1e-6 while giving every other pair an explicit distance target. A
+sparse heatmap therefore lets the chain fold freely and a dense one holds most segment pairs
+apart at once, which is why the second block of metrics measures that heatmap:
+
+  seg_bins             segment bins on this chromosome, the heatmap's side length
+  seg_density          fraction of off-diagonal pairs carrying a target at all. This is the
+                       load-bearing number. Near 1 means every segment pair is held at a
+                       prescribed distance and the chain cannot compact.
+  seg_avg_dist         mean of the positive targets, the scale the segment MC works at
+  seg_med_target       median positive target
+  seg_p90_target       90th percentile target
+  seg_clipped_frac     fraction of targets sitting on the heatmap_distance_stretching ceiling
 
     python playground/expansion_diag.py --configs slurm/ensemble/hg00512_trio_fixed.ini \
         slurm/ensemble/gm12878_chiapet_tads.ini --chrom chr1
@@ -31,13 +45,65 @@ os.environ.setdefault("JAX_PLATFORMS", "cpu")
 import numpy as np  # noqa: E402
 
 from gnome3d.data import ContactData  # noqa: E402
-from gnome3d.hierarchy import Level  # noqa: E402
-from gnome3d.io import parse_chrs_arg  # noqa: E402
+from gnome3d.hierarchy import Level, set_level  # noqa: E402
+from gnome3d.io import create_singleton_heatmap, parse_chrs_arg  # noqa: E402
 from gnome3d.pipeline.coarse.build import (  # noqa: E402
+    CoarseState,
+    add_long_pet_to_segment_heatmap,
     build_state,
     calc_anchor_expected_distances,
+    compute_segment_bins,
+)
+from gnome3d.pipeline.coarse.heatmap import (  # noqa: E402
+    create_distance_heatmap,
+    get_diagonal_size,
+    normalize_heatmap,
+    normalize_heatmap_diagonal_total,
 )
 from gnome3d.settings import Settings  # noqa: E402
+
+
+def segment_heatmap_stats(state: CoarseState, s: Settings) -> dict[str, float]:
+    """Density and target scale of the segment level heatmap the singletons build.
+
+    Repeats the frequency to distance path of `reconstruct_segment_level` without running MC.
+    Returns the metrics described in the module doc, all nan when the chromosome has one
+    segment and no heatmap exists.
+    """
+    current_level = set_level(
+        Level.SEGMENT - Level.CHROMOSOME, state.chr_root, state.clusters, state.chrs
+    )
+    bins, start_ind, total_size, bin_lengths_mb = compute_segment_bins(state, current_level)
+    nan = float("nan")
+    if total_size < 2:
+        return {"seg_bins": total_size, "seg_density": nan, "seg_avg_dist": nan,
+                "seg_med_target": nan, "seg_p90_target": nan, "seg_clipped_frac": nan}
+
+    h_raw = create_singleton_heatmap(
+        state.singletons, bins, start_ind, total_size, bin_lengths_mb=bin_lengths_mb
+    )
+    add_long_pet_to_segment_heatmap(state, h_raw, bins, start_ind, total_size)
+    h_norm = normalize_heatmap(h_raw, total_size)
+    h_norm = normalize_heatmap_diagonal_total(h_norm, total_size, 1.0)
+    dist, avg = create_distance_heatmap(s, h_norm, total_size, inter=False)
+
+    # a pair counts as constrained when it carries a positive target. Band cells are -1 and
+    # unconstrained cells are 0, so both are excluded, and the denominator drops the band too.
+    diag = get_diagonal_size(h_norm, total_size)
+    iu = np.triu_indices(total_size, k=max(diag, 1))
+    cells = dist[iu]
+    active = cells[cells > 0.0]
+    ceiling = avg * s.heatmap_distance_stretching
+    return {
+        "seg_bins": float(total_size),
+        "seg_density": float(active.size / cells.size) if cells.size else nan,
+        "seg_avg_dist": avg,
+        "seg_med_target": float(np.median(active)) if active.size else nan,
+        "seg_p90_target": float(np.percentile(active, 90)) if active.size else nan,
+        "seg_clipped_frac": (
+            float((active >= ceiling - 1e-9).mean()) if active.size else nan
+        ),
+    }
 
 
 def describe(cfg_path: Path, chrom: str, data_dir: str | None) -> dict[str, float]:
@@ -72,7 +138,7 @@ def describe(cfg_path: Path, chrom: str, data_dir: str | None) -> dict[str, floa
 
     med_dtn = float(np.median(dtn)) if dtn.size else float("nan")
     med_arc = float(np.median(arc_exp)) if arc_exp.size else float("nan")
-    return {
+    row = {
         "anchors": len(anchors),
         "blocks": len(blocks),
         "arcs": len(arcs),
@@ -83,6 +149,8 @@ def describe(cfg_path: Path, chrom: str, data_dir: str | None) -> dict[str, floa
         "arc_over_dtn": med_arc / med_dtn if med_dtn else float("nan"),
         "singletons": len(state.singletons),
     }
+    row.update(segment_heatmap_stats(state, s))
+    return row
 
 
 def main() -> None:
@@ -102,14 +170,16 @@ def main() -> None:
         print(f"[diag] {r['config']}", flush=True)
 
     keys = ["anchors", "blocks", "arcs", "arcs_per_anchor", "median_gap_kb",
-            "median_dtn", "median_arc_exp", "arc_over_dtn", "singletons"]
+            "median_dtn", "median_arc_exp", "arc_over_dtn", "singletons",
+            "seg_bins", "seg_density", "seg_avg_dist", "seg_med_target",
+            "seg_p90_target", "seg_clipped_frac"]
     w = max(len(k) for k in keys) + 2
     head = "".join(f"{r['config'][:26]:>28s}" for r in rows)
     print(f"\n{'metric':{w}s}{head}")
     for k in keys:
         line = "".join(f"{r[k]:28.3f}" for r in rows)
         print(f"{k:{w}s}{line}")
-    print("\n[diag] arc_over_dtn is the one to compare: a higher value keeps the chain extended")
+    print("\n[diag] seg_density is the one to compare: near 1 holds every segment pair apart")
 
 
 if __name__ == "__main__":
