@@ -16,13 +16,17 @@
 # Why per chromosome rather than one whole-genome job per conformation. The downstream
 # enhancer3D analysis is intra-chromosomal (enhancer-promoter distances within a chromosome) and
 # its published models are per-chromosome, so nothing consumes inter-chromosomal placement.
-# Sharding this way turns one ~2.6 h GM12878 genome run into 23 short independent tasks that
-# backfill into free GPUs, and a failure costs one chromosome rather than a whole genome. The
-# cost is that chromosomes are placed independently, with no chromosome-level MC between them;
-# if you need a single coherent nucleus, run `--region ""` in one task instead.
+# Sharding this way turns one long genome run into 23 independent tasks that backfill into free
+# GPUs, and a failure costs one chromosome rather than a whole genome. The cost is that
+# chromosomes are placed independently, with no chromosome-level MC between them; if you need a
+# single coherent nucleus, run `--region ""` in one task instead.
 #
-# Total work is unchanged by the sharding: about 2.6 GPU-hours per GM12878 conformation, 1.6 for
-# H1ESC and 1.3 for HFFC6, scaling with each line's anchor count.
+# Total work is unchanged by the sharding. Under arc-gap blocks, measured on chr1 to chr6, one
+# GM12878 conformation costs about 18 GPU-hours across the whole genome, H1ESC about 10 and
+# HFFC6 about 9, scaling with each line's anchor count. Arc-gap blocks are several times more
+# expensive than TAD blocks at the same bead count, because they give far fewer and far larger
+# interaction blocks and smooth MC cost grows faster than linearly in chain length. Budget
+# N_MODELS accordingly: 100 GM12878 models is roughly 1800 GPU-hours on its own.
 #
 # Requeue safety: a member whose .cif already exists is skipped, so a requeued or resubmitted
 # task resumes rather than redoing finished work.
@@ -34,7 +38,13 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=64G
 #SBATCH --partition=long
-#SBATCH --time=08:00:00
+# Sized from measured arc-gap rates, GM12878 being the slowest cell line: 96 min per chr1
+# conformation, 53 to 80 elsewhere on chr1 to chr6. PER_TASK=10 therefore needs 16 h on the worst
+# chromosome, which is why the earlier 08:00:00 timed out on chr1, chr3 and chr5. 24 h leaves
+# roughly 50 percent headroom for a slow node and stays well inside the long partition's 5 day
+# limit. Raising this rather than cutting PER_TASK is safe because each conformation is written
+# as it finishes, so a timeout costs only the one in flight.
+#SBATCH --time=24:00:00
 #SBATCH --account=sfglab
 # Absolute for the same reason as setup_cell.sh: sbatch parses #SBATCH before the shell runs, so
 # these cannot use $ROOT, and the directory must already exist.
