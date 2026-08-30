@@ -29,6 +29,13 @@ apart at once, which is why the second block of metrics measures that heatmap:
   seg_med_target       median positive target
   seg_p90_target       90th percentile target
   seg_clipped_frac     fraction of targets sitting on the heatmap_distance_stretching ceiling
+  seg_decay            median target of the most separated fifth of segment pairs over that of
+                       the least separated fifth. This is the load-bearing number. A contact
+                       map carries distance decay, so far pairs should want to sit further
+                       apart than near ones and the ratio should be well above 1. At 1 the
+                       segment MC is told every pair is equally far, which no arrangement in
+                       three dimensions satisfies, and it settles on an inflated shell.
+  seg_near/seg_far     the two medians the ratio is built from
 
     python playground/expansion_diag.py --configs slurm/ensemble/hg00512_trio_fixed.ini \
         slurm/ensemble/gm12878_chiapet_tads.ini --chrom chr1
@@ -94,15 +101,29 @@ def segment_heatmap_stats(state: CoarseState, s: Settings) -> dict[str, float]:
     cells = dist[iu]
     active = cells[cells > 0.0]
     ceiling = avg * s.heatmap_distance_stretching
+
+    # decay: compare targets at small against large bin separation, over active cells only
+    sep = (iu[1] - iu[0])[cells > 0.0]
+    if active.size > 20:
+        near_cut, far_cut = np.percentile(sep, [20.0, 80.0])
+        near = active[sep <= near_cut]
+        far = active[sep >= far_cut]
+        med_near = float(np.median(near)) if near.size else nan
+        med_far = float(np.median(far)) if far.size else nan
+        decay = med_far / med_near if med_near else nan
+    else:
+        med_near = med_far = decay = nan
+
     return {
         "seg_bins": float(total_size),
         "seg_density": float(active.size / cells.size) if cells.size else nan,
         "seg_avg_dist": avg,
         "seg_med_target": float(np.median(active)) if active.size else nan,
         "seg_p90_target": float(np.percentile(active, 90)) if active.size else nan,
-        "seg_clipped_frac": (
-            float((active >= ceiling - 1e-9).mean()) if active.size else nan
-        ),
+        "seg_clipped_frac": (float((active >= ceiling - 1e-9).mean()) if active.size else nan),
+        "seg_near": med_near,
+        "seg_far": med_far,
+        "seg_decay": decay,
     }
 
 
@@ -172,14 +193,14 @@ def main() -> None:
     keys = ["anchors", "blocks", "arcs", "arcs_per_anchor", "median_gap_kb",
             "median_dtn", "median_arc_exp", "arc_over_dtn", "singletons",
             "seg_bins", "seg_density", "seg_avg_dist", "seg_med_target",
-            "seg_p90_target", "seg_clipped_frac"]
+            "seg_p90_target", "seg_clipped_frac", "seg_near", "seg_far", "seg_decay"]
     w = max(len(k) for k in keys) + 2
     head = "".join(f"{r['config'][:26]:>28s}" for r in rows)
     print(f"\n{'metric':{w}s}{head}")
     for k in keys:
         line = "".join(f"{r[k]:28.3f}" for r in rows)
         print(f"{k:{w}s}{line}")
-    print("\n[diag] seg_density is the one to compare: near 1 holds every segment pair apart")
+    print("\n[diag] seg_decay is the one to compare: at 1 the segment map has no distance decay")
 
 
 if __name__ == "__main__":
