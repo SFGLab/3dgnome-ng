@@ -2,8 +2,8 @@
 
 # Whole-genome conformational ensemble for one cell line, sharded over chromosomes.
 #
-#   CELL=GM12878 sbatch --array=0-229%6 slurm/ensemble/genome_ensemble.sh
-#   CELL=H1ESC   N_MODELS=20 PER_TASK=5 sbatch --array=0-91%6 slurm/ensemble/genome_ensemble.sh
+#   CELL=GM12878 sbatch --array=0-45%12 slurm/ensemble/genome_ensemble.sh
+#   CELL=H1ESC   N_MODELS=40 PER_TASK=10 sbatch --array=0-91%12 slurm/ensemble/genome_ensemble.sh
 #
 # One array task = one chromosome x a block of PER_TASK conformations. The array index maps to
 #
@@ -11,7 +11,7 @@
 #   chunk       = TASK % CHUNKS        members = chunk*PER_TASK .. +PER_TASK-1
 #
 # so the array length is (number of chromosomes) * CHUNKS. With the defaults below that is
-# 23 * 10 = 230, printed by the script at startup so a wrong --array is obvious immediately.
+# 23 * 2 = 46, printed by the script at startup so a wrong --array is obvious immediately.
 #
 # Why per chromosome rather than one whole-genome job per conformation. The downstream
 # enhancer3D analysis is intra-chromosomal (enhancer-promoter distances within a chromosome) and
@@ -59,9 +59,14 @@ CELL="${CELL:-${1:-}}"
 
 ROOT="${ROOT:-/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng}"
 LOWER=$(echo "$CELL" | tr '[:upper:]' '[:lower:]')
-CONFIG="${CONFIG:-$ROOT/slurm/ensemble/${LOWER}_hic_tads.ini}"
-OUT="${OUT:-$ROOT/out/${LOWER}_genome}"
-N_MODELS="${N_MODELS:-100}"
+# Blocks come from arc gaps. TAD interaction blocks were dropped: a TAD boundary is an
+# insulation call that knows nothing about the arcs, so it cuts through them, orphaning 43.6
+# percent of GM12878 chr1 arcs against exactly 0 under arc gaps, and the models lose expression
+# signal accordingly. `out/<cell>_genome` holds the superseded TAD-block ensembles, so the
+# arc-gap output goes somewhere else rather than merging into them.
+CONFIG="${CONFIG:-$ROOT/slurm/ensemble/${LOWER}_hic_arcs.ini}"
+OUT="${OUT:-$ROOT/out/${LOWER}_genome_arcs}"
+N_MODELS="${N_MODELS:-20}"
 PER_TASK="${PER_TASK:-10}"
 CHROMS="${CHROMS:-chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX}"
 
