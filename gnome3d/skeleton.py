@@ -120,12 +120,8 @@ def _collect_ib_work(
             continue
         # Each anchor seeds at the IB centroid (matches the arc stage's initial_pos before
         # its per-anchor noise).  IBs partition the anchors, so these writes never overlap.
-        # Skipped under `use_segment_arcs`, where a segment-scope pass has already placed every
-        # anchor jointly: resetting them here would discard exactly the cross-block information
-        # that pass exists to add.
-        if not state.s.use_segment_arcs:
-            for a_idx in active_region:
-                clusters[a_idx].pos = ib.pos.copy()
+        for a_idx in active_region:
+            clusters[a_idx].pos = ib.pos.copy()
         work.append((ib_id, ib_idx, active_region))
     return work
 

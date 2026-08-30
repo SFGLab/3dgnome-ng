@@ -208,7 +208,6 @@ class Settings:
     # segment-scope anchor pass runs first: every anchor of every block in a segment is placed in
     # one arc MC, where cross-block arcs are ordinary in-chain arcs. The per-block MC then refines
     # from those positions, and smooth MC holds anchors fixed, so the joint placement survives.
-    use_segment_arcs: bool
 
     # ---- MC arcs ----
     max_temp: float
@@ -489,7 +488,6 @@ class Settings:
         self.mc_multigpu_mode = "groups"
         self.use_ib_arcs = False
         self.ib_arcs_weight = 1.0
-        self.use_segment_arcs = False
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -1042,7 +1040,6 @@ class Settings:
         self.mc_stop_steps_ib = geti("simulation_ib", "stop_condition_steps", self.mc_stop_steps_ib)
         self.use_ib_arcs = getb("simulation_ib", "use_ib_arcs", self.use_ib_arcs)
         self.ib_arcs_weight = getf("simulation_ib", "arcs_weight", self.ib_arcs_weight)
-        self.use_segment_arcs = getb("simulation_arcs", "use_segment_arcs", self.use_segment_arcs)
         self.mc_stop_improvement_ib = getf(
             "simulation_ib",
             "stop_condition_improvement_threshold",

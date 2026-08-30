@@ -4,8 +4,8 @@ Same modelling parameters as the three cell lines, taken from
 `validation.core.config.CANONICAL` so the two arms cannot drift. Only the data section differs.
 
 Two keys depart from `cell_data_section`. The trio samples have no CCDS breakpoints file, so
-segments come from TAD boundaries thinned to 2 Mb, and blocks come from the same boundaries
-thinned only enough to merge TADs under 100 kb. Both files are written by trio_segments.py.
+segments come from TAD boundaries thinned to 2 Mb. Blocks come from arc gaps, as in the cell
+line arm. The segments file is written by trio_segments.py.
 
     python playground/trio/trio_segments.py --samples HG00512
     python playground/trio/trio_configs.py --samples HG00512
@@ -40,28 +40,24 @@ HEADER = """\
 
 
 def build(
-    sample: trio_samples.Sample, binsize: int, segment_arcs: bool = True
+    sample: trio_samples.Sample, binsize: int
 ) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
     name = sample.name
     params["data"] = cell_data_section(name, "data")
     params["data"]["segment_split"] = f"{name}_segments.bed"
-    params["data"]["ib_split"] = f"{name}_blocks.bed"
-    params["data"]["ib_split_source"] = "tads"
+    # Blocks come from arc gaps, as in the cell line arm. A TAD boundary is an insulation call
+    # that knows nothing about the arcs, so it cuts through them and the anchors either side stop
+    # constraining each other. Segments stay TAD derived because the trio samples have no CCDS
+    # breakpoints file and segments are not interaction blocks.
+    params["data"]["ib_split"] = ""
+    params["data"]["ib_split_source"] = "arcs"
     params["data"]["singletons"] = f"{name}_hic_{binsize // 1000}kb_singletons.bedpe"
     params["data"]["singletons_inter"] = ""
     params["simulation_backend"]["multigpu_mode"] = "groups"
     params["simulation_backend"]["mc_executor_jax_bucket_shapes"] = "yes"
     params["subanchor_heatmap"]["heat_min_reduction"] = "0.001"
-    if segment_arcs:
-        # On by default here, unlike the cell line arm, because these blocks are the densest in
-        # the project: 543 boundaries on HG00512 chr1. Without it anchors enter the per-block arc
-        # MC collapsed on their block centroid and no cross-block arc constrains anything, and
-        # the 2026-08-24 run measured the consequence directly on HG00512 chr1 over nine
-        # structures: between-block contact of exactly zero, block enrichment 152.6, Rg 225.9.
-        # Those structures encode the block partition rather than chromatin.
-        params["simulation_arcs"]["use_segment_arcs"] = "yes"
     for sec, kv in params.items():
         cfg[sec] = {str(k): str(v) for k, v in kv.items()}
     return cfg
@@ -72,19 +68,14 @@ def main() -> None:
     ap.add_argument("--samples")
     ap.add_argument("--out-dir", default="slurm/ensemble")
     ap.add_argument("--binsize", type=int, default=BINSIZE)
-    ap.add_argument(
-        "--no-segment-arcs",
-        action="store_true",
-        help="omit segment-scope anchor placement, reproducing the 2026-08-24 arm",
-    )
     args = ap.parse_args()
     out_dir = ROOT / args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     for s in trio_samples.resolve(args.samples):
-        cfg = build(s, args.binsize, not args.no_segment_arcs)
+        cfg = build(s, args.binsize)
         # Distinct name so the fixed arm cannot be confused with, or overwrite, the
         # 2026-08-24 configs whose structures had zero between-block contact.
-        tag = "_trio" if args.no_segment_arcs else "_trio_fixed"
+        tag = "_trio"
         path = out_dir / f"{s.name.lower()}{tag}.ini"
         with path.open("w") as fh:
             fh.write(HEADER.format(name=s.name, role=s.role, pop=s.pop))

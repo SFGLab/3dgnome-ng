@@ -469,14 +469,24 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   like the baseline. `python -m validation tracks` writes the boundary file via
   `cooltools.insulation` at 10 kb with a 200 kb window.
 
-  Measured on four GM12878 regions, baseline arm, ten structures at full quality: within-block
-  over between-block contact enrichment relative to the same ratio on experimental Hi-C went from
-  2.60, 11.16, 28160 and unbounded down to 1.86, 0.68, 4.26 and 1.90, and the mean absolute
-  compartment-saddle gap fell from 1.664 to 0.373. The experimental enrichment itself rises under
-  the TAD partition in all four regions, which is evidence from the data alone that TAD blocks are
-  domains and arc-gap blocks are not. Caveat: bead count falls about 27 percent because more
-  boundaries mean fewer inter-anchor gaps receive subanchors, so model resolution moves alongside
-  block definition.
+  **`tads` is not in use. Prefer `arcs`, the default.** A TAD boundary comes from an insulation
+  call that knows nothing about the arcs, so it cuts through them: measured on GM12878 chr1,
+  5437 of 12474 arcs, 43.6 percent, have their two anchors in different blocks under `tads`
+  against exactly 0 under `arcs`. An arc whose anchors sit in different blocks constrains
+  nothing at anchor resolution, because the per-block arc MC only sees arcs internal to its own
+  block and the blocks are held together by the chain bond between their centroids alone. So a
+  `tads` run discards nearly half its arc data. Arc-gap boundaries cannot do this by
+  construction, since they are placed where arc coverage is already zero. Reproduce with
+  `playground/blockscope_cost.py`.
+
+  The earlier case for `tads` was within-block over between-block contact enrichment on four
+  GM12878 regions, 2.60, 11.16, 28160 and unbounded falling to 1.86, 0.68, 4.26 and 1.90, with
+  the mean absolute compartment-saddle gap falling 1.664 to 0.373. Those numbers are real but
+  do not carry: enrichment is strongly span and bin-size dependent, reading 44.2 on a 20 Mb
+  region against 5.75 for the same pipeline on full chr1, so it ranks configurations only
+  within one fixed span. Bead count also falls about 27 percent under `tads`, because more
+  boundaries mean fewer inter-anchor gaps receive subanchors, so model resolution moves
+  alongside block definition. See [[project_trio_expansion_artifact]].
 
 - **IB placement scope: `[simulation_ib] refine_scope = segment | chromosome`, default `segment`.**
   `segment` is the prior behaviour: each segment's blocks are refined as a separate chain and any
