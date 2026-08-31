@@ -2,9 +2,9 @@
 
 # Conformational ensembles for the nine trio samples, sharded chromosome first.
 #
-#   sbatch --array=0-89%6   slurm/ensemble/trio_ensemble.sh          # chr1, all nine samples
-#   CHROMS=chr1 sbatch --array=0-89%6 slurm/ensemble/trio_ensemble.sh
-#   sbatch --array=0-2069%6 slurm/ensemble/trio_ensemble.sh          # whole genome, if allowed
+#   CHROMS=chr1 sbatch --array=0-17%6 slurm/ensemble/trio_ensemble.sh   # chr1, all nine samples
+#   sbatch --array=0-413%6 slurm/ensemble/trio_ensemble.sh              # whole genome
+#   SAMPLES=HG00512,HG00513,HG00514 sbatch --array=0-137%6 ...          # one trio, whole genome
 #
 # One array task is one chromosome by one sample by a block of PER_TASK conformations. The
 # chromosome is the slowest varying dimension, so the first 9*CHUNKS tasks cover one chromosome
@@ -14,9 +14,9 @@
 # The mapping lives in playground/trio/trio_samples.py::shard rather than here, so this script and
 # playground/trio/trio_status.py cannot disagree about which index means what.
 #
-# Array size. Nine samples by 23 chromosomes by 10 chunks is 2070 tasks, and Slurm's default
-# MaxArraySize is 1001. Check with `scontrol show config | grep MaxArraySize`. If it is under
-# 2070, submit one chromosome at a time with CHROMS=chrN, which is 90 tasks, or raise PER_TASK.
+# Array size. Nine samples by 23 chromosomes by 2 chunks is 414 tasks, inside Slurm's default
+# MaxArraySize of 1001. Check with `scontrol show config | grep MaxArraySize`. Raising N_MODELS
+# multiplies this, so at 100 models it is 2070 and needs one chromosome at a time instead.
 #
 # Resuming. A member whose .cif already exists is skipped by gnome3d-ng, and a task whose whole
 # block is already present exits before requesting any GPU work. So a cancelled array, a dead
@@ -72,8 +72,13 @@ fi
   echo "[error] submit from the repo root, or pass ROOT=/path/to/3dgnome-ng" >&2
   exit 1
 }
-OUT="${OUT:-$ROOT/out/trio}"
-N_MODELS="${N_MODELS:-100}"
+# `out/trio` holds the superseded TAD-block ensembles. Arc-gap output goes elsewhere: a member
+# whose cif exists is skipped, so writing here would take the old structures as done and leave a
+# tree mixing two block definitions with no way to tell which is which.
+OUT="${OUT:-$ROOT/out/trio_arcs}"
+# Arc-gap conformations cost several times their TAD equivalents, about 18 GPU-hours for a
+# genome, and nine samples multiply it. 20 matches the cell line arm.
+N_MODELS="${N_MODELS:-20}"
 PER_TASK="${PER_TASK:-10}"
 CHROMS="${CHROMS:-}"
 SAMPLES="${SAMPLES:-}"
