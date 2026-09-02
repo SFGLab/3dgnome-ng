@@ -141,12 +141,20 @@ arrangement the arcs MC produced untouched.
 The most direct statement of the missing constraint. Left last because it competes with the arc
 springs and needs a weight balance that A and B do not.
 
-### D. Finer blocks
+### D. Finer blocks. Rejected
 
 Smaller blocks would let the hierarchy supply structure at shorter range, since it already places
 block centroids by genomic distance. TAD blocks are about 340 kb against 4.8 Mb for arc gaps.
-Rejected as a primary route because TAD boundaries orphan 43.6 percent of arcs, measured as 5437
-of 12474 on GM12878 chr1 against exactly zero under arc gaps.
+
+Rejected, and on principle rather than on a measurement. An arc gap boundary sits where no arc
+spans, so the arc gap partition is by construction the finest one that discards no arc. Any
+finer partition has to cut through arcs, and a cut arc constrains nothing at anchor resolution
+because the per block arc MC only sees arcs internal to its own block. TAD boundaries make that
+concrete, orphaning 5437 of 12474 arcs on GM12878 chr1 against exactly zero under arc gaps, but
+the count is a symptom. The rule is that block granularity trades directly against arc retention,
+so blocks cannot be the lever for short range structure.
+
+That is what leaves A and B as the routes. Both add structure without touching the partition.
 
 ## Validation
 
