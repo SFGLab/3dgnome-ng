@@ -266,6 +266,12 @@ class Settings:
     confinement_packing_factor_smooth: float
     confinement_packing_factor_ib: float
 
+    # ---- boundary stitch ----
+    use_boundary_stitch: bool
+    boundary_stitch_spring_weight: float
+    boundary_stitch_ev_weight: float
+    boundary_stitch_max_iter: int
+
     # ---- A/B compartments ----
     use_compartments: bool
     compartment_weight: float
@@ -560,6 +566,14 @@ class Settings:
         self.confinement_packing_factor_arcs = 1.5
         self.confinement_packing_factor_smooth = 1.5
         self.confinement_packing_factor_ib = 0.75
+
+        # ---- boundary stitch ----
+        # Rigid post pass that closes the gap between adjacent blocks' edge anchors.
+        # See gnome3d/pipeline/stitch.py.
+        self.use_boundary_stitch = False
+        self.boundary_stitch_spring_weight = 1.0
+        self.boundary_stitch_ev_weight = 1.0
+        self.boundary_stitch_max_iter = 500
 
         # ---- A/B compartments ----
         # Block-copolymer segregation over a per-bead compartment call, ported
@@ -1066,6 +1080,20 @@ class Settings:
         )
         self.confinement_packing_factor_ib = getf(
             "confinement", "packing_factor_ib", self.confinement_packing_factor_ib
+        )
+
+        # [boundary_stitch]
+        self.use_boundary_stitch = getb(
+            "boundary_stitch", "use_boundary_stitch", self.use_boundary_stitch
+        )
+        self.boundary_stitch_spring_weight = getf(
+            "boundary_stitch", "spring_weight", self.boundary_stitch_spring_weight
+        )
+        self.boundary_stitch_ev_weight = getf(
+            "boundary_stitch", "ev_weight", self.boundary_stitch_ev_weight
+        )
+        self.boundary_stitch_max_iter = geti(
+            "boundary_stitch", "max_iter", self.boundary_stitch_max_iter
         )
 
         # [compartments]

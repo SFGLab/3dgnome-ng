@@ -660,6 +660,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Motivation: at the IB level, EV pushes IBs apart but only nearest-neighbor chain bonds pull them back, so the segment stretches out into a long sausage. The IB tether (small packing factor → tight sphere around the segment centroid) softly holds the chain together while EV still keeps IB spheres from overlapping. At arc / smooth levels, confinement instead acts as a nuclear-like envelope for under-constrained small IBs.
 
+  The packing factor has a physical floor. The sphere diameter is `2 × pf × N^(1/3)` chain bonds, so below `pf ≈ 0.58` a segment of fewer than `(1/(2·pf))³` blocks is asked to fold into a sphere narrower than one of its own bonds, and the layout is then set by where EV and confinement jam rather than by genomic separation. Measured on GM12878 chr1 the block-layout distance exponent is 0.021 at 0.15, 0.214 at 0.75 and 0.297 at 1.0 against 0.285 from the cell line's own Hi-C contact-probability curve (`playground/ps_curve.py`, `playground/ib_confine_ablate.py`).
+
 - **Small-IB spring boost** — described below but **not currently implemented**: `use_small_ib_boost`, `small_ib_threshold` and `small_ib_spring_multiplier` are not fields of `Settings`, and `solver.py` no longer exists. Kept as a design note.
   When an IB has fewer anchors than `small_ib_threshold`, multiplies `spring_stretch_arcs`, `spring_squeeze_arcs`, `spring_stretch`, `spring_squeeze`, `spring_angular` by `small_ib_spring_multiplier` for that IB only. No kernel changes — implemented in `solver.py::_settings_for_ib()` by passing a `copy.copy(self.s)` clone with boosted values to `_reconstruct_cluster_arcs` / `_reconstruct_cluster_smooth` via an `s_override` parameter. Thread-safe (never mutates `self.s`). Settings:
     - `use_small_ib_boost`
@@ -733,6 +735,27 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   DAG growth stays deterministic.
 
   Why not in the reference: 3dgnome is CPU-only and single-process.
+
+- **Boundary stitch: `[boundary_stitch] use_boundary_stitch = yes`, default no.**
+  ([gnome3d/pipeline/stitch.py](gnome3d/pipeline/stitch.py))
+  The per block chains place anchors only through their own block, so the last anchor of one
+  block and the first anchor of the next have no term coupling them. Measured on GM12878
+  chr1:1-60 Mb at matched separation of 562 kb to 1 Mb, an interior pair sits at 0.092 of
+  `genomic_length_to_distance` and a boundary pair at 5.42, a factor of 59. This pass runs after
+  every chain of a chromosome is done, in `reconstruct.py::_assemble`, and moves each block as a
+  rigid body so every boundary pair sits at the distance the structure's own interior pairs
+  realise at that separation. Rigid means the arcs and smooth results inside a block are
+  untouched.
+
+  Energy is a two sided spring per boundary plus a soft excluded volume between block
+  centroids at the interaction block radius (`exclusion_radius_ib`, or the auto derivation
+  `ib_mc_refine` uses), minimised with L-BFGS-B over one rotation and one translation per
+  block. There is no chain bond and no confinement. Keys: `spring_weight` (1.0), `ev_weight`
+  (1.0), `max_iter` (500). The pass uses no RNG and runs on the calling thread, so flag off is
+  byte exact and flag on reproduces. Unit checks in `harness/test_stitch.py`.
+
+  Why not in the reference: the reference has no term across block boundaries either, which is
+  why its structures show the same scatter. See `design/anchor-placement.md`.
 
 ---
 

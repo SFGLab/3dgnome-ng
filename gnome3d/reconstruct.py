@@ -28,6 +28,7 @@ from gnome3d.pipeline.executor import (
 from gnome3d.pipeline.ib import ib_chain_nodes, ib_node_id
 from gnome3d.pipeline.stage import StageKind
 from gnome3d.pipeline.state import Seeded, Smoothed, State
+from gnome3d.pipeline.stitch import stitch_blocks
 
 if TYPE_CHECKING:
     from gnome3d.data import ContactData
@@ -107,6 +108,19 @@ def _beads(output: State) -> list[BeadOut]:
     return output.beads
 
 
+def _assemble(
+    per_chr: dict[str, list[list[BeadOut]]], settings: Settings
+) -> dict[str, list[BeadOut]]:
+    """Flatten each chromosome's per block beads into one list in genomic order. With
+    `use_boundary_stitch` set, the blocks are stitched at their edges first."""
+    out: dict[str, list[BeadOut]] = {}
+    for chr_, blocks in per_chr.items():
+        if settings.use_boundary_stitch:
+            blocks = stitch_blocks(blocks, settings)
+        out[chr_] = sorted((b for block in blocks for b in block), key=lambda b: b.start)
+    return out
+
+
 def reconstruct(
     settings: Settings,
     data: ContactData,
@@ -130,12 +144,11 @@ def reconstruct(
     LOG.info(f"running DAG with {len(dag.nodes)} nodes and {len(dag.seeds)} seeds...")
     outputs = (executor or SerialExecutor()).run(dag)
 
-    per_chr: dict[str, list[BeadOut]] = defaultdict(list)
+    per_chr: dict[str, list[list[BeadOut]]] = defaultdict(list)
     for ibs in ib_sink:
-        beads = _beads(outputs[ib_node_id(ibs.ib_id, StageKind.SMOOTH)])
-        per_chr[ibs.chr_].extend(beads)
+        per_chr[ibs.chr_].append(_beads(outputs[ib_node_id(ibs.ib_id, StageKind.SMOOTH)]))
 
-    return {chr_: sorted(beads, key=lambda b: b.start) for chr_, beads in per_chr.items()}
+    return _assemble(per_chr, settings)
 
 
 def reconstruct_ensemble(
@@ -190,11 +203,11 @@ def reconstruct_ensemble(
     # Phase 3: collect each member's beads, sorted per chr.
     results: list[dict[str, list[BeadOut]]] = []
     for m, ibseeds in enumerate(member_seeds):
-        per_chr: dict[str, list[BeadOut]] = defaultdict(list)
+        per_chr: dict[str, list[list[BeadOut]]] = defaultdict(list)
         for ibs in ibseeds:
-            beads = _beads(outputs[ib_node_id(f"m{m} :: {ibs.ib_id}", StageKind.SMOOTH)])
-            per_chr[ibs.chr_].extend(beads)
+            nid = ib_node_id(f"m{m} :: {ibs.ib_id}", StageKind.SMOOTH)
+            per_chr[ibs.chr_].append(_beads(outputs[nid]))
 
-        results.append({c: sorted(b, key=lambda x: x.start) for c, b in per_chr.items()})
+        results.append(_assemble(per_chr, settings))
 
     return results

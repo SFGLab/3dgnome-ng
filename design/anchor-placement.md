@@ -2,9 +2,10 @@
 
 Reconstructions come out as compact balls of anchors scattered in space and joined by thin
 strands. This records what causes that, what has been measured, what has been ruled out, and
-which changes are worth trying.
+which changes are worth making.
 
-Status. Diagnosis complete and quantified. No fix implemented. Nothing here has been built.
+Status. Diagnosis complete and quantified on finished structures. One cause was a configuration
+value and has been changed. Option B is built and opt in. Option A is specified and not built.
 
 ## Symptom
 
@@ -12,16 +13,56 @@ A whole chromosome renders as roughly one ball per interaction block, each ball 
 with long single strands between them. On chr1 that is about 52 balls for the arc gap block
 partition and about 69 for the trio partition.
 
+## The target
+
+Polymer physics links contact probability to spatial distance. If distance grows as `s^nu` with
+genomic separation `s`, two loci meet with probability near `s^(-3 nu)`, because the capture
+volume is fixed and the coil volume grows as the cube of its radius. A contact probability slope
+measured from Hi-C therefore fixes `nu` without appeal to any other implementation.
+
+Measured with `playground/ps_curve.py` on the deepest 4DN mcool for each cell line, five
+chromosomes, 5 kb bins, log binned ten per decade.
+
+| cell line | 20 kb to 1 Mb | 1 to 10 Mb |
+|---|---|---|
+| GM12878 | 0.309 | 0.345 |
+| H1ESC | 0.269 | 0.260 |
+| HFFC6 | 0.277 | 0.261 |
+
+`nu` is near 0.285 in every cell line and both ranges, the fractal globule value. Every
+comparison below uses that number as the yardstick.
+
+`genomic_length_to_distance` is `1 + 0.5 * (s / 1000)^0.75`, so its own exponent is 0.75, about
+0.70 effective over 20 kb to 1 Mb once the base is included. That is 2.5 times steeper than the
+data. Over 20 kb to 1 Mb it separates loci 5.2 times more than Hi-C implies. It is the right
+chain bond target at the scale it was tuned for and the wrong shape for anything that has to hold
+across separations.
+
 ## What was measured
 
-All numbers are from this repository, not from comparison against another implementation.
+All numbers are from this repository. Unless stated otherwise they come from GM12878 on the
+arc gap block partition.
 
-### Anchors inside a block collapse
+### Three defects, not one
+
+The realised distance curve is not one flat line. It is two flat regimes joined by a jump, and
+each piece has its own cause.
+
+| regime | separation | realised distance | cause |
+|---|---|---|---|
+| within a block | 3 kb to 200 kb | flat near 3.4 | arc target has no separation, everything else is scale free repulsion |
+| across blocks | 1 Mb to 60 Mb | flat near 75 | `confinement_packing_factor_ib = 0.15` |
+| the jump | any boundary | 33 to 59 times at matched separation | nothing couples the two edges |
+
+Pooling them produces an apparent overall exponent near 0.9 that is pure mixture, since short
+pairs are all within block and long pairs are all across.
+
+### Within a block, anchors collapse
 
 The arc target does not depend on genomic separation. `freq_to_distance(freq)` is
 `base_level + scale / exp(a * (freq + shift))`, a function of PET count alone, and at
-`base_level = 0.2` with `a = 0.2` and `shift = 8` any arc above about twenty reads returns
-approximately 0.2. Measured on H1ESC chr11, `playground/scale_clash.py`:
+`base_level = 0.2` any arc above about twenty reads returns approximately 0.2. Measured on H1ESC
+chr11 with `playground/scale_clash.py`:
 
 | genomic separation | arc target | chain target | realised |
 |---|---|---|---|
@@ -31,42 +72,90 @@ approximately 0.2. Measured on H1ESC chr11, `playground/scale_clash.py`:
 | 100 to 300 kb | 0.249 | 25.51 | 0.450 |
 | 300 kb to 1 Mb | 0.309 | 50.73 | 0.530 |
 
-The arc target is flat across two orders of magnitude and the realised positions follow it, so
-anchors sit 14 to 100 times closer than the chain expects.
+Almost no pair is constrained at all. `calc_anchor_expected_distances` gives a pair either an arc
+target or -1, which the kernel scores as an unbounded `1/d` repulsion. On HG00512 chr1 over the
+twelve largest blocks, 5.17M anchor pairs, `playground/hic_coverage.py`, between 95 and 100
+percent of pairs at every separation have nothing but that repulsion, and Hi-C reaches only 0.1
+percent of them. Arc springs pulling everything to 0.2 against a repulsion with no sense of scale
+equilibrates at a uniform ball.
 
-### Almost no anchor pair is constrained at all
+Measured on five finished models from three data sources with `playground/calibrate_beta.py`,
+the realised exponent over 20 kb to 1 Mb is 0.143 to 0.212, always well under 0.285. The
+simulated contact probability from the beads themselves decays as `s^-0.41` against `s^-0.86` in
+the Hi-C, which is the same fact on the observable Hi-C measures directly.
 
-`calc_anchor_expected_distances` gives a pair either an arc target or -1, which the kernel scores
-as an unbounded `1/d` repulsion. Measured on HG00512 chr1 over the twelve largest blocks,
-5.17M anchor pairs, `playground/hic_coverage.py`:
+### Across blocks, the layout was a setting
 
-| separation | pairs | arc | Hi-C only | neither |
-|---|---|---|---|---|
-| 0 to 5 kb | 20,942 | 0.0% | 0.0% | 100.0% |
-| 5 to 20 kb | 23,156 | 5.2% | 0.0% | 94.7% |
-| 50 to 100 kb | 62,236 | 3.2% | 0.2% | 96.6% |
-| 100 to 300 kb | 220,539 | 1.9% | 0.2% | 97.9% |
-| above 1 Mb | 4,173,583 | 0.0% | 0.1% | 99.9% |
+Block centroids are placed by the coarse stage with chain bonds between consecutive centroids,
+excluded volume, and a confinement sphere of radius `pf * mean(dtn) * N^(1/3)` per segment.
+`validation/core/config.py::CANONICAL` set `pf = 0.15`, five times tighter than the `Settings`
+default of 0.75. It entered in commit c7dc086 and never went through the harness grid, which
+had validated 0.75 to 1.0.
 
-Between 95 and 100 percent of pairs have nothing but the scale free repulsion. Arc springs pulling
-everything to 0.2 against a repulsion with no sense of scale equilibrates at a uniform 0.4, which
-is the ball.
+That sphere is `2 * pf * N^(1/3)` chain bonds wide. At 0.15 a segment needs 37 blocks before the
+sphere can hold one bond. GM12878 chr1 segments hold 3 to 20, so every bond in every segment is
+violated by construction. Excluded volume wants centroids at least `0.5 * dtn` apart, confinement
+wants all of them inside a sphere narrower than one bond, both cannot hold, and whichever jams
+first sets the layout instead of genomic separation.
 
-### Anchors across a block boundary are pushed apart
+Coarse stage alone on chr1, 52 blocks, `playground/ib_confine_ablate.py`:
 
-The arcs MC runs per block, so a consecutive anchor pair split by a boundary has no term coupling
-it. Both anchors are placed only through their own block centroid. Measured on HG00512 chr1,
-`playground/boundary_gap.py`, matched on genomic gap between 64 and 700 kb:
-
-| consecutive pairs | n | realised over target |
+| `packing_factor_ib` | block layout exponent | Rg |
 |---|---|---|
-| inside one block | 793 | 0.074 |
-| crossing a boundary | 35 | 1.965 |
+| 0.15 | 0.021 | 99 |
+| 0.29 | 0.068 | 146 |
+| 0.50 | 0.146 | 190 |
+| 0.75 | 0.214 | 261 |
+| 1.00 | 0.297 | 320 |
+| 1.50 | 0.280 | 320 |
+| off | 0.280 | 320 |
 
-The two errors run in opposite directions. Inside a block anchors are about thirteen times too
-close. Across a boundary they are about twice too far. The boundary itself costs a factor of 27
-independent of genomic distance. Note that n is only 35 for the crossing pairs, so the factor of
-two is indicative rather than settled.
+Finished structures on chr1:1-60 Mb, 11 blocks in 5 segments, 3158 anchors, 3M sampled pairs,
+`playground/boundary_wide.py`:
+
+| `packing_factor_ib` | cross block exponent | within block exponent | Rg, all beads |
+|---|---|---|---|
+| 0.15 | 0.017 | 0.648 | 146 |
+| 0.75 | 0.183 | 0.645 | 342 |
+| 1.00 | 0.168 | 0.648 | 418 |
+| off | 0.168 | 0.648 | 418 |
+
+The finished structures inherit the coarse layout. Within block numbers are identical across all
+four, so the setting is orthogonal to the within block collapse. At 1.0 the sphere never binds
+on this region's 3 to 5 block segments and the run reproduces the unconfined trajectory exactly.
+At 0.75 it binds during the trajectory and ends inside the sphere, realised over auto radius
+0.75, so it still nudges the layout. The binding threshold scales with block count, so the
+choice between 0.75 and 1.0 is decided by segments with many blocks, where the coarse sweep
+shows 1.0 landing on 0.297 and 0.75 short at 0.214.
+
+Changed to 0.75 in `CANONICAL` and all seventeen configs on 2026-09-02. Every production model
+built before that carries 0.15, including the three cell line genome ensembles and the trio
+array 1805610.
+
+### The jump at a boundary survives that change
+
+Relaxing confinement restored separation scaling across blocks. It did not close the gap
+between a block's last anchor and the next block's first, because nothing couples them. Both
+are placed only through their own block centroid. Measured at matched separation of 562 kb to
+1 Mb on the finished chr1:1-60 Mb structures:
+
+| `packing_factor_ib` | within block, over `gld` | across a boundary, over `gld` | ratio |
+|---|---|---|---|
+| 0.15 | 0.092 | 3.04 | 33 |
+| 0.75 | 0.092 | 5.42 | 59 |
+| off | 0.092 | 5.72 | 62 |
+
+In model units two loci 750 kb apart sit at about 7 within a block and about 400 across a
+boundary. The ratio grew when confinement was relaxed, because blocks moved apart and nothing
+pulled the adjacent edges back together. This is a separate defect from the scaling and it is
+what option B addresses. The earlier estimate of a flat factor of 27 came from 35 consecutive
+pairs whose gaps barely overlapped the comparison group. On 3.7M pairs the penalty is 15.5 at
+300 to 560 kb on whole chromosome models and falls to 3.8 above 5 Mb, so it is separation
+dependent, and the short range end is where it bites.
+
+Cross block contacts beyond 1 Mb at twice the bond length are 0.0008 of pairs in all three
+structures. The models predict essentially no contact across a boundary, whatever the packing
+factor.
 
 ### The subanchor chain balloons
 
@@ -74,119 +163,135 @@ Between anchors 35 kb apart the chain is handed about 8.7 units of contour for a
 roughly 36 times more than it needs. Anchors are held fixed during smooth MC, so the excess
 relaxes into a free coil. That is the fuzz on each ball rather than a clean path.
 
-### The result is a bimodal distance curve
-
-Median spatial distance against genomic separation is flat near 1.8 from 1 kb to 400 kb, then
-jumps to about 100 at 6.4 Mb. Realised over target is 1.9 at 5 kb and 0.57 at 50 kb, so the
-structures do not follow `genomic_length_to_distance` at any scale and the error changes sign.
-
 ## What has been ruled out
 
-Each of these was tested and is not the cause.
-
-- Excluded volume, confinement and the CTCF motif weight. Ablated one at a time on a 10 Mb
-  region. Confinement is inert, it never binds. Excluded volume accounts for about 23 percent of
-  the short range inflation and motif for about 8 percent. The defect survives all three off.
-- Smooth MC failing to converge. It converges, 222 rounds and 11.1M steps, one of one converged.
-  It reaches a minimum that is not at the target distances.
+- Excluded volume, confinement at the arcs and smooth levels, and the CTCF motif weight, for
+  the within block collapse. Ablated one at a time on a 10 Mb region. The defect survives all
+  three off. Confinement at those levels never binds. The IB level confinement is a different
+  term and does bind, see above.
+- Smooth MC failing to converge. It converges to a minimum that is not at the target distances.
 - Ensemble depth. Five, ten and twenty conformations give the same answer to within 0.006 on a
   pinned gene set.
-- Being worse than cudaMMC. Its leaf chain is equally flat. This is the algorithm's output, not a
-  defect this port introduced. An earlier investigation chased four imaginary defects because it
-  compared our raw beads against cudaMMC's `.smooth.txt`, which is the chain resampled onto a
-  uniform 1 kb lattice and so manufactures short range structure that the model does not have.
-- Hi-C supplying the missing targets. It reaches 0.1 percent of arcless pairs. Anchors cover
-  little sequence, so a 25 kb bin rarely lands on two of them. Where Hi-C does exist its implied
-  distance scales correctly, 2.57 below 50 kb against 39.86 above 300 kb, so the physics is right
-  and only the sampling is too sparse.
+- Being worse than cudaMMC. Its leaf chain is equally flat. An earlier investigation compared
+  our raw beads against cudaMMC's `.smooth.txt`, which is resampled onto a uniform 1 kb lattice
+  and manufactures short range structure the model does not have.
+- Hi-C supplying the missing within block targets. It reaches 0.1 percent of arcless pairs.
+- Finer blocks. An arc gap boundary sits where no arc spans, so the arc gap partition is by
+  construction the finest one that discards no arc. Any finer partition cuts arcs, and a cut arc
+  constrains nothing at anchor resolution. TAD boundaries orphan 5437 of 12474 arcs on GM12878
+  chr1 against zero under arc gaps. Block granularity trades directly against arc retention.
 
-## Solutions to explore
+## Solutions
 
-### A. Excluded volume radius that depends on genomic separation
+### A. Excluded volume floor that grows with genomic separation
 
-Replace the constant `exclusion_radius_arcs` with `beta * genomic_length_to_distance(separation)`
-for pairs with no arc. This is what a self avoiding polymer does and it is the mechanism that
-produces contact probability decay. It addresses the collapse, which is the larger of the two
-errors and affects almost every pair.
+For pairs with no arc, replace the constant `exclusion_radius_arcs` with a floor
+`r0(s) = beta * (s / 1000)^nu`. Keep it a floor rather than a spring. Arcs must still be able to
+pull distant loci together, since that is the biology the model exists to capture.
 
-Keep it a floor rather than a spring. Arcs must still be able to pull distant loci together,
-since that is the biology the model exists to capture. A two sided spring on every pair would
-impose an ideal chain and erase the loops.
+The exponent is fixed by the data. `nu = 0.285` from the contact probability curve, as a
+setting so a cell line can carry its own value. Do not use `genomic_length_to_distance` as the
+shape, since its exponent is 0.70 and would impose a chain 2.5 times more extended than the
+data at every scale.
+
+The prefactor is derived at runtime. `beta` is not a constant, it is 1.17 to 1.36 on the cell
+line models and 0.70 to 0.76 on the trio models, but `beta` over the median consecutive anchor
+distance is 0.447, 0.456, 0.447, 0.410 and 0.437 across those five models. So the rule is
+`beta = factor * d_bond` with `factor = 0.44`, following the pattern the other excluded volume
+levels already use. `d_bond` is the median consecutive anchor distance, which is measurable in
+a pass that runs after the arcs MC has placed anchors and only approximately at arcs MC setup.
+
+Calibrated that way the floor binds only between 44 kb and 780 kb, peaks at 1.69 times inflation
+near 250 kb, and touches nothing beyond 1.4 Mb. It is a bounded correction, not an inflation.
 
 Cost is free. The kernel already visits every pair for the repulsion. It also retires the
 unbounded `1/d`, which is the known cause of the small interaction block blow ups.
 
-`beta` decides everything. Near one it forces ideal chain geometry and the structures inflate.
-Calibrate it against a contact probability curve derived from the cell line's own Hi-C rather
-than by eye.
+### B. Stitch block edges together. Built, opt in
 
-### B. Stitch block edges together
+Implemented in `gnome3d/pipeline/stitch.py`, wired into `reconstruct.py::_assemble`, gated on
+`[boundary_stitch] use_boundary_stitch`. Unit checks in `harness/test_stitch.py`.
 
-Add a bond between the last anchor of one block and the first anchor of the next, targeting
-`genomic_length_to_distance` of their genomic gap. About 68 boundaries on chr1, so one spring
-each and no quadratic cost.
+Measured by applying the pass offline to the finished chr1:1-60 Mb structure at packing factor
+0.75, `playground/stitch_offline.py` then `playground/boundary_wide.py`:
 
-Those pairs are few but they set the global layout, so the effect on the scatter is out of
-proportion to the count. This is also the narrow version of what `use_segment_arcs` attempted and
+| separation | jump before | jump after |
+|---|---|---|
+| 562 kb to 1 Mb | 58.9 | 0.97 |
+| 1 to 1.78 Mb | 43.6 | 0.97 |
+| 1.78 to 3.16 Mb | 34.5 | 0.90 |
+| 3.16 to 5.62 Mb | 22.9 | 0.84 |
+| 5.62 to 10 Mb | 16.3 | 1.09 |
+
+Cross block exponent 0.183 to 0.770 against within block 0.645, and the whole structure's
+exponent 1.39 to 0.74, so the curve is no longer bimodal. Cross block anchor pairs closer than
+one bond are 1 in 100,000, so blocks do not interpenetrate.
+
+Two consequences to know. Rg of the region fell from 342 to 49.5. That is the pass doing its
+job. It makes a boundary pair look like an interior pair, and interior pairs are collapsed by
+the within block defect, so the collapse now spans the chromosome instead of stopping at each
+block. Option A is what lifts it, and B without A produces a compact structure by design.
+
+And the excluded volume regulariser is mis-scaled. Its radius derives from
+`genomic_length_to_distance` of the centroid gaps, 153 units here, against a median block Rg of
+7.7, so 53 of 55 centroid pairs sit inside it and the term acts as a weak global compaction
+penalty rather than an overlap guard. It did no harm on this structure but it does not mean
+what it says. The fix is a per pair radius `rg_k + rg_l` from each block's own radius of
+gyration, with `exclusion_radius_ib` kept as the explicit override. Not built.
+
+Add a bond between the last anchor of one block and the first anchor of the next, targeting the
+distance a within block pair at that separation realises. About 68 boundaries on chr1, so one
+spring each and no quadratic cost.
+
+Those pairs are few but they set the global layout, and the jump they close is a factor of 33 to
+62 at matched separation. This is the narrow version of what `use_segment_arcs` attempted and
 lost on. That change widened the arcs MC to whole segments, which dragged every arcless pair into
-the unbounded repulsion and raised repulsion per arc by 2.06 times under arc gap blocks. Touching
-only the boundary pairs avoids that entirely.
+the unbounded repulsion. Touching only the boundary pairs avoids that.
 
 Placement needs a stage that sees both blocks. The natural shape is a short pass after anchors
 are placed, adjusting each block rigidly to satisfy its edge bonds while leaving the intra block
-arrangement the arcs MC produced untouched.
+arrangement the arcs MC produced untouched. That is the same pass A wants for measuring
+`d_bond`, so the two share a stage.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC
 
 The most direct statement of the missing constraint. Left last because it competes with the arc
 springs and needs a weight balance that A and B do not.
 
-### D. Finer blocks. Rejected
-
-Smaller blocks would let the hierarchy supply structure at shorter range, since it already places
-block centroids by genomic distance. TAD blocks are about 340 kb against 4.8 Mb for arc gaps.
-
-Rejected, and on principle rather than on a measurement. An arc gap boundary sits where no arc
-spans, so the arc gap partition is by construction the finest one that discards no arc. Any
-finer partition has to cut through arcs, and a cut arc constrains nothing at anchor resolution
-because the per block arc MC only sees arcs internal to its own block. TAD boundaries make that
-concrete, orphaning 5437 of 12474 arcs on GM12878 chr1 against exactly zero under arc gaps, but
-the count is a symptom. The rule is that block granularity trades directly against arc retention,
-so blocks cannot be the lever for short range structure.
-
-That is what leaves A and B as the routes. Both add structure without touching the partition.
-
 ## Validation
 
-The measurements to judge a change by already exist.
+| gate | tool | at 0.15 | at 0.75 |
+|---|---|---|---|
+| cross block exponent, finished | `playground/boundary_wide.py` | 0.017 | 0.183 |
+| within block exponent, 20 kb to 1 Mb | `playground/calibrate_beta.py` | 0.205 | 0.208 |
+| simulated contact probability slope | `playground/calibrate_beta.py` | 0.40 | 0.41 |
+| boundary jump at 562 kb to 1 Mb | `playground/boundary_wide.py` | 33 | 59, stitched 0.97 |
+| block layout exponent, coarse | `playground/ib_confine_ablate.py` | 0.021 | 0.214 |
+| enhancer promoter expression | `enhancer3d/playground/beyond_linear.py` | 86 percent of v4 | not yet run |
+| byte exact parity, flag off | see AGENTS.md parity gate | must stay identical | |
 
-| gate | tool | current |
-|---|---|---|
-| realised over target | `playground/target_check.py` | 1.9 at 5 kb, 0.57 at 50 kb |
-| distance against separation | `playground/scaling_curve.py` | 1.3 fold over 7 kb to 380 kb |
-| boundary penalty | `playground/boundary_gap.py` | 26.7 times |
-| enhancer promoter expression | `enhancer3d/playground/beyond_linear.py` | 86 percent of v4 |
-| byte exact parity, flag off | see AGENTS.md parity gate | must stay identical |
-
-The target for the second gate should come from a contact probability curve computed from the
-cell line's own Hi-C, not from matching cudaMMC. Contact probability decaying near s to the minus
-one implies distance growing near s to the one third, so a flat curve is wrong on the data's own
-terms. That gives an objective goal and calibrates `beta`.
+Targets are 0.285 for the two exponents and 0.86 for the contact probability slope, from the
+Hi-C. The jump should approach 1.
 
 ## Decisions worth making before building
 
-- Both changes are divergences from the reference and from cudaMMC. They must be opt in, default
+- A and B are divergences from the reference and from cudaMMC. They must be opt in, default
   off, and recorded in the AGENTS.md divergences section. The parity baseline does not move.
-- Better geometry may not improve the expression statistic. If that happens it should be reported
-  as evidence the statistic is limited by annotation, not used as a reason to tune `beta` until it
-  moves. Agreeing this in advance is what keeps the exercise honest.
-- The boundary factor of two rests on 35 pairs. Widen that measurement to a cell line with more
-  boundaries before sizing B against it.
+- The packing factor change is configuration, not code, and moves no parity baseline. Whether it
+  should be 0.75 or 1.0 is decided by segments with many blocks, not by the 60 Mb region.
+- Better geometry may not improve the expression statistic. If that happens it should be
+  reported as evidence the statistic is limited by annotation, not used as a reason to tune
+  `beta` or `nu` until it moves.
+- The existing ensembles and the running trio array carry 0.15. Regenerating is expensive and is
+  a decision to take on the finished structure evidence above, not on the general worry.
 
 ## Order
 
-1. Derive the contact probability curve and calibrate `beta`. No GPU, uses mcools already fetched.
-2. Widen the boundary measurement beyond 35 pairs.
-3. Build B. It is smaller, cheaper and independent of `beta`.
-4. Build A.
-5. Only then consider C.
+1. Contact probability curve and `beta`. Done.
+2. Widen the boundary measurement. Done, and it split the problem into three.
+3. Packing factor. Changed to 0.75, confirmed end to end. Decide 0.75 against 1.0 on a many
+   block segment.
+4. Build the post placement pass that A and B share, with B first since it is one spring per
+   boundary and independent of `nu`.
+5. Build A in that pass.
+6. Only then consider C.
