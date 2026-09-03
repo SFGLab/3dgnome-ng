@@ -405,8 +405,24 @@ one. Implemented as `build.add_chain_bonds`, consecutive arcless pairs entered i
 target matrix at `genomic_length_to_distance` of their gap after the heatmap scaling, arc pairs
 kept, gated on `[springs] use_arcs_chain_bonds`. Same spring constants as the arcs; a separate
 weight would need a per pair weight in the kernels. Unit checks in `harness/test_arc_target.py`.
-The gate is the corona, anchors beyond 50 units from the block centroid and the largest block's
-radius, with the D and stitch gates not regressing.
+Measured offline on the largest block, 1227 anchors, 1188 bonds, median bond target 1.27,
+under D with and without C:
+
+| | D | D and C |
+|---|---|---|
+| consecutive pairs more than 3 times the chain law apart | 749 of 1226 | 149 |
+| more than 10 times | 274 | 0 |
+| more than 20 units apart | 267 | 0 |
+| 90th percentile of realised over chain law | 54 | 3.1 |
+| median consecutive distance | 5.82 | 2.93 |
+| core Rg | 32.2 | 29.3 |
+| island centroid distance from core, median and 90th | 74 and 88 | 38 and 77 |
+
+C removes the spokes. No consecutive pair is left more than ten times the chain law apart,
+where D alone had 274, so no subanchor strand is drawn taut. The small islands come home and the
+large ones stay at the block's edge, now reached by satisfied chains rather than lines. Arcs are
+as satisfied as under D alone, realised over target 2.28 in both. The region run with the
+stitch follows, with the D and stitch gates not to regress.
 
 ## Validation
 
