@@ -5,7 +5,7 @@ strands. This records what causes that, what has been measured, what has been ru
 which changes are worth making.
 
 Status. Diagnosis complete and quantified on finished structures. One cause was a configuration
-value and has been changed. Options A and B are built and opt in. A is not yet measured.
+value and has been changed. Options A and B are built and opt in. A is measured and does not fix the within block shape. The next lever is D, the arc target law.
 
 ## Symptom
 
@@ -205,9 +205,42 @@ ball at 3.2, and replaced it with a quadratic at a tenth of the arcs' weight, wh
 anything against springs saturated at 0.2. Stitching onto that shrunken interior curve then
 packed the blocks into 13 overlapping pairs, worse than the stitch alone.
 
-The floor now carries its own weight, `genomic_floor_weight`, default 1. The value is decided by
-a sweep on the same region, floor alone at 1 and 10, judged on the within block bins rising
-rather than falling, on block Rg, and on the overlap count once the stitch is added.
+The floor now carries its own weight, `genomic_floor_weight`, default 1. Swept on the same
+region, floor alone:
+
+| weight | 3 to 5 kb | 100 to 177 kb | 562 kb to 1 Mb | within block exponent | block Rg median |
+|---|---|---|---|---|---|
+| off | 3.19 | 3.46 | 6.89 | 0.208 | 7.7 |
+| 0.1 | 1.86 | 2.07 | 4.88 | 0.267 | 7.2 |
+| 1 | 3.87 | 4.23 | 8.30 | 0.219 | 8.0 |
+| 10 | 6.78 | 6.69 | 12.04 | 0.184 | 9.5 |
+
+The floor sets the size of the ball and not its shape. Every bin moves together, collapse at
+0.1, a fifth up at 1, double at 10, and the exponent stays between 0.18 and 0.27 at every
+weight against a target of 0.285. The mid range pairs the floor was calibrated to lift do reach
+their floors at weight 10, and drag every other pair with them.
+
+Why. Inside a block there are two populations at every separation. Arc pairs sit at 0.55 to
+0.94, arcless pairs at 2.8 to 6.7, and both carry an exponent near 0.12. The 4240 arcs of this
+region target 0.218 at 10 to 30 kb and 0.363 at 300 kb to 1 Mb, a range of 0.20 to 0.40 in every
+bin, because `freq_to_distance` maps PET count alone and 30 percent of arcs sit at its floor. A
+1 Mb arc with 4 PETs targets 0.36 while the chain law says 90. Arcs are realised at 2.6 to 3.2
+times their target in every bin, the equilibrium of a network of near equal links against a
+repulsion. A floor on the pairs that are not links can inflate that network or let it
+collapse, and cannot change its shape, because the shape is the network's. The first row of
+the cause table, the arc target has no separation, is the one that sets the exponent, and A
+never touched it.
+
+What A is good for. It retires the unbounded `1/d` cleanly, it gives the block a size knob with
+a physical meaning, and it is parity safe and tested in both kernels. It is not the fix for the
+within block collapse.
+
+Two caveats on the measurements. They ran the numba arcs kernel, since the measurement config
+leaves `mc_executor_arcs` at `auto`, which resolves arcs to threaded numba, while production
+sets `batch`; the JAX path is covered by the unit checks and initial energy agreement only, and
+`out/floor_jax/run.sh` on the workstation runs it on this region at a given weight. And the
+stitch on top of weight 0.1 gave 13 overlapping block pairs, so no floor weight has yet been
+combined with the stitch.
 
 For pairs with no arc, replace the constant `exclusion_radius_arcs` with a floor
 `r0(s) = beta * (s / 1000)^nu`. Keep it a floor rather than a spring. Arcs must still be able to
@@ -289,6 +322,17 @@ Placement needs a stage that sees both blocks. The natural shape is a short pass
 are placed, adjusting each block rigidly to satisfy its edge bonds while leaving the intra block
 arrangement the arcs MC produced untouched. That is the same pass A wants for measuring
 `d_bond`, so the two share a stage.
+
+### D. Separation aware arc targets
+
+The measurement of A points here. The arc target law is the one term that sets the within
+block shape and it is blind to separation. Options, none built. Give `freq_to_distance` a
+separation term so a long arc with few PETs targets more than a short one with the same count.
+Or lift the target with a floor of its own, `max(freq_to_distance(PET), c * (s / 1000)^nu)`,
+which keeps strong short arcs tight and stops weak long arcs from pinning a block into a ball.
+Either is a change to the parity era law and must be opt in. Calibration would follow the same
+route as A, the contact probability curve for the exponent and a bond scale for the prefactor,
+and the gate is the same within block exponent that A failed.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC
 
