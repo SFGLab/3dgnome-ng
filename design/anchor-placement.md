@@ -243,6 +243,15 @@ compaction penalty rather than an overlap guard. It did no harm on this structur
 mean what it said. Replaced by a per pair radius `rg_k + rg_l` from each block's own radius of
 gyration over all its beads, with `exclusion_radius_ib` kept as the explicit override.
 
+With that radius the guard still leaves 8 of 55 block pairs inside touching on this structure,
+5 of them chain neighbours. Raising `ev_weight` from 1 to 30 moves that to 7, with the worst
+pair going from 0.18 to 0.46 of touching, while the jump stays between 1.0 and 1.24 and Rg
+between 45 and 50. The overlaps are not a weight problem. A neighbouring pair is asked to put
+its edge anchors about 7 units apart while each block is a ball of radius 7 to 25, so the
+springs and the guard cannot both be satisfied until the blocks themselves are less collapsed,
+which is option A. The two worst pairs both involve a 102 bead block whose radius of gyration
+is inflated by a loose coil rather than by dense material. `ev_weight` stays at 1.
+
 Add a bond between the last anchor of one block and the first anchor of the next, targeting the
 distance a within block pair at that separation realises. About 68 boundaries on chr1, so one
 spring each and no quadratic cost.
