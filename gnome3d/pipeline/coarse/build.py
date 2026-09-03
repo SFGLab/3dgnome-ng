@@ -417,7 +417,8 @@ def add_chain_bonds(mat: F64Array, mids: list[int], s: Settings) -> F64Array:
     The arcs MC otherwise has no term between genomic neighbours, so a group of anchors joined
     only among themselves by arcs floats out to the confinement leash. The bond ties it to its
     neighbours the way the smooth stage ties consecutive beads. A pair that already has an arc
-    keeps the arc. The bond carries the arcs spring constants.
+    keeps the arc. The bond carries the arcs spring constants and its target is
+    `arcs_chain_bond_scale` times the chain law.
     """
     if not s.use_arcs_chain_bonds:
         return mat
@@ -426,7 +427,9 @@ def add_chain_bonds(mat: F64Array, mids: list[int], s: Settings) -> F64Array:
     for a, b in zip(order[:-1], order[1:], strict=True):
         if out[a, b] > 0.0:
             continue
-        d = float(s.genomic_length_to_distance(abs(int(mids[b]) - int(mids[a]))))
+        d = float(s.arcs_chain_bond_scale) * float(
+            s.genomic_length_to_distance(abs(int(mids[b]) - int(mids[a])))
+        )
         out[a, b] = d
         out[b, a] = d
     return out

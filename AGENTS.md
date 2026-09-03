@@ -827,7 +827,10 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   beads to, entered into the arcs target matrix after the anchor heatmap scaling so Hi-C
   contact between neighbours does not shrink it. A pair that already has an arc keeps the arc.
   The bond carries the arcs spring constants; a separate weight needs a per pair weight in the
-  kernels and is not built. No kernel is touched. Unit checks in `harness/test_arc_target.py`.
+  kernels and is not built. `arcs_chain_bond_scale` (1) multiplies the bond target, because at
+  1 the bonds pull the short range below the parity values and the distance curve steepens past
+  the Hi-C exponent, 0.321 against 0.285 on chr1:1-60 Mb. No kernel is touched. Unit checks in
+  `harness/test_arc_target.py`.
 
   Why not in the reference: the reference's arcs MC has no chain term either. See
   `design/anchor-placement.md`, option C.

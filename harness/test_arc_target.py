@@ -143,6 +143,15 @@ def test_chain_bonds() -> None:
         on[0, 2] == base[0, 2] and np.array_equal(on, on.T) and base[0, 1] == -1.0,
     )
     check("default is off", Settings().use_arcs_chain_bonds is False)
+    s.arcs_chain_bond_scale = 2.0
+    scaled = add_chain_bonds(base, mids, s)
+    check(
+        "scale multiplies the bond target",
+        abs(scaled[0, 1] - 2.0 * gld(500)) < 1e-12
+        and abs(scaled[2, 3] - 2.0 * gld(118_500)) < 1e-12,
+    )
+    check("scale leaves arcs alone", scaled[0, 2] == base[0, 2] and scaled[3, 4] == base[3, 4])
+    check("scale default is 1", Settings().arcs_chain_bond_scale == 1.0)
 
 
 def main() -> int:
