@@ -5,7 +5,7 @@ strands. This records what causes that, what has been measured, what has been ru
 which changes are worth making.
 
 Status. Diagnosis complete and quantified on finished structures. One cause was a configuration
-value and has been changed. Option B is built and opt in. Option A is specified and not built.
+value and has been changed. Options A and B are built and opt in. A is not yet measured.
 
 ## Symptom
 
@@ -183,7 +183,11 @@ relaxes into a free coil. That is the fuzz on each ball rather than a clean path
 
 ## Solutions
 
-### A. Excluded volume floor that grows with genomic separation
+### A. Excluded volume floor that grows with genomic separation. Built, opt in
+
+Implemented in `gnome3d/pipeline/ib/floor.py`, the arcs stage and both arcs kernels, gated on
+`[excluded_volume] use_genomic_floor`. Unit checks in `harness/test_genomic_floor.py`. Not yet
+measured on a real structure.
 
 For pairs with no arc, replace the constant `exclusion_radius_arcs` with a floor
 `r0(s) = beta * (s / 1000)^nu`. Keep it a floor rather than a spring. Arcs must still be able to

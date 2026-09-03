@@ -236,6 +236,11 @@ class Settings:
     exclusion_auto_factor_smooth: float
     exclusion_auto_factor_heatmap: float
     exclusion_auto_factor_ib: float
+    use_genomic_floor: bool
+    genomic_floor_factor: float
+    genomic_floor_exponent: float
+    genomic_floor_scale: float
+    genomic_floor_polish_temp: float
 
     # ---- IB-level MC pass (chain bonds + EV between IB centroids) ----
     # IB MC is a peer stage to smooth/arcs/heatmap, not a sub-mode of smooth.
@@ -522,6 +527,18 @@ class Settings:
         self.exclusion_auto_factor_smooth = 0.5
         self.exclusion_auto_factor_heatmap = 0.5
         self.exclusion_auto_factor_ib = 0.5
+        # The genomic floor. Arcless anchor pairs in the arcs MC get an excluded volume
+        # radius of scale * (separation / 1000)^exponent instead of the 1/d repulsion.
+        # scale 0 derives it as factor times the median consecutive anchor distance of a
+        # first anneal. See gnome3d/pipeline/ib/floor.py.
+        self.use_genomic_floor = False
+        self.genomic_floor_factor = 0.44
+        self.genomic_floor_exponent = 0.285
+        self.genomic_floor_scale = 0.0
+        # Starting temperature of the floor pass as a fraction of max_temp. The pass is a
+        # polish of the first anneal, so it must not re-heat the structure. Zero accepts
+        # only moves that do not raise the score.
+        self.genomic_floor_polish_temp = 0.0
 
         # ---- IB-level MC pass ----
         # When enabled, each segment runs a small chain-spring + EV MC pass over
@@ -1030,6 +1047,21 @@ class Settings:
         )
         self.exclusion_auto_factor_ib = getf(
             "excluded_volume", "auto_factor_ib", self.exclusion_auto_factor_ib
+        )
+        self.use_genomic_floor = getb(
+            "excluded_volume", "use_genomic_floor", self.use_genomic_floor
+        )
+        self.genomic_floor_factor = getf(
+            "excluded_volume", "genomic_floor_factor", self.genomic_floor_factor
+        )
+        self.genomic_floor_exponent = getf(
+            "excluded_volume", "genomic_floor_exponent", self.genomic_floor_exponent
+        )
+        self.genomic_floor_scale = getf(
+            "excluded_volume", "genomic_floor_scale", self.genomic_floor_scale
+        )
+        self.genomic_floor_polish_temp = getf(
+            "excluded_volume", "genomic_floor_polish_temp", self.genomic_floor_polish_temp
         )
 
         # [simulation_ib]

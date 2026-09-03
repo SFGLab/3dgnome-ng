@@ -44,6 +44,7 @@ def dummy_i32(shape: tuple[int, ...] = (1,)) -> I32Array:
 # indexed, so these exist only to give numba a concrete type.  Never written to.
 NO_I8: I8Array = np.zeros(1, dtype=np.int8)
 NO_F64: F64Array = np.zeros(1, dtype=np.float64)
+NO_MAT: F64Array = np.zeros((1, 1), dtype=np.float64)
 
 
 class AffinityParams(NamedTuple):
@@ -274,6 +275,8 @@ def run_outer_loop(
     brdg_weight: float = 0.0,
     score_comp: float = 0.0,
     score_brdg: float = 0.0,
+    use_excl_mat: bool = False,
+    excl_r0_mat: F64Array = NO_MAT,
 ) -> float:
     """Drive the unified kernel until convergence; return the final total score."""
     score = (
@@ -353,6 +356,8 @@ def run_outer_loop(
             score_comp,
             score_brdg,
             rep_inv_cutoff,
+            use_excl_mat,
+            excl_r0_mat,
         )
         score = (
             score_struct

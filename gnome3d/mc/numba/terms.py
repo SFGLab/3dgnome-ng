@@ -183,6 +183,9 @@ def init_confine_nb(
 # sum_{i != j, |i-j| > skip} E_pair(d_ij). Delta is 2 * (local_curr - local_prev).
 
 
+NO_MAT: F64Array = np.zeros((1, 1), dtype=np.float64)
+
+
 @njit(cache=True, fastmath=True, nogil=True)
 def _excl_pair_nb(d: float, r0: float, weight: float) -> float:
     if d >= r0:
@@ -206,6 +209,53 @@ def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -
         dz = pos[i, 2] - pos[p, 2]
         d = math.sqrt(dx * dx + dy * dy + dz * dz)
         err += _excl_pair_nb(d, r0, weight)
+    return err
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def local_excl_mat_nb(pos: F64Array, p: int, r0: F64Array, weight: float, skip: int) -> float:
+    """Excluded volume local score with one radius per pair. A radius of zero skips the pair,
+    which is how arc pairs and the diagonal opt out of the genomic floor."""
+    n = pos.shape[0]
+    err = 0.0
+    for i in range(n):
+        diff = i - p
+        if diff < 0:
+            diff = -diff
+        if diff <= skip:
+            continue
+        r = r0[i, p]
+        if r <= 0.0:
+            continue
+        dx = pos[i, 0] - pos[p, 0]
+        dy = pos[i, 1] - pos[p, 1]
+        dz = pos[i, 2] - pos[p, 2]
+        d = math.sqrt(dx * dx + dy * dy + dz * dz)
+        err += _excl_pair_nb(d, r, weight)
+    return err
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def init_excl_mat_nb(pos: F64Array, r0: F64Array, weight: float, skip: int) -> float:
+    n = pos.shape[0]
+    err = 0.0
+    for i in range(n):
+        row_err = 0.0
+        for j in range(n):
+            diff = i - j
+            if diff < 0:
+                diff = -diff
+            if diff <= skip:
+                continue
+            r = r0[i, j]
+            if r <= 0.0:
+                continue
+            dx = pos[i, 0] - pos[j, 0]
+            dy = pos[i, 1] - pos[j, 1]
+            dz = pos[i, 2] - pos[j, 2]
+            d = math.sqrt(dx * dx + dy * dy + dz * dz)
+            row_err += _excl_pair_nb(d, r, weight)
+        err += row_err
     return err
 
 
@@ -807,6 +857,10 @@ def batch_mc_nb(
     score_comp: float,
     score_brdg: float,
     rep_inv_cutoff: float = 0.0,
+    # The genomic floor gives the excluded volume term one radius per pair. Off by default so
+    # every stage but arcs passes nothing new.
+    use_excl_mat: bool = False,
+    excl_r0_mat: F64Array = NO_MAT,
 ) -> tuple[float, float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
     n_mov = movable.shape[0]
@@ -838,7 +892,10 @@ def batch_mc_nb(
 
         loc_excl_prev = 0.0
         if use_excl:
-            loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+            if use_excl_mat:
+                loc_excl_prev = local_excl_mat_nb(pos, p, excl_r0_mat, excl_weight, excl_skip)
+            else:
+                loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
 
         loc_conf_prev = 0.0
         if use_conf:
@@ -908,7 +965,10 @@ def batch_mc_nb(
 
         score_excl_new = score_excl
         if use_excl:
-            loc_excl_curr = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+            if use_excl_mat:
+                loc_excl_curr = local_excl_mat_nb(pos, p, excl_r0_mat, excl_weight, excl_skip)
+            else:
+                loc_excl_curr = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
             score_excl_new = score_excl + 2.0 * (loc_excl_curr - loc_excl_prev)
 
         score_conf_new = score_conf

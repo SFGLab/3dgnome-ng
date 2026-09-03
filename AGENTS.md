@@ -759,6 +759,36 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference has no term across block boundaries either, which is
   why its structures show the same scatter. See `design/anchor-placement.md`.
 
+- **Genomic excluded volume floor: `[excluded_volume] use_genomic_floor = yes`, default no.**
+  ([gnome3d/pipeline/ib/floor.py](gnome3d/pipeline/ib/floor.py), the arcs stage and both arcs
+  kernels)
+  An anchor pair with no arc has no target distance in the arcs MC, only the scale free `1/d`
+  repulsion, so anchors inside a block settle into a ball whose size does not depend on genomic
+  separation. Measured over 20 kb to 1 Mb the realised distance exponent is 0.14 to 0.21 against
+  0.285 from the cell line's own Hi-C contact probability curve. The floor gives every arcless
+  pair an excluded volume radius `scale * (separation / 1000)^exponent`, one sided, so arcs can
+  still pull distant loci together. Arc pairs keep their springs and get no floor.
+
+  It rides the existing excluded volume term with one radius per pair instead of one per IB,
+  in numba (`local_excl_mat_nb`, `init_excl_mat_nb`, threaded through `batch_mc_nb`) and in the
+  JAX arcs kernel (a `(B, B)` radius per IB, static cache key entry `excl_mat`). With the floor on
+  the arcless entries of the arcs matrix are zeroed, so those pairs carry the floor and nothing
+  else and the unbounded `1/d` retires for them. The checkerboard and hybrid arcs kernels do not
+  implement it and raise.
+
+  The scale is calibrated on the structure itself. The arcs stage anneals as before, reads the
+  median consecutive anchor distance off the result, sets `scale = factor * that`, and runs a
+  second pass from that structure at `polish_temp * max_temp`. The second pass must not re-heat:
+  from `max_temp` it tears the arcs the first pass satisfied. Keys: `genomic_floor_factor`
+  (0.44, from five models where `beta` over the bond distance held to six percent),
+  `genomic_floor_exponent` (0.285, each cell line measured 0.26 to 0.35), `genomic_floor_scale`
+  (0, an explicit scale in model units overrides the calibration), `genomic_floor_polish_temp`
+  (0). Unit checks in `harness/test_genomic_floor.py`, including numba against JAX on the initial
+  energy.
+
+  Why not in the reference: the reference's arcs MC has the same `1/d` for arcless pairs. See
+  `design/anchor-placement.md`.
+
 ---
 
 ## Correctness Rules
