@@ -363,8 +363,22 @@ components, and the components outside the largest sit about 40 units from the b
 under the parity law and about 67 under D. Nothing in the arcs MC joins one component to
 another except the `1/d` repulsion, which is cut off beyond three times the mean arc target,
 so their radius is not set by any term that knows the genome. The arcs step size is a constant,
-so D does not change the anneal's reach. What does set that radius is under measurement, on the
-largest block offline, with the arcs level confinement on and off.
+so D does not change the anneal's reach. What sets that radius is the arcs level confinement,
+measured on the largest block, 1227 anchors, annealed offline four ways from the same seed:
+
+| law | arcs confinement | Rg | anchors beyond 50 | max radius |
+|---|---|---|---|---|
+| parity | on | 26.0 | 0 | 49 |
+| D | on | 44.0 | 157 | 78 |
+| parity | off | 32.7 | 139 | 63 |
+| D | off | 52.5 | 410 | 93 |
+
+The islands are held by nothing but the confinement leash. Its radius is
+`1.5 * mean arc target * N^(1/3)`, 4.6 units under the parity law and 10.7 under D because D
+lifts the mean target from 0.29 to 0.67, and at weight 0.1 it is a leash rather than a wall,
+so the islands float where the leash balances the anneal's diffusion, 40 units out under the
+parity law and 67 under D. Turn the leash off and the parity law grows the same corona. The
+corona is not something D created, it is the island problem D made visible by scaling it.
 
 That corona is where option C, chain bonds between consecutive anchors in the arcs MC, would
 act: it is exactly the term that ties a component to its genomic neighbours. It also reads A
