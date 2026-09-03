@@ -283,6 +283,14 @@ class Settings:
     boundary_stitch_ev_weight: float
     boundary_stitch_max_iter: int
 
+    # ---- cross block relaxation ----
+    use_cross_block_relax: bool
+    relax_ev_weight: float
+    relax_ev_radius: float
+    relax_temp: float
+    relax_noise: float
+    relax_bond_weight: float
+
     # ---- A/B compartments ----
     use_compartments: bool
     compartment_weight: float
@@ -615,6 +623,17 @@ class Settings:
         self.boundary_stitch_spring_weight = 1.0
         self.boundary_stitch_ev_weight = 1.0
         self.boundary_stitch_max_iter = 500
+
+        # ---- cross block relaxation ----
+        # After the stitch nothing acts between beads of different blocks. This runs the smooth
+        # kernel over the whole chromosome with excluded volume on every pair and anchors fixed,
+        # so the coils re route around each other. See gnome3d/pipeline/relax.py.
+        self.use_cross_block_relax = False
+        self.relax_ev_weight = 10.0
+        self.relax_ev_radius = 0.0  # 0 = 1.5 times the median bond length
+        self.relax_temp = 0.1  # fraction of max_temp_smooth; a little heat lets coils cross
+        self.relax_noise = 0.5  # step size as a fraction of the median bond length
+        self.relax_bond_weight = 10.0  # chain spring constants during the pass
 
         # ---- A/B compartments ----
         # Block-copolymer segregation over a per-bead compartment call, ported
@@ -1165,6 +1184,16 @@ class Settings:
         self.boundary_stitch_max_iter = geti(
             "boundary_stitch", "max_iter", self.boundary_stitch_max_iter
         )
+
+        # [relax]
+        self.use_cross_block_relax = getb(
+            "relax", "use_cross_block_relax", self.use_cross_block_relax
+        )
+        self.relax_ev_weight = getf("relax", "ev_weight", self.relax_ev_weight)
+        self.relax_ev_radius = getf("relax", "ev_radius", self.relax_ev_radius)
+        self.relax_temp = getf("relax", "temp", self.relax_temp)
+        self.relax_noise = getf("relax", "noise", self.relax_noise)
+        self.relax_bond_weight = getf("relax", "bond_weight", self.relax_bond_weight)
 
         # [compartments]
         self.use_compartments = getb("compartments", "use_compartments", self.use_compartments)

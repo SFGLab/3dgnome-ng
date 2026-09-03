@@ -835,6 +835,29 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference's arcs MC has no chain term either. See
   `design/anchor-placement.md`, option C.
 
+- **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no.**
+  ([gnome3d/pipeline/relax.py](gnome3d/pipeline/relax.py))
+  The smooth stage's excluded volume acts within one block and the stitch guards block
+  centroids only, so once blocks are stitched together nothing acts between their beads and two
+  coils pass through each other. On GM12878 chr1:1-60 Mb the arm that agrees best with Hi-C
+  had 11.9 percent of its beads within one bond of a bead from another block, four times the
+  parity value. This pass runs the smooth kernel once over the whole chromosome, numba or JAX
+  by `mc_executor_smooth`, with excluded volume on every pair and every anchor held fixed, so
+  the arcs and the stitch are kept and only the subanchor coils re route. Bond targets are the
+  bonds as they are.
+
+  Three things it needs to work, each learned on a toy. The excluded volume acts at 1.5 bonds by
+  default so that at equilibrium nothing is left under one bond, where contacts are counted. The
+  chain springs carry their own weight, `bond_weight` (10), since at the smooth stage's 0.1 the
+  excluded volume tears the coil instead of re routing it. And a little temperature, `temp`
+  (0.1 of `max_temp_smooth`), because untangling two coils needs a bead to cross a neighbour's
+  shell and a greedy pass stalls with contacts left. Keys: `ev_weight` (10), `ev_radius` (0 for
+  1.5 bonds), `noise` (0.5 bonds). Runs after the stitch in `reconstruct.py::_assemble`. The
+  gate is `cross_block_contacts`. Unit checks in `harness/test_relax.py`.
+
+  Why not in the reference: the reference has no term across blocks at any stage. See
+  `design/anchor-placement.md`, option E.
+
 ---
 
 ## Correctness Rules

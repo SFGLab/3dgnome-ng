@@ -26,6 +26,7 @@ from gnome3d.pipeline.executor import (
     SerialExecutor,
 )
 from gnome3d.pipeline.ib import ib_chain_nodes, ib_node_id
+from gnome3d.pipeline.relax import relax_blocks
 from gnome3d.pipeline.stage import StageKind
 from gnome3d.pipeline.state import Seeded, Smoothed, State
 from gnome3d.pipeline.stitch import stitch_blocks
@@ -117,6 +118,8 @@ def _assemble(
     for chr_, blocks in per_chr.items():
         if settings.use_boundary_stitch:
             blocks = stitch_blocks(blocks, settings)
+        if settings.use_cross_block_relax:
+            blocks = relax_blocks(blocks, settings)
         out[chr_] = sorted((b for block in blocks for b in block), key=lambda b: b.start)
     return out
 
