@@ -380,11 +380,13 @@ so the islands float where the leash balances the anneal's diffusion, 40 units o
 parity law and 67 under D. Turn the leash off and the parity law grows the same corona. The
 corona is not something D created, it is the island problem D made visible by scaling it.
 
-That corona is where option C, chain bonds between consecutive anchors in the arcs MC, would
-act: it is exactly the term that ties a component to its genomic neighbours. It also reads A
-and D as complementary. A failed alone because it pushed arcless pairs against a flat network;
-D gives the network a gradient for the floor to work with. The D with A arm, floor at weight 1,
-alone and with the stitch, is queued on the same region.
+That corona is where option C, chain bonds between consecutive anchors in the arcs MC, acts: it
+is exactly the term that ties a component to its genomic neighbours.
+
+A on top of D was tried on the same region, floor at weight 1, on the reading that A had failed
+alone only because the network it pushed against was flat. It inflates every bin by 1.3 to 1.4
+over D alone and the exponent falls, 0.241 to 0.225. The floor is a size knob in every
+combination and is not a shape lever. It stays as the clean replacement for the unbounded `1/d`.
 
 The measurement of A points here. The arc target law is the one term that sets the within
 block shape and it is blind to separation. Options, none built. Give `freq_to_distance` a
