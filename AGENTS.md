@@ -783,7 +783,10 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   (0.44, from five models where `beta` over the bond distance held to six percent),
   `genomic_floor_exponent` (0.285, each cell line measured 0.26 to 0.35), `genomic_floor_scale`
   (0, an explicit scale in model units overrides the calibration), `genomic_floor_polish_temp`
-  (0). Unit checks in `harness/test_genomic_floor.py`, including numba against JAX on the initial
+  (0), `genomic_floor_weight` (1). The weight is the floor's own, not the excluded volume
+  term's. At 0.1 the floor cannot stand in for the `1/d` it retires, which reaches 5 at a
+  distance of 0.2, and on chr1:1-60 Mb every within block bin shrank to about half its floor.
+  Unit checks in `harness/test_genomic_floor.py`, including numba against JAX on the initial
   energy.
 
   Why not in the reference: the reference's arcs MC has the same `1/d` for arcless pairs. See
