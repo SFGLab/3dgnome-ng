@@ -212,22 +212,26 @@ unbounded `1/d`, which is the known cause of the small interaction block blow up
 Implemented in `gnome3d/pipeline/stitch.py`, wired into `reconstruct.py::_assemble`, gated on
 `[boundary_stitch] use_boundary_stitch`. Unit checks in `harness/test_stitch.py`.
 
-Measured by applying the pass offline to the finished chr1:1-60 Mb structure at packing factor
-0.75, `playground/stitch_offline.py` then `playground/boundary_wide.py`:
+Measured through the pipeline on the workstation, chr1:1-60 Mb at packing factor 0.75, flag
+off and flag on from the same seed so the two structures differ only by the pass, then
+`playground/boundary_wide.py` on each. The offline application of the pass to the laptop's
+finished structure, `playground/stitch_offline.py`, gave the same answer to within 0.05 in every
+bin.
 
-| separation | jump before | jump after |
+| separation | jump, flag off | jump, flag on |
 |---|---|---|
-| 562 kb to 1 Mb | 58.9 | 0.97 |
-| 1 to 1.78 Mb | 43.6 | 0.97 |
-| 1.78 to 3.16 Mb | 34.5 | 0.90 |
+| 562 kb to 1 Mb | 58.9 | 0.98 |
+| 1 to 1.78 Mb | 43.6 | 0.92 |
+| 1.78 to 3.16 Mb | 34.5 | 0.86 |
 | 3.16 to 5.62 Mb | 22.9 | 0.84 |
-| 5.62 to 10 Mb | 16.3 | 1.09 |
+| 5.62 to 10 Mb | 16.3 | 1.06 |
 
-Cross block exponent 0.183 to 0.770 against within block 0.645, and the whole structure's
-exponent 1.39 to 0.74, so the curve is no longer bimodal. Cross block anchor pairs closer than
-one bond are 1 in 100,000, so blocks do not interpenetrate.
+Cross block exponent 0.183 to 0.750 against within block 0.645, and the whole structure's
+exponent 1.39 to 0.71, so the curve is no longer bimodal. Cross block anchor pairs closer than
+one bond are 1 in 100,000, so blocks do not interpenetrate. The flag off structure reproduces
+the laptop's to 0.1 in Rg, 342.3 against 342.4, so the GPU and CPU paths agree on this region.
 
-Two consequences to know. Rg of the region fell from 342 to 49.5. That is the pass doing its
+Two consequences to know. Rg of the region fell from 342 to 46. That is the pass doing its
 job. It makes a boundary pair look like an interior pair, and interior pairs are collapsed by
 the within block defect, so the collapse now spans the chromosome instead of stopping at each
 block. Option A is what lifts it, and B without A produces a compact structure by design.
@@ -265,7 +269,7 @@ springs and needs a weight balance that A and B do not.
 | cross block exponent, finished | `playground/boundary_wide.py` | 0.017 | 0.183 |
 | within block exponent, 20 kb to 1 Mb | `playground/calibrate_beta.py` | 0.205 | 0.208 |
 | simulated contact probability slope | `playground/calibrate_beta.py` | 0.40 | 0.41 |
-| boundary jump at 562 kb to 1 Mb | `playground/boundary_wide.py` | 33 | 59, stitched 0.97 |
+| boundary jump at 562 kb to 1 Mb | `playground/boundary_wide.py` | 33 | 59, with stitch 0.98 |
 | block layout exponent, coarse | `playground/ib_confine_ablate.py` | 0.021 | 0.214 |
 | enhancer promoter expression | `enhancer3d/playground/beyond_linear.py` | 86 percent of v4 | not yet run |
 | byte exact parity, flag off | see AGENTS.md parity gate | must stay identical | |
