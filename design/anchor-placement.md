@@ -441,8 +441,23 @@ The spokes are gone, the twelve strands left are five units long. The chain bond
 short range back toward the parity values while the long range keeps most of D's lift, so the
 curve steepens past the target on both measures, 0.321 against 0.285 and 1.03 against 0.855,
 where D alone fell short on both. That overshoot is a weight or a target law to tune. The
-undershoot with spokes was a missing term. The stitched arm decides whether the D and stitch
-gates hold.
+undershoot with spokes was a missing term.
+
+`arcs_chain_bond_scale` multiplies the bond target. Swept on the largest block under D:
+
+| scale | block exponent | 3 to 10 kb | 562 kb to 1 Mb | consecutive pairs beyond 3 and 10 times the chain law | median consecutive |
+|---|---|---|---|---|---|
+| D alone | 0.144 | 6.19 | 12.92 | 749 and 274 | 5.87 |
+| 1 | 0.223 | 3.70 | 10.93 | 149 and 0 | 2.79 |
+| 1.5 | 0.183 | 4.56 | 11.40 | 460 and 2 | 3.78 |
+| 2 | 0.165 | 5.08 | 11.88 | 602 and 3 | 4.39 |
+| 3 | 0.144 | 5.88 | 12.39 | 694 and 29 | 5.21 |
+
+The block's own exponent maps onto the region's, D alone 0.144 against 0.241 and scale 1
+0.223 against 0.321, so the region target of 0.285 sits near 0.187 on the block. Scale 1.5 lands
+there with two pairs left beyond ten times the chain law; at 3 the exponent is back at D's and
+the spokes return. 1.5 is the value carried into the production run. The stitched arm decides
+whether the D and stitch gates hold.
 
 ## Validation
 
