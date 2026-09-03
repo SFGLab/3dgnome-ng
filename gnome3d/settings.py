@@ -100,6 +100,9 @@ class Settings:
     count_dist_scale: float
     count_dist_shift: float
     count_dist_base_level: float
+    use_separation_arc_target: bool
+    arc_target_exponent: float
+    arc_target_pivot_kb: float
 
     # ---- spring constants ----
     spring_stretch: float
@@ -441,6 +444,12 @@ class Settings:
         self.count_dist_scale = 20.0
         self.count_dist_shift = 1.0
         self.count_dist_base_level = 0.01
+        # Separation aware arc target. The parity law maps PET count alone, so a 1 Mb arc
+        # with four PETs targets the same distance as a 100 kb one. With the flag the target is
+        # multiplied by max(1, s_kb / pivot)^exponent. See gnome3d/util.py.
+        self.use_separation_arc_target = False
+        self.arc_target_exponent = 0.285
+        self.arc_target_pivot_kb = 10.0
 
         # ---- spring constants ----
         self.spring_stretch = 0.1
@@ -850,6 +859,11 @@ class Settings:
         self.count_dist_base_level = getf(
             "distance", "count_dist_base_level", self.count_dist_base_level
         )
+        self.use_separation_arc_target = getb(
+            "distance", "use_separation_arc_target", self.use_separation_arc_target
+        )
+        self.arc_target_exponent = getf("distance", "arc_target_exponent", self.arc_target_exponent)
+        self.arc_target_pivot_kb = getf("distance", "arc_target_pivot_kb", self.arc_target_pivot_kb)
 
         # [heatmaps]
         self.heatmap_inter_scaling = getf("heatmaps", "inter_scaling", self.heatmap_inter_scaling)
@@ -1324,6 +1338,18 @@ class Settings:
             self.count_dist_scale,
             self.count_dist_shift,
             self.count_dist_base_level,
+        )
+
+    def arc_expected_distance(self, score: int, sep_bp: int) -> float:
+        """The arc target for an arc of `score` PETs spanning `sep_bp`. The parity law when
+        `use_separation_arc_target` is off."""
+        from gnome3d.util import arc_target_with_separation
+
+        base = self.freq_to_distance(score)
+        if not self.use_separation_arc_target:
+            return base
+        return arc_target_with_separation(
+            base, sep_bp, self.arc_target_pivot_kb, self.arc_target_exponent
         )
 
     def data_path(self, filename: str) -> str:

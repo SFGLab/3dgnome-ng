@@ -323,7 +323,11 @@ are placed, adjusting each block rigidly to satisfy its edge bonds while leaving
 arrangement the arcs MC produced untouched. That is the same pass A wants for measuring
 `d_bond`, so the two share a stage.
 
-### D. Separation aware arc targets
+### D. Separation aware arc targets. Built, opt in, not yet measured
+
+Implemented as `util.arc_target_with_separation`, `Settings.arc_expected_distance` and
+`build.arc_expected_matrix`, gated on `[distance] use_separation_arc_target`, multiplicative above
+a 10 kb pivot. Unit checks in `harness/test_arc_target.py`.
 
 The measurement of A points here. The arc target law is the one term that sets the within
 block shape and it is blind to separation. Options, none built. Give `freq_to_distance` a

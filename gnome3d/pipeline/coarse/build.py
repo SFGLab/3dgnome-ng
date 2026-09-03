@@ -388,6 +388,27 @@ def add_long_pet_to_segment_heatmap(
         LOG.info("long-PET folded into segment heatmap: %d arcs", n_added)
 
 
+def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int, int]]) -> F64Array:
+    """The arc target matrix for one active region. -1 marks an arcless pair, 0 the diagonal,
+    and an arc pair carries `Settings.arc_expected_distance` of its PET count and span.
+
+    Parameters
+    ----------
+    mids
+        Genomic midpoint in bp per anchor, in active region order.
+    arcs
+        (i, j, score) per arc in active region indices.
+    """
+    n = len(mids)
+    mat: F64Array = np.full((n, n), -1.0, dtype=np.float64)
+    np.fill_diagonal(mat, 0.0)
+    for i, j, score in arcs:
+        exp_d = s.arc_expected_distance(score, mids[j] - mids[i])
+        mat[i, j] = exp_d
+        mat[j, i] = exp_d
+    return mat
+
+
 def calc_anchor_expected_distances(
     state: CoarseState,
     active_region: list[int],
@@ -410,12 +431,10 @@ def calc_anchor_expected_distances(
     s = state.s
     clusters = state.clusters
     n = len(active_region)
-    mat: F64Array = np.full((n, n), -1.0, dtype=np.float64)
-    np.fill_diagonal(mat, 0.0)
-
     cluster_to_active = {ci: ai for ai, ci in enumerate(active_region)}
     chr_arcs = state.arcs.get(chr_, [])
 
+    arcs: list[tuple[int, int, int]] = []
     for ai, ci in enumerate(active_region):
         for arc_local in clusters[ci].arcs:
             if arc_local >= len(chr_arcs):
@@ -426,10 +445,9 @@ def calc_anchor_expected_distances(
             if other < ci or other not in cluster_to_active:
                 continue
 
-            bi = cluster_to_active[other]
-            exp_d = s.freq_to_distance(arc.score)
-            mat[ai, bi] = exp_d
-            mat[bi, ai] = exp_d
+            arcs.append((ai, cluster_to_active[other], int(arc.score)))
+    mids = [int(clusters[ci].genomic_pos) for ci in active_region]
+    mat = arc_expected_matrix(s, mids, arcs)
 
     # Apply anchor heatmap: scale down expected distances for high-contact pairs.
     # Mirrors Reference post-processing in calcAnchorExpectedDistancesHeatmap().

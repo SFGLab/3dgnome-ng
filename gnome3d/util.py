@@ -53,6 +53,15 @@ def freq_to_dist_heatmap_inter(freq: float, scale_inter: float, power_inter: flo
     return scale_inter * (freq**power_inter)
 
 
+def arc_target_with_separation(base: float, sep_bp: int, pivot_kb: float, nu: float) -> float:
+    """The separation aware arc target. `base` is the PET only target, multiplied by the polymer
+    background factor `(s_kb / pivot_kb)^nu` above the pivot span and left alone below it."""
+    s_kb = abs(int(sep_bp)) / 1000.0
+    if s_kb <= pivot_kb or nu == 0.0:
+        return base
+    return base * (s_kb / pivot_kb) ** nu
+
+
 def freq_to_distance(freq: int, a: float, scale: float, shift: float, base_level: float) -> float:
     """Reference: freqToDistance(freq) = base_level + scale / exp(a * (freq + shift))"""
     try:

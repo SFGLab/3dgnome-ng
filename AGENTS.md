@@ -792,6 +792,27 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference's arcs MC has the same `1/d` for arcless pairs. See
   `design/anchor-placement.md`.
 
+- **Separation aware arc target: `[distance] use_separation_arc_target = yes`, default no.**
+  ([gnome3d/util.py](gnome3d/util.py) `arc_target_with_separation`,
+  [settings.py](gnome3d/settings.py) `arc_expected_distance`,
+  [pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `arc_expected_matrix`)
+  The parity arc target is `freq_to_distance(PET)`, a function of PET count alone, so on
+  GM12878 chr1:1-60 Mb a 1 Mb arc with four PETs targets 0.36 while the chain law says 90, and
+  every arc lands in 0.20 to 0.56 whatever its span. Arcs are realised at 2.6 to 3.2 times
+  their target in every span bin, the equilibrium of a network of near equal links, and that
+  network is what sets the within block distance exponent, 0.21 against 0.285 from Hi-C. The
+  genomic floor on the pairs that are not links could only inflate or deflate that network.
+
+  With the flag the target is `freq_to_distance(PET) * max(1, s_kb / pivot)^exponent`, the PET
+  law times the polymer background above a pivot span, and unchanged below it. PET ordering is
+  kept at every span, so a strong long arc still targets shorter than a weak one. Keys:
+  `arc_target_exponent` (0.285, the contact probability curve), `arc_target_pivot_kb` (10, the
+  short end the PET law was tuned at). One site: the matrix builder; no kernel is touched. Unit
+  checks in `harness/test_arc_target.py`.
+
+  Why not in the reference: the reference's `freqToDistance` is the PET only law. See
+  `design/anchor-placement.md`, option D.
+
 ---
 
 ## Correctness Rules
