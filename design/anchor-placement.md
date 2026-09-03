@@ -347,9 +347,30 @@ block exponent moves 0.208 to 0.241 and the contact probability slope 0.41 to 0.
 the network's own change, because the arcless majority still sits at the flat `1/d` equilibrium
 and is inflated uniformly, 3.19 to 5.75 at 3 to 5 kb and 6.89 to 13.18 at 0.5 to 1 Mb.
 
-That reads A and D as complementary. A failed alone because it pushed arcless pairs against a
-flat network; D gives the network a gradient for the floor to work with. The D with A arm, floor
-at weight 1, alone and with the stitch, is queued on the same region.
+With the stitch, D is the first arm that moves every gate the right way at once:
+
+| arm | jump at 562 kb to 1 Mb | Rg | overlapping block pairs | within block exponent | P(s) slope |
+|---|---|---|---|---|---|
+| stitch alone | 0.98 | 46 | 8 | 0.207 | 0.41 |
+| D and stitch | 0.95 | 56 | 5 | 0.240 | 0.50 |
+
+Rg rises because blocks are larger, block Rg median 7.7 to 10.4, and fewer of them overlap when
+stitched. The cost is a corona. Under D, 342 anchors sit more than 50 units from their block
+centroid where the parity law leaves none, and the largest block's radius of gyration goes 24
+to 41. Those anchors are not dangling, their arcs are intra block and realised at 1.3 times
+target. They are whole sub networks. The two largest blocks hold 66 and 48 arc graph connected
+components, and the components outside the largest sit about 40 units from the block centroid
+under the parity law and about 67 under D. Nothing in the arcs MC joins one component to
+another except the `1/d` repulsion, which is cut off beyond three times the mean arc target,
+so their radius is not set by any term that knows the genome. The arcs step size is a constant,
+so D does not change the anneal's reach. What does set that radius is under measurement, on the
+largest block offline, with the arcs level confinement on and off.
+
+That corona is where option C, chain bonds between consecutive anchors in the arcs MC, would
+act: it is exactly the term that ties a component to its genomic neighbours. It also reads A
+and D as complementary. A failed alone because it pushed arcless pairs against a flat network;
+D gives the network a gradient for the floor to work with. The D with A arm, floor at weight 1,
+alone and with the stitch, is queued on the same region.
 
 The measurement of A points here. The arc target law is the one term that sets the within
 block shape and it is blind to separation. Options, none built. Give `freq_to_distance` a
