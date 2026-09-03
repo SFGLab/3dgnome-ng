@@ -46,6 +46,7 @@ CANONICAL: dict[str, dict[str, object]] = {
         "max_subanchors_per_arc": 100,
     },
     "distance": {
+        "use_separation_arc_target": "yes",
         "genomic_dist_power": 0.75,
         "genomic_dist_scale": 0.5,
         "genomic_dist_base": 1.0,
@@ -70,6 +71,8 @@ CANONICAL: dict[str, dict[str, object]] = {
     },
     "heatmaps": {"inter_scaling": 1.0, "distance_heatmap_stretching": 2.5},
     "springs": {
+        "use_arcs_chain_bonds": "yes",
+        "arcs_chain_bond_scale": 1.5,
         "stretch_constant": 0.1,
         "squeeze_constant": 0.1,
         "angular_constant": 0.1,
@@ -152,6 +155,7 @@ CANONICAL: dict[str, dict[str, object]] = {
         "apply_to_ib": "yes",
         "packing_factor_ib": 0.75,
     },
+    "boundary_stitch": {"use_boundary_stitch": "yes"},
     "small_ib_boost": {"use_small_ib_boost": "no"},
 }
 
