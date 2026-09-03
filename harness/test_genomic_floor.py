@@ -304,6 +304,41 @@ def test_stage_two_pass_jax() -> None:
     _floor_checks("jax", on, floor, n)
 
 
+def test_floor_weight() -> None:
+    print("\n[weight] the floor carries its own weight, not the excluded volume term's")
+    gen, exp, start = _chain_toy()
+    n = len(gen)
+    d = lambda p, i, j: float(np.linalg.norm(p[i] - p[j]))  # noqa: E731
+
+    def run(weight: float) -> np.ndarray:
+        s = _toy_settings(True)
+        s.exclusion_weight = 0.01  # the EV term's weight, which must not be the floor's
+        s.genomic_floor_weight = weight
+        # floors the arc chain cannot fully reach, so the weight decides how far they win
+        s.genomic_floor_scale = 0.2
+        problem = {
+            "anchor_pos": start,
+            "exp_dist": exp,
+            "step_size": 0.1,
+            "settings": s,
+            "seed": 11,
+            "anchor_genomic": gen,
+        }
+        from gnome3d.pipeline.ib.arcs import _run
+
+        return np.asarray(_run(problem)[1])
+
+    weak = run(0.01)
+    strong = run(5.0)
+    pairs = [(i, j) for i in range(n) for j in range(i + 2, n)]
+    check(
+        "a heavier floor lifts arcless pairs further than the EV weight alone would",
+        np.median([d(strong, i, j) for i, j in pairs])
+        > 1.2 * np.median([d(weak, i, j) for i, j in pairs]),
+        f"median arcless d: weight 0.01 {np.median([d(weak, i, j) for i, j in pairs]):.3f}, weight 5 {np.median([d(strong, i, j) for i, j in pairs]):.3f}",
+    )
+
+
 def test_jax_agrees() -> None:
     from gnome3d.mc.jax.util import jax_is_available
 
@@ -354,6 +389,7 @@ def main() -> int:
     test_arcs_driver()
     test_stage_two_pass()
     test_stage_two_pass_jax()
+    test_floor_weight()
     test_jax_agrees()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:

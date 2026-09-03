@@ -1064,7 +1064,11 @@ def _mc_arcs_jax_batch_chunk(
         bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
     )
     use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_arcs)
-    excl_w_v = float(settings.exclusion_weight) if use_excl else 0.0
+    excl_w_v = (
+        float(settings.genomic_floor_weight)
+        if use_mat
+        else (float(settings.exclusion_weight) if use_excl else 0.0)
+    )
     conf_w_v = float(settings.confinement_weight) if use_conf else 0.0
     stretch_v = float(settings.spring_stretch_arcs)
     squeeze_v = float(settings.spring_squeeze_arcs)

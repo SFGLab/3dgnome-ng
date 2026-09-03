@@ -241,6 +241,7 @@ class Settings:
     genomic_floor_exponent: float
     genomic_floor_scale: float
     genomic_floor_polish_temp: float
+    genomic_floor_weight: float
 
     # ---- IB-level MC pass (chain bonds + EV between IB centroids) ----
     # IB MC is a peer stage to smooth/arcs/heatmap, not a sub-mode of smooth.
@@ -539,6 +540,10 @@ class Settings:
         # polish of the first anneal, so it must not re-heat the structure. Zero accepts
         # only moves that do not raise the score.
         self.genomic_floor_polish_temp = 0.0
+        # The floor's own weight. It replaces the 1/d repulsion, which reaches 5 at a distance
+        # of 0.2, so it cannot ride the excluded volume term's 0.1: at that weight the whole
+        # block collapsed to half its floor on chr1:1-60Mb.
+        self.genomic_floor_weight = 1.0
 
         # ---- IB-level MC pass ----
         # When enabled, each segment runs a small chain-spring + EV MC pass over
@@ -1062,6 +1067,9 @@ class Settings:
         )
         self.genomic_floor_polish_temp = getf(
             "excluded_volume", "genomic_floor_polish_temp", self.genomic_floor_polish_temp
+        )
+        self.genomic_floor_weight = getf(
+            "excluded_volume", "genomic_floor_weight", self.genomic_floor_weight
         )
 
         # [simulation_ib]

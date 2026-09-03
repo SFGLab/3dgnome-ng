@@ -99,7 +99,7 @@ def mc_arcs_numba(
 
     movable: I64Array = np.arange(n, dtype=np.int64)
     score_struct = float(init_arcs_nb(pw, exp64, stretch_k, squeeze_k, rep_inv_cutoff))
-    excl_w = float(settings.exclusion_weight)
+    excl_w = float(settings.genomic_floor_weight if use_floor else settings.exclusion_weight)
     excl_skip = int(settings.exclusion_skip_neighbors)
     if use_floor:
         score_excl = float(init_excl_mat_nb(pw, floor64, excl_w, excl_skip))

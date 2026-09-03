@@ -186,8 +186,28 @@ relaxes into a free coil. That is the fuzz on each ball rather than a clean path
 ### A. Excluded volume floor that grows with genomic separation. Built, opt in
 
 Implemented in `gnome3d/pipeline/ib/floor.py`, the arcs stage and both arcs kernels, gated on
-`[excluded_volume] use_genomic_floor`. Unit checks in `harness/test_genomic_floor.py`. Not yet
-measured on a real structure.
+`[excluded_volume] use_genomic_floor`. Unit checks in `harness/test_genomic_floor.py`.
+
+First measurement, chr1:1-60 Mb on the workstation, same seed as the stitch runs, with the floor
+riding the excluded volume term's weight of 0.1. It failed, and the reason is the weight.
+
+| arm | within block exponent | block Rg median | Rg | jump at 562 kb to 1 Mb | overlapping block pairs |
+|---|---|---|---|---|---|
+| off | 0.208 | 7.7 | 342 | 58.9 | 1 |
+| floor | 0.267 | 7.2 | 342 | 84.9 | 1 |
+| floor and stitch | 0.266 | 7.2 | 36 | 0.86 | 13 |
+
+The exponent moved toward 0.285 as designed, but every within block bin got smaller, 3.19 to
+1.86 at 3 to 5 kb and 6.89 to 4.88 at 0.5 to 1 Mb, so the exponent rose only because short
+range shrank faster than long range. Pairs sat at about half their floor. The floor retires the
+`1/d` repulsion, which reaches 5 at a distance of 0.2 and was the term actually holding each
+ball at 3.2, and replaced it with a quadratic at a tenth of the arcs' weight, which cannot hold
+anything against springs saturated at 0.2. Stitching onto that shrunken interior curve then
+packed the blocks into 13 overlapping pairs, worse than the stitch alone.
+
+The floor now carries its own weight, `genomic_floor_weight`, default 1. The value is decided by
+a sweep on the same region, floor alone at 1 and 10, judged on the within block bins rising
+rather than falling, on block Rg, and on the overlap count once the stitch is added.
 
 For pairs with no arc, replace the constant `exclusion_radius_arcs` with a floor
 `r0(s) = beta * (s / 1000)^nu`. Keep it a floor rather than a spring. Arcs must still be able to
