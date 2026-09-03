@@ -397,6 +397,16 @@ Either is a change to the parity era law and must be opt in. Calibration would f
 route as A, the contact probability curve for the exponent and a bond scale for the prefactor,
 and the gate is the same within block exponent that A failed.
 
+### E. Excluded volume across blocks after the stitch. Not built
+
+Once blocks are stitched, their coils interpenetrate because no term acts between beads of
+different blocks. A relaxation pass over the whole chromosome with the smooth stage's excluded
+volume on every pair, anchors held fixed so the arcs and the stitch are kept and only the
+subanchor coils re route, is the direct fix. The smooth kernels exist; the cost is the excluded
+volume scan over the whole chromosome per move, which needs a neighbour list at genome scale.
+Making the stitch itself bead aware would only move rigid blocks and cannot untangle coils that
+have to touch at their edges.
+
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
 The most direct statement of the missing constraint. It was left last because it competes with
@@ -491,6 +501,23 @@ was, D lifts every Hi-C measure, and C lifts it again, most on the MultiMM Pears
 is the result. The distance exponent of the stitched arms mixes cross block pairs into an
 anchors only fit and is not the within block number above. The contact probability exponent at
 this radius stays far from the Hi-C value of -0.86 in every arm.
+
+Self collision. After the stitch nothing acts between the beads of different blocks, the
+smooth stage's excluded volume being per block and the stitch guarding centroids only, so two
+coils can pass through each other. Beads with a bead of another block within one bond length,
+on all 42480 beads with a spatial index:
+
+| arm | cross block bead pairs within a bond | beads touched |
+|---|---|---|
+| parity | 5,765 | 3.3 percent |
+| stitch | 14,037 | 9.6 percent |
+| D and stitch | 6,469 | 8.0 percent |
+| D, C and stitch | 21,640 | 11.9 percent |
+
+The arm that agrees best with Hi-C is the most interpenetrated, four times the parity value,
+and at genome scale the same mechanism lets chromosomes pass through each other. This is a gate
+from here on, and the fix is a term, not a weight: excluded volume across blocks after the
+stitch, option E.
 
 | gate | tool | at 0.15 | at 0.75 |
 |---|---|---|---|
