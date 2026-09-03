@@ -150,7 +150,7 @@ CANONICAL: dict[str, dict[str, object]] = {
         "apply_to_arcs": "yes",
         "apply_to_smooth": "yes",
         "apply_to_ib": "yes",
-        "packing_factor_ib": 0.15,
+        "packing_factor_ib": 0.75,
     },
     "small_ib_boost": {"use_small_ib_boost": "no"},
 }
