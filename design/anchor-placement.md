@@ -498,8 +498,26 @@ With the stitch, at scale 1 on the region:
 
 The spokes go from 56 to 11 and Rg holds. Two small regressions come with it, overlapping pairs
 5 to 7 and the jump 0.95 to 0.76, the stitch now pulling boundary pairs a little inside the
-interior curve, and the exponent is the scale 1 overshoot. Scale 1.5 on the production base,
-Hi-C singletons and the JAX arcs kernel, is the arm that decides.
+interior curve, and the exponent is the scale 1 overshoot.
+
+Scale 1.5 on the production base, Hi-C singletons and the JAX arcs kernel, with D, C and the
+stitch, on the same region:
+
+| | D, C and stitch, ChIA-PET base, scale 1 | tuned, production base, scale 1.5 |
+|---|---|---|
+| boundary realised over target, median and worst | 1.33 and 2.64 | 1.04 and 1.20 |
+| straight strands | 11 | 12 |
+| overlapping block pairs | 7 | 9 |
+| cross block bead contacts, beads touched | 21,641, 11.9 percent | 27,900, 16.4 percent |
+| Rg | 58 | 33 |
+| contact probability slope | 1.03 | 0.71 |
+| Hi-C SCC, Pearson, MultiMM Pearson | 0.091, 0.196, 0.293 | 0.085, 0.183, 0.310 |
+
+Scale 1.5 closes every boundary to within 20 percent, where scale 1 over pulled. The
+production base is more compact and more interpenetrated, 16.4 percent of beads touching
+another block, which is the case for option E. Its within block exponent and Hi-C numbers need
+the production base's own parity arm before they can be read, since every earlier arm ran on
+the ChIA-PET base; that arm is running.
 
 ## Validation
 
