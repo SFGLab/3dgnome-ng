@@ -308,7 +308,11 @@ Hi-C. The jump should approach 1.
 2. Widen the boundary measurement. Done, and it split the problem into three.
 3. Packing factor. Changed to 0.75, confirmed end to end. Decide 0.75 against 1.0 on a many
    block segment.
-4. Build the post placement pass that A and B share, with B first since it is one spring per
-   boundary and independent of `nu`.
-5. Build A in that pass.
-6. Only then consider C.
+4. B, the boundary stitch. Built and measured through the pipeline, jump 58.9 to 0.98.
+5. A, the genomic floor. Built. Measured on chr1:1-60 Mb on the workstation, floor alone and
+   floor with the stitch, against the flag off structure from the same seed. The gates are the
+   within block exponent, the simulated contact probability slope, Rg with the stitch on, and
+   the block overlap count.
+6. Decide, on those numbers, whether the existing ensembles and the running trio array are
+   regenerated with both flags on.
+7. Only then consider C.
