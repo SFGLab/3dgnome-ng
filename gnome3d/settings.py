@@ -110,6 +110,7 @@ class Settings:
     spring_angular: float
     spring_stretch_arcs: float
     spring_squeeze_arcs: float
+    use_arcs_chain_bonds: bool
 
     # ---- simulation steps ----
     steps_lvl1: int
@@ -457,6 +458,11 @@ class Settings:
         self.spring_angular = 0.1
         self.spring_stretch_arcs = 1.0
         self.spring_squeeze_arcs = 1.0
+        # Chain bonds in the arcs MC. Consecutive anchors with no arc between them get a
+        # spring at genomic_length_to_distance of their gap, so an island of anchors joined
+        # only among themselves is tied to its genomic neighbours instead of floating out to
+        # the confinement leash. Same spring constants as the arcs.
+        self.use_arcs_chain_bonds = False
 
         # ---- simulation steps ----
         self.steps_lvl1 = 2
@@ -880,6 +886,9 @@ class Settings:
         )
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs
+        )
+        self.use_arcs_chain_bonds = getb(
+            "springs", "use_arcs_chain_bonds", self.use_arcs_chain_bonds
         )
         self.spring_stretch_ib = getf("springs", "stretch_constant_ib", self.spring_stretch_ib)
         self.spring_squeeze_ib = getf("springs", "squeeze_constant_ib", self.spring_squeeze_ib)

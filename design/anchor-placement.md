@@ -395,10 +395,16 @@ Either is a change to the parity era law and must be opt in. Calibration would f
 route as A, the contact probability curve for the exponent and a bond scale for the prefactor,
 and the gate is the same within block exponent that A failed.
 
-### C. Chain bonds between consecutive anchors in the arcs MC
+### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
-The most direct statement of the missing constraint. Left last because it competes with the arc
-springs and needs a weight balance that A and B do not.
+The most direct statement of the missing constraint. It was left last because it competes with
+the arc springs, and under D the arcs target sensible distances so that competition is the right
+one. Implemented as `build.add_chain_bonds`, consecutive arcless pairs entered into the arcs
+target matrix at `genomic_length_to_distance` of their gap after the heatmap scaling, arc pairs
+kept, gated on `[springs] use_arcs_chain_bonds`. Same spring constants as the arcs; a separate
+weight would need a per pair weight in the kernels. Unit checks in `harness/test_arc_target.py`.
+The gate is the corona, anchors beyond 50 units from the block centroid and the largest block's
+radius, with the D and stitch gates not regressing.
 
 ## Validation
 

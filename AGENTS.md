@@ -813,6 +813,25 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference's `freqToDistance` is the PET only law. See
   `design/anchor-placement.md`, option D.
 
+- **Chain bonds in the arcs MC: `[springs] use_arcs_chain_bonds = yes`, default no.**
+  ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `add_chain_bonds`)
+  The arcs MC has no term between genomic neighbours. Inside a block the arc graph falls into
+  islands, 66 and 48 of them in the two largest blocks of GM12878 chr1:1-60 Mb, and an island is
+  held by nothing but the arcs level confinement leash, so it floats out to where the leash
+  balances the anneal, 40 units from the block centroid under the parity law and 67 under the
+  separation aware target. The smooth stage then strings subanchors between a core anchor and
+  an island anchor as a taut spoke.
+
+  With the flag every consecutive anchor pair with no arc gets a spring at
+  `genomic_length_to_distance` of its gap, the rule the smooth stage already holds consecutive
+  beads to, entered into the arcs target matrix after the anchor heatmap scaling so Hi-C
+  contact between neighbours does not shrink it. A pair that already has an arc keeps the arc.
+  The bond carries the arcs spring constants; a separate weight needs a per pair weight in the
+  kernels and is not built. No kernel is touched. Unit checks in `harness/test_arc_target.py`.
+
+  Why not in the reference: the reference's arcs MC has no chain term either. See
+  `design/anchor-placement.md`, option C.
+
 ---
 
 ## Correctness Rules

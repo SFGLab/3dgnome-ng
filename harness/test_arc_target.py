@@ -113,11 +113,44 @@ def test_matrix() -> None:
     check("symmetric", np.array_equal(on, on.T))
 
 
+def test_chain_bonds() -> None:
+    print("\n[chain] consecutive anchors get the chain law when they have no arc")
+    from gnome3d.pipeline.coarse.build import add_chain_bonds, arc_expected_matrix
+
+    s = Settings()
+    mids = [0, 500, 1_500, 120_000, 121_000]
+    arcs = [(0, 2, 10), (3, 4, 5)]  # 0-2 skips 1; 3-4 is a consecutive pair WITH an arc
+    base = arc_expected_matrix(s, mids, arcs)
+    off = add_chain_bonds(base, mids, s)
+    check("flag off returns the matrix unchanged", np.array_equal(off, base))
+    s.use_arcs_chain_bonds = True
+    on = add_chain_bonds(base, mids, s)
+    gld = s.genomic_length_to_distance
+    check(
+        "consecutive arcless pair gets gld(gap)",
+        abs(on[0, 1] - gld(500)) < 1e-12 and abs(on[1, 2] - gld(1_000)) < 1e-12,
+        f"{on[0, 1]:.3f}, {on[1, 2]:.3f}",
+    )
+    check(
+        "the island boundary pair gets its long bond",
+        abs(on[2, 3] - gld(118_500)) < 1e-12,
+        f"{on[2, 3]:.2f}",
+    )
+    check("consecutive pair with an arc keeps the arc", on[3, 4] == base[3, 4])
+    check("non consecutive arcless pairs stay repulsive", on[0, 3] == -1.0 and on[1, 4] == -1.0)
+    check(
+        "arc pairs untouched, symmetric, input not mutated",
+        on[0, 2] == base[0, 2] and np.array_equal(on, on.T) and base[0, 1] == -1.0,
+    )
+    check("default is off", Settings().use_arcs_chain_bonds is False)
+
+
 def main() -> int:
     print("separation aware arc target checks")
     test_helper()
     test_settings()
     test_matrix()
+    test_chain_bonds()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")
