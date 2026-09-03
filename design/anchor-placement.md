@@ -456,8 +456,20 @@ undershoot with spokes was a missing term.
 The block's own exponent maps onto the region's, D alone 0.144 against 0.241 and scale 1
 0.223 against 0.321, so the region target of 0.285 sits near 0.187 on the block. Scale 1.5 lands
 there with two pairs left beyond ten times the chain law; at 3 the exponent is back at D's and
-the spokes return. 1.5 is the value carried into the production run. The stitched arm decides
-whether the D and stitch gates hold.
+the spokes return. 1.5 is the value carried into the production run.
+
+With the stitch, at scale 1 on the region:
+
+| arm | straight strands | jump at 562 kb to 1 Mb | Rg | overlapping block pairs | block Rg max | within block exponent |
+|---|---|---|---|---|---|---|
+| stitch alone | 34 | 0.98 | 46 | 8 | 24.5 | 0.207 |
+| D and stitch | 56 | 0.95 | 56 | 5 | 41.3 | 0.240 |
+| D, C and stitch | 11 | 0.76 | 58 | 7 | 39.4 | 0.320 |
+
+The spokes go from 56 to 11 and Rg holds. Two small regressions come with it, overlapping pairs
+5 to 7 and the jump 0.95 to 0.76, the stitch now pulling boundary pairs a little inside the
+interior curve, and the exponent is the scale 1 overshoot. Scale 1.5 on the production base,
+Hi-C singletons and the JAX arcs kernel, is the arm that decides.
 
 ## Validation
 
