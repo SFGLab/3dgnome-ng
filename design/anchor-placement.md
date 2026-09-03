@@ -323,11 +323,33 @@ are placed, adjusting each block rigidly to satisfy its edge bonds while leaving
 arrangement the arcs MC produced untouched. That is the same pass A wants for measuring
 `d_bond`, so the two share a stage.
 
-### D. Separation aware arc targets. Built, opt in, not yet measured
+### D. Separation aware arc targets. Built, opt in, measured alone
 
 Implemented as `util.arc_target_with_separation`, `Settings.arc_expected_distance` and
 `build.arc_expected_matrix`, gated on `[distance] use_separation_arc_target`, multiplicative above
 a 10 kb pivot. Unit checks in `harness/test_arc_target.py`.
+
+Measured alone on chr1:1-60 Mb, same seed and executor as every other arm:
+
+| arcs by span | 10 to 30 kb | 30 to 100 kb | 100 to 300 kb | 300 kb to 1 Mb |
+|---|---|---|---|---|
+| target, parity law | 0.22 | 0.23 | 0.27 | 0.36 |
+| target, D | 0.27 | 0.39 | 0.65 | 1.00 |
+| realised, parity | 0.67 | 0.68 | 0.82 | 1.00 |
+| realised, D | 0.56 | 0.86 | 1.52 | 2.50 |
+| realised over target, parity | 2.60 | 2.55 | 2.88 | 3.16 |
+| realised over target, D | 1.85 | 1.99 | 2.35 | 2.62 |
+
+The arc network gains the separation gradient it lacked. Realised arc distance runs 0.56 to
+2.50 across 10 kb to 1 Mb where the parity law gave 0.67 to 1.00, arcs sit closer to their
+targets in every bin, and the sub pivot arcs tighten rather than loosen. The all pairs within
+block exponent moves 0.208 to 0.241 and the contact probability slope 0.41 to 0.50, less than
+the network's own change, because the arcless majority still sits at the flat `1/d` equilibrium
+and is inflated uniformly, 3.19 to 5.75 at 3 to 5 kb and 6.89 to 13.18 at 0.5 to 1 Mb.
+
+That reads A and D as complementary. A failed alone because it pushed arcless pairs against a
+flat network; D gives the network a gradient for the floor to work with. The D with A arm, floor
+at weight 1, alone and with the stitch, is queued on the same region.
 
 The measurement of A points here. The arc target law is the one term that sets the within
 block shape and it is blind to separation. Options, none built. Give `freq_to_distance` a
