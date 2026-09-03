@@ -473,6 +473,25 @@ Hi-C singletons and the JAX arcs kernel, is the arm that decides.
 
 ## Validation
 
+Against the cell line's own Hi-C, GM12878 4DN mcool at 25 kb on chr1:1-60 Mb, anchors of one
+structure, contact radius 5 model units, with the validation package's metrics:
+
+| arm | SCC | Pearson | insulation | MultiMM Pearson | contact probability exponent | distance exponent |
+|---|---|---|---|---|---|---|
+| parity | 0.070 | 0.160 | 0.240 | 0.239 | -0.33 | 0.23 |
+| stitch | 0.070 | 0.159 | 0.244 | 0.242 | -0.50 | 0.13 |
+| D and stitch | 0.087 | 0.187 | 0.264 | 0.242 | -0.55 | 0.12 |
+| D, C and stitch | 0.091 | 0.196 | 0.284 | 0.293 | -0.40 | 0.20 |
+| D alone | 0.087 | 0.187 | 0.264 | 0.245 | -0.42 | 0.20 |
+| D and C alone | 0.092 | 0.198 | 0.286 | 0.298 | -0.34 | 0.30 |
+
+The ordering matches the geometry. The stitch moves blocks and leaves Hi-C agreement where it
+was, D lifts every Hi-C measure, and C lifts it again, most on the MultiMM Pearson, 0.24 to
+0.29. These are single structure numbers at 25 kb, so the magnitudes are low and the ordering
+is the result. The distance exponent of the stitched arms mixes cross block pairs into an
+anchors only fit and is not the within block number above. The contact probability exponent at
+this radius stays far from the Hi-C value of -0.86 in every arm.
+
 | gate | tool | at 0.15 | at 0.75 |
 |---|---|---|---|
 | cross block exponent, finished | `playground/boundary_wide.py` | 0.017 | 0.183 |
