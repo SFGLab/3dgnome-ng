@@ -421,8 +421,28 @@ under D with and without C:
 C removes the spokes. No consecutive pair is left more than ten times the chain law apart,
 where D alone had 274, so no subanchor strand is drawn taut. The small islands come home and the
 large ones stay at the block's edge, now reached by satisfied chains rather than lines. Arcs are
-as satisfied as under D alone, realised over target 2.28 in both. The region run with the
-stitch follows, with the D and stitch gates not to regress.
+as satisfied as under D alone, realised over target 2.28 in both.
+
+On the region, D with C alone, same seed and executor as every other arm:
+
+| | off | D | D and C |
+|---|---|---|---|
+| straight subanchor strands, chord over contour above 0.9 | 35 | 57 | 12 |
+| median 3D length of those strands | 41 | 68 | 4.9 |
+| consecutive pairs more than 10 times the chain law apart | | 574 | 0 |
+| median consecutive arcless distance | 3.18 | 5.35 | 2.73 |
+| within block, 3 to 5 kb | 3.19 | 5.75 | 3.73 |
+| within block, 562 kb to 1 Mb | 6.89 | 13.18 | 11.34 |
+| within block exponent, 20 kb to 1 Mb | 0.208 | 0.241 | 0.321 |
+| simulated contact probability slope | 0.41 | 0.50 | 1.03 |
+| arcs realised over target, 10 to 30 kb and 300 kb to 1 Mb | 2.60 and 3.16 | 1.85 and 2.62 | 1.80 and 2.92 |
+
+The spokes are gone, the twelve strands left are five units long. The chain bonds pull the
+short range back toward the parity values while the long range keeps most of D's lift, so the
+curve steepens past the target on both measures, 0.321 against 0.285 and 1.03 against 0.855,
+where D alone fell short on both. That overshoot is a weight or a target law to tune. The
+undershoot with spokes was a missing term. The stitched arm decides whether the D and stitch
+gates hold.
 
 ## Validation
 
