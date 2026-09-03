@@ -9,9 +9,10 @@ the arcs and smooth results are untouched.
 
 The pass runs after all chains of a chromosome are done, on the calling thread, with no RNG.
 Two terms are minimised over one rotation and one translation per block. A two sided spring
-per boundary, and a soft excluded volume between block centroids at the interaction block
-radius the run already derives, so closing a boundary cannot fold a block onto a neighbour it
-shares no edge with. See [[project_ib_packing_factor]] for why there is no chain bond and no
+per boundary, and a soft excluded volume between block centroids with a radius per pair of
+the two blocks' radii of gyration added, so closing a boundary cannot fold a block onto a
+neighbour it shares no edge with. `exclusion_radius_ib`, when positive, replaces that with one
+constant radius for every pair. See [[project_ib_packing_factor]] for why there is no chain bond and no
 confinement here.
 """
 
@@ -97,16 +98,6 @@ def within_block_curve(
     return curve
 
 
-def _ib_radius(s: Settings, gm: F64Array) -> float:
-    """The interaction block excluded volume radius, derived as `ib_mc_refine` derives it."""
-    if s.exclusion_radius_ib > 0.0:
-        return float(s.exclusion_radius_ib)
-    if gm.size < 2:
-        return 0.0
-    dtn = [s.genomic_length_to_distance(int(abs(gm[i + 1] - gm[i]))) for i in range(gm.size - 1)]
-    return float(s.exclusion_auto_factor_ib * np.mean(dtn))
-
-
 def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]]:
     """Return the blocks with each one moved rigidly so boundary pairs sit on the interior
     curve. Blocks without anchors pass through untouched and do not take part in the chain.
@@ -119,8 +110,7 @@ def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut
         One chromosome's per block bead lists, in any order. Chain order is taken from each
         block's first anchor midpoint.
     s
-        Settings. Reads the `boundary_stitch_*` weights and the interaction block radius
-        fields.
+        Settings. Reads the `boundary_stitch_*` weights and `exclusion_radius_ib`.
     """
     active = [k for k, b in enumerate(blocks) if _anchor_index(b).size > 0]
     if len(active) < 2:
@@ -140,18 +130,21 @@ def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut
     cen = np.array([p[a].mean(axis=0) for p, a in zip(pos, aidx, strict=True)])
     first = np.array([p[a[0]] - c for p, a, c in zip(pos, aidx, cen, strict=True)])
     last = np.array([p[a[-1]] - c for p, a, c in zip(pos, aidx, cen, strict=True)])
-    gm = np.array(
-        [float(np.mean([_mid(blocks[k][i]) for i in a])) for k, a in zip(active, aidx, strict=True)]
-    )
     gaps = [
         _mid(blocks[active[j + 1]][aidx[j + 1][0]]) - _mid(blocks[active[j]][aidx[j][-1]])
         for j in range(n - 1)
     ]
     target = np.array([curve(int(abs(g))) for g in gaps], dtype=np.float64)
-    r0 = _ib_radius(s, gm)
     w_spring = float(s.boundary_stitch_spring_weight)
     w_ev = float(s.boundary_stitch_ev_weight)
     iu = np.triu_indices(n, k=1)
+    rg = np.array([float(np.sqrt(np.mean(np.sum((p - p.mean(axis=0)) ** 2, axis=1)))) for p in pos])
+    r0 = (
+        np.full(iu[0].size, float(s.exclusion_radius_ib))
+        if s.exclusion_radius_ib > 0.0
+        else rg[iu[0]] + rg[iu[1]]
+    )
+    ev_pairs = r0 > 0.0
 
     def energy(x: F64Array) -> float:
         rv = x[: 3 * n].reshape(n, 3)
@@ -162,10 +155,10 @@ def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut
         a_first = c + rot.apply(first)
         d = np.linalg.norm(a_last[:-1] - a_first[1:], axis=1)
         e = w_spring * float(np.sum(((d - target) / target) ** 2))
-        if r0 > 0.0 and w_ev > 0.0:
-            dc = np.linalg.norm(c[iu[0]] - c[iu[1]], axis=1)
-            over = np.clip(r0 - dc, 0.0, None)
-            e += w_ev * float(np.sum((over / r0) ** 2))
+        if w_ev > 0.0 and ev_pairs.any():
+            dc = np.linalg.norm(c[iu[0]] - c[iu[1]], axis=1)[ev_pairs]
+            over = np.clip(r0[ev_pairs] - dc, 0.0, None)
+            e += w_ev * float(np.sum((over / r0[ev_pairs]) ** 2))
         return e
 
     res = minimize(

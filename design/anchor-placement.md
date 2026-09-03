@@ -236,12 +236,12 @@ job. It makes a boundary pair look like an interior pair, and interior pairs are
 the within block defect, so the collapse now spans the chromosome instead of stopping at each
 block. Option A is what lifts it, and B without A produces a compact structure by design.
 
-And the excluded volume regulariser is mis-scaled. Its radius derives from
-`genomic_length_to_distance` of the centroid gaps, 153 units here, against a median block Rg of
-7.7, so 53 of 55 centroid pairs sit inside it and the term acts as a weak global compaction
-penalty rather than an overlap guard. It did no harm on this structure but it does not mean
-what it says. The fix is a per pair radius `rg_k + rg_l` from each block's own radius of
-gyration, with `exclusion_radius_ib` kept as the explicit override. Not built.
+And the excluded volume regulariser was mis-scaled in the first build. Its radius derived
+from `genomic_length_to_distance` of the centroid gaps, 153 units here, against a median block
+Rg of 7.7, so 53 of 55 centroid pairs sat inside it and the term acted as a weak global
+compaction penalty rather than an overlap guard. It did no harm on this structure but it did not
+mean what it said. Replaced by a per pair radius `rg_k + rg_l` from each block's own radius of
+gyration over all its beads, with `exclusion_radius_ib` kept as the explicit override.
 
 Add a bond between the last anchor of one block and the first anchor of the next, targeting the
 distance a within block pair at that separation realises. About 68 boundaries on chr1, so one

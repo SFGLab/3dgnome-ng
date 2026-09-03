@@ -748,9 +748,11 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   untouched.
 
   Energy is a two sided spring per boundary plus a soft excluded volume between block
-  centroids at the interaction block radius (`exclusion_radius_ib`, or the auto derivation
-  `ib_mc_refine` uses), minimised with L-BFGS-B over one rotation and one translation per
-  block. There is no chain bond and no confinement. Keys: `spring_weight` (1.0), `ev_weight`
+  centroids with a radius per pair of the two blocks' radii of gyration added, or one constant
+  radius for every pair when `exclusion_radius_ib` is positive, minimised with L-BFGS-B over one
+  rotation and one translation per block. The radius came from `genomic_length_to_distance` of
+  the centroid gap at first, 153 units against block radii near 8 on chr1:1-60 Mb, which made
+  the term a compaction penalty instead of an overlap guard. There is no chain bond and no confinement. Keys: `spring_weight` (1.0), `ev_weight`
   (1.0), `max_iter` (500). The pass uses no RNG and runs on the calling thread, so flag off is
   byte exact and flag on reproduces. Unit checks in `harness/test_stitch.py`.
 

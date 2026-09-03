@@ -143,6 +143,29 @@ def test_excluded_volume() -> None:
     )
 
 
+def test_per_pair_radius() -> None:
+    print("\n[radius] the excluded volume radius comes from the blocks' own size")
+    # outer tetrahedra have Rg D*sqrt(3/8) = 6.12 each, so two of them touch at 12.2 apart. The
+    # old radius came from gld of the centroid gap, 0.5 * gld(100 kb) = 8.4, below touching.
+    mid = [BeadOut(100_000, 100_500, 0.0, 0.0, 0.0, "anchor")]
+    blocks = [block(0, np.array([-600.0, 0, 0])), mid, block(200_000, np.array([600.0, 0, 0]))]
+    held = stitch_blocks(blocks, settings(exclusion_radius_ib=0.0, boundary_stitch_ev_weight=1.0))
+    d = float(np.linalg.norm(centroid(held[0]) - centroid(held[2])))
+    rg = float(np.sqrt(np.mean(np.sum((TET - TET.mean(axis=0)) ** 2, axis=1))))
+    check(
+        "outer blocks held at or beyond touching",
+        d > 0.9 * 2 * rg and d > 8.4,
+        f"{d:.2f}, touching {2 * rg:.2f}, old radius 8.4",
+    )
+    fixed = stitch_blocks(
+        blocks, settings(exclusion_radius_ib=4 * D, boundary_stitch_ev_weight=1.0)
+    )
+    d_fixed = float(np.linalg.norm(centroid(fixed[0]) - centroid(fixed[2])))
+    check(
+        "explicit exclusion_radius_ib still overrides", d_fixed > d + D, f"{d_fixed:.2f} vs {d:.2f}"
+    )
+
+
 def test_pass_through() -> None:
     print("\n[pass through] nothing to stitch")
     one = [block(0, np.array([7.0, 8.0, 9.0]))]
@@ -160,6 +183,7 @@ def main() -> int:
     test_boundary_lands_on_curve()
     test_rigid()
     test_excluded_volume()
+    test_per_pair_radius()
     test_pass_through()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
