@@ -397,7 +397,14 @@ Either is a change to the parity era law and must be opt in. Calibration would f
 route as A, the contact probability curve for the exponent and a bond scale for the prefactor,
 and the gate is the same within block exponent that A failed.
 
-### E. Excluded volume across blocks after the stitch. Not built
+### E. Excluded volume across blocks after the stitch. Built, opt in, under measurement
+
+Implemented as `gnome3d/pipeline/relax.py`, the smooth kernel over the whole chromosome with
+excluded volume at 1.5 bonds, bond springs at weight 10, temperature 0.1 of the smooth
+maximum, anchors fixed, gated on `[relax] use_cross_block_relax`, run after the stitch. On a
+toy of two overlapping coils it takes 564 cross block contacts to zero with bonds kept within
+1.44. Unit checks in `harness/test_relax.py`. The measurement on the D, C and stitch structure
+follows.
 
 Once blocks are stitched, their coils interpenetrate because no term acts between beads of
 different blocks. A relaxation pass over the whole chromosome with the smooth stage's excluded
@@ -406,6 +413,19 @@ subanchor coils re route, is the direct fix. The smooth kernels exist; the cost 
 volume scan over the whole chromosome per move, which needs a neighbour list at genome scale.
 Making the stitch itself bead aware would only move rigid blocks and cannot untangle coils that
 have to touch at their edges.
+
+### F. Subanchors across block boundaries. Not built
+
+Densify runs per block, so the gap between the last anchor of one block and the first of the
+next holds no subanchor at all. On chr1:1-60 Mb every one of the ten boundaries spans 28 kb to
+1.46 Mb with zero beads between its two anchors, one boundary has a single bead. The strand
+drawn across a boundary is therefore one straight bond whatever the stitch does, and it is what
+a stitch gap looks like. The stitch itself is satisfied to 1.0 to 1.6 times its target on nine
+boundaries and misses one, the 1.46 Mb gap, at 2.6 times, which the rigid optimiser could not
+close against the excluded volume of the two large blocks on either side. Inserting subanchors
+across boundaries at the same density the blocks use, and letting the relaxation of option E
+route them, is the fix. It also gives the chain a genomic length across the gap instead of a
+bond of zero length, which the stitch target currently stands in for.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
