@@ -153,6 +153,16 @@ Nine checks in `harness/test_batch_seeding.py`, which compare at equal width to 
 algorithm from the arithmetic and measure the width effect on its own. Removing either fix makes
 them fail.
 
+The wiring is confirmed on a real chr1:1-8000000 reconstruction. Three launches of one, one and
+two IBs became one launch of four, the description now reads "all bead sizes", and the structure
+is the same to the float noise the width change implies, radius of gyration 28.29 against 28.30
+over 4,306 beads.
+
+That run was on JAX's CPU backend, where the merge is worth almost nothing, 10.2 seconds against
+9.7. CPU JAX is arithmetic bound, so four chains cost about four times one and padding a small IB
+up to a large bucket is paid in full. The whole case for merging rests on the GPU being latency
+bound, so the end to end number has to come from the workstation and not from a laptop.
+
 ### 4. The estimate_dist stage. Not started
 
 Thirty one percent of the whole chromosome run. Its launches are already wide and already run
