@@ -184,6 +184,9 @@ def init_confine_nb(
 
 
 NO_MAT: F64Array = np.zeros((1, 1), dtype=np.float64)
+NO_F64_3: F64Array = np.zeros(3, dtype=np.float64)
+NO_I64_3: I64Array = np.ones(3, dtype=np.int64)
+NO_I32: I32Array = np.zeros(1, dtype=np.int32)
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -787,6 +790,148 @@ def init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float
 # Smooth uses strict (preserves prior behaviour); arcs/heatmap use non-strict.
 
 
+# --- cell grid primitives for the excluded volume term ------------------------------------
+# The grid itself is built by gnome3d/mc/numba/cells.py; these three run inside the step loop,
+# so they live here to keep that module's import one way.
+
+
+@njit(cache=True, nogil=True)
+def cell_of_nb(x: float, y: float, z: float, lo: F64Array, dim: I64Array, c: float) -> int:
+    """The cell a point falls in, clamped so a bead outside the original extent still lands
+    somewhere valid."""
+    ix = int((x - lo[0]) / c)
+    iy = int((y - lo[1]) / c)
+    iz = int((z - lo[2]) / c)
+    if ix < 0:
+        ix = 0
+    elif ix >= dim[0]:
+        ix = dim[0] - 1
+    if iy < 0:
+        iy = 0
+    elif iy >= dim[1]:
+        iy = dim[1] - 1
+    if iz < 0:
+        iz = 0
+    elif iz >= dim[2]:
+        iz = dim[2] - 1
+    return int(ix + dim[0] * (iy + dim[1] * iz))
+
+
+@njit(cache=True, nogil=True)
+def relink_nb(head: I32Array, nxt: I32Array, where: I32Array, i: int, k_new: int) -> None:
+    """Move bead `i` to cell `k_new`. Unlinking walks the old chain, which holds a handful of
+    beads at this cell size."""
+    k_old = int(where[i])
+    if k_old == k_new:
+        return
+    j = int(head[k_old])
+    if j == i:
+        head[k_old] = nxt[i]
+    else:
+        while j != -1 and nxt[j] != i:
+            j = int(nxt[j])
+        if j != -1:
+            nxt[j] = nxt[i]
+    nxt[i] = head[k_new]
+    head[k_new] = i
+    where[i] = k_new
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def local_excl_cells_nb(
+    pos: F64Array,
+    p: int,
+    r0: float,
+    weight: float,
+    skip: int,
+    lo: F64Array,
+    dim: I64Array,
+    c: float,
+    head: I32Array,
+    nxt: I32Array,
+    buf: I32Array,
+) -> float:
+    """The excluded volume local score for bead `p` over the grid's twenty seven cell
+    neighbourhood, summed in ascending index order so the result matches `_local_excl_nb` bit
+    for bit. Returns a negative number when more beads lie inside the radius than the buffer
+    holds, which tells the caller to fall back to the full scan for this bead."""
+    px = pos[p, 0]
+    py = pos[p, 1]
+    pz = pos[p, 2]
+    r2 = r0 * r0
+    nx = int(dim[0])
+    ny = int(dim[1])
+    nz = int(dim[2])
+    ix = int((px - lo[0]) / c)
+    iy = int((py - lo[1]) / c)
+    iz = int((pz - lo[2]) / c)
+    m = 0
+    for jz in range(max(iz - 1, 0), min(iz + 2, nz)):
+        for jy in range(max(iy - 1, 0), min(iy + 2, ny)):
+            base = nx * (jy + ny * jz)
+            for jx in range(max(ix - 1, 0), min(ix + 2, nx)):
+                i = int(head[jx + base])
+                while i != -1:
+                    diff = i - p
+                    if diff < 0:
+                        diff = -diff
+                    if diff > skip:
+                        dx = pos[i, 0] - px
+                        dy = pos[i, 1] - py
+                        dz = pos[i, 2] - pz
+                        if dx * dx + dy * dy + dz * dz < r2:
+                            if m >= buf.shape[0]:
+                                return -1.0
+                            buf[m] = i
+                            m += 1
+                    i = int(nxt[i])
+    # Insertion sort: only the beads inside the radius reach here, a few dozen of them.
+    for a in range(1, m):
+        v = buf[a]
+        b = a - 1
+        while b >= 0 and buf[b] > v:
+            buf[b + 1] = buf[b]
+            b -= 1
+        buf[b + 1] = v
+    err = 0.0
+    for t in range(m):
+        i = int(buf[t])
+        dx = pos[i, 0] - px
+        dy = pos[i, 1] - py
+        dz = pos[i, 2] - pz
+        d = np.sqrt(dx * dx + dy * dy + dz * dz)
+        err += _excl_pair_nb(d, r0, weight)
+    return err
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def init_excl_cells_nb(
+    pos: F64Array,
+    r0: float,
+    weight: float,
+    skip: int,
+    lo: F64Array,
+    dim: I64Array,
+    c: float,
+    head: I32Array,
+    nxt: I32Array,
+    buf: I32Array,
+) -> float:
+    """The whole excluded volume score through the grid. `init_excl_nb` is a full pair scan,
+    quadratic in the structure and a second or two on a chromosome, and it runs once per call.
+    Summing each bead's local score over the grid gives the same number, since a row here is
+    that function's inner loop, and the rows are added in the same order.
+
+    Returns a negative number if any bead overflowed the buffer, so the caller can fall back."""
+    err = 0.0
+    for i in range(pos.shape[0]):
+        row = local_excl_cells_nb(pos, i, r0, weight, skip, lo, dim, c, head, nxt, buf)
+        if row < 0.0:
+            return -1.0
+        err += row
+    return err
+
+
 @njit(cache=True, fastmath=True, nogil=True)
 def batch_mc_nb(
     pos: F64Array,
@@ -861,6 +1006,16 @@ def batch_mc_nb(
     # every stage but arcs passes nothing new.
     use_excl_mat: bool = False,
     excl_r0_mat: F64Array = NO_MAT,
+    # Cell grid for the excluded volume term. Off by default so every caller that does not
+    # build one passes nothing new. See gnome3d/mc/numba/cells.py.
+    use_cells: bool = False,
+    cell_lo: F64Array = NO_F64_3,
+    cell_dim: I64Array = NO_I64_3,
+    cell_size: float = 1.0,
+    cell_head: I32Array = NO_I32,
+    cell_next: I32Array = NO_I32,
+    cell_where: I32Array = NO_I32,
+    cell_buf: I32Array = NO_I32,
 ) -> tuple[float, float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
     n_mov = movable.shape[0]
@@ -894,6 +1049,22 @@ def batch_mc_nb(
         if use_excl:
             if use_excl_mat:
                 loc_excl_prev = local_excl_mat_nb(pos, p, excl_r0_mat, excl_weight, excl_skip)
+            elif use_cells:
+                loc_excl_prev = local_excl_cells_nb(
+                    pos,
+                    p,
+                    excl_r0,
+                    excl_weight,
+                    excl_skip,
+                    cell_lo,
+                    cell_dim,
+                    cell_size,
+                    cell_head,
+                    cell_next,
+                    cell_buf,
+                )
+                if loc_excl_prev < 0.0:
+                    loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
             else:
                 loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
 
@@ -967,6 +1138,22 @@ def batch_mc_nb(
         if use_excl:
             if use_excl_mat:
                 loc_excl_curr = local_excl_mat_nb(pos, p, excl_r0_mat, excl_weight, excl_skip)
+            elif use_cells:
+                loc_excl_curr = local_excl_cells_nb(
+                    pos,
+                    p,
+                    excl_r0,
+                    excl_weight,
+                    excl_skip,
+                    cell_lo,
+                    cell_dim,
+                    cell_size,
+                    cell_head,
+                    cell_next,
+                    cell_buf,
+                )
+                if loc_excl_curr < 0.0:
+                    loc_excl_curr = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
             else:
                 loc_excl_curr = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
             score_excl_new = score_excl + 2.0 * (loc_excl_curr - loc_excl_prev)
@@ -1035,6 +1222,14 @@ def batch_mc_nb(
 
         if ok:
             n_ok += 1
+            if use_cells:
+                relink_nb(
+                    cell_head,
+                    cell_next,
+                    cell_where,
+                    p,
+                    cell_of_nb(pos[p, 0], pos[p, 1], pos[p, 2], cell_lo, cell_dim, cell_size),
+                )
             score = score_new
             score_struct = score_struct_new
             score_heat = score_heat_new

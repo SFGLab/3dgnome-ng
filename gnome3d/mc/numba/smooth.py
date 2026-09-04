@@ -17,7 +17,11 @@ import numpy as np
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
+from gnome3d.mc.numba.cells import BUF, build_grid, grid_shape
 from gnome3d.mc.numba.common import (
+    NO_F64_3,
+    NO_I32,
+    NO_I64_3,
     affinity_params,
     as_f64,
     dummy_bool,
@@ -30,6 +34,7 @@ from gnome3d.mc.numba.common import (
 from gnome3d.mc.numba.terms import (
     STRUCT_CHAIN,
     init_confine_nb,
+    init_excl_cells_nb,
     init_excl_nb,
     init_heat_nb,
     init_smooth_nb,
@@ -390,18 +395,42 @@ def mc_smooth_numba(
         score_orn = 0.0
 
     score_struct = float(init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
-    score_excl = (
-        float(
-            init_excl_nb(
+    # Cell grid for the excluded volume term. It sums the same pairs in the same order, so this
+    # changes only how long the term takes, both here and in the step loop. Below a couple of
+    # thousand beads the full scan is already cheap and the bookkeeping is not worth it.
+    excl_w = float(settings.exclusion_weight)
+    excl_skip_n = int(settings.exclusion_skip_neighbors)
+    use_cells = use_excl and bool(getattr(settings, "mc_neighbour_grid", True)) and n >= 2048
+    cell_lo = NO_F64_3
+    cell_dim = NO_I64_3
+    cell_size = 1.0
+    cell_head = NO_I32
+    cell_next = NO_I32
+    cell_where = NO_I32
+    cell_buf = NO_I32
+    score_excl = 0.0
+    if use_cells:
+        cell_lo, cell_dim, cell_size = grid_shape(pw, excl_r0)
+        cell_head, cell_next, cell_where = build_grid(pw, cell_lo, cell_dim, cell_size)
+        cell_buf = np.empty(BUF, dtype=np.int32)
+        score_excl = float(
+            init_excl_cells_nb(
                 pw,
                 excl_r0,
-                float(settings.exclusion_weight),
-                int(settings.exclusion_skip_neighbors),
+                excl_w,
+                excl_skip_n,
+                cell_lo,
+                cell_dim,
+                cell_size,
+                cell_head,
+                cell_next,
+                cell_buf,
             )
         )
-        if use_excl
-        else 0.0
-    )
+        if score_excl < 0.0:  # a bead had more neighbours than the buffer holds
+            use_cells = False
+    if use_excl and not use_cells:
+        score_excl = float(init_excl_nb(pw, excl_r0, excl_w, excl_skip_n))
     score_conf = (
         float(
             init_confine_nb(
@@ -476,6 +505,14 @@ def mc_smooth_numba(
         brdg_weight=aff.brdg_weight,
         score_comp=score_comp,
         score_brdg=score_brdg,
+        use_cells=use_cells,
+        cell_lo=cell_lo,
+        cell_dim=cell_dim,
+        cell_size=cell_size,
+        cell_head=cell_head,
+        cell_next=cell_next,
+        cell_where=cell_where,
+        cell_buf=cell_buf,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

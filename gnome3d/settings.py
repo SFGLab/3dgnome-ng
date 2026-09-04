@@ -229,6 +229,7 @@ class Settings:
     exclusion_apply_to_heatmap: bool
     exclusion_apply_to_ib: bool
     exclusion_skip_neighbors: int
+    mc_neighbour_grid: bool
     # Per-level radius (one knob per MC level).  0.0 = auto = factor * mean
     # of that level's natural bond / expected distance.  Each level has its
     # own factor (default 0.5 - half the typical bead-bead target).
@@ -540,6 +541,10 @@ class Settings:
         self.exclusion_apply_to_heatmap = False
         self.exclusion_apply_to_ib = True  # IB-level MC (default on with use_ib_mc)
         self.exclusion_skip_neighbors = 1  # skip pairs with |i-j| <= this (1 = skip bonded)
+        # Bin beads into a cell grid so the excluded volume term visits the beads within its
+        # radius instead of every bead. The sum is built in the same order, so results are
+        # identical and this only changes how long they take. See gnome3d/mc/numba/cells.py.
+        self.mc_neighbour_grid = True
         # Per-level radius: 0.0 = auto from this level's bond-length mean.
         self.exclusion_radius_arcs = 0.0
         self.exclusion_radius_smooth = 0.0
@@ -1074,6 +1079,9 @@ class Settings:
         )
         self.exclusion_skip_neighbors = geti(
             "excluded_volume", "skip_neighbors", self.exclusion_skip_neighbors
+        )
+        self.mc_neighbour_grid = getb(
+            "simulation_backend", "neighbour_grid", self.mc_neighbour_grid
         )
         # Per-level radii.  Key naming: radius_<level>.  0 = auto.
         self.exclusion_radius_arcs = getf(

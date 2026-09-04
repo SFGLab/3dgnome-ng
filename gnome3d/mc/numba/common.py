@@ -45,6 +45,9 @@ def dummy_i32(shape: tuple[int, ...] = (1,)) -> I32Array:
 NO_I8: I8Array = np.zeros(1, dtype=np.int8)
 NO_F64: F64Array = np.zeros(1, dtype=np.float64)
 NO_MAT: F64Array = np.zeros((1, 1), dtype=np.float64)
+NO_F64_3: F64Array = np.zeros(3, dtype=np.float64)
+NO_I64_3: I64Array = np.ones(3, dtype=np.int64)
+NO_I32: I32Array = np.zeros(1, dtype=np.int32)
 
 
 class AffinityParams(NamedTuple):
@@ -277,6 +280,14 @@ def run_outer_loop(
     score_brdg: float = 0.0,
     use_excl_mat: bool = False,
     excl_r0_mat: F64Array = NO_MAT,
+    use_cells: bool = False,
+    cell_lo: F64Array = NO_F64_3,
+    cell_dim: I64Array = NO_I64_3,
+    cell_size: float = 1.0,
+    cell_head: I32Array = NO_I32,
+    cell_next: I32Array = NO_I32,
+    cell_where: I32Array = NO_I32,
+    cell_buf: I32Array = NO_I32,
 ) -> float:
     """Drive the unified kernel until convergence; return the final total score."""
     score = (
@@ -358,6 +369,14 @@ def run_outer_loop(
             rep_inv_cutoff,
             use_excl_mat,
             excl_r0_mat,
+            use_cells,
+            cell_lo,
+            cell_dim,
+            cell_size,
+            cell_head,
+            cell_next,
+            cell_where,
+            cell_buf,
         )
         score = (
             score_struct

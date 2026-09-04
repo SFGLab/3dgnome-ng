@@ -858,6 +858,36 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference has no term across blocks at any stage. See
   `design/anchor-placement.md`, option E.
 
+### Performance (no behaviour change)
+
+- **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
+  `[simulation_backend] neighbour_grid`, default yes)
+  The excluded volume term sums over pairs closer than `r0` and was implemented as a scan over
+  every bead. Only about fifty beads are ever that close whatever the structure's size, since
+  that is a local density, so on a chromosome the scan did hundreds of times more work than it
+  needed. Profiled on a finished 60 Mb region: the term is 99 percent of an MC step at 42,480
+  beads, growing at 1.29 microseconds per thousand beads, while the useful neighbour count
+  stayed at 57. The initial score was worse, a full pair scan quadratic in the structure.
+
+  Beads are binned into a linked list per cell at cell size `r0`, so the twenty seven cells
+  around a bead hold everything within `r0`. An accepted move unlinks the bead from its old cell
+  and links it into the new one, which keeps the cells exactly `r0` wide with no margin for
+  drift and the grid exact after every move. Both the step term and the initial score go
+  through it.
+
+  Results are identical bit for bit, not merely close, so no trajectory changes and the parity
+  gate is unaffected. Two things make that true: only pairs inside the radius contribute
+  anything, and the sum is built in ascending bead index, the order the full scan uses. A query
+  that finds more neighbours than its buffer holds returns a sentinel and the caller falls back
+  to the full scan, so correctness never depends on a capacity guess.
+
+  Measured on the real structure, same seed, positions and scores identical: 5.3 times faster
+  at 8,000 beads, 11.2 at 20,000, 22.8 at 42,480. It applies to every reconstruction, since the
+  per block smooth stage runs the same term on blocks of up to 16,384 beads, and smooth is most
+  of the pipeline's wall time. Below 2,048 beads the full scan is already cheap and the grid is
+  skipped. The JAX kernels are untouched and keep the full scan. Unit checks in
+  `harness/test_cells.py`.
+
 ---
 
 ## Correctness Rules
