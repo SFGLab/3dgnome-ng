@@ -539,9 +539,25 @@ stitch, on the same region:
 
 Scale 1.5 closes every boundary to within 20 percent, where scale 1 over pulled. The
 production base is more compact and more interpenetrated, 16.4 percent of beads touching
-another block, which is the case for option E. Its within block exponent and Hi-C numbers need
-the production base's own parity arm before they can be read, since every earlier arm ran on
-the ChIA-PET base; that arm is running.
+another block, which is the case for option E.
+
+Against the production base's own parity arm, every flag off at packing factor 0.75, same
+region and seed:
+
+| production base | parity | tuned |
+|---|---|---|
+| boundary realised over target, median and worst | 90 and 472 | 1.04 and 1.20 |
+| straight strands | 4 | 12 |
+| cross block bead contacts, beads touched | 4,786, 3.3 percent | 27,900, 16.4 percent |
+| Rg | 348 | 33 |
+| within block exponent | 0.100 | 0.161 |
+| Hi-C SCC, Pearson, MultiMM Pearson | 0.025, 0.062, 0.222 | 0.085, 0.183, 0.310 |
+
+The production base starts worse than the ChIA-PET base, a boundary jump of 90 against 44 and
+an exponent of 0.10 against 0.16, and the tuned configuration lifts it further in relative
+terms: the exponent by 1.6 times, SCC by 3.4 times, Pearson by 3 times, the MultiMM Pearson by
+1.4 times. The eight extra straight strands and the fivefold rise in cross block contacts are
+the same two costs as on the ChIA-PET base, and E is the answer to both.
 
 ## Validation
 
