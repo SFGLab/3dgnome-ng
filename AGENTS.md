@@ -705,7 +705,10 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   **The batched smooth kernel seeds each chain from its own seed.** `mc_smooth_jax_batch`
   takes its launch key from the scope alone and folds each problem's `seed` per chain, rather
-  than taking the key from `problems[0]` and splitting it by slot. A chain's stream therefore
+  than taking the key from `problems[0]` and splitting it by slot. Every caller supplies one:
+  the smooth stage from the node, and the estimate stage from the parent block and the
+  replicate number, in `estimate_dist._expand_replicates`. A replicate carried no seed before
+  and would have fallen back to its slot. A chain's stream therefore
   does not depend on how many chains share the launch, on where it sits among them, or on
   which sub-batch it lands in. That is what lets the grouping change without changing the
   algorithm. The arcs kernel and the multi-chain restart kernel still split by slot, which is

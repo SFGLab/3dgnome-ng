@@ -142,6 +142,45 @@ def _run(problem: Problem) -> Result:
     return _heat_dist_from_avg(avg, problem["subanchor_heat_raw"], problem["settings"])
 
 
+# Spreads a parent seed and a replicate number across the output range before they are mixed,
+# so two blocks whose seeds differ by one do not hand their replicates overlapping streams.
+_REPLICATE_STRIDE = 0x9E3779B1
+
+
+def _expand_replicates(problems: list[Problem], per_ib: int) -> tuple[list[Problem], list[int]]:
+    """One dry smooth problem per replicate, and where each input block's run starts.
+
+    Each replicate carries a seed fixed by its parent block and its replicate number. The
+    batched kernel seeds a chain from the seed its problem carries, so a replicate without one
+    would fall back to its slot in the launch and the grouping would decide its stream.
+    """
+    expanded: list[Problem] = []
+    spans: list[int] = []
+    for prob in problems:
+        spans.append(len(expanded))
+        seed_rng(int(prob["seed"]))
+        pos = prob["pos"]
+        fixed = prob["fixed"]
+        step = float(prob["step_size"])
+        for rep in range(per_ib):
+            start = pos.copy()
+            add_movable_noise_inplace(start, fixed, step)
+            expanded.append(
+                {
+                    "pos": start,
+                    "dtn": prob["dtn"],
+                    "fixed": fixed,
+                    "step_size": step,
+                    "seed": (int(prob["seed"]) + rep * _REPLICATE_STRIDE) & 0x7FFFFFFF,
+                    "heat_dist": None,  # dry: chain+EV+conf only
+                    "char_orientations": None,
+                    "anchor_neighbors": None,
+                    "anchor_neighbor_weights": None,
+                }
+            )
+    return expanded, spans
+
+
 def _batch_run(problems: list[Problem]) -> list[Result]:
     """Batched (JAX) runner: run every IB's dry-smooth trials in one vmapped
     kernel (no heat/orientation), then build each IB's target matrix.  Mirrors
@@ -154,29 +193,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     n_steps = int(s.subanchor_estimate_steps)
     per_ib = n_reps * n_steps
 
-    expanded: list[Problem] = []
-    spans: list[int] = []
-    for prob in problems:
-        spans.append(len(expanded))
-        seed_rng(int(prob["seed"]))
-        pos = prob["pos"]
-        fixed = prob["fixed"]
-        step = float(prob["step_size"])
-        for _ in range(per_ib):
-            start = pos.copy()
-            add_movable_noise_inplace(start, fixed, step)
-            expanded.append(
-                {
-                    "pos": start,
-                    "dtn": prob["dtn"],
-                    "fixed": fixed,
-                    "step_size": step,
-                    "heat_dist": None,  # dry: chain+EV+conf only
-                    "char_orientations": None,
-                    "anchor_neighbors": None,
-                    "anchor_neighbor_weights": None,
-                }
-            )
+    expanded, spans = _expand_replicates(problems, per_ib)
 
     # Plain "checker" double-compacts here: estimation's output is the dense distance TARGET
     # the final smooth chases, and the checker's stale-EV compaction shrinks it (measured Rg

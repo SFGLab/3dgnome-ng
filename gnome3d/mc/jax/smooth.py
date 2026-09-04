@@ -2286,8 +2286,9 @@ def _mc_smooth_jax_batch_chunk(
     # from `problems[0]` instead would tie every chain's stream to whichever IB happened to sort
     # first, and regrouping or sub-batching would then change results.
     base_key = jax.random.PRNGKey(stable_seed_offset(log.current()))
-    # A caller that supplies no seed falls back to the slot, which is the old behaviour and is
-    # only reachable from a bench. The pipeline gives every IB a seed.
+    # Every pipeline caller supplies a seed: the smooth stage from the node, the estimate stage
+    # from the parent block and the replicate number. A caller that supplies none falls back to
+    # the slot, which is the old grouping dependent behaviour.
     chain_seed_k = jnp.asarray(
         np.array(
             [int(p.get("seed", i) or 0) & 0x7FFFFFFF for i, p in enumerate(problems)],
