@@ -116,7 +116,7 @@ It targeted arithmetic. The kernel is latency bound at every production shape, s
 arithmetic saves nothing. Reinstate this only if a later measurement shows a shape where the
 arithmetic actually dominates.
 
-### 3. Merge the smooth groups. Built, not yet measured end to end
+### 3. Merge the smooth groups. Built and measured
 
 Group by the energy term signature alone and pad the group to the ladder bucket of its largest
 member, instead of splitting a uniform set across bead buckets.
@@ -264,7 +264,7 @@ available thing, three biggest together and two smallest in a cheap 4096 launch.
 84 s, about six percent of the run, needs a sparse heat target, which is a capacity fix and not
 a bandwidth one.
 
-### 4d. The arcs cell grid. The last well founded lever
+### 4d. The arcs cell grid. What the neighbour counts said
 
 Measured on real converged blocks, how many anchors fall inside the repulsion cutoff:
 
@@ -282,10 +282,12 @@ arcs wall, since eleven blocks on sixteen threaded workers means the wall is the
 one. It works because arcs runs on the CPU, where cutting the per step scan converts directly to
 wall time and there is no latency floor to hide behind.
 
-`playground/jax_roofline.py` and the capture script that produced the table both run in minutes,
-which is the point. Three of this section's measurements were wrong before they were right, each
-time because a short synthetic benchmark measured a fixed cost or answered a different question
-than the one that mattered. A real run's log did not mislead once.
+Read this table with the section below it: the counts are right and the conclusion drawn from
+them was not. `playground/jax_roofline.py` and the capture script that produced the table both
+run in minutes, which is the point. Several of this section's measurements were wrong before they
+were right, each time because a synthetic benchmark measured a fixed cost, used a density no real
+structure has, or answered a different question than the one that mattered. A real run's log did
+not mislead once.
 
 ### 4e. The arcs cell grid. Built, measured, refuted, reverted
 
@@ -325,7 +327,46 @@ Thirty one percent of the whole chromosome run. Its launches are already wide an
 at 0.18 to 0.69 us per step per IB, so the kernel is not the lever. Its cost is sixteen restart
 replicas times the step budget, and that is what to look at.
 
-### 6. Arcs, the other levers. Not started
+### 6. Fewer steps, which is the only thing left
+
+Everything above attacks the cost of a step. The kernels are latency bound, so the cost of a step
+is set by the dependent chain of accept or reject decisions and not by bandwidth or arithmetic,
+which leaves the number of steps. These are the options, cheapest first. None is started.
+
+**Step size annealing.** The step size is fixed for a whole run. cudaMMC anneals it, one
+multiply per outer round beside the temperature, and it is the closest comparable code to ours.
+This is a one line schedule change and the obvious first thing to try. A smaller step late in the
+anneal raises the acceptance rate, so it interacts with a convergence test that watches the score
+plateau and the accept count, and the measurement has to cover quality as well as wall time.
+
+**Diagnose the straggler before redesigning for it.** One arcs launch ran 3,929 rounds where its
+median chain needed 2, and the arcs wall is the slowest single block since eleven blocks run on
+sixteen workers. That is either one pathological block or a schedule badly matched to it, and
+finding out which is a measurement rather than a rewrite.
+
+**Parallel tempering.** Replicas at a ladder of temperatures that swap, the standard cure for a
+chain stuck in a basin, which is what a 3,929 round straggler looks like. It uses width, which we
+have spare, though only tens of replicas rather than the thousands the GPU could hold.
+
+**Population annealing.** A population carried through the temperature schedule, resampled toward
+the Boltzmann weight at each step rather than taking the best at the end. It is the natural fit
+for a latency bound kernel with idle width, and GPU implementations report around 230 times over
+a serial CPU. The problem is that resampling kills replica diversity, and diversity is the
+product here: the hybrid polish already homogenised an ensemble from 1.024 to 0.92 and needed
+re-noising to recover it. This fights the thing we are trying to produce.
+
+**Event chain Monte Carlo.** Rejection free. A displacement continues until an event under a
+factorised Metropolis filter, instead of proposing, evaluating and accepting or rejecting. That
+removes the dependent chain which is the latency floor, rather than working around it. It was
+developed for dense polymer melts with excluded volume, which is our system, and reaches speeds
+comparable to optimised molecular dynamics with the gain growing at density. It is also the
+largest rewrite, and it is a sampler by construction, so running it under an annealing schedule
+is off label.
+
+References: population annealing on GPU, arXiv 1703.03676, and its theory, arXiv 1508.05647.
+Event chain Monte Carlo for dense polymer melts, arXiv 1502.06447.
+
+### 7. Arcs, the other levers. Not started
 
 Seventy nine percent of the time in the configuration that puts arcs on JAX, twenty two percent
 in the one that leaves it on threaded numba. Two independent levers, and the profiling has to
@@ -339,7 +380,7 @@ depends on whether the arcs kernel is latency bound the way smooth is, which is 
 Separately, the launches converge badly. One took 5,023 rounds and 251 million steps for two
 regions. Another reported 86 percent of its time wasted waiting for its slowest chain.
 
-### 7. Re-measure, then run. Not started
+### 8. Re-measure, then run. Not started
 
 Repeat the stage breakdown with whatever the earlier steps changed, measure the cross block
 relaxation's cost with the cell grid, and only then start the trios.
