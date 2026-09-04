@@ -4,15 +4,26 @@ Where a reconstruction spends its wall time, what has been done about it, and wh
 work is ordered by measured cost rather than by which kernel is most interesting. Each step
 records its outcome when it is finished, so this file is the record as well as the plan.
 
-Status. The numba excluded volume scan is fixed. The JAX kernels and the arcs stage are not.
+Status. The numba excluded volume scan is fixed. The smooth stage's JAX launches are too
+narrow and that is the next work. The arcs stage is unexamined.
 
 ## How to measure
 
-`playground/profile_run.py <run.log>` sums the dispatch lines a run writes and reports each
-stage's share, plus the per launch detail for the batched stages. `playground/relax_profile.py`
-times the numba local scorers against bead count. `playground/jax_step_cost.py` and
-`playground/jax_batch_cost.py` time the JAX smooth kernel against bead count and batch width.
-The last two need a GPU, so they run on the workstation.
+Prefer a real run's own log to a synthetic benchmark. A production log records every launch's
+shape, wall time and step count, which is the same measurement a benchmark tries to reconstruct,
+on the real workload and for free.
+
+`playground/profile_run.py <run.log>` sums the dispatch lines and reports each stage's share plus
+the per launch detail. `playground/launch_width.py <run.log>` breaks the smooth launches down by
+how many IBs were in each and reports the cost per step per IB, which is what shows whether the
+launches are wide enough. `playground/relax_profile.py` times the numba local scorers against
+bead count.
+
+`playground/jax_overhead.py` separates a JAX call's fixed cost from its per step cost by timing
+the same shape at several step budgets. Run it before trusting any JAX timing: the fixed cost is
+seconds, so a short benchmark measures it rather than the kernel. `playground/jax_step_cost.py`
+and `playground/jax_batch_cost.py` are the short benchmarks that got this wrong and are kept only
+so the error stays visible. All of these need a GPU, so they run on the workstation.
 
 ## Where the time goes
 
@@ -43,70 +54,109 @@ numba smooth, measured on a finished 60 Mb region:
 | 10,000 | 0.38 us | 12.91 us | 97 percent | 52 |
 | 42,480 | 0.52 us | 52.87 us | 99 percent | 57 |
 
-JAX smooth on the workstation GPU is a different shape of problem. One chain costs about ten
-microseconds a step whatever the bead count, because the chain is sequential and each step is
-one small reduction on the device. The excluded volume is only a quarter of that at 16,384
-beads. Batching many regions into one launch is supposed to share that latency, and it does
-not share it well:
+JAX smooth is not the same shape of problem, and an earlier version of this file had it
+backwards. The numbers here replace those.
 
-| regions in a launch | us per step, 4,096 beads | per region | us per step, 16,384 beads | per region |
-|---|---|---|---|---|
-| 1 | 13.45 | 13.45 | 25.21 | 25.21 |
-| 4 | 25.43 | 6.36 | 69.63 | 17.41 |
-| 8 | 40.02 | 5.00 | 126.42 | 15.80 |
-| 16 | 69.08 | 4.32 | 237.76 | 14.86 |
-| 32 | 128.40 | 4.01 | 464.16 | 14.51 |
+`jax_batch_cost.py` timed one call of a fixed step budget and divided by the budget. A call
+carries a large fixed cost, so that division charged the fixed cost to the steps and reported a
+per step cost that fell as the budget rose. Measured at one shape, 32 regions of 4,096 beads:
 
-Thirty two regions buy 3.4 times at 4,096 beads and 1.7 times at 16,384, not thirty two. The
-kernel is therefore not latency bound at production batch widths, it is arithmetic bound, and
-the excluded volume share rises with the batch width to 43 percent at 4,096 beads and 46
-percent at 16,384. Two things follow. A neighbour list for JAX is worth building, because it
-cuts the term that is nearly half the cost in the regime that matters. And the executor choice
-itself is in question, since numba with the cell grid costs about seven microseconds per step
-for one region where JAX costs 14.5 per region at its widest batch.
+| steps in the call | reported us per step |
+|---|---|
+| 20,000 | 132.79 |
+| 100,000 | 34.34 |
+| 500,000 | 15.56 |
+| 2,000,000 | 12.05 |
+
+The fixed cost is about 2.3 seconds at that width and the true per step cost is 12.05 us. The
+old table ran 20,000 steps, so 88 percent of what it measured was the fixed cost. Production
+runs millions of steps per call and never pays it in any meaningful proportion.
+
+With the fixed cost separated out, the kernel is latency bound rather than arithmetic bound. One
+region of 4,096 beads costs 9.72 us per step and thirty two cost 12.05, so thirty two times the
+work costs 1.24 times the time. The same holds in production. Every smooth launch of a real
+chr1 GM12878 run, grouped by how many interaction blocks were in the launch:
+
+| IBs in the launch | us per step, whole launch | us per step per IB | share of smooth time |
+|---|---|---|---|
+| 1 | 14 to 22 | 14 to 22 | 10.0 percent |
+| 2 | 17 to 37 | 8.6 to 18.3 | 33.4 percent |
+| 3 to 4 | 19 to 31 | 4.8 to 7.8 | 12.4 percent |
+| 12 | 16 to 18 | 1.3 to 1.5 | 5.3 percent |
+| 16 to 64 | 11 to 14 | 0.18 to 0.69 | 38.8 percent |
+
+Cost per step barely moves with either the width or the bead count. Sixty four IBs of 6,400
+beads cost 13.9 us per step and one IB of 12,800 costs 16.9. Adding sixty three chains is free.
+
+The wide launches in that table are not smooth. They are `estimate_dist`, which is wide only
+because it expands each IB into sixteen restart replicas, so four nodes become sixty four
+chains. The real smooth launches are one, two, three, four or twelve IBs wide, and 55.8 percent
+of smooth time is in launches of four or fewer, running about forty times worse per IB than the
+estimate_dist launches a few lines below them in the same log.
+
+They are narrow because `SmoothStage.batch_key` is `(heat, orn, comp, brdg, shape bucket)` and
+the shape ladder splits an otherwise uniform set across many buckets. The first dispatch of that
+run is 28 IBs that agree on every energy term flag, cut into five launches by bead count alone.
 
 ## Steps
 
-### 1. Which executor the smooth stage should use. Not started
+### 1. Which executor the smooth stage should use. Answered
 
-Head to head on the same real interaction blocks, threaded numba with the cell grid against
-batched JAX, wall time for an identical dispatch. No code, one measurement. It either changes
-`mc_executor_smooth` in the production configuration, which is a larger win than any kernel
-change, or it confirms JAX and step 2 follows.
+JAX, and by a wide margin, but not for the reason the question assumed. The executor is second
+order. Cost per step is flat in launch width, so the question that matters is how many IBs are
+in a launch, and the answer today is too few.
 
-### 2. A neighbour list for the JAX excluded volume. Not started
+### 2. A neighbour list for the JAX excluded volume. Dropped
 
-Only if step 1 keeps JAX. A fixed size neighbour array per bead, rebuilt each round on the
-device, so the term reads its neighbours instead of every bead. It targets 43 to 46 percent of
-the cost.
+It targeted arithmetic. The kernel is latency bound at every production shape, so cutting the
+arithmetic saves nothing. Reinstate this only if a later measurement shows a shape where the
+arithmetic actually dominates.
 
-This cannot be bit exact the way the numba grid is. The numba sum is built in ascending bead
-index, the order the full scan uses, so it is identical. JAX sums by reduction over a padded
-array and the order is the reduction's, so results will differ in the last bits and structures
-will diverge over millions of steps. That means a flag, its own validation against the current
-kernel, and a decision about whether a changed trajectory is acceptable. It is a different bar
-from the numba work and should not be described as the same kind of change.
+### 3. Merge the smooth groups. Next
 
-### 3. The arcs stage. Not started
+Group by the energy term signature alone and pad the group to the ladder bucket of its largest
+member, instead of splitting a uniform set across bead buckets. Modelled on two real runs by
+taking each dispatch's slowest chain and costing it at a conservative 20 us per step:
 
-Seventy nine percent of the production configuration's time. Two independent levers, and the
-profiling has to come before either.
+| run | smooth now | merged | |
+|---|---|---|---|
+| GM12878 chr1 | 3,315 s | 737 s | 4.5x |
+| H1ESC chr1 | 2,909 s | 823 s | 3.5x |
 
-The arcless pairs carry a `1/d` repulsion, and `arcs_repulsion_cutoff_factor` truncates it at
-three times the mean arc distance, so the term is zero beyond that and is distance limited
-after all. A cell grid may apply exactly as it did for smooth. The neighbour count inside that
-cutoff is what decides the size of the win, and it has not been measured.
+Two things have to be settled first, and neither is a performance question.
 
-Separately, the launches converge badly. One took 5,023 rounds and 251 million steps for two
-regions. Another reported 86 percent of its time wasted waiting for its slowest chain. That is
-a grouping and scheduling problem rather than an arithmetic one, and it may be the larger half.
+A merged launch runs until every chain converges, and a converged chain is latched but not
+frozen, so it keeps taking steps. The small IBs in a merged launch would anneal for as long as
+the largest one needs. Freezing a converged chain's moves keeps each IB's anneal the same as it
+would have been alone, and costs nothing, since the arithmetic is free.
+
+Regrouping changes results whatever else is done, because a chain's RNG stream comes from
+`jax.random.split(iter_key, K)` at its index in the launch, and `base_key` comes from
+`problems[0]`. Both depend on who is batched with whom. Folding each chain's own stable id
+instead would make grouping irrelevant to the draw, which would also make the multi GPU `within`
+mode byte exact. That is a one time break of existing results and needs its own validation.
 
 ### 4. The estimate_dist stage. Not started
 
-Thirty one percent of the whole chromosome run and never examined. It had a host side quadratic
-reduction once before, which was fixed, so it deserves its own look rather than an assumption.
+Thirty one percent of the whole chromosome run. Its launches are already wide and already run
+at 0.18 to 0.69 us per step per IB, so the kernel is not the lever. Its cost is sixteen restart
+replicas times the step budget, and that is what to look at.
 
-### 5. Re-measure, then run. Not started
+### 5. The arcs stage. Not started
+
+Seventy nine percent of the time in the configuration that puts arcs on JAX, twenty two percent
+in the one that leaves it on threaded numba. Two independent levers, and the profiling has to
+come before either.
+
+The arcless pairs carry a `1/d` repulsion, and `arcs_repulsion_cutoff_factor` truncates it at
+three times the mean arc distance, so the term is distance limited after all and a cell grid may
+apply exactly as it did for smooth. That is a numba lever. Whether it is also a JAX lever
+depends on whether the arcs kernel is latency bound the way smooth is, which is unmeasured.
+
+Separately, the launches converge badly. One took 5,023 rounds and 251 million steps for two
+regions. Another reported 86 percent of its time wasted waiting for its slowest chain.
+
+### 6. Re-measure, then run. Not started
 
 Repeat the stage breakdown with whatever the earlier steps changed, measure the cross block
 relaxation's cost with the cell grid, and only then start the trios.
