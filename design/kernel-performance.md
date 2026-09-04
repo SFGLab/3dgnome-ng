@@ -4,8 +4,10 @@ Where a reconstruction spends its wall time, what has been done about it, and wh
 work is ordered by measured cost rather than by which kernel is most interesting. Each step
 records its outcome when it is finished, so this file is the record as well as the plan.
 
-Status. The numba excluded volume scan is fixed. The smooth stage's JAX launches are too
-narrow and that is the next work. The arcs stage is unexamined.
+Status. The numba excluded volume scan is fixed and both batched stages now merge their
+launches, together 1.29x end to end. Arcs is the largest stage left, its wall is one straggler
+block on one core, and the hybrid kernel that would address it re-anneals from full temperature
+and is 4.3x slower than the CPU as wired.
 
 ## How to measure
 
@@ -163,13 +165,66 @@ That run was on JAX's CPU backend, where the merge is worth almost nothing, 10.2
 up to a large bucket is paid in full. The whole case for merging rests on the GPU being latency
 bound, so the end to end number has to come from the workstation and not from a laptop.
 
-### 4. The estimate_dist stage. Not started
+### 3b. Measured. Both merges landed
+
+On chr1:1-60000000, GM12878, the tuned configuration, same region and seed in every arm.
+
+| arm | total wall | smooth | estimate_dist | arcs |
+|---|---|---|---|---|
+| off | 1789 s | 784 s | 489 s | 506 s |
+| smooth merged | 1577 s | 573 s | 489 s | 508 s |
+| both merged | 1382 s | 556 s | 313 s | 505 s |
+
+1.29x end to end. The smooth stage splits into two very different cases. Its heat free dispatch
+went from four launches at 135.6 s to one at 43.2 s, 3.1x, which is what the model predicted. Its
+heat carrying dispatch went from four launches at 648 s to two at 530 s, 1.22x, because the heat
+target is one (B, B) float32 per chain and at 16,384 beads that is 1.07 GB, so only three chains
+fit. The model was optimistic on both counts: it assumed one launch, and it costed a merged
+launch at 20 us per step where the real cost of that shape is 39.
+
+The estimate stage had no such limit. Its four groups became one launch of eighty chains, 489 s
+to 313 s.
+
+That launch also bounds the flat cost claim. Eighty chains of 16,384 beads run at 23.86 us per
+step against 14.24 at thirty two, so 2.5 times the work costs 1.68 times the time. Cost is flat
+in width up to roughly half a million bead evaluations per step and becomes partly arithmetic
+bound past that. Sublinear, not free.
+
+### 4. The arcs stage. The hybrid kernel is not ready, and the reason is specific
+
+Arcs is now the largest stage. On this region it runs eleven interaction blocks on sixteen
+threaded workers, so every block already has a core to itself and the 505 s is the slowest single
+block on one core. More cores cannot touch it. Only intra chain parallelism can, and
+`mc_executor_jax_arcs_kernel = hybrid` is exactly that, built and validated at block level but
+never run end to end.
+
+It was run end to end and it is at least 4.3x slower: over 2,187 s of arcs against 505 s, killed
+before it finished.
+
+The checker initialiser is as fast as promised, 53 s for every group. The whole cost is the
+sequential polish, 696.7 s for eight 256 bead blocks and 1463.5 s for one 512 bead block, the
+latter 3929 rounds and 196 million steps.
+
+The cause is that the polish re-anneals from the full `max_temp_arcs`, because
+`pipeline/ib/arcs.py` hands `mc_arcs_jax_batch` the same settings object. It therefore throws
+away the initialisation it was given. This is the same trap the genomic floor hit, which is why
+that feature carries `genomic_floor_polish_temp` defaulting to 0. The hybrid has no such knob,
+so what ran is not the algorithm that was validated.
+
+Group one shows the initialiser is doing its job even so: the polish converged in two rounds for
+the median block and 1517 for one straggler, 87 percent of the launch wasted waiting.
+
+A warm start polish is the obvious next attempt, and it is small. It is not a sure thing: a
+sequential step on this GPU costs about 7 us against a CPU core's 1.8, so the straggler has to
+converge in under about thirty percent of its steps merely to break even.
+
+### 5. The estimate_dist stage. Not started
 
 Thirty one percent of the whole chromosome run. Its launches are already wide and already run
 at 0.18 to 0.69 us per step per IB, so the kernel is not the lever. Its cost is sixteen restart
 replicas times the step budget, and that is what to look at.
 
-### 5. The arcs stage. Not started
+### 6. Arcs, the other levers. Not started
 
 Seventy nine percent of the time in the configuration that puts arcs on JAX, twenty two percent
 in the one that leaves it on threaded numba. Two independent levers, and the profiling has to
@@ -183,7 +238,7 @@ depends on whether the arcs kernel is latency bound the way smooth is, which is 
 Separately, the launches converge badly. One took 5,023 rounds and 251 million steps for two
 regions. Another reported 86 percent of its time wasted waiting for its slowest chain.
 
-### 6. Re-measure, then run. Not started
+### 7. Re-measure, then run. Not started
 
 Repeat the stage breakdown with whatever the earlier steps changed, measure the cross block
 relaxation's cost with the cell grid, and only then start the trios.
