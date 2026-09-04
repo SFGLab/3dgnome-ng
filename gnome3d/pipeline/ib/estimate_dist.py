@@ -241,10 +241,17 @@ class EstimateDistStage:
         return int(inputs[0].pos.shape[0])  # type: ignore[attr-defined]
 
     def batch_key(self, inputs: tuple[State, ...]) -> tuple[object, ...]:
-        """Heat-dist is the *dry* smooth (no heat/orientation terms), so the key
-        is just the bead shape-ladder bucket."""
+        """Heat-dist is the dry smooth, with no heat or orientation terms, so nothing but the
+        bead extent could separate two blocks.
+
+        Merging drops that too. The dry pass carries no heat target, which is the only input
+        that grows with the square of the padded extent, so a merged launch of every block's
+        replicates costs tens of megabytes and the packing in `mc_smooth_jax_batch` has no
+        reason to split it."""
         st = inputs[0]
         assert isinstance(st, Densified)
+        if bool(st.settings.merge_smooth_launches):
+            return (0,)
         return (batch_bucket(int(st.pos.shape[0]), st.settings),)
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:

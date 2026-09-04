@@ -21,10 +21,17 @@ from pathlib import Path
 
 SHAPE = re.compile(r"smooth\[mc\]: (\d+) IBs x (\d+) beads")
 DONE = re.compile(r"smooth\[mc\]: (\d+) IBs in ([\d.]+)s - (\d+) rounds \((\d+) steps\)")
+# The bucket is "N-bead bucket" when launches are split by size and "all bead sizes" when they
+# are merged, so the size is optional and a merged group reports its extent as unknown.
 GROUP = re.compile(
-    r"smooth\[batch\]: (\d+) nodes \(group (\d+)/(\d+), heat=(\w+).*?(\d+)-bead bucket"
+    r"smooth\[batch\]: (\d+) nodes \(group (\d+)/(\d+), heat=(\w+).*?"
+    r"(?:(\d+)-bead bucket|all bead sizes)"
 )
-ESTIMATE = re.compile(r"estimate_dist\[batch\]:")
+# The executor prints no start line for a dispatch's first group, so the stage a launch belongs
+# to is read from the marker each stage prints for itself: the estimate stage announces its
+# replicate fan-out, and the smooth stage's own dispatch line follows its launches.
+ESTIMATE = re.compile(r"estimate: \d+ nodes x \d+ reps")
+SMOOTH_DISPATCH = re.compile(r"smooth\[batch\]: \d+ nodes")
 
 # A merged launch pads to its largest member, and the biggest real launches cost 14.2 us per
 # step at 32x16384 and 16.9 at 1x12800. Twenty is a conservative stand-in for that.
@@ -71,10 +78,11 @@ def main(path: str) -> None:
     for line in Path(path).read_text().splitlines():
         if ESTIMATE.search(line):
             in_estimate = True
+        elif SMOOTH_DISPATCH.search(line):
+            in_estimate = False
         m = GROUP.search(line)
         if m:
-            in_estimate = False
-            pending = (m.group(4) == "yes", int(m.group(5)))
+            pending = (m.group(4) == "yes", int(m.group(5) or 0))
             if m.group(2) == "1" and current:
                 dispatches.append(current)
                 current = []
@@ -88,7 +96,7 @@ def main(path: str) -> None:
             beads = shape[1] if shape[0] == k else 0
             launches.append((k, beads, 0 if in_estimate else 1, secs, steps))
             if not in_estimate and pending is not None:
-                current.append((k, pending[1], steps, pending[0], secs))
+                current.append((k, pending[1] or beads, steps, pending[0], secs))
     if current:
         dispatches.append(current)
 
