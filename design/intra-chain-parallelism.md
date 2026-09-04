@@ -113,14 +113,53 @@ sampler, but it changes structures and needs its own validation.
 
 **Parallel tempering.** Replicas on a temperature ladder that swap, the standard cure for a chain
 stuck in a basin, which is what a 3,929 round straggler looks like. Uses width, though only tens
-of replicas rather than the thousands the device could hold.
+of replicas rather than the thousands the device could hold. The population annealing papers put
+the two at comparable efficiency, so the choice between them is about which fits the pipeline,
+and population annealing is the one that scales with the width we have.
 
-**Population annealing.** A population carried through the temperature schedule, resampled toward
-the Boltzmann weight at each step rather than taking the best at the end. The natural fit for a
-latency bound kernel with idle width, and GPU implementations report around 230 times over a
-serial CPU. The problem is that resampling kills replica diversity, and diversity is the product
-here: the hybrid polish already homogenised an ensemble from 1.024 to 0.92 and needed re-noising
-to recover it. This one fights what we are trying to make.
+**Population annealing. Read the papers; the most promising of these, and better than an earlier
+draft of this file said.** Start R replicas at infinite temperature, where equilibrating is
+trivial. To step to the next inverse temperature, resample replica j with weight
+`exp[-(b_i - b_{i-1}) E_j] / Q`, then run some MCMC rounds on each replica at the new
+temperature, and repeat down the ladder.
+
+Three things make it fit us better than expected.
+
+It is reported as comparably efficient to parallel tempering and both as far more efficient than
+simulated annealing, which is what we run. Its authors have also used it as a heuristic to find
+spin glass ground states, so unlike event chain Monte Carlo it has a track record as an optimiser
+and not only as a sampler.
+
+The diversity worry is measurable rather than fatal. Resampling copies replicas, so the
+population correlates, and the standard diagnostic for that is the mean square family size,
+`rho_t = lim R * sum_i n_i^2` over the fractions `n_i` of the population descended from each
+initial replica. The effective number of independent members is `R / rho_t`, and `rho_t = 1` when
+every family is a singleton. So the question is not whether resampling collapses the population
+but how large R has to be for `R / rho_t` to be the ensemble size we actually want, and that is
+a number we can measure rather than a reason not to try.
+
+And it is parallel across replicas, which is the width the kernels leave idle.
+
+Three things against.
+
+The 230 times figure needs its baseline. The paper is explicit that its CPU code parallelises
+with close to perfect scaling and that a comparison against a parallel CPU is made by dividing by
+the core count, so against our sixteen cores it is nearer 14 times. The further tenfold from
+multi-spin coding is an Ising trick on bit packed spins and does not apply to continuous
+positions at all.
+
+The results are for discrete spin models. Dense fluids and complex biomolecules appear in the
+conclusions as a prospect, not a result, and there are no polymer numbers.
+
+It changes what an ensemble is. We currently produce a set of independent local minima, one per
+pipeline run. Population annealing produces a properly weighted equilibrium ensemble at the final
+temperature, with its spread set by that temperature and by R rather than by independent starting
+noise. That is arguably the more principled object, and it is a change to the science and not
+only to the implementation, so it is not a decision to make on performance grounds alone.
+
+It is also a pipeline level change rather than a kernel one: the population has to be carried
+together down a shared temperature ladder with a global resampling step between rungs, where our
+stages anneal each block independently and hand back one structure per run.
 
 **Event chain Monte Carlo. Read the papers; it does not serve this goal.** The idea was that a
 rejection free algorithm removes the dependent chain that is the latency floor. It does not,
@@ -171,6 +210,7 @@ same experiment, which is the one knob measured to move round count.
 
 ## References
 
-Population annealing on GPU, arXiv 1703.03676, and its theory, arXiv 1508.05647. Event chain
-Monte Carlo for dense polymer melts, arXiv 1502.06447. cudaMMC, Bioinformatics 39(10) btad588,
-source at `~/Desktop/bio/cudaMMC`.
+Population annealing on GPU, arXiv 1703.03676, and its theory, arXiv 1508.05647, both read.
+Event chain Monte Carlo for dense polymer melts, arXiv 1502.06447, and Krauth's review, arXiv
+2102.07217, both read. cudaMMC, Bioinformatics 39(10) btad588, source at
+`~/Desktop/bio/cudaMMC`, read.
