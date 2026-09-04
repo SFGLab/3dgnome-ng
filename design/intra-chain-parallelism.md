@@ -4,8 +4,9 @@ How to make one Monte Carlo chain converge in fewer steps, or use more of a devi
 This is the half of the performance problem that batching cannot reach, and it is where the work
 goes once [kernel-performance.md](kernel-performance.md) runs out.
 
-Status. Nothing here is built. Four things have been tried and three failed, which is most of
-what this document is for.
+Status. Nothing here is built. Four things have been tried and three failed, and event chain
+Monte Carlo has been read and ruled out for this purpose, which is most of what this document is
+for.
 
 ## Why this is the only thing left
 
@@ -121,12 +122,52 @@ serial CPU. The problem is that resampling kills replica diversity, and diversit
 here: the hybrid polish already homogenised an ensemble from 1.024 to 0.92 and needed re-noising
 to recover it. This one fights what we are trying to make.
 
-**Event chain Monte Carlo.** Rejection free. A displacement continues until an event under a
-factorised Metropolis filter, instead of proposing, evaluating, accepting or rejecting. It
-removes the dependent chain that is the latency floor rather than working around it. Developed
-for dense polymer melts with excluded volume, which is our system, reaching speeds comparable to
-optimised molecular dynamics with the gain growing at density. Also the largest rewrite, and a
-sampler by construction, so running it under an annealing schedule is off label.
+**Event chain Monte Carlo. Read the papers; it does not serve this goal.** The idea was that a
+rejection free algorithm removes the dependent chain that is the latency floor. It does not,
+because ECMC has one active particle at a time.
+
+What it actually is. The total potential is written as a sum over factors and the Metropolis
+filter is applied to each factor separately, so a move is accepted by consensus and vetoed by any
+single factor. In the infinitesimal limit the rejection probability becomes a sum over factors,
+a veto is attributed to a unique factor and turned into a lifting, and the trajectory between
+vetoes is deterministic. The lifted sample space is the configuration together with the index of
+**the** active particle. That singular is the whole problem for us.
+
+Krauth's review, section 7, is explicit: a road map for multithreaded ECMC exists at present only
+for hard sphere systems, and genuine parallel event driven ECMC for generic potentials is an open
+research subject. Our potentials are generic: springs on a target distance, a truncated `1/d`
+repulsion, a soft excluded volume. So ECMC would be a large rewrite that leaves the sequential
+dependency exactly where it is.
+
+What it would buy instead is rejection freedom, and that is worth measuring rather than
+dismissing, because our waste is large. Acceptance through a production arcs anneal:
+
+| block | overall | first quarter | last quarter | final round |
+|---|---|---|---|---|
+| N=462 | 14.3 percent | 20.0 | 12.3 | 12.6 |
+| N=1227 | 9.0 percent | 25.1 | 2.2 | 1.7 |
+
+At the large block 91 percent of 4.3 million evaluations move nothing, and by the end of the
+anneal 98 percent do not. Every one of those is a full O(N) local score.
+
+Three further costs, if anyone reconsiders. Every term needs a per factor event time, the
+displacement at which the accumulated positive part of its energy change exceeds an exponential
+variable; the springs, the repulsion and the excluded volume are one dimensional along a ray and
+invertible, but the orientation term is not a pairwise potential in the positions at all and does
+not factorise. ECMC's correctness is for a fixed inverse temperature and we anneal. And it is a
+sampler, so using it as an optimiser is off label, as our Metropolis already is.
+
+**The cheap thing the paper actually points at.** If 91 percent of evaluations move nothing, the
+step size is far too large for the temperature, and that is fixable with feedback rather than a
+new algorithm. Adapting the step to hold a measured acceptance rate is standard practice, and it
+is what the step decay in [kernel-performance.md](kernel-performance.md) was groping at and got
+wrong: that is an open loop geometric schedule, this is closed loop on the measured rate.
+
+One caveat carries over from that result and should be designed around rather than discovered
+again. More productive steps improve the score faster per round, and the convergence test stops
+on the score no longer improving, so the run ends lower rather than sooner. Recovering the waste
+buys quality by default. Banking it as wall time needs the convergence threshold loosened in the
+same experiment, which is the one knob measured to move round count.
 
 ## References
 
