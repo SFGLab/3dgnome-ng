@@ -699,16 +699,24 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
 
   **Kernel seeding is process-stable.** Every JAX kernel takes its PRNG offset from
-  `util.stable_seed_offset(log.current(), problems[0]["seed"])`, a blake2b digest of the
-  active scope path mixed with the seed the DAG node carries. The scope path separates
-  concurrent kernels and the node seed ties the draw to `Seeded.seed`, matching what the
-  numba path does. `PYTHONHASHSEED` no longer affects results, so comparing two runs needs
-  no environment override.
+  `util.stable_seed_offset(log.current(), ...)`, a blake2b digest of the active scope path.
+  The scope path separates concurrent kernels. `PYTHONHASHSEED` no longer affects results,
+  so comparing two runs needs no environment override.
 
-  Chains inside one batch are separated by the kernel's own per-index fold rather than by
-  their own seeds, so changing how IBs group into batches still shifts which chain gets
-  which stream. Grouping is deterministic for a given config, so a run reproduces; runs
-  compared across different executor settings do not.
+  **The batched smooth kernel seeds each chain from its own seed.** `mc_smooth_jax_batch`
+  takes its launch key from the scope alone and folds each problem's `seed` per chain, rather
+  than taking the key from `problems[0]` and splitting it by slot. A chain's stream therefore
+  does not depend on how many chains share the launch, on where it sits among them, or on
+  which sub-batch it lands in. That is what lets the grouping change without changing the
+  algorithm. The arcs kernel and the multi-chain restart kernel still split by slot, which is
+  correct for them: their widths come from settings rather than from grouping.
+
+  What remains is arithmetic, not algorithm. XLA vectorises across the chain axis, so a
+  reduction does not associate the same way at every launch width, and the first difference is
+  one unit in the last place of the float32 score. Monte Carlo amplifies that into a different
+  structure, so a run reproduces at a fixed configuration but structures cannot be compared bit
+  for bit across launch widths. `harness/test_batch_seeding.py` compares at equal width for
+  exactly this reason, and measures the width effect separately.
 
   Why not in the reference: 3dgnome is CPU-only. The JAX port is a Python-side acceleration of the same algorithm; numerical results agree with numba within float32 RNG-trajectory noise. Harness/parity tests run with default settings (`mc_backend=numba`), so the new backend doesn't affect the parity baseline.
 
@@ -733,6 +741,36 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Results are applied in group order on the calling thread however the groups interleaved, so
   DAG growth stays deterministic.
+
+  Why not in the reference: 3dgnome is CPU-only and single-process.
+
+- **Merged smooth launches: `[simulation_backend] merge_smooth_launches = yes`, default yes.**
+  ([pipeline/ib/smooth.py](gnome3d/pipeline/ib/smooth.py) `batch_key`,
+  [mc/jax/smooth.py](gnome3d/mc/jax/smooth.py) `_chunk_plan`)
+  `SmoothStage.batch_key` was `(heat, orn, comp, brdg, bead bucket)`, so a set of interaction
+  blocks agreeing on every energy term was still split into one launch per bead bucket. Cost per
+  step in the batched kernel is flat in the launch width, so that split bought nothing. Measured
+  on a real chr1 GM12878 run, 55.8 percent of smooth time sat in launches of four blocks or
+  fewer at 4.8 to 22 us per step per block, against 0.18 to 0.69 in the sixty four wide
+  `estimate_dist` launches in the same log.
+
+  With the flag the bucket leaves the key and `mc_smooth_jax_batch` packs the group into as few
+  launches as device memory allows, largest first so a launch's shape is fixed by its first
+  member. Memory is the only reason to split: the heat target is one `(B, B)` float32 per chain,
+  and merging every heat carrying group of one real dispatch would need 25.8 GB on a 16 GB card.
+  Modelled on two real runs the merge is 3.7x on GM12878 chr1 and 3.5x on H1ESC chr1.
+
+  Two changes make the merge safe, both unconditional because neither is a feature. Each chain
+  seeds from its own seed rather than its slot, so regrouping does not change the draw. And a
+  converged chain holds its state while the rest of the launch runs on, so a small block ends
+  where it would have ended alone instead of annealing for as long as the largest block needs.
+
+  Both change results once, on every JAX smooth run, and no flag restores the old streams.
+  `merge_smooth_launches = no` restores the old grouping only.
+
+  A merged dispatch is one or two groups where it used to be five to nine, so the multi GPU
+  `groups` mode has fewer groups to shard. The wide groups it produces are what `within` needs,
+  so the two changes point at different modes. Nothing here re-tunes that choice.
 
   Why not in the reference: 3dgnome is CPU-only and single-process.
 

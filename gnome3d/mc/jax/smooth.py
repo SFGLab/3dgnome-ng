@@ -11,7 +11,7 @@ confinement-enabled smooth calls back to numba.
 
 import logging
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -1146,6 +1146,7 @@ def _build_smooth_kernel(
         brdg_r0: Any,
         brdg_w: Any,
         base_key: Any,
+        chain_seed: Any,
         stop_improvement: Any,
         stop_successes: Any,
         score_eps: Any,
@@ -1159,10 +1160,22 @@ def _build_smooth_kernel(
             converged = state[11]  # (K,) per-chain
             return jnp.logical_and(jnp.logical_not(jnp.all(converged)), iter_i < _MAX_ITERS)
 
+        def hold(new: Any, old: Any, done: Any) -> Any:
+            """Keep a converged chain's value, so it stops where it would have stopped alone."""
+            return jnp.where(done.reshape(done.shape + (1,) * (new.ndim - 1)), old, new)
+
         def body_fn(state: Any) -> Any:
+            prev = state
             pos, ss, se, sh, so, sc, anchor_orn, T, ms_score, iter_i, _, conv_prev = state
             iter_key = jax.random.fold_in(base_key, iter_i + 1)
-            keys = jax.random.split(iter_key, K)
+            # Folding each chain's own seed rather than splitting by slot keeps a chain's stream
+            # independent of how many chains share the launch and of where it sits among them,
+            # which is what makes the grouping free to change.
+
+            def chain_key(sd: Any) -> Any:
+                return jax.random.fold_in(iter_key, sd)
+
+            keys = jax.vmap(chain_key)(chain_seed)
             pos, ss, se, sh, so, sc, anchor_orn, T, n_ok = batched_mp(
                 pos,
                 ss,
@@ -1212,6 +1225,18 @@ def _build_smooth_kernel(
                 n_active,
                 n_movable_active,
             )
+            # A converged chain keeps its previous state while the rest of the launch runs on,
+            # so it ends where it would have ended alone.  The loop still evaluates it, which
+            # costs nothing: the kernel is latency bound, not arithmetic bound.
+            pos = hold(pos, prev[0], conv_prev)
+            ss = hold(ss, prev[1], conv_prev)
+            se = hold(se, prev[2], conv_prev)
+            sh = hold(sh, prev[3], conv_prev)
+            so = hold(so, prev[4], conv_prev)
+            sc = hold(sc, prev[5], conv_prev)
+            anchor_orn = hold(anchor_orn, prev[6], conv_prev)
+            n_ok = hold(n_ok, prev[10], conv_prev)
+
             score = ss + se + sh + so + sc  # (K,) per-chain total
             # Per-chain plateau: improvement below threshold AND too few accepts
             # this batch.  ms_score is the previous batch's per-chain score.
@@ -1971,49 +1996,77 @@ def mc_smooth_jax_batch(
     """
     if not problems:
         return []
-    bucket = bool(settings.mc_executor_jax_bucket_shapes)
-    bsz = [int(p["pos"].shape[0]) for p in problems]
-    big_b = max((jax_bucket_for(n) if bucket else n) for n in bsz)
     use_heat = problems[0].get("heat_dist") is not None
     use_orn = (
         problems[0].get("char_orientations") is not None
         and problems[0].get("anchor_neighbors") is not None
         and problems[0].get("anchor_neighbor_weights") is not None
     )
-    # Group maxes of the anchor (A) and neighbor-width (M) axes, matching the
-    # padding the chunk applies, so the footprint model sees the real shapes.
-    big_a, big_m = 1, 1
-    if use_orn:
-        a_list, m_list = [], []
-        for p in problems:
-            anchors_i = int(np.count_nonzero(p["fixed"]))
-            nbrs_i = max(
-                (len(p["anchor_neighbors"].get(k, [])) for k in range(anchors_i)), default=1
-            )
-            a_list.append(jax_bucket_for(anchors_i, ANCHOR_BUCKETS) if bucket else anchors_i)
-            m_list.append(jax_bucket_for(max(nbrs_i, 1), NBR_BUCKETS) if bucket else max(nbrs_i, 1))
-        big_a, big_m = max(a_list), max(m_list)
-    max_k, basis = _resolve_smooth_max_k(big_b, big_a, big_m, use_heat, use_orn, settings)
-    if len(problems) <= max_k:
+    shapes = [_padded_shape(p, settings, use_orn) for p in problems]
+    plan = _chunk_plan(shapes, use_heat, use_orn, settings)
+    if len(plan) == 1:
         return _mc_smooth_jax_batch_chunk(problems, settings)
+
     LOG.debug(
-        "region-batch[smooth]: %d IBs > max_k=%d (%s) at B=%d heat=%s; running %d sub-batches",
+        "region-batch[smooth]: %d IBs at B<=%d heat=%s in %d sub-batches",
         len(problems),
-        max_k,
-        basis,
-        big_b,
+        max(s[0] for s in shapes),
         use_heat,
-        -(-len(problems) // max_k),
+        len(plan),
     )
-    results: list[tuple[float, np.ndarray[Any, Any]]] = []
-    n_chunks = (len(problems) + max_k - 1) // max_k
-    for ci, i in enumerate(range(0, len(problems), max_k), start=1):
-        results.extend(
-            _mc_smooth_jax_batch_chunk(
-                problems[i : i + max_k], settings, f", chunk {ci}/{n_chunks}"
-            )
+    out: list[tuple[float, np.ndarray[Any, Any]] | None] = [None] * len(problems)
+    for ci, idx in enumerate(plan, start=1):
+        got = _mc_smooth_jax_batch_chunk(
+            [problems[i] for i in idx], settings, f", chunk {ci}/{len(plan)}"
         )
-    return results
+        for i, r in zip(idx, got, strict=True):
+            out[i] = r
+    assert all(r is not None for r in out)
+    return cast("list[tuple[float, np.ndarray[Any, Any]]]", out)
+
+
+def _padded_shape(
+    problem: dict[str, Any], settings: "Settings", use_orn: bool
+) -> tuple[int, int, int]:
+    """The bead, anchor and neighbour-width extents one IB pads up to in a launch."""
+    bucket = bool(settings.mc_executor_jax_bucket_shapes)
+    n = int(problem["pos"].shape[0])
+    b = jax_bucket_for(n) if bucket else n
+    if not use_orn:
+        return b, 1, 1
+    anchors = int(np.count_nonzero(problem["fixed"]))
+    nbrs = max(
+        max((len(problem["anchor_neighbors"].get(k, [])) for k in range(anchors)), default=1), 1
+    )
+    a = jax_bucket_for(anchors, ANCHOR_BUCKETS) if bucket else anchors
+    m = jax_bucket_for(nbrs, NBR_BUCKETS) if bucket else nbrs
+    return b, a, m
+
+
+def _chunk_plan(
+    shapes: list[tuple[int, int, int]], use_heat: bool, use_orn: bool, settings: "Settings"
+) -> list[list[int]]:
+    """Split IB indices into launches, each as wide as device memory allows.
+
+    A launch pads every member up to its largest, and with heat on that padding grows with the
+    square of the bead extent, so how the IBs are divided decides both how many launches there
+    are and how much each one wastes. Taking the largest first fixes a launch's shape at its
+    first member and keeps a small IB from being padded up to a big one's extent.
+
+    A wider launch is never slower, since the kernel is latency bound rather than arithmetic
+    bound, so the only reason to split at all is the memory a launch needs.
+    """
+    order = sorted(range(len(shapes)), key=lambda i: shapes[i], reverse=True)
+    plan: list[list[int]] = []
+    cap = 0
+    for i in order:
+        if not plan or len(plan[-1]) >= cap:
+            b, a, m = shapes[i]
+            cap = _resolve_smooth_max_k(b, a, m, use_heat, use_orn, settings)[0]
+            plan.append([i])
+        else:
+            plan[-1].append(i)
+    return plan
 
 
 def _mc_smooth_jax_batch_chunk(
@@ -2228,8 +2281,19 @@ def _mc_smooth_jax_batch_chunk(
     # Scope path distinguishes concurrent kernels; the node seed makes the draw
     # follow from Seeded.seed. Chains within a batch are separated by the kernel's
     # own per-index fold, so grouping still shifts which chain gets which stream.
-    seed_offset = stable_seed_offset(log.current(), problems[0].get("seed"))
-    base_key = jax.random.PRNGKey(seed_offset)
+    # The launch key comes from the scope alone and each chain folds its own seed, so neither
+    # the composition of the batch nor a chain's slot in it reaches the draw. Taking the key
+    # from `problems[0]` instead would tie every chain's stream to whichever IB happened to sort
+    # first, and regrouping or sub-batching would then change results.
+    base_key = jax.random.PRNGKey(stable_seed_offset(log.current()))
+    # A caller that supplies no seed falls back to the slot, which is the old behaviour and is
+    # only reachable from a bench. The pipeline gives every IB a seed.
+    chain_seed_k = jnp.asarray(
+        np.array(
+            [int(p.get("seed", i) or 0) & 0x7FFFFFFF for i, p in enumerate(problems)],
+            dtype=np.uint32,
+        )
+    )
 
     _desc = ("" if not use_heat else ", heat") + (
         "" if not use_orn else f", orientation ({A} anchors, <={M} motif-nbrs/anchor)"
@@ -2282,6 +2346,7 @@ def _mc_smooth_jax_batch_chunk(
         brdg_r0_k,
         jnp.float32(brdg_w_v),
         base_key,
+        chain_seed_k,
         jnp.float32(settings.mc_stop_improvement_smooth),
         jnp.int32(settings.mc_stop_successes_smooth),
         jnp.float32(1e-6),

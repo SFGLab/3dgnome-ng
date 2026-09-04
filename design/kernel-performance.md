@@ -113,7 +113,7 @@ It targeted arithmetic. The kernel is latency bound at every production shape, s
 arithmetic saves nothing. Reinstate this only if a later measurement shows a shape where the
 arithmetic actually dominates.
 
-### 3. Merge the smooth groups. Next
+### 3. Merge the smooth groups. Built, not yet measured end to end
 
 Group by the energy term signature alone and pad the group to the ladder bucket of its largest
 member, instead of splitting a uniform set across bead buckets.
@@ -130,18 +130,28 @@ slowest chain's step count and a conservative 20 us per step:
 | GM12878 chr1 | 3,315 s | 5 to 9 becomes 1 to 2 | 884 s | 3.7x |
 | H1ESC chr1 | 2,909 s | 4 to 11 becomes 1 | 823 s | 3.5x |
 
-Two things have to be settled first, and neither is a performance question.
+Two things had to be settled first, and neither was a performance question. Both are done.
 
-A merged launch runs until every chain converges, and a converged chain is latched but not
-frozen, so it keeps taking steps. The small IBs in a merged launch would anneal for as long as
-the largest one needs. Freezing a converged chain's moves keeps each IB's anneal the same as it
-would have been alone, and costs nothing, since the arithmetic is free.
+A merged launch runs until every chain converges, and a converged chain was latched but not
+frozen, so it kept taking steps and a small IB would have annealed for as long as the largest
+one needed. A converged chain now holds its state while the rest of the launch runs on, which
+costs nothing because the arithmetic is free.
 
-Regrouping changes results whatever else is done, because a chain's RNG stream comes from
-`jax.random.split(iter_key, K)` at its index in the launch, and `base_key` comes from
-`problems[0]`. Both depend on who is batched with whom. Folding each chain's own stable id
-instead would make grouping irrelevant to the draw, which would also make the multi GPU `within`
-mode byte exact. That is a one time break of existing results and needs its own validation.
+A chain's stream came from `jax.random.split(iter_key, K)` at its slot, and `base_key` came from
+`problems[0]`, so both depended on who was batched with whom. The launch key now comes from the
+scope alone and each chain folds its own seed. The arcs and multi-chain-restart kernels still
+split by slot, which is correct for them since their widths come from settings rather than from
+grouping.
+
+What is left is arithmetic. XLA vectorises across the chain axis, so a reduction does not
+associate the same way at every width. Measured, the first difference is 7.06e-08 relative,
+which is one float32 ulp, and Monte Carlo then amplifies it into a different structure. A run
+reproduces at a fixed configuration, but structures cannot be compared bit for bit across launch
+widths, and this change breaks existing JAX smooth results once.
+
+Nine checks in `harness/test_batch_seeding.py`, which compare at equal width to separate the
+algorithm from the arithmetic and measure the width effect on its own. Removing either fix makes
+them fail.
 
 ### 4. The estimate_dist stage. Not started
 

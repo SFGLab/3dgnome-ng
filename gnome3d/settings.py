@@ -171,6 +171,12 @@ class Settings:
     # Padding is inert (pad beads never move + contribute zero energy), so
     # results are unchanged; this is a pure compile-time optimization.
     mc_executor_jax_bucket_shapes: bool
+    # Put every interaction block that shares an energy term signature into one launch,
+    # instead of splitting it by bead bucket as well.  Cost per step in the batched kernels is
+    # flat in the launch width, so a launch of sixty four chains costs about what a launch of
+    # one costs and the split is pure loss.  Device memory still bounds a launch, and the
+    # packing in `mc_smooth_jax_batch` splits only for that.
+    merge_smooth_launches: bool
     # Cap on the region-batch vmap width (IBs per kernel launch) for the batched
     # JAX kernels, per kernel.  Excess IBs run in sequential sub-batches.  The cap
     # exists only to bound device memory (a wider launch is never slower than more
@@ -506,6 +512,7 @@ class Settings:
         self.mc_executor_smooth = "auto"
         self.mc_executor_threaded_workers = 1
         self.mc_executor_jax_bucket_shapes = False
+        self.merge_smooth_launches = True
         self.mc_executor_jax_batch_width_smooth = "auto"
         self.mc_executor_jax_batch_width_arcs = "auto"
         self.mc_executor_jax_arcs_kernel = "mc"
@@ -1016,6 +1023,9 @@ class Settings:
             "simulation_backend",
             "mc_executor_jax_bucket_shapes",
             self.mc_executor_jax_bucket_shapes,
+        )
+        self.merge_smooth_launches = getb(
+            "simulation_backend", "merge_smooth_launches", self.merge_smooth_launches
         )
         self.mc_executor_jax_batch_width_smooth = gets(
             "simulation_backend",

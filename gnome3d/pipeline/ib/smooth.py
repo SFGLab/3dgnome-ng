@@ -192,6 +192,12 @@ class SmoothStage:
         )
         comp = st.bead_compartment is not None
         brdg = st.bead_accessibility is not None
+        # The bead bucket is only in the key when launches are not merged.  A launch pads to its
+        # largest member and costs the same either way, so splitting a term uniform set by size
+        # buys nothing and costs one launch per bucket.  `mc_smooth_jax_batch` still splits a
+        # merged group for device memory.
+        if bool(st.settings.merge_smooth_launches):
+            return heat, orn, comp, brdg, 0
         return heat, orn, comp, brdg, batch_bucket(int(st.pos.shape[0]), st.settings)
 
     @staticmethod
@@ -201,7 +207,7 @@ class SmoothStage:
         return (
             f"heat={'yes' if heat else 'no'} orn={'yes' if orn else 'no'} "
             f"comp={'yes' if comp else 'no'} brdg={'yes' if brdg else 'no'} "
-            f"{bucket}-bead bucket"
+            + (f"{bucket}-bead bucket" if bucket else "all bead sizes")
         )
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:
