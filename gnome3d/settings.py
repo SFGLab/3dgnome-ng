@@ -369,6 +369,11 @@ class Settings:
     # accept count below its threshold and acceptance sits at 15 to 50 percent throughout. So
     # this number sets the round count, and the round count is the arcs wall. Smooth and the
     # interaction-block stage pass 2.0 for the same argument, unreachable, so this is arcs only.
+    # Bias an arcs proposal along the local descent direction by this fraction, 0 being the
+    # isotropic draw the reference makes. The gradient comes free from the same sweep as the
+    # score. It proposes only: the Metropolis rule still rejects, which is what keeps a singular
+    # 1/d repulsion safe where a gradient solver would see unbounded forces.
+    arcs_force_bias: float
     mc_stop_ratio_arcs: float
     mc_step_decay_arcs: float
     mc_step_decay_smooth: float
@@ -769,6 +774,7 @@ class Settings:
         self.mc_stop_improvement_smooth = 0.995
         self.mc_stop_successes_smooth = 5
         self.mc_stop_steps_smooth = 10000
+        self.arcs_force_bias = 0.0
         self.mc_stop_ratio_arcs = 0.9999
         self.mc_step_decay_arcs = 1.0
         self.mc_step_decay_smooth = 1.0
@@ -1356,6 +1362,7 @@ class Settings:
         self.mc_stop_ratio_arcs = getf(
             "simulation_arcs", "stop_condition_ratio", self.mc_stop_ratio_arcs
         )
+        self.arcs_force_bias = getf("simulation_arcs", "force_bias", self.arcs_force_bias)
         self.mc_step_decay_smooth = getf(
             "simulation_arcs_smooth", "step_decay", self.mc_step_decay_smooth
         )

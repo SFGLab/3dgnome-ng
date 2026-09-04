@@ -289,6 +289,7 @@ def run_outer_loop(
     cell_next: I32Array = NO_I32,
     cell_where: I32Array = NO_I32,
     cell_buf: I32Array = NO_I32,
+    force_bias: float = 0.0,
     step_decay: float = 1.0,
     step_decay_floor: float = 0.1,
 ) -> float:
@@ -383,6 +384,7 @@ def run_outer_loop(
             cell_next,
             cell_where,
             cell_buf,
+            force_bias,
         )
         score = (
             score_struct

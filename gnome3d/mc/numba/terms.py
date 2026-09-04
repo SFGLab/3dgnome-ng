@@ -717,6 +717,61 @@ def _local_arcs_nb(
     return sc
 
 
+# fastmath matches `_local_arcs_nb`, whose score this replaces on the biased path. The two feed
+# the same incremental total, so a reassociation difference between them would drift it over tens
+# of millions of steps. The gradient only steers a proposal, so its own precision is not critical.
+@njit(cache=True, fastmath=True, nogil=True)
+def _local_arcs_grad_nb(
+    pos: F64Array,
+    exp: F64Array,
+    p: int,
+    stretch_k: float,
+    squeeze_k: float,
+    rep_inv_cutoff: float = 0.0,
+) -> tuple[float, float, float, float]:
+    """The arcs local score for anchor `p` and its gradient, in one pass.
+
+    The same sum as `_local_arcs_nb`, with the derivative accumulated alongside so a force biased
+    proposal costs no extra sweep. Returns the score and the gradient with respect to `pos[p]`,
+    so a descent direction is its negation.
+
+    The repulsion `max(0, 1/d - c)` differentiates to `-r/d^3` where it is active and to zero
+    beyond the cutoff, and a spring `k ((d - e)/e)^2` to `2 k (d - e) r / (e^2 d)` with `k`
+    switching at `d = e`. Both have a kink, which is why this drives a proposal and not a solver.
+    """
+    n = pos.shape[0]
+    sc = 0.0
+    gx = 0.0
+    gy = 0.0
+    gz = 0.0
+    for i in range(n):
+        if i == p:
+            continue
+        e = exp[i, p]
+        dx = pos[p, 0] - pos[i, 0]
+        dy = pos[p, 1] - pos[i, 1]
+        dz = pos[p, 2] - pos[i, 2]
+        d = math.sqrt(dx * dx + dy * dy + dz * dz)
+        dd = d if d > 1e-10 else 1e-10
+        if e < 0.0:
+            v = 1.0 / dd - rep_inv_cutoff
+            if v > 0.0:
+                sc += v
+                w = -1.0 / (dd * dd * dd)
+                gx += w * dx
+                gy += w * dy
+                gz += w * dz
+        elif e >= 1e-6:
+            rel = (d - e) / e
+            k = stretch_k if rel >= 0.0 else squeeze_k
+            sc += rel * rel * k
+            w = 2.0 * k * rel / (e * dd)
+            gx += w * dx
+            gy += w * dy
+            gz += w * dz
+    return sc, gx, gy, gz
+
+
 @njit(cache=True, fastmath=True, nogil=True)
 def init_arcs_nb(
     pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float, rep_inv_cutoff: float = 0.0
@@ -1031,6 +1086,7 @@ def batch_mc_nb(
     cell_next: I32Array = NO_I32,
     cell_where: I32Array = NO_I32,
     cell_buf: I32Array = NO_I32,
+    force_bias: float = 0.0,
 ) -> tuple[float, float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
     n_mov = movable.shape[0]
@@ -1048,7 +1104,23 @@ def batch_mc_nb(
 
         # --- prev local scores ---
         if struct_type == STRUCT_ARCS:
-            loc_struct_prev = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff)
+            if force_bias > 0.0:
+                # The gradient rides the same sweep as the score, so biasing costs nothing extra.
+                # The displacement was already drawn above and is only steered here, which leaves
+                # the random stream exactly as it was.
+                loc_struct_prev, gx, gy, gz = _local_arcs_grad_nb(
+                    pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff
+                )
+                gn = math.sqrt(gx * gx + gy * gy + gz * gz)
+                if gn > 1e-12:
+                    w = force_bias * step_size / gn
+                    dx = (1.0 - force_bias) * dx - w * gx
+                    dy = (1.0 - force_bias) * dy - w * gy
+                    dz = (1.0 - force_bias) * dz - w * gz
+            else:
+                loc_struct_prev = _local_arcs_nb(
+                    pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff
+                )
         elif struct_type == STRUCT_CHAIN:
             loc_struct_prev = local_smooth_nb(
                 pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w

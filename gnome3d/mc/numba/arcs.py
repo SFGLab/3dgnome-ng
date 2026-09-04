@@ -172,6 +172,7 @@ def mc_arcs_numba(
         score_orn=0.0,
         score_excl=score_excl,
         score_conf=score_conf,
+        force_bias=float(settings.arcs_force_bias),
         step_decay=float(settings.mc_step_decay_arcs),
         step_decay_floor=float(settings.mc_step_decay_floor),
     )
