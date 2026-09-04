@@ -218,6 +218,74 @@ A warm start polish is the obvious next attempt, and it is small. It is not a su
 sequential step on this GPU costs about 7 us against a CPU core's 1.8, so the straggler has to
 converge in under about thirty percent of its steps merely to break even.
 
+### 4b. The kernels are latency bound. Measured, and it closes the GPU side
+
+The roofline, from what the kernel provably touches, since XLA cannot cost the loops.
+
+| shape | K | B | us/step | GB/s | percent of DRAM | percent of arithmetic |
+|---|---|---|---|---|---|---|
+| smooth heat+orn | 3 | 16384 | 39.02 | 15 | 5 | 0.1 |
+| smooth orn only | 6 | 2048 | 18.17 | 8 | 3 | 0.0 |
+| estimate dry | 80 | 16384 | 23.86 | 659 | 229 | 2.5 |
+| estimate dry | 32 | 16384 | 14.24 | 442 | 153 | 1.7 |
+
+Nothing is memory bound. The wide launches exceed the card's DRAM bandwidth, which is only
+possible because their 15.7 MB working set fits its 32 MB L2, so DRAM never binds, and they are
+still at 2.5 percent of arithmetic peak. The narrow launches sit at a few percent of one ceiling
+and a tenth of a percent of the other. Far from both means the limit is the dependent chain of
+sequential steps: each accept or reject must resolve before the next begins. That agrees with the
+width scan, which found thirty two times the chains for 1.24 times the time.
+
+`playground/jax_roofline.py` reports this. Read its note on `cost_analysis`: XLA does not unroll
+a `while_loop` over a `fori_loop` for static costing, so its flops and bytes are a small fraction
+of the real work. Measured against a hand count it under-reported by about 128 times, so the
+figures above are analytic rather than from that call.
+
+One correction this forces. The heat carrying launch is not slow because of the heat term. Every
+launch costs 18 to 39 us per step whatever its terms, so 39 us at three chains against 23.86 at
+eighty is the latency floor divided by fewer chains. It is slow because it is three chains wide,
+and it is three chains wide because of the heat matrix.
+
+### 4c. Grouping is done, and merging is the right policy
+
+A per step comparison says a padded wide launch is 30 percent worse than two launches split by
+size. That is the wrong question. Sequential launches add their rounds where a merged launch runs
+the slowest chain's, and the round collapse dominates: the estimate stage's four launches were
+191, 239, 160 and 184 rounds for 469.5 s, and merged they are 236 rounds for 281.5 s. Costing a
+two way size split at real production rates gives 170 s plus 156 s against 281 s merged, so
+merging still wins.
+
+The heat carrying dispatch is the one that cannot merge further, and not for want of trying. The
+heat buffer is `(K, B, B)`, so a 512 bead block padded into a 16,384 launch costs a full 1.07 GB.
+Adding a small chain costs what adding a large one costs, which is why the width caps at three
+against an 11.1 GiB budget and a 3.5 peak overhead factor. The packing already does the best
+available thing, three biggest together and two smallest in a cheap 4096 launch. The remaining
+84 s, about six percent of the run, needs a sparse heat target, which is a capacity fix and not
+a bandwidth one.
+
+### 4d. The arcs cell grid. The last well founded lever
+
+Measured on real converged blocks, how many anchors fall inside the repulsion cutoff:
+
+| N | neighbours inside | fraction | grid does |
+|---|---|---|---|
+| 103 | 59 | 57 percent | 1.7x less |
+| 462 | 100 | 22 percent | 4.6x less |
+| 1146 | 118 | 10 percent | 9.7x less |
+| 1227 | 112 | 9 percent | 11x less |
+
+The neighbour count is flat at 60 to 120 whatever the block size, which is the local density
+property that made the smooth grid 22.8 times faster and bit identical. So the advantage grows
+with N, the 2,048 anchor blocks land near 15 to 18 times, and those are the blocks that set the
+arcs wall, since eleven blocks on sixteen threaded workers means the wall is the slowest single
+one. It works because arcs runs on the CPU, where cutting the per step scan converts directly to
+wall time and there is no latency floor to hide behind.
+
+`playground/jax_roofline.py` and the capture script that produced the table both run in minutes,
+which is the point. Three of this section's measurements were wrong before they were right, each
+time because a short synthetic benchmark measured a fixed cost or answered a different question
+than the one that mattered. A real run's log did not mislead once.
+
 ### 5. The estimate_dist stage. Not started
 
 Thirty one percent of the whole chromosome run. Its launches are already wide and already run
