@@ -1,8 +1,10 @@
 # Intra chain parallelism
 
-How to make one Monte Carlo chain converge in fewer steps, or use more of a device per step.
-This is the half of the performance problem that batching cannot reach, and it is where the work
-goes once [kernel-performance.md](kernel-performance.md) runs out.
+What has been tried to parallelise one Monte Carlo chain, and why most of it failed. This is the
+half of the performance problem that batching cannot reach.
+[kernel-performance.md](kernel-performance.md) covers the cost of a step and the grouping of
+work. [algorithm-improvements.md](algorithm-improvements.md) covers changing the Monte Carlo so
+it needs fewer steps, which is the open space.
 
 Status. Nothing here is built. Four things have been tried and three failed, event chain Monte
 Carlo has been read and ruled out for this purpose, and population annealing has been ruled out

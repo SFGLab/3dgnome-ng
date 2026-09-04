@@ -4,9 +4,11 @@ Where a reconstruction spends its wall time, what has been done about it, and wh
 work is ordered by measured cost rather than by which kernel is most interesting. Each step
 records its outcome when it is finished, so this file is the record as well as the plan.
 
-Scope. This file covers the cost of a step and how work is grouped into launches. Making one
-chain converge in fewer steps, or use more of a device within a step, is a separate problem and
-lives in [intra-chain-parallelism.md](intra-chain-parallelism.md).
+Scope. This file covers the cost of a step and how work is grouped into launches. Two neighbours
+carry the rest. [intra-chain-parallelism.md](intra-chain-parallelism.md) is the record of what
+has been tried to parallelise within one chain and why most of it failed.
+[algorithm-improvements.md](algorithm-improvements.md) is the open space: changing the Monte
+Carlo itself so it needs fewer steps.
 
 Status. The numba excluded volume scan is fixed and both batched stages now merge their
 launches, together 1.29x end to end. Arcs is the largest stage left, its wall is one straggler
