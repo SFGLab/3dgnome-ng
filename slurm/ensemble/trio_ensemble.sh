@@ -42,7 +42,10 @@
 #SBATCH --job-name=trio_ens
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
+# A dgx node is 128 cores and 8 A100s, so 16 cores per GPU task still fits eight tasks on a
+# node. The arcs stage runs on these cores now, and its wall is the slowest single block on
+# one of them, so this is headroom rather than a lever.
+#SBATCH --cpus-per-task=16
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=64G
 #SBATCH --partition=long

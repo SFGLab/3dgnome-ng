@@ -83,7 +83,16 @@ CANONICAL: dict[str, dict[str, object]] = {
         "ib_workers": "auto",
         "heatmap_chains": 1,
         "smooth_chains": 1,
-        "mc_executor_arcs": "batch",
+        # Arcs runs on the CPU, not the GPU, and it is the one stage where that is true.
+        # Measured on a genome scale trio run, where arcs is 89.6 percent of the wall: one
+        # launch put 54 blocks together, 53 of them converged by round 2 and one needed 3,753,
+        # and a vmapped launch cannot retire a converged chain, so all 54 ran 3,753 rounds.
+        # That is 10.1 billion chain steps where independent CPU tasks do 193 million, because
+        # each block exits when it converges. On top of that an arcs step reduces over 256 to
+        # 2,048 anchors, which is a tight cache resident loop on a core at about 1.8 us and a
+        # whole kernel dispatch on the device at 18.4 us measured. Smooth is the opposite shape,
+        # eighty chains of 16,384 beads with similar convergence, and stays on the GPU.
+        "mc_executor_arcs": "threaded",
         "mc_executor_densify": "threaded",
         "mc_executor_estimate_dist": "batch",
         "mc_executor_smooth": "batch",

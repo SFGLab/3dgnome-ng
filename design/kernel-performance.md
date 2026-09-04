@@ -106,6 +106,49 @@ They are narrow because `SmoothStage.batch_key` is `(heat, orn, comp, brdg, shap
 the shape ladder splits an otherwise uniform set across many buckets. The first dispatch of that
 run is 28 IBs that agree on every energy term flag, cut into five launches by bead count alone.
 
+## Where the time really goes, at genome scale
+
+Everything above was measured on a 60 Mb region, where smooth and estimate_dist dominate. A
+real genome scale trio run says something different, and the difference is the whole picture:
+
+| stage | seconds | share |
+|---|---|---|
+| arcs | 15,246 | 89.6 percent |
+| estimate_dist | 1,532 | 9.0 percent |
+| smooth | 193 | 1.1 percent |
+
+So the work above went into ten percent of the real workload. Arcs is the rest, and it was
+running on the GPU, which is the one stage where that is wrong.
+
+Its launches, from the same run:
+
+| IBs | beads | seconds | rounds | median converged | slowest | wasted |
+|---|---|---|---|---|---|---|
+| 54 | 256 | 3,383 | 3,753 | round 2 | 3,753 | 95 percent |
+| 3 | 1024 | 2,611 | 3,032 | 1,769 | 3,032 | 35 percent |
+| 3 | 2048 | 5,337 | 5,791 | 4,856 | 5,791 | 12 percent |
+
+Three reasons the GPU loses here, largest first.
+
+A vmapped launch cannot retire a converged chain. In the first launch 53 of 54 blocks are done
+by round 2 and one needs 3,753, so all 54 run 3,753 rounds: 10.1 billion chain steps where
+independent CPU tasks do 193 million, because each block exits when it converges.
+
+The per step work is too small to amortise a dispatch. An arcs step reduces over 256 to 2,048
+anchors, a tight cache resident loop on a core at about 1.8 us against 18.4 us per launch step
+measured on the device.
+
+And arcs has no width to hide behind. Its blocks are small and few, where smooth runs eighty
+chains of 16,384 beads with similar convergence and is the best case for the same kernel.
+
+Moving arcs to `threaded` projects the stage from 15,246 s to about 1,500 s and the run from
+17,016 to about 3,300, roughly five times, on the workload that is actually paid for. This is a
+projection from the measured GPU numbers and a prior CPU measurement, not an A/B.
+
+It also corrects a conclusion drawn earlier in this file. The straggler was dismissed as absent
+after measuring an eleven block region where blocks converge at similar rates. At genome scale
+fifty four blocks share a launch and one takes 1,800 times the median.
+
 ## Steps
 
 ### 1. Which executor the smooth stage should use. Answered
