@@ -7,7 +7,8 @@ records its outcome when it is finished, so this file is the record as well as t
 Status. The numba excluded volume scan is fixed and both batched stages now merge their
 launches, together 1.29x end to end. Arcs is the largest stage left, its wall is one straggler
 block on one core, and the hybrid kernel that would address it re-anneals from full temperature
-and is 4.3x slower than the CPU as wired.
+and is 4.3x slower than the CPU as wired. A cell grid for its repulsion was built and refuted:
+its blocks are too small for one to pay.
 
 ## How to measure
 
@@ -285,6 +286,38 @@ wall time and there is no latency floor to hide behind.
 which is the point. Three of this section's measurements were wrong before they were right, each
 time because a short synthetic benchmark measured a fixed cost or answered a different question
 than the one that mattered. A real run's log did not mislead once.
+
+### 4e. The arcs cell grid. Built, measured, refuted, reverted
+
+Built with the same linked list grid the smooth stage uses, plus a compressed row for the
+springs, which are not distance limited and so cannot come from a grid. It reached bit
+identical results end to end, but only after dropping `fastmath` from the arcs local scorer:
+reassociation makes the sum depend on how LLVM vectorised it, so the full scan and the gridded
+scan disagreed on 73 of 400 anchors at the 1e-14 level. That flag was measured at 18.1 ms
+against 18.2 without it, so it was buying nothing and costing exactness.
+
+At the density real blocks actually have, it loses.
+
+| N | inside the cutoff | grid off | grid on | |
+|---|---|---|---|---|
+| 462 | 15 percent | 0.032 s | 0.106 s | 0.3x |
+| 1227 | 6.6 percent | 0.089 s | 0.166 s | 0.5x |
+| 2048 | 5.4 percent | 0.359 s | 0.295 s | 1.2x |
+
+A first benchmark said 3.2 to 3.3 times, on structures far more spread out relative to the
+cutoff than a real converged block. Corrected to the measured densities the win disappears.
+
+Two reasons, and both say a grid can never pay here. Arcs blocks are small, so the full scan is
+a tight cache friendly loop over a thousand anchors rather than the forty thousand that made the
+smooth scan catastrophic, and a linked list's pointer chasing costs more per candidate than that
+loop does. And a three by three by three box of cells is 6.4 times the volume of the sphere it
+is approximating, so at 6.6 percent inside the cutoff the grid still examines about 42 percent
+of the block.
+
+The neighbour count table in the previous section is still correct. What was wrong was reading
+"11 times less distance work" as an available speedup: it is an upper bound on a perfect
+neighbour list, and neither the grid's geometry nor its constant factor gets close to it at this
+block size. Reverted; nothing kept.
 
 ### 5. The estimate_dist stage. Not started
 
