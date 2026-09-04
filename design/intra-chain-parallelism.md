@@ -92,6 +92,51 @@ Also worth noting: cudaMMC GPU-ised only the heatmap level MC.
 called, so arcs and arcs smooth stayed on the CPU. The stage it optimised costs us 3.0 seconds.
 Its 3 to 25 times figures are for a profile nothing like ours.
 
+## The landscape is not rough, and that rules out two of the options
+
+Measured before prototyping anything, because population annealing and parallel tempering both
+exist to traverse a rough landscape with a temperature ladder and neither can help if the ladder
+does not.
+
+`delta_temp` is applied once per MC step rather than per round. At the reference's 0.9999 over
+50,000 steps a round the temperature falls by a factor of 148 every round, so from `max_temp` 5.0
+it is 3e-2 after one round and 1e-13 after six, and runs take seventy to ninety. **Every stage in
+this pipeline anneals for about three rounds and then descends greedily for the rest.** Those are
+the reference's own values, unchanged, in every stage, so this is inherited rather than chosen.
+
+So the question is whether a real ladder would be better. On three real captured arcs blocks,
+one chain, a fixed budget of two million steps so the work is matched, three seeds, energy
+relative to the reference schedule:
+
+| ladder | N=1227 | N=1146 | N=462 |
+|---|---|---|---|
+| reference 0.9999, dead after 1 percent of the run | 1.000 | 1.000 | 1.000 |
+| reaches 0.01 a tenth of the way in | 1.001 | 1.004 | 0.985 |
+| reaches 0.01 at the end | 1.023 | 1.028 | 1.002 |
+| reaches 0.1 at the end | 1.043 | 1.045 | 1.027 |
+| no temperature at all | 1.000 | 1.004 | 0.982 |
+
+A ladder that actually spans the run is **worse**, by two to four percent. Pure greedy descent
+ties the reference or beats it. Temperature buys nothing on this landscape.
+
+That kills two options outright. Population annealing resamples on the Boltzmann weight
+`exp[-(b_i - b_{i-1}) E_j]`; at the effectively zero temperature this schedule spends its time at
+those weights degenerate and the whole population collapses onto the lowest energy replica in a
+single step, so `rho_t` goes to R and the effective ensemble size to one. It would be maximally
+destructive exactly where our runs live, in exchange for traversing a ladder that is worth
+nothing. Parallel tempering fails for the same reason: swapping with higher temperatures only
+helps if those temperatures explore usefully, and here they do not.
+
+It also says what the problem actually is. This is not annealing that needs a better schedule, it
+is **greedy descent with a badly sized step**: at the end of a run 98 percent of proposals are
+rejected, which for a downhill-only search means the step is far too large. The classical fix is
+an adaptive step, a trust region, not a better sampler.
+
+Measured on the arcs stage only, on three blocks and three seeds. The smooth stage has a
+different energy, chain bonds and angles and heat and orientation, and has not been checked.
+
+`playground/anneal_ladder_real.py` runs this, on blocks captured by the script beside it.
+
 ## Options, cheapest first
 
 **Diagnose the straggler before redesigning for it.** One arcs launch ran 3,929 rounds where its
@@ -111,55 +156,28 @@ cannot otherwise help, and it does not change who moves when, only how good the 
 It does make the search greedier, which is defensible because this is an optimiser and not a
 sampler, but it changes structures and needs its own validation.
 
-**Parallel tempering.** Replicas on a temperature ladder that swap, the standard cure for a chain
-stuck in a basin, which is what a 3,929 round straggler looks like. Uses width, though only tens
-of replicas rather than the thousands the device could hold. The population annealing papers put
-the two at comparable efficiency, so the choice between them is about which fits the pipeline,
-and population annealing is the one that scales with the width we have.
+**Parallel tempering. Ruled out by the measurement above.** Replicas on a temperature ladder that
+swap. It cures a chain stuck in a basin, and a ladder buys nothing here.
 
-**Population annealing. Read the papers; the most promising of these, and better than an earlier
-draft of this file said.** Start R replicas at infinite temperature, where equilibrating is
-trivial. To step to the next inverse temperature, resample replica j with weight
-`exp[-(b_i - b_{i-1}) E_j] / Q`, then run some MCMC rounds on each replica at the new
-temperature, and repeat down the ladder.
+**Population annealing. Read the papers, then ruled out by the measurement above.** Start R
+replicas at infinite temperature, resample each rung on the Boltzmann weight, run MCMC rounds,
+repeat down the ladder. It is reported comparably efficient to parallel tempering and both far
+more efficient than simulated annealing, its authors have used it to find spin glass ground
+states so it has a track record as an optimiser, and it is parallel across replicas, which is the
+width the kernels leave idle. Its resampling correlates the population, but that is measurable
+rather than fatal: the mean square family size `rho_t = lim R * sum_i n_i^2` gives `R / rho_t` as
+the effective number of independent members.
 
-Three things make it fit us better than expected.
+None of that survives a landscape where the ladder is worth nothing. At the effectively zero
+temperature our schedule spends its time at, the resampling weights degenerate and the population
+collapses to one effective member in a single rung.
 
-It is reported as comparably efficient to parallel tempering and both as far more efficient than
-simulated annealing, which is what we run. Its authors have also used it as a heuristic to find
-spin glass ground states, so unlike event chain Monte Carlo it has a track record as an optimiser
-and not only as a sampler.
-
-The diversity worry is measurable rather than fatal. Resampling copies replicas, so the
-population correlates, and the standard diagnostic for that is the mean square family size,
-`rho_t = lim R * sum_i n_i^2` over the fractions `n_i` of the population descended from each
-initial replica. The effective number of independent members is `R / rho_t`, and `rho_t = 1` when
-every family is a singleton. So the question is not whether resampling collapses the population
-but how large R has to be for `R / rho_t` to be the ensemble size we actually want, and that is
-a number we can measure rather than a reason not to try.
-
-And it is parallel across replicas, which is the width the kernels leave idle.
-
-Three things against.
-
-The 230 times figure needs its baseline. The paper is explicit that its CPU code parallelises
-with close to perfect scaling and that a comparison against a parallel CPU is made by dividing by
-the core count, so against our sixteen cores it is nearer 14 times. The further tenfold from
-multi-spin coding is an Ising trick on bit packed spins and does not apply to continuous
-positions at all.
-
-The results are for discrete spin models. Dense fluids and complex biomolecules appear in the
-conclusions as a prospect, not a result, and there are no polymer numbers.
-
-It changes what an ensemble is. We currently produce a set of independent local minima, one per
-pipeline run. Population annealing produces a properly weighted equilibrium ensemble at the final
-temperature, with its spread set by that temperature and by R rather than by independent starting
-noise. That is arguably the more principled object, and it is a change to the science and not
-only to the implementation, so it is not a decision to make on performance grounds alone.
-
-It is also a pipeline level change rather than a kernel one: the population has to be carried
-together down a shared temperature ladder with a global resampling step between rungs, where our
-stages anneal each block independently and hand back one structure per run.
+Two things worth keeping from the reading anyway. The 230 times GPU figure is against a single
+core: the paper says its CPU code parallelises with close to perfect scaling and that comparison
+against a parallel CPU means dividing by the core count, so against our sixteen it is nearer 14,
+and the further tenfold is Ising multi-spin coding which does nothing for continuous positions.
+And the results are all discrete spin models; dense fluids and biomolecules appear in the
+conclusions as a prospect, not a result.
 
 **Event chain Monte Carlo. Read the papers; it does not serve this goal.** The idea was that a
 rejection free algorithm removes the dependent chain that is the latency floor. It does not,
