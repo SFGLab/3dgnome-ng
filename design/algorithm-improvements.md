@@ -30,21 +30,28 @@ funnel, and it is the number every option here is trying to cut.
 
 ## Realistic
 
-### Force bias Monte Carlo
+### Force bias Monte Carlo. Built and measured, a modest win
 
-Propose a displacement biased along the local force rather than isotropically. The gradient is
-already implicit in the score, so one pass can produce both, and a proposal that points downhill
-is accepted more often and moves further when it is.
+Propose along the local descent direction rather than isotropically. The gradient rides the same
+sweep as the score, and the displacement is drawn as before and only steered, so
+`[simulation_arcs] force_bias = 0` is bit exact.
 
-This is also the right way to use the gradient on this particular energy, which is why it ranks
-above solving with one. The `1/d` repulsion is singular, so a gradient method sees unbounded
-forces whenever two anchors approach and has to damp hard. Monte Carlo is naturally robust to
-that, because a move landing on top of another anchor is simply rejected. Force bias keeps the
-rejection as the safety valve and takes the gradient only as a hint.
+Measured on the largest real block, two seeds, each arm to its own convergence:
 
-It must pay for itself. A gradient pass costs about what a local score costs, so unless the
-score and the force are accumulated in one loop a step gets meaningfully more expensive, and the
-step count then has to fall by more than that to win.
+| bias | rounds | seconds | energy | Rg | acceptance |
+|---|---|---|---|---|---|
+| 0 | 793 | 174.7 | 11,580 | 13.38 | 36.0 percent |
+| 0.10 | 764 | 266.3 | 11,538 | 13.59 | 40.0 |
+| 0.25 | 612 | 214.5 | 11,481 | 13.60 | 51.0 |
+| 0.50 | 450 | 153.2 | 11,424 | 14.39 | 71.8 |
+
+It does what it is supposed to. Acceptance doubles, rounds fall by 1.76 times and the energy
+improves 1.3 percent. The wall does not follow, because the gradient sweep costs more per step
+than the score alone despite sharing the loop, so at a bias of 0.5 the whole thing is 1.14 times
+rather than 1.76. It is worth keeping and it is not the answer: L-BFGS reaches the same energy 37
+times faster on the same block.
+
+`playground/force_bias_sweep.py` runs the sweep.
 
 ### A neighbour list for the truncated repulsion
 
@@ -60,24 +67,39 @@ molecular dynamics for the same reason. It is a different data structure rather 
 
 Force bias needs one anyway, since a force is the same sum as a score.
 
-### Gradient descent or L-BFGS
+### Gradient descent or L-BFGS. Measured, and it wins by a lot
 
-The arithmetic is attractive. Reaching convergence on a 1,227 anchor block costs Monte Carlo
-about 5.1e10 pair evaluations, where two thousand L-BFGS iterations cost 3e9, or 2.7e8 with a
-neighbour list. A gradient is also a dense parallel reduction, which is what a device does well,
-where the sequential Monte Carlo sits at 2.5 percent of arithmetic peak.
+Settled 2026-09-05 on the three real captured blocks, same start, same energy the Monte Carlo
+minimises, both run on the same machine.
 
-It is ranked below force bias because the objective fights it. The `1/d` repulsion is singular.
-The energy is piecewise smooth with kinks at the repulsion cutoff, at the stretch to squeeze
-crossover, and at the confinement radius. Quasi Newton methods assume smoothness and stall on
-kinks.
+| block | MC | L-BFGS, 200 iterations | |
+|---|---|---|---|
+| N=1227 | 312.5 s, 11,537 | 8.4 s, 11,713, 1.015 of it | 37x |
+| N=1146 | 272.7 s, 11,790 | 7.1 s, 11,888, 1.008 | 38x |
+| N=462 | 33.3 s, 4,023 | 7.1 s, 4,029, 1.002 | 4.7x |
 
-Note what the existing evidence does and does not say. The SMACOF attempt reached energies five
-to eleven times worse, but SMACOF majorises a multidimensional scaling stress, which is not this
-energy, so that is a different algorithm failing rather than gradients failing. The earlier
-gradient and Langevin refutation was about throughput, a gradient being O(N squared) per step
-against a Monte Carlo step at O(N), and it did not consider that the step counts differ by orders
-of magnitude. Worth one afternoon with the captured blocks to settle, not a rewrite on faith.
+Two hundred iterations reach the Monte Carlo's energy in a fortieth of its time on the large
+blocks. Two thousand go past it, to 0.978, 0.986 and 0.997 of the Monte Carlo's energy, and are
+still 3.3 to 3.7 times faster. It converges on its own before twenty thousand, at 4,292 and 4,921
+iterations on the two large blocks.
+
+The singularity and the kinks did not stop it, which is the part that was uncertain. The starts
+are nearly collapsed, radius of gyration 0.005, so the solver walks in from an energy of 1.4e8
+without trouble.
+
+**It also says something about the Monte Carlo.** Ten Monte Carlo starts land within 0.38 percent
+of each other, but L-BFGS reaches 2.2 percent below any of them, so the Monte Carlo is not
+finding the minimum, it is stopping short. That is `stop_when_ratio_above` firing while the run
+is still descending. And the properly converged structure is more expanded, radius of gyration
+18.26 against 13.80. Since `anchor-placement.md` exists because blocks come out too compact, some
+of that may be under convergence rather than a modelling problem, and that is worth checking
+before any more modelling work goes into it.
+
+What is not yet known is whether an ensemble survives. Conformational heterogeneity is the
+product, and it currently comes from perturbing each start. `playground/lbfgs_diversity.py`
+measures the energy spread and the structural spread of both arms from the same starts.
+
+`playground/lbfgs_vs_mc.py` runs the comparison.
 
 ### A better initial structure
 
