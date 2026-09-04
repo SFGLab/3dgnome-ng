@@ -4,9 +4,9 @@ How to make one Monte Carlo chain converge in fewer steps, or use more of a devi
 This is the half of the performance problem that batching cannot reach, and it is where the work
 goes once [kernel-performance.md](kernel-performance.md) runs out.
 
-Status. Nothing here is built. Four things have been tried and three failed, and event chain
-Monte Carlo has been read and ruled out for this purpose, which is most of what this document is
-for.
+Status. Nothing here is built. Four things have been tried and three failed, event chain Monte
+Carlo has been read and ruled out for this purpose, and population annealing has been ruled out
+by a measurement of the landscape. That record is most of what this document is for.
 
 ## Why this is the only thing left
 
@@ -92,50 +92,55 @@ Also worth noting: cudaMMC GPU-ised only the heatmap level MC.
 called, so arcs and arcs smooth stayed on the CPU. The stage it optimised costs us 3.0 seconds.
 Its 3 to 25 times figures are for a profile nothing like ours.
 
-## The landscape is not rough, and that rules out two of the options
+## The landscape is a funnel, and that rules out two of the options
 
-Measured before prototyping anything, because population annealing and parallel tempering both
-exist to traverse a rough landscape with a temperature ladder and neither can help if the ladder
-does not.
+An earlier version of this section said temperature was harmful and that a real ladder was two to
+four percent worse. Both claims came from matched budget comparisons, and a matched budget is
+exactly the test that flatters greedy descent: it dives into the nearest basin and banks energy
+early, so it wins at any fixed budget whether or not that basin is the right one. Temperature
+exists to accept worsening moves and leave a basin, and a fixed budget cannot see that. Those
+claims are withdrawn.
 
-`delta_temp` is applied once per MC step rather than per round. At the reference's 0.9999 over
-50,000 steps a round the temperature falls by a factor of 148 every round, so from `max_temp` 5.0
-it is 3e-2 after one round and 1e-13 after six, and runs take seventy to ninety. **Every stage in
-this pipeline anneals for about three rounds and then descends greedily for the rest.** Those are
-the reference's own values, unchanged, in every stage, so this is inherited rather than chosen.
+What the schedule does is still worth knowing, and it is arithmetic rather than a benchmark.
+`delta_temp` is applied once per MC step, not per round, so at the reference's 0.9999 over 50,000
+steps a round the temperature falls by 148 each round: from `max_temp` 5.0 it is 3e-2 after one
+round and 1e-13 after six, where runs take seventy to ninety. Whatever escaping happens, happens
+in the first one percent of the run. Those are the reference's own values in every stage.
 
-So the question is whether a real ladder would be better. On three real captured arcs blocks,
-one chain, a fixed budget of two million steps so the work is matched, three seeds, energy
-relative to the reference schedule:
+The right test for whether that matters is the spread over many starts, not the mean at a fixed
+budget. If temperature earns its keep, running without it leaves some starts stuck somewhere much
+worse. On real captured arcs blocks, ten starts each, both arms run to their own convergence:
 
-| ladder | N=1227 | N=1146 | N=462 |
-|---|---|---|---|
-| reference 0.9999, dead after 1 percent of the run | 1.000 | 1.000 | 1.000 |
-| reaches 0.01 a tenth of the way in | 1.001 | 1.004 | 0.985 |
-| reaches 0.01 at the end | 1.023 | 1.028 | 1.002 |
-| reaches 0.1 at the end | 1.043 | 1.045 | 1.027 |
-| no temperature at all | 1.000 | 1.004 | 0.982 |
+| block | temperature | mean | cv | worst | best to worst |
+|---|---|---|---|---|---|
+| N=1146 | production 5.0 | 11,871 | 0.38 percent | 11,937 | 1.012 |
+| N=1146 | none | 11,850 | 0.52 percent | 11,957 | 1.017 |
+| N=462 | production 5.0 | 4,040 | 0.34 percent | 4,057 | 1.010 |
+| N=462 | none | 4,043 | 0.34 percent | 4,071 | 1.013 |
 
-A ladder that actually spans the run is **worse**, by two to four percent. Pure greedy descent
-ties the reference or beats it. Temperature buys nothing on this landscape.
+The distributions are indistinguishable. Every start lands within about one percent of the same
+energy with or without temperature, and running to convergence rather than a budget the two agree
+to within one percent on energy as well. So temperature is **inert** on the arcs objective at
+these sizes, not harmful: the landscape is a funnel and the escape mechanism has nothing to
+escape. Ten starts cannot rule out a rare trap, but a coefficient of variation of a third of a
+percent in both arms is strong evidence against one.
 
-That kills two options outright. Population annealing resamples on the Boltzmann weight
-`exp[-(b_i - b_{i-1}) E_j]`; at the effectively zero temperature this schedule spends its time at
-those weights degenerate and the whole population collapses onto the lowest energy replica in a
-single step, so `rho_t` goes to R and the effective ensemble size to one. It would be maximally
-destructive exactly where our runs live, in exchange for traversing a ladder that is worth
-nothing. Parallel tempering fails for the same reason: swapping with higher temperatures only
-helps if those temperatures explore usefully, and here they do not.
+That still rules out the two options that exist to traverse a rough landscape. Population
+annealing resamples on the Boltzmann weight, and at the temperature this schedule spends its time
+at those weights degenerate and the population collapses onto the lowest energy replica in a
+single rung, `rho_t` going to R and the effective ensemble size to one. It would pay that price
+to traverse a ladder worth nothing. Parallel tempering fails the same way: swapping with hotter
+replicas helps only if they explore usefully, and here they do not.
 
-It also says what the problem actually is. This is not annealing that needs a better schedule, it
-is **greedy descent with a badly sized step**: at the end of a run 98 percent of proposals are
-rejected, which for a downhill-only search means the step is far too large. The classical fix is
-an adaptive step, a trust region, not a better sampler.
+It does not license removing the temperature. It is inert, the measurement is arcs only on three
+blocks, and there is no reason to disturb a schedule inherited from the reference for no gain.
 
-Measured on the arcs stage only, on three blocks and three seeds. The smooth stage has a
-different energy, chain bonds and angles and heat and orientation, and has not been checked.
+The smooth stage is **not** covered. Two attempts were discarded, one for the matched budget bias
+above and one because the fixture dropped the orientation term entirely. A harness for it also
+has to reproduce production behaviour before it can be believed: the current one converges in one
+round where the real pipeline runs eighty three to a hundred and three on the same region.
 
-`playground/anneal_ladder_real.py` runs this, on blocks captured by the script beside it.
+`playground/trapping_spread.py` runs the spread measurement, on blocks from `capture_arcs.py`.
 
 ## Options, cheapest first
 
