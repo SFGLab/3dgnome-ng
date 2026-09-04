@@ -4,6 +4,10 @@ Where a reconstruction spends its wall time, what has been done about it, and wh
 work is ordered by measured cost rather than by which kernel is most interesting. Each step
 records its outcome when it is finished, so this file is the record as well as the plan.
 
+Scope. This file covers the cost of a step and how work is grouped into launches. Making one
+chain converge in fewer steps, or use more of a device within a step, is a separate problem and
+lives in [intra-chain-parallelism.md](intra-chain-parallelism.md).
+
 Status. The numba excluded volume scan is fixed and both batched stages now merge their
 launches, together 1.29x end to end. Arcs is the largest stage left, its wall is one straggler
 block on one core, and the hybrid kernel that would address it re-anneals from full temperature
@@ -166,7 +170,7 @@ That run was on JAX's CPU backend, where the merge is worth almost nothing, 10.2
 up to a large bucket is paid in full. The whole case for merging rests on the GPU being latency
 bound, so the end to end number has to come from the workstation and not from a laptop.
 
-### 3b. Measured. Both merges landed
+#### What the merges measured
 
 On chr1:1-60000000, GM12878, the tuned configuration, same region and seed in every arm.
 
@@ -191,35 +195,19 @@ step against 14.24 at thirty two, so 2.5 times the work costs 1.68 times the tim
 in width up to roughly half a million bead evaluations per step and becomes partly arithmetic
 bound past that. Sublinear, not free.
 
-### 4. The arcs stage. The hybrid kernel is not ready, and the reason is specific
+### 4. The arcs stage. Batching has nothing left to give it
 
 Arcs is now the largest stage. On this region it runs eleven interaction blocks on sixteen
 threaded workers, so every block already has a core to itself and the 505 s is the slowest single
-block on one core. More cores cannot touch it. Only intra chain parallelism can, and
-`mc_executor_jax_arcs_kernel = hybrid` is exactly that, built and validated at block level but
-never run end to end.
+block on one core. More cores cannot touch it, and neither can a wider launch.
 
-It was run end to end and it is at least 4.3x slower: over 2,187 s of arcs against 505 s, killed
-before it finished.
+The kernel that could, `mc_executor_jax_arcs_kernel = hybrid`, was run end to end for the first
+time and is at least 4.3 times slower: over 2,187 s of arcs against 505. Its checker initialiser
+costs 53 s as promised and the whole cost is the sequential polish, which re-anneals from full
+temperature. Diagnosis and what to do about it are in
+[intra-chain-parallelism.md](intra-chain-parallelism.md).
 
-The checker initialiser is as fast as promised, 53 s for every group. The whole cost is the
-sequential polish, 696.7 s for eight 256 bead blocks and 1463.5 s for one 512 bead block, the
-latter 3929 rounds and 196 million steps.
-
-The cause is that the polish re-anneals from the full `max_temp_arcs`, because
-`pipeline/ib/arcs.py` hands `mc_arcs_jax_batch` the same settings object. It therefore throws
-away the initialisation it was given. This is the same trap the genomic floor hit, which is why
-that feature carries `genomic_floor_polish_temp` defaulting to 0. The hybrid has no such knob,
-so what ran is not the algorithm that was validated.
-
-Group one shows the initialiser is doing its job even so: the polish converged in two rounds for
-the median block and 1517 for one straggler, 87 percent of the launch wasted waiting.
-
-A warm start polish is the obvious next attempt, and it is small. It is not a sure thing: a
-sequential step on this GPU costs about 7 us against a CPU core's 1.8, so the straggler has to
-converge in under about thirty percent of its steps merely to break even.
-
-### 4b. The kernels are latency bound. Measured, and it closes the GPU side
+### 5. The kernels are latency bound. Measured, and it closes the GPU side
 
 The roofline, from what the kernel provably touches, since XLA cannot cost the loops.
 
@@ -247,7 +235,7 @@ launch costs 18 to 39 us per step whatever its terms, so 39 us at three chains a
 eighty is the latency floor divided by fewer chains. It is slow because it is three chains wide,
 and it is three chains wide because of the heat matrix.
 
-### 4c. Grouping is done, and merging is the right policy
+### 6. Grouping is done, and merging is the right policy
 
 A per step comparison says a padded wide launch is 30 percent worse than two launches split by
 size. That is the wrong question. Sequential launches add their rounds where a merged launch runs
@@ -264,7 +252,7 @@ available thing, three biggest together and two smallest in a cheap 4096 launch.
 84 s, about six percent of the run, needs a sparse heat target, which is a capacity fix and not
 a bandwidth one.
 
-### 4d. The arcs cell grid. What the neighbour counts said
+### 7. The arcs cell grid. Built, measured, refuted, reverted
 
 Measured on real converged blocks, how many anchors fall inside the repulsion cutoff:
 
@@ -282,14 +270,12 @@ arcs wall, since eleven blocks on sixteen threaded workers means the wall is the
 one. It works because arcs runs on the CPU, where cutting the per step scan converts directly to
 wall time and there is no latency floor to hide behind.
 
-Read this table with the section below it: the counts are right and the conclusion drawn from
+Read this table with what follows it: the counts are right and the conclusion first drawn from
 them was not. `playground/jax_roofline.py` and the capture script that produced the table both
 run in minutes, which is the point. Several of this section's measurements were wrong before they
 were right, each time because a synthetic benchmark measured a fixed cost, used a density no real
 structure has, or answered a different question than the one that mattered. A real run's log did
 not mislead once.
-
-### 4e. The arcs cell grid. Built, measured, refuted, reverted
 
 Built with the same linked list grid the smooth stage uses, plus a compressed row for the
 springs, which are not distance limited and so cannot come from a grid. It reached bit
@@ -316,24 +302,23 @@ loop does. And a three by three by three box of cells is 6.4 times the volume of
 is approximating, so at 6.6 percent inside the cutoff the grid still examines about 42 percent
 of the block.
 
-The neighbour count table in the previous section is still correct. What was wrong was reading
-"11 times less distance work" as an available speedup: it is an upper bound on a perfect
+The neighbour counts above are still correct. What was wrong was reading "11 times less
+distance work" as an available speedup: it is an upper bound on a perfect
 neighbour list, and neither the grid's geometry nor its constant factor gets close to it at this
 block size. Reverted; nothing kept.
 
-### 5. The estimate_dist stage. Not started
+### 8. The estimate_dist stage. Not started
 
 Thirty one percent of the whole chromosome run. Its launches are already wide and already run
 at 0.18 to 0.69 us per step per IB, so the kernel is not the lever. Its cost is sixteen restart
 replicas times the step budget, and that is what to look at.
 
-### 6. Fewer steps, which is the only thing left
+### 9. Step size annealing. Built and measured, it does not help speed
 
-Everything above attacks the cost of a step. The kernels are latency bound, so the cost of a step
-is set by the dependent chain of accept or reject decisions and not by bandwidth or arithmetic,
-which leaves the number of steps. These are the options, cheapest first. None is started.
+The one schedule knob tried so far. The rest of the options for cutting steps, and what has
+already failed at it, are in [intra-chain-parallelism.md](intra-chain-parallelism.md).
 
-**Step size annealing. Built and measured: it does not help speed.** `[simulation_arcs]
+`[simulation_arcs]
 step_decay`, and the same key under `[simulation_arcs_smooth]` and `[simulation_ib]`, default 1.0
 which holds the step as before and is byte exact against the previous commit. The floor is
 `[main] step_decay_floor`, 0.1 of the starting step, which cudaMMC does not need because it
@@ -366,48 +351,15 @@ inside the current convergence test are spent. The test itself is the remaining 
 the run earlier by construction. That is an explicit quality for speed trade rather than a free
 win, and it has not been measured.
 
-**Diagnose the straggler before redesigning for it.** One arcs launch ran 3,929 rounds where its
-median chain needed 2, and the arcs wall is the slowest single block since eleven blocks run on
-sixteen workers. That is either one pathological block or a schedule badly matched to it, and
-finding out which is a measurement rather than a rewrite.
+### 10. Arcs on the JAX executor. Not started
 
-**Parallel tempering.** Replicas at a ladder of temperatures that swap, the standard cure for a
-chain stuck in a basin, which is what a 3,929 round straggler looks like. It uses width, which we
-have spare, though only tens of replicas rather than the thousands the GPU could hold.
+Arcs is 79 percent of the time in the configuration that puts it on JAX and 22 percent in the one
+that leaves it on threaded numba, which is what production uses. Whether the arcs kernel is
+latency bound the way the smooth kernel is has not been measured, so whether widening its
+launches would pay is unknown. Its cell grid is refuted above and its convergence is covered in
+[intra-chain-parallelism.md](intra-chain-parallelism.md).
 
-**Population annealing.** A population carried through the temperature schedule, resampled toward
-the Boltzmann weight at each step rather than taking the best at the end. It is the natural fit
-for a latency bound kernel with idle width, and GPU implementations report around 230 times over
-a serial CPU. The problem is that resampling kills replica diversity, and diversity is the
-product here: the hybrid polish already homogenised an ensemble from 1.024 to 0.92 and needed
-re-noising to recover it. This fights the thing we are trying to produce.
-
-**Event chain Monte Carlo.** Rejection free. A displacement continues until an event under a
-factorised Metropolis filter, instead of proposing, evaluating and accepting or rejecting. That
-removes the dependent chain which is the latency floor, rather than working around it. It was
-developed for dense polymer melts with excluded volume, which is our system, and reaches speeds
-comparable to optimised molecular dynamics with the gain growing at density. It is also the
-largest rewrite, and it is a sampler by construction, so running it under an annealing schedule
-is off label.
-
-References: population annealing on GPU, arXiv 1703.03676, and its theory, arXiv 1508.05647.
-Event chain Monte Carlo for dense polymer melts, arXiv 1502.06447.
-
-### 7. Arcs, the other levers. Not started
-
-Seventy nine percent of the time in the configuration that puts arcs on JAX, twenty two percent
-in the one that leaves it on threaded numba. Two independent levers, and the profiling has to
-come before either.
-
-The arcless pairs carry a `1/d` repulsion, and `arcs_repulsion_cutoff_factor` truncates it at
-three times the mean arc distance, so the term is distance limited after all and a cell grid may
-apply exactly as it did for smooth. That is a numba lever. Whether it is also a JAX lever
-depends on whether the arcs kernel is latency bound the way smooth is, which is unmeasured.
-
-Separately, the launches converge badly. One took 5,023 rounds and 251 million steps for two
-regions. Another reported 86 percent of its time wasted waiting for its slowest chain.
-
-### 8. Re-measure, then run. Not started
+### 11. Re-measure, then run. Not started
 
 Repeat the stage breakdown with whatever the earlier steps changed, measure the cross block
 relaxation's cost with the cell grid, and only then start the trios.
