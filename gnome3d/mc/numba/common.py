@@ -16,6 +16,7 @@ import numpy as np
 from gnome3d import log
 from gnome3d.mc.numba.terms import (
     batch_mc_nb,
+    decayed_step_nb,
     init_affinity_nb,
     score_orientation_full_nb,
 )
@@ -288,6 +289,8 @@ def run_outer_loop(
     cell_next: I32Array = NO_I32,
     cell_where: I32Array = NO_I32,
     cell_buf: I32Array = NO_I32,
+    step_decay: float = 1.0,
+    step_decay_floor: float = 0.1,
 ) -> float:
     """Drive the unified kernel until convergence; return the final total score."""
     score = (
@@ -295,7 +298,10 @@ def run_outer_loop(
     )
     ms_score = score
     step_i = 0
+    round_i = 0
+    step0 = float(step_size)
     while True:
+        step_size = decayed_step_nb(step0, step_decay, step_decay_floor, round_i)
         (
             T,
             score_struct,
@@ -388,6 +394,7 @@ def run_outer_loop(
             + score_brdg
         )
         step_i += stop_steps
+        round_i += 1
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (
             (score > stop_improvement * ms_score and n_ok < stop_successes)

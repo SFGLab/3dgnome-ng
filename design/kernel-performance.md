@@ -333,11 +333,38 @@ Everything above attacks the cost of a step. The kernels are latency bound, so t
 is set by the dependent chain of accept or reject decisions and not by bandwidth or arithmetic,
 which leaves the number of steps. These are the options, cheapest first. None is started.
 
-**Step size annealing.** The step size is fixed for a whole run. cudaMMC anneals it, one
-multiply per outer round beside the temperature, and it is the closest comparable code to ours.
-This is a one line schedule change and the obvious first thing to try. A smaller step late in the
-anneal raises the acceptance rate, so it interacts with a convergence test that watches the score
-plateau and the accept count, and the measurement has to cover quality as well as wall time.
+**Step size annealing. Built and measured: it does not help speed.** `[simulation_arcs]
+step_decay`, and the same key under `[simulation_arcs_smooth]` and `[simulation_ib]`, default 1.0
+which holds the step as before and is byte exact against the previous commit. The floor is
+`[main] step_decay_floor`, 0.1 of the starting step, which cudaMMC does not need because it
+anneals over tens of rounds where our arcs stage has taken 3,929.
+
+Measured on blocks at the density real ones converge to, production arcs schedule, three seeds:
+
+| decay | rounds | energy | Rg |
+|---|---|---|---|
+| 1.0 | 72 | 36,078 | 2.199 |
+| 0.9999 | 83 | 35,922 | 2.205 |
+| 0.999 | 106 | 35,854 | 2.201 |
+| 0.99 | 94 | 35,731 | 2.203 |
+
+It costs 15 to 45 percent more rounds and reaches an energy about one percent lower, with the
+radius of gyration unchanged. So it is a quality knob, not a speed one, and anyone reaching for
+it hoping for speed should stop here.
+
+The reason is worth keeping. Convergence in this regime fires on `stop_when_ratio_above`, a
+relative improvement below 0.01 percent in a round, and not on the plateau branch at all: accepts
+run about 4,500 a round against a `stop_condition_successes_threshold` of 100, so
+`n_ok < stop_successes` is never true. A finer step keeps finding small improvements, so the run
+goes longer and ends lower.
+
+Cooling faster does not recover it either. At decay 1.0 a `delta_temp` of 0.9995 took 104 rounds
+and 0.999 took 89, against 72 for the production 0.9999, all reaching the same energy. Neither
+the step size nor the cooling rate moves the round count much, which says the schedule levers
+inside the current convergence test are spent. The test itself is the remaining knob:
+`stop_when_ratio_above` is hardcoded at 0.9999 in `pipeline`'s arcs entry, and loosening it stops
+the run earlier by construction. That is an explicit quality for speed trade rather than a free
+win, and it has not been measured.
 
 **Diagnose the straggler before redesigning for it.** One arcs launch ran 3,929 rounds where its
 median chain needed 2, and the arcs wall is the slowest single block since eleven blocks run on

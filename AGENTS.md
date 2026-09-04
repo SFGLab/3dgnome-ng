@@ -899,6 +899,24 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference has no term across blocks at any stage. See
   `design/anchor-placement.md`, option E.
 
+- **Step size annealing: `[simulation_arcs] step_decay`, and the same key under
+  `[simulation_arcs_smooth]` and `[simulation_ib]`, default `1.0` which is off.**
+  ([mc/numba/terms.py](gnome3d/mc/numba/terms.py) `decayed_step_nb`,
+  [mc/numba/common.py](gnome3d/mc/numba/common.py) `run_outer_loop`)
+  The step size is held fixed for a whole run. cudaMMC shrinks it once per outer round beside the
+  temperature; this is the same knob. `[main] step_decay_floor` (0.1) bounds it as a fraction of
+  the starting step, which cudaMMC does not need because it anneals over tens of rounds where the
+  arcs stage has taken 3,929, and a decay carried that far freezes the chain.
+
+  **It is a quality knob, not a speed one.** Measured over three seeds on blocks at the density
+  real ones converge to, it costs 15 to 45 percent more rounds and reaches an energy about one
+  percent lower, with the radius of gyration unchanged. Convergence there fires on the relative
+  improvement test rather than the accept count, so a finer step keeps finding small improvements
+  and the run goes longer and ends lower. Only the numba path implements it; the JAX kernels hold
+  the step as before, so a stage on the batch executor ignores the setting.
+
+  Why not in the reference: the reference holds the step size fixed too.
+
 ### Performance (no behaviour change)
 
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),

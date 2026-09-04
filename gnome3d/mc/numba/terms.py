@@ -672,6 +672,21 @@ def init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> floa
     return err * heat_weight
 
 
+@njit(cache=True, nogil=True)
+def decayed_step_nb(step0: float, decay: float, floor: float, round_i: int) -> float:
+    """The step size at outer round `round_i`, shrunk beside the temperature.
+
+    Floored at `floor` times the starting step. cudaMMC anneals over tens of rounds where our
+    arcs stage has taken 3,929, and a decay carried that far freezes the chain instead of
+    refining it.
+    """
+    if decay >= 1.0:
+        return step0
+    s = step0 * decay**round_i
+    lo = step0 * floor
+    return s if s > lo else lo
+
+
 # Arcs MC helpers
 
 
