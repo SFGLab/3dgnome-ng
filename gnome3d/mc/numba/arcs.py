@@ -166,7 +166,7 @@ def mc_arcs_numba(
         stop_successes=int(settings.mc_stop_successes),
         strict_better=False,
         score_eps=1e-5,
-        stop_when_ratio_above=0.9999,
+        stop_when_ratio_above=float(settings.mc_stop_ratio_arcs),
         score_struct=score_struct,
         score_heat=0.0,
         score_orn=0.0,

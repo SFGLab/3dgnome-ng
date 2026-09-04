@@ -364,6 +364,12 @@ class Settings:
     # we did not. One value per stage, 1.0 meaning the step is held as it always was. The floor
     # is shared and is a fraction of the starting step: cudaMMC anneals over tens of rounds
     # where the arcs stage has taken 3,929, and a decay carried that far freezes the chain.
+    # The arcs MC stops when a round improves the score by less than this, relatively. Measured
+    # on real blocks this is the branch that ends every run: the plateau branch also requires the
+    # accept count below its threshold and acceptance sits at 15 to 50 percent throughout. So
+    # this number sets the round count, and the round count is the arcs wall. Smooth and the
+    # interaction-block stage pass 2.0 for the same argument, unreachable, so this is arcs only.
+    mc_stop_ratio_arcs: float
     mc_step_decay_arcs: float
     mc_step_decay_smooth: float
     mc_step_decay_ib: float
@@ -763,6 +769,7 @@ class Settings:
         self.mc_stop_improvement_smooth = 0.995
         self.mc_stop_successes_smooth = 5
         self.mc_stop_steps_smooth = 10000
+        self.mc_stop_ratio_arcs = 0.9999
         self.mc_step_decay_arcs = 1.0
         self.mc_step_decay_smooth = 1.0
         self.mc_step_decay_ib = 1.0
@@ -1346,6 +1353,9 @@ class Settings:
             "simulation_arcs_smooth", "stop_condition_steps", self.mc_stop_steps_smooth
         )
         self.mc_step_decay_arcs = getf("simulation_arcs", "step_decay", self.mc_step_decay_arcs)
+        self.mc_stop_ratio_arcs = getf(
+            "simulation_arcs", "stop_condition_ratio", self.mc_stop_ratio_arcs
+        )
         self.mc_step_decay_smooth = getf(
             "simulation_arcs_smooth", "step_decay", self.mc_step_decay_smooth
         )
