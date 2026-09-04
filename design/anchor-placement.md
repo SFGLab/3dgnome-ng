@@ -424,11 +424,34 @@ around them cannot clear each other while the anchors stay put. Zero there needs
 stitch target to respect coil size at short gaps or the anchors to move a little, and that
 choice is open. Everywhere else the globules no longer touch.
 
-The cost rules it out at genome scale as it stands: 19,788 seconds for 42,480 beads on the
-laptop's numba path, the excluded volume scan over every bead per move. A neighbour list, a
-cell grid over the bead positions rebuilt every few thousand moves, in both smooth kernels is
-the engineering item that makes E affordable, and it would speed the per block smooth stage as
-well.
+The cost rules it out at genome scale as it stands, 19,788 seconds for 42,480 beads on the
+laptop's numba path, and profiling says exactly why. An MC step is two local score
+evaluations. The chain term looks at a bead's two neighbours and costs a constant 0.4
+microseconds. The excluded volume term scans every bead in the structure:
+
+| beads | chain | excluded volume | its share of the step | beads inside the radius | scanned over useful |
+|---|---|---|---|---|---|
+| 2,000 | 0.36 us | 2.68 us | 88 percent | 53 | 38 |
+| 10,000 | 0.38 us | 12.91 us | 97 percent | 52 | 191 |
+| 42,480 | 0.52 us | 52.87 us | 99 percent | 57 | 749 |
+
+The scan is linear in the structure, 1.29 microseconds per thousand beads with a spread of
+0.04, while the number of beads actually inside the radius stays near 55 at every size because
+that is a local density. At full size the scan therefore does 749 times more work than it
+needs, and a step costs 107 microseconds, which puts the run at about 185 million steps, some
+4,362 moves per bead. The step count is reasonable. The per step cost is not.
+
+A cell list, a uniform grid at the excluded volume radius rebuilt every few thousand moves,
+makes the term visit the beads that are actually near instead of all of them. That takes the
+step from 107 microseconds to under two, about seventy times, so this region relaxes in
+minutes rather than hours and a whole chromosome becomes possible at all.
+
+It is not only about this pass. `exclusion_apply_to_smooth` is on in the production
+configuration, so the per block smooth stage runs the same scan on blocks of up to 16,384
+beads, and that stage is most of the pipeline's wall time. The same neighbour list speeds up
+every reconstruction, not just the relaxation. The JAX kernels have the same shape of work
+vectorised; there the equivalent is a fixed size neighbour array rebuilt on the same schedule
+rather than a cell list.
 
 Once blocks are stitched, their coils interpenetrate because no term acts between beads of
 different blocks. A relaxation pass over the whole chromosome with the smooth stage's excluded
