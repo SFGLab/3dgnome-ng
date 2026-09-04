@@ -87,6 +87,9 @@ CANONICAL: dict[str, dict[str, object]] = {
         "mc_executor_densify": "threaded",
         "mc_executor_estimate_dist": "batch",
         "mc_executor_smooth": "batch",
+        # Cell grid for the excluded volume term. Identical results, so this is only about
+        # speed, and it is written out rather than left to the default so a config records it.
+        "neighbour_grid": "yes",
     },
     "simulation_ib": {
         "use_ib_mc": "yes",
@@ -156,6 +159,9 @@ CANONICAL: dict[str, dict[str, object]] = {
         "packing_factor_ib": 0.75,
     },
     "boundary_stitch": {"use_boundary_stitch": "yes"},
+    # Excluded volume across blocks, so the stitched globules cannot interpenetrate. Without it
+    # nothing acts between the beads of two blocks once the stitch has moved them together.
+    "relax": {"use_cross_block_relax": "yes"},
     "small_ib_boost": {"use_small_ib_boost": "no"},
 }
 
