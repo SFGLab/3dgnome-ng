@@ -61,16 +61,17 @@ backwards. The numbers here replace those.
 carries a large fixed cost, so that division charged the fixed cost to the steps and reported a
 per step cost that fell as the budget rose. Measured at one shape, 32 regions of 4,096 beads:
 
-| steps in the call | reported us per step |
-|---|---|
-| 20,000 | 132.79 |
-| 100,000 | 34.34 |
-| 500,000 | 15.56 |
-| 2,000,000 | 12.05 |
+| steps in the call | us per step, 32 x 4,096 | us per step, 32 x 16,384 |
+|---|---|---|
+| 20,000 | 132.79 | 465.47 |
+| 100,000 | 34.34 | 105.16 |
+| 500,000 | 15.56 | 32.40 |
+| 2,000,000 | 12.05 | 18.72 |
 
-The fixed cost is about 2.3 seconds at that width and the true per step cost is 12.05 us. The
-old table ran 20,000 steps, so 88 percent of what it measured was the fixed cost. Production
-runs millions of steps per call and never pays it in any meaningful proportion.
+The fixed cost is about 2.3 seconds at the first shape and 9.1 at the second, and the true per
+step costs are 12.05 and 18.72 us. The old table ran 20,000 steps and reported 128.40 and
+464.16, so it was measuring the fixed cost. Production runs millions of steps per call and never
+pays it in any meaningful proportion.
 
 With the fixed cost separated out, the kernel is latency bound rather than arithmetic bound. One
 region of 4,096 beads costs 9.72 us per step and thirty two cost 12.05, so thirty two times the
@@ -115,13 +116,19 @@ arithmetic actually dominates.
 ### 3. Merge the smooth groups. Next
 
 Group by the energy term signature alone and pad the group to the ladder bucket of its largest
-member, instead of splitting a uniform set across bead buckets. Modelled on two real runs by
-taking each dispatch's slowest chain and costing it at a conservative 20 us per step:
+member, instead of splitting a uniform set across bead buckets.
 
-| run | smooth now | merged | |
-|---|---|---|---|
-| GM12878 chr1 | 3,315 s | 737 s | 4.5x |
-| H1ESC chr1 | 2,909 s | 823 s | 3.5x |
+Merging is bounded by device memory rather than by time. The heat target is one (B, B) float32
+per chain and is the only input that grows with the square of the padded size, so merging every
+heat carrying group of one real dispatch to its largest bucket would need 25.8 GB on a 16 GB
+card. Groups therefore pack into as few launches as an 11 GiB budget allows, largest bucket
+first, rather than into one. Modelled on two real runs by costing each merged launch at its
+slowest chain's step count and a conservative 20 us per step:
+
+| run | smooth now | launches per dispatch | merged | |
+|---|---|---|---|---|
+| GM12878 chr1 | 3,315 s | 5 to 9 becomes 1 to 2 | 884 s | 3.7x |
+| H1ESC chr1 | 2,909 s | 4 to 11 becomes 1 | 823 s | 3.5x |
 
 Two things have to be settled first, and neither is a performance question.
 
