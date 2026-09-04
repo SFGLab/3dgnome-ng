@@ -403,8 +403,32 @@ Implemented as `gnome3d/pipeline/relax.py`, the smooth kernel over the whole chr
 excluded volume at 1.5 bonds, bond springs at weight 10, temperature 0.1 of the smooth
 maximum, anchors fixed, gated on `[relax] use_cross_block_relax`, run after the stitch. On a
 toy of two overlapping coils it takes 564 cross block contacts to zero with bonds kept within
-1.44. Unit checks in `harness/test_relax.py`. The measurement on the D, C and stitch structure
-follows.
+1.44. Unit checks in `harness/test_relax.py`.
+
+Applied offline to the D, C and stitch structure, `playground/relax_offline.py`:
+
+| | before | after |
+|---|---|---|
+| cross block bead pairs within a bond | 21,641 | 605 |
+| beads touched | 11.9 percent | 2.0 percent |
+| straight strands | 11 | 0 |
+| boundary realised over target, median and worst | 1.33 and 2.64 | 1.33 and 2.64 |
+| within block exponent, Hi-C SCC, Pearson, MultiMM | 0.250, 0.091, 0.196, 0.293 | unchanged |
+| Rg | 57.7 | 59.0 |
+
+Anchors do not move, so nothing the earlier passes set is touched, and the last straight
+strands go because the coils around them are free to route. Of the 605 pairs left, 520 sit
+between one adjacent block pair and 599 are grazing at half a bond to a bond. That pair is the
+boundary with a 33 kb gap, whose edge anchors are pinned about four units apart, so the coils
+around them cannot clear each other while the anchors stay put. Zero there needs either the
+stitch target to respect coil size at short gaps or the anchors to move a little, and that
+choice is open. Everywhere else the globules no longer touch.
+
+The cost rules it out at genome scale as it stands: 19,788 seconds for 42,480 beads on the
+laptop's numba path, the excluded volume scan over every bead per move. A neighbour list, a
+cell grid over the bead positions rebuilt every few thousand moves, in both smooth kernels is
+the engineering item that makes E affordable, and it would speed the per block smooth stage as
+well.
 
 Once blocks are stitched, their coils interpenetrate because no term acts between beads of
 different blocks. A relaxation pass over the whole chromosome with the smooth stage's excluded
