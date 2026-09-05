@@ -8,6 +8,18 @@ the polymer background above a pivot span, `target = freq_to_distance(PET) * max
 
 Checks: closed form, unchanged below the pivot, monotone in span, PET ordering kept at every
 span, and the flag off returns the parity law exactly.
+
+Both of those laws set the target from the PET count and scale it by span, so the absolute
+distance comes from the PET law and lands between 0.2 and 1.6 model units. The chain law, which
+sets the target for a consecutive arcless anchor pair in the same matrix, lands between 4.0 and
+135 over the same span range. A pair an arc joins is therefore asked to sit an order of
+magnitude closer than the chain says two anchors that far apart should be, and measured on a
+finished chromosome 93 percent of arc joined anchor pairs end up closer than a bead's own size.
+
+The unified law puts both families on one background. A pair sits at the chain law distance for
+its separation, and its PET count pulls it in from there by a factor between `arc_target_pull`
+and 1. The PET law supplies that factor rather than the distance, normalised by its own limits,
+which it has: it runs from `freq_to_distance(0)` down to `count_dist_base_level`.
 """
 
 from __future__ import annotations
@@ -154,12 +166,67 @@ def test_chain_bonds() -> None:
     check("scale default is 1", Settings().arcs_chain_bond_scale == 1.0)
 
 
+def test_unified_law() -> None:
+    print("\n[unified] one background for both families")
+    s = Settings()
+    s.use_unified_arc_target = True
+    s.arc_target_pull = 0.45
+    for sep in (5_000, 50_000, 1_000_000):
+        bg = s.genomic_length_to_distance(sep)
+        check(
+            f"at {sep // 1000} kb a zero PET arc sits on the background",
+            abs(s.arc_expected_distance(0, sep) - bg) < 1e-9,
+            f"{s.arc_expected_distance(0, sep):.4f} against {bg:.4f}",
+        )
+        check(
+            f"at {sep // 1000} kb a saturated arc sits at the pull",
+            abs(s.arc_expected_distance(10_000, sep) - s.arc_target_pull * bg) < 1e-6,
+            f"{s.arc_expected_distance(10_000, sep):.4f} against {s.arc_target_pull * bg:.4f}",
+        )
+
+    pets = [0, 1, 2, 5, 10, 50]
+    d = [s.arc_expected_distance(p, 50_000) for p in pets]
+    check(
+        "more PETs means a closer target", all(a >= b for a, b in zip(d[:-1], d[1:], strict=True))
+    )
+
+    seps = [5_000, 20_000, 100_000, 1_000_000]
+    e = [s.arc_expected_distance(4, x) for x in seps]
+    check("a wider arc targets further", all(a < b for a, b in zip(e[:-1], e[1:], strict=True)))
+
+    # The point of the law: an arc's target now grows with separation the way the chain does,
+    # rather than being pinned near the PET law's own scale.
+    slope = float(np.polyfit(np.log(seps), np.log(e), 1)[0])
+    chain = [s.genomic_length_to_distance(x) for x in seps]
+    cslope = float(np.polyfit(np.log(seps), np.log(chain), 1)[0])
+    check(
+        "an arc target now follows the chain law's exponent",
+        abs(slope - cslope) < 1e-9,
+        f"{slope:.4f} against the chain's {cslope:.4f}",
+    )
+    ratio = [s.genomic_length_to_distance(x) / s.arc_expected_distance(4, x) for x in seps]
+    check(
+        "and the gap to the chain no longer widens with span",
+        max(ratio) - min(ratio) < 1e-9,
+        f"ratio {min(ratio):.2f} to {max(ratio):.2f}, was 11x to 100x",
+    )
+    check("it supersedes the separation aware law", s.use_unified_arc_target is True)
+
+
+def test_unified_is_off_by_default() -> None:
+    d = Settings()
+    check("the unified law is opt in", d.use_unified_arc_target is False)
+    check("and the pull defaults to the measured value", abs(d.arc_target_pull - 0.45) < 1e-12)
+
+
 def main() -> int:
     print("separation aware arc target checks")
     test_helper()
     test_settings()
     test_matrix()
     test_chain_bonds()
+    test_unified_law()
+    test_unified_is_off_by_default()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

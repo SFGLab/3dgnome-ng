@@ -368,6 +368,8 @@ class Settings:
     # minimises the same energy directly, which on real blocks reaches the same minimum about
     # thirty six times faster with the ensemble spread slightly wider and the geometry matching.
     # The landscape is a funnel, so there is nothing for the stochastic search to escape.
+    use_unified_arc_target: bool
+    arc_target_pull: float
     arcs_solver: str
     arcs_solver_iters: int
     mc_stop_ratio_arcs: float
@@ -781,6 +783,14 @@ class Settings:
         self.mc_stop_successes_smooth = 5
         self.mc_stop_steps_smooth = 10000
         self.arcs_force_bias = 0.0
+        # One background for the arc targets and the chain bonds. The parity and separation
+        # aware laws both set an arc's distance from its PET count, which lands between 0.2 and
+        # 1.6 model units, while the chain law sets a consecutive arcless anchor pair between
+        # 4.0 and 135 over the same span range. Measured on a finished chromosome, 93 percent of
+        # arc joined anchor pairs end up closer than a bead's own size as a result. See
+        # [[project_unified_arc_target]].
+        self.use_unified_arc_target = False
+        self.arc_target_pull = 0.45
         self.arcs_solver = "mc"
         self.arcs_solver_iters = 200
         self.mc_stop_ratio_arcs = 0.9999
@@ -1357,6 +1367,10 @@ class Settings:
             "simulation_arcs", "stop_condition_ratio", self.mc_stop_ratio_arcs
         )
         self.arcs_force_bias = getf("simulation_arcs", "force_bias", self.arcs_force_bias)
+        self.use_unified_arc_target = getb(
+            "distance", "use_unified_arc_target", self.use_unified_arc_target
+        )
+        self.arc_target_pull = getf("distance", "arc_target_pull", self.arc_target_pull)
         self.arcs_solver = gets("simulation_arcs", "solver", self.arcs_solver)
         self.arcs_solver_iters = geti("simulation_arcs", "solver_iters", self.arcs_solver_iters)
         self.mc_step_decay_smooth = getf(
@@ -1435,9 +1449,26 @@ class Settings:
         )
 
     def arc_expected_distance(self, score: int, sep_bp: int) -> float:
-        """The arc target for an arc of `score` PETs spanning `sep_bp`. The parity law when
-        `use_separation_arc_target` is off."""
+        """The arc target for an arc of `score` PETs spanning `sep_bp`. The parity law when both
+        `use_unified_arc_target` and `use_separation_arc_target` are off.
+
+        Under the unified law the distance comes from the chain law at that separation, the same
+        background a consecutive arcless anchor pair is held to, and the PET count only says how
+        far in from it to pull. The PET law supplies that factor rather than the distance,
+        normalised by its own limits, which run from `freq_to_distance(0)` down to
+        `count_dist_base_level`. A zero PET arc therefore sits on the background and a saturated
+        one at `arc_target_pull` of it. The unified law supersedes the separation aware one,
+        since it carries the separation itself.
+        """
         from gnome3d.util import arc_target_with_separation
+
+        if self.use_unified_arc_target:
+            bg = self.genomic_length_to_distance(max(abs(int(sep_bp)), 1))
+            lo = float(self.count_dist_base_level)
+            span = float(self.freq_to_distance(0)) - lo
+            g = (float(self.freq_to_distance(score)) - lo) / span if span > 1e-12 else 0.0
+            pull = float(self.arc_target_pull)
+            return bg * (pull + (1.0 - pull) * min(max(g, 0.0), 1.0))
 
         base = self.freq_to_distance(score)
         if not self.use_separation_arc_target:
