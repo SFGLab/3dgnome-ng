@@ -559,17 +559,14 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     A signed eigenvector track is the recommended input. Eigenvector sign is arbitrary, so
     phasing is mandatory and explicit; an unphaseable chromosome is left unassigned rather than
     segregated backwards.
-  - **The JAX smooth kernel carries the affinity terms; the checkerboard kernel does not.**
+  - **The JAX smooth kernel carries the affinity terms.**
     `mc_smooth_jax` and `mc_smooth_jax_batch` implement compartment and bridging, agreeing with
     numba on initial energy to 1.2e-07 relative. `use_aff` is a static cache-key entry rather
     than a weight gate, because the term costs an extra O(N) pass per step and making it
     structural keeps that off runs that do not use it. The scores ride the excluded-volume
     accumulator: all three terms are pairwise, double counted and share the factor-2 delta, so
     the sum is exact for both the Metropolis ratio and the final score, and only the per-term
-    breakdown is lost. The opt-in checkerboard kernel
-    ([smooth_checker.py](gnome3d/mc/jax/smooth_checker.py)) does **not** implement them and
-    raises rather than dropping them; unlike orientation they are not constant during smooth,
-    so omitting them would change the structures.
+    breakdown is lost.
   - **The estimate-dist dry pass excludes them.** They are attractive, so including them would
     shrink the estimated distances that become the heat target and the real smooth pass would
     then compact against an already-compacted target.
@@ -814,8 +811,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   in numba (`local_excl_mat_nb`, `init_excl_mat_nb`, threaded through `batch_mc_nb`) and in the
   JAX arcs kernel (a `(B, B)` radius per IB, static cache key entry `excl_mat`). With the floor on
   the arcless entries of the arcs matrix are zeroed, so those pairs carry the floor and nothing
-  else and the unbounded `1/d` retires for them. The checkerboard and hybrid arcs kernels do not
-  implement it and raise.
+  else and the unbounded `1/d` retires for them.
 
   The scale is calibrated on the structure itself. The arcs stage anneals as before, reads the
   median consecutive anchor distance off the result, sets `scale = factor * that`, and runs a

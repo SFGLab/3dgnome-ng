@@ -195,27 +195,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
 
     expanded, spans = _expand_replicates(problems, per_ib)
 
-    # Plain "checker" double-compacts here: estimation's output is the dense distance TARGET
-    # the final smooth chases, and the checker's stale-EV compaction shrinks it (measured Rg
-    # 0.965 -> 0.890 at B=1024).  Only "hybrid" (checker init + sequential polish) yields a
-    # CORRECT target, so estimation upgrades checker->hybrid and is otherwise sequential -
-    # never plain checker.  See docs/arcs-gpu-acceleration.md.
-    est_setting = str(getattr(s, "mc_executor_jax_estimate_kernel", "auto")).strip().lower()
-    if est_setting in ("mc", "hybrid"):
-        est_kernel = est_setting  # explicit override (never plain checker - it compounds)
-    else:  # "auto": follow the final-smooth kernel (hybrid -> hybrid), else sequential
-        smooth_k = str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")).strip().lower()
-        est_kernel = "hybrid" if smooth_k == "hybrid" else "mc"
-    # Make the fan-out explicit: a batch of N estimate nodes expands to N x (reps*steps) dry-smooth
-    # IBs, which the kernel then chunks - so the smooth[checker]/[mc] line count is NOT the node count.
-    log.status(
-        _LOG,
-        "    estimate: %d nodes x %d reps = %d dry-smooth IBs",
-        len(problems),
-        per_ib,
-        len(expanded),
-    )
-    results = run_smooth_batch(expanded, s, est_kernel)
+    results = run_smooth_batch(expanded, s)
 
     out: list[Result] = []
     for gi, prob in enumerate(problems):

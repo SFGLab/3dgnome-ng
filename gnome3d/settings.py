@@ -186,16 +186,6 @@ class Settings:
     mc_executor_jax_batch_width_smooth: str
     mc_executor_jax_batch_width_arcs: str
 
-    # Arcs JAX kernel: "mc" = sequential single-bead region-batch (default, byte-exact
-    # port); "checker" = approximate color-gather spatial-checkerboard MC (much faster on
-    # GPU for large IBs; a deliberate divergence from sequential dynamics, equal-energy).
-    mc_executor_jax_arcs_kernel: str
-    # Smooth JAX kernel, same choices.  The "checker" path OMITS the (constant) CTCF
-    # orientation term from the score; the produced structures are correct.
-    mc_executor_jax_smooth_kernel: str
-    mc_executor_jax_estimate_kernel: str
-    hybrid_polish_renoise: float
-
     # How the batch strategy uses several visible GPUs.  "groups" runs whole batch groups
     # side by side, one group per device, which keeps each group's launch intact and so draws
     # the same RNG as a one-device run.  "within" splits one group across devices, which only
@@ -534,12 +524,6 @@ class Settings:
         self.merge_smooth_launches = True
         self.mc_executor_jax_batch_width_smooth = "auto"
         self.mc_executor_jax_batch_width_arcs = "auto"
-        self.mc_executor_jax_arcs_kernel = "mc"
-        self.mc_executor_jax_smooth_kernel = "mc"
-        self.mc_executor_jax_estimate_kernel = "auto"  # auto = follow smooth (hybrid->hybrid)
-        self.hybrid_polish_renoise = (
-            1.0  # re-noise (x step) on hybrid-smooth polish init; recovers diversity
-        )
         self.mc_multigpu_mode = "groups"
         self.use_ib_arcs = False
         self.ib_arcs_weight = 1.0
@@ -1061,24 +1045,6 @@ class Settings:
             "simulation_backend",
             "mc_executor_jax_batch_width_arcs",
             self.mc_executor_jax_batch_width_arcs,
-        )
-        self.mc_executor_jax_arcs_kernel = gets(
-            "simulation_backend",
-            "mc_executor_jax_arcs_kernel",
-            self.mc_executor_jax_arcs_kernel,
-        )
-        self.mc_executor_jax_smooth_kernel = gets(
-            "simulation_backend",
-            "mc_executor_jax_smooth_kernel",
-            self.mc_executor_jax_smooth_kernel,
-        )
-        self.mc_executor_jax_estimate_kernel = gets(
-            "simulation_backend",
-            "mc_executor_jax_estimate_kernel",
-            self.mc_executor_jax_estimate_kernel,
-        )
-        self.hybrid_polish_renoise = getf(
-            "simulation_backend", "hybrid_polish_renoise", self.hybrid_polish_renoise
         )
         self.mc_multigpu_mode = gets("simulation_backend", "multigpu_mode", self.mc_multigpu_mode)
 

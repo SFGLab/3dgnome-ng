@@ -72,34 +72,11 @@ def _assemble_beads(
     ]
 
 
-def run_smooth_batch(expanded: list[Problem], s: Settings, kernel: str) -> list[Result]:
-    """Dispatch one smooth batch by kernel.  'mc' = sequential region-batch; 'checker' =
-    approximate 24-colour checkerboard MC (fast on GPU, mild bond drift); 'hybrid' = checker
-    as a fast initializer + a sequential re-anneal that corrects the drift (the same pattern
-    that fixes arcs - see project_arcs_checker_fromscratch_compaction).  Shared by the SMOOTH
-    stage and the dry-smooth ESTIMATE_DIST trials."""
+def run_smooth_batch(expanded: list[Problem], s: Settings) -> list[Result]:
+    """One batched smooth launch. Shared by the smooth stage and the dry smooth trials the
+    estimate stage runs."""
     from gnome3d.mc import jax as mc_jax
 
-    k = str(kernel).strip().lower()
-    if k in ("checker", "hybrid"):
-        from gnome3d.mc.jax.smooth_checker import mc_smooth_checker_jax_batch
-
-        res = mc_smooth_checker_jax_batch(expanded, s)
-        if k == "hybrid":
-            # Re-noise the checker output before the polish: the checker converges to a
-            # consistent attractor that homogenizes the ensemble (lowers diversity ~0.09); fresh
-            # per-restart noise here re-diversifies the polish's starting points while the
-            # sequential polish still relaxes to correct bonds.  Noise as a fraction of step;
-            # tuned default 1.0 -> diversity 0.99 + clean bonds at n=50.
-            rn = float(getattr(s, "hybrid_polish_renoise", 1.0))
-            polish = []
-            for p, (_, pc) in zip(expanded, res, strict=True):
-                start = np.asarray(pc, np.float32).copy()
-                if rn > 0.0:
-                    add_movable_noise_inplace(start, p["fixed"], rn * float(p["step_size"]))
-                polish.append({**p, "pos": start})
-            res = mc_jax.mc_smooth_jax_batch(polish, s)
-        return res
     return mc_jax.mc_smooth_jax_batch(expanded, s)
 
 
@@ -124,8 +101,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
             expanded.append({**prob, "pos": start})
             owner.append(gi)
 
-    # Kernel select (mc | checker | hybrid), shared with ESTIMATE_DIST via run_smooth_batch.
-    results = run_smooth_batch(expanded, s, str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")))
+    results = run_smooth_batch(expanded, s)
 
     best: dict[int, Result] = {}
     for (score, final_pos), gi in zip(results, owner, strict=True):

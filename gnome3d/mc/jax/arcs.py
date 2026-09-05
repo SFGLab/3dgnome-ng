@@ -961,8 +961,7 @@ def mc_arcs_jax_batch(
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     """Anneal K *different* IBs' anchors in one vmapped kernel (region batching).
 
-    `max_iters` caps the outer round budget (default `_MAX_ITERS`=10000); the
-    hybrid polish passes a low value to bound a slow-to-expand outlier IB.
+    `max_iters` caps the outer round budget, defaulting to `_MAX_ITERS` of 10000.
 
     Each problem: `pos` (n,3), ``exp_dist`` (n,n), ``step_size`` (float).  All
     share the energy-term flags (caller groups by terms + size bucket).  Returns

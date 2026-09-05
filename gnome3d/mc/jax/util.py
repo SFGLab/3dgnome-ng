@@ -48,8 +48,8 @@ NBR_BUCKETS: tuple[int, ...] = (4, 8, 16, 32, 64)
 def log_kernel_start(
     logger: logging.Logger, stage: str, kernel: str, k: int, b: int, detail: str
 ) -> None:
-    """Standard JAX-kernel START line - one format for every mc/checker/hybrid kernel (arcs +
-    smooth): ``arcs[checker]: 719 IBs x 256 beads - <detail>, running...``."""
+    """Standard JAX kernel start line, one format for arcs and smooth:
+    ``arcs[mc]: 719 IBs x 256 beads - <detail>, running...``."""
     log.status(
         logger, "    %s[%s]: %d IBs x %d beads - %s, running...", stage, kernel, k, b, detail
     )
@@ -58,7 +58,7 @@ def log_kernel_start(
 def log_kernel_done(
     logger: logging.Logger, stage: str, kernel: str, k: int, secs: float, summary: str
 ) -> None:
-    """Standard JAX-kernel DONE line: ``arcs[checker]: 719 IBs in 268.1s - <summary>``."""
+    """Standard JAX kernel done line: ``arcs[mc]: 719 IBs in 268.1s - <summary>``."""
     log.status(logger, "    %s[%s]: %d IBs in %.1fs - %s", stage, kernel, k, secs, summary)
 
 
