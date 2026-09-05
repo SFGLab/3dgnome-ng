@@ -47,11 +47,18 @@ def cross_block_contacts(blocks: list[list[BeadOut]], radius: float) -> tuple[in
     )
     if pos.shape[0] < 2:
         return 0, 0
+    cross = _cross_pairs(pos, owner, radius)
+    return int(cross.shape[0]), int(np.unique(cross.ravel()).size)
+
+
+def _cross_pairs(pos: F32Array, owner: np.ndarray, radius: float) -> np.ndarray:
+    """Index pairs, into `pos`, of beads from different blocks closer than `radius`."""
+    if pos.shape[0] < 2:
+        return np.zeros((0, 2), dtype=np.int64)
     pairs = KDTree(pos).query_pairs(radius, output_type="ndarray")
     if pairs.size == 0:
-        return 0, 0
-    cross = pairs[owner[pairs[:, 0]] != owner[pairs[:, 1]]]
-    return int(cross.shape[0]), int(np.unique(cross.ravel()).size)
+        return np.zeros((0, 2), dtype=np.int64)
+    return pairs[owner[pairs[:, 0]] != owner[pairs[:, 1]]]
 
 
 def _relax_settings(s: Settings, bond: float) -> Settings:
@@ -117,6 +124,32 @@ def relax_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]
             floor * 100.0,
         )
         return blocks
+
+    # Which beads may move. Every subanchor by default, which is what the pass did before, but
+    # the round count is proportional to that number and only a handful of beads touch anything.
+    # A window keeps the beads that touch another block, and that many chain neighbours either
+    # side so the chain can take up the slack, and freezes the rest.
+    window = int(getattr(s, "relax_local_window", -1))
+    if window >= 0:
+        owner_chain = (
+            np.concatenate([np.full(len(blocks[k]), k) for k in order]) if blocks else np.zeros(0)
+        )
+        touching = np.unique(_cross_pairs(pos, owner_chain, radius).ravel())
+        movable = np.zeros(len(chain), dtype=np.bool_)
+        for off in range(-window, window + 1):
+            idx = touching + off
+            movable[idx[(idx >= 0) & (idx < len(chain))]] = True
+        movable &= ~fixed
+        LOG.info(
+            "cross block relax: %d of %d beads may move (%d touching, window %d)",
+            int(movable.sum()),
+            len(chain),
+            int(touching.size),
+            window,
+        )
+        if not movable.any():
+            return blocks
+        fixed = ~movable
 
     step = float(s.relax_noise) * bond
 

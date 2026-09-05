@@ -661,6 +661,12 @@ class Settings:
         # minutes per structure whatever the input, once to move two beads out of 129,457.
         # Zero keeps it running always, which is what it did before.
         self.relax_min_contact_fraction = 0.0
+        # How many chain neighbours either side of a bead that touches another block may move.
+        # Negative lets every subanchor move, which is what the pass did before. The round count
+        # is proportional to the movable bead count, measured at 114 rounds for 1,177 movable and
+        # 691 for 11,766 on a real chromosome, so restricting it to the beads that need moving is
+        # where the pass's cost actually goes.
+        self.relax_local_window = -1
 
         # ---- A/B compartments ----
         # Block-copolymer segregation over a per-bead compartment call, ported
@@ -1220,6 +1226,7 @@ class Settings:
         self.relax_min_contact_fraction = getf(
             "relax", "min_contact_fraction", self.relax_min_contact_fraction
         )
+        self.relax_local_window = geti("relax", "local_window", self.relax_local_window)
 
         # [compartments]
         self.use_compartments = getb("compartments", "use_compartments", self.use_compartments)

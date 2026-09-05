@@ -902,9 +902,18 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   fraction of the chromosome's beads; on those four structures 0.1 percent skips one of four and
   1 percent skips three, the one it keeps being the structure that moved 518 beads.
 
-  The principled fix is not a threshold. Seven beads needing to move should not cost annealing
-  129,457, so the pass should relax the neighbourhood of the offending contacts rather than the
-  whole chromosome. That is not built.
+  **`[relax] local_window` (default -1, off) is the better fix.** The round count is proportional
+  to how many beads may move, measured on a real 129,457 bead chromosome at 19 rounds for 159
+  movable, 104 for 1,177 and 850 for 11,766, which extrapolates to the 6,201 a trio run took with
+  all 117,660 subanchors movable. A window of `k` keeps the beads touching another block and `k`
+  chain neighbours either side, so the chain can take up the slack, and freezes everything else.
+  With 53 beads touching, a window of 1 leaves 159 movable and about 19 rounds instead of 6,201.
+  A negative value keeps every subanchor movable, which is what the pass did before.
+
+  It runs on the wrong kernel as well. It picks from `mc_executor_smooth`, which production sets
+  to `batch`, so a pass that is one single chain runs on the JAX kernel where one chain is its
+  worst case. Measured against the trio run's own numbers, 22.6 us a step there against 6.6 on
+  numba with the cell grid.
 
   Why not in the reference: the reference has no term across blocks at any stage. See
   `design/anchor-placement.md`, option E.

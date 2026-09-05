@@ -184,6 +184,82 @@ def test_the_default_is_off() -> None:
     )
 
 
+def test_local_window_restricts_who_may_move() -> None:
+    """Only beads near an offending contact need to move, and the round count follows that.
+
+    Measured on a real 129,457 bead chromosome: rounds scale with the movable bead count, 114 at
+    1,177 movable and 691 at 11,766, which extrapolates to the 6,201 a trio run actually took
+    with all 117,660 subanchors movable. A few dozen beads touch anything, so almost all of that
+    is proposing moves for beads with nothing to fix.
+
+    The window runs along the chain and the chain crosses block boundaries, so a bead of an
+    untouched block next to a touched one may move. What has to hold is that most of the
+    structure is frozen.
+    """
+    rng = np.random.default_rng(11)
+    # Coils are half width 3, so offsetting by 5 makes only the facing edges touch, which is
+    # what a real chromosome looks like: a handful of beads in contact, not two blocks on top of
+    # each other.
+    a = coil(0, 60, np.zeros(3), rng, 1.0)
+    b = coil(200_000, 60, np.array([5.0, 0.0, 0.0]), rng, 1.0)
+    c = coil(400_000, 60, np.array([100.0, 0.0, 0.0]), rng, 1.0)  # far from both
+
+    def moved_count(before: list[list[BeadOut]], after: list[list[BeadOut]]) -> int:
+        """Beads the MC actually moved.
+
+        The pass narrows coordinates to float32 for the kernel and widens them back, so every
+        bead's value changes by about a float32 ulp whether or not it moved. Moves are half a
+        bond, so a tolerance well above that rounding separates the two cleanly.
+        """
+        return sum(
+            1
+            for bi, bo in zip(before, after, strict=True)
+            for x, y in zip(bi, bo, strict=True)
+            if abs(x.x - y.x) > 1e-3 or abs(x.y - y.y) > 1e-3 or abs(x.z - y.z) > 1e-3
+        )
+
+    s = settings()
+    s.relax_local_window = 2
+    local = moved_count([a, b, c], relax_blocks([a, b, c], s))
+    s.relax_local_window = -1
+    everything = moved_count([a, b, c], relax_blocks([a, b, c], s))
+    check(
+        "a window moves far fewer beads than letting every subanchor move",
+        0 < local < everything,
+        f"{local} against {everything} of {3 * 60}",
+    )
+
+
+def test_local_window_is_off_by_default() -> None:
+    check(
+        "the window defaults to every subanchor, which is what it did before",
+        Settings().relax_local_window < 0,
+    )
+
+
+def test_it_is_reproducible_from_a_given_rng_state() -> None:
+    """The pass does not seed; it runs on whatever state the stages left, so a whole run is
+    reproducible while an isolated call is only reproducible from the same state."""
+    from gnome3d.mc.numba import seed_numba
+
+    rng = np.random.default_rng(12)
+    a = coil(0, 50, np.zeros(3), rng, 1.0)
+    b = coil(200_000, 50, np.zeros(3), rng, 1.0)
+    s = settings()
+    seed_numba(5)
+    np.random.seed(5)
+    first = relax_blocks([a, b], s)
+    seed_numba(5)
+    np.random.seed(5)
+    second = relax_blocks([a, b], s)
+    same = all(
+        x.x == y.x and x.y == y.y and x.z == y.z
+        for bi, bo in zip(first, second, strict=True)
+        for x, y in zip(bi, bo, strict=True)
+    )
+    check("from the same RNG state it gives the same structure", same)
+
+
 def main() -> int:
     print("cross block relaxation checks")
     test_gate_function()
@@ -192,6 +268,9 @@ def main() -> int:
     test_it_skips_when_there_is_nothing_to_fix()
     test_it_still_runs_when_blocks_do_interpenetrate()
     test_the_default_is_off()
+    test_local_window_restricts_who_may_move()
+    test_local_window_is_off_by_default()
+    test_it_is_reproducible_from_a_given_rng_state()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")
