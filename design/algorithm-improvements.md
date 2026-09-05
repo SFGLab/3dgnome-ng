@@ -45,22 +45,21 @@ Measured on the largest real block, two seeds, each arm to its own convergence:
 | 0.25 | 612 | 214.5 | 11,481 | 13.60 | 51.0 |
 | 0.50 | 450 | 153.2 | 11,424 | 14.39 | 71.8 |
 
-A bias of 0.5 was not the end of it. Across the other two blocks, at 0.75:
+Across all three blocks, and with the spread measured over six starts:
 
-| block | rounds | wall | energy | acceptance |
-|---|---|---|---|---|
-| N=1146 | 815 to 248 | 1.81x | 0.992 of it | 34 to 73 percent |
-| N=462 | 246 to 84 | 1.76x | 0.996 | 32 to 66 percent |
+| bias | speed | energy | spread |
+|---|---|---|---|
+| 0 | 1.00x | 11,543 | 29.25 percent |
+| 0.50 | 1.41x | 0.992 of it | 27.42 |
+| 0.75 | 1.95x | 0.989 | 26.17 |
+| 0.90 | 2.25x | 0.989 | 25.97 |
 
-So 1.8 times with a slightly lower energy, from one setting, with the Monte Carlo otherwise
-untouched. The wall lags the round count because the gradient sweep costs more per step than the
-score alone even sharing the loop, which is why 0.5 gives 1.14 times where its round count would
-suggest 1.76.
+A clean monotone trade: more bias is faster and reaches a slightly lower energy, and costs
+spread, about a tenth of it by 0.9. The wall lags the round count because the gradient sweep
+costs more per step than the score alone even sharing the loop.
 
-A caveat that has to be measured rather than assumed. A biased proposal is a step toward
-deterministic descent, and at a bias of one the move is purely downhill and every start would run
-the same trajectory. `playground/force_bias_diversity.py` checks whether the spread survives 0.75
-and 0.9.
+It works, and the solver above makes it the lesser option: fifty nine times against a little over
+two, and the solver gains spread where this loses it.
 
 `playground/force_bias_sweep.py` runs the sweep.
 
@@ -78,71 +77,51 @@ molecular dynamics for the same reason. It is a different data structure rather 
 
 Force bias needs one anyway, since a force is the same sum as a score.
 
-### Gradient descent or L-BFGS. Measured, and it wins by a lot
+### Solving the arcs stage. Built and wired, and it wins by a lot
 
-Settled 2026-09-05 on the three real captured blocks, same start, same energy the Monte Carlo
-minimises, both run on the same machine.
+`[simulation_arcs] solver = mc | lbfgs`, default `mc`, with `solver_iters` at 200.
+`gnome3d/mc/numba/arcs_solver.py` carries the energy and its gradient over a whole structure,
+checked against the initialisers the Monte Carlo builds its score from.
 
-| block | MC | L-BFGS, 200 iterations | |
-|---|---|---|---|
-| N=1227 | 312.5 s, 11,537 | 8.4 s, 11,713, 1.015 of it | 37x |
-| N=1146 | 272.7 s, 11,790 | 7.1 s, 11,888, 1.008 | 38x |
-| N=462 | 33.3 s, 4,023 | 7.1 s, 4,029, 1.002 | 4.7x |
+Measured on real captured blocks with the settings loaded from a production config, so the
+energy is the one production minimises. Six starts per arm, each run to its own convergence:
 
-Two hundred iterations reach the Monte Carlo's energy in a fortieth of its time on the large
-blocks. Two thousand go past it, to 0.978, 0.986 and 0.997 of the Monte Carlo's energy, and are
-still 3.3 to 3.7 times faster. It converges on its own before twenty thousand, at 4,292 and 4,921
-iterations on the two large blocks.
+| arm | wall | energy | Rg | spread | realised over target | inside cutoff | nearest |
+|---|---|---|---|---|---|---|---|
+| MC | 2,981 s | 11,593 | 13.40 | 29.72 percent | 1.92 | 9.2 percent | 0.849 |
+| L-BFGS 200 | 50 s | 11,638, 1.004 of it | 14.25 | 31.10 | 1.93 | 9.1 | 0.847 |
+| L-BFGS 2000 | 495 s | 11,347, 0.979 | 18.58 | 27.63 | 1.94 | 8.9 | 0.850 |
 
-The singularity and the kinks did not stop it, which is the part that was uncertain. The starts
-are nearly collapsed, radius of gyration 0.005, so the solver walks in from an energy of 1.4e8
-without trouble.
+**Fifty nine times, for the same energy to within half a percent, with the ensemble spread
+slightly wider rather than narrower and the geometry matching across its whole distribution**,
+tenth and ninetieth percentiles included. Two thousand iterations go below the Monte Carlo's
+energy and are still six times faster.
 
-**It also says something about the Monte Carlo.** Ten Monte Carlo starts land within 0.38 percent
-of each other, but L-BFGS reaches 2.2 percent below any of them, so the Monte Carlo is not
-finding the minimum, it is stopping short. That is `stop_when_ratio_above` firing while the run
-is still descending. And the properly converged structure is more expanded, radius of gyration
-18.26 against 13.80. Since `anchor-placement.md` exists because blocks come out too compact, some
-of that may be under convergence rather than a modelling problem, and that is worth checking
-before any more modelling work goes into it.
+The iteration count is a dial between energy and spread that the Monte Carlo does not offer:
+two thousand iterations reach two percent lower energy and give up about a tenth of the spread.
 
-**An ensemble survives it.** Eight starts, the same perturbed seeds for both arms, structural
-spread measured as the mean relative difference between distance matrices, which needs no
-superposition:
+An earlier version of this measurement left the excluded volume off, because the setting is
+`apply_to_arcs` under `[excluded_volume]` and a grep for `exclusion_apply_to_arcs` missed it.
+Both arms were consistent with each other so nothing was wrong internally, but it was not the
+production energy. Redone with it on, the ratio improved from thirty six to fifty nine, since the
+extra term costs the annealer more than it costs the solver.
 
-| block | arm | wall for eight | mean energy | mean Rg | spread |
-|---|---|---|---|---|---|
-| N=1227 | MC | 2,381.7 s | 11,545.6 | 13.49 | 29.38 percent |
-| N=1227 | L-BFGS 200 | 66.6 s | 11,552.0 | 14.30 | 30.02 percent |
-| N=1227 | L-BFGS 2000 | 663.2 s | 11,309.6 | 18.10 | 25.49 percent |
-| N=1146 | MC | 2,013.1 s | 11,861.7 | 12.21 | 27.20 percent |
-| N=1146 | L-BFGS 200 | 60.6 s | 11,981.2 | 12.55 | 27.69 percent |
-| N=1146 | L-BFGS 2000 | 652.5 s | 11,634.9 | 16.00 | 22.85 percent |
+**Why a solver works here at all.** The landscape is a funnel. Ten Monte Carlo starts land within
+one percent of each other and temperature is inert, so there is nothing for a stochastic search
+to escape. The singularity in the repulsion and the kinks at the cutoff, the stretch to squeeze
+crossover and the confinement radius did not stop it, and it walks in from a nearly collapsed
+start at an energy of 1.4e8.
 
-Thirty six times faster for the same energy to within 0.06 percent and slightly more spread than
-the Monte Carlo gives. The iteration count is a clean dial between the two: two thousand
-iterations buy two percent lower energy and cost about an eighth of the spread. The Monte Carlo
-offers no equivalent knob.
+**It also says something about the Monte Carlo.** Those ten starts sit within 0.38 percent of
+each other, and the solver reaches two percent below all of them, so the Monte Carlo is not
+finding the minimum, it is stopping short where the improvement ratio test fires while it is
+still descending. The properly converged structure is more expanded, 18.58 against 13.40. Since
+`anchor-placement.md` exists because blocks come out too compact, some of that may be a stopping
+rule rather than a modelling problem, and that is worth checking before more modelling goes in.
 
-**And the geometry is indistinguishable.** Equal energy and equal spread do not make it the same
-kind of structure, so the two arms were compared on what the arcs stage is for, how arc linked
-anchors sit relative to the distance their arc asked for:
-
-| block | arm | realised over target, median | p10 | p90 | inside the cutoff | nearest neighbour |
-|---|---|---|---|---|---|---|
-| N=1227 | MC | 1.92 | 0.92 | 3.07 | 9.2 percent | 0.839 |
-| N=1227 | L-BFGS 200 | 1.92 | 0.93 | 3.08 | 9.0 | 0.841 |
-| N=1146 | MC | 1.95 | 0.88 | 3.15 | 10.5 | 0.875 |
-| N=1146 | L-BFGS 200 | 1.96 | 0.89 | 3.16 | 10.3 | 0.880 |
-
-The whole distribution matches, not just its centre, and so do the crowding and the nearest
-neighbour spacing. The local arc network is the same. What differs is the global compression,
-and that grows with iterations: 13.44, 14.65 and 18.30 for the Monte Carlo, two hundred
-iterations and two thousand.
-
-`playground/lbfgs_quality.py` compares them, `playground/lbfgs_diversity.py` the spread.
-
-`playground/lbfgs_vs_mc.py` runs the comparison.
+Not yet done: the ensemble comparison through the real pipeline, and the validation battery,
+Hi-C correlation and the within block distance exponent, which is what should gate adoption
+rather than an energy number.
 
 ### A better initial structure
 
