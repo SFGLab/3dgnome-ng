@@ -4,8 +4,13 @@ Reconstructions come out as compact balls of anchors scattered in space and join
 strands. This records what causes that, what has been measured, what has been ruled out, and
 which changes are worth making.
 
-Status. Diagnosis complete and quantified on finished structures. One cause was a configuration
-value and has been changed. Options A and B are built and opt in. A is measured and does not fix the within block shape. The next lever is D, the arc target law.
+Status. Diagnosis complete and quantified on finished structures. B, the boundary stitch, is
+built and now converges; it removes the strands between blocks. E, the cross block relaxation,
+removes the interpenetration. Neither touches what is inside a block, and the within block
+defect has a root cause as of 2026-09-05: the arcs stage minimises a matrix built from two
+distance laws that disagree by eleven times at five kb and a hundred at one Mb. G, one
+background for both, is built and opt in and fixes both the overlap rate and the distance
+exponent on real blocks offline. It is under whole region measurement.
 
 ## Symptom
 
@@ -474,6 +479,70 @@ across boundaries at the same density the blocks use, and letting the relaxation
 route them, is the fix. It also gives the chain a genomic length across the gap instead of a
 bond of zero length, which the stitch target currently stands in for.
 
+### G. One distance law for arc targets and chain bonds. Built, opt in, under measurement
+
+The root cause of the within block collapse, found 2026-09-05.
+
+The arcs stage's target matrix carries two families of positive entry and they are built by
+different laws. An arc's target is `freq_to_distance(PET)`, times a span factor when D is on,
+and lands between 0.2 and 1.6 model units over five kb to one Mb. A consecutive arcless anchor
+pair's target, which C adds, is `arcs_chain_bond_scale` times the chain law and lands between
+4.0 and 135 over the same range.
+
+| separation | an arc asks for | the chain asks for | ratio |
+|---|---|---|---|
+| 5 kb | 0.44 at 2 PET to 0.20 at 50 | 4.01 | 9 to 20 |
+| 20 kb | 0.54 to 0.24 | 8.59 | 16 to 35 |
+| 200 kb | 1.04 to 0.47 | 41.4 | 40 to 88 |
+| 1 Mb | 1.65 to 0.74 | 134.9 | 82 to 182 |
+
+The chain law's own exponent is 0.671, far steeper than the 0.285 the contact probability curves
+give. The arc law's is 0.264, close to it by construction since D sets it, but its absolute
+scale is a tenth to a hundredth of the chain's. An arc therefore asks two beads to sit at a
+fraction of one bead's own size, which nothing downstream can undo, because the smooth stage
+holds every anchor fixed.
+
+What that produces, measured on a finished trio chr1 by matching each loop in the bedpe to its
+anchor pair. 93 percent of arc joined anchor pairs end up closer than a bead's size. Those are
+24 percent of the chromosome's 13,177 overlapping anchor pairs, a 5.8 times enrichment over the
+4.13 percent base rate. The other 76 percent have no arc between them and are squeezed together
+as the arc network collapses the block.
+
+Under the unified law a pair sits at the chain law distance for its separation, and its PET
+count only says how far in to pull from there, between `arc_target_pull` and 1. The PET law
+supplies that factor rather than the distance, normalised by its own limits, which it has: it
+runs from `freq_to_distance(0)` down to `count_dist_base_level`. A zero PET arc sits on the
+background, a saturated one at the pull, and an arc's target now grows with separation exactly
+as the chain's does. One site, `Settings.arc_expected_distance`. Keys under `[distance]`:
+`use_unified_arc_target`, `arc_target_pull` (0.45). It supersedes D, which carries the same
+separation dependence in a form that cannot fix the scale.
+
+Measured offline on eight real blocks of a trio chr1, each solved from a common start, against
+the production matrix rebuilt from the same anchors and the same bedpe. The one thing not
+reproduced is the anchor heatmap scaling, which shrinks arc targets further, so the production
+arm here is a conservative version of the real one.
+
+| arm | overlaps per thousand anchors | exponent | against 0.285 | arc over background |
+|---|---|---|---|---|
+| production | 1,619 | 0.067 | 0.24 | 0.44 |
+| floor at 1.5 bead sizes | 37 | 0.069 | 0.24 | 0.52 |
+| unified, pull 0.9 | 0 | 0.309 | 1.08 | 0.63 |
+| unified, pull 0.45 | 0 | 0.288 | 1.01 | 0.63 |
+| unified, pull 0.3 | 12 | 0.272 | 0.95 | 0.62 |
+
+Three things that table says. The overlap and the flat curve are one defect, not two, because
+flooring the old targets at a bead's size removes the overlaps and leaves the exponent where it
+was. Arc joined pairs still sit at 0.63 of what an unjoined pair holds at the same separation,
+so the data is still doing work. And the pull barely matters between 0.9 and 0.45, which says
+most of the gain is from putting arcs on the background at all rather than from how far the PET
+count pulls them in.
+
+What is not yet known. Per block the exponent varies far more widely than production's does,
+0.04 to 0.60 against -0.08 to 0.22, so the mean is right and the individual block is not.
+Blocks expand, on one block Rg 7.7 to 27.8, and expansion has previously traded against contact
+density. Nothing here has been measured against Hi-C, which is the gate that decides it. A whole
+region arm on chr1:1-60 Mb against the arm generated the same night is running.
+
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
 The most direct statement of the missing constraint. It was left last because it competes with
@@ -661,3 +730,9 @@ Hi-C. The jump should approach 1.
 7. Decide, on those numbers, whether the existing ensembles and the running trio array are
    regenerated with the working flags on.
 8. Only then consider C.
+9. G, one distance law for both families. Built 2026-09-05 after the two laws were found to
+   disagree by one to two orders of magnitude. Offline it takes the overlap rate to zero and the
+   exponent to 0.288 against a 0.285 target. The gate is the whole region battery against the
+   production arm, Hi-C correlation first, then the exponent, then the overlap columns. If it
+   holds it supersedes D and makes A unnecessary, since a floor is only needed while the targets
+   are below a bead's size.

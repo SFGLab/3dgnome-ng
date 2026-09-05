@@ -865,6 +865,48 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference's `freqToDistance` is the PET only law. See
   `design/anchor-placement.md`, option D.
 
+- **Unified arc target: `[distance] use_unified_arc_target = yes`, default no.**
+  ([settings.py](gnome3d/settings.py) `arc_expected_distance`)
+  The arcs stage minimises a matrix carrying two families of positive entry built by different
+  laws. An arc's target is `freq_to_distance(PET)`, times a span factor when
+  `use_separation_arc_target` is on, and lands between 0.2 and 1.6 model units over five kb to
+  one Mb. A consecutive arcless anchor pair's target, which `use_arcs_chain_bonds` adds, is
+  `arcs_chain_bond_scale` times the chain law and lands between 4.0 and 135 over the same range.
+  The two differ by eleven times at five kb and a hundred at one Mb. An arc therefore asks two
+  beads to sit at a fraction of one bead's own size, and nothing downstream can undo it because
+  the smooth stage holds every anchor fixed.
+
+  Measured on a finished trio chr1 by matching each loop in the bedpe to its anchor pair, 93
+  percent of arc joined anchor pairs end up closer than a bead's size. Those are 24 percent of
+  the chromosome's 13,177 overlapping anchor pairs, a 5.8 times enrichment over the 4.13 percent
+  base rate, and the rest are anchors with no arc between them squeezed together as the arc
+  network collapses the block.
+
+  Under the flag a pair sits at the chain law distance for its separation and its PET count only
+  says how far in to pull from there, between `arc_target_pull` and 1. The PET law supplies that
+  factor rather than the distance, normalised by its own limits, which it has: it runs from
+  `freq_to_distance(0)` down to `count_dist_base_level`. A zero PET arc sits on the background, a
+  saturated one at the pull, and an arc's target grows with separation exactly as the chain's
+  does. One site, `Settings.arc_expected_distance`; no kernel and no matrix builder is touched.
+  It supersedes the separation aware law, which carries the same span dependence in a form that
+  cannot fix the scale. Keys: `use_unified_arc_target`, `arc_target_pull` (0.45).
+
+  Solved on eight real blocks of a trio chr1 from a common start, against the production matrix
+  rebuilt from the same anchors and the same bedpe, the overlap rate goes from 1,619 per thousand
+  anchors to zero and the realised distance exponent from 0.067 to 0.288 against the 0.285 the
+  contact probability curves give. Arc joined pairs still sit at 0.63 of the distance an unjoined
+  pair holds at the same separation. Flooring the old targets at a bead's size removes the
+  overlaps too, 1,619 to 37, but leaves the exponent at 0.069, so the overlap and the flat curve
+  are one defect rather than two. Unit checks in `harness/test_arc_target.py`,
+  `playground/arc_law_arms.py` runs the offline comparison.
+
+  Per block the exponent varies far more widely than production's, 0.04 to 0.60 against -0.08 to
+  0.22, and blocks expand, so this stays opt in until a whole region run measures it against
+  Hi-C. See `design/anchor-placement.md`, option G.
+
+  Why not in the reference: the reference has only the PET law and no chain term in this stage,
+  so the two never met.
+
 - **Chain bonds in the arcs MC: `[springs] use_arcs_chain_bonds = yes`, default no.**
   ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `add_chain_bonds`)
   The arcs MC has no term between genomic neighbours. Inside a block the arc graph falls into
