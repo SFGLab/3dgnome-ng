@@ -50,7 +50,7 @@ def _run(problem: Problem) -> Result:
     # Anneal or solve. The solver minimises the same energy directly and reaches the same
     # minimum far faster, because the landscape is a funnel. Restarts, noise and best-of are
     # the same either way, so an ensemble still comes from the perturbed starts.
-    solver = str(getattr(s, "arcs_solver", "mc")).strip().lower()
+    solver = arcs_solver(s)
 
     best_score = -1.0
     best: F32Array = pos0.copy()
@@ -58,7 +58,7 @@ def _run(problem: Problem) -> Result:
         pos: F32Array = pos0.copy()
         add_movable_noise_inplace(pos, None, step)  # arcs noises ALL anchors
         if solver == "lbfgs":
-            from gnome3d.mc.numba.arcs_solver import solve_arcs
+            from gnome3d.mc.numba.arcs_solver import solve_arcs  # noqa: PLC0415
 
             score, pos = solve_arcs(pos, exp_dist, s)
         else:
@@ -77,6 +77,15 @@ def _run(problem: Problem) -> Result:
             )
             best = pos
     return best_score, np.asarray(best, dtype=np.float32)
+
+
+def arcs_solver(s: Settings) -> str:
+    """The stage's solver name, validated. An unrecognised name is refused rather than falling
+    through to the annealer, which would run the wrong stage and report nothing."""
+    name = str(s.arcs_solver).strip().lower()
+    if name not in ("mc", "lbfgs"):
+        raise ValueError(f"[simulation_arcs] solver must be mc or lbfgs, got {s.arcs_solver!r}")
+    return name
 
 
 def polish_temp(s: Settings) -> float:
@@ -103,10 +112,20 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     """Batched (JAX) runner: anneal a whole bucket of IBs' arcs in one vmapped
     kernel.  Each IB is fanned out to `steps_arcs` noised restarts (best kept),
     mirroring the serial loop.  Returns one `(score, pos)` per input problem.
-    Lazy `mc_jax` import so the numba path never requires JAX."""
-    from gnome3d.mc import jax as mc_jax
+    Lazy `mc_jax` import so the numba path never requires JAX.
 
+    There is no solver here, only the JAX annealer, so a run that asked for one is refused. It
+    would otherwise anneal and look like it had solved."""
     s = problems[0]["settings"]
+    if arcs_solver(s) != "mc":
+        raise NotImplementedError(
+            f"[simulation_arcs] solver = {s.arcs_solver} needs "
+            "[simulation_backend] mc_executor_arcs = serial or threaded; "
+            "the batch executor has no solver"
+        )
+
+    from gnome3d.mc import jax as mc_jax  # noqa: PLC0415
+
     n_restarts = max(1, int(s.steps_arcs))
 
     expanded: list[Problem] = []

@@ -120,6 +120,14 @@ CANONICAL: dict[str, dict[str, object]] = {
         "stop_condition_steps_heatmap": 50000,
     },
     "simulation_arcs": {
+        # Solve the stage rather than anneal it. The landscape is a funnel, so a quasi Newton
+        # descent lands in the same minimum. Measured over five structures on chr1:1-60Mb the
+        # two arms agree on every quality number, Hi-C Pearson 0.403 against 0.405, distance
+        # exponent 0.240 against 0.249, and the anchor overlap rate 89.2 against 89.1 per
+        # thousand beads. The stage's two calls went from 492s to 6s and from 500s to 23s, and
+        # the whole run from 1h57m to 1h13m. The batch executor has no solver in it, so this
+        # needs mc_executor_arcs serial or threaded, which is what it is set to above.
+        "solver": "lbfgs",
         "max_temp": 5.0,
         "jump_temp_scale": 50.0,
         "jump_temp_coef": 20.0,

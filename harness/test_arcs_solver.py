@@ -13,8 +13,11 @@ against the two initialisers the MC builds its score from, and its gradient agai
 differences of itself.
 
 The solver covers the terms production uses, springs, a truncated repulsion and confinement. It
-does not implement the genomic floor or an excluded volume on arcs, both off by default, and it
-refuses rather than silently dropping them.
+does not implement the genomic floor, and it refuses rather than silently dropping it.
+
+Two ways it could be asked for and silently not run, both checked here. A misspelled solver name
+must not fall through to the annealer, and the batched runner cannot honour a solver at all, so
+it has to say so rather than anneal.
 """
 
 from __future__ import annotations
@@ -188,6 +191,54 @@ def test_off_by_default() -> None:
     check("the stage anneals unless asked otherwise", Settings().arcs_solver == "mc")
 
 
+def test_an_unknown_name_is_refused() -> None:
+    """Falling through to the annealer would run the wrong stage and say nothing."""
+    from gnome3d.pipeline.ib.arcs import _run
+
+    pos, exp, s = block(40, 5)
+    s.arcs_solver = "lbgfs"  # a plausible typo
+    s.steps_arcs = 1
+    try:
+        _run(
+            {
+                "anchor_pos": pos,
+                "exp_dist": exp,
+                "step_size": 0.01,
+                "settings": s,
+                "seed": 1,
+            }  # type: ignore[arg-type]
+        )
+        ok = False
+    except ValueError:
+        ok = True
+    check("a misspelled solver name is refused, not ignored", ok)
+
+
+def test_the_batched_runner_cannot_honour_it() -> None:
+    """The batched runner is a JAX annealer with no solver in it, so asking for one there has
+    to fail rather than quietly anneal."""
+    from gnome3d.pipeline.ib.arcs import _batch_run
+
+    pos, exp, s = block(40, 6)
+    s.arcs_solver = "lbfgs"
+    try:
+        _batch_run(
+            [
+                {
+                    "anchor_pos": pos,
+                    "exp_dist": exp,
+                    "step_size": 0.01,
+                    "settings": s,
+                    "seed": 1,
+                }  # type: ignore[arg-type]
+            ]
+        )
+        ok = False
+    except NotImplementedError:
+        ok = True
+    check("the batch executor refuses a solver rather than annealing", ok)
+
+
 def main() -> int:
     print("arcs solver checks\n")
     test_energy_is_the_one_the_mc_scores()
@@ -195,6 +246,8 @@ def main() -> int:
     test_it_descends()
     test_it_refuses_terms_it_does_not_implement()
     test_off_by_default()
+    test_an_unknown_name_is_refused()
+    test_the_batched_runner_cannot_honour_it()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

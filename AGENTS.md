@@ -933,6 +933,39 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference has no term across blocks at any stage. See
   `design/anchor-placement.md`, option E.
 
+- **Solving the arcs stage: `[simulation_arcs] solver = mc | lbfgs`, default `mc`, production
+  `lbfgs`.** ([gnome3d/mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py))
+  The arcs landscape is a funnel. Ten Monte Carlo starts from perturbed seeds land within one
+  percent of the same energy at a coefficient of variation of a third of a percent, and
+  temperature makes no difference to where a run converges, so there are no basins for a
+  stochastic search to escape. A quasi Newton descent on the same energy therefore reaches the
+  same minimum.
+
+  `arcs_energy_grad` is the energy `mc_arcs_numba` scores, its arc term plus its truncated
+  repulsion, an excluded volume and confinement, with the cutoff and the confinement centre and
+  radius derived the way that driver derives them, and its gradient. The genomic floor is not
+  implemented and is refused rather than dropped. Restarts, the per anchor start noise and best
+  of are unchanged, so an ensemble still comes from the perturbed starts. Keys: `solver`,
+  `solver_iters` (200).
+
+  Measured over five structures on chr1:1-60Mb the two arms agree on every quality number, Hi-C
+  Pearson 0.403 against 0.405, Spearman 0.318 against 0.321, SCC 0.110 against 0.109, MultiMM
+  0.331 against 0.331, distance exponent 0.240 against 0.249, and the within block anchor
+  overlap rate 89.2 against 89.1 per thousand beads. The stage's two calls fell from 492s to 6s
+  and from 500s to 23s, and the whole five structure run from 1h57m to 1h13m.
+
+  It is a speed change and nothing more. The anchor overlap rate is identical to three figures,
+  so a faster solver of the same energy does not touch the within block compaction that
+  `design/anchor-placement.md` exists for.
+
+  Two ways it could be asked for and silently not run, both refused. An unrecognised name is a
+  `ValueError` rather than a fall through to the annealer. And the batch executor is a JAX
+  annealer with no solver in it, so it raises rather than annealing; the solver needs
+  `mc_executor_arcs = serial` or `threaded`, which is what `CANONICAL` sets. Unit checks in
+  `harness/test_arcs_solver.py`.
+
+  Why not in the reference: the reference anneals this stage too.
+
 - **Step size annealing: `[simulation_arcs] step_decay`, and the same key under
   `[simulation_arcs_smooth]` and `[simulation_ib]`, default `1.0` which is off.**
   ([mc/numba/terms.py](gnome3d/mc/numba/terms.py) `decayed_step_nb`,
