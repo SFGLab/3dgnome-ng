@@ -47,12 +47,22 @@ def _run(problem: Problem) -> Result:
     seed_rng(seed)
     mc_numba.seed_numba(seed)
 
+    # Anneal or solve. The solver minimises the same energy directly and reaches the same
+    # minimum far faster, because the landscape is a funnel. Restarts, noise and best-of are
+    # the same either way, so an ensemble still comes from the perturbed starts.
+    solver = str(getattr(s, "arcs_solver", "mc")).strip().lower()
+
     best_score = -1.0
     best: F32Array = pos0.copy()
     for _run_i in range(max(1, int(s.steps_arcs))):
         pos: F32Array = pos0.copy()
         add_movable_noise_inplace(pos, None, step)  # arcs noises ALL anchors
-        score = mc_numba.mc_arcs_numba(pos, exp_dist, step, s)  # mutates pos in place
+        if solver == "lbfgs":
+            from gnome3d.mc.numba.arcs_solver import solve_arcs
+
+            score, pos = solve_arcs(pos, exp_dist, s)
+        else:
+            score = mc_numba.mc_arcs_numba(pos, exp_dist, step, s)  # mutates pos in place
         if score < best_score or best_score < 0.0:
             best_score = score
             best = pos.copy()

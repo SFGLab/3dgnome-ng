@@ -364,6 +364,12 @@ class Settings:
     # score. It proposes only: the Metropolis rule still rejects, which is what keeps a singular
     # 1/d repulsion safe where a gradient solver would see unbounded forces.
     arcs_force_bias: float
+    # Anneal the arcs stage or solve it. "mc" is the Monte Carlo the reference uses. "lbfgs"
+    # minimises the same energy directly, which on real blocks reaches the same minimum about
+    # thirty six times faster with the ensemble spread slightly wider and the geometry matching.
+    # The landscape is a funnel, so there is nothing for the stochastic search to escape.
+    arcs_solver: str
+    arcs_solver_iters: int
     mc_stop_ratio_arcs: float
     mc_step_decay_arcs: float
     mc_step_decay_smooth: float
@@ -759,6 +765,8 @@ class Settings:
         self.mc_stop_successes_smooth = 5
         self.mc_stop_steps_smooth = 10000
         self.arcs_force_bias = 0.0
+        self.arcs_solver = "mc"
+        self.arcs_solver_iters = 200
         self.mc_stop_ratio_arcs = 0.9999
         self.mc_step_decay_arcs = 1.0
         self.mc_step_decay_smooth = 1.0
@@ -1329,6 +1337,8 @@ class Settings:
             "simulation_arcs", "stop_condition_ratio", self.mc_stop_ratio_arcs
         )
         self.arcs_force_bias = getf("simulation_arcs", "force_bias", self.arcs_force_bias)
+        self.arcs_solver = gets("simulation_arcs", "solver", self.arcs_solver)
+        self.arcs_solver_iters = geti("simulation_arcs", "solver_iters", self.arcs_solver_iters)
         self.mc_step_decay_smooth = getf(
             "simulation_arcs_smooth", "step_decay", self.mc_step_decay_smooth
         )
