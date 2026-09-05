@@ -655,6 +655,12 @@ class Settings:
         self.relax_temp = 0.1  # fraction of max_temp_smooth; a little heat lets coils cross
         self.relax_noise = 0.5  # step size as a fraction of the median bond length
         self.relax_bond_weight = 10.0  # chain spring constants during the pass
+        # Skip the pass when fewer than this fraction of beads are touching another block.
+        # It anneals the whole chromosome until its own convergence test fires, so it costs the
+        # same however little there is to fix: measured on a trio run at an hour and fifty five
+        # minutes per structure whatever the input, once to move two beads out of 129,457.
+        # Zero keeps it running always, which is what it did before.
+        self.relax_min_contact_fraction = 0.0
 
         # ---- A/B compartments ----
         # Block-copolymer segregation over a per-bead compartment call, ported
@@ -1211,6 +1217,9 @@ class Settings:
         self.relax_temp = getf("relax", "temp", self.relax_temp)
         self.relax_noise = getf("relax", "noise", self.relax_noise)
         self.relax_bond_weight = getf("relax", "bond_weight", self.relax_bond_weight)
+        self.relax_min_contact_fraction = getf(
+            "relax", "min_contact_fraction", self.relax_min_contact_fraction
+        )
 
         # [compartments]
         self.use_compartments = getb("compartments", "use_compartments", self.use_compartments)

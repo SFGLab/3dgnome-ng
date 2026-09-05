@@ -102,6 +102,22 @@ def relax_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]
     r = _relax_settings(s, bond)
     radius = bond  # contacts are counted at one bond; the excluded volume acts wider
     before, _ = cross_block_contacts(blocks, radius)
+
+    # Decline when there is next to nothing to fix. The pass anneals the whole chromosome until
+    # its own convergence test fires, so its cost does not follow its workload, and on a real
+    # trio run it took an hour and fifty five minutes per structure whatever the input, once to
+    # move two beads out of 129,457.
+    floor = float(getattr(s, "relax_min_contact_fraction", 0.0))
+    if floor > 0.0 and before < floor * len(chain):
+        LOG.info(
+            "cross block relax: %d beads, %d contacts within %.2f is below %.2f%% of them, skipped",
+            len(chain),
+            before,
+            radius,
+            floor * 100.0,
+        )
+        return blocks
+
     step = float(s.relax_noise) * bond
 
     use_jax = str(s.mc_executor_smooth).strip().lower() == "batch"

@@ -892,6 +892,20 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   1.5 bonds), `noise` (0.5 bonds). Runs after the stitch in `reconstruct.py::_assemble`. The
   gate is `cross_block_contacts`. Unit checks in `harness/test_relax.py`.
 
+  **`[relax] min_contact_fraction` (default 0, off) declines the pass when there is next to
+  nothing to fix.** The pass anneals the whole chromosome until its own convergence test fires,
+  so its cost does not follow its workload. Measured on a real trio run it took an hour and fifty
+  five minutes per structure whatever the input: once to take 91 contacts to 29 by moving 53 beads
+  of 129,457, and once to take 800 to 1 by moving two. It is the largest stage in those runs at
+  44 percent of the wall, and it is invisible to `playground/profile_run.py` because it runs in
+  `reconstruct.py::_assemble` rather than through an executor dispatch. The threshold is a
+  fraction of the chromosome's beads; on those four structures 0.1 percent skips one of four and
+  1 percent skips three, the one it keeps being the structure that moved 518 beads.
+
+  The principled fix is not a threshold. Seven beads needing to move should not cost annealing
+  129,457, so the pass should relax the neighbourhood of the offending contacts rather than the
+  whole chromosome. That is not built.
+
   Why not in the reference: the reference has no term across blocks at any stage. See
   `design/anchor-placement.md`, option E.
 
