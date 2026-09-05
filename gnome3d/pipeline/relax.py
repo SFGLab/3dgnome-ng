@@ -51,7 +51,7 @@ def cross_block_contacts(blocks: list[list[BeadOut]], radius: float) -> tuple[in
     return int(cross.shape[0]), int(np.unique(cross.ravel()).size)
 
 
-def _cross_pairs(pos: F32Array, owner: np.ndarray, radius: float) -> np.ndarray:
+def _cross_pairs(pos: np.ndarray, owner: np.ndarray, radius: float) -> np.ndarray:
     """Index pairs, into `pos`, of beads from different blocks closer than `radius`."""
     if pos.shape[0] < 2:
         return np.zeros((0, 2), dtype=np.int64)
