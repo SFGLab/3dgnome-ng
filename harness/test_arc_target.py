@@ -213,10 +213,49 @@ def test_unified_law() -> None:
     check("it supersedes the separation aware law", s.use_unified_arc_target is True)
 
 
+def test_background_exponent() -> None:
+    """The chain law's own exponent is 0.671, far steeper than the 0.285 the contact probability
+    curves give, and the arcs stage evaluates it out to a Mb where that matters. The background
+    can instead be anchored where the chain law is calibrated and continued at a chosen slope."""
+    print("\n[background] the slope the unified law rides on")
+    s = Settings()
+    s.use_unified_arc_target = True
+    check(
+        "zero keeps the chain law itself",
+        abs(s.arc_background_distance(50_000) - s.genomic_length_to_distance(50_000)) < 1e-12,
+    )
+    s.arc_target_background_exponent = 0.285
+    ref = s.arc_target_background_ref_bp
+    check(
+        "and it still agrees with the chain law at the reference separation",
+        abs(s.arc_background_distance(ref) - s.genomic_length_to_distance(ref)) < 1e-12,
+        f"{s.arc_background_distance(ref):.4f}",
+    )
+    seps = [5_000, 50_000, 1_000_000]
+    v = [s.arc_background_distance(x) for x in seps]
+    slope = float(np.polyfit(np.log(seps), np.log(v), 1)[0])
+    check(
+        "the background carries the slope it was given", abs(slope - 0.285) < 1e-9, f"{slope:.4f}"
+    )
+    a = [s.arc_expected_distance(4, x) for x in seps]
+    aslope = float(np.polyfit(np.log(seps), np.log(a), 1)[0])
+    check("and an arc target carries it too", abs(aslope - 0.285) < 1e-9, f"{aslope:.4f}")
+    check(
+        "it is flatter than the chain law at long range",
+        s.arc_background_distance(1_000_000) < s.genomic_length_to_distance(1_000_000),
+        f"{s.arc_background_distance(1_000_000):.1f} against "
+        f"{s.genomic_length_to_distance(1_000_000):.1f}",
+    )
+
+
 def test_unified_is_off_by_default() -> None:
     d = Settings()
     check("the unified law is opt in", d.use_unified_arc_target is False)
     check("and the pull defaults to the measured value", abs(d.arc_target_pull - 0.45) < 1e-12)
+    check(
+        "the background defaults to the chain law, which is what was measured end to end",
+        d.arc_target_background_exponent == 0.0,
+    )
 
 
 def main() -> int:
@@ -226,6 +265,7 @@ def main() -> int:
     test_matrix()
     test_chain_bonds()
     test_unified_law()
+    test_background_exponent()
     test_unified_is_off_by_default()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:

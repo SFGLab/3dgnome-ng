@@ -370,6 +370,8 @@ class Settings:
     # The landscape is a funnel, so there is nothing for the stochastic search to escape.
     use_unified_arc_target: bool
     arc_target_pull: float
+    arc_target_background_exponent: float
+    arc_target_background_ref_bp: int
     arcs_solver: str
     arcs_solver_iters: int
     mc_stop_ratio_arcs: float
@@ -791,6 +793,13 @@ class Settings:
         # [[project_unified_arc_target]].
         self.use_unified_arc_target = False
         self.arc_target_pull = 0.45
+        # The chain law's own exponent is 0.671, far steeper than the 0.285 the contact
+        # probability curves give, and this stage evaluates it out to a Mb where that matters.
+        # Zero keeps the chain law itself, which is what was measured end to end. A positive
+        # value anchors the background where the chain law is calibrated and continues it at
+        # that slope. Offline the right value differs by cell line, so it is a knob.
+        self.arc_target_background_exponent = 0.0
+        self.arc_target_background_ref_bp = 1000
         self.arcs_solver = "mc"
         self.arcs_solver_iters = 200
         self.mc_stop_ratio_arcs = 0.9999
@@ -1371,6 +1380,12 @@ class Settings:
             "distance", "use_unified_arc_target", self.use_unified_arc_target
         )
         self.arc_target_pull = getf("distance", "arc_target_pull", self.arc_target_pull)
+        self.arc_target_background_exponent = getf(
+            "distance", "arc_target_background_exponent", self.arc_target_background_exponent
+        )
+        self.arc_target_background_ref_bp = geti(
+            "distance", "arc_target_background_ref_bp", self.arc_target_background_ref_bp
+        )
         self.arcs_solver = gets("simulation_arcs", "solver", self.arcs_solver)
         self.arcs_solver_iters = geti("simulation_arcs", "solver_iters", self.arcs_solver_iters)
         self.mc_step_decay_smooth = getf(
@@ -1448,6 +1463,20 @@ class Settings:
             self.count_dist_base_level,
         )
 
+    def arc_background_distance(self, sep_bp: int) -> float:
+        """The distance two anchors that far apart hold with no contact between them.
+
+        With `arc_target_background_exponent` at zero this is the chain law itself. Otherwise it
+        is the chain law's value at `arc_target_background_ref_bp`, where that law is calibrated
+        for consecutive beads, continued at the given exponent.
+        """
+        sep = max(abs(int(sep_bp)), 1)
+        nu = float(self.arc_target_background_exponent)
+        if nu <= 0.0:
+            return float(self.genomic_length_to_distance(sep))
+        ref = max(int(self.arc_target_background_ref_bp), 1)
+        return float(self.genomic_length_to_distance(ref)) * (sep / ref) ** nu
+
     def arc_expected_distance(self, score: int, sep_bp: int) -> float:
         """The arc target for an arc of `score` PETs spanning `sep_bp`. The parity law when both
         `use_unified_arc_target` and `use_separation_arc_target` are off.
@@ -1463,7 +1492,7 @@ class Settings:
         from gnome3d.util import arc_target_with_separation
 
         if self.use_unified_arc_target:
-            bg = self.genomic_length_to_distance(max(abs(int(sep_bp)), 1))
+            bg = self.arc_background_distance(sep_bp)
             lo = float(self.count_dist_base_level)
             span = float(self.freq_to_distance(0)) - lo
             g = (float(self.freq_to_distance(score)) - lo) / span if span > 1e-12 else 0.0

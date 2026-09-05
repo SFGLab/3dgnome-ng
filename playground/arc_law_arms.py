@@ -52,11 +52,25 @@ def read_arcs(path: str, chrom: str) -> list[tuple[int, int, int, int]]:
     return out
 
 
+def background(s: Settings, sep_bp: int, nu: float, ref_bp: int = 1000) -> float:
+    """The distance two anchors that far apart should hold with no contact between them.
+
+    With `nu` at zero this is the chain law itself, whose own exponent is 0.671. Otherwise it is
+    the chain law anchored at `ref_bp`, where it is calibrated, and continued at `nu`. The chain
+    law is written for consecutive beads a kb or so apart and the arcs stage evaluates it out to
+    a Mb, where 0.671 is far steeper than the 0.285 the contact probability curves give.
+    """
+    if nu <= 0.0:
+        return float(s.genomic_length_to_distance(max(abs(sep_bp), 1)))
+    return float(s.genomic_length_to_distance(ref_bp)) * (max(abs(sep_bp), 1) / ref_bp) ** nu
+
+
 def unified_matrix(
     s: Settings,
     mids: list[int],
     arcs: list[tuple[int, int, int]],
     pull: float,
+    nu: float = 0.0,
 ) -> F64Array:
     """One law for both families. A pair sits at the chain law distance for its separation, and
     an arc pulls its pair in from there by a factor between `pull` and 1 set by its PET rank.
@@ -66,13 +80,23 @@ def unified_matrix(
     n = len(mids)
     mat: F64Array = np.full((n, n), -1.0, dtype=np.float64)
     np.fill_diagonal(mat, 0.0)
-    if arcs:
-        sc = np.array([a[2] for a in arcs], dtype=np.float64)
-        rank = sc.argsort().argsort() / max(len(sc) - 1, 1)
-        for (i, j, _), r in zip(arcs, rank, strict=True):
-            bg = float(s.genomic_length_to_distance(max(abs(mids[j] - mids[i]), 1)))
-            mat[i, j] = mat[j, i] = bg * (1.0 - r * (1.0 - pull))
-    return add_chain_bonds(mat, mids, s)
+    lo = float(s.count_dist_base_level)
+    span = float(s.freq_to_distance(0)) - lo
+    for i, j, sc in arcs:
+        g = (float(s.freq_to_distance(sc)) - lo) / span if span > 1e-12 else 0.0
+        bg = background(s, mids[j] - mids[i], nu)
+        mat[i, j] = mat[j, i] = bg * (pull + (1.0 - pull) * min(max(g, 0.0), 1.0))
+    if not s.use_arcs_chain_bonds:
+        return mat
+    # The chain bond has to sit on the same background, or the two families disagree in slope
+    # even once they agree in scale.
+    order = sorted(range(len(mids)), key=lambda k: mids[k])
+    for a, b in zip(order[:-1], order[1:], strict=True):
+        if mat[a, b] > 0.0:
+            continue
+        d = float(s.arcs_chain_bond_scale) * background(s, mids[b] - mids[a], nu)
+        mat[a, b] = mat[b, a] = d
+    return mat
 
 
 def bead_size(s: Settings, mids: list[int]) -> float:
@@ -177,8 +201,9 @@ def main() -> None:
         prod = add_chain_bonds(arc_expected_matrix(s, mids, arcs), mids, s)
         arms: list[tuple[str, F64Array]] = [("production", prod)]
         arms.append(("floor 1.5 bead", floored(s, prod, mids, 1.5)))
-        for pull in (0.9, 0.75, 0.6, 0.45, 0.3):
-            arms.append((f"unified pull {pull}", unified_matrix(s, mids, arcs, pull)))
+        arms.append(("unified chain slope", unified_matrix(s, mids, arcs, 0.45, 0.0)))
+        for nu in (0.20, 0.285, 0.40):
+            arms.append((f"unified nu {nu}", unified_matrix(s, mids, arcs, 0.45, nu)))
         for name, mat in arms:
             _, out = solve_arcs(start_pos.copy(), mat, s)
             r = measure(np.asarray(out, np.float64), np.array(mids), mat)

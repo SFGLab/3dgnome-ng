@@ -427,9 +427,15 @@ def add_chain_bonds(mat: F64Array, mids: list[int], s: Settings) -> F64Array:
     for a, b in zip(order[:-1], order[1:], strict=True):
         if out[a, b] > 0.0:
             continue
-        d = float(s.arcs_chain_bond_scale) * float(
-            s.genomic_length_to_distance(abs(int(mids[b]) - int(mids[a])))
+        # Under the unified law the bond rides the same background the arc targets do, or the
+        # two families agree in scale and still disagree in slope.
+        gap = abs(int(mids[b]) - int(mids[a]))
+        bg = (
+            s.arc_background_distance(gap)
+            if s.use_unified_arc_target
+            else (s.genomic_length_to_distance(gap))
         )
+        d = float(s.arcs_chain_bond_scale) * float(bg)
         out[a, b] = d
         out[b, a] = d
     return out
