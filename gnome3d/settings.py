@@ -643,7 +643,11 @@ class Settings:
         self.use_boundary_stitch = False
         self.boundary_stitch_spring_weight = 1.0
         self.boundary_stitch_ev_weight = 1.0
-        self.boundary_stitch_max_iter = 500
+        # The energy is minimised with its own gradient, so an iteration is one evaluation
+        # and the count is what sets the cost. Measured on a trio chr1 of 1,494 blocks, 500
+        # leaves the worst boundary at 6.0 times the curve, 2000 reaches 1.32 in 85 seconds,
+        # and 5000 finds nothing further. See [[project_boundary_stitch]].
+        self.boundary_stitch_max_iter = 2000
 
         # ---- cross block relaxation ----
         # After the stitch nothing acts between beads of different blocks. This runs the smooth

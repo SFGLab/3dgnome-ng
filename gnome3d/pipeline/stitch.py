@@ -14,6 +14,11 @@ the two blocks' radii of gyration added, so closing a boundary cannot fold a blo
 neighbour it shares no edge with. `exclusion_radius_ib`, when positive, replaces that with one
 constant radius for every pair. See [[project_ib_packing_factor]] for why there is no chain bond and no
 confinement here.
+
+The energy carries its own gradient. A chromosome is a thousand or more blocks, so six
+variables per block puts the problem in the thousands of dimensions, where a finite difference
+gradient costs one evaluation per variable and the solver runs out of its evaluation budget
+after one step. See [[project_boundary_stitch]].
 """
 
 from __future__ import annotations
@@ -25,7 +30,7 @@ from scipy.optimize import minimize
 from scipy.spatial.transform import Rotation
 
 from gnome3d.settings import Settings
-from gnome3d.types import BeadOut, F64Array, I64Array
+from gnome3d.types import BeadOut, BoolArray, F64Array, I64Array
 
 _MIN_BIN_COUNT = 5
 
@@ -98,6 +103,124 @@ def within_block_curve(
     return curve
 
 
+def _hat(v: F64Array) -> F64Array:
+    """The skew symmetric matrices of a stack of vectors, shape (..., 3) to (..., 3, 3)."""
+    z = np.zeros(v.shape[:-1], dtype=np.float64)
+    x, y, w = v[..., 0], v[..., 1], v[..., 2]
+    return np.stack(
+        [
+            np.stack([z, -w, y], axis=-1),
+            np.stack([w, z, -x], axis=-1),
+            np.stack([-y, x, z], axis=-1),
+        ],
+        axis=-2,
+    )
+
+
+def _rot_and_jac(rv: F64Array) -> tuple[F64Array, F64Array]:
+    """The rotation matrices of a stack of rotation vectors and their derivatives.
+
+    Returns `R` of shape (n, 3, 3) and `dR` of shape (n, 3, 3, 3) where `dR[:, i]` is the
+    derivative of `R` with respect to the i-th component of the rotation vector. The formula is
+    Gallego and Yezzi's, with the small angle limit taken as the generator itself.
+
+    Parameters
+    ----------
+    rv
+        Rotation vectors, shape (n, 3).
+    """
+    n = rv.shape[0]
+    rot: F64Array = Rotation.from_rotvec(rv).as_matrix().reshape(n, 3, 3)
+    rx = _hat(rv)
+    th2 = np.sum(rv * rv, axis=1)
+    small = th2 < 1e-16
+    gen = _hat(np.eye(3))
+    a = np.eye(3)[None, :, :] - rot
+    out = np.empty((n, 3, 3, 3), dtype=np.float64)
+    for i in range(3):
+        m = rv[:, i, None, None] * rx + _hat(np.cross(rv, a[:, :, i]))
+        out[:, i] = np.where(
+            small[:, None, None],
+            gen[i][None, :, :],
+            m @ rot / np.where(small, 1.0, th2)[:, None, None],
+        )
+    return rot, out
+
+
+def _energy_grad(
+    x: F64Array,
+    cen: F64Array,
+    first: F64Array,
+    last: F64Array,
+    target: F64Array,
+    w_spring: float,
+    iu0: I64Array,
+    iu1: I64Array,
+    r0: F64Array,
+    w_ev: float,
+) -> tuple[float, F64Array]:
+    """The stitch energy and its gradient at one rotation and one translation per block.
+
+    The variable vector is the n rotation vectors followed by the n translations, both
+    flattened. Excluded volume pairs are expected to be pre filtered to a positive radius.
+
+    Parameters
+    ----------
+    x
+        The 6n variables.
+    cen
+        Per block anchor centroids, shape (n, 3).
+    first, last
+        The first and last anchor of each block relative to its centroid, shape (n, 3).
+    target
+        The boundary distance each consecutive block pair is held to, shape (n - 1,).
+    w_spring
+        Weight on the boundary springs.
+    iu0, iu1
+        Block index pairs carrying the centroid excluded volume.
+    r0
+        The excluded volume radius of each of those pairs.
+    w_ev
+        Weight on the excluded volume.
+    """
+    n = cen.shape[0]
+    rv = x[: 3 * n].reshape(n, 3)
+    t = x[3 * n :].reshape(n, 3)
+    rot, drot = _rot_and_jac(rv)
+    c = cen + t
+    wl = np.einsum("nij,nj->ni", rot, last)
+    wf = np.einsum("nij,nj->ni", rot, first)
+
+    v = (c + wl)[:-1] - (c + wf)[1:]
+    d = np.linalg.norm(v, axis=1)
+    e = w_spring * float(np.sum(((d - target) / target) ** 2))
+    gv = (2.0 * w_spring * (d - target) / target**2 / np.maximum(d, 1e-30))[:, None] * v
+
+    gc = np.zeros((n, 3), dtype=np.float64)
+    gc[:-1] += gv
+    gc[1:] -= gv
+    gwl = np.zeros((n, 3), dtype=np.float64)
+    gwf = np.zeros((n, 3), dtype=np.float64)
+    gwl[:-1] = gv
+    gwf[1:] = -gv
+
+    if w_ev > 0.0 and iu0.size:
+        u = c[iu0] - c[iu1]
+        dc = np.linalg.norm(u, axis=1)
+        over = np.clip(r0 - dc, 0.0, None)
+        e += w_ev * float(np.sum((over / r0) ** 2))
+        m = over > 0.0
+        if m.any():
+            g = (-2.0 * w_ev * over[m] / r0[m] ** 2 / np.maximum(dc[m], 1e-30))[:, None] * u[m]
+            np.add.at(gc, iu0[m], g)
+            np.add.at(gc, iu1[m], -g)
+
+    grv = np.einsum("ni,nkij,nj->nk", gwl, drot, last) + np.einsum(
+        "ni,nkij,nj->nk", gwf, drot, first
+    )
+    return e, np.concatenate([grv.reshape(-1), gc.reshape(-1)])
+
+
 def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]]:
     """Return the blocks with each one moved rigidly so boundary pairs sit on the interior
     curve. Blocks without anchors pass through untouched and do not take part in the chain.
@@ -144,28 +267,25 @@ def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut
         if s.exclusion_radius_ib > 0.0
         else rg[iu[0]] + rg[iu[1]]
     )
-    ev_pairs = r0 > 0.0
-
-    def energy(x: F64Array) -> float:
-        rv = x[: 3 * n].reshape(n, 3)
-        t = x[3 * n :].reshape(n, 3)
-        rot = Rotation.from_rotvec(rv)
-        c = cen + t
-        a_last = c + rot.apply(last)
-        a_first = c + rot.apply(first)
-        d = np.linalg.norm(a_last[:-1] - a_first[1:], axis=1)
-        e = w_spring * float(np.sum(((d - target) / target) ** 2))
-        if w_ev > 0.0 and ev_pairs.any():
-            dc = np.linalg.norm(c[iu[0]] - c[iu[1]], axis=1)[ev_pairs]
-            over = np.clip(r0[ev_pairs] - dc, 0.0, None)
-            e += w_ev * float(np.sum((over / r0[ev_pairs]) ** 2))
-        return e
+    ev_pairs: BoolArray = r0 > 0.0
+    iu0 = iu[0][ev_pairs]
+    iu1 = iu[1][ev_pairs]
+    r0 = r0[ev_pairs]
 
     res = minimize(
-        energy,
+        _energy_grad,
         np.zeros(6 * n),
+        args=(cen, first, last, target, w_spring, iu0, iu1, r0, w_ev),
+        jac=True,
         method="L-BFGS-B",
-        options={"maxiter": int(s.boundary_stitch_max_iter), "ftol": 1e-14, "gtol": 1e-10},
+        options={
+            "maxiter": int(s.boundary_stitch_max_iter),
+            # The evaluation budget must not bind before the iteration count does, which is what
+            # scipy's own default of 15000 did once a chromosome brought thousands of variables.
+            "maxfun": 100 * int(s.boundary_stitch_max_iter) + 1000,
+            "ftol": 1e-14,
+            "gtol": 1e-10,
+        },
     )
     rv = res.x[: 3 * n].reshape(n, 3)
     t = res.x[3 * n :].reshape(n, 3)

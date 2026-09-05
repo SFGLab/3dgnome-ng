@@ -3,13 +3,15 @@
     python harness/test_stitch.py
 
 The pass moves whole blocks rigidly so that the last anchor of one block and the first anchor
-of the next sit at the distance an interior pair of the same genomic separation realises. Four
+of the next sit at the distance an interior pair of the same genomic separation realises. Six
 properties.
 
   * the within block curve is read off the structure itself
   * a boundary pair lands on that curve to a tight tolerance
   * intra block geometry is untouched, which is what rigid means
   * centroid excluded volume keeps non adjacent blocks apart
+  * the energy's gradient is the gradient of that energy
+  * a chromosome sized chain converges, which needs the gradient to be analytic
 
 Plus the pass through cases a chromosome with one block or no anchors must take unchanged.
 """
@@ -23,7 +25,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from gnome3d.pipeline.stitch import stitch_blocks, within_block_curve  # noqa: E402
+from gnome3d.pipeline.stitch import (  # noqa: E402
+    _energy_grad,
+    stitch_blocks,
+    within_block_curve,
+)
 from gnome3d.settings import Settings  # noqa: E402
 from gnome3d.types import BeadOut  # noqa: E402
 
@@ -177,6 +183,65 @@ def test_pass_through() -> None:
     check("blocks without anchors returned unchanged", stitch_blocks(sub, settings()) == sub)
 
 
+def test_gradient() -> None:
+    """Against central differences, with the excluded volume active so its term is covered."""
+    print("\n[gradient] the energy carries its own gradient")
+    rng = np.random.default_rng(0)
+    n = 7
+    cen = rng.normal(0.0, 10.0, (n, 3))
+    first = rng.normal(0.0, 2.0, (n, 3))
+    last = rng.normal(0.0, 2.0, (n, 3))
+    target = rng.uniform(1.0, 5.0, n - 1)
+    iu = np.triu_indices(n, k=1)
+    r0 = rng.uniform(3.0, 8.0, iu[0].size)
+    args = (cen, first, last, target, 1.0, iu[0], iu[1], r0, 1.0)
+    x = rng.normal(0.0, 0.5, 6 * n)
+    _, g = _energy_grad(x, *args)
+    h = 1e-6
+    worst = 0.0
+    for k in range(x.size):
+        a, b = x.copy(), x.copy()
+        a[k] += h
+        b[k] -= h
+        fd = (_energy_grad(a, *args)[0] - _energy_grad(b, *args)[0]) / (2 * h)
+        worst = max(worst, abs(fd - g[k]) / max(abs(fd), 1e-6))
+    check("it matches central differences", worst < 1e-5, f"worst relative {worst:.2e}")
+
+
+def test_many_blocks_converge() -> None:
+    """The property a chromosome needs and a handful of blocks cannot show.
+
+    Six variables per block puts a real chromosome in the thousands of dimensions. A finite
+    difference gradient costs one evaluation per variable, so scipy's own default evaluation
+    budget of 15000 buys about one step there and the pass stops having moved almost nothing.
+    A hundred and twenty blocks is already past the point where that shows.
+    """
+    print("\n[scale] a long chain of blocks reaches its own minimum")
+    rng = np.random.default_rng(4)
+    n = 120
+    blocks = [block(k * 100_000, rng.normal(0.0, 60.0, 3)) for k in range(n)]
+    out = stitch_blocks(blocks, settings())
+    curve = within_block_curve(out)
+    assert curve is not None
+    ratio = np.array(
+        [
+            edge_distance(out[k], out[k + 1])
+            / curve(out[k + 1][0].start + 250 - (out[k][-1].start + 250))
+            for k in range(n - 1)
+        ]
+    )
+    check(
+        "every boundary lands on the curve",
+        float(np.median(ratio)) == 1.0 or abs(float(np.median(ratio)) - 1.0) < 0.05,
+        f"median ratio {np.median(ratio):.3f}, worst {np.max(np.abs(ratio - 1.0)):.3f} off",
+    )
+    check(
+        "and none is left stranded",
+        float(np.max(ratio)) < 2.0,
+        f"max ratio {np.max(ratio):.3f}",
+    )
+
+
 def main() -> int:
     print("boundary stitch checks")
     test_curve()
@@ -185,6 +250,8 @@ def main() -> int:
     test_excluded_volume()
     test_per_pair_radius()
     test_pass_through()
+    test_gradient()
+    test_many_blocks_converge()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

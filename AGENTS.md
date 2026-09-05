@@ -791,8 +791,23 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   rotation and one translation per block. The radius came from `genomic_length_to_distance` of
   the centroid gap at first, 153 units against block radii near 8 on chr1:1-60 Mb, which made
   the term a compaction penalty instead of an overlap guard. There is no chain bond and no confinement. Keys: `spring_weight` (1.0), `ev_weight`
-  (1.0), `max_iter` (500). The pass uses no RNG and runs on the calling thread, so flag off is
+  (1.0), `max_iter` (2000, which on a trio chr1 of 1,494 blocks costs 85 seconds and reaches a
+  worst boundary of 1.32 times the curve, against 6.0 at 500 and nothing further at 5000). The pass uses no RNG and runs on the calling thread, so flag off is
   byte exact and flag on reproduces. Unit checks in `harness/test_stitch.py`.
+
+  **The energy carries its own gradient, and it has to.** Six variables per block puts a real
+  chromosome in the thousands of dimensions, 8,964 for the 1,494 blocks of a trio chr1, where a
+  finite difference gradient costs one evaluation per variable and scipy's default budget of
+  15,000 evaluations buys about one step. The pass ran and moved almost nothing, which showed up
+  as boundaries realised at up to 80 times what the structure's own interior realises at that
+  separation, the visible strands between blocks. Validation had used an 11 block region, 66
+  variables, where the default budget was 220 gradients and the pass converged. The gradient is
+  Gallego and Yezzi's for the rotation derivative, chained through the boundary springs and the
+  centroid excluded volume, and `maxfun` is set from `max_iter` so the budget cannot bind first.
+  Replayed on a finished trio chr1 the worst boundary falls from 79.6 to 1.32 times the curve
+  and the longest from 932 to 13 model units. `playground/restitch_model.py` runs both end of
+  run passes on a finished cif, recovering block membership from the densification rule, so a
+  change to either can be measured without paying for a reconstruction.
 
   Why not in the reference: the reference has no term across block boundaries either, which is
   why its structures show the same scatter. See `design/anchor-placement.md`.
