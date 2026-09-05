@@ -95,9 +95,27 @@ is still descending. And the properly converged structure is more expanded, radi
 of that may be under convergence rather than a modelling problem, and that is worth checking
 before any more modelling work goes into it.
 
-What is not yet known is whether an ensemble survives. Conformational heterogeneity is the
-product, and it currently comes from perturbing each start. `playground/lbfgs_diversity.py`
-measures the energy spread and the structural spread of both arms from the same starts.
+**An ensemble survives it.** Eight starts, the same perturbed seeds for both arms, structural
+spread measured as the mean relative difference between distance matrices, which needs no
+superposition:
+
+| block | arm | wall for eight | mean energy | mean Rg | spread |
+|---|---|---|---|---|---|
+| N=1227 | MC | 2,381.7 s | 11,545.6 | 13.49 | 29.38 percent |
+| N=1227 | L-BFGS 200 | 66.6 s | 11,552.0 | 14.30 | 30.02 percent |
+| N=1227 | L-BFGS 2000 | 663.2 s | 11,309.6 | 18.10 | 25.49 percent |
+| N=1146 | MC | 2,013.1 s | 11,861.7 | 12.21 | 27.20 percent |
+| N=1146 | L-BFGS 200 | 60.6 s | 11,981.2 | 12.55 | 27.69 percent |
+| N=1146 | L-BFGS 2000 | 652.5 s | 11,634.9 | 16.00 | 22.85 percent |
+
+Thirty six times faster for the same energy to within 0.06 percent and slightly more spread than
+the Monte Carlo gives. The iteration count is a clean dial between the two: two thousand
+iterations buy two percent lower energy and cost about an eighth of the spread. The Monte Carlo
+offers no equivalent knob.
+
+What is left is geometry. Equal energy and equal spread do not mean the same kind of structure,
+and what the pipeline is judged on is how arc linked anchors sit relative to the distance their
+arc asked for. `playground/lbfgs_quality.py` compares that.
 
 `playground/lbfgs_vs_mc.py` runs the comparison.
 
