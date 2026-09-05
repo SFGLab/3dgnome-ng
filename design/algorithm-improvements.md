@@ -45,11 +45,22 @@ Measured on the largest real block, two seeds, each arm to its own convergence:
 | 0.25 | 612 | 214.5 | 11,481 | 13.60 | 51.0 |
 | 0.50 | 450 | 153.2 | 11,424 | 14.39 | 71.8 |
 
-It does what it is supposed to. Acceptance doubles, rounds fall by 1.76 times and the energy
-improves 1.3 percent. The wall does not follow, because the gradient sweep costs more per step
-than the score alone despite sharing the loop, so at a bias of 0.5 the whole thing is 1.14 times
-rather than 1.76. It is worth keeping and it is not the answer: L-BFGS reaches the same energy 37
-times faster on the same block.
+A bias of 0.5 was not the end of it. Across the other two blocks, at 0.75:
+
+| block | rounds | wall | energy | acceptance |
+|---|---|---|---|---|
+| N=1146 | 815 to 248 | 1.81x | 0.992 of it | 34 to 73 percent |
+| N=462 | 246 to 84 | 1.76x | 0.996 | 32 to 66 percent |
+
+So 1.8 times with a slightly lower energy, from one setting, with the Monte Carlo otherwise
+untouched. The wall lags the round count because the gradient sweep costs more per step than the
+score alone even sharing the loop, which is why 0.5 gives 1.14 times where its round count would
+suggest 1.76.
+
+A caveat that has to be measured rather than assumed. A biased proposal is a step toward
+deterministic descent, and at a bias of one the move is purely downhill and every start would run
+the same trajectory. `playground/force_bias_diversity.py` checks whether the spread survives 0.75
+and 0.9.
 
 `playground/force_bias_sweep.py` runs the sweep.
 
@@ -113,9 +124,23 @@ the Monte Carlo gives. The iteration count is a clean dial between the two: two 
 iterations buy two percent lower energy and cost about an eighth of the spread. The Monte Carlo
 offers no equivalent knob.
 
-What is left is geometry. Equal energy and equal spread do not mean the same kind of structure,
-and what the pipeline is judged on is how arc linked anchors sit relative to the distance their
-arc asked for. `playground/lbfgs_quality.py` compares that.
+**And the geometry is indistinguishable.** Equal energy and equal spread do not make it the same
+kind of structure, so the two arms were compared on what the arcs stage is for, how arc linked
+anchors sit relative to the distance their arc asked for:
+
+| block | arm | realised over target, median | p10 | p90 | inside the cutoff | nearest neighbour |
+|---|---|---|---|---|---|---|
+| N=1227 | MC | 1.92 | 0.92 | 3.07 | 9.2 percent | 0.839 |
+| N=1227 | L-BFGS 200 | 1.92 | 0.93 | 3.08 | 9.0 | 0.841 |
+| N=1146 | MC | 1.95 | 0.88 | 3.15 | 10.5 | 0.875 |
+| N=1146 | L-BFGS 200 | 1.96 | 0.89 | 3.16 | 10.3 | 0.880 |
+
+The whole distribution matches, not just its centre, and so do the crowding and the nearest
+neighbour spacing. The local arc network is the same. What differs is the global compression,
+and that grows with iterations: 13.44, 14.65 and 18.30 for the Monte Carlo, two hundred
+iterations and two thousand.
+
+`playground/lbfgs_quality.py` compares them, `playground/lbfgs_diversity.py` the spread.
 
 `playground/lbfgs_vs_mc.py` runs the comparison.
 
@@ -130,6 +155,25 @@ rather than as the solver, which is a different proposition from the attempt tha
 Built and measured. `[simulation_arcs] stop_condition_ratio` at 0.9995 gives 1.2 to 1.5 times for
 one to six percent of energy. It is not recommended: it also shrinks blocks five to fifteen
 percent, and block over compaction is what `anchor-placement.md` exists to fight.
+
+### What is left before either could be used
+
+Both are measured offline on captured problems and neither is wired into the pipeline.
+
+Force bias is the small change. One setting, the Monte Carlo otherwise untouched, bit exact when
+off, and about 1.8 times. It needs the diversity check and then it is a configuration decision.
+
+L-BFGS is the large one. Thirty six times on the stage that is ninety percent of a genome scale
+run, with matching energy, spread and geometry, but it replaces the arcs kernel rather than
+tuning it. It needs wiring as an opt in kernel beside `mc` and `hybrid`, and then the validation
+battery rather than an energy number, since the structures differ: Hi-C correlation, the within
+block distance exponent, the boundary measurements. Its iteration count is a real knob and the
+right setting for it is a question about ensembles, not about speed.
+
+The under convergence finding should be followed up on its own. If the Monte Carlo stops two
+percent above the minimum and the properly converged structure is more expanded, then some of
+what `anchor-placement.md` treats as a modelling problem may be a stopping rule, and that is
+worth knowing before more modelling goes into it.
 
 ## Research, not engineering
 
