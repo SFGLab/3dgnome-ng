@@ -537,11 +537,32 @@ so the data is still doing work. And the pull barely matters between 0.9 and 0.4
 most of the gain is from putting arcs on the background at all rather than from how far the PET
 count pulls them in.
 
-What is not yet known. Per block the exponent varies far more widely than production's does,
-0.04 to 0.60 against -0.08 to 0.22, so the mean is right and the individual block is not.
-Blocks expand, on one block Rg 7.7 to 27.8, and expansion has previously traded against contact
-density. Nothing here has been measured against Hi-C, which is the gate that decides it. A whole
-region arm on chr1:1-60 Mb against the arm generated the same night is running.
+Measured end to end on chr1:1-60 Mb, five structures per arm, against the production arm
+generated the same night.
+
+| arm | Pearson | Spearman | SCC | MultiMM | exponent | Rg | wb-aa | wb-sa | xb |
+|---|---|---|---|---|---|---|---|---|---|
+| production | 0.405 | 0.321 | 0.109 | 0.331 | 0.249 | 32.9 | 89.2 | 3376 | 2680 |
+| unified, chain background | 0.499 | 0.206 | 0.082 | 0.256 | 0.688 | 147.0 | 0.9 | 474 | 16 |
+
+The overlap fix carries all the way through. Anchor overlaps fall by 99 percent, and the two
+other overlap columns fall with them, which says the collateral overlaps were collateral.
+
+The cost is expansion. Rg goes up four and a half times and the distance exponent to 0.688
+against a 0.285 target. Three of the four Hi-C measures fall. Pearson rises, but full matrix
+Pearson is dominated by the decay trend and a steeper decay inflates it, so it should not be
+read alone against three that fall.
+
+The expansion is the chain law's own exponent of 0.671 showing through, since the unified law
+rides it. `arc_target_background_exponent` puts the background on a chosen slope instead,
+anchored at the separation the chain law is calibrated for. Offline at the anchor level GM12878
+lands at 0.500 with the chain slope, 0.296 at 0.285 and 0.250 at 0.20, while the trio lands at
+0.278, 0.139 and 0.088, so the right slope is not the same for both. Arms at 0.285 and 0.20 are
+under measurement.
+
+What is still open. Whether one background slope serves every cell line, or whether it has to be
+calibrated per dataset the way `beta` is. And whether the exponent can be brought to target
+without giving the overlaps back, which the two arms will answer.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
