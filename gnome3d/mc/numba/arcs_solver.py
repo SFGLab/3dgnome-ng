@@ -8,8 +8,9 @@ Monte Carlo's energy about thirty six times faster, with the ensemble spread sli
 rather than narrower and the geometry, realised distance against the distance an arc asked for,
 matching across the whole distribution.
 
-The energy here is the one `mc_arcs_numba` scores, its arc term plus its confinement, with the
-repulsion cutoff and the confinement centre and radius derived the way that driver derives them.
+The energy here is the one `mc_arcs_numba` scores, its arc term, the background springs on
+arcless pairs, an excluded volume and its confinement, with the centre and radius derived the
+way that driver derives them.
 It implements every term the arcs stage carries.
 
 Production solves; the annealer stays available as `solver = mc`. See
@@ -36,7 +37,7 @@ def arcs_energy_grad(
     exp: F64Array,
     stretch_k: float,
     squeeze_k: float,
-    rep_inv_cutoff: float,
+    bg_weight: float,
     cx: float,
     cy: float,
     cz: float,
@@ -76,13 +77,20 @@ def arcs_energy_grad(
             d = np.sqrt(dx * dx + dy * dy + dz * dz)
             dd = d if d > 1e-10 else 1e-10
             if e < 0.0:
-                v = 1.0 / dd - rep_inv_cutoff
-                if v > 0.0:
-                    ei += 0.5 * v
-                    w = -1.0 / (dd * dd * dd)
-                    gi0 += w * dx
-                    gi1 += w * dy
-                    gi2 += w * dz
+                # A weak spring at the background for the pair's separation, minus e.
+                bg = -e
+                if d < bg:
+                    # rel = 1 - bg / d, d rel / d d = bg / d^2
+                    rel = (dd - bg) / dd
+                    ei += 0.5 * rel * rel * bg_weight
+                    w = 2.0 * bg_weight * rel * bg / (dd * dd * dd)
+                else:
+                    rel = (d - bg) / bg
+                    ei += 0.5 * rel * rel * bg_weight
+                    w = 2.0 * bg_weight * rel / (bg * dd)
+                gi0 += w * dx
+                gi1 += w * dy
+                gi2 += w * dz
             elif e >= 1e-6:
                 rel = (d - e) / e
                 k = stretch_k if rel >= 0.0 else squeeze_k
@@ -135,8 +143,7 @@ def solve_arcs(
 
     mask = exp64 > 1e-6
     avg = float(exp64[mask].mean()) if mask.any() else 1.0
-    factor = float(s.arcs_repulsion_cutoff_factor)
-    rep_inv = 1.0 / (factor * avg) if factor > 0.0 else 0.0
+    bg_weight = float(s.background_weight)
 
     excl_r0 = 0.0
     excl_w = 0.0
@@ -161,7 +168,7 @@ def solve_arcs(
         exp64,
         float(s.spring_stretch_arcs),
         float(s.spring_squeeze_arcs),
-        rep_inv,
+        bg_weight,
         cx,
         cy,
         cz,

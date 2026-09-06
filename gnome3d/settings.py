@@ -93,6 +93,7 @@ class Settings:
     spring_squeeze: float
     spring_angular: float
     spring_stretch_arcs: float
+    background_weight: float
     spring_squeeze_arcs: float
     use_arcs_chain_bonds: bool
     arcs_chain_bond_scale: float
@@ -212,7 +213,6 @@ class Settings:
     # of that level's natural bond / expected distance.  Each level has its
     # own factor (default 0.5 - half the typical bead-bead target).
     exclusion_radius_arcs: float
-    arcs_repulsion_cutoff_factor: float
     exclusion_radius_smooth: float
     exclusion_radius_heatmap: float
     exclusion_radius_ib: float
@@ -428,6 +428,12 @@ class Settings:
         self.spring_squeeze = 0.1
         self.spring_angular = 0.1
         self.spring_stretch_arcs = 1.0
+        # Weight of the spring that holds an arcless anchor pair at the background for its
+        # separation in the arcs stage. Weak against the arc springs, since the background is an
+        # expectation with wide variance and not a measured contact. 0.3 puts the short range
+        # band on the measured exponent with arcs still realised within 1.25 of target; at 1.0
+        # the background overrides the data. See [[project_polymer_law]].
+        self.background_weight = 0.3
         self.spring_squeeze_arcs = 1.0
         # Chain bonds in the arcs MC. Consecutive anchors with no arc between them get a
         # spring at genomic_length_to_distance of their gap, so an island of anchors joined
@@ -504,9 +510,6 @@ class Settings:
         self.exclusion_radius_smooth = 0.0
         self.exclusion_radius_heatmap = 0.0
         self.exclusion_radius_ib = 0.0
-        # Truncate the arcs non-arc 1/d repulsion at factor x mean-arc-distance (0 = off =
-        # unbounded, faithful to the reference; ~2.5 fixes small/sparse IBs blowing up to huge Rg).
-        self.arcs_repulsion_cutoff_factor = 0.0
         # Per-level auto factor: used only when the matching radius is 0.0.
         # 0.5 means "EV kicks in once beads get closer than half the typical
         # bond distance at this level".
@@ -841,6 +844,7 @@ class Settings:
         self.spring_stretch_arcs = getf(
             "springs", "stretch_constant_arcs", self.spring_stretch_arcs
         )
+        self.background_weight = getf("springs", "background_weight", self.background_weight)
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs
         )
@@ -997,9 +1001,6 @@ class Settings:
         # Per-level radii.  Key naming: radius_<level>.  0 = auto.
         self.exclusion_radius_arcs = getf(
             "excluded_volume", "radius_arcs", self.exclusion_radius_arcs
-        )
-        self.arcs_repulsion_cutoff_factor = getf(
-            "excluded_volume", "arcs_repulsion_cutoff_factor", self.arcs_repulsion_cutoff_factor
         )
         self.exclusion_radius_smooth = getf(
             "excluded_volume", "radius_smooth", self.exclusion_radius_smooth

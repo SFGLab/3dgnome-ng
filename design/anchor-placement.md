@@ -657,6 +657,29 @@ factor that looks the same across cells, which a single correction on the backgr
 would absorb. Not built. It does not gate adoption, since every Hi-C measure already holds
 without it.
 
+The residual, and what it turned out to be. The realised exponent ran 1.3 to 1.5 times the
+measured input on every cell. Fitted by band it is a kink, not a slope: 0.09 to 0.20 under
+100 kb, 0.34 to 0.48 above, against inputs of 0.20 to 0.30. Loops pull pairs to touching and
+nothing held the arcless pairs between them, and the steep long range is the recovery. A global
+correction on the exponent would have rotated the whole line. The fix was the other half of
+tier C: every arcless pair sits on the background, held by a spring symmetric in log distance,
+since a plain relative spring is bounded on the compressed side and reproduced the collapse.
+Swept on eight real GM12878 blocks with the solver, measured input 0.272:
+
+| weight | chain bonds | 20 to 100 kb | 100 kb to 1 Mb | overlaps per thousand | arcs realised over target |
+|---|---|---|---|---|---|
+| 0.01 | off | 0.203 | 0.422 | 101 | 1.03 |
+| 0.10 | off | 0.256 | 0.388 | 79 | 1.15 |
+| 0.30 | off | 0.287 | 0.378 | 27 | 1.25 |
+| 1.00 | off | 0.312 | 0.355 | 23 | 1.38 |
+| 0.30 | on | 0.284 | 0.365 | 587 | 0.98 |
+
+Weight 0.3 with chain bonds off is production. C is off: with every pair held at the
+background the full weight 1.5 times bond on consecutive pairs shoves neighbours into each
+other, five to twenty times the overlaps at every weight. The long band still sits above the
+input, 0.378 against 0.272. That residual is arcs realised inside their targets and is the next
+thing to look at, not a global correction.
+
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
 The most direct statement of the missing constraint. It was left last because it competes with

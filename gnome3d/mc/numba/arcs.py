@@ -51,14 +51,7 @@ def mc_arcs_numba(
     squeeze_k = float(settings.spring_squeeze_arcs)
 
     # Non-arc 1/d repulsion cutoff (mirror of _prep_arcs_problem_np): 0 => unbounded (faithful to the reference).
-    rep_factor = float(getattr(settings, "arcs_repulsion_cutoff_factor", 0.0))
-    rep_inv_cutoff = 0.0
-    if rep_factor > 0.0:
-        _rep_mask = exp64 > 1e-6
-        _rep_mean = float(exp64[_rep_mask].mean()) if _rep_mask.any() else 1.0
-        if _rep_mean > 0.0:
-            rep_inv_cutoff = 1.0 / (rep_factor * _rep_mean)
-
+    bg_weight = float(settings.background_weight)
     use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
     excl_r0 = float(settings.exclusion_radius_arcs)
     if use_excl and excl_r0 <= 0.0:
@@ -81,7 +74,7 @@ def mc_arcs_numba(
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
     movable: I64Array = np.arange(n, dtype=np.int64)
-    score_struct = float(init_arcs_nb(pw, exp64, stretch_k, squeeze_k, rep_inv_cutoff))
+    score_struct = float(init_arcs_nb(pw, exp64, stretch_k, squeeze_k, bg_weight))
     excl_w = float(settings.exclusion_weight)
     excl_skip = int(settings.exclusion_skip_neighbors)
     if use_excl:
@@ -111,7 +104,7 @@ def mc_arcs_numba(
         dist_w=1.0,
         ang_w=1.0,
         struct_delta_factor=1.0,
-        rep_inv_cutoff=rep_inv_cutoff,
+        bg_weight=bg_weight,
         use_heat=False,
         heat_dist=dummy_f64(),
         heat_weight=0.0,

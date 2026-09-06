@@ -838,10 +838,29 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   `harness/test_polymer.py` and `harness/test_arc_matrix.py`; `playground/ps_from_singletons.py`
   fits the exponent on a file by hand. See `design/anchor-placement.md`, option H.
 
+  **Every arcless anchor pair sits on the background too**, from 2026-09-06 later the same day.
+  The arcs matrix carries minus the background for every pair no arc joins and the kernels
+  score a negative entry as a spring at that distance with `[springs] background_weight`
+  (0.3), replacing the reference's `1/d` repulsion and its cutoff factor outright. The spring
+  is symmetric in log distance, `((d - b) / min(d, b))^2`, because a plain relative spring is
+  bounded at the weight on the compressed side and let every pair be crushed to touching for
+  0.1 each while arcs pulled at 1.0, which reproduced the collapse it was built to stop. Why:
+  the exponent overshoot on the polymer law was a kink, not a slope. Fitted by band the
+  realised exponent was 0.09 to 0.20 under 100 kb and 0.34 to 0.48 above, against inputs of
+  0.20 to 0.30, because loops pull pairs to touching and nothing held the arcless pairs between
+  them. Swept on eight real GM12878 blocks with the solver, weight 0.3 puts the short band on
+  the measured exponent, 0.287 against 0.272, brings the long band from 0.42 to 0.38, and cuts
+  anchor overlaps from 101 to 27 per thousand with arcs realised within 1.25 of target; at 1.0
+  the background overrides the data. Chain bonds are off in production: with every pair held
+  at the background the full weight 1.5 times bond on consecutive pairs shoved neighbours into
+  each other, five to twenty times the overlaps at every weight. JAX matches numba on the
+  initial energy to float32 in `harness/test_arc_matrix.py`. Sweep in
+  `playground/background_weight_sweep.py`; the battery now reports the two band exponents.
+
   Why not in the reference: the reference has the three laws and their constants. This is what
   they were standing in for.
 
-- **Chain bonds in the arcs MC: `[springs] use_arcs_chain_bonds = yes`, default no.**
+- **Chain bonds in the arcs MC: `[springs] use_arcs_chain_bonds = yes`, default no, and off in production since 2026-09-06 (see the distance law entry).**
   ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `add_chain_bonds`)
   The arcs MC has no term between genomic neighbours. Inside a block the arc graph falls into
   islands, 66 and 48 of them in the two largest blocks of GM12878 chr1:1-60 Mb, and an island is

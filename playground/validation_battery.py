@@ -229,8 +229,8 @@ def main() -> None:
     contact_r: float = 0.0  # in bead units of each structure, since arms may differ in model unit
     print(
         f"  {'arm':>10s} {'n':>3s} {'pearson':>9s} {'spearman':>9s} {'SCC':>8s} "
-        f"{'multimm':>9s} {'exponent':>9s} {'vs Hi-C':>8s} {'Rg':>8s} "
-        f"{'wb-aa':>7s} {'wb-sa':>7s} {'xb':>7s}"
+        f"{'multimm':>9s} {'exponent':>9s} {'vs Hi-C':>8s} {'e20-100k':>9s} {'e100k-1M':>9s} "
+        f"{'Rg':>8s} {'wb-aa':>7s} {'wb-sa':>7s} {'xb':>7s}"
     )
     for d in sys.argv[4:]:
         cifs = sorted(Path(d).glob("*.cif"))
@@ -239,6 +239,7 @@ def main() -> None:
             continue
         coords, mids = [], None
         pear, spear, scc, expo, rgs = [], [], [], [], []
+        elo, ehi = [], []
         waa, wsa, xb = [], [], []
         for c in cifs:
             p, m, bmid, anchor = load(c)
@@ -254,6 +255,8 @@ def main() -> None:
             spear.append(r.get("spearman", float("nan")))
             scc.append(r.get("scc", float("nan")))
             expo.append(exponent(p, m))
+            elo.append(exponent(p, m, 20_000, 100_000))
+            ehi.append(exponent(p, m, 100_000, 1_000_000))
             rgs.append(float(np.sqrt(((p - p.mean(0)) ** 2).sum(1).mean())))
             o = overlaps(p, anchor, owner, rad)
             waa.append(o[0])
@@ -264,12 +267,15 @@ def main() -> None:
         print(
             f"  {Path(d).name:>10s} {len(cifs):>3d} {np.nanmean(pear):>9.3f} "
             f"{np.nanmean(spear):>9.3f} {np.nanmean(scc):>8.3f} {mm:>9.3f} "
-            f"{e:>9.3f} {e / NU_HIC:>7.2f}x {np.mean(rgs):>8.2f} "
+            f"{e:>9.3f} {e / NU_HIC:>7.2f}x {np.nanmean(elo):>9.3f} {np.nanmean(ehi):>9.3f} {np.mean(rgs):>8.2f} "
             f"{np.mean(waa):>7.1f} {np.mean(wsa):>7.1f} {np.mean(xb):>7.1f}",
             flush=True,
         )
     print(f"\n  exponent target is {NU_HIC} from the cell lines' own contact probability curves;")
     print("  the project's structures have measured flatter than that, so higher is better here.")
+    print("  e20-100k and e100k-1M are the exponent fitted on each band alone; the two should agree")
+    print("  with each other and with the cell's measured nu, and a flat short band under a steep")
+    print("  long one is loops pulling pairs in with nothing holding the rest at the background.")
     print(f"  the overlap columns count pairs closer than {ev_factor} of their block's mean chain")
     print("  bond, per thousand beads, each structure on its own radii. wb-aa is")
     print("  anchors inside one block, which only the arcs")

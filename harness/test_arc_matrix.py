@@ -2,9 +2,12 @@
 
     python harness/test_arc_matrix.py
 
-The matrix has three kinds of entry. A pair an arc joins carries the law's contact distance. A
-consecutive pair with no arc carries `arcs_chain_bond_scale` times the background when chain
-bonds are on. Every other pair carries -1, no target, and the diagonal is 0.
+The matrix has three kinds of entry. A pair an arc joins carries the law's contact distance,
+positive. Every other pair carries minus the background for its separation, which the kernels
+score as a weak spring at that distance with `background_weight`, so nothing in a block is free
+to collapse onto its neighbours. A consecutive pair with no arc is overwritten by
+`arcs_chain_bond_scale` times the background at full weight when chain bonds are on. The
+diagonal is 0.
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from gnome3d.mc.numba.terms import _local_arcs_nb, init_arcs_nb  # noqa: E402
 from gnome3d.pipeline.coarse.build import add_chain_bonds, arc_expected_matrix  # noqa: E402
 from gnome3d.polymer import PolymerLaw  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
@@ -43,7 +47,12 @@ def test_matrix() -> None:
     arcs = [(0, 2, 4), (1, 3, 40)]
     m = arc_expected_matrix(s, mids, arcs)
     check("diagonal is zero", float(np.abs(np.diag(m)).max()) == 0.0)
-    check("an arcless pair is -1", m[0, 1] == -1.0 and m[2, 3] == -1.0)
+    check(
+        "an arcless pair carries minus the background for its separation",
+        abs(m[0, 1] + s.polymer.background(10_000)) < 1e-12
+        and abs(m[2, 3] + s.polymer.background(150_000)) < 1e-12,
+        f"{m[0, 1]:.3f}, {m[2, 3]:.3f}",
+    )
     check(
         "an arc pair carries the law's distance",
         abs(m[0, 2] - s.arc_expected_distance(4, 50_000)) < 1e-12,
@@ -73,16 +82,100 @@ def test_chain_bonds() -> None:
         "a consecutive pair with an arc keeps the arc",
         abs(m[1, 2] - 1.5 * s.polymer.background(40_000)) < 1e-12 or m[1, 2] > 0.0,
     )
-    check("a non consecutive arcless pair stays -1", m[0, 3] == -1.0)
+    check(
+        "a non consecutive arcless pair keeps its background target",
+        m[0, 3] < 0.0 and abs(m[0, 3] + s.polymer.background(200_000)) < 1e-12,
+    )
     s.use_arcs_chain_bonds = False
     m2 = add_chain_bonds(arc_expected_matrix(s, mids, [(0, 2, 4)]), mids, s)
-    check("with chain bonds off the matrix is returned as built", m2[0, 1] == -1.0)
+    check("with chain bonds off the matrix is returned as built", m2[0, 1] < 0.0)
+
+
+def test_background_spring() -> None:
+    """A negative entry scores as a weak spring at its magnitude, in both scorers, and the per
+    bead local scores sum to the full score, which the incremental update depends on."""
+    print("\n[kernel] a negative entry is a weak spring at its magnitude")
+    pos = np.array([[0.0, 0.0, 0.0], [6.0, 0.0, 0.0], [0.0, 2.0, 0.0]], dtype=np.float64)
+    exp = np.zeros((3, 3))
+    exp[0, 1] = exp[1, 0] = -3.0  # background 3, realised 6
+    exp[0, 2] = exp[2, 0] = 2.0  # arc target 2, realised 2
+    exp[1, 2] = exp[2, 1] = -5.0  # background 5, realised sqrt(40)
+    bg_w = 0.1
+    full = float(init_arcs_nb(pos, exp, 1.0, 1.0, bg_w))
+    want = bg_w * ((6.0 - 3.0) / 3.0) ** 2 + 0.0 + bg_w * ((np.sqrt(40.0) - 5.0) / 5.0) ** 2
+    check(
+        "the full score is the weak springs plus the arc",
+        abs(full - want) < 1e-12,
+        f"{full:.6f} against {want:.6f}",
+    )
+    loc = sum(float(_local_arcs_nb(pos, exp, p, 1.0, 1.0, bg_w)) for p in range(3))
+    check("local scores sum to twice the full score", abs(loc - 2.0 * full) < 1e-12, f"{loc:.6f}")
+    check("no term is negative", full >= 0.0 and loc >= 0.0)
+    far = pos.copy()
+    far[1, 0] = 60.0
+    check(
+        "a pair far beyond its background costs more",
+        float(init_arcs_nb(far, exp, 1.0, 1.0, bg_w)) > full,
+    )
+    close = pos.copy()
+    close[1, 0] = 0.5
+    check(
+        "and a pair far inside it costs more too, which the old repulsion also did",
+        float(init_arcs_nb(close, exp, 1.0, 1.0, bg_w)) > full,
+    )
+
+
+def test_jax_matches_numba() -> None:
+    """The JAX arcs kernel scores the same energy as numba on a matrix that mixes arc springs and
+    background springs, both sides of the background. This is what kept the two kernels honest
+    for the genomic floor and is the check that outlived it."""
+    print("\n[jax] the batched kernel's initial energy is numba's")
+    try:
+        import os
+
+        os.environ.setdefault("JAX_PLATFORMS", "cpu")
+        import jax.numpy as jnp
+
+        from gnome3d.mc.jax.arcs import _build_arcs_kernel
+    except Exception as exc:  # noqa: BLE001
+        check("jax available for the cross kernel check", False, str(exc)[:60])
+        return
+    rng = np.random.default_rng(3)
+    n = 40
+    pos = rng.normal(0.0, 2.0, (n, 3))
+    mids = np.sort(rng.integers(0, 2_000_000, n))
+    sep = np.abs(mids[:, None] - mids[None, :]).astype(float)
+    exp = -np.maximum(1.0, (sep / 1000.0) ** 0.3)  # background springs everywhere
+    for _ in range(25):  # a few arcs, closer than the background
+        i, j = rng.integers(0, n, 2)
+        if i != j:
+            exp[i, j] = exp[j, i] = 0.5 * -exp[i, j]
+    np.fill_diagonal(exp, 0.0)
+    bg_w = 0.1
+    want = float(init_arcs_nb(pos, exp, 1.0, 1.0, bg_w))
+    _, init_arcs, _, _, _ = _build_arcs_kernel(10, 1)
+    got = float(
+        init_arcs(
+            jnp.asarray(pos[None].astype(np.float32)),
+            jnp.asarray(exp.astype(np.float32)),
+            jnp.float32(1.0),
+            jnp.float32(1.0),
+            jnp.float32(bg_w),
+        )[0]
+    )
+    check(
+        "jax and numba agree on the initial energy",
+        abs(got - want) / max(abs(want), 1e-9) < 1e-4,
+        f"{got:.5f} against {want:.5f}",
+    )
 
 
 def main() -> int:
     print("arc matrix checks")
     test_matrix()
     test_chain_bonds()
+    test_background_spring()
+    test_jax_matches_numba()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

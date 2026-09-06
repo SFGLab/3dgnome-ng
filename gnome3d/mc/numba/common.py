@@ -263,7 +263,7 @@ def run_outer_loop(
     score_orn: float,
     score_excl: float,
     score_conf: float,
-    rep_inv_cutoff: float = 0.0,
+    bg_weight: float = 0.0,
     # Affinity terms default to off so a stage that never uses them (arcs) needs
     # no extra arguments.  The dummy arrays are only there to fix numba's types.
     use_comp: bool = False,
@@ -365,7 +365,7 @@ def run_outer_loop(
             score_conf,
             score_comp,
             score_brdg,
-            rep_inv_cutoff,
+            bg_weight,
             use_cells,
             cell_lo,
             cell_dim,

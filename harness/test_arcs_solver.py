@@ -60,7 +60,7 @@ def block(n: int = 90, seed: int = 3) -> tuple[np.ndarray, np.ndarray, Settings]
     np.fill_diagonal(exp, 0.0)
     pos = np.ascontiguousarray(rng.normal(0.0, 1.5, size=(n, 3)).astype(np.float32))
     s = Settings()
-    s.arcs_repulsion_cutoff_factor = 3.0
+    s.background_weight = 0.1
     s.use_confinement = True
     s.confinement_apply_to_arcs = True
     return pos, exp, s
@@ -70,7 +70,7 @@ def terms(pos: np.ndarray, exp: np.ndarray, s: Settings):
     """The same derivations `mc_arcs_numba` makes, so both sides score one thing."""
     m = exp > 1e-6
     avg = float(exp[m].mean())
-    rep_inv = 1.0 / (float(s.arcs_repulsion_cutoff_factor) * avg)
+    rep_inv = float(s.background_weight)  # the slot every kernel threads, now a spring weight
     n = pos.shape[0]
     cr = float(s.confinement_packing_factor_arcs) * avg * (n ** (1.0 / 3.0))
     c = pos.astype(np.float64).mean(0)
