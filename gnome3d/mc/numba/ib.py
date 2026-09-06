@@ -24,7 +24,6 @@ from gnome3d.mc.numba.terms import (
     STRUCT_CHAIN,
     init_confine_nb,
     init_excl_nb,
-    init_heat_nb,
     init_smooth_nb,
 )
 from gnome3d.types import I32Array, I64Array
@@ -40,19 +39,12 @@ def mc_ib_numba(
     settings: Settings,
     compartment: np.ndarray[Any, Any] | None = None,
     accessibility: np.ndarray[Any, Any] | None = None,
-    arc_dist: np.ndarray[Any, Any] | None = None,
 ) -> float:
     """Numba simulated-annealing implementation for IB-centroid chain MC.
     Peer to mc_smooth (not a sub-mode of it).  Called by `gnome3d.mc.mc_ib`.
 
     Energy: chain bonds (no angle term, no orientation) + optional IB-scale excluded volume +
-    optional IB-scale confinement + optional cross-block arc targets.
-
-    `arc_dist` is an (n, n) matrix of target distances between block centroids, built from arcs
-    whose anchors fall in different blocks and kept only where they pull a pair closer than its
-    genomic separation already does. It rides the kernel's existing pairwise distance term, whose
-    skip rule is a target below 1e-6, so pairs without a target cost nothing and no new energy
-    code is needed.  All IBs move
+    optional IB-scale confinement.  All IBs move
     (no fixed set). Reads only its own settings: `spring_*_ib`, `dist_weight_ib`,
     `max_temp_ib`/`dt_temp_ib`/`jump_*_ib`/`mc_stop_*_ib` under [simulation_ib],
     plus the `*_ib` knobs under [excluded_volume] and [confinement].
@@ -92,10 +84,6 @@ def mc_ib_numba(
             pf = float(settings.confinement_packing_factor_ib)
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
-    use_arcs = arc_dist is not None
-    arc_mat = as_f64(arc_dist) if arc_dist is not None else dummy_f64()
-    arc_weight = float(settings.ib_arcs_weight) if use_arcs else 0.0
-
     aff = affinity_params(
         settings,
         "ib",
@@ -106,7 +94,6 @@ def mc_ib_numba(
     score_comp, score_brdg = init_affinity_scores(pw, aff)
 
     score_struct = float(init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
-    score_arcs = float(init_heat_nb(pw, arc_mat, arc_weight)) if use_arcs else 0.0
     score_excl = (
         float(init_excl_nb(pw, excl_r0, float(settings.exclusion_weight), 1)) if use_excl else 0.0
     )
@@ -133,9 +120,9 @@ def mc_ib_numba(
         dist_w=dist_w,
         ang_w=ang_w,
         struct_delta_factor=1.0,
-        use_heat=use_arcs,
-        heat_dist=arc_mat,
-        heat_weight=arc_weight,
+        use_heat=False,
+        heat_dist=dummy_f64(),
+        heat_weight=0.0,
         use_orn=False,
         orn_is_L=np.zeros(1, dtype=np.bool_),
         anchor_ar=dummy_i32(),
@@ -170,7 +157,7 @@ def mc_ib_numba(
         score_eps=1e-6,
         stop_when_ratio_above=2.0,
         score_struct=score_struct,
-        score_heat=score_arcs,
+        score_heat=0.0,
         score_orn=0.0,
         score_excl=score_excl,
         score_conf=score_conf,

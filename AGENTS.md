@@ -10,17 +10,29 @@ Do **not** modify anything inside `3dnome/`. That directory is the reference imp
 
 Refer to `3dnome/MC/` as **"the reference"** (or "the reference implementation"), never as "C++". The language it happens to be written in is irrelevant to the design; the relevant fact is that it is the algorithmic source-of-truth we port from. This applies in code comments, docstrings, agent-visible documentation, commit messages, and conversations. When you cite a specific file or line, write `LooperSolver.cpp:1069-1104` — not "the C++ code at...".
 
-### Status: post-parity, feature-extension phase
+### Status: results parity, not settings parity
 
-The Python port reached algorithmic parity with the reference; that work is documented and frozen. **New work no longer requires matching the reference.** Features added from here on (biophysics extensions, new energy terms, scheduling tweaks, etc.) are expected to diverge intentionally from `3dnome/`.
+The Python port reached algorithmic parity with the reference and that work is documented and
+frozen in git history. As of 2026-09-06 the project no longer keeps the reference's settings
+or its distance laws. What it keeps is the ability to replicate the reference's results, and
+that is judged by the validation battery, Hi-C correlation, the distance exponent and the
+overlap counts, not by matching the reference's numbers bit for bit.
 
-Rules for new feature work:
+Rules for the code as it stands:
 
-- **All new features must be opt-in via `gnome3d/settings.py`.** Default-off so existing configs continue to reproduce the parity-era behavior.
-- **Document divergences** in the "Python divergences from reference" section below — what changed, why, and which setting toggles it.
-- The reference and `harness/integration.py` remain authoritative for the **parity baseline** (feature flags off). They are not authoritative for new features.
-- The parity gate is a byte-exactness diff of a real reconstruction, not a unit harness. See [Parity gate](#parity-gate).
-- Inside a feature's own code, document any non-obvious behavior; project memory (`[[…]]` links) carries the longer-form rationale.
+- **Every physical constant is either measured from the run's own input at load time, or a
+  documented choice with its provenance beside it.** Nothing tuned on this project's datasets
+  becomes a default that silently applies to another. When a measurement cannot be made the
+  run says so in an always visible line and names the fallback.
+- **A setting exists because a run reads it.** A key nothing consults is deleted, not kept for
+  the reference's sake. `SETTINGS.md` is the reference and is checked against the loader.
+- **Features are opt in while they are being measured, and become the law once the battery
+  says so.** The old path is then deleted rather than kept behind a flag.
+- **A change meant to be inert is proved inert.** `playground/parity_dump.py` reconstructs one
+  region at the previous commit and on the working tree and compares coordinates exactly. It
+  is the regression tool for refactors, not a contract with the reference.
+- Inside a feature's own code, document any non-obvious behavior; project memory (`[[…]]`
+  links) carries the longer-form rationale.
 
 ---
 
@@ -313,43 +325,25 @@ A style pass is also a correctness pass. While rewriting a doc, confirm the clai
 
 ---
 
-## Parity gate
+## The byte exactness gate
 
-`harness/compare.py` and `harness/scorer.cpp` were **removed**.  They compiled a scorer against
-the real 3dnome sources and compared it against `gnome3d/energy.py` and `gnome3d/solver.py`, both
-of which the pipeline refactor deleted.  Every one of the 51 checks had been silently skipping on
-`ImportError` since then, so the harness reported `0 passed, 0 failed, 51 skipped` while looking
-green.  A gate that cannot fail is worse than no gate.  The reference binary itself is untouched
-and `harness/integration.py` still uses it.
-
-**The parity gate for flag-off changes is a byte-exactness diff of a real reconstruction.**
-Reconstruct one region at the previous commit and again on the working tree, then compare bead
-coordinates exactly:
+`playground/parity_dump.py` reconstructs one region and dumps `(start, end, x, y, z)` per bead.
+Run it from a worktree at the previous commit and from the working tree, then compare the two
+files exactly. It proves a refactor or a default-off feature changed nothing. Both runs must
+use the same executor settings, since batch grouping selects which chain gets which RNG stream.
 
 ```bash
 git worktree add --detach /tmp/g3d_head HEAD
 ln -s "$PWD/data" /tmp/g3d_head/data
-# run the same region in both trees, then compare the coordinates
-.venv/bin/python <driver> /tmp/g3d_head  head.npz
-.venv/bin/python <driver> "$PWD"         wip.npz
+python playground/parity_dump.py /tmp/g3d_head head.npz
+python playground/parity_dump.py "$PWD"       wip.npz
 ```
 
-where `<driver>` calls `gnome3d.simulate.run_region` and dumps `(start, end, x, y, z)` per bead.
-Any new opt-in feature must leave this diff byte-identical with its flag off.  Both runs must use
-the same executor settings, since batch grouping selects which chain gets which RNG stream.
-
-For the *behaviour* of a new energy term, unit-test it directly:
-
-```bash
-python harness/test_terms.py
-```
-
-That file covers the epigenome terms and is the template for the next one. Three properties per
-term. A hand-built configuration whose energy is computable in closed form. A check that the
-per-bead local scores sum to the full score, which is the contract the incremental MC update
-depends on. And a check that the term stays non-negative over random configurations, which the
-Metropolis rule requires because it divides by the running score. Plus whatever behavioural claim
-the term makes that a closed form cannot express.
+For the behaviour of a new energy term, unit test it directly. `harness/test_terms.py` is the
+template: a hand built configuration whose energy is computable in closed form, a check that the
+per bead local scores sum to the full score, which the incremental MC update depends on, and a
+check that the term stays non negative over random configurations, which the Metropolis rule
+requires because it divides by the running score.
 
 ---
 
@@ -813,38 +807,6 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference has no term across block boundaries either, which is
   why its structures show the same scatter. See `design/anchor-placement.md`.
 
-- **Genomic excluded volume floor: `[excluded_volume] use_genomic_floor = yes`, default no.**
-  ([gnome3d/pipeline/ib/floor.py](gnome3d/pipeline/ib/floor.py), the arcs stage and both arcs
-  kernels)
-  An anchor pair with no arc has no target distance in the arcs MC, only the scale free `1/d`
-  repulsion, so anchors inside a block settle into a ball whose size does not depend on genomic
-  separation. Measured over 20 kb to 1 Mb the realised distance exponent is 0.14 to 0.21 against
-  0.285 from the cell line's own Hi-C contact probability curve. The floor gives every arcless
-  pair an excluded volume radius `scale * (separation / 1000)^exponent`, one sided, so arcs can
-  still pull distant loci together. Arc pairs keep their springs and get no floor.
-
-  It rides the existing excluded volume term with one radius per pair instead of one per IB,
-  in numba (`local_excl_mat_nb`, `init_excl_mat_nb`, threaded through `batch_mc_nb`) and in the
-  JAX arcs kernel (a `(B, B)` radius per IB, static cache key entry `excl_mat`). With the floor on
-  the arcless entries of the arcs matrix are zeroed, so those pairs carry the floor and nothing
-  else and the unbounded `1/d` retires for them.
-
-  The scale is calibrated on the structure itself. The arcs stage anneals as before, reads the
-  median consecutive anchor distance off the result, sets `scale = factor * that`, and runs a
-  second pass from that structure at `polish_temp * max_temp`. The second pass must not re-heat:
-  from `max_temp` it tears the arcs the first pass satisfied. Keys: `genomic_floor_factor`
-  (0.44, from five models where `beta` over the bond distance held to six percent),
-  `genomic_floor_exponent` (0.285, each cell line measured 0.26 to 0.35), `genomic_floor_scale`
-  (0, an explicit scale in model units overrides the calibration), `genomic_floor_polish_temp`
-  (0), `genomic_floor_weight` (1). The weight is the floor's own, not the excluded volume
-  term's. At 0.1 the floor cannot stand in for the `1/d` it retires, which reaches 5 at a
-  distance of 0.2, and on chr1:1-60 Mb every within block bin shrank to about half its floor.
-  Unit checks in `harness/test_genomic_floor.py`, including numba against JAX on the initial
-  energy.
-
-  Why not in the reference: the reference's arcs MC has the same `1/d` for arcless pairs. See
-  `design/anchor-placement.md`.
-
 - **Separation aware arc target: `[distance] use_separation_arc_target = yes`, default no.**
   ([gnome3d/util.py](gnome3d/util.py) `arc_target_with_separation`,
   [settings.py](gnome3d/settings.py) `arc_expected_distance`,
@@ -1046,26 +1008,6 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: the reference anneals this stage too.
 
-- **Step size annealing: `[simulation_arcs] step_decay`, and the same key under
-  `[simulation_arcs_smooth]` and `[simulation_ib]`, default `1.0` which is off.**
-  ([mc/numba/terms.py](gnome3d/mc/numba/terms.py) `decayed_step_nb`,
-  [mc/numba/common.py](gnome3d/mc/numba/common.py) `run_outer_loop`)
-  The step size is held fixed for a whole run. cudaMMC shrinks it once per outer round beside the
-  temperature; this is the same knob. `[main] step_decay_floor` (0.1) bounds it as a fraction of
-  the starting step, which cudaMMC does not need because it anneals over tens of rounds where the
-  arcs stage has taken 3,929, and a decay carried that far freezes the chain.
-
-  **It is a quality knob, not a speed one.** Measured over three seeds on blocks at the density
-  real ones converge to, it costs 15 to 45 percent more rounds and reaches an energy about one
-  percent lower, with the radius of gyration unchanged. Convergence there fires on the relative
-  improvement test rather than the accept count, so a finer step keeps finding small improvements
-  and the run goes longer and ends lower. Only the numba path implements it; the JAX kernels hold
-  the step as before, so a stage on the batch executor ignores the setting.
-
-  Why not in the reference: the reference holds the step size fixed too.
-
-### Performance (no behaviour change)
-
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
   `[simulation_backend] neighbour_grid`, default yes)
   The excluded volume term sums over pairs closer than `r0` and was implemented as a scan over
@@ -1098,11 +1040,15 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
 ## Correctness Rules
 
-These rules apply to the **parity baseline** (all new feature flags off). New feature work has its own rules in [Status: post-parity, feature-extension phase](#status-post-parity-feature-extension-phase) above.
-
-1. When working on or near parity code, verify algorithmic choices against the reference source. Do not invent behavior on the parity path.
-2. If behavior in the reference source is ambiguous or surprising, document it explicitly rather than working around it.
-3. **Run the byte-exactness parity gate after touching parity-baseline scoring code.** See [Parity gate](#parity-gate). A flag-off change is not done until the diff is byte-identical.
-4. **Run `python harness/integration.py` after touching parity-baseline MC code.** Bead-position distributions of reference and Python ensembles must remain statistically compatible.
-5. Parity-baseline scoring functions must produce numerically equivalent results to the reference on the same inputs (within 1e-6 absolute tolerance).
-6. New features are allowed and encouraged to diverge from the reference. They must be opt-in via `gnome3d/settings.py`, documented in the divergences section above, and must not change behavior when their flag is off.
+1. Read the reference source before changing a port of it, and say in the commit what the
+   reference does where the two now differ.
+2. If behavior in the reference source is ambiguous or surprising, document it explicitly
+   rather than working around it.
+3. A change meant to be inert runs the byte exactness gate and is not done until the diff is
+   empty. A change meant to move results runs the validation battery and is not adopted until
+   it wins there.
+4. `python harness/integration.py` after touching the MC loop, so bead position distributions
+   of reference and Python ensembles stay statistically compatible.
+5. New physics is measured from the input or documented as a choice, opt in until measured,
+   and then replaces what it supersedes. It is recorded in the divergences section above and
+   in `SETTINGS.md`.

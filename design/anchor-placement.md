@@ -10,7 +10,9 @@ removes the interpenetration. Neither touches what is inside a block, and the wi
 defect has a root cause as of 2026-09-05: the arcs stage minimises a matrix built from two
 distance laws that disagree by eleven times at five kb and a hundred at one Mb. G, one
 background for both, is built and opt in and fixes both the overlap rate and the distance
-exponent on real blocks offline. It is under whole region measurement.
+exponent on real blocks offline. It is under whole region measurement. A was removed on
+2026-09-06 along with its six keys: it set block size rather than shape, the solver never
+implemented it, and the polymer law makes a per pair floor unnecessary.
 
 ## Symptom
 
@@ -188,7 +190,7 @@ relaxes into a free coil. That is the fuzz on each ball rather than a clean path
 
 ## Solutions
 
-### A. Excluded volume floor that grows with genomic separation. Built, opt in
+### A. Excluded volume floor that grows with genomic separation. Removed 2026-09-06
 
 Implemented in `gnome3d/pipeline/ib/floor.py`, the arcs stage and both arcs kernels, gated on
 `[excluded_volume] use_genomic_floor`. Unit checks in `harness/test_genomic_floor.py`.

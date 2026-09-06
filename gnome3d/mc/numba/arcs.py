@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 
 from gnome3d.mc.numba.common import (
-    NO_MAT,
     as_f64,
     dummy_bool,
     dummy_f64,
@@ -23,7 +22,6 @@ from gnome3d.mc.numba.terms import (
     STRUCT_ARCS,
     init_arcs_nb,
     init_confine_nb,
-    init_excl_mat_nb,
     init_excl_nb,
 )
 from gnome3d.types import I32Array, I64Array
@@ -37,19 +35,10 @@ def mc_arcs_numba(
     exp_dist_mat: np.ndarray[Any, Any],
     step_size: float,
     settings: Settings,
-    floor_mat: np.ndarray[Any, Any] | None = None,
-    temp: float | None = None,
 ) -> float:
     """Numba simulated-annealing implementation for arc-MC.  Single-counted
     structure (delta factor 1). Mirrors Reference LooperSolver::MonteCarloArcs().
     Called by `gnome3d.mc.mc_arcs` when `settings.mc_backend != "jax"`.
-
-    `floor_mat` switches the excluded volume term to one radius per pair, the genomic floor
-    from `gnome3d.pipeline.ib.floor`. Arcless pairs then carry the floor and nothing else:
-    their `1/d` repulsion is dropped by zeroing the negative entries of the arcs matrix, which
-    the arcs term treats as skip. Without it the driver is unchanged. `temp` overrides the
-    starting temperature, which the floor pass sets low so it polishes the first anneal
-    instead of re-heating it.
     """
     n = pos.shape[0]
     if n <= 1:
@@ -57,10 +46,6 @@ def mc_arcs_numba(
 
     pw = as_f64(pos)
     exp64 = as_f64(exp_dist_mat)
-    use_floor = floor_mat is not None
-    floor64 = as_f64(floor_mat) if floor_mat is not None else NO_MAT
-    if use_floor:
-        exp64 = np.where(exp64 < 0.0, 0.0, exp64)
 
     stretch_k = float(settings.spring_stretch_arcs)
     squeeze_k = float(settings.spring_squeeze_arcs)
@@ -74,11 +59,9 @@ def mc_arcs_numba(
         if _rep_mean > 0.0:
             rep_inv_cutoff = 1.0 / (rep_factor * _rep_mean)
 
-    use_excl = use_floor or (
-        bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
-    )
+    use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
     excl_r0 = float(settings.exclusion_radius_arcs)
-    if use_excl and not use_floor and excl_r0 <= 0.0:
+    if use_excl and excl_r0 <= 0.0:
         pos_mask = exp64 > 1e-6
         factor = float(settings.exclusion_auto_factor_arcs)
         excl_r0 = factor * float(exp64[pos_mask].mean()) if pos_mask.any() else 1.0
@@ -99,11 +82,9 @@ def mc_arcs_numba(
 
     movable: I64Array = np.arange(n, dtype=np.int64)
     score_struct = float(init_arcs_nb(pw, exp64, stretch_k, squeeze_k, rep_inv_cutoff))
-    excl_w = float(settings.genomic_floor_weight if use_floor else settings.exclusion_weight)
+    excl_w = float(settings.exclusion_weight)
     excl_skip = int(settings.exclusion_skip_neighbors)
-    if use_floor:
-        score_excl = float(init_excl_mat_nb(pw, floor64, excl_w, excl_skip))
-    elif use_excl:
+    if use_excl:
         score_excl = float(init_excl_nb(pw, excl_r0, excl_w, excl_skip))
     else:
         score_excl = 0.0
@@ -148,8 +129,6 @@ def mc_arcs_numba(
         excl_r0=excl_r0,
         excl_weight=excl_w,
         excl_skip=excl_skip,
-        use_excl_mat=use_floor,
-        excl_r0_mat=floor64,
         use_conf=use_conf,
         conf_cx=conf_cx,
         conf_cy=conf_cy,
@@ -157,7 +136,7 @@ def mc_arcs_numba(
         conf_R=conf_R,
         conf_weight=float(settings.confinement_weight),
         step_size=step_size,
-        T=float(settings.max_temp) if temp is None else float(temp),
+        T=float(settings.max_temp),
         dt=float(settings.dt_temp),
         jump_scale=float(settings.jump_scale),
         jump_coef=float(settings.jump_coef),
@@ -172,9 +151,6 @@ def mc_arcs_numba(
         score_orn=0.0,
         score_excl=score_excl,
         score_conf=score_conf,
-        force_bias=float(settings.arcs_force_bias),
-        step_decay=float(settings.mc_step_decay_arcs),
-        step_decay_floor=float(settings.mc_step_decay_floor),
     )
     pos[:] = pw.astype(pos.dtype)
     return score

@@ -216,53 +216,6 @@ def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -
 
 
 @njit(cache=True, fastmath=True, nogil=True)
-def local_excl_mat_nb(pos: F64Array, p: int, r0: F64Array, weight: float, skip: int) -> float:
-    """Excluded volume local score with one radius per pair. A radius of zero skips the pair,
-    which is how arc pairs and the diagonal opt out of the genomic floor."""
-    n = pos.shape[0]
-    err = 0.0
-    for i in range(n):
-        diff = i - p
-        if diff < 0:
-            diff = -diff
-        if diff <= skip:
-            continue
-        r = r0[i, p]
-        if r <= 0.0:
-            continue
-        dx = pos[i, 0] - pos[p, 0]
-        dy = pos[i, 1] - pos[p, 1]
-        dz = pos[i, 2] - pos[p, 2]
-        d = math.sqrt(dx * dx + dy * dy + dz * dz)
-        err += _excl_pair_nb(d, r, weight)
-    return err
-
-
-@njit(cache=True, fastmath=True, nogil=True)
-def init_excl_mat_nb(pos: F64Array, r0: F64Array, weight: float, skip: int) -> float:
-    n = pos.shape[0]
-    err = 0.0
-    for i in range(n):
-        row_err = 0.0
-        for j in range(n):
-            diff = i - j
-            if diff < 0:
-                diff = -diff
-            if diff <= skip:
-                continue
-            r = r0[i, j]
-            if r <= 0.0:
-                continue
-            dx = pos[i, 0] - pos[j, 0]
-            dy = pos[i, 1] - pos[j, 1]
-            dz = pos[i, 2] - pos[j, 2]
-            d = math.sqrt(dx * dx + dy * dy + dz * dz)
-            row_err += _excl_pair_nb(d, r, weight)
-        err += row_err
-    return err
-
-
-@njit(cache=True, fastmath=True, nogil=True)
 def init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
     n = pos.shape[0]
     err = 0.0
@@ -672,21 +625,6 @@ def init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> floa
     return err * heat_weight
 
 
-@njit(cache=True, nogil=True)
-def decayed_step_nb(step0: float, decay: float, floor: float, round_i: int) -> float:
-    """The step size at outer round `round_i`, shrunk beside the temperature.
-
-    Floored at `floor` times the starting step. cudaMMC anneals over tens of rounds where our
-    arcs stage has taken 3,929, and a decay carried that far freezes the chain instead of
-    refining it.
-    """
-    if decay >= 1.0:
-        return step0
-    s = step0 * decay**round_i
-    lo = step0 * floor
-    return s if s > lo else lo
-
-
 # Arcs MC helpers
 
 
@@ -720,58 +658,6 @@ def _local_arcs_nb(
 # fastmath matches `_local_arcs_nb`, whose score this replaces on the biased path. The two feed
 # the same incremental total, so a reassociation difference between them would drift it over tens
 # of millions of steps. The gradient only steers a proposal, so its own precision is not critical.
-@njit(cache=True, fastmath=True, nogil=True)
-def _local_arcs_grad_nb(
-    pos: F64Array,
-    exp: F64Array,
-    p: int,
-    stretch_k: float,
-    squeeze_k: float,
-    rep_inv_cutoff: float = 0.0,
-) -> tuple[float, float, float, float]:
-    """The arcs local score for anchor `p` and its gradient, in one pass.
-
-    The same sum as `_local_arcs_nb`, with the derivative accumulated alongside so a force biased
-    proposal costs no extra sweep. Returns the score and the gradient with respect to `pos[p]`,
-    so a descent direction is its negation.
-
-    The repulsion `max(0, 1/d - c)` differentiates to `-r/d^3` where it is active and to zero
-    beyond the cutoff, and a spring `k ((d - e)/e)^2` to `2 k (d - e) r / (e^2 d)` with `k`
-    switching at `d = e`. Both have a kink, which is why this drives a proposal and not a solver.
-    """
-    n = pos.shape[0]
-    sc = 0.0
-    gx = 0.0
-    gy = 0.0
-    gz = 0.0
-    for i in range(n):
-        if i == p:
-            continue
-        e = exp[i, p]
-        dx = pos[p, 0] - pos[i, 0]
-        dy = pos[p, 1] - pos[i, 1]
-        dz = pos[p, 2] - pos[i, 2]
-        d = math.sqrt(dx * dx + dy * dy + dz * dz)
-        dd = d if d > 1e-10 else 1e-10
-        if e < 0.0:
-            v = 1.0 / dd - rep_inv_cutoff
-            if v > 0.0:
-                sc += v
-                w = -1.0 / (dd * dd * dd)
-                gx += w * dx
-                gy += w * dy
-                gz += w * dz
-        elif e >= 1e-6:
-            rel = (d - e) / e
-            k = stretch_k if rel >= 0.0 else squeeze_k
-            sc += rel * rel * k
-            w = 2.0 * k * rel / (e * dd)
-            gx += w * dx
-            gy += w * dy
-            gz += w * dz
-    return sc, gx, gy, gz
-
-
 @njit(cache=True, fastmath=True, nogil=True)
 def init_arcs_nb(
     pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float, rep_inv_cutoff: float = 0.0
@@ -1072,10 +958,6 @@ def batch_mc_nb(
     score_comp: float,
     score_brdg: float,
     rep_inv_cutoff: float = 0.0,
-    # The genomic floor gives the excluded volume term one radius per pair. Off by default so
-    # every stage but arcs passes nothing new.
-    use_excl_mat: bool = False,
-    excl_r0_mat: F64Array = NO_MAT,
     # Cell grid for the excluded volume term. Off by default so every caller that does not
     # build one passes nothing new. See gnome3d/mc/numba/cells.py.
     use_cells: bool = False,
@@ -1086,7 +968,6 @@ def batch_mc_nb(
     cell_next: I32Array = NO_I32,
     cell_where: I32Array = NO_I32,
     cell_buf: I32Array = NO_I32,
-    force_bias: float = 0.0,
 ) -> tuple[float, float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
     n_mov = movable.shape[0]
@@ -1104,23 +985,7 @@ def batch_mc_nb(
 
         # --- prev local scores ---
         if struct_type == STRUCT_ARCS:
-            if force_bias > 0.0:
-                # The gradient rides the same sweep as the score, so biasing costs nothing extra.
-                # The displacement was already drawn above and is only steered here, which leaves
-                # the random stream exactly as it was.
-                loc_struct_prev, gx, gy, gz = _local_arcs_grad_nb(
-                    pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff
-                )
-                gn = math.sqrt(gx * gx + gy * gy + gz * gz)
-                if gn > 1e-12:
-                    w = force_bias * step_size / gn
-                    dx = (1.0 - force_bias) * dx - w * gx
-                    dy = (1.0 - force_bias) * dy - w * gy
-                    dz = (1.0 - force_bias) * dz - w * gz
-            else:
-                loc_struct_prev = _local_arcs_nb(
-                    pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff
-                )
+            loc_struct_prev = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff)
         elif struct_type == STRUCT_CHAIN:
             loc_struct_prev = local_smooth_nb(
                 pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
@@ -1134,9 +999,7 @@ def batch_mc_nb(
 
         loc_excl_prev = 0.0
         if use_excl:
-            if use_excl_mat:
-                loc_excl_prev = local_excl_mat_nb(pos, p, excl_r0_mat, excl_weight, excl_skip)
-            elif use_cells:
+            if use_cells:
                 loc_excl_prev = local_excl_cells_nb(
                     pos,
                     p,
@@ -1223,9 +1086,7 @@ def batch_mc_nb(
 
         score_excl_new = score_excl
         if use_excl:
-            if use_excl_mat:
-                loc_excl_curr = local_excl_mat_nb(pos, p, excl_r0_mat, excl_weight, excl_skip)
-            elif use_cells:
+            if use_cells:
                 loc_excl_curr = local_excl_cells_nb(
                     pos,
                     p,

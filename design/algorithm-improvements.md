@@ -30,7 +30,7 @@ funnel, and it is the number every option here is trying to cut.
 
 ## Realistic
 
-### Force bias Monte Carlo. Built and measured, a modest win
+### Force bias Monte Carlo. Built and measured, a modest win Removed 2026-09-06, measured and not adopted.
 
 Propose along the local descent direction rather than isotropically. The gradient rides the same
 sweep as the score, and the displacement is drawn as before and only steered, so
@@ -205,6 +205,7 @@ Population annealing and parallel tempering, because both traverse a rough lands
 is a funnel, and population annealing's resampling weights degenerate at the temperature the
 schedule spends its time at. A checkerboard over arcs, because its every bead per sweep update
 lands in a worse basin and that is its defining property. Step size annealing, which costs 15 to
-45 percent more rounds for one percent lower energy. An adaptive step targeting an acceptance
+45 percent more rounds for one percent lower energy, and was removed with its keys on
+2026-09-06. An adaptive step targeting an acceptance
 rate, because acceptance is already 35 percent. All are recorded with their measurements in
 [intra-chain-parallelism.md](intra-chain-parallelism.md).

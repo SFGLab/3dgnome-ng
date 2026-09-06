@@ -10,10 +10,10 @@ matching across the whole distribution.
 
 The energy here is the one `mc_arcs_numba` scores, its arc term plus its confinement, with the
 repulsion cutoff and the confinement centre and radius derived the way that driver derives them.
-Anything else it can score is refused rather than dropped: the genomic floor and an excluded
-volume on arcs are both off in production and neither is implemented here.
+It implements every term the arcs stage carries.
 
-The Monte Carlo remains the default. See design/algorithm-improvements.md.
+Production solves; the annealer stays available as `solver = mc`. See
+design/algorithm-improvements.md.
 """
 
 from __future__ import annotations
@@ -129,11 +129,6 @@ def solve_arcs(
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
-    if bool(s.use_genomic_floor):
-        raise NotImplementedError(
-            "the arcs solver does not implement the genomic floor; "
-            "set [simulation_arcs] solver = mc or turn use_genomic_floor off"
-        )
     exp64 = np.ascontiguousarray(exp_dist, dtype=np.float64)
     pw = np.ascontiguousarray(pos, dtype=np.float64)
     n = pw.shape[0]

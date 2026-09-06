@@ -59,7 +59,6 @@ CANONICAL: dict[str, dict[str, object]] = {
         "count_dist_shift": 8,
         "count_dist_base_level": 0.2,
     },
-    "template": {"template_scale": 7.0, "dist_heatmap_scale": 15.0},
     "motif_orientation": {"use_motif_orientation": "yes", "weight": 50.0},
     "anchor_heatmap": {"use_anchor_heatmap": "yes", "heatmap_influence": 0.1},
     "subanchor_heatmap": {
@@ -179,7 +178,6 @@ CANONICAL: dict[str, dict[str, object]] = {
     # Excluded volume across blocks, so the stitched globules cannot interpenetrate. Without it
     # nothing acts between the beads of two blocks once the stitch has moved them together.
     "relax": {"use_cross_block_relax": "yes"},
-    "small_ib_boost": {"use_small_ib_boost": "no"},
 }
 
 # Per-stage stop_condition_steps by quality. None or "full" keeps the canonical 50000.
@@ -192,9 +190,7 @@ def cell_data_section(cell: str, data_root: str = "data") -> dict[str, object]:
         "data_dir": str(Path(data_root) / cell),
         "anchors": f"{cell}_anchors_3+_oriented.bed",
         "clusters": f"{cell}_clusters_3+.bedpe",
-        "factors": "CTCF",
         "singletons": f"{cell}_singletons_lessthan3.bedpe",
-        "split_singleton_files_by_chr": "no",
         "singletons_inter": "",
         "segment_split": f"ccds_all_hg38_merged100k_{cell}.breakpoints.bed",
         "centromeres": "hg38_centromeres.bed",

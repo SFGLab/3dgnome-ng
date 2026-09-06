@@ -44,21 +44,14 @@ class Settings:
     data_pet_clusters: str
     data_singletons: str
     data_singletons_inter: str
-    data_factors: str
-    data_split_singletons_by_chr: bool
     data_centromeres: str
     data_segment_split: str
     ib_refine_scope: str
-    data_segment_heatmap: str
     data_compartments: str
     data_accessibility: str
     data_phasing_track: str
 
     # ---- template ----
-    template_segment: str
-    template_scale: float
-    dist_heatmap: str
-    dist_heatmap_scale: float
 
     # ---- motif orientation ----
     use_ctcf_motif: bool
@@ -76,7 +69,6 @@ class Settings:
     subanchor_heatmap_dist_weight: float
     subanchor_estimate_steps: int
     subanchor_estimate_replicates: int
-    subanchor_batch_trials: bool
     subanchor_heat_min_reduction: float
     # Threads building per-IB contact heatmaps during seed gathering (skeleton).  The
     # build is O(N^2) numpy per IB and embarrassingly parallel across IBs.  >1 parallelises
@@ -205,8 +197,6 @@ class Settings:
     # support implies a distance SHORTER than its genomic separation already does. Measured on a
     # 20 Mb region it closes about a fifth of the cross-block distance penalty, because a
     # centroid is a coarse handle on where a block's edge anchors actually sit.
-    use_ib_arcs: bool
-    ib_arcs_weight: float
 
     # Anchors enter the per-block arc MC collapsed on their block's centroid, and that MC sees
     # only arcs internal to its block, so a cross-block arc never constrains anything. When on, a
@@ -244,12 +234,6 @@ class Settings:
     exclusion_auto_factor_smooth: float
     exclusion_auto_factor_heatmap: float
     exclusion_auto_factor_ib: float
-    use_genomic_floor: bool
-    genomic_floor_factor: float
-    genomic_floor_exponent: float
-    genomic_floor_scale: float
-    genomic_floor_polish_temp: float
-    genomic_floor_weight: float
 
     # ---- IB-level MC pass (chain bonds + EV between IB centroids) ----
     # IB MC is a peer stage to smooth/arcs/heatmap, not a sub-mode of smooth.
@@ -369,7 +353,6 @@ class Settings:
     # isotropic draw the reference makes. The gradient comes free from the same sweep as the
     # score. It proposes only: the Metropolis rule still rejects, which is what keeps a singular
     # 1/d repulsion safe where a gradient solver would see unbounded forces.
-    arcs_force_bias: float
     # Anneal the arcs stage or solve it. "mc" is the Monte Carlo the reference uses. "lbfgs"
     # minimises the same energy directly, which on real blocks reaches the same minimum about
     # thirty six times faster with the ensemble spread slightly wider and the geometry matching.
@@ -385,10 +368,6 @@ class Settings:
     arcs_solver: str
     arcs_solver_iters: int
     mc_stop_ratio_arcs: float
-    mc_step_decay_arcs: float
-    mc_step_decay_smooth: float
-    mc_step_decay_ib: float
-    mc_step_decay_floor: float
     smooth_dist_weight: float
     smooth_angle_weight: float
 
@@ -413,8 +392,6 @@ class Settings:
         self.data_pet_clusters = ""
         self.data_singletons = ""
         self.data_singletons_inter = ""
-        self.data_factors = ""
-        self.data_split_singletons_by_chr = False
         self.data_centromeres = ""
         self.data_segment_split = ""
         # What forms one chain in the IB placement MC. "segment" refines each
@@ -425,16 +402,9 @@ class Settings:
         # contact density from 0.087 to 0.035 and worsened block cohesion about
         # threefold, so it needs its own EV and confinement tuning.
         self.ib_refine_scope = "segment"
-        self.data_segment_heatmap = ""
         self.data_compartments = ""
         self.data_accessibility = ""
         self.data_phasing_track = ""
-
-        # ---- template ----
-        self.template_segment = ""
-        self.template_scale = 1.0
-        self.dist_heatmap = ""
-        self.dist_heatmap_scale = 1.0
 
         # ---- motif orientation ----
         self.use_ctcf_motif = False
@@ -452,12 +422,6 @@ class Settings:
         self.subanchor_heatmap_dist_weight = 1.0
         self.subanchor_estimate_steps = 2
         self.subanchor_estimate_replicates = 5
-        # Opt-in (default off): run the IB estimate's n_reps*n_steps independent
-        # anneals as ONE vmapped JAX kernel instead of a sequential python loop.
-        # ~3-6x faster at large N on GPU (the per-step kernel is latency-bound,
-        # leaving the GPU idle at chains=1).  JAX smooth backend only; falls back
-        # to the sequential loop otherwise.  Diverges from the parity baseline.
-        self.subanchor_batch_trials = False
         # Opt-in (default 0.0 = off, parity preserved): skip an IB's subanchor
         # heat-dist entirely when its signal is too sparse to matter.  The
         # active-pair fraction (n_active / n_pairs) is a provable upper bound on
@@ -545,8 +509,6 @@ class Settings:
         self.mc_executor_jax_batch_width_smooth = "auto"
         self.mc_executor_jax_batch_width_arcs = "auto"
         self.mc_multigpu_mode = "groups"
-        self.use_ib_arcs = False
-        self.ib_arcs_weight = 1.0
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -590,22 +552,6 @@ class Settings:
         self.exclusion_auto_factor_smooth = 0.5
         self.exclusion_auto_factor_heatmap = 0.5
         self.exclusion_auto_factor_ib = 0.5
-        # The genomic floor. Arcless anchor pairs in the arcs MC get an excluded volume
-        # radius of scale * (separation / 1000)^exponent instead of the 1/d repulsion.
-        # scale 0 derives it as factor times the median consecutive anchor distance of a
-        # first anneal. See gnome3d/pipeline/ib/floor.py.
-        self.use_genomic_floor = False
-        self.genomic_floor_factor = 0.44
-        self.genomic_floor_exponent = 0.285
-        self.genomic_floor_scale = 0.0
-        # Starting temperature of the floor pass as a fraction of max_temp. The pass is a
-        # polish of the first anneal, so it must not re-heat the structure. Zero accepts
-        # only moves that do not raise the score.
-        self.genomic_floor_polish_temp = 0.0
-        # The floor's own weight. It replaces the 1/d repulsion, which reaches 5 at a distance
-        # of 0.2, so it cannot ride the excluded volume term's 0.1: at that weight the whole
-        # block collapsed to half its floor on chr1:1-60Mb.
-        self.genomic_floor_weight = 1.0
 
         # ---- IB-level MC pass ----
         # When enabled, each segment runs a small chain-spring + EV MC pass over
@@ -794,7 +740,6 @@ class Settings:
         self.mc_stop_improvement_smooth = 0.995
         self.mc_stop_successes_smooth = 5
         self.mc_stop_steps_smooth = 10000
-        self.arcs_force_bias = 0.0
         # One background for the arc targets and the chain bonds. The parity and separation
         # aware laws both set an arc's distance from its PET count, which lands between 0.2 and
         # 1.6 model units, while the chain law sets a consecutive arcless anchor pair between
@@ -821,10 +766,6 @@ class Settings:
         self.arcs_solver = "mc"
         self.arcs_solver_iters = 200
         self.mc_stop_ratio_arcs = 0.9999
-        self.mc_step_decay_arcs = 1.0
-        self.mc_step_decay_smooth = 1.0
-        self.mc_step_decay_ib = 1.0
-        self.mc_step_decay_floor = 0.1
         self.smooth_dist_weight = 1.0
         self.smooth_angle_weight = 1.0
 
@@ -934,23 +875,14 @@ class Settings:
         self.data_pet_clusters = gets("data", "clusters", self.data_pet_clusters)
         self.data_singletons = gets("data", "singletons", self.data_singletons)
         self.data_singletons_inter = gets("data", "singletons_inter", self.data_singletons_inter)
-        self.data_factors = gets("data", "factors", self.data_factors)
-        self.data_split_singletons_by_chr = getb(
-            "data", "split_singleton_files_by_chr", self.data_split_singletons_by_chr
-        )
         self.data_centromeres = gets("data", "centromeres", self.data_centromeres)
         self.data_segment_split = gets("data", "segment_split", self.data_segment_split)
         self.ib_refine_scope = gets("simulation_ib", "refine_scope", self.ib_refine_scope)
-        self.data_segment_heatmap = gets("data", "segment_heatmap", self.data_segment_heatmap)
         self.data_compartments = gets("data", "compartments", self.data_compartments)
         self.data_accessibility = gets("data", "accessibility", self.data_accessibility)
         self.data_phasing_track = gets("data", "phasing_track", self.data_phasing_track)
 
         # [template]
-        self.template_segment = gets("template", "template_segment", self.template_segment)
-        self.template_scale = getf("template", "template_scale", self.template_scale)
-        self.dist_heatmap = gets("template", "dist_heatmap", self.dist_heatmap)
-        self.dist_heatmap_scale = getf("template", "dist_heatmap_scale", self.dist_heatmap_scale)
 
         # [distance]
         self.genomic_dist_power = getf("distance", "genomic_dist_power", self.genomic_dist_power)
@@ -1031,9 +963,6 @@ class Settings:
         )
         self.subanchor_estimate_replicates = geti(
             "subanchor_heatmap", "estimate_distances_replicates", self.subanchor_estimate_replicates
-        )
-        self.subanchor_batch_trials = getb(
-            "subanchor_heatmap", "batch_trials", self.subanchor_batch_trials
         )
         self.subanchor_heat_min_reduction = getf(
             "subanchor_heatmap", "heat_min_reduction", self.subanchor_heat_min_reduction
@@ -1172,24 +1101,6 @@ class Settings:
         self.exclusion_auto_factor_ib = getf(
             "excluded_volume", "auto_factor_ib", self.exclusion_auto_factor_ib
         )
-        self.use_genomic_floor = getb(
-            "excluded_volume", "use_genomic_floor", self.use_genomic_floor
-        )
-        self.genomic_floor_factor = getf(
-            "excluded_volume", "genomic_floor_factor", self.genomic_floor_factor
-        )
-        self.genomic_floor_exponent = getf(
-            "excluded_volume", "genomic_floor_exponent", self.genomic_floor_exponent
-        )
-        self.genomic_floor_scale = getf(
-            "excluded_volume", "genomic_floor_scale", self.genomic_floor_scale
-        )
-        self.genomic_floor_polish_temp = getf(
-            "excluded_volume", "genomic_floor_polish_temp", self.genomic_floor_polish_temp
-        )
-        self.genomic_floor_weight = getf(
-            "excluded_volume", "genomic_floor_weight", self.genomic_floor_weight
-        )
 
         # [simulation_ib]
         self.use_ib_mc = getb("simulation_ib", "use_ib_mc", self.use_ib_mc)
@@ -1198,8 +1109,6 @@ class Settings:
         self.jump_scale_ib = getf("simulation_ib", "jump_temp_scale", self.jump_scale_ib)
         self.jump_coef_ib = getf("simulation_ib", "jump_temp_coef", self.jump_coef_ib)
         self.mc_stop_steps_ib = geti("simulation_ib", "stop_condition_steps", self.mc_stop_steps_ib)
-        self.use_ib_arcs = getb("simulation_ib", "use_ib_arcs", self.use_ib_arcs)
-        self.ib_arcs_weight = getf("simulation_ib", "arcs_weight", self.ib_arcs_weight)
         self.mc_stop_improvement_ib = getf(
             "simulation_ib",
             "stop_condition_improvement_threshold",
@@ -1389,11 +1298,9 @@ class Settings:
         self.mc_stop_steps_smooth = geti(
             "simulation_arcs_smooth", "stop_condition_steps", self.mc_stop_steps_smooth
         )
-        self.mc_step_decay_arcs = getf("simulation_arcs", "step_decay", self.mc_step_decay_arcs)
         self.mc_stop_ratio_arcs = getf(
             "simulation_arcs", "stop_condition_ratio", self.mc_stop_ratio_arcs
         )
-        self.arcs_force_bias = getf("simulation_arcs", "force_bias", self.arcs_force_bias)
         self.use_polymer_law = getb("distance", "use_polymer_law", self.use_polymer_law)
         self.polymer_exponent = getf("distance", "polymer_exponent", self.polymer_exponent)
         self.contact_half_saturation = getf(
@@ -1411,11 +1318,6 @@ class Settings:
         )
         self.arcs_solver = gets("simulation_arcs", "solver", self.arcs_solver)
         self.arcs_solver_iters = geti("simulation_arcs", "solver_iters", self.arcs_solver_iters)
-        self.mc_step_decay_smooth = getf(
-            "simulation_arcs_smooth", "step_decay", self.mc_step_decay_smooth
-        )
-        self.mc_step_decay_ib = getf("simulation_ib", "step_decay", self.mc_step_decay_ib)
-        self.mc_step_decay_floor = getf("main", "step_decay_floor", self.mc_step_decay_floor)
         self.mc_stop_improvement_smooth = getf(
             "simulation_arcs_smooth",
             "stop_condition_improvement_threshold",

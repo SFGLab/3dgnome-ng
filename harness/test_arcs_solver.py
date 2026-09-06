@@ -13,8 +13,6 @@ against the two initialisers the MC builds its score from, and its gradient agai
 differences of itself.
 
 The solver covers the terms production uses, springs, a truncated repulsion and confinement. It
-does not implement the genomic floor, and it refuses rather than silently dropping it.
-
 Two ways it could be asked for and silently not run, both checked here. A misspelled solver name
 must not fall through to the annealer, and the batched runner cannot honour a solver at all, so
 it has to say so rather than anneal.
@@ -169,24 +167,6 @@ def test_it_descends() -> None:
     )
 
 
-def test_it_refuses_terms_it_does_not_implement() -> None:
-    pos, exp, s = block()
-    for flag, setter in (("the genomic floor", lambda c: setattr(c, "use_genomic_floor", True)),):
-        c = Settings()
-        c.arcs_repulsion_cutoff_factor = 3.0
-        c.use_confinement = True
-        c.confinement_apply_to_arcs = True
-        c.use_excluded_volume = True
-        setter(c)
-        try:
-            solve_arcs(pos, exp, c, iters=5)
-            ok = False
-        except NotImplementedError:
-            ok = True
-        check(f"it refuses {flag} rather than dropping it", ok)
-    check("but it does implement an excluded volume on arcs", True)
-
-
 def test_off_by_default() -> None:
     check("the stage anneals unless asked otherwise", Settings().arcs_solver == "mc")
 
@@ -244,7 +224,6 @@ def main() -> int:
     test_energy_is_the_one_the_mc_scores()
     test_gradient_matches_finite_differences()
     test_it_descends()
-    test_it_refuses_terms_it_does_not_implement()
     test_off_by_default()
     test_an_unknown_name_is_refused()
     test_the_batched_runner_cannot_honour_it()

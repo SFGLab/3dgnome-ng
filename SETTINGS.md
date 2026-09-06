@@ -31,7 +31,6 @@ taken relative to `data_dir` unless they are absolute.
 | `target_bp_per_subanchor` | int | 5000 | 1000 | Target genomic length of one chain segment under dynamic density. |
 | `min_subanchors_per_arc` | int | 0 | 0 | Lower bound on the count per gap under dynamic density. |
 | `max_subanchors_per_arc` | int | 50 | 100 | Upper bound on the count per gap under dynamic density. |
-| `step_decay_floor` | float | 0.1 | 0.1 | Lower bound on the step size under the per stage `step_decay` keys, as a fraction of the starting step. |
 
 ## [data]
 
@@ -44,11 +43,8 @@ Filenames are relative to `data_dir` unless absolute. The region string is `chr:
 | `clusters` | str |  | BEDPE of PET clusters, the arcs, `chr1 s1 e1 chr2 s2 e2 score`. |
 | `singletons` | str |  | BEDPE of singleton contacts for the segment level heatmap. A Hi-C bin pair file works here too. |
 | `singletons_inter` | str |  | A second singletons file appended for multi chromosome runs only. |
-| `factors` | str |  | Accepted and never used. The reference implementation's protein factor filter. |
-| `split_singleton_files_by_chr` | bool | no | Accepted and never used. |
 | `centromeres` | str |  | BED of centromere positions. |
 | `segment_split` | str |  | BED of segment boundary breakpoints. |
-| `segment_heatmap` | str |  | Accepted and never used. |
 | `compartments` | str |  | bedGraph of a signed compartment eigenvector or a CALDER BED, for `[compartments]`. |
 | `accessibility` | str |  | bedGraph of ATAC or DNase signal, for `[accessibility]`. |
 | `phasing_track` | str |  | Track used to fix the eigenvector's arbitrary sign. Required with `compartments`. |
@@ -81,19 +77,6 @@ and is not read while `use_polymer_law` is on.
 | `arc_target_pull` | float | 0.45 | 0.45 | The fraction of the background a saturated arc pulls its pair to. A zero PET arc sits on the background. |
 | `arc_target_background_exponent` | float | 0.0 | 0.0 | Zero rides the chain law itself, whose exponent is far steeper than the contact probability curves give. A positive value continues the chain law from the reference separation at this slope. 0.15 measured best on two cell lines. The optimum differs by dataset. |
 | `arc_target_background_ref_bp` | int | 1000 | 1000 | The separation at which the background agrees with the chain law when an exponent is set. |
-
-## [template]
-
-All four keys are accepted and never used. They are the reference implementation's structural
-template and MDS distance heatmap inputs, which are not ported. The production config sets
-`template_scale` and `dist_heatmap_scale` and neither has any effect.
-
-| key | type | default |
-| --- | --- | --- |
-| `template_segment` | str |  |
-| `template_scale` | float | 1.0 |
-| `dist_heatmap` | str |  |
-| `dist_heatmap_scale` | float | 1.0 |
 
 ## [heatmaps]
 
@@ -143,7 +126,6 @@ is too far and the squeeze constant when too close.
 | `heatmap_dist_weight` | float | 1.0 | 0.01 | Weight of that term against the chain and angle terms. |
 | `estimate_distances_steps` | int | 2 | 4 | Dry smooth runs per replicate when estimating the mean pairwise distances. |
 | `estimate_distances_replicates` | int | 5 | 4 | Replicate estimates averaged into the target. |
-| `batch_trials` | bool | no |  | Accepted and never used. |
 | `heat_min_reduction` | float | 0.0 | 0.0 | Skip the estimate for a block whose fraction of contact carrying pairs, an upper bound on the reduction the term can achieve, is below this. |
 | `heatmap_workers` | int or auto | 1 |  | Threads used to build the per block contact heatmaps. `auto` uses every usable core. |
 
@@ -157,9 +139,7 @@ An uphill move is accepted when `rand < jump_temp_scale * exp(-jump_temp_coef * 
 / T)`, and `T` is multiplied by `delta_temp` after every step from `max_temp`. Every
 `stop_condition_steps` steps is one round. The run stops when a round neither lowered the score
 below `stop_condition_improvement_threshold` times the previous round's score nor accepted at
-least `stop_condition_successes_threshold` moves. `step_decay` multiplies the step size by that
-factor each round, down to `step_decay_floor` of the start, and only the numba kernels honour
-it.
+least `stop_condition_successes_threshold` moves.
 
 | key | type | default | production | what it does |
 |---|---|---|---|---|
@@ -170,14 +150,12 @@ it.
 | `stop_condition_steps` | int | 10000 | 50000 | Steps per round. |
 | `stop_condition_improvement_threshold` | float | 0.995 | 0.999 | A round improved when the score fell below this times the previous round's. |
 | `stop_condition_successes_threshold` | int | 5 | arcs and ib 100, smooth 50, heatmap 10 | Accepted moves in a round below which a non improving round ends the run. |
-| `step_decay` | float | 1.0 | 1.0 | Per round step size multiplier. 1.0 is off. Not in `[simulation_heatmap]`. |
 
 ### [simulation_arcs] only
 
 | key | type | default | production | what it does |
 | --- | --- | --- | --- | --- |
 | `stop_condition_ratio` | float | 0.9999 | 0.9999 | Also stop when the score over the previous round's is at or above this, a plateau guard. |
-| `force_bias` | float | 0.0 | 0.0 | Steer each proposal along the local gradient by this fraction of the step. 0 is a plain random step. |
 | `solver` | str | mc | lbfgs | `mc` anneals, `lbfgs` minimises the same energy with L-BFGS-B. Same minimum, same overlaps, the stage's calls fell from minutes to seconds. Needs `mc_executor_arcs` of `serial` or `threaded`. The batch executor has no solver and refuses. |
 | `solver_iters` | int | 200 | 200 | Iterations for the solver. |
 
@@ -194,8 +172,6 @@ it.
 | --- | --- | --- | --- | --- |
 | `refine_scope` | str | segment | segment | `segment` places each segment's blocks as one chain and skips a segment with one block or fewer. `chromosome` places every block on the chromosome as one chain. It inflates structures and needs the excluded volume and confinement retuned. |
 | `use_ib_mc` | bool | no | yes | Anneal block centroids with chain bonds, excluded volume and confinement instead of placing them by interpolation. |
-| `use_ib_arcs` | bool | no | no | Add attraction only targets between block centroids from the arcs crossing their boundary, normalised so adjacent blocks sit at unit frequency and mapped through the heatmap frequency law. |
-| `arcs_weight` | float | 1.0 | 1.0 | Weight of those targets. |
 | `dist_weight` | float | 1.0 | 1.0 | Weight of the chain bond term. |
 
 ## [simulation_backend]
@@ -244,12 +220,6 @@ one as the stage's auto factor times the stage's mean bond scale.
 | `auto_factor_heatmap` | float | 0.5 | 0.5 | Times the mean active heatmap target. |
 | `auto_factor_ib` | float | 0.5 | 0.5 | Times the mean block chain bond. |
 | `arcs_repulsion_cutoff_factor` | float | 0.0 | 3.0 | Truncate the arcless pair repulsion `1 / d` beyond this times the mean arc target. 0 leaves it unbounded, which is the reference's behaviour and lets a sparse block explode. |
-| `use_genomic_floor` | bool | no | no | Give every arcless anchor pair an excluded volume radius `scale * (separation / 1000) ^ exponent` in the arcs stage, and retire the `1 / d` for them. Sets block size rather than shape. The arcs solver does not implement it. |
-| `genomic_floor_factor` | float | 0.44 | 0.44 | The scale is this times the median consecutive anchor distance of a first pass. |
-| `genomic_floor_exponent` | float | 0.285 | 0.285 | Separation exponent of the floor. |
-| `genomic_floor_scale` | float | 0.0 | 0.0 | An explicit scale in model units, overriding the calibration. |
-| `genomic_floor_polish_temp` | float | 0.0 | 0.0 | Starting temperature of the second pass, as a fraction of `max_temp`. |
-| `genomic_floor_weight` | float | 1.0 | 1.0 | Weight of the floor term, separate from `weight`. |
 
 ## [confinement]
 
@@ -508,8 +478,7 @@ Precisely. A pair an arc joins carries the arc target, from whichever law is on.
 pair with no arc carries `arcs_chain_bond_scale` times the chain law, or times the unified
 background, when `use_arcs_chain_bonds` is on. Every other pair carries no target and feels
 only the repulsion [1], `max(0, 1 / d - 1 / (arcs_repulsion_cutoff_factor * mean arc
-target))`, unbounded when the factor is zero, plus the genomic floor when `use_genomic_floor`
-is on, an excluded volume radius per pair that grows with separation.
+target))`, unbounded when the factor is zero.
 
 **The heatmap frequency law**, `[distance] freq_dist_*`. Parity law, not read when the polymer law is on.
 

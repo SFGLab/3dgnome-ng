@@ -318,8 +318,6 @@ count_dist_shift = 8
 count_dist_base_level = 0.2
 
 [template]
-template_scale = 7.0
-dist_heatmap_scale = 15.0
 
 [motif_orientation]
 use_motif_orientation = no

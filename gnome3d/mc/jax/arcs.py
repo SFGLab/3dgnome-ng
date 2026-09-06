@@ -134,7 +134,7 @@ def dump_arcs_profile() -> None:
             )
 
 
-def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int, excl_mat: bool = False) -> Any:
+def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
     """Build (or look up cached) compiled arcs-MC kernel.
 
     Arcs MC differs from smooth in three ways:
@@ -145,13 +145,10 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int, excl_mat: bool = 
       3. **Convergence**: an additional `stop_when_ratio_above` clause
          (0.9999 in production) that exits early when improvement stalls.
 
-    Cache key: (n_steps_per_batch, excl_skip, excl_mat).  EV support is always wired
-    (excl_w=0 disables it at runtime, constant-folded by XLA).  `excl_mat` makes the EV
-    radius one (B, B) matrix per IB instead of a scalar, which is how the genomic floor
-    reaches the kernel; a zero entry skips the pair.  Static so the scalar path compiles
-    exactly as before.
+    Cache key: (n_steps_per_batch, excl_skip).  EV support is always wired
+    (excl_w=0 disables it at runtime, constant-folded by XLA).
     """
-    cache_key = ("arcs", n_steps_per_batch, excl_skip, excl_mat)
+    cache_key = ("arcs", n_steps_per_batch, excl_skip)
     # _kernel_cache is typed for the smooth case; arcs uses string-prefixed
     # tuple keys to share the same dict without collision.
     if cache_key in _kernel_cache:  # pyright: ignore[reportArgumentType]
@@ -205,12 +202,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int, excl_mat: bool = 
         idx = jnp.arange(n)
         # Exclude pad beads (idx >= n_active); no-op when unbucketed (n_active==n).
         in_range = jnp.logical_and(jnp.abs(idx - p) > excl_skip, idx < n_active)
-        if excl_mat:
-            r = r0[p]
-            rel = jnp.maximum(0.0, (r - d) / jnp.maximum(r, 1e-30))
-            in_range = jnp.logical_and(in_range, r > 0.0)
-        else:
-            rel = jnp.maximum(0.0, (r0 - d) / r0)
+        rel = jnp.maximum(0.0, (r0 - d) / r0)
         contrib = weight * rel * rel
         return jnp.sum(jnp.where(in_range, contrib, 0.0))
 
@@ -265,12 +257,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int, excl_mat: bool = 
             d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
             # Mask pad columns (idx >= n_active); zero the whole row if i is pad.
             in_range = jnp.logical_and(jnp.abs(idx - i) > excl_skip, idx < n_active)
-            if excl_mat:
-                r = r0[i]
-                rel = jnp.maximum(0.0, (r - d) / jnp.maximum(r, 1e-30))
-                in_range = jnp.logical_and(in_range, r > 0.0)
-            else:
-                rel = jnp.maximum(0.0, (r0 - d) / r0)
+            rel = jnp.maximum(0.0, (r0 - d) / r0)
             contrib = weight * rel * rel
             row = jnp.where(i < n_active, jnp.sum(jnp.where(in_range, contrib, 0.0)), 0.0)
             return carry + row, None
@@ -844,25 +831,15 @@ def _prep_arcs_problem_np(
     exp_dist_mat: np.ndarray[Any, Any],
     settings: "Settings",
     B: int,
-    floor_mat: np.ndarray[Any, Any] | None = None,
 ) -> dict[str, Any]:
     """One IB's arcs kernel inputs as numpy, padded to bucket B.  Pure numpy
     mirror of the per-problem prep in `mc_arcs_jax` (per-IB excl radius +
     confinement envelope); pad beads are inert (exp_mat=0 rows/cols, n_active
-    masks EV/confine).
-
-    With `floor_mat` the EV radius becomes that (n, n) matrix padded to (B, B), and the
-    arcless entries of the arcs matrix are zeroed so those pairs carry the floor alone."""
+    masks EV/confine)."""
     n = int(pos.shape[0])
-    if floor_mat is not None:
-        exp_dist_mat = np.where(np.asarray(exp_dist_mat) < 0.0, 0.0, np.asarray(exp_dist_mat))
     use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
     excl_r0: Any = 1.0
-    if floor_mat is not None:
-        fp = np.zeros((B, B), dtype=np.float32)
-        fp[:n, :n] = np.asarray(floor_mat, dtype=np.float32)
-        excl_r0 = fp
-    elif use_excl:
+    if use_excl:
         excl_r0 = float(settings.exclusion_radius_arcs)
         if excl_r0 <= 0.0:
             mask = np.asarray(exp_dist_mat) > 1e-6
@@ -957,7 +934,6 @@ def mc_arcs_jax_batch(
     problems: list[dict[str, Any]],
     settings: "Settings",
     max_iters: int | None = None,
-    start_temp: float | None = None,
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     """Anneal K *different* IBs' anchors in one vmapped kernel (region batching).
 
@@ -981,7 +957,7 @@ def mc_arcs_jax_batch(
     )
     max_k, basis = _resolve_arcs_max_k(big_b, settings)
     if len(problems) <= max_k:
-        return _mc_arcs_jax_batch_chunk(problems, settings, max_iters, start_temp=start_temp)
+        return _mc_arcs_jax_batch_chunk(problems, settings, max_iters)
     LOG.debug(
         "region-batch[arcs]: %d IBs > max_k=%d (%s) at B=%d; running %d sub-batches",
         len(problems),
@@ -999,7 +975,6 @@ def mc_arcs_jax_batch(
                 settings,
                 max_iters,
                 f", chunk {ci}/{n_chunks}",
-                start_temp=start_temp,
             )
         )
     return out
@@ -1010,7 +985,6 @@ def _mc_arcs_jax_batch_chunk(
     settings: "Settings",
     max_iters: int | None = None,
     chunk_tag: str = "",
-    start_temp: float | None = None,
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
     """One vmapped arcs kernel launch for up to max_k IBs.  `max_iters` caps the
     outer round budget (``None`` => 10000); used by the polish to bound an outlier."""
@@ -1028,13 +1002,7 @@ def _mc_arcs_jax_batch_chunk(
         (jax_bucket_for(int(p["pos"].shape[0])) if bucket else int(p["pos"].shape[0]))
         for p in problems
     )
-    use_mat = any(p.get("floor_mat") is not None for p in problems)
-    if use_mat and not all(p.get("floor_mat") is not None for p in problems):
-        raise ValueError("arcs batch mixes problems with and without a genomic floor")
-    preps = [
-        _prep_arcs_problem_np(p["pos"], p["exp_dist"], settings, B, p.get("floor_mat"))
-        for p in problems
-    ]
+    preps = [_prep_arcs_problem_np(p["pos"], p["exp_dist"], settings, B) for p in problems]
 
     def stack(key: str) -> Any:
         return jnp.asarray(np.stack([pr[key] for pr in preps], axis=0))
@@ -1042,11 +1010,7 @@ def _mc_arcs_jax_batch_chunk(
     pos_k = stack("pos")  # (K, B, 3)
     exp_k = stack("exp_mat")  # (K, B, B)
     n_active_k = jnp.asarray(np.array([pr["n_active"] for pr in preps], dtype=np.int32))
-    excl_r0_k = (
-        jnp.asarray(np.stack([pr["excl_r0"] for pr in preps], axis=0))
-        if use_mat
-        else jnp.asarray(np.array([pr["excl_r0"] for pr in preps], dtype=np.float32))
-    )
+    excl_r0_k = jnp.asarray(np.array([pr["excl_r0"] for pr in preps], dtype=np.float32))
     conf_cx_k = jnp.asarray(np.array([pr["conf_cx"] for pr in preps], dtype=np.float32))
     conf_cy_k = jnp.asarray(np.array([pr["conf_cy"] for pr in preps], dtype=np.float32))
     conf_cz_k = jnp.asarray(np.array([pr["conf_cz"] for pr in preps], dtype=np.float32))
@@ -1059,20 +1023,14 @@ def _mc_arcs_jax_batch_chunk(
     # shared schedule / weights
     excl_skip = int(settings.exclusion_skip_neighbors)
     n_steps_per_batch = int(settings.mc_stop_steps)
-    use_excl = use_mat or (
-        bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
-    )
+    use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
     use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_arcs)
-    excl_w_v = (
-        float(settings.genomic_floor_weight)
-        if use_mat
-        else (float(settings.exclusion_weight) if use_excl else 0.0)
-    )
+    excl_w_v = float(settings.exclusion_weight) if use_excl else 0.0
     conf_w_v = float(settings.confinement_weight) if use_conf else 0.0
     stretch_v = float(settings.spring_stretch_arcs)
     squeeze_v = float(settings.spring_squeeze_arcs)
 
-    bundle = _build_arcs_kernel(n_steps_per_batch, excl_skip, use_mat)
+    bundle = _build_arcs_kernel(n_steps_per_batch, excl_skip)
     _kf, init_arcs, init_excl, init_confine, kernel_full_mp = bundle
 
     # per-IB initial scores (reuse the validated init helpers)
@@ -1117,7 +1075,7 @@ def _mc_arcs_jax_batch_chunk(
         ss_k,
         se_k,
         sc_k,
-        jnp.float32(settings.max_temp if start_temp is None else start_temp),
+        jnp.float32(settings.max_temp),
         exp_k,
         step_size_k,
         jnp.float32(settings.dt_temp),

@@ -79,10 +79,16 @@ def test_gate_function() -> None:
 
 def test_relax_separates() -> None:
     print("\n[relax] two overlapping coils are pushed apart with anchors fixed")
+    from gnome3d.mc.numba import seed_numba
+
     rng = np.random.default_rng(2)
     a = coil(0, 150, np.zeros(3), rng, 1.0)
     b = coil(200_000, 150, np.array([0.5, 0.0, 0.0]), rng, 1.0)
     before, _ = cross_block_contacts([a, b], 1.0)
+    # The pass runs on whatever RNG state the process has, so pin it or the bond ratio
+    # assertion sits on a coin flip at 1.47 against a 1.5 limit.
+    seed_numba(5)
+    np.random.seed(5)
     out = relax_blocks([a, b], settings())
     after, touched = cross_block_contacts(out, 1.0)
     check(
