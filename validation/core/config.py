@@ -163,7 +163,15 @@ CANONICAL: dict[str, dict[str, object]] = {
     "boundary_stitch": {"use_boundary_stitch": "yes"},
     # Excluded volume across blocks, so the stitched globules cannot interpenetrate. Without it
     # nothing acts between the beads of two blocks once the stitch has moved them together.
-    "relax": {"use_cross_block_relax": "yes"},
+    "relax": {
+        "use_cross_block_relax": "yes",
+        # Only the beads touching another block move, plus one chain neighbour either side.
+        # With every subanchor movable the pass took an hour and fifty five minutes per
+        # structure on a trio chr1 whatever the workload, and the last trio array timed out at
+        # 24 hours on it. Replayed on the same chromosome a window of one took 129 seconds and
+        # cut cross block contacts 31,637 to 362; a wider window only adds rounds.
+        "local_window": 1,
+    },
 }
 
 # Per-stage stop_condition_steps by quality. None or "full" keeps the canonical 50000.
