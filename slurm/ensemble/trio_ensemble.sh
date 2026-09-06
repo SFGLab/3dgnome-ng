@@ -2,9 +2,9 @@
 
 # Conformational ensembles for the nine trio samples, sharded chromosome first.
 #
-#   CHROMS=chr1 sbatch --array=0-17%6 slurm/ensemble/trio_ensemble.sh   # chr1, all nine samples
-#   sbatch --array=0-413%6 slurm/ensemble/trio_ensemble.sh              # whole genome
-#   SAMPLES=HG00512,HG00513,HG00514 sbatch --array=0-137%6 ...          # one trio, whole genome
+#   CHROMS=chr1 sbatch --array=0-8%6 slurm/ensemble/trio_ensemble.sh    # chr1, all nine samples
+#   sbatch --array=0-206%6 slurm/ensemble/trio_ensemble.sh              # whole genome
+#   SAMPLES=HG00512,HG00513,HG00514 sbatch --array=0-68%6 ...           # one trio, whole genome
 #
 # One array task is one chromosome by one sample by a block of PER_TASK conformations. The
 # chromosome is the slowest varying dimension, so the first 9*CHUNKS tasks cover one chromosome
@@ -14,9 +14,9 @@
 # The mapping lives in playground/trio/trio_samples.py::shard rather than here, so this script and
 # playground/trio/trio_status.py cannot disagree about which index means what.
 #
-# Array size. Nine samples by 23 chromosomes by 2 chunks is 414 tasks, inside Slurm's default
-# MaxArraySize of 1001. Check with `scontrol show config | grep MaxArraySize`. Raising N_MODELS
-# multiplies this, so at 100 models it is 2070 and needs one chromosome at a time instead.
+# Array size. Nine samples by 23 chromosomes by 1 chunk of 10 is 207 tasks, inside Slurm's
+# default MaxArraySize of 1001. Check with `scontrol show config | grep MaxArraySize`. Raising
+# N_MODELS multiplies this, so at 100 models it is 2070 and needs one chromosome at a time.
 #
 # Resuming. A member whose .cif already exists is skipped by gnome3d-ng, and a task whose whole
 # block is already present exits before requesting any GPU work. So a cancelled array, a dead
@@ -39,7 +39,7 @@
 #
 # --time on the command line overrides the directive above, so the file needs no edit.
 
-#SBATCH --job-name=trio_ens
+#SBATCH --job-name=trio_poly
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 # A dgx node is 128 cores and 8 A100s, so 16 cores per GPU task still fits eight tasks on a
@@ -75,13 +75,15 @@ fi
   echo "[error] submit from the repo root, or pass ROOT=/path/to/3dgnome-ng" >&2
   exit 1
 }
-# `out/trio` holds the superseded TAD-block ensembles. Arc-gap output goes elsewhere: a member
-# whose cif exists is skipped, so writing here would take the old structures as done and leave a
-# tree mixing two block definitions with no way to tell which is which.
-OUT="${OUT:-$ROOT/out/trio_arcs}"
-# Arc-gap conformations cost several times their TAD equivalents, about 18 GPU-hours for a
-# genome, and nine samples multiply it. 20 matches the cell line arm.
-N_MODELS="${N_MODELS:-20}"
+# Two older trees are kept and must not be written into. `out/trio` holds the TAD-block
+# ensembles and `out/trio_arcs` the arc-gap ensembles built under the reference's distance
+# laws. A member whose cif exists is skipped, so writing into either would take old structures
+# as done and leave a tree mixing energies with no way to tell which is which. This tree is the
+# polymer law, 2026-09-06 onward.
+OUT="${OUT:-$ROOT/out/trio_polymer}"
+# Ten conformations per sample. The arcs stage is solved rather than annealed now, so a
+# conformation is cheaper than the 20-model runs were, and ten is what the analyses need.
+N_MODELS="${N_MODELS:-10}"
 PER_TASK="${PER_TASK:-10}"
 CHROMS="${CHROMS:-}"
 SAMPLES="${SAMPLES:-}"
