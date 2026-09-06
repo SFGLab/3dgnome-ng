@@ -631,9 +631,34 @@ and that it fell back to 0.285. Three keys replace eighteen. Flag off is byte ex
 What it retires if it holds: A, D and G, and the fifteen constants. What it does not touch: B,
 C and E, which act on block placement and on subanchors and are unchanged.
 
-The gate is the battery against production on GM12878, H1ESC and HFFC6, HFFC6 being the one
-whose own exponent the old constant was furthest from, then the trio. The contact radius in the
-battery is bead relative now so the arms compare across units.
+Measured 2026-09-06, chr1:1-60 Mb, five structures per arm, contact maps read raw so the three
+cells sit on one footing. Raw numbers compare the two arms of one cell with each other and not
+with the balanced tables above. Overlap columns are each structure on its own radii.
+
+| cell | arm | Pearson | Spearman | SCC | MultiMM | exponent | measured nu | wb-aa | wb-sa | xb |
+|---|---|---|---|---|---|---|---|---|---|---|
+| GM12878 | production | 0.433 | 0.324 | 0.202 | 0.353 | 0.249 | | 90.2 | 3424 | 2734 |
+| GM12878 | polymer | 0.487 | 0.342 | 0.215 | 0.335 | 0.388 | 0.272 | 1.6 | 1478 | 286 |
+| H1ESC | production | 0.161 | 0.118 | 0.027 | 0.072 | 0.163 | | 122.2 | 3675 | 4731 |
+| H1ESC | polymer | 0.251 | 0.173 | 0.037 | 0.073 | 0.385 | 0.299 | 4.6 | 1635 | 504 |
+| HFFC6 | production | 0.239 | 0.166 | 0.096 | 0.211 | 0.165 | | 102.3 | 2774 | 3004 |
+| HFFC6 | polymer | 0.275 | 0.178 | 0.123 | 0.208 | 0.293 | 0.197 | 3.7 | 1655 | 794 |
+
+On every cell Pearson, Spearman and SCC rise and MultiMM is level, the worst change being
+0.018 down on GM12878. Anchor overlaps fall 96 to 98 percent, subanchor overlaps halve, cross
+block overlaps fall four to ten times. HFFC6, whose own exponent is furthest from the old
+constant, gains the most on SCC, 0.096 to 0.123.
+
+Two things learned in the measuring. The battery had pinned its overlap radii from the first
+arm, which is right within one model unit and wrong across two: the polymer law's bead is 0.62
+of the old chain law's bond, so the polymer arm's subanchor overlaps were scored at its whole
+bond and reported as rising when they had halved. Each structure now scores on its own radii.
+And the realised exponent runs 1.3 to 1.5 times the input on every cell, 0.388 against 0.272,
+0.385 against 0.299, 0.293 against 0.197, so HFFC6 lands on 0.285 by coincidence. The
+arcs, the confinement and the excluded volume steepen what the background asks for, by a
+factor that looks the same across cells, which a single correction on the background exponent
+would absorb. Not built. It does not gate adoption, since every Hi-C measure already holds
+without it.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 

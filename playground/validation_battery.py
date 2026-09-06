@@ -140,10 +140,12 @@ def overlaps(
     `exclusion_skip_neighbors` skips, and closer than its block's radius. A cross block pair
     uses the mean of its two blocks' radii.
 
-    The radii are passed in rather than derived per structure, and every arm is scored on one
-    set, because they are derived from the chain bond and a structure that expands would
-    otherwise be measured with a wider net. Measured on a real chromosome that is worth 4.8
-    percent on the anchor column, against a true change of zero.
+    Radii are the structure's own, `ev_factor` times its own block bonds. Pinning one set across
+    arms was tried and is wrong whenever arms differ in model unit: the polymer law's bead is
+    about two thirds of the old chain law's, and pinned radii scored its subanchor overlaps at
+    its whole bond instead of 0.7 of it, reporting a rise where there was a halving. Within one
+    unit a pinned set removes a 4.8 percent drift from expansion; across units it inverts the
+    answer, and the second failure is the worse one.
 
     Parameters
     ----------
@@ -224,8 +226,7 @@ def main() -> None:
         f"observed Hi-C {region} at {binsize:,} bp: {c_obs.shape[0]} bins"
         f"{'' if balance else ', raw counts, not comparable with a balanced run'}\n"
     )
-    rad: np.ndarray | None = None  # the first arm's first structure sets it for every arm
-    contact_r: float = 0.0  # likewise, in bead units, since arms may differ in model unit
+    contact_r: float = 0.0  # in bead units of each structure, since arms may differ in model unit
     print(
         f"  {'arm':>10s} {'n':>3s} {'pearson':>9s} {'spearman':>9s} {'SCC':>8s} "
         f"{'multimm':>9s} {'exponent':>9s} {'vs Hi-C':>8s} {'Rg':>8s} "
@@ -242,9 +243,8 @@ def main() -> None:
         for c in cifs:
             p, m, bmid, anchor = load(c)
             owner = block_owner(bmid, anchor, target_bp)
-            if rad is None:
-                rad = ev_factor * block_bonds(p, owner)
-                contact_r = CONTACT_BEADS * float(np.median(np.linalg.norm(np.diff(p, axis=0), axis=1)))
+            rad = ev_factor * block_bonds(p, owner)
+            contact_r = CONTACT_BEADS * float(np.median(np.linalg.norm(np.diff(p, axis=0), axis=1)))
             coords.append(p)
             mids = m
             r = hic_correlation(
@@ -271,7 +271,7 @@ def main() -> None:
     print(f"\n  exponent target is {NU_HIC} from the cell lines' own contact probability curves;")
     print("  the project's structures have measured flatter than that, so higher is better here.")
     print(f"  the overlap columns count pairs closer than {ev_factor} of their block's mean chain")
-    print("  bond, per thousand beads, on radii the first arm sets for all of them. wb-aa is")
+    print("  bond, per thousand beads, each structure on its own radii. wb-aa is")
     print("  anchors inside one block, which only the arcs")
     print("  stage can move; wb-sa is the smooth stage's own excluded volume; xb is across two")
     print("  blocks, which the boundary stitch and the cross block relaxation own.")
