@@ -2,9 +2,9 @@
 
 # Conformational ensembles for the nine trio samples, sharded chromosome first.
 #
-#   CHROMS=chr1 sbatch --array=0-8%6 slurm/ensemble/trio_ensemble.sh    # chr1, all nine samples
-#   sbatch --array=0-206%6 slurm/ensemble/trio_ensemble.sh              # whole genome
-#   SAMPLES=HG00512,HG00513,HG00514 sbatch --array=0-68%6 ...           # one trio, whole genome
+#   CHROMS=chr1 sbatch --array=0-8%12 slurm/ensemble/trio_ensemble.sh    # chr1, all nine samples
+#   sbatch --array=0-206%12 slurm/ensemble/trio_ensemble.sh              # whole genome
+#   SAMPLES=HG00512,HG00513,HG00514 sbatch --array=0-68%12 ...           # one trio, whole genome
 #
 # One array task is one chromosome by one sample by a block of PER_TASK conformations. The
 # chromosome is the slowest varying dimension, so the first 9*CHUNKS tasks cover one chromosome
@@ -34,8 +34,8 @@
 # the limit unused on the small chromosomes. Since submission is per chromosome anyway, pass a
 # different PER_TASK and --time for each:
 #
-#   CHROMS=chr1  PER_TASK=10 sbatch --array=0-89%6 --time=24:00:00 ...
-#   CHROMS=chr21 PER_TASK=50 sbatch --array=0-17%6 --time=24:00:00 ...
+#   CHROMS=chr1  PER_TASK=10 sbatch --array=0-89%12 --time=24:00:00 ...
+#   CHROMS=chr21 PER_TASK=50 sbatch --array=0-17%12 --time=24:00:00 ...
 #
 # --time on the command line overrides the directive above, so the file needs no edit.
 
