@@ -555,14 +555,28 @@ read alone against three that fall.
 
 The expansion is the chain law's own exponent of 0.671 showing through, since the unified law
 rides it. `arc_target_background_exponent` puts the background on a chosen slope instead,
-anchored at the separation the chain law is calibrated for. Offline at the anchor level GM12878
-lands at 0.500 with the chain slope, 0.296 at 0.285 and 0.250 at 0.20, while the trio lands at
-0.278, 0.139 and 0.088, so the right slope is not the same for both. Arms at 0.285 and 0.20 are
-under measurement.
+anchored at the separation the chain law is calibrated for.
 
-What is still open. Whether one background slope serves every cell line, or whether it has to be
-calibrated per dataset the way `beta` is. And whether the exponent can be brought to target
-without giving the overlaps back, which the two arms will answer.
+| background slope | Pearson | Spearman | SCC | MultiMM | exponent | Rg | wb-aa | wb-sa | xb |
+|---|---|---|---|---|---|---|---|---|---|
+| production, no unified law | 0.405 | 0.321 | 0.109 | 0.331 | 0.249 | 32.9 | 89.2 | 3376 | 2680 |
+| 0.20 | 0.479 | 0.320 | 0.110 | 0.334 | 0.345 | 46.9 | 9.1 | 2255 | 640 |
+| 0.285 | 0.498 | 0.296 | 0.101 | 0.318 | 0.453 | 53.6 | 6.4 | 1690 | 284 |
+| the chain law, 0.671 | 0.499 | 0.206 | 0.082 | 0.256 | 0.688 | 147.0 | 0.9 | 474 | 16 |
+
+At 0.20 the law is a strict improvement. Pearson is up 18 percent, Spearman, SCC and MultiMM are
+all level with production, and anchor overlaps fall ten times. Above that the overlap count keeps
+falling and the three discriminating Hi-C measures start paying for it, so the slope trades
+overlap against contact fidelity and 0.20 is the point where the trade is free.
+
+The exponent crosses the target between production and 0.20, undershooting at 0.249 and
+overshooting at 0.345, and it is close to linear in the slope. Arms at 0.15 and 0.10 are
+measuring where it lands and whether the overlap fix survives that far down.
+
+What is still open. Whether one background slope serves every cell line or has to be calibrated
+per dataset the way `beta` is. Offline at the anchor level GM12878 and the trio want different
+values, 0.500 against 0.278 under the chain slope. And whether the exponent hitting target
+matters more than the three Hi-C measures, which at 0.20 are already at parity.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
