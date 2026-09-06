@@ -723,7 +723,43 @@ bond shrinks with them, so a threshold of 0.7 bonds catches pairs sitting at the
 background. Decomposed on the weight 0.1 arm, 91 percent of the counted pairs have a target
 within one bond of touching and sit at it, against 94 percent of production's far fewer; pairs
 crushed below 0.7 of their own target went from 4 to 71 across the eight blocks, a real and
-small cost. Weight 0.1 at 100 kb goes to the battery.
+small cost. Weight 0.1 at 100 kb went to the battery, chr1:1-60 Mb, five structures per arm, raw maps,
+against the polymer arms of 2026-09-06:
+
+| cell | arm | Pearson | Spearman | SCC | MultiMM | 20 to 100 kb | 100 kb to 1 Mb | Rg |
+|---|---|---|---|---|---|---|---|---|
+| GM12878 | polymer | 0.462 | 0.316 | 0.191 | 0.335 | -0.228 | 0.431 | 31.5 |
+| GM12878 | short range | 0.471 | 0.314 | 0.221 | 0.305 | 0.171 | 0.473 | 26.2 |
+| H1ESC | polymer | 0.258 | 0.181 | 0.033 | 0.073 | -0.008 | 0.442 | 33.6 |
+| H1ESC | short range | 0.244 | 0.162 | 0.040 | 0.071 | 0.102 | 0.517 | 27.8 |
+| HFFC6 | polymer | 0.267 | 0.175 | 0.113 | 0.208 | 0.051 | 0.343 | 26.2 |
+| HFFC6 | short range | 0.269 | 0.174 | 0.104 | 0.213 | 0.135 | 0.340 | 24.1 |
+
+The short band improves on every cell and lands at about a third of the input, not on it. Hi-C
+is mixed: GM12878 SCC up 16 percent and Pearson up with MultiMM down 9, H1ESC Pearson and
+Spearman down 5 to 10 percent, HFFC6 level throughout. Not adopted. Kept opt in and off, since
+what it did and did not do is now separable.
+
+Decomposed on the same structures, anchors alone against all beads over 20 to 100 kb, and the
+subanchor chain between consecutive anchors:
+
+| cell | arm | beads | anchors | subanchor bond over target | chain end to end over background |
+|---|---|---|---|---|---|
+| GM12878 | polymer | 0.197 | 0.159 | 1.16 | 1.63 |
+| GM12878 | short range | 0.307 | 0.356 | 1.15 | 1.13 |
+| H1ESC | polymer | 0.090 | 0.133 | 1.40 | 1.55 |
+| H1ESC | short range | 0.159 | 0.323 | 1.40 | 1.12 |
+| HFFC6 | polymer | 0.096 | 0.140 | 1.35 | 1.60 |
+| HFFC6 | short range | 0.111 | 0.312 | 1.35 | 1.20 |
+
+Anchors alone are on the input on every cell. The subanchor runs between anchor pairs, which
+ended 60 percent further apart than the background, now sit at it. The one number the term did
+not move is the subanchor bond itself, realised 16 to 40 percent longer than its one bead
+target, set in the smooth stage. A chain of stretched bonds whose ends are pinned at the
+background folds back on itself, which is the flat bead level band, and the stretch tracks the
+band across cells: GM12878, stretched least, is the cell whose beads came out on target. The
+next lever is therefore in the smooth stage, the chain spring against the excluded volume and
+the subanchor heat term, and it needs its own measurement.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
