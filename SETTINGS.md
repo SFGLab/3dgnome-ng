@@ -371,7 +371,7 @@ other while the arcs and the stitch are kept.
 
 ## [compartments]
 
-A/B compartment terms ported from MultiMM, written shifted and non negative so the Metropolis
+A/B compartment terms ported from MultiMM [7], written shifted and non negative so the Metropolis
 ratio stays defined, and divided by `N - 1` so a weight tuned on a small region holds on a large
 one. Needs `[data] compartments` and `phasing_track`, and excluded volume or confinement
 alongside since the terms are attractive.
@@ -394,7 +394,7 @@ alongside since the terms are attractive.
 
 ## [accessibility]
 
-The HiP-HoP mechanisms driven from one accessibility track. Bridging is an effective pairwise
+The HiP-HoP mechanisms [6] driven from one accessibility track. Bridging is an effective pairwise
 attraction between open beads. Fibre compaction shortens the chain bond where the bead is
 closed.
 
@@ -418,7 +418,7 @@ closed.
 
 ## [nucleus]
 
-Whole nucleus terms from MultiMM. They run in the segment level heatmap MC only, since that is
+Whole nucleus terms from MultiMM [7]. They run in the segment level heatmap MC only, since that is
 the one call that spans the whole active region.
 
 | key | type | default | what it does |
@@ -433,12 +433,6 @@ the one call that spans the whole active region.
 | `radius` | float | 0.0 | Outer nuclear radius, 0 derives it. |
 | `packing_factor` | float | 1.0 | The derived outer radius is this times the mean bond scale times the cube root of the bead count. |
 | `inner_fraction` | float | 0.2 | The inner radius is the outer one times the cube root of this. |
-
-## Not settings
-
-`[small_ib_boost]` appears in the generated configs with `use_small_ib_boost = no`. Nothing
-reads it and the feature is not implemented. `[cuda]` in the reference implementation's config
-is its binary's own and is ignored.
 
 ## References
 
@@ -462,3 +456,6 @@ is its binary's own and is ignored.
 6. Buckle A, Brackley CA, Boyle S, Marenduzzo D, Gilbert N. Polymer Simulations of Heteromorphic
    Chromatin Predict the 3D Folding of Complex Genomic Loci. Molecular Cell 72, 786 to 797
    (2018). doi:10.1016/j.molcel.2018.09.016
+7. Korsak S, Banecki K, Plewczynski D. Multiscale molecular modeling of chromatin with MultiMM:
+   From nucleosomes to the whole genome. Computational and Structural Biotechnology Journal 23,
+   3537 to 3548 (2024). doi:10.1016/j.csbj.2024.09.025
