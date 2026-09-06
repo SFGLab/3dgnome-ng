@@ -48,6 +48,7 @@ Rules for new feature work:
 ├── data/                       # Input datasets (GM12878, H1ESC, HFFC6). _hic holds 4DN mcools
 ├── docs/                       # Local-only notes, gitignored and not part of the repo
 ├── pyproject.toml              # gnome3d-torch, [validation] extra for the validation package
+├── SETTINGS.md                 # Every config key, default, production value and meaning
 └── AGENTS.md                   # This file
 ```
 

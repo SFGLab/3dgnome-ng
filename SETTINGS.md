@@ -85,9 +85,10 @@ a choice of this project.
 In plain terms. Start from where two loci would sit anyway, given how much DNA lies between
 them and nothing holding them together. Call that the background. Then, if a loop joins them,
 pull them in from the background, more for a loop seen more often, but never closer than
-touching. Two loci 50 kb apart sit at about 7 units with no loop between them. With the
-strongest possible loop they are pulled to 0.45 of that, about 3.2 units, which is two beads
-side by side. A loop seen a few times lands in between. The rope sets how far apart two points
+touching. Under the production values two loci 50 kb apart sit at about 10 units with no loop
+between them. With the strongest possible loop they are pulled to 0.45 of that, about 4.7
+units, a few beads apart and well clear of sitting inside each other. A loop seen a few times
+lands in between. The rope sets how far apart two points
 can be, a loop is a clip that draws them together, and two beads cannot pass through each
 other. The same background sets the bond between neighbouring anchors with no loop, so
 everything in the block is measured on one scale.
