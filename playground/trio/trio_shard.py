@@ -16,7 +16,7 @@ import trio_samples  # noqa: E402
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--task", type=int, required=True)
-    ap.add_argument("--n-models", type=int, default=100)
+    ap.add_argument("--n-models", type=int, default=10)
     ap.add_argument("--per-task", type=int, default=10)
     ap.add_argument("--chroms", default="")
     ap.add_argument("--samples", default="")
