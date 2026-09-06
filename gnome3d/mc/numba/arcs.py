@@ -81,7 +81,8 @@ def mc_arcs_numba(
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
     movable: I64Array = np.arange(n, dtype=np.int64)
-    score_struct = float(init_arcs_nb(pw, exp64, stretch_k, squeeze_k, rep_inv_cutoff))
+    bg_weight = float(settings.background_weight)
+    score_struct = float(init_arcs_nb(pw, exp64, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight))
     excl_w = float(settings.exclusion_weight)
     excl_skip = int(settings.exclusion_skip_neighbors)
     if use_excl:
@@ -112,6 +113,7 @@ def mc_arcs_numba(
         ang_w=1.0,
         struct_delta_factor=1.0,
         rep_inv_cutoff=rep_inv_cutoff,
+        bg_weight=bg_weight,
         use_heat=False,
         heat_dist=dummy_f64(),
         heat_weight=0.0,

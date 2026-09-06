@@ -165,6 +165,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         stretch_k: Any,
         squeeze_k: Any,
         rep_inv_cutoff: Any = 0.0,
+        bg_weight: Any = 0.0,
     ) -> Any:
         """Mirror of gnome3d.mc._local_arcs_nb, with bead p virtually at p_pos.
         Three branches per i:
@@ -179,13 +180,18 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         e = exp_mat[:, p]
         idx = jnp.arange(n)
         not_self = idx != p
-        is_repulse = jnp.logical_and(not_self, e < 0.0)
+        is_background = jnp.logical_and(not_self, e <= -0.75)
+        is_repulse = jnp.logical_and(not_self, jnp.logical_and(e > -0.75, e < 0.0))
         is_spring = jnp.logical_and(not_self, e >= 1e-6)
 
         d_safe = jnp.maximum(d, 1e-10)
         rep = jnp.maximum(
             0.0, 1.0 / d_safe - rep_inv_cutoff
         )  # truncate 1/d at cutoff (0 => unbounded)
+        bg = jnp.maximum(-e, 1e-6)
+        bgs = bg_weight * ((d - bg) / jnp.minimum(d_safe, bg)) ** 2  # log symmetric spring
+        rep = jnp.where(is_background, bgs, rep)
+        is_repulse = jnp.logical_or(is_repulse, is_background)
 
         e_safe = jnp.maximum(e, 1e-6)
         rel = (d - e_safe) / e_safe
@@ -217,7 +223,12 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         return jnp.where(r > R, contrib, 0.0)
 
     def _init_arcs(
-        pos: Any, exp_mat: Any, stretch_k: Any, squeeze_k: Any, rep_inv_cutoff: Any = 0.0
+        pos: Any,
+        exp_mat: Any,
+        stretch_k: Any,
+        squeeze_k: Any,
+        rep_inv_cutoff: Any = 0.0,
+        bg_weight: Any = 0.0,
     ) -> Any:
         """O(N^2) init via row-at-a-time scan, summing only upper triangle
         (i < j) to match gnome3d.mc._init_arcs_nb."""
@@ -230,13 +241,18 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             e = exp_mat[:, i]
             above = idx > i
             # Match numba: skip e in (-1e-10, 1e-6).
-            is_repulse = jnp.logical_and(above, e <= -1e-10)
+            is_background = jnp.logical_and(above, e <= -0.75)
+            is_repulse = jnp.logical_and(above, jnp.logical_and(e > -0.75, e <= -1e-10))
             is_spring = jnp.logical_and(above, e >= 1e-6)
 
             d_safe = jnp.maximum(d, 1e-10)
             rep = jnp.maximum(
                 0.0, 1.0 / d_safe - rep_inv_cutoff
             )  # truncate 1/d at cutoff (0 => unbounded)
+            bg = jnp.maximum(-e, 1e-6)
+            bgs = bg_weight * ((d - bg) / jnp.minimum(d_safe, bg)) ** 2  # log symmetric spring
+            rep = jnp.where(is_background, bgs, rep)
+            is_repulse = jnp.logical_or(is_repulse, is_background)
             e_safe = jnp.maximum(e, 1e-6)
             rel = (d - e_safe) / e_safe
             k = jnp.where(rel >= 0, stretch_k, squeeze_k)
@@ -299,6 +315,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         key: Any,
         n_active: Any,
         rep_inv_cutoff: Any,
+        bg_weight: Any,
     ) -> Any:
         k_p, k_d, k_a = jax.random.split(key, 3)
         # Arcs: all real beads movable (mc.py uses np.arange(n)).  Under bucketing
@@ -325,10 +342,10 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             new_p = old_p + delta
 
             loc_s_prev = _local_arcs_at(
-                pos, old_p, p, exp_mat, stretch_k, squeeze_k, rep_inv_cutoff
+                pos, old_p, p, exp_mat, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight
             )
             loc_s_curr = _local_arcs_at(
-                pos, new_p, p, exp_mat, stretch_k, squeeze_k, rep_inv_cutoff
+                pos, new_p, p, exp_mat, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight
             )
             # struct_delta_factor = 1 for arcs (single-counted)
             ss_new = ss + (loc_s_curr - loc_s_prev)
@@ -387,6 +404,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         0,  # key
         None,  # n_active (shared)
         None,  # rep_inv_cutoff (shared per-IB)
+        None,  # bg_weight (shared)
     )
     out_axes = (0, 0, 0, 0, None, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
@@ -421,6 +439,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         stop_when_ratio_above: Any,
         n_active: Any,
         rep_inv_cutoff: Any,
+        bg_weight: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -455,6 +474,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
                 keys,
                 n_active,
                 rep_inv_cutoff,
+                bg_weight,
             )
             score_per_chain = ss + se + sc
             best_idx = jnp.argmin(score_per_chain)
@@ -517,6 +537,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         0,  # key (per-chain)
         0,  # n_active (per-IB)
         0,  # rep_inv_cutoff (per-IB)
+        None,  # bg_weight (shared)
     )
     batched_mp = jax.vmap(chain_batch, in_axes=in_axes_mp, out_axes=out_axes)
 
@@ -548,6 +569,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         stop_when_ratio_above: Any,
         n_active: Any,
         rep_inv_cutoff: Any,
+        bg_weight: Any,
         max_iters: Any,
     ) -> Any:
         K = pos_k.shape[0]
@@ -584,6 +606,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
                 keys,
                 n_active,
                 rep_inv_cutoff,
+                bg_weight,
             )
             # Freeze chains already converged (non-strict accept could worsen them).
             frozen = conv_prev
@@ -624,7 +647,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         pos_f, ss_f, se_f, sc_f, _T_f, _score_f, iter_f, _nok_f, converged_f, conv_iter_f = final
         return pos_f, ss_f, se_f, sc_f, iter_f, converged_f, conv_iter_f
 
-    init_arcs = jax.jit(jax.vmap(_init_arcs, in_axes=(0, None, None, None, None)))
+    init_arcs = jax.jit(jax.vmap(_init_arcs, in_axes=(0, None, None, None, None, None)))
     init_excl_arcs = jax.jit(jax.vmap(_init_excl, in_axes=(0, None, None, None)))
     init_confine_arcs = jax.jit(
         jax.vmap(_init_confine, in_axes=(0, None, None, None, None, None, None))
@@ -731,12 +754,14 @@ def mc_arcs_jax(
         if _rmean > 0.0:
             rep_inv_cutoff_v = 1.0 / (rep_factor * _rmean)
     rep_inv_cutoff_j = jnp.float32(rep_inv_cutoff_v)
+    bg_weight_j = jnp.float32(float(settings.background_weight))
     ss_k = init_arcs(
         pos_k,
         exp_mat_j,
         jnp.float32(stretch_k_v),
         jnp.float32(squeeze_k_v),
         rep_inv_cutoff_j,
+        bg_weight_j,
     )
     se_k = (
         init_excl(pos_k, jnp.float32(excl_r0), jnp.float32(excl_w_v), n_active_j)
@@ -805,6 +830,7 @@ def mc_arcs_jax(
         stop_when_ratio_above,
         n_active_j,
         rep_inv_cutoff_j,
+        bg_weight_j,
     )
 
     score_per_chain = np.asarray(ss_k + se_k + sc_k)
@@ -1019,6 +1045,7 @@ def _mc_arcs_jax_batch_chunk(
         np.array([pr["rep_inv_cutoff"] for pr in preps], dtype=np.float32)
     )
     step_size_k = jnp.asarray(np.array([float(p["step_size"]) for p in problems], dtype=np.float32))
+    bg_weight_j = jnp.float32(float(settings.background_weight))
 
     # shared schedule / weights
     excl_skip = int(settings.exclusion_skip_neighbors)
@@ -1038,7 +1065,12 @@ def _mc_arcs_jax_batch_chunk(
         p1 = pos_k[i : i + 1]  # (1, B, 3)
         na = jnp.int32(int(np.asarray(n_active_k[i])))
         ss = init_arcs(
-            p1, exp_k[i], jnp.float32(stretch_v), jnp.float32(squeeze_v), rep_inv_cutoff_k[i]
+            p1,
+            exp_k[i],
+            jnp.float32(stretch_v),
+            jnp.float32(squeeze_v),
+            rep_inv_cutoff_k[i],
+            bg_weight_j,
         )
         se = (
             init_excl(p1, excl_r0_k[i], jnp.float32(excl_w_v), na)
@@ -1097,6 +1129,7 @@ def _mc_arcs_jax_batch_chunk(
         jnp.float32(0.9999),
         n_active_k,
         rep_inv_cutoff_k,
+        bg_weight_j,
         jnp.int32(max_iters if max_iters is not None else 10000),
     )
 

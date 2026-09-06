@@ -636,6 +636,7 @@ def _local_arcs_nb(
     stretch_k: float,
     squeeze_k: float,
     rep_inv_cutoff: float = 0.0,
+    bg_weight: float = 0.0,
 ) -> float:
     n = pos.shape[0]
     sc = 0.0
@@ -647,7 +648,14 @@ def _local_arcs_nb(
         dy = pos[p, 1] - pos[i, 1]
         dz = pos[p, 2] - pos[i, 2]
         d = math.sqrt(dx * dx + dy * dy + dz * dz)
-        if e < 0.0:
+        if e <= -0.75:
+            # An arcless pair inside the short range: a weak spring at the background, minus
+            # e, symmetric in log distance so crushing it costs (bg / d)^2. A background is
+            # never under one bead, so the marker -0.5 below cannot be mistaken for one.
+            bg = -e
+            rel = (d - bg) / (d if d < bg and d > 1e-10 else bg)
+            sc += bg_weight * rel * rel
+        elif e < 0.0:
             sc += max(0.0, 1.0 / (d if d > 1e-10 else 1e-10) - rep_inv_cutoff)
         elif e >= 1e-6:
             rel = (d - e) / e
@@ -660,7 +668,12 @@ def _local_arcs_nb(
 # of millions of steps. The gradient only steers a proposal, so its own precision is not critical.
 @njit(cache=True, fastmath=True, nogil=True)
 def init_arcs_nb(
-    pos: F64Array, exp: F64Array, stretch_k: float, squeeze_k: float, rep_inv_cutoff: float = 0.0
+    pos: F64Array,
+    exp: F64Array,
+    stretch_k: float,
+    squeeze_k: float,
+    rep_inv_cutoff: float = 0.0,
+    bg_weight: float = 0.0,
 ) -> float:
     n = pos.shape[0]
     sc = 0.0
@@ -674,7 +687,11 @@ def init_arcs_nb(
             dy = pos[i, 1] - pos[j, 1]
             dz = pos[i, 2] - pos[j, 2]
             d = math.sqrt(dx * dx + dy * dy + dz * dz)
-            if e < 0.0:
+            if e <= -0.75:
+                bg = -e
+                rel = (d - bg) / (d if d < bg and d > 1e-10 else bg)
+                row_sc += bg_weight * rel * rel
+            elif e < 0.0:
                 row_sc += max(0.0, 1.0 / (d if d > 1e-10 else 1e-10) - rep_inv_cutoff)
             else:
                 rel = (d - e) / e
@@ -958,6 +975,7 @@ def batch_mc_nb(
     score_comp: float,
     score_brdg: float,
     rep_inv_cutoff: float = 0.0,
+    bg_weight: float = 0.0,
     # Cell grid for the excluded volume term. Off by default so every caller that does not
     # build one passes nothing new. See gnome3d/mc/numba/cells.py.
     use_cells: bool = False,
@@ -985,7 +1003,9 @@ def batch_mc_nb(
 
         # --- prev local scores ---
         if struct_type == STRUCT_ARCS:
-            loc_struct_prev = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff)
+            loc_struct_prev = _local_arcs_nb(
+                pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight
+            )
         elif struct_type == STRUCT_CHAIN:
             loc_struct_prev = local_smooth_nb(
                 pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w
@@ -1070,7 +1090,9 @@ def batch_mc_nb(
 
         # --- new local scores ---
         if struct_type == STRUCT_ARCS:
-            loc_struct_curr = _local_arcs_nb(pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff)
+            loc_struct_curr = _local_arcs_nb(
+                pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight
+            )
         elif struct_type == STRUCT_CHAIN:
             loc_struct_curr = local_smooth_nb(
                 pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w

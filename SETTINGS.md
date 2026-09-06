@@ -78,6 +78,8 @@ is too far and the squeeze constant when too close.
 | `angular_constant` | float | 0.1 | 0.1 | Smooth stage bend penalty, the cube of the angle between consecutive bonds. |
 | `stretch_constant_arcs` | float | 1.0 | 1.0 | Arcs stage, every target in the matrix, arcs and chain bonds alike. |
 | `squeeze_constant_arcs` | float | 1.0 | 1.0 | Arcs stage. |
+| `background_weight` | float | 0.0 | 0.0 | A weak spring holding an arcless anchor pair inside `background_range_bp` at the background for its separation, in the arcs stage. Zero is off and every other arcless pair keeps the repulsion. Opt in until the battery decides. |
+| `background_range_bp` | int | 100000 | 100000 | The separation under which an arcless pair is held at the background. Beyond it the pair keeps the repulsion, since a power law distance matrix cannot be embedded in three dimensions over every pair, only over a band. |
 | `use_arcs_chain_bonds` | bool | no | yes | Give every consecutive anchor pair with no arc a spring at the chain law of its gap, entered after the anchor heatmap scaling. |
 | `arcs_chain_bond_scale` | float | 1.0 | 1.5 | Multiplier on that bond's target. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
@@ -336,7 +338,9 @@ segments on the coarse map sits closer the more contacts they share.
 Precisely, with `s0` being `target_bp_per_subanchor` and `nu` the measured exponent.
 
 - No contact: `d = max(1, (s / s0) ^ nu)` for separation `s`. Mean spatial distance grows
-  with genomic separation as a power law [4, 5].
+  with genomic separation as a power law [4, 5]. In the arcs stage an arcless pair inside
+  `background_range_bp` can be held there by `background_weight`. Every other arcless pair feels
+  only the truncated repulsion.
 - A loop of strength `q`: `d = 1 + (background - 1) / (1 + q / q_half)`. `q` is the loop's PET
   count over the typical count at its span, fitted on the run's own arcs, which is observed
   over expected [8, 9]. A saturated loop sits at one bead, touching, as polymer loop models

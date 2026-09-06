@@ -695,8 +695,35 @@ which was the sign and was read as stability. Reverted the same day.
 
 What that leaves. The kink is real and its cause is known. A fix has to hold only the pairs
 that collapse, under about 100 kb, and leave the long range free to be set by the arcs and the
-polymer scale. That is a short range background, not an all pairs one, and it has not been
-tried.
+polymer scale. That is a short range background, not an all pairs one. It is built, opt in, as
+`[springs] background_weight` and `background_range_bp`, swept in
+`playground/short_range_sweep.py`, and the three cell battery decides.
+
+Swept on the same eight GM12878 blocks with the solver, measured input 0.272, production
+otherwise (chain bonds on at 1.5, cutoff 3.0):
+
+| weight | range | 20 to 100 kb | 100 kb to 1 Mb | arcs realised over target | background realised over target |
+|---|---|---|---|---|---|
+| off | | 0.099 | 0.381 | 1.39 | |
+| 0.03 | 50 kb | 0.567 | 0.420 | 1.25 | 1.36 |
+| 0.03 | 100 kb | 0.273 | 0.384 | 1.17 | 1.18 |
+| 0.10 | 100 kb | 0.313 | 0.414 | 1.15 | 1.10 |
+| 0.30 | 100 kb | 0.288 | 0.428 | 1.14 | 1.06 |
+| 1.00 | 100 kb | 0.285 | 0.431 | 1.12 | 1.03 |
+| 0.10 | 200 kb | 0.245 | 0.619 | 1.09 | 1.05 |
+
+The range is the whole answer. At 50 kb the short band overshoots, since the 20 to 100 kb band
+is only half held. At 200 kb the long band blows up to 0.62, which is the embedding strain
+appearing, the failure mode of the all pairs version. At 100 kb the short band lands on the
+input at every weight and the long band stays where production has it, and arcs are realised
+closer to their targets than without it. The weight hardly matters to the bands. The sweep's
+overlap column rises four to six times, and that column is not to be trusted across these
+arms: pairs under the bead spacing are held at one bead, touching, by design, and the block
+bond shrinks with them, so a threshold of 0.7 bonds catches pairs sitting at their own
+background. Decomposed on the weight 0.1 arm, 91 percent of the counted pairs have a target
+within one bond of touching and sit at it, against 94 percent of production's far fewer; pairs
+crushed below 0.7 of their own target went from 4 to 71 across the eight blocks, a real and
+small cost. Weight 0.1 at 100 kb goes to the battery.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 

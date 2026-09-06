@@ -435,8 +435,14 @@ def add_long_pet_to_segment_heatmap(
 
 
 def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int, int]]) -> F64Array:
-    """The arc target matrix for one active region. -1 marks an arcless pair, 0 the diagonal,
-    and an arc pair carries `Settings.arc_expected_distance` of its PET count and span.
+    """The arc target matrix for one active region.
+
+    An arc pair carries `Settings.arc_expected_distance` of its PET count and span, positive.
+    An arcless pair closer than `background_range_bp` carries minus the background for its
+    separation when `background_weight` is on, which the kernels score as a weak spring
+    symmetric in log distance. Every other arcless pair carries -0.5, which the kernels score
+    as the truncated repulsion. A background is never under one bead, so the sign and the
+    magnitude tell the two arcless kinds apart without a second matrix. The diagonal is 0.
 
     Parameters
     ----------
@@ -446,7 +452,14 @@ def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int,
         (i, j, score) per arc in active region indices.
     """
     n = len(mids)
-    mat: F64Array = np.full((n, n), -1.0, dtype=np.float64)
+    mat: F64Array = np.full((n, n), -0.5, dtype=np.float64)
+    if float(s.background_weight) > 0.0:
+        law = s.polymer_law()
+        m = np.asarray(mids, dtype=np.float64)
+        sep = np.abs(m[:, None] - m[None, :])
+        rng = float(s.background_range_bp)
+        for i, j in zip(*np.nonzero((sep > 0.0) & (sep < rng)), strict=True):
+            mat[i, j] = -law.background(int(sep[i, j]))
     np.fill_diagonal(mat, 0.0)
     for i, j, score in arcs:
         exp_d = s.arc_expected_distance(score, mids[j] - mids[i])

@@ -855,6 +855,17 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   reports the two band exponents from here on. Any future fix for the kink has to be short
   range only, holding pairs under about 100 kb and leaving the long range free.
 
+  **Built as that, opt in, under measurement: `[springs] background_weight` (0, off) and
+  `background_range_bp` (100000).** An arcless anchor pair inside the range carries minus the
+  background in the arcs matrix and the kernels score it as the log symmetric spring; every
+  other arcless pair carries `-0.5` and keeps the truncated repulsion. A background is never
+  under one bead, so sign and magnitude tell the two kinds apart without a second matrix. The
+  weight sits in every kernel beside the cutoff rather than replacing it, so weight zero is
+  byte exact against the previous commit. JAX matches numba on a matrix carrying both arcless
+  kinds, and the batched driver runs with the background on, both in
+  `harness/test_arc_matrix.py`. Swept in `playground/short_range_sweep.py`; the three cell
+  battery decides.
+
   Why not in the reference: the reference has the three laws and their constants. This is what
   they were standing in for.
 

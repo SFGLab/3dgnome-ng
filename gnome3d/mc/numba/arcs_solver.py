@@ -37,6 +37,7 @@ def arcs_energy_grad(
     stretch_k: float,
     squeeze_k: float,
     rep_inv_cutoff: float,
+    bg_weight: float,
     cx: float,
     cy: float,
     cz: float,
@@ -75,7 +76,20 @@ def arcs_energy_grad(
             dz = pos[i, 2] - pos[j, 2]
             d = np.sqrt(dx * dx + dy * dy + dz * dz)
             dd = d if d > 1e-10 else 1e-10
-            if e < 0.0:
+            if e <= -0.75:
+                bg = -e
+                if d < bg:
+                    rel = (dd - bg) / dd
+                    ei += 0.5 * rel * rel * bg_weight
+                    w = 2.0 * bg_weight * rel * bg / (dd * dd * dd)
+                else:
+                    rel = (d - bg) / bg
+                    ei += 0.5 * rel * rel * bg_weight
+                    w = 2.0 * bg_weight * rel / (bg * dd)
+                gi0 += w * dx
+                gi1 += w * dy
+                gi2 += w * dz
+            elif e < 0.0:
                 v = 1.0 / dd - rep_inv_cutoff
                 if v > 0.0:
                     ei += 0.5 * v
@@ -162,6 +176,7 @@ def solve_arcs(
         float(s.spring_stretch_arcs),
         float(s.spring_squeeze_arcs),
         rep_inv,
+        float(s.background_weight),
         cx,
         cy,
         cz,

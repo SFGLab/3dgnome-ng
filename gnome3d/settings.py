@@ -93,6 +93,8 @@ class Settings:
     spring_squeeze: float
     spring_angular: float
     spring_stretch_arcs: float
+    background_weight: float
+    background_range_bp: int
     spring_squeeze_arcs: float
     use_arcs_chain_bonds: bool
     arcs_chain_bond_scale: float
@@ -428,6 +430,13 @@ class Settings:
         self.spring_squeeze = 0.1
         self.spring_angular = 0.1
         self.spring_stretch_arcs = 1.0
+        # A weak spring holding an arcless anchor pair inside `background_range_bp` at the
+        # background for its separation, in the arcs stage, beside the repulsion that every
+        # other arcless pair keeps. Zero is off. The all pairs version lost the battery because a
+        # power law distance matrix at an exponent under a third cannot be embedded in three
+        # dimensions; a band of it can. See [[project_polymer_law]].
+        self.background_weight = 0.0
+        self.background_range_bp = 100_000
         self.spring_squeeze_arcs = 1.0
         # Chain bonds in the arcs MC. Consecutive anchors with no arc between them get a
         # spring at genomic_length_to_distance of their gap, so an island of anchors joined
@@ -841,6 +850,8 @@ class Settings:
         self.spring_stretch_arcs = getf(
             "springs", "stretch_constant_arcs", self.spring_stretch_arcs
         )
+        self.background_weight = getf("springs", "background_weight", self.background_weight)
+        self.background_range_bp = geti("springs", "background_range_bp", self.background_range_bp)
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs
         )
