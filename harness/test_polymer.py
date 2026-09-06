@@ -18,7 +18,14 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from gnome3d.polymer import FALLBACK_NU, fit_contact_exponent  # noqa: E402
+from gnome3d.polymer import (  # noqa: E402
+    FALLBACK_NU,
+    PolymerLaw,
+    fit_arc_strength,
+    fit_contact_exponent,
+)
+from gnome3d.settings import Settings  # noqa: E402
+from gnome3d.types import InteractionArc  # noqa: E402
 
 PASS: list[str] = []
 FAIL: list[str] = []
@@ -94,8 +101,133 @@ def test_reports_what_it_used() -> None:
     check("and the band it fitted on", f.lo < f.hi, f"{f.lo // 1000} kb to {f.hi // 1000} kb")
 
 
+def test_the_law() -> None:
+    """One law for every distance. Its unit is the bead, which is the distance at the
+    resolution the run declared, so the background at that separation is one by definition."""
+    print("\n[law] background, contact and heatmap distances in bead units")
+    law = PolymerLaw(nu=0.3, s0_bp=1000, q_half=1.0)
+    check("the background at the resolution is one bead", abs(law.background(1000) - 1.0) < 1e-12)
+    check("closer than a bead is still one bead", abs(law.background(10) - 1.0) < 1e-12)
+    check(
+        "ten times the separation is ten to the exponent further",
+        abs(law.background(10_000) - 10**0.3) < 1e-9,
+        f"{law.background(10_000):.4f}",
+    )
+    seps = [5_000, 50_000, 500_000]
+    slope = float(np.polyfit(np.log(seps), np.log([law.background(x) for x in seps]), 1)[0])
+    check("and the background carries the exponent exactly", abs(slope - 0.3) < 1e-9)
+
+    bg = law.background(100_000)
+    check("no contact sits on the background", abs(law.contact_distance(100_000, 0.0) - bg) < 1e-12)
+    check(
+        "a contact at half saturation sits halfway to touching",
+        abs(law.contact_distance(100_000, 1.0) - (1.0 + 0.5 * (bg - 1.0))) < 1e-9,
+    )
+    check(
+        "a saturated contact sits at touching, one bead",
+        abs(law.contact_distance(100_000, 1e9) - 1.0) < 1e-6,
+    )
+    ds = [law.contact_distance(100_000, q) for q in (0.0, 0.5, 1.0, 2.0, 8.0)]
+    check("more contact is always closer", all(a > b for a, b in zip(ds[:-1], ds[1:], strict=True)))
+    check("and never closer than one bead", min(ds) >= 1.0 - 1e-12)
+
+    check(
+        "the expected contact at a separation puts a heatmap pair on the background",
+        abs(law.heatmap_distance(0.02, 0.02, 100_000) - bg) < 1e-12,
+    )
+    check(
+        "twice the expected contact is two to the minus third closer",
+        abs(law.heatmap_distance(0.04, 0.02, 100_000) / bg - 2 ** (-1.0 / 3.0)) < 1e-9,
+    )
+    check(
+        "no contact in a heatmap cell is no target", law.heatmap_distance(0.0, 0.02, 100_000) == 0.0
+    )
+
+
+def arcs(seed: int, n: int, slope: float = -0.5) -> list[InteractionArc]:
+    """Arcs whose typical PET count falls as span to `slope`, with scatter."""
+    rng = np.random.default_rng(seed)
+    span = 10 ** rng.uniform(4.0, 6.0, n)
+    typical = 20.0 * (span / 1e4) ** slope
+    score = np.maximum(1, np.round(typical * rng.lognormal(0.0, 0.4, n))).astype(int)
+    out: list[InteractionArc] = []
+    for k in range(n):
+        st = int(rng.integers(1_000_000, 100_000_000))
+        out.append(
+            InteractionArc(0, 1, int(score[k]), genomic_start=st, genomic_end=st + int(span[k]))
+        )
+    return out
+
+
+def test_arc_strength() -> None:
+    """A loop's strength is its PET count over what a loop of its span typically has, which is
+    observed over expected read off the run's own arcs rather than a curve from another
+    dataset."""
+    print("\n[arcs] typical strength against span, from the run's own arcs")
+    f = fit_arc_strength(arcs(1, 5000))
+    check("the fit is accepted on enough arcs", f.ok, f.reason)
+    q10 = f.strength(20, 10_000)
+    q100 = f.strength(20, 100_000)
+    check(
+        "the same PET count is a stronger loop at a longer span",
+        q100 > q10 > 0.0,
+        f"{q10:.2f} at 10 kb, {q100:.2f} at 100 kb",
+    )
+    check(
+        "a typical arc has strength near one",
+        0.7 < f.strength(int(20 * (5.0) ** -0.5), 50_000) < 1.4,
+        f"{f.strength(int(20 * 5.0**-0.5), 50_000):.2f}",
+    )
+    few = fit_arc_strength(arcs(2, 20))
+    check(
+        "too few arcs is refused, and strength then follows the PET count alone",
+        not few.ok and few.strength(4, 50_000) > few.strength(2, 50_000),
+    )
+
+
+def test_settings_delegate_only_when_asked() -> None:
+    """Every existing distance call goes through the law when it is on and is untouched when it
+    is off. The off path is the parity path and must not move."""
+    print("\n[settings] the law is opt in and routes the existing calls")
+    base = Settings()
+    s = Settings()
+    check("off by default", s.use_polymer_law is False)
+    check("the exponent is measured unless pinned", s.polymer_exponent == 0.0)
+    check("half saturation defaults to one typical loop", s.contact_half_saturation == 1.0)
+    for sep in (1_000, 50_000, 2_000_000):
+        check(
+            f"flag off: chain law unchanged at {sep // 1000} kb",
+            s.genomic_length_to_distance(sep) == base.genomic_length_to_distance(sep),
+        )
+    check(
+        "flag off: arc target unchanged",
+        s.arc_expected_distance(4, 50_000) == base.arc_expected_distance(4, 50_000),
+    )
+    check(
+        "flag off: heatmap law unchanged",
+        s.freq_to_dist_heatmap(0.5) == base.freq_to_dist_heatmap(0.5),
+    )
+
+    s.use_polymer_law = True
+    s.polymer = PolymerLaw(nu=0.25, s0_bp=1000, q_half=1.0)
+    check(
+        "on: the chain law is the background", abs(s.genomic_length_to_distance(1000) - 1.0) < 1e-12
+    )
+    check(
+        "on: an arc target is a contact distance, closer than the background",
+        1.0 <= s.arc_expected_distance(4, 50_000) < s.polymer.background(50_000),
+    )
+    check(
+        "on: a stronger arc is closer",
+        s.arc_expected_distance(40, 50_000) < s.arc_expected_distance(4, 50_000),
+    )
+
+
 def main() -> int:
     print("polymer law checks")
+    test_the_law()
+    test_arc_strength()
+    test_settings_delegate_only_when_asked()
     test_recovers_a_known_slope()
     test_refuses_what_is_not_a_decay()
     test_band_follows_the_resolution()

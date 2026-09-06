@@ -4,13 +4,19 @@ Configuration for 3dgnome-ng.
 Mirrors Reference Settings class.  All defaults match Settings::init() in Settings.cpp.
 """
 
+from __future__ import annotations
+
 import configparser
 import difflib
 import os
 from collections.abc import Mapping
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from gnome3d import log
+
+if TYPE_CHECKING:
+    from gnome3d.polymer import PolymerLaw
 
 LOG = log.get("settings")
 
@@ -368,6 +374,10 @@ class Settings:
     # minimises the same energy directly, which on real blocks reaches the same minimum about
     # thirty six times faster with the ensemble spread slightly wider and the geometry matching.
     # The landscape is a funnel, so there is nothing for the stochastic search to escape.
+    use_polymer_law: bool
+    polymer_exponent: float
+    contact_half_saturation: float
+    polymer: PolymerLaw | None
     use_unified_arc_target: bool
     arc_target_pull: float
     arc_target_background_exponent: float
@@ -791,6 +801,14 @@ class Settings:
         # 4.0 and 135 over the same span range. Measured on a finished chromosome, 93 percent of
         # arc joined anchor pairs end up closer than a bead's own size as a result. See
         # [[project_unified_arc_target]].
+        # One law for every distance, in bead units, with its exponent read off the run's own
+        # contacts. Replaces the chain law, the PET law, the separation aware and unified arc
+        # targets and the heatmap frequency law when on, none of which is read then. The law
+        # object is attached by build_state once the data is loaded. See [[project_polymer_law]].
+        self.use_polymer_law = False
+        self.polymer_exponent = 0.0  # 0 measures it; a positive value pins it and documents that
+        self.contact_half_saturation = 1.0
+        self.polymer = None
         self.use_unified_arc_target = False
         self.arc_target_pull = 0.45
         # The chain law's own exponent is 0.671, far steeper than the 0.285 the contact
@@ -817,7 +835,7 @@ class Settings:
         return self._load_from_parser(cfg)
 
     @classmethod
-    def from_dict(cls, config: Mapping[str, Mapping[str, object]]) -> "Settings":
+    def from_dict(cls, config: Mapping[str, Mapping[str, object]]) -> Settings:
         """Build a Settings from a nested ``{section: {key: value}}`` mapping,
         mirroring the .ini layout — e.g.::
 
@@ -1376,6 +1394,11 @@ class Settings:
             "simulation_arcs", "stop_condition_ratio", self.mc_stop_ratio_arcs
         )
         self.arcs_force_bias = getf("simulation_arcs", "force_bias", self.arcs_force_bias)
+        self.use_polymer_law = getb("distance", "use_polymer_law", self.use_polymer_law)
+        self.polymer_exponent = getf("distance", "polymer_exponent", self.polymer_exponent)
+        self.contact_half_saturation = getf(
+            "distance", "contact_half_saturation", self.contact_half_saturation
+        )
         self.use_unified_arc_target = getb(
             "distance", "use_unified_arc_target", self.use_unified_arc_target
         )
@@ -1436,6 +1459,8 @@ class Settings:
     def genomic_length_to_distance(self, length_bp: int) -> float:
         from gnome3d.util import genomic_length_to_distance
 
+        if self.use_polymer_law and self.polymer is not None:
+            return self.polymer.background(length_bp)
         return genomic_length_to_distance(
             length_bp, self.genomic_dist_base, self.genomic_dist_scale, self.genomic_dist_power
         )
@@ -1491,6 +1516,8 @@ class Settings:
         """
         from gnome3d.util import arc_target_with_separation
 
+        if self.use_polymer_law and self.polymer is not None:
+            return self.polymer.arc_distance(score, sep_bp)
         if self.use_unified_arc_target:
             bg = self.arc_background_distance(sep_bp)
             lo = float(self.count_dist_base_level)

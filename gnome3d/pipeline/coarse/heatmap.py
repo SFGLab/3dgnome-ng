@@ -18,8 +18,9 @@ from typing import TYPE_CHECKING, TypeAlias
 import numpy as np
 
 if TYPE_CHECKING:
+    from gnome3d.polymer import PolymerLaw
     from gnome3d.settings import Settings
-    from gnome3d.types import ChrLevel, F64Array
+    from gnome3d.types import BoolArray, ChrLevel, F64Array
 
 # Accepts a freshly-built list-of-list heatmap or an ndarray; np.asarray unifies.
 Matrix: TypeAlias = "F64Array | list[list[float]]"
@@ -85,8 +86,31 @@ def normalize_heatmap_inter(h: Matrix, n: int, current_level: ChrLevel, scale: f
     return out
 
 
+def _polymer_distances(
+    law: PolymerLaw, ha: F64Array, use: BoolArray, separations_bp: F64Array
+) -> F64Array:
+    """Per cell targets under the polymer law. `use` marks the cells that carry a contact and
+    lie outside the diagonal band; the expected contact at a separation is the mean over those
+    cells in the same log separation bin, eight bins a decade."""
+    n = ha.shape[0]
+    sep = np.abs(separations_bp[:, None] - separations_bp[None, :])
+    ls = np.log10(np.maximum(sep, 1.0))
+    key = np.floor(ls * 8.0).astype(np.int64)
+    out = np.zeros((n, n), dtype=np.float64)
+    for k in np.unique(key[use]):
+        m = use & (key == k)
+        expected = float(ha[m].mean())
+        for i, j in zip(*np.nonzero(m), strict=True):
+            out[i, j] = law.heatmap_distance(float(ha[i, j]), expected, int(sep[i, j]))
+    return out
+
+
 def create_distance_heatmap(
-    settings: Settings, h: Matrix, n: int, inter: bool = False
+    settings: Settings,
+    h: Matrix,
+    n: int,
+    inter: bool = False,
+    separations_bp: F64Array | None = None,
 ) -> tuple[F64Array, float]:
     """Convert a normalized contact-frequency heatmap to an expected-distance
     heatmap.  Mirrors Reference createDistanceHeatmap(), per cell:
@@ -105,7 +129,14 @@ def create_distance_heatmap(
     active = ha >= 1e-6
     ii, jj = np.indices((n, n))
     band = np.abs(ii - jj) < diag
-    fd = scale * np.power(np.where(active, ha, 1.0), power)  # clamp inactive -> no 0**neg warn
+    law = settings.polymer if settings.use_polymer_law else None
+    if law is not None and separations_bp is not None:
+        # Observed over expected within the heatmap itself. The expected contact at a
+        # separation is the mean of the active cells in the same log separation bin, so a
+        # cell at its expectation lands on the background and no constant sets the scale.
+        fd = _polymer_distances(law, ha, active & ~band, separations_bp)
+    else:
+        fd = scale * np.power(np.where(active, ha, 1.0), power)  # clamp inactive: no 0**neg warn
     dist = np.where(active, np.where(band, -1.0, fd), 0.0)
     dist = np.triu(dist) + np.triu(dist, 1).T  # mirror upper -> lower
 

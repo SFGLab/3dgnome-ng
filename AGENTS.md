@@ -866,6 +866,43 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference's `freqToDistance` is the PET only law. See
   `design/anchor-placement.md`, option D.
 
+- **Polymer law: `[distance] use_polymer_law = yes`, default no.**
+  ([gnome3d/polymer.py](gnome3d/polymer.py), `Settings.genomic_length_to_distance` and
+  `arc_expected_distance`, [pipeline/coarse/heatmap.py](gnome3d/pipeline/coarse/heatmap.py)
+  `create_distance_heatmap`, [data.py](gnome3d/data.py) `from_files`)
+  The `[distance]` section carried fifteen free constants for one physical relation, how far
+  two loci sit given the DNA between them and how often they touch. Eleven were copied from the
+  reference authors' GM12878 config with no derivation and were byte identical across every
+  cell line. Three laws set that one quantity on three unrelated absolute scales, in a unit
+  with no meaning, which is why arc targets and chain bonds could disagree by a hundred times.
+  And the one derived number, 0.285, was a mean over three of our own Hi-C files typed in as a
+  default. Fitted on the inputs we run it is 0.275 for GM12878, 0.299 for H1ESC, 0.192 for
+  HFFC6 and 0.072 for a trio sample, whose production structures came out at 0.067.
+
+  One law in bead units, one bead being the distance at `target_bp_per_subanchor`. A pair with
+  no contact sits at `max(1, (s / s0) ^ nu)`. A loop of strength `q` pulls its pair to
+  `1 + (background - 1) / (1 + q / q_half)`, so a saturated loop sits at one bead and never
+  inside; `q` is the PET count over the typical count at that span fitted on the run's own arcs.
+  A heatmap cell sits at the background times observed over expected to the minus third, the
+  expectation taken within the heatmap at that separation. `nu` is measured at load from the
+  singletons every run already reads, on the whole chromosome set before the region filter. The
+  fit refuses what is not a polymer decay and says so in a STATUS line with the reason, then
+  uses 0.285 as a named fallback. Every ChIA-PET singletons file is refused, since it is
+  enrichment filtered around CTCF and does not decay, and every Hi-C file is accepted.
+
+  Three keys replace eighteen: `use_polymer_law`, `polymer_exponent` (0 measures, a positive
+  value pins and is the record that someone chose to), `contact_half_saturation` (1.0). The
+  other fifteen are not read while it is on. Flag off is byte exact by construction and was
+  gated with `playground/parity_dump.py` against a HEAD worktree. `from_dataframes` takes
+  `polymer_law` as a parameter. Unit checks in `harness/test_polymer.py`. The battery's Hi-C
+  contact radius is bead relative now, so arms in different units compare.
+
+  Not yet default. `CANONICAL` keeps the old laws until the battery on three cell lines says
+  otherwise. See `design/anchor-placement.md`, option H.
+
+  Why not in the reference: the reference has the three laws and their constants. This is
+  what they were standing in for.
+
 - **Unified arc target: `[distance] use_unified_arc_target = yes`, default no.**
   ([settings.py](gnome3d/settings.py) `arc_expected_distance`)
   The arcs stage minimises a matrix carrying two families of positive entry built by different

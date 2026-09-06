@@ -26,8 +26,12 @@ field set, not of the positioned graph.
 from __future__ import annotations
 
 from dataclasses import field
+from typing import TYPE_CHECKING
 
 from gnome3d import log
+
+if TYPE_CHECKING:
+    from gnome3d.polymer import PolymerLaw
 from gnome3d.data import ContactData
 from gnome3d.hierarchy import Cluster, Level, build_cluster_tree, set_level
 from gnome3d.io import create_singleton_heatmap
@@ -95,6 +99,49 @@ class CoarseState:
     accessibility: SignalMap = field(default_factory=empty_signal_map)
 
 
+def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
+    """The run's polymer law, from its own fits, with one always visible line saying what it
+    measured or why it could not.
+
+    The exponent is `polymer_exponent` when pinned, otherwise the contact fit's, otherwise the
+    named fallback. The bead is the subanchor spacing the run declared.
+    """
+    from gnome3d.polymer import FALLBACK_NU, PolymerLaw
+
+    fit = data.contact_fit
+    if settings.polymer_exponent > 0.0:
+        nu = float(settings.polymer_exponent)
+        log.status(LOG, "polymer law: exponent pinned at %.3f by the config", nu)
+    elif fit is not None and fit.ok:
+        nu = fit.nu
+        log.status(
+            LOG,
+            "polymer law: exponent %.3f measured on %s intra pairs, %d to %d kb, slope %+.3f",
+            nu,
+            f"{fit.n_pairs:,}",
+            fit.lo // 1000,
+            fit.hi // 1000,
+            fit.slope,
+        )
+    else:
+        nu = FALLBACK_NU
+        log.status(
+            LOG,
+            "polymer law: the singletons cannot supply an exponent (%s), using the fallback %.3f",
+            fit.reason if fit is not None else "no fit",
+            nu,
+        )
+    arcs = data.arc_fit
+    if arcs is not None and not arcs.ok:
+        log.status(LOG, "polymer law: loop strength follows the PET count alone (%s)", arcs.reason)
+    return PolymerLaw(
+        nu=nu,
+        s0_bp=int(settings.target_bp_per_subanchor),
+        q_half=float(settings.contact_half_saturation),
+        arcs=arcs,
+    )
+
+
 def build_state(
     settings: Settings,
     data: ContactData,
@@ -113,6 +160,9 @@ def build_state(
             chrs_list,
         )
         LOG.info("total clusters: %d", len(clusters))
+
+    if settings.use_polymer_law:
+        settings.polymer = attach_polymer_law(settings, data)
 
     return CoarseState(
         s=settings,
@@ -866,8 +916,15 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
     if len(state.chrs) > 1:
         h_norm = normalize_heatmap_inter(h_norm, total_size, current_level, s.heatmap_inter_scaling)
 
-    # Convert freq -> distance heatmap
-    heatmap_dist, avg_dist = create_distance_heatmap(s, h_norm, total_size, inter=False)
+    # Convert freq -> distance heatmap. Under the polymer law the conversion is observed over
+    # expected at each pair's separation, so it needs where each bin sits.
+    separations = None
+    if s.use_polymer_law and s.polymer is not None:
+        ends = np.cumsum(np.asarray(bin_lengths_mb, dtype=np.float64)) * 1e6
+        separations = ends - 0.5 * np.asarray(bin_lengths_mb, dtype=np.float64) * 1e6
+    heatmap_dist, avg_dist = create_distance_heatmap(
+        s, h_norm, total_size, inter=False, separations_bp=separations
+    )
     heatmap_dist = np.array(heatmap_dist, dtype=np.float64)
     heatmap_dist_diag = get_diagonal_size(h_norm, total_size)
 
@@ -1021,8 +1078,14 @@ def ib_arc_target_distances(state: CoarseState, ibs: list[int], chr_: str) -> F6
     out: F64Array = np.zeros((n, n), dtype=np.float64)
     kept = 0
     for i, j in zip(*np.nonzero(np.triu(support, 1) > 0.0), strict=True):
-        target = state.s.freq_to_dist_heatmap(float(support[i, j]) / ref)
-        natural = state.s.genomic_length_to_distance(abs(int(gpos[j]) - int(gpos[i])))
+        gap = abs(int(gpos[j]) - int(gpos[i]))
+        law = state.s.polymer if state.s.use_polymer_law else None
+        target = (
+            law.heatmap_distance(float(support[i, j]) / ref, 1.0, gap)
+            if law is not None
+            else state.s.freq_to_dist_heatmap(float(support[i, j]) / ref)
+        )
+        natural = state.s.genomic_length_to_distance(gap)
         if target >= natural:
             continue  # no more attraction than the chain already provides: leave it alone
         out[i, j] = target

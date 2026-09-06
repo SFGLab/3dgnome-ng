@@ -56,6 +56,7 @@ from validation.metrics.hic import (  # noqa: E402
 )
 
 NU_HIC = 0.285  # ps_curve.py, mean over three cell lines, 20 kb to 1 Mb
+CONTACT_BEADS = 1.33  # a contact is two beads within this many chain bonds; 2.0 units at the old 1.5 unit bead
 
 
 def load(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -224,6 +225,7 @@ def main() -> None:
         f"{'' if balance else ', raw counts, not comparable with a balanced run'}\n"
     )
     rad: np.ndarray | None = None  # the first arm's first structure sets it for every arm
+    contact_r: float = 0.0  # likewise, in bead units, since arms may differ in model unit
     print(
         f"  {'arm':>10s} {'n':>3s} {'pearson':>9s} {'spearman':>9s} {'SCC':>8s} "
         f"{'multimm':>9s} {'exponent':>9s} {'vs Hi-C':>8s} {'Rg':>8s} "
@@ -242,9 +244,12 @@ def main() -> None:
             owner = block_owner(bmid, anchor, target_bp)
             if rad is None:
                 rad = ev_factor * block_bonds(p, owner)
+                contact_r = CONTACT_BEADS * float(np.median(np.linalg.norm(np.diff(p, axis=0), axis=1)))
             coords.append(p)
             mids = m
-            r = hic_correlation(p, m, mcool, region, binsize, contact_radius=2.0, balance=balance)
+            r = hic_correlation(
+                p, m, mcool, region, binsize, contact_radius=contact_r, balance=balance
+            )
             pear.append(r.get("pearson", float("nan")))
             spear.append(r.get("spearman", float("nan")))
             scc.append(r.get("scc", float("nan")))

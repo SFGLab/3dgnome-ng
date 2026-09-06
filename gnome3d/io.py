@@ -405,6 +405,17 @@ def load_singletons(
     return contacts
 
 
+def filter_singletons(
+    contacts: list[SingletonContact], region: BedRegion | None
+) -> list[SingletonContact]:
+    """The contacts with both ends inside `region`, or all of them when there is no region.
+    The same test the loader applies, for a list that was loaded unfiltered so the whole
+    chromosome could be fitted first."""
+    if region is None:
+        return contacts
+    return [c for c in contacts if region.contains(c[1]) and region.contains(c[3])]
+
+
 # Create singleton heatmap from pre-loaded contacts
 
 

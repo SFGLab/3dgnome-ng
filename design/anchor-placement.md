@@ -602,6 +602,37 @@ What is still open. The trio, whose data lives on the cluster and cannot be meas
 workstation. And whether to make the law default on, which turns on for all fifteen ensemble
 configs at once, the nine trio ones included, and those are the unmeasured half.
 
+### H. One distance law, in bead units, with its exponent measured from the input. Built, opt in, under measurement
+
+G fixed the arcs against the chain bonds and left the structure of the problem in place. The
+settings reference made that structure visible, 2026-09-06. Fifteen free constants for one
+physical relation. Eleven copied from the reference authors' GM12878 config with no derivation
+and byte identical across every cell line. Three laws setting one quantity on three unrelated
+absolute scales in a unit with no meaning, which is what let a hundredfold disagreement exist.
+And the one derived number, 0.285, a mean over three of our own Hi-C files typed in as a
+default that then applied to every input.
+
+Fitted on the inputs this project runs, that exponent is 0.275 for GM12878, 0.299 for H1ESC,
+0.192 for HFFC6 and 0.072 for a trio sample. The trio's production structures came out at
+0.067. They tracked their own data the whole time; the constant was what did not fit. The
+ChIA-PET singletons files are not a decay at all, slopes -0.23, +0.20 and -0.08, since they are
+enrichment filtered around CTCF, so a fit has to be able to refuse.
+
+The law. One bead is the distance at `target_bp_per_subanchor`, and everything is in beads.
+No contact, `max(1, (s / s0) ^ nu)`. A loop of strength `q`, `1 + (background - 1) / (1 + q /
+q_half)`, touching at saturation and never inside, `q` being the PET count over the typical
+count at that span fitted on the run's own arcs. A heatmap cell, the background times observed
+over expected to the minus third, the expectation taken within the heatmap at that separation.
+`nu` is read off the singletons at load and the run says what it measured, or why it could not
+and that it fell back to 0.285. Three keys replace eighteen. Flag off is byte exact.
+
+What it retires if it holds: A, D and G, and the fifteen constants. What it does not touch: B,
+C and E, which act on block placement and on subanchors and are unchanged.
+
+The gate is the battery against production on GM12878, H1ESC and HFFC6, HFFC6 being the one
+whose own exponent the old constant was furthest from, then the trio. The contact radius in the
+battery is bead relative now so the arms compare across units.
+
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
 The most direct statement of the missing constraint. It was left last because it competes with

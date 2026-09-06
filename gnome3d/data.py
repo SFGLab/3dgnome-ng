@@ -29,12 +29,19 @@ from typing import TYPE_CHECKING, Any
 from gnome3d import log
 from gnome3d.io import (
     compartment_from_label,
+    filter_singletons,
     load_anchors,
     load_arcs,
     load_breakpoints,
     load_compartments,
     load_signal,
     load_singletons,
+)
+from gnome3d.polymer import (
+    ArcStrengthFit,
+    ContactFit,
+    fit_arc_strength,
+    fit_contact_exponent,
 )
 from gnome3d.tracks import normalize_signal_map, phase_compartments
 from gnome3d.types import *
@@ -61,6 +68,10 @@ class ContactData:
     arcs: ArcMap = field(default_factory=empty_arc_map)
     breakpoints: BreakpointMap = field(default_factory=empty_breakpoint_map)
     singletons: list[SingletonContact] = field(default_factory=empty_singleton_list)
+    # The polymer law's own fits, made on the whole loaded input before any region filter so a
+    # small region can still supply an exponent. None until the law is on.
+    contact_fit: ContactFit | None = None
+    arc_fit: ArcStrengthFit | None = None
     # Long-range arcs (gap > max_pet_length): not anchor-mapped, folded into the
     # segment heatmap by Solver. Mirrors Reference InteractionArcs::long_arcs.
     long_arcs: RawArcMap = field(default_factory=empty_raw_arc_map)
@@ -109,7 +120,17 @@ class ContactData:
         breakpoints = load_breakpoints(s.data_path(s.data_segment_split), chrs)
 
         LOG.info("load singletons")
-        singletons = load_singletons(s.data_path(s.data_singletons), chr_set, region)
+        contact_fit: ContactFit | None = None
+        arc_fit: ArcStrengthFit | None = None
+        if s.use_polymer_law:
+            # Fit on the whole chromosome set, then cut to the region. A region alone is too
+            # narrow a band to read a decay off.
+            singletons = load_singletons(s.data_path(s.data_singletons), chr_set, None)
+            contact_fit = fit_contact_exponent(singletons)
+            arc_fit = fit_arc_strength([a for al in arcs.values() for a in al])
+            singletons = filter_singletons(singletons, region)
+        else:
+            singletons = load_singletons(s.data_path(s.data_singletons), chr_set, region)
 
         # Optional second file for inter-chromosomal singletons (matches the
         # Reference `data_singletons_inter` config key).  Only meaningful for
@@ -149,6 +170,8 @@ class ContactData:
             arcs=arcs,
             breakpoints=breakpoints,
             singletons=singletons,
+            contact_fit=contact_fit,
+            arc_fit=arc_fit,
             long_arcs=long_arcs,
             compartments=compartments,
             accessibility=accessibility,
@@ -169,6 +192,7 @@ class ContactData:
         phasing_df: Any | None = None,
         accessibility_mode: str = "log",
         accessibility_percentile: float = 80.0,
+        polymer_law: bool = False,
     ) -> ContactData:
         """
         Build ContactData from pandas DataFrames.
@@ -196,6 +220,13 @@ class ContactData:
             Columns: chr, start, end, value
         phasing_df : DataFrame or None
             Columns: chr, start, end, value.  Used to orient a value-only
+        accessibility_mode : str
+            `log` or `binary`, how the accessibility signal is normalised.
+        accessibility_percentile : float
+            Under `binary`, the percentile at or above which a bead is open.
+        polymer_law : bool
+            Fit the contact exponent and the loop strength on the frames, as `from_files`
+            does when `use_polymer_law` is on.
             compartment frame when no accessibility frame is given.
         """
         chr_set: set[str] = (
@@ -251,6 +282,8 @@ class ContactData:
 
         # singletons
         singletons: list[SingletonContact] = []
+        contact_fit: ContactFit | None = None
+        arc_fit: ArcStrengthFit | None = None
         if singletons_df is not None:
             for _, row in singletons_df.iterrows():
                 c1, c2 = str(row["chr1"]), str(row["chr2"])
@@ -274,11 +307,16 @@ class ContactData:
             percentile=accessibility_percentile,
         )
 
+        if polymer_law:
+            contact_fit = fit_contact_exponent(singletons)
+            arc_fit = fit_arc_strength([a for al in arcs.values() for a in al])
         return cls(
             anchors=anchors,
             arcs=arcs,
             breakpoints=breakpoints,
             singletons=singletons,
+            contact_fit=contact_fit,
+            arc_fit=arc_fit,
             long_arcs=long_arcs,
             compartments=compartments,
             accessibility=accessibility,
