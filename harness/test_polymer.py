@@ -185,40 +185,39 @@ def test_arc_strength() -> None:
     )
 
 
-def test_settings_delegate_only_when_asked() -> None:
-    """Every existing distance call goes through the law when it is on and is untouched when it
-    is off. The off path is the parity path and must not move."""
-    print("\n[settings] the law is opt in and routes the existing calls")
-    base = Settings()
+def test_settings_route_through_the_law() -> None:
+    """Every distance call on Settings answers from the attached law, and a Settings with no law
+    attached builds a default from the named fallback and says so, so nothing answers from a
+    constant silently."""
+    print("\n[settings] every distance call answers from the law")
     s = Settings()
-    check("off by default", s.use_polymer_law is False)
+    check("no law is attached until data is loaded", s.polymer is None)
     check("the exponent is measured unless pinned", s.polymer_exponent == 0.0)
     check("half saturation defaults to one typical loop", s.contact_half_saturation == 1.0)
-    for sep in (1_000, 50_000, 2_000_000):
-        check(
-            f"flag off: chain law unchanged at {sep // 1000} kb",
-            s.genomic_length_to_distance(sep) == base.genomic_length_to_distance(sep),
-        )
+    d = s.genomic_length_to_distance(1000)
     check(
-        "flag off: arc target unchanged",
-        s.arc_expected_distance(4, 50_000) == base.arc_expected_distance(4, 50_000),
+        "a call with no law attached still answers, from the fallback",
+        s.polymer is not None and abs(d - 1.0) < 1e-12,
     )
-    check(
-        "flag off: heatmap law unchanged",
-        s.freq_to_dist_heatmap(0.5) == base.freq_to_dist_heatmap(0.5),
-    )
+    check("and the default carries the fallback exponent", abs(s.polymer.nu - FALLBACK_NU) < 1e-12)
 
-    s.use_polymer_law = True
+    s = Settings()
+    s.polymer_exponent = 0.2
+    s.genomic_length_to_distance(1000)
+    check("a pinned exponent is what the default carries", abs(s.polymer.nu - 0.2) < 1e-12)
+
+    s = Settings()
     s.polymer = PolymerLaw(nu=0.25, s0_bp=1000, q_half=1.0)
     check(
-        "on: the chain law is the background", abs(s.genomic_length_to_distance(1000) - 1.0) < 1e-12
+        "the chain law call is the background",
+        abs(s.genomic_length_to_distance(1000) - 1.0) < 1e-12,
     )
     check(
-        "on: an arc target is a contact distance, closer than the background",
+        "an arc target is a contact distance, closer than the background",
         1.0 <= s.arc_expected_distance(4, 50_000) < s.polymer.background(50_000),
     )
     check(
-        "on: a stronger arc is closer",
+        "a stronger arc is closer",
         s.arc_expected_distance(40, 50_000) < s.arc_expected_distance(4, 50_000),
     )
 
@@ -227,7 +226,7 @@ def main() -> int:
     print("polymer law checks")
     test_the_law()
     test_arc_strength()
-    test_settings_delegate_only_when_asked()
+    test_settings_route_through_the_law()
     test_recovers_a_known_slope()
     test_refuses_what_is_not_a_decay()
     test_band_follows_the_resolution()

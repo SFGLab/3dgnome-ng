@@ -87,20 +87,6 @@ class Settings:
     heatmap_distance_stretching: float
 
     # ---- distance conversion ----
-    genomic_dist_power: float
-    genomic_dist_scale: float
-    genomic_dist_base: float
-    freq_dist_scale: float
-    freq_dist_power: float
-    freq_dist_scale_inter: float
-    freq_dist_power_inter: float
-    count_dist_a: float
-    count_dist_scale: float
-    count_dist_shift: float
-    count_dist_base_level: float
-    use_separation_arc_target: bool
-    arc_target_exponent: float
-    arc_target_pivot_kb: float
 
     # ---- spring constants ----
     spring_stretch: float
@@ -357,14 +343,9 @@ class Settings:
     # minimises the same energy directly, which on real blocks reaches the same minimum about
     # thirty six times faster with the ensemble spread slightly wider and the geometry matching.
     # The landscape is a funnel, so there is nothing for the stochastic search to escape.
-    use_polymer_law: bool
     polymer_exponent: float
     contact_half_saturation: float
     polymer: PolymerLaw | None
-    use_unified_arc_target: bool
-    arc_target_pull: float
-    arc_target_background_exponent: float
-    arc_target_background_ref_bp: int
     arcs_solver: str
     arcs_solver_iters: int
     mc_stop_ratio_arcs: float
@@ -441,25 +422,6 @@ class Settings:
         # ---- heatmap parameters ----
         self.heatmap_inter_scaling = 1.0
         self.heatmap_distance_stretching = 2.0
-
-        # ---- distance conversion ----
-        self.genomic_dist_power = 0.5
-        self.genomic_dist_scale = 1.0
-        self.genomic_dist_base = 0.0
-        self.freq_dist_scale = 100.0
-        self.freq_dist_power = -0.333
-        self.freq_dist_scale_inter = 100.0
-        self.freq_dist_power_inter = -1.0
-        self.count_dist_a = 0.5
-        self.count_dist_scale = 20.0
-        self.count_dist_shift = 1.0
-        self.count_dist_base_level = 0.01
-        # Separation aware arc target. The parity law maps PET count alone, so a 1 Mb arc
-        # with four PETs targets the same distance as a 100 kb one. With the flag the target is
-        # multiplied by max(1, s_kb / pivot)^exponent. See gnome3d/util.py.
-        self.use_separation_arc_target = False
-        self.arc_target_exponent = 0.285
-        self.arc_target_pivot_kb = 10.0
 
         # ---- spring constants ----
         self.spring_stretch = 0.1
@@ -740,29 +702,9 @@ class Settings:
         self.mc_stop_improvement_smooth = 0.995
         self.mc_stop_successes_smooth = 5
         self.mc_stop_steps_smooth = 10000
-        # One background for the arc targets and the chain bonds. The parity and separation
-        # aware laws both set an arc's distance from its PET count, which lands between 0.2 and
-        # 1.6 model units, while the chain law sets a consecutive arcless anchor pair between
-        # 4.0 and 135 over the same span range. Measured on a finished chromosome, 93 percent of
-        # arc joined anchor pairs end up closer than a bead's own size as a result. See
-        # [[project_unified_arc_target]].
-        # One law for every distance, in bead units, with its exponent read off the run's own
-        # contacts. Replaces the chain law, the PET law, the separation aware and unified arc
-        # targets and the heatmap frequency law when on, none of which is read then. The law
-        # object is attached by build_state once the data is loaded. See [[project_polymer_law]].
-        self.use_polymer_law = False
         self.polymer_exponent = 0.0  # 0 measures it; a positive value pins it and documents that
         self.contact_half_saturation = 1.0
         self.polymer = None
-        self.use_unified_arc_target = False
-        self.arc_target_pull = 0.45
-        # The chain law's own exponent is 0.671, far steeper than the 0.285 the contact
-        # probability curves give, and this stage evaluates it out to a Mb where that matters.
-        # Zero keeps the chain law itself, which is what was measured end to end. A positive
-        # value anchors the background where the chain law is calibrated and continues it at
-        # that slope. Offline the right value differs by cell line, so it is a knob.
-        self.arc_target_background_exponent = 0.0
-        self.arc_target_background_ref_bp = 1000
         self.arcs_solver = "mc"
         self.arcs_solver_iters = 200
         self.mc_stop_ratio_arcs = 0.9999
@@ -885,28 +827,6 @@ class Settings:
         # [template]
 
         # [distance]
-        self.genomic_dist_power = getf("distance", "genomic_dist_power", self.genomic_dist_power)
-        self.genomic_dist_scale = getf("distance", "genomic_dist_scale", self.genomic_dist_scale)
-        self.genomic_dist_base = getf("distance", "genomic_dist_base", self.genomic_dist_base)
-        self.freq_dist_scale = getf("distance", "freq_dist_scale", self.freq_dist_scale)
-        self.freq_dist_power = getf("distance", "freq_dist_power", self.freq_dist_power)
-        self.freq_dist_scale_inter = getf(
-            "distance", "freq_dist_scale_inter", self.freq_dist_scale_inter
-        )
-        self.freq_dist_power_inter = getf(
-            "distance", "freq_dist_power_inter", self.freq_dist_power_inter
-        )
-        self.count_dist_a = getf("distance", "count_dist_a", self.count_dist_a)
-        self.count_dist_scale = getf("distance", "count_dist_scale", self.count_dist_scale)
-        self.count_dist_shift = getf("distance", "count_dist_shift", self.count_dist_shift)
-        self.count_dist_base_level = getf(
-            "distance", "count_dist_base_level", self.count_dist_base_level
-        )
-        self.use_separation_arc_target = getb(
-            "distance", "use_separation_arc_target", self.use_separation_arc_target
-        )
-        self.arc_target_exponent = getf("distance", "arc_target_exponent", self.arc_target_exponent)
-        self.arc_target_pivot_kb = getf("distance", "arc_target_pivot_kb", self.arc_target_pivot_kb)
 
         # [heatmaps]
         self.heatmap_inter_scaling = getf("heatmaps", "inter_scaling", self.heatmap_inter_scaling)
@@ -1301,20 +1221,9 @@ class Settings:
         self.mc_stop_ratio_arcs = getf(
             "simulation_arcs", "stop_condition_ratio", self.mc_stop_ratio_arcs
         )
-        self.use_polymer_law = getb("distance", "use_polymer_law", self.use_polymer_law)
         self.polymer_exponent = getf("distance", "polymer_exponent", self.polymer_exponent)
         self.contact_half_saturation = getf(
             "distance", "contact_half_saturation", self.contact_half_saturation
-        )
-        self.use_unified_arc_target = getb(
-            "distance", "use_unified_arc_target", self.use_unified_arc_target
-        )
-        self.arc_target_pull = getf("distance", "arc_target_pull", self.arc_target_pull)
-        self.arc_target_background_exponent = getf(
-            "distance", "arc_target_background_exponent", self.arc_target_background_exponent
-        )
-        self.arc_target_background_ref_bp = geti(
-            "distance", "arc_target_background_ref_bp", self.arc_target_background_ref_bp
         )
         self.arcs_solver = gets("simulation_arcs", "solver", self.arcs_solver)
         self.arcs_solver_iters = geti("simulation_arcs", "solver_iters", self.arcs_solver_iters)
@@ -1358,82 +1267,34 @@ class Settings:
                 hint = f" (did you mean '{near[0]}'?)" if near else ""
                 LOG.warning("[%s] unknown key '%s' is ignored%s", section, key, hint)
 
+    def polymer_law(self) -> PolymerLaw:
+        """The run's distance law. `build_state` attaches one fitted to the input. Before that,
+        or in code that never loads data, a default is built from `polymer_exponent` or the
+        named fallback and a warning says so once, so every distance call has a law to answer
+        with and none answers with a constant silently."""
+        if self.polymer is None:
+            from gnome3d.polymer import FALLBACK_NU, PolymerLaw
+
+            nu = float(self.polymer_exponent) if self.polymer_exponent > 0.0 else FALLBACK_NU
+            log.get("settings").warning(
+                "no fitted polymer law attached; using exponent %.3f %s",
+                nu,
+                "from the config" if self.polymer_exponent > 0.0 else "as the fallback",
+            )
+            self.polymer = PolymerLaw(
+                nu=nu,
+                s0_bp=int(self.target_bp_per_subanchor),
+                q_half=float(self.contact_half_saturation),
+            )
+        return self.polymer
+
     def genomic_length_to_distance(self, length_bp: int) -> float:
-        from gnome3d.util import genomic_length_to_distance
-
-        if self.use_polymer_law and self.polymer is not None:
-            return self.polymer.background(length_bp)
-        return genomic_length_to_distance(
-            length_bp, self.genomic_dist_base, self.genomic_dist_scale, self.genomic_dist_power
-        )
-
-    def freq_to_dist_heatmap(self, freq: float) -> float:
-        from gnome3d.util import freq_to_dist_heatmap
-
-        return freq_to_dist_heatmap(freq, self.freq_dist_scale, self.freq_dist_power)
-
-    def freq_to_dist_heatmap_inter(self, freq: float) -> float:
-        from gnome3d.util import freq_to_dist_heatmap_inter
-
-        return freq_to_dist_heatmap_inter(
-            freq, self.freq_dist_scale_inter, self.freq_dist_power_inter
-        )
-
-    def freq_to_distance(self, freq: int) -> float:
-        from gnome3d.util import freq_to_distance
-
-        return freq_to_distance(
-            freq,
-            self.count_dist_a,
-            self.count_dist_scale,
-            self.count_dist_shift,
-            self.count_dist_base_level,
-        )
-
-    def arc_background_distance(self, sep_bp: int) -> float:
-        """The distance two anchors that far apart hold with no contact between them.
-
-        With `arc_target_background_exponent` at zero this is the chain law itself. Otherwise it
-        is the chain law's value at `arc_target_background_ref_bp`, where that law is calibrated
-        for consecutive beads, continued at the given exponent.
-        """
-        sep = max(abs(int(sep_bp)), 1)
-        nu = float(self.arc_target_background_exponent)
-        if nu <= 0.0:
-            return float(self.genomic_length_to_distance(sep))
-        ref = max(int(self.arc_target_background_ref_bp), 1)
-        return float(self.genomic_length_to_distance(ref)) * (sep / ref) ** nu
+        """The distance two beads that far apart hold with nothing between them, in beads."""
+        return self.polymer_law().background(length_bp)
 
     def arc_expected_distance(self, score: int, sep_bp: int) -> float:
-        """The arc target for an arc of `score` PETs spanning `sep_bp`. The parity law when both
-        `use_unified_arc_target` and `use_separation_arc_target` are off.
-
-        Under the unified law the distance comes from the chain law at that separation, the same
-        background a consecutive arcless anchor pair is held to, and the PET count only says how
-        far in from it to pull. The PET law supplies that factor rather than the distance,
-        normalised by its own limits, which run from `freq_to_distance(0)` down to
-        `count_dist_base_level`. A zero PET arc therefore sits on the background and a saturated
-        one at `arc_target_pull` of it. The unified law supersedes the separation aware one,
-        since it carries the separation itself.
-        """
-        from gnome3d.util import arc_target_with_separation
-
-        if self.use_polymer_law and self.polymer is not None:
-            return self.polymer.arc_distance(score, sep_bp)
-        if self.use_unified_arc_target:
-            bg = self.arc_background_distance(sep_bp)
-            lo = float(self.count_dist_base_level)
-            span = float(self.freq_to_distance(0)) - lo
-            g = (float(self.freq_to_distance(score)) - lo) / span if span > 1e-12 else 0.0
-            pull = float(self.arc_target_pull)
-            return bg * (pull + (1.0 - pull) * min(max(g, 0.0), 1.0))
-
-        base = self.freq_to_distance(score)
-        if not self.use_separation_arc_target:
-            return base
-        return arc_target_with_separation(
-            base, sep_bp, self.arc_target_pivot_kb, self.arc_target_exponent
-        )
+        """The target for an arc of `score` PETs spanning `sep_bp`, in beads."""
+        return self.polymer_law().arc_distance(score, sep_bp)
 
     def data_path(self, filename: str) -> str:
         """Resolve a data filename relative to data_dir."""

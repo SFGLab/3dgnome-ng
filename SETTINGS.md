@@ -51,32 +51,13 @@ Filenames are relative to `data_dir` unless absolute. The region string is `chr:
 
 ## [distance]
 
-Three keys are the polymer law. Every other key in this section is one of the parity era laws
-and is not read while `use_polymer_law` is on.
+One law sets every distance, in bead units, and it reads two keys. Its exponent is measured
+from the run's own singletons at load, so the section is usually empty.
 
 | key | type | default | production | what it does |
 | --- | --- | --- | --- | --- |
-| `use_polymer_law` | bool | no | no | One law for every distance, in bead units, with the exponent measured from the run's own contacts. See the section above. Measured, not yet default. |
 | `polymer_exponent` | float | 0.0 | 0.0 | Zero measures the exponent from the singletons at load. A positive value pins it, and its presence in a config is the record that someone chose to. |
 | `contact_half_saturation` | float | 1.0 | 1.0 | The loop strength, in multiples of a typical loop at that span, at which a contact pulls its pair halfway from the background to touching. |
-| `genomic_dist_base` | float | 0.0 | 1.0 | Chain law, `base + scale * (bp / 1000) ^ power`. |
-| `genomic_dist_scale` | float | 1.0 | 0.5 | Chain law. |
-| `genomic_dist_power` | float | 0.5 | 0.75 | Chain law. |
-| `freq_dist_scale` | float | 100.0 | 25.0 | Segment heatmap frequency to distance, `scale * freq ^ power`. |
-| `freq_dist_power` | float | -0.333 | -0.6 | Segment heatmap frequency to distance. |
-| `freq_dist_scale_inter` | float | 100.0 | 120.0 | The same for the chromosome level heatmap. |
-| `freq_dist_power_inter` | float | -1.0 | -1.0 | The same for the chromosome level heatmap. |
-| `count_dist_a` | float | 0.5 | 0.2 | PET law, `base_level + scale / exp(a * (PET + shift))`. |
-| `count_dist_scale` | float | 20.0 | 1.8 | PET law. |
-| `count_dist_shift` | float | 1.0 | 8.0 | PET law. |
-| `count_dist_base_level` | float | 0.01 | 0.2 | PET law. The distance a saturated arc asks for, and the lower of the two limits the unified law normalises against. |
-| `use_separation_arc_target` | bool | no | yes | Multiply the PET law by `max(1, s_kb / arc_target_pivot_kb) ^ arc_target_exponent`. Superseded by the unified law when both are on. |
-| `arc_target_exponent` | float | 0.285 | 0.285 | Separation aware exponent. |
-| `arc_target_pivot_kb` | float | 10.0 | 10.0 | Span below which the separation aware law leaves the PET law alone. |
-| `use_unified_arc_target` | bool | no | no | One background for arc targets and chain bonds, with the PET count setting only the pull. See the section above. Measured a strict improvement on GM12878 and H1ESC at a background exponent of 0.15. |
-| `arc_target_pull` | float | 0.45 | 0.45 | The fraction of the background a saturated arc pulls its pair to. A zero PET arc sits on the background. |
-| `arc_target_background_exponent` | float | 0.0 | 0.0 | Zero rides the chain law itself, whose exponent is far steeper than the contact probability curves give. A positive value continues the chain law from the reference separation at this slope. 0.15 measured best on two cell lines. The optimum differs by dataset. |
-| `arc_target_background_ref_bp` | int | 1000 | 1000 | The separation at which the background agrees with the chain law when an exponent is set. |
 
 ## [heatmaps]
 
@@ -336,172 +317,52 @@ the one call that spans the whole active region.
 | `packing_factor` | float | 1.0 | The derived outer radius is this times the mean bond scale times the cube root of the bead count. |
 | `inner_fraction` | float | 0.2 | The inner radius is the outer one times the cube root of this. |
 
-## How the distance targets fit together
+## How distances are set
 
-The pipeline has several laws that turn something about the data into a distance in model
-units, and they meet in the arcs stage's target matrix. This is the part of the configuration
-where a wrong reading costs the most, so it is laid out before the tables. Each law is given
-first in plain terms with a worked number, then precisely with its source. The chain law, the
-PET law, the heatmap frequency law and the anchor heatmap scaling are 3D-GNOME's own, from the
-modelling engine paper [1] and carried through its later releases [2, 3]. The separation aware
-and unified laws are this project's, and they add no physics of their own. Each applies two
-established results to the arc targets. Mean spatial distance grows with genomic separation as
-a power law [4, 5], and a contact's meaning depends on how much more often the pair meets than
-two loci that far apart meet anyway, which is the observed over expected normalisation that
-loop calling [8] and restraint based modelling [9, 10] both rest on. What is this project's
-alone is the parameterisation, and that is said where it applies.
+One law turns everything the pipeline knows about a pair of beads into a distance, and every
+stage reads it: the bond between consecutive beads in the smooth stage, the bond between
+block centroids in block placement, the target for a pair of anchors an arc joins, the bond a
+consecutive arcless anchor pair gets, and the target for a cell of the segment heatmap.
 
-One number to hold onto. Chromatin in a nucleus is crumpled, not stretched out, so distance
-grows only slowly with the amount of DNA in between. Ten times more DNA between two loci puts
-them only about twice as far apart. Written as a power law that is an exponent near 0.285, and
-it is the target every distance law here is measured against. It comes from Hi-C. Contact
-probability falls close to the inverse of separation [4], and if distance grows as separation
-to the power `nu`, contact falls as separation to the power `-3 nu` [5]. This project's three
-cell lines measure a contact slope near `-0.86`, which gives `nu` near 0.285.
+In plain terms. The unit is the bead, the distance two beads hold at the resolution the run
+declared, so nothing is measured in a number that means nothing. Two loci with nothing between
+them sit at the crumpled chromatin distance for how much DNA separates them. Chromatin in a
+nucleus is crumpled, not stretched out, so distance grows only slowly with the DNA in between:
+ten times more DNA puts two loci only about twice as far apart. That exponent is read off the
+run's own contacts rather than typed in. A loop draws its two ends in from there, more for a
+loop stronger than is typical at its span, and never closer than touching. A pair of big
+segments on the coarse map sits closer the more contacts they share.
 
-**The polymer law**, `[distance] use_polymer_law`. The one to use.
+Precisely, with `s0` being `target_bp_per_subanchor` and `nu` the measured exponent.
 
-In plain terms. Everything below collapses into one rule, in one unit. The unit is the bead,
-the distance two beads hold at the resolution the run declared, so nothing is measured in a
-number that means nothing. Two loci with nothing between them sit at the crumpled chromatin
-distance for how much DNA separates them, and that exponent is read off the run's own
-contacts rather than typed in. A loop draws its two ends in from there, more for a loop
-stronger than is typical at its span, and never closer than touching. Turning it on retires
-every other law in this section and every constant they carry. It reads three keys, the
-exponent, which is measured unless pinned, and one shape number for how hard a loop pulls.
+- No contact: `d = max(1, (s / s0) ^ nu)` for separation `s`. Mean spatial distance grows
+  with genomic separation as a power law [4, 5].
+- A loop of strength `q`: `d = 1 + (background - 1) / (1 + q / q_half)`. `q` is the loop's PET
+  count over the typical count at its span, fitted on the run's own arcs, which is observed
+  over expected [8, 9]. A saturated loop sits at one bead, touching, as polymer loop models
+  hold loop anchors [6, 11], and never inside.
+- A heatmap cell: the background times observed over expected contact to the minus third,
+  the fractal globule relation [4, 5, 10], the expectation being the mean of the cells at that
+  separation within the heatmap. At the chromosome level, where pairs have no separation,
+  every cell shares one expectation and the background is taken at the mean chromosome span.
+- `nu` is the slope of log contact count against log separation on the run's singletons,
+  over minus three [4, 5], fitted at load on the whole chromosome set before any region
+  filter. Contact probability falls close to the inverse of separation in Hi-C [4], and if
+  distance grows as `s ^ nu` contact falls as `s ^ (-3 nu)` [5]. When the singletons cannot
+  supply one, which a ChIA-PET singletons file cannot since it is enrichment filtered around
+  CTCF and does not decay, the run says so in an always visible line and uses 0.285, the
+  fractal globule value, as a named fallback.
 
-Precisely. `d = max(1, (s / s0) ^ nu)` for a pair at separation `s` with no contact, `s0`
-being `target_bp_per_subanchor`. With a loop of strength `q`, `d = 1 + (background - 1) /
-(1 + q / q_half)`, where `q` is the loop's PET count over the typical count at its span fitted
-on the run's own arcs, which is observed over expected [8, 9]. A heatmap cell sits at the
-background times observed over expected to the minus third, the fractal globule relation
-[4, 5], the expectation being the mean of the cells at that separation within the heatmap. The
-exponent `nu` is the slope of log contact count against log separation on the run's singletons,
-over minus three [4, 5], measured at load. When the singletons cannot supply one, which a
-ChIA-PET singletons file cannot since it is enrichment filtered around CTCF and does not decay,
-the run says so in an always visible line and uses 0.285, the fractal globule value.
+Measured on this project's own inputs the exponent is 0.275 for GM12878, 0.299 for H1ESC,
+0.192 for HFFC6 and 0.072 for a trio sample, which is why it is measured and not a constant.
 
-Measured on this project's own inputs the exponent is 0.275 for GM12878, 0.299 for H1ESC, 0.192
-for HFFC6 and 0.072 for a trio sample, which is why it is measured and not a constant.
-
-**The chain law**, `[distance] genomic_dist_*`. Parity law, not read when the polymer law is on.
-
-In plain terms. The chain is a rope. Two beads next to each other on it are held a set
-distance apart, and that distance is larger the more DNA lies between them. Under the
-production values two beads 1 kb apart are held 1.5 units apart, 20 kb apart 5.7 units, and
-1 Mb apart 90 units. That last number is the catch. Ninety is sixty times 1.5, but crumpled
-chromatin would put loci 1 Mb apart only about seven times further than loci 1 kb apart. The
-rope is right for neighbours and far too stiff over long stretches.
-
-Precisely. `base + scale * (bp / 1000) ^ power` [1]. It sets the bond between consecutive
-beads in the smooth stage, the bond between consecutive block centroids in block placement, the
-bond a consecutive arcless anchor pair gets in the arcs stage when `use_arcs_chain_bonds` is
-on, and the background of the unified arc target. It is calibrated for consecutive beads a kb
-or so apart. Its exponent under the production values is 0.75 against the 0.285 above, which
-matters wherever it is evaluated at large separations.
-
-**The PET law**, `[distance] count_dist_*`. Parity law, not read when the polymer law is on.
-
-In plain terms. An arc is a loop the experiment saw, and the PET count is how many times it
-saw it. The more often a loop was seen, the closer its two ends are pulled. Seen twice, the
-ends are asked to sit 0.44 units apart. Seen fifty times, 0.20. Two catches. Those distances
-are a fraction of one bead's size, which is about 1.5 units, so the law asks the two ends to
-sit inside each other. And the law says the same distance whether the loop spans 5 kb or
-1 Mb, because it never looks at the span.
-
-Precisely. `base_level + scale / exp(a * (PET + shift))` [1]. It runs from its zero PET value
-down to `base_level` as the count grows, which under the production values is 0.56 down to
-0.20.
-
-**The separation aware law**, `[distance] use_separation_arc_target`. Not read when the polymer law is on.
-
-In plain terms. The PET law with one correction. A longer loop is allowed to be longer. A loop
-spanning 1 Mb is asked for about 3.7 times the distance of one spanning 10 kb with the same
-PET count, which is the crumpled chromatin scaling above. Loops under 10 kb are left as the
-PET law had them. This fixes the second catch and not the first. A 1 Mb loop seen four times is
-now asked for 1.35 units instead of 0.36, still less than one bead.
-
-Precisely. The PET law times `max(1, s_kb / pivot) ^ exponent`. The factor is the polymer
-scaling of mean distance with separation [4, 5], applied to the arc target so that two arcs of
-equal PET count but different span are no longer asked for the same distance. It gives the
-target the polymer slope and leaves its scale where the PET law put it. The pivot of 10 kb is
-a choice of this project.
-
-**The unified law**, `[distance] use_unified_arc_target`. Superseded by the polymer law, which is the same idea with the scale and the exponent taken from the data instead of from constants.
-
-In plain terms. Start from where two loci would sit anyway, given how much DNA lies between
-them and nothing holding them together. Call that the background. Then, if a loop joins them,
-pull them in from the background, more for a loop seen more often, but never closer than
-touching. Under the production values two loci 50 kb apart sit at about 10 units with no loop
-between them. With the strongest possible loop they are pulled to 0.45 of that, about 4.7
-units, a few beads apart and well clear of sitting inside each other. A loop seen a few times
-lands in between. The rope sets how far apart two points
-can be, a loop is a clip that draws them together, and two beads cannot pass through each
-other. The same background sets the bond between neighbouring anchors with no loop, so
-everything in the block is measured on one scale.
-
-Precisely. This is the form restraint based genome modelling generally takes. A pair sits at
-the expected distance for its separation [4, 5], and its contact only says how far in from that
-background to pull. That is observed over expected [8] written as a distance: TADbit sets its
-restraints from a pair's contact relative to the expectation at its separation [9], and
-distance inference methods map contact to distance through the same power law [10]. A contact
-pulls a pair toward touching and no further, since two beads cannot be closer than their own
-size, which is how polymer loop models hold loop anchors [6, 11], so the pull is bounded below
-by `arc_target_pull` of the background. The PET law supplies the pull factor rather than the
-distance, normalised by its own two limits, which reuses 3D-GNOME's calibrated shape of PET
-count against strength [1]. The background is the chain law, or with
-`arc_target_background_exponent` set, the chain law's value at `arc_target_background_ref_bp`
-continued at that exponent, which is the power law of [4, 5] anchored where the chain law is
-calibrated. When it is on, the chain bond a consecutive arcless anchor pair gets rides the same
-background, so the two families agree in scale and in slope. It supersedes the separation aware
-law. The pull of 0.45 and the exponent are this project's, chosen on measurement against Hi-C
-rather than derived.
-
-**The anchor heatmap**, `[anchor_heatmap]`.
-
-In plain terms. If Hi-C also sees a pair of anchors touching often, shrink their target a
-little more, by up to a tenth under the production values. It is a nudge on top of whichever
-arc law is on, not a law of its own.
-
-Precisely. Scales an arc target down by up to `heatmap_influence` in proportion to the pair's
-singleton contact count relative to the region's maximum [1]. It runs after the arc targets are
-set and before the chain bonds are added, so contact between neighbours does not shrink a
-bond.
-
-**The arcs stage matrix**, what every anchor pair ends up with.
-
-In plain terms. Every pair of anchors in a block is one of three things. Joined by a loop, and
-pulled to the loop distance. Next to each other on the chain with no loop, and held at the rope
-distance. Neither, and given no target at all, only a push apart if they come very close.
-
-Precisely. A pair an arc joins carries the arc target, from whichever law is on. A consecutive
-pair with no arc carries `arcs_chain_bond_scale` times the chain law, or times the unified
-background, when `use_arcs_chain_bonds` is on. Every other pair carries no target and feels
-only the repulsion [1], `max(0, 1 / d - 1 / (arcs_repulsion_cutoff_factor * mean arc
-target))`, unbounded when the factor is zero.
-
-**The heatmap frequency law**, `[distance] freq_dist_*`. Parity law, not read when the polymer law is on.
-
-In plain terms. This one is for the coarse map, not for loops. The genome is first laid out as
-big segments, and two segments that share more contacts are placed closer. Contact drops off
-as the cube of distance, so distance is taken as contacts to the power of minus one third.
-Twice the contacts means about a fifth closer.
-
-Precisely. `scale * freq ^ power` for the segment level heatmap, and the `_inter` pair does
-the same for the chromosome level heatmap [1]. The default power of minus one third is the
-fractal globule relation, contact falling as the cube of distance [4, 5], and the same
-exponent distance inference methods use [10]. It is not used for arcs.
-
-**The smooth stage**, where the anchors stop moving.
-
-In plain terms. Once the arcs stage has placed the anchors, they are nailed down. The smooth
-stage only threads the beads between them along the rope, bending as little as it can, and
-packs the rope tighter where the chromatin is closed. Nothing after the arcs stage moves an
-anchor, so whatever the arcs stage asked for is what the structure has.
-
-Precisely. Consecutive beads are held at the chain law of their gap, compacted by
-`fibre_compaction` where accessibility is low following HiP-HoP [6], and every anchor is held
-fixed.
+This law replaced, on 2026-09-06, the three laws 3D-GNOME set these distances with [1]: a chain
+law from genomic separation, a PET law from loop count, and a heatmap frequency law, plus two
+later patches on the PET law. Together they carried fifteen constants copied from one config
+with no derivation, set one quantity on three unrelated scales, and asked loop ends to sit
+inside each other. Measured against them on three cell lines the polymer law is better on
+Hi-C correlation by every statistic, cuts anchor overlaps by 97 percent and halves subanchor
+overlaps. The old constants are not accepted in a config and warn if present.
 
 ## References
 

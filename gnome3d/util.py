@@ -4,7 +4,6 @@ util functions for 3dgnome-ng.
 
 from __future__ import annotations
 
-import math
 import random
 import threading
 
@@ -36,38 +35,6 @@ def seed_rng(seed: int) -> None:
     Replaces a bare `random.seed`, so coarse seeding and per-stage seeding are
     thread-isolated; same seed -> same stream as the old global `random`."""
     _rng().seed(seed)
-
-
-def genomic_length_to_distance(length_bp: int, base: float, scale: float, power: float) -> float:
-    """Reference: genomicLengthToDistance(length) = base + scale * (length/1000)^power"""
-    return base + scale * (length_bp / 1000.0) ** power
-
-
-def freq_to_dist_heatmap(freq: float, scale: float, power: float) -> float:
-    """Reference: freqToDistanceHeatmap(freq) = scale * freq^power"""
-    return scale * (freq**power)
-
-
-def freq_to_dist_heatmap_inter(freq: float, scale_inter: float, power_inter: float) -> float:
-    """Reference: freqToDistanceHeatmapInter(freq) = scale_inter * freq^power_inter"""
-    return scale_inter * (freq**power_inter)
-
-
-def arc_target_with_separation(base: float, sep_bp: int, pivot_kb: float, nu: float) -> float:
-    """The separation aware arc target. `base` is the PET only target, multiplied by the polymer
-    background factor `(s_kb / pivot_kb)^nu` above the pivot span and left alone below it."""
-    s_kb = abs(int(sep_bp)) / 1000.0
-    if s_kb <= pivot_kb or nu == 0.0:
-        return base
-    return base * (s_kb / pivot_kb) ** nu
-
-
-def freq_to_distance(freq: int, a: float, scale: float, shift: float, base_level: float) -> float:
-    """Reference: freqToDistance(freq) = base_level + scale / exp(a * (freq + shift))"""
-    try:
-        return base_level + scale / math.exp(a * (freq + shift))
-    except OverflowError:  # Reference exp() returns inf -> scale/inf = 0
-        return base_level
 
 
 def random_vector_np(step: float, in_2d: bool = False) -> F32Array:

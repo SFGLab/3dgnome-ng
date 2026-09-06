@@ -4,15 +4,12 @@ Reconstructions come out as compact balls of anchors scattered in space and join
 strands. This records what causes that, what has been measured, what has been ruled out, and
 which changes are worth making.
 
-Status. Diagnosis complete and quantified on finished structures. B, the boundary stitch, is
-built and now converges; it removes the strands between blocks. E, the cross block relaxation,
-removes the interpenetration. Neither touches what is inside a block, and the within block
-defect has a root cause as of 2026-09-05: the arcs stage minimises a matrix built from two
-distance laws that disagree by eleven times at five kb and a hundred at one Mb. G, one
-background for both, is built and opt in and fixes both the overlap rate and the distance
-exponent on real blocks offline. It is under whole region measurement. A was removed on
-2026-09-06 along with its six keys: it set block size rather than shape, the solver never
-implemented it, and the polymer law makes a per pair floor unnecessary.
+Status. Diagnosis complete. B, the boundary stitch, converges and removes the strands between
+blocks. E, the cross block relaxation, removes the interpenetration. H, one distance law in
+bead units with its exponent measured from the input, is the law as of 2026-09-06: it replaced
+the three reference laws and their fifteen constants after beating them on three cell lines,
+and A, D and G went with them. What remains open is the realised exponent running 1.3 to 1.5
+times the measured input, which one correction on the background exponent would absorb.
 
 ## Symptom
 
@@ -330,7 +327,7 @@ are placed, adjusting each block rigidly to satisfy its edge bonds while leaving
 arrangement the arcs MC produced untouched. That is the same pass A wants for measuring
 `d_bond`, so the two share a stage.
 
-### D. Separation aware arc targets. Built, opt in, measured alone
+### D. Separation aware arc targets. Superseded by H, removed 2026-09-06
 
 Implemented as `util.arc_target_with_separation`, `Settings.arc_expected_distance` and
 `build.arc_expected_matrix`, gated on `[distance] use_separation_arc_target`, multiplicative above
@@ -481,7 +478,7 @@ across boundaries at the same density the blocks use, and letting the relaxation
 route them, is the fix. It also gives the chain a genomic length across the gap instead of a
 bond of zero length, which the stitch target currently stands in for.
 
-### G. One distance law for arc targets and chain bonds. Built, opt in, under measurement
+### G. One distance law for arc targets and chain bonds. Superseded by H, removed 2026-09-06
 
 The root cause of the within block collapse, found 2026-09-05.
 
@@ -604,7 +601,7 @@ What is still open. The trio, whose data lives on the cluster and cannot be meas
 workstation. And whether to make the law default on, which turns on for all fifteen ensemble
 configs at once, the nine trio ones included, and those are the unmeasured half.
 
-### H. One distance law, in bead units, with its exponent measured from the input. Built, opt in, under measurement
+### H. One distance law, in bead units, with its exponent measured from the input. Adopted 2026-09-06, the law
 
 G fixed the arcs against the chain bonds and left the structure of the problem in place. The
 settings reference made that structure visible, 2026-09-06. Fifteen free constants for one

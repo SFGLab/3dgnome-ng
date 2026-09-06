@@ -87,16 +87,29 @@ def normalize_heatmap_inter(h: Matrix, n: int, current_level: ChrLevel, scale: f
 
 
 def _polymer_distances(
-    law: PolymerLaw, ha: F64Array, use: BoolArray, separations_bp: F64Array
+    law: PolymerLaw,
+    ha: F64Array,
+    use: BoolArray,
+    separations_bp: F64Array | None,
+    scale_bp: float | None,
 ) -> F64Array:
     """Per cell targets under the polymer law. `use` marks the cells that carry a contact and
-    lie outside the diagonal band; the expected contact at a separation is the mean over those
-    cells in the same log separation bin, eight bins a decade."""
+    lie outside the diagonal band. With separations the expected contact at a separation is the
+    mean over those cells in the same log separation bin, eight bins a decade. Without them every
+    cell shares one expectation and the background is taken at `scale_bp`."""
     n = ha.shape[0]
+    out = np.zeros((n, n), dtype=np.float64)
+    if not use.any():
+        return out
+    if separations_bp is None:
+        expected = float(ha[use].mean())
+        sep_bp = int(scale_bp if scale_bp is not None else 1)
+        for i, j in zip(*np.nonzero(use), strict=True):
+            out[i, j] = law.heatmap_distance(float(ha[i, j]), expected, sep_bp)
+        return out
     sep = np.abs(separations_bp[:, None] - separations_bp[None, :])
     ls = np.log10(np.maximum(sep, 1.0))
     key = np.floor(ls * 8.0).astype(np.int64)
-    out = np.zeros((n, n), dtype=np.float64)
     for k in np.unique(key[use]):
         m = use & (key == k)
         expected = float(ha[m].mean())
@@ -109,34 +122,25 @@ def create_distance_heatmap(
     settings: Settings,
     h: Matrix,
     n: int,
-    inter: bool = False,
     separations_bp: F64Array | None = None,
+    scale_bp: float | None = None,
 ) -> tuple[F64Array, float]:
-    """Convert a normalized contact-frequency heatmap to an expected-distance
-    heatmap.  Mirrors Reference createDistanceHeatmap(), per cell:
-      - freq < 1e-6           -> 0   (no contact)
-      - within diagonal band  -> -1  (ignored in scoring)
-      - else                  -> scale * freq^power
-    then clip distances above ``avg(>0) * heatmap_distance_stretching``.  Uses the
-    upper triangle of `h` and mirrors it (matches the reference's j>=i loop)."""
+    """Convert a normalised contact frequency heatmap to expected distances under the polymer
+    law. Per cell: no contact gives 0, the diagonal band gives -1, which scoring ignores, and
+    every other cell sits at the background for its separation scaled by observed over expected
+    contact to the minus third. The expectation is the mean of the active cells at that log
+    separation within the heatmap. With `separations_bp` absent, which is the chromosome level
+    where pairs have no genomic separation, every cell shares one expectation and the background
+    is taken at `scale_bp`. Distances are then clipped above the mean positive distance times
+    `heatmap_distance_stretching`. Uses the upper triangle and mirrors it.
+    """
     ha = np.asarray(h, dtype=np.float64)
     diag = get_diagonal_size(ha, n)
-    scale, power = (
-        (settings.freq_dist_scale_inter, settings.freq_dist_power_inter)
-        if inter
-        else (settings.freq_dist_scale, settings.freq_dist_power)
-    )
+    law = settings.polymer_law()
     active = ha >= 1e-6
     ii, jj = np.indices((n, n))
     band = np.abs(ii - jj) < diag
-    law = settings.polymer if settings.use_polymer_law else None
-    if law is not None and separations_bp is not None:
-        # Observed over expected within the heatmap itself. The expected contact at a
-        # separation is the mean of the active cells in the same log separation bin, so a
-        # cell at its expectation lands on the background and no constant sets the scale.
-        fd = _polymer_distances(law, ha, active & ~band, separations_bp)
-    else:
-        fd = scale * np.power(np.where(active, ha, 1.0), power)  # clamp inactive: no 0**neg warn
+    fd = _polymer_distances(law, ha, active & ~band, separations_bp, scale_bp)
     dist = np.where(active, np.where(band, -1.0, fd), 0.0)
     dist = np.triu(dist) + np.triu(dist, 1).T  # mirror upper -> lower
 

@@ -305,17 +305,6 @@ segment_split = {data_dir}/ccds_all_hg38_merged100k_GM12878.breakpoints.bed
 centromeres = {data_dir}/hg38_centromeres.bed
 
 [distance]
-genomic_dist_power = 0.75
-genomic_dist_scale = 0.5
-genomic_dist_base = 1.0
-freq_dist_scale = 25.0
-freq_dist_power = -0.6
-freq_dist_scale_inter = 120.0
-freq_dist_power_inter = -1.0
-count_dist_a = 0.2
-count_dist_scale = 1.8
-count_dist_shift = 8
-count_dist_base_level = 0.2
 
 [template]
 

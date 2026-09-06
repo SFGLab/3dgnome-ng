@@ -807,105 +807,39 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference has no term across block boundaries either, which is
   why its structures show the same scatter. See `design/anchor-placement.md`.
 
-- **Separation aware arc target: `[distance] use_separation_arc_target = yes`, default no.**
-  ([gnome3d/util.py](gnome3d/util.py) `arc_target_with_separation`,
-  [settings.py](gnome3d/settings.py) `arc_expected_distance`,
-  [pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `arc_expected_matrix`)
-  The parity arc target is `freq_to_distance(PET)`, a function of PET count alone, so on
-  GM12878 chr1:1-60 Mb a 1 Mb arc with four PETs targets 0.36 while the chain law says 90, and
-  every arc lands in 0.20 to 0.56 whatever its span. Arcs are realised at 2.6 to 3.2 times
-  their target in every span bin, the equilibrium of a network of near equal links, and that
-  network is what sets the within block distance exponent, 0.21 against 0.285 from Hi-C. The
-  genomic floor on the pairs that are not links could only inflate or deflate that network.
+- **The distance law.** ([gnome3d/polymer.py](gnome3d/polymer.py), `Settings.polymer_law`,
+  [pipeline/coarse/heatmap.py](gnome3d/pipeline/coarse/heatmap.py), [data.py](gnome3d/data.py))
+  One law sets every distance, in bead units, one bead being the distance at
+  `target_bp_per_subanchor`. A pair with no contact sits at `max(1, (s / s0) ^ nu)`. A loop of
+  strength `q` pulls its pair to `1 + (background - 1) / (1 + q / q_half)`, so a saturated loop
+  sits at one bead and never inside; `q` is the PET count over the typical count at that span
+  fitted on the run's own arcs. A heatmap cell sits at the background times observed over
+  expected to the minus third, the expectation taken within the heatmap at that separation,
+  and at the chromosome level, where pairs have no separation, at the mean chromosome span.
+  `nu` is measured at load from the singletons every run reads, on the whole chromosome set
+  before the region filter. The fit refuses what is not a polymer decay and says so in a
+  STATUS line with the reason, then uses 0.285 as a named fallback; every ChIA-PET singletons
+  file is refused, since it is enrichment filtered around CTCF, and every Hi-C file is
+  accepted. A `Settings` with no law attached builds one from `polymer_exponent` or the
+  fallback and warns once, so no distance call ever answers from a constant silently. Two keys,
+  `polymer_exponent` (0 measures, a positive value pins) and `contact_half_saturation` (1.0).
 
-  With the flag the target is `freq_to_distance(PET) * max(1, s_kb / pivot)^exponent`, the PET
-  law times the polymer background above a pivot span, and unchanged below it. PET ordering is
-  kept at every span, so a strong long arc still targets shorter than a weak one. Keys:
-  `arc_target_exponent` (0.285, the contact probability curve), `arc_target_pivot_kb` (10, the
-  short end the PET law was tuned at). One site: the matrix builder; no kernel is touched. Unit
-  checks in `harness/test_arc_target.py`.
+  It replaced, on 2026-09-06, the reference's chain law, PET law and heatmap frequency law and
+  two later patches on the PET law: fifteen constants copied from one config with no derivation
+  and byte identical across cell lines, three absolute scales for one quantity in a unit with no
+  meaning, and a derived exponent that was a mean over three of our own Hi-C files typed in as
+  a default. Fitted on the inputs we run that exponent is 0.275, 0.299, 0.192 and 0.072 for
+  GM12878, H1ESC, HFFC6 and a trio sample. Measured against the old laws on GM12878, H1ESC and
+  HFFC6, chr1:1-60 Mb, five structures each, raw contact maps: Pearson, Spearman and SCC up on
+  every cell, MultiMM level, anchor overlaps down 96 to 98 percent, subanchor overlaps halved,
+  cross block overlaps down four to ten times. The realised exponent runs 1.3 to 1.5 times the
+  measured input on every cell, which one correction on the background exponent would absorb;
+  not built. The old keys are not read and warn if present. Unit checks in
+  `harness/test_polymer.py` and `harness/test_arc_matrix.py`; `playground/ps_from_singletons.py`
+  fits the exponent on a file by hand. See `design/anchor-placement.md`, option H.
 
-  Why not in the reference: the reference's `freqToDistance` is the PET only law. See
-  `design/anchor-placement.md`, option D.
-
-- **Polymer law: `[distance] use_polymer_law = yes`, default no.**
-  ([gnome3d/polymer.py](gnome3d/polymer.py), `Settings.genomic_length_to_distance` and
-  `arc_expected_distance`, [pipeline/coarse/heatmap.py](gnome3d/pipeline/coarse/heatmap.py)
-  `create_distance_heatmap`, [data.py](gnome3d/data.py) `from_files`)
-  The `[distance]` section carried fifteen free constants for one physical relation, how far
-  two loci sit given the DNA between them and how often they touch. Eleven were copied from the
-  reference authors' GM12878 config with no derivation and were byte identical across every
-  cell line. Three laws set that one quantity on three unrelated absolute scales, in a unit
-  with no meaning, which is why arc targets and chain bonds could disagree by a hundred times.
-  And the one derived number, 0.285, was a mean over three of our own Hi-C files typed in as a
-  default. Fitted on the inputs we run it is 0.275 for GM12878, 0.299 for H1ESC, 0.192 for
-  HFFC6 and 0.072 for a trio sample, whose production structures came out at 0.067.
-
-  One law in bead units, one bead being the distance at `target_bp_per_subanchor`. A pair with
-  no contact sits at `max(1, (s / s0) ^ nu)`. A loop of strength `q` pulls its pair to
-  `1 + (background - 1) / (1 + q / q_half)`, so a saturated loop sits at one bead and never
-  inside; `q` is the PET count over the typical count at that span fitted on the run's own arcs.
-  A heatmap cell sits at the background times observed over expected to the minus third, the
-  expectation taken within the heatmap at that separation. `nu` is measured at load from the
-  singletons every run already reads, on the whole chromosome set before the region filter. The
-  fit refuses what is not a polymer decay and says so in a STATUS line with the reason, then
-  uses 0.285 as a named fallback. Every ChIA-PET singletons file is refused, since it is
-  enrichment filtered around CTCF and does not decay, and every Hi-C file is accepted.
-
-  Three keys replace eighteen: `use_polymer_law`, `polymer_exponent` (0 measures, a positive
-  value pins and is the record that someone chose to), `contact_half_saturation` (1.0). The
-  other fifteen are not read while it is on. Flag off is byte exact by construction and was
-  gated with `playground/parity_dump.py` against a HEAD worktree. `from_dataframes` takes
-  `polymer_law` as a parameter. Unit checks in `harness/test_polymer.py`. The battery's Hi-C
-  contact radius is bead relative now, so arms in different units compare.
-
-  Not yet default. `CANONICAL` keeps the old laws until the battery on three cell lines says
-  otherwise. See `design/anchor-placement.md`, option H.
-
-  Why not in the reference: the reference has the three laws and their constants. This is
-  what they were standing in for.
-
-- **Unified arc target: `[distance] use_unified_arc_target = yes`, default no.**
-  ([settings.py](gnome3d/settings.py) `arc_expected_distance`)
-  The arcs stage minimises a matrix carrying two families of positive entry built by different
-  laws. An arc's target is `freq_to_distance(PET)`, times a span factor when
-  `use_separation_arc_target` is on, and lands between 0.2 and 1.6 model units over five kb to
-  one Mb. A consecutive arcless anchor pair's target, which `use_arcs_chain_bonds` adds, is
-  `arcs_chain_bond_scale` times the chain law and lands between 4.0 and 135 over the same range.
-  The two differ by eleven times at five kb and a hundred at one Mb. An arc therefore asks two
-  beads to sit at a fraction of one bead's own size, and nothing downstream can undo it because
-  the smooth stage holds every anchor fixed.
-
-  Measured on a finished trio chr1 by matching each loop in the bedpe to its anchor pair, 93
-  percent of arc joined anchor pairs end up closer than a bead's size. Those are 24 percent of
-  the chromosome's 13,177 overlapping anchor pairs, a 5.8 times enrichment over the 4.13 percent
-  base rate, and the rest are anchors with no arc between them squeezed together as the arc
-  network collapses the block.
-
-  Under the flag a pair sits at the chain law distance for its separation and its PET count only
-  says how far in to pull from there, between `arc_target_pull` and 1. The PET law supplies that
-  factor rather than the distance, normalised by its own limits, which it has: it runs from
-  `freq_to_distance(0)` down to `count_dist_base_level`. A zero PET arc sits on the background, a
-  saturated one at the pull, and an arc's target grows with separation exactly as the chain's
-  does. One site, `Settings.arc_expected_distance`; no kernel and no matrix builder is touched.
-  It supersedes the separation aware law, which carries the same span dependence in a form that
-  cannot fix the scale. Keys: `use_unified_arc_target`, `arc_target_pull` (0.45).
-
-  Solved on eight real blocks of a trio chr1 from a common start, against the production matrix
-  rebuilt from the same anchors and the same bedpe, the overlap rate goes from 1,619 per thousand
-  anchors to zero and the realised distance exponent from 0.067 to 0.288 against the 0.285 the
-  contact probability curves give. Arc joined pairs still sit at 0.63 of the distance an unjoined
-  pair holds at the same separation. Flooring the old targets at a bead's size removes the
-  overlaps too, 1,619 to 37, but leaves the exponent at 0.069, so the overlap and the flat curve
-  are one defect rather than two. Unit checks in `harness/test_arc_target.py`,
-  `playground/arc_law_arms.py` runs the offline comparison.
-
-  Per block the exponent varies far more widely than production's, 0.04 to 0.60 against -0.08 to
-  0.22, and blocks expand, so this stays opt in until a whole region run measures it against
-  Hi-C. See `design/anchor-placement.md`, option G.
-
-  Why not in the reference: the reference has only the PET law and no chain term in this stage,
-  so the two never met.
+  Why not in the reference: the reference has the three laws and their constants. This is what
+  they were standing in for.
 
 - **Chain bonds in the arcs MC: `[springs] use_arcs_chain_bonds = yes`, default no.**
   ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `add_chain_bonds`)
@@ -917,7 +851,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   an island anchor as a taut spoke.
 
   With the flag every consecutive anchor pair with no arc gets a spring at
-  `genomic_length_to_distance` of its gap, the rule the smooth stage already holds consecutive
+  the law's background for its gap, the rule the smooth stage already holds consecutive
   beads to, entered into the arcs target matrix after the anchor heatmap scaling so Hi-C
   contact between neighbours does not shrink it. A pair that already has an arc keeps the arc.
   The bond carries the arcs spring constants; a separate weight needs a per pair weight in the

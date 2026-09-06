@@ -5,7 +5,7 @@ diagnosable. These are the reference, the python parity model with features off,
 tuned model.
 
 3dgnome turns singleton contact frequencies into target distances the MC minimises toward, via
-load_singletons then create_singleton_heatmap then freq_to_dist_heatmap. Correlating the output
+load_singletons then create_singleton_heatmap then the polymer law's heatmap distance. Correlating the output
 against the same contacts fed in would measure self-consistency by construction rather than
 prediction. The Hi-C bin-pairs are therefore split into train, fed in as singletons, and test, held
 out, and only the test pairs are correlated against for a genuine generalisation check. This

@@ -101,7 +101,8 @@ class CoarseState:
 
 def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
     """The run's polymer law, from its own fits, with one always visible line saying what it
-    measured or why it could not.
+    measured or why it could not. A repeat attach with the same exponent, which the ensemble
+    path makes once per member, logs at debug so the line is not printed per structure.
 
     The exponent is `polymer_exponent` when pinned, otherwise the contact fit's, otherwise the
     named fallback. The bead is the subanchor spacing the run declared.
@@ -109,30 +110,26 @@ def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
     from gnome3d.polymer import FALLBACK_NU, PolymerLaw
 
     fit = data.contact_fit
+    args: tuple[object, ...]
     if settings.polymer_exponent > 0.0:
         nu = float(settings.polymer_exponent)
-        log.status(LOG, "polymer law: exponent pinned at %.3f by the config", nu)
+        msg = "polymer law: exponent pinned at %.3f by the config"
+        args = (nu,)
     elif fit is not None and fit.ok:
         nu = fit.nu
-        log.status(
-            LOG,
-            "polymer law: exponent %.3f measured on %s intra pairs, %d to %d kb, slope %+.3f",
-            nu,
-            f"{fit.n_pairs:,}",
-            fit.lo // 1000,
-            fit.hi // 1000,
-            fit.slope,
-        )
+        msg = "polymer law: exponent %.3f measured on %s intra pairs, %d to %d kb, slope %+.3f"
+        args = (nu, f"{fit.n_pairs:,}", fit.lo // 1000, fit.hi // 1000, fit.slope)
     else:
         nu = FALLBACK_NU
-        log.status(
-            LOG,
-            "polymer law: the singletons cannot supply an exponent (%s), using the fallback %.3f",
-            fit.reason if fit is not None else "no fit",
-            nu,
-        )
+        msg = "polymer law: the singletons cannot supply an exponent (%s), using the fallback %.3f"
+        args = (fit.reason if fit is not None else "no fit", nu)
+    repeat = settings.polymer is not None and abs(settings.polymer.nu - nu) < 1e-12
+    if repeat:
+        LOG.debug(msg, *args)
+    else:
+        log.status(LOG, msg, *args)
     arcs = data.arc_fit
-    if arcs is not None and not arcs.ok:
+    if arcs is not None and not arcs.ok and not repeat:
         log.status(LOG, "polymer law: loop strength follows the PET count alone (%s)", arcs.reason)
     return PolymerLaw(
         nu=nu,
@@ -161,8 +158,7 @@ def build_state(
         )
         LOG.info("total clusters: %d", len(clusters))
 
-    if settings.use_polymer_law:
-        settings.polymer = attach_polymer_law(settings, data)
+    settings.polymer = attach_polymer_law(settings, data)
 
     return CoarseState(
         s=settings,
@@ -477,15 +473,8 @@ def add_chain_bonds(mat: F64Array, mids: list[int], s: Settings) -> F64Array:
     for a, b in zip(order[:-1], order[1:], strict=True):
         if out[a, b] > 0.0:
             continue
-        # Under the unified law the bond rides the same background the arc targets do, or the
-        # two families agree in scale and still disagree in slope.
         gap = abs(int(mids[b]) - int(mids[a]))
-        bg = (
-            s.arc_background_distance(gap)
-            if s.use_unified_arc_target
-            else (s.genomic_length_to_distance(gap))
-        )
-        d = float(s.arcs_chain_bond_scale) * float(bg)
+        d = float(s.arcs_chain_bond_scale) * float(s.genomic_length_to_distance(gap))
         out[a, b] = d
         out[b, a] = d
     return out
@@ -827,7 +816,16 @@ def reconstruct_chromosome_level(state: CoarseState) -> None:
 
     # Normalize first non-zero diagonal to 1.0; convert freq → expected dist.
     hd = normalize_heatmap_diagonal_total(h, n_chr, 1.0)
-    heatmap_dist, avg_dist = create_distance_heatmap(s, hd, n_chr, inter=False)
+    # Chromosome pairs have no genomic separation, so every cell shares one expectation and
+    # the background is taken at the mean chromosome span.
+    spans = [
+        float(clusters[state.chr_root[c]].end - clusters[state.chr_root[c]].start)
+        for c in state.chrs
+        if c in state.chr_root
+    ]
+    heatmap_dist, avg_dist = create_distance_heatmap(
+        s, hd, n_chr, scale_bp=float(np.mean(spans)) if spans else None
+    )
     heatmap_dist = np.array(heatmap_dist, dtype=np.float64)
     heatmap_dist_diag = get_diagonal_size(hd, n_chr)
 
@@ -916,14 +914,12 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
     if len(state.chrs) > 1:
         h_norm = normalize_heatmap_inter(h_norm, total_size, current_level, s.heatmap_inter_scaling)
 
-    # Convert freq -> distance heatmap. Under the polymer law the conversion is observed over
-    # expected at each pair's separation, so it needs where each bin sits.
-    separations = None
-    if s.use_polymer_law and s.polymer is not None:
-        ends = np.cumsum(np.asarray(bin_lengths_mb, dtype=np.float64)) * 1e6
-        separations = ends - 0.5 * np.asarray(bin_lengths_mb, dtype=np.float64) * 1e6
+    # The conversion is observed over expected at each pair's separation, so it needs where
+    # each bin sits.
+    ends = np.cumsum(np.asarray(bin_lengths_mb, dtype=np.float64)) * 1e6
+    separations = ends - 0.5 * np.asarray(bin_lengths_mb, dtype=np.float64) * 1e6
     heatmap_dist, avg_dist = create_distance_heatmap(
-        s, h_norm, total_size, inter=False, separations_bp=separations
+        s, h_norm, total_size, separations_bp=separations
     )
     heatmap_dist = np.array(heatmap_dist, dtype=np.float64)
     heatmap_dist_diag = get_diagonal_size(h_norm, total_size)
