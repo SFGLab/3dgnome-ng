@@ -18,11 +18,15 @@ meaning it does not have.
 
 The pipeline has several laws that turn something about the data into a distance in model
 units, and they meet in the arcs stage's target matrix. This is the part of the configuration
-where a wrong reading costs the most, so it is laid out before the tables. The first three laws
-and the heatmap scaling are 3D-GNOME's own, from the modelling engine paper [1] and carried
-through its later releases [2, 3]. The separation aware and unified laws are this project's
-additions and have no paper behind them. The exponent they aim at rests on the polymer physics
-that links contact probability to spatial distance [4, 5].
+where a wrong reading costs the most, so it is laid out before the tables. The chain law, the PET
+law, the heatmap frequency law and the anchor heatmap scaling are 3D-GNOME's own, from the
+modelling engine paper [1] and carried through its later releases [2, 3]. The separation aware
+and unified laws are this project's, and they add no physics of their own. Each applies two
+established results to the arc targets. Mean spatial distance grows with genomic separation as
+a power law [4, 5], and a contact's meaning depends on how much more often the pair meets than
+two loci that far apart meet anyway, which is the observed over expected normalisation that
+loop calling [8] and restraint based modelling [9, 10] both rest on. What is this project's
+alone is the parameterisation, and that is said where it applies.
 
 **The chain law**, `[distance] genomic_dist_*`, gives the distance between two beads from their
 genomic separation, `base + scale * (bp / 1000) ^ power` [1]. It sets the bond between
@@ -44,17 +48,29 @@ scale is a fraction of one chain bond, so on its own it asks two anchors an arc 
 inside each other.
 
 **The separation aware law**, `[distance] use_separation_arc_target`, multiplies the PET law by
-`max(1, s_kb / pivot) ^ exponent`. It gives an arc's target the polymer slope in separation and
-leaves its scale where the PET law put it.
+`max(1, s_kb / pivot) ^ exponent`. The factor is the polymer scaling of mean distance with
+separation [4, 5], applied to the arc target so that two arcs of equal PET count but different
+span are no longer asked for the same distance. It gives the target the polymer slope and
+leaves its scale where the PET law put it. The pivot of 10 kb, below which the PET law is left
+alone, is a choice of this project.
 
-**The unified law**, `[distance] use_unified_arc_target`, replaces both. A pair sits on a
-background distance for its separation, and its PET count only says how far in to pull from
-there, between `arc_target_pull` and 1. The PET law supplies that factor rather than the
-distance, normalised by its own two limits. The background is the chain law, or with
-`arc_target_background_exponent` set, the chain law's value at `arc_target_background_ref_bp`
-continued at that exponent. When it is on the chain bond a consecutive arcless anchor pair gets
-rides the same background, so the two families agree in scale and in slope. It supersedes the
-separation aware law.
+**The unified law**, `[distance] use_unified_arc_target`, replaces both, and is the form
+restraint based genome modelling generally takes. A pair sits on a background distance for its
+separation, the expected distance for two loci that far apart with nothing holding them
+together [4, 5], and its contact only says how far in from that background to pull. That is
+observed over expected [8], written as a distance: TADbit sets its restraints from a pair's
+contact relative to the expectation at its separation [9], and distance inference methods map
+contact to distance through the same power law [10]. A contact pulls a pair toward touching
+and no further, since two beads cannot be closer than their own size, which is how polymer
+loop models hold loop anchors [6, 11], so the pull is bounded below by `arc_target_pull` of
+the background. The PET law supplies the pull factor rather than the distance, normalised by
+its own two limits, which reuses 3D-GNOME's calibrated shape of PET count against strength
+[1]. The background is the chain law, or with `arc_target_background_exponent` set, the chain
+law's value at `arc_target_background_ref_bp` continued at that exponent, which is the power
+law of [4, 5] anchored where the chain law is calibrated. When it is on, the chain bond a
+consecutive arcless anchor pair gets rides the same background, so the two families agree in
+scale and in slope. It supersedes the separation aware law. The pull of 0.45 and the exponent
+are this project's, chosen on measurement against Hi-C rather than derived.
 
 **The anchor heatmap**, `[anchor_heatmap]`, then scales an arc target down by up to
 `heatmap_influence` in proportion to the pair's Hi-C contact [1]. It runs after the arc targets
@@ -71,8 +87,10 @@ per pair that grows with separation.
 
 **The heatmap frequency law**, `[distance] freq_dist_*`, is a different thing. It turns an
 aggregate singleton contact count into a distance, `scale * freq ^ power`, for the segment level
-heatmap, and the `_inter` pair does the same for the chromosome level heatmap [1]. It is not
-used for arcs.
+heatmap, and the `_inter` pair does the same for the chromosome level heatmap [1]. Its default
+power of one third below zero is the fractal globule relation, contact falling as the cube of
+distance [4, 5], and the same exponent distance inference methods use [10]. It is not used for
+arcs.
 
 **The smooth stage** holds consecutive beads at the chain law of their gap, compacted by
 `fibre_compaction` where accessibility is low following HiP-HoP [6], and holds every anchor
@@ -459,3 +477,14 @@ the one call that spans the whole active region.
 7. Korsak S, Banecki K, Plewczynski D. Multiscale molecular modeling of chromatin with MultiMM:
    From nucleosomes to the whole genome. Computational and Structural Biotechnology Journal 23,
    3537 to 3548 (2024). doi:10.1016/j.csbj.2024.09.025
+8. Rao SSP, Huntley MH, Durand NC, Stamenova EK, Bochkov ID, Robinson JT, Sanborn AL, Machol I,
+   Omer AD, Lander ES, Aiden EL. A 3D map of the human genome at kilobase resolution reveals
+   principles of chromatin looping. Cell 159, 1665 to 1680 (2014). doi:10.1016/j.cell.2014.11.021
+9. Serra F, Baù D, Goodstadt M, Castillo D, Filion GJ, Marti-Renom MA. Automatic analysis and
+   3D-modelling of Hi-C data using TADbit reveals structural features of the fly chromatin
+   colors. PLoS Computational Biology 13, e1005665 (2017). doi:10.1371/journal.pcbi.1005665
+10. Varoquaux N, Ay F, Noble WS, Vert JP. A statistical approach for inferring the 3D structure
+    of the genome. Bioinformatics 30, i26 to i33 (2014). doi:10.1093/bioinformatics/btu268
+11. Fudenberg G, Imakaev M, Lu C, Goloborodko A, Abdennur N, Mirny LA. Formation of chromosomal
+    domains by loop extrusion. Cell Reports 15, 2038 to 2049 (2016).
+    doi:10.1016/j.celrep.2016.04.085
