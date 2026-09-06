@@ -581,11 +581,26 @@ sits in the middle of the flat region rather than on its edge.
 The exponent crosses the target between 0.10 and 0.15, at 0.276 and 0.305, and is close to
 linear in the slope.
 
-What is still open. Whether one slope serves every cell line or has to be calibrated per dataset
-the way `beta` is. Everything above is GM12878. Offline at the anchor level GM12878 and the trio
-wanted different values, 0.500 against 0.278 under the chain slope. An H1ESC arm at production
-and at 0.15 is measuring the transfer. The trio cannot be measured on the workstation, since its
-data lives on the cluster.
+The slope transfers. H1ESC, same region, same five structures per arm, read from a raw contact
+map since none of that file's thirteen resolutions carries balancing weights, so these numbers
+stand against each other and not against the balanced table above.
+
+| arm | Pearson | Spearman | SCC | MultiMM | exponent | Rg | wb-aa | wb-sa | xb |
+|---|---|---|---|---|---|---|---|---|---|
+| production | 0.160 | 0.120 | 0.025 | 0.072 | 0.163 | 36.5 | 121.6 | 3662 | 4719 |
+| 0.15 | 0.183 | 0.134 | 0.034 | 0.075 | 0.226 | 40.4 | 35.5 | 3104 | 2815 |
+
+Every measure improves, Pearson by 14 percent, Spearman by 12, SCC by 36, MultiMM by 4, and the
+anchor overlaps fall 3.4 times. So one slope is a strict improvement on two cell lines that
+differ in assay and in depth.
+
+The optimum is not the same for both. At 0.15 GM12878 overshoots the exponent at 0.305 and
+H1ESC undershoots at 0.226, so a per dataset calibration would do better than one constant. It
+is not needed to adopt the law, since 0.15 improves both and harms neither.
+
+What is still open. The trio, whose data lives on the cluster and cannot be measured on the
+workstation. And whether to make the law default on, which turns on for all fifteen ensemble
+configs at once, the nine trio ones included, and those are the unmeasured half.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
