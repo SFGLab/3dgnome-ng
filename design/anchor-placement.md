@@ -560,23 +560,32 @@ anchored at the separation the chain law is calibrated for.
 | background slope | Pearson | Spearman | SCC | MultiMM | exponent | Rg | wb-aa | wb-sa | xb |
 |---|---|---|---|---|---|---|---|---|---|
 | production, no unified law | 0.405 | 0.321 | 0.109 | 0.331 | 0.249 | 32.9 | 89.2 | 3376 | 2680 |
+| 0.10 | 0.436 | 0.323 | 0.115 | 0.339 | 0.276 | 35.6 | 28.1 | 3011 | 1595 |
+| 0.15 | 0.455 | 0.324 | 0.112 | 0.336 | 0.305 | 39.0 | 16.1 | 2607 | 1098 |
 | 0.20 | 0.479 | 0.320 | 0.110 | 0.334 | 0.345 | 46.9 | 9.1 | 2255 | 640 |
 | 0.285 | 0.498 | 0.296 | 0.101 | 0.318 | 0.453 | 53.6 | 6.4 | 1690 | 284 |
 | the chain law, 0.671 | 0.499 | 0.206 | 0.082 | 0.256 | 0.688 | 147.0 | 0.9 | 474 | 16 |
 
-At 0.20 the law is a strict improvement. Pearson is up 18 percent, Spearman, SCC and MultiMM are
-all level with production, and anchor overlaps fall ten times. Above that the overlap count keeps
-falling and the three discriminating Hi-C measures start paying for it, so the slope trades
-overlap against contact fidelity and 0.20 is the point where the trade is free.
+Every slope from 0.10 to 0.20 beats production on all four Hi-C measures and cuts the overlaps
+at the same time, so the law is not a trade against contact fidelity in that range. It becomes
+one above 0.20, where the overlap count keeps falling and Spearman, SCC and MultiMM start
+paying.
 
-The exponent crosses the target between production and 0.20, undershooting at 0.249 and
-overshooting at 0.345, and it is close to linear in the slope. Arms at 0.15 and 0.10 are
-measuring where it lands and whether the overlap fix survives that far down.
+Within 0.10 to 0.20 the Hi-C measures barely move, SCC 0.115 to 0.110 and MultiMM 0.339 to
+0.334, while the anchor overlaps fall threefold, 28.1 to 9.1. So the choice inside that range
+costs almost nothing on Hi-C and buys a lot on overlap. 0.15 is the balanced pick. It has the
+best Spearman of any arm including production, SCC and MultiMM above production, the exponent
+at 0.305 against a 0.285 target where production sits at 0.249, overlaps down 5.5 times, and it
+sits in the middle of the flat region rather than on its edge.
 
-What is still open. Whether one background slope serves every cell line or has to be calibrated
-per dataset the way `beta` is. Offline at the anchor level GM12878 and the trio want different
-values, 0.500 against 0.278 under the chain slope. And whether the exponent hitting target
-matters more than the three Hi-C measures, which at 0.20 are already at parity.
+The exponent crosses the target between 0.10 and 0.15, at 0.276 and 0.305, and is close to
+linear in the slope.
+
+What is still open. Whether one slope serves every cell line or has to be calibrated per dataset
+the way `beta` is. Everything above is GM12878. Offline at the anchor level GM12878 and the trio
+wanted different values, 0.500 against 0.278 under the chain slope. An H1ESC arm at production
+and at 0.15 is measuring the transfer. The trio cannot be measured on the workstation, since its
+data lives on the cluster.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
