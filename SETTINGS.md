@@ -78,9 +78,8 @@ is too far and the squeeze constant when too close.
 | `angular_constant` | float | 0.1 | 0.1 | Smooth stage bend penalty, the cube of the angle between consecutive bonds. |
 | `stretch_constant_arcs` | float | 1.0 | 1.0 | Arcs stage, every target in the matrix, arcs and chain bonds alike. |
 | `squeeze_constant_arcs` | float | 1.0 | 1.0 | Arcs stage. |
-| `background_weight` | float | 0.3 | 0.3 | Weight of the spring holding an arcless anchor pair at the background for its separation in the arcs stage. Weak against the arc springs, since the background is an expectation and not a measured contact. |
-| `use_arcs_chain_bonds` | bool | no | no | Give every consecutive anchor pair with no arc a full weight spring at `arcs_chain_bond_scale` times the background. Off in production: with every arcless pair already held at the background it is redundant, and at 1.5 it shoved neighbours into each other. |
-| `arcs_chain_bond_scale` | float | 1.0 | 1.0 | Multiplier on that bond's target. |
+| `use_arcs_chain_bonds` | bool | no | yes | Give every consecutive anchor pair with no arc a spring at the chain law of its gap, entered after the anchor heatmap scaling. |
+| `arcs_chain_bond_scale` | float | 1.0 | 1.5 | Multiplier on that bond's target. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 
@@ -201,6 +200,7 @@ one as the stage's auto factor times the stage's mean bond scale.
 | `auto_factor_smooth` | float | 0.5 | 0.7 | Times the mean chain bond target of the block. |
 | `auto_factor_heatmap` | float | 0.5 | 0.5 | Times the mean active heatmap target. |
 | `auto_factor_ib` | float | 0.5 | 0.5 | Times the mean block chain bond. |
+| `arcs_repulsion_cutoff_factor` | float | 0.0 | 3.0 | Truncate the arcless pair repulsion `1 / d` beyond this times the mean arc target. 0 leaves it unbounded, which is the reference's behaviour and lets a sparse block explode. |
 
 ## [confinement]
 
@@ -336,9 +336,7 @@ segments on the coarse map sits closer the more contacts they share.
 Precisely, with `s0` being `target_bp_per_subanchor` and `nu` the measured exponent.
 
 - No contact: `d = max(1, (s / s0) ^ nu)` for separation `s`. Mean spatial distance grows
-  with genomic separation as a power law [4, 5]. In the arcs stage every arcless anchor pair
-  is held there by a weak spring, `background_weight`, so no pair is free to collapse onto
-  another.
+  with genomic separation as a power law [4, 5].
 - A loop of strength `q`: `d = 1 + (background - 1) / (1 + q / q_half)`. `q` is the loop's PET
   count over the typical count at its span, fitted on the run's own arcs, which is observed
   over expected [8, 9]. A saturated loop sits at one bead, touching, as polymer loop models

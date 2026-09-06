@@ -1,4 +1,15 @@
-"""Choose background_weight on real blocks, with the two band exponents as the gate.
+"""Record of a rejected experiment. Do not expect it to run.
+
+Background springs on every arcless pair, weight 0.3, chain bonds off, won this sweep on eight
+real blocks and then lost the three cell battery on every Hi-C statistic, with Rg halved and
+overlaps up. The sweep could not see why: every block came out at Rg 3.8 whatever the weight,
+which is the sign. An all pairs spring network asking every pair for s^nu with nu below a third
+is not embeddable in three dimensions, so the least squares compromise flattens the structure
+into a mean field blob, which the old 1/d repulsion never did because it never constrained an
+arcless pair. The energy was reverted; `background_weight` no longer exists. Kept so the sweep
+that preceded the loss can be read. See design/anchor-placement.md.
+
+Choose background_weight on real blocks, with the two band exponents as the gate.
 
 Every arcless anchor pair now sits on the background for its separation, held by a spring of
 this weight, in place of the old 1/d repulsion. The weight trades two things. Too weak and the

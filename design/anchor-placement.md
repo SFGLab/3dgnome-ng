@@ -657,28 +657,46 @@ factor that looks the same across cells, which a single correction on the backgr
 would absorb. Not built. It does not gate adoption, since every Hi-C measure already holds
 without it.
 
-The residual, and what it turned out to be. The realised exponent ran 1.3 to 1.5 times the
-measured input on every cell. Fitted by band it is a kink, not a slope: 0.09 to 0.20 under
-100 kb, 0.34 to 0.48 above, against inputs of 0.20 to 0.30. Loops pull pairs to touching and
-nothing held the arcless pairs between them, and the steep long range is the recovery. A global
-correction on the exponent would have rotated the whole line. The fix was the other half of
-tier C: every arcless pair sits on the background, held by a spring symmetric in log distance,
-since a plain relative spring is bounded on the compressed side and reproduced the collapse.
-Swept on eight real GM12878 blocks with the solver, measured input 0.272:
+The residual, what it turned out to be, and what did not fix it. The realised exponent ran
+1.3 to 1.5 times the measured input on every cell. Fitted by band it is a kink, not a slope:
+0.09 to 0.20 under 100 kb, 0.34 to 0.48 above, against inputs of 0.20 to 0.30. Loops pull
+pairs to touching and nothing holds the arcless pairs between them, and the steep long range is
+the recovery. A global correction on the exponent would rotate the whole line.
+
+The other half of tier C was tried: every arcless pair held at the background by a spring
+symmetric in log distance, in place of the `1/d` repulsion. On eight real GM12878 blocks with
+the solver, measured input 0.272:
 
 | weight | chain bonds | 20 to 100 kb | 100 kb to 1 Mb | overlaps per thousand | arcs realised over target |
 |---|---|---|---|---|---|
 | 0.01 | off | 0.203 | 0.422 | 101 | 1.03 |
-| 0.10 | off | 0.256 | 0.388 | 79 | 1.15 |
 | 0.30 | off | 0.287 | 0.378 | 27 | 1.25 |
 | 1.00 | off | 0.312 | 0.355 | 23 | 1.38 |
 | 0.30 | on | 0.284 | 0.365 | 587 | 0.98 |
 
-Weight 0.3 with chain bonds off is production. C is off: with every pair held at the
-background the full weight 1.5 times bond on consecutive pairs shoves neighbours into each
-other, five to twenty times the overlaps at every weight. The long band still sits above the
-input, 0.378 against 0.272. That residual is arcs realised inside their targets and is the next
-thing to look at, not a global correction.
+Then the three cell battery, five structures each, against the polymer arms of the same day:
+
+| cell | arm | Pearson | Spearman | SCC | MultiMM | 20 to 100 kb | 100 kb to 1 Mb | Rg | wb-aa | xb |
+|---|---|---|---|---|---|---|---|---|---|---|
+| GM12878 | polymer | 0.462 | 0.316 | 0.191 | 0.335 | -0.228 | 0.431 | 31.5 | 1.6 | 286 |
+| GM12878 | background springs | 0.329 | 0.231 | 0.130 | 0.278 | 0.248 | 0.200 | 16.8 | 67.7 | 3800 |
+| H1ESC | polymer | 0.258 | 0.181 | 0.033 | 0.073 | -0.008 | 0.442 | 33.6 | 4.6 | 504 |
+| H1ESC | background springs | 0.119 | 0.079 | 0.020 | 0.041 | 0.110 | 0.164 | 18.8 | 47.4 | 13445 |
+| HFFC6 | polymer | 0.267 | 0.175 | 0.113 | 0.208 | 0.051 | 0.343 | 26.2 | 3.7 | 794 |
+| HFFC6 | background springs | 0.181 | 0.133 | 0.070 | 0.173 | 0.104 | 0.135 | 14.1 | 132.5 | 8773 |
+
+A loss on every cell and every statistic. The kink is gone and both bands agree, but at 0.20
+against an input of 0.27, with Rg halved and overlaps up. The reason is embedding. A distance
+matrix that asks every pair for `s^nu` with `nu` below a third cannot be realised in three
+dimensions, so an all pairs spring network settles into the least squares compromise, a mean
+field blob. The `1/d` repulsion never constrained an arcless pair and so never met this. The
+sweep could not see it because every isolated block came out at Rg 3.8 whatever the weight,
+which was the sign and was read as stability. Reverted the same day.
+
+What that leaves. The kink is real and its cause is known. A fix has to hold only the pairs
+that collapse, under about 100 kb, and leave the long range free to be set by the arcs and the
+polymer scale. That is a short range background, not an all pairs one, and it has not been
+tried.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 

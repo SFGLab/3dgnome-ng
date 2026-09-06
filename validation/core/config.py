@@ -56,11 +56,8 @@ CANONICAL: dict[str, dict[str, object]] = {
     },
     "heatmaps": {"inter_scaling": 1.0, "distance_heatmap_stretching": 2.5},
     "springs": {
-        # Off since 2026-09-06. With every arcless pair held at the background the full weight
-        # bond on consecutive pairs is redundant and at 1.5 times the background it shoves
-        # neighbours into each other: anchor overlaps five to twenty times higher at every
-        # background weight on eight real blocks.
-        "use_arcs_chain_bonds": "no",
+        "use_arcs_chain_bonds": "yes",
+        "arcs_chain_bond_scale": 1.5,
         "stretch_constant": 0.1,
         "squeeze_constant": 0.1,
         "angular_constant": 0.1,
@@ -148,6 +145,12 @@ CANONICAL: dict[str, dict[str, object]] = {
         "apply_to_heatmap": "yes",
         "apply_to_arcs": "yes",
         "apply_to_smooth": "yes",
+        # Truncate the non-arc 1/d repulsion beyond factor times mean-arc-distance. 0.0 means
+        # unbounded, faithful to LooperSolver.cpp:1533, which explodes small or sparse arcs
+        # IBs from target 0.4 to Rg 515 and causes the multi-hour arcs polish. Capping the
+        # long-range tail at 3x the natural arc scale keeps local de-clashing while stopping the
+        # excess expansion.
+        "arcs_repulsion_cutoff_factor": 3.0,
     },
     "confinement": {
         "use_confinement": "yes",

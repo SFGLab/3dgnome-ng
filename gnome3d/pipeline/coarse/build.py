@@ -435,11 +435,8 @@ def add_long_pet_to_segment_heatmap(
 
 
 def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int, int]]) -> F64Array:
-    """The arc target matrix for one active region. An arc pair carries
-    `Settings.arc_expected_distance` of its PET count and span, positive. Every other pair
-    carries minus the background for its separation, which the kernels score as a weak spring
-    at that distance with `background_weight`, so no pair is free to collapse onto another. The
-    diagonal is 0.
+    """The arc target matrix for one active region. -1 marks an arcless pair, 0 the diagonal,
+    and an arc pair carries `Settings.arc_expected_distance` of its PET count and span.
 
     Parameters
     ----------
@@ -449,13 +446,7 @@ def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int,
         (i, j, score) per arc in active region indices.
     """
     n = len(mids)
-    m = np.asarray(mids, dtype=np.float64)
-    sep = np.abs(m[:, None] - m[None, :])
-    law = s.polymer_law()
-    mat: F64Array = np.empty((n, n), dtype=np.float64)
-    for i in range(n):
-        for j in range(n):
-            mat[i, j] = -law.background(int(sep[i, j]))
+    mat: F64Array = np.full((n, n), -1.0, dtype=np.float64)
     np.fill_diagonal(mat, 0.0)
     for i, j, score in arcs:
         exp_d = s.arc_expected_distance(score, mids[j] - mids[i])
