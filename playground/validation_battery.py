@@ -28,6 +28,11 @@ placement, which the boundary stitch and the cross block relaxation own. Collaps
 lets an arm that improves block placement read as though it improved block shape.
 
     python playground/validation_battery.py <mcool> <region> <binsize> <arm_dir> [<arm_dir> ...]
+
+Contact maps are read balanced. Not every 4DN mcool carries balancing weights, and none of the
+H1ESC file's thirteen resolutions does, so `--balance no` reads raw counts instead. Raw and
+balanced correlations are not comparable to each other, so a run that needs it can still compare
+its own arms and not the numbers in another cell line's table.
 """
 
 from __future__ import annotations
@@ -198,12 +203,26 @@ def _flag(name: str, default: float) -> float:
     return v
 
 
+def _str_flag(name: str) -> str:
+    """Read `--name value` out of argv and remove it, so the positionals keep their places."""
+    if name not in sys.argv:
+        return ""
+    k = sys.argv.index(name)
+    v = sys.argv[k + 1]
+    del sys.argv[k : k + 2]
+    return v
+
+
 def main() -> None:
     target_bp = int(_flag("--target-bp", 1000))  # the run's target_bp_per_subanchor
     ev_factor = _flag("--ev-factor", 0.7)  # the run's exclusion_auto_factor_smooth
+    balance = "--balance" not in sys.argv or _str_flag("--balance") != "no"
     mcool, region, binsize = sys.argv[1], sys.argv[2], int(sys.argv[3])
-    c_obs, bin_starts = observed_hic(mcool, region, binsize, balance=True)
-    print(f"observed Hi-C {region} at {binsize:,} bp: {c_obs.shape[0]} bins\n")
+    c_obs, bin_starts = observed_hic(mcool, region, binsize, balance=balance)
+    print(
+        f"observed Hi-C {region} at {binsize:,} bp: {c_obs.shape[0]} bins"
+        f"{'' if balance else ', raw counts, not comparable with a balanced run'}\n"
+    )
     rad: np.ndarray | None = None  # the first arm's first structure sets it for every arm
     print(
         f"  {'arm':>10s} {'n':>3s} {'pearson':>9s} {'spearman':>9s} {'SCC':>8s} "
@@ -225,7 +244,7 @@ def main() -> None:
                 rad = ev_factor * block_bonds(p, owner)
             coords.append(p)
             mids = m
-            r = hic_correlation(p, m, mcool, region, binsize, contact_radius=2.0, balance=True)
+            r = hic_correlation(p, m, mcool, region, binsize, contact_radius=2.0, balance=balance)
             pear.append(r.get("pearson", float("nan")))
             spear.append(r.get("spearman", float("nan")))
             scc.append(r.get("scc", float("nan")))
