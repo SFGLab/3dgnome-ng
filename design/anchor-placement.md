@@ -758,8 +758,13 @@ not move is the subanchor bond itself, realised 16 to 40 percent longer than its
 target, set in the smooth stage. A chain of stretched bonds whose ends are pinned at the
 background folds back on itself, which is the flat bead level band, and the stretch tracks the
 band across cells: GM12878, stretched least, is the cell whose beads came out on target. The
-next lever is therefore in the smooth stage, the chain spring against the excluded volume and
-the subanchor heat term, and it needs its own measurement.
+next lever is therefore in the smooth stage. Not its excluded volume: per bond, the stretch is
+uncorrelated with local crowding, r between -0.05 and 0.11 on every cell and arm, and the least
+crowded quartile of bonds is already stretched 1.25 to 1.5 times. Something acting on every
+bond alike stretches them, which leaves the chain spring's weight against the subanchor heat
+term and the confinement, or the step size, five bonds per proposal against bonds of one bead,
+which may never resolve a bond length at all. That is an end to end sweep of the smooth stage
+and needs its own measurement.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
