@@ -1006,6 +1006,12 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   `mc_executor_arcs = serial` or `threaded`, which is what `CANONICAL` sets. Unit checks in
   `harness/test_arcs_solver.py`.
 
+  The annealer is kept by decision, 2026-09-06, not as a leftover. The solver's justification
+  is a funnel landscape measured on a few real blocks. A dataset or an energy change that
+  breaks that assumption has the annealer to fall back on, and the annealer is the reference's
+  own method, so it is the comparison arm for replicating results. Do not propose removing
+  `solver = mc`, its schedule keys or the JAX arcs kernel.
+
   Why not in the reference: the reference anneals this stage too.
 
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
