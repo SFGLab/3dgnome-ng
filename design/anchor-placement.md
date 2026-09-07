@@ -838,8 +838,15 @@ short chains still at 3.0 with their ends at 1.55, so the bond is not what holds
 a wall: anchor pairs 1 to 10 kb apart realise 0.8 to 3.2 beads against a law of 1.36, a
 quarter of them under it, median 1.35 over the law. They are loosely held. The short range
 spring took them from 2.95 over the law, with none under it, to 1.35, and it sits at weight 0.1
-against loops at 1.0, so its weight is the knob left on this piece. Arms at 0.3 and 1.0 on top
-of the other fixes are queued.
+against loops at 1.0, so its weight is the knob left on this piece. Measured at 0.3 and 1.0 on top of the
+other fixes on H1ESC: the close pairs come onto the law, 1.37, 1.17 and 1.07 over it, and Hi-C
+falls with every step, Pearson 0.338, 0.322 and 0.276, SCC 0.051, 0.051 and 0.039, with Rg
+25.9, 23.3 and 21.5 and cross block overlaps 195, 286 and 667. The weight stays at 0.1. Under
+10 kb the anchors are 1.1 to 1.3 over the law and that is the price of the Hi-C agreement. The
+beads under 10 kb are a different matter, at 1.3 to 1.5 with bonds on target: two bonds
+spanning 2.1 beads is a straight chain, and the law at this exponent is crumpled at every
+scale. The one term that straightens a chain is the smooth stage's bend penalty, the
+reference's cube of the angle at `angular_constant` 0.1; an arm with it off is queued.
 
 The step and the block's mean bond target were checked as the cell difference and are not:
 the mean target is 1.02 to 1.08 on every cell and uncorrelated with the stretch. What differs
