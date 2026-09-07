@@ -803,6 +803,82 @@ that stay flat are the same chain and the different chain pairs equally, at 0.10
 H1ESC. That is the smooth stage, and its step size is the first thing to sweep, on H1ESC with
 the short range term on.
 
+**Swept 2026-09-07 on H1ESC, short range term on, five structures per arm.** The step is
+`noise_smooth` in bonds per proposal; production's 5 is the reference's constant.
+
+| step | bond over target | Pearson | Spearman | SCC | MultiMM | 20 to 100 kb | 100 kb to 1 Mb | wb-aa | xb |
+|---|---|---|---|---|---|---|---|---|---|
+| 5 | 1.40 | 0.244 | 0.162 | 0.040 | 0.071 | 0.14 | 0.52 | 29.3 | 738 |
+| 3 | 1.17 | 0.288 | 0.184 | 0.050 | 0.067 | 0.22 | 0.57 | 14.0 | 368 |
+| 2 | 1.10 | 0.315 | 0.194 | 0.051 | 0.066 | 0.28 | 0.59 | 10.0 | 246 |
+| 1 | 1.05 | 0.342 | 0.201 | 0.057 | 0.063 | 0.35 | 0.60 | 6.9 | 186 |
+| 0.5 | 1.04 | 0.357 | 0.204 | 0.060 | 0.062 | 0.38 | 0.61 | 5.7 | 174 |
+
+Monotone in every column. Pearson up 46 percent at half a bond, anchor overlaps down five
+times, MultiMM down a tenth. The input is 0.30, so at one bond and below the short band
+overshoots and the long band, which the step does not touch, stays twice too steep.
+
+The stretch is not spread evenly and the chain length says where it sits. On the arm at 5,
+chains of 2 to 5 bonds, a third of all chains, are stretched 2.4 to 3.1 times on every cell,
+and their two end anchors sit 1.55 times the background apart. Chains over 20 bonds have their
+ends on the background and their bonds at 1.15 on GM12878 against 1.4 on H1ESC and HFFC6; at
+half a bond those bonds are 1.04 on H1ESC while the short chains stay at 1.76 with their ends
+still at 1.57. The short chains are the arcs stage: a consecutive pair with no arc is held by
+the chain bond of option C at `arcs_chain_bond_scale` 1.5 times the background at the full
+arcs spring weight, and `add_chain_bonds` overwrites the short range entry for that pair, so
+the two terms disagree on the same pair and the stronger one wins. The 1.5 was tuned under
+the old laws. An arm with the bond off is queued.
+
+The step and the block's mean bond target were checked as the cell difference and are not:
+the mean target is 1.02 to 1.08 on every cell and uncorrelated with the stretch. What differs
+on the long chains is under measurement with the subanchor heat off on H1ESC, since GM12878's
+Hi-C is seven times deeper than H1ESC's and the heat term held bonds in on GM12878.
+
+**The whole curve, realised over the law by separation bin**, H1ESC at half a bond, all
+beads and anchors alone, within blocks and across:
+
+| separation | beads | within | cross | anchors |
+|---|---|---|---|---|
+| 2 to 5 kb | 1.45 | 1.45 | | 1.30 |
+| 5 to 10 kb | 1.20 | 1.19 | | 1.23 |
+| 10 to 20 kb | 1.06 | 1.05 | 1.32 | 1.11 |
+| 20 to 50 kb | 1.02 | 1.01 | 1.12 | 1.03 |
+| 50 to 100 kb | 1.08 | 1.07 | 1.11 | 1.04 |
+| 100 to 200 kb | 1.22 | 1.20 | 1.27 | 1.30 |
+| 200 to 500 kb | 1.50 | 1.42 | 1.57 | 1.48 |
+| 500 kb to 1 Mb | 1.92 | 1.81 | 1.95 | 1.92 |
+| 1 to 2 Mb | 2.29 | 2.15 | 2.31 | 2.34 |
+
+From 10 to 100 kb everything is on the law. Under 10 kb is the chain bond. Above 100 kb every
+pair runs away and the excess grows with separation, the same within a block as across, so it
+is not the stitch. Per block, anchor radius of gyration over the law's radius of gyration for a
+chain of that span, `S^nu / sqrt(2 (2 nu + 1)(nu + 1))`:
+
+| block span | GM12878 | H1ESC | HFFC6 |
+|---|---|---|---|
+| 50 to 100 kb | 1.00 | 1.09 | 1.07 |
+| 100 to 200 kb | 1.22 | 1.10 | 1.06 |
+| 200 to 500 kb | 1.29 | 1.22 | 1.50 |
+| 500 kb to 1 Mb | 1.34 | 1.43 | 1.79 |
+| 1 to 2 Mb | 1.60 | 1.62 | 2.00 |
+| over 2 Mb | 2.05 | 2.24 | 2.83 |
+
+Blocks under 200 kb are the size the law says, which is the range the short range term holds.
+Larger blocks are too big in proportion to how much of them lies beyond that range. Nothing
+holds an arcless pair beyond 100 kb but the block's confinement, whose radius is
+`confinement_packing_factor_arcs` 1.5 times the mean positive arc target times the cube root
+of the anchor count, a copied constant on a formula with no derivation. For a 1.5 Mb block of
+50 anchors that is about 14 bead units where the law's sphere is about 6.
+
+The proposed fix derives the radius from the law: a chain of span S has the radius of gyration
+above, a uniform sphere of that radius of gyration has radius `sqrt(5/3)` times it, and there
+is no free constant. Wired as the meaning of packing factor zero at the arcs level so it is opt
+in, then the three cell battery with the step, the chain bond and the radius together. Not
+built; the user's call.
+
+Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
+`block_rg.py` on the workstation, all reading finished cifs.
+
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
 The most direct statement of the missing constraint. It was left last because it competes with
