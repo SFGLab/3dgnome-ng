@@ -15,6 +15,7 @@ Serial runner = the numba backend (`mc_arcs_numba`).  The batched JAX runner
 from __future__ import annotations
 
 import copy
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -70,7 +71,9 @@ def _run(problem: Problem) -> Result:
     return best_score, np.asarray(best, dtype=np.float32)
 
 
-def settings_for_block(s: Settings, anchor_genomic: I64Array) -> Settings:
+def settings_for_block(
+    s: Settings, anchor_genomic: Sequence[int] | Sequence[tuple[int, int, int]] | I64Array
+) -> Settings:
     """The settings one block's kernels run with.
 
     With `confinement_packing_factor_arcs` at zero the block's confinement radius is the sphere
@@ -84,7 +87,8 @@ def settings_for_block(s: Settings, anchor_genomic: I64Array) -> Settings:
     s
         The run's settings.
     anchor_genomic
-        Genomic position of each anchor in the block.
+        The block's anchors as the state carries them, (start, end, midpoint) triples, or a
+        flat sequence of positions. The span runs from the first start to the last end.
     """
     derive = (
         bool(s.use_confinement)
@@ -94,7 +98,13 @@ def settings_for_block(s: Settings, anchor_genomic: I64Array) -> Settings:
     )
     if not derive:
         return s
-    span = int(anchor_genomic.max() - anchor_genomic.min()) if len(anchor_genomic) else 0
+    g = np.asarray(anchor_genomic, dtype=np.int64)
+    if g.size == 0:
+        span = 0
+    elif g.ndim == 2:
+        span = int(g[:, 1].max() - g[:, 0].min())
+    else:
+        span = int(g.max() - g.min())
     out = copy.copy(s)
     out.confinement_radius_arcs = s.polymer_law().confinement_radius(span)
     return out

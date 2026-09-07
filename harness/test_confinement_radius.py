@@ -67,6 +67,16 @@ def test_settings_for_block() -> None:
     )
     check("the original is untouched", s.confinement_radius_arcs == 0.0)
     check("everything else is shared", t.polymer is s.polymer and t.steps_arcs == s.steps_arcs)
+    u = settings_for_block(s, [int(g) for g in genomic])  # type: ignore[arg-type]
+    check("the pipeline's plain list works too", abs(u.confinement_radius_arcs - want) < 1e-12)
+    triples = [(int(g) - 5_000, int(g) + 5_000, int(g)) for g in genomic]
+    v = settings_for_block(s, triples)
+    want3 = s.polymer_law().confinement_radius(1_510_000)
+    check(
+        "the state's (start, end, midpoint) triples span first start to last end",
+        abs(v.confinement_radius_arcs - want3) < 1e-12,
+        f"{v.confinement_radius_arcs:.4f} vs {want3:.4f}",
+    )
 
 
 def test_the_kernel_sees_it() -> None:
