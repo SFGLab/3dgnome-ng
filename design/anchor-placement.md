@@ -922,8 +922,22 @@ What inflates a block is the arcless repulsion: it acts out to `arcs_repulsion_c
 the relative overshoot squared per anchor and cannot hold it. The 3 is a copied constant on a
 term the reference wrote as an unbounded 1/d. The physical statement is that an arcless pair
 is free down to touching, one bead, and repelled below it, which is an excluded volume at the
-law's own unit and needs no constant. Arms at cutoff 1.5 and 1.0 on top of the derived sphere
-are queued.
+law's own unit and needs no constant. Run at 1.5 and 1.0 on top of the derived sphere, H1ESC:
+
+| reach | Pearson | Spearman | SCC | MultiMM | Rg | wb-aa | wb-sa | xb | 100 to 200 kb | 1 to 2 Mb | blocks 1 to 2 Mb over law |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 3 | 0.338 | 0.196 | 0.051 | 0.061 | 25.9 | 7.7 | 1365 | 195 | 1.26 | 2.27 | 1.68 |
+| 1.5 | 0.269 | 0.149 | 0.043 | 0.057 | 17.7 | 12.5 | 1612 | 784 | 1.17 | 1.60 | 1.37 |
+| 1.0 | 0.220 | 0.123 | 0.036 | 0.050 | 15.4 | 16.1 | 1929 | 1776 | 1.12 | 1.37 | 1.26 |
+
+The long range comes onto the law and Hi-C falls with it, for the third time by a third route
+after the all pairs springs and the spring weight. The cross block overlaps say why: nine
+times more beads within a bond of a bead from another block. When a block shrinks to the law's
+size nothing below the arcs stage keeps it out of its neighbours, the IB layout and the stitch
+place centroids and the relaxation is a light pass, so the blocks pile up and Hi-C reads the
+pile. The reach stays at 3. Bringing the long range onto the law is not an arcs stage change
+alone; it needs the blocks to keep their volume against each other, which is the IB layout,
+the stitch and the relaxation, and that is a separate piece of work.
 
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
