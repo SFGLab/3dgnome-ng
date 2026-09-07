@@ -889,8 +889,21 @@ of the anchor count, a copied constant on a formula with no derivation. For a 1.
 The proposed fix derives the radius from the law: a chain of span S has the radius of gyration
 above, a uniform sphere of that radius of gyration has radius `sqrt(5/3)` times it, and there
 is no free constant. Wired as the meaning of packing factor zero at the arcs level so it is opt
-in, then the three cell battery with the step, the chain bond and the radius together. Not
-built; the user's call.
+in, in `settings_for_block`.
+
+**Built and run alone on H1ESC: the blocks did not move.** Radius of gyration over the law
+1.09, 1.11, 1.23, 1.45, 1.68 and 2.44 by span, against 1.09, 1.10, 1.22, 1.43, 1.62 and 2.24
+before. The old formula was already near the derived value, since most loops sit near one
+bead and the mean spring target it multiplies is about 1.2, so a 1.5 Mb block of 52 anchors
+had a wall at about 6.7 beads against the law's 5.6. The sphere was never what set the size.
+What inflates a block is the arcless repulsion: it acts out to `arcs_repulsion_cutoff_factor`
+3 times that mean target, about 3.6 beads, and the law packs 52 anchors in a sphere of 5.6 at
+2.4 beads apart, inside the repulsion's reach of every neighbour, while the wall costs 0.1 of
+the relative overshoot squared per anchor and cannot hold it. The 3 is a copied constant on a
+term the reference wrote as an unbounded 1/d. The physical statement is that an arcless pair
+is free down to touching, one bead, and repelled below it, which is an excluded volume at the
+law's own unit and needs no constant. Arms at cutoff 1.5 and 1.0 on top of the derived sphere
+are queued.
 
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
