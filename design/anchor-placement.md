@@ -862,8 +862,11 @@ scale. The one term that straightens a chain is the smooth stage's bend penalty,
 reference's cube of the angle at `angular_constant` 0.1; with it off on H1ESC at
 spring weight 0.3 the beads at 2 to 5 kb go from 1.54 to 1.37 over the law and 5 to 10 kb from
 1.34 to 1.29, Pearson 0.322 to 0.337 with Spearman, SCC and MultiMM level, overlaps slightly
-down. A small gain at no cost, and not the whole piece: the shortest chains stay at 1.79. It
-goes into the candidate for the other two cells to confirm.
+down. A small gain at no cost, and not the whole piece: the shortest chains stay at 1.79. On the
+other two cells it is not: GM12878 Pearson 0.476 to 0.470 and SCC 0.217 to 0.203 with MultiMM
+0.280 to 0.288, HFFC6 Pearson 0.298 to 0.291 and SCC 0.130 to 0.123 with MultiMM level, beads
+at 2 to 5 kb better on both, 1.57 to 1.42 and 1.74 to 1.56, and subanchor overlaps down. The
+geometry improves and Hi-C slips on two cells of three. Not adopted; the bend penalty stays.
 
 **Production, 2026-09-07 evening.** One bond per proposal, subanchor heat off, short range
 spring at 0.1 over 100 kb, chain bonds off, arcs sphere from the law. Three cells against the
