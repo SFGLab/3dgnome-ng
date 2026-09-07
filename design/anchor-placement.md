@@ -821,7 +821,20 @@ Hi-C, Pearson 0.471 to 0.440, Spearman 0.314 to 0.262, SCC 0.221 to 0.194, Multi
 from 2 to 50 kb where the step of 5 had them at 1.5, anchor overlaps 24 to 3, subanchor
 overlaps 1530 to 589. Its bonds come out at 0.84 of target rather than H1ESC's 1.05, and the one
 input GM12878 has that H1ESC lacks is a working subanchor heat term, fed by Hi-C seven times
-deeper. Arms with all three fixes on GM12878, with and without the heat term, are queued. The input is 0.30, so at one bond and below the short band
+deeper. Run:
+
+| GM12878 arm | Pearson | Spearman | SCC | MultiMM | bond over target | wb-aa | wb-sa | xb | wall |
+|---|---|---|---|---|---|---|---|---|---|
+| step 5, spring on | 0.471 | 0.314 | 0.221 | 0.305 | 1.16 | 23.8 | 1530 | 308 | 73 min |
+| step 1, heat on | 0.435 | 0.258 | 0.204 | 0.266 | 0.83 | 3.0 | 610 | 88 | 73 min |
+| step 1, heat off | 0.476 | 0.310 | 0.217 | 0.280 | 1.10 | 13.9 | 1324 | 259 | 15 min |
+
+The heat term is what pulled the bonds under target once the step let them settle. With it
+off GM12878 at one bond matches production on Pearson, Spearman and SCC, gives up 8 percent of
+MultiMM, halves the anchor overlaps, and runs five times faster, since the heat estimate pass
+is most of the wall. On H1ESC the term is inert and the step alone lifts Pearson 0.244 to
+0.338. The production candidate is therefore one bond, heat off, spring on; HFFC6 with that
+set is queued to complete the battery. The input is 0.30, so at one bond and below the short band
 overshoots and the long band, which the step does not touch, stays twice too steep.
 
 The stretch is not spread evenly and the chain length says where it sits. On the arm at 5,
