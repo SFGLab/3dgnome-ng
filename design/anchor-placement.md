@@ -831,8 +831,12 @@ the old laws. An arm with the bond off is queued.
 
 The step and the block's mean bond target were checked as the cell difference and are not:
 the mean target is 1.02 to 1.08 on every cell and uncorrelated with the stretch. What differs
-on the long chains is under measurement with the subanchor heat off on H1ESC, since GM12878's
-Hi-C is seven times deeper than H1ESC's and the heat term held bonds in on GM12878.
+on the long chains is the subanchor heat term. With it off on H1ESC every battery column is
+identical to three decimals, Pearson 0.243 against 0.244, stretch 1.58 against 1.57, so on
+H1ESC the term does nothing: its Hi-C is seven times shallower than GM12878's and binned to 1 kb
+beads it leaves the heat target nearly empty. On GM12878 the same term held bonds in, 1.16
+against 1.39 with it off. That is the cell difference at a step of 5, and at a step of 1 or
+below it no longer matters, since the bonds are on target with or without the term.
 
 **The whole curve, realised over the law by separation bin**, H1ESC at half a bond, all
 beads and anchors alone, within blocks and across:
