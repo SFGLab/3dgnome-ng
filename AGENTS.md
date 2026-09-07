@@ -863,8 +863,10 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   weight sits in every kernel beside the cutoff rather than replacing it, so weight zero is
   byte exact against the previous commit. JAX matches numba on a matrix carrying both arcless
   kinds, and the batched driver runs with the background on, both in
-  `harness/test_arc_matrix.py`. Swept in `playground/short_range_sweep.py`; the three cell
-  battery decides.
+  `harness/test_arc_matrix.py`. Swept in `playground/short_range_sweep.py`. Production since
+  2026-09-07 at weight 0.1: with it the anchors sit on the input curve on all three cells,
+  within blocks and across them. Weights 0.3 and 1.0 pull the closest pairs closer and cost
+  Hi-C at every step.
 
   Why not in the reference: the reference has the three laws and their constants. This is what
   they were standing in for.
@@ -887,7 +889,23 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   block at the first block's radius. Unit checks in `harness/test_confinement_radius.py` and
   `harness/test_polymer.py`.
 
+  Production since 2026-09-07 as the principled form. Alone it moved nothing, the old formula
+  already landed near it. What inflates a block is the arcless repulsion's reach; cutting that
+  puts the long range on the law and the blocks in a pile, Hi-C down and cross block overlaps
+  up nine times, so the reach stays at 3 and the long range is a stitch and relaxation
+  problem, not an arcs stage one.
+
   Why not in the reference: the reference has no confinement at all.
+
+- **The smooth step and the subanchor heat term, production 2026-09-07.** `noise_smooth` is one
+  bond per proposal, not the reference's five. At five the bonds never settle and come out 1.2
+  to 1.4 times their target, the chain folds and the distance curve is flat under 100 kb; at
+  one they sit at 1.05 and the curve follows the law from 10 to 100 kb, on H1ESC Hi-C Pearson
+  0.244 to 0.338. `use_subanchor_heatmap` is off: inert on shallow Hi-C, where the pass is
+  skipped for lack of active pairs, and on deep Hi-C it pulls bonds to 0.83 of target once
+  the step lets them settle, GM12878 Pearson 0.476 without it against 0.435 with, at a fifth of
+  the wall. Three cell battery: Pearson and SCC up on every cell, Spearman level, MultiMM down
+  8 to 14 percent. See `design/anchor-placement.md`.
 
 - **Chain bonds in the arcs MC: `[springs] use_arcs_chain_bonds = yes`, default no.**
   ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `add_chain_bonds`)
@@ -907,6 +925,9 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   1 the bonds pull the short range below the parity values and the distance curve steepens past
   the Hi-C exponent, 0.321 against 0.285 on chr1:1-60 Mb. No kernel is touched. Unit checks in
   `harness/test_arc_target.py`.
+
+  Off in production since 2026-09-07: redundant once the short range spring holds every
+  arcless pair under 100 kb, and measured null on H1ESC with that spring on.
 
   Why not in the reference: the reference's arcs MC has no chain term either. See
   `design/anchor-placement.md`, option C.

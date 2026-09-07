@@ -23,7 +23,7 @@ taken relative to `data_dir` unless they are absolute.
 | `steps_smooth` | int | 5 | 1 | Restarts of the smooth stage per block, best kept. |
 | `noise_lvl1` | float | 1.0 | 0.5 | Chromosome level step size, as a multiple of the mean target distance. |
 | `noise_lvl2` | float | 0.1 | 0.5 | Segment level step size, as a multiple of the mean target distance. |
-| `noise_smooth` | float | 0.5 | 5.0 | Smooth stage step size, as a multiple of the mean chain bond target. |
+| `noise_smooth` | float | 0.5 | 1.0 | Smooth stage step size, as a multiple of the mean chain bond target. |
 | `noise_ib` | float | 0.5 | 0.5 | Block placement step size, as a multiple of the mean block chain bond. |
 | `overlap_anchor_strict` | bool | no | no | The reference's span rule for overlapping anchors, which collapses the subanchors between them to one point. Off tiles the overlap with non degenerate ranges. |
 | `drop_zero_length_subanchors` | bool | no | yes | Leave zero width subanchors out of the written structure. The chain still carries them. |
@@ -78,10 +78,10 @@ is too far and the squeeze constant when too close.
 | `angular_constant` | float | 0.1 | 0.1 | Smooth stage bend penalty, the cube of the angle between consecutive bonds. |
 | `stretch_constant_arcs` | float | 1.0 | 1.0 | Arcs stage, every target in the matrix, arcs and chain bonds alike. |
 | `squeeze_constant_arcs` | float | 1.0 | 1.0 | Arcs stage. |
-| `background_weight` | float | 0.0 | 0.0 | A weak spring holding an arcless anchor pair inside `background_range_bp` at the background for its separation, in the arcs stage. Zero is off and every other arcless pair keeps the repulsion. Opt in until the battery decides. |
+| `background_weight` | float | 0.0 | 0.1 | A weak spring holding an arcless anchor pair inside `background_range_bp` at the background for its separation, in the arcs stage. Zero is off and every other arcless pair keeps the repulsion. |
 | `background_range_bp` | int | 100000 | 100000 | The separation under which an arcless pair is held at the background. Beyond it the pair keeps the repulsion, since a power law distance matrix cannot be embedded in three dimensions over every pair, only over a band. |
-| `use_arcs_chain_bonds` | bool | no | yes | Give every consecutive anchor pair with no arc a spring at the chain law of its gap, entered after the anchor heatmap scaling. |
-| `arcs_chain_bond_scale` | float | 1.0 | 1.5 | Multiplier on that bond's target. |
+| `use_arcs_chain_bonds` | bool | no | no | Give every consecutive anchor pair with no arc a spring at the chain law of its gap, entered after the anchor heatmap scaling. |
+| `arcs_chain_bond_scale` | float | 1.0 | 1.0 | Multiplier on that bond's target. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 
@@ -104,7 +104,7 @@ is too far and the squeeze constant when too close.
 
 | key | type | default | production | what it does |
 | --- | --- | --- | --- | --- |
-| `use_subanchor_heatmap` | bool | no | yes | Add a contact distance target between subanchor pairs in the smooth stage, estimated from dry smooth passes and scaled by contact. |
+| `use_subanchor_heatmap` | bool | no | no | Add a contact distance target between subanchor pairs in the smooth stage, estimated from dry smooth passes and scaled by contact. |
 | `heatmap_influence` | float | 0.5 | 0.1 | The most a pair's estimated distance is scaled down by its contact. |
 | `heatmap_dist_weight` | float | 1.0 | 0.01 | Weight of that term against the chain and angle terms. |
 | `estimate_distances_steps` | int | 2 | 4 | Dry smooth runs per replicate when estimating the mean pairwise distances. |
@@ -220,7 +220,7 @@ stage's mean bond scale times the cube root of the bead count.
 | `radius_arcs` | float | 0.0 | 0.0 | Arcs stage radius, 0 derives it. |
 | `radius_smooth` | float | 0.0 | 0.0 | Smooth stage radius. |
 | `radius_ib` | float | 0.0 | 0.0 | Block placement radius. |
-| `packing_factor_arcs` | float | 1.5 | 1.5 | Arcs stage packing factor. At 0 each block's radius is derived from the law instead: the sphere a chain of the block's genomic span fills, root five thirds of its radius of gyration `S^nu / sqrt(2 (2 nu + 1)(nu + 1))`, with no constant. Needs `mc_executor_arcs` serial or threaded. |
+| `packing_factor_arcs` | float | 1.5 | 0 | Arcs stage packing factor. At 0 each block's radius is derived from the law instead: the sphere a chain of the block's genomic span fills, root five thirds of its radius of gyration `S^nu / sqrt(2 (2 nu + 1)(nu + 1))`, with no constant. Needs `mc_executor_arcs` serial or threaded. |
 | `packing_factor_smooth` | float | 1.5 | 1.5 | Smooth stage packing factor. |
 | `packing_factor_ib` | float | 0.75 | 0.75 | Block placement packing factor. Below about 0.58 a small segment is asked to fold tighter than one of its own bonds, and 0.15 crushed the cross block distance scaling. |
 

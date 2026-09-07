@@ -37,7 +37,9 @@ CANONICAL: dict[str, dict[str, object]] = {
         "steps_smooth": 1,
         "noise_lvl1": 0.5,
         "noise_lvl2": 0.5,
-        "noise_smooth": 5.0,
+        # One bond per proposal. At the reference's 5 the bonds never settle and come out 1.2 to
+        # 1.4 times their target, and the distance curve is flat under 100 kb. Swept 2026-09-07.
+        "noise_smooth": 1.0,
         "overlap_anchor_strict": "no",
         "drop_zero_length_subanchors": "yes",
         "use_dynamic_loop_density": "yes",
@@ -48,7 +50,10 @@ CANONICAL: dict[str, dict[str, object]] = {
     "motif_orientation": {"use_motif_orientation": "yes", "weight": 50.0},
     "anchor_heatmap": {"use_anchor_heatmap": "yes", "heatmap_influence": 0.1},
     "subanchor_heatmap": {
-        "use_subanchor_heatmap": "yes",
+        # Off. Inert on shallow Hi-C, where the pass is skipped for lack of active pairs, and on
+        # deep Hi-C it pulls bonds to 0.83 of target once the step lets them settle, costing
+        # Hi-C agreement and most of the wall. Measured 2026-09-07.
+        "use_subanchor_heatmap": "no",
         "estimate_distances_steps": 4,
         "estimate_distances_replicates": 4,
         "heatmap_influence": 0.1,
@@ -56,8 +61,14 @@ CANONICAL: dict[str, dict[str, object]] = {
     },
     "heatmaps": {"inter_scaling": 1.0, "distance_heatmap_stretching": 2.5},
     "springs": {
-        "use_arcs_chain_bonds": "yes",
-        "arcs_chain_bond_scale": 1.5,
+        # Off. Redundant once the short range spring holds every arcless pair under 100 kb,
+        # and measured null on H1ESC with that spring on.
+        "use_arcs_chain_bonds": "no",
+        # Every arcless anchor pair under 100 kb held at the law's background. Puts the anchors on
+        # the input curve on all three cells; 0.3 and 1.0 pull the closest pairs closer at a
+        # steady cost in Hi-C. Measured 2026-09-07.
+        "background_weight": 0.1,
+        "background_range_bp": 100000,
         "stretch_constant": 0.1,
         "squeeze_constant": 0.1,
         "angular_constant": 0.1,
@@ -156,6 +167,9 @@ CANONICAL: dict[str, dict[str, object]] = {
         "use_confinement": "yes",
         "weight": 0.1,
         "apply_to_arcs": "yes",
+        # The arcs sphere from the law, no constant. Null on its own, since the old formula
+        # landed near it, and the principled form.
+        "packing_factor_arcs": 0,
         "apply_to_smooth": "yes",
         "apply_to_ib": "yes",
         "packing_factor_ib": 0.75,
