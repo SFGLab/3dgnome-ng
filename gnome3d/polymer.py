@@ -210,6 +210,23 @@ class PolymerLaw:
         sep = max(abs(int(sep_bp)), 1)
         return max(1.0, (sep / max(int(self.s0_bp), 1)) ** self.nu)
 
+    def radius_of_gyration(self, span_bp: int) -> float:
+        """The radius of gyration of a chain of `span_bp` whose pair distances follow the law.
+
+        The mean square distance over all pairs of a chain of unit length whose pairs sit at
+        their separation to the power nu is 1 over (2 nu + 1)(nu + 1), and the radius of
+        gyration squared is half the mean square pair distance. At nu one half this is the
+        Gaussian chain's N over 6.
+        """
+        nu = self.nu
+        return self.background(span_bp) / (2.0 * (2.0 * nu + 1.0) * (nu + 1.0)) ** 0.5
+
+    def confinement_radius(self, span_bp: int) -> float:
+        """The sphere a chain of `span_bp` fills under the law. A uniform sphere of radius R
+        has a radius of gyration of R root three fifths, so the radius is root five thirds of
+        the chain's. The assumption is that a confined block fills its sphere evenly."""
+        return (5.0 / 3.0) ** 0.5 * self.radius_of_gyration(span_bp)
+
     def contact_distance(self, sep_bp: int, q: float) -> float:
         """The distance for a pair with loop strength `q`, from the background at no strength
         to one bead at saturation. Halfway at `q_half`."""

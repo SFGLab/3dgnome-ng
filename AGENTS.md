@@ -869,6 +869,26 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference has the three laws and their constants. This is what
   they were standing in for.
 
+- **Arcs confinement radius from the law: `[confinement] packing_factor_arcs = 0`, default 1.5.**
+  ([pipeline/ib/arcs.py](gnome3d/pipeline/ib/arcs.py) `settings_for_block`,
+  [polymer.py](gnome3d/polymer.py) `radius_of_gyration`, `confinement_radius`)
+  Above 100 kb nothing holds an arcless anchor pair but the block's confinement sphere, and its
+  radius was the packing factor times the mean arc target times the cube root of the anchor
+  count, a copied constant on a formula with no derivation. Measured on three cells, blocks
+  under 200 kb came out the size the law says and blocks over 2 Mb two to three times it, and
+  every pair beyond 100 kb ran away in proportion, 2.3 times the law at 1.5 Mb.
+
+  At factor zero the radius is derived: a chain of span S whose pairs follow the law has a
+  radius of gyration of `S^nu / sqrt(2 (2 nu + 1)(nu + 1))`, the Gaussian chain's N over 6 at
+  nu one half, and a uniform sphere with that radius of gyration has radius root five thirds of
+  it. The one assumption is that a confined block fills its sphere evenly. The value reaches the
+  annealer, the solver and the JAX kernel as an explicit radius on a per block copy of the
+  settings. The batch executor runs a launch on one settings and refuses rather than run every
+  block at the first block's radius. Unit checks in `harness/test_confinement_radius.py` and
+  `harness/test_polymer.py`.
+
+  Why not in the reference: the reference has no confinement at all.
+
 - **Chain bonds in the arcs MC: `[springs] use_arcs_chain_bonds = yes`, default no.**
   ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `add_chain_bonds`)
   The arcs MC has no term between genomic neighbours. Inside a block the arc graph falls into

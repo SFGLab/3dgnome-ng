@@ -14,6 +14,7 @@ Serial runner = the numba backend (`mc_arcs_numba`).  The batched JAX runner
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -25,7 +26,7 @@ from gnome3d.util import add_movable_noise_inplace, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
-    from gnome3d.types import F32Array
+    from gnome3d.types import F32Array, I64Array
 
 
 def _run(problem: Problem) -> Result:
@@ -39,7 +40,7 @@ def _run(problem: Problem) -> Result:
     pos0: F32Array = problem["anchor_pos"]
     exp_dist = problem["exp_dist"]
     step = float(problem["step_size"])
-    s = problem["settings"]
+    s = settings_for_block(problem["settings"], problem["anchor_genomic"])
     seed = int(problem["seed"])
 
     # Deterministic per-IB RNG: Python `random` (initial noise) + numba (kernel).
@@ -69,6 +70,36 @@ def _run(problem: Problem) -> Result:
     return best_score, np.asarray(best, dtype=np.float32)
 
 
+def settings_for_block(s: Settings, anchor_genomic: I64Array) -> Settings:
+    """The settings one block's kernels run with.
+
+    With `confinement_packing_factor_arcs` at zero the block's confinement radius is the sphere
+    the law says a chain of its genomic span fills, and it reaches the kernels as an explicit
+    `confinement_radius_arcs` on a shallow copy, so the numba annealer, the solver and the JAX
+    kernel all read one value. The input is returned as is when the factor is positive, when
+    confinement is off at this level, or when a radius is set by hand.
+
+    Parameters
+    ----------
+    s
+        The run's settings.
+    anchor_genomic
+        Genomic position of each anchor in the block.
+    """
+    derive = (
+        bool(s.use_confinement)
+        and bool(s.confinement_apply_to_arcs)
+        and float(s.confinement_radius_arcs) <= 0.0
+        and float(s.confinement_packing_factor_arcs) <= 0.0
+    )
+    if not derive:
+        return s
+    span = int(anchor_genomic.max() - anchor_genomic.min()) if len(anchor_genomic) else 0
+    out = copy.copy(s)
+    out.confinement_radius_arcs = s.polymer_law().confinement_radius(span)
+    return out
+
+
 def arcs_solver(s: Settings) -> str:
     """The stage's solver name, validated. An unrecognised name is refused rather than falling
     through to the annealer, which would run the wrong stage and report nothing."""
@@ -87,6 +118,12 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     There is no solver here, only the JAX annealer, so a run that asked for one is refused. It
     would otherwise anneal and look like it had solved."""
     s = problems[0]["settings"]
+    if settings_for_block(s, problems[0]["anchor_genomic"]) is not s:
+        raise ValueError(
+            "the batch executor runs a launch on one settings and cannot give each block the "
+            "confinement radius the law derives for its span; set mc_executor_arcs to serial "
+            "or threaded, or give confinement_packing_factor_arcs a positive value"
+        )
     if arcs_solver(s) != "mc":
         raise NotImplementedError(
             f"[simulation_arcs] solver = {s.arcs_solver} needs "

@@ -220,7 +220,7 @@ stage's mean bond scale times the cube root of the bead count.
 | `radius_arcs` | float | 0.0 | 0.0 | Arcs stage radius, 0 derives it. |
 | `radius_smooth` | float | 0.0 | 0.0 | Smooth stage radius. |
 | `radius_ib` | float | 0.0 | 0.0 | Block placement radius. |
-| `packing_factor_arcs` | float | 1.5 | 1.5 | Arcs stage packing factor. |
+| `packing_factor_arcs` | float | 1.5 | 1.5 | Arcs stage packing factor. At 0 each block's radius is derived from the law instead: the sphere a chain of the block's genomic span fills, root five thirds of its radius of gyration `S^nu / sqrt(2 (2 nu + 1)(nu + 1))`, with no constant. Needs `mc_executor_arcs` serial or threaded. |
 | `packing_factor_smooth` | float | 1.5 | 1.5 | Smooth stage packing factor. |
 | `packing_factor_ib` | float | 0.75 | 0.75 | Block placement packing factor. Below about 0.58 a small segment is asked to fold tighter than one of its own bonds, and 0.15 crushed the cross block distance scaling. |
 

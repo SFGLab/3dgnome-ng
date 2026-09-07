@@ -188,6 +188,7 @@ def test_an_unknown_name_is_refused() -> None:
                 "step_size": 0.01,
                 "settings": s,
                 "seed": 1,
+                "anchor_genomic": np.arange(len(pos), dtype=np.int64) * 50_000,
             }  # type: ignore[arg-type]
         )
         ok = False
@@ -212,6 +213,7 @@ def test_the_batched_runner_cannot_honour_it() -> None:
                     "step_size": 0.01,
                     "settings": s,
                     "seed": 1,
+                    "anchor_genomic": np.arange(len(pos), dtype=np.int64) * 50_000,
                 }  # type: ignore[arg-type]
             ]
         )

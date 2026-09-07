@@ -222,6 +222,33 @@ def test_settings_route_through_the_law() -> None:
     )
 
 
+def test_block_size() -> None:
+    """A chain of span S under the law has a radius of gyration with no free constant, and the
+    sphere that holds it follows from that. At nu one half the chain is Gaussian and the
+    textbook result is Rg squared equal to N over 6 bonds."""
+    law = PolymerLaw(nu=0.5, s0_bp=1000, q_half=1.0)
+    rg = law.radius_of_gyration(6_000)
+    check("Gaussian chain of six bonds has Rg 1", abs(rg - 1.0) < 1e-9, f"{rg:.6f}")
+    rg24 = law.radius_of_gyration(24_000)
+    check("Rg grows as the square root of span at nu one half", abs(rg24 - 2.0) < 1e-9)
+    r = law.confinement_radius(6_000)
+    check(
+        "the sphere with that Rg has radius root five thirds of it",
+        abs(r - (5.0 / 3.0) ** 0.5) < 1e-9,
+        f"{r:.6f}",
+    )
+    law3 = PolymerLaw(nu=0.3, s0_bp=1000, q_half=1.0)
+    rg_law = 1500.0**0.3 / (2.0 * 1.6 * 1.3) ** 0.5
+    check(
+        "the general formula, S^nu over root 2 (2 nu + 1)(nu + 1)",
+        abs(law3.radius_of_gyration(1_500_000) - rg_law) < 1e-9,
+    )
+    check(
+        "a span under one bead is one bead's chain",
+        abs(law3.radius_of_gyration(10) - 1.0 / (2.0 * 1.6 * 1.3) ** 0.5) < 1e-9,
+    )
+
+
 def main() -> int:
     print("polymer law checks")
     test_the_law()
@@ -231,6 +258,7 @@ def main() -> int:
     test_refuses_what_is_not_a_decay()
     test_band_follows_the_resolution()
     test_reports_what_it_used()
+    test_block_size()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")
