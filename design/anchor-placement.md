@@ -827,7 +827,13 @@ still at 1.57. The short chains are the arcs stage: a consecutive pair with no a
 the chain bond of option C at `arcs_chain_bond_scale` 1.5 times the background at the full
 arcs spring weight, and `add_chain_bonds` overwrites the short range entry for that pair, so
 the two terms disagree on the same pair and the stronger one wins. The 1.5 was tuned under
-the old laws. An arm with the bond off is queued.
+the old laws. With the bond off on H1ESC nothing moves: Hi-C identical to three decimals, the
+short chains still at 3.0 with their ends at 1.55, so the bond is not what holds them. Nor is
+a wall: anchor pairs 1 to 10 kb apart realise 0.8 to 3.2 beads against a law of 1.36, a
+quarter of them under it, median 1.35 over the law. They are loosely held. The short range
+spring took them from 2.95 over the law, with none under it, to 1.35, and it sits at weight 0.1
+against loops at 1.0, so its weight is the knob left on this piece. Arms at 0.3 and 1.0 on top
+of the other fixes are queued.
 
 The step and the block's mean bond target were checked as the cell difference and are not:
 the mean target is 1.02 to 1.08 on every cell and uncorrelated with the stretch. What differs
