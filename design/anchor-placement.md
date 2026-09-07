@@ -815,7 +815,13 @@ the short range term on.
 | 0.5 | 1.04 | 0.357 | 0.204 | 0.060 | 0.062 | 0.38 | 0.61 | 5.7 | 174 |
 
 Monotone in every column. Pearson up 46 percent at half a bond, anchor overlaps down five
-times, MultiMM down a tenth. The input is 0.30, so at one bond and below the short band
+times, MultiMM down a tenth. GM12878 at one bond with the spring on reads the other way on
+Hi-C, Pearson 0.471 to 0.440, Spearman 0.314 to 0.262, SCC 0.221 to 0.194, MultiMM 0.305 to
+0.275, while its geometry is the best measured: beads at 1.08, 1.00, 0.97 and 1.02 of the law
+from 2 to 50 kb where the step of 5 had them at 1.5, anchor overlaps 24 to 3, subanchor
+overlaps 1530 to 589. Its bonds come out at 0.84 of target rather than H1ESC's 1.05, and the one
+input GM12878 has that H1ESC lacks is a working subanchor heat term, fed by Hi-C seven times
+deeper. Arms with all three fixes on GM12878, with and without the heat term, are queued. The input is 0.30, so at one bond and below the short band
 overshoots and the long band, which the step does not touch, stays twice too steep.
 
 The stretch is not spread evenly and the chain length says where it sits. On the arm at 5,
