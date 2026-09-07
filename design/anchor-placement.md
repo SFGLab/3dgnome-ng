@@ -766,6 +766,31 @@ term and the confinement, or the step size, five bonds per proposal against bond
 which may never resolve a bond length at all. That is an end to end sweep of the smooth stage
 and needs its own measurement.
 
+Measured 2026-09-07 on GM12878, chr1:1-60 Mb, five structures per arm, production settings with
+the short range term off and one smooth stage setting changed per arm:
+
+| arm | bond over target | 20 to 100 kb | 100 kb to 1 Mb | Pearson | Spearman | SCC | MultiMM | Rg | wb-sa | xb |
+|---|---|---|---|---|---|---|---|---|---|---|
+| production | 1.16 | -0.228 | 0.431 | 0.462 | 0.316 | 0.191 | 0.335 | 31.5 | 1478 | 286 |
+| `noise_smooth` 1 | 0.77 | -0.290 | 0.464 | 0.436 | 0.267 | 0.157 | 0.310 | 29.6 | 845 | 91 |
+| chain springs 1.0 | 1.10 | -0.180 | 0.448 | 0.459 | 0.311 | 0.186 | 0.332 | 30.8 | 1575 | 258 |
+| subanchor heat off | 1.39 | -0.253 | 0.379 | 0.446 | 0.328 | 0.179 | 0.353 | 32.2 | 1451 | 667 |
+
+None of the three is the lever, and the table separates the two things that were taken for
+one. The step size is what stretches the bonds. At one bond per proposal they come out
+compressed to 0.77, the excluded volume overlaps halve, and the short band goes flatter still
+with Hi-C down on every statistic. The chain spring at ten times its weight moves the bond to
+1.10 and the band by 0.05 and nothing else. With the subanchor heat off the bonds stretch
+further, to 1.39, so that term was holding them in rather than pushing them out. The arm with
+the shortest bonds has the flattest band, so the bond stretch and the band are independent. The
+stretch is a step size artefact worth a bond of its own some day, and the band is not the
+smooth stage's to set.
+
+What did move the bead band was the short range term at the arcs level, which moved the anchors
+and the beads followed. The smooth stage is cleared, and the remaining lever for placement under
+100 kb is at the arcs level, where that term is the only candidate measured and its Hi-C
+verdict was mixed.
+
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 
 The most direct statement of the missing constraint. It was left last because it competes with
