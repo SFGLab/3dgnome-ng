@@ -859,7 +859,11 @@ falls with every step, Pearson 0.338, 0.322 and 0.276, SCC 0.051, 0.051 and 0.03
 beads under 10 kb are a different matter, at 1.3 to 1.5 with bonds on target: two bonds
 spanning 2.1 beads is a straight chain, and the law at this exponent is crumpled at every
 scale. The one term that straightens a chain is the smooth stage's bend penalty, the
-reference's cube of the angle at `angular_constant` 0.1; an arm with it off is queued.
+reference's cube of the angle at `angular_constant` 0.1; with it off on H1ESC at
+spring weight 0.3 the beads at 2 to 5 kb go from 1.54 to 1.37 over the law and 5 to 10 kb from
+1.34 to 1.29, Pearson 0.322 to 0.337 with Spearman, SCC and MultiMM level, overlaps slightly
+down. A small gain at no cost, and not the whole piece: the shortest chains stay at 1.79. It
+goes into the candidate for the other two cells to confirm.
 
 The step and the block's mean bond target were checked as the cell difference and are not:
 the mean target is 1.02 to 1.08 on every cell and uncorrelated with the stretch. What differs
