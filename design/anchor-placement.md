@@ -865,6 +865,16 @@ spring weight 0.3 the beads at 2 to 5 kb go from 1.54 to 1.37 over the law and 5
 down. A small gain at no cost, and not the whole piece: the shortest chains stay at 1.79. It
 goes into the candidate for the other two cells to confirm.
 
+**Production, 2026-09-07 evening.** One bond per proposal, subanchor heat off, short range
+spring at 0.1 over 100 kb, chain bonds off, arcs sphere from the law. Three cells against the
+polymer arms: Pearson 0.471 to 0.476, 0.244 to 0.338 and 0.267 to 0.298; SCC 0.221 to 0.217,
+0.040 to 0.051 and 0.113 to 0.130; Spearman level; MultiMM 0.305 to 0.280, 0.071 to 0.061
+and 0.208 to 0.179. The short band from 0.26, 0.14 and 0.11 to 0.33, 0.36 and 0.25 against
+inputs of 0.27, 0.30 and 0.20. Bonds at 1.05 to 1.12 of target everywhere. GM12878 in a fifth of
+the wall. Open: the long range above 100 kb, which needs the blocks to keep their volume
+against each other below the arcs stage; and the bend penalty, confirmed on H1ESC and pending
+on the other two.
+
 The step and the block's mean bond target were checked as the cell difference and are not:
 the mean target is 1.02 to 1.08 on every cell and uncorrelated with the stretch. What differs
 on the long chains is the subanchor heat term. With it off on H1ESC every battery column is
