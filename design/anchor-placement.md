@@ -767,29 +767,41 @@ which may never resolve a bond length at all. That is an end to end sweep of the
 and needs its own measurement.
 
 Measured 2026-09-07 on GM12878, chr1:1-60 Mb, five structures per arm, production settings with
-the short range term off and one smooth stage setting changed per arm:
+the short range term off and one smooth stage setting changed per arm. The first reading of
+this table was wrong, because the battery's short band column was. It sampled every sixtieth
+bead by index, and at 1 kb subanchor spacing that puts every pair inside a subanchor run at a
+multiple of 60 kb: of 613 pairs in the band, none sat at 20 to 30 kb and 507 at 45 to 75 kb, and
+the fit came out at -0.30 on a structure whose random pair slope is 0.24. The column now draws
+pairs at random; the long band and the all pairs exponent were not affected. Remeasured:
 
 | arm | bond over target | 20 to 100 kb | 100 kb to 1 Mb | Pearson | Spearman | SCC | MultiMM | Rg | wb-sa | xb |
 |---|---|---|---|---|---|---|---|---|---|---|
-| production | 1.16 | -0.228 | 0.431 | 0.462 | 0.316 | 0.191 | 0.335 | 31.5 | 1478 | 286 |
-| `noise_smooth` 1 | 0.77 | -0.290 | 0.464 | 0.436 | 0.267 | 0.157 | 0.310 | 29.6 | 845 | 91 |
-| chain springs 1.0 | 1.10 | -0.180 | 0.448 | 0.459 | 0.311 | 0.186 | 0.332 | 30.8 | 1575 | 258 |
-| subanchor heat off | 1.39 | -0.253 | 0.379 | 0.446 | 0.328 | 0.179 | 0.353 | 32.2 | 1451 | 667 |
+| production | 1.16 | 0.246 | 0.438 | 0.462 | 0.316 | 0.191 | 0.335 | 31.5 | 1478 | 286 |
+| `noise_smooth` 1 | 0.77 | 0.380 | 0.472 | 0.436 | 0.267 | 0.157 | 0.310 | 29.6 | 845 | 91 |
+| chain springs 1.0 | 1.10 | 0.256 | 0.458 | 0.459 | 0.311 | 0.186 | 0.332 | 30.8 | 1575 | 258 |
+| subanchor heat off | 1.39 | 0.136 | 0.389 | 0.446 | 0.328 | 0.179 | 0.353 | 32.2 | 1451 | 667 |
 
-None of the three is the lever, and the table separates the two things that were taken for
-one. The step size is what stretches the bonds. At one bond per proposal they come out
-compressed to 0.77, the excluded volume overlaps halve, and the short band goes flatter still
-with Hi-C down on every statistic. The chain spring at ten times its weight moves the bond to
-1.10 and the band by 0.05 and nothing else. With the subanchor heat off the bonds stretch
-further, to 1.39, so that term was holding them in rather than pushing them out. The arm with
-the shortest bonds has the flattest band, so the bond stretch and the band are independent. The
-stretch is a step size artefact worth a bond of its own some day, and the band is not the
-smooth stage's to set.
+The bond stretch predicts the band, monotonically, across arms and across cells: 0.77 gives
+0.38, 1.10 and 1.16 give 0.25, 1.39 gives 0.14, and on the polymer arms H1ESC at 1.40 sits at
+0.14 and HFFC6 at 1.35 at 0.11 while GM12878 at 1.16 is on its input. The step size sets the
+stretch. At five bonds per proposal, the reference's constant, the bonds never settle and come
+out long; at one they overshoot to 0.77 and the band overshoots the input. The heat term holds
+bonds in, not out. The chain spring weight is nearly inert.
 
-What did move the bead band was the short range term at the arcs level, which moved the anchors
-and the beads followed. The smooth stage is cleared, and the remaining lever for placement under
-100 kb is at the arcs level, where that term is the only candidate measured and its Hi-C
-verdict was mixed.
+The same split on the three cells with the short range term on, random pairs, all beads over 20
+to 100 kb against anchors alone:
+
+| cell | input | beads, off | beads, on | anchors, off | anchors, on |
+|---|---|---|---|---|---|
+| GM12878 | 0.272 | 0.246 | 0.260 | 0.154 | 0.354 |
+| H1ESC | 0.299 | 0.143 | 0.141 | 0.142 | 0.326 |
+| HFFC6 | 0.197 | 0.107 | 0.093 | 0.149 | 0.310 |
+
+The short range term puts the anchors on the input on every cell, within blocks and across
+them alike, so the arcs stage is done. On H1ESC and HFFC6 the beads do not follow, and the pairs
+that stay flat are the same chain and the different chain pairs equally, at 0.10 and 0.10 on
+H1ESC. That is the smooth stage, and its step size is the first thing to sweep, on H1ESC with
+the short range term on.
 
 ### C. Chain bonds between consecutive anchors in the arcs MC. Built, opt in, under measurement
 

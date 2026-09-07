@@ -181,11 +181,17 @@ def overlaps(
 
 
 def exponent(pos: np.ndarray, mid: np.ndarray, lo: int = 20_000, hi: int = 1_000_000) -> float:
-    """Slope of log distance against log genomic separation, over the band Hi-C is measured on."""
+    """Slope of log distance against log genomic separation, over the band Hi-C is measured on.
+
+    Pairs are drawn at random with a fixed seed. A stride over bead index aliases against the
+    1 kb subanchor spacing: at a stride of 60 beads every pair inside a subanchor run sits at a
+    multiple of 60 kb, the 20 to 30 kb bin is empty and the short band fit comes out negative on
+    a structure whose random pair slope is 0.24.
+    """
     n = len(mid)
-    step = max(1, n // 700)  # bound the pair count on a whole region
-    i = np.arange(0, n, step)
-    a, b = np.meshgrid(i, i, indexing="ij")
+    rng = np.random.default_rng(0)
+    a = rng.integers(0, n, 4_000_000)
+    b = rng.integers(0, n, 4_000_000)
     m = a < b
     a, b = a[m], b[m]
     sep = np.abs(mid[b] - mid[a]).astype(np.float64)
