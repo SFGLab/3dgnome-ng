@@ -956,6 +956,21 @@ pile. The reach stays at 3. Bringing the long range onto the law is not an arcs 
 alone; it needs the blocks to keep their volume against each other, which is the IB layout,
 the stitch and the relaxation, and that is a separate piece of work.
 
+**Where the Hi-C goes, 2026-09-08.** The simulated contact map split by pair class, H1ESC,
+`playground/hic_split.py`:
+
+| reach | Pearson, all | within block only | cross block only | cross block share of contacts | Hi-C's own share |
+|---|---|---|---|---|---|
+| 3 | 0.338 | 0.357 | 0.058 | 11.4 percent | 48.3 percent |
+| 1.5 | 0.269 | 0.343 | 0.033 | 31.7 | 48.3 |
+| 1.0 | 0.220 | 0.327 | 0.025 | 46.9 | 48.3 |
+
+The within block map correlates about the same at every reach. The loss is all in the cross
+block contacts: shrinking the blocks brings their share up to Hi-C's own, and they correlate
+with Hi-C at 0.03, so they are the right number of contacts in the wrong places. Nothing
+arranges the blocks against each other by Hi-C. That is the lever, and it is below the arcs
+stage.
+
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
 
