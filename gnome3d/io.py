@@ -535,3 +535,16 @@ _atom_site.gnome_bead_kind
                 f"{bead.x} {bead.y} {bead.z} 1.00 99.99 C "
                 f"{bead.start} {bead.end} {bead.kind}\n"
             )
+
+
+def write_bead_table(path: str, chr_: str, beads: list[BeadOut]) -> None:
+    """Write one structure as a tab separated table, one row per bead.
+
+    Columns are chromosome, genomic start and end in bp, x, y, z and the bead kind, after one
+    header line. The table carries the same beads as the CIF written beside it, for readers
+    that do not parse mmCIF.
+    """
+    with open(path, "w") as f:
+        f.write("#chr\tstart\tend\tx\ty\tz\tkind\n")
+        for b in beads:
+            f.write(f"{chr_}\t{b.start}\t{b.end}\t{b.x}\t{b.y}\t{b.z}\t{b.kind}\n")

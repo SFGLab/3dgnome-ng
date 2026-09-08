@@ -15,7 +15,7 @@ from pathlib import Path
 
 from gnome3d import log
 from gnome3d.data import ContactData
-from gnome3d.io import parse_chrs_arg, write_cif
+from gnome3d.io import parse_chrs_arg, write_bead_table, write_cif
 from gnome3d.pipeline.executor import Executor
 from gnome3d.reconstruct import MEMBER_SEED_STRIDE, pick_executor, reconstruct
 from gnome3d.settings import Settings
@@ -85,6 +85,7 @@ def _run_structure(
             cif_path = out_dir / _cif_name(entry_base, chr_, i, multi_chr)
             entry_id = cif_path.stem
             write_cif(str(cif_path), beads, entry_id=entry_id)
+            write_bead_table(str(cif_path.with_suffix(".beads.tsv")), chr_, beads)
             LOG.info("wrote %s  (%d beads)", cif_path, len(beads))
             total_beads += len(beads)
 
