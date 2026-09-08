@@ -62,8 +62,9 @@ def fit_contact_exponent(contacts: list[SingletonContact]) -> ContactFit:
     Intra chromosomal pairs only, on the grid the file is binned to. At each grid separation
     the contact probability is the counts at that separation over the number of bin pairs on
     the chromosomes that could hold them, so a deep map with every pixel present and a thin
-    map with most pixels missing read the same curve. The band starts at 20 kb or at twice
-    the grid step, whichever is larger, so a file binned at 25 kb is fitted from 50 kb, and
+    map with most pixels missing read the same curve. The grid step is read from where the
+    separations pile up, since a chromosome's last bin is cut short and sits off the grid.
+    The band starts at 20 kb or at twice the grid step, whichever is larger, so a file binned at 25 kb is fitted from 50 kb, and
     runs to 1 Mb. The fit is refused, with the reason recorded, when the band holds too few
     pairs or separations, or when the slope is not a decay a polymer can produce.
 
@@ -85,7 +86,10 @@ def fit_contact_exponent(contacts: list[SingletonContact]) -> ContactFit:
     pos = sep > 0
     if not pos.any():
         return _refused("no intra chromosomal pairs")
-    step = float(sep[pos].min())
+    # The grid step is where the separations pile up. The smallest one in the file can be an
+    # end bin the chromosome cut short, one midpoint off the grid per chromosome.
+    vals, freq = np.unique(sep[pos], return_counts=True)
+    step = float(vals[freq >= 0.1 * freq.max()][0])
     lo = int(max(_BAND_LO, 2 * step))
     hi = _BAND_HI
     if lo >= hi:
