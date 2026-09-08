@@ -1,8 +1,0 @@
-{
-  "_note": "Deep Hi-C for HFFC6: Tier 1 in situ Hi-C (DpnII), two biological replicates merged, set 4DNES2R6PUEK, 2.93 billion contacts, 21.3 GB. Replaces the shallow file the project used until 2026-09-08 (GM12878 7.8M, H1ESC 104M, HFFC6 193M contacts genome wide). Carries the portal's cooler 0.8.3 duplicate pixel warning: sum duplicates when reading. Fetch: python -m validation fetch --manifest validation/manifests/HFFC6_hic_deep.json --out /mnt/storagelinux/_hic",
-  "cell_line": "HFFC6",
-  "assembly": "GRCh38",
-  "assays": [
-    {"name": "hic", "source": "4dn", "accession": "4DNFIB59T7NN", "output_type": "in situ Hi-C"}
-  ]
-}

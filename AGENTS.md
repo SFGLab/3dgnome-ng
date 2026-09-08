@@ -929,7 +929,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Production since 2026-09-08 together with `arcs_repulsion_cutoff_factor` 1.5, on the deep
   4DN maps. The files the project had used held 7.8 million, 104 million and 193 million
   contacts genome wide, so the term held under 1 percent of the far pairs and did nothing;
-  `validation/manifests/<CELL>_hic_deep.json` fetch the 2.5 to 4.0 billion contact maps.
+  `validation/manifests/<CELL>_hic.json` now fetch the 2.5 to 4.0 billion contact maps and
+  the shallow ones are kept as `<CELL>_hic_shallow.json` for the record.
   With those as input, the term on and the reach at 1.5, the structures follow the law from
   20 kb to 2 Mb within a quarter on three cells, where before every pair beyond 100 kb ran
   away by 1.3 to 1.8 times; Hi-C against the deep maps is up on GM12878 and HFFC6 and a shade
