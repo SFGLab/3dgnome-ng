@@ -998,6 +998,16 @@ heat term is inert on H1ESC and a plausible part of why every Hi-C correlation s
 since the target it correlates against is the same shallow map. A deeper file per cell is the
 next input decision, ahead of any further term.
 
+**The exponent fit was counting rows, 2026-09-08.** On a thin map nearly every pixel holds one
+contact so rows and counts agree; on the deep GM12878 map every pixel is present and the fit
+read a flat -0.10. Rewritten as contact probability per grid separation, counts over the bin
+pairs the chromosomes offer at that separation, with the grid step read from where the
+separations pile up rather than from a chromosome's cut short end bin. Under it the thin
+files read 0.333, 0.299 and 0.298 for GM12878, H1ESC and HFFC6, the deep GM12878 map 0.343,
+and a trio sample 0.376 where the old fit had refused it and the run had fallen back to
+0.285. The earlier spread of 0.275, 0.299, 0.192 and 0.072 was the estimator, not the cells,
+and the realised exponents of 0.39 to 0.48 stand against inputs near 0.34, not 0.20 to 0.30.
+
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
 
