@@ -986,6 +986,18 @@ The lever is contact data for those pairs in the arcs stage, not a layout of blo
 layout contact term built the same day acts on the 9 blocks and is moot on this data.
 `playground/true_ib.py` reads the tree's blocks from the run's config.
 
+**Built as `[springs] use_contact_background` and run on H1ESC: nothing moved, every column
+identical, because the input is too thin to say which pair is enriched.** On H1ESC chr1:1-60 Mb
+the run holds 13,861 contacts, 0.3 to 3 percent of arcless pairs beyond the range have any
+contact and 0.0 to 0.6 percent are held; GM12878 holds 0.2 to 3.3 percent
+(`playground/held_pairs.py`). The Hi-C files themselves are the reason. Genome wide the file in
+use holds 7.8 million contacts for GM12878, 104 million for H1ESC and 193 million for HFFC6,
+against the billions a deep map has; over chr1:1-60 Mb at 25 kb that is 118 thousand, 1.06
+million and 1.66 million counts across 2,400 bins. That thinness is also why the subanchor
+heat term is inert on H1ESC and a plausible part of why every Hi-C correlation sits under 0.5,
+since the target it correlates against is the same shallow map. A deeper file per cell is the
+next input decision, ahead of any further term.
+
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
 
