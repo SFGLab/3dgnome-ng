@@ -1057,8 +1057,11 @@ and 0.589 and the old thin input candidate at 0.283, 0.117, 0.386 and 0.608. The
 run's own law: 0.94 at 20 to 50 kb, 0.99 at 100 to 200 kb, 1.20 at 500 kb to 1 Mb and 1.24 at
 1 to 2 Mb, block radius of gyration over the law 0.88, where the deep input alone had 1.56,
 1.77 and 1.26. The reach cut that scrambled the block on the thin input, since nothing
-informed the far pairs, does not on the deep one. H1ESC and HFFC6 at the same settings and
-GM12878 at reach 1.0 are queued for the battery.
+informed the far pairs, does not on the deep one. H1ESC at the same settings: the curve comes onto the law the same way, 0.93, 0.98, 1.27 and
+1.29 with block size 0.88, and holds 4 percent of the far pairs as GM12878 does, but Hi-C reads
+a shade under the deep input alone, Pearson 0.282 against 0.288, Spearman 0.105 against 0.102,
+SCC 0.253 against 0.260, and MultiMM 0.568 against 0.611, with cross block overlaps 148 to 416.
+HFFC6 and GM12878 at reach 1.0 are queued.
 
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
