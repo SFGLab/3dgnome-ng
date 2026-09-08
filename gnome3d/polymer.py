@@ -62,8 +62,10 @@ def fit_contact_exponent(contacts: list[SingletonContact]) -> ContactFit:
 
     Intra chromosomal pairs only. The band starts at 20 kb or at twice the smallest separation
     the data resolves, whichever is larger, so a file binned at 25 kb is fitted from 50 kb, and
-    runs to 1 Mb. Counts are binned in log separation and divided by bin width, so the bin
-    layout does not shape the slope. The fit is refused, with the reason recorded, when the
+    runs to 1 Mb. Each row is weighted by its count, since on a deep map every pixel is present
+    and the decay lives in the counts, not in how many rows a separation has. The weighted
+    counts are binned in log separation and divided by bin width, so the bin layout does not
+    shape the slope. The fit is refused, with the reason recorded, when the
     band holds too few pairs or bins, or when the slope is not a decay a polymer can produce.
 
     Parameters
@@ -73,9 +75,12 @@ def fit_contact_exponent(contacts: list[SingletonContact]) -> ContactFit:
     """
     if not contacts:
         return _refused("no contacts")
-    a = np.array([c[1] for c in contacts if c[0] == c[2]], dtype=np.float64)
-    b = np.array([c[3] for c in contacts if c[0] == c[2]], dtype=np.float64)
+    intra = [c for c in contacts if c[0] == c[2]]
+    a = np.array([c[1] for c in intra], dtype=np.float64)
+    b = np.array([c[3] for c in intra], dtype=np.float64)
+    w = np.array([max(float(c[4]), 0.0) for c in intra], dtype=np.float64)
     sep = np.abs(b - a)
+    w = w[sep > 0]
     sep = sep[sep > 0]
     if sep.size == 0:
         return _refused("no intra chromosomal pairs")
@@ -83,11 +88,12 @@ def fit_contact_exponent(contacts: list[SingletonContact]) -> ContactFit:
     hi = _BAND_HI
     if lo >= hi:
         return _refused(f"resolution too coarse for a {hi // 1000} kb band", lo, hi)
-    inside = sep[(sep >= lo) & (sep <= hi)]
+    band = (sep >= lo) & (sep <= hi)
+    inside = sep[band]
     if inside.size < _MIN_PAIRS:
         return _refused(f"only {inside.size:,} pairs in the band", lo, hi, int(inside.size))
     edges = np.logspace(np.log10(lo), np.log10(hi), _N_BINS + 1)
-    counts, _ = np.histogram(inside, edges)
+    counts, _ = np.histogram(inside, edges, weights=w[band])
     centres = np.sqrt(edges[:-1] * edges[1:])
     density = counts / np.diff(edges)
     keep = counts > _MIN_COUNT

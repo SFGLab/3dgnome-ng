@@ -249,6 +249,28 @@ def test_block_size() -> None:
     )
 
 
+def test_counts_not_rows() -> None:
+    """A deep map has every pixel present, so the number of rows per separation says nothing
+    and the decay lives in the counts. The fit must weight rows by their count. On a thin map
+    the two agree, which is how counting rows passed."""
+    rng = np.random.default_rng(3)
+    rows: list[tuple[str, int, str, int, int]] = []
+    n_bins = 400
+    for i in range(n_bins):
+        for j in range(i + 1, n_bins):
+            sep = (j - i) * 25_000
+            if sep > 1_500_000:
+                continue
+            mean = 2000.0 * (sep / 50_000.0) ** -0.9
+            rows.append(("chr1", i * 25_000, "chr1", j * 25_000, int(max(1, rng.poisson(mean)))))
+    fit = fit_contact_exponent(rows)
+    check(
+        "every pixel present, the decay is read from the counts",
+        fit.ok and abs(fit.slope + 0.9) < 0.1,
+        f"slope {fit.slope:.3f} ok={fit.ok} {fit.reason}",
+    )
+
+
 def main() -> int:
     print("polymer law checks")
     test_the_law()
@@ -259,6 +281,7 @@ def main() -> int:
     test_band_follows_the_resolution()
     test_reports_what_it_used()
     test_block_size()
+    test_counts_not_rows()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")
