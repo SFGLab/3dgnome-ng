@@ -896,8 +896,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Production since 2026-09-07 as the principled form. Alone it moved nothing, the old formula
   already landed near it. What inflates a block is the arcless repulsion's reach; cutting that
   puts the long range on the law and the blocks in a pile, Hi-C down and cross block overlaps
-  up nine times, so the reach stays at 3 and the long range is a stitch and relaxation
-  problem, not an arcs stage one.
+  up nine times, which was the thin input: with the deep maps and the contact background the reach is
+  1.5 in production, see that entry.
 
   Why not in the reference: the reference has no confinement at all.
 
@@ -925,6 +925,19 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   below its expected contact keeps the repulsion, so the held set stays sparse; holding every
   pair at a power law could not be embedded and was rejected. No kernel change. Unit checks in
   `harness/test_arc_matrix.py`.
+
+  Production since 2026-09-08 together with `arcs_repulsion_cutoff_factor` 1.5, on the deep
+  4DN maps. The files the project had used held 7.8 million, 104 million and 193 million
+  contacts genome wide, so the term held under 1 percent of the far pairs and did nothing;
+  `validation/manifests/<CELL>_hic_deep.json` fetch the 2.5 to 4.0 billion contact maps.
+  With those as input, the term on and the reach at 1.5, the structures follow the law from
+  20 kb to 2 Mb within a quarter on three cells, where before every pair beyond 100 kb ran
+  away by 1.3 to 1.8 times; Hi-C against the deep maps is up on GM12878 and HFFC6 and a shade
+  down on H1ESC. Reach 1.0 compacts past the law and doubles cross block overlaps. On a thin
+  map the term holds next to nothing and that is allowed: no input has to be deep, and the
+  reach at 1.5 then behaves as it did on the thin input. Anchors are about 13 kb wide against
+  25 kb pixels, so even a dense map reaches only about 4 percent of the far pairs through
+  the singletons; a denser anchor level map is a data path change and is not built.
 
   Why not in the reference: the reference scales arc targets by the anchor heatmap and has no
   term on an arcless pair beyond its 1/d.

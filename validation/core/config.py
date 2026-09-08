@@ -69,6 +69,10 @@ CANONICAL: dict[str, dict[str, object]] = {
         # steady cost in Hi-C. Measured 2026-09-07.
         "background_weight": 0.1,
         "background_range_bp": 100000,
+        # Beyond that range, an arcless pair whose contact cell puts it under the background is
+        # held at the law's contact distance. Sparse by construction, and on a thin map it
+        # holds next to nothing, which is allowed: no input has to be deep.
+        "use_contact_background": "yes",
         "stretch_constant": 0.1,
         "squeeze_constant": 0.1,
         "angular_constant": 0.1,
@@ -161,7 +165,11 @@ CANONICAL: dict[str, dict[str, object]] = {
         # IBs from target 0.4 to Rg 515 and causes the multi-hour arcs polish. Capping the
         # long-range tail at 3x the natural arc scale keeps local de-clashing while stopping the
         # excess expansion.
-        "arcs_repulsion_cutoff_factor": 3.0,
+        # 1.5 since 2026-09-08. At 3 the reach pushed a block's arcless anchors out to 3.6
+        # beads where the law packs them 2.4 apart, and every pair beyond 100 kb ran away by
+        # 1.3 to 1.8 times. At 1.5, with the contact background holding the far pairs that
+        # carry data, the curve sits on the law to 2 Mb on three cells; 1.0 compacts past it.
+        "arcs_repulsion_cutoff_factor": 1.5,
     },
     "confinement": {
         "use_confinement": "yes",
@@ -193,12 +201,18 @@ _QUALITY_STEPS = {"fast": 1000, "balanced": 5000, "full": 50000}
 
 
 def cell_data_section(cell: str, data_root: str = "data") -> dict[str, object]:
-    """The data section for a cell line, by 3dgnome file-naming convention."""
+    """The data section for a cell line, by 3dgnome file-naming convention.
+
+    The singletons are the Hi-C derived file, `<cell>_hic_25kb_singletons.bedpe`, when it is
+    present in the cell's directory, and the ChIA-PET singletons when it is not. A deep map is
+    not always available and nothing may require one.
+    """
+    hic = Path(data_root) / cell / f"{cell}_hic_25kb_singletons.bedpe"
     return {
         "data_dir": str(Path(data_root) / cell),
         "anchors": f"{cell}_anchors_3+_oriented.bed",
         "clusters": f"{cell}_clusters_3+.bedpe",
-        "singletons": f"{cell}_singletons_lessthan3.bedpe",
+        "singletons": hic.name if hic.is_file() else f"{cell}_singletons_lessthan3.bedpe",
         "singletons_inter": "",
         "segment_split": f"ccds_all_hg38_merged100k_{cell}.breakpoints.bed",
         "centromeres": "hg38_centromeres.bed",

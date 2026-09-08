@@ -1,5 +1,9 @@
 """Write Hi-C bin pairs as a singleton BEDPE the model can ingest.
 
+On a deep map thin with `--contacts-per-mb`: every 25 kb pair is present there, tens of
+millions of rows per chromosome, and the model holds singletons as a list. The thinning is a
+random draw on the counts, which keeps the decay; `--min-count` drops the far pairs first.
+
 Every pair with a count is written. The train/test split that
 ``validation.studies.self_corr`` applies is a validation device, and holding half the contacts
 back would only weaken a production ensemble, so ``holdout=False`` here.
@@ -44,6 +48,14 @@ def main() -> None:
         default=1,
         help="Drop pairs below this raw count. Raise it on a deep map to cut file size.",
     )
+    ap.add_argument(
+        "--contacts-per-mb",
+        type=float,
+        default=0.0,
+        help="Thin each chromosome to this many contacts per Mb of its length before writing, "
+        "by a random draw that keeps every separation's share. 0 keeps every contact. A count "
+        "threshold drops the far pairs first and steepens the decay; this does not.",
+    )
     args = ap.parse_args()
 
     if bool(args.region) == bool(args.chroms):
@@ -67,6 +79,13 @@ def main() -> None:
             for region in regions:
                 part = tmp_path.with_suffix(f".{region}")
                 try:
+                    thin_to = None
+                    if args.contacts_per_mb > 0.0:
+                        import cooler
+
+                        clr = cooler.Cooler(f"{args.mcool}::/resolutions/{args.binsize}")
+                        length = float(clr.chromsizes.get(region.split(":")[0], 0))
+                        thin_to = args.contacts_per_mb * length / 1e6
                     _bal, starts, _test, _train = hic_to_singleton_bedpe(
                         args.mcool,
                         region,
@@ -74,6 +93,7 @@ def main() -> None:
                         part,
                         holdout=False,
                         min_count=args.min_count,
+                        thin_to=thin_to,
                     )
                 except Exception as exc:  # noqa: BLE001 - a chromosome absent from the cooler
                     print(f"[prep] {region}: skipped ({exc})", flush=True)
