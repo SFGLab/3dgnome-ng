@@ -1065,8 +1065,17 @@ HFFC6 at the same settings: on the law throughout, 0.88, 0.89, 1.01 and 1.09 wit
 0.86, and Hi-C up against the deep input alone, Pearson 0.301 against 0.283, Spearman 0.112
 against 0.102, MultiMM 0.652 against 0.627, SCC 0.318 against 0.337. Three cells: the geometry
 comes onto the law on every one, Pearson and Spearman up on two and level on the third, MultiMM
-up on two and down on one, SCC down a hundredth or two on all three. GM12878 at reach 1.0 is
-queued.
+up on two and down on one, SCC down a hundredth or two on all three. GM12878 at reach 1.0: Pearson 0.275, Spearman 0.132, SCC 0.353, MultiMM 0.579, the long range
+at 1.04 to 1.07 but the blocks at 0.74 of the law and cross block overlaps 642 against 320 at
+1.5. Tighter compacts past the law and the overlaps double, so 1.5 is the setting.
+
+**Where this leaves the range above 100 kb, 2026-09-08 evening.** With the deep maps as
+input, the contact background on and the reach at 1.5, the structures follow the law from
+20 kb to 2 Mb within about a quarter on all three cells, block sizes at 0.86 to 0.88 of the
+law, and Hi-C against the deep maps is up on two cells and a shade down on H1ESC. That is the
+piece done as far as the input reaches. What would take it further is a denser anchor level
+contact map, since the term holds only 4 percent of the far pairs through the 25 kb pixels,
+and that is a data path change.
 
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
