@@ -156,6 +156,7 @@ least `stop_condition_successes_threshold` moves.
 | `refine_scope` | str | segment | segment | `segment` places each segment's blocks as one chain and skips a segment with one block or fewer. `chromosome` places every block on the chromosome as one chain. It inflates structures and needs the excluded volume and confinement retuned. |
 | `use_ib_mc` | bool | no | yes | Anneal block centroids with chain bonds, excluded volume and confinement instead of placing them by interpolation. |
 | `dist_weight` | float | 1.0 | 1.0 | Weight of the chain bond term. |
+| `heatmap_weight` | float | 0.0 | 0.0 | A contact term between the blocks of one chain: the run's contacts binned by block and converted with the law as the segment heatmap is, scored at this weight. Zero is off. |
 
 ## [simulation_backend]
 

@@ -907,6 +907,18 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   the wall. Three cell battery: Pearson and SCC up on every cell, Spearman level, MultiMM down
   8 to 14 percent. See `design/anchor-placement.md`.
 
+- **A contact term in the block layout: `[simulation_ib] heatmap_weight`, default 0.**
+  ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `block_heatmap_distances`,
+  [mc/numba/ib.py](gnome3d/mc/numba/ib.py))
+  The blocks of a segment were laid out by chain bonds, excluded volume and a sphere, with no
+  contact data at all. The run's contacts are binned by block, the bins meeting halfway between
+  neighbours, normalised and converted with the law the way the segment heatmap is, and the
+  block kernel scores the matrix as its heat term. Weight zero is byte exact. Unit checks in
+  `harness/test_ib_heatmap.py`, which also record that at the defaults' `max_temp_ib` of 20 the
+  layout never cools and ends with bonds nine times their target, while production's 5 settles.
+
+  Why not in the reference: the reference has no block layout pass at all.
+
 - **Chain bonds in the arcs MC: `[springs] use_arcs_chain_bonds = yes`, default no.**
   ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `add_chain_bonds`)
   The arcs MC has no term between genomic neighbours. Inside a block the arc graph falls into

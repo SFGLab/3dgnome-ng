@@ -237,6 +237,7 @@ class Settings:
     spring_stretch_ib: float
     spring_squeeze_ib: float
     dist_weight_ib: float
+    heatmap_weight_ib: float
     noise_ib: float
 
     # ---- confinement ----
@@ -545,6 +546,7 @@ class Settings:
         self.spring_stretch_ib = 0.1
         self.spring_squeeze_ib = 0.1
         self.dist_weight_ib = 1.0
+        self.heatmap_weight_ib = 0.0
         self.noise_ib = 0.5
 
         # ---- confinement ----
@@ -1051,6 +1053,7 @@ class Settings:
             self.mc_stop_successes_ib,
         )
         self.dist_weight_ib = getf("simulation_ib", "dist_weight", self.dist_weight_ib)
+        self.heatmap_weight_ib = getf("simulation_ib", "heatmap_weight", self.heatmap_weight_ib)
 
         # [confinement]
         self.use_confinement = getb("confinement", "use_confinement", self.use_confinement)

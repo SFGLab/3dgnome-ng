@@ -1023,6 +1023,57 @@ def position_interaction_blocks(state: CoarseState, segs: list[int], chr_: str) 
         ib_mc_refine(state, segs, chr_)
 
 
+def block_heatmap_distances(
+    s: Settings,
+    singletons: list[SingletonContact],
+    chr_: str,
+    blocks: list[tuple[int, int, int]],
+) -> F64Array:
+    """Distance targets between the blocks of one chain, from the run's own contacts.
+
+    Contacts are binned by block, the bins meeting halfway between neighbouring blocks, then
+    normalised and converted with the law the way the segment heatmap is. A cell with no
+    contact carries 0 and the diagonal band -1, both of which the kernel skips.
+
+    Parameters
+    ----------
+    s
+        The run's settings, carrying the law.
+    singletons
+        Contacts on this chromosome.
+    chr_
+        The chromosome.
+    blocks
+        One (start, end, midpoint) per block, in genomic order.
+    """
+    n = len(blocks)
+    if n <= 1:
+        return np.zeros((n, n), dtype=np.float64)
+    breaks = [0]
+    for (_, end_a, _), (start_b, _, _) in zip(blocks[:-1], blocks[1:], strict=True):
+        breaks.append((end_a + start_b) // 2)
+    breaks.append(int(1e9))
+    lengths_mb: list[float] = []
+    for i, (start, end, _) in enumerate(blocks):
+        if i == 0:
+            bp = breaks[1] - start
+        elif i == n - 1:
+            bp = end - breaks[-2]
+        else:
+            bp = breaks[i + 1] - breaks[i]
+        lengths_mb.append(max(bp, 1) / 1e6)
+    h_raw = create_singleton_heatmap(
+        singletons, {chr_: breaks}, {chr_: 0}, n, bin_lengths_mb=lengths_mb
+    )
+    if float(np.asarray(h_raw).sum()) <= 0.0:
+        return np.zeros((n, n), dtype=np.float64)
+    h_norm = normalize_heatmap(h_raw, n)
+    h_norm = normalize_heatmap_diagonal_total(h_norm, n, 1.0)
+    mids = np.array([m for _, _, m in blocks], dtype=np.float64)
+    dist, _avg = create_distance_heatmap(s, h_norm, n, separations_bp=mids)
+    return np.array(dist, dtype=np.float64)
+
+
 def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
     """
     Refine IB centroid positions with a small chain-bond + EV + confinement
@@ -1060,10 +1111,23 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
     else:
         groups = [list(clusters[seg_idx].children) for seg_idx in segs]
 
+    heat_w = float(s.heatmap_weight_ib)
+    chr_contacts: list[SingletonContact] = (
+        [c for c in state.singletons if c[0] == chr_ and c[2] == chr_] if heat_w > 0.0 else []
+    )
+
     for ibs in groups:
         if len(ibs) <= 1:
             continue
         pos: F32Array = np.array([clusters[ib].pos for ib in ibs], dtype=np.float32)
+        heat: F64Array | None = None
+        if heat_w > 0.0:
+            heat = block_heatmap_distances(
+                s,
+                chr_contacts,
+                chr_,
+                [(clusters[ib].start, clusters[ib].end, clusters[ib].genomic_pos) for ib in ibs],
+            )
         dtn: F32Array = np.zeros(len(ibs) - 1, dtype=np.float32)
         for i in range(len(ibs) - 1):
             gap = abs(clusters[ibs[i + 1]].genomic_pos - clusters[ibs[i]].genomic_pos)
@@ -1106,6 +1170,7 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
                 s,
                 compartment_for_clusters(state, ibs, chr_),
                 accessibility_for_clusters(state, ibs, chr_),
+                heat_dist=heat,
             )
             gyr_after = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
             LOG.info("gyr %.2f -> %.2f", gyr_before, gyr_after)
