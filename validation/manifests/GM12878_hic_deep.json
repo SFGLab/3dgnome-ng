@@ -1,0 +1,8 @@
+{
+  "_note": "Deep Hi-C for GM12878: Rao 2014 in situ Hi-C (MboI), 27 experiments merged, Aiden lab, set 4DNES3JX38V5, 4.9 billion contacts, 25.5 GB. Replaces the shallow file the project used until 2026-09-08 (GM12878 7.8M, H1ESC 104M, HFFC6 193M contacts genome wide). Carries the portal's cooler 0.8.3 duplicate pixel warning: sum duplicates when reading. Fetch: python -m validation fetch --manifest validation/manifests/GM12878_hic_deep.json --out /mnt/storagelinux/_hic",
+  "cell_line": "GM12878",
+  "assembly": "GRCh38",
+  "assays": [
+    {"name": "hic", "source": "4dn", "accession": "4DNFIXP4QG5B", "output_type": "in situ Hi-C"}
+  ]
+}
