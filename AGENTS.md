@@ -25,7 +25,9 @@ Rules for the code as it stands:
   becomes a default that silently applies to another. When a measurement cannot be made the
   run says so in an always visible line and names the fallback.
 - **A setting exists because a run reads it.** A key nothing consults is deleted, not kept for
-  the reference's sake. `SETTINGS.md` is the reference and is checked against the loader.
+  the reference's sake. `SETTINGS.md` is the reference. `harness/check_settings_doc.py`
+  checks every row against the loader, the defaults and the production config, both ways,
+  and runs before any commit that touches settings.
 - **Features are opt in while they are being measured, and become the law once the battery
   says so.** The old path is then deleted rather than kept behind a flag.
 - **A change meant to be inert is proved inert.** `playground/parity_dump.py` reconstructs one

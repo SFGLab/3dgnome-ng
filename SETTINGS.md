@@ -5,6 +5,13 @@ of these produces a warning rather than silently doing nothing, so a misspelling
 Booleans accept `yes`, `no`, `true`, `false`, `1` and `0`. Filenames in the data section are
 taken relative to `data_dir` unless they are absolute.
 
+The production column is `validation.core.config.CANONICAL`, which every validation run and
+the ensemble configs share. The ensemble configs written by `playground/trio/trio_configs.py`
+add three overrides on top: `mc_executor_jax_bucket_shapes = yes`, `multigpu_mode = groups`
+and `heat_min_reduction = 0.001`. `python harness/check_settings_doc.py` checks every row
+against the loader, the defaults and the production config, and is run before a commit that
+touches settings.
+
 ## [main]
 
 | key | type | default | production | what it does |
@@ -174,7 +181,7 @@ resolves from the older backend keys.
 | `mc_executor_densify` | str | auto | threaded | Executor for densification. |
 | `mc_executor_estimate_dist` | str | auto | batch | Executor for the subanchor distance estimate. |
 | `mc_executor_smooth` | str | auto | batch | Executor for the smooth stage. The cross block relaxation also picks its kernel from this, and one chain on the batch kernel is that kernel's worst case. |
-| `mc_executor_jax_bucket_shapes` | bool | no | yes | Pad each block to a shape ladder so a stage is a few wide launches rather than one compile per size. |
+| `mc_executor_jax_bucket_shapes` | bool | no | no | Pad each block to a shape ladder so a stage is a few wide launches rather than one compile per size. |
 | `merge_smooth_launches` | bool | yes | yes | Pack every smooth block that agrees on its energy terms into as few launches as device memory allows, regardless of size. |
 | `mc_executor_jax_batch_width_smooth` | int or auto | auto | auto | Blocks per smooth launch. `auto` solves the largest count that fits the device. |
 | `mc_executor_jax_batch_width_arcs` | int or auto | auto | auto | The same for the JAX arcs kernel. |
@@ -254,7 +261,7 @@ other while the arcs and the stitch are kept.
 | `noise` | float | 0.5 | 0.5 | Step size in chain bonds. |
 | `bond_weight` | float | 10.0 | 10.0 | Chain spring weight for the pass. At the smooth stage's 0.1 the excluded volume tears the coil. |
 | `min_contact_fraction` | float | 0.0 | 0.0 | Decline the pass when cross block contacts are fewer than this fraction of the chromosome's beads. 0 always runs. |
-| `local_window` | int | -1 | -1 | Let only the beads touching another block move, plus this many chain neighbours either side. -1 lets every subanchor move, which on a chromosome is hours. A window of 1 is minutes. |
+| `local_window` | int | -1 | 1 | Let only the beads touching another block move, plus this many chain neighbours either side. -1 lets every subanchor move, which on a chromosome is hours. A window of 1 is minutes. |
 
 ## [compartments]
 
@@ -263,21 +270,21 @@ ratio stays defined, and divided by `N - 1` so a weight tuned on a small region 
 one. Needs `[data] compartments` and `phasing_track`, and excluded volume or confinement
 alongside since the terms are attractive.
 
-| key | type | default | what it does |
-| --- | --- | --- | --- |
-| `use_compartments` | bool | no | Master switch. |
-| `weight` | float | 1.0 | Weight of the pairwise affinity. |
-| `energy_a` | float | 1.0 | Affinity between two A beads. |
-| `energy_b` | float | 2.0 | Affinity between two B beads. |
-| `apply_to_heatmap` | bool | yes | In the heatmap stages. |
-| `apply_to_ib` | bool | yes | In block placement. |
-| `apply_to_smooth` | bool | yes | In the smooth stage. |
-| `radius_heatmap` | float | 0.0 | Interaction radius, 0 derives it. |
-| `radius_ib` | float | 0.0 | Interaction radius. |
-| `radius_smooth` | float | 0.0 | Interaction radius. |
-| `auto_factor_heatmap` | float | 1.5 | Times the stage's mean bond scale. |
-| `auto_factor_ib` | float | 1.5 | Times the stage's mean bond scale. |
-| `auto_factor_smooth` | float | 1.5 | Times the stage's mean bond scale. |
+| key | type | default | production | what it does |
+| --- | --- | --- | --- | --- |
+| `use_compartments` | bool | no | no | Master switch. |
+| `weight` | float | 1.0 | 1.0 | Weight of the pairwise affinity. |
+| `energy_a` | float | 1.0 | 1.0 | Affinity between two A beads. |
+| `energy_b` | float | 2.0 | 2.0 | Affinity between two B beads. |
+| `apply_to_heatmap` | bool | yes | yes | In the heatmap stages. |
+| `apply_to_ib` | bool | yes | yes | In block placement. |
+| `apply_to_smooth` | bool | yes | yes | In the smooth stage. |
+| `radius_heatmap` | float | 0.0 | 0.0 | Interaction radius, 0 derives it. |
+| `radius_ib` | float | 0.0 | 0.0 | Interaction radius. |
+| `radius_smooth` | float | 0.0 | 0.0 | Interaction radius. |
+| `auto_factor_heatmap` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
+| `auto_factor_ib` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
+| `auto_factor_smooth` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
 
 ## [accessibility]
 
@@ -285,41 +292,41 @@ The HiP-HoP mechanisms [6] driven from one accessibility track. Bridging is an e
 attraction between open beads. Fibre compaction shortens the chain bond where the bead is
 closed.
 
-| key | type | default | what it does |
-| --- | --- | --- | --- |
-| `mode` | str | log | `log` is log then min max normalisation. `binary` is HiP-HoP's own open or closed state and is the faithful one. `log` is close to inert on a track binned to several kb. |
-| `percentile` | float | 80.0 | Under `binary`, a bead is open at or above this percentile of the loaded values. |
-| `use_bridging` | bool | no | Master switch for bridging. |
-| `bridging_weight` | float | 1.0 | Weight of the bridging affinity. |
-| `apply_to_heatmap` | bool | no | In the heatmap stages. |
-| `apply_to_ib` | bool | no | In block placement. |
-| `apply_to_smooth` | bool | yes | In the smooth stage. |
-| `radius_heatmap` | float | 0.0 | Interaction radius, 0 derives it. |
-| `radius_ib` | float | 0.0 | Interaction radius. |
-| `radius_smooth` | float | 0.0 | Interaction radius. |
-| `auto_factor_heatmap` | float | 1.5 | Times the stage's mean bond scale. |
-| `auto_factor_ib` | float | 1.5 | Times the stage's mean bond scale. |
-| `auto_factor_smooth` | float | 1.5 | Times the stage's mean bond scale. |
-| `use_fibre_compaction` | bool | no | Master switch for compaction. |
-| `fibre_compaction` | float | 0.3 | A bead's chain bond target is scaled by `1 - fibre_compaction * (1 - accessibility)`. |
+| key | type | default | production | what it does |
+| --- | --- | --- | --- | --- |
+| `mode` | str | log | log | `log` is log then min max normalisation. `binary` is HiP-HoP's own open or closed state and is the faithful one. `log` is close to inert on a track binned to several kb. |
+| `percentile` | float | 80.0 | 80.0 | Under `binary`, a bead is open at or above this percentile of the loaded values. |
+| `use_bridging` | bool | no | no | Master switch for bridging. |
+| `bridging_weight` | float | 1.0 | 1.0 | Weight of the bridging affinity. |
+| `apply_to_heatmap` | bool | no | no | In the heatmap stages. |
+| `apply_to_ib` | bool | no | no | In block placement. |
+| `apply_to_smooth` | bool | yes | yes | In the smooth stage. |
+| `radius_heatmap` | float | 0.0 | 0.0 | Interaction radius, 0 derives it. |
+| `radius_ib` | float | 0.0 | 0.0 | Interaction radius. |
+| `radius_smooth` | float | 0.0 | 0.0 | Interaction radius. |
+| `auto_factor_heatmap` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
+| `auto_factor_ib` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
+| `auto_factor_smooth` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
+| `use_fibre_compaction` | bool | no | no | Master switch for compaction. |
+| `fibre_compaction` | float | 0.3 | 0.3 | A bead's chain bond target is scaled by `1 - fibre_compaction * (1 - accessibility)`. |
 
 ## [nucleus]
 
 Whole nucleus terms from MultiMM [7]. They run in the segment level heatmap MC only, since that is
 the one call that spans the whole active region.
 
-| key | type | default | what it does |
-| --- | --- | --- | --- |
-| `use_lamina` | bool | no | Pull B beads toward the nuclear envelope. |
-| `lamina_weight` | float | 400.0 | Weight. |
-| `use_central_force` | bool | no | Pull A beads toward the centre. |
-| `central_weight` | float | 20.0 | Weight. |
-| `use_chromosomal_blocks` | bool | no | Keep each chromosome in its own territory. Multi chromosome runs. |
-| `chrom_block_kc` | float | 0.3 | Territory stiffness. |
-| `chrom_block_weight` | float | 0.0001 | Weight. |
-| `radius` | float | 0.0 | Outer nuclear radius, 0 derives it. |
-| `packing_factor` | float | 1.0 | The derived outer radius is this times the mean bond scale times the cube root of the bead count. |
-| `inner_fraction` | float | 0.2 | The inner radius is the outer one times the cube root of this. |
+| key | type | default | production | what it does |
+| --- | --- | --- | --- | --- |
+| `use_lamina` | bool | no | no | Pull B beads toward the nuclear envelope. |
+| `lamina_weight` | float | 400.0 | 400.0 | Weight. |
+| `use_central_force` | bool | no | no | Pull A beads toward the centre. |
+| `central_weight` | float | 20.0 | 20.0 | Weight. |
+| `use_chromosomal_blocks` | bool | no | no | Keep each chromosome in its own territory. Multi chromosome runs. |
+| `chrom_block_kc` | float | 0.3 | 0.3 | Territory stiffness. |
+| `chrom_block_weight` | float | 0.0001 | 0.0001 | Weight. |
+| `radius` | float | 0.0 | 0.0 | Outer nuclear radius, 0 derives it. |
+| `packing_factor` | float | 1.0 | 1.0 | The derived outer radius is this times the mean bond scale times the cube root of the bead count. |
+| `inner_fraction` | float | 0.2 | 0.2 | The inner radius is the outer one times the cube root of this. |
 
 ## How distances are set
 
