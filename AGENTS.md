@@ -830,8 +830,10 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   two later patches on the PET law: fifteen constants copied from one config with no derivation
   and byte identical across cell lines, three absolute scales for one quantity in a unit with no
   meaning, and a derived exponent that was a mean over three of our own Hi-C files typed in as
-  a default. Fitted on the inputs we run that exponent is 0.275, 0.299, 0.192 and 0.072 for
-  GM12878, H1ESC, HFFC6 and a trio sample. Measured against the old laws on GM12878, H1ESC and
+  a default. Fitted on the inputs we run that exponent is 0.333, 0.299 and 0.298 for GM12878, H1ESC
+  and HFFC6 on the 25 kb files, and 0.343 on the deep GM12878 map. Earlier figures of 0.275,
+  0.299, 0.192 and 0.072 came from a fit that counted rows per separation rather than their
+  counts, fixed 2026-09-08; the fit is contact probability per grid separation now. Measured against the old laws on GM12878, H1ESC and
   HFFC6, chr1:1-60 Mb, five structures each, raw contact maps: Pearson, Spearman and SCC up on
   every cell, MultiMM level, anchor overlaps down 96 to 98 percent, subanchor overlaps halved,
   cross block overlaps down four to ten times. The realised exponent runs 1.3 to 1.5 times the
