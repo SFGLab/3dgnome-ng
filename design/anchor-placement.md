@@ -1044,6 +1044,11 @@ over the anchor bins they overlap, or a finer grid read straight from the map ra
 through a singletons list, and that is a data path change. H1ESC on the deep input reads as
 GM12878 does: on its law to 200 kb, 0.95 and 1.07, running away above, 1.59 and 1.82, Hi-C
 0.288 against 0.306.
+HFFC6 too: on its law to 200 kb, 0.91 and 1.00, above it 1.32 and 1.45, Pearson 0.283 against
+0.347 with SCC 0.337 against 0.323 and MultiMM 0.627 against 0.657, Rg 18 to 36 as its exponent
+went 0.298 to 0.371, anchor overlaps 7.3 to 2.1. Three cells, one pattern: with the true
+exponent the structure is right to 200 kb and runs away above, and the old runs on a too flat
+exponent scored better on Hi-C by cancelling that run away with a compressed short range.
 
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
