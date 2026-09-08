@@ -26,7 +26,6 @@ only when a run's own contacts cannot supply an exponent."""
 
 _BAND_LO = 20_000
 _BAND_HI = 1_000_000
-_N_BINS = 12
 _MIN_PAIRS = 5_000
 _MIN_BINS = 8
 _MIN_COUNT = 20
@@ -60,13 +59,13 @@ def _refused(reason: str, lo: int = _BAND_LO, hi: int = _BAND_HI, n: int = 0) ->
 def fit_contact_exponent(contacts: list[SingletonContact]) -> ContactFit:
     """Fit the contact decay exponent on a run's singletons.
 
-    Intra chromosomal pairs only. The band starts at 20 kb or at twice the smallest separation
-    the data resolves, whichever is larger, so a file binned at 25 kb is fitted from 50 kb, and
-    runs to 1 Mb. Each row is weighted by its count, since on a deep map every pixel is present
-    and the decay lives in the counts, not in how many rows a separation has. The weighted
-    counts are binned in log separation and divided by bin width, so the bin layout does not
-    shape the slope. The fit is refused, with the reason recorded, when the
-    band holds too few pairs or bins, or when the slope is not a decay a polymer can produce.
+    Intra chromosomal pairs only, on the grid the file is binned to. At each grid separation
+    the contact probability is the counts at that separation over the number of bin pairs on
+    the chromosomes that could hold them, so a deep map with every pixel present and a thin
+    map with most pixels missing read the same curve. The band starts at 20 kb or at twice
+    the grid step, whichever is larger, so a file binned at 25 kb is fitted from 50 kb, and
+    runs to 1 Mb. The fit is refused, with the reason recorded, when the band holds too few
+    pairs or separations, or when the slope is not a decay a polymer can produce.
 
     Parameters
     ----------
@@ -76,43 +75,56 @@ def fit_contact_exponent(contacts: list[SingletonContact]) -> ContactFit:
     if not contacts:
         return _refused("no contacts")
     intra = [c for c in contacts if c[0] == c[2]]
+    if not intra:
+        return _refused("no intra chromosomal pairs")
+    chrom = np.array([c[0] for c in intra])
     a = np.array([c[1] for c in intra], dtype=np.float64)
     b = np.array([c[3] for c in intra], dtype=np.float64)
     w = np.array([max(float(c[4]), 0.0) for c in intra], dtype=np.float64)
     sep = np.abs(b - a)
-    w = w[sep > 0]
-    sep = sep[sep > 0]
-    if sep.size == 0:
+    pos = sep > 0
+    if not pos.any():
         return _refused("no intra chromosomal pairs")
-    lo = int(max(_BAND_LO, 2 * sep.min()))
+    step = float(sep[pos].min())
+    lo = int(max(_BAND_LO, 2 * step))
     hi = _BAND_HI
     if lo >= hi:
         return _refused(f"resolution too coarse for a {hi // 1000} kb band", lo, hi)
     band = (sep >= lo) & (sep <= hi)
-    inside = sep[band]
-    if inside.size < _MIN_PAIRS:
-        return _refused(f"only {inside.size:,} pairs in the band", lo, hi, int(inside.size))
-    edges = np.logspace(np.log10(lo), np.log10(hi), _N_BINS + 1)
-    counts, _ = np.histogram(inside, edges, weights=w[band])
-    centres = np.sqrt(edges[:-1] * edges[1:])
-    density = counts / np.diff(edges)
-    keep = counts > _MIN_COUNT
+    n_pairs = int(band.sum())
+    if n_pairs < _MIN_PAIRS:
+        return _refused(f"only {n_pairs:,} pairs in the band", lo, hi, n_pairs)
+    # Counts per grid separation, and the bin pairs each chromosome offers at that separation.
+    k = np.rint(sep[band] / step).astype(np.int64)
+    k_max = int(k.max())
+    counts = np.bincount(k, weights=w[band], minlength=k_max + 1)
+    offered = np.zeros(k_max + 1, dtype=np.float64)
+    for name in np.unique(chrom):
+        m = chrom == name
+        n_bins = (
+            int(np.rint((max(a[m].max(), b[m].max()) - min(a[m].min(), b[m].min())) / step)) + 1
+        )
+        kk = np.arange(k_max + 1)
+        offered += np.maximum(n_bins - kk, 0)
+    ks = np.arange(k_max + 1)
+    keep = (counts > _MIN_COUNT) & (offered > 0) & (ks * step >= lo) & (ks * step <= hi)
     if int(keep.sum()) < _MIN_BINS:
-        return _refused(f"only {int(keep.sum())} populated bins", lo, hi, int(inside.size))
-    slope = float(np.polyfit(np.log(centres[keep]), np.log(density[keep]), 1)[0])
+        return _refused(f"only {int(keep.sum())} populated separations", lo, hi, n_pairs)
+    prob = counts[keep] / offered[keep]
+    slope = float(np.polyfit(np.log(ks[keep] * step), np.log(prob), 1)[0])
     if not (_SLOPE_RANGE[0] <= slope <= _SLOPE_RANGE[1]):
         return ContactFit(
             FALLBACK_NU,
             slope,
             lo,
             hi,
-            int(inside.size),
+            n_pairs,
             int(keep.sum()),
             False,
             f"slope {slope:+.3f} is not a polymer decay, expected {_SLOPE_RANGE[0]} to "
             f"{_SLOPE_RANGE[1]}",
         )
-    return ContactFit(-slope / 3.0, slope, lo, hi, int(inside.size), int(keep.sum()), True, "")
+    return ContactFit(-slope / 3.0, slope, lo, hi, n_pairs, int(keep.sum()), True, "")
 
 
 _ARC_MIN = 200
