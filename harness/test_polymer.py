@@ -271,6 +271,29 @@ def test_counts_not_rows() -> None:
     )
 
 
+def test_grid_step_survives_a_truncated_end_bin() -> None:
+    """A binned file's last bin is shorter than the grid, so one midpoint per chromosome sits
+    off the grid and the smallest separation in the file is not the grid step. The step must
+    be read from where the separations pile up, not from the single smallest one."""
+    rng = np.random.default_rng(4)
+    rows: list[tuple[str, int, str, int, int]] = []
+    n_bins = 300
+    mids = [i * 25_000 + 12_500 for i in range(n_bins)] + [n_bins * 25_000 + 6_000]
+    for i in range(len(mids)):
+        for j in range(i + 1, len(mids)):
+            sep = mids[j] - mids[i]
+            if sep > 1_500_000:
+                continue
+            mean = 2000.0 * (sep / 50_000.0) ** -0.9
+            rows.append(("chr1", mids[i], "chr1", mids[j], int(max(1, rng.poisson(mean)))))
+    fit = fit_contact_exponent(rows)
+    check(
+        "an off grid end bin does not move the grid step",
+        fit.ok and fit.lo == 50_000 and abs(fit.slope + 0.9) < 0.1,
+        f"band from {fit.lo // 1000} kb, slope {fit.slope:.3f} {fit.reason}",
+    )
+
+
 def main() -> int:
     print("polymer law checks")
     test_the_law()
@@ -282,6 +305,7 @@ def main() -> int:
     test_reports_what_it_used()
     test_block_size()
     test_counts_not_rows()
+    test_grid_step_survives_a_truncated_end_bin()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")
