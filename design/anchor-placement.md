@@ -968,8 +968,23 @@ the stitch and the relaxation, and that is a separate piece of work.
 The within block map correlates about the same at every reach. The loss is all in the cross
 block contacts: shrinking the blocks brings their share up to Hi-C's own, and they correlate
 with Hi-C at 0.03, so they are the right number of contacts in the wrong places. Nothing
-arranges the blocks against each other by Hi-C. That is the lever, and it is below the arcs
-stage.
+arranges the blocks against each other by Hi-C.
+
+**Corrected the same day on the tree's own blocks.** The units above were inferred from the
+densification rule on bead midpoints, which splits a block wherever two anchors overlap, and
+gave 137 per 60 Mb. The tree has 9 interaction blocks on H1ESC chr1:1-60 Mb, median 2.65 Mb
+and one of 32 Mb, since an interaction block runs until a position no arc covers. On the true
+blocks the same measures read: pairs up to 2 Mb apart are within one block 93 percent of the
+time, cross block contacts are 2 percent of all contacts and correlate with Hi-C at 0.000
+whatever the reach, and the loss at reach 1.0 is entirely within block, Pearson 0.344 to
+0.228. True block radius of gyration over the law is 1.61 at reach 3 and 0.90 at reach 1.0.
+
+So the 100 kb to 2 Mb range is the arcs stage's, inside one chain. An arcless anchor pair
+beyond the short range spring has nothing behind its placement but the repulsion's reach and
+the sphere, and compacting those pairs without data scrambles the block's own contact map.
+The lever is contact data for those pairs in the arcs stage, not a layout of blocks. The block
+layout contact term built the same day acts on the 9 blocks and is moot on this data.
+`playground/true_ib.py` reads the tree's blocks from the run's config.
 
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
