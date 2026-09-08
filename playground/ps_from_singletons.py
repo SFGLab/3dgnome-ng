@@ -1,43 +1,40 @@
-"""The contact decay exponent from a singletons file, which every run already loads.
+"""Fit the contact decay exponent on singletons files by hand, with the run's own fit.
 
-Fits log contact count against log separation over a band and reports `nu = -slope / 3`, the
-exponent distance grows with. A Hi-C file binned at 25 kb has no separation under 25 kb, so
-its band starts at 50 kb. A ChIA-PET singletons file is point resolution and can start at 20 kb.
+    python playground/ps_from_singletons.py data/GM12878/GM12878_hic_25kb_singletons.bedpe ...
 
-    python playground/ps_from_singletons.py <bedpe> [<bedpe> ...]
+Routes through `gnome3d.polymer.fit_contact_exponent` so this can never disagree with what a
+run measures at load. Prints the slope, `nu`, the band, the pairs in it and the refusal
+reason when there is one.
 """
 
+from __future__ import annotations
+
 import sys
+from pathlib import Path
 
-import numpy as np
-import pandas as pd
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-
-def fit(path: str, lo: float, hi: float, nbins: int = 12) -> tuple[float, int]:
-    edges = np.logspace(np.log10(lo), np.log10(hi), nbins + 1)
-    counts = np.zeros(nbins)
-    n = 0
-    for chunk in pd.read_csv(
-        path, sep="\t", header=None, usecols=[0, 1, 2, 3, 4, 5], chunksize=2_000_000
-    ):
-        c = chunk[chunk[0] == chunk[3]]
-        s = np.abs((c[4] + c[5]) / 2 - (c[1] + c[2]) / 2).to_numpy()
-        h, _ = np.histogram(s, edges)
-        counts += h
-        n += len(c)
-    centres = np.sqrt(edges[:-1] * edges[1:])
-    dens = counts / np.diff(edges)  # per bp, so a log bin's width does not shape the slope
-    k = counts > 20
-    slope = float(np.polyfit(np.log(centres[k]), np.log(dens[k]), 1)[0])
-    return slope, n
+from gnome3d.polymer import fit_contact_exponent  # noqa: E402
+from gnome3d.types import SingletonContact  # noqa: E402
 
 
-for p in sys.argv[1:]:
-    hic = "hic_" in p
-    lo, hi = (50_000, 1_000_000) if hic else (20_000, 1_000_000)
-    slope, n = fit(p, lo, hi)
+def read(path: Path) -> list[SingletonContact]:
+    """Seven column BEDPE rows as the loader returns them, midpoints and score."""
+    out: list[SingletonContact] = []
+    with open(path) as fh:
+        for line in fh:
+            p = line.split()
+            if len(p) < 7 or p[0].startswith("#"):
+                continue
+            out.append((p[0], (int(p[1]) + int(p[2])) // 2, p[3], (int(p[4]) + int(p[5])) // 2, int(float(p[6]))))
+    return out
+
+
+for arg in sys.argv[1:]:
+    path = Path(arg)
+    f = fit_contact_exponent(read(path))
+    tail = "" if f.ok else f"  REFUSED: {f.reason}"
     print(
-        f"{p.split('/')[-1]:44} intra {n:>11,}  band {lo // 1000:>3}kb-{hi // 1000_000}Mb"
-        f"  P(s) slope {slope:+.3f}  nu {-slope / 3:.3f}",
-        flush=True,
+        f"{path.name:<48s} pairs in band {f.n_pairs:>11,}  {f.lo // 1000}-{f.hi // 1000}kb  "
+        f"slope {f.slope:+.3f}  nu {f.nu:.3f}{tail}"
     )
