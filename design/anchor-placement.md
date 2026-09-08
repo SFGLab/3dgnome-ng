@@ -1008,6 +1008,18 @@ and a trio sample 0.376 where the old fit had refused it and the run had fallen 
 0.285. The earlier spread of 0.275, 0.299, 0.192 and 0.072 was the estimator, not the cells,
 and the realised exponents of 0.39 to 0.48 stand against inputs near 0.34, not 0.20 to 0.30.
 
+**The deep GM12878 map as target and as input, 2026-09-08.** Scored against the deep map the
+production candidate's structures read Pearson 0.283, Spearman 0.117, SCC 0.386 and MultiMM
+0.608, where the thin map gave 0.476, 0.310, 0.217 and 0.280 for the same structures: the
+thin target was half noise and the battery targets the deep map from here on. Fed the deep
+chr1 singletons the same settings give a more expanded structure, 1.24 to 1.36 of the law at
+10 to 100 kb where the thin input sat at 1.0 to 1.1, 3.0 at 1 to 2 Mb, Rg 24.1 to 29.8, and
+read slightly worse on every column, 0.260, 0.105, 0.367 and 0.589, with overlaps down. The
+one arcs stage term that reads the singletons is the anchor heatmap scaling, which shrinks a
+loop's target by up to a tenth of the cell's share of the map's maximum; a dense map's maximum
+sits on the diagonal and dwarfs every loop cell, so the shrinkage a thin map applied to most
+loops vanishes. Arms with that scaling off on both inputs are running.
+
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
 
