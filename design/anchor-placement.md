@@ -1050,6 +1050,16 @@ went 0.298 to 0.371, anchor overlaps 7.3 to 2.1. Three cells, one pattern: with 
 exponent the structure is right to 200 kb and runs away above, and the old runs on a too flat
 exponent scored better on Hi-C by cancelling that run away with a compressed short range.
 
+**The contact background with the reach at 1.5 on the deep input, GM12878: the first arm that
+holds the long range without scrambling the block.** Against the deep map, Pearson 0.271,
+Spearman 0.118, SCC 0.358, MultiMM 0.607, against the deep input alone at 0.260, 0.103, 0.367
+and 0.589 and the old thin input candidate at 0.283, 0.117, 0.386 and 0.608. The curve on the
+run's own law: 0.94 at 20 to 50 kb, 0.99 at 100 to 200 kb, 1.20 at 500 kb to 1 Mb and 1.24 at
+1 to 2 Mb, block radius of gyration over the law 0.88, where the deep input alone had 1.56,
+1.77 and 1.26. The reach cut that scrambled the block on the thin input, since nothing
+informed the far pairs, does not on the deep one. H1ESC and HFFC6 at the same settings and
+GM12878 at reach 1.0 are queued for the battery.
+
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
 
