@@ -1061,7 +1061,12 @@ informed the far pairs, does not on the deep one. H1ESC at the same settings: th
 1.29 with block size 0.88, and holds 4 percent of the far pairs as GM12878 does, but Hi-C reads
 a shade under the deep input alone, Pearson 0.282 against 0.288, Spearman 0.105 against 0.102,
 SCC 0.253 against 0.260, and MultiMM 0.568 against 0.611, with cross block overlaps 148 to 416.
-HFFC6 and GM12878 at reach 1.0 are queued.
+HFFC6 at the same settings: on the law throughout, 0.88, 0.89, 1.01 and 1.09 with block size
+0.86, and Hi-C up against the deep input alone, Pearson 0.301 against 0.283, Spearman 0.112
+against 0.102, MultiMM 0.652 against 0.627, SCC 0.318 against 0.337. Three cells: the geometry
+comes onto the law on every one, Pearson and Spearman up on two and level on the third, MultiMM
+up on two and down on one, SCC down a hundredth or two on all three. GM12878 at reach 1.0 is
+queued.
 
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
