@@ -468,6 +468,56 @@ def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int,
     return mat
 
 
+def add_contact_background(
+    mat: F64Array, mids: list[int], anchor_heatmap: F64Array | None, s: Settings
+) -> F64Array:
+    """Hold an arcless anchor pair beyond the short range at the law's contact distance when
+    its contact cell says it sits closer than the background. Returns a new matrix, or the
+    input as is when the term is off, the spring weight is zero or there is no contact map.
+
+    The contact map is converted with the law the way every heatmap is, observed over the
+    expectation at that separation within the map itself. Only a pair whose distance comes out
+    under the background is entered, as minus that distance and never under one bead, so the
+    kernels score it with the background spring. A pair at or below its expected contact keeps
+    the repulsion marker, which keeps the held set sparse; holding every pair at a power law
+    could not be embedded and was rejected. Inside the range the short range entry stands, and
+    arc pairs are untouched.
+
+    Parameters
+    ----------
+    mat
+        The target matrix from `arc_expected_matrix`.
+    mids
+        Genomic midpoint of each anchor.
+    anchor_heatmap
+        Contact counts between anchor pairs, or None.
+    s
+        The run's settings.
+    """
+    if (
+        not bool(s.use_contact_background)
+        or float(s.background_weight) <= 0.0
+        or anchor_heatmap is None
+    ):
+        return mat
+    n = len(mids)
+    heat = np.asarray(anchor_heatmap, dtype=np.float64)
+    if n < 2 or float(heat.max()) <= 0.0:
+        return mat
+    pos = np.asarray(mids, dtype=np.float64)
+    dist, _avg = create_distance_heatmap(s, heat, n, separations_bp=pos)
+    dist = np.asarray(dist, dtype=np.float64)
+    law = s.polymer_law()
+    sep = np.abs(pos[:, None] - pos[None, :])
+    bg = np.maximum(1.0, (sep / max(int(law.s0_bp), 1)) ** law.nu)  # law.background, arrayed
+    eligible = (mat == -0.5) & (sep > float(s.background_range_bp)) & (dist > 0.0) & (dist < bg)
+    if not eligible.any():
+        return mat
+    out = np.array(mat, dtype=np.float64, copy=True)
+    out[eligible] = -np.maximum(1.0, dist[eligible])
+    return out
+
+
 def add_chain_bonds(mat: F64Array, mids: list[int], s: Settings) -> F64Array:
     """Give every consecutive anchor pair with no arc a spring at the chain law distance of its
     gap. Returns a new matrix; the input is left alone. With `use_arcs_chain_bonds` off the
@@ -549,6 +599,7 @@ def calc_anchor_expected_distances(
                     mat[i, j] *= 1.0 - s_val
                     mat[j, i] = mat[i, j]
 
+    mat = add_contact_background(mat, mids, anchor_heatmap, s)
     # After the heatmap scaling, so Hi-C contact between neighbours does not shrink the bond.
     return add_chain_bonds(mat, mids, s)
 

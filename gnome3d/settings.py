@@ -98,6 +98,7 @@ class Settings:
     spring_squeeze_arcs: float
     use_arcs_chain_bonds: bool
     arcs_chain_bond_scale: float
+    use_contact_background: bool
 
     # ---- simulation steps ----
     steps_lvl1: int
@@ -447,6 +448,7 @@ class Settings:
         # Multiplies the chain bond target. At 1 the bonds pull the short range below the
         # parity values and the distance curve steepens past the Hi-C exponent.
         self.arcs_chain_bond_scale = 1.0
+        self.use_contact_background = False
 
         # ---- simulation steps ----
         self.steps_lvl1 = 2
@@ -862,6 +864,9 @@ class Settings:
         )
         self.arcs_chain_bond_scale = getf(
             "springs", "arcs_chain_bond_scale", self.arcs_chain_bond_scale
+        )
+        self.use_contact_background = getb(
+            "springs", "use_contact_background", self.use_contact_background
         )
         self.spring_stretch_ib = getf("springs", "stretch_constant_ib", self.spring_stretch_ib)
         self.spring_squeeze_ib = getf("springs", "squeeze_constant_ib", self.spring_squeeze_ib)

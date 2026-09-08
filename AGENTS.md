@@ -907,6 +907,24 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   the wall. Three cell battery: Pearson and SCC up on every cell, Spearman level, MultiMM down
   8 to 14 percent. See `design/anchor-placement.md`.
 
+- **Contact data for arcless pairs beyond the short range: `[springs] use_contact_background`,
+  default no.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
+  `add_contact_background`)
+  On the tree's own interaction blocks, which run until a position no arc covers and are 9 on
+  H1ESC chr1:1-60 Mb at a median of 2.65 Mb, pairs up to 2 Mb apart are within one block 93
+  percent of the time, so the range above 100 kb belongs to the arcs stage. An arcless anchor
+  pair there had nothing behind its placement but the repulsion's reach and the sphere, and
+  compacting those pairs without data scrambled the block's own contact map. With the flag the
+  anchor level contact map, the run's singletons binned by anchor, is converted with the law as
+  every heatmap is, and an arcless pair beyond the range whose cell puts it under the background
+  carries minus that distance, which the kernels hold with the background spring. A pair at or
+  below its expected contact keeps the repulsion, so the held set stays sparse; holding every
+  pair at a power law could not be embedded and was rejected. No kernel change. Unit checks in
+  `harness/test_arc_matrix.py`.
+
+  Why not in the reference: the reference scales arc targets by the anchor heatmap and has no
+  term on an arcless pair beyond its 1/d.
+
 - **A contact term in the block layout: `[simulation_ib] heatmap_weight`, default 0.**
   ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `block_heatmap_distances`,
   [mc/numba/ib.py](gnome3d/mc/numba/ib.py))

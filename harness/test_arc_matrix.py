@@ -24,7 +24,11 @@ from gnome3d.mc.numba.terms import (
     _local_arcs_nb,  # noqa: E402
     init_arcs_nb,  # noqa: E402
 )
-from gnome3d.pipeline.coarse.build import add_chain_bonds, arc_expected_matrix  # noqa: E402
+from gnome3d.pipeline.coarse.build import (  # noqa: E402
+    add_chain_bonds,
+    add_contact_background,
+    arc_expected_matrix,
+)
 from gnome3d.polymer import PolymerLaw  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
 
@@ -144,6 +148,50 @@ def test_short_range_background() -> None:
     )
 
 
+def test_contact_background() -> None:
+    """Beyond the short range, an arcless pair whose contact cell says it sits closer than the
+    background carries minus the law's contact distance, and the kernels hold it there with the
+    background spring. A pair at or below its expected contact keeps the repulsion, so the set
+    stays sparse. Inside the range and on arc pairs nothing changes."""
+    print("\n[contact background] enriched arcless pairs beyond the range get the law's distance")
+    s = settings()
+    s.background_weight = 0.3
+    s.background_range_bp = 100_000
+    s.use_contact_background = True
+    mids = [0, 50_000, 500_000, 1_000_000, 1_500_000, 2_000_000]
+    n = len(mids)
+    m0 = arc_expected_matrix(s, mids, [(0, 3, 4)])
+    heat = np.zeros((n, n))
+    # three pairs at 500 kb: one enriched, one at the mean, one below
+    heat[1, 2] = heat[2, 1] = 8.0
+    heat[2, 3] = heat[3, 2] = 1.0
+    heat[3, 4] = heat[4, 3] = 0.5
+    heat[0, 1] = heat[1, 0] = 50.0  # inside the range, must be untouched
+    heat[0, 3] = heat[3, 0] = 50.0  # the arc pair, must be untouched
+    m = add_contact_background(m0, mids, heat, s)
+    bg = s.polymer.background(450_000)
+    check(
+        "the enriched pair carries minus a distance under its background",
+        m[1, 2] <= -1.0 and -m[1, 2] < bg,
+        f"{m[1, 2]:.2f} vs bg {bg:.2f}",
+    )
+    check("the pair at its expected contact keeps the repulsion", m[2, 3] == -0.5)
+    check("the pair below its expected contact keeps the repulsion", m[3, 4] == -0.5)
+    check("a pair with no contact keeps the repulsion", m[1, 4] == -0.5 and m[2, 5] == -0.5)
+    check("inside the range the short range entry stands", m[0, 1] == m0[0, 1])
+    check("the arc pair is untouched", m[0, 3] == m0[0, 3] and m[0, 3] > 0.0)
+    check("symmetric", np.allclose(m, m.T))
+    check("the input is left alone", np.array_equal(m0, arc_expected_matrix(s, mids, [(0, 3, 4)])))
+    s.use_contact_background = False
+    check("off, the matrix is returned as is", add_contact_background(m0, mids, heat, s) is m0)
+    s.use_contact_background = True
+    s.background_weight = 0.0
+    check(
+        "without the spring weight there is nothing to hold it, so off",
+        add_contact_background(m0, mids, heat, s) is m0,
+    )
+
+
 def test_jax_matches_numba() -> None:
     """The JAX arcs kernel scores the same energy as numba on a matrix that mixes arc springs
     and arcless pairs under the truncated repulsion. The check that keeps the batch kernel from
@@ -235,6 +283,7 @@ def main() -> int:
     test_matrix()
     test_chain_bonds()
     test_short_range_background()
+    test_contact_background()
     test_jax_matches_numba()
     test_jax_batched_driver_runs()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
