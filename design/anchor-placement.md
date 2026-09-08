@@ -990,7 +990,7 @@ layout contact term built the same day acts on the 9 blocks and is moot on this 
 identical, because the input is too thin to say which pair is enriched.** On H1ESC chr1:1-60 Mb
 the run holds 13,861 contacts, 0.3 to 3 percent of arcless pairs beyond the range have any
 contact and 0.0 to 0.6 percent are held; GM12878 holds 0.2 to 3.3 percent
-(`playground/held_pairs.py`). The Hi-C files themselves are the reason. Genome wide the file in
+(`playground/held_pairs.py`) and reads the same way, Pearson 0.476 to 0.473. The Hi-C files themselves are the reason. Genome wide the file in
 use holds 7.8 million contacts for GM12878, 104 million for H1ESC and 193 million for HFFC6,
 against the billions a deep map has; over chr1:1-60 Mb at 25 kb that is 118 thousand, 1.06
 million and 1.66 million counts across 2,400 bins. That thinness is also why the subanchor
