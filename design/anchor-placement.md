@@ -1077,6 +1077,17 @@ piece done as far as the input reaches. What would take it further is a denser a
 contact map, since the term holds only 4 percent of the far pairs through the 25 kb pixels,
 and that is a data path change.
 
+**Adopted 2026-09-08 evening, the user's decision.** Production is the deep maps as input, the
+contact background on and the reach at 1.5, with two rules from the user: no input has to be
+deep, so the term degrades to holding next to nothing on a thin map and the data section
+falls back to the ChIA-PET singletons when no Hi-C file is present, and whole genome runs
+take a thinned file. The thinning is a seeded binomial draw on the counts to 5,000 contacts
+per Mb, `prep_singletons.py --contacts-per-mb`, which keeps every separation's share where a
+count threshold drops the far pairs first; on GM12878 the thinned whole genome file, 9
+million rows, reproduces the full chr1 file's structures to two decimals on every column.
+The three cells' files sit under `<CELL>_hic_25kb_singletons.bedpe` with the shallow ones
+kept as `_shallow_`, and fit 0.329, 0.333 and 0.352.
+
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
 
