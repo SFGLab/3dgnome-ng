@@ -1033,8 +1033,17 @@ thin input run, built on a law a fifth too flat, sits under the true law at shor
 nearer it at long range, and those two errors cancel into a slightly better Hi-C score,
 0.283 against 0.260 on Pearson and 0.386 against 0.367 on SCC. The deep input is right where
 the data reaches and shows the run away above 100 kb undisguised. The deep map has contacts
-on most of those pairs, which the thin one did not, so the contact background term now has
-something to hold them with; that arm is queued.
+on most of those pairs, which the thin one did not, so the contact background term has more
+to hold them with. Run: it holds 3 to 6 percent of the arcless pairs beyond the range, up
+from under 1 percent, at 0.81 to 0.84 of the background, and moves the long range from 1.77
+to 1.71 at 1 to 2 Mb with Hi-C level, Pearson 0.258 against 0.260. It stays sparse because
+of a binning mismatch: anchors are about 13 kb wide and a 25 kb pixel's midpoint lands in
+one anchor bin, so on a map that is 88 percent dense at 25 kb only 10 to 23 percent of anchor
+pairs beyond the range receive any contact. A denser anchor level map needs the pixels spread
+over the anchor bins they overlap, or a finer grid read straight from the map rather than
+through a singletons list, and that is a data path change. H1ESC on the deep input reads as
+GM12878 does: on its law to 200 kb, 0.95 and 1.07, running away above, 1.59 and 1.82, Hi-C
+0.288 against 0.306.
 
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
