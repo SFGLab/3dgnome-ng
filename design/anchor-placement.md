@@ -1018,7 +1018,23 @@ read slightly worse on every column, 0.260, 0.105, 0.367 and 0.589, with overlap
 one arcs stage term that reads the singletons is the anchor heatmap scaling, which shrinks a
 loop's target by up to a tenth of the cell's share of the map's maximum; a dense map's maximum
 sits on the diagonal and dwarfs every loop cell, so the shrinkage a thin map applied to most
-loops vanishes. Arms with that scaling off on both inputs are running.
+loops vanishes. With that scaling off the deep input arm reads the same, 0.255 against 0.260, so the scaling
+is not it. The expansion was the yardstick: the curve was measured against a law at the old
+0.272 while the run had fitted and used 0.343, and at 50 kb those two laws differ by 1.32. On
+the one yardstick, the deep map's own 0.343:
+
+| arm | law used | 20 to 50 kb | 100 to 200 kb | 500 kb to 1 Mb | 1 to 2 Mb | block Rg over law |
+|---|---|---|---|---|---|---|
+| candidate on the thin input | 0.272 | 0.91 | 0.95 | 1.20 | 1.37 | 0.95 |
+| candidate on the deep input | 0.343 | 0.96 | 1.11 | 1.56 | 1.77 | 1.26 |
+
+The deep input run follows its law to 200 kb and runs away above it, as every run has. The
+thin input run, built on a law a fifth too flat, sits under the true law at short range and
+nearer it at long range, and those two errors cancel into a slightly better Hi-C score,
+0.283 against 0.260 on Pearson and 0.386 against 0.367 on SCC. The deep input is right where
+the data reaches and shows the run away above 100 kb undisguised. The deep map has contacts
+on most of those pairs, which the thin one did not, so the contact background term now has
+something to hold them with; that arm is queued.
 
 Playground: `chain_split.py`, `chain_stretch.py`, `block_stretch.py`, `curve.py`,
 `block_rg.py` on the workstation, all reading finished cifs.
