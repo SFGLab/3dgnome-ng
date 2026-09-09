@@ -26,6 +26,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from gnome3d.pipeline.stitch import (  # noqa: E402
+    CompartmentSites,
     _energy_grad,
     stitch_blocks,
     within_block_curve,
@@ -208,6 +209,106 @@ def test_gradient() -> None:
     check("it matches central differences", worst < 1e-5, f"worst relative {worst:.2e}")
 
 
+def _sites(n: int, rng: np.random.Generator, weight: float = 1.0) -> CompartmentSites:
+    iu = np.triu_indices(n, k=1)
+    return CompartmentSites(
+        sites=rng.normal(0.0, 2.0, (n, 2, 3)),
+        mass=rng.uniform(0.0, 1.0, (n, 2)),
+        strength=(1.0, 2.0),
+        pairs0=iu[0],
+        pairs1=iu[1],
+        radius=rng.uniform(5.0, 15.0, iu[0].size),
+        weight=weight,
+    )
+
+
+def test_compartment_energy() -> None:
+    """Two blocks, one A site each, no other term. The energy is the well in closed form."""
+    print("\n[compartments] the block affinity is the well in closed form")
+    cen = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0]])
+    zero = np.zeros((2, 3))
+    comp = CompartmentSites(
+        sites=np.array([[[1.0, 0, 0], [0, 0, 0]], [[-1.0, 0, 0], [0, 0, 0]]]),
+        mass=np.array([[1.0, 0.0], [0.5, 0.0]]),
+        strength=(3.0, 2.0),
+        pairs0=np.array([0]),
+        pairs1=np.array([1]),
+        radius=np.array([5.0]),
+        weight=0.7,
+    )
+    e, _ = _energy_grad(
+        np.zeros(12),
+        cen,
+        zero,
+        zero,
+        np.array([1.0]),
+        0.0,
+        np.array([], dtype=np.int64),
+        np.array([], dtype=np.int64),
+        np.array([]),
+        0.0,
+        comp,
+    )
+    want = 0.7 * 3.0 * 1.0 * 0.5 * (1.0 - np.exp(-(8.0**2) / (2 * 25.0)))
+    check("energy equals the closed form", abs(e - want) < 1e-12, f"{e:.6f} vs {want:.6f}")
+
+
+def test_compartment_gradient() -> None:
+    """Central differences with the springs, the excluded volume and the affinity all on."""
+    print("\n[compartments] the affinity carries its gradient")
+    rng = np.random.default_rng(3)
+    n = 6
+    cen = rng.normal(0.0, 8.0, (n, 3))
+    first = rng.normal(0.0, 2.0, (n, 3))
+    last = rng.normal(0.0, 2.0, (n, 3))
+    target = rng.uniform(1.0, 5.0, n - 1)
+    iu = np.triu_indices(n, k=1)
+    r0 = rng.uniform(3.0, 8.0, iu[0].size)
+    args = (cen, first, last, target, 1.0, iu[0], iu[1], r0, 1.0, _sites(n, rng, 2.0))
+    x = rng.normal(0.0, 0.5, 6 * n)
+    _, g = _energy_grad(x, *args)
+    h = 1e-6
+    worst = 0.0
+    for k in range(x.size):
+        a, b = x.copy(), x.copy()
+        a[k] += h
+        b[k] -= h
+        fd = (_energy_grad(a, *args)[0] - _energy_grad(b, *args)[0]) / (2 * h)
+        worst = max(worst, abs(fd - g[k]) / max(abs(fd), 1e-6))
+    check("it matches central differences", worst < 1e-5, f"worst relative {worst:.2e}")
+
+
+def test_compartment_pulls_like_blocks() -> None:
+    """A, B, A along the chain, the B block off the line. With the term the two A blocks end
+    closer than without it, and the boundary springs still hold."""
+    print("\n[compartments] like blocks are drawn together across a block in between")
+    blocks = [
+        block(0, np.array([0.0, 0.0, 0.0])),
+        block(100_000, np.array([12.0, 12.0, 0.0])),
+        block(200_000, np.array([24.0, 0.0, 0.0])),
+    ]
+    classes = [
+        np.full(4, 1, dtype=np.int8),
+        np.full(4, -1, dtype=np.int8),
+        np.full(4, 1, dtype=np.int8),
+    ]
+
+    def aa_gap(out: list[list[BeadOut]]) -> float:
+        c = [np.array([[b.x, b.y, b.z] for b in blk]).mean(axis=0) for blk in out]
+        return float(np.linalg.norm(c[0] - c[2]))
+
+    off = stitch_blocks(blocks, settings(), classes)
+    on = stitch_blocks(blocks, settings(boundary_stitch_compartment_weight=5.0), classes)
+    check(
+        "the A blocks are closer with the term",
+        aa_gap(on) < aa_gap(off) - 1.0,
+        f"{aa_gap(on):.2f} vs {aa_gap(off):.2f}",
+    )
+    plain = stitch_blocks(blocks, settings())
+    same = all(a == b for x, y in zip(off, plain, strict=True) for a, b in zip(x, y, strict=True))
+    check("weight zero with classes given is the plain stitch, exactly", same)
+
+
 def test_many_blocks_converge() -> None:
     """The property a chromosome needs and a handful of blocks cannot show.
 
@@ -251,6 +352,9 @@ def main() -> int:
     test_per_pair_radius()
     test_pass_through()
     test_gradient()
+    test_compartment_energy()
+    test_compartment_gradient()
+    test_compartment_pulls_like_blocks()
     test_many_blocks_converge()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:

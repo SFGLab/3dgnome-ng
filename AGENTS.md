@@ -980,6 +980,30 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference's arcs MC has no chain term either. See
   `design/anchor-placement.md`, option C.
 
+- **Compartment affinity in the boundary stitch: `[boundary_stitch] compartment_weight`,
+  default 0.** ([gnome3d/pipeline/stitch.py](gnome3d/pipeline/stitch.py) `compartment_sites`)
+  The compartment term in the kernels acts within a chain, and a chain is one block. A
+  compartment pattern runs over many blocks, and the pass that decides where blocks sit
+  relative to one another is the stitch, which moved them on the boundary springs and the
+  centroid excluded volume alone and so undid whatever the block placement stage had
+  arranged. Measured on GM12878 chr1:1-60 Mb, 2026-09-09: the kernel term at weight 0.5 takes
+  the compartment saddle from 0.77 to 2.75 on a 12 Mb window that sits inside three blocks,
+  and from 1.13 to 1.30 on the 60 Mb region; with the stitch and the relaxation off the same
+  weight reaches 1.94 there. A weight eight times larger does not reach it either, so the
+  kernel's per partner normalisation is not what stops it.
+
+  With a positive weight each block carries one site per compartment, the centroid of its A
+  beads and of its B beads with the fraction of the block's beads each holds, from
+  `bin_compartments` over the block's beads, and two sites of the same class on different
+  blocks attract through the well `1 - exp(-d^2 / 2 R^2)` with `R` the two blocks' radii of
+  gyration added, A against A at `energy_a` and B against B at `energy_b`. The gradient goes
+  through the rigid body variables like the boundary springs'. The well is flat beyond a few
+  `R`, so only neighbouring blocks feel it, and the solver does not care about the flat part,
+  so there is no normalisation and no ratio to keep positive. Weight zero is byte exact and
+  reads no track. Needs `[data] compartments`. Unit checks in `harness/test_stitch.py`.
+
+  Why not in the reference: the reference has no compartment term and no pass across blocks.
+
 - **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no.**
   ([gnome3d/pipeline/relax.py](gnome3d/pipeline/relax.py))
   The smooth stage's excluded volume acts within one block and the stitch guards block

@@ -258,6 +258,7 @@ class Settings:
     use_boundary_stitch: bool
     boundary_stitch_spring_weight: float
     boundary_stitch_ev_weight: float
+    boundary_stitch_compartment_weight: float
     boundary_stitch_max_iter: int
 
     # ---- cross block relaxation ----
@@ -578,6 +579,8 @@ class Settings:
         self.use_boundary_stitch = False
         self.boundary_stitch_spring_weight = 1.0
         self.boundary_stitch_ev_weight = 1.0
+        # Off. A compartment affinity between blocks, measured on GM12878 before it is a default.
+        self.boundary_stitch_compartment_weight = 0.0
         # The energy is minimised with its own gradient, so an iteration is one evaluation
         # and the count is what sets the cost. Measured on a trio chr1 of 1,494 blocks, 500
         # leaves the worst boundary at 6.0 times the curve, 2000 reaches 1.32 in 85 seconds,
@@ -1095,6 +1098,9 @@ class Settings:
         )
         self.boundary_stitch_spring_weight = getf(
             "boundary_stitch", "spring_weight", self.boundary_stitch_spring_weight
+        )
+        self.boundary_stitch_compartment_weight = getf(
+            "boundary_stitch", "compartment_weight", self.boundary_stitch_compartment_weight
         )
         self.boundary_stitch_ev_weight = getf(
             "boundary_stitch", "ev_weight", self.boundary_stitch_ev_weight

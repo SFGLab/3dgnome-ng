@@ -15,6 +15,16 @@ neighbour it shares no edge with. `exclusion_radius_ib`, when positive, replaces
 constant radius for every pair. See [[project_ib_packing_factor]] for why there is no chain bond and no
 confinement here.
 
+A third term, off unless `boundary_stitch_compartment_weight` is positive, is a compartment
+affinity between blocks. Compartments are a pattern over many blocks, and the per block
+chains cannot build it, while this pass decides where blocks sit relative to one another and
+would otherwise undo whatever the block placement stage arranged. Each block carries one site
+per compartment, the centroid of its A beads and of its B beads, each with the fraction of
+the block's beads it holds, and two sites of the same class on different blocks attract
+through the well `1 - exp(-d^2 / 2 R^2)` with R the two blocks' radii of gyration added, the
+same reach as the excluded volume. The well is flat beyond a few R, so only neighbouring
+blocks feel it. See [[project_epigenome_terms]].
+
 The energy carries its own gradient. A chromosome is a thousand or more blocks, so six
 variables per block puts the problem in the thousands of dimensions, where a finite difference
 gradient costs one evaluation per variable and the solver runs out of its evaluation budget
@@ -24,15 +34,53 @@ after one step. See [[project_boundary_stitch]].
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import NamedTuple
 
 import numpy as np
 from scipy.optimize import minimize
 from scipy.spatial.transform import Rotation
 
 from gnome3d.settings import Settings
-from gnome3d.types import BeadOut, BoolArray, F64Array, I64Array
+from gnome3d.types import BeadOut, BoolArray, F64Array, I8Array, I64Array
 
 _MIN_BIN_COUNT = 5
+
+
+class CompartmentSites(NamedTuple):
+    """The compartment affinity's inputs. One A site and one B site per block, as local
+    vectors from the block's pivot, with the fraction of the block's beads each holds, and
+    the block pairs it acts over with a well radius per pair."""
+
+    sites: F64Array
+    mass: F64Array
+    strength: tuple[float, float]
+    pairs0: I64Array
+    pairs1: I64Array
+    radius: F64Array
+    weight: float
+
+
+def compartment_sites(
+    pos: list[F64Array],
+    cen: F64Array,
+    classes: list[I8Array],
+    rg: F64Array,
+    strength: tuple[float, float],
+    weight: float,
+) -> CompartmentSites:
+    """Build the affinity's sites from each block's bead classes, positive for A and negative
+    for B. The well radius of a pair is the two blocks' radii of gyration added, so the term
+    reaches as far as the blocks are large whatever the excluded volume is set to."""
+    n = len(pos)
+    sites = np.zeros((n, 2, 3), dtype=np.float64)
+    mass = np.zeros((n, 2), dtype=np.float64)
+    for k, (p, c) in enumerate(zip(pos, classes, strict=True)):
+        for slot, m in enumerate((c > 0, c < 0)):
+            if m.any():
+                sites[k, slot] = p[m].mean(axis=0) - cen[k]
+                mass[k, slot] = float(m.sum()) / p.shape[0]
+    iu = np.triu_indices(n, k=1)
+    return CompartmentSites(sites, mass, strength, iu[0], iu[1], rg[iu[0]] + rg[iu[1]], weight)
 
 
 def _mid(b: BeadOut) -> int:
@@ -158,6 +206,7 @@ def _energy_grad(
     iu1: I64Array,
     r0: F64Array,
     w_ev: float,
+    comp: CompartmentSites | None = None,
 ) -> tuple[float, F64Array]:
     """The stitch energy and its gradient at one rotation and one translation per block.
 
@@ -182,6 +231,8 @@ def _energy_grad(
         The excluded volume radius of each of those pairs.
     w_ev
         Weight on the excluded volume.
+    comp
+        The compartment affinity's sites, or None for no such term.
     """
     n = cen.shape[0]
     rv = x[: 3 * n].reshape(n, 3)
@@ -218,10 +269,33 @@ def _energy_grad(
     grv = np.einsum("ni,nkij,nj->nk", gwl, drot, last) + np.einsum(
         "ni,nkij,nj->nk", gwf, drot, first
     )
+
+    if comp is not None and comp.weight > 0.0 and comp.pairs0.size:
+        ws = np.einsum("nij,nsj->nsi", rot, comp.sites)
+        world = c[:, None, :] + ws
+        gsite = np.zeros_like(ws)
+        for slot, g_cls in enumerate(comp.strength):
+            i, j = comp.pairs0, comp.pairs1
+            mm = comp.mass[i, slot] * comp.mass[j, slot]
+            live = mm > 0.0
+            if not live.any():
+                continue
+            i, j, mm, rr = i[live], j[live], mm[live], comp.radius[live]
+            u = world[i, slot] - world[j, slot]
+            d2 = np.sum(u * u, axis=1)
+            ex = np.exp(-d2 / (2.0 * rr * rr))
+            e += comp.weight * g_cls * float(np.sum(mm * (1.0 - ex)))
+            gu = (comp.weight * g_cls * mm * ex / (rr * rr))[:, None] * u
+            np.add.at(gsite[:, slot], i, gu)
+            np.add.at(gsite[:, slot], j, -gu)
+        gc += gsite.sum(axis=1)
+        grv += np.einsum("nsi,nkij,nsj->nk", gsite, drot, comp.sites)
     return e, np.concatenate([grv.reshape(-1), gc.reshape(-1)])
 
 
-def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]]:
+def stitch_blocks(
+    blocks: list[list[BeadOut]], s: Settings, compartments: list[I8Array] | None = None
+) -> list[list[BeadOut]]:
     """Return the blocks with each one moved rigidly so boundary pairs sit on the interior
     curve. Blocks without anchors pass through untouched and do not take part in the chain.
     With fewer than two blocks holding anchors, or no usable curve, the input is returned as
@@ -234,6 +308,9 @@ def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut
         block's first anchor midpoint.
     s
         Settings. Reads the `boundary_stitch_*` weights and `exclusion_radius_ib`.
+    compartments
+        One int8 class array per block, aligned with the block's beads, positive for A and
+        negative for B. Read only when `boundary_stitch_compartment_weight` is positive.
     """
     active = [k for k, b in enumerate(blocks) if _anchor_index(b).size > 0]
     if len(active) < 2:
@@ -271,11 +348,22 @@ def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut
     iu0 = iu[0][ev_pairs]
     iu1 = iu[1][ev_pairs]
     r0 = r0[ev_pairs]
+    comp: CompartmentSites | None = None
+    w_comp = float(s.boundary_stitch_compartment_weight)
+    if w_comp > 0.0 and compartments is not None:
+        comp = compartment_sites(
+            pos,
+            cen,
+            [compartments[k] for k in active],
+            rg,
+            (float(s.compartment_energy_a), float(s.compartment_energy_b)),
+            w_comp,
+        )
 
     res = minimize(
         _energy_grad,
         np.zeros(6 * n),
-        args=(cen, first, last, target, w_spring, iu0, iu1, r0, w_ev),
+        args=(cen, first, last, target, w_spring, iu0, iu1, r0, w_ev, comp),
         jac=True,
         method="L-BFGS-B",
         options={
