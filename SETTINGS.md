@@ -262,6 +262,7 @@ other while the arcs and the stitch are kept.
 | `temp` | float | 0.1 | 0.1 | Starting temperature as a fraction of the smooth stage's `max_temp`. Untangling needs a bead to cross a neighbour's shell, and a greedy pass stalls. |
 | `noise` | float | 0.5 | 0.5 | Step size in chain bonds. |
 | `bond_weight` | float | 10.0 | 10.0 | Chain spring weight for the pass. At the smooth stage's 0.1 the excluded volume tears the coil. |
+| `keep_compartments` | bool | no | no | Keep the compartment term on inside the pass, when the run carries it. Off, the pass acts on chain bonds and excluded volume alone. |
 | `min_contact_fraction` | float | 0.0 | 0.0 | Decline the pass when cross block contacts are fewer than this fraction of the chromosome's beads. 0 always runs. |
 | `local_window` | int | -1 | 1 | Let only the beads touching another block move, plus this many chain neighbours either side. -1 lets every subanchor move, which on a chromosome is hours. A window of 1 is minutes. |
 

@@ -269,6 +269,7 @@ class Settings:
     relax_temp: float
     relax_noise: float
     relax_bond_weight: float
+    relax_keep_compartments: bool
 
     # ---- A/B compartments ----
     use_compartments: bool
@@ -602,6 +603,9 @@ class Settings:
         self.relax_temp = 0.1  # fraction of max_temp_smooth; a little heat lets coils cross
         self.relax_noise = 0.5  # step size as a fraction of the median bond length
         self.relax_bond_weight = 10.0  # chain spring constants during the pass
+        # Keep the compartment term on inside the pass. Off, the pass drops it and can undo
+        # the compartment arrangement the block placement built. Under measurement.
+        self.relax_keep_compartments = False
         # Skip the pass when fewer than this fraction of beads are touching another block.
         # It anneals the whole chromosome until its own convergence test fires, so it costs the
         # same however little there is to fix: measured on a trio run at an hour and fifty five
@@ -1126,6 +1130,9 @@ class Settings:
         self.relax_temp = getf("relax", "temp", self.relax_temp)
         self.relax_noise = getf("relax", "noise", self.relax_noise)
         self.relax_bond_weight = getf("relax", "bond_weight", self.relax_bond_weight)
+        self.relax_keep_compartments = getb(
+            "relax", "keep_compartments", self.relax_keep_compartments
+        )
         self.relax_min_contact_fraction = getf(
             "relax", "min_contact_fraction", self.relax_min_contact_fraction
         )

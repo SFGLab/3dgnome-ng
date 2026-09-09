@@ -266,6 +266,21 @@ def test_it_is_reproducible_from_a_given_rng_state() -> None:
     check("from the same RNG state it gives the same structure", same)
 
 
+def test_keep_compartments() -> None:
+    """The pass drops the compartment term unless `relax_keep_compartments` asks for it, and
+    then only when the run has the term on at all."""
+    print("\n[compartments] the pass keeps the compartment term only when asked")
+    from gnome3d.pipeline.relax import _relax_settings
+
+    s = Settings()
+    s.use_compartments = True
+    check("off by default", _relax_settings(s, 1.0).use_compartments is False)
+    s.relax_keep_compartments = True
+    check("kept when asked", _relax_settings(s, 1.0).use_compartments is True)
+    s.use_compartments = False
+    check("never on when the run has it off", _relax_settings(s, 1.0).use_compartments is False)
+
+
 def main() -> int:
     print("cross block relaxation checks")
     test_gate_function()
@@ -277,6 +292,7 @@ def main() -> int:
     test_local_window_restricts_who_may_move()
     test_local_window_is_off_by_default()
     test_it_is_reproducible_from_a_given_rng_state()
+    test_keep_compartments()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

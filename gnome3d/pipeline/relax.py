@@ -62,7 +62,8 @@ def _cross_pairs(pos: np.ndarray, owner: np.ndarray, radius: float) -> np.ndarra
 
 
 def _relax_settings(s: Settings, bond: float) -> Settings:
-    """A copy of the settings with only chain bonds and excluded volume active."""
+    """A copy of the settings with chain bonds and excluded volume active, and the compartment
+    term kept when `relax_keep_compartments` asks for it and the run carries it."""
     r = copy.copy(s)
     r.use_excluded_volume = True
     r.exclusion_apply_to_smooth = True
@@ -75,7 +76,7 @@ def _relax_settings(s: Settings, bond: float) -> Settings:
     r.spring_stretch = float(s.relax_bond_weight)
     r.spring_squeeze = float(s.relax_bond_weight)
     r.use_confinement = False
-    r.use_compartments = False
+    r.use_compartments = bool(s.relax_keep_compartments) and bool(s.use_compartments)
     r.use_bridging = False
     r.use_fibre_compaction = False
     r.max_temp_smooth = float(s.max_temp_smooth) * float(s.relax_temp)
