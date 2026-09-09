@@ -21,9 +21,10 @@ chains cannot build it, while this pass decides where blocks sit relative to one
 would otherwise undo whatever the block placement stage arranged. Each block carries one site
 per compartment, the centroid of its A beads and of its B beads, each with the fraction of
 the block's beads it holds, and two sites of the same class on different blocks attract
-through the well `1 - exp(-d^2 / 2 R^2)` with R the two blocks' radii of gyration added, the
-same reach as the excluded volume. The well is flat beyond a few R, so only neighbouring
-blocks feel it. See [[project_epigenome_terms]].
+through the well `1 - exp(-(d - R)^2 / 2 R^2)` beyond touching, with R the two blocks' radii
+of gyration added, and zero inside it, so the term draws two blocks together until they touch
+and no further. The well is flat beyond a few R, so only neighbouring blocks feel it. See
+[[project_epigenome_terms]].
 
 The energy carries its own gradient. A chromosome is a thousand or more blocks, so six
 variables per block puts the problem in the thousands of dimensions, where a finite difference
@@ -282,10 +283,17 @@ def _energy_grad(
                 continue
             i, j, mm, rr = i[live], j[live], mm[live], comp.radius[live]
             u = world[i, slot] - world[j, slot]
-            d2 = np.sum(u * u, axis=1)
-            ex = np.exp(-d2 / (2.0 * rr * rr))
+            d = np.sqrt(np.sum(u * u, axis=1))
+            # The well starts at touching, so the term pulls two blocks together and no
+            # further. A well centred on zero kept pulling until the sites coincided, which
+            # drove blocks into each other and left the excluded volume holding them apart,
+            # and every bead then touched another block.
+            over = np.clip(d - rr, 0.0, None)
+            ex = np.exp(-(over * over) / (2.0 * rr * rr))
             e += comp.weight * g_cls * float(np.sum(mm * (1.0 - ex)))
-            gu = (comp.weight * g_cls * mm * ex / (rr * rr))[:, None] * u
+            gu = (comp.weight * g_cls * mm * ex * over / (rr * rr * np.maximum(d, 1e-30)))[
+                :, None
+            ] * u
             np.add.at(gsite[:, slot], i, gu)
             np.add.at(gsite[:, slot], j, -gu)
         gc += gsite.sum(axis=1)

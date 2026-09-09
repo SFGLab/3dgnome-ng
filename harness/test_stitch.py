@@ -223,7 +223,8 @@ def _sites(n: int, rng: np.random.Generator, weight: float = 1.0) -> Compartment
 
 
 def test_compartment_energy() -> None:
-    """Two blocks, one A site each, no other term. The energy is the well in closed form."""
+    """Two blocks, one A site each, no other term. The energy is the well in closed form, the
+    well starting at touching, the pair's radius."""
     print("\n[compartments] the block affinity is the well in closed form")
     cen = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0]])
     zero = np.zeros((2, 3))
@@ -249,7 +250,7 @@ def test_compartment_energy() -> None:
         0.0,
         comp,
     )
-    want = 0.7 * 3.0 * 1.0 * 0.5 * (1.0 - np.exp(-(8.0**2) / (2 * 25.0)))
+    want = 0.7 * 3.0 * 1.0 * 0.5 * (1.0 - np.exp(-((8.0 - 5.0) ** 2) / (2 * 25.0)))
     check("energy equals the closed form", abs(e - want) < 1e-12, f"{e:.6f} vs {want:.6f}")
 
 
