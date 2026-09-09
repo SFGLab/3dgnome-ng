@@ -310,6 +310,32 @@ def test_compartment_pulls_like_blocks() -> None:
     check("weight zero with classes given is the plain stitch, exactly", same)
 
 
+def test_ev_factor() -> None:
+    """`boundary_stitch_ev_factor` scales the per pair radius. At a half the outer blocks of the
+    excluded volume test settle nearer than at one, and one is the plain radius exactly."""
+    print("\n[ev factor] the centroid repulsion radius scales with the factor")
+    blocks = [
+        block(0, np.array([0.0, 0.0, 0.0])),
+        block(100_000, np.array([8.0, 0.0, 0.0])),
+        block(200_000, np.array([16.0, 0.0, 0.0])),
+    ]
+
+    def outer(out: list[list[BeadOut]]) -> float:
+        c = [np.array([[b.x, b.y, b.z] for b in blk]).mean(axis=0) for blk in out]
+        return float(np.linalg.norm(c[0] - c[2]))
+
+    full = stitch_blocks(blocks, settings(exclusion_radius_ib=0.0))
+    half = stitch_blocks(blocks, settings(exclusion_radius_ib=0.0, boundary_stitch_ev_factor=0.5))
+    check(
+        "a half factor lets the outer blocks sit closer",
+        outer(half) < outer(full) - 1.0,
+        f"{outer(half):.2f} vs {outer(full):.2f}",
+    )
+    one = stitch_blocks(blocks, settings(exclusion_radius_ib=0.0, boundary_stitch_ev_factor=1.0))
+    same = all(a == b for x, y in zip(one, full, strict=True) for a, b in zip(x, y, strict=True))
+    check("factor one is the plain radius, exactly", same)
+
+
 def test_many_blocks_converge() -> None:
     """The property a chromosome needs and a handful of blocks cannot show.
 
@@ -356,6 +382,7 @@ def main() -> int:
     test_compartment_energy()
     test_compartment_gradient()
     test_compartment_pulls_like_blocks()
+    test_ev_factor()
     test_many_blocks_converge()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:

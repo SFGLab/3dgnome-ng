@@ -1002,6 +1002,19 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   so there is no normalisation and no ratio to keep positive. Weight zero is byte exact and
   reads no track. Needs `[data] compartments`. Unit checks in `harness/test_stitch.py`.
 
+  The well as first built was centred on zero and kept pulling until the sites coincided, which
+  drove blocks into each other; on chr1:1-60 Mb the relaxation then found 27,168 of 42,480
+  beads touching another block and a structure took an hour. It now starts at touching.
+
+  Measured on chr1:1-60 Mb, 2026-09-09, the term at 0.2 and 1 is a null, saddle 1.11 and 1.09
+  against a baseline of 1.13, because it is satisfied at the distance where the stitch's
+  centroid repulsion begins, so together they say like blocks touch, and touching spheres
+  share few contacts. The stitch off run's compartmentalisation is cross block, A against A
+  at 1.97 over expected against 0.7 stitched, and it exists because the block placement
+  stage lets blocks interpenetrate, which the data supports: within block enrichment in Hi-C
+  is near one on these blocks. `[boundary_stitch] ev_factor` (1.0) scales the repulsion
+  radius for that reason and is under measurement at 0.25 and 0.
+
   Why not in the reference: the reference has no compartment term and no pass across blocks.
 
 - **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no.**

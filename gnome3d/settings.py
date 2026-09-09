@@ -258,6 +258,7 @@ class Settings:
     use_boundary_stitch: bool
     boundary_stitch_spring_weight: float
     boundary_stitch_ev_weight: float
+    boundary_stitch_ev_factor: float
     boundary_stitch_compartment_weight: float
     boundary_stitch_max_iter: int
 
@@ -579,6 +580,10 @@ class Settings:
         self.use_boundary_stitch = False
         self.boundary_stitch_spring_weight = 1.0
         self.boundary_stitch_ev_weight = 1.0
+        # Times the two blocks' radii of gyration added. One keeps blocks at touching spheres,
+        # which the data does not show: within block enrichment in Hi-C is near one, so blocks
+        # interpenetrate. Under measurement.
+        self.boundary_stitch_ev_factor = 1.0
         # Off. A compartment affinity between blocks, measured on GM12878 before it is a default.
         self.boundary_stitch_compartment_weight = 0.0
         # The energy is minimised with its own gradient, so an iteration is one evaluation
@@ -1101,6 +1106,9 @@ class Settings:
         )
         self.boundary_stitch_compartment_weight = getf(
             "boundary_stitch", "compartment_weight", self.boundary_stitch_compartment_weight
+        )
+        self.boundary_stitch_ev_factor = getf(
+            "boundary_stitch", "ev_factor", self.boundary_stitch_ev_factor
         )
         self.boundary_stitch_ev_weight = getf(
             "boundary_stitch", "ev_weight", self.boundary_stitch_ev_weight

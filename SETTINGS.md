@@ -244,6 +244,7 @@ pairs realise at that separation, with a soft excluded volume between block cent
 | `use_boundary_stitch` | bool | no | yes | Master switch. |
 | `spring_weight` | float | 1.0 | 1.0 | Weight of the boundary springs. |
 | `ev_weight` | float | 1.0 | 1.0 | Weight of the centroid excluded volume. |
+| `ev_factor` | float | 1.0 | 1.0 | The centroid excluded volume radius of a block pair is this times the two radii of gyration added. Ignored when `[excluded_volume] radius_ib` is positive. |
 | `compartment_weight` | float | 0.0 | 0.0 | Weight of a compartment affinity between blocks, one site per compartment per block, a well of the two blocks' radii of gyration added. 0 is off. Needs `[data] compartments`. |
 | `max_iter` | int | 2000 | 2000 | L-BFGS-B iterations. The energy carries its own gradient, so an iteration is one evaluation. 500 leaves a chromosome unconverged. 2000 converges a 1,494 block chromosome in 85 seconds. |
 

@@ -315,7 +315,7 @@ def stitch_blocks(
         One chromosome's per block bead lists, in any order. Chain order is taken from each
         block's first anchor midpoint.
     s
-        Settings. Reads the `boundary_stitch_*` weights and `exclusion_radius_ib`.
+        Settings. Reads the `boundary_stitch_*` weights and factor and `exclusion_radius_ib`.
     compartments
         One int8 class array per block, aligned with the block's beads, positive for A and
         negative for B. Read only when `boundary_stitch_compartment_weight` is positive.
@@ -350,7 +350,7 @@ def stitch_blocks(
     r0 = (
         np.full(iu[0].size, float(s.exclusion_radius_ib))
         if s.exclusion_radius_ib > 0.0
-        else rg[iu[0]] + rg[iu[1]]
+        else float(s.boundary_stitch_ev_factor) * (rg[iu[0]] + rg[iu[1]])
     )
     ev_pairs: BoolArray = r0 > 0.0
     iu0 = iu[0][ev_pairs]
