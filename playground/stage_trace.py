@@ -16,6 +16,7 @@ keeps the compartment term on inside the pass.
 
 from __future__ import annotations
 
+import pickle
 import sys
 from pathlib import Path
 
@@ -103,13 +104,20 @@ def main() -> None:
     chrom = region.split(":")[0]
     chrs, reg = parse_chrs_arg(region)
     data = ContactData.from_files(s, chrs, reg)
-    state = build_state(s, data, chrs, reg)
-    dag, ib_sink = build_coarse_dag(state, 0)
-    outputs = pick_executor(s).run(dag)
-    blocks = [
-        _beads(outputs[ib_node_id(ibs.ib_id, StageKind.SMOOTH)]) for ibs in ib_sink if ibs.chr_ == chrom
-    ]
-    blocks.sort(key=lambda blk: blk[0].start)
+    cache = Path(config).with_suffix(".placement.pkl")
+    if cache.is_file():
+        blocks = pickle.loads(cache.read_bytes())
+    else:
+        state = build_state(s, data, chrs, reg)
+        dag, ib_sink = build_coarse_dag(state, 0)
+        outputs = pick_executor(s).run(dag)
+        blocks = [
+            _beads(outputs[ib_node_id(ibs.ib_id, StageKind.SMOOTH)])
+            for ibs in ib_sink
+            if ibs.chr_ == chrom
+        ]
+        blocks.sort(key=lambda blk: blk[0].start)
+        cache.write_bytes(pickle.dumps(blocks))
     beads = [b for blk in blocks for b in blk]
     binsize = 100_000
     c_obs, bin_starts = contacts.observed_hic(mcool, region, binsize, balance=True)
@@ -120,6 +128,8 @@ def main() -> None:
         hi = int(((blk[-1].start + blk[-1].end) // 2 - bin_starts[0]) // binsize)
         lab[max(lo, 0) : min(hi, len(lab) - 1) + 1] = k
     classes = _block_compartments(blocks, data.compartments.get(chrom, []))
+    cls_beads = np.concatenate(classes)
+    cls_block = np.array([int(np.sign(np.sum(np.sign(c)))) for c in classes])
     radius = float(np.median(smetrics.bond_lengths(coords(blocks))))
     bond = radius
     exp = split_saddle(c_obs, track, lab)
