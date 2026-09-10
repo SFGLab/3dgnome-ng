@@ -1130,6 +1130,13 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   far pairs. Block scope, centroid start and weight zero are byte exact by the parity gate.
   Unit checks in `harness/test_arcs_scope.py` and `harness/test_arcs_start.py`.
 
+  Production since 2026-09-10 at chromosome scope, walk start and `weight_arcs` 10. Three cell
+  gate on chr1:1-60 Mb against the deep maps: Pearson 0.271, 0.282 and 0.301 to 0.291, 0.318
+  and 0.304, MultiMM 0.607, 0.568 and 0.652 to 0.674, 0.667 and 0.673, SCC level within 0.01,
+  cross block overlaps 320, 416 and 170 to 176, 173 and 143 per thousand. With the compartment
+  term at 0.5 on top the saddle rises on H1ESC 1.02 to 2.15 and HFFC6 0.71 to 1.09, not on
+  GM12878, and SCC and MultiMM fall 0.07 to 0.10 on every cell, so the term stays opt in.
+
   Why not in the reference: the reference solves every block alone.
 
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),

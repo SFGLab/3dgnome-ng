@@ -128,6 +128,14 @@ CANONICAL: dict[str, dict[str, object]] = {
         # the whole run from 1h57m to 1h13m. The batch executor has no solver in it, so this
         # needs mc_executor_arcs serial or threaded, which is what it is set to above.
         "solver": "lbfgs",
+        # Solve every anchor of a chromosome together, from the block layout, each block's
+        # anchors on a walk at the law's distance per gap. Three cell gate on chr1:1-60 Mb
+        # against the deep maps, 2026-09-10: Pearson 0.271/0.282/0.301 to 0.291/0.318/0.304,
+        # MultiMM 0.607/0.568/0.652 to 0.674/0.667/0.673, SCC level within 0.01, cross block
+        # overlaps 320/416/170 to 176/173/143 per thousand. The sphere for the chromosome's
+        # span needs weight_arcs below.
+        "scope": "chromosome",
+        "start": "walk",
         "max_temp": 5.0,
         "jump_temp_scale": 50.0,
         "jump_temp_coef": 20.0,
@@ -175,6 +183,9 @@ CANONICAL: dict[str, dict[str, object]] = {
         "use_confinement": "yes",
         "weight": 0.1,
         "apply_to_arcs": "yes",
+        # The chromosome sized solve needs a stronger sphere than a block's chain; at the
+        # shared 0.1 a walk started chromosome stays at Rg 44 against 22 from the data.
+        "weight_arcs": 10.0,
         # The arcs sphere from the law, no constant. Null on its own, since the old formula
         # landed near it, and the principled form.
         "packing_factor_arcs": 0,
