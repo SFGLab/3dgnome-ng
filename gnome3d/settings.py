@@ -747,7 +747,7 @@ class Settings:
         # Where a block's anchors start. centroid is every anchor at the block centroid; walk is
         # a random walk at the law's distance per gap. Under measurement.
         self.arcs_start = "centroid"
-        # block solves each block's anchors alone; chromosome solves every anchor of a
+        # centroid, walk or hilbert. block solves each block's anchors alone; chromosome solves every anchor of a
         # chromosome together from the placed block centroids. Under measurement.
         self.arcs_scope = "block"
         self.mc_stop_ratio_arcs = 0.9999

@@ -31,7 +31,7 @@ from gnome3d.pipeline import Orientation, Seeded
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
 from gnome3d.pipeline.coarse.build import compartment_for_clusters
-from gnome3d.pipeline.ib.arcs import run_arcs_problem, walk_start
+from gnome3d.pipeline.ib.arcs import hilbert_start, run_arcs_problem, walk_start
 from gnome3d.settings import Settings
 from gnome3d.tracks import slice_intervals
 from gnome3d.types import (
@@ -158,6 +158,11 @@ def joint_arcs_solve(
             cen = walk_start(cen, mids, law)
         starts.append(cen)
     pos0 = np.ascontiguousarray(np.concatenate(starts), dtype=np.float32)
+    if s.arcs_start == "hilbert":
+        # One curve over the chromosome's anchors, centred where the block layout's centroid
+        # is; the curve, not the layout, is then the long range arrangement.
+        mids_all = np.array([clusters[a].genomic_pos for a in active_all], dtype=np.int64)
+        pos0 = hilbert_start(pos0, mids_all, law)
     anchor_heat: F64Array | None = None
     if s.use_anchor_heatmap and state.singletons:
         anchor_heat, _ = cb.build_contact_heatmaps(state, active_all, chr_, with_subanchor=False)

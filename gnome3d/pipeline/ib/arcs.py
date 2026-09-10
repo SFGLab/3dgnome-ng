@@ -29,7 +29,7 @@ from gnome3d.util import add_movable_noise_inplace, positioning_rng, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
-    from gnome3d.types import F32Array, I8Array, I64Array
+    from gnome3d.types import F32Array, F64Array, I8Array, I64Array
 
 
 def _run(problem: Problem) -> Result:
@@ -66,8 +66,10 @@ def _run(problem: Problem) -> Result:
         return 0.0, np.asarray(pos0, dtype=np.float32)
     if s.arcs_start == "walk":
         pos0 = walk_start(pos0, problem["anchor_genomic"], s.polymer_law())
+    elif s.arcs_start == "hilbert":
+        pos0 = hilbert_start(pos0, problem["anchor_genomic"], s.polymer_law())
     elif s.arcs_start != "centroid":
-        raise ValueError(f"unknown arcs start {s.arcs_start!r}, expected centroid or walk")
+        raise ValueError(f"unknown arcs start {s.arcs_start!r}, expected centroid, walk or hilbert")
 
     best_score = -1.0
     best: F32Array = pos0.copy()
@@ -117,6 +119,65 @@ def _anchor_classes(st: Seeded) -> I8Array | None:
         st.track_compartments, [g[0] for g in st.anchor_genomic], [g[1] for g in st.anchor_genomic]
     )
     return cls
+
+
+def _hilbert_points(index: I64Array, bits: int) -> F64Array:
+    """Coordinates on the 3D Hilbert curve of `bits` bits per axis for each curve index.
+
+    Skilling's transpose to axes, vectorised. The index's bits are dealt round robin to the
+    three axes, most significant first, then Gray decoded and unwound axis by axis.
+    """
+    n = 3
+    x = np.zeros((index.shape[0], n), dtype=np.int64)
+    for level in range(bits):
+        for axis in range(n):
+            src = n * bits - 1 - (level * n + axis)
+            x[:, axis] |= ((index >> src) & 1) << (bits - 1 - level)
+    t = x[:, n - 1] >> 1
+    for i in range(n - 1, 0, -1):
+        x[:, i] ^= x[:, i - 1]
+    x[:, 0] ^= t
+    q = 2
+    top = 1 << bits
+    while q != top:
+        p = q - 1
+        for i in range(n - 1, -1, -1):
+            hit = (x[:, i] & q) != 0
+            x[hit, 0] ^= p
+            t = (x[:, 0] ^ x[:, i]) & p
+            t[hit] = 0
+            x[:, 0] ^= t
+            x[:, i] ^= t
+        q <<= 1
+    return x.astype(np.float64)
+
+
+def hilbert_start(pos0: F32Array, anchor_genomic: object, law: PolymerLaw) -> F32Array:
+    """Anchor starting positions along a 3D Hilbert curve, each anchor at the curve point of
+    its genomic fraction, scaled so consecutive anchors sit at the law's bond on average and
+    centred where the block's centroid was.
+
+    A space filling curve keeps genomic neighbours spatial neighbours at every scale and its
+    size grows as the cube root of the count, the exponent the maps show beyond a megabase.
+    A walk has the wrong exponent and a collapsed start none. No RNG; the start is a
+    function of the genomic positions alone.
+    """
+    g = np.asarray(anchor_genomic, dtype=np.int64)
+    mids = g[:, 2] if g.ndim == 2 else g
+    n = mids.shape[0]
+    bits = 1
+    while (1 << (3 * bits)) < 4 * n:
+        bits += 1
+    span = max(int(mids[-1] - mids[0]), 1)
+    frac = (mids - mids[0]).astype(np.float64) / span
+    index = np.rint(frac * ((1 << (3 * bits)) - 1)).astype(np.int64)
+    pts = _hilbert_points(index, bits)
+    steps = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+    want = np.mean([law.background(int(b - a)) for a, b in zip(mids[:-1], mids[1:], strict=True)])
+    scale = want / max(float(steps.mean()), 1e-12) if n > 1 else 1.0
+    out = pts * scale
+    out += np.asarray(pos0, dtype=np.float64).mean(axis=0) - out.mean(axis=0)
+    return np.ascontiguousarray(out, dtype=np.float32)
 
 
 def run_arcs_problem(problem: Problem) -> Result:
