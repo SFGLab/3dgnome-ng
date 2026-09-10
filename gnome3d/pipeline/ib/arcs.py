@@ -54,6 +54,9 @@ def _run(problem: Problem) -> Result:
     # the same either way, so an ensemble still comes from the perturbed starts.
     solver = arcs_solver(s)
 
+    if s.arcs_scope == "chromosome":
+        # The chromosome's anchors were solved together at seed time; the block's are final.
+        return 0.0, np.asarray(pos0, dtype=np.float32)
     if s.arcs_start == "walk":
         pos0 = walk_start(pos0, problem["anchor_genomic"], s.polymer_law())
     elif s.arcs_start != "centroid":
@@ -99,6 +102,12 @@ def walk_start(pos0: F32Array, anchor_genomic: object, law: PolymerLaw) -> F32Ar
     return np.ascontiguousarray(out, dtype=np.float32)
 
 
+def run_arcs_problem(problem: Problem) -> Result:
+    """Solve or anneal one arcs problem on the calling thread. The joint chromosome solve in
+    the skeleton uses it directly, outside the executor."""
+    return _run(problem)
+
+
 def settings_for_block(
     s: Settings, anchor_genomic: Sequence[int] | Sequence[tuple[int, int, int]] | I64Array
 ) -> Settings:
@@ -124,8 +133,13 @@ def settings_for_block(
         and float(s.confinement_radius_arcs) <= 0.0
         and float(s.confinement_packing_factor_arcs) <= 0.0
     )
-    if not derive:
+    w_arcs = float(s.confinement_weight_arcs)
+    if not derive and w_arcs <= 0.0:
         return s
+    if not derive:
+        out = copy.copy(s)
+        out.confinement_weight = w_arcs
+        return out
     g = np.asarray(anchor_genomic, dtype=np.int64)
     if g.size == 0:
         span = 0
@@ -135,6 +149,8 @@ def settings_for_block(
         span = int(g.max() - g.min())
     out = copy.copy(s)
     out.confinement_radius_arcs = s.polymer_law().confinement_radius(span)
+    if w_arcs > 0.0:
+        out.confinement_weight = w_arcs
     return out
 
 
@@ -156,6 +172,8 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     There is no solver here, only the JAX annealer, so a run that asked for one is refused. It
     would otherwise anneal and look like it had solved."""
     s = problems[0]["settings"]
+    if s.arcs_scope == "chromosome":
+        return [(0.0, np.asarray(p["anchor_pos"], dtype=np.float32)) for p in problems]
     if s.arcs_start != "centroid":
         raise NotImplementedError("the batched arcs runner starts at the centroid only")
     if settings_for_block(s, problems[0]["anchor_genomic"]) is not s:

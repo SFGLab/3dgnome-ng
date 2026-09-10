@@ -150,6 +150,7 @@ least `stop_condition_successes_threshold` moves.
 | `solver` | str | mc | lbfgs | `mc` anneals, `lbfgs` minimises the same energy with L-BFGS-B. Same minimum, same overlaps, the stage's calls fell from minutes to seconds. Needs `mc_executor_arcs` of `serial` or `threaded`. The batch executor has no solver and refuses. |
 | `solver_iters` | int | 200 | 200 | Iterations for the solver. |
 | `start` | str | centroid | centroid | Where a block's anchors start. `centroid` puts every anchor at the block centroid, from which the solver descends to a compact minimum. `walk` places consecutive anchors at the law's distance for their gap along random directions, so pairs no term acts on begin near the law. Solver and annealer only; the batch executor refuses it. |
+| `scope` | str | block | block | `block` solves each block's anchors alone. `chromosome` solves every anchor of a chromosome as one problem, each block's anchors starting at its placed centroid, so loops, the contact background and the compartment term act across blocks; the per block stage then passes its anchors through. Solver and annealer only. |
 
 ### [simulation_arcs_smooth] only
 
@@ -224,6 +225,7 @@ stage's mean bond scale times the cube root of the bead count.
 | --- | --- | --- | --- | --- |
 | `use_confinement` | bool | no | yes | Master switch. |
 | `weight` | float | 0.5 | 0.1 | Weight. |
+| `weight_arcs` | float | 0.0 | 0.0 | The arcs stage's own confinement weight. 0 uses `weight`. A chromosome sized solve needs a stronger sphere than a block's chain. |
 | `apply_to_arcs` | bool | yes | yes | In the arcs stage. |
 | `apply_to_smooth` | bool | yes | yes | In the smooth stage. |
 | `apply_to_ib` | bool | yes | yes | In block placement. |

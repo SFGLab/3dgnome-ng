@@ -1108,6 +1108,30 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: the reference anneals this stage too.
 
+- **Chromosome scope for the arcs stage: `[simulation_arcs] scope = block | chromosome`,
+  default block, with `start = centroid | walk` and `[confinement] weight_arcs`.**
+  ([gnome3d/skeleton.py](gnome3d/skeleton.py) `joint_arcs_solve`,
+  [gnome3d/pipeline/ib/arcs.py](gnome3d/pipeline/ib/arcs.py) `walk_start`)
+  A compartment is a pattern over many blocks, and at block scope nothing places one block's
+  anchors relative to another's but the block layout and the stitch. At chromosome scope every
+  anchor of a chromosome is solved as one problem, each block's anchors starting at the
+  centroid the block layout gave it, on a walk at the law's distance per gap under `walk`, with
+  the target matrix built over the whole chromosome so the loops, the contact background and
+  the compartment term act across blocks, and the law's sphere for the chromosome's span held
+  at `weight_arcs`. The per block arcs stage then passes its anchors through and the chains,
+  the stitch and the relaxation run as at block scope.
+
+  Measured 2026-09-10 on GM12878 chr1:1-60 Mb with the chromosome as one block, before this
+  scope existed: every anchor at one point collapses the solve to Rg 14 against production's
+  22, the walk start alone leaves it at 44, and the walk with the sphere at weight 10 lands at
+  22.9 with Pearson 0.303 against 0.270, SCC level, MultiMM 0.572 against 0.628, cross block
+  overlaps level and the compartment eigenvector correlation 0.22 against 0.05 with the term
+  off. The start decides the long range structure because the arcs energy has no term between
+  far pairs. Block scope, centroid start and weight zero are byte exact by the parity gate.
+  Unit checks in `harness/test_arcs_scope.py` and `harness/test_arcs_start.py`.
+
+  Why not in the reference: the reference solves every block alone.
+
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
   `[simulation_backend] neighbour_grid`, default yes)
   The excluded volume term sums over pairs closer than `r0` and was implemented as a scan over

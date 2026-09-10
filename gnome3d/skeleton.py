@@ -17,7 +17,9 @@ decides whether an IB's chain includes the ESTIMATE_DIST stage.
 
 from __future__ import annotations
 
+import copy
 import math
+import zlib
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
@@ -28,6 +30,7 @@ from gnome3d.hierarchy import Level, set_level
 from gnome3d.pipeline import Orientation, Seeded
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
+from gnome3d.pipeline.ib.arcs import run_arcs_problem, walk_start
 from gnome3d.settings import Settings
 from gnome3d.tracks import slice_intervals
 from gnome3d.types import (
@@ -37,6 +40,7 @@ from gnome3d.types import (
     I8Array,
     SignalInterval,
 )
+from gnome3d.util import seed_rng
 
 LOG = log.get("skeleton")
 
@@ -126,6 +130,67 @@ def _collect_ib_work(
     return work
 
 
+def joint_arcs_solve(
+    state: CoarseState, chr_: str, work: list[tuple[str, int, list[int]]], seed_offset: int
+) -> None:
+    """Solve every anchor of one chromosome as a single arcs problem and write the result
+    into the cluster graph, so each block's seed carries final anchors.
+
+    Each block's anchors start where the block placement stage put the block, at its centroid,
+    or on a walk around it under `arcs_start = walk`. The target matrix is the one a block
+    would get, built over the whole chromosome, so the contact background and the loops act
+    across blocks, and the confinement sphere is the law's for the chromosome's span.
+    """
+    s = state.s
+    clusters = state.clusters
+    active_all = [a for _, _, ar in work for a in ar]
+    if len(active_all) < 2:
+        return
+    seed = (zlib.crc32(chr_.encode()) * 2_654_435_761 + 40_503 + seed_offset) & 0x7FFFFFFF
+    seed_rng(seed)
+    law = s.polymer_law()
+    starts: list[F32Array] = []
+    for _, ib_idx, ar in work:
+        cen = np.tile(clusters[ib_idx].pos.astype(np.float32), (len(ar), 1))
+        if s.arcs_start == "walk":
+            mids = np.array([clusters[a].genomic_pos for a in ar], dtype=np.int64)
+            cen = walk_start(cen, mids, law)
+        starts.append(cen)
+    pos0 = np.ascontiguousarray(np.concatenate(starts), dtype=np.float32)
+    anchor_heat: F64Array | None = None
+    if s.use_anchor_heatmap and state.singletons:
+        anchor_heat, _ = cb.build_contact_heatmaps(state, active_all, chr_, with_subanchor=False)
+    exp_dist = cb.calc_anchor_expected_distances(state, active_all, chr_, anchor_heat)
+    anchor_genomic = [
+        (clusters[a].start, clusters[a].end, clusters[a].genomic_pos) for a in active_all
+    ]
+    # The per block stage passes anchors through at chromosome scope, so the joint call runs
+    # at block scope on a copy, from the start built here.
+    s_joint = copy.copy(s)
+    s_joint.arcs_scope = "block"
+    s_joint.arcs_start = "centroid"
+    score, pos = run_arcs_problem(
+        {
+            "anchor_pos": pos0,
+            "exp_dist": exp_dist,
+            "step_size": _ARCS_NOISE,
+            "settings": s_joint,
+            "seed": seed,
+            "anchor_genomic": anchor_genomic,
+        }  # type: ignore[arg-type]
+    )
+    for k, a in enumerate(active_all):
+        clusters[a].pos = np.asarray(pos[k], dtype=np.float64)
+    log.status(
+        LOG,
+        "joint arcs solve %s: %d anchors in %d blocks, energy %.4g",
+        chr_,
+        len(active_all),
+        len(work),
+        score,
+    )
+
+
 def _build_ib_seed(
     state: CoarseState, chr_: str, item: tuple[str, int, list[int]], seed_offset: int
 ) -> IBSeed:
@@ -148,9 +213,12 @@ def gather_all_ib_seeds(state: CoarseState, seed_offset: int = 0) -> list[IBSeed
     seg_level = set_level(
         Level.SEGMENT - Level.CHROMOSOME, state.chr_root, state.clusters, state.chrs
     )
-    items: list[tuple[str, tuple[str, int, list[int]]]] = [
-        (chr_, w) for chr_ in state.chrs for w in _collect_ib_work(state, chr_, seg_level)
-    ]
+    items: list[tuple[str, tuple[str, int, list[int]]]] = []
+    for chr_ in state.chrs:
+        work = _collect_ib_work(state, chr_, seg_level)
+        if state.s.arcs_scope == "chromosome":
+            joint_arcs_solve(state, chr_, work, seed_offset)
+        items.extend((chr_, w) for w in work)
     workers = max(1, int(getattr(state.s, "heatmap_workers", 1)))
     if workers > 1 and len(items) > 1:
         with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="heatbuild") as ex:
@@ -165,10 +233,10 @@ def gather_ib_seeds(
     (serial).  Consumes no RNG - pure read-out - so it runs after all coarse positioning
     (the unified-DAG fan-out) or interleaved per chr (the legacy path) with identical
     results.  ``gather_all_ib_seeds`` is the parallel whole-graph entry point."""
-    return [
-        _build_ib_seed(state, chr_, w, seed_offset)
-        for w in _collect_ib_work(state, chr_, seg_level)
-    ]
+    work = _collect_ib_work(state, chr_, seg_level)
+    if state.s.arcs_scope == "chromosome":
+        joint_arcs_solve(state, chr_, work, seed_offset)
+    return [_build_ib_seed(state, chr_, w, seed_offset) for w in work]
 
 
 def seed_for_ib(

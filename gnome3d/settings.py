@@ -244,6 +244,7 @@ class Settings:
     # ---- confinement ----
     use_confinement: bool
     confinement_weight: float
+    confinement_weight_arcs: float
     confinement_apply_to_arcs: bool
     confinement_apply_to_smooth: bool
     confinement_apply_to_ib: bool
@@ -356,6 +357,7 @@ class Settings:
     arcs_solver: str
     arcs_solver_iters: int
     arcs_start: str
+    arcs_scope: str
     mc_stop_ratio_arcs: float
     smooth_dist_weight: float
     smooth_angle_weight: float
@@ -563,6 +565,8 @@ class Settings:
         # own bond data as `packing_factor * mean(bond) * N^(1/3)`.
         self.use_confinement = False
         self.confinement_weight = 0.5
+        # The arcs stage's own confinement weight. Zero uses the shared weight.
+        self.confinement_weight_arcs = 0.0
         self.confinement_apply_to_arcs = True
         self.confinement_apply_to_smooth = True
         self.confinement_apply_to_ib = True
@@ -736,6 +740,9 @@ class Settings:
         # Where a block's anchors start. centroid is every anchor at the block centroid; walk is
         # a random walk at the law's distance per gap. Under measurement.
         self.arcs_start = "centroid"
+        # block solves each block's anchors alone; chromosome solves every anchor of a
+        # chromosome together from the placed block centroids. Under measurement.
+        self.arcs_scope = "block"
         self.mc_stop_ratio_arcs = 0.9999
         self.smooth_dist_weight = 1.0
         self.smooth_angle_weight = 1.0
@@ -1079,6 +1086,9 @@ class Settings:
         # [confinement]
         self.use_confinement = getb("confinement", "use_confinement", self.use_confinement)
         self.confinement_weight = getf("confinement", "weight", self.confinement_weight)
+        self.confinement_weight_arcs = getf(
+            "confinement", "weight_arcs", self.confinement_weight_arcs
+        )
         self.confinement_apply_to_arcs = getb(
             "confinement", "apply_to_arcs", self.confinement_apply_to_arcs
         )
@@ -1272,6 +1282,7 @@ class Settings:
         self.arcs_solver = gets("simulation_arcs", "solver", self.arcs_solver)
         self.arcs_solver_iters = geti("simulation_arcs", "solver_iters", self.arcs_solver_iters)
         self.arcs_start = gets("simulation_arcs", "start", self.arcs_start)
+        self.arcs_scope = gets("simulation_arcs", "scope", self.arcs_scope)
         self.mc_stop_improvement_smooth = getf(
             "simulation_arcs_smooth",
             "stop_condition_improvement_threshold",
