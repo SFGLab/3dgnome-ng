@@ -48,7 +48,8 @@ August 2026 and measured through September. This note records where it stands an
 6. **The anchor level term is not a lever.** A well between like anchors inside the joint
    solve (`[compartments] apply_to_arcs`, off): at 0.01 a mild gain at no cost on chr1, at
    0.05 a reversal, at 0.2 anchors piled into clusters; at 0.05 on the balanced chr2 window
-   compaction to Rg 18 and overlaps up two and a half times.
+   compaction to Rg 18 and overlaps up two and a half times, and at 0.2 a saddle of 1.60
+   bought with anchor and cross block overlaps four times the no term value.
 7. **GM12878 is not a data problem.** Its compartment track agrees with the other cells to a
    correlation of 0.7 to 0.8 up to sign, and its loops look like theirs in every summary. Its
    production run had compartment like structure on chr1 without any term, which chromosome
