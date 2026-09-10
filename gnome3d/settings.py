@@ -355,6 +355,7 @@ class Settings:
     polymer: PolymerLaw | None
     arcs_solver: str
     arcs_solver_iters: int
+    arcs_start: str
     mc_stop_ratio_arcs: float
     smooth_dist_weight: float
     smooth_angle_weight: float
@@ -732,6 +733,9 @@ class Settings:
         self.polymer = None
         self.arcs_solver = "mc"
         self.arcs_solver_iters = 200
+        # Where a block's anchors start. centroid is every anchor at the block centroid; walk is
+        # a random walk at the law's distance per gap. Under measurement.
+        self.arcs_start = "centroid"
         self.mc_stop_ratio_arcs = 0.9999
         self.smooth_dist_weight = 1.0
         self.smooth_angle_weight = 1.0
@@ -1267,6 +1271,7 @@ class Settings:
         )
         self.arcs_solver = gets("simulation_arcs", "solver", self.arcs_solver)
         self.arcs_solver_iters = geti("simulation_arcs", "solver_iters", self.arcs_solver_iters)
+        self.arcs_start = gets("simulation_arcs", "start", self.arcs_start)
         self.mc_stop_improvement_smooth = getf(
             "simulation_arcs_smooth",
             "stop_condition_improvement_threshold",

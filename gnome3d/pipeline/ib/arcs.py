@@ -23,7 +23,8 @@ import numpy as np
 from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Arced, Seeded, State
-from gnome3d.util import add_movable_noise_inplace, seed_rng
+from gnome3d.polymer import PolymerLaw
+from gnome3d.util import add_movable_noise_inplace, positioning_rng, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -53,6 +54,11 @@ def _run(problem: Problem) -> Result:
     # the same either way, so an ensemble still comes from the perturbed starts.
     solver = arcs_solver(s)
 
+    if s.arcs_start == "walk":
+        pos0 = walk_start(pos0, problem["anchor_genomic"], s.polymer_law())
+    elif s.arcs_start != "centroid":
+        raise ValueError(f"unknown arcs start {s.arcs_start!r}, expected centroid or walk")
+
     best_score = -1.0
     best: F32Array = pos0.copy()
     for _run_i in range(max(1, int(s.steps_arcs))):
@@ -69,6 +75,28 @@ def _run(problem: Problem) -> Result:
             best = pos.copy()
 
     return best_score, np.asarray(best, dtype=np.float32)
+
+
+def walk_start(pos0: F32Array, anchor_genomic: object, law: PolymerLaw) -> F32Array:
+    """Anchor starting positions on a random walk whose steps are the law's distance for each
+    consecutive gap, centred where the block's centroid was.
+
+    Every anchor otherwise starts at the block's centroid and the solver descends from that
+    collapsed point to a compact minimum, bounded only by the block's size. On the walk a pair
+    no term acts on begins near the law and the solver leaves it there. Directions come from
+    the seeded Python RNG, so a block's walk is reproducible.
+    """
+    g = np.asarray(anchor_genomic, dtype=np.int64)
+    mids = g[:, 2] if g.ndim == 2 else g
+    n = mids.shape[0]
+    out = np.zeros((n, 3), dtype=np.float64)
+    rng = positioning_rng()
+    for i in range(1, n):
+        v = np.array([rng.gauss(0.0, 1.0) for _ in range(3)])
+        v /= max(float(np.linalg.norm(v)), 1e-12)
+        out[i] = out[i - 1] + v * law.background(int(mids[i] - mids[i - 1]))
+    out += np.asarray(pos0, dtype=np.float64).mean(axis=0) - out.mean(axis=0)
+    return np.ascontiguousarray(out, dtype=np.float32)
 
 
 def settings_for_block(
@@ -128,6 +156,8 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     There is no solver here, only the JAX annealer, so a run that asked for one is refused. It
     would otherwise anneal and look like it had solved."""
     s = problems[0]["settings"]
+    if s.arcs_start != "centroid":
+        raise NotImplementedError("the batched arcs runner starts at the centroid only")
     if settings_for_block(s, problems[0]["anchor_genomic"]) is not s:
         raise ValueError(
             "the batch executor runs a launch on one settings and cannot give each block the "

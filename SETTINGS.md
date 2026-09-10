@@ -149,6 +149,7 @@ least `stop_condition_successes_threshold` moves.
 | `stop_condition_ratio` | float | 0.9999 | 0.9999 | Also stop when the score over the previous round's is at or above this, a plateau guard. |
 | `solver` | str | mc | lbfgs | `mc` anneals, `lbfgs` minimises the same energy with L-BFGS-B. Same minimum, same overlaps, the stage's calls fell from minutes to seconds. Needs `mc_executor_arcs` of `serial` or `threaded`. The batch executor has no solver and refuses. |
 | `solver_iters` | int | 200 | 200 | Iterations for the solver. |
+| `start` | str | centroid | centroid | Where a block's anchors start. `centroid` puts every anchor at the block centroid, from which the solver descends to a compact minimum. `walk` places consecutive anchors at the law's distance for their gap along random directions, so pairs no term acts on begin near the law. Solver and annealer only; the batch executor refuses it. |
 
 ### [simulation_arcs_smooth] only
 

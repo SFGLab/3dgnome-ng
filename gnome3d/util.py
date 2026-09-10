@@ -30,6 +30,11 @@ def _rng() -> random.Random:
     return r
 
 
+def positioning_rng() -> random.Random:
+    """The calling thread's positioning RNG, for a caller that draws its own shapes."""
+    return _rng()
+
+
 def seed_rng(seed: int) -> None:
     """Seed the calling thread's positioning RNG (used by `random_vector_np`).
     Replaces a bare `random.seed`, so coarse seeding and per-stage seeding are
