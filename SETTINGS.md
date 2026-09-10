@@ -283,6 +283,9 @@ alongside since the terms are attractive.
 | `energy_a` | float | 1.0 | 1.0 | Affinity between two A beads. |
 | `energy_b` | float | 2.0 | 2.0 | Affinity between two B beads. |
 | `apply_to_heatmap` | bool | yes | yes | In the heatmap stages. |
+| `apply_to_arcs` | bool | no | no | In the arcs solve, which at chromosome scope is where the term can act across blocks. A well between like anchors with no division by count, since the solver is a descent. Solver only. |
+| `radius_arcs` | float | 0.0 | 0.0 | Interaction radius in the arcs solve, 0 derives it. |
+| `auto_factor_arcs` | float | 1.5 | 1.5 | Times the mean positive arc target. |
 | `apply_to_ib` | bool | yes | yes | In block placement. |
 | `apply_to_smooth` | bool | yes | yes | In the smooth stage. |
 | `radius_heatmap` | float | 0.0 | 0.0 | Interaction radius, 0 derives it. |

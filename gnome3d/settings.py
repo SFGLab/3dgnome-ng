@@ -278,6 +278,9 @@ class Settings:
     compartment_energy_a: float
     compartment_energy_b: float
     compartment_apply_to_heatmap: bool
+    compartment_apply_to_arcs: bool
+    compartment_radius_arcs: float
+    compartment_auto_factor_arcs: float
     compartment_apply_to_ib: bool
     compartment_apply_to_smooth: bool
     compartment_radius_heatmap: float
@@ -635,6 +638,10 @@ class Settings:
         self.compartment_energy_a = 1.0  # MultiMM COB_EA
         self.compartment_energy_b = 2.0  # MultiMM COB_EB
         self.compartment_apply_to_heatmap = True
+        # In the arcs solve, where the term acts across blocks at chromosome scope. Off.
+        self.compartment_apply_to_arcs = False
+        self.compartment_radius_arcs = 0.0
+        self.compartment_auto_factor_arcs = 1.5
         self.compartment_apply_to_ib = True
         self.compartment_apply_to_smooth = True
         # Interaction range: 0.0 = auto = factor * mean(bond) at that level.
@@ -1159,6 +1166,15 @@ class Settings:
         self.compartment_energy_b = getf("compartments", "energy_b", self.compartment_energy_b)
         self.compartment_apply_to_heatmap = getb(
             "compartments", "apply_to_heatmap", self.compartment_apply_to_heatmap
+        )
+        self.compartment_apply_to_arcs = getb(
+            "compartments", "apply_to_arcs", self.compartment_apply_to_arcs
+        )
+        self.compartment_radius_arcs = getf(
+            "compartments", "radius_arcs", self.compartment_radius_arcs
+        )
+        self.compartment_auto_factor_arcs = getf(
+            "compartments", "auto_factor_arcs", self.compartment_auto_factor_arcs
         )
         self.compartment_apply_to_ib = getb(
             "compartments", "apply_to_ib", self.compartment_apply_to_ib

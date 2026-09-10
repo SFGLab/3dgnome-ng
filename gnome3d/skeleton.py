@@ -30,6 +30,7 @@ from gnome3d.hierarchy import Level, set_level
 from gnome3d.pipeline import Orientation, Seeded
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
+from gnome3d.pipeline.coarse.build import compartment_for_clusters
 from gnome3d.pipeline.ib.arcs import run_arcs_problem, walk_start
 from gnome3d.settings import Settings
 from gnome3d.tracks import slice_intervals
@@ -177,6 +178,7 @@ def joint_arcs_solve(
             "settings": s_joint,
             "seed": seed,
             "anchor_genomic": anchor_genomic,
+            "compartment": compartment_for_clusters(state, active_all, chr_),
         }  # type: ignore[arg-type]
     )
     for k, a in enumerate(active_all):

@@ -1137,6 +1137,15 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   term at 0.5 on top the saddle rises on H1ESC 1.02 to 2.15 and HFFC6 0.71 to 1.09, not on
   GM12878, and SCC and MultiMM fall 0.07 to 0.10 on every cell, so the term stays opt in.
 
+  **`[compartments] apply_to_arcs` (default no) puts the compartment term into the joint solve
+  itself**, a well `1 - exp(-d^2 / 2 r0^2)` between like anchors at `energy_a` and `energy_b`
+  with `r0` from `radius_arcs` or `auto_factor_arcs` times the mean arc target, and no
+  division by count. The kernel term divides by the chain length so that a weight tuned on a
+  block holds on a chromosome, and on a chain of tens of thousands of beads that makes it
+  inert; the solver is a descent, where the flat part of a well does nothing, so the anchor
+  level term needs no such normalisation. Solver only, refused with the annealer. Under
+  measurement.
+
   Why not in the reference: the reference solves every block alone.
 
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),

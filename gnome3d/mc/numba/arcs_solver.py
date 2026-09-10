@@ -18,13 +18,14 @@ design/algorithm-improvements.md.
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d.mc.numba.terms import njit
-from gnome3d.types import F32Array, F64Array
+from gnome3d.types import F32Array, F64Array, I8Array
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -46,6 +47,11 @@ def arcs_energy_grad(
     excl_r0: float,
     excl_w: float,
     excl_skip: int,
+    comp_cls: I8Array,
+    comp_r0: float,
+    comp_w: float,
+    comp_ea: float,
+    comp_eb: float,
 ) -> tuple[float, F64Array]:
     """The arcs energy over a whole structure and its gradient, for a flattened `(3N,)` vector.
 
@@ -54,6 +60,11 @@ def arcs_energy_grad(
     gradient stays whole, the two halves being the derivative with respect to each end. The
     excluded volume sums ordered pairs and so is counted twice, which means a whole energy and a
     doubled gradient. Confinement is per anchor and single counted.
+
+    The compartment affinity is a well `1 - exp(-d^2 / 2 r0^2)` between two A anchors at
+    `comp_ea` and two B anchors at `comp_eb`, unordered like the arc term, with no division by
+    count: the solver is a descent and the flat part of the well does not move it. `comp_w`
+    zero skips it.
 
     Per anchor energies are summed after the loop rather than reduced inside it, because numba's
     parallel reduction does not cope with a scalar accumulator beside the array writes.
@@ -74,7 +85,8 @@ def arcs_energy_grad(
             dx = pos[i, 0] - pos[j, 0]
             dy = pos[i, 1] - pos[j, 1]
             dz = pos[i, 2] - pos[j, 2]
-            d = np.sqrt(dx * dx + dy * dy + dz * dz)
+            d2 = dx * dx + dy * dy + dz * dz
+            d = np.sqrt(d2)
             dd = d if d > 1e-10 else 1e-10
             if e <= -0.75:
                 bg = -e
@@ -105,6 +117,21 @@ def arcs_energy_grad(
                 gi0 += w * dx
                 gi1 += w * dy
                 gi2 += w * dz
+            if comp_w > 0.0:
+                ci = comp_cls[i]
+                cj = comp_cls[j]
+                gs = 0.0
+                if ci > 0 and cj > 0:
+                    gs = comp_ea
+                elif ci < 0 and cj < 0:
+                    gs = comp_eb
+                if gs > 0.0:
+                    ex = math.exp(-d2 / (2.0 * comp_r0 * comp_r0))
+                    ei += 0.5 * comp_w * gs * (1.0 - ex)
+                    w = comp_w * gs * ex / (comp_r0 * comp_r0)
+                    gi0 += w * dx
+                    gi1 += w * dy
+                    gi2 += w * dz
             if excl_w > 0.0 and d < excl_r0:
                 sep = i - j
                 if sep < 0:
@@ -135,11 +162,18 @@ def arcs_energy_grad(
 
 
 def solve_arcs(
-    pos: F32Array, exp_dist: F64Array, s: Settings, iters: int | None = None
+    pos: F32Array,
+    exp_dist: F64Array,
+    s: Settings,
+    iters: int | None = None,
+    compartment: I8Array | None = None,
 ) -> tuple[float, F32Array]:
     """Minimise the arcs energy from `pos`. Returns `(energy, positions)`.
 
     Mirrors the derivations in `mc_arcs_numba` so the energy is the one the annealer reports.
+    `compartment` is the class per anchor, positive A and negative B, read only with
+    `compartment_apply_to_arcs`; its radius is `compartment_radius_arcs` or
+    `compartment_auto_factor_arcs` times the mean positive arc target.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -171,6 +205,16 @@ def solve_arcs(
             conf_r = float(s.confinement_packing_factor_arcs) * avg * (n ** (1.0 / 3.0))
         conf_w = float(s.confinement_weight)
 
+    comp_cls = np.zeros(n, dtype=np.int8)
+    comp_r0 = 1.0
+    comp_w = 0.0
+    if bool(s.use_compartments) and bool(s.compartment_apply_to_arcs) and compartment is not None:
+        comp_cls = np.ascontiguousarray(compartment, dtype=np.int8)
+        comp_r0 = float(s.compartment_radius_arcs)
+        if comp_r0 <= 0.0:
+            comp_r0 = float(s.compartment_auto_factor_arcs) * avg
+        comp_w = float(s.compartment_weight)
+
     args = (
         exp64,
         float(s.spring_stretch_arcs),
@@ -185,6 +229,11 @@ def solve_arcs(
         excl_r0,
         excl_w,
         excl_skip,
+        comp_cls,
+        comp_r0,
+        comp_w,
+        float(s.compartment_energy_a),
+        float(s.compartment_energy_b),
     )
     n_it = int(s.arcs_solver_iters if iters is None else iters)
     res: Any = minimize(

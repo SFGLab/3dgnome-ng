@@ -24,11 +24,12 @@ from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import Arced, Seeded, State
 from gnome3d.polymer import PolymerLaw
+from gnome3d.tracks import bin_compartments
 from gnome3d.util import add_movable_noise_inplace, positioning_rng, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
-    from gnome3d.types import F32Array, I64Array
+    from gnome3d.types import F32Array, I8Array, I64Array
 
 
 def _run(problem: Problem) -> Result:
@@ -53,6 +54,12 @@ def _run(problem: Problem) -> Result:
     # minimum far faster, because the landscape is a funnel. Restarts, noise and best-of are
     # the same either way, so an ensemble still comes from the perturbed starts.
     solver = arcs_solver(s)
+    compartment = problem.get("compartment")
+    if compartment is not None and s.use_compartments and s.compartment_apply_to_arcs:
+        if solver != "lbfgs":
+            raise ValueError("the compartment term in the arcs stage needs solver = lbfgs")
+    else:
+        compartment = None
 
     if s.arcs_scope == "chromosome":
         # The chromosome's anchors were solved together at seed time; the block's are final.
@@ -70,7 +77,7 @@ def _run(problem: Problem) -> Result:
         if solver == "lbfgs":
             from gnome3d.mc.numba.arcs_solver import solve_arcs  # noqa: PLC0415
 
-            score, pos = solve_arcs(pos, exp_dist, s)
+            score, pos = solve_arcs(pos, exp_dist, s, compartment=compartment)
         else:
             score = mc_numba.mc_arcs_numba(pos, exp_dist, step, s)  # mutates pos in place
         if score < best_score or best_score < 0.0:
@@ -100,6 +107,16 @@ def walk_start(pos0: F32Array, anchor_genomic: object, law: PolymerLaw) -> F32Ar
         out[i] = out[i - 1] + v * law.background(int(mids[i] - mids[i - 1]))
     out += np.asarray(pos0, dtype=np.float64).mean(axis=0) - out.mean(axis=0)
     return np.ascontiguousarray(out, dtype=np.float32)
+
+
+def _anchor_classes(st: Seeded) -> I8Array | None:
+    """The compartment class per anchor from the block's track slice, or None."""
+    if not st.track_compartments:
+        return None
+    cls, _ = bin_compartments(
+        st.track_compartments, [g[0] for g in st.anchor_genomic], [g[1] for g in st.anchor_genomic]
+    )
+    return cls
 
 
 def run_arcs_problem(problem: Problem) -> Result:
@@ -240,6 +257,7 @@ class ArcsStage:
             "settings": st.settings,
             "seed": st.seed,
             "anchor_genomic": st.anchor_genomic,
+            "compartment": _anchor_classes(st),
         }
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
