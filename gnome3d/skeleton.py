@@ -189,7 +189,9 @@ def seed_for_ib(
     anchor_heat: F64Array | None = None
     subanchor_heat_raw: F32Array | None = None
     if (state.s.use_anchor_heatmap or state.s.use_subanchor_heatmap) and state.singletons:
-        anchor_heat, subanchor_heat_raw = cb.build_contact_heatmaps(state, active_region, chr_)
+        anchor_heat, subanchor_heat_raw = cb.build_contact_heatmaps(
+            state, active_region, chr_, with_subanchor=bool(state.s.use_subanchor_heatmap)
+        )
 
     exp_dist = cb.calc_anchor_expected_distances(state, active_region, chr_, anchor_heat)
 

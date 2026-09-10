@@ -651,10 +651,16 @@ def build_contact_heatmaps(
     state: CoarseState,
     active_region: list[int],
     chr_: str,
-) -> tuple[F64Array, F32Array]:
+    with_subanchor: bool = True,
+) -> tuple[F64Array, F32Array | None]:
     """
     Build anchor-level and subanchor-level singleton contact heatmaps.
     Mirrors Reference createSingletonSubanchorHeatmap().
+
+    With `with_subanchor` false the anchor heatmap is binned directly at anchor resolution
+    and the subanchor matrix is None. The anchor matrix is the same to the byte, since it is
+    the anchor bins of the subanchor matrix and the same contacts land in them in the same
+    order, and nothing N by N is allocated, which on a 43,000 bead block is 15 GB.
 
     Returns (anchor_heatmap, subanchor_heatmap_raw) where:
       anchor_heatmap:      (n_anchors, n_anchors) float64 - normalized contact
@@ -729,6 +735,35 @@ def build_contact_heatmaps(
     # [[project-singleton-chr-filter-divergence]] (intentional divergence).
     import bisect
 
+    anchor_off = np.asarray(anchor_offsets[:n_anchors], dtype=np.intp)
+    al = np.maximum(np.asarray(anchor_lens, dtype=np.float64), 1.0)  # (n_anchors,)
+
+    if not with_subanchor:
+        # The anchor bins alone. A contact whose either end falls in a subanchor bin is
+        # not an anchor pair and is dropped, as cutting the anchor bins out of the full
+        # matrix would drop it.
+        bin_anchor = np.full(N, -1, dtype=np.int64)
+        bin_anchor[anchor_off] = np.arange(n_anchors)
+        h_direct: F64Array = np.zeros((n_anchors, n_anchors), dtype=np.float64)
+        for c1, p1, c2, p2, sc in state.singletons:
+            if c1 != chr_ or c2 != chr_:
+                continue
+            if p1 < region_start or p1 > region_end or p2 < region_start or p2 > region_end:
+                continue
+            si = bisect.bisect_right(breaks, p1) - 1
+            ei = bisect.bisect_right(breaks, p2) - 1
+            if si < 0 or ei < 0 or si >= N or ei >= N or si == ei:
+                continue
+            ai = int(bin_anchor[si])
+            aj = int(bin_anchor[ei])
+            if ai < 0 or aj < 0:
+                continue
+            h_direct[ai, aj] += sc
+            h_direct[aj, ai] += sc
+        h_direct /= np.outer(al, al) / 1e6
+        np.fill_diagonal(h_direct, 0.0)
+        return h_direct, None
+
     h_sub: F64Array = np.zeros((N, N), dtype=np.float64)
     for c1, p1, c2, p2, sc in state.singletons:
         if c1 != chr_ or c2 != chr_:
@@ -745,8 +780,6 @@ def build_contact_heatmaps(
     # Anchor heatmap from raw subanchor values (BEFORE normalization), normalized
     # by anchor area in Mbp^2.  Mirrors Reference lines 1267-1273; vectorized over
     # the anchor bins (diagonal stays 0, off-diagonal symmetric).
-    anchor_off = np.asarray(anchor_offsets[:n_anchors], dtype=np.intp)
-    al = np.maximum(np.asarray(anchor_lens, dtype=np.float64), 1.0)  # (n_anchors,)
     h_anchor: F64Array = h_sub[np.ix_(anchor_off, anchor_off)] / (np.outer(al, al) / 1e6)
     np.fill_diagonal(h_anchor, 0.0)
 
