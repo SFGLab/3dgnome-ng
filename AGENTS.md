@@ -1047,6 +1047,12 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   fraction of the chromosome's beads; on those four structures 0.1 percent skips one of four and
   1 percent skips three, the one it keeps being the structure that moved 518 beads.
 
+  **`[relax] keep_compartments` (default no) keeps the compartment term on inside the pass.**
+  Measured 2026-09-10 on chr1:1-60 Mb it changes nothing at any weight, since the pass pins
+  every anchor and steps half a bond, so it cannot sort beads by class across blocks. The
+  relaxation is the pass that erases cross block compartmentalisation, by clearing the cross
+  block contacts that carry it. See `docs/epigenome-energy-terms.md`.
+
   **`[relax] local_window` (default -1, off) is the better fix.** The round count is proportional
   to how many beads may move, measured on a real 129,457 bead chromosome at 19 rounds for 159
   movable, 104 for 1,177 and 850 for 11,766, which extrapolates to the 6,201 a trio run took with
