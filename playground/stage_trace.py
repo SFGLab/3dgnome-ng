@@ -8,10 +8,10 @@ relaxation, and after each stage reports the compartment saddle over within bloc
 pairs, how far like and unlike block pairs sit from each other, how many beads touch another
 block, and how far beads of each compartment moved.
 
-    python playground/stage_trace.py CONFIG.ini MCOOL TRACK.bedGraph REGION [relax_radius] [keep]
+    python playground/stage_trace.py CONFIG.ini MCOOL TRACK.bedGraph REGION [relax_radius] [keep] [window]
 
 A fifth argument overrides the relaxation's excluded volume radius, and a sixth of `keep`
-keeps the compartment term on inside the pass.
+keeps the compartment term on inside the pass, and a seventh sets its local window, -1 for every bead.
 """
 
 from __future__ import annotations
@@ -100,7 +100,9 @@ def main() -> None:
         s.relax_ev_radius = float(sys.argv[5])
     if len(sys.argv) > 6 and sys.argv[6] == "keep":
         s.relax_keep_compartments = True
-    print(f"relax radius {s.relax_ev_radius or '1.5 bonds'}, keep compartments {getattr(s, 'relax_keep_compartments', False)}")
+    if len(sys.argv) > 7:
+        s.relax_local_window = int(sys.argv[7])
+    print(f"relax radius {s.relax_ev_radius or '1.5 bonds'}, keep compartments {s.relax_keep_compartments}, window {s.relax_local_window}")
     chrom = region.split(":")[0]
     chrs, reg = parse_chrs_arg(region)
     data = ContactData.from_files(s, chrs, reg)
