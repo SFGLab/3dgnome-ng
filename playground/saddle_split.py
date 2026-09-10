@@ -3,8 +3,8 @@
 Says where a structure's compartmentalisation lives. Blocks are recovered from the densified
 beads by the densification rule, bins take the block of most of their beads, and the saddle's
 three enrichments are averaged over pairs inside one block and over pairs across two blocks
-separately, on the same observed over expected map. The experiment is split by the same
-block labels.
+separately, each class normalised on its own distance decay so neither leaks into the other.
+The experiment is split by the same block labels.
 
     python playground/saddle_split.py <mcool> <region> <binsize> <compartment bedGraph> <dir> [<dir> ...]
 """
@@ -40,24 +40,41 @@ def bin_blocks(beads, bin_starts, binsize):
     return lab
 
 
+def _oe_masked(c, keep):
+    """Observed over expected where the expectation on each diagonal is the mean over the
+    kept pairs of that diagonal alone, so the within block and the cross block classes are
+    each normalised on their own decay and neither leaks into the other."""
+    n = c.shape[0]
+    oe = np.zeros_like(c, dtype=np.float64)
+    for d in range(1, n):
+        idx = np.arange(n - d)
+        diag = c[idx, idx + d]
+        m = keep[idx, idx + d] & (diag > 0)
+        if not m.any():
+            continue
+        v = np.where(keep[idx, idx + d], diag / float(diag[m].mean()), 0.0)
+        oe[idx, idx + d] = v
+        oe[idx + d, idx] = v
+    return oe
+
+
 def split_saddle(c, track, lab, n_quantiles=5):
-    oe = contacts.observed_over_expected(c, min_sep_bins=1)
     usable = (track != 0.0) & np.isfinite(track) & (c.sum(axis=1) > 0) & (lab >= 0)
     idx = np.flatnonzero(usable)
     order = idx[np.argsort(track[idx])]
     m = len(order) // n_quantiles
     lo, hi = order[:m], order[-m:]
     same = lab[:, None] == lab[None, :]
-
-    def mean_block(a, b, within):
-        blk = oe[np.ix_(a, b)]
-        mask = same[np.ix_(a, b)] if within else ~same[np.ix_(a, b)]
-        vals = blk[(blk > 0.0) & mask]
-        return float(vals.mean()) if vals.size else float("nan")
-
     out = {}
-    for name, within in (("within", True), ("cross", False)):
-        aa, bb, ab = mean_block(hi, hi, within), mean_block(lo, lo, within), mean_block(hi, lo, within)
+    for name, keep in (("within", same), ("cross", ~same)):
+        oe = _oe_masked(c, keep)
+
+        def mean_block(a, b):
+            blk = oe[np.ix_(a, b)]
+            vals = blk[blk > 0.0]
+            return float(vals.mean()) if vals.size else float("nan")
+
+        aa, bb, ab = mean_block(hi, hi), mean_block(lo, lo), mean_block(hi, lo)
         out[name] = ((aa + bb) / (2 * ab) if ab > 0 else float("nan"), aa, bb, ab)
     return out
 
