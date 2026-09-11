@@ -45,8 +45,16 @@ def _build_smooth_kernel(
     use_orn: bool,
     max_nbrs: int,
     use_aff: bool = False,
+    use_wall: bool = False,
+    use_cap: bool = False,
 ) -> Any:
     """Build (or look up cached) compiled smooth-MC kernel.
+
+    `use_wall` and `use_cap` are the smooth stage's hard rules, static like `use_aff` because
+    each costs a pass per step. The wall rejects a move that adds a non neighbour pair under
+    the excluded volume radius or deepens one that is there. The cap rejects a move that takes
+    a capped bead further than `cap_r` from `cap_home`. Neither draws a random number, so with
+    both off the kernel is the one it was.
 
     Returns (kernel, init_smooth, init_excl, init_heat, init_orn) - the four
     init functions compute initial scores on-device, vmapped across K chains.
@@ -66,7 +74,16 @@ def _build_smooth_kernel(
     incur per-shape compile cost (cached persistently via
     jax.experimental.compilation_cache).
     """
-    cache_key = (n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs, use_aff)
+    cache_key = (
+        n_steps_per_batch,
+        excl_skip,
+        use_heat,
+        use_orn,
+        max_nbrs,
+        use_aff,
+        use_wall,
+        use_cap,
+    )
     if cache_key in _kernel_cache:
         return _kernel_cache[cache_key]
 
@@ -155,6 +172,18 @@ def _build_smooth_kernel(
         # n_active == n, so this is a no-op.
         in_range = jnp.logical_and(jnp.abs(idx - p) > excl_skip, idx < n_active)
         return jnp.sum(jnp.where(in_range, contrib, 0.0))
+
+    def _wall_at(pos: Any, p_pos: Any, p: Any, r0: Any, n_active: Any) -> tuple[Any, Any]:
+        """How many non neighbour beads sit under `r0` from `p_pos`, and by how much."""
+        n = pos.shape[0]
+        diff = pos - p_pos
+        d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+        idx = jnp.arange(n)
+        in_range = jnp.logical_and(jnp.abs(idx - p) > excl_skip, idx < n_active)
+        under = jnp.logical_and(in_range, d < r0)
+        cnt = jnp.sum(under.astype(jnp.int32))
+        depth = jnp.sum(jnp.where(under, r0 - d, 0.0))
+        return cnt, depth
 
     # ---- confinement helper ----
     #
@@ -330,6 +359,8 @@ def _build_smooth_kernel(
         # real bead count + real movable count (< padded lengths when bucketed)
         n_active: Any,
         n_movable_active: Any,
+        cap_home: Any,
+        cap_r: Any,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         """One batch of `n_steps_per_batch` MC steps for ONE chain.  Returns
         (pos_f, ss_f, se_f, sh_f, so_f, sc_f, anchor_orn_f, T_f, n_ok)."""
@@ -460,6 +491,19 @@ def _build_smooth_kernel(
             exponent = jnp.clip(exponent, -80.0, 80.0)
             p_acc = js * jnp.exp(exponent)
             ok = jnp.logical_or(ok_unc, jnp.logical_and(can_jump, u < p_acc))
+            # The hard rules, decided on the same draw so the stream is untouched.
+            if use_cap:
+                hd = new_p - cap_home[p]
+                cap_reject = jnp.logical_and(cap_r[p] > 0.0, jnp.sum(hd * hd) > cap_r[p] * cap_r[p])
+                ok = jnp.logical_and(ok, jnp.logical_not(cap_reject))
+            if use_wall:
+                cnt0, dep0 = _wall_at(pos, old_p, p, r0, n_active)
+                cnt1, dep1 = _wall_at(pos, new_p, p, r0, n_active)
+                worse = jnp.logical_or(
+                    cnt1 > cnt0,
+                    jnp.logical_and(jnp.logical_and(cnt1 == cnt0, cnt1 > 0), dep1 > dep0),
+                )
+                ok = jnp.logical_and(ok, jnp.logical_not(worse))
 
             final_p = jnp.where(ok, new_p, old_p)
             pos_next = pos.at[p].set(final_p)
@@ -538,6 +582,8 @@ def _build_smooth_kernel(
         0,  # key
         None,  # n_active (shared)
         None,  # n_movable_active (shared)
+        None,  # cap_home (shared across restarts)
+        None,  # cap_r (shared)
     )
     out_axes = (0, 0, 0, 0, 0, 0, 0, None, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
@@ -588,6 +634,8 @@ def _build_smooth_kernel(
         keys: Any,
         n_active: Any,
         n_movable_active: Any,
+        cap_home: Any,
+        cap_r: Any,
     ) -> Any:
         return batched(
             pos_k,
@@ -634,6 +682,8 @@ def _build_smooth_kernel(
             keys,
             n_active,
             n_movable_active,
+            cap_home,
+            cap_r,
         )
 
     # ---- full convergence loop, on device ----
@@ -699,6 +749,8 @@ def _build_smooth_kernel(
         score_eps: Any,
         n_active: Any,
         n_movable_active: Any,
+        cap_home: Any,
+        cap_r: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -756,6 +808,8 @@ def _build_smooth_kernel(
                 keys,
                 n_active,
                 n_movable_active,
+                cap_home,
+                cap_r,
             )
             score_per_chain = ss + se + sh + so + sc
             best_idx = jnp.argmin(score_per_chain)
@@ -1059,6 +1113,8 @@ def _build_smooth_kernel(
         0,  # keys (per-chain)
         0,  # n_active (per-IB)
         0,  # n_movable_active (per-IB)
+        0,  # cap_home (per-IB)
+        0,  # cap_r (per-IB)
     )
     batched_mp = jax.vmap(chain_batch, in_axes=in_axes_mp, out_axes=out_axes)
 
@@ -1112,6 +1168,8 @@ def _build_smooth_kernel(
         score_eps: Any,
         n_active: Any,
         n_movable_active: Any,
+        cap_home: Any,
+        cap_r: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -1181,6 +1239,8 @@ def _build_smooth_kernel(
                 keys,
                 n_active,
                 n_movable_active,
+                cap_home,
+                cap_r,
             )
             # A converged chain keeps its previous state while the rest of the launch runs on,
             # so it ends where it would have ended alone.  The loop still evaluates it, which
@@ -1291,7 +1351,14 @@ def mc_smooth_jax(
     if n <= 2:
         return 0.0
 
-    movable_np: I64Array = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    use_wall: bool = bool(getattr(settings, "smooth_hard_wall", False))
+    cap_frac: float = float(getattr(settings, "smooth_anchor_cap", 0.0))
+    use_cap: bool = cap_frac > 0.0
+    movable_np: I64Array = (
+        np.arange(n, dtype=np.int64)
+        if use_cap
+        else np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    )
     if len(movable_np) == 0:
         return 0.0
 
@@ -1462,7 +1529,7 @@ def mc_smooth_jax(
         )
 
     bundle = _build_smooth_kernel(
-        n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs, use_aff
+        n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs, use_aff, use_wall, use_cap
     )
     (
         _kernel_one_batch,
@@ -1480,6 +1547,12 @@ def mc_smooth_jax(
     pos_k = jnp.asarray(pos_k_np)
     dtn_j = jnp.asarray(dtn_np)
     movable_j = jnp.asarray(movable_np)
+    # The cap's home is where the anchors stand now, which is where the arcs put them.
+    cap_r_np = np.zeros(pos_k_np.shape[1], dtype=np.float32)
+    if use_cap:
+        cap_r_np[:n] = np.where(fixed, cap_frac * float(dtn_np[:n].mean()), 0.0)
+    cap_home_j = jnp.asarray(pos_k_np[0])
+    cap_r_j = jnp.asarray(cap_r_np)
     heat_j = jnp.asarray(heat_np)
     anchor_ar_j = jnp.asarray(anchor_ar_np)
     bead_to_anchor_k_j = jnp.asarray(bead_to_anchor_k_np)
@@ -1654,6 +1727,8 @@ def mc_smooth_jax(
         score_eps,
         n_active_j,
         n_movable_active_j,
+        cap_home_j,
+        cap_r_j,
     )
 
     score_per_chain = np.asarray(ss_k + se_k + sh_k + so_k + sc_k)
@@ -1797,7 +1872,12 @@ def _prep_smooth_problem_np(
         is_L = np.zeros(n, dtype=np.bool_)
 
     # --- bead-indexed arrays, padded to B ---
-    movable = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    cap_frac = float(getattr(settings, "smooth_anchor_cap", 0.0))
+    movable = (
+        np.arange(n, dtype=np.int64)
+        if cap_frac > 0.0
+        else np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    )
     n_movable = int(movable.shape[0])
     pos_pad = pos.astype(np.float32)
     dtn_pad = dtn.astype(np.float32)
@@ -1842,6 +1922,8 @@ def _prep_smooth_problem_np(
         "n_active": n,
         "n_movable": n_movable,
         "excl_r0": excl_r0,
+        "cap_home": pos_pad.copy(),  # (B, 3)
+        "cap_r": _cap_radii(fixed, dtn, cap_frac, B),  # (B,)
         # Pad entries are class 0, which contributes nothing.
         "comp_cls": _pad_track(compartment, B, np.int8),
         "conf_cx": conf_cx,
@@ -1850,6 +1932,18 @@ def _prep_smooth_problem_np(
         "conf_R": conf_R,
         "conf_w": conf_w,
     }
+
+
+def _cap_radii(
+    fixed: np.ndarray[Any, Any], dtn: np.ndarray[Any, Any], cap_frac: float, B: int
+) -> np.ndarray[Any, Any]:
+    """Per bead cap radius padded to B: `cap_frac` mean bonds for an anchor, zero otherwise."""
+    out = np.zeros(B, dtype=np.float32)
+    if cap_frac > 0.0:
+        n = int(fixed.shape[0])
+        scale = float(np.asarray(dtn).mean()) if np.asarray(dtn).size else 1.0
+        out[:n] = np.where(fixed, cap_frac * scale, 0.0)
+    return out
 
 
 def _smooth_tensor_bytes(B: int, A: int, M: int, use_heat: bool, use_orn: bool) -> int:
@@ -1868,6 +1962,8 @@ def _smooth_tensor_bytes(B: int, A: int, M: int, use_heat: bool, use_orn: bool) 
         + A_ * 3 * f4  # anchor_orn_k
         + B * f4  # dtn_k
         + B * i4  # movable_k
+        + B * 3 * f4  # cap_home
+        + B * f4  # cap_r
         + (B * B * f4 if use_heat else f4)  # heat_k
         + A_ * i4  # anchor_ar_k
         + B * i4  # bead_to_anchor_k
@@ -2038,6 +2134,8 @@ def _mc_smooth_jax_batch_chunk(
     # Uniform across the batch: SmoothStage.batch_key includes the track flag, so
     # every problem in a group agrees with problems[0].
     use_aff = problems[0].get("compartment") is not None and bool(settings.use_compartments)
+    use_wall = bool(getattr(settings, "smooth_hard_wall", False))
+    use_cap = float(getattr(settings, "smooth_anchor_cap", 0.0)) > 0.0
 
     Bs, As, Ms = [], [], []
     for p in problems:
@@ -2092,6 +2190,8 @@ def _mc_smooth_jax_batch_chunk(
     comp_cls_k = stack("comp_cls")  # (K, B)
     dtn_k = stack("dtn")
     movable_k = stack("movable")
+    cap_home_k = stack("cap_home")
+    cap_r_k = stack("cap_r")
     heat_k = jnp.asarray(heat_all)  # already (K, B, B); prep wrote into it
     anchor_ar_k = stack("anchor_ar")
     b2a_k = stack("bead_to_anchor_k")
@@ -2139,7 +2239,9 @@ def _mc_smooth_jax_batch_chunk(
     motif_weight_v = float(settings.motif_weight) if use_orn else 0.0
     excl_w_v = float(settings.exclusion_weight) if use_excl else 0.0
 
-    bundle = _build_smooth_kernel(n_steps_per_batch, excl_skip, use_heat, use_orn, M, use_aff)
+    bundle = _build_smooth_kernel(
+        n_steps_per_batch, excl_skip, use_heat, use_orn, M, use_aff, use_wall, use_cap
+    )
     (
         _kb,
         _kf,
@@ -2278,6 +2380,8 @@ def _mc_smooth_jax_batch_chunk(
         jnp.float32(1e-6),
         n_active_k,
         n_movable_k,
+        cap_home_k,
+        cap_r_k,
     )
     pos_f, ss_f, se_f, sh_f, so_f, sc_f, _ao_f, _final_score, iter_count, converged = out
     score_per_chain = np.asarray(ss_f + se_f + sh_f + so_f + sc_f)  # forces device sync

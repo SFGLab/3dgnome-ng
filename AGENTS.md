@@ -1057,9 +1057,14 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   the kernel's stream and the parity gate are untouched. One block, from the stage's own
   start: soft term alone 766 per thousand; wall 92; compact coil 487; compact coil with the
   wall 43 at the same Rg and bonds as production; a first clear coil with the wall reaches 0
-  but swells the block by a third, which is why the compact rule is the one built. The
-  relaxation pass and the JAX smooth kernel do not carry them. Unit checks in
-  `harness/test_smooth_levers.py`; three cell arms in `slurm/ensemble/overlap_levers.sh`.
+  but swells the block by a third, which is why the compact rule is the one built. Both
+  kernels carry the wall and the cap, as static flags on the JAX side since each is a pass per
+  step; the relaxation pass does not. Three cells on the numba kernel, 2026-09-11: coil with
+  the wall against the plain start raises Pearson 0.011 to 0.022 and MultiMM's own metric
+  0.033 to 0.043, cuts overlaps five to seven times within blocks and three to four across at
+  the same Rg, and flattens the short band exponent from 0.33 to 0.21; the cap adds a few
+  percent fewer overlaps and nothing else. Unit checks in `harness/test_smooth_levers.py`;
+  three cell arms in `slurm/ensemble/overlap_levers.sh`.
 
   Why not in the reference: the reference has no excluded volume at all.
 

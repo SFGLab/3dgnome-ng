@@ -170,13 +170,12 @@ CANONICAL: dict[str, dict[str, object]] = {
         # overlaps further but cost more Rg. Earlier weights of 1.0 to 2.0 over-expanded. The old
         # explosion was a config divergence bug, not EV. See [[project_config_unification]].
         "weight": 0.1,
-        # A bead excludes one bond. The term is a quadratic that vanishes at its own radius, so
-        # at 0.7 it had no force on the shallow overlaps that make up 86 percent of the count,
-        # and the smooth stage ended with 1,200 pairs per thousand beads under 0.7 of a bond,
-        # twice an ideal chain with no excluded volume. On one block at weight 0.1 a radius of
-        # one bond leaves 4 per thousand with the bonds unchanged and the block 6 percent larger.
-        # Set 2026-09-11, under the three cell gate.
-        "auto_factor_smooth": 1.0,
+        # 0.7 of a bond. A radius of one bond was gated on 2026-09-11 and reverted the same
+        # day: it clears the within block overlaps but pushes every pair under a bond outward,
+        # contacts included, and costs Pearson 0.015, SCC 0.02 to 0.03 and the distance
+        # exponent 0.045 on all three cells. The overlaps are addressed by the coil start and
+        # the hard wall instead, which act on the pairs inside the radius only.
+        "auto_factor_smooth": 0.7,
         "apply_to_heatmap": "yes",
         "apply_to_arcs": "yes",
         "apply_to_smooth": "yes",

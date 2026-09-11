@@ -156,6 +156,68 @@ def test_coil_start() -> None:
     check("and not the line", np.linalg.norm(out - pos) > 1.0)
 
 
+def _jax_available() -> bool:
+    try:
+        from gnome3d.mc.jax.util import jax_is_available
+
+        return bool(jax_is_available())
+    except Exception:
+        return False
+
+
+def test_jax_wall_and_cap() -> None:
+    """The JAX kernel carries the same two rules, on the single and the batched path."""
+    if not _jax_available():
+        print("  skip  JAX not available")
+        return
+    from gnome3d.mc import jax as mc_jax
+
+    s = settings(smooth_hard_wall=True)
+    s.mc_smooth_chains = 1
+    pos, fixed, dtn = chain()
+    before = under(pos, 0.7)
+    mc_jax.mc_smooth_jax(pos, dtn, fixed, 0.5, s)
+    after = under(pos, 0.7)
+    pos2, fixed2, dtn2 = chain()
+    mc_jax.mc_smooth_jax(pos2, dtn2, fixed2, 0.5, settings())
+    soft = under(pos2, 0.7)
+    check("JAX: the wall never lets the count rise", after <= before, f"{before} -> {after}")
+    check("JAX: and ends lower than the soft term alone", after < soft, f"wall {after}, soft {soft}")
+    pos, fixed, dtn = chain()
+    home = pos[fixed].copy()
+    mc_jax.mc_smooth_jax(pos, dtn, fixed, 0.5, settings(smooth_anchor_cap=0.5))
+    drift = np.linalg.norm(pos[fixed] - home, axis=1)
+    check("JAX: anchors move under the cap but never past it", 0.0 < drift.max() <= 0.5 + 1e-5, f"max drift {drift.max():.3f}")
+    # the batched path, two problems in one launch
+    problems = []
+    starts = []
+    for seed in (1, 2):
+        p_, f_, d_ = chain(seed=seed)
+        starts.append(under(p_, 0.7))
+        problems.append(
+            {
+                "pos": p_,
+                "dtn": d_,
+                "fixed": f_,
+                "step_size": 0.5,
+                "settings": s,
+                "seed": seed,
+                "char_orientations": None,
+                "anchor_neighbors": None,
+                "anchor_neighbor_weights": None,
+                "heat_dist": None,
+                "compartment": None,
+            }
+        )
+    out = mc_jax.mc_smooth_jax_batch(problems, s)
+    ends = [under(np.asarray(o[1]), 0.7) for o in out]
+    check(
+        "JAX batch: the wall never lets the count rise in either chain",
+        all(e <= b for e, b in zip(ends, starts, strict=True)),
+        f"{starts} -> {ends}",
+    )
+
+
 def main() -> int:
     print("smooth lever checks\n")
     test_off_by_default()
@@ -163,6 +225,7 @@ def main() -> int:
     test_wall_holds_once_clear()
     test_anchor_cap()
     test_coil_start()
+    test_jax_wall_and_cap()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")
