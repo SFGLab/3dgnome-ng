@@ -4,7 +4,12 @@ Reconstructions come out as compact balls of anchors scattered in space and join
 strands. This records what causes that, what has been measured, what has been ruled out, and
 which changes are worth making.
 
-Status. Diagnosis complete. B, the boundary stitch, converges and removes the strands between
+Status, 2026-09-11. The arcs stage now solves every anchor of a chromosome together from a
+Hilbert curve start, so the between block placement this note is about is no longer left to
+the stitch: see `ab-compartments.md` for the measurements and AGENTS.md for the entry. What
+follows is the history that led there.
+
+Status, 2026-09-06. Diagnosis complete. B, the boundary stitch, converges and removes the strands between
 blocks. E, the cross block relaxation, removes the interpenetration. H, one distance law in
 bead units with its exponent measured from the input, is the law as of 2026-09-06: it replaced
 the three reference laws and their fifteen constants after beating them on three cell lines,

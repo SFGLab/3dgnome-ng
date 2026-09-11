@@ -35,6 +35,11 @@ Rules for the code as it stands:
   is the regression tool for refactors, not a contract with the reference.
 - Inside a feature's own code, document any non-obvious behavior; project memory (`[[…]]`
   links) carries the longer-form rationale.
+- **Where things stand is `SETTINGS.md`'s production column and `validation/core/config.py`.**
+  The design notes under `design/` record why: `anchor-placement.md` for the distance law and
+  the end passes, `ab-compartments.md` for the compartment work, the chromosome scope and the
+  Hilbert start. Accessibility and nucleus terms were removed on 2026-09-11 after measuring
+  null or harmful; do not reintroduce them without a new idea.
 
 ---
 
