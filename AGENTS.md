@@ -1130,7 +1130,15 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   far pairs. Block scope, centroid start and weight zero are byte exact by the parity gate.
   Unit checks in `harness/test_arcs_scope.py` and `harness/test_arcs_start.py`.
 
-  Production since 2026-09-10 at chromosome scope, walk start and `weight_arcs` 10. Three cell
+  Production since 2026-09-11 at chromosome scope with the Hilbert start and no arcs sphere.
+  The joint solve holds no arc across blocks and the contact background 80 of 3.5 million
+  cross block pairs on chr1:1-60 Mb, so the start is the long range arrangement, and a
+  Hilbert curve scaled to the law's bond gives it the cube root size growth the maps show
+  beyond a megabase with no weight. Like for like on three cells against the walk with the
+  sphere at 10: Pearson 0.291, 0.318 and 0.304 to 0.295, 0.328 and 0.310, SCC level, MultiMM
+  0.674, 0.667 and 0.673 to 0.631, 0.663 and 0.661, cross block overlaps 176, 173 and 143 to
+  163, 126 and 100, Rg 28, 27 and 30 to 24, 25 and 26. The walk with the sphere was
+  production for one day, 2026-09-10, on the gate that follows. Three cell
   gate on chr1:1-60 Mb against the deep maps: Pearson 0.271, 0.282 and 0.301 to 0.291, 0.318
   and 0.304, MultiMM 0.607, 0.568 and 0.652 to 0.674, 0.667 and 0.673, SCC level within 0.01,
   cross block overlaps 320, 416 and 170 to 176, 173 and 143 per thousand. With the compartment

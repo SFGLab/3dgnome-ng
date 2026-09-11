@@ -135,7 +135,14 @@ CANONICAL: dict[str, dict[str, object]] = {
         # overlaps 320/416/170 to 176/173/143 per thousand. The sphere for the chromosome's
         # span needs weight_arcs below.
         "scope": "chromosome",
-        "start": "walk",
+        # The start is the long range arrangement: across blocks the joint solve holds no arc
+        # and the contact background a few dozen pairs in millions. A Hilbert curve keeps
+        # genomic neighbours spatial neighbours at every scale and grows as the cube root of
+        # the count, so no sphere is needed to set the size. Like for like on three cells
+        # against the walk with the sphere: Pearson up on all, SCC level, MultiMM level on
+        # H1ESC and 0.01 to 0.04 down on the others, cross block overlaps 176/173/143 to
+        # 163/126/100 per thousand, Rg 28/27/30 to 24/25/26.
+        "start": "hilbert",
         "max_temp": 5.0,
         "jump_temp_scale": 50.0,
         "jump_temp_coef": 20.0,
@@ -183,9 +190,9 @@ CANONICAL: dict[str, dict[str, object]] = {
         "use_confinement": "yes",
         "weight": 0.1,
         "apply_to_arcs": "yes",
-        # The chromosome sized solve needs a stronger sphere than a block's chain; at the
-        # shared 0.1 a walk started chromosome stays at Rg 44 against 22 from the data.
-        "weight_arcs": 10.0,
+        # Off with the Hilbert start, whose size follows from the curve; the walk start needed
+        # 10 here, since at the shared 0.1 a walked chromosome stayed at Rg 44 against 22.
+        "weight_arcs": 0,
         # The arcs sphere from the law, no constant. Null on its own, since the old formula
         # landed near it, and the principled form.
         "packing_factor_arcs": 0,
