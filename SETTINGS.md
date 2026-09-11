@@ -207,7 +207,7 @@ one as the stage's auto factor times the stage's mean bond scale.
 | `radius_heatmap` | float | 0.0 | 0.0 | Heatmap stage radius. |
 | `radius_ib` | float | 0.0 | 0.0 | Block placement radius. Also the constant centroid radius of the boundary stitch when positive. |
 | `auto_factor_arcs` | float | 0.5 | 0.5 | Times the mean positive arc target. |
-| `auto_factor_smooth` | float | 0.5 | 0.7 | Times the mean chain bond target of the block. |
+| `auto_factor_smooth` | float | 0.5 | 1.0 | Times the mean chain bond target of the block. Production is one bond, since the quadratic has no force near its radius and the overlaps it must clear sit just inside it. |
 | `auto_factor_heatmap` | float | 0.5 | 0.5 | Times the mean active heatmap target. |
 | `auto_factor_ib` | float | 0.5 | 0.5 | Times the mean block chain bond. |
 | `arcs_repulsion_cutoff_factor` | float | 0.0 | 1.5 | Truncate the arcless pair repulsion `1 / d` beyond this times the mean arc target. 0 leaves it unbounded, which is the reference's behaviour and lets a sparse block explode. At 3 every pair beyond 100 kb ran away; 1.5 with the contact background sits on the law to 2 Mb, and 1.0 compacts past it. |
