@@ -81,19 +81,14 @@ def mc_arcs_numba(
             conf_R = pf * avg_bond * (n ** (1.0 / 3.0))
 
     movable: I64Array = np.arange(n, dtype=np.int64)
-    score_struct = float(init_arcs_nb(pw, exp64, stretch_k, squeeze_k, rep_inv_cutoff))
-    score_excl = (
-        float(
-            init_excl_nb(
-                pw,
-                excl_r0,
-                float(settings.exclusion_weight),
-                int(settings.exclusion_skip_neighbors),
-            )
-        )
-        if use_excl
-        else 0.0
-    )
+    bg_weight = float(settings.background_weight)
+    score_struct = float(init_arcs_nb(pw, exp64, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight))
+    excl_w = float(settings.exclusion_weight)
+    excl_skip = int(settings.exclusion_skip_neighbors)
+    if use_excl:
+        score_excl = float(init_excl_nb(pw, excl_r0, excl_w, excl_skip))
+    else:
+        score_excl = 0.0
     score_conf = (
         float(
             init_confine_nb(
@@ -118,6 +113,7 @@ def mc_arcs_numba(
         ang_w=1.0,
         struct_delta_factor=1.0,
         rep_inv_cutoff=rep_inv_cutoff,
+        bg_weight=bg_weight,
         use_heat=False,
         heat_dist=dummy_f64(),
         heat_weight=0.0,
@@ -133,8 +129,8 @@ def mc_arcs_numba(
         motifs_symmetric=True,
         use_excl=use_excl,
         excl_r0=excl_r0,
-        excl_weight=float(settings.exclusion_weight),
-        excl_skip=int(settings.exclusion_skip_neighbors),
+        excl_weight=excl_w,
+        excl_skip=excl_skip,
         use_conf=use_conf,
         conf_cx=conf_cx,
         conf_cy=conf_cy,
@@ -151,7 +147,7 @@ def mc_arcs_numba(
         stop_successes=int(settings.mc_stop_successes),
         strict_better=False,
         score_eps=1e-5,
-        stop_when_ratio_above=0.9999,
+        stop_when_ratio_above=float(settings.mc_stop_ratio_arcs),
         score_struct=score_struct,
         score_heat=0.0,
         score_orn=0.0,

@@ -1,7 +1,7 @@
-"""Ablate the epigenome energy terms against real Hi-C.
+"""Ablate the compartment energy term against real Hi-C.
 
-Reconstructs one region several times, each with a different subset of the
-compartment and accessibility terms enabled, and reports for each:
+Reconstructs one region with the compartment term off and on, and reports for
+each:
 
   * compartment eigenvector correlation with that cell line's own Hi-C, plus
     Cohen's kappa on the per-bin compartment calls.  This is MultiMM's second
@@ -9,15 +9,13 @@ compartment and accessibility terms enabled, and reports for each:
   * radius of gyration, bond-length spread and overlap fraction, the polymer
     sanity numbers that must not regress while the compartment score improves.
 
-The terms are purely attractive, so a run that improves compartment agreement by
+The term is purely attractive, so a run that improves compartment agreement by
 collapsing the structure has not improved anything.  Reporting both together is
 the point of this study.
 
-Needs tracks built first:
+Needs the track built first:
 
     python -m validation fetch  --manifest validation/manifests/<CELL>_hic.json --out data/_hic
-    python -m validation fetch  --manifest validation/manifests/<CELL>_accessibility.json \\
-                                --out data/_epigenome
     python -m validation tracks --cell <CELL>
     python -m validation epigenome --cell <CELL> --region chr1:20000000-40000000
 
@@ -41,7 +39,7 @@ from validation.studies import Context, Study, register
 #
 # CANONICAL already enables excluded volume and confinement, so the baseline is
 # not a bare polymer and there is no point in an EV-only arm. That matters here:
-# the affinity terms are attractive and need that repulsion to push back against.
+# the compartment term is attractive and needs that repulsion to push back against.
 # Stride between independent ensembles, matching reconstruct.MEMBER_SEED_STRIDE's
 # intent: far enough apart that two repeats share no member seeds.
 _SEED_STRIDE = 50_000_003
@@ -49,13 +47,6 @@ _SEED_STRIDE = 50_000_003
 ARMS: dict[str, dict[str, object]] = {
     "off": {},
     "compartments": {"use_compartments": True},
-    "bridging": {"use_bridging": True},
-    "fibre": {"use_fibre_compaction": True},
-    "all": {
-        "use_compartments": True,
-        "use_bridging": True,
-        "use_fibre_compaction": True,
-    },
 }
 
 
@@ -89,47 +80,12 @@ def _track_on_bins(comp_path: str, chrom: str, bin_starts: I64Array) -> F64Array
     return out
 
 
-def _signal_on_bins(path: str, chrom: str, bin_starts: I64Array, binsize: int) -> F64Array:
-    """A signal bedGraph averaged onto the Hi-C bin grid.
-
-    Averaging rather than sampling, because the accessibility track is finer than
-    the contact grid (5 kb against 10 kb or more) and taking one sub-interval per
-    bin would discard half the signal and add noise the metric would read as
-    structure. Bins with no covering interval stay at zero.
-    """
-    sums: dict[int, float] = {}
-    counts: dict[int, int] = {}
-    lo, hi = int(bin_starts[0]), int(bin_starts[-1]) + binsize
-    with open(path) as f:
-        for line in f:
-            parts = line.split()
-            if len(parts) < 4 or parts[0] != chrom:
-                continue
-            try:
-                s0, v = int(parts[1]), float(parts[3])
-            except ValueError:
-                continue
-            if s0 < lo or s0 >= hi:
-                continue
-            b = (s0 - lo) // binsize
-            sums[b] = sums.get(b, 0.0) + v
-            counts[b] = counts.get(b, 0) + 1
-    out = np.zeros(len(bin_starts), dtype=np.float64)
-    for b, tot in sums.items():
-        if 0 <= b < len(out):
-            out[b] = tot / counts[b]
-    return out
-
-
-def _track_paths(cell: str, data_root: str) -> tuple[str, str]:
-    """Absolute paths.  `Settings.data_path` joins a relative name onto `data_dir`,
-    which for these tracks is already `<data_root>/<cell>`, so a repo-relative path
+def _track_path(cell: str, data_root: str) -> str:
+    """Absolute path.  `Settings.data_path` joins a relative name onto `data_dir`,
+    which for this track is already `<data_root>/<cell>`, so a repo-relative path
     would resolve to `data/<cell>/data/<cell>/...` and silently load nothing."""
     d = (Path(data_root) / cell).resolve()
-    return (
-        str(d / f"{cell}_compartments.bedGraph"),
-        str(d / f"{cell}_atac.bedGraph"),
-    )
+    return str(d / f"{cell}_compartments.bedGraph")
 
 
 def _ib_ids(settings: object, chrs: list[str], region: object, bin_starts: I64Array) -> I64Array:
@@ -164,7 +120,6 @@ def _run_arm(
     sort_track: F64Array,
     seed_offset: int = 0,
     block_id: I64Array | None = None,
-    acc_track: F64Array | None = None,
     contact_radius: float | None = None,
 ) -> dict[str, float]:
     """Reconstruct one arm and score it. Returns the metric row.
@@ -179,8 +134,6 @@ def _run_arm(
     data = ContactData.from_files(s, chrs, region)
     if flags.get("use_compartments") and not data.compartments:
         raise RuntimeError(f"no compartment intervals loaded from {flags.get('data_compartments')}")
-    if flags.get("use_bridging") and not data.accessibility:
-        raise RuntimeError(f"no accessibility bins loaded from {flags.get('data_accessibility')}")
 
     ens = ens_mod.run_ensemble(s, data, chrs, region, ctx.n, seed_offset=seed_offset)
     cl, ml = ens_mod.to_arrays_list(ens)
@@ -188,10 +141,9 @@ def _run_arm(
     # The contact radius must be the SAME for every arm. Deriving it per arm from
     # that arm's own median bond length means a term which shortens bonds also
     # shrinks the radius, so its contact map is built at a different effective
-    # resolution and every contact metric shifts for that reason alone. Fibre
-    # compaction shortens bonds by about a fifth, which is enough to move accE and
-    # overlap on its own. The caller passes the baseline's radius; `None` keeps the
-    # self-derived value for standalone use.
+    # resolution and every contact metric shifts for that reason alone. The caller
+    # passes the baseline's radius; `None` keeps the self-derived value for
+    # standalone use.
     own_radius = float(np.median(smetrics.bond_lengths(cl[0])))
     radius = own_radius if contact_radius is None else float(contact_radius)
     c_sim = np.zeros_like(c_obs)
@@ -214,16 +166,8 @@ def _run_arm(
         if block_id is not None
         else float("nan")
     )
-    # Saddle sorted by accessibility rather than compartment. Bridging clusters
-    # accessible beads, and nothing else measured that directly.
-    acc_sad = (
-        contacts.compartment_saddle(c_sim, contacts.signed_track(acc_track))["strength"]
-        if acc_track is not None
-        else float("nan")
-    )
     return {
         "ib_ratio": ib_ratio,
-        "acc_saddle": acc_sad,
         "saddle": sad["strength"],
         "eig": cc["eig_pearson_abs"],
         "kappa": cc["agreement_kappa"],
@@ -237,37 +181,18 @@ def _run_arm(
     }
 
 
-def _arm_flags(
-    name: str, args: argparse.Namespace, comp_path: str, acc_path: str
-) -> dict[str, object]:
+def _arm_flags(name: str, args: argparse.Namespace, comp_path: str) -> dict[str, object]:
     flags = dict(ARMS[name])
     if flags.get("use_compartments"):
         flags["compartment_weight"] = args.compartment_weight
-    if flags.get("use_bridging"):
-        flags["bridging_weight"] = args.bridging_weight
-    if flags.get("use_fibre_compaction"):
-        flags["fibre_compaction"] = args.fibre
-    # The tracks are always pointed at; only the flags decide whether a term reads them.
+    # The track is always pointed at; only the flag decides whether the term reads it.
     flags["data_compartments"] = comp_path
-    flags["data_accessibility"] = acc_path
-    # Applied to every arm including off, so the baseline reads the same track the
-    # treated arms do and a difference is the term rather than the normalisation.
-    # `getattr` because this helper is shared with studies that do not offer these
-    # options; the fallbacks are the `Settings` defaults, and a study with no
-    # accessibility term reads the track but never scores against it.
-    # Applied to every arm, so the baseline is built from the same blocks the
-    # treated arms are and a difference is the term rather than the partition.
-    if getattr(args, "ib_split_source", "arcs") != "arcs":
-        flags["ib_split_source"] = args.ib_split_source
-        flags["data_ib_split"] = str(Path(args.ib_split_file).resolve())
-    flags["accessibility_mode"] = getattr(args, "accessibility_mode", "log")
-    flags["accessibility_percentile"] = float(getattr(args, "accessibility_percentile", 80.0))
     return flags
 
 
 class Epigenome(Study):
     name = "epigenome"
-    help = "ablate the compartment and accessibility terms against real Hi-C"
+    help = "ablate the compartment term against real Hi-C"
 
     def add_args(self, p: argparse.ArgumentParser) -> None:
         p.add_argument("--region", default="chr1:20000000-40000000")
@@ -276,22 +201,6 @@ class Epigenome(Study):
         )
         p.add_argument("--arms", default=",".join(ARMS), help="comma list of arm names")
         p.add_argument("--compartment-weight", type=float, default=2.0)
-        p.add_argument("--bridging-weight", type=float, default=1.0)
-        p.add_argument("--fibre", type=float, default=0.2)
-        p.add_argument(
-            "--accessibility-mode",
-            default="log",
-            choices=["log", "binary"],
-            help="how the raw ATAC track maps to [0,1]; binary is HiP-HoP's open/closed state",
-        )
-        p.add_argument("--accessibility-percentile", type=float, default=80.0)
-        p.add_argument(
-            "--ib-split-source",
-            default="arcs",
-            choices=["arcs", "tads"],
-            help="where interaction block boundaries come from; tads needs --ib-split-file",
-        )
-        p.add_argument("--ib-split-file", default=None, help="boundary BED for tads")
         p.add_argument(
             "--baseline-repeats",
             type=int,
@@ -303,33 +212,16 @@ class Epigenome(Study):
     def run(self, ctx: Context, args: argparse.Namespace) -> None:
         from gnome3d.io import parse_chrs_arg
 
-        comp_path, acc_path = _track_paths(ctx.cell, ctx.data_root)
-        # Only the tracks some selected arm actually reads are required. Demanding
-        # both refuses a compartments-only run on a machine that has no
-        # accessibility bigWig, which is a precondition the run does not have.
-        wanted = [ARMS[a.strip()] for a in args.arms.split(",") if a.strip() in ARMS]
-        need_comp = any(f.get("use_compartments") for f in wanted)
-        need_acc = any(f.get("use_bridging") or f.get("use_fibre_compaction") for f in wanted)
-        required = ([(comp_path, "compartments")] if need_comp else []) + (
-            [(acc_path, "accessibility")] if need_acc else []
-        )
+        comp_path = _track_path(ctx.cell, ctx.data_root)
         # The saddle sorting track is the compartment call, so it is needed for the
         # report even when no arm switches the compartment term on.
-        if not need_comp:
-            required.append((comp_path, "compartments (for the saddle sorting track)"))
-        for path, what in required:
-            if not Path(path).exists():
-                print(f"[epigenome] missing {what} track: {path}")
-                print(f"[epigenome] build it: python -m validation tracks --cell {ctx.cell}")
-                return
+        if not Path(comp_path).exists():
+            print(f"[epigenome] missing compartments track: {comp_path}")
+            print(f"[epigenome] build it: python -m validation tracks --cell {ctx.cell}")
+            return
         if not ctx.hic:
             print("[epigenome] --hic is required; it is the target the arms are scored against")
             return
-        if args.ib_split_source != "arcs" and not args.ib_split_file:
-            print("[epigenome] --ib-split-source needs --ib-split-file")
-            return
-        if args.ib_split_source != "arcs":
-            print(f"  interaction blocks from: {args.ib_split_source} ({args.ib_split_file})")
 
         chrs, region = parse_chrs_arg(args.region)
         c_obs, bin_starts = contacts.observed_hic(ctx.hic, args.region, args.binsize, balance=True)
@@ -344,29 +236,24 @@ class Epigenome(Study):
         blocks = _ib_ids(
             cfgmod.apply_flags(
                 cfgmod.settings_for_cell(ctx.cell, ctx.data_root, ctx.quality),
-                _arm_flags("off", args, comp_path, acc_path),
+                _arm_flags("off", args, comp_path),
             ),
             chrs,
             region,
             bin_starts,
         )
         obs_ib = contacts.block_enrichment(c_obs, blocks)["ratio"]
-        # Accessibility on the same grid, for the accessibility-sorted saddle.
-        acc_track = _signal_on_bins(acc_path, chrs[0], bin_starts, args.binsize)
-        obs_acc = contacts.compartment_saddle(c_obs, contacts.signed_track(acc_track))["strength"]
 
         print(f"epigenome ablation  {ctx.cell}  {args.region}  n={ctx.n}")
         print(f"  compartments: {comp_path}")
-        print(f"  accessibility: {acc_path}")
         print(f"  scored against {Path(ctx.hic).name} @ {args.binsize // 1000}kb")
         print(
             f"  experimental saddle = {obs_saddle['strength']:.3f} "
             f"over {int(obs_saddle['n_bins'])} bins  (1.0 = no compartmentalization)\n"
             f"  experimental within-block enrichment = {obs_ib:.3f}\n"
-            f"  experimental accessibility saddle    = {obs_acc:.3f}\n"
         )
         header = (
-            f"  {'arm':<14}{'saddle':>9}{'accE':>9}{'ibE':>9}{'eig |r|':>9}{'kappa':>8}"
+            f"  {'arm':<14}{'saddle':>9}{'ibE':>9}{'eig |r|':>9}{'kappa':>8}"
             f"{'Rg':>9}{'bondCV':>9}{'overlap':>9}"
         )
         print(header)
@@ -380,7 +267,7 @@ class Epigenome(Study):
         # salted per process - that is a bug, not sampling noise.)
         floor: float | None = None
         if args.baseline_repeats > 1:
-            off_flags = _arm_flags("off", args, comp_path, acc_path)
+            off_flags = _arm_flags("off", args, comp_path)
             reps = [
                 _run_arm(
                     ctx,
@@ -393,23 +280,18 @@ class Epigenome(Study):
                     sort_track,
                     seed_offset=i * _SEED_STRIDE,
                     block_id=blocks,
-                    acc_track=acc_track,
                 )
                 for i in range(args.baseline_repeats)
             ]
             eigs = [r["eig"] for r in reps]
             sads = [r["saddle"] for r in reps]
-            accs = [r["acc_saddle"] for r in reps]
             if len(eigs) > 1:
                 floor = float(np.std(eigs, ddof=1))
                 sad_floor = float(np.std(sads, ddof=1))
-                acc_floor = (
-                    float(np.std(accs, ddof=1)) if np.all(np.isfinite(accs)) else float("nan")
-                )
                 print(
                     f"  {'off x' + str(len(eigs)):<14}"
                     f"{np.mean(sads):>9.3f}{np.mean(eigs):>9.3f}{'':>8}{'':>9}{'':>9}{'':>9}"
-                    f"   floor: saddle sd={sad_floor:.3f}  accE sd={acc_floor:.3f}  eig sd={floor:.3f}"
+                    f"   floor: saddle sd={sad_floor:.3f}  eig sd={floor:.3f}"
                 )
 
         base: dict[str, float] = {}
@@ -430,7 +312,7 @@ class Epigenome(Study):
             if name not in ARMS:
                 print(f"  {name:<14}  unknown arm")
                 continue
-            flags = _arm_flags(name, args, comp_path, acc_path)
+            flags = _arm_flags(name, args, comp_path)
             try:
                 row = _run_arm(
                     ctx,
@@ -442,7 +324,6 @@ class Epigenome(Study):
                     bin_starts,
                     sort_track,
                     block_id=blocks,
-                    acc_track=acc_track,
                     contact_radius=shared_radius,
                 )
                 if name == "off":
@@ -458,7 +339,7 @@ class Epigenome(Study):
                         sigma = abs(d_eig) / floor if floor > 0 else 0.0
                         mark += f"  ({sigma:.1f} sd eig)" + ("" if sigma >= 2.0 else " = noise")
                 print(
-                    f"  {name:<14}{row['saddle']:>9.3f}{row['acc_saddle']:>9.3f}"
+                    f"  {name:<14}{row['saddle']:>9.3f}"
                     f"{row['ib_ratio']:>9.3f}"
                     f"{row['eig']:>9.3f}{row['kappa']:>8.3f}"
                     f"{row['rg']:>9.2f}{row['cv']:>9.3f}{row['overlap']:>9.3f}{mark}"
@@ -475,7 +356,7 @@ class Epigenome(Study):
             "  with the experimental one; kappa is Cohen's kappa on the per-bin compartment\n"
             "  calls, which is 0 at chance. The raw same-compartment fraction is not chance\n"
             "  corrected and sits near 0.6 on an unbalanced region even with no signal, so it\n"
-            "  is not reported. A gain only counts if Rg and bondCV hold: these terms are\n"
+            "  is not reported. A gain only counts if Rg and bondCV hold: the term is\n"
             "  attractive and can raise the score by collapsing the structure.\n"
             "  Pass --baseline-repeats to print the noise floor; an effect under 2 sd of it\n"
             "  is not a result."

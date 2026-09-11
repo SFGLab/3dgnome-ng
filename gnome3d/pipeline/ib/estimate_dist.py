@@ -142,6 +142,45 @@ def _run(problem: Problem) -> Result:
     return _heat_dist_from_avg(avg, problem["subanchor_heat_raw"], problem["settings"])
 
 
+# Spreads a parent seed and a replicate number across the output range before they are mixed,
+# so two blocks whose seeds differ by one do not hand their replicates overlapping streams.
+_REPLICATE_STRIDE = 0x9E3779B1
+
+
+def _expand_replicates(problems: list[Problem], per_ib: int) -> tuple[list[Problem], list[int]]:
+    """One dry smooth problem per replicate, and where each input block's run starts.
+
+    Each replicate carries a seed fixed by its parent block and its replicate number. The
+    batched kernel seeds a chain from the seed its problem carries, so a replicate without one
+    would fall back to its slot in the launch and the grouping would decide its stream.
+    """
+    expanded: list[Problem] = []
+    spans: list[int] = []
+    for prob in problems:
+        spans.append(len(expanded))
+        seed_rng(int(prob["seed"]))
+        pos = prob["pos"]
+        fixed = prob["fixed"]
+        step = float(prob["step_size"])
+        for rep in range(per_ib):
+            start = pos.copy()
+            add_movable_noise_inplace(start, fixed, step)
+            expanded.append(
+                {
+                    "pos": start,
+                    "dtn": prob["dtn"],
+                    "fixed": fixed,
+                    "step_size": step,
+                    "seed": (int(prob["seed"]) + rep * _REPLICATE_STRIDE) & 0x7FFFFFFF,
+                    "heat_dist": None,  # dry: chain+EV+conf only
+                    "char_orientations": None,
+                    "anchor_neighbors": None,
+                    "anchor_neighbor_weights": None,
+                }
+            )
+    return expanded, spans
+
+
 def _batch_run(problems: list[Problem]) -> list[Result]:
     """Batched (JAX) runner: run every IB's dry-smooth trials in one vmapped
     kernel (no heat/orientation), then build each IB's target matrix.  Mirrors
@@ -154,51 +193,9 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     n_steps = int(s.subanchor_estimate_steps)
     per_ib = n_reps * n_steps
 
-    expanded: list[Problem] = []
-    spans: list[int] = []
-    for prob in problems:
-        spans.append(len(expanded))
-        seed_rng(int(prob["seed"]))
-        pos = prob["pos"]
-        fixed = prob["fixed"]
-        step = float(prob["step_size"])
-        for _ in range(per_ib):
-            start = pos.copy()
-            add_movable_noise_inplace(start, fixed, step)
-            expanded.append(
-                {
-                    "pos": start,
-                    "dtn": prob["dtn"],
-                    "fixed": fixed,
-                    "step_size": step,
-                    "heat_dist": None,  # dry: chain+EV+conf only
-                    "char_orientations": None,
-                    "anchor_neighbors": None,
-                    "anchor_neighbor_weights": None,
-                }
-            )
+    expanded, spans = _expand_replicates(problems, per_ib)
 
-    # Plain "checker" double-compacts here: estimation's output is the dense distance TARGET
-    # the final smooth chases, and the checker's stale-EV compaction shrinks it (measured Rg
-    # 0.965 -> 0.890 at B=1024).  Only "hybrid" (checker init + sequential polish) yields a
-    # CORRECT target, so estimation upgrades checker->hybrid and is otherwise sequential -
-    # never plain checker.  See docs/arcs-gpu-acceleration.md.
-    est_setting = str(getattr(s, "mc_executor_jax_estimate_kernel", "auto")).strip().lower()
-    if est_setting in ("mc", "hybrid"):
-        est_kernel = est_setting  # explicit override (never plain checker - it compounds)
-    else:  # "auto": follow the final-smooth kernel (hybrid -> hybrid), else sequential
-        smooth_k = str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")).strip().lower()
-        est_kernel = "hybrid" if smooth_k == "hybrid" else "mc"
-    # Make the fan-out explicit: a batch of N estimate nodes expands to N x (reps*steps) dry-smooth
-    # IBs, which the kernel then chunks - so the smooth[checker]/[mc] line count is NOT the node count.
-    log.status(
-        _LOG,
-        "    estimate: %d nodes x %d reps = %d dry-smooth IBs",
-        len(problems),
-        per_ib,
-        len(expanded),
-    )
-    results = run_smooth_batch(expanded, s, est_kernel)
+    results = run_smooth_batch(expanded, s)
 
     out: list[Result] = []
     for gi, prob in enumerate(problems):
@@ -224,10 +221,17 @@ class EstimateDistStage:
         return int(inputs[0].pos.shape[0])  # type: ignore[attr-defined]
 
     def batch_key(self, inputs: tuple[State, ...]) -> tuple[object, ...]:
-        """Heat-dist is the *dry* smooth (no heat/orientation terms), so the key
-        is just the bead shape-ladder bucket."""
+        """Heat-dist is the dry smooth, with no heat or orientation terms, so nothing but the
+        bead extent could separate two blocks.
+
+        Merging drops that too. The dry pass carries no heat target, which is the only input
+        that grows with the square of the padded extent, so a merged launch of every block's
+        replicates costs tens of megabytes and the packing in `mc_smooth_jax_batch` has no
+        reason to split it."""
         st = inputs[0]
         assert isinstance(st, Densified)
+        if bool(st.settings.merge_smooth_launches):
+            return (0,)
         return (batch_bucket(int(st.pos.shape[0]), st.settings),)
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:

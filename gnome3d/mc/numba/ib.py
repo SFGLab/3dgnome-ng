@@ -24,6 +24,7 @@ from gnome3d.mc.numba.terms import (
     STRUCT_CHAIN,
     init_confine_nb,
     init_excl_nb,
+    init_heat_nb,
     init_smooth_nb,
 )
 from gnome3d.types import I32Array, I64Array
@@ -38,13 +39,14 @@ def mc_ib_numba(
     step_size: float,
     settings: Settings,
     compartment: np.ndarray[Any, Any] | None = None,
-    accessibility: np.ndarray[Any, Any] | None = None,
+    heat_dist: np.ndarray[Any, Any] | None = None,
 ) -> float:
     """Numba simulated-annealing implementation for IB-centroid chain MC.
     Peer to mc_smooth (not a sub-mode of it).  Called by `gnome3d.mc.mc_ib`.
 
-    Energy: chain bonds (no angle term, no orientation, no heat) + optional
-    IB-scale excluded volume + optional IB-scale confinement.  All IBs move
+    Energy: chain bonds (no angle term, no orientation) + optional IB-scale excluded volume +
+    optional IB-scale confinement + an optional contact term, `heat_dist` being the block
+    pair distance targets scored at `heatmap_weight_ib`, off at weight zero.  All IBs move
     (no fixed set). Reads only its own settings: `spring_*_ib`, `dist_weight_ib`,
     `max_temp_ib`/`dt_temp_ib`/`jump_*_ib`/`mc_stop_*_ib` under [simulation_ib],
     plus the `*_ib` knobs under [excluded_volume] and [confinement].
@@ -89,9 +91,13 @@ def mc_ib_numba(
         "ib",
         float(dtn64.mean()) if dtn64.size > 0 else 1.0,
         compartment,
-        accessibility,
     )
-    score_comp, score_brdg = init_affinity_scores(pw, aff)
+    score_comp = init_affinity_scores(pw, aff)
+
+    heat_weight = float(settings.heatmap_weight_ib)
+    use_heat = heat_dist is not None and heat_weight > 0.0
+    heat64 = as_f64(heat_dist) if use_heat and heat_dist is not None else dummy_f64()
+    score_heat = float(init_heat_nb(pw, heat64, heat_weight)) if use_heat else 0.0
 
     score_struct = float(init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
     score_excl = (
@@ -120,9 +126,9 @@ def mc_ib_numba(
         dist_w=dist_w,
         ang_w=ang_w,
         struct_delta_factor=1.0,
-        use_heat=False,
-        heat_dist=dummy_f64(),
-        heat_weight=0.0,
+        use_heat=use_heat,
+        heat_dist=heat64,
+        heat_weight=heat_weight if use_heat else 0.0,
         use_orn=False,
         orn_is_L=np.zeros(1, dtype=np.bool_),
         anchor_ar=dummy_i32(),
@@ -157,7 +163,7 @@ def mc_ib_numba(
         score_eps=1e-6,
         stop_when_ratio_above=2.0,
         score_struct=score_struct,
-        score_heat=0.0,
+        score_heat=score_heat,
         score_orn=0.0,
         score_excl=score_excl,
         score_conf=score_conf,
@@ -167,12 +173,7 @@ def mc_ib_numba(
         comp_weight=aff.comp_weight,
         comp_ea=aff.comp_ea,
         comp_eb=aff.comp_eb,
-        use_brdg=aff.use_brdg,
-        brdg_a=aff.brdg_a,
-        brdg_r0=aff.brdg_r0,
-        brdg_weight=aff.brdg_weight,
         score_comp=score_comp,
-        score_brdg=score_brdg,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

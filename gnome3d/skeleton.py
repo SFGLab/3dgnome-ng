@@ -17,7 +17,9 @@ decides whether an IB's chain includes the ESTIMATE_DIST stage.
 
 from __future__ import annotations
 
+import copy
 import math
+import zlib
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
@@ -28,6 +30,7 @@ from gnome3d.hierarchy import Level, set_level
 from gnome3d.pipeline import Orientation, Seeded
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
+from gnome3d.pipeline.ib.arcs import hilbert_start, run_arcs_problem, walk_start
 from gnome3d.settings import Settings
 from gnome3d.tracks import slice_intervals
 from gnome3d.types import (
@@ -35,8 +38,8 @@ from gnome3d.types import (
     F32Array,
     F64Array,
     I8Array,
-    SignalInterval,
 )
+from gnome3d.util import seed_rng
 
 LOG = log.get("skeleton")
 
@@ -100,7 +103,7 @@ def _collect_ib_work(
     state: CoarseState, chr_: str, seg_level: dict[str, list[int]]
 ) -> list[tuple[str, int, list[int]]]:
     """Serial, cheap pass: list one chr's buildable IBs (skipping <=1-anchor ones) and seed
-    each anchor at its IB centroid.  Returns ``(ib_id, ib_idx, active_region)`` tuples for
+    each anchor at its IB centroid, unless a segment-scope arc pass already placed them.  Returns ``(ib_id, ib_idx, active_region)`` tuples for
     the (parallel) heatmap build.  Separating this out keeps the only shared-graph writes
     (the centroid seeding) up front, before any build thread reads the graph."""
     clusters = state.clusters
@@ -126,6 +129,72 @@ def _collect_ib_work(
     return work
 
 
+def joint_arcs_solve(
+    state: CoarseState, chr_: str, work: list[tuple[str, int, list[int]]], seed_offset: int
+) -> None:
+    """Solve every anchor of one chromosome as a single arcs problem and write the result
+    into the cluster graph, so each block's seed carries final anchors.
+
+    Each block's anchors start where the block placement stage put the block, at its centroid,
+    or on a walk around it under `arcs_start = walk`. The target matrix is the one a block
+    would get, built over the whole chromosome, so the contact background and the loops act
+    across blocks, and the confinement sphere is the law's for the chromosome's span.
+    """
+    s = state.s
+    clusters = state.clusters
+    active_all = [a for _, _, ar in work for a in ar]
+    if len(active_all) < 2:
+        return
+    seed = (zlib.crc32(chr_.encode()) * 2_654_435_761 + 40_503 + seed_offset) & 0x7FFFFFFF
+    seed_rng(seed)
+    law = s.polymer_law()
+    starts: list[F32Array] = []
+    for _, ib_idx, ar in work:
+        cen = np.tile(clusters[ib_idx].pos.astype(np.float32), (len(ar), 1))
+        if s.arcs_start == "walk":
+            mids = np.array([clusters[a].genomic_pos for a in ar], dtype=np.int64)
+            cen = walk_start(cen, mids, law)
+        starts.append(cen)
+    pos0 = np.ascontiguousarray(np.concatenate(starts), dtype=np.float32)
+    if s.arcs_start == "hilbert":
+        # One curve over the chromosome's anchors, centred where the block layout's centroid
+        # is; the curve, not the layout, is then the long range arrangement.
+        mids_all = np.array([clusters[a].genomic_pos for a in active_all], dtype=np.int64)
+        pos0 = hilbert_start(pos0, mids_all, law)
+    anchor_heat: F64Array | None = None
+    if s.use_anchor_heatmap and state.singletons:
+        anchor_heat, _ = cb.build_contact_heatmaps(state, active_all, chr_, with_subanchor=False)
+    exp_dist = cb.calc_anchor_expected_distances(state, active_all, chr_, anchor_heat)
+    anchor_genomic = [
+        (clusters[a].start, clusters[a].end, clusters[a].genomic_pos) for a in active_all
+    ]
+    # The per block stage passes anchors through at chromosome scope, so the joint call runs
+    # at block scope on a copy, from the start built here.
+    s_joint = copy.copy(s)
+    s_joint.arcs_scope = "block"
+    s_joint.arcs_start = "centroid"
+    score, pos = run_arcs_problem(
+        {
+            "anchor_pos": pos0,
+            "exp_dist": exp_dist,
+            "step_size": _ARCS_NOISE,
+            "settings": s_joint,
+            "seed": seed,
+            "anchor_genomic": anchor_genomic,
+        }  # type: ignore[arg-type]
+    )
+    for k, a in enumerate(active_all):
+        clusters[a].pos = np.asarray(pos[k], dtype=np.float64)
+    log.status(
+        LOG,
+        "joint arcs solve %s: %d anchors in %d blocks, energy %.4g",
+        chr_,
+        len(active_all),
+        len(work),
+        score,
+    )
+
+
 def _build_ib_seed(
     state: CoarseState, chr_: str, item: tuple[str, int, list[int]], seed_offset: int
 ) -> IBSeed:
@@ -148,9 +217,12 @@ def gather_all_ib_seeds(state: CoarseState, seed_offset: int = 0) -> list[IBSeed
     seg_level = set_level(
         Level.SEGMENT - Level.CHROMOSOME, state.chr_root, state.clusters, state.chrs
     )
-    items: list[tuple[str, tuple[str, int, list[int]]]] = [
-        (chr_, w) for chr_ in state.chrs for w in _collect_ib_work(state, chr_, seg_level)
-    ]
+    items: list[tuple[str, tuple[str, int, list[int]]]] = []
+    for chr_ in state.chrs:
+        work = _collect_ib_work(state, chr_, seg_level)
+        if state.s.arcs_scope == "chromosome":
+            joint_arcs_solve(state, chr_, work, seed_offset)
+        items.extend((chr_, w) for w in work)
     workers = max(1, int(getattr(state.s, "heatmap_workers", 1)))
     if workers > 1 and len(items) > 1:
         with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="heatbuild") as ex:
@@ -165,10 +237,10 @@ def gather_ib_seeds(
     (serial).  Consumes no RNG - pure read-out - so it runs after all coarse positioning
     (the unified-DAG fan-out) or interleaved per chr (the legacy path) with identical
     results.  ``gather_all_ib_seeds`` is the parallel whole-graph entry point."""
-    return [
-        _build_ib_seed(state, chr_, w, seed_offset)
-        for w in _collect_ib_work(state, chr_, seg_level)
-    ]
+    work = _collect_ib_work(state, chr_, seg_level)
+    if state.s.arcs_scope == "chromosome":
+        joint_arcs_solve(state, chr_, work, seed_offset)
+    return [_build_ib_seed(state, chr_, w, seed_offset) for w in work]
 
 
 def seed_for_ib(
@@ -189,7 +261,9 @@ def seed_for_ib(
     anchor_heat: F64Array | None = None
     subanchor_heat_raw: F32Array | None = None
     if (state.s.use_anchor_heatmap or state.s.use_subanchor_heatmap) and state.singletons:
-        anchor_heat, subanchor_heat_raw = cb.build_contact_heatmaps(state, active_region, chr_)
+        anchor_heat, subanchor_heat_raw = cb.build_contact_heatmaps(
+            state, active_region, chr_, with_subanchor=bool(state.s.use_subanchor_heatmap)
+        )
 
     exp_dist = cb.calc_anchor_expected_distances(state, active_region, chr_, anchor_heat)
 
@@ -226,18 +300,14 @@ def seed_for_ib(
                     anchor_neighbors[k].append(cluster_to_k[other_ci])
                     anchor_neighbor_weights[k].append(math.sqrt(max(arc.score, 0)))
 
-    # Epigenomic tracks, sliced to this IB's genomic span.  Sliced only when the
+    # Compartment track, sliced to this IB's genomic span.  Sliced only when the
     # consuming term is on, so a loaded track costs nothing until something reads
-    # it.  Densify bins them onto bead ranges.
+    # it.  Densify bins it onto bead ranges.
     track_compartments: list[CompartmentInterval] | None = None
-    track_accessibility: list[SignalInterval] | None = None
-    if chr_ and anchor_genomic:
+    if chr_ and anchor_genomic and s.use_compartments:
         ib_lo = anchor_genomic[0][0]
         ib_hi = anchor_genomic[-1][1]
-        if s.use_compartments or s.use_lamina:
-            track_compartments = slice_intervals(state.compartments.get(chr_, []), ib_lo, ib_hi)
-        if s.use_bridging or s.use_fibre_compaction:
-            track_accessibility = slice_intervals(state.accessibility.get(chr_, []), ib_lo, ib_hi)
+        track_compartments = slice_intervals(state.compartments.get(chr_, []), ib_lo, ib_hi)
 
     # ESTIMATE_DIST inclusion: same sparse-signal early-out as the engine - empty
     # heatmap or active-fraction below threshold => no heat stage.
@@ -264,6 +334,5 @@ def seed_for_ib(
         anchor_genomic=anchor_genomic,
         step_size_arcs=_ARCS_NOISE,
         track_compartments=track_compartments,
-        track_accessibility=track_accessibility,
     )
     return seed, wants_heat

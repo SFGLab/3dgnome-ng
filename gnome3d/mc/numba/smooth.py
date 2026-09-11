@@ -17,7 +17,11 @@ import numpy as np
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
+from gnome3d.mc.numba.cells import BUF, build_grid, grid_shape
 from gnome3d.mc.numba.common import (
+    NO_F64_3,
+    NO_I32,
+    NO_I64_3,
     affinity_params,
     as_f64,
     dummy_bool,
@@ -30,6 +34,7 @@ from gnome3d.mc.numba.common import (
 from gnome3d.mc.numba.terms import (
     STRUCT_CHAIN,
     init_confine_nb,
+    init_excl_cells_nb,
     init_excl_nb,
     init_heat_nb,
     init_smooth_nb,
@@ -266,7 +271,6 @@ def mc_smooth_numba(
     anchor_neighbor_weights: dict[int, list[float]] | None = None,
     heat_dist: np.ndarray[Any, Any] | None = None,
     compartment: np.ndarray[Any, Any] | None = None,
-    accessibility: np.ndarray[Any, Any] | None = None,
 ) -> float:
     """Chain connectivity + angle MC.  Optionally adds CTCF orientation and/or
     subanchor heat. Anchor beads (fixed=True) never move. Single-counted
@@ -292,7 +296,6 @@ def mc_smooth_numba(
             )
             and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
             and compartment is None
-            and accessibility is None
         )
         if simple_config:
             return _mc_smooth_multichain(pos, dtn, fixed, step_size, settings, heat_dist)
@@ -345,9 +348,8 @@ def mc_smooth_numba(
         "smooth",
         float(dtn64.mean()) if dtn64.size > 0 else 1.0,
         compartment,
-        accessibility,
     )
-    score_comp, score_brdg = init_affinity_scores(pw, aff)
+    score_comp = init_affinity_scores(pw, aff)
 
     if use_heat:
         assert heat_dist is not None
@@ -390,18 +392,42 @@ def mc_smooth_numba(
         score_orn = 0.0
 
     score_struct = float(init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
-    score_excl = (
-        float(
-            init_excl_nb(
+    # Cell grid for the excluded volume term. It sums the same pairs in the same order, so this
+    # changes only how long the term takes, both here and in the step loop. Below a couple of
+    # thousand beads the full scan is already cheap and the bookkeeping is not worth it.
+    excl_w = float(settings.exclusion_weight)
+    excl_skip_n = int(settings.exclusion_skip_neighbors)
+    use_cells = use_excl and bool(getattr(settings, "mc_neighbour_grid", True)) and n >= 2048
+    cell_lo = NO_F64_3
+    cell_dim = NO_I64_3
+    cell_size = 1.0
+    cell_head = NO_I32
+    cell_next = NO_I32
+    cell_where = NO_I32
+    cell_buf = NO_I32
+    score_excl = 0.0
+    if use_cells:
+        cell_lo, cell_dim, cell_size = grid_shape(pw, excl_r0)
+        cell_head, cell_next, cell_where = build_grid(pw, cell_lo, cell_dim, cell_size)
+        cell_buf = np.empty(BUF, dtype=np.int32)
+        score_excl = float(
+            init_excl_cells_nb(
                 pw,
                 excl_r0,
-                float(settings.exclusion_weight),
-                int(settings.exclusion_skip_neighbors),
+                excl_w,
+                excl_skip_n,
+                cell_lo,
+                cell_dim,
+                cell_size,
+                cell_head,
+                cell_next,
+                cell_buf,
             )
         )
-        if use_excl
-        else 0.0
-    )
+        if score_excl < 0.0:  # a bead had more neighbours than the buffer holds
+            use_cells = False
+    if use_excl and not use_cells:
+        score_excl = float(init_excl_nb(pw, excl_r0, excl_w, excl_skip_n))
     score_conf = (
         float(
             init_confine_nb(
@@ -470,12 +496,15 @@ def mc_smooth_numba(
         comp_weight=aff.comp_weight,
         comp_ea=aff.comp_ea,
         comp_eb=aff.comp_eb,
-        use_brdg=aff.use_brdg,
-        brdg_a=aff.brdg_a,
-        brdg_r0=aff.brdg_r0,
-        brdg_weight=aff.brdg_weight,
         score_comp=score_comp,
-        score_brdg=score_brdg,
+        use_cells=use_cells,
+        cell_lo=cell_lo,
+        cell_dim=cell_dim,
+        cell_size=cell_size,
+        cell_head=cell_head,
+        cell_next=cell_next,
+        cell_where=cell_where,
+        cell_buf=cell_buf,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

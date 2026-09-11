@@ -4,13 +4,19 @@ Configuration for 3dgnome-ng.
 Mirrors Reference Settings class.  All defaults match Settings::init() in Settings.cpp.
 """
 
+from __future__ import annotations
+
 import configparser
 import difflib
 import os
 from collections.abc import Mapping
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from gnome3d import log
+
+if TYPE_CHECKING:
+    from gnome3d.polymer import PolymerLaw
 
 LOG = log.get("settings")
 
@@ -38,23 +44,13 @@ class Settings:
     data_pet_clusters: str
     data_singletons: str
     data_singletons_inter: str
-    data_factors: str
-    data_split_singletons_by_chr: bool
     data_centromeres: str
     data_segment_split: str
-    data_ib_split: str
-    ib_split_source: str
     ib_refine_scope: str
-    data_segment_heatmap: str
     data_compartments: str
-    data_accessibility: str
     data_phasing_track: str
 
     # ---- template ----
-    template_segment: str
-    template_scale: float
-    dist_heatmap: str
-    dist_heatmap_scale: float
 
     # ---- motif orientation ----
     use_ctcf_motif: bool
@@ -72,7 +68,6 @@ class Settings:
     subanchor_heatmap_dist_weight: float
     subanchor_estimate_steps: int
     subanchor_estimate_replicates: int
-    subanchor_batch_trials: bool
     subanchor_heat_min_reduction: float
     # Threads building per-IB contact heatmaps during seed gathering (skeleton).  The
     # build is O(N^2) numpy per IB and embarrassingly parallel across IBs.  >1 parallelises
@@ -91,24 +86,16 @@ class Settings:
     heatmap_distance_stretching: float
 
     # ---- distance conversion ----
-    genomic_dist_power: float
-    genomic_dist_scale: float
-    genomic_dist_base: float
-    freq_dist_scale: float
-    freq_dist_power: float
-    freq_dist_scale_inter: float
-    freq_dist_power_inter: float
-    count_dist_a: float
-    count_dist_scale: float
-    count_dist_shift: float
-    count_dist_base_level: float
 
     # ---- spring constants ----
     spring_stretch: float
     spring_squeeze: float
     spring_angular: float
     spring_stretch_arcs: float
+    background_weight: float
+    background_range_bp: int
     spring_squeeze_arcs: float
+    use_contact_background: bool
 
     # ---- simulation steps ----
     steps_lvl1: int
@@ -168,6 +155,12 @@ class Settings:
     # Padding is inert (pad beads never move + contribute zero energy), so
     # results are unchanged; this is a pure compile-time optimization.
     mc_executor_jax_bucket_shapes: bool
+    # Put every interaction block that shares an energy term signature into one launch,
+    # instead of splitting it by bead bucket as well.  Cost per step in the batched kernels is
+    # flat in the launch width, so a launch of sixty four chains costs about what a launch of
+    # one costs and the split is pure loss.  Device memory still bounds a launch, and the
+    # packing in `mc_smooth_jax_batch` splits only for that.
+    merge_smooth_launches: bool
     # Cap on the region-batch vmap width (IBs per kernel launch) for the batched
     # JAX kernels, per kernel.  Excess IBs run in sequential sub-batches.  The cap
     # exists only to bound device memory (a wider launch is never slower than more
@@ -177,15 +170,25 @@ class Settings:
     mc_executor_jax_batch_width_smooth: str
     mc_executor_jax_batch_width_arcs: str
 
-    # Arcs JAX kernel: "mc" = sequential single-bead region-batch (default, byte-exact
-    # port); "checker" = approximate color-gather spatial-checkerboard MC (much faster on
-    # GPU for large IBs; a deliberate divergence from sequential dynamics, equal-energy).
-    mc_executor_jax_arcs_kernel: str
-    # Smooth JAX kernel, same choices.  The "checker" path OMITS the (constant) CTCF
-    # orientation term from the score; the produced structures are correct.
-    mc_executor_jax_smooth_kernel: str
-    mc_executor_jax_estimate_kernel: str
-    hybrid_polish_renoise: float
+    # How the batch strategy uses several visible GPUs.  "groups" runs whole batch groups
+    # side by side, one group per device, which keeps each group's launch intact and so draws
+    # the same RNG as a one-device run.  "within" splits one group across devices, which only
+    # pays off while groups hold more IBs than there are devices.  "off" pins to one device.
+    mc_multigpu_mode: str
+
+    # IB placement scores chain bonds between block centroids, excluded volume and confinement,
+    # and discards every arc crossing a block boundary, so two blocks joined by many CTCF loops
+    # are placed no closer than two joined by none. When on, cross-block arcs become a pairwise
+    # target between centroids. Attraction only: a pair is given a target solely when its arc
+    # support implies a distance SHORTER than its genomic separation already does. Measured on a
+    # 20 Mb region it closes about a fifth of the cross-block distance penalty, because a
+    # centroid is a coarse handle on where a block's edge anchors actually sit.
+
+    # Anchors enter the per-block arc MC collapsed on their block's centroid, and that MC sees
+    # only arcs internal to its block, so a cross-block arc never constrains anything. When on, a
+    # segment-scope anchor pass runs first: every anchor of every block in a segment is placed in
+    # one arc MC, where cross-block arcs are ordinary in-chain arcs. The per-block MC then refines
+    # from those positions, and smooth MC holds anchors fixed, so the joint placement survives.
 
     # ---- MC arcs ----
     max_temp: float
@@ -204,6 +207,7 @@ class Settings:
     exclusion_apply_to_heatmap: bool
     exclusion_apply_to_ib: bool
     exclusion_skip_neighbors: int
+    mc_neighbour_grid: bool
     # Per-level radius (one knob per MC level).  0.0 = auto = factor * mean
     # of that level's natural bond / expected distance.  Each level has its
     # own factor (default 0.5 - half the typical bead-bead target).
@@ -231,11 +235,13 @@ class Settings:
     spring_stretch_ib: float
     spring_squeeze_ib: float
     dist_weight_ib: float
+    heatmap_weight_ib: float
     noise_ib: float
 
     # ---- confinement ----
     use_confinement: bool
     confinement_weight: float
+    confinement_weight_arcs: float
     confinement_apply_to_arcs: bool
     confinement_apply_to_smooth: bool
     confinement_apply_to_ib: bool
@@ -245,6 +251,20 @@ class Settings:
     confinement_packing_factor_arcs: float
     confinement_packing_factor_smooth: float
     confinement_packing_factor_ib: float
+
+    # ---- boundary stitch ----
+    use_boundary_stitch: bool
+    boundary_stitch_spring_weight: float
+    boundary_stitch_ev_weight: float
+    boundary_stitch_max_iter: int
+
+    # ---- cross block relaxation ----
+    use_cross_block_relax: bool
+    relax_ev_weight: float
+    relax_ev_radius: float
+    relax_temp: float
+    relax_noise: float
+    relax_bond_weight: float
 
     # ---- A/B compartments ----
     use_compartments: bool
@@ -260,35 +280,6 @@ class Settings:
     compartment_auto_factor_heatmap: float
     compartment_auto_factor_ib: float
     compartment_auto_factor_smooth: float
-
-    # ---- chromatin accessibility ----
-    use_bridging: bool
-    bridging_weight: float
-    bridging_apply_to_heatmap: bool
-    bridging_apply_to_ib: bool
-    bridging_apply_to_smooth: bool
-    bridging_radius_heatmap: float
-    bridging_radius_ib: float
-    bridging_radius_smooth: float
-    bridging_auto_factor_heatmap: float
-    bridging_auto_factor_ib: float
-    bridging_auto_factor_smooth: float
-    use_fibre_compaction: bool
-    fibre_compaction: float
-    accessibility_mode: str
-    accessibility_percentile: float
-
-    # ---- nuclear forces ----
-    use_lamina: bool
-    lamina_weight: float
-    use_central_force: bool
-    central_weight: float
-    use_chromosomal_blocks: bool
-    chrom_block_kc: float
-    chrom_block_weight: float
-    nucleus_radius: float
-    nucleus_packing_factor: float
-    nucleus_inner_fraction: float
 
     # ---- overlapping-anchor handling (densification) ----
     overlap_anchor_strict: bool
@@ -308,6 +299,31 @@ class Settings:
     mc_stop_improvement_smooth: float
     mc_stop_successes_smooth: int
     mc_stop_steps_smooth: int
+    # Shrink the step size once per outer round, beside the temperature. cudaMMC does this and
+    # we did not. One value per stage, 1.0 meaning the step is held as it always was. The floor
+    # is shared and is a fraction of the starting step: cudaMMC anneals over tens of rounds
+    # where the arcs stage has taken 3,929, and a decay carried that far freezes the chain.
+    # The arcs MC stops when a round improves the score by less than this, relatively. Measured
+    # on real blocks this is the branch that ends every run: the plateau branch also requires the
+    # accept count below its threshold and acceptance sits at 15 to 50 percent throughout. So
+    # this number sets the round count, and the round count is the arcs wall. Smooth and the
+    # interaction-block stage pass 2.0 for the same argument, unreachable, so this is arcs only.
+    # Bias an arcs proposal along the local descent direction by this fraction, 0 being the
+    # isotropic draw the reference makes. The gradient comes free from the same sweep as the
+    # score. It proposes only: the Metropolis rule still rejects, which is what keeps a singular
+    # 1/d repulsion safe where a gradient solver would see unbounded forces.
+    # Anneal the arcs stage or solve it. "mc" is the Monte Carlo the reference uses. "lbfgs"
+    # minimises the same energy directly, which on real blocks reaches the same minimum about
+    # thirty six times faster with the ensemble spread slightly wider and the geometry matching.
+    # The landscape is a funnel, so there is nothing for the stochastic search to escape.
+    polymer_exponent: float
+    contact_half_saturation: float
+    polymer: PolymerLaw | None
+    arcs_solver: str
+    arcs_solver_iters: int
+    arcs_start: str
+    arcs_scope: str
+    mc_stop_ratio_arcs: float
     smooth_dist_weight: float
     smooth_angle_weight: float
 
@@ -332,19 +348,8 @@ class Settings:
         self.data_pet_clusters = ""
         self.data_singletons = ""
         self.data_singletons_inter = ""
-        self.data_factors = ""
-        self.data_split_singletons_by_chr = False
         self.data_centromeres = ""
         self.data_segment_split = ""
-        # Where interaction block boundaries come from. "arcs" is the reference
-        # behaviour, splitting where ChIA-PET arc coverage falls to zero, which is
-        # partly a property of that library's depth. "tads" reads `data_ib_split`
-        # instead, and requires it. That file is separate from `data_segment_split`
-        # because block granularity and segment granularity are independent: point
-        # both at one boundary set and every segment ends up holding a single
-        # block, which collapses the coarse level rather than refining it.
-        self.data_ib_split = ""
-        self.ib_split_source = "arcs"
         # What forms one chain in the IB placement MC. "segment" refines each
         # segment's blocks separately, which is the prior behaviour and the
         # default. "chromosome" refines them all together, removing the dependency
@@ -353,16 +358,8 @@ class Settings:
         # contact density from 0.087 to 0.035 and worsened block cohesion about
         # threefold, so it needs its own EV and confinement tuning.
         self.ib_refine_scope = "segment"
-        self.data_segment_heatmap = ""
         self.data_compartments = ""
-        self.data_accessibility = ""
         self.data_phasing_track = ""
-
-        # ---- template ----
-        self.template_segment = ""
-        self.template_scale = 1.0
-        self.dist_heatmap = ""
-        self.dist_heatmap_scale = 1.0
 
         # ---- motif orientation ----
         self.use_ctcf_motif = False
@@ -380,12 +377,6 @@ class Settings:
         self.subanchor_heatmap_dist_weight = 1.0
         self.subanchor_estimate_steps = 2
         self.subanchor_estimate_replicates = 5
-        # Opt-in (default off): run the IB estimate's n_reps*n_steps independent
-        # anneals as ONE vmapped JAX kernel instead of a sequential python loop.
-        # ~3-6x faster at large N on GPU (the per-step kernel is latency-bound,
-        # leaving the GPU idle at chains=1).  JAX smooth backend only; falls back
-        # to the sequential loop otherwise.  Diverges from the parity baseline.
-        self.subanchor_batch_trials = False
         # Opt-in (default 0.0 = off, parity preserved): skip an IB's subanchor
         # heat-dist entirely when its signal is too sparse to matter.  The
         # active-pair fraction (n_active / n_pairs) is a provable upper bound on
@@ -406,25 +397,26 @@ class Settings:
         self.heatmap_inter_scaling = 1.0
         self.heatmap_distance_stretching = 2.0
 
-        # ---- distance conversion ----
-        self.genomic_dist_power = 0.5
-        self.genomic_dist_scale = 1.0
-        self.genomic_dist_base = 0.0
-        self.freq_dist_scale = 100.0
-        self.freq_dist_power = -0.333
-        self.freq_dist_scale_inter = 100.0
-        self.freq_dist_power_inter = -1.0
-        self.count_dist_a = 0.5
-        self.count_dist_scale = 20.0
-        self.count_dist_shift = 1.0
-        self.count_dist_base_level = 0.01
-
         # ---- spring constants ----
         self.spring_stretch = 0.1
         self.spring_squeeze = 0.1
         self.spring_angular = 0.1
         self.spring_stretch_arcs = 1.0
+        # A weak spring holding an arcless anchor pair inside `background_range_bp` at the
+        # background for its separation, in the arcs stage, beside the repulsion that every
+        # other arcless pair keeps. Zero is off. The all pairs version lost the battery because a
+        # power law distance matrix at an exponent under a third cannot be embedded in three
+        # dimensions; a band of it can. See [[project_polymer_law]].
+        self.background_weight = 0.0
+        self.background_range_bp = 100_000
         self.spring_squeeze_arcs = 1.0
+        # Chain bonds in the arcs MC. Consecutive anchors with no arc between them get a
+        # spring at genomic_length_to_distance of their gap, so an island of anchors joined
+        # only among themselves is tied to its genomic neighbours instead of floating out to
+        # the confinement leash. Same spring constants as the arcs.
+        # Multiplies the chain bond target. At 1 the bonds pull the short range below the
+        # parity values and the distance curve steepens past the Hi-C exponent.
+        self.use_contact_background = False
 
         # ---- simulation steps ----
         self.steps_lvl1 = 2
@@ -455,14 +447,10 @@ class Settings:
         self.mc_executor_smooth = "auto"
         self.mc_executor_threaded_workers = 1
         self.mc_executor_jax_bucket_shapes = False
+        self.merge_smooth_launches = True
         self.mc_executor_jax_batch_width_smooth = "auto"
         self.mc_executor_jax_batch_width_arcs = "auto"
-        self.mc_executor_jax_arcs_kernel = "mc"
-        self.mc_executor_jax_smooth_kernel = "mc"
-        self.mc_executor_jax_estimate_kernel = "auto"  # auto = follow smooth (hybrid->hybrid)
-        self.hybrid_polish_renoise = (
-            1.0  # re-noise (x step) on hybrid-smooth polish init; recovers diversity
-        )
+        self.mc_multigpu_mode = "groups"
 
         # ---- MC arcs ----
         self.max_temp = 20.0
@@ -487,6 +475,10 @@ class Settings:
         self.exclusion_apply_to_heatmap = False
         self.exclusion_apply_to_ib = True  # IB-level MC (default on with use_ib_mc)
         self.exclusion_skip_neighbors = 1  # skip pairs with |i-j| <= this (1 = skip bonded)
+        # Bin beads into a cell grid so the excluded volume term visits the beads within its
+        # radius instead of every bead. The sum is built in the same order, so results are
+        # identical and this only changes how long they take. See gnome3d/mc/numba/cells.py.
+        self.mc_neighbour_grid = True
         # Per-level radius: 0.0 = auto from this level's bond-length mean.
         self.exclusion_radius_arcs = 0.0
         self.exclusion_radius_smooth = 0.0
@@ -524,6 +516,7 @@ class Settings:
         self.spring_stretch_ib = 0.1
         self.spring_squeeze_ib = 0.1
         self.dist_weight_ib = 1.0
+        self.heatmap_weight_ib = 0.0
         self.noise_ib = 0.5
 
         # ---- confinement ----
@@ -534,6 +527,8 @@ class Settings:
         # own bond data as `packing_factor * mean(bond) * N^(1/3)`.
         self.use_confinement = False
         self.confinement_weight = 0.5
+        # The arcs stage's own confinement weight. Zero uses the shared weight.
+        self.confinement_weight_arcs = 0.0
         self.confinement_apply_to_arcs = True
         self.confinement_apply_to_smooth = True
         self.confinement_apply_to_ib = True
@@ -546,6 +541,40 @@ class Settings:
         self.confinement_packing_factor_arcs = 1.5
         self.confinement_packing_factor_smooth = 1.5
         self.confinement_packing_factor_ib = 0.75
+
+        # ---- boundary stitch ----
+        # Rigid post pass that closes the gap between adjacent blocks' edge anchors.
+        # See gnome3d/pipeline/stitch.py.
+        self.use_boundary_stitch = False
+        self.boundary_stitch_spring_weight = 1.0
+        self.boundary_stitch_ev_weight = 1.0
+        # The energy is minimised with its own gradient, so an iteration is one evaluation
+        # and the count is what sets the cost. Measured on a trio chr1 of 1,494 blocks, 500
+        # leaves the worst boundary at 6.0 times the curve, 2000 reaches 1.32 in 85 seconds,
+        # and 5000 finds nothing further. See [[project_boundary_stitch]].
+        self.boundary_stitch_max_iter = 2000
+
+        # ---- cross block relaxation ----
+        # After the stitch nothing acts between beads of different blocks. This runs the smooth
+        # kernel over the whole chromosome with excluded volume on every pair and anchors fixed,
+        # so the coils re route around each other. See gnome3d/pipeline/relax.py.
+        self.use_cross_block_relax = False
+        self.relax_ev_weight = 10.0
+        self.relax_ev_radius = 0.0  # 0 = 1.5 times the median bond length
+        self.relax_temp = 0.1  # fraction of max_temp_smooth; a little heat lets coils cross
+        self.relax_noise = 0.5  # step size as a fraction of the median bond length
+        self.relax_bond_weight = 10.0  # chain spring constants during the pass
+        # Skip the pass when fewer than this fraction of beads are touching another block.
+        # It anneals the whole chromosome until its own convergence test fires, so it costs the
+        # same however little there is to fix: measured on a trio run at an hour and fifty five
+        # minutes per structure whatever the input, once to move two beads out of 129,457.
+        # Zero keeps it running always, which is what it did before.
+        # How many chain neighbours either side of a bead that touches another block may move.
+        # Negative lets every subanchor move, which is what the pass did before. The round count
+        # is proportional to the movable bead count, measured at 114 rounds for 1,177 movable and
+        # 691 for 11,766 on a real chromosome, so restricting it to the beads that need moving is
+        # where the pass's cost actually goes.
+        self.relax_local_window = -1
 
         # ---- A/B compartments ----
         # Block-copolymer segregation over a per-bead compartment call, ported
@@ -568,53 +597,6 @@ class Settings:
         self.compartment_auto_factor_heatmap = 1.5
         self.compartment_auto_factor_ib = 1.5
         self.compartment_auto_factor_smooth = 1.5
-
-        # ---- chromatin accessibility ----
-        # Bridging: accessible beads attract each other, HiP-HoP's diffusing
-        # bridges integrated out into an effective pairwise well.  Defaults to
-        # smooth only because accessibility varies bead-to-bead at subanchor
-        # scale and is near-constant over a coarse bead.
-        # Fibre compaction: closed chromatin shortens the chain bond target,
-        # standing in for HiP-HoP's extra i,i+2 springs.
-        self.use_bridging = False
-        self.bridging_weight = 1.0
-        self.bridging_apply_to_heatmap = False
-        self.bridging_apply_to_ib = False
-        self.bridging_apply_to_smooth = True
-        self.bridging_radius_heatmap = 0.0
-        self.bridging_radius_ib = 0.0
-        self.bridging_radius_smooth = 0.0
-        self.bridging_auto_factor_heatmap = 1.5
-        self.bridging_auto_factor_ib = 1.5
-        self.bridging_auto_factor_smooth = 1.5
-        self.use_fibre_compaction = False
-        self.fibre_compaction = 0.3  # 0 = off, 1 = fully collapse closed chromatin
-        # How a raw accessibility track becomes the [0, 1] scale the terms read.
-        # "log" is log-then-minmax.  "binary" is HiP-HoP's open/closed state, open
-        # at or above `accessibility_percentile` of the loaded values.  On a track
-        # binned to several kb the log leaves the median bead reading 0.85 open,
-        # so fibre compaction has almost nothing to act on; binary restores the
-        # range.  Default stays "log" so existing configs are unchanged.
-        self.accessibility_mode = "log"
-        self.accessibility_percentile = 80.0
-
-        # ---- nuclear forces ----
-        # Lamina, nucleolar attraction and chromosome territories, from MultiMM.
-        # All three read the shared nuclear frame and run at coarse levels only:
-        # a single IB is far smaller than the shell width, so the terms carry no
-        # gradient there.  Lamina needs a compartment track.
-        self.use_lamina = False
-        self.lamina_weight = 400.0  # MultiMM IBL_SCALE
-        self.use_central_force = False
-        self.central_weight = 20.0  # MultiMM CF_STRENGTH
-        self.use_chromosomal_blocks = False
-        self.chrom_block_kc = 0.3  # MultiMM CHB_KC
-        self.chrom_block_weight = 1e-4  # MultiMM CHB_DE
-        # Nuclear frame: 0.0 = auto = packing * mean(bond) * N^(1/3), MultiMM's
-        # constant-density rule.  R1 = R2 * inner_fraction^(1/3).
-        self.nucleus_radius = 0.0
-        self.nucleus_packing_factor = 1.0
-        self.nucleus_inner_fraction = 0.2
 
         # ---- overlapping-anchor handling ----
         # overlap_anchor_strict controls span computation in densification:
@@ -655,6 +637,18 @@ class Settings:
         self.mc_stop_improvement_smooth = 0.995
         self.mc_stop_successes_smooth = 5
         self.mc_stop_steps_smooth = 10000
+        self.polymer_exponent = 0.0  # 0 measures it; a positive value pins it and documents that
+        self.contact_half_saturation = 1.0
+        self.polymer = None
+        self.arcs_solver = "mc"
+        self.arcs_solver_iters = 200
+        # Where a block's anchors start. centroid is every anchor at the block centroid; walk is
+        # a random walk at the law's distance per gap. Under measurement.
+        self.arcs_start = "centroid"
+        # centroid, walk or hilbert. block solves each block's anchors alone; chromosome solves every anchor of a
+        # chromosome together from the placed block centroids. Under measurement.
+        self.arcs_scope = "block"
+        self.mc_stop_ratio_arcs = 0.9999
         self.smooth_dist_weight = 1.0
         self.smooth_angle_weight = 1.0
 
@@ -665,7 +659,7 @@ class Settings:
         return self._load_from_parser(cfg)
 
     @classmethod
-    def from_dict(cls, config: Mapping[str, Mapping[str, object]]) -> "Settings":
+    def from_dict(cls, config: Mapping[str, Mapping[str, object]]) -> Settings:
         """Build a Settings from a nested ``{section: {key: value}}`` mapping,
         mirroring the .ini layout — e.g.::
 
@@ -764,44 +758,15 @@ class Settings:
         self.data_pet_clusters = gets("data", "clusters", self.data_pet_clusters)
         self.data_singletons = gets("data", "singletons", self.data_singletons)
         self.data_singletons_inter = gets("data", "singletons_inter", self.data_singletons_inter)
-        self.data_factors = gets("data", "factors", self.data_factors)
-        self.data_split_singletons_by_chr = getb(
-            "data", "split_singleton_files_by_chr", self.data_split_singletons_by_chr
-        )
         self.data_centromeres = gets("data", "centromeres", self.data_centromeres)
         self.data_segment_split = gets("data", "segment_split", self.data_segment_split)
-        self.data_ib_split = gets("data", "ib_split", self.data_ib_split)
-        self.ib_split_source = gets("data", "ib_split_source", self.ib_split_source)
         self.ib_refine_scope = gets("simulation_ib", "refine_scope", self.ib_refine_scope)
-        self.data_segment_heatmap = gets("data", "segment_heatmap", self.data_segment_heatmap)
         self.data_compartments = gets("data", "compartments", self.data_compartments)
-        self.data_accessibility = gets("data", "accessibility", self.data_accessibility)
         self.data_phasing_track = gets("data", "phasing_track", self.data_phasing_track)
 
         # [template]
-        self.template_segment = gets("template", "template_segment", self.template_segment)
-        self.template_scale = getf("template", "template_scale", self.template_scale)
-        self.dist_heatmap = gets("template", "dist_heatmap", self.dist_heatmap)
-        self.dist_heatmap_scale = getf("template", "dist_heatmap_scale", self.dist_heatmap_scale)
 
         # [distance]
-        self.genomic_dist_power = getf("distance", "genomic_dist_power", self.genomic_dist_power)
-        self.genomic_dist_scale = getf("distance", "genomic_dist_scale", self.genomic_dist_scale)
-        self.genomic_dist_base = getf("distance", "genomic_dist_base", self.genomic_dist_base)
-        self.freq_dist_scale = getf("distance", "freq_dist_scale", self.freq_dist_scale)
-        self.freq_dist_power = getf("distance", "freq_dist_power", self.freq_dist_power)
-        self.freq_dist_scale_inter = getf(
-            "distance", "freq_dist_scale_inter", self.freq_dist_scale_inter
-        )
-        self.freq_dist_power_inter = getf(
-            "distance", "freq_dist_power_inter", self.freq_dist_power_inter
-        )
-        self.count_dist_a = getf("distance", "count_dist_a", self.count_dist_a)
-        self.count_dist_scale = getf("distance", "count_dist_scale", self.count_dist_scale)
-        self.count_dist_shift = getf("distance", "count_dist_shift", self.count_dist_shift)
-        self.count_dist_base_level = getf(
-            "distance", "count_dist_base_level", self.count_dist_base_level
-        )
 
         # [heatmaps]
         self.heatmap_inter_scaling = getf("heatmaps", "inter_scaling", self.heatmap_inter_scaling)
@@ -816,8 +781,13 @@ class Settings:
         self.spring_stretch_arcs = getf(
             "springs", "stretch_constant_arcs", self.spring_stretch_arcs
         )
+        self.background_weight = getf("springs", "background_weight", self.background_weight)
+        self.background_range_bp = geti("springs", "background_range_bp", self.background_range_bp)
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs
+        )
+        self.use_contact_background = getb(
+            "springs", "use_contact_background", self.use_contact_background
         )
         self.spring_stretch_ib = getf("springs", "stretch_constant_ib", self.spring_stretch_ib)
         self.spring_squeeze_ib = getf("springs", "squeeze_constant_ib", self.spring_squeeze_ib)
@@ -852,9 +822,6 @@ class Settings:
         )
         self.subanchor_estimate_replicates = geti(
             "subanchor_heatmap", "estimate_distances_replicates", self.subanchor_estimate_replicates
-        )
-        self.subanchor_batch_trials = getb(
-            "subanchor_heatmap", "batch_trials", self.subanchor_batch_trials
         )
         self.subanchor_heat_min_reduction = getf(
             "subanchor_heatmap", "heat_min_reduction", self.subanchor_heat_min_reduction
@@ -915,6 +882,9 @@ class Settings:
             "mc_executor_jax_bucket_shapes",
             self.mc_executor_jax_bucket_shapes,
         )
+        self.merge_smooth_launches = getb(
+            "simulation_backend", "merge_smooth_launches", self.merge_smooth_launches
+        )
         self.mc_executor_jax_batch_width_smooth = gets(
             "simulation_backend",
             "mc_executor_jax_batch_width_smooth",
@@ -925,24 +895,7 @@ class Settings:
             "mc_executor_jax_batch_width_arcs",
             self.mc_executor_jax_batch_width_arcs,
         )
-        self.mc_executor_jax_arcs_kernel = gets(
-            "simulation_backend",
-            "mc_executor_jax_arcs_kernel",
-            self.mc_executor_jax_arcs_kernel,
-        )
-        self.mc_executor_jax_smooth_kernel = gets(
-            "simulation_backend",
-            "mc_executor_jax_smooth_kernel",
-            self.mc_executor_jax_smooth_kernel,
-        )
-        self.mc_executor_jax_estimate_kernel = gets(
-            "simulation_backend",
-            "mc_executor_jax_estimate_kernel",
-            self.mc_executor_jax_estimate_kernel,
-        )
-        self.hybrid_polish_renoise = getf(
-            "simulation_backend", "hybrid_polish_renoise", self.hybrid_polish_renoise
-        )
+        self.mc_multigpu_mode = gets("simulation_backend", "multigpu_mode", self.mc_multigpu_mode)
 
         # [simulation_arcs]
         self.max_temp = getf("simulation_arcs", "max_temp", self.max_temp)
@@ -976,6 +929,9 @@ class Settings:
         )
         self.exclusion_skip_neighbors = geti(
             "excluded_volume", "skip_neighbors", self.exclusion_skip_neighbors
+        )
+        self.mc_neighbour_grid = getb(
+            "simulation_backend", "neighbour_grid", self.mc_neighbour_grid
         )
         # Per-level radii.  Key naming: radius_<level>.  0 = auto.
         self.exclusion_radius_arcs = getf(
@@ -1023,10 +979,14 @@ class Settings:
             self.mc_stop_successes_ib,
         )
         self.dist_weight_ib = getf("simulation_ib", "dist_weight", self.dist_weight_ib)
+        self.heatmap_weight_ib = getf("simulation_ib", "heatmap_weight", self.heatmap_weight_ib)
 
         # [confinement]
         self.use_confinement = getb("confinement", "use_confinement", self.use_confinement)
         self.confinement_weight = getf("confinement", "weight", self.confinement_weight)
+        self.confinement_weight_arcs = getf(
+            "confinement", "weight_arcs", self.confinement_weight_arcs
+        )
         self.confinement_apply_to_arcs = getb(
             "confinement", "apply_to_arcs", self.confinement_apply_to_arcs
         )
@@ -1052,6 +1012,31 @@ class Settings:
         self.confinement_packing_factor_ib = getf(
             "confinement", "packing_factor_ib", self.confinement_packing_factor_ib
         )
+
+        # [boundary_stitch]
+        self.use_boundary_stitch = getb(
+            "boundary_stitch", "use_boundary_stitch", self.use_boundary_stitch
+        )
+        self.boundary_stitch_spring_weight = getf(
+            "boundary_stitch", "spring_weight", self.boundary_stitch_spring_weight
+        )
+        self.boundary_stitch_ev_weight = getf(
+            "boundary_stitch", "ev_weight", self.boundary_stitch_ev_weight
+        )
+        self.boundary_stitch_max_iter = geti(
+            "boundary_stitch", "max_iter", self.boundary_stitch_max_iter
+        )
+
+        # [relax]
+        self.use_cross_block_relax = getb(
+            "relax", "use_cross_block_relax", self.use_cross_block_relax
+        )
+        self.relax_ev_weight = getf("relax", "ev_weight", self.relax_ev_weight)
+        self.relax_ev_radius = getf("relax", "ev_radius", self.relax_ev_radius)
+        self.relax_temp = getf("relax", "temp", self.relax_temp)
+        self.relax_noise = getf("relax", "noise", self.relax_noise)
+        self.relax_bond_weight = getf("relax", "bond_weight", self.relax_bond_weight)
+        self.relax_local_window = geti("relax", "local_window", self.relax_local_window)
 
         # [compartments]
         self.use_compartments = getb("compartments", "use_compartments", self.use_compartments)
@@ -1083,55 +1068,6 @@ class Settings:
         self.compartment_auto_factor_smooth = getf(
             "compartments", "auto_factor_smooth", self.compartment_auto_factor_smooth
         )
-
-        # [accessibility]
-        self.accessibility_mode = gets("accessibility", "mode", self.accessibility_mode)
-        self.accessibility_percentile = getf(
-            "accessibility", "percentile", self.accessibility_percentile
-        )
-        self.use_bridging = getb("accessibility", "use_bridging", self.use_bridging)
-        self.bridging_weight = getf("accessibility", "bridging_weight", self.bridging_weight)
-        self.bridging_apply_to_heatmap = getb(
-            "accessibility", "apply_to_heatmap", self.bridging_apply_to_heatmap
-        )
-        self.bridging_apply_to_ib = getb("accessibility", "apply_to_ib", self.bridging_apply_to_ib)
-        self.bridging_apply_to_smooth = getb(
-            "accessibility", "apply_to_smooth", self.bridging_apply_to_smooth
-        )
-        self.bridging_radius_heatmap = getf(
-            "accessibility", "radius_heatmap", self.bridging_radius_heatmap
-        )
-        self.bridging_radius_ib = getf("accessibility", "radius_ib", self.bridging_radius_ib)
-        self.bridging_radius_smooth = getf(
-            "accessibility", "radius_smooth", self.bridging_radius_smooth
-        )
-        self.bridging_auto_factor_heatmap = getf(
-            "accessibility", "auto_factor_heatmap", self.bridging_auto_factor_heatmap
-        )
-        self.bridging_auto_factor_ib = getf(
-            "accessibility", "auto_factor_ib", self.bridging_auto_factor_ib
-        )
-        self.bridging_auto_factor_smooth = getf(
-            "accessibility", "auto_factor_smooth", self.bridging_auto_factor_smooth
-        )
-        self.use_fibre_compaction = getb(
-            "accessibility", "use_fibre_compaction", self.use_fibre_compaction
-        )
-        self.fibre_compaction = getf("accessibility", "fibre_compaction", self.fibre_compaction)
-
-        # [nucleus]
-        self.use_lamina = getb("nucleus", "use_lamina", self.use_lamina)
-        self.lamina_weight = getf("nucleus", "lamina_weight", self.lamina_weight)
-        self.use_central_force = getb("nucleus", "use_central_force", self.use_central_force)
-        self.central_weight = getf("nucleus", "central_weight", self.central_weight)
-        self.use_chromosomal_blocks = getb(
-            "nucleus", "use_chromosomal_blocks", self.use_chromosomal_blocks
-        )
-        self.chrom_block_kc = getf("nucleus", "chrom_block_kc", self.chrom_block_kc)
-        self.chrom_block_weight = getf("nucleus", "chrom_block_weight", self.chrom_block_weight)
-        self.nucleus_radius = getf("nucleus", "radius", self.nucleus_radius)
-        self.nucleus_packing_factor = getf("nucleus", "packing_factor", self.nucleus_packing_factor)
-        self.nucleus_inner_fraction = getf("nucleus", "inner_fraction", self.nucleus_inner_fraction)
 
         # [main] overlapping-anchor handling toggles (kept under [main] for simplicity).
         self.overlap_anchor_strict = getb(
@@ -1173,6 +1109,17 @@ class Settings:
         self.mc_stop_steps_smooth = geti(
             "simulation_arcs_smooth", "stop_condition_steps", self.mc_stop_steps_smooth
         )
+        self.mc_stop_ratio_arcs = getf(
+            "simulation_arcs", "stop_condition_ratio", self.mc_stop_ratio_arcs
+        )
+        self.polymer_exponent = getf("distance", "polymer_exponent", self.polymer_exponent)
+        self.contact_half_saturation = getf(
+            "distance", "contact_half_saturation", self.contact_half_saturation
+        )
+        self.arcs_solver = gets("simulation_arcs", "solver", self.arcs_solver)
+        self.arcs_solver_iters = geti("simulation_arcs", "solver_iters", self.arcs_solver_iters)
+        self.arcs_start = gets("simulation_arcs", "start", self.arcs_start)
+        self.arcs_scope = gets("simulation_arcs", "scope", self.arcs_scope)
         self.mc_stop_improvement_smooth = getf(
             "simulation_arcs_smooth",
             "stop_condition_improvement_threshold",
@@ -1213,35 +1160,34 @@ class Settings:
                 hint = f" (did you mean '{near[0]}'?)" if near else ""
                 LOG.warning("[%s] unknown key '%s' is ignored%s", section, key, hint)
 
+    def polymer_law(self) -> PolymerLaw:
+        """The run's distance law. `build_state` attaches one fitted to the input. Before that,
+        or in code that never loads data, a default is built from `polymer_exponent` or the
+        named fallback and a warning says so once, so every distance call has a law to answer
+        with and none answers with a constant silently."""
+        if self.polymer is None:
+            from gnome3d.polymer import FALLBACK_NU, PolymerLaw
+
+            nu = float(self.polymer_exponent) if self.polymer_exponent > 0.0 else FALLBACK_NU
+            log.get("settings").warning(
+                "no fitted polymer law attached; using exponent %.3f %s",
+                nu,
+                "from the config" if self.polymer_exponent > 0.0 else "as the fallback",
+            )
+            self.polymer = PolymerLaw(
+                nu=nu,
+                s0_bp=int(self.target_bp_per_subanchor),
+                q_half=float(self.contact_half_saturation),
+            )
+        return self.polymer
+
     def genomic_length_to_distance(self, length_bp: int) -> float:
-        from gnome3d.util import genomic_length_to_distance
+        """The distance two beads that far apart hold with nothing between them, in beads."""
+        return self.polymer_law().background(length_bp)
 
-        return genomic_length_to_distance(
-            length_bp, self.genomic_dist_base, self.genomic_dist_scale, self.genomic_dist_power
-        )
-
-    def freq_to_dist_heatmap(self, freq: float) -> float:
-        from gnome3d.util import freq_to_dist_heatmap
-
-        return freq_to_dist_heatmap(freq, self.freq_dist_scale, self.freq_dist_power)
-
-    def freq_to_dist_heatmap_inter(self, freq: float) -> float:
-        from gnome3d.util import freq_to_dist_heatmap_inter
-
-        return freq_to_dist_heatmap_inter(
-            freq, self.freq_dist_scale_inter, self.freq_dist_power_inter
-        )
-
-    def freq_to_distance(self, freq: int) -> float:
-        from gnome3d.util import freq_to_distance
-
-        return freq_to_distance(
-            freq,
-            self.count_dist_a,
-            self.count_dist_scale,
-            self.count_dist_shift,
-            self.count_dist_base_level,
-        )
+    def arc_expected_distance(self, score: int, sep_bp: int) -> float:
+        """The target for an arc of `score` PETs spanning `sep_bp`, in beads."""
+        return self.polymer_law().arc_distance(score, sep_bp)
 
     def data_path(self, filename: str) -> str:
         """Resolve a data filename relative to data_dir."""

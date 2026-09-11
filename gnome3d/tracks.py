@@ -1,10 +1,9 @@
 """
 Epigenomic track handling.
 
-Turns loaded compartment and signal intervals into the per-bead arrays the MC
-terms read.  Three steps live here.  Binning intervals onto bead ranges, phasing
-an unsigned eigenvector track into A and B calls, and normalising a raw signal
-into the accessibility scale HiP-HoP uses.
+Turns loaded compartment intervals into the per-bead arrays the MC terms read.
+Two steps live here.  Binning intervals onto bead ranges and phasing an unsigned
+eigenvector track into A and B calls.
 
 Bead ranges are inclusive, so a bead spanning `[s, e]` covers `e - s + 1` bases
 and a zero-length subanchor still covers one.  Track intervals are half open,
@@ -33,9 +32,6 @@ from gnome3d.types import (
 )
 
 LOG = log.get("tracks")
-
-# Offset inside the log used to normalise accessibility.  HiP-HoP's value.
-_LOG_EPS = 1e-6
 
 # Either interval flavour, for the helpers that only touch start and end.
 _IntervalT = TypeVar("_IntervalT", CompartmentInterval, SignalInterval)
@@ -107,135 +103,6 @@ def bin_compartments(
         score[i] = acc / total
 
     return cls, score
-
-
-def bin_signal(
-    intervals: list[SignalInterval],
-    starts: list[int],
-    ends: list[int],
-) -> F32Array:
-    """
-    Reduce a continuous track onto bead ranges as a coverage-weighted mean.
-
-    A bead with no overlapping interval gets the mean over the beads that do have
-    one, so an unmeasured gap reads as typical rather than as silent.  With no
-    overlap anywhere the result is all zeros.
-
-    Parameters
-    ----------
-    intervals : list[SignalInterval]
-        Sorted by start, for one chromosome.
-    starts, ends : list[int]
-        Inclusive genomic range per bead.
-    """
-    n = len(starts)
-    out: F32Array = np.zeros(n, dtype=np.float32)
-    if not intervals:
-        return out
-
-    iv_starts = [iv.start for iv in intervals]
-    iv_ends = [iv.end for iv in intervals]
-    covered: list[int] = []
-
-    for i in range(n):
-        s, e = starts[i], ends[i] + 1
-        lo, hi = _candidate_range(iv_starts, iv_ends, s, e)
-        total = 0
-        acc = 0.0
-        for k in range(lo, hi):
-            iv = intervals[k]
-            w = min(e, iv.end) - max(s, iv.start)
-            if w <= 0:
-                continue
-            total += w
-            acc += iv.value * w
-        if total == 0:
-            continue
-        out[i] = acc / total
-        covered.append(i)
-
-    if covered and len(covered) < n:
-        fill = float(out[covered].mean())
-        mask = np.ones(n, dtype=np.bool_)
-        mask[covered] = False
-        out[mask] = fill
-
-    return out
-
-
-def normalize_accessibility(
-    values: F32Array, mode: str = "log", percentile: float = 80.0
-) -> F32Array:
-    """
-    Map a raw signal onto the [0, 1] accessibility scale.
-
-    Two modes.
-
-    `log` applies `log(v + 1e-6)` then min-max.  The log is there to compress the
-    long upper tail of a fold-change track.  On a track binned to several kb it
-    does the opposite of what is wanted: binning a narrow peak into a wide bin
-    already removes the tail, so the log stretches the remaining background across
-    most of the range.  Measured on GM12878 ATAC at 5 kb the median bead reads
-    0.85 open and only 0.224 of `1 - a` is left for fibre compaction to act on,
-    which is why that term measured as noise.
-
-    `binary` assigns a state instead: open above `percentile` of the loaded
-    values, closed below.  This is what HiP-HoP does, where a bead is either a
-    strong binding site or a weak one rather than somewhere on a continuum, and it
-    matches the biology that only a small fraction of the genome sits under a peak.
-    At the 80th percentile it leaves 0.800 of `1 - a` to act on.
-
-    A constant track maps to all zeros in either mode.
-
-    Parameters
-    ----------
-    values : raw per-interval signal.
-    mode : "log" or "binary".
-    percentile : the open/closed split for `binary`, in percent.
-    """
-    if values.size == 0:
-        return values.astype(np.float32)
-    v64 = np.maximum(values, 0.0).astype(np.float64)
-    if float(v64.max()) - float(v64.min()) <= 0.0:
-        return np.zeros_like(values, dtype=np.float32)
-
-    if str(mode).strip().lower() == "binary":
-        thr = float(np.percentile(v64, float(percentile)))
-        return (v64 >= thr).astype(np.float32)
-
-    v = np.log(v64 + _LOG_EPS)
-    lo, hi = float(v.min()), float(v.max())
-    if hi - lo <= 0.0:
-        return np.zeros_like(values, dtype=np.float32)
-    return ((v - lo) / (hi - lo)).astype(np.float32)
-
-
-def normalize_signal_map(
-    signal: SignalMap, mode: str = "log", percentile: float = 80.0
-) -> SignalMap:
-    """
-    Rescale a whole signal map onto [0, 1] in place.
-
-    Normalising once over every loaded interval, rather than per region at scoring
-    time, is what makes the bridging strength comparable across regions.  A region
-    that is closed throughout would otherwise still produce beads at 1.0 after a
-    local min-max.  The extent is whatever was loaded, so a whole-genome run
-    normalises genome wide and a single-chromosome run normalises over that
-    chromosome.  The same holds for the `binary` percentile, which is taken over
-    the loaded extent.
-
-    `mode` and `percentile` are passed through to `normalize_accessibility`.
-
-    Mutates and returns `signal`.
-    """
-    flat = [iv for lst in signal.values() for iv in lst]
-    if not flat:
-        return signal
-    raw = np.array([iv.value for iv in flat], dtype=np.float32)
-    scaled = normalize_accessibility(raw, mode=mode, percentile=percentile)
-    for iv, v in zip(flat, scaled.tolist(), strict=True):
-        iv.value = float(v)
-    return signal
 
 
 def slice_intervals(intervals: list[_IntervalT], lo: int, hi: int) -> list[_IntervalT]:

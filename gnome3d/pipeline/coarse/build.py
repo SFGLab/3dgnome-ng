@@ -26,8 +26,12 @@ field set, not of the positioned graph.
 from __future__ import annotations
 
 from dataclasses import field
+from typing import TYPE_CHECKING
 
 from gnome3d import log
+
+if TYPE_CHECKING:
+    from gnome3d.polymer import PolymerLaw
 from gnome3d.data import ContactData
 from gnome3d.hierarchy import Cluster, Level, build_cluster_tree, set_level
 from gnome3d.io import create_singleton_heatmap
@@ -39,7 +43,7 @@ from gnome3d.pipeline.coarse.heatmap import (
     normalize_heatmap_inter,
 )
 from gnome3d.settings import Settings
-from gnome3d.tracks import bin_compartments, bin_signal, normalize_accessibility
+from gnome3d.tracks import bin_compartments
 from gnome3d.types import *
 from gnome3d.util import random_vector_np, seed_rng
 
@@ -89,10 +93,49 @@ class CoarseState:
     singletons: list[SingletonContact]
     long_arcs: RawArcMap
     selected_region: BedRegion | None = None
-    # Epigenomic tracks for the opt-in compartment and accessibility terms.
-    # Empty when no track is configured, which leaves those terms inert.
+    # Compartment track for the opt-in compartment term.  Empty when no track
+    # is configured, which leaves the term inert.
     compartments: CompartmentMap = field(default_factory=empty_compartment_map)
-    accessibility: SignalMap = field(default_factory=empty_signal_map)
+
+
+def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
+    """The run's polymer law, from its own fits, with one always visible line saying what it
+    measured or why it could not. A repeat attach with the same exponent, which the ensemble
+    path makes once per member, logs at debug so the line is not printed per structure.
+
+    The exponent is `polymer_exponent` when pinned, otherwise the contact fit's, otherwise the
+    named fallback. The bead is the subanchor spacing the run declared.
+    """
+    from gnome3d.polymer import FALLBACK_NU, PolymerLaw
+
+    fit = data.contact_fit
+    args: tuple[object, ...]
+    if settings.polymer_exponent > 0.0:
+        nu = float(settings.polymer_exponent)
+        msg = "polymer law: exponent pinned at %.3f by the config"
+        args = (nu,)
+    elif fit is not None and fit.ok:
+        nu = fit.nu
+        msg = "polymer law: exponent %.3f measured on %s intra pairs, %d to %d kb, slope %+.3f"
+        args = (nu, f"{fit.n_pairs:,}", fit.lo // 1000, fit.hi // 1000, fit.slope)
+    else:
+        nu = FALLBACK_NU
+        msg = "polymer law: the singletons cannot supply an exponent (%s), using the fallback %.3f"
+        args = (fit.reason if fit is not None else "no fit", nu)
+    repeat = settings.polymer is not None and abs(settings.polymer.nu - nu) < 1e-12
+    if repeat:
+        LOG.debug(msg, *args)
+    else:
+        log.status(LOG, msg, *args)
+    arcs = data.arc_fit
+    if arcs is not None and not arcs.ok and not repeat:
+        log.status(LOG, "polymer law: loop strength follows the PET count alone (%s)", arcs.reason)
+    return PolymerLaw(
+        nu=nu,
+        s0_bp=int(settings.target_bp_per_subanchor),
+        q_half=float(settings.contact_half_saturation),
+        arcs=arcs,
+    )
 
 
 def build_state(
@@ -111,10 +154,10 @@ def build_state(
             data.arcs,
             data.breakpoints,
             chrs_list,
-            ib_splits=data.ib_splits,
-            ib_split_source=settings.ib_split_source,
         )
         LOG.info("total clusters: %d", len(clusters))
+
+    settings.polymer = attach_polymer_law(settings, data)
 
     return CoarseState(
         s=settings,
@@ -128,7 +171,6 @@ def build_state(
         long_arcs=data.long_arcs,
         selected_region=region,
         compartments=data.compartments,
-        accessibility=data.accessibility,
     )
 
 
@@ -156,26 +198,16 @@ def compartment_for_clusters(
 
 def coarse_track_arrays(
     state: CoarseState, active_region: list[ClusterIndex], chr_of: list[str]
-) -> tuple[I8Array | None, F32Array | None, I32Array | None, F64Array | None]:
-    """Per-cluster track arrays for a multi-chromosome active region.
+) -> I8Array | None:
+    """Per-cluster compartment array for a multi-chromosome active region.
 
     `active_region` and `chr_of` are parallel, so each cluster is binned against
-    its own chromosome's track.  Returns
-    (compartment, accessibility, chromosome id, chromosome weight), each None
-    when the term that reads it is off or its data is missing.
-
-    The chromosome weight drives the nucleolar pull.  It is the mean chromosome
-    span over this chromosome's span, so a smaller chromosome gets a larger
-    weight and sits nearer the centre, which is the bias MultiMM's central force
-    encodes.
+    its own chromosome's track.  Returns None when the compartment term is off or
+    no chromosome has a track.
     """
     s = state.s
-    if not active_region:
-        return None, None, None, None
-
-    want_comp = s.use_compartments or s.use_lamina
-    want_acc = s.use_bridging
-    want_chrom = s.use_central_force or s.use_chromosomal_blocks
+    if not active_region or not s.use_compartments:
+        return None
 
     n = len(active_region)
     clusters = state.clusters
@@ -183,70 +215,20 @@ def coarse_track_arrays(
     for i, c in enumerate(chr_of):
         by_chr.setdefault(c, []).append(i)
 
-    comp: I8Array | None = np.zeros(n, dtype=np.int8) if want_comp else None
-    acc: F32Array | None = np.zeros(n, dtype=np.float32) if want_acc else None
+    comp: I8Array = np.zeros(n, dtype=np.int8)
     got_comp = False
-    got_acc = False
 
     for chr_, rows in by_chr.items():
         idx = [active_region[i] for i in rows]
         starts = [clusters[ci].start for ci in idx]
         ends = [clusters[ci].end for ci in idx]
-        if comp is not None:
-            ivs = state.compartments.get(chr_, [])
-            if ivs:
-                cls, _score = bin_compartments(ivs, starts, ends)
-                comp[rows] = cls
-                got_comp = True
-        if acc is not None:
-            sig = state.accessibility.get(chr_, [])
-            if sig:
-                acc[rows] = bin_signal(sig, starts, ends)
-                got_acc = True
+        ivs = state.compartments.get(chr_, [])
+        if ivs:
+            cls, _score = bin_compartments(ivs, starts, ends)
+            comp[rows] = cls
+            got_comp = True
 
-    chrom_id: I32Array | None = None
-    chrom_w: F64Array | None = None
-    if want_chrom:
-        order = {c: k for k, c in enumerate(sorted(by_chr))}
-        chrom_id = np.array([order[c] for c in chr_of], dtype=np.int32)
-        spans = {
-            c: max(
-                max(clusters[active_region[i]].end for i in rows)
-                - min(clusters[active_region[i]].start for i in rows),
-                1,
-            )
-            for c, rows in by_chr.items()
-        }
-        mean_span = float(sum(spans.values())) / len(spans)
-        chrom_w = np.array([mean_span / spans[c] for c in chr_of], dtype=np.float64)
-
-    return (
-        comp if got_comp else None,
-        acc if got_acc else None,
-        chrom_id,
-        chrom_w,
-    )
-
-
-def accessibility_for_clusters(
-    state: CoarseState, indices: list[ClusterIndex], chr_: str
-) -> F32Array | None:
-    """
-    Normalised accessibility per cluster, or None when no track covers this
-    chromosome.
-
-    The normalisation is done over the clusters handed in rather than genome
-    wide, so `a` spans [0, 1] within whatever region is being scored.  That keeps
-    the bridging strength comparable across regions of very different signal
-    depth.
-    """
-    ivs = state.accessibility.get(chr_, [])
-    if not ivs or not indices:
-        return None
-    clusters = state.clusters
-    starts = [clusters[ci].start for ci in indices]
-    ends = [clusters[ci].end for ci in indices]
-    return normalize_accessibility(bin_signal(ivs, starts, ends))
+    return comp if got_comp else None
 
 
 # --- RNG-ordered shared subroutine ------------------------------------------
@@ -390,6 +372,90 @@ def add_long_pet_to_segment_heatmap(
         LOG.info("long-PET folded into segment heatmap: %d arcs", n_added)
 
 
+def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int, int]]) -> F64Array:
+    """The arc target matrix for one active region.
+
+    An arc pair carries `Settings.arc_expected_distance` of its PET count and span, positive.
+    An arcless pair closer than `background_range_bp` carries minus the background for its
+    separation when `background_weight` is on, which the kernels score as a weak spring
+    symmetric in log distance. Every other arcless pair carries -0.5, which the kernels score
+    as the truncated repulsion. A background is never under one bead, so the sign and the
+    magnitude tell the two arcless kinds apart without a second matrix. The diagonal is 0.
+
+    Parameters
+    ----------
+    mids
+        Genomic midpoint in bp per anchor, in active region order.
+    arcs
+        (i, j, score) per arc in active region indices.
+    """
+    n = len(mids)
+    mat: F64Array = np.full((n, n), -0.5, dtype=np.float64)
+    if float(s.background_weight) > 0.0:
+        law = s.polymer_law()
+        m = np.asarray(mids, dtype=np.float64)
+        sep = np.abs(m[:, None] - m[None, :])
+        rng = float(s.background_range_bp)
+        for i, j in zip(*np.nonzero((sep > 0.0) & (sep < rng)), strict=True):
+            mat[i, j] = -law.background(int(sep[i, j]))
+    np.fill_diagonal(mat, 0.0)
+    for i, j, score in arcs:
+        exp_d = s.arc_expected_distance(score, mids[j] - mids[i])
+        mat[i, j] = exp_d
+        mat[j, i] = exp_d
+    return mat
+
+
+def add_contact_background(
+    mat: F64Array, mids: list[int], anchor_heatmap: F64Array | None, s: Settings
+) -> F64Array:
+    """Hold an arcless anchor pair beyond the short range at the law's contact distance when
+    its contact cell says it sits closer than the background. Returns a new matrix, or the
+    input as is when the term is off, the spring weight is zero or there is no contact map.
+
+    The contact map is converted with the law the way every heatmap is, observed over the
+    expectation at that separation within the map itself. Only a pair whose distance comes out
+    under the background is entered, as minus that distance and never under one bead, so the
+    kernels score it with the background spring. A pair at or below its expected contact keeps
+    the repulsion marker, which keeps the held set sparse; holding every pair at a power law
+    could not be embedded and was rejected. Inside the range the short range entry stands, and
+    arc pairs are untouched.
+
+    Parameters
+    ----------
+    mat
+        The target matrix from `arc_expected_matrix`.
+    mids
+        Genomic midpoint of each anchor.
+    anchor_heatmap
+        Contact counts between anchor pairs, or None.
+    s
+        The run's settings.
+    """
+    if (
+        not bool(s.use_contact_background)
+        or float(s.background_weight) <= 0.0
+        or anchor_heatmap is None
+    ):
+        return mat
+    n = len(mids)
+    heat = np.asarray(anchor_heatmap, dtype=np.float64)
+    if n < 2 or float(heat.max()) <= 0.0:
+        return mat
+    pos = np.asarray(mids, dtype=np.float64)
+    dist, _avg = create_distance_heatmap(s, heat, n, separations_bp=pos)
+    dist = np.asarray(dist, dtype=np.float64)
+    law = s.polymer_law()
+    sep = np.abs(pos[:, None] - pos[None, :])
+    bg = np.maximum(1.0, (sep / max(int(law.s0_bp), 1)) ** law.nu)  # law.background, arrayed
+    eligible = (mat == -0.5) & (sep > float(s.background_range_bp)) & (dist > 0.0) & (dist < bg)
+    if not eligible.any():
+        return mat
+    out = np.array(mat, dtype=np.float64, copy=True)
+    out[eligible] = -np.maximum(1.0, dist[eligible])
+    return out
+
+
 def calc_anchor_expected_distances(
     state: CoarseState,
     active_region: list[int],
@@ -412,12 +478,10 @@ def calc_anchor_expected_distances(
     s = state.s
     clusters = state.clusters
     n = len(active_region)
-    mat: F64Array = np.full((n, n), -1.0, dtype=np.float64)
-    np.fill_diagonal(mat, 0.0)
-
     cluster_to_active = {ci: ai for ai, ci in enumerate(active_region)}
     chr_arcs = state.arcs.get(chr_, [])
 
+    arcs: list[tuple[int, int, int]] = []
     for ai, ci in enumerate(active_region):
         for arc_local in clusters[ci].arcs:
             if arc_local >= len(chr_arcs):
@@ -428,10 +492,9 @@ def calc_anchor_expected_distances(
             if other < ci or other not in cluster_to_active:
                 continue
 
-            bi = cluster_to_active[other]
-            exp_d = s.freq_to_distance(arc.score)
-            mat[ai, bi] = exp_d
-            mat[bi, ai] = exp_d
+            arcs.append((ai, cluster_to_active[other], int(arc.score)))
+    mids = [int(clusters[ci].genomic_pos) for ci in active_region]
+    mat = arc_expected_matrix(s, mids, arcs)
 
     # Apply anchor heatmap: scale down expected distances for high-contact pairs.
     # Mirrors Reference post-processing in calcAnchorExpectedDistancesHeatmap().
@@ -449,7 +512,7 @@ def calc_anchor_expected_distances(
                     mat[i, j] *= 1.0 - s_val
                     mat[j, i] = mat[i, j]
 
-    return mat
+    return add_contact_background(mat, mids, anchor_heatmap, s)
 
 
 def subanchor_counts_per_arc(state: CoarseState, active_region: list[int]) -> list[int]:
@@ -499,10 +562,16 @@ def build_contact_heatmaps(
     state: CoarseState,
     active_region: list[int],
     chr_: str,
-) -> tuple[F64Array, F32Array]:
+    with_subanchor: bool = True,
+) -> tuple[F64Array, F32Array | None]:
     """
     Build anchor-level and subanchor-level singleton contact heatmaps.
     Mirrors Reference createSingletonSubanchorHeatmap().
+
+    With `with_subanchor` false the anchor heatmap is binned directly at anchor resolution
+    and the subanchor matrix is None. The anchor matrix is the same to the byte, since it is
+    the anchor bins of the subanchor matrix and the same contacts land in them in the same
+    order, and nothing N by N is allocated, which on a 43,000 bead block is 15 GB.
 
     Returns (anchor_heatmap, subanchor_heatmap_raw) where:
       anchor_heatmap:      (n_anchors, n_anchors) float64 - normalized contact
@@ -577,6 +646,35 @@ def build_contact_heatmaps(
     # [[project-singleton-chr-filter-divergence]] (intentional divergence).
     import bisect
 
+    anchor_off = np.asarray(anchor_offsets[:n_anchors], dtype=np.intp)
+    al = np.maximum(np.asarray(anchor_lens, dtype=np.float64), 1.0)  # (n_anchors,)
+
+    if not with_subanchor:
+        # The anchor bins alone. A contact whose either end falls in a subanchor bin is
+        # not an anchor pair and is dropped, as cutting the anchor bins out of the full
+        # matrix would drop it.
+        bin_anchor = np.full(N, -1, dtype=np.int64)
+        bin_anchor[anchor_off] = np.arange(n_anchors)
+        h_direct: F64Array = np.zeros((n_anchors, n_anchors), dtype=np.float64)
+        for c1, p1, c2, p2, sc in state.singletons:
+            if c1 != chr_ or c2 != chr_:
+                continue
+            if p1 < region_start or p1 > region_end or p2 < region_start or p2 > region_end:
+                continue
+            si = bisect.bisect_right(breaks, p1) - 1
+            ei = bisect.bisect_right(breaks, p2) - 1
+            if si < 0 or ei < 0 or si >= N or ei >= N or si == ei:
+                continue
+            ai = int(bin_anchor[si])
+            aj = int(bin_anchor[ei])
+            if ai < 0 or aj < 0:
+                continue
+            h_direct[ai, aj] += sc
+            h_direct[aj, ai] += sc
+        h_direct /= np.outer(al, al) / 1e6
+        np.fill_diagonal(h_direct, 0.0)
+        return h_direct, None
+
     h_sub: F64Array = np.zeros((N, N), dtype=np.float64)
     for c1, p1, c2, p2, sc in state.singletons:
         if c1 != chr_ or c2 != chr_:
@@ -593,8 +691,6 @@ def build_contact_heatmaps(
     # Anchor heatmap from raw subanchor values (BEFORE normalization), normalized
     # by anchor area in Mbp^2.  Mirrors Reference lines 1267-1273; vectorized over
     # the anchor bins (diagonal stays 0, off-diagonal symmetric).
-    anchor_off = np.asarray(anchor_offsets[:n_anchors], dtype=np.intp)
-    al = np.maximum(np.asarray(anchor_lens, dtype=np.float64), 1.0)  # (n_anchors,)
     h_anchor: F64Array = h_sub[np.ix_(anchor_off, anchor_off)] / (np.outer(al, al) / 1e6)
     np.fill_diagonal(h_anchor, 0.0)
 
@@ -728,7 +824,16 @@ def reconstruct_chromosome_level(state: CoarseState) -> None:
 
     # Normalize first non-zero diagonal to 1.0; convert freq → expected dist.
     hd = normalize_heatmap_diagonal_total(h, n_chr, 1.0)
-    heatmap_dist, avg_dist = create_distance_heatmap(s, hd, n_chr, inter=False)
+    # Chromosome pairs have no genomic separation, so every cell shares one expectation and
+    # the background is taken at the mean chromosome span.
+    spans = [
+        float(clusters[state.chr_root[c]].end - clusters[state.chr_root[c]].start)
+        for c in state.chrs
+        if c in state.chr_root
+    ]
+    heatmap_dist, avg_dist = create_distance_heatmap(
+        s, hd, n_chr, scale_bp=float(np.mean(spans)) if spans else None
+    )
     heatmap_dist = np.array(heatmap_dist, dtype=np.float64)
     heatmap_dist_diag = get_diagonal_size(hd, n_chr)
 
@@ -817,8 +922,13 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
     if len(state.chrs) > 1:
         h_norm = normalize_heatmap_inter(h_norm, total_size, current_level, s.heatmap_inter_scaling)
 
-    # Convert freq -> distance heatmap
-    heatmap_dist, avg_dist = create_distance_heatmap(s, h_norm, total_size, inter=False)
+    # The conversion is observed over expected at each pair's separation, so it needs where
+    # each bin sits.
+    ends = np.cumsum(np.asarray(bin_lengths_mb, dtype=np.float64)) * 1e6
+    separations = ends - 0.5 * np.asarray(bin_lengths_mb, dtype=np.float64) * 1e6
+    heatmap_dist, avg_dist = create_distance_heatmap(
+        s, h_norm, total_size, separations_bp=separations
+    )
     heatmap_dist = np.array(heatmap_dist, dtype=np.float64)
     heatmap_dist_diag = get_diagonal_size(h_norm, total_size)
 
@@ -846,7 +956,7 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
 
     step_size = avg_dist * s.noise_lvl2
 
-    seg_comp, seg_acc, seg_chrom_id, seg_chrom_w = coarse_track_arrays(state, active_region, chr_of)
+    seg_comp = coarse_track_arrays(state, active_region, chr_of)
 
     pos: F32Array = np.array([clusters[i].pos for i in active_region], dtype=np.float32)
     n = len(active_region)
@@ -865,9 +975,6 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
                 step_size,
                 s,
                 seg_comp,
-                seg_acc,
-                seg_chrom_id,
-                seg_chrom_w,
             )
             if score < best_score or best_score < 0:
                 best_score = score
@@ -908,6 +1015,57 @@ def position_interaction_blocks(state: CoarseState, segs: list[int], chr_: str) 
         ib_mc_refine(state, segs, chr_)
 
 
+def block_heatmap_distances(
+    s: Settings,
+    singletons: list[SingletonContact],
+    chr_: str,
+    blocks: list[tuple[int, int, int]],
+) -> F64Array:
+    """Distance targets between the blocks of one chain, from the run's own contacts.
+
+    Contacts are binned by block, the bins meeting halfway between neighbouring blocks, then
+    normalised and converted with the law the way the segment heatmap is. A cell with no
+    contact carries 0 and the diagonal band -1, both of which the kernel skips.
+
+    Parameters
+    ----------
+    s
+        The run's settings, carrying the law.
+    singletons
+        Contacts on this chromosome.
+    chr_
+        The chromosome.
+    blocks
+        One (start, end, midpoint) per block, in genomic order.
+    """
+    n = len(blocks)
+    if n <= 1:
+        return np.zeros((n, n), dtype=np.float64)
+    breaks = [0]
+    for (_, end_a, _), (start_b, _, _) in zip(blocks[:-1], blocks[1:], strict=True):
+        breaks.append((end_a + start_b) // 2)
+    breaks.append(int(1e9))
+    lengths_mb: list[float] = []
+    for i, (start, end, _) in enumerate(blocks):
+        if i == 0:
+            bp = breaks[1] - start
+        elif i == n - 1:
+            bp = end - breaks[-2]
+        else:
+            bp = breaks[i + 1] - breaks[i]
+        lengths_mb.append(max(bp, 1) / 1e6)
+    h_raw = create_singleton_heatmap(
+        singletons, {chr_: breaks}, {chr_: 0}, n, bin_lengths_mb=lengths_mb
+    )
+    if float(np.asarray(h_raw).sum()) <= 0.0:
+        return np.zeros((n, n), dtype=np.float64)
+    h_norm = normalize_heatmap(h_raw, n)
+    h_norm = normalize_heatmap_diagonal_total(h_norm, n, 1.0)
+    mids = np.array([m for _, _, m in blocks], dtype=np.float64)
+    dist, _avg = create_distance_heatmap(s, h_norm, n, separations_bp=mids)
+    return np.array(dist, dtype=np.float64)
+
+
 def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
     """
     Refine IB centroid positions with a small chain-bond + EV + confinement
@@ -945,10 +1103,23 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
     else:
         groups = [list(clusters[seg_idx].children) for seg_idx in segs]
 
+    heat_w = float(s.heatmap_weight_ib)
+    chr_contacts: list[SingletonContact] = (
+        [c for c in state.singletons if c[0] == chr_ and c[2] == chr_] if heat_w > 0.0 else []
+    )
+
     for ibs in groups:
         if len(ibs) <= 1:
             continue
         pos: F32Array = np.array([clusters[ib].pos for ib in ibs], dtype=np.float32)
+        heat: F64Array | None = None
+        if heat_w > 0.0:
+            heat = block_heatmap_distances(
+                s,
+                chr_contacts,
+                chr_,
+                [(clusters[ib].start, clusters[ib].end, clusters[ib].genomic_pos) for ib in ibs],
+            )
         dtn: F32Array = np.zeros(len(ibs) - 1, dtype=np.float32)
         for i in range(len(ibs) - 1):
             gap = abs(clusters[ibs[i + 1]].genomic_pos - clusters[ibs[i]].genomic_pos)
@@ -990,7 +1161,7 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
                 step_size,
                 s,
                 compartment_for_clusters(state, ibs, chr_),
-                accessibility_for_clusters(state, ibs, chr_),
+                heat_dist=heat,
             )
             gyr_after = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())
             LOG.info("gyr %.2f -> %.2f", gyr_before, gyr_after)

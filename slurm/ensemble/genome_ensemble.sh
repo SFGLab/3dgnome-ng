@@ -1,0 +1,148 @@
+#!/bin/bash -l
+
+# Whole-genome conformational ensemble for one cell line, sharded over chromosomes.
+#
+#   CELL=GM12878 sbatch --array=0-45%12 slurm/ensemble/genome_ensemble.sh
+#   CELL=H1ESC   N_MODELS=40 PER_TASK=10 sbatch --array=0-91%12 slurm/ensemble/genome_ensemble.sh
+#
+# One array task = one chromosome x a block of PER_TASK conformations. The array index maps to
+#
+#   chrom_index = TASK / CHUNKS        CHUNKS = N_MODELS / PER_TASK
+#   chunk       = TASK % CHUNKS        members = chunk*PER_TASK .. +PER_TASK-1
+#
+# so the array length is (number of chromosomes) * CHUNKS. With the defaults below that is
+# 23 * 2 = 46, printed by the script at startup so a wrong --array is obvious immediately.
+#
+# Why per chromosome rather than one whole-genome job per conformation. The downstream
+# enhancer3D analysis is intra-chromosomal (enhancer-promoter distances within a chromosome) and
+# its published models are per-chromosome, so nothing consumes inter-chromosomal placement.
+# Sharding this way turns one long genome run into 23 independent tasks that backfill into free
+# GPUs, and a failure costs one chromosome rather than a whole genome. The cost is that
+# chromosomes are placed independently, with no chromosome-level MC between them; if you need a
+# single coherent nucleus, run `--region ""` in one task instead.
+#
+# Total work is unchanged by the sharding. Under arc-gap blocks, measured on chr1 to chr6, one
+# GM12878 conformation costs about 18 GPU-hours across the whole genome, H1ESC about 10 and
+# HFFC6 about 9, scaling with each line's anchor count. Arc-gap blocks are several times more
+# expensive than TAD blocks at the same bead count, because they give far fewer and far larger
+# interaction blocks and smooth MC cost grows faster than linearly in chain length. Budget
+# N_MODELS accordingly: 100 GM12878 models is roughly 1800 GPU-hours on its own.
+#
+# Requeue safety: a member whose .cif already exists is skipped, so a requeued or resubmitted
+# task resumes rather than redoing finished work.
+
+#SBATCH --job-name=e3d_ens
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=8
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem=64G
+#SBATCH --partition=long
+# Sized from measured arc-gap rates, GM12878 being the slowest cell line: 96 min per chr1
+# conformation, 53 to 80 elsewhere on chr1 to chr6. PER_TASK=10 therefore needs 16 h on the worst
+# chromosome, which is why the earlier 08:00:00 timed out on chr1, chr3 and chr5. 24 h leaves
+# roughly 50 percent headroom for a slow node and stays well inside the long partition's 5 day
+# limit. Raising this rather than cutting PER_TASK is safe because each conformation is written
+# as it finishes, so a timeout costs only the one in flight.
+#SBATCH --time=24:00:00
+#SBATCH --account=sfglab
+# Absolute for the same reason as setup_cell.sh: sbatch parses #SBATCH before the shell runs, so
+# these cannot use $ROOT, and the directory must already exist.
+#SBATCH --open-mode=append
+#SBATCH --output=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/ens_%x_%A_%a.out
+#SBATCH --error=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/ens_%x_%A_%a.out
+
+set -euo pipefail
+
+CELL="${CELL:-${1:-}}"
+[ -n "$CELL" ] || { echo "set CELL=GM12878|H1ESC|HFFC6" >&2; exit 1; }
+
+ROOT="${ROOT:-/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng}"
+LOWER=$(echo "$CELL" | tr '[:upper:]' '[:lower:]')
+# Blocks come from arc gaps. TAD interaction blocks were dropped: a TAD boundary is an
+# insulation call that knows nothing about the arcs, so it cuts through them, orphaning 43.6
+# percent of GM12878 chr1 arcs against exactly 0 under arc gaps, and the models lose expression
+# signal accordingly. `out/<cell>_genome` holds the superseded TAD-block ensembles, so the
+# arc-gap output goes somewhere else rather than merging into them.
+CONFIG="${CONFIG:-$ROOT/slurm/ensemble/${LOWER}_hic_arcs.ini}"
+OUT="${OUT:-$ROOT/out/${LOWER}_genome_arcs}"
+N_MODELS="${N_MODELS:-20}"
+PER_TASK="${PER_TASK:-10}"
+CHROMS="${CHROMS:-chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 chrX}"
+
+read -r -a CHROM_ARR <<< "$CHROMS"
+CHUNKS=$(( (N_MODELS + PER_TASK - 1) / PER_TASK ))
+NEEDED=$(( ${#CHROM_ARR[@]} * CHUNKS ))
+
+TASK="${SLURM_ARRAY_TASK_ID:-0}"
+CHROM_IDX=$(( TASK / CHUNKS ))
+CHUNK=$(( TASK % CHUNKS ))
+
+echo "[ens:$CELL] array length needed = $NEEDED (${#CHROM_ARR[@]} chroms x $CHUNKS chunks of $PER_TASK)"
+if [ "$CHROM_IDX" -ge "${#CHROM_ARR[@]}" ]; then
+  echo "[ens:$CELL] task $TASK is past the end; submit --array=0-$((NEEDED - 1))" >&2
+  exit 1
+fi
+
+CHROM="${CHROM_ARR[$CHROM_IDX]}"
+FIRST=$(( CHUNK * PER_TASK ))
+LAST=$(( FIRST + PER_TASK - 1 ))
+[ "$LAST" -ge "$N_MODELS" ] && LAST=$(( N_MODELS - 1 ))
+MEMBERS="${FIRST}-${LAST}"
+
+cd "$ROOT"
+mkdir -p slurm/ensemble/logs "$OUT/$CHROM"
+source .venv/bin/activate
+
+# Share one XLA cache across the whole array. Each distinct IB shape compiles once per machine
+# instead of once per task; with bucketing that is a handful of shapes rather than hundreds.
+export GNOME3D_JAX_CACHE="${GNOME3D_JAX_CACHE:-$ROOT/.cache/gnome3d-jax}"
+mkdir -p "$GNOME3D_JAX_CACHE"
+export PYTHONFAULTHANDLER=1
+export PYTHONUNBUFFERED=1
+
+python - "$CONFIG" "$CELL" <<'PYCHECK'
+import sys
+
+from gnome3d.settings import Settings
+
+s = Settings()
+assert s.load_ini(sys.argv[1]), f"cannot load {sys.argv[1]}"
+cell = sys.argv[2]
+
+# Each of these fails silently rather than loudly if unset: epigenome terms left on from another
+# run produce a plausible structure that answers a different question. The singleton source is
+# deliberately NOT constrained here, since Hi-C, ChIA-PET and the blend are all legitimate arms;
+# what is checked is that the file exists. Blocks are not checked because they no longer vary,
+# always coming from arc gaps.
+assert cell in s.data_anchors, f"config is not for {cell}: anchors={s.data_anchors!r}"
+assert s.use_ctcf_motif and s.use_excluded_volume and s.use_dynamic_loop_density
+assert s.use_anchor_heatmap and s.use_subanchor_heatmap
+assert s.mc_executor_jax_bucket_shapes, "shape bucketing is off; this run would be ~5x slower"
+assert not s.use_compartments, "use_compartments is on; these runs exclude epigenome terms"
+# Every input the run will open, resolved through the config rather than assumed by name.
+from pathlib import Path  # noqa: E402
+
+required = ["data_anchors", "data_pet_clusters", "data_singletons", "data_segment_split",
+            "data_centromeres"]
+for field in required:
+    name = getattr(s, field)
+    assert name, f"{field} is unset"
+    path = Path(s.data_path(name))
+    assert path.is_file() and path.stat().st_size > 0, (
+        f"{field}: missing or empty {path}; run sbatch slurm/ensemble/setup_cell.sh {cell}")
+
+print(f"[guard] {cell} ok, singletons={s.data_singletons}, bucketing on, "
+      f"heat_min_reduction={s.subanchor_heat_min_reduction}")
+PYCHECK
+
+# DRY_RUN prints the resolved shard and stops, so the array mapping can be checked without
+# an allocation.
+if [ "${DRY_RUN:-0}" = "1" ]; then
+  echo "[dry] task=$TASK chrom=$CHROM members=$MEMBERS out=$OUT/$CHROM"
+  exit 0
+fi
+
+echo "[launch] node=$(hostname) cell=$CELL chrom=$CHROM members=$MEMBERS task=$TASK"
+srun gnome3d-ng --config "$CONFIG" --region "$CHROM" --members "$MEMBERS" --out "$OUT/$CHROM" \
+  --log-file "$ROOT/slurm/ensemble/logs/ens_${CELL}_${CHROM}_${SLURM_ARRAY_JOB_ID:-0}_${TASK}.detail.log"

@@ -5,7 +5,7 @@ diagnosable. These are the reference, the python parity model with features off,
 tuned model.
 
 3dgnome turns singleton contact frequencies into target distances the MC minimises toward, via
-load_singletons then create_singleton_heatmap then freq_to_dist_heatmap. Correlating the output
+load_singletons then create_singleton_heatmap then the polymer law's heatmap distance. Correlating the output
 against the same contacts fed in would measure self-consistency by construction rather than
 prediction. The Hi-C bin-pairs are therefore split into train, fed in as singletons, and test, held
 out, and only the test pairs are correlated against for a genuine generalisation check. This
@@ -87,6 +87,39 @@ def _stable_holdout(i: int, j: int, seed: int, frac: float = 0.5) -> bool:
     return (h % 1000) < int(frac * 1000)
 
 
+def thin_counts(raw: F64Array, target: float, seed: int = 0) -> F64Array:
+    """Thin a symmetric count matrix to about `target` contacts over its upper triangle.
+
+    Every count is drawn binomially with the same keep probability, so each separation keeps
+    its expected share and the decay the exponent is fitted on survives, where a count
+    threshold would drop the far pairs first. A target at or above the depth returns a copy.
+    Deterministic in the seed.
+
+    Parameters
+    ----------
+    raw
+        Symmetric counts, bins by bins.
+    target
+        Contacts to keep over the upper triangle.
+    seed
+        Seed of the draw.
+    """
+    n = raw.shape[0]
+    iu = np.triu_indices(n, 1)
+    total = float(raw[iu].sum())
+    if total <= 0.0 or target >= total:
+        return np.array(raw, dtype=np.float64, copy=True)
+    rng = np.random.default_rng(seed)
+    counts = np.rint(raw[iu]).astype(np.int64)
+    kept = rng.binomial(counts, target / total).astype(np.float64)
+    out = np.zeros_like(raw, dtype=np.float64)
+    out[iu] = kept
+    out = out + out.T
+    d = np.arange(n)
+    out[d, d] = raw[d, d]
+    return out
+
+
 def hic_to_singleton_bedpe(
     mcool_path: str,
     region: str,
@@ -97,6 +130,7 @@ def hic_to_singleton_bedpe(
     min_count: int = 1,
     count_scale: float = 1.0,
     holdout_frac: float = 0.5,
+    thin_to: float | None = None,
 ) -> tuple[F64Array, I64Array, np.ndarray, np.ndarray]:
     """Read the raw Hi-C counts for region and write the train bin-pairs as a 7-column singleton
     BEDPE of chr start end chr start end count that 3dgnome can ingest. Raw integer counts are used,
@@ -106,7 +140,8 @@ def hic_to_singleton_bedpe(
     boolean (B, B) masks of the held-out pairs and the fed-in train pairs, and c_obs_balanced is the
     ICE-balanced observed matrix used by the faithful metric. With holdout=False all pairs are
     written for a pure self-consistency check and test_mask covers the whole upper-triangular
-    off-diagonal.
+    off-diagonal. `thin_to` thins the counts to about that many contacts over the region first,
+    see `thin_counts`.
     """
     import cooler
 
@@ -123,6 +158,8 @@ def hic_to_singleton_bedpe(
     uri = f"{mcool_path}::/resolutions/{res}" if avail else mcool_path
     c = cooler.Cooler(uri)
     raw = np.nan_to_num(np.asarray(c.matrix(balance=False).fetch(region), dtype=np.float64))
+    if thin_to is not None and thin_to > 0.0:
+        raw = thin_counts(raw, thin_to, seed)
     bal = np.nan_to_num(np.asarray(c.matrix(balance=True).fetch(region), dtype=np.float64))
     bins = c.bins().fetch(region)
     starts = bins["start"].to_numpy().astype(np.int64)

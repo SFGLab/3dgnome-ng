@@ -29,7 +29,6 @@ if TYPE_CHECKING:
         F32Array,
         F64Array,
         I8Array,
-        SignalInterval,
     )
 
 # (bead_index_in_densified, anchor_index_in_ib) - abstract, no global cluster ref.
@@ -62,13 +61,11 @@ class Seeded:
     subanchor_heat_raw: F32Array | None  # raw subanchor contact heatmap (or None); float32 (N,N)
     anchor_genomic: list[tuple[int, int, int]]  # (start_bp, end_bp, midpoint_bp) per anchor
     step_size_arcs: float
-    # Epigenomic tracks, as the slice of each chromosome track this IB spans.
-    # Carried as intervals rather than anchor-shaped arrays so densify can bin
-    # them straight onto subanchor ranges: accessibility varies at exactly that
-    # scale, and interpolating between anchor values would throw the variation
-    # away.  None when the track is absent or its term is off.
+    # Compartment track, as the slice of the chromosome track this IB spans.
+    # Carried as intervals rather than an anchor-shaped array so densify can bin
+    # it straight onto subanchor ranges.  None when the track is absent or its
+    # term is off.
     track_compartments: list[CompartmentInterval] | None
-    track_accessibility: list[SignalInterval] | None
 
 
 @dataclass(frozen=True)
@@ -89,9 +86,8 @@ class Densified(Arced):
     bead_starts: list[int]  # (N,) genomic start per bead
     bead_ends: list[int]  # (N,) genomic end per bead
     step_size_smooth: float
-    # Epigenomic tracks expanded from anchor shape (A) to bead shape (N).
+    # Compartment track binned onto bead shape (N).
     bead_compartment: I8Array | None
-    bead_accessibility: F32Array | None
 
 
 @dataclass(frozen=True)

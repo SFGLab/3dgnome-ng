@@ -72,34 +72,11 @@ def _assemble_beads(
     ]
 
 
-def run_smooth_batch(expanded: list[Problem], s: Settings, kernel: str) -> list[Result]:
-    """Dispatch one smooth batch by kernel.  'mc' = sequential region-batch; 'checker' =
-    approximate 24-colour checkerboard MC (fast on GPU, mild bond drift); 'hybrid' = checker
-    as a fast initializer + a sequential re-anneal that corrects the drift (the same pattern
-    that fixes arcs - see project_arcs_checker_fromscratch_compaction).  Shared by the SMOOTH
-    stage and the dry-smooth ESTIMATE_DIST trials."""
+def run_smooth_batch(expanded: list[Problem], s: Settings) -> list[Result]:
+    """One batched smooth launch. Shared by the smooth stage and the dry smooth trials the
+    estimate stage runs."""
     from gnome3d.mc import jax as mc_jax
 
-    k = str(kernel).strip().lower()
-    if k in ("checker", "hybrid"):
-        from gnome3d.mc.jax.smooth_checker import mc_smooth_checker_jax_batch
-
-        res = mc_smooth_checker_jax_batch(expanded, s)
-        if k == "hybrid":
-            # Re-noise the checker output before the polish: the checker converges to a
-            # consistent attractor that homogenizes the ensemble (lowers diversity ~0.09); fresh
-            # per-restart noise here re-diversifies the polish's starting points while the
-            # sequential polish still relaxes to correct bonds.  Noise as a fraction of step;
-            # tuned default 1.0 -> diversity 0.99 + clean bonds at n=50.
-            rn = float(getattr(s, "hybrid_polish_renoise", 1.0))
-            polish = []
-            for p, (_, pc) in zip(expanded, res, strict=True):
-                start = np.asarray(pc, np.float32).copy()
-                if rn > 0.0:
-                    add_movable_noise_inplace(start, p["fixed"], rn * float(p["step_size"]))
-                polish.append({**p, "pos": start})
-            res = mc_jax.mc_smooth_jax_batch(polish, s)
-        return res
     return mc_jax.mc_smooth_jax_batch(expanded, s)
 
 
@@ -124,8 +101,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
             expanded.append({**prob, "pos": start})
             owner.append(gi)
 
-    # Kernel select (mc | checker | hybrid), shared with ESTIMATE_DIST via run_smooth_batch.
-    results = run_smooth_batch(expanded, s, str(getattr(s, "mc_executor_jax_smooth_kernel", "mc")))
+    results = run_smooth_batch(expanded, s)
 
     best: dict[int, Result] = {}
     for (score, final_pos), gi in zip(results, owner, strict=True):
@@ -150,7 +126,6 @@ def _run(problem: Problem) -> Result:
     nbr_w = problem["anchor_neighbor_weights"]
     heat = problem["heat_dist"]
     comp = problem["compartment"]
-    acc = problem["accessibility"]
 
     seed_rng(seed)
     mc_numba.seed_numba(seed)
@@ -161,7 +136,7 @@ def _run(problem: Problem) -> Result:
         pos_run: F32Array = best_pos.copy()
         add_movable_noise_inplace(pos_run, fixed, step)
         score = mc_numba.mc_smooth_numba(
-            pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat, comp, acc
+            pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat, comp
         )
         if score < best_score or best_score < 0.0:
             best_score = score
@@ -178,7 +153,7 @@ class SmoothStage:
         return int(inputs[0].pos.shape[0])  # type: ignore[attr-defined]
 
     def batch_key(self, inputs: tuple[State, ...]) -> tuple[object, ...]:
-        """``(heat?, orn?, comp?, brdg?, bead-bucket)`` - the exact signature
+        """``(heat?, orn?, comp?, bead-bucket)`` - the exact signature
         `mc_smooth_jax_batch` reads from ``problems[0]`` to pick its kernel.  A
         batch MUST be uniform in these flags, so they are part of the key (else a
         no-heat IB could land in a heat batch and get the wrong kernel)."""
@@ -191,17 +166,22 @@ class SmoothStage:
             and st.anchor_neighbor_weights is not None
         )
         comp = st.bead_compartment is not None
-        brdg = st.bead_accessibility is not None
-        return heat, orn, comp, brdg, batch_bucket(int(st.pos.shape[0]), st.settings)
+        # The bead bucket is only in the key when launches are not merged.  A launch pads to its
+        # largest member and costs the same either way, so splitting a term uniform set by size
+        # buys nothing and costs one launch per bucket.  `mc_smooth_jax_batch` still splits a
+        # merged group for device memory.
+        if bool(st.settings.merge_smooth_launches):
+            return heat, orn, comp, 0
+        return heat, orn, comp, batch_bucket(int(st.pos.shape[0]), st.settings)
 
     @staticmethod
     def describe_batch_key(key: tuple[object, ...]) -> str:
         """Human-readable form of the batch key for logs."""
-        heat, orn, comp, brdg, bucket = key
+        heat, orn, comp, bucket = key
         return (
             f"heat={'yes' if heat else 'no'} orn={'yes' if orn else 'no'} "
-            f"comp={'yes' if comp else 'no'} brdg={'yes' if brdg else 'no'} "
-            f"{bucket}-bead bucket"
+            f"comp={'yes' if comp else 'no'} "
+            + (f"{bucket}-bead bucket" if bucket else "all bead sizes")
         )
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:
@@ -224,7 +204,6 @@ class SmoothStage:
             "anchor_neighbor_weights": st.anchor_neighbor_weights,
             "heat_dist": getattr(st, "heat_dist", None),
             "compartment": st.bead_compartment,
-            "accessibility": st.bead_accessibility,
         }
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:

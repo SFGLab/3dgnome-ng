@@ -199,9 +199,9 @@ def contact_probability(
 #
 # The 3dgnome 2016 paper does not validate these exponents. It uses power laws as model inputs.
 # Methods, Subloop level, sets the preferred distance between consecutive subanchors to
-# d = N^a for genomic span N, which is the genomic_dist_power setting. Methods, heat map
+# d = N^a for genomic span N, which was the chain law's exponent before the polymer law. Methods, heat map
 # normalization, converts frequency to distance as d = c·f^-α with α = 0.6 from a ranking analysis
-# citing Rousseau 2011, which is the freq_dist_power setting. Neither is the exponent measured here.
+# citing Rousseau 2011, which was the heatmap frequency law's exponent. Neither is the exponent measured here.
 # The paper's α and the contact-decay α below are different quantities that share a letter.
 #
 # We fit each law as a power law on log-log bin-means over the scaling window only. That excludes

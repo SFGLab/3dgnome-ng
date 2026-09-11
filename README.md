@@ -3,7 +3,9 @@
 Python reimplementation of the [3dgnome](https://bitbucket.org/3dome/3dgnome/src/master/) Monte Carlo chromosome
 structure prediction algorithm.
 
-The reference C++ implementation lives in `3dnome/` (read-only). The rewrite lives in `src/`.
+The reference implementation lives in `3dnome/` (read-only). The rewrite lives in `gnome3d/`.
+
+Every config key, its default, its production value and what it does is in [SETTINGS.md](SETTINGS.md).
 
 WARNING: this is a very experimental playground project. (sic: it doesn't even reimplement 3dgnome properly to the
 letter). New features and optimizations will be added iteratively. Use at your own risk.
@@ -83,6 +85,10 @@ Beads are written as sequential ALA residues on chain A - ChimeraX connects them
 
 `data_dir` overrides the `data_dir` key in the config, which is useful because the bundled `config.ini` has it hardcoded
 to `/Projects/GM12878/`. Pass the actual local path instead.
+
+The config sections and every key they take are documented in [SETTINGS.md](SETTINGS.md), including how the
+several distance laws combine into the arcs stage's targets. The production values live in
+`validation/core/config.py::CANONICAL`, and `slurm/ensemble/make_configs.py` generates the per cell line inis from it.
 
 ---
 

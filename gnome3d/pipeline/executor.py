@@ -35,7 +35,7 @@ from typing import Protocol, runtime_checkable
 
 from gnome3d import log
 from gnome3d.pipeline.dag import Dag, Node, NodeId
-from gnome3d.pipeline.multigpu import run_sharded, visible_devices
+from gnome3d.pipeline.multigpu import run_group_parallel, run_sharded, visible_devices
 from gnome3d.pipeline.registry import runners_for
 from gnome3d.pipeline.stage import Result, StageKind
 from gnome3d.pipeline.state import State
@@ -219,17 +219,29 @@ class BatchStrategy:
     from ``problems[0]``.  Each group is timed and logged (always-on) so a slow
     launch is never a silent stall.
 
-    Multi-GPU: each group's independent IBs are sharded across the visible JAX devices
-    (`multigpu.run_sharded`), concurrently.  Output is statistically-equivalent (valid) but NOT
-    byte-identical to single-device - the per-IB RNG keys on launch position, so a different GPU
-    count is a different random draw; the fixed-seed reproducibility gate runs single-GPU."""
+    Multi-GPU follows ``mc_multigpu_mode``.  Under the default "groups" the groups themselves are
+    the unit of parallelism: each one stays whole on a single device and different groups run side
+    by side (`multigpu.run_group_parallel`).  That is what scales here, because the batch key
+    splits a dispatch into many narrow groups - a chr1 smooth dispatch is 252 groups, most holding
+    one or two IBs, so splitting inside a group has almost nothing to split.  Keeping a group
+    intact also leaves every IB at the launch position it would have had on one device, and the
+    kernels key their per-step RNG on that position, so output is byte-identical whatever the
+    device count.
 
-    def __init__(self) -> None:
+    "within" is the older behaviour, sharding one group's IBs across devices (`run_sharded`); it
+    helps only while groups are wider than the device count and it does change the random draw.
+    "off" pins everything to one device.  Results are applied in group order regardless."""
+
+    def __init__(self, multigpu_mode: str = "groups") -> None:
         self._devices: list[object] | None = None  # visible JAX devices (lazy, jax-only)
+        self._mode = str(multigpu_mode).strip().lower()
+
+    def _shard_limit(self) -> int:
+        return 1 if self._mode == "off" else 0
 
     def _shard_devices(self) -> list[object]:
         if self._devices is None:
-            self._devices = visible_devices()
+            self._devices = visible_devices(limit=self._shard_limit())
         return self._devices
 
     def dispatch(
@@ -248,7 +260,15 @@ class BatchStrategy:
             key = key_fn(inputs) if key_fn is not None else node.stage.bucket(inputs)
             groups[key].append((node, inputs))
 
-        for gi, (key, members) in enumerate(groups.items(), 1):
+        ordered = list(groups.items())
+        devices = self._shard_devices() if runners.batch is not None else []
+        # "groups" keeps each group whole on one device and runs different groups side by side.
+        # "within" splits a single group across devices, which only helps while groups are wide.
+        by_group = self._mode == "groups" and len(devices) > 1
+        results: list[list[Result] | None] = [None] * len(ordered)
+
+        def _run_group(gi: int) -> None:
+            key, members = ordered[gi]
             problems = [node.stage.to_problem(inp) for node, inp in members]
             stage0 = members[0][0].stage
             key_desc = (
@@ -256,24 +276,39 @@ class BatchStrategy:
                 if hasattr(stage0, "describe_batch_key")
                 else f"key={key}"
             )
-            devices = self._shard_devices() if runners.batch is not None else []
             gpu_tag = f", {len(devices)} GPUs" if len(devices) > 1 else ""
             _log_dispatch_start(
-                kind, "batch", len(members), f" (group {gi}/{len(groups)}, {key_desc}{gpu_tag})"
+                kind,
+                "batch",
+                len(members),
+                f" (group {gi + 1}/{len(ordered)}, {key_desc}{gpu_tag})",
             )
 
             t0 = time.perf_counter()
             if runners.batch is not None:
-                results = run_sharded(runners.batch, problems, devices)
+                results[gi] = (
+                    runners.batch(problems)
+                    if by_group
+                    else run_sharded(runners.batch, problems, devices)
+                )
             elif runners.serial is not None:
-                results = [runners.serial(p) for p in problems]
+                results[gi] = [runners.serial(p) for p in problems]
             else:
                 raise RuntimeError(f"no runner registered for {kind}")
 
             _log_dispatch_done(kind, "batch", len(members), time.perf_counter() - t0)
 
-            for (node, inputs), result in zip(members, results, strict=True):
-                _finish(dag, node, node.stage.apply(inputs, result), outputs, done)
+        if by_group:
+            run_group_parallel(_run_group, len(ordered), devices)
+        else:
+            for gi in range(len(ordered)):
+                _run_group(gi)
+
+        # Applied on the calling thread in group order, so DAG growth stays deterministic
+        # however the groups were interleaved across devices.
+        for (_key, members), result in zip(ordered, results, strict=True):
+            for (node, inputs), one in zip(members, result or [], strict=True):
+                _finish(dag, node, node.stage.apply(inputs, one), outputs, done)
 
     def close(self) -> None:
         pass
@@ -304,8 +339,10 @@ class MixedExecutor:
         self,
         strategy: Mapping[StageKind, ExecutorStrategy],
         max_workers: int | None = None,
+        multigpu_mode: str = "groups",
     ) -> None:
         self._strategy_map: dict[StageKind, ExecutorStrategy] = dict(strategy)
+        self._multigpu_mode: str = multigpu_mode
         self._max_workers: int = (
             max_workers if max_workers and max_workers > 0 else (os.cpu_count() or 1)
         )
@@ -328,7 +365,7 @@ class MixedExecutor:
         elif name is ExecutorStrategy.THREADED:
             strat = ThreadedStrategy(self._max_workers)
         elif name is ExecutorStrategy.BATCH:
-            strat = BatchStrategy()
+            strat = BatchStrategy(self._multigpu_mode)
         else:
             raise ValueError(f"unknown executor strategy: {name!r}")
 

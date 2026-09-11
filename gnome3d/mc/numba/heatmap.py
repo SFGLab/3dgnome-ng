@@ -25,15 +25,8 @@ from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
-from gnome3d.mc.numba.terms import (
-    init_affinity_nb,
-    init_chrom_block_nb,
-    init_nuclear_nb,
-    local_affinity_nb,
-    local_chrom_block_nb,
-    local_nuclear_nb,
-)
-from gnome3d.types import BoolArray, F64Array, I8Array, I32Array, I64Array
+from gnome3d.mc.numba.terms import init_affinity_nb, local_affinity_nb
+from gnome3d.types import BoolArray, F64Array, I8Array, I64Array
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -146,12 +139,11 @@ def _init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
 
 
 class CoarseTerms(NamedTuple):
-    """Resolved arguments for the optional coarse-level terms.
+    """Resolved arguments for the optional compartment term at the coarse level.
 
-    Bundled because the heatmap kernel takes all of them positionally and the
-    driver would otherwise carry two dozen extra parameters.  `off()` builds an
-    all-disabled instance whose placeholder arrays exist only to fix numba's
-    types; a disabled term never indexes them.
+    Bundled because the heatmap kernel takes them positionally.  `off()` builds
+    an all-disabled instance whose placeholder array exists only to fix numba's
+    type; a disabled term never indexes it.
     """
 
     use_comp: bool
@@ -160,24 +152,6 @@ class CoarseTerms(NamedTuple):
     comp_weight: float
     comp_ea: float
     comp_eb: float
-    use_brdg: bool
-    brdg_a: F64Array
-    brdg_r0: float
-    brdg_weight: float
-    use_lam: bool
-    lam_weight: float
-    use_cen: bool
-    cen_weight: float
-    chrom_w: F64Array
-    nuc_cx: float
-    nuc_cy: float
-    nuc_cz: float
-    nuc_R1: float
-    nuc_R2: float
-    use_chb: bool
-    chrom_id: I32Array
-    chb_kc: float
-    chb_weight: float
 
     @staticmethod
     def off(n: int = 1) -> CoarseTerms:
@@ -188,29 +162,11 @@ class CoarseTerms(NamedTuple):
             comp_weight=0.0,
             comp_ea=0.0,
             comp_eb=0.0,
-            use_brdg=False,
-            brdg_a=np.zeros(n, dtype=np.float64),
-            brdg_r0=1.0,
-            brdg_weight=0.0,
-            use_lam=False,
-            lam_weight=0.0,
-            use_cen=False,
-            cen_weight=0.0,
-            chrom_w=np.zeros(n, dtype=np.float64),
-            nuc_cx=0.0,
-            nuc_cy=0.0,
-            nuc_cz=0.0,
-            nuc_R1=1.0,
-            nuc_R2=2.0,
-            use_chb=False,
-            chrom_id=np.zeros(n, dtype=np.int32),
-            chb_kc=0.0,
-            chb_weight=0.0,
         )
 
     @property
     def any_on(self) -> bool:
-        return self.use_comp or self.use_brdg or self.use_lam or self.use_cen or self.use_chb
+        return self.use_comp
 
 
 def build_coarse_terms(
@@ -218,92 +174,37 @@ def build_coarse_terms(
     pos: F64Array,
     bond_scale: float,
     compartment: np.ndarray[Any, Any] | None,
-    accessibility: np.ndarray[Any, Any] | None,
-    chrom_id: np.ndarray[Any, Any] | None,
-    chrom_weight: np.ndarray[Any, Any] | None,
 ) -> CoarseTerms:
-    """Resolve the optional coarse-level terms for one heatmap MC call.
+    """Resolve the optional compartment term for one heatmap MC call.
 
-    The nuclear frame is derived here because this call is the only one that
-    spans the whole active region.  `R2` follows MultiMM's constant-density rule
-    `packing * mean(bond) * N^(1/3)` and `R1 = R2 * inner_fraction^(1/3)`; the
-    center is the centroid of the starting positions.
-
-    Each term switches on only when its flag and its data are both present, so a
-    missing track leaves the term off instead of scoring against zeros.
+    The term switches on only when its flag and its data are both present, so a
+    missing track leaves it off instead of scoring against zeros.
     """
     from gnome3d.mc.numba.common import affinity_params
 
     n = pos.shape[0]
     off = CoarseTerms.off(n)
-    aff = affinity_params(settings, "heatmap", bond_scale, compartment, accessibility)
-
-    have_c = compartment is not None and compartment.size == n
-    use_lam = bool(settings.use_lamina) and have_c
-    use_cen = bool(settings.use_central_force) and chrom_weight is not None
-    use_chb = bool(settings.use_chromosomal_blocks) and chrom_id is not None
-
-    nuc_cx = nuc_cy = nuc_cz = 0.0
-    nuc_R1, nuc_R2 = off.nuc_R1, off.nuc_R2
-    if use_lam or use_cen:
-        nuc_cx = float(pos[:, 0].mean())
-        nuc_cy = float(pos[:, 1].mean())
-        nuc_cz = float(pos[:, 2].mean())
-        nuc_R2 = float(settings.nucleus_radius)
-        if nuc_R2 <= 0.0:
-            nuc_R2 = float(settings.nucleus_packing_factor) * bond_scale * (n ** (1.0 / 3.0))
-        nuc_R1 = nuc_R2 * float(settings.nucleus_inner_fraction) ** (1.0 / 3.0)
+    aff = affinity_params(settings, "heatmap", bond_scale, compartment)
 
     return CoarseTerms(
         use_comp=aff.use_comp,
-        # The lamina term reads the same compartment array, so it must be present
-        # whenever either of the two is on.
         comp_cls=(
             np.ascontiguousarray(compartment, dtype=np.int8)
-            if (aff.use_comp or use_lam) and compartment is not None
+            if aff.use_comp and compartment is not None
             else off.comp_cls
         ),
         comp_r0=aff.comp_r0,
         comp_weight=aff.comp_weight,
         comp_ea=aff.comp_ea,
         comp_eb=aff.comp_eb,
-        use_brdg=aff.use_brdg,
-        brdg_a=aff.brdg_a if aff.use_brdg else off.brdg_a,
-        brdg_r0=aff.brdg_r0,
-        brdg_weight=aff.brdg_weight,
-        use_lam=use_lam,
-        lam_weight=float(settings.lamina_weight),
-        use_cen=use_cen,
-        cen_weight=float(settings.central_weight),
-        chrom_w=(
-            np.ascontiguousarray(chrom_weight, dtype=np.float64)
-            if use_cen and chrom_weight is not None
-            else off.chrom_w
-        ),
-        nuc_cx=nuc_cx,
-        nuc_cy=nuc_cy,
-        nuc_cz=nuc_cz,
-        nuc_R1=nuc_R1,
-        nuc_R2=nuc_R2,
-        use_chb=use_chb,
-        chrom_id=(
-            np.ascontiguousarray(chrom_id, dtype=np.int32)
-            if use_chb and chrom_id is not None
-            else off.chrom_id
-        ),
-        chb_kc=float(settings.chrom_block_kc),
-        chb_weight=float(settings.chrom_block_weight),
     )
 
 
-def init_coarse_scores(pos: F64Array, ct: CoarseTerms) -> tuple[float, float, float, float, float]:
-    """Full scores for the optional coarse terms at the starting positions.
-
-    Returns (compartment, bridging, lamina, central, chromosomal-block).
-    """
-    comp = brdg = lam = cen = chb = 0.0
-    if ct.use_comp or ct.use_brdg:
-        comp, brdg = init_affinity_nb(
+def init_coarse_scores(pos: F64Array, ct: CoarseTerms) -> float:
+    """Full compartment score at the starting positions."""
+    comp = 0.0
+    if ct.use_comp:
+        comp = init_affinity_nb(
             pos,
             ct.use_comp,
             ct.comp_cls,
@@ -311,29 +212,8 @@ def init_coarse_scores(pos: F64Array, ct: CoarseTerms) -> tuple[float, float, fl
             ct.comp_weight,
             ct.comp_ea,
             ct.comp_eb,
-            ct.use_brdg,
-            ct.brdg_a,
-            ct.brdg_r0,
-            ct.brdg_weight,
         )
-    if ct.use_lam or ct.use_cen:
-        lam, cen = init_nuclear_nb(
-            pos,
-            ct.comp_cls,
-            ct.chrom_w,
-            ct.use_lam,
-            ct.lam_weight,
-            ct.use_cen,
-            ct.cen_weight,
-            ct.nuc_cx,
-            ct.nuc_cy,
-            ct.nuc_cz,
-            ct.nuc_R1,
-            ct.nuc_R2,
-        )
-    if ct.use_chb:
-        chb = init_chrom_block_nb(pos, ct.chrom_id, ct.chb_kc, ct.chb_weight)
-    return float(comp), float(brdg), float(lam), float(cen), float(chb)
+    return float(comp)
 
 
 # ----- MC inner loop + convergence driver -----
@@ -357,24 +237,6 @@ def _batch_heatmap_nb(
     comp_weight: float,
     comp_ea: float,
     comp_eb: float,
-    use_brdg: bool,
-    brdg_a: F64Array,
-    brdg_r0: float,
-    brdg_weight: float,
-    use_lam: bool,
-    lam_weight: float,
-    use_cen: bool,
-    cen_weight: float,
-    chrom_w: F64Array,
-    nuc_cx: float,
-    nuc_cy: float,
-    nuc_cz: float,
-    nuc_R1: float,
-    nuc_R2: float,
-    use_chb: bool,
-    chrom_id: I32Array,
-    chb_kc: float,
-    chb_weight: float,
     step_size: float,
     T: float,
     dt: float,
@@ -384,22 +246,14 @@ def _batch_heatmap_nb(
     score_struct: float,
     score_excl: float,
     score_comp: float,
-    score_brdg: float,
-    score_lam: float,
-    score_cen: float,
-    score_chb: float,
-) -> tuple[float, float, float, float, float, float, float, float, int]:
+) -> tuple[float, float, float, float, int]:
     """One batch of `n_steps` heatmap MC steps for a single chain.
 
-    Carries the heatmap distance term plus the optional excluded-volume,
-    compartment, bridging, lamina, central and chromosomal-block terms.  Returns
-    (T, score_struct, score_excl, score_comp, score_brdg, score_lam, score_cen,
-    score_chb, n_ok)."""
+    Carries the heatmap distance term plus the optional excluded-volume and
+    compartment terms.  Returns (T, score_struct, score_excl, score_comp, n_ok)."""
     n = pos.shape[0]
     n_ok = 0
-    use_aff = use_comp or use_brdg
-    use_nuc = use_lam or use_cen
-    score = score_struct + score_excl + score_comp + score_brdg + score_lam + score_cen + score_chb
+    score = score_struct + score_excl + score_comp
 
     for _ in range(n_steps):
         p: int = int(np.random.randint(0, n))  # pyright: ignore[reportUnknownArgumentType]
@@ -413,9 +267,8 @@ def _batch_heatmap_nb(
             loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
 
         loc_comp_prev = 0.0
-        loc_brdg_prev = 0.0
-        if use_aff:
-            loc_comp_prev, loc_brdg_prev = local_affinity_nb(
+        if use_comp:
+            loc_comp_prev = local_affinity_nb(
                 pos,
                 p,
                 use_comp,
@@ -424,34 +277,7 @@ def _batch_heatmap_nb(
                 comp_weight,
                 comp_ea,
                 comp_eb,
-                use_brdg,
-                brdg_a,
-                brdg_r0,
-                brdg_weight,
             )
-
-        loc_lam_prev = 0.0
-        loc_cen_prev = 0.0
-        if use_nuc:
-            loc_lam_prev, loc_cen_prev = local_nuclear_nb(
-                pos,
-                p,
-                comp_cls,
-                chrom_w,
-                use_lam,
-                lam_weight,
-                use_cen,
-                cen_weight,
-                nuc_cx,
-                nuc_cy,
-                nuc_cz,
-                nuc_R1,
-                nuc_R2,
-            )
-
-        loc_chb_prev = 0.0
-        if use_chb:
-            loc_chb_prev = local_chrom_block_nb(pos, p, chrom_id, chb_kc, chb_weight)
 
         pos[p, 0] += dx
         pos[p, 1] += dy
@@ -466,9 +292,8 @@ def _batch_heatmap_nb(
             score_excl_new = score_excl + 2.0 * (loc_excl_curr - loc_excl_prev)
 
         score_comp_new = score_comp
-        score_brdg_new = score_brdg
-        if use_aff:
-            loc_comp_curr, loc_brdg_curr = local_affinity_nb(
+        if use_comp:
+            loc_comp_curr = local_affinity_nb(
                 pos,
                 p,
                 use_comp,
@@ -477,49 +302,10 @@ def _batch_heatmap_nb(
                 comp_weight,
                 comp_ea,
                 comp_eb,
-                use_brdg,
-                brdg_a,
-                brdg_r0,
-                brdg_weight,
             )
             score_comp_new = score_comp + 2.0 * (loc_comp_curr - loc_comp_prev)
-            score_brdg_new = score_brdg + 2.0 * (loc_brdg_curr - loc_brdg_prev)
 
-        score_lam_new = score_lam
-        score_cen_new = score_cen
-        if use_nuc:
-            loc_lam_curr, loc_cen_curr = local_nuclear_nb(
-                pos,
-                p,
-                comp_cls,
-                chrom_w,
-                use_lam,
-                lam_weight,
-                use_cen,
-                cen_weight,
-                nuc_cx,
-                nuc_cy,
-                nuc_cz,
-                nuc_R1,
-                nuc_R2,
-            )
-            score_lam_new = score_lam + (loc_lam_curr - loc_lam_prev)
-            score_cen_new = score_cen + (loc_cen_curr - loc_cen_prev)
-
-        score_chb_new = score_chb
-        if use_chb:
-            loc_chb_curr = local_chrom_block_nb(pos, p, chrom_id, chb_kc, chb_weight)
-            score_chb_new = score_chb + 2.0 * (loc_chb_curr - loc_chb_prev)
-
-        score_new = (
-            score_struct_new
-            + score_excl_new
-            + score_comp_new
-            + score_brdg_new
-            + score_lam_new
-            + score_cen_new
-            + score_chb_new
-        )
+        score_new = score_struct_new + score_excl_new + score_comp_new
 
         ok = score_new <= score
         if not ok and T > 0.0 and score > 0.0:
@@ -531,10 +317,6 @@ def _batch_heatmap_nb(
             score_struct = score_struct_new
             score_excl = score_excl_new
             score_comp = score_comp_new
-            score_brdg = score_brdg_new
-            score_lam = score_lam_new
-            score_cen = score_cen_new
-            score_chb = score_chb_new
         else:
             pos[p, 0] -= dx
             pos[p, 1] -= dy
@@ -545,10 +327,6 @@ def _batch_heatmap_nb(
         score_struct,
         score_excl,
         score_comp,
-        score_brdg,
-        score_lam,
-        score_cen,
-        score_chb,
         n_ok,
     )
 
@@ -580,8 +358,8 @@ def _run_heatmap_loop(
     ratio guard), specialised to the heatmap term set."""
     if ct is None:
         ct = CoarseTerms.off(pos.shape[0])
-    score_comp, score_brdg, score_lam, score_cen, score_chb = init_coarse_scores(pos, ct)
-    score = score_struct + score_excl + score_comp + score_brdg + score_lam + score_cen + score_chb
+    score_comp = init_coarse_scores(pos, ct)
+    score = score_struct + score_excl + score_comp
     ms_score = score
     step_i = 0
     while True:
@@ -590,10 +368,6 @@ def _run_heatmap_loop(
             score_struct,
             score_excl,
             score_comp,
-            score_brdg,
-            score_lam,
-            score_cen,
-            score_chb,
             n_ok,
         ) = _batch_heatmap_nb(
             pos,
@@ -609,24 +383,6 @@ def _run_heatmap_loop(
             ct.comp_weight,
             ct.comp_ea,
             ct.comp_eb,
-            ct.use_brdg,
-            ct.brdg_a,
-            ct.brdg_r0,
-            ct.brdg_weight,
-            ct.use_lam,
-            ct.lam_weight,
-            ct.use_cen,
-            ct.cen_weight,
-            ct.chrom_w,
-            ct.nuc_cx,
-            ct.nuc_cy,
-            ct.nuc_cz,
-            ct.nuc_R1,
-            ct.nuc_R2,
-            ct.use_chb,
-            ct.chrom_id,
-            ct.chb_kc,
-            ct.chb_weight,
             float(step_size),
             T,
             dt,
@@ -636,14 +392,8 @@ def _run_heatmap_loop(
             score_struct,
             score_excl,
             score_comp,
-            score_brdg,
-            score_lam,
-            score_cen,
-            score_chb,
         )
-        score = (
-            score_struct + score_excl + score_comp + score_brdg + score_lam + score_cen + score_chb
-        )
+        score = score_struct + score_excl + score_comp
         step_i += stop_steps
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (
@@ -688,11 +438,9 @@ def _mc_heatmap_kchains_nb(
     the cudaMMC-style "K parallel chains, take the best" pattern in pure numba.
     EV is off here (matches the reference multi-chain path)."""
     K = pos_k.shape[0]
-    # Placeholders for the optional terms, which this path never enables.  They
-    # exist only to satisfy the kernel signature; nothing indexes them.
+    # Placeholder for the compartment term, which this path never enables.  It
+    # exists only to satisfy the kernel signature; nothing indexes it.
     no_i8 = np.zeros(1, dtype=np.int8)
-    no_f64 = np.zeros(1, dtype=np.float64)
-    no_i32 = np.zeros(1, dtype=np.int32)
     for k in prange(K):  # pyright: ignore[reportGeneralTypeIssues]
         pos = pos_k[k]  # view into the (k, :, :) slice
         T = max_temp
@@ -700,7 +448,7 @@ def _mc_heatmap_kchains_nb(
         ms_score = score
         # Outer convergence loop entirely inside the kernel.
         while True:
-            T, score, _se, _sc, _sb, _sl, _scn, _sch, n_ok = _batch_heatmap_nb(
+            T, score, _se, _sc, n_ok = _batch_heatmap_nb(
                 pos,
                 exp_safe,
                 skip,
@@ -714,24 +462,6 @@ def _mc_heatmap_kchains_nb(
                 0.0,
                 0.0,
                 0.0,
-                False,  # use_brdg
-                no_f64,
-                1.0,
-                0.0,
-                False,  # use_lam
-                0.0,
-                False,  # use_cen
-                0.0,
-                no_f64,
-                0.0,
-                0.0,
-                0.0,
-                1.0,
-                2.0,
-                False,  # use_chb
-                no_i32,
-                0.0,
-                0.0,
                 step_size,
                 T,
                 dt,
@@ -741,10 +471,6 @@ def _mc_heatmap_kchains_nb(
                 score,
                 0.0,  # score_excl
                 0.0,  # score_comp
-                0.0,  # score_brdg
-                0.0,  # score_lam
-                0.0,  # score_cen
-                0.0,  # score_chb
             )
             converged = (
                 score > stop_improvement * ms_score and n_ok < stop_successes
@@ -820,9 +546,6 @@ def mc_heatmap_numba(
     step_size: float,
     settings: Settings,
     compartment: np.ndarray[Any, Any] | None = None,
-    accessibility: np.ndarray[Any, Any] | None = None,
-    chrom_id: np.ndarray[Any, Any] | None = None,
-    chrom_weight: np.ndarray[Any, Any] | None = None,
 ) -> float:
     """Numba simulated-annealing implementation for heatmap-energy MC.
     Double-counted structure (delta factor 2). Mirrors Reference
@@ -835,9 +558,9 @@ def mc_heatmap_numba(
     """
     n = pos.shape[0]
 
-    if int(settings.mc_heatmap_chains) > 1 and compartment is None and chrom_id is None:
+    if int(settings.mc_heatmap_chains) > 1 and compartment is None:
         # The K-chain kernel carries only the heatmap term, so it can only be
-        # used when no coarse term is active.
+        # used when the compartment term is inactive.
         return _mc_heatmap_multichain(pos, exp_dist, diag_size, step_size, settings)
 
     if n <= 1:
@@ -877,9 +600,6 @@ def mc_heatmap_numba(
         pw,
         float(np.asarray(exp_dist)[~skip].mean()) if (~skip).any() else 1.0,
         compartment,
-        accessibility,
-        chrom_id,
-        chrom_weight,
     )
 
     score = _run_heatmap_loop(
