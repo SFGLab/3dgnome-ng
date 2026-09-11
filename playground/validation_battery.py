@@ -132,10 +132,13 @@ def block_owner(mid: np.ndarray, anchor: np.ndarray, target_bp: int) -> np.ndarr
 
 
 def block_bonds(pos: np.ndarray, owner: np.ndarray) -> np.ndarray:
-    """The mean realised chain bond of each block, which is the scale its excluded volume used.
+    """The median realised chain bond of each block, the spacing of a bead in it.
 
     One proxy is unavoidable here. The kernel takes the mean of the chain bond targets and a
-    finished structure only carries the realised distances.
+    finished structure only carries the realised distances. The median, not the mean: the bonds
+    touching an anchor sit near 1.6 beads against 1.03 for a subanchor bond, and the mean they
+    inflate grew from 1.24 to 1.36 on an arm whose wall stretched them further, so the counting
+    radius moved with the arm and an arm with fewer close pairs scored more overlaps.
 
     Parameters
     ----------
@@ -151,7 +154,7 @@ def block_bonds(pos: np.ndarray, owner: np.ndarray) -> np.ndarray:
     for k in range(out.size):
         inner = step[same & (owner[:-1] == k)]
         if inner.size:
-            out[k] = float(inner.mean())
+            out[k] = float(np.median(inner))
     return out
 
 
