@@ -53,7 +53,6 @@ Filenames are relative to `data_dir` unless absolute. The region string is `chr:
 | `centromeres` | str |  | BED of centromere positions. |
 | `segment_split` | str |  | BED of segment boundary breakpoints. |
 | `compartments` | str |  | bedGraph of a signed compartment eigenvector or a CALDER BED, for `[compartments]`. |
-| `accessibility` | str |  | bedGraph of ATAC or DNase signal, for `[accessibility]`. |
 | `phasing_track` | str |  | Track used to fix the eigenvector's arbitrary sign. Required with `compartments`. |
 
 ## [distance]
@@ -285,48 +284,6 @@ alongside since the terms are attractive.
 | `auto_factor_heatmap` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
 | `auto_factor_ib` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
 | `auto_factor_smooth` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
-
-## [accessibility]
-
-The HiP-HoP mechanisms [6] driven from one accessibility track. Bridging is an effective pairwise
-attraction between open beads. Fibre compaction shortens the chain bond where the bead is
-closed.
-
-| key | type | default | production | what it does |
-| --- | --- | --- | --- | --- |
-| `mode` | str | log | log | `log` is log then min max normalisation. `binary` is HiP-HoP's own open or closed state and is the faithful one. `log` is close to inert on a track binned to several kb. |
-| `percentile` | float | 80.0 | 80.0 | Under `binary`, a bead is open at or above this percentile of the loaded values. |
-| `use_bridging` | bool | no | no | Master switch for bridging. |
-| `bridging_weight` | float | 1.0 | 1.0 | Weight of the bridging affinity. |
-| `apply_to_heatmap` | bool | no | no | In the heatmap stages. |
-| `apply_to_ib` | bool | no | no | In block placement. |
-| `apply_to_smooth` | bool | yes | yes | In the smooth stage. |
-| `radius_heatmap` | float | 0.0 | 0.0 | Interaction radius, 0 derives it. |
-| `radius_ib` | float | 0.0 | 0.0 | Interaction radius. |
-| `radius_smooth` | float | 0.0 | 0.0 | Interaction radius. |
-| `auto_factor_heatmap` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
-| `auto_factor_ib` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
-| `auto_factor_smooth` | float | 1.5 | 1.5 | Times the stage's mean bond scale. |
-| `use_fibre_compaction` | bool | no | no | Master switch for compaction. |
-| `fibre_compaction` | float | 0.3 | 0.3 | A bead's chain bond target is scaled by `1 - fibre_compaction * (1 - accessibility)`. |
-
-## [nucleus]
-
-Whole nucleus terms from MultiMM [7]. They run in the segment level heatmap MC only, since that is
-the one call that spans the whole active region.
-
-| key | type | default | production | what it does |
-| --- | --- | --- | --- | --- |
-| `use_lamina` | bool | no | no | Pull B beads toward the nuclear envelope. |
-| `lamina_weight` | float | 400.0 | 400.0 | Weight. |
-| `use_central_force` | bool | no | no | Pull A beads toward the centre. |
-| `central_weight` | float | 20.0 | 20.0 | Weight. |
-| `use_chromosomal_blocks` | bool | no | no | Keep each chromosome in its own territory. Multi chromosome runs. |
-| `chrom_block_kc` | float | 0.3 | 0.3 | Territory stiffness. |
-| `chrom_block_weight` | float | 0.0001 | 0.0001 | Weight. |
-| `radius` | float | 0.0 | 0.0 | Outer nuclear radius, 0 derives it. |
-| `packing_factor` | float | 1.0 | 1.0 | The derived outer radius is this times the mean bond scale times the cube root of the bead count. |
-| `inner_fraction` | float | 0.2 | 0.2 | The inner radius is the outer one times the cube root of this. |
 
 ## How distances are set
 

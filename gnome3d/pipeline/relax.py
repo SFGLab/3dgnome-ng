@@ -76,8 +76,6 @@ def _relax_settings(s: Settings, bond: float) -> Settings:
     r.spring_squeeze = float(s.relax_bond_weight)
     r.use_confinement = False
     r.use_compartments = False
-    r.use_bridging = False
-    r.use_fibre_compaction = False
     r.max_temp_smooth = float(s.max_temp_smooth) * float(s.relax_temp)
     r.mc_smooth_chains = 1
     return r

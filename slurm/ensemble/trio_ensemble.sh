@@ -161,8 +161,7 @@ assert "hic" in s.data_singletons, f"singletons={s.data_singletons!r} does not l
 assert s.use_ctcf_motif and s.use_excluded_volume and s.use_dynamic_loop_density
 assert s.use_anchor_heatmap and s.use_subanchor_heatmap
 assert s.mc_executor_jax_bucket_shapes, "shape bucketing is off; this run would be ~5x slower"
-for flag in ("use_compartments", "use_bridging", "use_fibre_compaction", "use_lamina"):
-    assert not getattr(s, flag), f"{flag} is on; these runs exclude epigenome terms"
+assert not s.use_compartments, "use_compartments is on; these runs exclude epigenome terms"
 print(f"[guard] {sample} config ok, bucketing on")
 PYCHECK
 

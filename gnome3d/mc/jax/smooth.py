@@ -57,11 +57,11 @@ def _build_smooth_kernel(
     extra O(N) pass per step, and making it structural keeps that cost off every run
     that does not enable it.
 
-    The compartment and bridging energies are accumulated into the excluded-volume
-    score `se` rather than carried separately.  All three are pairwise, double
-    counted, and share the factor-of-2 delta, so the sum is exact for both the
-    Metropolis ratio and the final score.  Only the per-term breakdown is lost, and
-    nothing outside this module reads it.  JAX further
+    The compartment energy is accumulated into the excluded-volume score `se`
+    rather than carried separately.  Both are pairwise, double counted, and share
+    the factor-of-2 delta, so the sum is exact for both the Metropolis ratio and
+    the final score.  Only the per-term breakdown is lost, and nothing outside
+    this module reads it.  JAX further
     shape-specialises on (N, K, n_anchors, n_movable) at runtime - those
     incur per-shape compile cost (cached persistently via
     jax.experimental.compilation_cache).
@@ -173,11 +173,11 @@ def _build_smooth_kernel(
         contrib = weight * rel * rel
         return jnp.where(r > R, contrib, 0.0)
 
-    # ---- affinity helpers (compartment blocks + accessibility bridging) ----
+    # ---- affinity helper (compartment blocks) ----
     #
     # Mirrors gnome3d.mc.numba.terms.local_affinity_nb:
     #   E_pair = w * g * (1 - exp(-d^2 / (2 r0^2))) / (N - 1)
-    # with g = Ea or Eb for a same-compartment pair and a_i * a_j for bridging.
+    # with g = Ea or Eb for a same-compartment pair.
     # The 1/(N-1) keeps the strength independent of region size; see the doc.
 
     def _local_affinity_at(
@@ -185,13 +185,10 @@ def _build_smooth_kernel(
         p_pos: Any,
         p: Any,
         comp_cls: Any,
-        brdg_a: Any,
         comp_r0: Any,
         comp_w: Any,
         comp_ea: Any,
         comp_eb: Any,
-        brdg_r0: Any,
-        brdg_w: Any,
         n_active: Any,
     ) -> Any:
         n = pos.shape[0]
@@ -206,7 +203,6 @@ def _build_smooth_kernel(
         both_b = jnp.logical_and(ci < 0, comp_cls < 0)
         g_comp = jnp.where(both_a, comp_ea, jnp.where(both_b, comp_eb, 0.0))
         e = comp_w * g_comp * (1.0 - jnp.exp(-d2 / (2.0 * comp_r0 * comp_r0)))
-        e = e + brdg_w * (brdg_a[p] * brdg_a) * (1.0 - jnp.exp(-d2 / (2.0 * brdg_r0 * brdg_r0)))
         return jnp.sum(jnp.where(live, e, 0.0)) * inv_n
 
     # ---- heat (subanchor heatmap) helpers ----
@@ -299,7 +295,6 @@ def _build_smooth_kernel(
         movable: Any,
         heat_dist: Any,
         comp_cls: Any,
-        brdg_a: Any,
         anchor_ar: Any,
         bead_to_anchor_k: Any,
         nbr_idx: Any,
@@ -330,8 +325,6 @@ def _build_smooth_kernel(
         comp_w: Any,
         comp_ea: Any,
         comp_eb: Any,
-        brdg_r0: Any,
-        brdg_w: Any,
         # RNG
         key: Any,
         # real bead count + real movable count (< padded lengths when bucketed)
@@ -383,13 +376,10 @@ def _build_smooth_kernel(
                     old_p,
                     p,
                     comp_cls,
-                    brdg_a,
                     comp_r0,
                     comp_w,
                     comp_ea,
                     comp_eb,
-                    brdg_r0,
-                    brdg_w,
                     n_active,
                 )
                 loc_e_curr = loc_e_curr + _local_affinity_at(
@@ -397,13 +387,10 @@ def _build_smooth_kernel(
                     new_p,
                     p,
                     comp_cls,
-                    brdg_a,
                     comp_r0,
                     comp_w,
                     comp_ea,
                     comp_eb,
-                    brdg_r0,
-                    brdg_w,
                     n_active,
                 )
             se_new = se + 2.0 * (loc_e_curr - loc_e_prev)
@@ -518,8 +505,7 @@ def _build_smooth_kernel(
         None,
         None,  # dtn, movable
         None,  # heat_dist
-        None,
-        None,  # comp_cls, brdg_a
+        None,  # comp_cls
         None,
         None,  # anchor_ar, bead_to_anchor_k
         None,
@@ -548,9 +534,7 @@ def _build_smooth_kernel(
         None,
         None,
         None,
-        None,
-        None,
-        None,  # comp_r0, comp_w, comp_ea, comp_eb, brdg_r0, brdg_w
+        None,  # comp_r0, comp_w, comp_ea, comp_eb
         0,  # key
         None,  # n_active (shared)
         None,  # n_movable_active (shared)
@@ -572,7 +556,6 @@ def _build_smooth_kernel(
         movable: Any,
         heat_dist: Any,
         comp_cls: Any,
-        brdg_a: Any,
         anchor_ar: Any,
         bead_to_anchor_k: Any,
         nbr_idx: Any,
@@ -602,8 +585,6 @@ def _build_smooth_kernel(
         comp_w: Any,
         comp_ea: Any,
         comp_eb: Any,
-        brdg_r0: Any,
-        brdg_w: Any,
         keys: Any,
         n_active: Any,
         n_movable_active: Any,
@@ -621,7 +602,6 @@ def _build_smooth_kernel(
             movable,
             heat_dist,
             comp_cls,
-            brdg_a,
             anchor_ar,
             bead_to_anchor_k,
             nbr_idx,
@@ -651,8 +631,6 @@ def _build_smooth_kernel(
             comp_w,
             comp_ea,
             comp_eb,
-            brdg_r0,
-            brdg_w,
             keys,
             n_active,
             n_movable_active,
@@ -686,7 +664,6 @@ def _build_smooth_kernel(
         movable: Any,
         heat_dist: Any,
         comp_cls: Any,
-        brdg_a: Any,
         anchor_ar: Any,
         bead_to_anchor_k: Any,
         nbr_idx: Any,
@@ -716,8 +693,6 @@ def _build_smooth_kernel(
         comp_w: Any,
         comp_ea: Any,
         comp_eb: Any,
-        brdg_r0: Any,
-        brdg_w: Any,
         base_key: Any,
         stop_improvement: Any,
         stop_successes: Any,
@@ -749,7 +724,6 @@ def _build_smooth_kernel(
                 movable,
                 heat_dist,
                 comp_cls,
-                brdg_a,
                 anchor_ar,
                 bead_to_anchor_k,
                 nbr_idx,
@@ -779,8 +753,6 @@ def _build_smooth_kernel(
                 comp_w,
                 comp_ea,
                 comp_eb,
-                brdg_r0,
-                brdg_w,
                 keys,
                 n_active,
                 n_movable_active,
@@ -883,13 +855,10 @@ def _build_smooth_kernel(
     def _init_affinity_single(
         pos: Any,
         comp_cls: Any,
-        brdg_a: Any,
         comp_r0: Any,
         comp_w: Any,
         comp_ea: Any,
         comp_eb: Any,
-        brdg_r0: Any,
-        brdg_w: Any,
         n_active: Any,
     ) -> Any:
         n = pos.shape[0]
@@ -900,13 +869,10 @@ def _build_smooth_kernel(
                 pos[i],
                 i,
                 comp_cls,
-                brdg_a,
                 comp_r0,
                 comp_w,
                 comp_ea,
                 comp_eb,
-                brdg_r0,
-                brdg_w,
                 n_active,
             )
             return carry + jnp.where(i < n_active, row, 0.0), None
@@ -1011,7 +977,7 @@ def _build_smooth_kernel(
     init_affinity = jax.jit(
         jax.vmap(
             _init_affinity_single,
-            in_axes=(0, None, None, None, None, None, None, None, None, None),
+            in_axes=(0, None, None, None, None, None, None),
         )
     )
     init_heat = jax.jit(jax.vmap(_init_heat_single, in_axes=(0, None, None)))
@@ -1060,8 +1026,7 @@ def _build_smooth_kernel(
         0,
         0,  # dtn, movable (per-IB)
         0,  # heat_dist (per-IB)
-        0,
-        0,  # comp_cls, brdg_a (per-IB)
+        0,  # comp_cls (per-IB)
         0,
         0,  # anchor_ar, bead_to_anchor_k (per-IB)
         0,
@@ -1091,8 +1056,6 @@ def _build_smooth_kernel(
         None,  # comp_w (global)
         None,
         None,  # comp_ea, comp_eb (global)
-        0,  # brdg_r0 (per-IB auto radius)
-        None,  # brdg_w (global)
         0,  # keys (per-chain)
         0,  # n_active (per-IB)
         0,  # n_movable_active (per-IB)
@@ -1113,7 +1076,6 @@ def _build_smooth_kernel(
         movable: Any,
         heat_dist: Any,
         comp_cls: Any,
-        brdg_a: Any,
         anchor_ar: Any,
         bead_to_anchor_k: Any,
         nbr_idx: Any,
@@ -1143,8 +1105,6 @@ def _build_smooth_kernel(
         comp_w: Any,
         comp_ea: Any,
         comp_eb: Any,
-        brdg_r0: Any,
-        brdg_w: Any,
         base_key: Any,
         chain_seed: Any,
         stop_improvement: Any,
@@ -1189,7 +1149,6 @@ def _build_smooth_kernel(
                 movable,
                 heat_dist,
                 comp_cls,
-                brdg_a,
                 anchor_ar,
                 bead_to_anchor_k,
                 nbr_idx,
@@ -1219,8 +1178,6 @@ def _build_smooth_kernel(
                 comp_w,
                 comp_ea,
                 comp_eb,
-                brdg_r0,
-                brdg_w,
                 keys,
                 n_active,
                 n_movable_active,
@@ -1305,7 +1262,6 @@ def mc_smooth_jax(
     anchor_neighbor_weights: dict[int, list[float]] | None = None,
     heat_dist: np.ndarray[Any, Any] | None = None,
     compartment: np.ndarray[Any, Any] | None = None,
-    accessibility: np.ndarray[Any, Any] | None = None,
     pos_batch: np.ndarray[Any, Any] | None = None,
     return_all: bool = False,
 ) -> Any:
@@ -1367,7 +1323,6 @@ def mc_smooth_jax(
         "smooth",
         float(np.asarray(dtn).mean()) if np.asarray(dtn).size else 1.0,
         compartment,
-        accessibility,
     )
     use_aff: bool = _aff.any_on
 
@@ -1535,30 +1490,21 @@ def mc_smooth_jax(
     n_active_j = jnp.int32(n_active_v)
     n_movable_active_j = jnp.int32(n_movable_v)
 
-    # Affinity arrays, padded to the bucket width like pos.  Pad entries are
-    # class 0 and accessibility 0, which contribute nothing, and `n_active`
-    # masks them anyway.
+    # Compartment array, padded to the bucket width like pos.  Pad entries are
+    # class 0, which contributes nothing, and `n_active` masks them anyway.
     B_pad = int(pos_k.shape[1])
     if use_aff:
         _c = np.zeros(B_pad, dtype=np.int8)
-        _a = np.zeros(B_pad, dtype=np.float32)
         if compartment is not None:
             _cc = np.asarray(compartment, dtype=np.int8)
             _c[: _cc.shape[0]] = _cc
-        if accessibility is not None:
-            _aa = np.asarray(accessibility, dtype=np.float32)
-            _a[: _aa.shape[0]] = _aa
         comp_cls_j = jnp.asarray(_c)
-        brdg_a_j = jnp.asarray(_a)
     else:
         comp_cls_j = jnp.zeros((B_pad,), dtype=jnp.int8)
-        brdg_a_j = jnp.zeros((B_pad,), dtype=jnp.float32)
     comp_r0_j = jnp.float32(_aff.comp_r0)
     comp_w_j = jnp.float32(_aff.comp_weight if _aff.use_comp else 0.0)
     comp_ea_j = jnp.float32(_aff.comp_ea)
     comp_eb_j = jnp.float32(_aff.comp_eb)
-    brdg_r0_j = jnp.float32(_aff.brdg_r0)
-    brdg_w_j = jnp.float32(_aff.brdg_weight if _aff.use_brdg else 0.0)
     seed_offset: int = stable_seed_offset(log.current())
 
     # ---- initial scores ----
@@ -1582,13 +1528,10 @@ def mc_smooth_jax(
         se_k = se_k + init_affinity(
             pos_k,
             comp_cls_j,
-            brdg_a_j,
             comp_r0_j,
             comp_w_j,
             comp_ea_j,
             comp_eb_j,
-            brdg_r0_j,
-            brdg_w_j,
             n_active_j,
         )
     sh_k = (
@@ -1676,7 +1619,6 @@ def mc_smooth_jax(
         movable_j,
         heat_j,
         comp_cls_j,
-        brdg_a_j,
         anchor_ar_j,
         bead_to_anchor_k_j,
         nbr_idx_j,
@@ -1706,8 +1648,6 @@ def mc_smooth_jax(
         comp_w_j,
         comp_ea_j,
         comp_eb_j,
-        brdg_r0_j,
-        brdg_w_j,
         base_key,
         stop_improvement,
         stop_successes,
@@ -1767,7 +1707,6 @@ def _prep_smooth_problem_np(
     A: int,
     M: int,
     compartment: np.ndarray[Any, Any] | None = None,
-    accessibility: np.ndarray[Any, Any] | None = None,
     heat_out: np.ndarray[Any, Any] | None = None,
 ) -> dict[str, Any]:
     """Build one IB's kernel inputs as numpy arrays, padded to a common bucket
@@ -1903,9 +1842,8 @@ def _prep_smooth_problem_np(
         "n_active": n,
         "n_movable": n_movable,
         "excl_r0": excl_r0,
-        # Pad entries are class 0 and accessibility 0, which contribute nothing.
+        # Pad entries are class 0, which contributes nothing.
         "comp_cls": _pad_track(compartment, B, np.int8),
-        "brdg_a": _pad_track(accessibility, B, np.float32),
         "conf_cx": conf_cx,
         "conf_cy": conf_cy,
         "conf_cz": conf_cz,
@@ -2097,11 +2035,9 @@ def _mc_smooth_jax_batch_chunk(
     use_heat = problems[0].get("heat_dist") is not None
     use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
     use_conf = bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth)
-    # Uniform across the batch: SmoothStage.batch_key includes both track flags, so
+    # Uniform across the batch: SmoothStage.batch_key includes the track flag, so
     # every problem in a group agrees with problems[0].
-    use_aff = (
-        problems[0].get("compartment") is not None or problems[0].get("accessibility") is not None
-    ) and (bool(settings.use_compartments) or bool(settings.use_bridging))
+    use_aff = problems[0].get("compartment") is not None and bool(settings.use_compartments)
 
     Bs, As, Ms = [], [], []
     for p in problems:
@@ -2143,7 +2079,6 @@ def _mc_smooth_jax_batch_chunk(
             A,
             M,
             p.get("compartment"),
-            p.get("accessibility"),
             heat_all[i] if use_heat else None,
         )
         for i, p in enumerate(problems)
@@ -2155,7 +2090,6 @@ def _mc_smooth_jax_batch_chunk(
 
     pos_k = stack("pos")  # (K, B, 3)
     comp_cls_k = stack("comp_cls")  # (K, B)
-    brdg_a_k = stack("brdg_a")  # (K, B)
     dtn_k = stack("dtn")
     movable_k = stack("movable")
     heat_k = jnp.asarray(heat_all)  # already (K, B, B); prep wrote into it
@@ -2182,14 +2116,11 @@ def _mc_smooth_jax_batch_chunk(
             "smooth",
             float(np.asarray(p["dtn"]).mean()) if np.asarray(p["dtn"]).size else 1.0,
             p.get("compartment"),
-            p.get("accessibility"),
         )
         for p in problems
     ]
     comp_r0_k = jnp.asarray(np.array([a.comp_r0 for a in _affs], dtype=np.float32))
-    brdg_r0_k = jnp.asarray(np.array([a.brdg_r0 for a in _affs], dtype=np.float32))
     comp_w_v = float(_affs[0].comp_weight) if _affs[0].use_comp else 0.0
-    brdg_w_v = float(_affs[0].brdg_weight) if _affs[0].use_brdg else 0.0
     comp_ea_v = float(_affs[0].comp_ea)
     comp_eb_v = float(_affs[0].comp_eb)
     conf_w_k = jnp.asarray(np.array([pr["conf_w"] for pr in preps], dtype=np.float32))
@@ -2241,13 +2172,10 @@ def _mc_smooth_jax_batch_chunk(
             se = se + init_affinity(
                 p1,
                 comp_cls_k[i],
-                brdg_a_k[i],
                 comp_r0_k[i],
                 jnp.float32(comp_w_v),
                 jnp.float32(comp_ea_v),
                 jnp.float32(comp_eb_v),
-                brdg_r0_k[i],
-                jnp.float32(brdg_w_v),
                 na,
             )
         sh = (
@@ -2314,7 +2242,6 @@ def _mc_smooth_jax_batch_chunk(
         movable_k,
         heat_k,
         comp_cls_k,
-        brdg_a_k,
         anchor_ar_k,
         b2a_k,
         nbr_idx_k,
@@ -2344,8 +2271,6 @@ def _mc_smooth_jax_batch_chunk(
         jnp.float32(comp_w_v),
         jnp.float32(comp_ea_v),
         jnp.float32(comp_eb_v),
-        brdg_r0_k,
-        jnp.float32(brdg_w_v),
         base_key,
         chain_seed_k,
         jnp.float32(settings.mc_stop_improvement_smooth),

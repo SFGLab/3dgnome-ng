@@ -14,7 +14,6 @@ ContactData.from_dataframes(anchors_df, arcs_df, ...)
         breakpoints_df:   chr, pos
         singletons_df:    chr1, pos1, chr2, pos2, score
         compartments_df:  chr, start, end[, label][, value]
-        accessibility_df: chr, start, end, value
         phasing_df:       chr, start, end, value
 
 Once constructed, a ContactData instance is file-independent and can be
@@ -43,7 +42,7 @@ from gnome3d.polymer import (
     fit_arc_strength,
     fit_contact_exponent,
 )
-from gnome3d.tracks import normalize_signal_map, phase_compartments
+from gnome3d.tracks import phase_compartments
 from gnome3d.types import *
 
 if TYPE_CHECKING:
@@ -61,7 +60,6 @@ class ContactData:
     singletons:  list of (chr1, pos1, chr2, pos2, score) contacts
                  used to build the segment-level heatmap
     compartments: dict[chr -> list[CompartmentInterval]] - A/B calls, already phased
-    accessibility: dict[chr -> list[SignalInterval]] - ATAC-seq, rescaled to [0, 1]
     """
 
     anchors: AnchorMap = field(default_factory=empty_anchor_map)
@@ -75,10 +73,9 @@ class ContactData:
     # Long-range arcs (gap > max_pet_length): not anchor-mapped, folded into the
     # segment heatmap by Solver. Mirrors Reference InteractionArcs::long_arcs.
     long_arcs: RawArcMap = field(default_factory=empty_raw_arc_map)
-    # Epigenomic tracks driving the opt-in compartment and accessibility energy
-    # terms.  Empty when no track is configured, which leaves those terms inert.
+    # Epigenomic track driving the opt-in compartment energy term.  Empty when
+    # no track is configured, which leaves the term inert.
     compartments: CompartmentMap = field(default_factory=empty_compartment_map)
-    accessibility: SignalMap = field(default_factory=empty_signal_map)
 
     @classmethod
     def from_files(
@@ -141,24 +138,12 @@ class ContactData:
             LOG.info("load compartments")
             compartments = load_compartments(s.data_path(s.data_compartments), chr_set, region)
 
-        accessibility: SignalMap = {}
-        if s.data_accessibility:
-            LOG.info("load accessibility")
-            accessibility = load_signal(s.data_path(s.data_accessibility), chr_set, region)
-
         phasing: SignalMap = {}
         if s.data_phasing_track:
             LOG.info("load phasing track")
             phasing = load_signal(s.data_path(s.data_phasing_track), chr_set, region)
 
-        compartments, accessibility = _finalize_tracks(
-            compartments,
-            accessibility,
-            phasing,
-            anchors,
-            mode=s.accessibility_mode,
-            percentile=s.accessibility_percentile,
-        )
+        compartments = _finalize_tracks(compartments, phasing, anchors)
 
         return cls(
             anchors=anchors,
@@ -169,7 +154,6 @@ class ContactData:
             arc_fit=arc_fit,
             long_arcs=long_arcs,
             compartments=compartments,
-            accessibility=accessibility,
         )
 
     @classmethod
@@ -183,10 +167,7 @@ class ContactData:
         region: BedRegion | None = None,
         max_pet_length: int = 1_000_000,
         compartments_df: Any | None = None,
-        accessibility_df: Any | None = None,
         phasing_df: Any | None = None,
-        accessibility_mode: str = "log",
-        accessibility_percentile: float = 80.0,
     ) -> ContactData:
         """
         Build ContactData from pandas DataFrames.
@@ -210,15 +191,9 @@ class ContactData:
         compartments_df : DataFrame or None
             Columns: chr, start, end[, label][, value].  `label` wins when both
             are present.  A value-only frame is phased the same way a file is.
-        accessibility_df : DataFrame or None
-            Columns: chr, start, end, value
         phasing_df : DataFrame or None
             Columns: chr, start, end, value.  Used to orient a value-only
-        accessibility_mode : str
-            `log` or `binary`, how the accessibility signal is normalised.
-        accessibility_percentile : float
-            Under `binary`, the percentile at or above which a bead is open.
-            compartment frame when no accessibility frame is given.
+            compartment frame.
         """
         chr_set: set[str] = (
             set(chrs) if chrs is not None else {str(c) for c in anchors_df["chr"].unique()}
@@ -285,16 +260,8 @@ class ContactData:
                 singletons.append((c1, p1, c2, p2, sc))
 
         compartments = _compartments_from_df(compartments_df, chr_set, region)
-        accessibility = _signal_from_df(accessibility_df, chr_set, region)
         phasing = _signal_from_df(phasing_df, chr_set, region)
-        compartments, accessibility = _finalize_tracks(
-            compartments,
-            accessibility,
-            phasing,
-            anchors,
-            mode=accessibility_mode,
-            percentile=accessibility_percentile,
-        )
+        compartments = _finalize_tracks(compartments, phasing, anchors)
 
         contact_fit = fit_contact_exponent(singletons)
         arc_fit = fit_arc_strength([a for al in arcs.values() for a in al])
@@ -307,7 +274,6 @@ class ContactData:
             arc_fit=arc_fit,
             long_arcs=long_arcs,
             compartments=compartments,
-            accessibility=accessibility,
         )
 
 
@@ -316,29 +282,18 @@ class ContactData:
 
 def _finalize_tracks(
     compartments: CompartmentMap,
-    accessibility: SignalMap,
     phasing: SignalMap,
     anchors: AnchorMap,
-    mode: str = "log",
-    percentile: float = 80.0,
-) -> tuple[CompartmentMap, SignalMap]:
+) -> CompartmentMap:
     """
-    Phase the compartment track and rescale accessibility onto [0, 1].
-
-    Phasing uses accessibility ahead of a dedicated phasing track, because A is
-    the open compartment by definition, so that correlation is the one the model
-    actually means.  It runs on the raw signal, before rescaling, since a
-    monotone rescale cannot change the sign of the correlation.
+    Phase the compartment track against the phasing signal.
 
     Both factories go through here so the file and frame paths cannot pick
     different rules.
     """
     if compartments:
-        signal = accessibility if accessibility else phasing
-        compartments = phase_compartments(compartments, signal or None, anchors)
-    if accessibility:
-        accessibility = normalize_signal_map(accessibility, mode=mode, percentile=percentile)
-    return compartments, accessibility
+        compartments = phase_compartments(compartments, phasing or None, anchors)
+    return compartments
 
 
 def _compartments_from_df(df: Any, chr_set: set[str], region: BedRegion | None) -> CompartmentMap:

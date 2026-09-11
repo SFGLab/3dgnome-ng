@@ -431,7 +431,7 @@ def ensemble_hic_correlation(
 #
 # MultiMM's second validation: the first eigenvector of the structure-derived
 # correlation matrix against the eigenvector of the experimental Hi-C. See
-# the compartment and accessibility energy terms.
+# the compartment energy term.
 
 
 def compartment_eigenvector(contacts: F64Array, phasing: F64Array | None = None) -> F64Array:
@@ -526,32 +526,6 @@ def compartment_correlation(
             out["input_agreement"] = float(
                 np.mean(np.sign((1.0 if rt >= 0 else -1.0) * e_sim[m]) == np.sign(t[m]))
             )
-    return out
-
-
-def signed_track(values: F64Array) -> F64Array:
-    """Centre a non-negative track so `compartment_saddle` can sort by it.
-
-    That function reads a signed compartment call and drops bins at exactly zero,
-    which is right for an eigenvector and wrong for accessibility: a `[0, 1]` track
-    would lose every closed bin, and under the binary normalisation that is most of
-    them. Subtracting the median makes the two halves the extremes of the sort
-    while keeping the ordering, so the saddle asks whether open regions contact
-    open regions.
-
-    Bins exactly at the median are nudged rather than dropped, since with a binary
-    track the median may equal one of the two levels.
-    """
-    v = np.asarray(values, dtype=np.float64)
-    if v.size == 0:
-        return v
-    out = v - float(np.median(v))
-    if np.all(out == 0.0):
-        return out
-    # Half a step below the smallest non-zero magnitude: keeps ties on the closed
-    # side without colliding with a real value.
-    nz = np.abs(out[out != 0.0])
-    out[out == 0.0] = -0.5 * float(nz.min()) if nz.size else -1.0
     return out
 
 

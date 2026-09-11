@@ -126,7 +126,6 @@ def _run(problem: Problem) -> Result:
     nbr_w = problem["anchor_neighbor_weights"]
     heat = problem["heat_dist"]
     comp = problem["compartment"]
-    acc = problem["accessibility"]
 
     seed_rng(seed)
     mc_numba.seed_numba(seed)
@@ -137,7 +136,7 @@ def _run(problem: Problem) -> Result:
         pos_run: F32Array = best_pos.copy()
         add_movable_noise_inplace(pos_run, fixed, step)
         score = mc_numba.mc_smooth_numba(
-            pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat, comp, acc
+            pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat, comp
         )
         if score < best_score or best_score < 0.0:
             best_score = score
@@ -154,7 +153,7 @@ class SmoothStage:
         return int(inputs[0].pos.shape[0])  # type: ignore[attr-defined]
 
     def batch_key(self, inputs: tuple[State, ...]) -> tuple[object, ...]:
-        """``(heat?, orn?, comp?, brdg?, bead-bucket)`` - the exact signature
+        """``(heat?, orn?, comp?, bead-bucket)`` - the exact signature
         `mc_smooth_jax_batch` reads from ``problems[0]`` to pick its kernel.  A
         batch MUST be uniform in these flags, so they are part of the key (else a
         no-heat IB could land in a heat batch and get the wrong kernel)."""
@@ -167,22 +166,21 @@ class SmoothStage:
             and st.anchor_neighbor_weights is not None
         )
         comp = st.bead_compartment is not None
-        brdg = st.bead_accessibility is not None
         # The bead bucket is only in the key when launches are not merged.  A launch pads to its
         # largest member and costs the same either way, so splitting a term uniform set by size
         # buys nothing and costs one launch per bucket.  `mc_smooth_jax_batch` still splits a
         # merged group for device memory.
         if bool(st.settings.merge_smooth_launches):
-            return heat, orn, comp, brdg, 0
-        return heat, orn, comp, brdg, batch_bucket(int(st.pos.shape[0]), st.settings)
+            return heat, orn, comp, 0
+        return heat, orn, comp, batch_bucket(int(st.pos.shape[0]), st.settings)
 
     @staticmethod
     def describe_batch_key(key: tuple[object, ...]) -> str:
         """Human-readable form of the batch key for logs."""
-        heat, orn, comp, brdg, bucket = key
+        heat, orn, comp, bucket = key
         return (
             f"heat={'yes' if heat else 'no'} orn={'yes' if orn else 'no'} "
-            f"comp={'yes' if comp else 'no'} brdg={'yes' if brdg else 'no'} "
+            f"comp={'yes' if comp else 'no'} "
             + (f"{bucket}-bead bucket" if bucket else "all bead sizes")
         )
 
@@ -206,7 +204,6 @@ class SmoothStage:
             "anchor_neighbor_weights": st.anchor_neighbor_weights,
             "heat_dist": getattr(st, "heat_dist", None),
             "compartment": st.bead_compartment,
-            "accessibility": st.bead_accessibility,
         }
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:

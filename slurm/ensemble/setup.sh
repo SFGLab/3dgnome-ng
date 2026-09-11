@@ -122,11 +122,10 @@ else
   python -m validation fetch --manifest validation/manifests/${CELL}_hic.json --out data/_hic
 fi
 
-# Only the TAD boundaries are wanted. Compartments and the accessibility signal feed the
-# epigenome terms, which this ensemble runs without, and skipping the signal step means the ATAC
-# bigWig never has to be fetched and pyBigWig never has to be installed.
+# Only the TAD boundaries are wanted. Compartments feed the epigenome term, which this ensemble
+# runs without.
 echo "[setup] calling TADs"
-python -m validation tracks --cell "$CELL" --skip-compartments --skip-signal
+python -m validation tracks --cell "$CELL" --skip-compartments
 
 echo "[setup] building Hi-C singletons at ${BINSIZE}bp"
 python slurm/ensemble/prep_singletons.py \

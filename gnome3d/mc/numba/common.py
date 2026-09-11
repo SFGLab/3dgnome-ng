@@ -51,7 +51,7 @@ NO_I32: I32Array = np.zeros(1, dtype=np.int32)
 
 
 class AffinityParams(NamedTuple):
-    """Resolved compartment + bridging kernel arguments for one MC level."""
+    """Resolved compartment kernel arguments for one MC level."""
 
     use_comp: bool
     comp_cls: I8Array
@@ -59,14 +59,10 @@ class AffinityParams(NamedTuple):
     comp_weight: float
     comp_ea: float
     comp_eb: float
-    use_brdg: bool
-    brdg_a: F64Array
-    brdg_r0: float
-    brdg_weight: float
 
     @property
     def any_on(self) -> bool:
-        return self.use_comp or self.use_brdg
+        return self.use_comp
 
 
 def affinity_params(
@@ -74,11 +70,10 @@ def affinity_params(
     level: str,
     bond_scale: float,
     compartment: np.ndarray[Any, Any] | None,
-    accessibility: np.ndarray[Any, Any] | None,
 ) -> AffinityParams:
-    """Resolve the affinity terms for one MC level.
+    """Resolve the compartment term for one MC level.
 
-    A term is on only when its master flag, its per-level apply flag and its
+    The term is on only when its master flag, its per-level apply flag and its
     track are all present, so a missing track silently leaves it off rather than
     scoring against zeros.  A radius of 0 auto-derives as
     `auto_factor * bond_scale`, matching the excluded-volume convention.
@@ -101,17 +96,6 @@ def affinity_params(
         comp_r0 = float(getattr(settings, f"compartment_auto_factor_{level}")) * bond_scale
     comp_r0 = comp_r0 if comp_r0 > 0.0 else 1.0
 
-    have_a = accessibility is not None and accessibility.size > 0
-    use_brdg = (
-        bool(settings.use_bridging)
-        and bool(getattr(settings, f"bridging_apply_to_{level}"))
-        and have_a
-    )
-    brdg_r0 = float(getattr(settings, f"bridging_radius_{level}"))
-    if use_brdg and brdg_r0 <= 0.0:
-        brdg_r0 = float(getattr(settings, f"bridging_auto_factor_{level}")) * bond_scale
-    brdg_r0 = brdg_r0 if brdg_r0 > 0.0 else 1.0
-
     return AffinityParams(
         use_comp=use_comp,
         comp_cls=(
@@ -123,18 +107,14 @@ def affinity_params(
         comp_weight=float(settings.compartment_weight),
         comp_ea=float(settings.compartment_energy_a),
         comp_eb=float(settings.compartment_energy_b),
-        use_brdg=use_brdg,
-        brdg_a=(as_f64(accessibility) if use_brdg and accessibility is not None else NO_F64),
-        brdg_r0=brdg_r0,
-        brdg_weight=float(settings.bridging_weight),
     )
 
 
-def init_affinity_scores(pw: F64Array, aff: AffinityParams) -> tuple[float, float]:
-    """Full compartment and bridging scores for the starting positions."""
+def init_affinity_scores(pw: F64Array, aff: AffinityParams) -> float:
+    """Full compartment score for the starting positions."""
     if not aff.any_on:
-        return 0.0, 0.0
-    c, b = init_affinity_nb(
+        return 0.0
+    c = init_affinity_nb(
         pw,
         aff.use_comp,
         aff.comp_cls,
@@ -142,12 +122,8 @@ def init_affinity_scores(pw: F64Array, aff: AffinityParams) -> tuple[float, floa
         aff.comp_weight,
         aff.comp_ea,
         aff.comp_eb,
-        aff.use_brdg,
-        aff.brdg_a,
-        aff.brdg_r0,
-        aff.brdg_weight,
     )
-    return float(c), float(b)
+    return float(c)
 
 
 def prepare_orientation(
@@ -265,20 +241,15 @@ def run_outer_loop(
     score_conf: float,
     rep_inv_cutoff: float = 0.0,
     bg_weight: float = 0.0,
-    # Affinity terms default to off so a stage that never uses them (arcs) needs
-    # no extra arguments.  The dummy arrays are only there to fix numba's types.
+    # The affinity term defaults to off so a stage that never uses it (arcs) needs
+    # no extra arguments.  The dummy array is only there to fix numba's types.
     use_comp: bool = False,
     comp_cls: I8Array = NO_I8,
     comp_r0: float = 1.0,
     comp_weight: float = 0.0,
     comp_ea: float = 0.0,
     comp_eb: float = 0.0,
-    use_brdg: bool = False,
-    brdg_a: F64Array = NO_F64,
-    brdg_r0: float = 1.0,
-    brdg_weight: float = 0.0,
     score_comp: float = 0.0,
-    score_brdg: float = 0.0,
     use_cells: bool = False,
     cell_lo: F64Array = NO_F64_3,
     cell_dim: I64Array = NO_I64_3,
@@ -289,9 +260,7 @@ def run_outer_loop(
     cell_buf: I32Array = NO_I32,
 ) -> float:
     """Drive the unified kernel until convergence; return the final total score."""
-    score = (
-        score_struct + score_heat + score_orn + score_excl + score_conf + score_comp + score_brdg
-    )
+    score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
     ms_score = score
     step_i = 0
     round_i = 0
@@ -304,7 +273,6 @@ def run_outer_loop(
             score_excl,
             score_conf,
             score_comp,
-            score_brdg,
             n_ok,
         ) = batch_mc_nb(
             pw,
@@ -348,10 +316,6 @@ def run_outer_loop(
             comp_weight,
             comp_ea,
             comp_eb,
-            use_brdg,
-            brdg_a,
-            brdg_r0,
-            brdg_weight,
             float(step_size),
             T,
             dt,
@@ -365,7 +329,6 @@ def run_outer_loop(
             score_excl,
             score_conf,
             score_comp,
-            score_brdg,
             rep_inv_cutoff,
             bg_weight,
             use_cells,
@@ -377,15 +340,7 @@ def run_outer_loop(
             cell_where,
             cell_buf,
         )
-        score = (
-            score_struct
-            + score_heat
-            + score_orn
-            + score_excl
-            + score_conf
-            + score_comp
-            + score_brdg
-        )
+        score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
         step_i += stop_steps
         round_i += 1
         ratio = score / ms_score if ms_score > 0 else 1.0

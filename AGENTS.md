@@ -398,30 +398,24 @@ The test auto-skips the Python comparison if `gnome3d/simulate.py` is missing or
 
 ## Epigenomic tracks
 
-The compartment and accessibility energy terms read plain-text tracks derived from data the
-repo already fetches.  Build them once per cell line:
+The compartment energy term reads a plain-text track derived from data the repo already
+fetches.  Build it once per cell line:
 
 ```bash
 python -m validation fetch  --manifest validation/manifests/<CELL>_hic.json --out data/_hic
-python -m validation fetch  --manifest validation/manifests/<CELL>_accessibility.json \
-                            --out data/_epigenome
 python -m validation tracks --cell <CELL>
 ```
 
-That writes `data/<CELL>/<CELL>_compartments.bedGraph` and `<CELL>_atac.bedGraph` plus a
+That writes `data/<CELL>/<CELL>_compartments.bedGraph` and `<CELL>_tads.bed` plus a
 lockfile recording resolution, source file and a per-chromosome quality number.  It is
 idempotent, so re-running is free.
 
-Then ablate the terms against that cell line's own Hi-C:
+Then ablate the term against that cell line's own Hi-C:
 
 ```bash
 python -m validation epigenome --cell <CELL> --hic data/_hic/<CELL>/<file>.mcool \
                                --region chr1:20000000-40000000
 ```
-
-Accessibility assay differs by cell line.  ENCODE has ATAC-seq for GM12878 only; H1 and HFFc6
-use DNase-seq, which is what HiP-HoP itself used, so it is the intended input rather than a
-substitute.  The manifests record which is which.
 
 Three traps, each of which produces a silently wrong answer.  Pick the deepest contact file when
 a cell line has several, since a shallow one yields a compartment eigenvector that is pure noise;
@@ -513,63 +507,38 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
 ### New features (opt-in via settings, default-off)
 
-- **Epigenome energy terms** — A/B compartments and chromatin accessibility.
-  The compartment family is ported from MultiMM (`add_compartment_blocks`,
-  `add_Blamina_interaction`, `add_central_force`, `add_chromosomal_blocks`); accessibility from
-  HiP-HoP (Buckle et al., Mol Cell 72(4):786-797, 2018, doi:10.1016/j.molcel.2018.09.016), which
-  embeds ATAC-seq at 1 kbp beads, the same scale as our subanchors.  MultiMM has no ATAC energy
-  term at all, so the two families come from different papers.  Six flags, all default off:
-  `use_compartments`, `use_bridging`, `use_fibre_compaction`, `use_lamina`,
-  `use_central_force`, `use_chromosomal_blocks`, under `[compartments]`, `[accessibility]` and
-  `[nucleus]`. New `[data]` keys `compartments`, `accessibility`, `phasing_track`;
+- **Epigenome energy term** — A/B compartments.
+  Ported from MultiMM (`add_compartment_blocks`).  One flag, default off: `use_compartments`,
+  under `[compartments]`. New `[data]` keys `compartments` and `phasing_track`;
   `ContactData.from_dataframes` gains the matching frames.
 
   Divergences worth knowing:
-  - **Attractive terms are written shifted and non-negative.** MultiMM and HiP-HoP write them
-    as negative energies, which 3dgnome cannot use: the Metropolis rule divides by the running
+  - **The attractive term is written shifted and non-negative.** MultiMM writes it as a
+    negative energy, which 3dgnome cannot use: the Metropolis rule divides by the running
     score and is guarded on `score > 0`, so a negative-definite term would silently disable the
     temperature branch. The shift changes an additive constant, not the minimum or the gradient.
   - **The pairwise affinity is divided by `N - 1`.** Not in MultiMM. Without it the term's
     strength grows with region size, because it sums over all partners while springs act per
     bond, and a weight tuned on a small region collapses a large one.
-  - **ATAC drives both HiP-HoP mechanisms.** HiP-HoP uses H3K27ac for fibre compaction and ATAC
-    for bridging; we drive both from accessibility because the pipeline loads one track.
-    Compaction scales the existing `dtn` instead of adding i,i+2 springs.
-  - **Accessibility normalisation is selectable: `[accessibility] mode = log | binary`,
-    default `log`.** `log` is log-then-minmax. `binary` is HiP-HoP's own open/closed state,
-    open at or above `[accessibility] percentile` (default 80) of the loaded values.
-    The default is kept at `log` so existing configs are unchanged, but `binary` is the
-    faithful one and `log` is close to inert on a track binned to several kb. Binning a
-    narrow ATAC peak into a 5 kb bin already removes the upper tail the log exists to
-    compress, so the log stretches the remaining background over most of `[0, 1]`: measured
-    on GM12878 the median bead reads 0.85 open, leaving 0.224 of `1 - a` for fibre
-    compaction, which applies 3.0% mean compaction and correlates with accessibility at
-    r = -0.011. Under `binary` at the 80th percentile the same region gets 22.9% mean
-    compaction at r = +0.668, and realised bond lengths fall 22.8%. `ContactData.from_files`
-    reads both keys from settings; `from_dataframes` takes them as parameters.
-  - **Bridging is an effective pairwise attraction.** HiP-HoP's explicit diffusing bridge
-    particles are integrated out rather than simulated.
-  - **Lamina, central and chromosomal blocks run at segment-level heatmap MC only.** They need a
-    nuclear frame shared across the whole active region, and that is the one MC call spanning it.
   - **Compartment input is source-agnostic.** CALDER2 reads Juicer `.hic` only, and this repo's
     Hi-C is 4DN mcool, so a CALDER BED is one supported format rather than the required source.
     A signed eigenvector track is the recommended input. Eigenvector sign is arbitrary, so
     phasing is mandatory and explicit; an unphaseable chromosome is left unassigned rather than
     segregated backwards.
-  - **The JAX smooth kernel carries the affinity terms.**
-    `mc_smooth_jax` and `mc_smooth_jax_batch` implement compartment and bridging, agreeing with
+  - **The JAX smooth kernel carries the affinity term.**
+    `mc_smooth_jax` and `mc_smooth_jax_batch` implement the compartment term, agreeing with
     numba on initial energy to 1.2e-07 relative. `use_aff` is a static cache-key entry rather
     than a weight gate, because the term costs an extra O(N) pass per step and making it
-    structural keeps that off runs that do not use it. The scores ride the excluded-volume
-    accumulator: all three terms are pairwise, double counted and share the factor-2 delta, so
+    structural keeps that off runs that do not use it. The score rides the excluded-volume
+    accumulator: both terms are pairwise, double counted and share the factor-2 delta, so
     the sum is exact for both the Metropolis ratio and the final score, and only the per-term
     breakdown is lost.
-  - **The estimate-dist dry pass excludes them.** They are attractive, so including them would
+  - **The estimate-dist dry pass excludes it.** It is attractive, so including it would
     shrink the estimated distances that become the heat target and the real smooth pass would
     then compact against an already-compacted target.
 
-  These terms are purely attractive and need excluded volume or confinement enabled alongside
-  them, both of which also default off. See the doc.
+  The term is purely attractive and needs excluded volume or confinement enabled alongside
+  it, both of which also default off. See the doc.
 
 
 - **Excluded volume** — `settings.use_excluded_volume = true` to enable.
@@ -736,7 +705,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 - **Merged smooth launches: `[simulation_backend] merge_smooth_launches = yes`, default yes.**
   ([pipeline/ib/smooth.py](gnome3d/pipeline/ib/smooth.py) `batch_key`,
   [mc/jax/smooth.py](gnome3d/mc/jax/smooth.py) `_chunk_plan`)
-  `SmoothStage.batch_key` was `(heat, orn, comp, brdg, bead bucket)`, so a set of interaction
+  `SmoothStage.batch_key` was `(heat, orn, comp, bead bucket)`, so a set of interaction
   blocks agreeing on every energy term was still split into one launch per bead bucket. Cost per
   step in the batched kernel is flat in the launch width, so that split bought nothing. Measured
   on a real chr1 GM12878 run, 55.8 percent of smooth time sat in launches of four blocks or

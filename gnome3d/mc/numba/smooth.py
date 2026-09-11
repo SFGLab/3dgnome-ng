@@ -271,7 +271,6 @@ def mc_smooth_numba(
     anchor_neighbor_weights: dict[int, list[float]] | None = None,
     heat_dist: np.ndarray[Any, Any] | None = None,
     compartment: np.ndarray[Any, Any] | None = None,
-    accessibility: np.ndarray[Any, Any] | None = None,
 ) -> float:
     """Chain connectivity + angle MC.  Optionally adds CTCF orientation and/or
     subanchor heat. Anchor beads (fixed=True) never move. Single-counted
@@ -297,7 +296,6 @@ def mc_smooth_numba(
             )
             and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
             and compartment is None
-            and accessibility is None
         )
         if simple_config:
             return _mc_smooth_multichain(pos, dtn, fixed, step_size, settings, heat_dist)
@@ -350,9 +348,8 @@ def mc_smooth_numba(
         "smooth",
         float(dtn64.mean()) if dtn64.size > 0 else 1.0,
         compartment,
-        accessibility,
     )
-    score_comp, score_brdg = init_affinity_scores(pw, aff)
+    score_comp = init_affinity_scores(pw, aff)
 
     if use_heat:
         assert heat_dist is not None
@@ -499,12 +496,7 @@ def mc_smooth_numba(
         comp_weight=aff.comp_weight,
         comp_ea=aff.comp_ea,
         comp_eb=aff.comp_eb,
-        use_brdg=aff.use_brdg,
-        brdg_a=aff.brdg_a,
-        brdg_r0=aff.brdg_r0,
-        brdg_weight=aff.brdg_weight,
         score_comp=score_comp,
-        score_brdg=score_brdg,
         use_cells=use_cells,
         cell_lo=cell_lo,
         cell_dim=cell_dim,

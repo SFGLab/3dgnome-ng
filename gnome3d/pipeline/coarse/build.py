@@ -43,7 +43,7 @@ from gnome3d.pipeline.coarse.heatmap import (
     normalize_heatmap_inter,
 )
 from gnome3d.settings import Settings
-from gnome3d.tracks import bin_compartments, bin_signal, normalize_accessibility
+from gnome3d.tracks import bin_compartments
 from gnome3d.types import *
 from gnome3d.util import random_vector_np, seed_rng
 
@@ -93,10 +93,9 @@ class CoarseState:
     singletons: list[SingletonContact]
     long_arcs: RawArcMap
     selected_region: BedRegion | None = None
-    # Epigenomic tracks for the opt-in compartment and accessibility terms.
-    # Empty when no track is configured, which leaves those terms inert.
+    # Compartment track for the opt-in compartment term.  Empty when no track
+    # is configured, which leaves the term inert.
     compartments: CompartmentMap = field(default_factory=empty_compartment_map)
-    accessibility: SignalMap = field(default_factory=empty_signal_map)
 
 
 def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
@@ -172,7 +171,6 @@ def build_state(
         long_arcs=data.long_arcs,
         selected_region=region,
         compartments=data.compartments,
-        accessibility=data.accessibility,
     )
 
 
@@ -200,26 +198,16 @@ def compartment_for_clusters(
 
 def coarse_track_arrays(
     state: CoarseState, active_region: list[ClusterIndex], chr_of: list[str]
-) -> tuple[I8Array | None, F32Array | None, I32Array | None, F64Array | None]:
-    """Per-cluster track arrays for a multi-chromosome active region.
+) -> I8Array | None:
+    """Per-cluster compartment array for a multi-chromosome active region.
 
     `active_region` and `chr_of` are parallel, so each cluster is binned against
-    its own chromosome's track.  Returns
-    (compartment, accessibility, chromosome id, chromosome weight), each None
-    when the term that reads it is off or its data is missing.
-
-    The chromosome weight drives the nucleolar pull.  It is the mean chromosome
-    span over this chromosome's span, so a smaller chromosome gets a larger
-    weight and sits nearer the centre, which is the bias MultiMM's central force
-    encodes.
+    its own chromosome's track.  Returns None when the compartment term is off or
+    no chromosome has a track.
     """
     s = state.s
-    if not active_region:
-        return None, None, None, None
-
-    want_comp = s.use_compartments or s.use_lamina
-    want_acc = s.use_bridging
-    want_chrom = s.use_central_force or s.use_chromosomal_blocks
+    if not active_region or not s.use_compartments:
+        return None
 
     n = len(active_region)
     clusters = state.clusters
@@ -227,70 +215,20 @@ def coarse_track_arrays(
     for i, c in enumerate(chr_of):
         by_chr.setdefault(c, []).append(i)
 
-    comp: I8Array | None = np.zeros(n, dtype=np.int8) if want_comp else None
-    acc: F32Array | None = np.zeros(n, dtype=np.float32) if want_acc else None
+    comp: I8Array = np.zeros(n, dtype=np.int8)
     got_comp = False
-    got_acc = False
 
     for chr_, rows in by_chr.items():
         idx = [active_region[i] for i in rows]
         starts = [clusters[ci].start for ci in idx]
         ends = [clusters[ci].end for ci in idx]
-        if comp is not None:
-            ivs = state.compartments.get(chr_, [])
-            if ivs:
-                cls, _score = bin_compartments(ivs, starts, ends)
-                comp[rows] = cls
-                got_comp = True
-        if acc is not None:
-            sig = state.accessibility.get(chr_, [])
-            if sig:
-                acc[rows] = bin_signal(sig, starts, ends)
-                got_acc = True
+        ivs = state.compartments.get(chr_, [])
+        if ivs:
+            cls, _score = bin_compartments(ivs, starts, ends)
+            comp[rows] = cls
+            got_comp = True
 
-    chrom_id: I32Array | None = None
-    chrom_w: F64Array | None = None
-    if want_chrom:
-        order = {c: k for k, c in enumerate(sorted(by_chr))}
-        chrom_id = np.array([order[c] for c in chr_of], dtype=np.int32)
-        spans = {
-            c: max(
-                max(clusters[active_region[i]].end for i in rows)
-                - min(clusters[active_region[i]].start for i in rows),
-                1,
-            )
-            for c, rows in by_chr.items()
-        }
-        mean_span = float(sum(spans.values())) / len(spans)
-        chrom_w = np.array([mean_span / spans[c] for c in chr_of], dtype=np.float64)
-
-    return (
-        comp if got_comp else None,
-        acc if got_acc else None,
-        chrom_id,
-        chrom_w,
-    )
-
-
-def accessibility_for_clusters(
-    state: CoarseState, indices: list[ClusterIndex], chr_: str
-) -> F32Array | None:
-    """
-    Normalised accessibility per cluster, or None when no track covers this
-    chromosome.
-
-    The normalisation is done over the clusters handed in rather than genome
-    wide, so `a` spans [0, 1] within whatever region is being scored.  That keeps
-    the bridging strength comparable across regions of very different signal
-    depth.
-    """
-    ivs = state.accessibility.get(chr_, [])
-    if not ivs or not indices:
-        return None
-    clusters = state.clusters
-    starts = [clusters[ci].start for ci in indices]
-    ends = [clusters[ci].end for ci in indices]
-    return normalize_accessibility(bin_signal(ivs, starts, ends))
+    return comp if got_comp else None
 
 
 # --- RNG-ordered shared subroutine ------------------------------------------
@@ -1018,7 +956,7 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
 
     step_size = avg_dist * s.noise_lvl2
 
-    seg_comp, seg_acc, seg_chrom_id, seg_chrom_w = coarse_track_arrays(state, active_region, chr_of)
+    seg_comp = coarse_track_arrays(state, active_region, chr_of)
 
     pos: F32Array = np.array([clusters[i].pos for i in active_region], dtype=np.float32)
     n = len(active_region)
@@ -1037,9 +975,6 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
                 step_size,
                 s,
                 seg_comp,
-                seg_acc,
-                seg_chrom_id,
-                seg_chrom_w,
             )
             if score < best_score or best_score < 0:
                 best_score = score
@@ -1226,7 +1161,6 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
                 step_size,
                 s,
                 compartment_for_clusters(state, ibs, chr_),
-                accessibility_for_clusters(state, ibs, chr_),
                 heat_dist=heat,
             )
             gyr_after = float(np.linalg.norm(pos - pos.mean(axis=0), axis=1).mean())

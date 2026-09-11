@@ -133,7 +133,7 @@ class BedRegion:
         return self.start <= pos <= self.end
 
 
-# Epigenomic track types, consumed by the opt-in compartment and accessibility terms.
+# Epigenomic track types, consumed by the opt-in compartment term.
 
 
 class Compartment(IntEnum):

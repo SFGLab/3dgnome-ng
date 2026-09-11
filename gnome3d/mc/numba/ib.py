@@ -39,7 +39,6 @@ def mc_ib_numba(
     step_size: float,
     settings: Settings,
     compartment: np.ndarray[Any, Any] | None = None,
-    accessibility: np.ndarray[Any, Any] | None = None,
     heat_dist: np.ndarray[Any, Any] | None = None,
 ) -> float:
     """Numba simulated-annealing implementation for IB-centroid chain MC.
@@ -92,9 +91,8 @@ def mc_ib_numba(
         "ib",
         float(dtn64.mean()) if dtn64.size > 0 else 1.0,
         compartment,
-        accessibility,
     )
-    score_comp, score_brdg = init_affinity_scores(pw, aff)
+    score_comp = init_affinity_scores(pw, aff)
 
     heat_weight = float(settings.heatmap_weight_ib)
     use_heat = heat_dist is not None and heat_weight > 0.0
@@ -175,12 +173,7 @@ def mc_ib_numba(
         comp_weight=aff.comp_weight,
         comp_ea=aff.comp_ea,
         comp_eb=aff.comp_eb,
-        use_brdg=aff.use_brdg,
-        brdg_a=aff.brdg_a,
-        brdg_r0=aff.brdg_r0,
-        brdg_weight=aff.brdg_weight,
         score_comp=score_comp,
-        score_brdg=score_brdg,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

@@ -93,12 +93,11 @@ if [ -z "$MCOOL" ]; then
 fi
 echo "[setup:$CELL] mcool = $MCOOL"
 
-# TAD boundaries only. Compartments and the accessibility signal feed the epigenome terms, which
-# these runs leave off, and skipping the signal step means the ATAC bigWig is never needed.
+# TAD boundaries only. Compartments feed the epigenome term, which these runs leave off.
 if [ -s "data/$CELL/${CELL}_tads.bed" ]; then
   echo "[setup:$CELL] have data/$CELL/${CELL}_tads.bed"
 else
-  python -m validation tracks --cell "$CELL" --skip-compartments --skip-signal
+  python -m validation tracks --cell "$CELL" --skip-compartments
 fi
 
 # The singleton reader fetches the balanced matrix as well as the raw counts, so the resolution

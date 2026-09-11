@@ -38,7 +38,6 @@ from gnome3d.types import (
     F32Array,
     F64Array,
     I8Array,
-    SignalInterval,
 )
 from gnome3d.util import seed_rng
 
@@ -301,18 +300,14 @@ def seed_for_ib(
                     anchor_neighbors[k].append(cluster_to_k[other_ci])
                     anchor_neighbor_weights[k].append(math.sqrt(max(arc.score, 0)))
 
-    # Epigenomic tracks, sliced to this IB's genomic span.  Sliced only when the
+    # Compartment track, sliced to this IB's genomic span.  Sliced only when the
     # consuming term is on, so a loaded track costs nothing until something reads
-    # it.  Densify bins them onto bead ranges.
+    # it.  Densify bins it onto bead ranges.
     track_compartments: list[CompartmentInterval] | None = None
-    track_accessibility: list[SignalInterval] | None = None
-    if chr_ and anchor_genomic:
+    if chr_ and anchor_genomic and s.use_compartments:
         ib_lo = anchor_genomic[0][0]
         ib_hi = anchor_genomic[-1][1]
-        if s.use_compartments or s.use_lamina:
-            track_compartments = slice_intervals(state.compartments.get(chr_, []), ib_lo, ib_hi)
-        if s.use_bridging or s.use_fibre_compaction:
-            track_accessibility = slice_intervals(state.accessibility.get(chr_, []), ib_lo, ib_hi)
+        track_compartments = slice_intervals(state.compartments.get(chr_, []), ib_lo, ib_hi)
 
     # ESTIMATE_DIST inclusion: same sparse-signal early-out as the engine - empty
     # heatmap or active-fraction below threshold => no heat stage.
@@ -339,6 +334,5 @@ def seed_for_ib(
         anchor_genomic=anchor_genomic,
         step_size_arcs=_ARCS_NOISE,
         track_compartments=track_compartments,
-        track_accessibility=track_accessibility,
     )
     return seed, wants_heat

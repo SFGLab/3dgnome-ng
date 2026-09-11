@@ -119,8 +119,7 @@ assert cell in s.data_anchors, f"config is not for {cell}: anchors={s.data_ancho
 assert s.use_ctcf_motif and s.use_excluded_volume and s.use_dynamic_loop_density
 assert s.use_anchor_heatmap and s.use_subanchor_heatmap
 assert s.mc_executor_jax_bucket_shapes, "shape bucketing is off; this run would be ~5x slower"
-for flag in ("use_compartments", "use_bridging", "use_fibre_compaction", "use_lamina"):
-    assert not getattr(s, flag), f"{flag} is on; these runs exclude epigenome terms"
+assert not s.use_compartments, "use_compartments is on; these runs exclude epigenome terms"
 # Every input the run will open, resolved through the config rather than assumed by name.
 from pathlib import Path  # noqa: E402
 

@@ -39,7 +39,7 @@ from validation.studies.epigenome import (
     _ib_ids,
     _run_arm,
     _track_on_bins,
-    _track_paths,
+    _track_path,
 )
 
 # Region-level columns correlated against the gap, and what each one would mean.
@@ -170,7 +170,7 @@ class SaddleSurvey(Study):
     def run(self, ctx: Context, args: argparse.Namespace) -> None:
         from gnome3d.io import parse_chrs_arg
 
-        comp_path, acc_path = _track_paths(ctx.cell, ctx.data_root)
+        comp_path = _track_path(ctx.cell, ctx.data_root)
         if not Path(comp_path).exists():
             print(f"[saddle-survey] missing compartment track: {comp_path}")
             print(f"[saddle-survey] build it: python -m validation tracks --cell {ctx.cell}")
@@ -196,7 +196,7 @@ class SaddleSurvey(Study):
         print(header)
         print("  " + "-" * (len(header) - 2))
 
-        flags = _arm_flags("off", args, comp_path, acc_path)
+        flags = _arm_flags("off", args, comp_path)
         if args.segment_split_file:
             flags["data_segment_split"] = str(Path(args.segment_split_file).resolve())
             print(f"  segments from: {args.segment_split_file}")

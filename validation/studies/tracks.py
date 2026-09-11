@@ -1,10 +1,10 @@
-"""Derive the epigenomic tracks the compartment and accessibility terms read.
+"""Derive the epigenomic tracks the compartment term reads.
 
 Two transforms, both writing the plain-text formats `gnome3d.io` parses, so the
-engine never grows a cooler or bigWig dependency.
+engine never grows a cooler dependency.
 
   * mcool -> phased compartment eigenvector bedGraph, via `cooltools.eigs_cis`
-  * bigWig -> binned signal bedGraph, via pyBigWig
+  * mcool -> TAD boundary BED, via `cooltools.insulation`
 
 Both are idempotent. An output is rebuilt only when it is missing, when its input
 is newer, or when --force is given.
@@ -17,7 +17,7 @@ Outputs land next to that cell line's other engine inputs, using the same naming
 convention `cell_data_section` follows:
 
     data/<CELL>/<CELL>_compartments.bedGraph
-    data/<CELL>/<CELL>_atac.bedGraph
+    data/<CELL>/<CELL>_tads.bed
 
 A lockfile records resolution, phasing decision and input hash per output, so a
 rebuild is reproducible and an accidental re-derivation at a different resolution
@@ -40,9 +40,6 @@ from validation.studies import Context, register
 # Compartment calling is a megabase-scale question, so the default bin is coarse.
 # Finer bins make the eigenvector noisy without adding compartment detail.
 DEFAULT_RESOLUTION = 100_000
-
-# ATAC varies bead to bead at subanchor scale, which is the scale HiP-HoP works at.
-DEFAULT_SIGNAL_RESOLUTION = 5_000
 
 # TAD calling. 10 kb resolves boundaries without the map going too sparse, and the
 # insulation window has to be several times the bin or the score is dominated by
@@ -138,7 +135,7 @@ def derive_compartments(
     outright because float round-off leaves the matrix a hair asymmetric.
 
     The sign is arbitrary and is left as produced. `gnome3d.tracks.phase_compartments`
-    orients it at load time against accessibility or loop-anchor counts, which is
+    orients it at load time against the phasing track or loop-anchor counts, which is
     the only evidence available without a genome fasta.
     """
     from cooltools.api import eigdecomp  # noqa: PLC0415
@@ -198,7 +195,7 @@ def derive_compartments(
     }
 
 
-# --- signal from a bigWig ----------------------------------------------------
+# --- TAD boundaries from an mcool --------------------------------------------
 
 
 def derive_tad_boundaries(
@@ -258,45 +255,6 @@ def derive_tad_boundaries(
     }
 
 
-def derive_signal(
-    bigwig: Path, out: Path, resolution: int, chroms: list[str] | None
-) -> dict[str, Any]:
-    """bigWig -> mean signal per fixed-width bin, as a bedGraph.
-
-    Values are written raw.  `gnome3d.tracks.normalize_signal_map` applies the
-    HiP-HoP log-and-rescale once over everything the engine loads, which keeps the
-    bridging strength comparable across regions.
-    """
-    import pyBigWig  # noqa: PLC0415
-
-    bw = pyBigWig.open(str(bigwig))
-    try:
-        avail = bw.chroms()
-        want = [c for c in (chroms or list(avail)) if c in avail]
-        if not want:
-            raise SystemExit(f"none of the requested chromosomes are in {bigwig}")
-
-        rows: list[tuple[str, int, int, float]] = []
-        for chr_ in want:
-            length = int(avail[chr_])
-            n_bins = length // resolution
-            if n_bins < 1:
-                continue
-            vals = bw.stats(chr_, 0, n_bins * resolution, type="mean", nBins=n_bins)
-            for i, v in enumerate(vals):
-                if v is None:
-                    continue
-                fv = float(v)
-                if fv != fv:
-                    continue
-                rows.append((chr_, i * resolution, (i + 1) * resolution, fv))
-    finally:
-        bw.close()
-
-    _write_bedgraph(out, rows)
-    return {"resolution": resolution, "bins": len(rows), "chroms": sorted({r[0] for r in rows})}
-
-
 # --- study -------------------------------------------------------------------
 
 
@@ -317,24 +275,19 @@ def _find_one(root: Path, patterns: list[str]) -> Path | None:
 
 class TracksStudy:
     name = "tracks"
-    help = "derive compartment and accessibility bedGraphs from an mcool and a bigWig"
+    help = "derive the compartment bedGraph and TAD boundaries from an mcool"
 
     def add_args(self, p: ArgumentParser) -> None:
         p.add_argument(
             "--mcool", default=None, help="Hi-C mcool (default: search data/_hic/<cell>)"
         )
-        p.add_argument(
-            "--bigwig", default=None, help="ATAC bigWig (default: search data/_epigenome)"
-        )
         p.add_argument("--resolution", type=int, default=DEFAULT_RESOLUTION)
-        p.add_argument("--signal-resolution", type=int, default=DEFAULT_SIGNAL_RESOLUTION)
         p.add_argument("--chroms", default=None, help="comma list; default every chromosome")
         p.add_argument("--force", action="store_true", help="rebuild even when up to date")
         p.add_argument("--tad-resolution", type=int, default=DEFAULT_TAD_RESOLUTION)
         p.add_argument("--tad-window", type=int, default=DEFAULT_TAD_WINDOW)
         p.add_argument("--skip-compartments", action="store_true")
         p.add_argument("--skip-tads", action="store_true")
-        p.add_argument("--skip-signal", action="store_true")
 
     def run(self, ctx: Context, args: Namespace) -> None:
         cell = ctx.cell
@@ -393,32 +346,6 @@ class TracksStudy:
                         **meta,
                     }
                     print(f"[tracks]   wrote {meta['boundaries']} boundaries -> {out}")
-
-        if not args.skip_signal:
-            bw = (
-                Path(args.bigwig)
-                if args.bigwig
-                else _find_one(
-                    root / "_epigenome",
-                    [f"{cell}/*ATAC*.bigWig", f"{cell}/*ATAC*.bw", "*ATAC*.bigWig"],
-                )
-            )
-            if bw is None or not bw.exists():
-                print(
-                    f"[tracks] no ATAC bigWig for {cell} under {root / '_epigenome'}. "
-                    f"Fetch it first: python -m validation fetch "
-                    f"--manifest validation/manifests/{cell}.json --out {root}/_epigenome"
-                )
-            else:
-                out = out_dir / f"{cell}_atac.bedGraph"
-                key = _cache_key(bw, args.signal_resolution, chroms)
-                if _up_to_date(out, key, lock.get("atac"), args.force):
-                    print(f"[tracks] atac up to date: {out}")
-                else:
-                    print(f"[tracks] binning {bw.name} @ {args.signal_resolution}")
-                    meta = derive_signal(bw, out, args.signal_resolution, chroms)
-                    lock["atac"] = {"input": key, "source": str(bw), "out": str(out), **meta}
-                    print(f"[tracks]   wrote {meta['bins']} bins -> {out}")
 
         if lock:
             _save_lock(lock_path, lock)
