@@ -36,13 +36,17 @@ from gnome3d.types import BeadOut  # noqa: E402
 
 
 def read_multimm_cif(path: Path) -> np.ndarray:
-    """Positions from a MultiMM mmCIF, in file order, located by the `_atom_site` header."""
+    """Positions from a MultiMM mmCIF, in file order, located by the `_atom_site` header.
+
+    The two end beads carry the non standard residue ALB and OpenMM writes them as HETATM, so
+    both record kinds are beads.
+    """
     cols: list[str] = []
     rows: list[list[float]] = []
     for line in path.read_text().splitlines():
         if line.startswith("_atom_site."):
             cols.append(line.split(".", 1)[1].strip())
-        elif line.startswith("ATOM"):
+        elif line.startswith(("ATOM", "HETATM")):
             f = line.split()
             rows.append([float(f[cols.index(c)]) for c in ("Cartn_x", "Cartn_y", "Cartn_z")])
     return np.array(rows, dtype=np.float64).reshape(-1, 3)

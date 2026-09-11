@@ -64,11 +64,14 @@ _atom_site.Cartn_z
 
 
 def multimm_cif(path: Path, xyz: np.ndarray) -> None:
-    """The layout `initial_structure_tools.write_mmcif` produces, thirteen fields, x y z last."""
+    """MultiMM's layout, thirteen fields with x y z last. OpenMM writes the two end beads, whose
+    residue is the non standard ALB, as HETATM records, and a reader that takes ATOM alone
+    silently drops them."""
     lines = [MULTIMM_HEADER]
     for i, (x, y, z) in enumerate(xyz, start=1):
-        comp, atom = ("ALB", "CB") if i in (1, len(xyz)) else ("ALA", "CA")
-        lines.append(f"ATOM {i} D {atom} . {comp} A 0 {i} ? {x:.3f} {y:.3f} {z:.3f}\n")
+        end = i in (1, len(xyz))
+        comp, atom, rec = ("ALB", "CB", "HETATM") if end else ("ALA", "CA", "ATOM")
+        lines.append(f"{rec} {i} D {atom} . {comp} A 0 {i} ? {x:.3f} {y:.3f} {z:.3f}\n")
     path.write_text("".join(lines))
 
 
