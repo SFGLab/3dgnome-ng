@@ -23,6 +23,7 @@ battery bins it like any other structure and its overlap count lands in the suba
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -166,6 +167,9 @@ def collect_ensemble(
     """Relabel each member's minimised and after dynamics cif into the two arm directories.
 
     MultiMM writes member i to `<out_root>_i`. Returns how many members had a model directory.
+    A member's trajectory frames and DCD are removed once its models are collected. They are
+    about 1.4 GB per member at our bead count and nothing reads them; thirty of them filled a
+    150 GB disk.
     """
     arm_min.mkdir(parents=True, exist_ok=True)
     arm_md.mkdir(parents=True, exist_ok=True)
@@ -181,6 +185,9 @@ def collect_ensemble(
         ):
             if src.is_file():
                 write_cif(str(dst), uniform_beads(read_multimm_cif(src), lo, hi))
+        shutil.rmtree(model.parent / "md_frames", ignore_errors=True)
+        for big in (model.parent / "metadata").glob("*.dcd"):
+            big.unlink()
     return found
 
 

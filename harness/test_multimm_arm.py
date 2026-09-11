@@ -235,9 +235,21 @@ def test_collects_an_ensemble_into_arm_dirs() -> None:
             m.mkdir(parents=True)
             multimm_cif(m / "MultiMM_minimized.cif", rng.normal(size=(20, 3)))
             multimm_cif(m / "MultiMM_afterMD.cif", rng.normal(size=(20, 3)))
+        for i in (1, 2, 3):
+            fr = root.parent / f"mm_{i}" / "md_frames"
+            fr.mkdir()
+            (fr / "frame_1.cif").write_text("x")
+            (root.parent / f"mm_{i}" / "metadata").mkdir()
+            (root.parent / f"mm_{i}" / "metadata" / "traj.dcd").write_bytes(b"x")
         arm_min = Path(d) / "arm_min"
         arm_md = Path(d) / "arm_md"
         n = collect_ensemble(root, 3, 1, 1_000_000, arm_min, arm_md)
+        check(
+            "trajectory frames and the DCD are removed once collected, the models kept",
+            not (root.parent / "mm_1" / "md_frames").exists()
+            and not (root.parent / "mm_1" / "metadata" / "traj.dcd").exists()
+            and (root.parent / "mm_1" / "model" / "MultiMM_minimized.cif").is_file(),
+        )
         mins = sorted(arm_min.glob("*.cif"))
         mds = sorted(arm_md.glob("*.cif"))
         check(
