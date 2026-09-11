@@ -6,9 +6,14 @@ August 2026 and measured through September. This note records where it stands an
 ## What holds
 
 - **Chromosome scope for the arcs stage is production** (`[simulation_arcs] scope =
-  chromosome`, `start = walk`, `[confinement] weight_arcs = 10`, commit 7b2bed8). Every
-  anchor of a chromosome is solved as one problem from the block layout, so loops and the
-  contact background act across blocks. Three cell gate on chr1:1-60 Mb against the deep
+  chromosome`, `start = hilbert`, commits 7b2bed8 and 3c6dbda). Every anchor of a chromosome
+  is solved as one problem, the anchors starting along a Hilbert curve scaled to the law's
+  bond, since across blocks the solve holds no arc and the contact background 80 of 3.5
+  million pairs, so the start is the long range arrangement; the curve gives it the cube
+  root size growth the maps show beyond a megabase, with no sphere weight. Like for like on
+  three cells against the walk start with a sphere at 10, which was production for a day:
+  Pearson up on all, SCC level, MultiMM level on H1ESC and 0.01 to 0.04 down on the others,
+  cross block overlaps 176, 173 and 143 to 163, 126 and 100 per thousand. Three cell gate on chr1:1-60 Mb against the deep
   maps: Pearson 0.271, 0.282 and 0.301 to 0.291, 0.318 and 0.304; MultiMM 0.607, 0.568 and
   0.652 to 0.674, 0.667 and 0.673; SCC level within 0.01; cross block overlaps 320, 416 and
   170 to 176, 173 and 143 per thousand beads. This came out of the compartment work and is
