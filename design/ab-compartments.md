@@ -74,3 +74,15 @@ in process with the true blocks, caches it, and reports what the stitch and the 
 do to compartments and to beads. Two instrument faults were found and fixed: the split had
 shared one expectation between the classes, and the anchor heatmap was cut out of an N by N
 matrix that production never read, 45 GB on a chromosome sized block.
+
+## Accessibility, closed 2026-09-11
+
+The two HiP-HoP mechanisms driven from ATAC, bridging between open beads and fibre
+compaction of closed ones, were given their functional test: GM12878 whole chr1 on production
+settings, accessibility in binary mode at the 80th percentile, five structures per arm, scored
+by the enhancer3D pipeline's Spearman correlation between a gene's closest enhancer distance
+in 3D and its expression over 813 genes. Off gives -0.189, bridging -0.194, fibre compaction
+-0.131. Bridging is a null and fibre compaction weakens the signal by about 1.7 standard
+errors. Together with the 10 kb accessibility saddle, where fibre moves away from experiment
+on four regions of four and bridging is inconsistent, both terms stay off. The loops already
+sit at open chromatin, so the track adds nothing the anchors do not carry.
