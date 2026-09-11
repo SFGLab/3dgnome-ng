@@ -30,13 +30,12 @@ from gnome3d.pipeline.relax import relax_blocks
 from gnome3d.pipeline.stage import StageKind
 from gnome3d.pipeline.state import Seeded, Smoothed, State
 from gnome3d.pipeline.stitch import stitch_blocks
-from gnome3d.tracks import bin_compartments
 
 if TYPE_CHECKING:
     from gnome3d.data import ContactData
     from gnome3d.settings import Settings
     from gnome3d.skeleton import IBSeed
-    from gnome3d.types import BeadOut, BedRegion, CompartmentInterval, CompartmentMap, I8Array
+    from gnome3d.types import BeadOut, BedRegion
 
 LOG = log.get("reconstruct")
 
@@ -110,34 +109,15 @@ def _beads(output: State) -> list[BeadOut]:
     return output.beads
 
 
-def _block_compartments(
-    blocks: list[list[BeadOut]], intervals: list[CompartmentInterval]
-) -> list[I8Array]:
-    """One class array per block from the compartment intervals, positive A, negative B."""
-    out: list[I8Array] = []
-    for block in blocks:
-        cls, _ = bin_compartments(intervals, [b.start for b in block], [b.end for b in block])
-        out.append(cls)
-    return out
-
-
 def _assemble(
-    per_chr: dict[str, list[list[BeadOut]]],
-    settings: Settings,
-    compartments: CompartmentMap | None = None,
+    per_chr: dict[str, list[list[BeadOut]]], settings: Settings
 ) -> dict[str, list[BeadOut]]:
     """Flatten each chromosome's per block beads into one list in genomic order. With
-    `use_boundary_stitch` set, the blocks are stitched at their edges first, and with a
-    positive `boundary_stitch_compartment_weight` the stitch also reads the chromosome's
-    compartment calls."""
+    `use_boundary_stitch` set, the blocks are stitched at their edges first."""
     out: dict[str, list[BeadOut]] = {}
     for chr_, blocks in per_chr.items():
         if settings.use_boundary_stitch:
-            classes: list[I8Array] | None = None
-            ivs = (compartments or {}).get(chr_, [])
-            if settings.boundary_stitch_compartment_weight > 0.0 and ivs:
-                classes = _block_compartments(blocks, ivs)
-            blocks = stitch_blocks(blocks, settings, classes)
+            blocks = stitch_blocks(blocks, settings)
         if settings.use_cross_block_relax:
             blocks = relax_blocks(blocks, settings)
         out[chr_] = sorted((b for block in blocks for b in block), key=lambda b: b.start)
@@ -171,7 +151,7 @@ def reconstruct(
     for ibs in ib_sink:
         per_chr[ibs.chr_].append(_beads(outputs[ib_node_id(ibs.ib_id, StageKind.SMOOTH)]))
 
-    return _assemble(per_chr, settings, data.compartments)
+    return _assemble(per_chr, settings)
 
 
 def reconstruct_ensemble(
@@ -231,6 +211,6 @@ def reconstruct_ensemble(
             nid = ib_node_id(f"m{m} :: {ibs.ib_id}", StageKind.SMOOTH)
             per_chr[ibs.chr_].append(_beads(outputs[nid]))
 
-        results.append(_assemble(per_chr, settings, data.compartments))
+        results.append(_assemble(per_chr, settings))
 
     return results

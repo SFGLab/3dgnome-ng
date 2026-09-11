@@ -63,7 +63,6 @@ CANONICAL: dict[str, dict[str, object]] = {
     "springs": {
         # Off. Redundant once the short range spring holds every arcless pair under 100 kb,
         # and measured null on H1ESC with that spring on.
-        "use_arcs_chain_bonds": "no",
         # Every arcless anchor pair under 100 kb held at the law's background. Puts the anchors on
         # the input curve on all three cells; 0.3 and 1.0 pull the closest pairs closer at a
         # steady cost in Hi-C. Measured 2026-09-07.

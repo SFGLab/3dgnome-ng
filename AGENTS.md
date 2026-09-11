@@ -656,14 +656,6 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   The packing factor has a physical floor. The sphere diameter is `2 × pf × N^(1/3)` chain bonds, so below `pf ≈ 0.58` a segment of fewer than `(1/(2·pf))³` blocks is asked to fold into a sphere narrower than one of its own bonds, and the layout is then set by where EV and confinement jam rather than by genomic separation. Measured on GM12878 chr1 the block-layout distance exponent is 0.021 at 0.15, 0.214 at 0.75 and 0.297 at 1.0 against 0.285 from the cell line's own Hi-C contact-probability curve (`playground/ps_curve.py`, `playground/ib_confine_ablate.py`).
 
-- **Small-IB spring boost** — described below but **not currently implemented**: `use_small_ib_boost`, `small_ib_threshold` and `small_ib_spring_multiplier` are not fields of `Settings`, and `solver.py` no longer exists. Kept as a design note.
-  When an IB has fewer anchors than `small_ib_threshold`, multiplies `spring_stretch_arcs`, `spring_squeeze_arcs`, `spring_stretch`, `spring_squeeze`, `spring_angular` by `small_ib_spring_multiplier` for that IB only. No kernel changes — implemented in `solver.py::_settings_for_ib()` by passing a `copy.copy(self.s)` clone with boosted values to `_reconstruct_cluster_arcs` / `_reconstruct_cluster_smooth` via an `s_override` parameter. Thread-safe (never mutates `self.s`). Settings:
-    - `use_small_ib_boost`
-    - `small_ib_threshold` (anchor count below which an IB is "small"; default 10)
-    - `small_ib_spring_multiplier` (default 5.0)
-
-  Why not in the reference: complements confinement to prevent under-constrained small IBs from stretching out. The boost tightens chain and bond springs so the chain compresses against any repulsive/heatmap forces. Targeted: only affects small IBs, doesn't change behavior of large well-constrained IBs.
-
 - **JAX/CUDA backend** — selected per stage via `mc_executor_<stage> = batch`. ([gnome3d/mc/jax/](gnome3d/mc/jax/))
 
   Routes selected MC levels to a JAX/CUDA kernel instead of the default numba CPU implementation. Measured ~2× total speedup on chr22 dryrun (21 min → 10:26), peak ~6× per-kernel on the largest smooth-MC call (N=10116: 570s numba → 100s JAX). The win compounds with chromosome size since smooth-MC is ~90% of total wall time.
@@ -955,68 +947,6 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: the reference has no block layout pass at all.
 
-- **Chain bonds in the arcs MC: `[springs] use_arcs_chain_bonds = yes`, default no.**
-  ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `add_chain_bonds`)
-  The arcs MC has no term between genomic neighbours. Inside a block the arc graph falls into
-  islands, 66 and 48 of them in the two largest blocks of GM12878 chr1:1-60 Mb, and an island is
-  held by nothing but the arcs level confinement leash, so it floats out to where the leash
-  balances the anneal, 40 units from the block centroid under the parity law and 67 under the
-  separation aware target. The smooth stage then strings subanchors between a core anchor and
-  an island anchor as a taut spoke.
-
-  With the flag every consecutive anchor pair with no arc gets a spring at
-  the law's background for its gap, the rule the smooth stage already holds consecutive
-  beads to, entered into the arcs target matrix after the anchor heatmap scaling so Hi-C
-  contact between neighbours does not shrink it. A pair that already has an arc keeps the arc.
-  The bond carries the arcs spring constants; a separate weight needs a per pair weight in the
-  kernels and is not built. `arcs_chain_bond_scale` (1) multiplies the bond target, because at
-  1 the bonds pull the short range below the parity values and the distance curve steepens past
-  the Hi-C exponent, 0.321 against 0.285 on chr1:1-60 Mb. No kernel is touched. Unit checks in
-  `harness/test_arc_target.py`.
-
-  Off in production since 2026-09-07: redundant once the short range spring holds every
-  arcless pair under 100 kb, and measured null on H1ESC with that spring on.
-
-  Why not in the reference: the reference's arcs MC has no chain term either. See
-  `design/anchor-placement.md`, option C.
-
-- **Compartment affinity in the boundary stitch: `[boundary_stitch] compartment_weight`,
-  default 0.** ([gnome3d/pipeline/stitch.py](gnome3d/pipeline/stitch.py) `compartment_sites`)
-  The compartment term in the kernels acts within a chain, and a chain is one block. A
-  compartment pattern runs over many blocks, and the pass that decides where blocks sit
-  relative to one another is the stitch, which moved them on the boundary springs and the
-  centroid excluded volume alone and so undid whatever the block placement stage had
-  arranged. Measured on GM12878 chr1:1-60 Mb, 2026-09-09: the kernel term at weight 0.5 takes
-  the compartment saddle from 0.77 to 2.75 on a 12 Mb window that sits inside three blocks,
-  and from 1.13 to 1.30 on the 60 Mb region; with the stitch and the relaxation off the same
-  weight reaches 1.94 there. A weight eight times larger does not reach it either, so the
-  kernel's per partner normalisation is not what stops it.
-
-  With a positive weight each block carries one site per compartment, the centroid of its A
-  beads and of its B beads with the fraction of the block's beads each holds, from
-  `bin_compartments` over the block's beads, and two sites of the same class on different
-  blocks attract through the well `1 - exp(-d^2 / 2 R^2)` with `R` the two blocks' radii of
-  gyration added, A against A at `energy_a` and B against B at `energy_b`. The gradient goes
-  through the rigid body variables like the boundary springs'. The well is flat beyond a few
-  `R`, so only neighbouring blocks feel it, and the solver does not care about the flat part,
-  so there is no normalisation and no ratio to keep positive. Weight zero is byte exact and
-  reads no track. Needs `[data] compartments`. Unit checks in `harness/test_stitch.py`.
-
-  The well as first built was centred on zero and kept pulling until the sites coincided, which
-  drove blocks into each other; on chr1:1-60 Mb the relaxation then found 27,168 of 42,480
-  beads touching another block and a structure took an hour. It now starts at touching.
-
-  Measured on chr1:1-60 Mb, 2026-09-09, the term at 0.2 and 1 is a null, saddle 1.11 and 1.09
-  against a baseline of 1.13, because it is satisfied at the distance where the stitch's
-  centroid repulsion begins, so together they say like blocks touch, and touching spheres
-  share few contacts. The stitch off run's compartmentalisation is cross block, A against A
-  at 1.97 over expected against 0.7 stitched, and it exists because the block placement
-  stage lets blocks interpenetrate, which the data supports: within block enrichment in Hi-C
-  is near one on these blocks. `[boundary_stitch] ev_factor` (1.0) scales the repulsion
-  radius for that reason and is under measurement at 0.25 and 0.
-
-  Why not in the reference: the reference has no compartment term and no pass across blocks.
-
 - **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no.**
   ([gnome3d/pipeline/relax.py](gnome3d/pipeline/relax.py))
   The smooth stage's excluded volume acts within one block and the stitch guards block
@@ -1036,22 +966,6 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   shell and a greedy pass stalls with contacts left. Keys: `ev_weight` (10), `ev_radius` (0 for
   1.5 bonds), `noise` (0.5 bonds). Runs after the stitch in `reconstruct.py::_assemble`. The
   gate is `cross_block_contacts`. Unit checks in `harness/test_relax.py`.
-
-  **`[relax] min_contact_fraction` (default 0, off) declines the pass when there is next to
-  nothing to fix.** The pass anneals the whole chromosome until its own convergence test fires,
-  so its cost does not follow its workload. Measured on a real trio run it took an hour and fifty
-  five minutes per structure whatever the input: once to take 91 contacts to 29 by moving 53 beads
-  of 129,457, and once to take 800 to 1 by moving two. It is the largest stage in those runs at
-  44 percent of the wall, and it is invisible to `playground/profile_run.py` because it runs in
-  `reconstruct.py::_assemble` rather than through an executor dispatch. The threshold is a
-  fraction of the chromosome's beads; on those four structures 0.1 percent skips one of four and
-  1 percent skips three, the one it keeps being the structure that moved 518 beads.
-
-  **`[relax] keep_compartments` (default no) keeps the compartment term on inside the pass.**
-  Measured 2026-09-10 on chr1:1-60 Mb it changes nothing at any weight, since the pass pins
-  every anchor and steps half a bond, so it cannot sort beads by class across blocks. The
-  relaxation is the pass that erases cross block compartmentalisation, by clearing the cross
-  block contacts that carry it. See `docs/epigenome-energy-terms.md`.
 
   **`[relax] local_window` (default -1, off) is the better fix.** The round count is proportional
   to how many beads may move, measured on a real 129,457 bead chromosome at 19 rounds for 159
@@ -1144,15 +1058,6 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   cross block overlaps 320, 416 and 170 to 176, 173 and 143 per thousand. With the compartment
   term at 0.5 on top the saddle rises on H1ESC 1.02 to 2.15 and HFFC6 0.71 to 1.09, not on
   GM12878, and SCC and MultiMM fall 0.07 to 0.10 on every cell, so the term stays opt in.
-
-  **`[compartments] apply_to_arcs` (default no) puts the compartment term into the joint solve
-  itself**, a well `1 - exp(-d^2 / 2 r0^2)` between like anchors at `energy_a` and `energy_b`
-  with `r0` from `radius_arcs` or `auto_factor_arcs` times the mean arc target, and no
-  division by count. The kernel term divides by the chain length so that a weight tuned on a
-  block holds on a chromosome, and on a chain of tens of thousands of beads that makes it
-  inert; the solver is a descent, where the flat part of a well does nothing, so the anchor
-  level term needs no such normalisation. Solver only, refused with the annealer. Under
-  measurement.
 
   Why not in the reference: the reference solves every block alone.
 

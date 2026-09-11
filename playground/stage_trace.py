@@ -8,10 +8,10 @@ relaxation, and after each stage reports the compartment saddle over within bloc
 pairs, how far like and unlike block pairs sit from each other, how many beads touch another
 block, and how far beads of each compartment moved.
 
-    python playground/stage_trace.py CONFIG.ini MCOOL TRACK.bedGraph REGION [relax_radius] [keep] [window]
+    python playground/stage_trace.py CONFIG.ini MCOOL TRACK.bedGraph REGION [relax_radius] [window]
 
-A fifth argument overrides the relaxation's excluded volume radius, and a sixth of `keep`
-keeps the compartment term on inside the pass, and a seventh sets its local window, -1 for every bead.
+A fifth argument overrides the relaxation's excluded volume radius and a sixth sets its
+local window, -1 for every bead.
 """
 
 from __future__ import annotations
@@ -32,7 +32,8 @@ from gnome3d.pipeline.coarse import build_state
 from gnome3d.pipeline.coarse.stages import build_coarse_dag
 from gnome3d.pipeline.ib import ib_node_id
 from gnome3d.pipeline.stage import StageKind
-from gnome3d.reconstruct import _beads, _block_compartments, pick_executor
+from gnome3d.reconstruct import _beads, pick_executor
+from gnome3d.tracks import bin_compartments
 from gnome3d.settings import Settings
 from gnome3d.types import BeadOut
 from playground.saddle_split import split_saddle
@@ -98,11 +99,9 @@ def main() -> None:
         setattr(s, k, "threaded")
     if len(sys.argv) > 5 and float(sys.argv[5]) > 0:
         s.relax_ev_radius = float(sys.argv[5])
-    if len(sys.argv) > 6 and sys.argv[6] == "keep":
-        s.relax_keep_compartments = True
-    if len(sys.argv) > 7:
-        s.relax_local_window = int(sys.argv[7])
-    print(f"relax radius {s.relax_ev_radius or '1.5 bonds'}, keep compartments {s.relax_keep_compartments}, window {s.relax_local_window}")
+    if len(sys.argv) > 6:
+        s.relax_local_window = int(sys.argv[6])
+    print(f"relax radius {s.relax_ev_radius or '1.5 bonds'}, window {s.relax_local_window}")
     chrom = region.split(":")[0]
     chrs, reg = parse_chrs_arg(region)
     data = ContactData.from_files(s, chrs, reg)
@@ -129,7 +128,8 @@ def main() -> None:
         lo = int(((blk[0].start + blk[0].end) // 2 - bin_starts[0]) // binsize)
         hi = int(((blk[-1].start + blk[-1].end) // 2 - bin_starts[0]) // binsize)
         lab[max(lo, 0) : min(hi, len(lab) - 1) + 1] = k
-    classes = _block_compartments(blocks, data.compartments.get(chrom, []))
+    ivs = data.compartments.get(chrom, [])
+    classes = [bin_compartments(ivs, [b.start for b in blk], [b.end for b in blk])[0] for blk in blocks]
     cls_beads = np.concatenate(classes)
     cls_block = np.array([int(np.sign(np.sum(np.sign(c)))) for c in classes])
     radius = float(np.median(smetrics.bond_lengths(coords(blocks))))

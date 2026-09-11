@@ -95,8 +95,6 @@ def main() -> None:
             arcs = [(idx[u], idx[v], sc) for (u, v), sc in per_bead.items() if u in idx and v in idx]
             s = Settings()
             s.polymer = PolymerLaw(nu=nu, s0_bp=1000, q_half=1.0, arcs=strength)
-            s.use_arcs_chain_bonds = True
-            s.arcs_chain_bond_scale = 1.5
             s.arcs_repulsion_cutoff_factor = 3.0
             s.background_weight = w
             s.background_range_bp = r

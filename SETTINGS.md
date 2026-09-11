@@ -88,8 +88,6 @@ is too far and the squeeze constant when too close.
 | `background_weight` | float | 0.0 | 0.1 | A weak spring holding an arcless anchor pair inside `background_range_bp` at the background for its separation, in the arcs stage. Zero is off and every other arcless pair keeps the repulsion. |
 | `background_range_bp` | int | 100000 | 100000 | The separation under which an arcless pair is held at the background. Beyond it the pair keeps the repulsion, since a power law distance matrix cannot be embedded in three dimensions over every pair, only over a band. |
 | `use_contact_background` | bool | no | yes | Beyond that range, hold an arcless pair whose contact cell puts it closer than the background at the law's contact distance, with the same spring. A pair at or below its expected contact keeps the repulsion, so the held set stays sparse, and on a thin map it holds next to nothing, which is allowed. Needs `use_anchor_heatmap`. |
-| `use_arcs_chain_bonds` | bool | no | no | Give every consecutive anchor pair with no arc a spring at the chain law of its gap, entered after the anchor heatmap scaling. |
-| `arcs_chain_bond_scale` | float | 1.0 | 1.0 | Multiplier on that bond's target. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 
@@ -247,8 +245,6 @@ pairs realise at that separation, with a soft excluded volume between block cent
 | `use_boundary_stitch` | bool | no | yes | Master switch. |
 | `spring_weight` | float | 1.0 | 1.0 | Weight of the boundary springs. |
 | `ev_weight` | float | 1.0 | 1.0 | Weight of the centroid excluded volume. |
-| `ev_factor` | float | 1.0 | 1.0 | The centroid excluded volume radius of a block pair is this times the two radii of gyration added. Ignored when `[excluded_volume] radius_ib` is positive. |
-| `compartment_weight` | float | 0.0 | 0.0 | Weight of a compartment affinity between blocks, one site per compartment per block, a well of the two blocks' radii of gyration added. 0 is off. Needs `[data] compartments`. |
 | `max_iter` | int | 2000 | 2000 | L-BFGS-B iterations. The energy carries its own gradient, so an iteration is one evaluation. 500 leaves a chromosome unconverged. 2000 converges a 1,494 block chromosome in 85 seconds. |
 
 ## [relax]
@@ -265,8 +261,6 @@ other while the arcs and the stitch are kept.
 | `temp` | float | 0.1 | 0.1 | Starting temperature as a fraction of the smooth stage's `max_temp`. Untangling needs a bead to cross a neighbour's shell, and a greedy pass stalls. |
 | `noise` | float | 0.5 | 0.5 | Step size in chain bonds. |
 | `bond_weight` | float | 10.0 | 10.0 | Chain spring weight for the pass. At the smooth stage's 0.1 the excluded volume tears the coil. |
-| `keep_compartments` | bool | no | no | Keep the compartment term on inside the pass, when the run carries it. Off, the pass acts on chain bonds and excluded volume alone. |
-| `min_contact_fraction` | float | 0.0 | 0.0 | Decline the pass when cross block contacts are fewer than this fraction of the chromosome's beads. 0 always runs. |
 | `local_window` | int | -1 | 1 | Let only the beads touching another block move, plus this many chain neighbours either side. -1 lets every subanchor move, which on a chromosome is hours. A window of 1 is minutes. |
 
 ## [compartments]
@@ -283,9 +277,6 @@ alongside since the terms are attractive.
 | `energy_a` | float | 1.0 | 1.0 | Affinity between two A beads. |
 | `energy_b` | float | 2.0 | 2.0 | Affinity between two B beads. |
 | `apply_to_heatmap` | bool | yes | yes | In the heatmap stages. |
-| `apply_to_arcs` | bool | no | no | In the arcs solve, which at chromosome scope is where the term can act across blocks. A well between like anchors with no division by count, since the solver is a descent. Solver only. |
-| `radius_arcs` | float | 0.0 | 0.0 | Interaction radius in the arcs solve, 0 derives it. |
-| `auto_factor_arcs` | float | 1.5 | 1.5 | Times the mean positive arc target. |
 | `apply_to_ib` | bool | yes | yes | In block placement. |
 | `apply_to_smooth` | bool | yes | yes | In the smooth stage. |
 | `radius_heatmap` | float | 0.0 | 0.0 | Interaction radius, 0 derives it. |

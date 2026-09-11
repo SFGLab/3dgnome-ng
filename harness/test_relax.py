@@ -128,68 +128,6 @@ def test_flag_off() -> None:
     check("default is off", Settings().use_cross_block_relax is False)
 
 
-def test_it_skips_when_there_is_nothing_to_fix() -> None:
-    """The pass costs the same however little work it has, so it has to be able to decline.
-
-    Measured on a trio run: it took an hour and fifty five minutes per structure whatever the
-    input, once to move two beads out of 129,457, because it anneals the whole chromosome until
-    its own convergence test fires. The contact count it already computes for its log line is the
-    natural gate.
-    """
-    rng = np.random.default_rng(7)
-    s = settings()
-    # Two blocks placed far apart: no bead of one is anywhere near a bead of the other.
-    a = coil(0, 40, np.zeros(3), rng, 1.0)
-    b = coil(200_000, 40, np.array([500.0, 0.0, 0.0]), rng, 1.0)
-    s.relax_min_contact_fraction = 0.0
-    ran = relax_blocks([a, b], s)
-    s.relax_min_contact_fraction = 0.01
-    skipped = relax_blocks([a, b], s)
-    same_as_input = all(
-        x.x == y.x and x.y == y.y and x.z == y.z
-        for blk_in, blk_out in zip([a, b], skipped, strict=True)
-        for x, y in zip(blk_in, blk_out, strict=True)
-    )
-    check(
-        "with a threshold set it returns untouched blocks when nothing is touching",
-        same_as_input,
-        "",
-    )
-    moved_when_ungated = any(
-        x.x != y.x or x.y != y.y or x.z != y.z
-        for blk_in, blk_out in zip([a, b], ran, strict=True)
-        for x, y in zip(blk_in, blk_out, strict=True)
-    )
-    check(
-        "and without one it still runs, so the default is unchanged",
-        moved_when_ungated,
-        "",
-    )
-
-
-def test_it_still_runs_when_blocks_do_interpenetrate() -> None:
-    """A threshold must not stop it doing the job it exists for."""
-    rng = np.random.default_rng(8)
-    s = settings()
-    s.relax_min_contact_fraction = 0.01
-    a = coil(0, 40, np.zeros(3), rng, 1.0)
-    b = coil(200_000, 40, np.zeros(3), rng, 1.0)  # same centre: fully overlapping
-    out = relax_blocks([a, b], s)
-    moved = any(
-        x.x != y.x or x.y != y.y or x.z != y.z
-        for blk_in, blk_out in zip([a, b], out, strict=True)
-        for x, y in zip(blk_in, blk_out, strict=True)
-    )
-    check("it still runs when the blocks are on top of each other", moved)
-
-
-def test_the_default_is_off() -> None:
-    check(
-        "the threshold defaults to zero, so the pass runs as it always did",
-        Settings().relax_min_contact_fraction == 0.0,
-    )
-
-
 def test_local_window_restricts_who_may_move() -> None:
     """Only beads near an offending contact need to move, and the round count follows that.
 
@@ -266,33 +204,14 @@ def test_it_is_reproducible_from_a_given_rng_state() -> None:
     check("from the same RNG state it gives the same structure", same)
 
 
-def test_keep_compartments() -> None:
-    """The pass drops the compartment term unless `relax_keep_compartments` asks for it, and
-    then only when the run has the term on at all."""
-    print("\n[compartments] the pass keeps the compartment term only when asked")
-    from gnome3d.pipeline.relax import _relax_settings
-
-    s = Settings()
-    s.use_compartments = True
-    check("off by default", _relax_settings(s, 1.0).use_compartments is False)
-    s.relax_keep_compartments = True
-    check("kept when asked", _relax_settings(s, 1.0).use_compartments is True)
-    s.use_compartments = False
-    check("never on when the run has it off", _relax_settings(s, 1.0).use_compartments is False)
-
-
 def main() -> int:
     print("cross block relaxation checks")
     test_gate_function()
     test_relax_separates()
     test_flag_off()
-    test_it_skips_when_there_is_nothing_to_fix()
-    test_it_still_runs_when_blocks_do_interpenetrate()
-    test_the_default_is_off()
     test_local_window_restricts_who_may_move()
     test_local_window_is_off_by_default()
     test_it_is_reproducible_from_a_given_rng_state()
-    test_keep_compartments()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

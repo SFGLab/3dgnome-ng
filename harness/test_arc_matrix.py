@@ -3,7 +3,6 @@
     python harness/test_arc_matrix.py
 
 The matrix has four kinds of entry. A pair an arc joins carries the law's contact distance,
-positive. A consecutive pair with no arc carries `arcs_chain_bond_scale` times the background
 when chain bonds are on. An arcless pair closer than `background_range_bp` carries minus the
 background for its separation when `background_weight` is on, which the kernels score as a
 weak spring symmetric in log distance. Every other arcless pair carries -0.5, which the kernels
@@ -25,7 +24,6 @@ from gnome3d.mc.numba.terms import (
     init_arcs_nb,  # noqa: E402
 )
 from gnome3d.pipeline.coarse.build import (  # noqa: E402
-    add_chain_bonds,
     add_contact_background,
     arc_expected_matrix,
 )
@@ -70,28 +68,6 @@ def test_matrix() -> None:
         f"{m[1, 3]:.3f} against background {s.polymer.background(190_000):.3f}",
     )
     check("no arc target is under one bead", float(m[m > 0].min()) >= 1.0 - 1e-12)
-
-
-def test_chain_bonds() -> None:
-    print("\n[chain bonds] consecutive arcless anchors are held at the scaled background")
-    s = settings()
-    s.use_arcs_chain_bonds = True
-    s.arcs_chain_bond_scale = 1.5
-    mids = [0, 10_000, 50_000, 200_000]
-    m = add_chain_bonds(arc_expected_matrix(s, mids, [(0, 2, 4)]), mids, s)
-    check(
-        "a consecutive arcless pair gets scale times the background",
-        abs(m[0, 1] - 1.5 * s.polymer.background(10_000)) < 1e-12,
-        f"{m[0, 1]:.3f}",
-    )
-    check(
-        "a consecutive pair with an arc keeps the arc",
-        abs(m[1, 2] - 1.5 * s.polymer.background(40_000)) < 1e-12 or m[1, 2] > 0.0,
-    )
-    check("a non consecutive arcless pair keeps the repulsion marker", m[0, 3] == -0.5)
-    s.use_arcs_chain_bonds = False
-    m2 = add_chain_bonds(arc_expected_matrix(s, mids, [(0, 2, 4)]), mids, s)
-    check("with chain bonds off the matrix is returned as built", m2[0, 1] == -0.5)
 
 
 def test_short_range_background() -> None:
@@ -281,7 +257,6 @@ def test_jax_batched_driver_runs() -> None:
 def main() -> int:
     print("arc matrix checks")
     test_matrix()
-    test_chain_bonds()
     test_short_range_background()
     test_contact_background()
     test_jax_matches_numba()

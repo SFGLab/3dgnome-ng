@@ -62,8 +62,7 @@ def _cross_pairs(pos: np.ndarray, owner: np.ndarray, radius: float) -> np.ndarra
 
 
 def _relax_settings(s: Settings, bond: float) -> Settings:
-    """A copy of the settings with chain bonds and excluded volume active, and the compartment
-    term kept when `relax_keep_compartments` asks for it and the run carries it."""
+    """A copy of the settings with only chain bonds and excluded volume active."""
     r = copy.copy(s)
     r.use_excluded_volume = True
     r.exclusion_apply_to_smooth = True
@@ -76,7 +75,7 @@ def _relax_settings(s: Settings, bond: float) -> Settings:
     r.spring_stretch = float(s.relax_bond_weight)
     r.spring_squeeze = float(s.relax_bond_weight)
     r.use_confinement = False
-    r.use_compartments = bool(s.relax_keep_compartments) and bool(s.use_compartments)
+    r.use_compartments = False
     r.use_bridging = False
     r.use_fibre_compaction = False
     r.max_temp_smooth = float(s.max_temp_smooth) * float(s.relax_temp)
@@ -110,21 +109,6 @@ def relax_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]
     r = _relax_settings(s, bond)
     radius = bond  # contacts are counted at one bond; the excluded volume acts wider
     before, _ = cross_block_contacts(blocks, radius)
-
-    # Decline when there is next to nothing to fix. The pass anneals the whole chromosome until
-    # its own convergence test fires, so its cost does not follow its workload, and on a real
-    # trio run it took an hour and fifty five minutes per structure whatever the input, once to
-    # move two beads out of 129,457.
-    floor = float(getattr(s, "relax_min_contact_fraction", 0.0))
-    if floor > 0.0 and before < floor * len(chain):
-        LOG.info(
-            "cross block relax: %d beads, %d contacts within %.2f is below %.2f%% of them, skipped",
-            len(chain),
-            before,
-            radius,
-            floor * 100.0,
-        )
-        return blocks
 
     # Which beads may move. Every subanchor by default, which is what the pass did before, but
     # the round count is proportional to that number and only a handful of beads touch anything.

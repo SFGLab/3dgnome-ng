@@ -96,8 +96,6 @@ class Settings:
     background_weight: float
     background_range_bp: int
     spring_squeeze_arcs: float
-    use_arcs_chain_bonds: bool
-    arcs_chain_bond_scale: float
     use_contact_background: bool
 
     # ---- simulation steps ----
@@ -259,8 +257,6 @@ class Settings:
     use_boundary_stitch: bool
     boundary_stitch_spring_weight: float
     boundary_stitch_ev_weight: float
-    boundary_stitch_ev_factor: float
-    boundary_stitch_compartment_weight: float
     boundary_stitch_max_iter: int
 
     # ---- cross block relaxation ----
@@ -270,7 +266,6 @@ class Settings:
     relax_temp: float
     relax_noise: float
     relax_bond_weight: float
-    relax_keep_compartments: bool
 
     # ---- A/B compartments ----
     use_compartments: bool
@@ -278,9 +273,6 @@ class Settings:
     compartment_energy_a: float
     compartment_energy_b: float
     compartment_apply_to_heatmap: bool
-    compartment_apply_to_arcs: bool
-    compartment_radius_arcs: float
-    compartment_auto_factor_arcs: float
     compartment_apply_to_ib: bool
     compartment_apply_to_smooth: bool
     compartment_radius_heatmap: float
@@ -453,10 +445,8 @@ class Settings:
         # spring at genomic_length_to_distance of their gap, so an island of anchors joined
         # only among themselves is tied to its genomic neighbours instead of floating out to
         # the confinement leash. Same spring constants as the arcs.
-        self.use_arcs_chain_bonds = False
         # Multiplies the chain bond target. At 1 the bonds pull the short range below the
         # parity values and the distance curve steepens past the Hi-C exponent.
-        self.arcs_chain_bond_scale = 1.0
         self.use_contact_background = False
 
         # ---- simulation steps ----
@@ -589,12 +579,6 @@ class Settings:
         self.use_boundary_stitch = False
         self.boundary_stitch_spring_weight = 1.0
         self.boundary_stitch_ev_weight = 1.0
-        # Times the two blocks' radii of gyration added. One keeps blocks at touching spheres,
-        # which the data does not show: within block enrichment in Hi-C is near one, so blocks
-        # interpenetrate. Under measurement.
-        self.boundary_stitch_ev_factor = 1.0
-        # Off. A compartment affinity between blocks, measured on GM12878 before it is a default.
-        self.boundary_stitch_compartment_weight = 0.0
         # The energy is minimised with its own gradient, so an iteration is one evaluation
         # and the count is what sets the cost. Measured on a trio chr1 of 1,494 blocks, 500
         # leaves the worst boundary at 6.0 times the curve, 2000 reaches 1.32 in 85 seconds,
@@ -611,15 +595,11 @@ class Settings:
         self.relax_temp = 0.1  # fraction of max_temp_smooth; a little heat lets coils cross
         self.relax_noise = 0.5  # step size as a fraction of the median bond length
         self.relax_bond_weight = 10.0  # chain spring constants during the pass
-        # Keep the compartment term on inside the pass. Off, the pass drops it and can undo
-        # the compartment arrangement the block placement built. Under measurement.
-        self.relax_keep_compartments = False
         # Skip the pass when fewer than this fraction of beads are touching another block.
         # It anneals the whole chromosome until its own convergence test fires, so it costs the
         # same however little there is to fix: measured on a trio run at an hour and fifty five
         # minutes per structure whatever the input, once to move two beads out of 129,457.
         # Zero keeps it running always, which is what it did before.
-        self.relax_min_contact_fraction = 0.0
         # How many chain neighbours either side of a bead that touches another block may move.
         # Negative lets every subanchor move, which is what the pass did before. The round count
         # is proportional to the movable bead count, measured at 114 rounds for 1,177 movable and
@@ -638,10 +618,6 @@ class Settings:
         self.compartment_energy_a = 1.0  # MultiMM COB_EA
         self.compartment_energy_b = 2.0  # MultiMM COB_EB
         self.compartment_apply_to_heatmap = True
-        # In the arcs solve, where the term acts across blocks at chromosome scope. Off.
-        self.compartment_apply_to_arcs = False
-        self.compartment_radius_arcs = 0.0
-        self.compartment_auto_factor_arcs = 1.5
         self.compartment_apply_to_ib = True
         self.compartment_apply_to_smooth = True
         # Interaction range: 0.0 = auto = factor * mean(bond) at that level.
@@ -889,12 +865,6 @@ class Settings:
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs
         )
-        self.use_arcs_chain_bonds = getb(
-            "springs", "use_arcs_chain_bonds", self.use_arcs_chain_bonds
-        )
-        self.arcs_chain_bond_scale = getf(
-            "springs", "arcs_chain_bond_scale", self.arcs_chain_bond_scale
-        )
         self.use_contact_background = getb(
             "springs", "use_contact_background", self.use_contact_background
         )
@@ -1129,12 +1099,6 @@ class Settings:
         self.boundary_stitch_spring_weight = getf(
             "boundary_stitch", "spring_weight", self.boundary_stitch_spring_weight
         )
-        self.boundary_stitch_compartment_weight = getf(
-            "boundary_stitch", "compartment_weight", self.boundary_stitch_compartment_weight
-        )
-        self.boundary_stitch_ev_factor = getf(
-            "boundary_stitch", "ev_factor", self.boundary_stitch_ev_factor
-        )
         self.boundary_stitch_ev_weight = getf(
             "boundary_stitch", "ev_weight", self.boundary_stitch_ev_weight
         )
@@ -1151,12 +1115,6 @@ class Settings:
         self.relax_temp = getf("relax", "temp", self.relax_temp)
         self.relax_noise = getf("relax", "noise", self.relax_noise)
         self.relax_bond_weight = getf("relax", "bond_weight", self.relax_bond_weight)
-        self.relax_keep_compartments = getb(
-            "relax", "keep_compartments", self.relax_keep_compartments
-        )
-        self.relax_min_contact_fraction = getf(
-            "relax", "min_contact_fraction", self.relax_min_contact_fraction
-        )
         self.relax_local_window = geti("relax", "local_window", self.relax_local_window)
 
         # [compartments]
@@ -1166,15 +1124,6 @@ class Settings:
         self.compartment_energy_b = getf("compartments", "energy_b", self.compartment_energy_b)
         self.compartment_apply_to_heatmap = getb(
             "compartments", "apply_to_heatmap", self.compartment_apply_to_heatmap
-        )
-        self.compartment_apply_to_arcs = getb(
-            "compartments", "apply_to_arcs", self.compartment_apply_to_arcs
-        )
-        self.compartment_radius_arcs = getf(
-            "compartments", "radius_arcs", self.compartment_radius_arcs
-        )
-        self.compartment_auto_factor_arcs = getf(
-            "compartments", "auto_factor_arcs", self.compartment_auto_factor_arcs
         )
         self.compartment_apply_to_ib = getb(
             "compartments", "apply_to_ib", self.compartment_apply_to_ib

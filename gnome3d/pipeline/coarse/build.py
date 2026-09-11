@@ -518,31 +518,6 @@ def add_contact_background(
     return out
 
 
-def add_chain_bonds(mat: F64Array, mids: list[int], s: Settings) -> F64Array:
-    """Give every consecutive anchor pair with no arc a spring at the chain law distance of its
-    gap. Returns a new matrix; the input is left alone. With `use_arcs_chain_bonds` off the
-    input is returned as is.
-
-    The arcs MC otherwise has no term between genomic neighbours, so a group of anchors joined
-    only among themselves by arcs floats out to the confinement leash. The bond ties it to its
-    neighbours the way the smooth stage ties consecutive beads. A pair that already has an arc
-    keeps the arc. The bond carries the arcs spring constants and its target is
-    `arcs_chain_bond_scale` times the chain law.
-    """
-    if not s.use_arcs_chain_bonds:
-        return mat
-    out = np.array(mat, dtype=np.float64, copy=True)
-    order = sorted(range(len(mids)), key=lambda i: mids[i])
-    for a, b in zip(order[:-1], order[1:], strict=True):
-        if out[a, b] > 0.0:
-            continue
-        gap = abs(int(mids[b]) - int(mids[a]))
-        d = float(s.arcs_chain_bond_scale) * float(s.genomic_length_to_distance(gap))
-        out[a, b] = d
-        out[b, a] = d
-    return out
-
-
 def calc_anchor_expected_distances(
     state: CoarseState,
     active_region: list[int],
@@ -599,9 +574,7 @@ def calc_anchor_expected_distances(
                     mat[i, j] *= 1.0 - s_val
                     mat[j, i] = mat[i, j]
 
-    mat = add_contact_background(mat, mids, anchor_heatmap, s)
-    # After the heatmap scaling, so Hi-C contact between neighbours does not shrink the bond.
-    return add_chain_bonds(mat, mids, s)
+    return add_contact_background(mat, mids, anchor_heatmap, s)
 
 
 def subanchor_counts_per_arc(state: CoarseState, active_region: list[int]) -> list[int]:
