@@ -27,7 +27,12 @@ smooth stage's own excluded volume failing to exclude. A pair across two blocks 
 placement, which the boundary stitch and the cross block relaxation own. Collapsing the three
 lets an arm that improves block placement read as though it improved block shape.
 
-    python playground/validation_battery.py <mcool> <region> <binsize> <arm_dir> [<arm_dir> ...]
+    python playground/validation_battery.py [--singletons <bedpe>] [--balance no] \\
+        <mcool> <region> <binsize> <arm_dir> [<arm_dir> ...]
+
+`--singletons` names the run's own singletons file, and the exponent yardstick is then the fit a
+run makes on it. Without it the yardstick is the polymer law's named fallback, and the report
+says so.
 
 Contact maps are read balanced. Not every 4DN mcool carries balancing weights, and none of the
 H1ESC file's thirteen resolutions does, so `--balance no` reads raw counts instead. Raw and
@@ -49,14 +54,36 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scipy.spatial import KDTree  # noqa: E402
 
+from gnome3d.polymer import FALLBACK_NU, ContactFit, fit_contact_exponent  # noqa: E402
+from gnome3d.types import SingletonContact  # noqa: E402
 from validation.metrics.hic import (  # noqa: E402
     hic_correlation,
     multimm_faithful_pearson,
     observed_hic,
 )
-
-NU_HIC = 0.285  # ps_curve.py, mean over three cell lines, 20 kb to 1 Mb
 CONTACT_BEADS = 1.33  # a contact is two beads within this many chain bonds; 2.0 units at the old 1.5 unit bead
+
+
+def read_singletons(path: Path) -> list[SingletonContact]:
+    """Seven column BEDPE rows as the loader returns them, midpoints and score."""
+    out: list[SingletonContact] = []
+    with open(path) as fh:
+        for line in fh:
+            p = line.split()
+            if len(p) < 7 or p[0].startswith("#"):
+                continue
+            out.append(
+                (p[0], (int(p[1]) + int(p[2])) // 2, p[3], (int(p[4]) + int(p[5])) // 2, int(float(p[6])))
+            )
+    return out
+
+
+def cell_nu(singletons: Path) -> ContactFit:
+    """The exponent yardstick, the fit a run makes on the same singletons file.
+
+    A refused fit carries the named fallback, which the report then says.
+    """
+    return fit_contact_exponent(read_singletons(singletons))
 
 
 def load(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -226,12 +253,25 @@ def main() -> None:
     target_bp = int(_flag("--target-bp", 1000))  # the run's target_bp_per_subanchor
     ev_factor = _flag("--ev-factor", 0.7)  # the run's exclusion_auto_factor_smooth
     balance = "--balance" not in sys.argv or _str_flag("--balance") != "no"
+    singletons = _str_flag("--singletons")  # the run's own singletons file, for the exponent yardstick
     mcool, region, binsize = sys.argv[1], sys.argv[2], int(sys.argv[3])
+    if singletons:
+        fit = cell_nu(Path(singletons))
+        nu = fit.nu
+        yardstick = (
+            f"nu {nu:.3f} fitted on {Path(singletons).name}"
+            if fit.ok
+            else f"nu {nu:.3f}, the fallback, since the fit on {Path(singletons).name} was refused: {fit.reason}"
+        )
+    else:
+        nu = FALLBACK_NU
+        yardstick = f"nu {nu:.3f}, the fallback, since no --singletons file was given"
     c_obs, bin_starts = observed_hic(mcool, region, binsize, balance=balance)
     print(
         f"observed Hi-C {region} at {binsize:,} bp: {c_obs.shape[0]} bins"
-        f"{'' if balance else ', raw counts, not comparable with a balanced run'}\n"
+        f"{'' if balance else ', raw counts, not comparable with a balanced run'}"
     )
+    print(f"exponent yardstick: {yardstick}\n")
     contact_r: float = 0.0  # in bead units of each structure, since arms may differ in model unit
     print(
         f"  {'arm':>10s} {'n':>3s} {'pearson':>9s} {'spearman':>9s} {'SCC':>8s} "
@@ -273,11 +313,11 @@ def main() -> None:
         print(
             f"  {Path(d).name:>10s} {len(cifs):>3d} {np.nanmean(pear):>9.3f} "
             f"{np.nanmean(spear):>9.3f} {np.nanmean(scc):>8.3f} {mm:>9.3f} "
-            f"{e:>9.3f} {e / NU_HIC:>7.2f}x {np.nanmean(elo):>9.3f} {np.nanmean(ehi):>9.3f} {np.mean(rgs):>8.2f} "
+            f"{e:>9.3f} {e / nu:>7.2f}x {np.nanmean(elo):>9.3f} {np.nanmean(ehi):>9.3f} {np.mean(rgs):>8.2f} "
             f"{np.mean(waa):>7.1f} {np.mean(wsa):>7.1f} {np.mean(xb):>7.1f}",
             flush=True,
         )
-    print(f"\n  exponent target is {NU_HIC} from the cell lines' own contact probability curves;")
+    print(f"\n  exponent target is {nu:.3f}, {yardstick.split(', ', 1)[-1] if not singletons else 'the fit a run makes on the same file'};")
     print("  the project's structures have measured flatter than that, so higher is better here.")
     print("  e20-100k and e100k-1M are the exponent fitted on each band alone; the two should agree")
     print("  with each other and with the cell's measured nu, and a flat short band under a steep")
@@ -286,7 +326,8 @@ def main() -> None:
     print("  bond, per thousand beads, each structure on its own radii. wb-aa is")
     print("  anchors inside one block, which only the arcs")
     print("  stage can move; wb-sa is the smooth stage's own excluded volume; xb is across two")
-    print("  blocks, which the boundary stitch and the cross block relaxation own.")
+    print("  blocks, which the boundary stitch and the cross block relaxation own. an arm whose")
+    print("  beads carry no anchors and no blocks, such as MultiMM, has all its overlaps in wb-sa.")
 
 
 if __name__ == "__main__":
