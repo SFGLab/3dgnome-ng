@@ -102,6 +102,10 @@ class Settings:
     steps_lvl2: int
     steps_arcs: int
     steps_smooth: int
+    # Smooth stage levers against within block overlaps, all off by default.
+    smooth_hard_wall: bool
+    smooth_anchor_cap: float
+    smooth_start: str
 
     # ---- noise coefficients ----
     noise_lvl1: float
@@ -428,6 +432,9 @@ class Settings:
         self.noise_lvl1 = 1.0
         self.noise_lvl2 = 0.1
         self.noise_smooth = 0.5
+        self.smooth_hard_wall = False  # reject a move that adds or deepens a pair under the radius
+        self.smooth_anchor_cap = 0.0  # anchors may move this many mean bonds from the arcs position
+        self.smooth_start = "line"  # line | coil, where a gap's subanchors start
 
         # ---- MC heatmap ----
         self.max_temp_heatmap = 20.0
@@ -1092,6 +1099,15 @@ class Settings:
         )
 
         # [simulation_arcs_smooth]
+        self.smooth_hard_wall = getb("simulation_arcs_smooth", "hard_wall", self.smooth_hard_wall)
+        self.smooth_anchor_cap = getf(
+            "simulation_arcs_smooth", "anchor_cap", self.smooth_anchor_cap
+        )
+        self.smooth_start = gets("simulation_arcs_smooth", "start", self.smooth_start)
+        if self.smooth_start not in ("line", "coil"):
+            raise ValueError(
+                f"[simulation_arcs_smooth] start must be line or coil, got {self.smooth_start!r}"
+            )
         self.smooth_dist_weight = getf(
             "simulation_arcs_smooth", "dist_weight", self.smooth_dist_weight
         )

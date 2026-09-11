@@ -46,6 +46,7 @@ NO_I8: I8Array = np.zeros(1, dtype=np.int8)
 NO_F64: F64Array = np.zeros(1, dtype=np.float64)
 NO_MAT: F64Array = np.zeros((1, 1), dtype=np.float64)
 NO_F64_3: F64Array = np.zeros(3, dtype=np.float64)
+NO_F64_N3: F64Array = np.zeros((1, 3), dtype=np.float64)
 NO_I64_3: I64Array = np.ones(3, dtype=np.int64)
 NO_I32: I32Array = np.zeros(1, dtype=np.int32)
 
@@ -258,6 +259,10 @@ def run_outer_loop(
     cell_next: I32Array = NO_I32,
     cell_where: I32Array = NO_I32,
     cell_buf: I32Array = NO_I32,
+    use_wall: bool = False,
+    use_cap: bool = False,
+    cap_home: F64Array = NO_F64_N3,
+    cap_r: F64Array = NO_F64,
 ) -> float:
     """Drive the unified kernel until convergence; return the final total score."""
     score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
@@ -339,6 +344,10 @@ def run_outer_loop(
             cell_next,
             cell_where,
             cell_buf,
+            use_wall,
+            use_cap,
+            cap_home,
+            cap_r,
         )
         score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
         step_i += stop_steps

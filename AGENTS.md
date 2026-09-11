@@ -1035,6 +1035,34 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: the reference solves every block alone.
 
+- **Three smooth stage levers against within block overlaps: `[simulation_arcs_smooth]
+  hard_wall` (no), `anchor_cap` (0) and `start` (line), all opt in and under measurement.**
+  ([gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py) `batch_mc_nb`,
+  [gnome3d/pipeline/ib/start.py](gnome3d/pipeline/ib/start.py))
+  The smooth stage ended with about 1,200 non neighbour pairs per thousand beads under 0.7 of
+  a bond, twice an ideal chain with no excluded volume, on every cell and every gate. Traced
+  on 2026-09-11: 94 percent are subanchor pairs 4 to 100 beads apart and 86 percent sit in the
+  outer quarter of the radius, where the soft term `0.1 ((r0 - d) / r0)^2` has no force; the
+  stage starts every coil on a straight line, 14,000 pairs per thousand, and pushes out
+  against that term; and the anchors are pinned at 0.4 of an ideal coil's end to end. Widening
+  the soft radius to one bond clears the count but flattens the distance curve and costs Hi-C
+  on three cells, because it pushes every pair under a bond outward, contacts included.
+
+  The wall rejects a move that adds a non neighbour pair under the excluded volume radius or
+  deepens one that is there, so the count only falls and is a hard core once zero. It costs
+  the same neighbour query the soft term makes, on the cell grid. The cap lets anchors move
+  within that many mean bonds of where the arcs put them. The coil start places each gap's
+  subanchors on a compact random bridge between its anchors at the bond targets, drawn from a
+  generator seeded by the problem. Neither rule draws a random number, so with all three off
+  the kernel's stream and the parity gate are untouched. One block, from the stage's own
+  start: soft term alone 766 per thousand; wall 92; compact coil 487; compact coil with the
+  wall 43 at the same Rg and bonds as production; a first clear coil with the wall reaches 0
+  but swells the block by a third, which is why the compact rule is the one built. The
+  relaxation pass and the JAX smooth kernel do not carry them. Unit checks in
+  `harness/test_smooth_levers.py`; three cell arms in `slurm/ensemble/overlap_levers.sh`.
+
+  Why not in the reference: the reference has no excluded volume at all.
+
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
   `[simulation_backend] neighbour_grid`, default yes)
   The excluded volume term sums over pairs closer than `r0` and was implemented as a scan over

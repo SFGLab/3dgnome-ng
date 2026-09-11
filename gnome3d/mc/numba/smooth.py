@@ -19,7 +19,9 @@ from numba import prange  # type: ignore[reportMissingTypeStubs]
 from gnome3d import log
 from gnome3d.mc.numba.cells import BUF, build_grid, grid_shape
 from gnome3d.mc.numba.common import (
+    NO_F64,
     NO_F64_3,
+    NO_F64_N3,
     NO_I32,
     NO_I64_3,
     affinity_params,
@@ -290,7 +292,9 @@ def mc_smooth_numba(
     # Multi-chain dispatch (simple-config path only).
     if int(settings.mc_smooth_chains) > 1:
         simple_config = (
-            char_orientations is None
+            not bool(getattr(settings, "smooth_hard_wall", False))
+            and float(getattr(settings, "smooth_anchor_cap", 0.0)) == 0.0
+            and char_orientations is None
             and not (
                 bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_smooth)
             )
@@ -300,7 +304,19 @@ def mc_smooth_numba(
         if simple_config:
             return _mc_smooth_multichain(pos, dtn, fixed, step_size, settings, heat_dist)
 
-    movable: I64Array = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    # Anchors join the movable set under the cap, each held within `cap` mean bonds of where
+    # it stands now, which is where the arcs put it.
+    cap_frac = float(getattr(settings, "smooth_anchor_cap", 0.0))
+    use_cap = cap_frac > 0.0
+    use_wall = bool(getattr(settings, "smooth_hard_wall", False))
+    if use_cap:
+        cap_r: F64Array = np.where(fixed, cap_frac * float(np.mean(dtn)), 0.0).astype(np.float64)
+        cap_home: F64Array = np.ascontiguousarray(pos, dtype=np.float64).copy()
+        movable: I64Array = np.arange(pos.shape[0], dtype=np.int64)
+    else:
+        cap_r = NO_F64
+        cap_home = NO_F64_N3
+        movable = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
     if len(movable) == 0:
         return 0.0
 
@@ -505,6 +521,10 @@ def mc_smooth_numba(
         cell_next=cell_next,
         cell_where=cell_where,
         cell_buf=cell_buf,
+        use_wall=use_wall,
+        use_cap=use_cap,
+        cap_home=cap_home,
+        cap_r=cap_r,
     )
     pos[:] = pw.astype(pos.dtype)
     return score
