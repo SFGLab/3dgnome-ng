@@ -21,17 +21,17 @@ from scipy.spatial import KDTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from playground.validation_battery import _flag, block_bonds, block_owner, load  # noqa: E402
+from playground.validation_battery import _flag, bead_scale, block_owner, load  # noqa: E402
 
 SEP_BANDS = [(2, 2), (3, 3), (4, 5), (6, 10), (11, 30), (31, 100), (101, 1000), (1001, 10**9)]
 
 
-def overlapping_pairs(pos: np.ndarray, rad: np.ndarray, owner: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    q = KDTree(pos).query_pairs(float(rad.max()), output_type="ndarray")
+def overlapping_pairs(pos: np.ndarray, rad: float, owner: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    q = KDTree(pos).query_pairs(float(rad), output_type="ndarray")
     q = q[np.abs(q[:, 0] - q[:, 1]) > 1]
     i, j = q[:, 0], q[:, 1]
     d = np.linalg.norm(pos[i] - pos[j], axis=1)
-    keep = (d < 0.5 * (rad[owner[i]] + rad[owner[j]])) & (owner[i] == owner[j])
+    keep = owner[i] == owner[j]
     return q[keep], d[keep]
 
 
@@ -45,12 +45,12 @@ def ideal_chain(n: int, bond: float, seed: int = 0) -> np.ndarray:
 
 def profile(label: str, pos: np.ndarray, anchor: np.ndarray, owner: np.ndarray, ev_factor: float, weight: float) -> None:
     n = len(pos)
-    bonds = block_bonds(pos, owner)
-    rad = ev_factor * bonds
+    bead = bead_scale(pos, anchor)
+    rad = ev_factor * bead
     q, d = overlapping_pairs(pos, rad, owner)
     i, j = q[:, 0], q[:, 1]
     sep = np.abs(i - j)
-    r0 = 0.5 * (rad[owner[i]] + rad[owner[j]])
+    r0 = rad
     frac = d / r0
     print(f"\n{label}: {n:,} beads, {len(q):,} overlapping pairs, {1000 * len(q) / n:.0f} per thousand beads")
     print("  by chain separation (pairs per thousand beads, share of overlaps):")
@@ -66,12 +66,12 @@ def profile(label: str, pos: np.ndarray, anchor: np.ndarray, owner: np.ndarray, 
     for lo, hi in ((0.0, 0.25), (0.25, 0.5), (0.5, 0.75), (0.75, 1.0)):
         m = (frac >= lo) & (frac < hi)
         print(f"    {lo:.2f}-{hi:.2f}  {100 * m.mean():>5.1f}%")
-    print(f"  median pair distance {np.median(d):.3f} against a median bond of {np.median(bonds[owner]):.3f}")
+    print(f"  median pair distance {np.median(d):.3f} against a subanchor bond of {bead:.3f}")
     # energy the overlaps cost at the smooth stage's soft quadratic, double counted like the kernel
     ev = weight * ((r0 - d) / r0) ** 2
     step = np.linalg.norm(np.diff(pos, axis=0), axis=1)
     same = owner[:-1] == owner[1:]
-    target = bonds[owner[:-1]][same]  # the realised mean stands in for the target
+    target = np.full(int(same.sum()), bead)  # the bead stands in for the target
     chain = np.abs(step[same] - target) / target  # the smooth stage's bond term at dist_weight 1
     print(
         f"  excluded volume energy of the overlaps at weight {weight}: {2 * ev.sum():,.1f} total,"

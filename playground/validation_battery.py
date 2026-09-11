@@ -131,35 +131,34 @@ def block_owner(mid: np.ndarray, anchor: np.ndarray, target_bp: int) -> np.ndarr
     return np.concatenate(([0], np.cumsum(cut)))
 
 
-def block_bonds(pos: np.ndarray, owner: np.ndarray) -> np.ndarray:
-    """The median realised chain bond of each block, the spacing of a bead in it.
+def bead_scale(pos: np.ndarray, anchor: np.ndarray) -> float:
+    """The structure's own bead spacing, the median bond between two subanchors.
 
     One proxy is unavoidable here. The kernel takes the mean of the chain bond targets and a
-    finished structure only carries the realised distances. The median, not the mean: the bonds
-    touching an anchor sit near 1.6 beads against 1.03 for a subanchor bond, and the mean they
-    inflate grew from 1.24 to 1.36 on an arm whose wall stretched them further, so the counting
-    radius moved with the arm and an arm with fewer close pairs scored more overlaps.
+    finished structure only carries the realised distances. Subanchor bonds sit at 1.03 of the
+    bead on a real structure. The bonds touching an anchor sit near 1.6 and the few sub
+    kilobase bonds at 2.7, and a mean over a block that includes them grew from 1.24 to 1.36
+    on an arm whose wall stretched them further, so a radius taken from it moved with the arm
+    and an arm with fewer close pairs scored more overlaps. A structure with no subanchor bond,
+    which is what MultiMM's uniform chain is once every bead is a subanchor, or one with none at
+    all, falls back to the median of every bond.
 
     Parameters
     ----------
     pos
         Bead positions in genomic order.
-    owner
-        Block index per bead.
+    anchor
+        True where that bead is an anchor.
     """
     step = np.linalg.norm(np.diff(pos, axis=0), axis=1)
-    fallback = float(np.median(step))
-    same = owner[:-1] == owner[1:]
-    out = np.full(int(owner.max()) + 1, fallback)
-    for k in range(out.size):
-        inner = step[same & (owner[:-1] == k)]
-        if inner.size:
-            out[k] = float(np.median(inner))
-    return out
+    inner = ~anchor[:-1] & ~anchor[1:]
+    if inner.any():
+        return float(np.median(step[inner]))
+    return float(np.median(step)) if step.size else 1.0
 
 
 def overlaps(
-    pos: np.ndarray, anchor: np.ndarray, owner: np.ndarray, rad: np.ndarray
+    pos: np.ndarray, anchor: np.ndarray, owner: np.ndarray, rad: float
 ) -> tuple[float, float, float]:
     """Overlapping pairs per thousand beads, split by which stage owns them.
 
@@ -167,15 +166,13 @@ def overlaps(
     subanchor, and the cross block rate.
 
     A pair overlaps when it is more than one bead apart along the chain, which is what
-    `exclusion_skip_neighbors` skips, and closer than its block's radius. A cross block pair
-    uses the mean of its two blocks' radii.
+    `exclusion_skip_neighbors` skips, and closer than the radius, `ev_factor` times the
+    structure's own bead spacing from `bead_scale`.
 
-    Radii are the structure's own, `ev_factor` times its own block bonds. Pinning one set across
-    arms was tried and is wrong whenever arms differ in model unit: the polymer law's bead is
-    about two thirds of the old chain law's, and pinned radii scored its subanchor overlaps at
-    its whole bond instead of 0.7 of it, reporting a rise where there was a halving. Within one
-    unit a pinned set removes a 4.8 percent drift from expansion; across units it inverts the
-    answer, and the second failure is the worse one.
+    The radius is the structure's own rather than one pinned across arms, which was tried and
+    is wrong whenever arms differ in model unit: the polymer law's bead is about two thirds of
+    the old chain law's, and pinned radii scored its subanchor overlaps at its whole bond
+    instead of 0.7 of it, reporting a rise where there was a halving.
 
     Parameters
     ----------
@@ -186,17 +183,12 @@ def overlaps(
     owner
         Block index per bead.
     rad
-        The excluded volume radius of each block.
+        The radius, in the structure's own units.
     """
     n = len(pos)
-    q = KDTree(pos).query_pairs(float(rad.max()), output_type="ndarray")
+    q = KDTree(pos).query_pairs(float(rad), output_type="ndarray")
     if q.size:
         q = q[np.abs(q[:, 0] - q[:, 1]) > 1]
-    if not q.size:
-        return 0.0, 0.0, 0.0
-    i, j = q[:, 0], q[:, 1]
-    d = np.linalg.norm(pos[i] - pos[j], axis=1)
-    q = q[d < 0.5 * (rad[owner[i]] + rad[owner[j]])]
     if not q.size:
         return 0.0, 0.0, 0.0
     i, j = q[:, 0], q[:, 1]
@@ -293,7 +285,7 @@ def main() -> None:
         for c in cifs:
             p, m, bmid, anchor = load(c)
             owner = block_owner(bmid, anchor, target_bp)
-            rad = ev_factor * block_bonds(p, owner)
+            rad = ev_factor * bead_scale(p, anchor)
             contact_r = CONTACT_BEADS * float(np.median(np.linalg.norm(np.diff(p, axis=0), axis=1)))
             coords.append(p)
             mids = m
@@ -325,8 +317,8 @@ def main() -> None:
     print("  e20-100k and e100k-1M are the exponent fitted on each band alone; the two should agree")
     print("  with each other and with the cell's measured nu, and a flat short band under a steep")
     print("  long one is loops pulling pairs in with nothing holding the rest at the background.")
-    print(f"  the overlap columns count pairs closer than {ev_factor} of their block's mean chain")
-    print("  bond, per thousand beads, each structure on its own radii. wb-aa is")
+    print(f"  the overlap columns count pairs closer than {ev_factor} of the structure's own subanchor")
+    print("  bond, per thousand beads. wb-aa is")
     print("  anchors inside one block, which only the arcs")
     print("  stage can move; wb-sa is the smooth stage's own excluded volume; xb is across two")
     print("  blocks, which the boundary stitch and the cross block relaxation own. an arm whose")
