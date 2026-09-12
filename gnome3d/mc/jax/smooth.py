@@ -425,12 +425,14 @@ def _build_smooth_kernel(
                     n_active,
                 )
             se_new = se + 2.0 * (loc_e_curr - loc_e_prev)
+            delta = (loc_s_curr - loc_s_prev) + 2.0 * (loc_e_curr - loc_e_prev)
 
             # ---- heat ----
             if use_heat:
                 loc_h_prev = _local_heat_at(pos, old_p, p, heat_dist, heat_weight)
                 loc_h_curr = _local_heat_at(pos, new_p, p, heat_dist, heat_weight)
                 sh_new = sh + 2.0 * (loc_h_curr - loc_h_prev)
+                delta = delta + 2.0 * (loc_h_curr - loc_h_prev)
             else:
                 sh_new = sh
 
@@ -470,6 +472,7 @@ def _build_smooth_kernel(
                 )
                 loc_o_curr = jnp.where(has_orn, loc_o_curr_raw, 0.0)
                 so_new = so + 2.0 * (loc_o_curr - loc_o_prev)
+                delta = delta + 2.0 * (loc_o_curr - loc_o_prev)
             else:
                 anchor_orn_trial = anchor_orn
                 so_new = so
@@ -482,10 +485,17 @@ def _build_smooth_kernel(
             loc_c_prev = _local_confine_at(old_p, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
             loc_c_curr = _local_confine_at(new_p, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
             sc_new = sc + (loc_c_curr - loc_c_prev)
+            delta = delta + (loc_c_curr - loc_c_prev)
 
-            score_new = ss_new + se_new + sh_new + so_new + sc_new
-
-            ok_unc = score_new < score  # smooth uses STRICT less-than
+            # Accept on the summed local delta, not on the difference of two running totals.
+            # The totals are float32 and on a large block with the orientation term at its
+            # production weight they are large enough that one unit in the last place exceeds
+            # the gain of resolving a shallow overlap, so a move that lowered the energy read as
+            # no change and was refused. The delta is a sum of local terms and stays at the
+            # scale of the change. The totals are still carried for the Metropolis ratio and
+            # the plateau test, where a unit in the last place does not matter.
+            score_new = score + delta
+            ok_unc = delta < 0.0  # smooth uses STRICT less-than
             can_jump = jnp.logical_and(T > 0, score > 0)
             exponent = -jc * (score_new / jnp.maximum(score, 1e-30)) / jnp.maximum(T, 1e-30)
             exponent = jnp.clip(exponent, -80.0, 80.0)
