@@ -655,6 +655,16 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   - **Per-shape XLA compile cost** (~1–60s per (N, K, n_anchors) combo) is paid once per machine via the persistent compile cache at `~/.cache/gnome3d/jax` (override with `GNOME3D_JAX_CACHE`).
   - **Convergence loop runs on-device** via `lax.while_loop` — one JAX call drives the full annealing, no Python sync between batches.
   - **Float32 throughout the JAX path** — bench showed f64 is 2× slower on consumer GPUs (1/32 throughput) with no quality benefit at production run lengths.
+  - **The smooth kernel accepts a move on the summed local delta, not on `score_new < score`
+    between two running totals.** On a whole chromosome block with the orientation term at its
+    production weight the float32 totals are large enough that one unit in the last place
+    exceeds the gain of resolving a shallow overlap, so such moves read as no change and were
+    refused, and the stage plateaued early: with the coil start and the wall the JAX executor
+    left 254 overlapping pairs per thousand beads on GM12878 chr1:1-60 Mb against 103 on numba,
+    the same profile scaled by 2.4, while the two kernels agreed on any block whose totals
+    stayed small. Deciding on the delta, 2026-09-12, brings JAX to 110 with numba's Hi-C. The
+    totals are still carried for the Metropolis ratio and the plateau test. The JAX parity dump
+    changed with it, by design.
   - **`cli.py` auto-forces `ib_workers=1` when `mc_backend=jax`** — multiple Python threads contending for a single GPU is net-negative; restarts go inside JAX via `mc_smooth_chains` (vmap), not via thread pools.
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
 
