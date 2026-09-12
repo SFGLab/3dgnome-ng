@@ -160,6 +160,15 @@ CANONICAL: dict[str, dict[str, object]] = {
         "stop_condition_improvement_threshold": 0.999,
         "stop_condition_successes_threshold": 50,
         "stop_condition_steps": 50000,
+        # Each gap's subanchors start on a compact random bridge between its anchors instead of
+        # the straight line, and a move that adds a non neighbour pair under the excluded
+        # volume radius, or deepens one, is rejected. Together, on three cells, they raised
+        # Pearson 0.011 to 0.022 and MultiMM's metric 0.033 to 0.043 and cut overlaps five to
+        # seven times within blocks at the same Rg. The cap on anchor moves added nothing
+        # beyond them and stays off. Production since 2026-09-12.
+        "start": "coil",
+        "hard_wall": "yes",
+        "anchor_cap": 0.0,
     },
     "excluded_volume": {
         "use_excluded_volume": "yes",

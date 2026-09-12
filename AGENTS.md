@@ -1036,7 +1036,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference solves every block alone.
 
 - **Three smooth stage levers against within block overlaps: `[simulation_arcs_smooth]
-  hard_wall` (no), `anchor_cap` (0) and `start` (line), all opt in and under measurement.**
+  hard_wall` (default no, production yes), `anchor_cap` (0) and `start` (default line,
+  production coil). The wall and the coil start are production since 2026-09-12.**
   ([gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py) `batch_mc_nb`,
   [gnome3d/pipeline/ib/start.py](gnome3d/pipeline/ib/start.py))
   The smooth stage ended with about 1,200 non neighbour pairs per thousand beads under 0.7 of

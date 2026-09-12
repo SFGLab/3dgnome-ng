@@ -155,9 +155,9 @@ least `stop_condition_successes_threshold` moves.
 | --- | --- | --- | --- | --- |
 | `dist_weight` | float | 1.0 | 1.0 | Weight of the chain bond term. |
 | `angle_weight` | float | 1.0 | 1.0 | Weight of the bend term. |
-| `hard_wall` | bool | no | no | Reject a move that adds a non neighbour pair under the excluded volume radius or deepens one that is there, so the count only falls and is a wall once zero. |
+| `hard_wall` | bool | no | yes | Reject a move that adds a non neighbour pair under the excluded volume radius or deepens one that is there, so the count only falls and is a wall once zero. |
 | `anchor_cap` | float | 0.0 | 0.0 | Anchors move, but not further than this many mean bonds from where the arcs put them. 0 keeps them fixed. |
-| `start` | str | line | line | Where a gap's subanchors start. `line` is the densified straight line between its anchors, `coil` a compact random bridge at the bond targets. |
+| `start` | str | line | coil | Where a gap's subanchors start. `line` is the densified straight line between its anchors, `coil` a compact random bridge at the bond targets. |
 
 ### [simulation_ib] only
 
