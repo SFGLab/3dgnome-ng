@@ -8,7 +8,7 @@ place, the chain densified on straight lines, the coil start, the smooth stage's
 milestone by milestone, the boundary stitch and the cross block relaxation. Stage changes are
 shown as short morphs so the eye can follow what moved. The chain is coloured by genomic
 position and the camera orbits slowly. Frames go to OUT_DIR/frames and ffmpeg writes
-OUT_DIR/model_creation.mp4 and a 720 pixel GIF beside it.
+OUT_DIR/model_creation.mp4, square at `--size` pixels, and a 720 pixel GIF beside it.
 """
 
 from __future__ import annotations
@@ -101,6 +101,7 @@ class Scene:
 
 def main() -> None:
     fps = int(_flag("--fps", 25))
+    size = int(_flag("--size", 1440))  # square, pixels
     title = _str_flag("--title")
     npz_path, out_dir = Path(sys.argv[1]), Path(sys.argv[2])
     frames_dir = out_dir / "frames"
@@ -128,21 +129,22 @@ def main() -> None:
         xy, _ = project(pts, rotation(i), c)
         ext_x = max(ext_x, float(np.abs(xy[:, 0]).max()))
         ext_y = max(ext_y, float(np.abs(xy[:, 1]).max()))
-    half_w = max(ext_x, ext_y * 16 / 9) * 1.04
+    half_w = max(ext_x, ext_y) * 1.04
     print(f"{len(frames)} frames, {len(frames) / fps:.1f} s at {fps} fps", flush=True)
-    fig = plt.figure(figsize=(12.8, 7.2), dpi=100)
+    dpi = 120
+    fig = plt.figure(figsize=(size / dpi, size / dpi), dpi=dpi)
     ax = fig.add_axes((0.0, 0.0, 1.0, 1.0))
-    cap_text = fig.text(0.03, 0.93, "", fontsize=22, weight="bold", color="#202020")
-    sub_text = fig.text(0.03, 0.885, "", fontsize=12.5, color="#404040")
+    cap_text = fig.text(0.04, 0.945, "", fontsize=24, weight="bold", color="#202020")
+    sub_text = fig.text(0.04, 0.915, "", fontsize=12.5, color="#404040")
     if title:
-        fig.text(0.97, 0.04, title, fontsize=11, color="#606060", ha="right")
+        fig.text(0.96, 0.03, title, fontsize=11, color="#606060", ha="right")
     for i, (cap, sub, pos, chain) in enumerate(frames):
         ax.cla()
         ax.set_axis_off()
         rot = rotation(i)
         if chain:
-            pieces = [tube_pieces(p, scene.bead_col[k], rot, c, width=1.6) for k, p in enumerate(pos)]
-            draw(ax, pieces, background="white", halo=1.4, shade=0.5, thin=0.4)
+            pieces = [tube_pieces(p, scene.bead_col[k], rot, c, width=2.0) for k, p in enumerate(pos)]
+            draw(ax, pieces, background="white", halo=1.6, shade=0.5, thin=0.4)
             for k, p in enumerate(pos):
                 a = scene.fixed[k]
                 xy, _ = project(p[a], rot, c)
@@ -154,11 +156,11 @@ def main() -> None:
                 order = np.argsort(z)
                 ax.scatter(xy[order, 0], xy[order, 1], s=12, c=scene.anchor_col[k][order], zorder=3, linewidths=0)
         ax.set_xlim(-half_w, half_w)
-        ax.set_ylim(-half_w * 9 / 16, half_w * 9 / 16)
+        ax.set_ylim(-half_w * 1.08, half_w * 0.92)  # room for the captions at the top
         ax.set_aspect("equal")
         cap_text.set_text(cap)
         sub_text.set_text(sub)
-        fig.savefig(frames_dir / f"frame_{i:05d}.png", dpi=100, facecolor="white")
+        fig.savefig(frames_dir / f"frame_{i:05d}.png", dpi=dpi, facecolor="white")
         if i % 100 == 0:
             print(f"  frame {i}", flush=True)
     plt.close(fig)
@@ -171,7 +173,7 @@ def main() -> None:
     )  # fmt: skip
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-i", str(mp4),
-         "-vf", "fps=10,scale=640:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96[p];[s1][p]paletteuse=dither=bayer",
+         "-vf", "fps=10,scale=720:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96[p];[s1][p]paletteuse=dither=bayer",
          str(gif)],
         check=True,
     )  # fmt: skip
