@@ -22,10 +22,10 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-from mpl_toolkits.mplot3d.art3d import Line3DCollection  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from playground.figures.tube import camera, draw, project, tube_pieces  # noqa: E402
 from playground.validation_battery import _flag, _str_flag  # noqa: E402
 
 HOLD = 22
@@ -112,10 +112,10 @@ def main() -> None:
     # one box for the whole film, from every keyframe
     allpos = np.concatenate([p for _, _, pos, _ in frames[:: max(1, len(frames) // 40)] for p in pos])
     c = allpos.mean(0)
-    r = float(np.percentile(np.abs(allpos - c), 99.5)) * 0.72
+    r = float(np.percentile(np.linalg.norm(allpos - c, axis=1), 99.5)) * 0.62
     print(f"{len(frames)} frames, {len(frames) / fps:.1f} s at {fps} fps", flush=True)
     fig = plt.figure(figsize=(12.8, 7.2), dpi=100)
-    ax = fig.add_axes((0.0, 0.0, 1.0, 1.0), projection="3d")
+    ax = fig.add_axes((0.0, 0.0, 1.0, 1.0))
     cap_text = fig.text(0.03, 0.93, "", fontsize=22, weight="bold", color="#202020")
     sub_text = fig.text(0.03, 0.885, "", fontsize=12.5, color="#404040")
     if title:
@@ -123,21 +123,23 @@ def main() -> None:
     for i, (cap, sub, pos, chain) in enumerate(frames):
         ax.cla()
         ax.set_axis_off()
-        ax.set_xlim(c[0] - r, c[0] + r)
-        ax.set_ylim(c[1] - r, c[1] + r)
-        ax.set_zlim(c[2] - r, c[2] + r)
-        ax.set_box_aspect((16, 9, 9))
-        ax.view_init(elev=18, azim=-60 + 0.18 * i)
-        for k, p in enumerate(pos):
-            if chain:
-                seg = np.stack([p[:-1], p[1:]], axis=1)
-                lc = Line3DCollection(seg, colors=scene.bead_col[k][:-1], linewidths=1.4)
-                ax.add_collection3d(lc)
+        rot = camera(18.0, -60.0 + 0.18 * i)
+        if chain:
+            pieces = [tube_pieces(p, scene.bead_col[k], rot, c, width=1.6) for k, p in enumerate(pos)]
+            draw(ax, pieces, background="white", halo=1.4, shade=0.5, thin=0.4)
+            for k, p in enumerate(pos):
                 a = scene.fixed[k]
-                ax.scatter(p[a, 0], p[a, 1], p[a, 2], s=4, c="black", depthshade=False, zorder=4)
-            else:
-                ax.plot(p[:, 0], p[:, 1], p[:, 2], color="#b0b0b0", lw=0.6, alpha=0.7)
-                ax.scatter(p[:, 0], p[:, 1], p[:, 2], s=9, c=scene.anchor_col[k], depthshade=False)
+                xy, _ = project(p[a], rot, c)
+                ax.scatter(xy[:, 0], xy[:, 1], s=5, c="black", zorder=5, linewidths=0)
+        else:
+            for k, p in enumerate(pos):
+                xy, z = project(p, rot, c)
+                ax.plot(xy[:, 0], xy[:, 1], color="#b8b8b8", lw=0.6, alpha=0.8, zorder=1)
+                order = np.argsort(z)
+                ax.scatter(xy[order, 0], xy[order, 1], s=12, c=scene.anchor_col[k][order], zorder=3, linewidths=0)
+        ax.set_xlim(-r * 16 / 9, r * 16 / 9)
+        ax.set_ylim(-r, r)
+        ax.set_aspect("equal")
         cap_text.set_text(cap)
         sub_text.set_text(sub)
         fig.savefig(frames_dir / f"frame_{i:05d}.png", dpi=100, facecolor="white")
