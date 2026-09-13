@@ -14,11 +14,14 @@ tube would. Depth also darkens and thins a piece, so the back of the structure r
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection
+from matplotlib.figure import Figure
 
 
 def smooth_chain(pos: np.ndarray, per_bond: int = 4) -> np.ndarray:
@@ -151,3 +154,35 @@ def matplotlib_colour(c: str | tuple[float, float, float, float]) -> tuple[float
     from matplotlib.colors import to_rgba
 
     return to_rgba(c)
+
+
+def save_transparent(build: Callable[[str], Figure], path: Path, dpi: int = 300) -> None:
+    """Write a transparent PNG of a figure whose halos are in its background colour.
+
+    A halo drawn in the background colour is a cut-out only against that background. The
+    figure is built twice, on white and on black, and the alpha of every pixel is read off the
+    difference, which is exact through antialiased edges. Where the halo cut, the pixel is the
+    background in both renders and comes out fully transparent.
+    """
+    from PIL import Image
+
+    def rgb(bg: str) -> np.ndarray:
+        fig = build(bg)
+        fig.set_facecolor(bg)
+        fig.set_dpi(dpi)
+        fig.canvas.draw()
+        arr = np.asarray(fig.canvas.buffer_rgba())[:, :, :3].astype(np.float64) / 255.0
+        plt_close(fig)
+        return arr
+
+    white, black = rgb("white"), rgb("black")
+    alpha = np.clip(1.0 - (white - black).mean(axis=2), 0.0, 1.0)
+    colour = np.where(alpha[:, :, None] > 1e-3, black / np.maximum(alpha[:, :, None], 1e-3), 0.0)
+    out = np.dstack([np.clip(colour, 0, 1), alpha])
+    Image.fromarray((out * 255).round().astype(np.uint8), "RGBA").save(path, dpi=(dpi, dpi))
+
+
+def plt_close(fig: Figure) -> None:
+    import matplotlib.pyplot as plt
+
+    plt.close(fig)

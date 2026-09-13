@@ -25,7 +25,7 @@ import numpy as np  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from playground.figures.tube import camera, draw, project, tube_pieces  # noqa: E402
+from playground.figures.tube import draw, project, tube_pieces  # noqa: E402
 from playground.validation_battery import _flag, _str_flag  # noqa: E402
 
 HOLD = 22
@@ -109,10 +109,26 @@ def main() -> None:
         f.unlink()
     scene = Scene(dict(np.load(npz_path)))
     frames = scene.frames()
-    # one box for the whole film, from every keyframe
-    allpos = np.concatenate([p for _, _, pos, _ in frames[:: max(1, len(frames) // 40)] for p in pos])
-    c = allpos.mean(0)
-    r = float(np.percentile(np.linalg.norm(allpos - c, axis=1), 99.5)) * 0.62
+    # The camera's base frame is the finished structure's principal axes, longest across the
+    # screen, and the film orbits slowly about the screen's vertical. One box for the whole
+    # film, from the projected extent of every keyframe under its own orbit angle.
+    last = np.concatenate(frames[-1][2])
+    c = last.mean(0)
+    _, _, vt = np.linalg.svd(last - c, full_matrices=False)
+    base = vt if np.linalg.det(vt) > 0 else vt * np.array([[1.0], [1.0], [-1.0]])
+
+    def rotation(i: int) -> np.ndarray:
+        t = np.radians(0.18 * i)
+        orbit = np.array([[np.cos(t), 0.0, np.sin(t)], [0.0, 1.0, 0.0], [-np.sin(t), 0.0, np.cos(t)]])
+        return orbit @ base
+
+    ext_x = ext_y = 0.0
+    for i in range(0, len(frames), max(1, len(frames) // 120)):
+        pts = np.concatenate(frames[i][2])
+        xy, _ = project(pts, rotation(i), c)
+        ext_x = max(ext_x, float(np.abs(xy[:, 0]).max()))
+        ext_y = max(ext_y, float(np.abs(xy[:, 1]).max()))
+    half_w = max(ext_x, ext_y * 16 / 9) * 1.04
     print(f"{len(frames)} frames, {len(frames) / fps:.1f} s at {fps} fps", flush=True)
     fig = plt.figure(figsize=(12.8, 7.2), dpi=100)
     ax = fig.add_axes((0.0, 0.0, 1.0, 1.0))
@@ -123,7 +139,7 @@ def main() -> None:
     for i, (cap, sub, pos, chain) in enumerate(frames):
         ax.cla()
         ax.set_axis_off()
-        rot = camera(18.0, -60.0 + 0.18 * i)
+        rot = rotation(i)
         if chain:
             pieces = [tube_pieces(p, scene.bead_col[k], rot, c, width=1.6) for k, p in enumerate(pos)]
             draw(ax, pieces, background="white", halo=1.4, shade=0.5, thin=0.4)
@@ -137,8 +153,8 @@ def main() -> None:
                 ax.plot(xy[:, 0], xy[:, 1], color="#b8b8b8", lw=0.6, alpha=0.8, zorder=1)
                 order = np.argsort(z)
                 ax.scatter(xy[order, 0], xy[order, 1], s=12, c=scene.anchor_col[k][order], zorder=3, linewidths=0)
-        ax.set_xlim(-r * 16 / 9, r * 16 / 9)
-        ax.set_ylim(-r, r)
+        ax.set_xlim(-half_w, half_w)
+        ax.set_ylim(-half_w * 9 / 16, half_w * 9 / 16)
         ax.set_aspect("equal")
         cap_text.set_text(cap)
         sub_text.set_text(sub)
@@ -150,12 +166,12 @@ def main() -> None:
     gif = out_dir / "model_creation.gif"
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(fps), "-i", str(frames_dir / "frame_%05d.png"),
-         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", str(mp4)],
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "23", str(mp4)],
         check=True,
     )  # fmt: skip
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-i", str(mp4),
-         "-vf", "fps=12,scale=720:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer",
+         "-vf", "fps=10,scale=640:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96[p];[s1][p]paletteuse=dither=bayer",
          str(gif)],
         check=True,
     )  # fmt: skip
