@@ -1,7 +1,7 @@
 """One conformation coloured in genomic bands, the rest of its ensemble grey behind it.
 
     python playground/figures/stripes.py ENSEMBLE_DIR OUT.png [--pick 0] [--ref 0] [--band-mb 1.0]
-                                         [--title "GM12878 chr1:20-28 Mb"]
+                                         [--colour rainbow|bands|single] [--title "..."]
 
 Every cif in the directory is one member. The picked member is drawn as a smoothed tube coloured
 by genomic position in bands of `--band-mb`, the stripes, with a scale bar in Mb. Every other
@@ -23,7 +23,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-from matplotlib.colors import BoundaryNorm, ListedColormap  # noqa: E402
+from matplotlib.colors import BoundaryNorm, ListedColormap, Normalize  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -67,9 +67,12 @@ def build(
     band_mb: float,
     title: str,
     bg: str,
+    colour: str = "rainbow",
 ) -> plt.Figure:
     """The figure on background `bg`. Every member is superposed on member `ref` and the camera
-    is member `ref`'s, so any pick, and any figure of the same ensemble, sits in one frame."""
+    is member `ref`'s, so any pick, and any figure of the same ensemble, sits in one frame.
+    `colour` is `rainbow`, a continuous gradient along the chain, `bands` of `band_mb`, or
+    `single`, one colour throughout."""
     pos_ref, start_ref, _, _ = members[ref]
     aligned = [
         kabsch(p, pos_ref) if len(p) == len(pos_ref) and np.array_equal(st, start_ref) else None
@@ -79,10 +82,20 @@ def build(
     assert pos0 is not None, "the picked member does not share the reference's beads"
     _, _, mid0, _ = members[pick]
     lo = int(np.floor(start_ref.min() / (band_mb * 1e6)) * band_mb * 1e6)  # a round band edge
-    band = np.floor((mid0 - lo) / (band_mb * 1e6)).astype(int)
-    n_bands = int(band.max()) + 1
-    cmap = band_colours(n_bands)
-    norm = BoundaryNorm(np.arange(n_bands + 1) - 0.5, n_bands)
+    hi = int(np.ceil(members[ref][2].max() / (band_mb * 1e6)) * band_mb * 1e6)
+    if colour == "bands":
+        band = np.floor((mid0 - lo) / (band_mb * 1e6)).astype(int)
+        n_bands = int(band.max()) + 1
+        cmap = band_colours(n_bands)
+        norm = BoundaryNorm(np.arange(n_bands + 1) - 0.5, n_bands)
+        chain_rgba = cmap(norm(band))
+    elif colour == "rainbow":
+        cmap = plt.get_cmap("turbo")
+        norm = Normalize(lo, hi)
+        chain_rgba = cmap(norm(mid0))
+    else:
+        cmap, norm = None, None
+        chain_rgba = np.tile(np.array([[0.165, 0.471, 0.839, 1.0]]), (len(pos0), 1))
     fig = plt.figure(figsize=(9, 9), dpi=150)
     ax = fig.add_axes((0.02, 0.10, 0.96, 0.86))
     ax.set_axis_off()
@@ -94,8 +107,7 @@ def build(
     grey = np.tile(np.array([[0.66, 0.66, 0.66, 0.5]]), (len(pos0), 1))
     others = [tube_pieces(q, grey, rot, centre, width=0.7) for k, q in enumerate(aligned) if k != pick and q is not None]
     draw(ax, others, background=bg, halo=0.0, shade=0.0, thin=0.3)
-    band_rgba = cmap(norm(band))
-    draw(ax, [tube_pieces(pos0, band_rgba, rot, centre, width=3.4)], background=bg, halo=1.6, shade=0.45, thin=0.35)
+    draw(ax, [tube_pieces(pos0, chain_rgba, rot, centre, width=3.4)], background=bg, halo=1.6, shade=0.45, thin=0.35)
     # the same box for every pick of this ensemble
     xy_all = np.concatenate([project(q, rot, centre)[0] for q in aligned if q is not None])
     c = xy_all.mean(0)
@@ -103,14 +115,18 @@ def build(
     ax.set_xlim(c[0] - r, c[0] + r)
     ax.set_ylim(c[1] - r, c[1] + r)
     ink = "#0b0b0b" if bg == "white" else "#f2f2f2"
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    cb = fig.colorbar(sm, ax=ax, orientation="horizontal", fraction=0.035, pad=0.02, shrink=0.7)
-    edges = lo + np.arange(n_bands + 1) * band_mb * 1e6
-    cb.set_ticks(np.arange(n_bands + 1) - 0.5)
-    cb.set_ticklabels([f"{e / 1e6:g}" for e in edges])
-    cb.set_label("genomic position, Mb", color=ink)
-    cb.ax.tick_params(length=0, colors=ink)
-    cb.outline.set_edgecolor(ink)
+    if cmap is not None:
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        cb = fig.colorbar(sm, ax=ax, orientation="horizontal", fraction=0.035, pad=0.02, shrink=0.7)
+        edges = np.arange(lo, hi + 1, band_mb * 1e6)
+        if colour == "bands":
+            cb.set_ticks(np.arange(len(edges)) - 0.5)
+        else:
+            cb.set_ticks(edges)
+        cb.set_ticklabels([f"{e / 1e6:g}" for e in edges])
+        cb.set_label("genomic position, Mb", color=ink)
+        cb.ax.tick_params(length=0, colors=ink)
+        cb.outline.set_edgecolor(ink)
     if title:
         ax.set_title(f"{title}, one of {len(members)} conformations in colour", fontsize=11, color=ink)
     return fig
@@ -121,14 +137,15 @@ def main() -> None:
     ref = int(_flag("--ref", 0))
     band_mb = _flag("--band-mb", 1.0)
     title = _str_flag("--title")
+    colour = _str_flag("--colour") or "rainbow"
     ens, out = Path(sys.argv[1]), Path(sys.argv[2])
     members = [load(c) for c in sorted(ens.glob("*.cif"))]
-    fig = build(members, pick, ref, band_mb, title, "white")
+    fig = build(members, pick, ref, band_mb, title, "white", colour)
     fig.savefig(out, dpi=300, facecolor="white")
     fig.savefig(out.with_suffix(".svg"), facecolor="white")
     plt.close(fig)
     transparent = out.with_name(out.stem + "_transparent.png")
-    save_transparent(lambda bg: build(members, pick, ref, band_mb, title, bg), transparent, dpi=300)
+    save_transparent(lambda bg: build(members, pick, ref, band_mb, title, bg, colour), transparent, dpi=300)
     print(f"wrote {out}, {out.with_suffix('.svg')} and {transparent}: {len(members)} members")
 
 
