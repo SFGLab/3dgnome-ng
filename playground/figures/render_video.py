@@ -1,0 +1,164 @@
+"""Turn a stage trace into the model creation video.
+
+    python playground/figures/render_video.py TRACE.npz OUT_DIR [--fps 25] [--title "GM12878 chr1:1-8 Mb"]
+
+Reads the npz `trace_stages.py` writes and renders one frame per moment of the reconstruction:
+the block layout, the Hilbert curve the anchors start on, the anchors the loops pull into
+place, the chain densified on straight lines, the coil start, the smooth stage's annealing
+milestone by milestone, the boundary stitch and the cross block relaxation. Stage changes are
+shown as short morphs so the eye can follow what moved. The chain is coloured by genomic
+position and the camera orbits slowly. Frames go to OUT_DIR/frames and ffmpeg writes
+OUT_DIR/model_creation.mp4 and a 720 pixel GIF beside it.
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from pathlib import Path
+
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+from mpl_toolkits.mplot3d.art3d import Line3DCollection  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from playground.validation_battery import _flag, _str_flag  # noqa: E402
+
+HOLD = 22
+MORPH = 28
+
+
+def lerp(a: np.ndarray, b: np.ndarray, n: int) -> list[np.ndarray]:
+    t = (1 - np.cos(np.linspace(0, np.pi, n))) / 2  # ease in and out
+    return [a + (b - a) * ti for ti in t]
+
+
+class Scene:
+    def __init__(self, npz: dict[str, np.ndarray]) -> None:
+        self.n = int(npz["n_blocks"])
+        self.blocks = list(range(self.n))
+        self.start = [npz[f"b{k}_start"] for k in self.blocks]
+        self.fixed = [npz[f"b{k}_fixed"] for k in self.blocks]
+        self.amid = [npz[f"b{k}_anchor_mid"] for k in self.blocks]
+        self.d = npz
+        lo = min(int(s.min()) for s in self.start)
+        hi = max(int(s.max()) for s in self.start)
+        self.lo, self.hi = lo, hi
+        # one colour per bead by genomic position, and per anchor for the anchor stages
+        self.bead_col = [plt.get_cmap("turbo")((s - lo) / (hi - lo)) for s in self.start]
+        self.anchor_col = [plt.get_cmap("turbo")((m - lo) / (hi - lo)) for m in self.amid]
+
+    def anchors(self, key: str) -> list[np.ndarray]:
+        return [self.d[f"b{k}_{key}"] for k in self.blocks]
+
+    def chains(self, key: str) -> list[np.ndarray]:
+        return [self.d[f"b{k}_{key}"] for k in self.blocks]
+
+    def frames(self) -> list[tuple[str, str, list[np.ndarray], bool]]:
+        """(caption, sub caption, per block positions, is_chain) per frame."""
+        out: list[tuple[str, str, list[np.ndarray], bool]] = []
+
+        def hold(cap: str, sub: str, pos: list[np.ndarray], chain: bool, n: int = HOLD) -> None:
+            out.extend([(cap, sub, pos, chain)] * n)
+
+        def morph(cap: str, sub: str, a: list[np.ndarray], b: list[np.ndarray], chain: bool) -> None:
+            for i in range(MORPH):
+                out.append((cap, sub, [lerp(x, y, MORPH)[i] for x, y in zip(a, b, strict=True)], chain))
+
+        layout, hilbert, solved = self.anchors("layout"), self.anchors("hilbert"), self.anchors("anchors")
+        hold("Block layout", "each interaction block placed by its chain of blocks", layout, False)
+        morph("Hilbert start", "every anchor of the chromosome on one space filling curve", layout, hilbert, False)
+        hold("Hilbert start", "every anchor of the chromosome on one space filling curve", hilbert, False)
+        morph("Loops placed", "the arcs solve pulls loop anchors together", hilbert, solved, False)
+        hold("Loops placed", "the arcs solve pulls loop anchors together", solved, False)
+        line, coil = self.chains("line"), self.chains("coil")
+        hold("Chain densified", "one bead per kilobase between the anchors", line, True)
+        morph("Coil start", "each gap's beads on a compact bridge, clear of each other", line, coil, True)
+        hold("Coil start", "each gap's beads on a compact bridge, clear of each other", coil, True)
+        traj = [self.d[f"b{k}_frames"] for k in self.blocks]
+        n_ms = max(t.shape[0] for t in traj)
+        for i in range(n_ms):
+            pos = [t[min(i, t.shape[0] - 1)] for t in traj]
+            sub = f"Monte Carlo on the chain, milestone {i + 1} of {n_ms}, 50,000 moves each, hard wall on"
+            out.append(("Smoothing", sub, pos, True))
+            out.append(("Smoothing", sub, pos, True))
+        final = self.chains("final")
+        hold("Smoothing", "the smooth stage's own end point", final, True)
+        if self.n > 1:
+            stitched, relaxed = self.chains("stitched"), self.chains("relaxed")
+            morph("Boundary stitch", "blocks moved rigidly so boundary pairs sit at the structure's own distance", final, stitched, True)
+            hold("Boundary stitch", "blocks moved rigidly so boundary pairs sit at the structure's own distance", stitched, True)
+            morph("Cross block relaxation", "coils of different blocks re route around each other", stitched, relaxed, True)
+            hold("Cross block relaxation", "coils of different blocks re route around each other", relaxed, True, n=2 * HOLD)
+        else:
+            hold("Done", "one block, so nothing to stitch", final, True, n=2 * HOLD)
+        return out
+
+
+def main() -> None:
+    fps = int(_flag("--fps", 25))
+    title = _str_flag("--title")
+    npz_path, out_dir = Path(sys.argv[1]), Path(sys.argv[2])
+    frames_dir = out_dir / "frames"
+    frames_dir.mkdir(parents=True, exist_ok=True)
+    for f in frames_dir.glob("*.png"):
+        f.unlink()
+    scene = Scene(dict(np.load(npz_path)))
+    frames = scene.frames()
+    # one box for the whole film, from every keyframe
+    allpos = np.concatenate([p for _, _, pos, _ in frames[:: max(1, len(frames) // 40)] for p in pos])
+    c = allpos.mean(0)
+    r = float(np.percentile(np.abs(allpos - c), 99.5)) * 0.72
+    print(f"{len(frames)} frames, {len(frames) / fps:.1f} s at {fps} fps", flush=True)
+    fig = plt.figure(figsize=(12.8, 7.2), dpi=100)
+    ax = fig.add_axes((0.0, 0.0, 1.0, 1.0), projection="3d")
+    cap_text = fig.text(0.03, 0.93, "", fontsize=22, weight="bold", color="#202020")
+    sub_text = fig.text(0.03, 0.885, "", fontsize=12.5, color="#404040")
+    if title:
+        fig.text(0.97, 0.04, title, fontsize=11, color="#606060", ha="right")
+    for i, (cap, sub, pos, chain) in enumerate(frames):
+        ax.cla()
+        ax.set_axis_off()
+        ax.set_xlim(c[0] - r, c[0] + r)
+        ax.set_ylim(c[1] - r, c[1] + r)
+        ax.set_zlim(c[2] - r, c[2] + r)
+        ax.set_box_aspect((16, 9, 9))
+        ax.view_init(elev=18, azim=-60 + 0.18 * i)
+        for k, p in enumerate(pos):
+            if chain:
+                seg = np.stack([p[:-1], p[1:]], axis=1)
+                lc = Line3DCollection(seg, colors=scene.bead_col[k][:-1], linewidths=1.4)
+                ax.add_collection3d(lc)
+                a = scene.fixed[k]
+                ax.scatter(p[a, 0], p[a, 1], p[a, 2], s=4, c="black", depthshade=False, zorder=4)
+            else:
+                ax.plot(p[:, 0], p[:, 1], p[:, 2], color="#b0b0b0", lw=0.6, alpha=0.7)
+                ax.scatter(p[:, 0], p[:, 1], p[:, 2], s=9, c=scene.anchor_col[k], depthshade=False)
+        cap_text.set_text(cap)
+        sub_text.set_text(sub)
+        fig.savefig(frames_dir / f"frame_{i:05d}.png", dpi=100, facecolor="white")
+        if i % 100 == 0:
+            print(f"  frame {i}", flush=True)
+    plt.close(fig)
+    mp4 = out_dir / "model_creation.mp4"
+    gif = out_dir / "model_creation.gif"
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(fps), "-i", str(frames_dir / "frame_%05d.png"),
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", str(mp4)],
+        check=True,
+    )  # fmt: skip
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(mp4),
+         "-vf", "fps=12,scale=720:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer",
+         str(gif)],
+        check=True,
+    )  # fmt: skip
+    print(f"wrote {mp4} and {gif}")
+
+
+if __name__ == "__main__":
+    main()

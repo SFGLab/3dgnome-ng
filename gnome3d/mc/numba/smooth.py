@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import math
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -273,6 +274,7 @@ def mc_smooth_numba(
     anchor_neighbor_weights: dict[int, list[float]] | None = None,
     heat_dist: np.ndarray[Any, Any] | None = None,
     compartment: np.ndarray[Any, Any] | None = None,
+    on_round: Callable[[F64Array], None] | None = None,
 ) -> float:
     """Chain connectivity + angle MC.  Optionally adds CTCF orientation and/or
     subanchor heat. Anchor beads (fixed=True) never move. Single-counted
@@ -525,6 +527,7 @@ def mc_smooth_numba(
         use_cap=use_cap,
         cap_home=cap_home,
         cap_r=cap_r,
+        on_round=on_round,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

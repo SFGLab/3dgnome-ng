@@ -9,6 +9,7 @@ contiguous / placeholder arrays the kernel's fixed signature expects.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, NamedTuple, cast
 
 import numpy as np
@@ -263,6 +264,7 @@ def run_outer_loop(
     use_cap: bool = False,
     cap_home: F64Array = NO_F64_N3,
     cap_r: F64Array = NO_F64,
+    on_round: Callable[[F64Array], None] | None = None,
 ) -> float:
     """Drive the unified kernel until convergence; return the final total score."""
     score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
@@ -352,6 +354,8 @@ def run_outer_loop(
         score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
         step_i += stop_steps
         round_i += 1
+        if on_round is not None:
+            on_round(pw)
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (
             (score > stop_improvement * ms_score and n_ok < stop_successes)
