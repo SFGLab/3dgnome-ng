@@ -34,9 +34,13 @@ PANELS: list[tuple[str, str, str]] = [
     ("SCC", "stratum adjusted correlation", "higher is better"),
     ("multimm", "MultiMM's ensemble metric", "higher is better"),
     ("exponent", "distance exponent", "the cell's own fit is marked"),
-    ("wb-sa", "overlaps within blocks, per 1,000 beads", "lower is better"),
-    ("xb", "overlaps across blocks, per 1,000 beads", "lower is better"),
+    ("wb-sa", "overlaps within blocks, per 1,000 beads", "lower is better; the reference is off the scale"),
+    ("xb", "overlaps across blocks, per 1,000 beads", "lower is better; the reference is off the scale"),
 ]
+# The reference has no excluded volume and its own bead density, so its overlap counts run
+# into the thousands per thousand beads and would flatten every other bar. They are reported
+# in the note instead of the two overlap panels.
+OFF_SCALE = {("wb-sa", "reference"), ("xb", "reference")}
 
 
 def read_table(path: Path) -> tuple[dict[str, dict[str, float]], float | None]:
@@ -71,7 +75,7 @@ def main() -> None:
         for j, (suffix, label, colour) in enumerate(present):
             xs, ys = [], []
             for i, c in enumerate(CELLS):
-                if suffix in data[c][0]:
+                if suffix in data[c][0] and (key, suffix) not in OFF_SCALE:
                     xs.append(i + (j - (len(present) - 1) / 2) * width)
                     ys.append(data[c][0][suffix][key])
             ax.bar(xs, ys, width=width * 0.92, color=colour, label=label, linewidth=0)
