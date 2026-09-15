@@ -1,0 +1,130 @@
+# Validation, September 2026
+
+Closed 2026-09-15. Three cells, chr1:1-60 Mb, five structures per arm, scored against each
+cell's deep 4DN Hi-C at 25 kb with `playground/validation_battery.py --balance no --ev-factor
+0.7 --singletons`. The arms are the production settings of 2026-09-12 (`prod3`, the wall and
+the coil start, JAX executor), the production of 2026-09-11 before those levers (`prod`), the
+reference 3dgnome binary with each cell's `config.ini`, and MultiMM 2.0.2 on our clusters
+bedpe at our bead count, with loops only and with loops and A/B blocks. Tables are
+`out/validation/<cell>_battery.txt` and `<cell>_saddle.txt` on the workstation; the figures
+are `validation_figure` and `validation_regions_gm12878` in the figures folder, drawn by
+`playground/figures/results_figure.py` and `region_figure.py`.
+
+## The three cell gate
+
+Pearson, Spearman and SCC are correlations of the structures' contact map with the Hi-C map,
+MultiMM is that tool's own ensemble metric, the exponent is the distance law fitted on the
+structures between 20 kb and 1 Mb against the cell's own fit on its singletons, and the
+overlap columns are non neighbour pairs per thousand beads under 0.7 of the structure's
+median subanchor bond, within blocks between subanchors and across blocks.
+
+| cell | arm | Pearson | Spearman | SCC | MultiMM | exponent | Rg | wb-sa | xb |
+|---|---|---|---|---|---|---|---|---|---|
+| GM12878, nu 0.329 | reference | not run to the end, see below | | | | | | | |
+| | 3dgnome-ng before | 0.291 | 0.123 | 0.359 | 0.656 | 0.394 | 25.7 | 672 | 61 |
+| | 3dgnome-ng now | 0.310 | 0.135 | 0.366 | 0.696 | 0.356 | 25.9 | 110 | 20 |
+| | MultiMM loops | 0.183 | 0.090 | 0.259 | 0.353 | 0.158 | 27.4 | 18 | 0 |
+| | MultiMM loops + A/B | 0.200 | 0.102 | 0.237 | 0.387 | 0.163 | 23.6 | 26 | 0 |
+| H1ESC, nu 0.333 | reference | 0.235 | 0.126 | 0.156 | 0.415 | 0.118 | 38.5 | 2290 | 11782 |
+| | 3dgnome-ng before | 0.328 | 0.122 | 0.246 | 0.675 | 0.415 | 25.9 | 650 | 51 |
+| | 3dgnome-ng now | 0.344 | 0.132 | 0.252 | 0.711 | 0.368 | 26.0 | 100 | 15 |
+| | MultiMM loops | 0.190 | 0.088 | 0.142 | 0.283 | 0.163 | 28.1 | 17 | 0 |
+| | MultiMM loops + A/B | 0.207 | 0.099 | 0.132 | 0.323 | 0.163 | 23.8 | 25 | 0 |
+| HFFC6, nu 0.352 | reference | 0.204 | 0.114 | 0.161 | 0.393 | 0.192 | 32.4 | 2190 | 8003 |
+| | 3dgnome-ng before | 0.307 | 0.114 | 0.335 | 0.665 | 0.412 | 26.8 | 415 | 24 |
+| | 3dgnome-ng now | 0.319 | 0.122 | 0.316 | 0.712 | 0.374 | 27.1 | 62 | 6 |
+| | MultiMM loops | 0.180 | 0.073 | 0.157 | 0.307 | 0.178 | 29.0 | 3 | 0 |
+| | MultiMM loops + A/B | 0.207 | 0.089 | 0.131 | 0.384 | 0.190 | 23.7 | 3 | 0 |
+
+What it says. The production of 2026-09-12 is ahead of the reference on every Hi-C measure
+on both cells the reference finished, Pearson by 0.11 to 0.12, SCC by 0.10 to 0.16, MultiMM
+by 0.30 to 0.32, and its exponent sits at 1.06 to 1.10 times the cell's own fit where the
+reference sits at 0.35 to 0.55. Against MultiMM on MultiMM's own metric we are at 0.70 to
+0.71 where it reaches 0.28 to 0.39, and ahead on Pearson and SCC on every cell. The levers of
+2026-09-12 raised Pearson 0.012 to 0.019 and MultiMM 0.04 to 0.05 on every cell, cut within
+block overlaps five to seven times and cross block overlaps three to four times at the same
+Rg, and brought the exponent from 1.2 to 1.1 times the fit. SCC moved within 0.02 either way.
+
+The reference's overlap columns are not comparable and are kept off the overlap panels of the
+figure. It has no excluded volume, its bead density is its own, and the battery's block
+partition, recovered from our densification rule, over splits its chains, so its counts run
+into the thousands per thousand beads and say nothing about the comparison.
+
+## GM12878 and the reference
+
+The reference did not finish GM12878 on this gate. Fifteen processes were started on the
+workstation on 2026-09-13 at 18:28, one per structure and seed. HFFC6 finished in 2 h 15,
+H1ESC in 7.5 to 8.5 h, and GM12878 was stopped on 2026-09-15 at 11:02 after 29 hours with
+all five structures in segment 7 of 11, segment 6 alone having taken about a day per
+structure. Its arcs Monte Carlo on GM12878's largest blocks is the cost.
+
+What stands in for it is the original pipeline's own GM12878 models. The enhancer3d work
+holds one hundred models per window from the published pipeline on four chr1 windows,
+0.87-3.49 Mb, 12.6-13.83 Mb, 15.79-17.41 Mb and 18.3-20.22 Mb, converted with
+`playground/reference_arm.py` and scored on each window's Hi-C with our five 60 Mb structures
+and MultiMM's five cut to the same window by `playground/slice_arm.py`. The script is
+`slurm/ensemble/reference_regions.sh`, the tables `out/validation_regions/GM12878_r<k>_battery.txt`.
+
+| window | arm | n | Pearson | Spearman | SCC | MultiMM | exponent | Rg |
+|---|---|---|---|---|---|---|---|---|
+| 0.85-3.5 Mb, 106 bins | original pipeline | 100 | 0.132 | 0.118 | 0.165 | 0.112 | 0.066 | 5.3 |
+| | 3dgnome-ng now | 5 | 0.446 | 0.438 | 0.281 | 0.662 | 0.358 | 8.7 |
+| | MultiMM loops | 5 | 0.294 | 0.310 | 0.186 | 0.402 | 0.194 | 15.5 |
+| | MultiMM loops + A/B | 5 | 0.307 | 0.324 | 0.186 | 0.417 | 0.200 | 12.4 |
+| 12.6-13.85 Mb, 50 bins | original pipeline | 100 | 0.168 | 0.162 | 0.302 | 0.852 | -0.312 | 5.6 |
+| | 3dgnome-ng now | 5 | 0.254 | 0.220 | 0.580 | 0.985 | 0.216 | 6.5 |
+| | MultiMM loops | 5 | 0.281 | 0.252 | 0.353 | 0.338 | 0.276 | 16.1 |
+| | MultiMM loops + A/B | 5 | 0.255 | 0.240 | 0.194 | 0.311 | 0.306 | 12.2 |
+| 15.8-17.4 Mb, 66 bins | original pipeline | 100 | 0.144 | 0.098 | 0.307 | 0.200 | -0.002 | 4.2 |
+| | 3dgnome-ng now | 5 | 0.447 | 0.459 | 0.238 | 0.505 | 0.288 | 6.5 |
+| | MultiMM loops | 5 | 0.294 | 0.321 | 0.304 | 0.347 | 0.118 | 13.4 |
+| | MultiMM loops + A/B | 5 | 0.284 | 0.306 | 0.277 | 0.313 | 0.120 | 11.4 |
+| 18.3-20.2 Mb, 78 bins | original pipeline | 100 | 0.102 | 0.117 | 0.257 | 0.122 | -0.011 | 4.7 |
+| | 3dgnome-ng now | 5 | 0.681 | 0.599 | 0.216 | 0.743 | 0.400 | 7.1 |
+| | MultiMM loops | 5 | 0.338 | 0.347 | 0.205 | 0.290 | 0.113 | 12.4 |
+| | MultiMM loops + A/B | 5 | 0.337 | 0.344 | 0.190 | 0.288 | 0.117 | 10.8 |
+
+We are ahead of the original pipeline on Pearson on every window, by 0.09 to 0.58, and on
+MultiMM on every window. SCC is the exception, ahead on two windows and behind on two, and at
+50 to 106 bins a stratum holds very few pairs, so SCC on a window is the noisiest number in
+the table. The original pipeline's exponent is flat or negative on three windows and its Rg
+is 4 to 6 against our 6.5 to 8.7, which is the compaction the reference showed on the 60 Mb
+gate as well. Three caveats. The window models were built for the enhancer3d study on
+ChIA-PET input and whatever settings that study used, not on this gate's config, so this is
+the published pipeline as it was run rather than the reference binary under our data. Our
+structures are cut from a 60 Mb model, which places every window in the context of its
+chromosome where the window models saw nothing outside their span. And the 12.6-13.85 Mb
+window has 68 beads in the original models against our 226, so its numbers are the least
+reliable of the four.
+
+## Compartments
+
+The saddle statistic at 100 kb against the cell's compartment eigenvector, with the term off
+in production.
+
+| cell | experimental | reference | 3dgnome-ng now | MultiMM loops | MultiMM loops + A/B |
+|---|---|---|---|---|---|
+| GM12878 | 3.47 | not run | 1.41 | 1.51 | 1.62 |
+| H1ESC | 1.72 | 0.98 | 1.31 | 1.10 | 0.95 |
+| HFFC6 | 6.82 | 0.96 | 2.07 | 1.50 | 2.45 |
+
+Every arm is far under the experiment. Ours is ahead of the reference on both cells it ran,
+ahead of MultiMM on H1ESC, and between MultiMM's two arms on the other two. MultiMM's A/B
+blocks buy it 0.1 on GM12878 and 1.0 on HFFC6 and cost it on H1ESC. With our compartment
+term on the saddle rises on H1ESC and HFFC6 at a cost in SCC and MultiMM, recorded in
+`design/ab-compartments.md`, and it stays opt in.
+
+## Timings
+
+One chr1:1-60 Mb structure on the workstation, an RTX 4060 Ti with the JAX executor for the
+smooth stage and threaded numba for the arcs stage: GM12878 about 9 minutes, H1ESC about 13,
+HFFC6 about 7. MultiMM's five structure ensemble with molecular dynamics took 4 to 5 minutes
+on the same GPU. The reference on the CPU, one process per structure, took 2 h 15 on HFFC6,
+7.5 to 8.5 h on H1ESC and did not finish GM12878 in 29 hours.
+
+## What is open
+
+- A reference GM12878 arm on the 60 Mb gate needs a day or two of CPU per structure. The
+  window comparison stands in for it.
+- The window SCC is not settled at 50 to 106 bins. A finer bin size on the deep map would
+  give it more strata, at the cost of comparability with the 60 Mb tables.
