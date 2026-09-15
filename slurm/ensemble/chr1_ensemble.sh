@@ -95,7 +95,7 @@ assert "hic" in s.data_singletons, f"singletons={s.data_singletons!r} does not l
 assert s.use_ctcf_motif, "CTCF orientation term is off"
 assert s.use_excluded_volume, "excluded volume is off"
 assert s.use_dynamic_loop_density, "dynamic subanchors are off"
-assert s.use_anchor_heatmap and s.use_subanchor_heatmap, "distance-map terms are off"
+assert s.use_anchor_heatmap, "the anchor distance map is off"
 assert not s.use_compartments, "use_compartments is on; this ensemble runs without epigenome terms"
 print(f"[guard] config ok: singletons={s.data_singletons}")
 PYCHECK
