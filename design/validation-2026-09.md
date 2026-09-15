@@ -97,6 +97,24 @@ chromosome where the window models saw nothing outside their span. And the 12.6-
 window has 68 beads in the original models against our 226, so its numbers are the least
 reliable of the four.
 
+**Why SCC splits on the windows, checked 2026-09-15.** Five of the old models score the same
+SCC as all hundred, so the ensemble size is not it, and the battery averages SCC per
+structure in any case. SCC weights a stratum by the product of the two maps' standard
+deviations, so a stratum counts only where a model has contacts to vary. The old models sit
+at Rg 4 to 5 with a flat exponent and hold 13 to 22 contacts per pixel at every separation to
+2 Mb, where ours follow the distance law and have almost no pair within the 1.33 bond cutoff
+beyond 500 kb. On the 18.3-20.2 Mb window the strata under 100 kb tie at r 0.19, 125 to 500 kb
+reads 0.30 against 0.28, and over 500 kb 0.38 against 0.00 with 13 percent of the old models'
+weight there against 1 percent of ours. Scored on a soft map, every pair weighted by the cube
+of one over one plus its distance in bonds, ours leads on both windows, 0.37 against 0.31 and
+0.32 against 0.27, and the old pipeline and MultiMM barely move because their maps are dense
+at every separation. The arm before the levers of 2026-09-12 scores level with production
+on the windows, so the levers are not the cause. Run on the 18.3-20.2 Mb window alone rather
+than cut from the 60 Mb model, ours scores Pearson 0.668, SCC 0.249, MultiMM 0.736 and
+exponent 0.354, level with the cut on everything, so the context of the chromosome costs
+nothing on the window either. The battery keeps the hard cutoff, since the 60 Mb tables were
+scored with it and there we lead the reference on SCC on both finished cells.
+
 ## Compartments
 
 The saddle statistic at 100 kb against the cell's compartment eigenvector, with the term off
