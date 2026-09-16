@@ -46,6 +46,24 @@ arcs stage on the L-BFGS solver in production the checkerboard's remaining home 
 stage, where it was already fine, and the open question is only whether it beats best of `K`
 there.
 
+## Already done here, at the block level
+
+**Graph partitioning across GPUs with boundary coordination.** Li, Landry and Mettu, "GPU
+acceleration for Markov chain Monte Carlo sampling", Proceedings of the 4th International
+Conference on AI-ML Systems, 2024, <https://doi.org/10.1145/3703412.3703428>, open access. The
+interaction graph of a probabilistic model is partitioned, each subgraph is sampled on its own
+GPU, information about the shared boundary is exchanged over NVLink during sampling and the
+pieces are merged. Demonstrated on protein conformational stability, up to 4.0x on two A2000s and
+2.4x to 2.7x on eight V100s over an adaptive Monte Carlo sampler. Only the abstract and the
+reported numbers were readable; the ACM PDF is behind a script wall. For us the partition is the
+interaction block, every block's chain already runs in parallel in one launch, and the boundary
+is handled after sampling by the rigid stitch and the cross block relaxation rather than during
+it. The chain inside a partition stays sequential in their scheme as in ours, so it does not
+touch the one chain problem. What it suggests, unmeasured, is exchanging boundary information
+during the smooth stage, a relaxation round between milestones rather than one pass at the end.
+Their gain of 2.4x to 4x across several GPUs is below what per block batching on one GPU already
+gives, so the refinement is about boundary quality, not speed.
+
 ## Does not apply
 
 Three proton therapy dose codes, read because they were on a list. All three parallelise over
