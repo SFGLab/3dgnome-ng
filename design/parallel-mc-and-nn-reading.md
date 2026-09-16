@@ -46,6 +46,66 @@ arcs stage on the L-BFGS solver in production the checkerboard's remaining home 
 stage, where it was already fine, and the open question is only whether it beats best of `K`
 there.
 
+**Speculative prefetching, the exact form of width inside one chain.** Brockwell, "Parallel
+Markov chain Monte Carlo simulation by pre-fetching", Journal of Computational and Graphical
+Statistics 2006, and Angelino, Kohler, Waterland, Seltzer and Adams, "Accelerating MCMC via
+parallel predictive prefetching", UAI 2014, <https://arxiv.org/abs/1403.7265>. The chain's next
+`d` steps form a binary tree of accept and reject branches. Evaluate its nodes in parallel,
+then walk the tree with the serial accept decisions, discarding what was not taken. The result
+is identical to serial execution, and the speedup is `log2` of the lane count in general but
+close to linear in the lanes where one branch dominates, which Angelino et al. exploit by
+predicting acceptance. Our late anneal is that case: the reference log showed 54 accepted of
+50,000 proposals per milestone, so the tree is a straight line of rejections from one state,
+and evaluating the next `K` proposals from the current state in parallel and keeping the first
+accepted in proposal order is the whole scheme. It is the same chain as serial, so it needs no
+battery, only a wall measurement. It gains nothing early in the anneal where acceptance is high.
+Against best of `K`: prefetching keeps the serial result and gains only where acceptance is
+rare, best of `K` changes the result and gains everywhere. Build prefetching first, since it is
+free of validation, then best of `K` on top if the early anneal is a large enough share of the
+wall. The first measurement is the acceptance profile over the rounds of a real smooth run,
+which decides how much either can give.
+
+**Spatial checkerboard for off lattice particles.** Anderson, Jankowski, Grubb, Engel and
+Glotzer, "Massively parallel Monte Carlo for many particle simulations on GPUs", Journal of
+Computational Physics 2013, <https://arxiv.org/abs/1211.1646>, the scheme in HOOMD's HPMC.
+Space is cut into cells wider than the interaction range, a sweep updates one cell of every
+checkerboard colour at once with each move confined to its cell, and the grid is shifted at
+random between sweeps. Detailed balance holds without a graph colouring, and it reached 148
+times one CPU core on hard disks. Our earlier checkerboard was coloured on the interaction graph
+and is recorded in `design/intra-chain-parallelism.md`, fine on the smooth stage and compacting
+on the arcs stage from a collapsed seed. The spatial form is the same idea on the cell grid the
+excluded volume already keeps, and the smooth stage's terms are all within a bond or two of a
+bead except the heat term, which is off in production. It is the other candidate for the smooth
+stage beside prefetching, and the two compose: cells in parallel, prefetching inside a cell.
+
+**Rejection free selection.** Bortz, Kalos and Lebowitz 1975 and its continuous extension,
+<https://arxiv.org/abs/cond-mat/0211164>. Every candidate move is weighted by its acceptance
+probability and one is drawn, so every step moves. With continuous displacements the candidate
+set has to be a finite draw, and drawing among `K` proposals by weight is multiple try
+Metropolis again. Nothing separate to build.
+
+**Event chain Monte Carlo.** Bernard, Krauth and Wilson 2009, and for polymers Kampmann, Boltz
+and Kierfeld, "Parallelized event chain algorithm for dense hard sphere and polymer systems",
+Journal of Computational Physics 2015, <https://arxiv.org/abs/1409.6948>. Rejection free and
+lifted, one bead moves in a straight line until an event hands the motion to the next, with a
+domain decomposed parallel version, and it reaches molecular dynamics speeds on hard sphere
+polymer melts. It needs the energy factorised into pairwise terms and is a sampler at one
+temperature. Our smooth energy has the cubed angle term and the orientation term, and the run
+is an anneal. A rewrite of the stage, not a lever on it. Not now.
+
+**Asynchronous updates.** Terenin, Simpson and Draper, "Asynchronous Gibbs sampling", AISTATS
+2020, <https://proceedings.mlr.press/v108/terenin20a.html>. Run the sequential update in
+parallel without synchronising, which is what cudaMMC's warps do to bead positions. It can
+diverge, the exact variant needs a correction, and either way the result depends on thread
+timing. The parity gate and the seeded reproducibility of every kernel rule it out here.
+
+**Parallel across the sequence.** Zoltowski, Wu, Gonzalez, Kozachkov and Linderman,
+"Parallelizing MCMC across the sequence length", 2025, <https://arxiv.org/abs/2508.18413>. A
+whole trajectory of Gibbs, Langevin or Hamiltonian steps is solved as a fixed point with
+parallel Newton iterations, tens of iterations for hundreds of thousands of samples. It needs a
+smooth kernel. Metropolis accept and reject is a discontinuity in the state map, so it does not
+apply to ours.
+
 ## Already done here, at the block level
 
 **Graph partitioning across GPUs with boundary coordination.** Li, Landry and Mettu, "GPU
@@ -115,7 +175,11 @@ is of three kinds.
 
 ## Where this leaves the plan
 
-One parallel MC experiment, best of `K` in the JAX smooth kernel, with multiple try Metropolis
-as its reference. One neural direction, a ChromoGen style generator trained on our ensembles,
+Two parallel MC experiments on the JAX smooth kernel, in this order: speculative prefetching,
+the first accepted of `K` proposals from the current state, which reproduces the serial chain
+and needs only a wall measurement; then best of `K`, the greedy multiple try form, which changes
+structures and needs the battery. The spatial checkerboard on the excluded volume cell grid is
+the third candidate and composes with both. Before any of them, the acceptance profile over the
+rounds of one real smooth run, since prefetching pays only where acceptance is rare. One neural direction, a ChromoGen style generator trained on our ensembles,
 already planned on the cnf branch and waiting on training data. Nothing else on the list changes
 what is built.

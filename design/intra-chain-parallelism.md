@@ -172,6 +172,8 @@ same shape as the smooth kernel's fixed per step latency. The place it pays most
 the anneal, where acceptance is a fraction of a percent, since `K` tries raise the chance of an
 accepted move about `K` fold there. The multiple try ratio only matters for a sampler; for the
 optimiser the greedy best of `K` is the version to build.
+The exact counterpart, speculative prefetching, and the other candidates read on 2026-09-16 are
+in `design/parallel-mc-and-nn-reading.md`.
 
 **Parallel tempering. Ruled out by the measurement above.** Replicas on a temperature ladder that
 swap. It cures a chain stuck in a basin, and a ladder buys nothing here.
