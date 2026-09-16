@@ -163,6 +163,16 @@ cannot otherwise help, and it does not change who moves when, only how good the 
 It does make the search greedier, which is defensible because this is an optimiser and not a
 sampler, but it changes structures and needs its own validation.
 
+Multiple try Metropolis is the principled form of this, and Suchoski et al. 2022
+(doi 10.3389/fams.2022.818016) is a worked GPU case of it: `Nt` proposals per chain per
+iteration, all evaluated at once, one chosen by weight and accepted with the multiple try ratio,
+`Nc` chains sharing an adaptive proposal covariance. Their gain, 13.6x on one GPU against a 12
+core CPU at 128 tries, comes from fewer iterations at a fixed per iteration cost, which is the
+same shape as the smooth kernel's fixed per step latency. The place it pays most is late in
+the anneal, where acceptance is a fraction of a percent, since `K` tries raise the chance of an
+accepted move about `K` fold there. The multiple try ratio only matters for a sampler; for the
+optimiser the greedy best of `K` is the version to build.
+
 **Parallel tempering. Ruled out by the measurement above.** Replicas on a temperature ladder that
 swap. It cures a chain stuck in a basin, and a ladder buys nothing here.
 
