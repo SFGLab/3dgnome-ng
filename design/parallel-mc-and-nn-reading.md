@@ -175,6 +175,16 @@ is of three kinds.
 
 ## Where this leaves the plan
 
+**First, before any kernel work: measure the stitch and the relaxation at chromosome scope.**
+Decided 2026-09-17. Both passes were built when every block's arcs were solved alone. The
+joint solve has since removed the defect the stitch was built for, and the stitch's centroid
+excluded volume, one term per block pair at the two radii of gyration added, is an inflation
+force on a compact chromosome whose blocks interdigitate. The relaxation runs windowed at one
+in production and is probably close to null. `slurm/ensemble/assemble_ablation.sh` runs four
+arms on GM12878 chr1:1-60 Mb, production, stitch off, relaxation off, neither, three structures
+each, then the battery and the boundary report. If neither holds Hi-C and the boundary ratio
+at a smaller Rg, both passes are deleted per the project rule. Only then the kernel work.
+
 Two parallel MC experiments on the JAX smooth kernel, in this order: speculative prefetching,
 the first accepted of `K` proposals from the current state, which reproduces the serial chain
 and needs only a wall measurement; then best of `K`, the greedy multiple try form, which changes
