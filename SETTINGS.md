@@ -87,6 +87,7 @@ is too far and the squeeze constant when too close.
 | `squeeze_constant_arcs` | float | 1.0 | 1.0 | Arcs stage. |
 | `background_weight` | float | 0.0 | 0.1 | A weak spring holding an arcless anchor pair inside `background_range_bp` at the background for its separation, in the arcs stage. Zero is off and every other arcless pair keeps the repulsion. |
 | `background_range_bp` | int | 100000 | 100000 | The separation under which an arcless pair is held at the background. Beyond it the pair keeps the repulsion, since a power law distance matrix cannot be embedded in three dimensions over every pair, only over a band. |
+| `factor_strength` | str |  |  | A multiplier on loop strength per cluster file, comma separated in file order, 1 each when empty. A factor whose contacts are more transient than CTCF's pulls less at the same PET count; 0 holds its loops at the background, which keeps its anchors as beads with no pull. |
 | `use_contact_background` | bool | no | yes | Beyond that range, hold an arcless pair whose contact cell puts it closer than the background at the law's contact distance, with the same spring. A pair at or below its expected contact keeps the repulsion, so the held set stays sparse, and on a thin map it holds next to nothing, which is allowed. Needs `use_anchor_heatmap`. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |

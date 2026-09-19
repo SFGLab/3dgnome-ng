@@ -104,3 +104,23 @@ and the CTCF rerun stays on the depth matched set. GM12878 with the public RNAPI
 the test bed. B waits for A's result. The first pass carries no per factor spring weight: the
 arms are CTCF only, RNAPII anchors as beads without springs, and RNAPII springs at CTCF's
 weight; a weight comes if the springs move the expression test and cost structure.
+
+## First pass on GM12878, 2026-09-20
+
+Whole chr1, five structures per arm, the battery on the 1-60 Mb slice and the chr1 enhancer
+to promoter against expression test of enhancer3d on 854 genes. The RNAPII set is Tang et al.
+2015 lifted to hg38, 96,037 loops of three or more PETs, 57,258 anchors of 1 kb added beside
+the CTCF set; 37 percent of RNAPII loop ends already sit on CTCF anchors. On chr1 the joint
+solve grew from 9,195 anchors in 52 blocks to 15,976 in 92.
+
+| arm | Pearson | SCC | MultiMM | exponent | Rg | wb-aa | wb-sa | xb | saddle | eig r | expression Spearman |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| CTCF only | 0.309 | 0.364 | 0.682 | 0.385 | 25.1 | 2.7 | 91 | 25 | 1.15 | 0.12 | -0.178 |
+| CTCF + RNAPII at CTCF's strength | 0.278 | 0.280 | 0.587 | 0.386 | 24.0 | 9.1 | 15 | 19 | 0.96 | 0.25 | -0.234 |
+
+The springs move the expression test the right way and double the eigenvector correlation,
+and they cost SCC 0.08, MultiMM 0.10 and triple the anchor overlaps. A loop read at CTCF's
+strength is pulled to a bead or two like a cohesin loop, and RNAPII's contacts are not held
+that way. Next: `[springs] factor_strength`, a multiplier on the factor's loop strength in the
+law, at 0.3, 0.1 and 0, the last holding RNAPII loops at the background so its anchors are
+beads with no pull, the null arm the first pass could not run.

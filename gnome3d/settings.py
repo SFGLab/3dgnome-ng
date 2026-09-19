@@ -43,6 +43,7 @@ class Settings:
     data_anchors: str
     data_pet_clusters: str
     data_factors: str
+    factor_strength: str
     data_singletons: str
     data_singletons_inter: str
     data_centromeres: str
@@ -355,6 +356,9 @@ class Settings:
         self.data_anchors = ""
         self.data_pet_clusters = ""
         self.data_factors = ""  # one name per cluster file, comma separated; CTCF when empty
+        self.factor_strength = (
+            ""  # per factor multiplier on loop strength, comma separated; 1 each when empty
+        )
         self.data_singletons = ""
         self.data_singletons_inter = ""
         self.data_centromeres = ""
@@ -772,6 +776,7 @@ class Settings:
         self.data_anchors = gets("data", "anchors", self.data_anchors)
         self.data_pet_clusters = gets("data", "clusters", self.data_pet_clusters)
         self.data_factors = gets("data", "factors", self.data_factors)
+        self.factor_strength = gets("springs", "factor_strength", self.factor_strength)
         self.data_singletons = gets("data", "singletons", self.data_singletons)
         self.data_singletons_inter = gets("data", "singletons_inter", self.data_singletons_inter)
         self.data_centromeres = gets("data", "centromeres", self.data_centromeres)
@@ -1226,6 +1231,12 @@ class Settings:
         if not names:
             names = ["CTCF"] + [f"factor{i}" for i in range(1, len(paths))]
         return [(self.data_path(p), i, names[i]) for i, p in enumerate(paths)]
+
+    def factor_strengths(self) -> dict[int, float]:
+        """The multiplier on loop strength per factor index from `[springs] factor_strength`,
+        one value per cluster file in order; a factor not named keeps 1."""
+        vals = [v.strip() for v in str(self.factor_strength).split(",") if v.strip()]
+        return {i: float(v) for i, v in enumerate(vals)}
 
     def genomic_length_to_distance(self, length_bp: int) -> float:
         """The distance two beads that far apart hold with nothing between them, in beads."""

@@ -226,6 +226,9 @@ class PolymerLaw:
     q_half: float = 1.0
     arcs: ArcStrengthFit | None = None
     arcs_by_factor: dict[int, ArcStrengthFit] = field(default_factory=dict)
+    # A multiplier on a factor's loop strength, so a library whose contacts are more transient
+    # than CTCF's, RNAPII's, pulls less at the same PET count; 0 holds its loops at the background.
+    strength_by_factor: dict[int, float] = field(default_factory=dict)
 
     def background(self, sep_bp: int) -> float:
         """The distance two beads that far apart hold with nothing between them. Never under one
@@ -263,6 +266,7 @@ class PolymerLaw:
         span = abs(int(sep_bp))
         fit = self.arcs_by_factor.get(factor, self.arcs)
         q = fit.strength(score, span) if fit is not None else float(score)
+        q *= self.strength_by_factor.get(factor, 1.0)
         return self.contact_distance(span, q)
 
     def heatmap_distance(self, freq: float, expected: float, sep_bp: int) -> float:

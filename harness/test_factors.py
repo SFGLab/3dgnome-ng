@@ -130,7 +130,37 @@ def test_target_uses_the_factor_fit() -> None:
     check("a three field arc is factor 0", m2[0, 1] == m0[0, 1])
 
 
+def test_factor_strength() -> None:
+    s = Settings()
+    s.background_weight = 0.0
+    fit = ArcStrengthFit(log_a=0.0, slope=0.0, median=2.0, ok=False, reason="test")
+    s.polymer = PolymerLaw(
+        nu=0.3, s0_bp=1000, arcs=fit, arcs_by_factor={0: fit, 1: fit}, strength_by_factor={1: 0.3}
+    )
+    mids = [0, 500_000]
+    full = arc_expected_matrix(s, mids, [(0, 1, 10, 0)])[0, 1]
+    weak = arc_expected_matrix(s, mids, [(0, 1, 10, 1)])[0, 1]
+    check(
+        "a factor at strength 0.3 holds its loop farther than CTCF holds the same count",
+        weak > full,
+        f"{full:.3f} vs {weak:.3f}",
+    )
+    s.polymer = PolymerLaw(
+        nu=0.3, s0_bp=1000, arcs=fit, arcs_by_factor={0: fit, 1: fit}, strength_by_factor={1: 0.0}
+    )
+    none = arc_expected_matrix(s, mids, [(0, 1, 10, 1)])[0, 1]
+    check(
+        "at strength 0 the loop sits at the background",
+        abs(none - s.polymer.background(500_000)) < 1e-9,
+        f"{none:.3f}",
+    )
+    s2 = Settings()
+    s2.factor_strength = "1, 0.3"
+    check("the setting parses per file", s2.factor_strengths() == {0: 1.0, 1: 0.3})
+
+
 def main() -> int:
+    test_factor_strength()
     test_cluster_files()
     test_factor_through_marking_and_fit()
     test_target_uses_the_factor_fit()

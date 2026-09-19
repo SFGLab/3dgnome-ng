@@ -136,6 +136,7 @@ def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
         q_half=float(settings.contact_half_saturation),
         arcs=arcs,
         arcs_by_factor=dict(data.arc_fits),
+        strength_by_factor=settings.factor_strengths(),
     )
 
 
