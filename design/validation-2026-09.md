@@ -115,6 +115,33 @@ exponent 0.354, level with the cut on everything, so the context of the chromoso
 nothing on the window either. The battery keeps the hard cutoff, since the 60 Mb tables were
 scored with it and there we lead the reference on SCC on both finished cells.
 
+## The map as the contact background's source, 2026-09-19
+
+`[data] contact_map`, the deep mcool read at 25 kb, each anchor pair's pixel against the
+expectation at its separation from the same map, held when it clears `contact_map_z` Poisson
+standard deviations. GM12878 chr1:1-60 Mb, three structures per arm, 3 by 3 pooled unless
+said; production holds 80 far pairs through the thinned singletons.
+
+| arm | far pairs held | Pearson | Spearman | SCC | MultiMM | exponent | Rg | wb-sa | xb | saddle | eig r |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| production | 80 | 0.312 | 0.135 | 0.374 | 0.666 | 0.364 | 23.4 | 98 | 20 | 1.31 | 0.07 |
+| z 3, one pixel | | 0.333 | 0.157 | 0.404 | 0.669 | 0.325 | 17.6 | 351 | 167 | 0.91 | 0.06 |
+| z 3 | 1,434,000 | 0.343 | 0.163 | 0.390 | 0.677 | 0.314 | 19.5 | 396 | 161 | 0.78 | 0.33 |
+| z 2 | | 0.346 | 0.166 | 0.392 | 0.676 | 0.308 | 19.7 | 434 | 181 | 0.76 | 0.27 |
+| z 5 | 770,000 | 0.330 | 0.152 | 0.389 | 0.674 | 0.336 | 19.4 | 302 | 122 | 0.94 | 0.09 |
+| z 8 | 347,000 | 0.323 | 0.146 | 0.391 | 0.660 | 0.353 | 19.5 | 232 | 99 | 0.84 | 0.20 |
+| z 12 | 168,000 | 0.320 | 0.143 | 0.389 | 0.675 | 0.359 | 20.0 | 202 | 74 | 1.03 | 0.14 |
+
+Every Hi-C correlation rises at every threshold, and the pooled arm at z 3 is the first of
+ours to reach a compartment eigenvector correlation of 0.3. The price is compaction: a held
+pair only ever pulls in, since a pair under expected keeps the repulsion, so Rg falls 15 to
+20 percent whatever the threshold, the exponent sits under the fit until z 8, overlaps rise
+two to eight times and the saddle falls. Pairs held per band at z 12 run 55,000 under
+500 kb, 49,000 to 2 Mb, 35,000 to 10 Mb and 29,000 beyond. The long loops over 1 Mb added to
+the joint solve were a loss on their own and are dropped, see AGENTS.md. Next measured:
+`contact_map_symmetric`, holding pairs significantly under expected farther out, at z 8 and
+12, and the relaxation back on for the cross block overlaps.
+
 ## Compartments
 
 The saddle statistic at 100 kb against the cell's compartment eigenvector, with the term off
