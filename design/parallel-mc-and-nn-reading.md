@@ -186,6 +186,27 @@ about one step on the latency bound kernel: at 0.2 percent that is 14x at `K` 16
 same day is in `design/validation-2026-09.md`; both passes are off at chromosome scope, so the
 gate before kernel work is passed.
 
+## Prefetching built and measured, 2026-09-19
+
+Commit c6f54ef, `[simulation_arcs_smooth] prefetch`, opt in at 1. At 1 the working tree is
+byte identical to the commit before it on GM12878 chr1:1-8 Mb through the JAX executor, with
+the temperature now carried per chain across the vmap. The smooth stage's wall on the RTX
+4060 Ti, one structure, everything else production:
+
+| region | K 1 | K 8 | K 16 | K 32 | K 64 |
+|---|---|---|---|---|---|
+| chr1:1-8 Mb, 5 blocks to 2,048 beads | 57.3 s | 16.0 s | 9.4 s | 6.2 s | 4.2 s |
+| chr1:1-60 Mb, 11 blocks to 16,384 beads | 419.8 s | | | 116.1 s | 144.6 s |
+
+13.6x on the small blocks at 64, 3.6x on the large ones at 32 and less at 64, because the JAX
+kernel scans every bead for the excluded volume and a batch does that `K` times, so on a
+16,384 bead block the batch stops being one step's latency somewhere between 32 and 64.
+Rounds to convergence are level, 55 to 62 on the small region and 385 to 427 on the large.
+Hi-C, the exponent and Rg are level on every arm; the single structure MultiMM number on the
+large region is not comparable with the three structure arm it sits beside and is being
+remeasured at three. The numba cell grid, ported, would make the batch cost flat in `N` and
+recover the small block ratio on large blocks; that is the next kernel lever after this one.
+
 ## Where this leaves the plan
 
 **First, before any kernel work: measure the stitch and the relaxation at chromosome scope.**
