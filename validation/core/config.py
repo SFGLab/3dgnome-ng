@@ -169,6 +169,7 @@ CANONICAL: dict[str, dict[str, object]] = {
         "start": "coil",
         "hard_wall": "yes",
         "prefetch": 32,  # 32 proposals per JAX step; 3.4x on 60 Mb blocks, level on every measure
+        "jax_grid": "yes",  # excluded volume on a cell grid in the JAX kernel; 116 s to ~50 s on 60 Mb
         "anchor_cap": 0.0,
     },
     "excluded_volume": {

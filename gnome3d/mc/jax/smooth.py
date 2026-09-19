@@ -46,9 +46,11 @@ def _grid_static(structs: list[tuple[np.ndarray[Any, Any], float]]) -> tuple[int
 
     The grid is bucketed so a launch's compiled shape depends on the coarse size of what it
     holds and not on every structure's extent. Cells are at least `r0` wide, wider when the
-    structure does not fit 48 cells across at that width. Capacity is three times the fullest
-    starting cell plus sixteen, rounded up to sixteen, since a cell filling past it is not
-    detected inside the kernel.
+    structure does not fit 48 cells across at that width; a finer axis was measured slower,
+    since the rebuild writes the whole table. A finished chromosome holds about one bead per
+    cell at `r0` and never more than a handful, so the capacity is twice the fullest starting
+    cell plus four, rounded up to four. A cell filling past it later is not detected inside
+    the kernel.
     """
     g_all = 0
     cap = 0
@@ -64,8 +66,8 @@ def _grid_static(structs: list[tuple[np.ndarray[Any, Any], float]]) -> tuple[int
         lin = (c[:, 0] * g + c[:, 1]) * g + c[:, 2]
         occ = int(np.bincount(lin).max())
         g_all = max(g_all, g)
-        cap = max(cap, 3 * occ + 16)
-    return g_all, int(np.ceil(cap / 16.0) * 16)
+        cap = max(cap, 2 * occ + 4)
+    return g_all, int(np.ceil(cap / 4.0) * 4)
 
 
 def _build_smooth_kernel(

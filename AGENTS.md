@@ -679,6 +679,21 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     at 32 against 1: every battery number level, MultiMM 0.665 against 0.669. Numba ignores the
     key. Unit checks in `harness/test_smooth_levers.py`, sweep in `slurm/ensemble/prefetch_sweep.sh`,
     reading and numbers in `design/parallel-mc-and-nn-reading.md`.
+  - **The excluded volume and the wall run on a cell grid in the JAX kernel:
+    `[simulation_arcs_smooth] jax_grid`, default no, production yes since 2026-09-19, on
+    launches of `jax_grid_min_beads` (4096) beads or more.** Cells at least `r0` wide on up to
+    48 per axis, capacity twice the fullest starting cell plus four, a table rebuilt every
+    period of about 2,048 proposals and never written between rebuilds: a bead an accepted
+    move carries away is flagged and listed, and a query takes listed beads from the list at
+    their current position and skips them in the cells, so the sum is exact. Bit identical to
+    the full scan on the GPU. Smooth wall on GM12878 chr1:1-60 Mb at prefetch 32: 116 s to 47
+    to 85 s, three structures level with the full scan on every battery number. Two designs
+    lost on the way and are recorded in `design/parallel-mc-and-nn-reading.md`: a per move
+    relink is a batched scatter under the chain vmap that XLA does out of place and copied the
+    table every step, an hour where the scan took two minutes; a sorted order with a binary
+    search per cell was slower and a finer axis was slower, since the rebuild writes the table.
+    Past 32 proposals a batch gets slower, so the floor is now the number of kernel launches in
+    one step. The check needs a GPU, `harness/test_jax_grid.py`.
   - **`cli.py` auto-forces `ib_workers=1` when `mc_backend=jax`** — multiple Python threads contending for a single GPU is net-negative; restarts go inside JAX via `mc_smooth_chains` (vmap), not via thread pools.
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
 

@@ -209,6 +209,25 @@ large region is 141 s, so 32 is the production value from 2026-09-19. The numba 
 ported, would make the batch cost flat in `N` and recover the small block ratio on large
 blocks; that is the next kernel lever after this one.
 
+## The cell grid in the JAX kernel, 2026-09-19
+
+Built, commit 406ac1e and after. Measured on GM12878 chr1:1-60 Mb, one structure, smooth wall:
+
+| design | K 32 | K 64 | K 128 |
+|---|---|---|---|
+| full scan | 116 s | 145 s | |
+| table, 48 cells per axis, per move relink | over an hour | | |
+| table, rebuilt per period, cap 3x occupancy plus 16 | 65 s | 94 s | 123 s |
+| table, 96 cells per axis | 75 s | 105 s | 130 s |
+| sorted order with a binary search per cell | 172 s | 121 s | 114 s, and wrong on a dense chain |
+| table, 48 per axis, cap 2x occupancy plus 4 | 47 to 85 s | 78 s | |
+
+A finished chromosome holds 1.1 beads per cell at `r0` and never more than 3, so the queries
+touch a few hundred slots for the thirty beads that are there. Reducing that further did not
+help and a finer axis hurt, since the rebuild writes the whole table; the batch cost is the
+launches inside one step, not its arithmetic, and past 32 proposals a batch gets slower again.
+Production is the last row, three structures level with the full scan on every battery number.
+
 ## Where this leaves the plan
 
 **First, before any kernel work: measure the stitch and the relaxation at chromosome scope.**
