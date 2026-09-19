@@ -1091,12 +1091,15 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   term at 0.5 on top the saddle rises on H1ESC 1.02 to 2.15 and HFFC6 0.71 to 1.09, not on
   GM12878, and SCC and MultiMM fall 0.07 to 0.10 on every cell, so the term stays opt in.
 
-  **The loops beyond `max_pet_length` in the joint solve, opt in, under measurement since
-  2026-09-19: `[simulation_arcs] long_arcs`.** The loader sets those loops aside for the
-  segment heatmap, a block scope rule where a loop across blocks had nowhere to act. At
-  chromosome scope `long_arcs_on_anchors` maps each one to the anchors holding its ends and
-  they join the target matrix as arcs. On GM12878 chr1 that is 984 loops over 1 Mb, 233 with
-  five or more PETs. Unit checks in `harness/test_contact_map.py`.
+  **Tried and dropped, 2026-09-19: the loops beyond `max_pet_length` in the joint solve.**
+  The loader sets those loops aside for the segment heatmap, a block scope rule, and at
+  chromosome scope they could join the target matrix as arcs between the anchors holding
+  their ends, 984 loops over 1 Mb on GM12878 chr1. Measured on chr1:1-60 Mb, three
+  structures: Pearson 0.312 to 0.305, SCC 0.374 to 0.360, MultiMM 0.666 to 0.630, Rg 23.4 to
+  19.4, cross block overlaps 20 to 47 per thousand. The arc law sets a loop's target by its
+  PET count alone, so a 3 to 5 PET loop spanning megabases is asked to close to a bead or two
+  and compacts the chromosome. Removed the same day; a span aware target would be option D
+  of `design/anchor-placement.md` again.
 
   Why not in the reference: the reference solves every block alone.
 

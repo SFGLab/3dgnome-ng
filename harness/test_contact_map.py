@@ -93,43 +93,9 @@ def test_background_from_map() -> None:
     )
 
 
-def test_long_arcs_on_anchors() -> None:
-    from types import SimpleNamespace
-
-    from gnome3d.pipeline.coarse.build import long_arcs_on_anchors
-    from gnome3d.types import RawArc
-
-    clusters = [
-        SimpleNamespace(start=s, end=s + 10_000) for s in (100_000, 2_000_000, 5_000_000, 9_000_000)
-    ]
-    active = [0, 1, 2, 3]
-    state = SimpleNamespace(
-        clusters=clusters,
-        long_arcs={
-            "chr1": [
-                RawArc(start=105_000, end=5_004_000, score=7),  # anchors 0 and 2
-                RawArc(start=9_001_000, end=2_003_000, score=3),  # anchors 3 and 1, reversed
-                RawArc(start=3_000_000, end=9_002_000, score=5),  # one end on no anchor
-                RawArc(start=100_500, end=109_000, score=4),  # both ends on one anchor
-            ]
-        },
-    )
-    got = long_arcs_on_anchors(state, active, "chr1")  # type: ignore[arg-type]
-    check(
-        "long loops land on the anchors holding their ends, ordered",
-        got == [(0, 2, 7), (1, 3, 3)],
-        str(got),
-    )
-    check(
-        "a loop off the chromosome's list is nothing",
-        long_arcs_on_anchors(state, active, "chr2") == [],
-    )  # type: ignore[arg-type]
-
-
 def main() -> int:
     test_ratio_and_significance()
     test_background_from_map()
-    test_long_arcs_on_anchors()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     return 1 if FAIL else 0
 

@@ -333,7 +333,6 @@ class Settings:
     arcs_solver_iters: int
     arcs_start: str
     arcs_scope: str
-    arcs_long_in_joint: bool
     mc_stop_ratio_arcs: float
     smooth_dist_weight: float
     smooth_angle_weight: float
@@ -670,7 +669,6 @@ class Settings:
         # centroid, walk or hilbert. block solves each block's anchors alone; chromosome solves every anchor of a
         # chromosome together from the placed block centroids. Under measurement.
         self.arcs_scope = "block"
-        self.arcs_long_in_joint = False  # loops beyond max_pet_length enter the joint solve
         self.mc_stop_ratio_arcs = 0.9999
         self.smooth_dist_weight = 1.0
         self.smooth_angle_weight = 1.0
@@ -1162,7 +1160,6 @@ class Settings:
         self.arcs_solver_iters = geti("simulation_arcs", "solver_iters", self.arcs_solver_iters)
         self.arcs_start = gets("simulation_arcs", "start", self.arcs_start)
         self.arcs_scope = gets("simulation_arcs", "scope", self.arcs_scope)
-        self.arcs_long_in_joint = getb("simulation_arcs", "long_arcs", self.arcs_long_in_joint)
         self.mc_stop_improvement_smooth = getf(
             "simulation_arcs_smooth",
             "stop_condition_improvement_threshold",

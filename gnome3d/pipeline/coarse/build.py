@@ -548,45 +548,11 @@ def add_contact_background(
     return out
 
 
-def long_arcs_on_anchors(
-    state: CoarseState, active_region: list[int], chr_: str
-) -> list[tuple[int, int, int]]:
-    """The loops beyond `max_pet_length` as active anchor pairs with their PET counts.
-
-    A loop end is mapped to the active anchor whose span holds it; a loop with an end on no
-    anchor, or both ends on one, is dropped. Loops are read from `state.long_arcs`, where the
-    loader keeps them for the segment heatmap.
-    """
-    import bisect
-
-    clusters = state.clusters
-    order = sorted(range(len(active_region)), key=lambda ai: clusters[active_region[ai]].start)
-    starts = [clusters[active_region[ai]].start for ai in order]
-    ends = [clusters[active_region[ai]].end for ai in order]
-
-    def find(pos: int) -> int:
-        k = bisect.bisect_right(starts, pos) - 1
-        if k >= 0 and pos <= ends[k]:
-            return order[k]
-        return -1
-
-    out: list[tuple[int, int, int]] = []
-    for arc in state.long_arcs.get(chr_, []):
-        ai, aj = find(int(arc.start)), find(int(arc.end))
-        if ai < 0 or aj < 0 or ai == aj:
-            continue
-        if ai > aj:
-            ai, aj = aj, ai
-        out.append((ai, aj, int(arc.score)))
-    return out
-
-
 def calc_anchor_expected_distances(
     state: CoarseState,
     active_region: list[int],
     chr_: str,
     anchor_heatmap: F64Array | None = None,
-    with_long_arcs: bool = False,
 ) -> F64Array:
     """
     Build expected distance matrix for anchor-level active region.
@@ -619,10 +585,6 @@ def calc_anchor_expected_distances(
                 continue
 
             arcs.append((ai, cluster_to_active[other], int(arc.score)))
-    if with_long_arcs:
-        # At chromosome scope a loop across blocks has somewhere to act, so the loops the
-        # loader set aside as too long for a block join the target matrix here.
-        arcs.extend(long_arcs_on_anchors(state, active_region, chr_))
     mids = [int(clusters[ci].genomic_pos) for ci in active_region]
     mat = arc_expected_matrix(s, mids, arcs)
 
