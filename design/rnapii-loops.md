@@ -124,3 +124,9 @@ strength is pulled to a bead or two like a cohesin loop, and RNAPII's contacts a
 that way. Next: `[springs] factor_strength`, a multiplier on the factor's loop strength in the
 law, at 0.3, 0.1 and 0, the last holding RNAPII loops at the background so its anchors are
 beads with no pull, the null arm the first pass could not run.
+
+Decision criterion, set by the user 2026-09-20: the RNAPII arm exists to study expression
+and the behaviours around active genes, so the expression test is the objective and the
+Hi-C battery is the cost it is read against, not a gate. A strength is chosen for the trios by
+how much expression signal it keeps per unit of structure it costs; full strength stays a
+candidate if the gain is monotone in it. The CTCF arm keeps the battery as its gate as before.
