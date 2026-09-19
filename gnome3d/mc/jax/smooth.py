@@ -241,7 +241,15 @@ def _build_smooth_kernel(
     # clamped the same way, so a pair under `r0` still lands in adjacent cells. Row `C` holds
     # the pad beads and is never queried; row `C + 1` is empty and is what an out of range
     # neighbour cell points at.
+    #
+    # The table is never written between rebuilds. A bead an accepted move carries away is
+    # flagged and listed instead, and a query takes flagged beads from the list at their
+    # current position and skips them in the cells, so the sum stays exact. The table is
+    # rebuilt every `grid_period` batches, which bounds the list. A per move write into the
+    # table would be a batched scatter under the chain vmap, which XLA does out of place and
+    # which copied the whole table every step.
     n_cells = int(grid_g) ** 3
+    grid_period = max(1, 2048 // max(int(prefetch), 1)) if grid_g > 0 else 1
     offs27 = jnp.asarray(
         [[a, b, c] for a in (-1, 0, 1) for b in (-1, 0, 1) for c in (-1, 0, 1)], dtype=jnp.int32
     )
@@ -263,69 +271,59 @@ def _build_smooth_kernel(
         order = jnp.argsort(cid)
         sc = cid[order]
         first = jnp.searchsorted(sc, sc, side="left")
-        rank = jnp.arange(n) - first
-        counts = jnp.zeros(n_cells + 2, dtype=jnp.int32).at[sc].add(1)
-        rank_c = jnp.minimum(rank, grid_cap - 1)
+        rank_c = jnp.minimum(jnp.arange(n) - first, grid_cap - 1)
         cell_beads = jnp.full((n_cells + 2, grid_cap), -1, dtype=jnp.int32)
         cell_beads = cell_beads.at[sc, rank_c].set(order.astype(jnp.int32))
-        cell_n = jnp.minimum(counts, grid_cap)
-        bead_slot = jnp.zeros(n, dtype=jnp.int32).at[order].set(rank_c)
-        return cell_beads, cell_n, cid, bead_slot, lo3, w
+        moved = jnp.full((grid_period,), -1, dtype=jnp.int32)
+        flag = jnp.zeros((n,), dtype=jnp.bool_)
+        return cell_beads, lo3, w, moved, flag
 
-    def _grid_candidates(grid: Any, x: Any) -> Any:
-        cell_beads, _cn, _bc, _bs, lo3, w = grid
+    def _grid_candidates(grid: Any, x: Any) -> tuple[Any, Any]:
+        cell_beads, lo3, w, moved, _flag = grid
         c3 = jnp.clip(jnp.floor((x - lo3) / w).astype(jnp.int32), 0, grid_g - 1)
         nb = c3[None, :] + offs27
         inr = jnp.all(jnp.logical_and(nb >= 0, nb < grid_g), axis=1)
         lin = (nb[:, 0] * grid_g + nb[:, 1]) * grid_g + nb[:, 2]
         lin = jnp.where(inr, lin, n_cells + 1)
-        return cell_beads[lin].reshape(-1)
+        return cell_beads[lin].reshape(-1), moved
+
+    def _grid_pairs(pos: Any, p_pos: Any, p: Any, n_active: Any, grid: Any) -> tuple[Any, Any]:
+        """Candidate distances from `p_pos` and which of them count."""
+        flag = grid[4]
+        idx_c, idx_m = _grid_candidates(grid, p_pos)
+        idx = jnp.concatenate([idx_c, idx_m])
+        idx_i = jnp.maximum(idx, 0)
+        listed = jnp.concatenate(
+            [jnp.logical_not(flag[jnp.maximum(idx_c, 0)]), jnp.ones(idx_m.shape, dtype=jnp.bool_)]
+        )
+        ok = jnp.logical_and(
+            jnp.logical_and(idx >= 0, listed),
+            jnp.logical_and(idx < n_active, jnp.abs(idx - p) > excl_skip),
+        )
+        diff = pos[idx_i] - p_pos
+        return jnp.sqrt(jnp.sum(diff * diff, axis=1)), ok
 
     def _local_excl_grid(
         pos: Any, p_pos: Any, p: Any, r0: Any, weight: Any, n_active: Any, grid: Any
     ) -> Any:
-        idx = _grid_candidates(grid, p_pos)
-        ok = jnp.logical_and(
-            idx >= 0, jnp.logical_and(idx < n_active, jnp.abs(idx - p) > excl_skip)
-        )
-        diff = pos[jnp.maximum(idx, 0)] - p_pos
-        d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+        d, ok = _grid_pairs(pos, p_pos, p, n_active, grid)
         rel = jnp.maximum(0.0, (r0 - d) / r0)
         return jnp.sum(jnp.where(ok, weight * rel * rel, 0.0))
 
     def _wall_grid(
         pos: Any, p_pos: Any, p: Any, r0: Any, n_active: Any, grid: Any
     ) -> tuple[Any, Any]:
-        idx = _grid_candidates(grid, p_pos)
-        ok = jnp.logical_and(
-            idx >= 0, jnp.logical_and(idx < n_active, jnp.abs(idx - p) > excl_skip)
-        )
-        diff = pos[jnp.maximum(idx, 0)] - p_pos
-        d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+        d, ok = _grid_pairs(pos, p_pos, p, n_active, grid)
         under = jnp.logical_and(ok, d < r0)
         return jnp.sum(under.astype(jnp.int32)), jnp.sum(jnp.where(under, r0 - d, 0.0))
 
-    def _grid_relink(grid: Any, p: Any, new_p: Any, moved: Any) -> tuple[Any, ...]:
-        """Move bead `p` to the cell of `new_p` when `moved`, the hole in its old cell filled
-        by that cell's last bead. A no-op when the cell is unchanged."""
-        cell_beads, cell_n, bead_cell, bead_slot, lo3, w = grid
-        c_old = bead_cell[p]
-        c_new = _cell_of(new_p, lo3, w)
-        do = jnp.logical_and(moved, c_new != c_old)
-        slot = bead_slot[p]
-        last = cell_n[c_old] - 1
-        mover = cell_beads[c_old, last]
-        mover_i = jnp.maximum(mover, 0)
-        cell_beads = cell_beads.at[c_old, slot].set(jnp.where(do, mover, cell_beads[c_old, slot]))
-        cell_beads = cell_beads.at[c_old, last].set(jnp.where(do, -1, cell_beads[c_old, last]))
-        bead_slot = bead_slot.at[mover_i].set(jnp.where(do, slot, bead_slot[mover_i]))
-        cell_n = cell_n.at[c_old].add(jnp.where(do, -1, 0))
-        k = jnp.minimum(cell_n[c_new], grid_cap - 1)
-        cell_beads = cell_beads.at[c_new, k].set(jnp.where(do, p, cell_beads[c_new, k]))
-        bead_slot = bead_slot.at[p].set(jnp.where(do, k, bead_slot[p]))
-        bead_cell = bead_cell.at[p].set(jnp.where(do, c_new, c_old))
-        cell_n = jnp.minimum(cell_n.at[c_new].add(jnp.where(do, 1, 0)), grid_cap)
-        return cell_beads, cell_n, bead_cell, bead_slot, lo3, w
+    def _grid_note(grid: Any, p: Any, ok: Any, slot: Any) -> tuple[Any, ...]:
+        """Record that bead `p` moved in this period's slot, once per bead per period."""
+        cell_beads, lo3, w, moved, flag = grid
+        first_time = jnp.logical_and(ok, jnp.logical_not(flag[p]))
+        moved = moved.at[slot].set(jnp.where(first_time, p, moved[slot]))
+        flag = flag.at[p].set(jnp.logical_or(flag[p], ok))
+        return cell_beads, lo3, w, moved, flag
 
     # ---- confinement helper ----
     #
@@ -667,12 +665,14 @@ def _build_smooth_kernel(
 
             return ok, new_p, ss_new, se_new, sh_new, so_new, sc_new, has_orn, safe_k, new_orn_vec
 
-        def apply(carry: Any, p: Any, ok: Any, res: tuple[Any, ...], T_next: Any) -> Any:
+        def apply(
+            carry: Any, p: Any, ok: Any, res: tuple[Any, ...], T_next: Any, slot: Any = 0
+        ) -> Any:
             (pos, ss, se, sh, so, sc, anchor_orn, _T, n_ok), grid = carry
             _ok, new_p, ss_new, se_new, sh_new, so_new, sc_new, has_orn, safe_k, new_orn_vec = res
             pos_next = pos.at[p].set(jnp.where(ok, new_p, pos[p]))
             if grid_g > 0:
-                grid = _grid_relink(grid, p, new_p, ok)
+                grid = _grid_note(grid, p, ok, slot)
             ss_next = jnp.where(ok, ss_new, ss)
             se_next = jnp.where(ok, se_new, se)
             sh_next = jnp.where(ok, sh_new, sh)
@@ -698,8 +698,7 @@ def _build_smooth_kernel(
                 n_ok_next,
             ), grid
 
-        grid0 = _grid_build(pos0, n_active, r0) if grid_g > 0 else None
-        init = ((pos0, ss0, se0, sh0, so0, sc0, anchor_orn0, T0_, jnp.int32(0)), grid0)
+        init = ((pos0, ss0, se0, sh0, so0, sc0, anchor_orn0, T0_, jnp.int32(0)), None)
         if prefetch <= 1:
             k_p, k_d, k_a = jax.random.split(key, 3)
             idx_picks = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_movable_active)
@@ -713,13 +712,41 @@ def _build_smooth_kernel(
             )
             accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
 
-            def body(i: Any, carry: Any) -> Any:
-                (pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok), grid = carry
-                p = ps[i]
-                res = evaluate(pos, ss, se, sh, so, sc, anchor_orn, T, p, disps[i], accs[i], grid)
-                return apply(carry, p, res[0], res, T * dt)
+            if grid_g == 0:
 
-            return jax.lax.fori_loop(0, n_steps_per_batch, body, init)[0]
+                def body(i: Any, carry: Any) -> Any:
+                    (pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok), grid = carry
+                    p = ps[i]
+                    res = evaluate(
+                        pos, ss, se, sh, so, sc, anchor_orn, T, p, disps[i], accs[i], grid
+                    )
+                    return apply(carry, p, res[0], res, T * dt)
+
+                return jax.lax.fori_loop(0, n_steps_per_batch, body, init)[0]
+
+            # With the grid the steps run in periods, the table rebuilt at the start of each.
+            n_periods = -(-n_steps_per_batch // grid_period)
+
+            def period(q: Any, state: Any) -> Any:
+                pos_q = state[0]
+                grid_q = _grid_build(pos_q, n_active, r0)
+
+                def step(r: Any, carry: Any) -> Any:
+                    (pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok), grid = carry
+                    i = q * grid_period + r
+                    live = i < n_steps_per_batch
+                    ii = jnp.minimum(i, n_steps_per_batch - 1)
+                    p = ps[ii]
+                    res = evaluate(
+                        pos, ss, se, sh, so, sc, anchor_orn, T, p, disps[ii], accs[ii], grid
+                    )
+                    ok = jnp.logical_and(res[0], live)
+                    return apply(carry, p, ok, res, jnp.where(live, T * dt, T), r)
+
+                out, _g = jax.lax.fori_loop(0, grid_period, step, (state, grid_q))
+                return out
+
+            return jax.lax.fori_loop(0, n_periods, period, init[0])
 
         # `prefetch` proposals against one state, each on its own rung of the temperature
         # ladder. The first accepted in draw order is applied and the proposals up to it are
@@ -731,8 +758,7 @@ def _build_smooth_kernel(
         def cond_many(state: Any) -> Any:
             return state[1] < n_steps_per_batch
 
-        def body_many(state: Any) -> Any:
-            carry, consumed, b = state
+        def batch(b: Any, carry: Any, slot: Any) -> tuple[Any, Any]:
             (pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok), grid = carry
             kb_p, kb_d, kb_a = jax.random.split(jax.random.fold_in(key, b), 3)
             pk = movable[jax.random.randint(kb_p, (prefetch,), 0, n_movable_active)]
@@ -750,11 +776,38 @@ def _build_smooth_kernel(
                 return a[j]
 
             pick = jax.tree_util.tree_map(at_j, res)
-            carry = apply(carry, pk[j], any_ok, pick, T * (dt**used))
-            return carry, consumed + used, b + 1
+            return apply(carry, pk[j], any_ok, pick, T * (dt**used), slot), used
+
+        if grid_g == 0:
+
+            def body_many(state: Any) -> Any:
+                carry, consumed, b = state
+                carry, used = batch(b, carry, 0)
+                return carry, consumed + used, b + 1
+
+            final, _consumed, _b = jax.lax.while_loop(
+                cond_many, body_many, (init, jnp.int32(0), jnp.int32(0))
+            )
+            return final[0]
+
+        # With the grid the batches run in periods of `grid_period`, the table rebuilt at the
+        # start of each, so a round may overshoot its step count by less than one period.
+        def body_period(state: Any) -> Any:
+            carry, consumed, b = state
+            grid_q = _grid_build(carry[0][0], n_active, r0)
+
+            def one(r: Any, st: Any) -> Any:
+                c, used_sum = st
+                c, used = batch(b + r, c, r)
+                return c, used_sum + used
+
+            (carry, used_sum) = jax.lax.fori_loop(
+                0, grid_period, one, ((carry[0], grid_q), jnp.int32(0))
+            )
+            return (carry[0], None), consumed + used_sum, b + grid_period
 
         final, _consumed, _b = jax.lax.while_loop(
-            cond_many, body_many, (init, jnp.int32(0), jnp.int32(0))
+            cond_many, body_period, (init, jnp.int32(0), jnp.int32(0))
         )
         return final[0]
 
