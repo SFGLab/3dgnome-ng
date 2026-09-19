@@ -16,9 +16,87 @@ from __future__ import annotations
 
 import numpy as np
 
+from gnome3d.mc.numba.terms import njit
 from gnome3d.types import BoolArray, F32Array, F64Array
 
 _DRAWS = 20
+
+
+@njit(cache=True)
+def _bridge_compact_nb(
+    a: F64Array, b: F64Array, targets: F64Array, r_avoid: float, normals: F64Array
+) -> F64Array:
+    """`_bridge` under the compact rule with its draws made beforehand, `normals[j, k]` the
+    k-th draw for bead j. The arithmetic is the Python function's, so the result is identical."""
+    m = targets.shape[0] - 1
+    out = np.zeros((m, 3), dtype=np.float64)
+    pts = np.zeros((m + 2, 3), dtype=np.float64)
+    pts[0] = a
+    pts[1] = b
+    n_pts = 2
+    cur = a.copy()
+    centre = 0.5 * (a + b)
+    step = np.zeros(3, dtype=np.float64)
+    cand = np.zeros(3, dtype=np.float64)
+    best = np.zeros(3, dtype=np.float64)
+    for j in range(m):
+        remaining = m + 1 - j
+        length = targets[j]
+        best_gap = -1.0
+        best_key = np.inf
+        for k in range(normals.shape[1]):
+            u0, u1, u2 = normals[j, k, 0], normals[j, k, 1], normals[j, k, 2]
+            un = np.sqrt(u0 * u0 + u1 * u1 + u2 * u2)
+            u0, u1, u2 = u0 / un, u1 / un, u2 / un
+            step[0] = u0 * length + 0.7 * ((b[0] - cur[0]) / remaining)
+            step[1] = u1 * length + 0.7 * ((b[1] - cur[1]) / remaining)
+            step[2] = u2 * length + 0.7 * ((b[2] - cur[2]) / remaining)
+            sn = np.sqrt(step[0] * step[0] + step[1] * step[1] + step[2] * step[2])
+            f = length / sn
+            step[0] *= f
+            step[1] *= f
+            step[2] *= f
+            cand[0] = cur[0] + step[0]
+            cand[1] = cur[1] + step[1]
+            cand[2] = cur[2] + step[2]
+            gap = np.inf
+            for q in range(n_pts):
+                dx = pts[q, 0] - cand[0]
+                dy = pts[q, 1] - cand[1]
+                dz = pts[q, 2] - cand[2]
+                g = np.sqrt(dx * dx + dy * dy + dz * dz)
+                if g < gap:
+                    gap = g
+            if gap >= r_avoid:
+                cx = cand[0] - centre[0]
+                cy = cand[1] - centre[1]
+                cz = cand[2] - centre[2]
+                key = np.sqrt(cx * cx + cy * cy + cz * cz)
+                if key < best_key:
+                    best_key = key
+                    best[:] = cand
+            elif best_key == np.inf and gap > best_gap:
+                best_gap = gap
+                best[:] = cand
+        cur[:] = best
+        out[j] = cur
+        pts[n_pts] = cur
+        n_pts += 1
+    if m > 0:
+        dx = b[0] - cur[0]
+        dy = b[1] - cur[1]
+        dz = b[2] - cur[2]
+        dn = np.sqrt(dx * dx + dy * dy + dz * dz)
+        t = targets[m]
+        rx = b[0] - (cur[0] + dx / dn * t)
+        ry = b[1] - (cur[1] + dy / dn * t)
+        rz = b[2] - (cur[2] + dz / dn * t)
+        for j in range(m):
+            f = (j + 1) / (m + 1)
+            out[j, 0] += rx * f
+            out[j, 1] += ry * f
+            out[j, 2] += rz * f
+    return out
 
 
 def _bridge(
@@ -100,5 +178,11 @@ def coil_start(
     for a, b in zip(anchors[:-1], anchors[1:], strict=True):
         if b - a < 2:
             continue
-        out[a + 1 : b] = _bridge(out[a], out[b], d[a:b], r_avoid, rng, rule)
+        if rule == "compact":
+            # Every bead takes all of its draws under this rule, so they can be drawn at once
+            # in the order the loop would have drawn them, and the walk runs compiled.
+            normals = rng.normal(size=(b - a - 1, _DRAWS, 3))
+            out[a + 1 : b] = _bridge_compact_nb(out[a], out[b], d[a:b], float(r_avoid), normals)
+        else:
+            out[a + 1 : b] = _bridge(out[a], out[b], d[a:b], r_avoid, rng, rule)
     return out.astype(np.float32)
