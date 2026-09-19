@@ -173,6 +173,19 @@ is of three kinds.
   structures, and could only feed us input. Survey: "Machine and deep learning methods for
   predicting 3D genome organization", <https://arxiv.org/abs/2403.03231>.
 
+## The acceptance profile, measured 2026-09-19
+
+`playground/accept_profile.py` on GM12878 chr1:1-8 Mb, five blocks of 48 to 2,011 beads, the
+numba kernel from each block's own seed, 186 rounds of 50,000 proposals. Share of rounds by
+acceptance: 0.35 under 0.1 percent, 0.58 between 0.1 and 1 percent, 0.08 between 1 and 10
+percent, none above. Only the first round of a block accepts 5 to 8 percent; the median round
+of the two large blocks accepts 0.2 percent. A batch of `K` proposals from one state, first
+accepted kept, advances the chain about `K / (1 + pK)` steps at acceptance `p` for the cost of
+about one step on the latency bound kernel: at 0.2 percent that is 14x at `K` 16, 25x at 32,
+45x at 64, with the serial chain reproduced exactly. The stitch and relaxation ablation of the
+same day is in `design/validation-2026-09.md`; both passes are off at chromosome scope, so the
+gate before kernel work is passed.
+
 ## Where this leaves the plan
 
 **First, before any kernel work: measure the stitch and the relaxation at chromosome scope.**
