@@ -493,6 +493,7 @@ def add_contact_background(
     anchor_heatmap: F64Array | None,
     s: Settings,
     map_ratio: tuple[F64Array, BoolArray, BoolArray] | None = None,
+    block_of: I64Array | None = None,
 ) -> F64Array:
     """Hold an arcless anchor pair beyond the short range at the law's contact distance when
     its contact cell says it sits closer than the background. Returns a new matrix, or the
@@ -539,6 +540,9 @@ def add_contact_background(
         with np.errstate(divide="ignore"):
             dist = np.where(ratio > 0.0, bg * np.power(np.maximum(ratio, 1e-12), power), 0.0)
         far = (mat == -0.5) & (sep > float(s.background_range_bp))
+        if bool(s.contact_map_cross_only) and block_of is not None:
+            b = np.asarray(block_of)
+            far &= b[:, None] != b[None, :]
         eligible = far & sig & (dist < bg)
         if bool(s.contact_map_symmetric):
             eligible |= far & low & (dist > bg)
@@ -561,6 +565,7 @@ def calc_anchor_expected_distances(
     active_region: list[int],
     chr_: str,
     anchor_heatmap: F64Array | None = None,
+    block_of: I64Array | None = None,
 ) -> F64Array:
     """
     Build expected distance matrix for anchor-level active region.
@@ -617,7 +622,7 @@ def calc_anchor_expected_distances(
         if s.data_contact_map or chr_ in state.contact_maps
         else None
     )
-    return add_contact_background(mat, mids, anchor_heatmap, s, map_ratio)
+    return add_contact_background(mat, mids, anchor_heatmap, s, map_ratio, block_of)
 
 
 def subanchor_counts_per_arc(state: CoarseState, active_region: list[int]) -> list[int]:

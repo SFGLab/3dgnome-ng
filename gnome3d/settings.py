@@ -53,6 +53,7 @@ class Settings:
     contact_map_pool: int
     contact_map_symmetric: bool
     contact_map_strength: float
+    contact_map_cross_only: bool
     data_phasing_track: str
 
     # ---- template ----
@@ -432,6 +433,7 @@ class Settings:
         self.contact_map_symmetric = (
             False  # also hold pairs significantly under expected, farther out
         )
+        self.contact_map_cross_only = False  # hold only pairs in different blocks
         self.spring_squeeze_arcs = 1.0
         # Chain bonds in the arcs MC. Consecutive anchors with no arc between them get a
         # spring at genomic_length_to_distance of their gap, so an island of anchors joined
@@ -816,6 +818,9 @@ class Settings:
         self.contact_map_pool = geti("springs", "contact_map_pool", self.contact_map_pool)
         self.contact_map_strength = getf(
             "springs", "contact_map_strength", self.contact_map_strength
+        )
+        self.contact_map_cross_only = getb(
+            "springs", "contact_map_cross_only", self.contact_map_cross_only
         )
         self.contact_map_symmetric = getb(
             "springs", "contact_map_symmetric", self.contact_map_symmetric
