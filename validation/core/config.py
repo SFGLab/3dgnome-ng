@@ -213,11 +213,13 @@ CANONICAL: dict[str, dict[str, object]] = {
         "apply_to_ib": "yes",
         "packing_factor_ib": 0.75,
     },
-    "boundary_stitch": {"use_boundary_stitch": "yes"},
+    # Both end passes are off at chromosome scope, measured null on Hi-C and the stitch a tenth
+    # of Rg on 2026-09-19; at block scope they are what places one block against the next.
+    "boundary_stitch": {"use_boundary_stitch": "no"},
     # Excluded volume across blocks, so the stitched globules cannot interpenetrate. Without it
     # nothing acts between the beads of two blocks once the stitch has moved them together.
     "relax": {
-        "use_cross_block_relax": "yes",
+        "use_cross_block_relax": "no",
         # Only the beads touching another block move, plus one chain neighbour either side.
         # With every subanchor movable the pass took an hour and fifty five minutes per
         # structure on a trio chr1 whatever the workload, and the last trio array timed out at

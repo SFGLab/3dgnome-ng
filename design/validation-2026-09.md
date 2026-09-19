@@ -152,7 +152,7 @@ was built for. What the stitch adds is a tenth of Rg, from its centroid excluded
 every block pair, and cross block overlaps, 40 per thousand with it and no relaxation against
 23 with neither, which the relaxation then removes. With the stitch off the relaxation moves
 the cross block count from 23 to 21. Both passes are null on the data and one of them inflates.
-Decision pending: delete both.
+Decision 2026-09-19: both off in production at chromosome scope, both kept for block scope, where a chromosome too large for one joint solve still needs a pass that places one block against the next.
 
 ## Expression, genome wide
 

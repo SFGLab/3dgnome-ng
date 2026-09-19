@@ -244,7 +244,7 @@ pairs realise at that separation, with a soft excluded volume between block cent
 
 | key | type | default | production | what it does |
 | --- | --- | --- | --- | --- |
-| `use_boundary_stitch` | bool | no | yes | Master switch. |
+| `use_boundary_stitch` | bool | no | no | Master switch. On at block scope, where it places one block against the next. Off at chromosome scope, where the joint solve already does and the pass only inflates Rg by a tenth. |
 | `spring_weight` | float | 1.0 | 1.0 | Weight of the boundary springs. |
 | `ev_weight` | float | 1.0 | 1.0 | Weight of the centroid excluded volume. |
 | `max_iter` | int | 2000 | 2000 | L-BFGS-B iterations. The energy carries its own gradient, so an iteration is one evaluation. 500 leaves a chromosome unconverged. 2000 converges a 1,494 block chromosome in 85 seconds. |
@@ -257,7 +257,7 @@ other while the arcs and the stitch are kept.
 
 | key | type | default | production | what it does |
 | --- | --- | --- | --- | --- |
-| `use_cross_block_relax` | bool | no | yes | Master switch. |
+| `use_cross_block_relax` | bool | no | no | Master switch. On at block scope with the stitch, whose rigid moves it cleans up after. Off at chromosome scope, where it moves the cross block count from 23 to 21 per thousand. |
 | `ev_weight` | float | 10.0 | 10.0 | Excluded volume weight for the pass. |
 | `ev_radius` | float | 0.0 | 0.0 | Excluded volume radius. 0 uses 1.5 chain bonds, so nothing is left under one bond where contacts are counted. |
 | `temp` | float | 0.1 | 0.1 | Starting temperature as a fraction of the smooth stage's `max_temp`. Untangling needs a bead to cross a neighbour's shell, and a greedy pass stalls. |

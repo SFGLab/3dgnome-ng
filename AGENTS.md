@@ -747,7 +747,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: 3dgnome is CPU-only and single-process.
 
-- **Boundary stitch: `[boundary_stitch] use_boundary_stitch = yes`, default no.**
+- **Boundary stitch: `[boundary_stitch] use_boundary_stitch = yes`, default no, production no since 2026-09-19.** Off at chromosome scope, kept for block scope, see the relaxation entry.
   ([gnome3d/pipeline/stitch.py](gnome3d/pipeline/stitch.py))
   The per block chains place anchors only through their own block, so the last anchor of one
   block and the first anchor of the next have no term coupling them. Measured on GM12878
@@ -931,7 +931,13 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: the reference has no block layout pass at all.
 
-- **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no.**
+- **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no, production no since 2026-09-19.**
+  Both end passes were measured at chromosome scope on GM12878 chr1:1-60 Mb, three structures
+  per arm: Hi-C level on all four arms, the joint solve already holding boundary pairs at a
+  median of 1.03 times the curve and none over 2.34, the stitch adding a tenth of Rg through its
+  centroid excluded volume and 17 cross block overlaps per thousand that the relaxation then
+  removed. Both are kept, off, because a chromosome too large for one joint solve is solved by
+  block, and there they are what places one block against the next. `design/validation-2026-09.md`.
   ([gnome3d/pipeline/relax.py](gnome3d/pipeline/relax.py))
   The smooth stage's excluded volume acts within one block and the stitch guards block
   centroids only, so once blocks are stitched together nothing acts between their beads and two
