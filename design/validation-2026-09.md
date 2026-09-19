@@ -138,9 +138,29 @@ pair only ever pulls in, since a pair under expected keeps the repulsion, so Rg 
 20 percent whatever the threshold, the exponent sits under the fit until z 8, overlaps rise
 two to eight times and the saddle falls. Pairs held per band at z 12 run 55,000 under
 500 kb, 49,000 to 2 Mb, 35,000 to 10 Mb and 29,000 beyond. The long loops over 1 Mb added to
-the joint solve were a loss on their own and are dropped, see AGENTS.md. Next measured:
-`contact_map_symmetric`, holding pairs significantly under expected farther out, at z 8 and
-12, and the relaxation back on for the cross block overlaps.
+the joint solve were a loss on their own and are dropped, see AGENTS.md.
+
+`contact_map_symmetric` holds pairs significantly under expected farther out as well, at the
+same law. Three structures per arm, pooled:
+
+| arm | Pearson | Spearman | SCC | MultiMM | exponent | Rg | wb-sa | xb | saddle | eig r |
+|---|---|---|---|---|---|---|---|---|---|---|
+| z 8 symmetric | 0.313 | 0.136 | 0.401 | 0.652 | 0.369 | 19.9 | 212 | 104 | 0.91 | 0.04 |
+| z 12 symmetric | 0.313 | 0.138 | 0.400 | 0.663 | 0.372 | 20.3 | 165 | 79 | 1.07 | 0.12 |
+| z 8 symmetric, relaxation on | 0.315 | 0.138 | 0.390 | 0.665 | 0.358 | 20.0 | 184 | 42 | 1.15 | 0.13 |
+
+The symmetric form gives the Pearson gain back and keeps SCC at 0.40, and it does not
+restore Rg: beyond a few megabases the expectation is under a count, so a pair can never be
+significantly under it and the outward half holds nothing there. What compacts the
+chromosome is the tens of thousands of pairs held within blocks at 0.5 to 2 Mb, which pack
+each block's anchors closer and leave the coils less room, the within block overlaps
+doubling. The relaxation halves the cross block count and nothing else.
+
+Where this stands, 2026-09-19: the map source is a real gain on SCC, 0.37 to 0.39 or 0.40 on
+every arm, on Pearson when it may pull in, and it is the first arm to show a compartment
+eigenvector correlation above 0.1, but it pays with a fifth of Rg and two to five times the
+overlaps. Not production. It stays opt in with its measurements here until either the held
+target is made to conserve the block's size, or the overlaps are judged the lesser cost.
 
 ## Compartments
 
