@@ -406,8 +406,77 @@ def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int,
     return mat
 
 
+def anchor_map_ratio(
+    m: F64Array, bins: I64Array, z: float, pool: int
+) -> tuple[F64Array, BoolArray]:
+    """Observed over expected contact for every anchor pair read off a contact matrix, and
+    which pairs exceed the expectation by `z` Poisson standard deviations.
+
+    Parameters
+    ----------
+    m
+        Raw counts over one chromosome span, square, symmetric.
+    bins
+        The matrix bin holding each anchor's midpoint.
+    z
+        Significance in standard deviations of the expected count.
+    pool
+        Pixels pooled either side of a pair's pixel before the test, 0 for one pixel.
+    """
+    m = np.asarray(m, dtype=np.float64)
+    nb = m.shape[0]
+    if pool > 0:
+        pooled = np.zeros_like(m)
+        for di in range(-pool, pool + 1):
+            for dj in range(-pool, pool + 1):
+                pooled += np.roll(np.roll(m, di, axis=0), dj, axis=1)
+        m = pooled
+    # the expectation at each bin separation, the mean over the map at that separation
+    exp_by_d = np.zeros(nb, dtype=np.float64)
+    for k in range(nb):
+        diag = np.diagonal(m, k)
+        exp_by_d[k] = float(diag.mean()) if diag.size else 0.0
+    b = np.asarray(bins, dtype=np.int64)
+    obs = m[b[:, None], b[None, :]]
+    exp = exp_by_d[np.abs(b[:, None] - b[None, :])]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio = np.where(exp > 0.0, obs / np.maximum(exp, 1e-12), 0.0)
+    sig = (exp > 0.0) & (obs > exp + z * np.sqrt(exp))
+    np.fill_diagonal(ratio, 0.0)
+    np.fill_diagonal(sig, False)
+    return ratio, sig
+
+
+_CONTACT_MAP_CACHE: dict[tuple[str, str, int, int], tuple[F64Array, int]] = {}
+
+
+def contact_map_for(s: Settings, chr_: str, mids: list[int]) -> tuple[F64Array, BoolArray]:
+    """The anchor pair ratios and significance from `s.data_contact_map` for these anchors.
+
+    Reads the raw 25 kb matrix over the anchors' span once per chromosome span and caches it.
+    """
+    import cooler
+
+    binsize = 25_000
+    lo = (min(mids) // binsize) * binsize
+    hi = ((max(mids) // binsize) + 1) * binsize
+    key = (s.data_path(s.data_contact_map), chr_, lo, hi)
+    if key not in _CONTACT_MAP_CACHE:
+        clr = cooler.Cooler(f"{key[0]}::/resolutions/{binsize}")
+        m = clr.matrix(balance=False).fetch(f"{chr_}:{lo}-{hi}")
+        _CONTACT_MAP_CACHE[key] = (np.nan_to_num(np.asarray(m, dtype=np.float64)), lo)
+    m, lo = _CONTACT_MAP_CACHE[key]
+    bins = (np.asarray(mids, dtype=np.int64) - lo) // binsize
+    bins = np.clip(bins, 0, m.shape[0] - 1)
+    return anchor_map_ratio(m, bins, float(s.contact_map_z), int(s.contact_map_pool))
+
+
 def add_contact_background(
-    mat: F64Array, mids: list[int], anchor_heatmap: F64Array | None, s: Settings
+    mat: F64Array,
+    mids: list[int],
+    anchor_heatmap: F64Array | None,
+    s: Settings,
+    map_ratio: tuple[F64Array, BoolArray] | None = None,
 ) -> F64Array:
     """Hold an arcless anchor pair beyond the short range at the law's contact distance when
     its contact cell says it sits closer than the background. Returns a new matrix, or the
@@ -431,24 +500,34 @@ def add_contact_background(
         Contact counts between anchor pairs, or None.
     s
         The run's settings.
+    map_ratio
+        From `contact_map_for`: observed over expected per pair and which pairs are
+        significant. When given it replaces the binned singletons as the source, and a pair is
+        held only when significant, at the background times the ratio to the minus third.
     """
-    if (
-        not bool(s.use_contact_background)
-        or float(s.background_weight) <= 0.0
-        or anchor_heatmap is None
-    ):
+    if not bool(s.use_contact_background) or float(s.background_weight) <= 0.0:
+        return mat
+    if map_ratio is None and anchor_heatmap is None:
         return mat
     n = len(mids)
-    heat = np.asarray(anchor_heatmap, dtype=np.float64)
-    if n < 2 or float(heat.max()) <= 0.0:
+    if n < 2:
         return mat
     pos = np.asarray(mids, dtype=np.float64)
-    dist, _avg = create_distance_heatmap(s, heat, n, separations_bp=pos)
-    dist = np.asarray(dist, dtype=np.float64)
     law = s.polymer_law()
     sep = np.abs(pos[:, None] - pos[None, :])
     bg = np.maximum(1.0, (sep / max(int(law.s0_bp), 1)) ** law.nu)  # law.background, arrayed
-    eligible = (mat == -0.5) & (sep > float(s.background_range_bp)) & (dist > 0.0) & (dist < bg)
+    if map_ratio is not None:
+        ratio, sig = map_ratio
+        with np.errstate(divide="ignore"):
+            dist = np.where(ratio > 0.0, bg * np.power(np.maximum(ratio, 1e-12), -1.0 / 3.0), 0.0)
+        eligible = (mat == -0.5) & (sep > float(s.background_range_bp)) & sig & (dist < bg)
+    else:
+        heat = np.asarray(anchor_heatmap, dtype=np.float64)
+        if float(heat.max()) <= 0.0:
+            return mat
+        dist, _avg = create_distance_heatmap(s, heat, n, separations_bp=pos)
+        dist = np.asarray(dist, dtype=np.float64)
+        eligible = (mat == -0.5) & (sep > float(s.background_range_bp)) & (dist > 0.0) & (dist < bg)
     if not eligible.any():
         return mat
     out = np.array(mat, dtype=np.float64, copy=True)
@@ -512,7 +591,8 @@ def calc_anchor_expected_distances(
                     mat[i, j] *= 1.0 - s_val
                     mat[j, i] = mat[i, j]
 
-    return add_contact_background(mat, mids, anchor_heatmap, s)
+    map_ratio = contact_map_for(s, chr_, mids) if s.data_contact_map else None
+    return add_contact_background(mat, mids, anchor_heatmap, s, map_ratio)
 
 
 def subanchor_counts_per_arc(state: CoarseState, active_region: list[int]) -> list[int]:

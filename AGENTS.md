@@ -945,6 +945,19 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   25 kb pixels, so even a dense map reaches only about 4 percent of the far pairs through
   the singletons; a denser anchor level map is a data path change and is not built.
 
+  **The map itself as the source, opt in, under measurement since 2026-09-19: `[data]
+  contact_map`, an mcool, with `[springs] contact_map_z` (3.0) and `contact_map_pool` (0).**
+  ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `anchor_map_ratio`,
+  `contact_map_for`) Measured on GM12878 chr1:1-60 Mb against the deep map: the run's singletons
+  are thinned 230 fold and binned to anchors that hold few bin centres, so they hold no pair
+  beyond 100 kb, while the raw 25 kb map has 70 million contacts in the window and a quarter of
+  the 0.5 to 2 Mb anchor pairs and a tenth of the 2 to 10 Mb pairs sit three Poisson standard
+  deviations over the expectation at their separation, 37 and 29 percent with 3 by 3 pooling.
+  With the key set the background reads each anchor pair's pixel from the map, the expectation
+  from the same map's diagonals, and holds a pair only when it clears `contact_map_z`, since
+  half of all pairs sit over the mean by chance; the singletons keep every other use. Needs
+  cooler. Unit checks in `harness/test_contact_map.py`.
+
   Why not in the reference: the reference scales arc targets by the anchor heatmap and has no
   term on an arcless pair beyond its 1/d.
 

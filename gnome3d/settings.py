@@ -48,6 +48,9 @@ class Settings:
     data_segment_split: str
     ib_refine_scope: str
     data_compartments: str
+    data_contact_map: str
+    contact_map_z: float
+    contact_map_pool: int
     data_phasing_track: str
 
     # ---- template ----
@@ -366,6 +369,7 @@ class Settings:
         # threefold, so it needs its own EV and confinement tuning.
         self.ib_refine_scope = "segment"
         self.data_compartments = ""
+        self.data_contact_map = ""  # an mcool; the anchor level map for the contact background
         self.data_phasing_track = ""
 
         # ---- motif orientation ----
@@ -416,6 +420,10 @@ class Settings:
         # dimensions; a band of it can. See [[project_polymer_law]].
         self.background_weight = 0.0
         self.background_range_bp = 100_000
+        self.contact_map_z = (
+            3.0  # a pair is held from the map when its count is this many sigma over expected
+        )
+        self.contact_map_pool = 0  # pixels pooled either side of a pair's pixel, 0 for one pixel
         self.spring_squeeze_arcs = 1.0
         # Chain bonds in the arcs MC. Consecutive anchors with no arc between them get a
         # spring at genomic_length_to_distance of their gap, so an island of anchors joined
@@ -775,6 +783,7 @@ class Settings:
         self.data_segment_split = gets("data", "segment_split", self.data_segment_split)
         self.ib_refine_scope = gets("simulation_ib", "refine_scope", self.ib_refine_scope)
         self.data_compartments = gets("data", "compartments", self.data_compartments)
+        self.data_contact_map = gets("data", "contact_map", self.data_contact_map)
         self.data_phasing_track = gets("data", "phasing_track", self.data_phasing_track)
 
         # [template]
@@ -795,6 +804,8 @@ class Settings:
             "springs", "stretch_constant_arcs", self.spring_stretch_arcs
         )
         self.background_weight = getf("springs", "background_weight", self.background_weight)
+        self.contact_map_z = getf("springs", "contact_map_z", self.contact_map_z)
+        self.contact_map_pool = geti("springs", "contact_map_pool", self.contact_map_pool)
         self.background_range_bp = geti("springs", "background_range_bp", self.background_range_bp)
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs

@@ -54,6 +54,7 @@ Filenames are relative to `data_dir` unless absolute. The region string is `chr:
 | `segment_split` | str |  | BED of segment boundary breakpoints. |
 | `compartments` | str |  | bedGraph of a signed compartment eigenvector or a CALDER BED, for `[compartments]`. |
 | `phasing_track` | str |  | Track used to fix the eigenvector's arbitrary sign. Required with `compartments`. |
+| `contact_map` | str |  | An mcool. When set, the contact background reads each anchor pair's pixel from this map at 25 kb instead of the binned singletons, which are thinned and reach almost no pair beyond 100 kb. Needs cooler. |
 
 ## [distance]
 
@@ -86,6 +87,8 @@ is too far and the squeeze constant when too close.
 | `squeeze_constant_arcs` | float | 1.0 | 1.0 | Arcs stage. |
 | `background_weight` | float | 0.0 | 0.1 | A weak spring holding an arcless anchor pair inside `background_range_bp` at the background for its separation, in the arcs stage. Zero is off and every other arcless pair keeps the repulsion. |
 | `background_range_bp` | int | 100000 | 100000 | The separation under which an arcless pair is held at the background. Beyond it the pair keeps the repulsion, since a power law distance matrix cannot be embedded in three dimensions over every pair, only over a band. |
+| `contact_map_z` | float | 3.0 | 3.0 | With `contact_map`, a pair is held only when its count exceeds the expectation at its separation by this many Poisson standard deviations, so the held set is signal rather than the half of all pairs that sit over the mean by chance. |
+| `contact_map_pool` | int | 0 | 0 | With `contact_map`, pixels pooled either side of a pair's pixel before the test; 1 pools 3 by 3. |
 | `use_contact_background` | bool | no | yes | Beyond that range, hold an arcless pair whose contact cell puts it closer than the background at the law's contact distance, with the same spring. A pair at or below its expected contact keeps the repulsion, so the held set stays sparse, and on a thin map it holds next to nothing, which is allowed. Needs `use_anchor_heatmap`. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
