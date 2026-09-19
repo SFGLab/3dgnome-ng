@@ -47,7 +47,8 @@ Filenames are relative to `data_dir` unless absolute. The region string is `chr:
 | --- | --- | --- | --- |
 | `data_dir` | str |  | Directory the other filenames resolve against. The CLI's `--data-dir` overrides it. |
 | `anchors` | str |  | BED of loop anchors, `chr start end orientation`. |
-| `clusters` | str |  | BEDPE of PET clusters, the arcs, `chr1 s1 e1 chr2 s2 e2 score`. |
+| `clusters` | str |  | BEDPE of PET clusters, the arcs, `chr1 s1 e1 chr2 s2 e2 score`. One path, or several comma separated, one per loop factor; the first is the CTCF set. |
+| `factors` | str |  | One name per cluster file, comma separated, CTCF first. Empty names the single file CTCF. Every factor's PET counts are read against its own strength fit and only factor 0's loops enter the orientation term. |
 | `singletons` | str |  | BEDPE of singleton contacts for the segment level heatmap. A Hi-C bin pair file works here too. |
 | `singletons_inter` | str |  | A second singletons file appended for multi chromosome runs only. |
 | `centromeres` | str |  | BED of centromere positions. |

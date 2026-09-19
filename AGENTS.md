@@ -455,6 +455,22 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
 ### Algorithm divergences
 
+- **Loops of more than one factor: `[data] clusters` takes several files, `[data] factors`
+  names them, the first is CTCF.** ([io.load_arcs](gnome3d/io.py),
+  [data.fit_arc_strengths](gnome3d/data.py), [polymer.PolymerLaw.arc_distance](gnome3d/polymer.py),
+  [skeleton.py](gnome3d/skeleton.py)) Every arc carries the index of its file. Each factor gets
+  its own strength fit, so a second library's PET counts are read against its own typical
+  count at each span rather than the first's, and the target matrix converts each arc under
+  its factor's fit. The orientation term reads factor 0's loops alone, since a loop held by
+  anything but CTCF has no motif orientation. One file keeps the arc order it was read in,
+  byte identical by the parity gate. Built 2026-09-19 for RNAPII ChIA-PET as a second factor,
+  `design/rnapii-loops.md`. Unit checks in `harness/test_factors.py`.
+
+  Why not in the reference: the reference declares `[data] factors` and, for an anchor pair
+  carried by more than one factor, writes a summary arc with `eff_score` zero
+  (`InteractionArcs.cpp:98-141`); it fits no strength per factor and its orientation term
+  reads every arc.
+
 - **IB placement scope: `[simulation_ib] refine_scope = segment | chromosome`, default `segment`.**
   `segment` is the prior behaviour: each segment's blocks are refined as a separate chain and any
   segment holding one block or fewer is skipped, so segment grouping decides which blocks get

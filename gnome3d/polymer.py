@@ -14,7 +14,7 @@ See [[project_unified_arc_target]] for why the arcs stage needed this, and
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -225,6 +225,7 @@ class PolymerLaw:
     s0_bp: int
     q_half: float = 1.0
     arcs: ArcStrengthFit | None = None
+    arcs_by_factor: dict[int, ArcStrengthFit] = field(default_factory=dict)
 
     def background(self, sep_bp: int) -> float:
         """The distance two beads that far apart hold with nothing between them. Never under one
@@ -256,10 +257,12 @@ class PolymerLaw:
         h = 1.0 / (1.0 + max(q, 0.0) / max(self.q_half, 1e-9))
         return 1.0 + (bg - 1.0) * h
 
-    def arc_distance(self, score: int, sep_bp: int) -> float:
-        """The target for an arc of `score` PETs spanning `sep_bp`."""
+    def arc_distance(self, score: int, sep_bp: int, factor: int = 0) -> float:
+        """The target for an arc of `score` PETs spanning `sep_bp`, the count read against the
+        strength fit of its factor, or factor 0's when that factor has none."""
         span = abs(int(sep_bp))
-        q = self.arcs.strength(score, span) if self.arcs is not None else float(score)
+        fit = self.arcs_by_factor.get(factor, self.arcs)
+        q = fit.strength(score, span) if fit is not None else float(score)
         return self.contact_distance(span, q)
 
     def heatmap_distance(self, freq: float, expected: float, sep_bp: int) -> float:

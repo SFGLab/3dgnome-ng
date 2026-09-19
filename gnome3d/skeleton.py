@@ -295,6 +295,9 @@ def seed_for_ib(
                 if arc_local >= len(chr_arcs):
                     continue
                 arc = chr_arcs[arc_local]
+                if arc.factor != 0:
+                    # The motif term is CTCF's; a loop of another factor has no orientation.
+                    continue
                 other_ci = arc.end if arc.start == ci else arc.start
                 if other_ci in cluster_to_k:
                     anchor_neighbors[k].append(cluster_to_k[other_ci])

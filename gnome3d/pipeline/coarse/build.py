@@ -135,6 +135,7 @@ def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
         s0_bp=int(settings.target_bp_per_subanchor),
         q_half=float(settings.contact_half_saturation),
         arcs=arcs,
+        arcs_by_factor=dict(data.arc_fits),
     )
 
 
@@ -372,7 +373,9 @@ def add_long_pet_to_segment_heatmap(
         LOG.info("long-PET folded into segment heatmap: %d arcs", n_added)
 
 
-def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int, int]]) -> F64Array:
+def arc_expected_matrix(
+    s: Settings, mids: list[int], arcs: list[tuple[int, int, int] | tuple[int, int, int, int]]
+) -> F64Array:
     """The arc target matrix for one active region.
 
     An arc pair carries `Settings.arc_expected_distance` of its PET count and span, positive.
@@ -387,7 +390,7 @@ def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int,
     mids
         Genomic midpoint in bp per anchor, in active region order.
     arcs
-        (i, j, score) per arc in active region indices.
+        (i, j, score) or (i, j, score, factor) per arc in active region indices.
     """
     n = len(mids)
     mat: F64Array = np.full((n, n), -0.5, dtype=np.float64)
@@ -399,8 +402,10 @@ def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int,
         for i, j in zip(*np.nonzero((sep > 0.0) & (sep < rng)), strict=True):
             mat[i, j] = -law.background(int(sep[i, j]))
     np.fill_diagonal(mat, 0.0)
-    for i, j, score in arcs:
-        exp_d = s.arc_expected_distance(score, mids[j] - mids[i])
+    for arc in arcs:
+        i, j, score = arc[0], arc[1], arc[2]
+        factor = arc[3] if len(arc) > 3 else 0
+        exp_d = s.arc_expected_distance(score, mids[j] - mids[i], factor)
         mat[i, j] = exp_d
         mat[j, i] = exp_d
     return mat
@@ -481,7 +486,7 @@ def calc_anchor_expected_distances(
     cluster_to_active = {ci: ai for ai, ci in enumerate(active_region)}
     chr_arcs = state.arcs.get(chr_, [])
 
-    arcs: list[tuple[int, int, int]] = []
+    arcs: list[tuple[int, int, int] | tuple[int, int, int, int]] = []
     for ai, ci in enumerate(active_region):
         for arc_local in clusters[ci].arcs:
             if arc_local >= len(chr_arcs):
@@ -492,7 +497,7 @@ def calc_anchor_expected_distances(
             if other < ci or other not in cluster_to_active:
                 continue
 
-            arcs.append((ai, cluster_to_active[other], int(arc.score)))
+            arcs.append((ai, cluster_to_active[other], int(arc.score), int(arc.factor)))
     mids = [int(clusters[ci].genomic_pos) for ci in active_region]
     mat = arc_expected_matrix(s, mids, arcs)
 

@@ -70,6 +70,8 @@ class ContactData:
     # small region can still supply an exponent.
     contact_fit: ContactFit | None = None
     arc_fit: ArcStrengthFit | None = None
+    # One strength fit per factor, keyed by the cluster file's index; `arc_fit` is factor 0's.
+    arc_fits: dict[int, ArcStrengthFit] = field(default_factory=dict)
     # Long-range arcs (gap > max_pet_length): not anchor-mapped, folded into the
     # segment heatmap by Solver. Mirrors Reference InteractionArcs::long_arcs.
     long_arcs: RawArcMap = field(default_factory=empty_raw_arc_map)
@@ -103,9 +105,19 @@ class ContactData:
         anchors = load_anchors(s.data_path(s.data_anchors), chr_set, region)
 
         LOG.info("load arcs")
-        raw_arcs, long_arcs = load_arcs(
-            s.data_path(s.data_pet_clusters), chr_set, region, s.max_pet_length
-        )
+        raw_arcs: RawArcMap = {}
+        long_arcs: RawArcMap = {}
+        for path, factor, name in s.cluster_files():
+            raw_f, long_f = load_arcs(path, chr_set, region, s.max_pet_length, factor)
+            LOG.info("arcs of factor %d (%s): %d chromosomes", factor, name, len(raw_f))
+            for c, lst in raw_f.items():
+                raw_arcs.setdefault(c, []).extend(lst)
+            for c, lst in long_f.items():
+                long_arcs.setdefault(c, []).extend(lst)
+        if len(s.cluster_files()) > 1:
+            # A stable sort by start merges the files; one file keeps the order it was read in.
+            for lst in raw_arcs.values():
+                lst.sort(key=lambda a: a.start)
 
         with log.step(LOG, "mark arcs"):
             arcs = mark_arcs(anchors, raw_arcs)
@@ -121,7 +133,7 @@ class ContactData:
         # a band to read a decay off.
         singletons = load_singletons(s.data_path(s.data_singletons), chr_set, None)
         contact_fit = fit_contact_exponent(singletons)
-        arc_fit = fit_arc_strength([a for al in arcs.values() for a in al])
+        arc_fits = fit_arc_strengths(arcs)
         singletons = filter_singletons(singletons, region)
 
         # Optional second file for inter-chromosomal singletons (matches the
@@ -151,7 +163,8 @@ class ContactData:
             breakpoints=breakpoints,
             singletons=singletons,
             contact_fit=contact_fit,
-            arc_fit=arc_fit,
+            arc_fit=arc_fits.get(0),
+            arc_fits=arc_fits,
             long_arcs=long_arcs,
             compartments=compartments,
         )
@@ -224,7 +237,8 @@ class ContactData:
                 posa, posb = posb, posa
             if region is not None and not (region.contains(posa) and region.contains(posb)):
                 continue
-            arc = RawArc(posa, posb, float(row["score"]))
+            factor = int(row["factor"]) if "factor" in row.index else 0
+            arc = RawArc(posa, posb, float(row["score"]), factor)
             if posb - posa > max_pet_length:
                 long_arcs.setdefault(ca, []).append(arc)
                 continue
@@ -264,14 +278,15 @@ class ContactData:
         compartments = _finalize_tracks(compartments, phasing, anchors)
 
         contact_fit = fit_contact_exponent(singletons)
-        arc_fit = fit_arc_strength([a for al in arcs.values() for a in al])
+        arc_fits = fit_arc_strengths(arcs)
         return cls(
             anchors=anchors,
             arcs=arcs,
             breakpoints=breakpoints,
             singletons=singletons,
             contact_fit=contact_fit,
-            arc_fit=arc_fit,
+            arc_fit=arc_fits.get(0),
+            arc_fits=arc_fits,
             long_arcs=long_arcs,
             compartments=compartments,
         )
@@ -346,6 +361,17 @@ def _signal_from_df(df: Any, chr_set: set[str], region: BedRegion | None) -> Sig
 
 
 # map RawArcs -> anchor-indexed InteractionArcs
+
+
+def fit_arc_strengths(arcs: ArcMap) -> dict[int, ArcStrengthFit]:
+    """One strength fit per factor over a run's arcs, so a second library's PET counts are
+    read against its own typical count at each span rather than the first's."""
+    by_factor: dict[int, list[InteractionArc]] = {}
+    for lst in arcs.values():
+        for a in lst:
+            if a.factor >= 0:
+                by_factor.setdefault(a.factor, []).append(a)
+    return {f: fit_arc_strength(lst) for f, lst in sorted(by_factor.items())}
 
 
 def mark_arcs(
@@ -441,7 +467,7 @@ def mark_arcs(
                 end=end,
                 score=int(raw.score),
                 eff_score=0,
-                factor=0,
+                factor=int(raw.factor),
                 genomic_start=raw.start,
                 genomic_end=raw.end,
             )

@@ -42,6 +42,7 @@ class Settings:
     data_dir: str
     data_anchors: str
     data_pet_clusters: str
+    data_factors: str
     data_singletons: str
     data_singletons_inter: str
     data_centromeres: str
@@ -353,6 +354,7 @@ class Settings:
         self.data_dir = ""
         self.data_anchors = ""
         self.data_pet_clusters = ""
+        self.data_factors = ""  # one name per cluster file, comma separated; CTCF when empty
         self.data_singletons = ""
         self.data_singletons_inter = ""
         self.data_centromeres = ""
@@ -769,6 +771,7 @@ class Settings:
         self.data_dir = gets("data", "data_dir", self.data_dir)
         self.data_anchors = gets("data", "anchors", self.data_anchors)
         self.data_pet_clusters = gets("data", "clusters", self.data_pet_clusters)
+        self.data_factors = gets("data", "factors", self.data_factors)
         self.data_singletons = gets("data", "singletons", self.data_singletons)
         self.data_singletons_inter = gets("data", "singletons_inter", self.data_singletons_inter)
         self.data_centromeres = gets("data", "centromeres", self.data_centromeres)
@@ -1210,13 +1213,28 @@ class Settings:
             )
         return self.polymer
 
+    def cluster_files(self) -> list[tuple[str, int, str]]:
+        """The cluster files as (path, factor index, factor name). `[data] clusters` holds one
+        or more paths, comma separated, and `factors` one name each; the first is the CTCF set,
+        which is the one the orientation term reads, so factor 0 is CTCF by convention."""
+        paths = [p.strip() for p in str(self.data_pet_clusters).split(",") if p.strip()]
+        names = [n.strip() for n in str(self.data_factors).split(",") if n.strip()]
+        if names and len(names) != len(paths):
+            raise ValueError(
+                f"[data] factors names {len(names)} sets for {len(paths)} cluster files"
+            )
+        if not names:
+            names = ["CTCF"] + [f"factor{i}" for i in range(1, len(paths))]
+        return [(self.data_path(p), i, names[i]) for i, p in enumerate(paths)]
+
     def genomic_length_to_distance(self, length_bp: int) -> float:
         """The distance two beads that far apart hold with nothing between them, in beads."""
         return self.polymer_law().background(length_bp)
 
-    def arc_expected_distance(self, score: int, sep_bp: int) -> float:
-        """The target for an arc of `score` PETs spanning `sep_bp`, in beads."""
-        return self.polymer_law().arc_distance(score, sep_bp)
+    def arc_expected_distance(self, score: int, sep_bp: int, factor: int = 0) -> float:
+        """The target for an arc of `score` PETs spanning `sep_bp`, in beads, the count read
+        against the strength fit of the arc's own factor."""
+        return self.polymer_law().arc_distance(score, sep_bp, factor)
 
     def data_path(self, filename: str) -> str:
         """Resolve a data filename relative to data_dir."""

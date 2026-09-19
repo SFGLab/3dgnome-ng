@@ -149,9 +149,11 @@ def load_arcs(
     chr_set: set[str],
     region: BedRegion | None = None,
     max_pet_length: int = 1_000_000,
+    factor: int = 0,
 ) -> tuple[RawArcMap, RawArcMap]:
     """
     Load PET cluster BEDPE file.  Format: chr_a start_a end_a chr_b start_b end_b score
+    Every arc carries `factor`, the index of the cluster file it came from.
 
     Returns (raw, long_arcs) where:
       raw       : dict[chr -> list[RawArc]], sorted by start, intra only
@@ -194,7 +196,7 @@ def load_arcs(
                 if not (region.contains(posa) and region.contains(posb)):
                     continue
 
-            arc = RawArc(posa, posb, score)
+            arc = RawArc(posa, posb, score, factor)
 
             if posb - posa > max_pet_length:
                 long_cnt += 1
