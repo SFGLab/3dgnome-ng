@@ -89,6 +89,7 @@ is too far and the squeeze constant when too close.
 | `background_range_bp` | int | 100000 | 100000 | The separation under which an arcless pair is held at the background. Beyond it the pair keeps the repulsion, since a power law distance matrix cannot be embedded in three dimensions over every pair, only over a band. |
 | `contact_map_z` | float | 3.0 | 3.0 | With `contact_map`, a pair is held only when its count exceeds the expectation at its separation by this many Poisson standard deviations, so the held set is signal rather than the half of all pairs that sit over the mean by chance. |
 | `contact_map_pool` | int | 0 | 0 | With `contact_map`, pixels pooled either side of a pair's pixel before the test; 1 pools 3 by 3. |
+| `contact_map_symmetric` | bool | no | no | With `contact_map`, also hold a pair whose count falls that many standard deviations under the expectation, at the background scaled out by the same law, so the held set pulls in and pushes out alike instead of only pulling in. |
 | `use_contact_background` | bool | no | yes | Beyond that range, hold an arcless pair whose contact cell puts it closer than the background at the law's contact distance, with the same spring. A pair at or below its expected contact keeps the repulsion, so the held set stays sparse, and on a thin map it holds next to nothing, which is allowed. Needs `use_anchor_heatmap`. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |

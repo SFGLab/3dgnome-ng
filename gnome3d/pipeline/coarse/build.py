@@ -411,9 +411,10 @@ def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int,
 
 def anchor_map_ratio(
     m: F64Array, bins: I64Array, z: float, pool: int
-) -> tuple[F64Array, BoolArray]:
-    """Observed over expected contact for every anchor pair read off a contact matrix, and
-    which pairs exceed the expectation by `z` Poisson standard deviations.
+) -> tuple[F64Array, BoolArray, BoolArray]:
+    """Observed over expected contact for every anchor pair read off a contact matrix, which
+    pairs exceed the expectation by `z` Poisson standard deviations, and which fall under it
+    by as much.
 
     Parameters
     ----------
@@ -445,9 +446,11 @@ def anchor_map_ratio(
     with np.errstate(divide="ignore", invalid="ignore"):
         ratio = np.where(exp > 0.0, obs / np.maximum(exp, 1e-12), 0.0)
     sig = (exp > 0.0) & (obs > exp + z * np.sqrt(exp))
+    low = (exp > 0.0) & (obs < exp - z * np.sqrt(exp))
     np.fill_diagonal(ratio, 0.0)
     np.fill_diagonal(sig, False)
-    return ratio, sig
+    np.fill_diagonal(low, False)
+    return ratio, sig, low
 
 
 _CONTACT_MAP_CACHE: dict[tuple[str, str, int, int], tuple[F64Array, int]] = {}
@@ -458,7 +461,7 @@ def contact_map_for(
     chr_: str,
     mids: list[int],
     given: dict[str, tuple[F64Array, int, int]] | None = None,
-) -> tuple[F64Array, BoolArray]:
+) -> tuple[F64Array, BoolArray, BoolArray]:
     """The anchor pair ratios and significance for these anchors, from a matrix supplied in
     memory in `given` when the chromosome is there, else from `s.data_contact_map`.
 
@@ -489,7 +492,7 @@ def add_contact_background(
     mids: list[int],
     anchor_heatmap: F64Array | None,
     s: Settings,
-    map_ratio: tuple[F64Array, BoolArray] | None = None,
+    map_ratio: tuple[F64Array, BoolArray, BoolArray] | None = None,
 ) -> F64Array:
     """Hold an arcless anchor pair beyond the short range at the law's contact distance when
     its contact cell says it sits closer than the background. Returns a new matrix, or the
@@ -514,9 +517,10 @@ def add_contact_background(
     s
         The run's settings.
     map_ratio
-        From `contact_map_for`: observed over expected per pair and which pairs are
-        significant. When given it replaces the binned singletons as the source, and a pair is
-        held only when significant, at the background times the ratio to the minus third.
+        From `contact_map_for`: observed over expected per pair, which pairs are significantly
+        over the expectation and which significantly under. When given it replaces the binned
+        singletons as the source, and a pair is held only when significant, at the background
+        times the ratio to the minus third; the under pairs only with `contact_map_symmetric`.
     """
     if not bool(s.use_contact_background) or float(s.background_weight) <= 0.0:
         return mat
@@ -530,10 +534,13 @@ def add_contact_background(
     sep = np.abs(pos[:, None] - pos[None, :])
     bg = np.maximum(1.0, (sep / max(int(law.s0_bp), 1)) ** law.nu)  # law.background, arrayed
     if map_ratio is not None:
-        ratio, sig = map_ratio
+        ratio, sig, low = map_ratio
         with np.errstate(divide="ignore"):
             dist = np.where(ratio > 0.0, bg * np.power(np.maximum(ratio, 1e-12), -1.0 / 3.0), 0.0)
-        eligible = (mat == -0.5) & (sep > float(s.background_range_bp)) & sig & (dist < bg)
+        far = (mat == -0.5) & (sep > float(s.background_range_bp))
+        eligible = far & sig & (dist < bg)
+        if bool(s.contact_map_symmetric):
+            eligible |= far & low & (dist > bg)
     else:
         heat = np.asarray(anchor_heatmap, dtype=np.float64)
         if float(heat.max()) <= 0.0:

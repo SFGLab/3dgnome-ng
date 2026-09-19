@@ -51,6 +51,7 @@ class Settings:
     data_contact_map: str
     contact_map_z: float
     contact_map_pool: int
+    contact_map_symmetric: bool
     data_phasing_track: str
 
     # ---- template ----
@@ -424,6 +425,9 @@ class Settings:
             3.0  # a pair is held from the map when its count is this many sigma over expected
         )
         self.contact_map_pool = 0  # pixels pooled either side of a pair's pixel, 0 for one pixel
+        self.contact_map_symmetric = (
+            False  # also hold pairs significantly under expected, farther out
+        )
         self.spring_squeeze_arcs = 1.0
         # Chain bonds in the arcs MC. Consecutive anchors with no arc between them get a
         # spring at genomic_length_to_distance of their gap, so an island of anchors joined
@@ -806,6 +810,9 @@ class Settings:
         self.background_weight = getf("springs", "background_weight", self.background_weight)
         self.contact_map_z = getf("springs", "contact_map_z", self.contact_map_z)
         self.contact_map_pool = geti("springs", "contact_map_pool", self.contact_map_pool)
+        self.contact_map_symmetric = getb(
+            "springs", "contact_map_symmetric", self.contact_map_symmetric
+        )
         self.background_range_bp = geti("springs", "background_range_bp", self.background_range_bp)
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs

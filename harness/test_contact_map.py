@@ -40,7 +40,7 @@ def synthetic_map(nb: int = 200, seed: int = 0) -> np.ndarray:
 def test_ratio_and_significance() -> None:
     m = synthetic_map()
     bins = np.arange(0, 200, 5)  # forty anchors, one per five bins
-    ratio, sig = anchor_map_ratio(m, bins, z=3.0, pool=0)
+    ratio, sig, low = anchor_map_ratio(m, bins, z=3.0, pool=0)
     i, j = 4, 30  # bins 20 and 150
     check(
         "the planted contact is significant",
@@ -55,7 +55,7 @@ def test_ratio_and_significance() -> None:
         abs(float(np.median(ratio[far])) - 1.0) < 0.3,
         f"median {np.median(ratio[far]):.2f}",
     )
-    ratio_p, sig_p = anchor_map_ratio(m, bins, z=3.0, pool=1)
+    ratio_p, sig_p, _low_p = anchor_map_ratio(m, bins, z=3.0, pool=1)
     check("pooling keeps the planted contact", bool(sig_p[i, j]))
 
 
@@ -72,10 +72,13 @@ def test_background_from_map() -> None:
     mat[0, 1] = mat[1, 0] = 1.5  # an arc pair stays as it is
     ratio = np.ones((n, n))
     sig = np.zeros((n, n), dtype=bool)
+    low = np.zeros((n, n), dtype=bool)
+    ratio[3, 5] = ratio[5, 3] = 0.125
+    low[3, 5] = low[5, 3] = True
     ratio[1, 4] = ratio[4, 1] = 8.0
     sig[1, 4] = sig[4, 1] = True
     ratio[2, 5] = ratio[5, 2] = 8.0  # over expected but not significant: left alone
-    out = add_contact_background(mat, mids, None, s, (ratio, sig))
+    out = add_contact_background(mat, mids, None, s, (ratio, sig, low))
     law = s.polymer_law()
     sep = abs(mids[4] - mids[1])
     bg = max(1.0, (sep / law.s0_bp) ** law.nu)
@@ -87,6 +90,16 @@ def test_background_from_map() -> None:
     )
     check("an insignificant excess is left on the repulsion", out[2, 5] == -0.5)
     check("the arc pair is untouched", out[0, 1] == 1.5)
+    check("a pair under expected is left alone without the symmetric flag", out[3, 5] == -0.5)
+    s.contact_map_symmetric = True
+    out2 = add_contact_background(mat, mids, None, s, (ratio, sig, low))
+    sep35 = abs(mids[5] - mids[3])
+    bg35 = max(1.0, (sep35 / law.s0_bp) ** law.nu)
+    check(
+        "with it the pair is held out at the background scaled by the law",
+        abs(out2[3, 5] + bg35 * 0.125 ** (-1.0 / 3.0)) < 1e-9,
+        f"{out2[3, 5]:.3f} vs {-bg35 * 2:.3f}",
+    )
     check(
         "with no map and no heatmap the matrix is returned as is",
         add_contact_background(mat, mids, None, s) is mat,
