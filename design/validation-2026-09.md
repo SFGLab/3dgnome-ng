@@ -156,11 +156,23 @@ chromosome is the tens of thousands of pairs held within blocks at 0.5 to 2 Mb, 
 each block's anchors closer and leave the coils less room, the within block overlaps
 doubling. The relaxation halves the cross block count and nothing else.
 
-Where this stands, 2026-09-19: the map source is a real gain on SCC, 0.37 to 0.39 or 0.40 on
-every arm, on Pearson when it may pull in, and it is the first arm to show a compartment
-eigenvector correlation above 0.1, but it pays with a fifth of Rg and two to five times the
-overlaps. Not production. It stays opt in with its measurements here until either the held
-target is made to conserve the block's size, or the overlaps are judged the lesser cost.
+A weaker pull, `contact_map_strength` scaling how far under the background a pair is held,
+and the across block pairs alone, three structures per arm, pooled:
+
+| arm | Pearson | SCC | MultiMM | exponent | Rg | wb-sa | xb | saddle | eig r |
+|---|---|---|---|---|---|---|---|---|---|
+| z 3, pull 0.3 | 0.332 | 0.381 | 0.663 | 0.339 | 21.6 | 281 | 87 | 1.03 | 0.14 |
+| z 3, pull 0.1 | 0.329 | 0.375 | 0.663 | 0.338 | 22.2 | 250 | 77 | 0.91 | 0.19 |
+| z 12, pull 0.3 | 0.311 | 0.368 | 0.674 | 0.371 | 22.5 | 117 | 36 | 0.87 | 0.16 |
+| z 3, across blocks only | 0.329 | 0.376 | 0.616 | 0.335 | 19.1 | 351 | 152 | 1.34 | 0.10 |
+| z 12, across blocks only | 0.309 | 0.365 | 0.628 | 0.357 | 20.2 | 119 | 49 | 0.96 | 0.00 |
+
+Verdict, 2026-09-19: the gain and the cost leave together. At a tenth of the pull SCC is back
+at production with overlaps still 2.5 and 4 times higher; across blocks only, the shrinkage
+stays, MultiMM falls and the eigenvector signal goes, so the across block pairs carry the
+shrinkage and the within block pairs the correlation. No form keeps one without the other.
+The six keys are removed and this table is the record; a map source would need a held target
+that conserves a block's size, which is a modelling question, not a threshold.
 
 ## Compartments
 

@@ -76,9 +76,6 @@ class ContactData:
     # Epigenomic track driving the opt-in compartment energy term.  Empty when
     # no track is configured, which leaves the term inert.
     compartments: CompartmentMap = field(default_factory=empty_compartment_map)
-    # Raw contact matrices supplied in memory for the contact background, keyed by chromosome:
-    # (counts, start bp of the first bin, bin size). Consulted before `[data] contact_map`.
-    contact_maps: dict[str, tuple[F64Array, int, int]] = field(default_factory=dict)
 
     @classmethod
     def from_files(
@@ -171,7 +168,6 @@ class ContactData:
         max_pet_length: int = 1_000_000,
         compartments_df: Any | None = None,
         phasing_df: Any | None = None,
-        contact_maps: dict[str, tuple[F64Array, int, int]] | None = None,
     ) -> ContactData:
         """
         Build ContactData from pandas DataFrames.
@@ -198,9 +194,6 @@ class ContactData:
         phasing_df : DataFrame or None
             Columns: chr, start, end, value.  Used to orient a value-only
             compartment frame.
-        contact_maps : dict or None
-            Raw contact matrices per chromosome as (counts, first bin start bp, bin size), for
-            the contact background when no `[data] contact_map` file is used.
         """
         chr_set: set[str] = (
             set(chrs) if chrs is not None else {str(c) for c in anchors_df["chr"].unique()}
@@ -281,7 +274,6 @@ class ContactData:
             arc_fit=arc_fit,
             long_arcs=long_arcs,
             compartments=compartments,
-            contact_maps=dict(contact_maps or {}),
         )
 
 
