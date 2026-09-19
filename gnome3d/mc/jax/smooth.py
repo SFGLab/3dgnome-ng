@@ -38,6 +38,36 @@ LOG = log.get("mc.jax")
 _kernel_cache: dict[Any, Any] = {}
 
 
+GRID_BUCKETS: tuple[int, ...] = (8, 16, 24, 32, 48)
+
+
+def _grid_static(structs: list[tuple[np.ndarray[Any, Any], float]]) -> tuple[int, int]:
+    """Cells per axis and beads per cell for a launch, from its starting structures.
+
+    The grid is bucketed so a launch's compiled shape depends on the coarse size of what it
+    holds and not on every structure's extent. Cells are at least `r0` wide, wider when the
+    structure does not fit 48 cells across at that width. Capacity is three times the fullest
+    starting cell plus sixteen, rounded up to sixteen, since a cell filling past it is not
+    detected inside the kernel.
+    """
+    g_all = 0
+    cap = 0
+    for pos, r0 in structs:
+        if pos.shape[0] == 0:
+            continue
+        ext = float(np.max(pos.max(axis=0) - pos.min(axis=0)))
+        need = int(np.ceil(ext / max(r0, 1e-6))) + 3
+        g = next((b for b in GRID_BUCKETS if b >= need), GRID_BUCKETS[-1])
+        w = max(r0, ext / (g - 2)) * (1.0 + 1e-5)
+        lo = pos.min(axis=0) - w
+        c = np.clip(np.floor((pos - lo) / w).astype(np.int64), 0, g - 1)
+        lin = (c[:, 0] * g + c[:, 1]) * g + c[:, 2]
+        occ = int(np.bincount(lin).max())
+        g_all = max(g_all, g)
+        cap = max(cap, 3 * occ + 16)
+    return g_all, int(np.ceil(cap / 16.0) * 16)
+
+
 def _build_smooth_kernel(
     n_steps_per_batch: int,
     excl_skip: int,
@@ -48,8 +78,16 @@ def _build_smooth_kernel(
     use_wall: bool = False,
     use_cap: bool = False,
     prefetch: int = 1,
+    grid_g: int = 0,
+    grid_cap: int = 0,
 ) -> Any:
     """Build (or look up cached) compiled smooth-MC kernel.
+
+    `grid_g` above zero puts the excluded volume and the wall on a cell grid of that many cells
+    per axis, each cell holding up to `grid_cap` beads, so a proposal visits the 27 cells
+    around it instead of every bead. The grid is built once per batch from the positions and
+    kept exact by relinking the bead an accepted move carries into another cell. Both are
+    static because they are array shapes; `_grid_static` picks them from the launch.
 
     `prefetch` is how many proposals one step evaluates against the current state at once.
     Above 1 the step keeps the first proposal in draw order that passes the Metropolis test
@@ -92,6 +130,8 @@ def _build_smooth_kernel(
         use_wall,
         use_cap,
         int(prefetch),
+        int(grid_g),
+        int(grid_cap),
     )
     if cache_key in _kernel_cache:
         return _kernel_cache[cache_key]
@@ -193,6 +233,99 @@ def _build_smooth_kernel(
         cnt = jnp.sum(under.astype(jnp.int32))
         depth = jnp.sum(jnp.where(under, r0 - d, 0.0))
         return cnt, depth
+
+    # ---- the cell grid ----
+    #
+    # Cells are `w` wide, at least `r0`, so the 27 cells around a point hold every bead within
+    # `r0` of it. Beads outside the box are clamped into the edge cells, and a query's cell is
+    # clamped the same way, so a pair under `r0` still lands in adjacent cells. Row `C` holds
+    # the pad beads and is never queried; row `C + 1` is empty and is what an out of range
+    # neighbour cell points at.
+    n_cells = int(grid_g) ** 3
+    offs27 = jnp.asarray(
+        [[a, b, c] for a in (-1, 0, 1) for b in (-1, 0, 1) for c in (-1, 0, 1)], dtype=jnp.int32
+    )
+
+    def _cell_of(x: Any, lo3: Any, w: Any) -> Any:
+        c3 = jnp.clip(jnp.floor((x - lo3) / w).astype(jnp.int32), 0, grid_g - 1)
+        return (c3[..., 0] * grid_g + c3[..., 1]) * grid_g + c3[..., 2]
+
+    def _grid_build(pos: Any, n_active: Any, r0: Any) -> tuple[Any, ...]:
+        n = pos.shape[0]
+        valid = jnp.arange(n) < n_active
+        big = jnp.float32(3e38)
+        lo3 = jnp.min(jnp.where(valid[:, None], pos, big), axis=0)
+        hi3 = jnp.max(jnp.where(valid[:, None], pos, -big), axis=0)
+        extent = jnp.max(hi3 - lo3)
+        w = jnp.maximum(r0, extent / (grid_g - 2)) * (1.0 + 1e-5)
+        lo3 = lo3 - w
+        cid = jnp.where(valid, _cell_of(pos, lo3, w), n_cells)
+        order = jnp.argsort(cid)
+        sc = cid[order]
+        first = jnp.searchsorted(sc, sc, side="left")
+        rank = jnp.arange(n) - first
+        counts = jnp.zeros(n_cells + 2, dtype=jnp.int32).at[sc].add(1)
+        rank_c = jnp.minimum(rank, grid_cap - 1)
+        cell_beads = jnp.full((n_cells + 2, grid_cap), -1, dtype=jnp.int32)
+        cell_beads = cell_beads.at[sc, rank_c].set(order.astype(jnp.int32))
+        cell_n = jnp.minimum(counts, grid_cap)
+        bead_slot = jnp.zeros(n, dtype=jnp.int32).at[order].set(rank_c)
+        return cell_beads, cell_n, cid, bead_slot, lo3, w
+
+    def _grid_candidates(grid: Any, x: Any) -> Any:
+        cell_beads, _cn, _bc, _bs, lo3, w = grid
+        c3 = jnp.clip(jnp.floor((x - lo3) / w).astype(jnp.int32), 0, grid_g - 1)
+        nb = c3[None, :] + offs27
+        inr = jnp.all(jnp.logical_and(nb >= 0, nb < grid_g), axis=1)
+        lin = (nb[:, 0] * grid_g + nb[:, 1]) * grid_g + nb[:, 2]
+        lin = jnp.where(inr, lin, n_cells + 1)
+        return cell_beads[lin].reshape(-1)
+
+    def _local_excl_grid(
+        pos: Any, p_pos: Any, p: Any, r0: Any, weight: Any, n_active: Any, grid: Any
+    ) -> Any:
+        idx = _grid_candidates(grid, p_pos)
+        ok = jnp.logical_and(
+            idx >= 0, jnp.logical_and(idx < n_active, jnp.abs(idx - p) > excl_skip)
+        )
+        diff = pos[jnp.maximum(idx, 0)] - p_pos
+        d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+        rel = jnp.maximum(0.0, (r0 - d) / r0)
+        return jnp.sum(jnp.where(ok, weight * rel * rel, 0.0))
+
+    def _wall_grid(
+        pos: Any, p_pos: Any, p: Any, r0: Any, n_active: Any, grid: Any
+    ) -> tuple[Any, Any]:
+        idx = _grid_candidates(grid, p_pos)
+        ok = jnp.logical_and(
+            idx >= 0, jnp.logical_and(idx < n_active, jnp.abs(idx - p) > excl_skip)
+        )
+        diff = pos[jnp.maximum(idx, 0)] - p_pos
+        d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+        under = jnp.logical_and(ok, d < r0)
+        return jnp.sum(under.astype(jnp.int32)), jnp.sum(jnp.where(under, r0 - d, 0.0))
+
+    def _grid_relink(grid: Any, p: Any, new_p: Any, moved: Any) -> tuple[Any, ...]:
+        """Move bead `p` to the cell of `new_p` when `moved`, the hole in its old cell filled
+        by that cell's last bead. A no-op when the cell is unchanged."""
+        cell_beads, cell_n, bead_cell, bead_slot, lo3, w = grid
+        c_old = bead_cell[p]
+        c_new = _cell_of(new_p, lo3, w)
+        do = jnp.logical_and(moved, c_new != c_old)
+        slot = bead_slot[p]
+        last = cell_n[c_old] - 1
+        mover = cell_beads[c_old, last]
+        mover_i = jnp.maximum(mover, 0)
+        cell_beads = cell_beads.at[c_old, slot].set(jnp.where(do, mover, cell_beads[c_old, slot]))
+        cell_beads = cell_beads.at[c_old, last].set(jnp.where(do, -1, cell_beads[c_old, last]))
+        bead_slot = bead_slot.at[mover_i].set(jnp.where(do, slot, bead_slot[mover_i]))
+        cell_n = cell_n.at[c_old].add(jnp.where(do, -1, 0))
+        k = jnp.minimum(cell_n[c_new], grid_cap - 1)
+        cell_beads = cell_beads.at[c_new, k].set(jnp.where(do, p, cell_beads[c_new, k]))
+        bead_slot = bead_slot.at[p].set(jnp.where(do, k, bead_slot[p]))
+        bead_cell = bead_cell.at[p].set(jnp.where(do, c_new, c_old))
+        cell_n = jnp.minimum(cell_n.at[c_new].add(jnp.where(do, 1, 0)), grid_cap)
+        return cell_beads, cell_n, bead_cell, bead_slot, lo3, w
 
     # ---- confinement helper ----
     #
@@ -388,6 +521,7 @@ def _build_smooth_kernel(
             p: Any,
             disp: Any,
             u: Any,
+            grid: Any = None,
         ) -> tuple[Any, ...]:
             """One proposal against the state as it is. Returns whether it is accepted, the
             bead's new position, the five scores it would leave, and for the orientation term
@@ -406,8 +540,12 @@ def _build_smooth_kernel(
             ss_new = ss + (loc_s_curr - loc_s_prev)
 
             # ---- excluded volume ----
-            loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w, n_active)
-            loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w, n_active)
+            if grid_g > 0:
+                loc_e_prev = _local_excl_grid(pos, old_p, p, r0, excl_w, n_active, grid)
+                loc_e_curr = _local_excl_grid(pos, new_p, p, r0, excl_w, n_active, grid)
+            else:
+                loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w, n_active)
+                loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w, n_active)
             if use_aff:
                 # Same counting convention as EV, so it rides the same accumulator.
                 loc_e_prev = loc_e_prev + _local_affinity_at(
@@ -515,8 +653,12 @@ def _build_smooth_kernel(
                 cap_reject = jnp.logical_and(cap_r[p] > 0.0, jnp.sum(hd * hd) > cap_r[p] * cap_r[p])
                 ok = jnp.logical_and(ok, jnp.logical_not(cap_reject))
             if use_wall:
-                cnt0, dep0 = _wall_at(pos, old_p, p, r0, n_active)
-                cnt1, dep1 = _wall_at(pos, new_p, p, r0, n_active)
+                if grid_g > 0:
+                    cnt0, dep0 = _wall_grid(pos, old_p, p, r0, n_active, grid)
+                    cnt1, dep1 = _wall_grid(pos, new_p, p, r0, n_active, grid)
+                else:
+                    cnt0, dep0 = _wall_at(pos, old_p, p, r0, n_active)
+                    cnt1, dep1 = _wall_at(pos, new_p, p, r0, n_active)
                 worse = jnp.logical_or(
                     cnt1 > cnt0,
                     jnp.logical_and(jnp.logical_and(cnt1 == cnt0, cnt1 > 0), dep1 > dep0),
@@ -526,9 +668,11 @@ def _build_smooth_kernel(
             return ok, new_p, ss_new, se_new, sh_new, so_new, sc_new, has_orn, safe_k, new_orn_vec
 
         def apply(carry: Any, p: Any, ok: Any, res: tuple[Any, ...], T_next: Any) -> Any:
-            pos, ss, se, sh, so, sc, anchor_orn, _T, n_ok = carry
+            (pos, ss, se, sh, so, sc, anchor_orn, _T, n_ok), grid = carry
             _ok, new_p, ss_new, se_new, sh_new, so_new, sc_new, has_orn, safe_k, new_orn_vec = res
             pos_next = pos.at[p].set(jnp.where(ok, new_p, pos[p]))
+            if grid_g > 0:
+                grid = _grid_relink(grid, p, new_p, ok)
             ss_next = jnp.where(ok, ss_new, ss)
             se_next = jnp.where(ok, se_new, se)
             sh_next = jnp.where(ok, sh_new, sh)
@@ -552,9 +696,10 @@ def _build_smooth_kernel(
                 anchor_orn_next,
                 T_next,
                 n_ok_next,
-            )
+            ), grid
 
-        init = (pos0, ss0, se0, sh0, so0, sc0, anchor_orn0, T0_, jnp.int32(0))
+        grid0 = _grid_build(pos0, n_active, r0) if grid_g > 0 else None
+        init = ((pos0, ss0, se0, sh0, so0, sc0, anchor_orn0, T0_, jnp.int32(0)), grid0)
         if prefetch <= 1:
             k_p, k_d, k_a = jax.random.split(key, 3)
             idx_picks = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_movable_active)
@@ -569,18 +714,18 @@ def _build_smooth_kernel(
             accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
 
             def body(i: Any, carry: Any) -> Any:
-                pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok = carry
+                (pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok), grid = carry
                 p = ps[i]
-                res = evaluate(pos, ss, se, sh, so, sc, anchor_orn, T, p, disps[i], accs[i])
+                res = evaluate(pos, ss, se, sh, so, sc, anchor_orn, T, p, disps[i], accs[i], grid)
                 return apply(carry, p, res[0], res, T * dt)
 
-            return jax.lax.fori_loop(0, n_steps_per_batch, body, init)
+            return jax.lax.fori_loop(0, n_steps_per_batch, body, init)[0]
 
         # `prefetch` proposals against one state, each on its own rung of the temperature
         # ladder. The first accepted in draw order is applied and the proposals up to it are
         # what the batch consumed; the rest are discarded and drawn afresh, so a round still
         # delivers `n_steps_per_batch` serial steps and loses nothing where acceptance is high.
-        eval_many = jax.vmap(evaluate, in_axes=(None,) * 7 + (0, 0, 0, 0))
+        eval_many = jax.vmap(evaluate, in_axes=(None,) * 7 + (0, 0, 0, 0, None))
         ladder = dt ** jnp.arange(prefetch, dtype=pos0.dtype)
 
         def cond_many(state: Any) -> Any:
@@ -588,14 +733,14 @@ def _build_smooth_kernel(
 
         def body_many(state: Any) -> Any:
             carry, consumed, b = state
-            pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok = carry
+            (pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok), grid = carry
             kb_p, kb_d, kb_a = jax.random.split(jax.random.fold_in(key, b), 3)
             pk = movable[jax.random.randint(kb_p, (prefetch,), 0, n_movable_active)]
             dk = jax.random.uniform(
                 kb_d, (prefetch, 3), minval=-step_size, maxval=step_size, dtype=pos0.dtype
             )
             uk = jax.random.uniform(kb_a, (prefetch,), dtype=pos0.dtype)
-            res = eval_many(pos, ss, se, sh, so, sc, anchor_orn, T * ladder, pk, dk, uk)
+            res = eval_many(pos, ss, se, sh, so, sc, anchor_orn, T * ladder, pk, dk, uk, grid)
             ok_v = res[0]
             any_ok = jnp.any(ok_v)
             j = jnp.argmax(ok_v)
@@ -611,7 +756,7 @@ def _build_smooth_kernel(
         final, _consumed, _b = jax.lax.while_loop(
             cond_many, body_many, (init, jnp.int32(0), jnp.int32(0))
         )
-        return final
+        return final[0]
 
     # vmap over K chains; problem data and schedule are shared (None).
     # Per-chain: pos, all 5 scores, anchor_orn, key.  T is shared (deterministic).
@@ -1607,9 +1752,16 @@ def mc_smooth_jax(
             [movable_np, np.zeros(B - movable_np.shape[0], dtype=movable_np.dtype)]
         )
 
+    grid_g, grid_cap = 0, 0
+    if (
+        bool(getattr(settings, "smooth_jax_grid", False))
+        and use_excl
+        and B >= int(getattr(settings, "smooth_jax_grid_min_beads", 4096))
+    ):
+        grid_g, grid_cap = _grid_static([(pos_f32, excl_r0)])
     bundle = _build_smooth_kernel(
         n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs, use_aff, use_wall, use_cap,
-        prefetch,
+        prefetch, grid_g, grid_cap,
     )  # fmt: skip
     (
         _kernel_one_batch,
@@ -2320,9 +2472,22 @@ def _mc_smooth_jax_batch_chunk(
     motif_weight_v = float(settings.motif_weight) if use_orn else 0.0
     excl_w_v = float(settings.exclusion_weight) if use_excl else 0.0
 
+    grid_g, grid_cap = 0, 0
+    if (
+        bool(getattr(settings, "smooth_jax_grid", False))
+        and use_excl
+        and B >= int(getattr(settings, "smooth_jax_grid_min_beads", 4096))
+    ):
+        grid_g, grid_cap = _grid_static(
+            [
+                (np.asarray(p["pos"], dtype=np.float32), float(pr["excl_r0"]))
+                for p, pr in zip(problems, preps, strict=True)
+            ]
+        )
     bundle = _build_smooth_kernel(
-        n_steps_per_batch, excl_skip, use_heat, use_orn, M, use_aff, use_wall, use_cap, prefetch
-    )
+        n_steps_per_batch, excl_skip, use_heat, use_orn, M, use_aff, use_wall, use_cap, prefetch,
+        grid_g, grid_cap,
+    )  # fmt: skip
     (
         _kb,
         _kf,
