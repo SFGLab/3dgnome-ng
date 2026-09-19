@@ -132,6 +132,28 @@ blocks buy it 0.1 on GM12878 and 1.0 on HFFC6 and cost it on H1ESC. With our com
 term on the saddle rises on H1ESC and HFFC6 at a cost in SCC and MultiMM, recorded in
 `design/ab-compartments.md`, and it stays opt in.
 
+## The stitch and the relaxation at chromosome scope
+
+Measured 2026-09-19, `slurm/ensemble/assemble_ablation.sh`, GM12878 chr1:1-60 Mb, three
+structures per arm. Boundary ratio is a boundary anchor pair's distance over the structure's
+own within block curve, from `playground/restitch_model.py` on the first structure before its
+replayed stitch.
+
+| arm | Pearson | SCC | MultiMM | Rg | wb-sa | xb | boundary median, q95, max |
+|---|---|---|---|---|---|---|---|
+| production, both on | 0.311 | 0.377 | 0.674 | 25.6 | 118 | 22 | 1.01, 1.82, 2.30 |
+| stitch off | 0.313 | 0.375 | 0.672 | 23.4 | 117 | 21 | 1.03, 1.94, 2.34 |
+| relaxation off | 0.312 | 0.368 | 0.662 | 25.6 | 107 | 40 | 1.01, 1.82, 2.30 |
+| neither | 0.313 | 0.374 | 0.669 | 23.4 | 107 | 23 | 1.03, 1.94, 2.34 |
+
+Every Hi-C number is level across the four arms. The joint solve already puts boundary pairs
+on the curve, median 1.03 and no pair over 2.34 times it, against the 59 times that the stitch
+was built for. What the stitch adds is a tenth of Rg, from its centroid excluded volume between
+every block pair, and cross block overlaps, 40 per thousand with it and no relaxation against
+23 with neither, which the relaxation then removes. With the stitch off the relaxation moves
+the cross block count from 23 to 21. Both passes are null on the data and one of them inflates.
+Decision pending: delete both.
+
 ## Expression, genome wide
 
 The enhancer3d test on the production ensembles, three cell lines, ten conformations per
