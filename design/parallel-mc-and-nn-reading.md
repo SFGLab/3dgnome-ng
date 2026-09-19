@@ -204,8 +204,10 @@ kernel scans every bead for the excluded volume and a batch does that `K` times,
 Rounds to convergence are level, 55 to 62 on the small region and 385 to 427 on the large.
 Hi-C, the exponent and Rg are level on every arm; the single structure MultiMM number on the
 large region is not comparable with the three structure arm it sits beside and is being
-remeasured at three. The numba cell grid, ported, would make the batch cost flat in `N` and
-recover the small block ratio on large blocks; that is the next kernel lever after this one.
+remeasured at three: 0.665 against 0.669 with every other number level, and K 16 on the
+large region is 141 s, so 32 is the production value from 2026-09-19. The numba cell grid,
+ported, would make the batch cost flat in `N` and recover the small block ratio on large
+blocks; that is the next kernel lever after this one.
 
 ## Where this leaves the plan
 

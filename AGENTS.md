@@ -665,6 +665,20 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     stayed small. Deciding on the delta, 2026-09-12, brings JAX to 110 with numba's Hi-C. The
     totals are still carried for the Metropolis ratio and the plateau test. The JAX parity dump
     changed with it, by design.
+  - **The smooth kernel prefetches: `[simulation_arcs_smooth] prefetch`, default 1, production
+    32 since 2026-09-19.** Measured on GM12878 chr1:1-8 Mb, 93 percent of the stage's rounds
+    accept under one percent of their proposals, and a step on the GPU costs its latency
+    whatever the arithmetic. Above 1 a step evaluates that many proposals against the current
+    state in one vectorised pass, applies the first accepted in draw order, counts only the
+    proposals up to it as consumed and draws the rest afresh, so a round still delivers its
+    serial step count and every applied move is a Metropolis move from the state it was drawn
+    on; the chain has the serial law and the temperature is carried per chain. At 1 the body
+    and its draws are the serial ones, byte identical to before. Smooth wall on the RTX 4060 Ti:
+    chr1:1-8 Mb 57 s to 6 s at 32, chr1:1-60 Mb 420 s to 125 s at 32 and slower at 64, since
+    the kernel's full excluded volume scan is paid once per proposal. Three structures on 60 Mb
+    at 32 against 1: every battery number level, MultiMM 0.665 against 0.669. Numba ignores the
+    key. Unit checks in `harness/test_smooth_levers.py`, sweep in `slurm/ensemble/prefetch_sweep.sh`,
+    reading and numbers in `design/parallel-mc-and-nn-reading.md`.
   - **`cli.py` auto-forces `ib_workers=1` when `mc_backend=jax`** — multiple Python threads contending for a single GPU is net-negative; restarts go inside JAX via `mc_smooth_chains` (vmap), not via thread pools.
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
 
