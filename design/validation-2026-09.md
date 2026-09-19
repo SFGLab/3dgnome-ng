@@ -132,6 +132,27 @@ blocks buy it 0.1 on GM12878 and 1.0 on HFFC6 and cost it on H1ESC. With our com
 term on the saddle rises on H1ESC and HFFC6 at a cost in SCC and MultiMM, recorded in
 `design/ab-compartments.md`, and it stays opt in.
 
+## Expression, genome wide
+
+The enhancer3d test on the production ensembles, three cell lines, ten conformations per
+chromosome, run on eden 2026-09-15 to 2026-09-18 and scored 2026-09-19 with the notebook 3
+protocol of `enhancer3d/playground/genome_original_correlation.py`: per gene minimum
+enhancer distance, min max normalised per cell line, the difference between two lines
+correlated against the DESeq2 log2 fold change on the extreme quartile jumps. Spearman, with
+the gene count used, against the published cudaMMC models, which carry 100 conformations per
+chromosome.
+
+| cell pair | ours, beads as they are | ours, interpolated as v4 exports | cudaMMC v4 |
+|---|---|---|---|
+| GM12878 vs H1ESC | -0.559 (520) | -0.628 (479) | -0.566 (342) |
+| GM12878 vs HFFC6 | -0.486 (561) | -0.509 (580) | -0.577 (354) |
+| H1ESC vs HFFC6 | -0.459 (625) | -0.406 (696) | -0.456 (412) |
+
+Level with cudaMMC overall, ahead on one pair, behind on the HFFC6 pair, on about 21,000 genes
+with a bead in both arms against v4's 14,000 to 15,000. The previous genome wide run of ours,
+TAD block models on 2026-08-25, stood at -0.34, -0.31 and -0.16. Tables in
+`enhancer3d/playground/genome_correlation_prod` and `_prod_interp`, recipe `prod_e3d.sh`.
+
 ## Timings
 
 One chr1:1-60 Mb structure on the workstation, an RTX 4060 Ti with the JAX executor for the
