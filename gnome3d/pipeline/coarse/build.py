@@ -535,8 +535,9 @@ def add_contact_background(
     bg = np.maximum(1.0, (sep / max(int(law.s0_bp), 1)) ** law.nu)  # law.background, arrayed
     if map_ratio is not None:
         ratio, sig, low = map_ratio
+        power = -float(s.contact_map_strength) / 3.0
         with np.errstate(divide="ignore"):
-            dist = np.where(ratio > 0.0, bg * np.power(np.maximum(ratio, 1e-12), -1.0 / 3.0), 0.0)
+            dist = np.where(ratio > 0.0, bg * np.power(np.maximum(ratio, 1e-12), power), 0.0)
         far = (mat == -0.5) & (sep > float(s.background_range_bp))
         eligible = far & sig & (dist < bg)
         if bool(s.contact_map_symmetric):

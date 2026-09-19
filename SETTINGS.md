@@ -90,6 +90,7 @@ is too far and the squeeze constant when too close.
 | `contact_map_z` | float | 3.0 | 3.0 | With `contact_map`, a pair is held only when its count exceeds the expectation at its separation by this many Poisson standard deviations, so the held set is signal rather than the half of all pairs that sit over the mean by chance. |
 | `contact_map_pool` | int | 0 | 0 | With `contact_map`, pixels pooled either side of a pair's pixel before the test; 1 pools 3 by 3. |
 | `contact_map_symmetric` | bool | no | no | With `contact_map`, also hold a pair whose count falls that many standard deviations under the expectation, at the background scaled out by the same law, so the held set pulls in and pushes out alike instead of only pulling in. |
+| `contact_map_strength` | float | 1.0 | 1.0 | How far a held pair is pulled from the background: its distance is the background times observed over expected to the minus this over three, so 1 is the law's own conversion and smaller values pull less. |
 | `use_contact_background` | bool | no | yes | Beyond that range, hold an arcless pair whose contact cell puts it closer than the background at the law's contact distance, with the same spring. A pair at or below its expected contact keeps the repulsion, so the held set stays sparse, and on a thin map it holds next to nothing, which is allowed. Needs `use_anchor_heatmap`. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |

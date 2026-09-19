@@ -52,6 +52,7 @@ class Settings:
     contact_map_z: float
     contact_map_pool: int
     contact_map_symmetric: bool
+    contact_map_strength: float
     data_phasing_track: str
 
     # ---- template ----
@@ -425,6 +426,9 @@ class Settings:
             3.0  # a pair is held from the map when its count is this many sigma over expected
         )
         self.contact_map_pool = 0  # pixels pooled either side of a pair's pixel, 0 for one pixel
+        self.contact_map_strength = (
+            1.0  # how far a held pair is pulled from the background, 1 the law
+        )
         self.contact_map_symmetric = (
             False  # also hold pairs significantly under expected, farther out
         )
@@ -810,6 +814,9 @@ class Settings:
         self.background_weight = getf("springs", "background_weight", self.background_weight)
         self.contact_map_z = getf("springs", "contact_map_z", self.contact_map_z)
         self.contact_map_pool = geti("springs", "contact_map_pool", self.contact_map_pool)
+        self.contact_map_strength = getf(
+            "springs", "contact_map_strength", self.contact_map_strength
+        )
         self.contact_map_symmetric = getb(
             "springs", "contact_map_symmetric", self.contact_map_symmetric
         )
