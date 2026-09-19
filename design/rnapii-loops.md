@@ -98,8 +98,9 @@ same compaction every attractive term has shown here.
 
 ## Decisions taken and open
 
-Taken: RNAPII loops enter as their own factor, never merged into CTCF's counts, and the
-depth matched high quality RNAPII set is the input, the same rule as CTCF. Open, for the
-user: depth matched or merged CTCF loops for the rerun; whether GM12878 with the public RNAPII
-ChIA-PET is the accepted test bed, since the trios have no independent Hi-C; and whether B is
-worth its arm on the first pass or waits for A's result.
+Taken, 2026-09-19: encoding A. RNAPII loops enter as their own factor, never merged into
+CTCF's counts, the depth matched high quality RNAPII set is the input, the same rule as CTCF,
+and the CTCF rerun stays on the depth matched set. GM12878 with the public RNAPII ChIA-PET is
+the test bed. B waits for A's result. The first pass carries no per factor spring weight: the
+arms are CTCF only, RNAPII anchors as beads without springs, and RNAPII springs at CTCF's
+weight; a weight comes if the springs move the expression test and cost structure.
