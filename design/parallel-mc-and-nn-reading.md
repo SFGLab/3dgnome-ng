@@ -228,6 +228,16 @@ help and a finer axis hurt, since the rebuild writes the whole table; the batch 
 launches inside one step, not its arithmetic, and past 32 proposals a batch gets slower again.
 Production is the last row, three structures level with the full scan on every battery number.
 
+## Where a structure's time goes, 2026-09-19 evening
+
+GM12878 chr1:1-60 Mb, 42,480 beads, one structure on the RTX 4060 Ti, production settings,
+profiled with cProfile: 95 s end to end. The smooth kernel 50 s, the coil start 18 s in a
+Python walk over 1,408 gaps, the joint arcs solve 11.5 s, the block layout and the rest of the
+coarse stage 2.5 s, process start and JAX initialisation 6 s, the rest 7 s. The coil start is
+now compiled with its draws made beforehand, byte identical, and the structure takes 77 s:
+coarse 13 s, smooth 56 s of which the kernel 49 s. The kernel is two thirds of a structure and
+its floor is the launches in one step. Nothing else on the path is worth a day.
+
 ## Where this leaves the plan
 
 **First, before any kernel work: measure the stitch and the relaxation at chromosome scope.**
