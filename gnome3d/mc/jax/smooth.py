@@ -47,8 +47,16 @@ def _build_smooth_kernel(
     use_aff: bool = False,
     use_wall: bool = False,
     use_cap: bool = False,
+    prefetch: int = 1,
 ) -> Any:
     """Build (or look up cached) compiled smooth-MC kernel.
+
+    `prefetch` is how many proposals one step evaluates against the current state at once.
+    Above 1 the step keeps the first proposal in draw order that passes the Metropolis test
+    and the hard rules and discards the rest, so every applied move is a Metropolis move from
+    the state it was drawn on and the chain has the law of the serial one. The step costs
+    about one serial step on a latency bound device, so where acceptance is rare it advances
+    the chain by close to `prefetch` steps. At 1 the body is the serial one.
 
     `use_wall` and `use_cap` are the smooth stage's hard rules, static like `use_aff` because
     each costs a pass per step. The wall rejects a move that adds a non neighbour pair under
@@ -83,6 +91,7 @@ def _build_smooth_kernel(
         use_aff,
         use_wall,
         use_cap,
+        int(prefetch),
     )
     if cache_key in _kernel_cache:
         return _kernel_cache[cache_key]
@@ -364,29 +373,28 @@ def _build_smooth_kernel(
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         """One batch of `n_steps_per_batch` MC steps for ONE chain.  Returns
         (pos_f, ss_f, se_f, sh_f, so_f, sc_f, anchor_orn_f, T_f, n_ok)."""
+
         # `movable` is padded to the bucket; n_movable_active is the real count so
         # the sampler only draws real movable beads (no-op when unbucketed).
-        k_p, k_d, k_a = jax.random.split(key, 3)
-        idx_picks = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_movable_active)
-        ps = movable[idx_picks]
-        disps = jax.random.uniform(
-            k_d,
-            (n_steps_per_batch, 3),
-            minval=-step_size,
-            maxval=step_size,
-            dtype=pos0.dtype,
-        )
-        accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
-
-        def body(i: Any, carry: Any) -> Any:
-            pos, ss, se, sh, so, sc, anchor_orn, T, n_ok = carry
-            p = ps[i]
-            delta = disps[i]
-            u = accs[i]
-
+        def evaluate(
+            pos: Any,
+            ss: Any,
+            se: Any,
+            sh: Any,
+            so: Any,
+            sc: Any,
+            anchor_orn: Any,
+            T: Any,
+            p: Any,
+            disp: Any,
+            u: Any,
+        ) -> tuple[Any, ...]:
+            """One proposal against the state as it is. Returns whether it is accepted, the
+            bead's new position, the five scores it would leave, and for the orientation term
+            the anchor slot it rewrites and the vector it writes there."""  # fmt: skip
             score = ss + se + sh + so + sc
             old_p = pos[p]
-            new_p = old_p + delta
+            new_p = old_p + disp
 
             # ---- struct (chain bonds + angles) ----
             loc_s_prev = _local_smooth_at(
@@ -474,10 +482,10 @@ def _build_smooth_kernel(
                 so_new = so + 2.0 * (loc_o_curr - loc_o_prev)
                 delta = delta + 2.0 * (loc_o_curr - loc_o_prev)
             else:
-                anchor_orn_trial = anchor_orn
                 so_new = so
-                has_orn = False
+                has_orn = jnp.bool_(False)
                 safe_k = jnp.int32(0)
+                new_orn_vec = jnp.zeros((3,), dtype=pos.dtype)
 
             # ---- confinement (per-bead, single-counted, delta factor 1) ----
             # When conf_w == 0 the entire contribution folds to zero; XLA
@@ -515,18 +523,22 @@ def _build_smooth_kernel(
                 )
                 ok = jnp.logical_and(ok, jnp.logical_not(worse))
 
-            final_p = jnp.where(ok, new_p, old_p)
-            pos_next = pos.at[p].set(final_p)
+            return ok, new_p, ss_new, se_new, sh_new, so_new, sc_new, has_orn, safe_k, new_orn_vec
+
+        def apply(carry: Any, p: Any, ok: Any, res: tuple[Any, ...], T_next: Any) -> Any:
+            pos, ss, se, sh, so, sc, anchor_orn, _T, n_ok = carry
+            _ok, new_p, ss_new, se_new, sh_new, so_new, sc_new, has_orn, safe_k, new_orn_vec = res
+            pos_next = pos.at[p].set(jnp.where(ok, new_p, pos[p]))
             ss_next = jnp.where(ok, ss_new, ss)
             se_next = jnp.where(ok, se_new, se)
             sh_next = jnp.where(ok, sh_new, sh)
             so_next = jnp.where(ok, so_new, so)
             sc_next = jnp.where(ok, sc_new, sc)
             if use_orn:
-                # Accept = keep anchor_orn_trial; reject = keep anchor_orn.
-                # We only modified anchor_orn[safe_k], so equivalently:
-                #   anchor_orn_next = anchor_orn_trial if ok else anchor_orn
-                anchor_orn_next = jnp.where(ok, anchor_orn_trial, anchor_orn)
+                write = jnp.logical_and(ok, has_orn)
+                anchor_orn_next = anchor_orn.at[safe_k].set(
+                    jnp.where(write, new_orn_vec, anchor_orn[safe_k])
+                )
             else:
                 anchor_orn_next = anchor_orn
             n_ok_next = n_ok + jnp.where(ok, 1, 0)
@@ -538,12 +550,68 @@ def _build_smooth_kernel(
                 so_next,
                 sc_next,
                 anchor_orn_next,
-                T * dt,
+                T_next,
                 n_ok_next,
             )
 
         init = (pos0, ss0, se0, sh0, so0, sc0, anchor_orn0, T0_, jnp.int32(0))
-        return jax.lax.fori_loop(0, n_steps_per_batch, body, init)
+        if prefetch <= 1:
+            k_p, k_d, k_a = jax.random.split(key, 3)
+            idx_picks = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_movable_active)
+            ps = movable[idx_picks]
+            disps = jax.random.uniform(
+                k_d,
+                (n_steps_per_batch, 3),
+                minval=-step_size,
+                maxval=step_size,
+                dtype=pos0.dtype,
+            )
+            accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
+
+            def body(i: Any, carry: Any) -> Any:
+                pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok = carry
+                p = ps[i]
+                res = evaluate(pos, ss, se, sh, so, sc, anchor_orn, T, p, disps[i], accs[i])
+                return apply(carry, p, res[0], res, T * dt)
+
+            return jax.lax.fori_loop(0, n_steps_per_batch, body, init)
+
+        # `prefetch` proposals against one state, each on its own rung of the temperature
+        # ladder. The first accepted in draw order is applied and the proposals up to it are
+        # what the batch consumed; the rest are discarded and drawn afresh, so a round still
+        # delivers `n_steps_per_batch` serial steps and loses nothing where acceptance is high.
+        eval_many = jax.vmap(evaluate, in_axes=(None,) * 7 + (0, 0, 0, 0))
+        ladder = dt ** jnp.arange(prefetch, dtype=pos0.dtype)
+
+        def cond_many(state: Any) -> Any:
+            return state[1] < n_steps_per_batch
+
+        def body_many(state: Any) -> Any:
+            carry, consumed, b = state
+            pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok = carry
+            kb_p, kb_d, kb_a = jax.random.split(jax.random.fold_in(key, b), 3)
+            pk = movable[jax.random.randint(kb_p, (prefetch,), 0, n_movable_active)]
+            dk = jax.random.uniform(
+                kb_d, (prefetch, 3), minval=-step_size, maxval=step_size, dtype=pos0.dtype
+            )
+            uk = jax.random.uniform(kb_a, (prefetch,), dtype=pos0.dtype)
+            res = eval_many(pos, ss, se, sh, so, sc, anchor_orn, T * ladder, pk, dk, uk)
+            ok_v = res[0]
+            any_ok = jnp.any(ok_v)
+            j = jnp.argmax(ok_v)
+            used = jnp.where(any_ok, j + 1, prefetch)
+
+            def at_j(a: Any) -> Any:
+                return a[j]
+
+            pick = jax.tree_util.tree_map(at_j, res)
+            carry = apply(carry, pk[j], any_ok, pick, T * (dt**used))
+            return carry, consumed + used, b + 1
+
+        final, _consumed, _b = jax.lax.while_loop(
+            cond_many, body_many, (init, jnp.int32(0), jnp.int32(0))
+        )
+        return final
 
     # vmap over K chains; problem data and schedule are shared (None).
     # Per-chain: pos, all 5 scores, anchor_orn, key.  T is shared (deterministic).
@@ -555,7 +623,7 @@ def _build_smooth_kernel(
         0,
         0,  # pos, ss, se, sh, so, sc
         0,  # anchor_orn
-        None,  # T0
+        0,  # T0, per chain since a prefetching batch cools by what it consumed
         None,
         None,  # dtn, movable
         None,  # heat_dist
@@ -595,7 +663,7 @@ def _build_smooth_kernel(
         None,  # cap_home (shared across restarts)
         None,  # cap_r (shared)
     )
-    out_axes = (0, 0, 0, 0, 0, 0, 0, None, 0)
+    out_axes = (0, 0, 0, 0, 0, 0, 0, 0, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
 
     @jax.jit
@@ -843,7 +911,7 @@ def _build_smooth_kernel(
             so_k,
             sc_k,
             anchor_orn_k,
-            T_init,
+            jnp.full((K,), T_init, dtype=jnp.float32),
             jnp.float32(1e30),  # ms_score
             jnp.int32(0),  # iter_i
             jnp.int32(0),  # n_ok_best (filler)
@@ -1086,7 +1154,7 @@ def _build_smooth_kernel(
         0,
         0,  # pos, ss, se, sh, so, sc  (per-chain)
         0,  # anchor_orn (per-chain)
-        None,  # T0 (shared schedule start)
+        0,  # T0, per chain
         0,
         0,  # dtn, movable (per-IB)
         0,  # heat_dist (per-IB)
@@ -1282,7 +1350,7 @@ def _build_smooth_kernel(
             so_k,
             sc_k,
             anchor_orn_k,
-            T_init,
+            jnp.full((K,), T_init, dtype=jnp.float32),
             jnp.full((K,), 1e30, dtype=jnp.float32),  # ms_score per-chain
             jnp.int32(0),  # iter_i
             jnp.zeros((K,), dtype=jnp.int32),  # n_ok (filler)
@@ -1364,6 +1432,7 @@ def mc_smooth_jax(
     use_wall: bool = bool(getattr(settings, "smooth_hard_wall", False))
     cap_frac: float = float(getattr(settings, "smooth_anchor_cap", 0.0))
     use_cap: bool = cap_frac > 0.0
+    prefetch: int = max(1, int(getattr(settings, "smooth_prefetch", 1)))
     movable_np: I64Array = (
         np.arange(n, dtype=np.int64)
         if use_cap
@@ -1539,8 +1608,9 @@ def mc_smooth_jax(
         )
 
     bundle = _build_smooth_kernel(
-        n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs, use_aff, use_wall, use_cap
-    )
+        n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs, use_aff, use_wall, use_cap,
+        prefetch,
+    )  # fmt: skip
     (
         _kernel_one_batch,
         kernel_full,
@@ -2146,6 +2216,7 @@ def _mc_smooth_jax_batch_chunk(
     use_aff = problems[0].get("compartment") is not None and bool(settings.use_compartments)
     use_wall = bool(getattr(settings, "smooth_hard_wall", False))
     use_cap = float(getattr(settings, "smooth_anchor_cap", 0.0)) > 0.0
+    prefetch = max(1, int(getattr(settings, "smooth_prefetch", 1)))
 
     Bs, As, Ms = [], [], []
     for p in problems:
@@ -2250,7 +2321,7 @@ def _mc_smooth_jax_batch_chunk(
     excl_w_v = float(settings.exclusion_weight) if use_excl else 0.0
 
     bundle = _build_smooth_kernel(
-        n_steps_per_batch, excl_skip, use_heat, use_orn, M, use_aff, use_wall, use_cap
+        n_steps_per_batch, excl_skip, use_heat, use_orn, M, use_aff, use_wall, use_cap, prefetch
     )
     (
         _kb,

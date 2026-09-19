@@ -224,6 +224,79 @@ def test_jax_wall_and_cap() -> None:
     )
 
 
+def test_jax_prefetch() -> None:
+    """Prefetching keeps the hard rules, lands where the serial step lands, and runs batched."""
+    if not _jax_available():
+        print("  skip  JAX not available")
+        return
+    from gnome3d.mc import jax as mc_jax
+
+    pos8, fixed8, dtn8 = chain()
+    before = under(pos8, 0.7)
+    s8 = settings(smooth_hard_wall=True, smooth_prefetch=8)
+    s8.mc_smooth_chains = 1
+    mc_jax.mc_smooth_jax(pos8, dtn8, fixed8, 0.5, s8)
+    after = under(pos8, 0.7)
+    check(
+        "JAX prefetch: the wall still never lets the count rise",
+        after <= before,
+        f"{before} -> {after}",
+    )
+    # The chain has the serial law, so over seeds the final energies agree in the mean; one
+    # seed's energy differs between the two by as much as it does between two seeds.
+    means = {}
+    for k in (1, 8):
+        sk = settings(smooth_hard_wall=True, smooth_prefetch=k)
+        probs = []
+        for seed in range(1, 7):
+            p_, f_, d_ = chain(seed=seed)
+            probs.append(
+                {
+                    "pos": p_,
+                    "dtn": d_,
+                    "fixed": f_,
+                    "step_size": 0.5,
+                    "settings": sk,
+                    "seed": seed,
+                    "char_orientations": None,
+                    "anchor_neighbors": None,
+                    "anchor_neighbor_weights": None,
+                    "heat_dist": None,
+                    "compartment": None,
+                }  # fmt: skip
+            )
+        means[k] = float(np.mean([float(o[0]) for o in mc_jax.mc_smooth_jax_batch(probs, sk)]))
+    check(
+        "JAX prefetch: the mean final energy over six seeds matches the serial chain's",
+        abs(means[8] - means[1]) <= 0.5 * means[1],
+        f"serial {means[1]:.4f}, prefetch 8 {means[8]:.4f}",
+    )
+    check("JAX prefetch: anchors stay put", np.allclose(pos8[fixed8], chain()[0][fixed8]))
+    problems = []
+    for seed in (1, 2):
+        p, f, d = chain(seed=seed)
+        problems.append(
+            {
+                "pos": p,
+                "dtn": d,
+                "fixed": f,
+                "step_size": 0.5,
+                "settings": s8,
+                "char_orientations": None,
+                "anchor_neighbors": None,
+                "anchor_neighbor_weights": None,
+                "heat_dist": None,
+                "compartment": None,
+                "seed": seed,
+            }  # fmt: skip
+        )
+    out = mc_jax.mc_smooth_jax_batch(problems, s8)
+    check(
+        "JAX prefetch: the batched path runs",
+        len(out) == 2 and all(np.isfinite(float(o[0])) for o in out),
+    )
+
+
 def main() -> int:
     print("smooth lever checks\n")
     test_off_by_default()
@@ -232,6 +305,7 @@ def main() -> int:
     test_anchor_cap()
     test_coil_start()
     test_jax_wall_and_cap()
+    test_jax_prefetch()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

@@ -157,6 +157,7 @@ least `stop_condition_successes_threshold` moves.
 | `angle_weight` | float | 1.0 | 1.0 | Weight of the bend term. |
 | `hard_wall` | bool | no | yes | Reject a move that adds a non neighbour pair under the excluded volume radius or deepens one that is there, so the count only falls and is a wall once zero. |
 | `anchor_cap` | float | 0.0 | 0.0 | Anchors move, but not further than this many mean bonds from where the arcs put them. 0 keeps them fixed. |
+| `prefetch` | int | 1 | 1 | How many proposals one step of the JAX kernel evaluates against the current state at once, keeping the first accepted in draw order. The chain keeps its law and, where acceptance is rare, advances close to this many steps per step. Numba ignores it. |
 | `start` | str | line | coil | Where a gap's subanchors start. `line` is the densified straight line between its anchors, `coil` a compact random bridge at the bond targets. |
 
 ### [simulation_ib] only

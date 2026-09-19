@@ -106,6 +106,7 @@ class Settings:
     smooth_hard_wall: bool
     smooth_anchor_cap: float
     smooth_start: str
+    smooth_prefetch: int
 
     # ---- noise coefficients ----
     noise_lvl1: float
@@ -435,6 +436,7 @@ class Settings:
         self.smooth_hard_wall = False  # reject a move that adds or deepens a pair under the radius
         self.smooth_anchor_cap = 0.0  # anchors may move this many mean bonds from the arcs position
         self.smooth_start = "line"  # line | coil, where a gap's subanchors start
+        self.smooth_prefetch = 1  # proposals one JAX step evaluates at once, first accepted kept
 
         # ---- MC heatmap ----
         self.max_temp_heatmap = 20.0
@@ -1104,6 +1106,9 @@ class Settings:
             "simulation_arcs_smooth", "anchor_cap", self.smooth_anchor_cap
         )
         self.smooth_start = gets("simulation_arcs_smooth", "start", self.smooth_start)
+        self.smooth_prefetch = geti("simulation_arcs_smooth", "prefetch", self.smooth_prefetch)
+        if self.smooth_prefetch < 1:
+            raise ValueError("[simulation_arcs_smooth] prefetch must be at least 1")
         if self.smooth_start not in ("line", "coil"):
             raise ValueError(
                 f"[simulation_arcs_smooth] start must be line or coil, got {self.smooth_start!r}"
