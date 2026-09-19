@@ -1091,6 +1091,13 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   term at 0.5 on top the saddle rises on H1ESC 1.02 to 2.15 and HFFC6 0.71 to 1.09, not on
   GM12878, and SCC and MultiMM fall 0.07 to 0.10 on every cell, so the term stays opt in.
 
+  **The loops beyond `max_pet_length` in the joint solve, opt in, under measurement since
+  2026-09-19: `[simulation_arcs] long_arcs`.** The loader sets those loops aside for the
+  segment heatmap, a block scope rule where a loop across blocks had nowhere to act. At
+  chromosome scope `long_arcs_on_anchors` maps each one to the anchors holding its ends and
+  they join the target matrix as arcs. On GM12878 chr1 that is 984 loops over 1 Mb, 233 with
+  five or more PETs. Unit checks in `harness/test_contact_map.py`.
+
   Why not in the reference: the reference solves every block alone.
 
 - **Three smooth stage levers against within block overlaps: `[simulation_arcs_smooth]

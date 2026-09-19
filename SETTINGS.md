@@ -151,6 +151,7 @@ least `stop_condition_successes_threshold` moves.
 | `solver_iters` | int | 200 | 200 | Iterations for the solver. |
 | `start` | str | centroid | hilbert | Where a block's anchors start. `centroid` puts every anchor at the block centroid, from which the solver descends to a compact minimum. `walk` places consecutive anchors at the law's distance for their gap along random directions, so pairs no term acts on begin near the law. `hilbert` places them along a 3D Hilbert curve scaled to the law's bond, at chromosome scope one curve over the chromosome, so genomic neighbours are spatial neighbours at every scale and the size grows as the cube root of the count. Solver and annealer only; the batch executor refuses it. |
 | `scope` | str | block | chromosome | `block` solves each block's anchors alone. `chromosome` solves every anchor of a chromosome as one problem, each block's anchors starting at its placed centroid, so loops, the contact background and the compartment term act across blocks; the per block stage then passes its anchors through. Solver and annealer only. |
+| `long_arcs` | bool | no | no | At chromosome scope, the loops the loader set aside as longer than `max_pet_length` join the joint solve's target matrix as arcs between the anchors holding their ends. They still feed the segment heatmap. On GM12878 chr1 that is 984 loops over 1 Mb. |
 
 ### [simulation_arcs_smooth] only
 

@@ -96,6 +96,8 @@ class CoarseState:
     # Compartment track for the opt-in compartment term.  Empty when no track
     # is configured, which leaves the term inert.
     compartments: CompartmentMap = field(default_factory=empty_compartment_map)
+    # In memory contact matrices for the background, keyed by chromosome, see ContactData.
+    contact_maps: dict[str, tuple[F64Array, int, int]] = field(default_factory=dict)
 
 
 def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
@@ -171,6 +173,7 @@ def build_state(
         long_arcs=data.long_arcs,
         selected_region=region,
         compartments=data.compartments,
+        contact_maps=data.contact_maps,
     )
 
 
@@ -450,11 +453,21 @@ def anchor_map_ratio(
 _CONTACT_MAP_CACHE: dict[tuple[str, str, int, int], tuple[F64Array, int]] = {}
 
 
-def contact_map_for(s: Settings, chr_: str, mids: list[int]) -> tuple[F64Array, BoolArray]:
-    """The anchor pair ratios and significance from `s.data_contact_map` for these anchors.
+def contact_map_for(
+    s: Settings,
+    chr_: str,
+    mids: list[int],
+    given: dict[str, tuple[F64Array, int, int]] | None = None,
+) -> tuple[F64Array, BoolArray]:
+    """The anchor pair ratios and significance for these anchors, from a matrix supplied in
+    memory in `given` when the chromosome is there, else from `s.data_contact_map`.
 
     Reads the raw 25 kb matrix over the anchors' span once per chromosome span and caches it.
     """
+    if given and chr_ in given:
+        m_given, lo_given, bs = given[chr_]
+        bins = np.clip((np.asarray(mids, dtype=np.int64) - lo_given) // bs, 0, m_given.shape[0] - 1)
+        return anchor_map_ratio(m_given, bins, float(s.contact_map_z), int(s.contact_map_pool))
     import cooler
 
     binsize = 25_000
@@ -535,11 +548,45 @@ def add_contact_background(
     return out
 
 
+def long_arcs_on_anchors(
+    state: CoarseState, active_region: list[int], chr_: str
+) -> list[tuple[int, int, int]]:
+    """The loops beyond `max_pet_length` as active anchor pairs with their PET counts.
+
+    A loop end is mapped to the active anchor whose span holds it; a loop with an end on no
+    anchor, or both ends on one, is dropped. Loops are read from `state.long_arcs`, where the
+    loader keeps them for the segment heatmap.
+    """
+    import bisect
+
+    clusters = state.clusters
+    order = sorted(range(len(active_region)), key=lambda ai: clusters[active_region[ai]].start)
+    starts = [clusters[active_region[ai]].start for ai in order]
+    ends = [clusters[active_region[ai]].end for ai in order]
+
+    def find(pos: int) -> int:
+        k = bisect.bisect_right(starts, pos) - 1
+        if k >= 0 and pos <= ends[k]:
+            return order[k]
+        return -1
+
+    out: list[tuple[int, int, int]] = []
+    for arc in state.long_arcs.get(chr_, []):
+        ai, aj = find(int(arc.start)), find(int(arc.end))
+        if ai < 0 or aj < 0 or ai == aj:
+            continue
+        if ai > aj:
+            ai, aj = aj, ai
+        out.append((ai, aj, int(arc.score)))
+    return out
+
+
 def calc_anchor_expected_distances(
     state: CoarseState,
     active_region: list[int],
     chr_: str,
     anchor_heatmap: F64Array | None = None,
+    with_long_arcs: bool = False,
 ) -> F64Array:
     """
     Build expected distance matrix for anchor-level active region.
@@ -572,6 +619,10 @@ def calc_anchor_expected_distances(
                 continue
 
             arcs.append((ai, cluster_to_active[other], int(arc.score)))
+    if with_long_arcs:
+        # At chromosome scope a loop across blocks has somewhere to act, so the loops the
+        # loader set aside as too long for a block join the target matrix here.
+        arcs.extend(long_arcs_on_anchors(state, active_region, chr_))
     mids = [int(clusters[ci].genomic_pos) for ci in active_region]
     mat = arc_expected_matrix(s, mids, arcs)
 
@@ -591,7 +642,11 @@ def calc_anchor_expected_distances(
                     mat[i, j] *= 1.0 - s_val
                     mat[j, i] = mat[i, j]
 
-    map_ratio = contact_map_for(s, chr_, mids) if s.data_contact_map else None
+    map_ratio = (
+        contact_map_for(s, chr_, mids, state.contact_maps)
+        if s.data_contact_map or chr_ in state.contact_maps
+        else None
+    )
     return add_contact_background(mat, mids, anchor_heatmap, s, map_ratio)
 
 

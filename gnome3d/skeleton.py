@@ -164,7 +164,9 @@ def joint_arcs_solve(
     anchor_heat: F64Array | None = None
     if s.use_anchor_heatmap and state.singletons:
         anchor_heat, _ = cb.build_contact_heatmaps(state, active_all, chr_, with_subanchor=False)
-    exp_dist = cb.calc_anchor_expected_distances(state, active_all, chr_, anchor_heat)
+    exp_dist = cb.calc_anchor_expected_distances(
+        state, active_all, chr_, anchor_heat, with_long_arcs=bool(s.arcs_long_in_joint)
+    )
     anchor_genomic = [
         (clusters[a].start, clusters[a].end, clusters[a].genomic_pos) for a in active_all
     ]
