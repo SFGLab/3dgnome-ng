@@ -9,6 +9,10 @@ line arm. The segments file is written by trio_segments.py.
 
     python playground/trio/trio_segments.py --samples HG00512
     python playground/trio/trio_configs.py --samples HG00512
+
+With `--factor RNAPOL2` the config carries two cluster files, the CTCF set and the sample's
+RNAPOL2 set as a second factor at full strength, on the shared anchor set trio_prepare.py
+writes for it, and is named `<sample>_trio_rnapol2.ini`. Everything else is the CTCF arm's.
 """
 
 import argparse
@@ -35,12 +39,21 @@ HEADER = """\
 # The contact map here is built by juicer from this sample's own ChIA-PET pairs, so the TAD
 # blocks and the singletons are not independent of the loops the model fits. That differs from
 # the three cell line arm, where the Hi-C came from 4DN.
+{factor_note}
+"""
 
+FACTOR_NOTE = """\
+#
+# {factor} arm. The sample's {factor} ChIA-PET loops are a second cluster file with their own
+# strength fit, held at the multiplier in [springs] factor_strength; its loop ends that sit on
+# no CTCF anchor are anchors of no orientation. On GM12878 chr1 the pull carried the expression
+# signal and the anchor set carried the Hi-C cost whatever the strength, so the loops are at
+# full strength, design/rnapii-loops.md.
 """
 
 
 def build(
-    sample: trio_samples.Sample, binsize: int
+    sample: trio_samples.Sample, binsize: int, factor: str = "CTCF"
 ) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
@@ -49,6 +62,12 @@ def build(
     params["data"]["segment_split"] = f"{name}_segments.bed"
     params["data"]["singletons"] = f"{name}_hic_{binsize // 1000}kb_singletons.bedpe"
     params["data"]["singletons_inter"] = ""
+    if factor != "CTCF":
+        tag = factor.lower()
+        params["data"]["anchors"] = f"{name}_anchors_ctcf_{tag}.bed"
+        params["data"]["clusters"] = f"{name}_clusters_3+.bedpe,{name}_{tag}_clusters_3+.bedpe"
+        params["data"]["factors"] = f"CTCF,{factor}"
+        params["springs"]["factor_strength"] = "1,1"
     params["simulation_backend"]["multigpu_mode"] = "groups"
     params["simulation_backend"]["mc_executor_jax_bucket_shapes"] = "yes"
     params["subanchor_heatmap"]["heat_min_reduction"] = "0.001"
@@ -62,17 +81,19 @@ def main() -> None:
     ap.add_argument("--samples")
     ap.add_argument("--out-dir", default="slurm/ensemble")
     ap.add_argument("--binsize", type=int, default=BINSIZE)
+    ap.add_argument("--factor", choices=("CTCF", "RNAPOL2"), default="CTCF")
     args = ap.parse_args()
     out_dir = ROOT / args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     for s in trio_samples.resolve(args.samples):
-        cfg = build(s, args.binsize)
+        cfg = build(s, args.binsize, args.factor)
         # Distinct name so the fixed arm cannot be confused with, or overwrite, the
         # 2026-08-24 configs whose structures had zero between-block contact.
-        tag = "_trio"
+        tag = "_trio" if args.factor == "CTCF" else f"_trio_{args.factor.lower()}"
+        note = "" if args.factor == "CTCF" else FACTOR_NOTE.format(factor=args.factor)
         path = out_dir / f"{s.name.lower()}{tag}.ini"
         with path.open("w") as fh:
-            fh.write(HEADER.format(name=s.name, role=s.role, pop=s.pop))
+            fh.write(HEADER.format(name=s.name, role=s.role, pop=s.pop, factor_note=note))
             cfg.write(fh)
         print(f"wrote {path.relative_to(ROOT)}")
 

@@ -6,6 +6,11 @@
 #   sbatch --array=0-206%12 slurm/ensemble/trio_ensemble.sh              # whole genome
 #   SAMPLES=HG00512,HG00513,HG00514 sbatch --array=0-68%12 ...           # one trio, whole genome
 #
+# The CTCF plus RNAPOL2 arm is the same array on the other config and its own tree, so the two
+# arms never share a directory:
+#
+#   CONFIG_TAG=_trio_rnapol2 OUT=out/trio_rnapol2 CHROMS=chr1 sbatch --array=0-8%12 ...
+#
 # One array task is one chromosome by one sample by a block of PER_TASK conformations. The
 # chromosome is the slowest varying dimension, so the first 9*CHUNKS tasks cover one chromosome
 # across every sample. That ordering is deliberate: a trio comparison on that chromosome becomes
@@ -162,7 +167,16 @@ assert s.use_ctcf_motif and s.use_excluded_volume and s.use_dynamic_loop_density
 assert s.use_anchor_heatmap, "the anchor distance map is off"
 assert s.mc_executor_jax_bucket_shapes, "shape bucketing is off; this run would be ~5x slower"
 assert not s.use_compartments, "use_compartments is on; these runs exclude epigenome terms"
-print(f"[guard] {sample} config ok, bucketing on")
+# Every cluster file, so a two factor config whose second file never travelled fails here
+# rather than modelling the CTCF arm under the other arm's name.
+from pathlib import Path
+
+for path, _, factor in s.cluster_files():
+    assert Path(path).is_file() and Path(path).stat().st_size, f"{factor} clusters missing: {path}"
+anchors = s.data_path(s.data_anchors)
+assert Path(anchors).is_file(), f"anchors missing: {anchors}"
+names = [f for _, _, f in s.cluster_files()]
+print(f"[guard] {sample} config ok, bucketing on, factors {','.join(names)}")
 PYCHECK
 
 if [ "${DRY_RUN:-0}" = "1" ]; then

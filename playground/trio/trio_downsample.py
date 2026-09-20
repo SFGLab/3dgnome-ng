@@ -15,10 +15,12 @@ axes a trio comparison reads, so it must not be disturbed.
 
 Counting and sampling always read the fetched `<S>_hq.BE3`, never a previous result, so
 rerunning cannot compound. Output goes beside it as `<S>_hq.matched.BE3`, which
-trio_prepare.py prefers when present. Delete those files to undo.
+trio_prepare.py prefers when present. Delete those files to undo. A second factor's set is
+matched the same way under its own tag, `<S>_rnapol2_hq.BE3` to `<S>_rnapol2_hq.matched.BE3`.
 
     python playground/trio/trio_downsample.py --dry-run
     python playground/trio/trio_downsample.py
+    python playground/trio/trio_downsample.py --factor RNAPOL2 --dry-run
 
 Caveat. Subsampling loops is not the same as subsampling PETs and calling loops again. The reads
 are not here, so this is an approximation of the step the providers intended.
@@ -42,11 +44,13 @@ def main() -> None:
     ap.add_argument("--scope", choices=("family", "global"), default="family",
                     help="match within each family, or across all nine")
     ap.add_argument("--seed", type=int, default=SEED)
+    ap.add_argument("--factor", choices=("CTCF", "RNAPOL2"), default="CTCF")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
     raw = Path(args.raw)
-    src = {s.name: raw / s.name / f"{s.name}_hq.BE3" for s in trio_samples.SAMPLES}
+    tag = "" if args.factor == "CTCF" else f"_{args.factor.lower()}"
+    src = {s.name: raw / s.name / f"{s.name}{tag}_hq.BE3" for s in trio_samples.SAMPLES}
     n_hq = {k: sum(1 for _ in v.open()) for k, v in src.items()}
 
     groups = (
@@ -59,7 +63,7 @@ def main() -> None:
         print(f"[downsample] {label} target = {target} hq loops")
         for s in fam:
             n = n_hq[s.name]
-            dest = raw / s.name / f"{s.name}_hq.matched.BE3"
+            dest = raw / s.name / f"{s.name}{tag}_hq.matched.BE3"
             if n == target:
                 if dest.is_file():
                     dest.unlink()

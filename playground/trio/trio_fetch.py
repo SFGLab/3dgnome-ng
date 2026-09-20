@@ -59,6 +59,11 @@ def select(
     ds_dir = f"/downsampling/{sample.downsampling_dir}/{sample.name}_{fd}/"
     merged_dir = f"/Loops/{sample.pop}/{fl}/{sample.name}/merged/"
     out: list[tuple[str, dict[str, Any]]] = []
+    # A second factor's files carry the factor in their local name, so they sit beside the
+    # CTCF files of the same sample rather than over them. The contact map is built from the
+    # CTCF pairs and is fetched with the CTCF arm only; every factor's arm runs on it.
+    own = factor == "CTCF"
+    tag = "" if own else f"_{factor.lower()}"
 
     if arm == "downsampled":
         loops = pick(rows, ds_dir + "subsample_1.e500.clusters.cis.BE3")
@@ -72,44 +77,63 @@ def select(
         if plain and len(loops) > 1:
             print(f"[fetch:{sample.name}] {len(loops)} merged BE3 files, taking the plain merge")
             loops = plain
-    if not loops:
+    # Three of the nine RNAPOL2 downsampling folders hold no subsample BE3, only the filtered
+    # set below, which is the modelling input. So it is required for the CTCF arm alone.
+    if not loops and own:
         raise SystemExit(f"[fetch:{sample.name}] no loops BE3 found under {ds_dir or merged_dir}")
-    out.append((f"{sample.name}_loops.BE3", loops[0]))
+    if loops:
+        out.append((f"{sample.name}{tag}_loops.BE3", loops[0]))
     if include_gz and gz:
-        out.append((f"{sample.name}_loops.cis.gz", gz[0]))
+        out.append((f"{sample.name}{tag}_loops.cis.gz", gz[0]))
 
-    hic = pick(
-        rows,
-        f"/hic_files/pairs_merged_replicates_CTCF/ChIA-PET_hg38_{sample.name}_merged_allres.hic",
-    )
-    if not hic:
-        raise SystemExit(f"[fetch:{sample.name}] no _allres.hic found")
-    out.append((f"{sample.name}_allres.hic", hic[0]))
+    if own:
+        hic = pick(
+            rows,
+            f"/hic_files/pairs_merged_replicates_CTCF/ChIA-PET_hg38_{sample.name}_merged_allres.hic",
+        )
+        if not hic:
+            raise SystemExit(f"[fetch:{sample.name}] no _allres.hic found")
+        out.append((f"{sample.name}_allres.hic", hic[0]))
 
-    peaks = [
-        r
-        for r in pick(rows, f"/Peaks/{fl}/{sample.name}_merged_replicates", exact=False)
-        if r["name"].endswith(".broadPeak") and "alternativemerge" not in r["name"]
-    ]
-    if peaks:
-        out.append((f"{sample.name}_peaks.broadPeak", peaks[0]))
+    # The CTCF peaks sit directly under /Peaks/CTCF/, the RNAPOL2 peaks one level down by
+    # population and role, so the second factor is matched by name under its tree.
+    if own:
+        peaks = [
+            r
+            for r in pick(rows, f"/Peaks/{fl}/{sample.name}_merged_replicates", exact=False)
+            if r["name"].endswith(".broadPeak") and "alternativemerge" not in r["name"]
+        ]
     else:
+        peaks = [
+            r
+            for r in pick(rows, f"/Peaks/{fl}/", exact=False)
+            if r["name"].startswith(f"{sample.name}_merged_replicates")
+            and r["name"].endswith(".broadPeak")
+        ]
+    if peaks:
+        out.append((f"{sample.name}{tag}_peaks.broadPeak", peaks[0]))
+    elif own:
         print(f"[fetch:{sample.name}] no merged broadPeak, orientation will use motifs only")
+    else:
+        print(f"[fetch:{sample.name}] no merged {factor} broadPeak, the peak check is skipped")
 
     stats = [
         r for r in pick(rows, merged_dir, exact=False) if r["name"].endswith("final_stats.tsv")
     ]
     if stats:
-        out.append((f"{sample.name}_final_stats.tsv", stats[0]))
+        out.append((f"{sample.name}{tag}_final_stats.tsv", stats[0]))
 
     # The high quality set keeps PET3+ loops whose anchors both overlap a CTCF site. It is
     # the modelling input, so it is always fetched. The phased splits sit beside it and are
     # small, and they are what a later haplotype arm would need.
-    if True:
-        for r in pick(rows, ds_dir, exact=False):
-            if r["name"].startswith("wyniki_"):
-                tag = r["name"].split(".BE3")[-1].lstrip(".") or "hq.BE3"
-                out.append((f"{sample.name}_{tag}", r))
+    n_hq = 0
+    for r in pick(rows, ds_dir, exact=False):
+        if r["name"].startswith("wyniki_"):
+            part = r["name"].split(".BE3")[-1].lstrip(".") or "hq.BE3"
+            n_hq += part == "hq.BE3"
+            out.append((f"{sample.name}{tag}_{part}", r))
+    if not n_hq:
+        raise SystemExit(f"[fetch:{sample.name}] no wyniki_*.BE3 loop set under {ds_dir}")
     return out
 
 

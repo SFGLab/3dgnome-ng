@@ -25,7 +25,9 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from anchor_union import read_anchors, union_anchors  # noqa: E402
 from pyliftover import LiftOver  # noqa: E402
 
 DATA = Path("data/GM12878")
@@ -78,66 +80,14 @@ def main() -> None:
             out.write(f"{c}\t{s1}\t{e1}\t{c}\t{s2}\t{e2}\t{p}\n")
     print("loops:", dict(stats))
 
-    # anchors: the CTCF set verbatim, plus RNAPII ends that overlap no CTCF anchor, merged among
-    # themselves. An RNAPII end overlapping a CTCF anchor maps onto it when its midpoint falls
-    # inside, which is how the loader maps a loop end, and is lost otherwise; both are counted.
-    import bisect
-
-    ctcf: list[tuple[str, int, int, str]] = []
-    for line in CTCF_ANCHORS.read_text().splitlines():
-        f = line.split()
-        if len(f) >= 3:
-            ctcf.append((f[0], int(f[1]), int(f[2]), f[3] if len(f) > 3 else "N"))
-    by_chr: dict[str, list[tuple[int, int]]] = {}
-    for c, s, e, _ in ctcf:
-        by_chr.setdefault(c, []).append((s, e))
-    for lst in by_chr.values():
-        lst.sort()
-    starts = {c: [s for s, _ in lst] for c, lst in by_chr.items()}
-
-    def ctcf_hit(c: str, s: int, e: int) -> tuple[bool, bool]:
-        """Whether [s, e) overlaps a CTCF anchor, and whether its midpoint lies inside one."""
-        lst = by_chr.get(c, [])
-        k = bisect.bisect_right(starts.get(c, []), e) - 1
-        over = inside = False
-        mid = (s + e) // 2
-        while k >= 0 and lst[k][1] > s - 50_000:
-            if lst[k][0] < e and lst[k][1] > s:
-                over = True
-                if lst[k][0] <= mid <= lst[k][1]:
-                    inside = True
-            k -= 1
-        return over, inside
-
-    ends_over = ends_inside = ends_free = 0
-    free: list[tuple[str, int, int]] = []
-    for c, s1, e1, s2, e2, _ in loops:
-        for s, e in ((s1, e1), (s2, e2)):
-            over, inside = ctcf_hit(c, s, e)
-            if over:
-                ends_over += 1
-                ends_inside += int(inside)
-            else:
-                ends_free += 1
-                free.append((c, s, e))
-    free.sort()
-    merged: list[list[object]] = []
-    for c, s, e in free:
-        if merged and merged[-1][0] == c and s <= int(merged[-1][2]):
-            merged[-1][2] = max(int(merged[-1][2]), e)
-        else:
-            merged.append([c, s, e])
-    rows = [(c, s, e, o) for c, s, e, o in ctcf] + [(str(c), int(s), int(e), "N") for c, s, e in merged]
-    rows.sort()
+    ctcf = read_anchors(CTCF_ANCHORS)
+    ends = [(c, s, e) for c, s1, e1, s2, e2, _ in loops for s, e in ((s1, e1), (s2, e2))]
+    rows, st = union_anchors(ctcf, ends)
     with open(OUT_ANCHORS, "w") as out:
         for c, s, e, o in rows:
             out.write(f"{c}\t{s}\t{e}\t{o}\n")
-    print(
-        f"RNAPII loop ends: {ends_over} overlap a CTCF anchor ({ends_inside} with the midpoint inside it, "
-        f"{ends_over - ends_inside} lost), {ends_free} on no CTCF anchor -> {len(merged)} new anchors, "
-        f"mean width {sum(int(m[2]) - int(m[1]) for m in merged) / max(len(merged), 1) / 1e3:.1f} kb"
-    )
-    print(f"anchors: {len(ctcf)} CTCF rows + {len(merged)} RNAPII = {len(rows)}")
+    print("RNAPII", st.describe())
+    print(f"anchors: {len(ctcf)} CTCF rows + {st.added} RNAPII = {len(rows)}")
     print(f"wrote {OUT_LOOPS} and {OUT_ANCHORS}")
 
 

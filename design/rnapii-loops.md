@@ -130,3 +130,61 @@ and the behaviours around active genes, so the expression test is the objective 
 Hi-C battery is the cost it is read against, not a gate. A strength is chosen for the trios by
 how much expression signal it keeps per unit of structure it costs; full strength stays a
 candidate if the gain is monotone in it. The CTCF arm keeps the battery as its gate as before.
+
+## The strength sweep, 2026-09-20
+
+Same chr1, three structures per strength arm, the two first pass arms at five. Strength 0
+holds every RNAPII loop at the background, so its anchors are beads with no pull.
+
+| RNAPII strength | n | Pearson | SCC | MultiMM | Rg | wb-aa | wb-sa | xb | saddle | eig r | expression Spearman |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| CTCF only | 5 | 0.309 | 0.364 | 0.682 | 25.1 | 2.7 | 91 | 25 | 1.15 | 0.12 | -0.178 |
+| 0 | 3 | 0.263 | 0.259 | 0.538 | 24.8 | 7.0 | 11 | 16 | 0.82 | 0.22 | -0.149 |
+| 0.1 | 3 | 0.267 | 0.260 | 0.547 | 24.5 | 7.6 | 12 | 17 | 0.83 | 0.13 | -0.188 |
+| 0.3 | 3 | 0.270 | 0.265 | 0.552 | 24.3 | 8.0 | 13 | 19 | 0.90 | 0.13 | -0.224 |
+| 1 | 5 | 0.278 | 0.280 | 0.587 | 24.0 | 9.1 | 15 | 19 | 0.96 | 0.25 | -0.234 |
+
+Two things separate cleanly. The Hi-C cost is the anchor set's, not the pull's: at strength 0
+SCC, MultiMM, Pearson and the saddle are already at their lowest and the anchor overlaps are
+already at 7 per thousand, and every one of them recovers a little as the strength rises. The
+expression signal is the pull's: it is monotone in the strength from -0.149, worse than CTCF
+alone, to -0.234 at full strength. There is no trade to make between the two, so the trios
+run RNAPII at full strength, `[springs] factor_strength = 1,1`.
+
+What the anchor set costs is a separate question, and it is the one to take up if the RNAPII
+arm needs its Hi-C back: 57,258 anchors of 1 kb, dense around promoters, take the joint solve
+from 52 blocks to 92 on chr1 and put anchors within a bead of each other where the CTCF set
+had none. The remedy would be in how those ends become beads, wider anchors or ends merged
+with a neighbouring CTCF anchor within some distance, not in the springs. Not built.
+
+## The trio arm
+
+Built 2026-09-20, on the laptop, `playground/trio/README.md` has the sequence. The same Drive
+folder holds each sample's RNAPOL2 ChIA-PET, and its `downsampling/<family>/<sample>_RNAP2/`
+folder holds a filtered `wyniki_*RNAP*.BE3` set, the counterpart of the CTCF arm's high quality
+set. `trio_fetch.py --factor RNAPOL2` fetches it under a `_rnapol2` tag beside the CTCF files,
+`trio_prepare.py --factor RNAPOL2` writes `<S>_rnapol2_clusters_3+.bedpe` and the shared
+anchor set `<S>_anchors_ctcf_rnapol2.bed` by the GM12878 rule, now in
+`playground/rnapii/anchor_union.py` and byte identical to the file the GM12878 script wrote,
+and `trio_configs.py --factor RNAPOL2` writes `<s>_trio_rnapol2.ini` at full strength. The
+array takes `CONFIG_TAG=_trio_rnapol2 OUT=out/trio_rnapol2` and its guard now checks every
+cluster file, so the second file failing to travel cannot silently run the CTCF arm.
+
+| sample | RNAPOL2 loops | ends on a CTCF anchor | new anchors | shared anchors | on own RNAPOL2 peak |
+|---|---|---|---|---|---|
+| HG00512 | 155,906 | 54% | 74,878 | 335,270 | 76% |
+| HG00513 | 82,771 | 52% | 49,038 | 305,142 | 77% |
+| HG00514 | 15,708 | 50% | 12,548 | 271,288 | 70% |
+| HG00731 | 49,245 | 52% | 32,609 | 363,045 | 75% |
+| HG00732 | 37,201 | 58% | 19,872 | 353,705 | 83% |
+| HG00733 | 101,829 | 48% | 58,556 | 387,872 | 75% |
+| GM19239 | 193,929 | 46% | 98,390 | 299,855 | 78% |
+| GM19238 | 120,490 | 48% | 70,670 | 270,801 | 74% |
+| GM19240 | 158,862 | 50% | 72,587 | 272,437 | 81% |
+
+Open, for the user: the RNAPOL2 depth is not matched within families. The CTCF arm draws every
+sample down to its family's minimum so that a parent against child comparison is not a density
+comparison. The filtered RNAPOL2 sets are far more uneven, HG00514 at a tenth of its father
+and HG00732 at a third of its child, so the same draw would leave CHS with 15,708 RNAPOL2
+loops per sample. The tooling does the draw when asked, `trio_downsample.py --factor RNAPOL2`
+then `trio_prepare.py --factor RNAPOL2 --force`; the files built tonight are unmatched.

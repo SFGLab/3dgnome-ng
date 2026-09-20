@@ -37,6 +37,46 @@ python playground/trio/trio_configs.py --samples HG00512
 ```
 
 
+## The CTCF plus RNAPOL2 arm
+
+The same folder holds each sample's RNAPOL2 ChIA-PET, and the model reads a second factor as
+its own cluster file with its own strength fit, `design/rnapii-loops.md`. The arm reuses the
+CTCF arm's contact map, blocks, segments and singletons, so it needs only the loop files, the
+shared anchor set and a config. Every RNAPOL2 file sits beside its CTCF file under a
+`_rnapol2` tag, so the two arms never overwrite each other.
+
+```bash
+# on the laptop, after the CTCF sequence above
+python playground/trio/trio_fetch.py --inventory trio_inventory.json --factor RNAPOL2
+python playground/trio/trio_downsample.py --factor RNAPOL2 --dry-run    # see the note below
+python playground/trio/trio_prepare.py --factor RNAPOL2 --skip-hic
+python playground/trio/trio_configs.py --factor RNAPOL2
+
+# to the cluster: the RNAPOL2 clusters and the shared anchors only
+for S in HG00512 HG00513 HG00514 HG00731 HG00732 HG00733 GM19238 GM19239 GM19240; do
+  rsync -av "data/$S/${S}_rnapol2_clusters_3+.bedpe" "data/$S/${S}_anchors_ctcf_rnapol2.bed" \
+        "cluster:$ROOT/data/$S/"
+done
+
+# on the cluster, its own tree and config tag
+CONFIG_TAG=_trio_rnapol2 OUT=out/trio_rnapol2 CHROMS=chr1 PER_TASK=10 \
+  sbatch --array=0-8%6 --time=24:00:00 slurm/ensemble/trio_ensemble.sh
+```
+
+The loop input is the providers' filtered RNAPOL2 set, `wyniki_*RNAP*.BE3`, the counterpart of
+the CTCF arm's high quality set. The anchor set is the CTCF anchors verbatim plus the RNAPOL2
+loop ends that overlap no CTCF anchor, as anchors of no orientation, the rule
+`playground/rnapii/prep_gm12878.py` applies to GM12878. The RNAPOL2 loops run at full strength,
+`[springs] factor_strength = 1,1`, because on GM12878 chr1 the pull carried the expression
+signal and the anchor set carried the Hi-C cost at every strength.
+
+**RNAPOL2 depth is not matched, by default.** The filtered RNAPOL2 sets are far more uneven
+than the CTCF ones: within CHS the child HG00514 holds about a tenth of its father's loops, so
+drawing the family down to its minimum would leave the whole family with almost no RNAPOL2
+signal. `trio_downsample.py --factor RNAPOL2` does the draw when asked, and `trio_prepare.py
+--factor RNAPOL2 --force` then rebuilds on the matched files. Whether to match is a decision
+about what the trio comparison reads, and it is left open here.
+
 ## Running on the cluster
 
 The anchors and clusters are built on the laptop, because the motif track they need matches

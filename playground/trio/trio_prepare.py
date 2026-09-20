@@ -12,6 +12,13 @@ the existing tooling takes over unchanged.
 The loop input is the high quality set, PET3+ loops whose anchors both overlap a CTCF binding
 site. Anchors are the distinct anchor intervals of those loops, which is how the GM12878
 anchor file in this repo relates to its own cluster file.
+
+A second factor is prepared after the CTCF set, with `--factor RNAPOL2`. Its filtered loops
+become `<S>_rnapol2_clusters_3+.bedpe`, and `<S>_anchors_ctcf_rnapol2.bed` is the CTCF anchor
+file verbatim plus the RNAPOL2 loop ends that overlap no CTCF anchor, as anchors of no
+orientation, the rule playground/rnapii/prep_gm12878.py applies to GM12878.
+
+    python playground/trio/trio_prepare.py --factor RNAPOL2 --skip-hic
 """
 
 import argparse
@@ -21,9 +28,11 @@ from collections import defaultdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "rnapii"))
 
 import trio_orient  # noqa: E402
 import trio_samples  # noqa: E402
+from anchor_union import read_anchors, union_anchors  # noqa: E402
 
 CENTROMERES = Path("data/GM12878/hg38_centromeres.bed")
 
@@ -188,16 +197,71 @@ def prepare(
         convert_hic(raw / f"{name}_allres.hic", data_root / "_hic" / name / f"{name}.mcool")
 
 
+def prepare_factor(
+    sample: trio_samples.Sample, raw_root: Path, data_root: Path, factor: str, force: bool
+) -> None:
+    """A second factor's loops as their own cluster file, and the anchor set both factors share.
+
+    Needs the CTCF anchors of `prepare` first, since those are kept verbatim. Skips the contact
+    map, which is the CTCF arm's and is shared.
+    """
+    tag = factor.lower()
+    name = sample.name
+    raw = raw_root / name
+    out = data_root / name
+    clusters = out / f"{name}_{tag}_clusters_3+.bedpe"
+    anchors = out / f"{name}_anchors_ctcf_{tag}.bed"
+    ctcf_anchors = out / f"{name}_anchors_3+_oriented.bed"
+    if not ctcf_anchors.is_file():
+        raise SystemExit(f"[prepare:{name}] {ctcf_anchors} is missing, run the CTCF prepare first")
+    if not force and clusters.is_file() and anchors.is_file() and clusters.stat().st_size:
+        n = sum(1 for _ in anchors.open())
+        print(f"[prepare:{name}] have {factor} clusters and {n} shared anchors, skipping")
+        return
+
+    matched = raw / f"{name}_{tag}_hq.matched.BE3"
+    source = matched if matched.is_file() else raw / f"{name}_{tag}_hq.BE3"
+    if not source.is_file():
+        raise SystemExit(f"[prepare:{name}] {source} is missing, fetch with --factor {factor}")
+    if matched.is_file():
+        print(f"[prepare:{name}] using the depth matched {factor} loop set {matched.name}")
+    loops = read_loops(source)
+    pets = [x[6] for x in loops]
+    print(f"[prepare:{name}] {factor}: {len(loops)} loops, PET {min(pets)} to {max(pets)}")
+    write_atomic(
+        clusters,
+        [f"{c1}\t{s1}\t{e1}\t{c2}\t{s2}\t{e2}\t{pet}\n" for c1, s1, e1, c2, s2, e2, pet in loops],
+    )
+
+    ctcf = read_anchors(ctcf_anchors)
+    ends = [(c, s, e) for c1, s1, e1, c2, s2, e2, _ in loops for c, s, e in ((c1, s1, e1), (c2, s2, e2))]
+    rows, st = union_anchors(ctcf, ends)
+    write_atomic(anchors, [f"{c}\t{s}\t{e}\t{o}\n" for c, s, e, o in rows])
+    print(f"[prepare:{name}] {factor} {st.describe()}")
+    print(f"[prepare:{name}] anchors: {len(ctcf)} CTCF + {st.added} {factor} = {len(rows)}")
+    peaks = raw / f"{name}_{tag}_peaks.broadPeak"
+    if peaks.is_file():
+        own = sorted(set(ends))
+        print(
+            f"[prepare:{name}] {factor} loop ends on a called {factor} peak: "
+            f"{100 * peak_overlap(own, peaks):.1f}%"
+        )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--raw", default="data/_trio")
     ap.add_argument("--data-root", default="data")
     ap.add_argument("--samples")
+    ap.add_argument("--factor", choices=("CTCF", "RNAPOL2"), default="CTCF")
     ap.add_argument("--skip-hic", action="store_true", help="text inputs only, no mcool")
     ap.add_argument("--force", action="store_true", help="rebuild outputs that already exist")
     args = ap.parse_args()
     for s in trio_samples.resolve(args.samples):
-        prepare(s, Path(args.raw), Path(args.data_root), args.skip_hic, args.force)
+        if args.factor == "CTCF":
+            prepare(s, Path(args.raw), Path(args.data_root), args.skip_hic, args.force)
+        else:
+            prepare_factor(s, Path(args.raw), Path(args.data_root), args.factor, args.force)
 
 
 if __name__ == "__main__":
