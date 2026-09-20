@@ -194,11 +194,22 @@ def solve_arcs(
         excl_skip,
     )
     n_it = int(s.arcs_solver_iters if iters is None else iters)
+    device = str(s.arcs_solver_device).strip().lower()
+    if device not in ("cpu", "gpu"):
+        raise ValueError(f"[simulation_arcs] solver_device must be cpu or gpu, got {device!r}")
     t0 = time.perf_counter()
+    if device == "gpu":
+        from gnome3d.mc.jax.arcs_energy import DeviceArcsEnergy  # noqa: PLC0415
+
+        fun: Any = DeviceArcsEnergy(exp64, args[1:])
+        fun_args: tuple[Any, ...] = ()
+    else:
+        fun = arcs_energy_grad
+        fun_args = args
     res: Any = minimize(
-        arcs_energy_grad,
+        fun,
         pw.reshape(-1),
-        args=args,
+        args=fun_args,
         jac=True,
         method="L-BFGS-B",
         options={"maxiter": n_it, "maxfun": 4 * n_it, "maxcor": 20},
@@ -208,7 +219,8 @@ def solve_arcs(
     if n >= 2048:
         log.status(
             LOG,
-            "arcs solver: %d anchors, %d iterations, %d evaluations, %.1fs, %s",
+            "arcs solver on %s: %d anchors, %d iterations, %d evaluations, %.1fs, %s",
+            device,
             n,
             int(res.nit),
             int(res.nfev),

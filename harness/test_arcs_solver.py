@@ -169,6 +169,67 @@ def test_it_descends() -> None:
     )
 
 
+def test_device_energy_matches_the_cpu_kernel() -> None:
+    """The device evaluation is the CPU kernel's energy term for term, on a block carrying every
+    kind of pair: springs, backgrounds, repulsion, excluded volume and confinement."""
+    try:
+        import jax  # noqa: F401
+    except ImportError:
+        print("  skip  JAX not available, the device energy is not checked")
+        return
+    from gnome3d.mc.jax.arcs_energy import DeviceArcsEnergy
+
+    pos, exp, s = block(n=120, seed=11)
+    s.use_excluded_volume = True
+    s.exclusion_apply_to_arcs = True
+    s.background_weight = 0.1
+    rng = np.random.default_rng(12)
+    for _ in range(60):
+        i, j = rng.integers(0, exp.shape[0], 2)
+        if i != j and exp[i, j] < 0.0:
+            exp[i, j] = exp[j, i] = -float(rng.uniform(0.8, 2.5))
+    rep_inv, cx, cy, cz, cr, r0, w = terms(pos, exp, s)
+    args = (
+        exp,
+        float(s.spring_stretch_arcs),
+        float(s.spring_squeeze_arcs),
+        rep_inv,
+        float(s.background_weight),
+        cx,
+        cy,
+        cz,
+        cr,
+        float(s.confinement_weight),
+        r0,
+        w,
+        int(s.exclusion_skip_neighbors),
+    )
+    fun = DeviceArcsEnergy(exp, args[1:])
+    worst_e = 0.0
+    worst_g = 0.0
+    for k in range(3):
+        x = pos.astype(np.float64).reshape(-1) + rng.normal(0.0, 0.2 * k, size=pos.size)
+        e_cpu, g_cpu = arcs_energy_grad(x, *args)
+        e_dev, g_dev = fun(x)
+        worst_e = max(worst_e, abs(e_dev - e_cpu) / max(abs(e_cpu), 1e-12))
+        worst_g = max(
+            worst_g, float(np.max(np.abs(g_dev - g_cpu)) / max(np.max(np.abs(g_cpu)), 1e-12))
+        )
+    check("the device energy is the CPU kernel's", worst_e < 1e-10, f"worst relative {worst_e:.1e}")
+    check(
+        "the device gradient is the CPU kernel's", worst_g < 1e-9, f"worst relative {worst_g:.1e}"
+    )
+    s.arcs_solver_device = "gpu"
+    e_dev, _ = solve_arcs(pos, exp, s, iters=50)
+    s.arcs_solver_device = "cpu"
+    e_cpu, _ = solve_arcs(pos, exp, s, iters=50)
+    check(
+        "the solver on the device reaches the CPU solve's energy",
+        abs(e_dev - e_cpu) / max(abs(e_cpu), 1e-12) < 1e-2,
+        f"{e_cpu:,.4f} against {e_dev:,.4f}",
+    )
+
+
 def test_off_by_default() -> None:
     check("the stage anneals unless asked otherwise", Settings().arcs_solver == "mc")
 
@@ -228,6 +289,7 @@ def main() -> int:
     test_energy_is_the_one_the_mc_scores()
     test_gradient_matches_finite_differences()
     test_it_descends()
+    test_device_energy_matches_the_cpu_kernel()
     test_off_by_default()
     test_an_unknown_name_is_refused()
     test_the_batched_runner_cannot_honour_it()

@@ -330,6 +330,7 @@ class Settings:
     polymer: PolymerLaw | None
     arcs_solver: str
     arcs_solver_iters: int
+    arcs_solver_device: str
     arcs_start: str
     arcs_scope: str
     mc_stop_ratio_arcs: float
@@ -661,6 +662,9 @@ class Settings:
         self.polymer = None
         self.arcs_solver = "mc"
         self.arcs_solver_iters = 200
+        # Where the solver's energy is evaluated. cpu is the numba kernel; gpu evaluates the same
+        # energy on the JAX device in float64, one target matrix read per evaluation.
+        self.arcs_solver_device = "cpu"
         # Where a block's anchors start. centroid is every anchor at the block centroid; walk is
         # a random walk at the law's distance per gap. Under measurement.
         self.arcs_start = "centroid"
@@ -1155,6 +1159,7 @@ class Settings:
         )
         self.arcs_solver = gets("simulation_arcs", "solver", self.arcs_solver)
         self.arcs_solver_iters = geti("simulation_arcs", "solver_iters", self.arcs_solver_iters)
+        self.arcs_solver_device = gets("simulation_arcs", "solver_device", self.arcs_solver_device)
         self.arcs_start = gets("simulation_arcs", "start", self.arcs_start)
         self.arcs_scope = gets("simulation_arcs", "scope", self.arcs_scope)
         self.mc_stop_improvement_smooth = getf(
