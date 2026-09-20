@@ -303,3 +303,36 @@ p 0.03 and 0.02 within GM19238 against GM19240, and reversed on the contrasts th
 HG00512, the CHS father, three of them significantly positive. At |log2FC| 2 a contrast keeps
 5 to 21 genes and the arms cannot be ranked. What would settle it is the genome, where a
 contrast keeps ten times the genes.
+
+### The transition idea within one person, 2026-09-20
+
+enhancer3d's result between cell types is that large expression differences go with
+proximity shifts, up to r about -0.6, while the genome wide relation is weak. Between the nine
+individuals there are no large differences to condition on, so
+`enhancer3d/playground/trio_individual_transitions.py` asks it within a person, three ways,
+each per individual and never averaged, `trio_individual_transitions.png` and
+`trio_individual_vs_panel.png` with their csvs beside them.
+
+The one axis of large expression difference a lymphoblastoid individual carries is its cell
+type's own programme, so the cell line DE tables, GM12878 against H1ESC and against HFFC6,
+give each gene an LCL fold change, and the individual's own model gives the distance. The raw
+Spearman of distance against that fold change sharpens with the threshold exactly as the
+paper's does, on the RNAPOL2 arm from -0.27 on all genes to -0.52 on the 401 chr1 genes at
+|log2FC| 4 against H1ESC, the CTCF arm -0.26 to -0.48, and the individual's own expression on
+those genes reaches -0.50. The partial controlling linear distance to the nearest enhancer does
+not move, -0.05 to -0.18 at every threshold on every arm. The sharpening is carried by linear
+proximity: the LCL programme's genes sit beside the LCL enhancer atlas on the chromosome,
+which is partly circular since the atlas is GM12878's, and the models place them close. So
+the claim ports as a raw correlation and not as a claim about the structure beyond the
+sequence.
+
+The two tails of a person's own expression sharpen the partial a little, keeping 40 percent of
+genes takes the RNAPOL2 arm from -0.13 to -0.21 across the nine to -0.12 to -0.26 and the CTCF
+arm from -0.10 to -0.16 to -0.09 to -0.20, and 10 percent, 300 genes, is noise. Each
+individual against the median of the other eight keeps 4 to 19 genes on chr1 and says nothing.
+
+What would carry the idea properly within a person is a transition the person has on both
+sides: the two haplotypes. The folder holds phased loops for every sample, `_Maternal`,
+`_Paternal` and `_Crossed`, and allele specific expression from the same RNA-seq would give
+each gene a within nucleus fold change with the trans environment held fixed. Haplotype models
+are not built.
