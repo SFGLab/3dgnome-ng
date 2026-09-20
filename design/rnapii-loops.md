@@ -362,3 +362,6 @@ nearest enhancer in the closest distance tertile 52 to 58 percent of the time ag
 closest tertile have median log2 expression 11.1 to 11.7 against 4.5 to 5.7 for the farthest
 tertile, Mann-Whitney p 1e-53 to 1e-67 in every person. What the linear control leaves is
 about a third of the raw number at every cut, and it does not grow on the tails.
+
+What limits the number and the ideas to raise it, with their status, are tracked in
+`expression-from-structure.md`.

@@ -1,0 +1,76 @@
+# Expression from structure
+
+The question, 2026-09-20: can the 3D models explain more of a person's RNA-seq expression than
+they do now, and what limits them. The setting is the one that stands after the RNAPII work
+in `rnapii-loops.md`: the CTCF with RNAPOL2 trio arm, each of the nine people on their own
+model and their own expression, nothing averaged over people and no fold change across cell
+lines, since a person has one sample. chr1 at ten conformations until the genome arms run.
+This note holds the numbers to beat, what has been ruled out, and the ideas in the order they
+are to be tried, each with its status, so it is the tracker.
+
+## Where it stands
+
+Per person, chr1, genes the person expresses at all, 2,268 to 2,467. `rnapol2_individual.py`
+and `trio_diag.py` in `enhancer3d/playground`, outputs under `playground/trio_rnapol2/` on the
+workstation and `~/Desktop/enhancer3d/playground/trio_rnapol2/`.
+
+| feature against the person's expression, Spearman, range over the nine | rho |
+|---|---|
+| mean distance to the nearest atlas enhancer, the current feature | -0.34 to -0.39 |
+| the same with the silent genes kept | -0.36 to -0.44 |
+| the same on protein coding genes only, about 1,650 | -0.38 to -0.44 |
+| the same controlling linear distance to the nearest enhancer | -0.13 to -0.21 |
+| mean or maximum distance over all enhancers | 0.00 |
+| the input alone: RNAPOL2 loops with an anchor at the TSS | +0.43 to +0.57 |
+| the input alone: RNAPOL2 PET count at the TSS | +0.42 to +0.55 |
+| CTCF PET count at the TSS | +0.25 to +0.33 |
+| the current feature controlling the RNAPOL2 PET at the TSS | -0.08 to -0.20 |
+
+Three baselines every idea is judged against, per person: the input alone, the linear partial,
+and the current feature. The number that answers the question is what a 3D feature adds beyond
+the input and beyond linear proximity, out of fold where a fit is involved.
+
+## What is ruled out
+
+The colleague's hypothesis was the processing and the normalisation. Checked 2026-09-20:
+
+- The nine RNA-seq samples agree with each other at Spearman 0.90 or better, no outlier.
+- Counts are raw, so expression correlates with gene length at +0.35, but the distance does
+  not, at 0.00 to -0.10, and the partial controlling length is the raw number.
+- 46 percent of modelled chr1 genes have no count under their name, all of them non coding;
+  2,004 of 2,056 protein coding genes are covered.
+- Keeping the silent genes and restricting to protein coding each add a few hundredths.
+
+So the processing is worth a few hundredths and is not the ceiling.
+
+## Why the ceiling is the feature
+
+RNAPOL2 ChIA-PET is a polymerase occupancy readout, so its loop count at a promoter predicts
+expression at 0.55 with no model at all. The model turns that input into one number, the mean
+over conformations of the distance to the nearest enhancer of the GM12878 atlas, and that
+number keeps 0.36. A model cannot out-explain its own input on a per promoter measure. What
+it can add is geometry, which enhancers a promoter is brought together with and how often,
+and the current feature reads almost none of that: every summary over more than the nearest
+enhancer sits at zero.
+
+## Ideas, in the order to try them
+
+The judge for each is the table above, per person. Status is one of open, running, done and
+adopted, done and dropped. A result line gets the numbers and the date.
+
+| # | idea | what to build | status | result |
+|---|---|---|---|---|
+| 1 | Contact weighted enhancer load, the multi enhancer hub in one feature | Per gene the sum over enhancers of the atlas activity times a contact term, the ensemble frequency P(d < r) or exp(-d / d0), in the ABC model's form; the number of enhancers within r as the plain hub size. The pairwise mean distances are computed inside `genome_ep_distances.py` and only min, mean and max are kept, so the change is to keep the pairs. | open | |
+| 2 | Contact frequency instead of mean distance | A loop is on in some conformations and off in others and the mean blurs it. P(d < r) over the ensemble for the nearest enhancer and inside idea 1. Ten conformations is thin for it; the genome arms give more. | open | |
+| 3 | Distance relative to the polymer expectation | The law gives the expected distance at any genomic separation, so observed over expected says closer than the chain would be, which is the loop signal itself. Replaces the linear partial, which approximates it crudely. | open | |
+| 4 | The person's own regulatory elements | All nine use the GM12878 atlas. Each sample's RNAPOL2 peaks are fetched, and RNAPOL2 bound non promoter sites are that person's active elements; a hub of RNAPOL2 peaks within a 3D radius is the transcription factory view. Ideas 1 to 3 on that set. | open | |
+| 5 | A model, not one correlation | Per person, cross validated regression of log expression on the 3D features, the linear features, the promoter RNAPOL2 PET, CTCF, gene length and type; the out of fold gain from the 3D features is the answer to how much more. | open | |
+| 6 | The expression side | Protein coding only, silent genes kept or on and off fitted separately from level, length normalisation for the regression. Worth a few hundredths, see above. | open | |
+| 7 | Haplotypes, the within person transition | The folder holds phased loops for every sample. A maternal and a paternal model of one nucleus with allele specific expression from the same RNA-seq gives each gene a fold change with the trans environment fixed, the port of enhancer3d's between cell type result that stands. Needs haplotype models and allele specific counts, neither built. | open | |
+
+Ideas 1 to 3 are features from the pairwise distances the pipeline already computes, about a
+day of work with 5 on top, and they run on the models there are.
+
+## Log
+
+- 2026-09-20. Question raised, diagnostics run, baselines set, list written.
