@@ -267,3 +267,39 @@ Inheritance is null on both arms, as on every earlier run.
 Not done: the lab's RNAPII gene body signal, 4,266 genes at Spearman over 0.5 with
 expression, is a described result and not a table this side holds. The comparison needs
 their per gene, per sample gene body counts.
+
+### Per individual, and the jump statistic per contrast, 2026-09-20
+
+Nothing averaged over people from here on. `enhancer3d/playground/trio_arms_jump.py`
+writes three figures to `playground/trio_arms/` on the workstation, copied to
+`~/Desktop/enhancer3d/playground/trio_arms/`: `trio_arms_individual.png`, every individual's
+raw and partial correlation on the three arms; `trio_arms_jump.png`, the enhancer3d
+statistic on every contrast; `trio_arms_jump_ridges.png`, the fold change ridges for the
+child against parents contrasts. The table is `trio_arms_jump.csv`.
+
+Per individual the RNAPOL2 arm deepens the partial on eight of nine and the CTCF arm on nine
+of nine against the providers' run; HG00514 is level between the two new arms.
+
+The enhancer3d statistic is the one the paper uses between cell lines: genes whose enhancer
+distance jumps a tertile class between the two sides of a contrast, small to large or back,
+and whose expression differs by at least |log2FC| 1, then the Spearman of fold change
+against distance change and the median fold change of genes that came closer minus that of
+genes that moved away, both expected negative and positive. Contrasts are each child
+against its mid parent, the nine within family pairs and the 27 between family pairs. On
+chr1 a contrast keeps 11 to 92 genes, so one contrast is noise and the reading is across
+contrasts.
+
+| |log2FC| at least 1 | providers' inputs | CTCF | CTCF with RNAPOL2 |
+|---|---|---|---|
+| between family pairs, 27: median rho, right sign, p under 0.05 with it | -0.04, 18, 0 | -0.17, 25, 6 | -0.10, 18, 3 |
+| between family pairs, median closer minus farther log2FC | 0.0 | +1.5 | +0.2 |
+| within family pairs, 9: median rho, right sign | +0.05, 2 | -0.11, 7 | -0.08, 6 |
+| child against parents, 3: rho | 0.00, -0.09, -0.01 | +0.39, -0.48, -0.12 | -0.44, +0.09, -0.54 |
+
+The providers' models have no jump signal at all. The CTCF arm has it on 25 of 27 between
+family contrasts, six of them significant on their own, and 7 of 9 within. The RNAPOL2 arm
+has it more strongly where it has it, the CHS and YRI children against their parents at
+p 0.03 and 0.02 within GM19238 against GM19240, and reversed on the contrasts that involve
+HG00512, the CHS father, three of them significantly positive. At |log2FC| 2 a contrast keeps
+5 to 21 genes and the arms cannot be ranked. What would settle it is the genome, where a
+contrast keeps ten times the genes.
