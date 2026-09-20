@@ -663,7 +663,7 @@ class Settings:
         self.arcs_solver = "mc"
         self.arcs_solver_iters = 200
         # Where the solver's energy is evaluated. cpu is the numba kernel; gpu evaluates the same
-        # energy on the JAX device in float64, one target matrix read per evaluation.
+        # energy on the JAX device in float32, one target matrix read per evaluation.
         self.arcs_solver_device = "cpu"
         # Where a block's anchors start. centroid is every anchor at the block centroid; walk is
         # a random walk at the law's distance per gap. Under measurement.
