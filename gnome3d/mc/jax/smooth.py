@@ -433,16 +433,27 @@ def _build_smooth_kernel(
         nbr_valid: Any,
         motif_weight: Any,
         symmetric: Any,
+        a_vec: Any = None,
     ) -> Any:
         """Local orientation score for anchor k, summed over its (padded)
-        neighbors.  Mirrors gnome3d.mc._local_score_orientation_nb."""
+        neighbors.  Mirrors gnome3d.mc._local_score_orientation_nb.
+
+        `a_vec` stands in for anchor k's own vector when given. A trial move changes that
+        vector alone, so the trial score reads the neighbours from the array as it is and
+        never writes a copy of it. Written as a copy, `anchor_orn.at[k].set(trial)` under the
+        proposal vmap became a broadcast of the whole array to one copy per proposal, 82 MB
+        a batch on a chromosome, and was half of every batch's time."""
         # nbr_idx[k, :] are the neighbor anchor indices (max_nbrs wide, padded
         # with 0 + nbr_valid=False).  nbr_w[k, :] are the per-edge weights.
         neighbors_k = nbr_idx[k]  # (max_nbrs,)
         weights_k = nbr_w[k]  # (max_nbrs,)
         valid_k = nbr_valid[k]  # (max_nbrs,)
-        a = anchor_orn[k]  # (3,)
+        a = anchor_orn[k] if a_vec is None else a_vec  # (3,)
         b = anchor_orn[neighbors_k]  # (max_nbrs, 3)
+        if a_vec is not None:
+            # A loop whose two ends map to one anchor lists k as its own neighbour, and the
+            # copy would have shown the trial vector there too.
+            b = jnp.where((neighbors_k == k)[:, None], a[None, :], b)
         b_signed = jnp.where(symmetric, b, -b)
         dot = jnp.sum(a[None, :] * b_signed, axis=1)  # (max_nbrs,)
         ang = 1.0 - (dot + 1.0) * 0.5
@@ -605,16 +616,17 @@ def _build_smooth_kernel(
                 ar_p = anchor_ar[safe_k]
                 is_L_ar = is_L[ar_p]
                 new_orn_vec = _calc_orientation_at(pos, p, new_p, ar_p, is_L_ar)
-                # Update only that slot in anchor_orn (functional, single scatter)
-                anchor_orn_trial = anchor_orn.at[safe_k].set(new_orn_vec)
+                # Anchor k's neighbour list never holds k itself, so the trial score is the
+                # same sum with k's vector swapped, and the array is left untouched.
                 loc_o_curr_raw = _local_orientation_at(
-                    anchor_orn_trial,
+                    anchor_orn,
                     safe_k,
                     nbr_idx,
                     nbr_w,
                     nbr_valid,
                     motif_weight,
                     symmetric,
+                    a_vec=new_orn_vec,
                 )
                 loc_o_curr = jnp.where(has_orn, loc_o_curr_raw, 0.0)
                 so_new = so + 2.0 * (loc_o_curr - loc_o_prev)
@@ -1326,6 +1338,23 @@ def _build_smooth_kernel(
             in_axes=(0, None, None, None, None, None),
         )
     )
+    # The same initialisers over K chains that each carry their own problem data, so a launch
+    # scores its chains in one call. Each chain's scan is the single chain's, run side by side.
+    # Called one chain at a time on a chromosome these took a minute a structure, each call a
+    # scan of B rows with a host sync between chains.
+    init_k = {
+        "smooth": jax.jit(jax.vmap(_init_smooth_single, in_axes=(0, 0, 0, 0, 0, None, None, 0))),
+        "excl": jax.jit(jax.vmap(_init_excl_single, in_axes=(0, 0, None, 0))),
+        "affinity": jax.jit(
+            jax.vmap(_init_affinity_single, in_axes=(0, 0, 0, None, None, None, 0))
+        ),
+        "heat": jax.jit(jax.vmap(_init_heat_single, in_axes=(0, 0, None))),
+        "confine": jax.jit(jax.vmap(_init_confine_single, in_axes=(0, 0, 0, 0, 0, 0, 0))),
+        "anchor_orn": jax.jit(jax.vmap(_init_anchor_orientations_single, in_axes=(0, 0, 0))),
+        "orn_score": jax.jit(
+            jax.vmap(_init_orientation_score_single, in_axes=(0, 0, 0, 0, None, None))
+        ),
+    }
 
     # ---- multi-problem variant: K DIFFERENT IBs in one kernel ----
     #
@@ -1584,6 +1613,7 @@ def _build_smooth_kernel(
         init_orn_score,
         kernel_full_mp,  # region-batched (K different IBs); per-chain convergence
         init_affinity,
+        init_k,
     )
     _kernel_cache[cache_key] = bundle
     return bundle
@@ -1829,6 +1859,7 @@ def mc_smooth_jax(
         init_orn_score,
         _kernel_full_mp,  # region-batched entry uses this; single-problem path ignores it
         init_affinity,
+        _init_k,
     ) = bundle
 
     pos_k = jnp.asarray(pos_k_np)
@@ -2546,14 +2577,15 @@ def _mc_smooth_jax_batch_chunk(
     (
         _kb,
         _kf,
-        init_smooth,
-        init_excl,
-        init_heat,
-        init_confine,
-        init_anchor_orn,
-        init_orn_score,
+        _init_smooth,
+        _init_excl,
+        _init_heat,
+        _init_confine,
+        _init_anchor_orn,
+        _init_orn_score,
         kernel_full_mp,
-        init_affinity,
+        _init_affinity,
+        init_k,
     ) = bundle
 
     # --- per-IB initial scores (one-shot; reuse the validated init helpers) ---
@@ -2561,53 +2593,36 @@ def _mc_smooth_jax_batch_chunk(
     ang_w = jnp.float32(settings.smooth_angle_weight)
     symmetric = jnp.bool_(bool(getattr(settings, "motifs_symmetric", True)))
 
-    def init_one(i: int) -> tuple[Any, Any, Any, Any, Any, Any]:
-        p1 = pos_k[i : i + 1]  # (1, B, 3)
-        na = jnp.int32(int(np.asarray(n_active_k[i])))
-        ss = init_smooth(p1, dtn_k[i], stretch_k[i], squeeze_k[i], ang_k[i], dist_w, ang_w, na)
-        se = (
-            init_excl(p1, excl_r0_k[i], jnp.float32(excl_w_v), na)
-            if use_excl
-            else jnp.zeros((1,), jnp.float32)
+    zeros_k = jnp.zeros((K,), jnp.float32)
+    ss_k = init_k["smooth"](pos_k, dtn_k, stretch_k, squeeze_k, ang_k, dist_w, ang_w, n_active_k)
+    se_k = (
+        init_k["excl"](pos_k, excl_r0_k, jnp.float32(excl_w_v), n_active_k) if use_excl else zeros_k
+    )
+    if use_aff:
+        # Rides the excluded-volume accumulator; same counting convention.
+        se_k = se_k + init_k["affinity"](
+            pos_k,
+            comp_cls_k,
+            comp_r0_k,
+            jnp.float32(comp_w_v),
+            jnp.float32(comp_ea_v),
+            jnp.float32(comp_eb_v),
+            n_active_k,
         )
-        if use_aff:
-            # Rides the excluded-volume accumulator; same counting convention.
-            se = se + init_affinity(
-                p1,
-                comp_cls_k[i],
-                comp_r0_k[i],
-                jnp.float32(comp_w_v),
-                jnp.float32(comp_ea_v),
-                jnp.float32(comp_eb_v),
-                na,
-            )
-        sh = (
-            init_heat(p1, heat_k[i], jnp.float32(heat_weight_v))
-            if use_heat
-            else jnp.zeros((1,), jnp.float32)
+    sh_k = init_k["heat"](pos_k, heat_k, jnp.float32(heat_weight_v)) if use_heat else zeros_k
+    sc_k = (
+        init_k["confine"](pos_k, conf_cx_k, conf_cy_k, conf_cz_k, conf_R_k, conf_w_k, n_active_k)
+        if use_conf
+        else zeros_k
+    )
+    if use_orn:
+        anchor_orn_k = init_k["anchor_orn"](pos_k, anchor_ar_k, is_L_k)
+        so_k = init_k["orn_score"](
+            anchor_orn_k, nbr_idx_k, nbr_w_k, nbr_valid_k, jnp.float32(motif_weight_v), symmetric
         )
-        sc = (
-            init_confine(p1, conf_cx_k[i], conf_cy_k[i], conf_cz_k[i], conf_R_k[i], conf_w_k[i], na)
-            if use_conf
-            else jnp.zeros((1,), jnp.float32)
-        )
-        if use_orn:
-            ao = init_anchor_orn(p1, anchor_ar_k[i], is_L_k[i])
-            so = init_orn_score(
-                ao, nbr_idx_k[i], nbr_w_k[i], nbr_valid_k[i], jnp.float32(motif_weight_v), symmetric
-            )
-        else:
-            ao = jnp.zeros((1, A, 3), jnp.float32)
-            so = jnp.zeros((1,), jnp.float32)
-        return ss, se, sh, so, sc, ao
-
-    inits = [init_one(i) for i in range(K)]
-    ss_k = jnp.concatenate([x[0] for x in inits])
-    se_k = jnp.concatenate([x[1] for x in inits])
-    sh_k = jnp.concatenate([x[2] for x in inits])
-    so_k = jnp.concatenate([x[3] for x in inits])
-    sc_k = jnp.concatenate([x[4] for x in inits])
-    anchor_orn_k = jnp.concatenate([x[5] for x in inits])
+    else:
+        anchor_orn_k = jnp.zeros((K, A, 3), jnp.float32)
+        so_k = zeros_k
 
     # Scope path distinguishes concurrent kernels; the node seed makes the draw
     # follow from Seeded.seed. Chains within a batch are separated by the kernel's

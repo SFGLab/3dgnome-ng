@@ -18,16 +18,20 @@ design/algorithm-improvements.md.
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
+from gnome3d import log
 from gnome3d.mc.numba.terms import njit
 from gnome3d.types import F32Array, F64Array
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
+
+LOG = log.get("arcs.solver")
 
 
 @njit(cache=True, fastmath=True, nogil=True, parallel=True)
@@ -190,6 +194,7 @@ def solve_arcs(
         excl_skip,
     )
     n_it = int(s.arcs_solver_iters if iters is None else iters)
+    t0 = time.perf_counter()
     res: Any = minimize(
         arcs_energy_grad,
         pw.reshape(-1),
@@ -198,4 +203,16 @@ def solve_arcs(
         method="L-BFGS-B",
         options={"maxiter": n_it, "maxfun": 4 * n_it, "maxcor": 20},
     )
+    # Whether the iteration cap bound is what decides if a faster energy buys anything, so
+    # the count is always visible for the large solves.
+    if n >= 2048:
+        log.status(
+            LOG,
+            "arcs solver: %d anchors, %d iterations, %d evaluations, %.1fs, %s",
+            n,
+            int(res.nit),
+            int(res.nfev),
+            time.perf_counter() - t0,
+            str(res.message),
+        )
     return float(res.fun), np.ascontiguousarray(res.x.reshape(n, 3), dtype=np.float32)

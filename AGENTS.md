@@ -710,6 +710,17 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     search per cell was slower and a finer axis was slower, since the rebuild writes the table.
     Past 32 proposals a batch gets slower, so the floor is now the number of kernel launches in
     one step. The check needs a GPU, `harness/test_jax_grid.py`.
+  - **Two host and device costs the profile of 2026-09-20 removed, both byte identical by the
+    parity gate on GM12878 chr1:1-60 Mb.** The orientation term scored a trial move by writing
+    the anchor's new vector into a copy of the whole orientation array, and under the proposal
+    vmap XLA materialised that as a broadcast of the array to one copy per proposal, 82 MB a
+    batch on a chromosome and half of every batch's time; the trial score now takes the vector
+    as an argument and the array is never copied. And the launch's initial energies were
+    computed one chain at a time, each a scan of the chain's beads with a host sync between
+    chains, a minute a structure on a trio chromosome; they are one vectorised call per term
+    now. Kernel on chr1:1-60 Mb, 11 chains, 49.0 s to 35.5 s and the preparation before it 6 s
+    to 1 s on the RTX 4060 Ti. Numbers and the per batch composition in
+    `design/kernel-performance.md`.
   - **`cli.py` auto-forces `ib_workers=1` when `mc_backend=jax`** — multiple Python threads contending for a single GPU is net-negative; restarts go inside JAX via `mc_smooth_chains` (vmap), not via thread pools.
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
 
