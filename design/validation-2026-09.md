@@ -242,6 +242,15 @@ HFFC6 about 7. MultiMM's five structure ensemble with molecular dynamics took 4 
 on the same GPU. The reference on the CPU, one process per structure, took 2 h 15 on HFFC6,
 7.5 to 8.5 h on H1ESC and did not finish GM12878 in 29 hours.
 
+Whole chr1 on eden, one A100 per task, ten conformations per sample, measured from the
+output timestamps of the trio arrays. The 2026-09-09 trio run, `out/trio_polymer`, took 39
+to 79 minutes per conformation at 9,500 to 12,300 anchors after the singleton pruning, with
+the stitch and the whole chromosome relaxation on, prefetch 1 and the full excluded volume
+scan. The 2026-09-20 CTCF arm, `out/trio_prod`, on the resampled inputs takes 6 to 16 minutes
+at 13,000 to 18,800 anchors, and the two factor arm 15.7 minutes at 23,080. Per thousand
+anchors that is 4.8 minutes before and 0.7 to 0.8 after, a factor of six to seven, from the
+relaxation off, prefetch 32 and the cell grid together.
+
 ## What is open
 
 - A reference GM12878 arm on the 60 Mb gate needs a day or two of CPU per structure. The
