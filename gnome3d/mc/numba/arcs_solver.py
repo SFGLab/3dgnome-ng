@@ -143,10 +143,13 @@ def solve_arcs(
     exp_dist: F64Array,
     s: Settings,
     iters: int | None = None,
+    backend: str = "numba",
 ) -> tuple[float, F32Array]:
     """Minimise the arcs energy from `pos`. Returns `(energy, positions)`.
 
     Mirrors the derivations in `mc_arcs_numba` so the energy is the one the annealer reports.
+    `backend` is where the energy is evaluated, `numba` on the CPU or `jax` on the device; the
+    minimiser itself always runs on the host. The arcs stage passes the executor's choice.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -194,11 +197,10 @@ def solve_arcs(
         excl_skip,
     )
     n_it = int(s.arcs_solver_iters if iters is None else iters)
-    device = str(s.arcs_solver_device).strip().lower()
-    if device not in ("cpu", "gpu"):
-        raise ValueError(f"[simulation_arcs] solver_device must be cpu or gpu, got {device!r}")
+    if backend not in ("numba", "jax"):
+        raise ValueError(f"solver backend must be numba or jax, got {backend!r}")
     t0 = time.perf_counter()
-    if device == "gpu":
+    if backend == "jax":
         from gnome3d.mc.jax.arcs_energy import DeviceArcsEnergy  # noqa: PLC0415
 
         fun: Any = DeviceArcsEnergy(exp64, args[1:])
@@ -220,7 +222,7 @@ def solve_arcs(
         log.status(
             LOG,
             "arcs solver on %s: %d anchors, %d iterations, %d evaluations, %.1fs, %s",
-            device,
+            backend,
             n,
             int(res.nit),
             int(res.nfev),

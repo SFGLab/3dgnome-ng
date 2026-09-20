@@ -480,6 +480,40 @@ beads, halves both the fill and the candidate gathers. The small fusions are the
 and the lever there is width: ten conformations of a sample in one launch would share them.
 Neither is measured.
 
+### 13. The arcs energy on the device. Built, measured on one region
+
+The solver's cost is its energy evaluation and nothing else; L-BFGS-B's own work is twenty
+vector operations on 69k numbers. `gnome3d/mc/jax/arcs_energy.py` evaluates the same energy on
+the device in row chunks, float32 with the rows summed in float64 on the host, and scipy keeps
+the minimiser. Agreement with the numba kernel 2.6e-8 relative on the energy and 3.7e-7 on
+the gradient over a block carrying every kind of pair. Float64 on the device needs JAX's 64
+bit mode, which is process wide: it turned the smooth kernel's integer draws 64 bit, broke a
+loop carry's dtype and, where it ran, changed the structure, so float32 it is.
+
+| solve | anchors | cap | CPU | device | energy CPU | energy device |
+|---|---|---|---|---|---|---|
+| chr1:1-60 Mb | 3,158 | 200 | 10.9 s | 1.7 s | 1864 | 1868 |
+| chr1 | 9,195 | 200 | 31.6 s | 4.8 s | 6677 | 6742 |
+| chr1 | 9,195 | 800 | 104.8 s | 13.4 s | 6274 | 6266 |
+
+A whole chr1 conformation on the workstation with the cap at 800: 419 s this morning to
+144 s, of which the solve 13 s, the dense target matrices 17 s and the smooth kernel 107 s.
+The A100 should do better still; its float32 rate is higher and the evaluation is a memory
+read.
+
+The battery on chr1:1-60 Mb, three structures per arm, the same seeds:
+
+| arm | Pearson | Spearman | SCC | MultiMM | exponent | Rg | wb-aa | xb | saddle |
+|---|---|---|---|---|---|---|---|---|---|
+| CPU, 200 | 0.312 | 0.135 | 0.374 | 0.666 | 0.364 | 23.35 | 2.8 | 20.0 | 1.31 |
+| device, 200 | 0.311 | 0.135 | 0.366 | 0.663 | 0.364 | 23.33 | 2.7 | 20.0 | 1.38 |
+| device, 800 | 0.312 | 0.136 | 0.366 | 0.665 | 0.360 | 23.15 | 2.5 | 20.6 | 1.00 |
+
+Level on every Hi-C number; the saddle on three structures is noise, it read 1.15 on five
+this morning. Production from 2026-09-20: `mc_executor_arcs = batch`, the solver's energy on
+the device, and `solver_iters` 800. The setting is the executor's, not a new key: `batch`
+already means JAX for every stage, and the solver follows it.
+
 ## Outcomes
 
 ### The numba excluded volume cell grid. Done

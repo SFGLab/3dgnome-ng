@@ -82,7 +82,8 @@ CANONICAL: dict[str, dict[str, object]] = {
         "ib_workers": "auto",
         "heatmap_chains": 1,
         "smooth_chains": 1,
-        # Arcs runs on the CPU, not the GPU, and it is the one stage where that is true.
+        # The arcs annealer ran on the CPU, not the GPU, and it was the one stage where that
+        # was true.
         # Measured on a genome scale trio run, where arcs is 89.6 percent of the wall: one
         # launch put 54 blocks together, 53 of them converged by round 2 and one needed 3,753,
         # and a vmapped launch cannot retire a converged chain, so all 54 ran 3,753 rounds.
@@ -91,7 +92,11 @@ CANONICAL: dict[str, dict[str, object]] = {
         # 2,048 anchors, which is a tight cache resident loop on a core at about 1.8 us and a
         # whole kernel dispatch on the device at 18.4 us measured. Smooth is the opposite shape,
         # eighty chains of 16,384 beads with similar convergence, and stays on the GPU.
-        "mc_executor_arcs": "threaded",
+        # With the solver, batch means its energy on the JAX device, one read of the target
+        # matrix per evaluation, which is what makes a chromosome solve cheap; the annealer's
+        # reasons above are for the vmapped kernel and do not apply. Measured 2026-09-20 on
+        # GM12878 chr1:1-60 Mb, three structures per arm, level with the CPU on every number.
+        "mc_executor_arcs": "batch",
         "mc_executor_densify": "threaded",
         "mc_executor_estimate_dist": "batch",
         "mc_executor_smooth": "batch",
@@ -124,9 +129,13 @@ CANONICAL: dict[str, dict[str, object]] = {
         # two arms agree on every quality number, Hi-C Pearson 0.403 against 0.405, distance
         # exponent 0.240 against 0.249, and the anchor overlap rate 89.2 against 89.1 per
         # thousand beads. The stage's two calls went from 492s to 6s and from 500s to 23s, and
-        # the whole run from 1h57m to 1h13m. The batch executor has no solver in it, so this
-        # needs mc_executor_arcs serial or threaded, which is what it is set to above.
+        # the whole run from 1h57m to 1h13m. Where the energy is evaluated follows
+        # mc_executor_arcs.
         "solver": "lbfgs",
+        # The default cap of 200 bound on every chromosome solve, chr1 still 6 percent above
+        # its energy at 800. On the device 800 iterations cost what 200 did on the CPU, and the
+        # 60 Mb battery is level between the two. Measured 2026-09-20.
+        "solver_iters": 800,
         # Solve every anchor of a chromosome together, from the block layout, each block's
         # anchors on a walk at the law's distance per gap. Three cell gate on chr1:1-60 Mb
         # against the deep maps, 2026-09-10: Pearson 0.271/0.282/0.301 to 0.291/0.318/0.304,

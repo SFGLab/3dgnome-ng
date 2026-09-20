@@ -13,9 +13,9 @@ against the two initialisers the MC builds its score from, and its gradient agai
 differences of itself.
 
 The solver covers the terms production uses, springs, a truncated repulsion and confinement. It
-Two ways it could be asked for and silently not run, both checked here. A misspelled solver name
-must not fall through to the annealer, and the batched runner cannot honour a solver at all, so
-it has to say so rather than anneal.
+A misspelled solver name must not fall through to the annealer, checked here. Under the batch
+executor the solver's energy is evaluated on the JAX device, and that has to agree with the CPU
+kernel and reach the same minimum, also checked here.
 """
 
 from __future__ import annotations
@@ -219,10 +219,8 @@ def test_device_energy_matches_the_cpu_kernel() -> None:
     check(
         "the device gradient is the CPU kernel's", worst_g < 1e-4, f"worst relative {worst_g:.1e}"
     )
-    s.arcs_solver_device = "gpu"
-    e_dev, _ = solve_arcs(pos, exp, s, iters=50)
-    s.arcs_solver_device = "cpu"
-    e_cpu, _ = solve_arcs(pos, exp, s, iters=50)
+    e_dev, _ = solve_arcs(pos, exp, s, iters=50, backend="jax")
+    e_cpu, _ = solve_arcs(pos, exp, s, iters=50, backend="numba")
     check(
         "the solver on the device reaches the CPU solve's energy",
         abs(e_dev - e_cpu) / max(abs(e_cpu), 1e-12) < 1e-2,
@@ -258,30 +256,44 @@ def test_an_unknown_name_is_refused() -> None:
     check("a misspelled solver name is refused, not ignored", ok)
 
 
-def test_the_batched_runner_cannot_honour_it() -> None:
-    """The batched runner is a JAX annealer with no solver in it, so asking for one there has
-    to fail rather than quietly anneal."""
-    from gnome3d.pipeline.ib.arcs import _batch_run
-
-    pos, exp, s = block(40, 6)
-    s.arcs_solver = "lbfgs"
+def test_the_batched_runner_solves_on_the_device() -> None:
+    """Under the batch executor the solver evaluates its energy on the JAX device, block by
+    block on each block's own settings, and lands where the CPU solve lands."""
     try:
-        _batch_run(
-            [
-                {
-                    "anchor_pos": pos,
-                    "exp_dist": exp,
-                    "step_size": 0.01,
-                    "settings": s,
-                    "seed": 1,
-                    "anchor_genomic": np.arange(len(pos), dtype=np.int64) * 50_000,
-                }  # type: ignore[arg-type]
-            ]
-        )
-        ok = False
-    except NotImplementedError:
-        ok = True
-    check("the batch executor refuses a solver rather than annealing", ok)
+        import jax  # noqa: F401
+    except ImportError:
+        print("  skip  JAX not available, the batched solver is not checked")
+        return
+    from gnome3d.pipeline.ib.arcs import _batch_run, _run
+
+    pos, exp, s = block(60, 6)
+    s.arcs_solver = "lbfgs"
+    s.arcs_solver_iters = 60
+    # Excluded volume and a short repulsion reach keep the minimum above zero, so the two
+    # energies are compared as numbers rather than as noise around zero.
+    s.use_excluded_volume = True
+    s.exclusion_apply_to_arcs = True
+    s.arcs_repulsion_cutoff_factor = 1.0
+    r2 = np.random.default_rng(7)
+    for _ in range(400):
+        i, j = r2.integers(0, exp.shape[0], 2)
+        if i != j:
+            exp[i, j] = exp[j, i] = float(r2.uniform(0.3, 0.9))
+    problem = {
+        "anchor_pos": pos,
+        "exp_dist": exp,
+        "step_size": 0.01,
+        "settings": s,
+        "seed": 1,
+        "anchor_genomic": np.arange(len(pos), dtype=np.int64) * 50_000,
+    }
+    ((e_dev, _),) = _batch_run([problem])  # type: ignore[list-item]
+    e_cpu, _ = _run(problem)  # type: ignore[arg-type]
+    check(
+        "the batch executor solves on the device and reaches the CPU solve's energy",
+        abs(e_dev - e_cpu) < 1e-2 * max(abs(e_cpu), 1.0),
+        f"{e_cpu:,.4f} against {e_dev:,.4f}",
+    )
 
 
 def main() -> int:
@@ -292,7 +304,7 @@ def main() -> int:
     test_device_energy_matches_the_cpu_kernel()
     test_off_by_default()
     test_an_unknown_name_is_refused()
-    test_the_batched_runner_cannot_honour_it()
+    test_the_batched_runner_solves_on_the_device()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

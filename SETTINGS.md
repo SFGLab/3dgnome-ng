@@ -146,10 +146,9 @@ least `stop_condition_successes_threshold` moves.
 | key | type | default | production | what it does |
 | --- | --- | --- | --- | --- |
 | `stop_condition_ratio` | float | 0.9999 | 0.9999 | Also stop when the score over the previous round's is at or above this, a plateau guard. |
-| `solver` | str | mc | lbfgs | `mc` anneals, `lbfgs` minimises the same energy with L-BFGS-B. Same minimum, same overlaps, the stage's calls fell from minutes to seconds. Needs `mc_executor_arcs` of `serial` or `threaded`. The batch executor has no solver and refuses. |
-| `solver_iters` | int | 200 | 200 | Iterations for the solver. |
-| `solver_device` | str | cpu | cpu | Where the solver evaluates its energy. `cpu` is the numba kernel over every pair. `gpu` evaluates the same energy on the JAX device in float32, row chunked, so a chromosome solve costs one read of the target matrix per iteration instead of the CPU's visit of every pair; results agree to about 1e-6 relative and not to the bit. Needs JAX with a device. |
-| `start` | str | centroid | hilbert | Where a block's anchors start. `centroid` puts every anchor at the block centroid, from which the solver descends to a compact minimum. `walk` places consecutive anchors at the law's distance for their gap along random directions, so pairs no term acts on begin near the law. `hilbert` places them along a 3D Hilbert curve scaled to the law's bond, at chromosome scope one curve over the chromosome, so genomic neighbours are spatial neighbours at every scale and the size grows as the cube root of the count. Solver and annealer only; the batch executor refuses it. |
+| `solver` | str | mc | lbfgs | `mc` anneals, `lbfgs` minimises the same energy with L-BFGS-B. Same minimum, same overlaps, the stage's calls fell from minutes to seconds. Where its energy is evaluated follows `mc_executor_arcs`: `serial` and `threaded` are the numba kernel over every pair on the CPU, `batch` is the same energy on the JAX device in float32, row chunked, one read of the target matrix per evaluation, agreeing to about 1e-6 relative and not to the bit. |
+| `solver_iters` | int | 200 | 800 | Iterations for the solver. The default binds on every chromosome solve; on the device 800 cost what 200 did on the CPU, and the battery is level between the two. |
+| `start` | str | centroid | hilbert | Where a block's anchors start. `centroid` puts every anchor at the block centroid, from which the solver descends to a compact minimum. `walk` places consecutive anchors at the law's distance for their gap along random directions, so pairs no term acts on begin near the law. `hilbert` places them along a 3D Hilbert curve scaled to the law's bond, at chromosome scope one curve over the chromosome, so genomic neighbours are spatial neighbours at every scale and the size grows as the cube root of the count. Any executor with the solver; the batch executor's annealer refuses it. |
 | `scope` | str | block | chromosome | `block` solves each block's anchors alone. `chromosome` solves every anchor of a chromosome as one problem, each block's anchors starting at its placed centroid, so loops, the contact background and the compartment term act across blocks; the per block stage then passes its anchors through. Solver and annealer only. |
 
 ### [simulation_arcs_smooth] only
@@ -185,7 +184,7 @@ resolves from the older backend keys.
 | `ib_workers` | int or auto | 1 | auto | Threads for the threaded executor. `auto` uses every usable core. |
 | `heatmap_chains` | int | 1 | 1 | Independent heatmap MC chains run at once, best kept. |
 | `smooth_chains` | int | 1 | 1 | Independent smooth chains run at once per block, best kept. |
-| `mc_executor_arcs` | str | auto | threaded | Executor for the arcs stage. Threaded on the CPU because a vmapped launch cannot retire a converged block and one straggler holds every other block in the launch. |
+| `mc_executor_arcs` | str | auto | batch | Executor for the arcs stage. With the annealer, `batch` is the vmapped JAX kernel, which cannot retire a converged block, so one straggler holds every other block in the launch. With the solver, `batch` evaluates the energy on the JAX device block by block, which is where a chromosome solve is cheap; `serial` and `threaded` evaluate it on the CPU. |
 | `mc_executor_densify` | str | auto | threaded | Executor for densification. |
 | `mc_executor_estimate_dist` | str | auto | batch | Executor for the subanchor distance estimate. |
 | `mc_executor_smooth` | str | auto | batch | Executor for the smooth stage. The cross block relaxation also picks its kernel from this, and one chain on the batch kernel is that kernel's worst case. |
@@ -238,7 +237,7 @@ stage's mean bond scale times the cube root of the bead count.
 | `radius_arcs` | float | 0.0 | 0.0 | Arcs stage radius, 0 derives it. |
 | `radius_smooth` | float | 0.0 | 0.0 | Smooth stage radius. |
 | `radius_ib` | float | 0.0 | 0.0 | Block placement radius. |
-| `packing_factor_arcs` | float | 1.5 | 0 | Arcs stage packing factor. At 0 each block's radius is derived from the law instead: the sphere a chain of the block's genomic span fills, root five thirds of its radius of gyration `S^nu / sqrt(2 (2 nu + 1)(nu + 1))`, with no constant. Needs `mc_executor_arcs` serial or threaded. |
+| `packing_factor_arcs` | float | 1.5 | 0 | Arcs stage packing factor. At 0 each block's radius is derived from the law instead: the sphere a chain of the block's genomic span fills, root five thirds of its radius of gyration `S^nu / sqrt(2 (2 nu + 1)(nu + 1))`, with no constant. Any executor with the solver, which runs each block on its own settings; the batch executor's annealer runs a launch on one settings and refuses it. |
 | `packing_factor_smooth` | float | 1.5 | 1.5 | Smooth stage packing factor. |
 | `packing_factor_ib` | float | 0.75 | 0.75 | Block placement packing factor. Below about 0.58 a small segment is asked to fold tighter than one of its own bonds, and 0.15 crushed the cross block distance scaling. |
 

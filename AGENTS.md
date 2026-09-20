@@ -1077,6 +1077,29 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   `mc_executor_arcs = serial` or `threaded`, which is what `CANONICAL` sets. Unit checks in
   `harness/test_arcs_solver.py`.
 
+  **The solver's energy on the device: `mc_executor_arcs = batch` with the solver, production
+  since 2026-09-20 with `solver_iters` 800.** ([gnome3d/mc/jax/arcs_energy.py](gnome3d/mc/jax/arcs_energy.py))
+  The executor setting decides where every stage runs and `batch` means JAX, so the solver
+  follows it: under `batch` each block is solved in turn with its energy on the device, on its
+  own settings and from its own start, and under `serial` or `threaded` on the CPU. At
+  chromosome scope the solve was most of a conformation's wall and ran on the CPU while the
+  GPU idled: every pair of the chromosome visited against a dense target, up to 450 ms an
+  evaluation on a trio chromosome, and the 200 iteration cap binding on every solve, which
+  the solver's log line now reports. The device evaluates the same energy term for term in row
+  chunks in float32, the rows summed in float64 on the host, so an evaluation costs one read
+  of the target matrix; L-BFGS-B stays on the host. The energy and gradient agree with the
+  numba kernel to about 1e-6 relative on a block carrying every kind of pair, and a solve on
+  either side reaches the same energy; the two are not byte identical, since the summation
+  order differs. On the RTX 4060 Ti, GM12878 chr1, 9,195 anchors: 200 iterations 31.6 s on
+  the CPU to 4.8 s, 800 iterations 104.8 s to 13.4 s at energy 6274 against 6266, and a whole
+  conformation 419 s to 144 s with the cap at 800. Three structures on chr1:1-60 Mb, CPU at
+  200 against device at 200 and at 800: Pearson 0.312, 0.311, 0.312, SCC 0.374, 0.366,
+  0.366, MultiMM 0.666, 0.663, 0.665, Rg 23.4, 23.3, 23.2, anchor overlaps 2.8, 2.7, 2.5 per
+  thousand; the saddle 1.31, 1.38, 1.00 on three structures, which is noise at that count.
+  Float64 on the device would need JAX's 64 bit mode, which is process wide and changes the
+  smooth kernel's integer draws and its loop carries, so it is not used. Unit checks in
+  `harness/test_arcs_solver.py`.
+
   The annealer is kept by decision, 2026-09-06, not as a leftover. The solver's justification
   is a funnel landscape measured on a few real blocks. A dataset or an energy change that
   breaks that assumption has the annealer to fall back on, and the annealer is the reference's
