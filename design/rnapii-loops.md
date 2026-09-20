@@ -209,3 +209,61 @@ against its father's 194,853 at the same depth, because its library puts fewer o
 into clusters on peaks. That is a property of the library and is left visible rather than
 hidden by matching loop counts. The anchor totals grew, 3.4 M CTCF anchors over the nine
 against 2.4 M on the providers' sets and 4.6 M with RNAPOL2, so the runs cost accordingly.
+
+## The trios on chr1, 2026-09-20
+
+Arrays 1808796, CTCF only in `out/trio_prod`, and 1808803, CTCF with RNAPOL2 in
+`out/trio_rnapol2`, on eden: chr1, ten conformations, nine samples, both on the resampled
+inputs, both with the arcs solver on the CPU at 200 iterations. The checkout moved to the
+device solver while the second array ran and the running tasks kept their settings, every
+logged solve says 200. Wall per conformation on an A100 from the task times, setup included,
+8.3 minutes for the CTCF arm at 151 thousand beads and 13.3 with RNAPOL2 at 172 thousand, so
+a genome arm is about 150 and 240 GPU hours.
+
+The enhancer3d recipe is `enhancer3d/playground/trio_arms_e3d.sh`, the chr1 arm of
+`trio_poly_e3d.sh` with the population contrast left out, since at chr1 it keeps under ten
+genes. Each arm's control reads the anchors that arm was built on, `TRIO_ANCHORS` and
+`TRIO_ANCHOR_FILE` in `trio_control.py`. Outputs `playground/trio_prod` and
+`playground/trio_rnapol2` under `~/enhancer3d` on the workstation, the tables and figures
+copied to `~/Desktop/enhancer3d/playground/` under the same names, and
+`trio_arms_compare.py` writes the table. The first column is the 2026-09-09 polymer run's
+chr1 arm on the providers' inputs, also ten conformations, on the same genes.
+
+| statistic, chr1 | providers' inputs, 2026-09-09 | CTCF, resampled | CTCF with RNAPOL2 |
+|---|---|---|---|
+| genes per sample with a model and a count | 2,268 to 2,467 | same | same |
+| rho(3D distance, expression), mean of nine | -0.286 | -0.333 | -0.362 |
+| rho(linear distance, expression), same genes | -0.365 | -0.365 | -0.365 |
+| partial, 3D against expression controlling linear | -0.098 (sd 0.015) | -0.134 (sd 0.025) | -0.177 (sd 0.029) |
+| family separation, 3D, within minus between median rho | +0.044 (0.648 / 0.605), p 0.013 | +0.042 (0.730 / 0.688), p 0.004 | +0.013 (0.726 / 0.713), p 0.020 |
+| family separation, anchor input | +0.080 | +0.104 | +0.160 |
+| 3D separation over the anchors' | 0.55 | 0.41 | 0.08 |
+| anchors on chr1, median TSS to nearest anchor | | 32 to 54 thousand, 10 to 14 kb | 44 to 64 thousand, 1.7 to 2.2 kb |
+| inheritance ratio, child over unrelated against mid parent, CHS PUR YRI | 1.07 0.83 0.97 | 0.94 0.92 0.83 | 1.09 0.92 0.88 |
+| rho(structural deviation, expression deviation) | +0.03 -0.01 +0.02 | -0.01 -0.04 -0.01 | -0.02 -0.02 -0.03 |
+
+Three readings.
+
+The RNAPOL2 loops carry expression signal in the trios as they did on GM12878. The partial
+deepens from -0.134 to -0.177 and the raw 3D correlation reaches the linear one, -0.362
+against -0.365, on eight of nine individuals; the ninth is HG00514, the sample whose library
+yields a fifth of its family's loops at equal depth, level at -0.131 against -0.136. The CTCF
+arm on the resampled inputs is itself deeper than the providers' inputs gave, -0.134 against
+-0.098 on the same genes, so the resampling was worth its own step.
+
+The family signal goes the other way. The CTCF arm keeps it, +0.042 at p 0.004 and 0.41 of
+what its anchors carry. The RNAPOL2 arm's structures are alike across all nine, related or
+not, 0.726 within against 0.713 between where the CTCF arm has 0.730 against 0.688, so its
+separation is a third of the CTCF arm's and a twelfth of its own anchors'. Two things in the
+construction bear on that row and it should not be read as a ranking of the loop sets. The
+RNAPOL2 anchors are family wide, so within family anchor similarity is raised by design,
+Jaccard 0.970 against 0.951, and the anchor row is not comparable across arms. And the
+anchors sit at a median 2 kb from a TSS, so a gene's nearest enhancer distance is set by
+beads every individual shares and the loops move it little. A per sample RNAPOL2 anchor set,
+`--own-anchors`, is the arm that would separate the two.
+
+Inheritance is null on both arms, as on every earlier run.
+
+Not done: the lab's RNAPII gene body signal, 4,266 genes at Spearman over 0.5 with
+expression, is a described result and not a table this side holds. The comparison needs
+their per gene, per sample gene body counts.
