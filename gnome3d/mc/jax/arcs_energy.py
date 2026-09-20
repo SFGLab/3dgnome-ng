@@ -3,9 +3,11 @@
 `gnome3d.mc.numba.arcs_solver.arcs_energy_grad` visits every pair of a chromosome on the CPU
 against a dense target, and at chromosome scope that visit is most of a conformation's wall
 while the GPU idles. This is the same energy, pair for pair and term for term, evaluated on the
-device in row chunks, so an evaluation costs one read of the target matrix. Only the order of
-summation differs, so the two agree to float precision and not to the bit. Float64 throughout,
-which needs JAX's 64 bit mode; `DeviceArcsEnergy` turns it on before it builds anything.
+device in row chunks, so an evaluation costs one read of the target matrix. Float32 on the
+device, the rows summed in float64 on the host, so the two agree to about 1e-6 relative and
+not to the bit. Float64 on the device would need JAX's 64 bit mode, which is a process wide
+switch that changes the smooth kernel's integer draws and breaks its loop carries, so it is
+not used.
 """
 
 from __future__ import annotations
@@ -17,13 +19,6 @@ import numpy as np
 from gnome3d.types import F64Array
 
 CHUNK_ROWS = 256
-
-
-def enable_x64() -> None:
-    """Turn on 64 bit arrays for the process. Kernels compiled before keep their dtypes."""
-    import jax
-
-    jax.config.update("jax_enable_x64", True)
 
 
 class DeviceArcsEnergy:
@@ -38,7 +33,6 @@ class DeviceArcsEnergy:
     """
 
     def __init__(self, exp: F64Array, args: tuple[Any, ...]) -> None:
-        enable_x64()
         import jax
         import jax.numpy as jnp
 
@@ -48,9 +42,9 @@ class DeviceArcsEnergy:
         n = int(exp.shape[0])
         self.n = n
         # Rows of the transpose are what the CPU kernel reads for one anchor.
-        self._exp_t = jnp.asarray(np.ascontiguousarray(exp.T, dtype=np.float64))
+        self._exp_t = jnp.asarray(np.ascontiguousarray(exp.T, dtype=np.float32))
         idx_all = jnp.arange(n, dtype=jnp.int32)
-        centre = jnp.asarray(np.array([cx, cy, cz], dtype=np.float64))
+        centre = jnp.asarray(np.array([cx, cy, cz], dtype=np.float32))
         use_excl = excl_w > 0.0
 
         def row_terms(xi: Any, i: Any, e: Any, pos: Any) -> tuple[Any, Any]:
@@ -112,7 +106,7 @@ class DeviceArcsEnergy:
                 return row_terms(a[0], a[1], a[2], pos)
 
             ei, gi = jax.lax.map(one, (pos, idx_all, exp_t), batch_size=CHUNK_ROWS)
-            return jnp.sum(ei), gi.reshape(-1)
+            return ei, gi.reshape(-1)
 
         self._fn = jax.jit(energy_grad)
         self.evaluations = 0
@@ -120,6 +114,6 @@ class DeviceArcsEnergy:
     def __call__(self, x: F64Array) -> tuple[float, F64Array]:
         import jax.numpy as jnp
 
-        e, g = self._fn(jnp.asarray(x, dtype=jnp.float64), self._exp_t)
+        ei, g = self._fn(jnp.asarray(x, dtype=jnp.float32), self._exp_t)
         self.evaluations += 1
-        return float(e), np.asarray(g, dtype=np.float64)
+        return float(np.asarray(ei, dtype=np.float64).sum()), np.asarray(g, dtype=np.float64)
