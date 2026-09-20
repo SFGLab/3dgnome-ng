@@ -182,9 +182,30 @@ cluster file, so the second file failing to travel cannot silently run the CTCF 
 | GM19238 | 120,490 | 48% | 70,670 | 270,801 | 74% |
 | GM19240 | 158,862 | 50% | 72,587 | 272,437 | 81% |
 
-Open, for the user: the RNAPOL2 depth is not matched within families. The CTCF arm draws every
-sample down to its family's minimum so that a parent against child comparison is not a density
-comparison. The filtered RNAPOL2 sets are far more uneven, HG00514 at a tenth of its father
-and HG00732 at a third of its child, so the same draw would leave CHS with 15,708 RNAPOL2
-loops per sample. The tooling does the draw when asked, `trio_downsample.py --factor RNAPOL2`
-then `trio_prepare.py --factor RNAPOL2 --force`; the files built tonight are unmatched.
+The RNAPOL2 depth was not matched within families at first, and the table above is that
+state. The providers' filtered sets were uneven by ten times inside CHS, and the cause was
+their draw, not the libraries: HG00514's RNAPOL2 library is the deepest of its family by four
+times. The user's decision, 2026-09-20: resample from the rawest data the folder holds and
+depend on no one else's draw, for both factors, and give a family one RNAPOL2 bead set.
+
+## Depth resampled from the full libraries, 2026-09-20
+
+`playground/trio/trio_resample.py`, the sequence and the table in `playground/trio/README.md`.
+The merged PET 1 and up cluster files are the input. The providers' rule was recovered from
+their sets and reproduces them at 100 percent: span at most 1 Mb, anchors on the family's
+peak union, both for CTCF and at least one for RNAPOL2. Depth is the intra chromosomal PET
+total and every cluster's count is thinned binomially to the family minimum, which is the
+cluster level image of drawing reads. Both arms are rebuilt on it, so the CTCF trio arm is no
+longer the set the 2026-09-09 runs were made on; those runs stay under their own trees.
+
+Family wide RNAPOL2 anchors, option 2 of the discussion: `trio_prepare.py --factor RNAPOL2`
+takes the RNAPOL2 loop ends of all three members, so a family shares its RNAPOL2 beads up to
+each member's own CTCF anchors, which absorb the ends that fall on them, and members differ in
+which loops pull. This follows from the sweep, where the anchor set carried the Hi-C cost and
+the pull carried the expression signal.
+
+What equal depth leaves: HG00514 keeps a fifth of its RNAPOL2 PETs and yields 34,034 loops
+against its father's 194,853 at the same depth, because its library puts fewer of its PETs
+into clusters on peaks. That is a property of the library and is left visible rather than
+hidden by matching loop counts. The anchor totals grew, 3.4 M CTCF anchors over the nine
+against 2.4 M on the providers' sets and 4.6 M with RNAPOL2, so the runs cost accordingly.

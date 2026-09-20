@@ -64,6 +64,9 @@ def select(
     # CTCF pairs and is fetched with the CTCF arm only; every factor's arm runs on it.
     own = factor == "CTCF"
     tag = "" if own else f"_{factor.lower()}"
+    # The merged arm is the full library, the downsampled arm the providers' draw from it.
+    # Both can sit in one directory, so the merged files say so in their name.
+    arm_tag = "_merged" if arm == "merged" else ""
 
     if arm == "downsampled":
         loops = pick(rows, ds_dir + "subsample_1.e500.clusters.cis.BE3")
@@ -82,9 +85,9 @@ def select(
     if not loops and own:
         raise SystemExit(f"[fetch:{sample.name}] no loops BE3 found under {ds_dir or merged_dir}")
     if loops:
-        out.append((f"{sample.name}{tag}_loops.BE3", loops[0]))
+        out.append((f"{sample.name}{tag}{arm_tag}_loops.BE3", loops[0]))
     if include_gz and gz:
-        out.append((f"{sample.name}{tag}_loops.cis.gz", gz[0]))
+        out.append((f"{sample.name}{tag}{arm_tag}_loops.cis.gz", gz[0]))
 
     if own:
         hic = pick(

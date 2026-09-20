@@ -48,7 +48,8 @@ shared anchor set and a config. Every RNAPOL2 file sits beside its CTCF file und
 ```bash
 # on the laptop, after the CTCF sequence above
 python playground/trio/trio_fetch.py --inventory trio_inventory.json --factor RNAPOL2
-python playground/trio/trio_downsample.py --factor RNAPOL2 --dry-run    # see the note below
+python playground/trio/trio_fetch.py --inventory trio_inventory.json --factor RNAPOL2 --arm merged --include-gz
+python playground/trio/trio_resample.py --factor RNAPOL2 --validate
 python playground/trio/trio_prepare.py --factor RNAPOL2 --skip-hic
 python playground/trio/trio_configs.py --factor RNAPOL2
 
@@ -63,19 +64,52 @@ CONFIG_TAG=_trio_rnapol2 OUT=out/trio_rnapol2 CHROMS=chr1 PER_TASK=10 \
   sbatch --array=0-8%6 --time=24:00:00 slurm/ensemble/trio_ensemble.sh
 ```
 
-The loop input is the providers' filtered RNAPOL2 set, `wyniki_*RNAP*.BE3`, the counterpart of
-the CTCF arm's high quality set. The anchor set is the CTCF anchors verbatim plus the RNAPOL2
-loop ends that overlap no CTCF anchor, as anchors of no orientation, the rule
-`playground/rnapii/prep_gm12878.py` applies to GM12878. The RNAPOL2 loops run at full strength,
-`[springs] factor_strength = 1,1`, because on GM12878 chr1 the pull carried the expression
-signal and the anchor set carried the Hi-C cost at every strength.
+The loop input is the sample's full RNAPOL2 library filtered by the providers' rule and drawn
+down to its family's depth by `trio_resample.py`, see the next section. The anchor set is the
+CTCF anchors verbatim plus the RNAPOL2 loop ends of the whole family that overlap no CTCF
+anchor, as anchors of no orientation, the rule `playground/rnapii/prep_gm12878.py` applies to
+GM12878. Taking the ends from all three members rather than the sample alone gives the family
+one RNAPOL2 bead set, so members differ in which loops pull and not in where the beads are; on
+GM12878 chr1 the anchor set carried the Hi-C cost and the pull carried the expression signal.
+`--own-anchors` restores per sample anchors. The RNAPOL2 loops run at full strength,
+`[springs] factor_strength = 1,1`, for the same reason.
 
-**RNAPOL2 depth is not matched, by default.** The filtered RNAPOL2 sets are far more uneven
-than the CTCF ones: within CHS the child HG00514 holds about a tenth of its father's loops, so
-drawing the family down to its minimum would leave the whole family with almost no RNAPOL2
-signal. `trio_downsample.py --factor RNAPOL2` does the draw when asked, and `trio_prepare.py
---factor RNAPOL2 --force` then rebuilds on the matched files. Whether to match is a decision
-about what the trio comparison reads, and it is left open here.
+## Depth, resampled from the full libraries
+
+The providers' `downsampling/` folder was meant to bring each family to a common depth and did
+not: for CTCF the CHS child was left at 1.6 times its parents, and for RNAPOL2 the same child
+was cut to a tenth of its parents' loops although its library is the deepest of the three by
+four times. `trio_resample.py` therefore starts from the merged libraries, the PET 1 and up
+cluster files under `Loops/<pop>/<factor>/<sample>/merged/`, the rawest form the folder holds,
+and replaces `trio_downsample.py`, which drew loops from the providers' sets and is kept only
+for the record.
+
+The rule the providers' `wyniki_*` sets obey was recovered from those sets and is reproduced at
+100 percent on every sample (99 on HG00514 RNAPOL2, whose providers' set was re clustered at a
+tenth of the depth): a loop spans at most 1 Mb, and its anchors sit on the family's peak
+union, both of them for CTCF and at least one for RNAPOL2. Depth is the library's intra
+chromosomal PET total. Every kept cluster's PET count is thinned by a binomial draw at the
+family minimum over the sample's own depth and clusters left at three or more PETs are the
+loop set, which is the cluster level image of drawing reads.
+
+| sample | family | CTCF depth, M PETs | kept | CTCF loops | anchors | RNAPOL2 depth | kept | RNAPOL2 loops | shared anchors |
+|---|---|---|---|---|---|---|---|---|---|
+| HG00512 | CHS | 70.6 | 53% | 187,142 | 368,656 | 8.7 | 100% | 194,853 | 460,523 |
+| HG00513 | CHS | 43.3 | 87% | 143,255 | 278,712 | 12.9 | 68% | 109,233 | 389,930 |
+| HG00514 | CHS | 37.5 | 100% | 245,297 | 477,727 | 44.4 | 20% | 34,034 | 580,440 |
+| HG00731 | PUR | 54.2 | 79% | 210,876 | 408,026 | 20.2 | 76% | 180,986 | 559,525 |
+| HG00732 | PUR | 43.0 | 100% | 235,455 | 459,415 | 28.0 | 55% | 124,544 | 613,063 |
+| HG00733 | PUR | 44.1 | 98% | 205,582 | 396,725 | 15.5 | 100% | 290,415 | 554,205 |
+| GM19239 | YRI | 59.0 | 100% | 171,463 | 339,489 | 7.7 | 100% | 206,454 | 478,365 |
+| GM19238 | YRI | 63.9 | 92% | 171,169 | 336,652 | 9.6 | 80% | 129,632 | 472,596 |
+| GM19240 | YRI | 61.1 | 96% | 180,724 | 354,320 | 13.7 | 56% | 165,604 | 490,500 |
+
+Equal depth is not equal loop count. At its family's depth HG00514 yields the most CTCF loops
+of its family and the fewest RNAPOL2 loops by five times, because its RNAPOL2 library puts a
+smaller share of its PETs into clusters on peaks, 45 percent against 68 for its father at three
+PETs and up. That is the library, and matching loop counts instead would hide it. The CTCF
+sets are larger than the providers' matched sets were, 3.4 M anchors over the nine against
+2.4 M, so a genome conformation costs about 40 percent more than the earlier estimate.
 
 ## Running on the cluster
 
@@ -102,9 +136,10 @@ failure is quiet: rsync reports one missing path and transfers nothing.
 ```bash
 ROOT=<checkout path on the cluster>
 
-# on the laptop, once
+# on the laptop, once. The merged arm is the full library, which the depth resampling reads.
 python playground/trio/trio_fetch.py --inventory trio_inventory.json
-python playground/trio/trio_downsample.py
+python playground/trio/trio_fetch.py --inventory trio_inventory.json --arm merged --include-gz
+python playground/trio/trio_resample.py --validate
 python playground/trio/trio_prepare.py --skip-hic
 
 # rsync does not create intermediate parents, so make them first. Single quoted, so the loop
@@ -237,10 +272,11 @@ and carry an `ALL` pseudo chromosome, while every other input says `chr1`. Left 
 mismatch yields empty results rather than an error.
 
 
-## Measured, depth matched CTCF arm
+## Measured, depth matched CTCF arm (superseded 2026-09-20)
 
-Every sample is drawn down to its family's minimum loop count by `trio_downsample.py`, so a
-parent against child comparison is not also a density comparison.
+Superseded by the resampling above, kept for the runs made on it. Every sample was drawn down
+to its family's minimum loop count by `trio_downsample.py`, so a parent against child
+comparison was not also a density comparison.
 
 | sample | role | family | loops | anchors | on own peaks |
 |---|---|---|---|---|---|

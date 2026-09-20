@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "rnapii"))
 
 import trio_orient  # noqa: E402
 import trio_samples  # noqa: E402
-from anchor_union import read_anchors, union_anchors  # noqa: E402
+from anchor_union import End, read_anchors, union_anchors  # noqa: E402
 
 CENTROMERES = Path("data/GM12878/hg38_centromeres.bed")
 
@@ -141,6 +141,23 @@ def write_atomic(dest: Path, lines: list[str]) -> None:
     tmp.replace(dest)
 
 
+def loop_source(raw: Path, name: str, tag: str) -> Path:
+    """The loop set to model. trio_resample.py's draw from the full library first, then
+    trio_downsample.py's draw from the providers' set, then the providers' set itself."""
+    for suffix, what in (
+        ("_hq.resampled.BE3", "the depth resampled loop set"),
+        ("_hq.matched.BE3", "the depth matched loop set"),
+    ):
+        path = raw / f"{name}{tag}{suffix}"
+        if path.is_file():
+            print(f"[prepare:{name}] using {what} {path.name}")
+            return path
+    path = raw / f"{name}{tag}_hq.BE3"
+    if not path.is_file():
+        raise SystemExit(f"[prepare:{name}] {path} is missing, fetch it first")
+    return path
+
+
 def prepare(
     sample: trio_samples.Sample, raw_root: Path, data_root: Path, skip_hic: bool, force: bool
 ) -> None:
@@ -157,10 +174,7 @@ def prepare(
     else:
         # trio_downsample.py writes a matched file for any sample whose subsampling missed its
         # family's target. Preferring it here keeps that step out of the fetched data.
-        matched = raw / f"{name}_hq.matched.BE3"
-        source = matched if matched.is_file() else raw / f"{name}_hq.BE3"
-        if matched.is_file():
-            print(f"[prepare:{name}] using the depth matched loop set {matched.name}")
+        source = loop_source(raw, name, "")
         loops = read_loops(source)
         pets = [x[6] for x in loops]
         print(f"[prepare:{name}] {len(loops)} loops, PET {min(pets)} to {max(pets)}")
@@ -197,13 +211,32 @@ def prepare(
         convert_hic(raw / f"{name}_allres.hic", data_root / "_hic" / name / f"{name}.mcool")
 
 
+def factor_ends(raw_root: Path, samples: list[trio_samples.Sample], factor: str) -> list[End]:
+    """Both ends of every loop of every sample given, for the second factor."""
+    tag = f"_{factor.lower()}"
+    ends: list[End] = []
+    for s in samples:
+        for c1, s1, e1, c2, s2, e2, _ in read_loops(loop_source(raw_root / s.name, s.name, tag)):
+            ends.append((c1, s1, e1))
+            ends.append((c2, s2, e2))
+    return ends
+
+
 def prepare_factor(
-    sample: trio_samples.Sample, raw_root: Path, data_root: Path, factor: str, force: bool
+    sample: trio_samples.Sample,
+    raw_root: Path,
+    data_root: Path,
+    factor: str,
+    force: bool,
+    family_ends: list[End] | None = None,
 ) -> None:
     """A second factor's loops as their own cluster file, and the anchor set both factors share.
 
     Needs the CTCF anchors of `prepare` first, since those are kept verbatim. Skips the contact
-    map, which is the CTCF arm's and is shared.
+    map, which is the CTCF arm's and is shared. With `family_ends` the second factor's anchors
+    come from every member of the family rather than from this sample alone, so the three
+    members share their bead set and differ only in which loops pull; on GM12878 the anchor set
+    carried the Hi-C cost and the springs the expression signal, design/rnapii-loops.md.
     """
     tag = factor.lower()
     name = sample.name
@@ -219,13 +252,7 @@ def prepare_factor(
         print(f"[prepare:{name}] have {factor} clusters and {n} shared anchors, skipping")
         return
 
-    matched = raw / f"{name}_{tag}_hq.matched.BE3"
-    source = matched if matched.is_file() else raw / f"{name}_{tag}_hq.BE3"
-    if not source.is_file():
-        raise SystemExit(f"[prepare:{name}] {source} is missing, fetch with --factor {factor}")
-    if matched.is_file():
-        print(f"[prepare:{name}] using the depth matched {factor} loop set {matched.name}")
-    loops = read_loops(source)
+    loops = read_loops(loop_source(raw, name, f"_{tag}"))
     pets = [x[6] for x in loops]
     print(f"[prepare:{name}] {factor}: {len(loops)} loops, PET {min(pets)} to {max(pets)}")
     write_atomic(
@@ -234,14 +261,19 @@ def prepare_factor(
     )
 
     ctcf = read_anchors(ctcf_anchors)
-    ends = [(c, s, e) for c1, s1, e1, c2, s2, e2, _ in loops for c, s, e in ((c1, s1, e1), (c2, s2, e2))]
+    own_ends = [
+        (c, s, e)
+        for c1, s1, e1, c2, s2, e2, _ in loops
+        for c, s, e in ((c1, s1, e1), (c2, s2, e2))
+    ]
+    ends = family_ends if family_ends is not None else own_ends
     rows, st = union_anchors(ctcf, ends)
     write_atomic(anchors, [f"{c}\t{s}\t{e}\t{o}\n" for c, s, e, o in rows])
     print(f"[prepare:{name}] {factor} {st.describe()}")
     print(f"[prepare:{name}] anchors: {len(ctcf)} CTCF + {st.added} {factor} = {len(rows)}")
     peaks = raw / f"{name}_{tag}_peaks.broadPeak"
     if peaks.is_file():
-        own = sorted(set(ends))
+        own = sorted(set(own_ends))
         print(
             f"[prepare:{name}] {factor} loop ends on a called {factor} peak: "
             f"{100 * peak_overlap(own, peaks):.1f}%"
@@ -254,14 +286,30 @@ def main() -> None:
     ap.add_argument("--data-root", default="data")
     ap.add_argument("--samples")
     ap.add_argument("--factor", choices=("CTCF", "RNAPOL2"), default="CTCF")
+    ap.add_argument(
+        "--own-anchors",
+        action="store_true",
+        help="second factor anchors from the sample's own loops rather than its family's",
+    )
     ap.add_argument("--skip-hic", action="store_true", help="text inputs only, no mcool")
     ap.add_argument("--force", action="store_true", help="rebuild outputs that already exist")
     args = ap.parse_args()
-    for s in trio_samples.resolve(args.samples):
-        if args.factor == "CTCF":
+    samples = trio_samples.resolve(args.samples)
+    if args.factor == "CTCF":
+        for s in samples:
             prepare(s, Path(args.raw), Path(args.data_root), args.skip_hic, args.force)
-        else:
-            prepare_factor(s, Path(args.raw), Path(args.data_root), args.factor, args.force)
+        return
+    ends_by_family: dict[str, list[End]] = {}
+    for s in samples:
+        family = None
+        if not args.own_anchors:
+            if s.pop not in ends_by_family:
+                members = trio_samples.family(s.pop)
+                names = ", ".join(m.name for m in members)
+                print(f"[prepare:{s.pop}] {args.factor} anchors from {names}")
+                ends_by_family[s.pop] = factor_ends(Path(args.raw), members, args.factor)
+            family = ends_by_family[s.pop]
+        prepare_factor(s, Path(args.raw), Path(args.data_root), args.factor, args.force, family)
 
 
 if __name__ == "__main__":
