@@ -336,3 +336,29 @@ sides: the two haplotypes. The folder holds phased loops for every sample, `_Mat
 `_Paternal` and `_Crossed`, and allele specific expression from the same RNA-seq would give
 each gene a within nucleus fold change with the trans environment held fixed. Haplotype models
 are not built.
+
+### The RNAPOL2 arm within each person, on that person's own expression, 2026-09-20
+
+The fold change tables above are differences across cell lines and a person has one sample,
+so this is the port that stands: `enhancer3d/playground/rnapol2_individual.py`, one arm, nine
+people, each on their own model and their own expression, no other cell type and nothing
+averaged. Figures `rnapol2_individual.png` and `rnapol2_individual_ridges.png` under
+`playground/trio_rnapol2/individual/` on the workstation and in
+`~/Desktop/enhancer3d/playground/trio_rnapol2/individual/`, csvs beside them. Genes are those
+the person expresses at all, 2,268 to 2,467 on chr1.
+
+| within one person, chr1, ranges over the nine | raw | controlling linear distance |
+|---|---|---|
+| all genes, rho(distance, expression) | -0.34 to -0.39 | -0.13 to -0.21 |
+| the 20 percent most and least expressed genes | -0.38 to -0.48 | -0.11 to -0.27 |
+| the 10 percent closest and farthest enhancers, 239 genes | -0.41 to -0.58 | -0.09 to -0.27 |
+
+The extremes carry it, as between cell types: the relation sharpens on the tails of either
+axis and the distance tails sharpen it most. The shape is the same in all nine. Median
+enhancer distance falls monotonically over the person's expression quintiles, 2.7 to 3.3
+model units at the lowest to 1.6 to 2.1 at the highest. A gene in the highest quintile has its
+nearest enhancer in the closest distance tertile 52 to 58 percent of the time against 16 to
+18 for a gene in the lowest. And read the other way, the genes whose enhancer sits in the
+closest tertile have median log2 expression 11.1 to 11.7 against 4.5 to 5.7 for the farthest
+tertile, Mann-Whitney p 1e-53 to 1e-67 in every person. What the linear control leaves is
+about a third of the raw number at every cut, and it does not grow on the tails.
