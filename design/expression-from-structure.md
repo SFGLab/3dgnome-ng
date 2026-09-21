@@ -22,10 +22,11 @@ expression side (6), the ceiling in the forming data (8). Blocked on data: haplo
 
 What is left, in the order to try it:
 
-1. The saturation lever in the engine, from idea 8. `contact_half_saturation` above 1 so a
-   thirty PET loop sits closer than a three PET loop, one chr1 arm, judged on the deviation
-   statistic and idea 5.
-2. The person's own elements as the feature set everywhere, from ideas 4 and 8, and no atlas.
+1. The saturation lever in the engine, idea 19. `contact_half_saturation` at 3 and 10 so a
+   thirty PET loop sits closer than a three PET loop, one chr1 arm per value, judged on the
+   deviation statistic, the idea 5 gain and the cell line Hi-C.
+2. The person's own elements as the feature set everywhere, idea 20, and no atlas. Measured
+   on the same arm as 19.
 3. The HGSVC Hi-C arm as the background, prepared, tests what the background contributes.
 4. The data questions that can end the line: expression reliability from HGSVC's second
    RNA-seq (10), the structural variant pre test on HGSVC's calls (9).
@@ -214,6 +215,8 @@ of enhancer contact probability. GraphReg (Karbalayghareh 2022, Genome Research,
 | 16 | The person's compartments | 4DN ships a compartment and an insulation track per person from their Hi-C. Compartment deviation from the panel against expression deviation, and the tracks as features. | hours | open |
 | 17 | What the RNAPOL2 loops did to the structure | Per gene the CTCF arm distance minus the RNAPOL2 arm distance, the geometry the second factor added. Both arms exist. | hours | open |
 | 18 | Inter chromosomal | Li 2012's complexes cross chromosomes. The genome arms model chromosomes together at the top level, so a promoter's neighbours on other chromosomes are a feature only the genome run can give. | with the genome arms | open |
+| 19 | The saturation lever, from idea 8 | `[distance] contact_half_saturation` sets the loop strength, in multiples of a typical loop at that span, at which a pair sits halfway from the background to touching; at the default 1 a typical loop is already halfway and a ten times stronger loop at a tenth, so the person to person differences, which are in the counts of loops everyone has, compress into a fraction of a bead. One chr1 RNAPOL2 arm per value, 3 and 10 first, nine samples at ten conformations, `trio_configs.py` writing `<s>_trio_rnapol2_qh<value>.ini`. Judged on three numbers per person: the PET deviation against the distance deviation from `input_ceiling.py`, which has to rise from +0.08 before anything else is asked; the idea 5 gain of the 3D block beyond the input; and the battery's Hi-C on the cell lines, since a weaker pull on every loop can cost it. | an hour to prepare, one eden array, an afternoon to judge | open, next |
+| 20 | The person's own elements as the only feature set | Ideas 4 and 8 both put the person's active elements, the atlas enhancers under one of their RNAPOL2 peaks and their distal RNAPOL2 anchors, above the atlas, and they keep three times more of the person specific part. `genome_ep_distances.py` takes an enhancer table per cell, so the change is one table per person built from `own_elements.py`'s sets, and every downstream script then reads the person's distances. Measured together with 19, on the arm 19 produces, since each is what the other needs to show up. | hours | open, with 19 |
 
 8, 10 and 9's pre test are data questions and come first, since a negative on them ends the
 line. 11 to 14 and 17 are afternoon tests on the models there are.
@@ -227,6 +230,7 @@ line. 11 to 14 and 17 are afternoon tests on the models there are.
 - 2026-09-20. Idea 4 tried: the person's own active elements raise the raw number, the active atlas 0.39 to 0.46 and the distal loop anchors 0.36 to 0.42, the unbound atlas is inert, but nothing beats the atlas beyond the input and most of every set's signal is an element inside the gene's own span. Adopted as the element set for idea 5. `playground/trio_rnapol2/own_keep/` and `own/`.
 - 2026-09-20. Idea 5 done: out of fold, the 3D block adds -0.01 to +0.01 beyond the input and +0.00 to +0.03 beyond linear, in every person. `playground/trio_rnapol2/model/`.
 - 2026-09-20. Idea 6 done in the same model with the silent genes kept: every fit up a few hundredths, the gain of 3D unchanged.
+- 2026-09-21. Summary section written; ideas 19 and 20 are the next arm, one eden array.
 - 2026-09-21. Idea 8 reframed and done: the person specific ceiling is in the RNAPOL2 loops at the promoter, +0.10 on the deviation statistic; the nearest atlas distance keeps +0.016 of it, the person's own anchors +0.06; the law's saturation and the atlas lose it.
 - 2026-09-21. The Drive folder's Hi-C is the ChIA-PET pair map already in use. HGSVC has independent Hi-C, RNA-seq and phased VCFs for the nine; the HGSVC chr1 arm is prepared and waits for the sbatch.
 - 2026-09-21. Where the limit sits: the design has no person specific expression (0.97 agreement, another person's model predicts as well as one's own), the engine relays the loops on both arms, the ensemble costs about 0.06, the feature saturates at 0.35 to 0.39. Three levers named.
