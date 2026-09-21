@@ -54,9 +54,9 @@ FACTOR_NOTE = """\
 
 HGSVC_NOTE = """\
 #
-# Contact singletons from the HGSVC Hi-C of this individual, 40 kb, chr1, drawn to the depth of
-# the ChIA-PET derived map they replace by playground/trio/hgsvc_singletons.py. The ChIA-PET
-# derived map holds nothing the loops do not, and this one is an independent experiment,
+# Contact singletons from the HGSVC Hi-C of this individual, the 4DN mcool at 25 kb thinned by
+# slurm/ensemble/prep_singletons.py as the cell lines' maps are. The ChIA-PET derived map holds
+# nothing the loops do not, and this one is an independent experiment,
 # design/expression-from-structure.md.
 """
 
@@ -72,7 +72,7 @@ def build(
     params["data"]["singletons"] = (
         f"{name}_hic_{binsize // 1000}kb_singletons.bedpe"
         if singletons == "chiapet"
-        else f"{name}_hgsvc_40kb_chr1_singletons.bedpe"
+        else f"{name}_hgsvc_{binsize // 1000}kb_singletons.bedpe"
     )
     params["data"]["singletons_inter"] = ""
     if factor != "CTCF":

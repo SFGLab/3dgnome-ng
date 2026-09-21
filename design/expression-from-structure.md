@@ -117,15 +117,17 @@ The last two are what idea 7 was blocked on: allele specific expression per gene
 the RNA-seq reads against the phased VCF, and the ChIA-PET reads could be phased on the same
 VCF with per haplotype counts.
 
-The first is the engine side lever. `playground/trio/hgsvc_singletons.py` draws contacts from
-a 40 kb matrix in proportion to its values, seeded, to the depth of the ChIA-PET map it
-replaces, and `trio_configs.py --factor RNAPOL2 --singletons hgsvc` writes
-`<s>_trio_rnapol2_hgsvc.ini`, which differs from the RNAPOL2 arm's config in the singletons
-line alone. The arm is chr1 at ten conformations on the nine, `CONFIG_TAG=_trio_rnapol2_hgsvc
-OUT=out/trio_rnapol2_hgsvc`, and the judge is idea 5's model on it, the 3D block's gain beyond
-the input. 40 kb is coarser than the 25 kb the ChIA-PET map used and the anchors are 1 to 13
-kb, so the contact background will hold fewer far pairs than a 10 kb map from the BAMs would;
-if the arm moves the gain, the BAMs are the next step, 460 GB and a pairs pipeline.
+The first is the engine side lever, and 4DN has reprocessed that Hi-C: one released GRCh38
+mcool a sample on the open data bucket, 3.8 to 6.1 GB, accessions 4DNFIM8SM3SD, 4DNFI66KARTU,
+4DNFIEWJXIW4, 4DNFIUZJP1ED, 4DNFIFXDDDJ6, 4DNFIHGNUBH5, 4DNFIIRNP38T, 4DNFIO7M1D22 and
+4DNFIM8KVPS6 for the nine in the order above, with compartment and insulation tracks beside
+each. They go through the cell lines' own path, `slurm/ensemble/prep_singletons.py` at 25 kb
+thinned to 5,000 contacts a megabase, into `<S>_hgsvc_25kb_singletons.bedpe`, and
+`trio_configs.py --factor RNAPOL2 --singletons hgsvc` writes `<s>_trio_rnapol2_hgsvc.ini`,
+which differs from the RNAPOL2 arm's config in the singletons line alone. The arm is chr1 at
+ten conformations on the nine, `CONFIG_TAG=_trio_rnapol2_hgsvc OUT=out/trio_rnapol2_hgsvc`,
+and the judge is idea 5's model on it, the 3D block's gain beyond the input. The mcools are
+on the workstation under `/mnt/storagelinux/_hgsvc/mcool/`.
 
 ## Why the ceiling is the feature
 
