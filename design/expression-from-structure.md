@@ -47,6 +47,49 @@ So the processing is worth a few hundredths and is not the ceiling.
 
 2026-09-20, from idea 5. Out of fold, per person on chr1, a model of expression reaches 0.55 to 0.57 from the gene alone, 0.69 to 0.71 with the linear map of elements around it, 0.75 to 0.77 with the loops at its promoter, and 0.76 to 0.77 with everything the 3D ensemble gives on top. The models add nothing beyond their input and the linear map. Ideas 1 to 4 each moved the raw correlation and none moved this number. What would move it has to put information into the models that is not in the loops at the promoter: the haplotypes of idea 7, or a second data type in the energy.
 
+## What limits amplification, 2026-09-21
+
+The signal is there in every person and nothing tried amplified it, so three tests asked where
+the limit sits: in the data, in the engine, or in the feature. `cross_person.py`,
+`pooled_panel.py`, and `expression_model.py` on the CTCF arm.
+
+**The data design has no person specific expression to explain.** The nine expression
+profiles agree at Spearman 0.97 on the genes all nine express. Another person's model predicts
+a person's expression as well as their own, 0.33 to 0.38 against 0.34 to 0.39 on the RNAPOL2
+arm and the same on the CTCF arm, and the person specific part of the distance against the
+person specific part of expression is 0.00 to 0.05. What the models read is the shared
+lymphoblastoid map, which every person carries alike. That is a property of healthy trios and
+not of the modelling: the cross cell type design has expression differences of many log units
+to work with, and this design has none outside the haplotypes of idea 7.
+
+**The engine relays its loops and adds nothing of its own, on both arms.** On the CTCF arm,
+where the loops are not a transcription readout, the out of fold gain of the 3D block beyond
+the loops at the promoter and the linear map is -0.01 to +0.01, the same as on the RNAPOL2
+arm. Nothing emergent, transitive proximity, hubs or compartment level packing, reaches
+expression. That is by construction: a pair with no loop sits at the polymer law, and the
+contact background these runs carry comes from a Hi-C built from the same ChIA-PET, so it
+holds no long range information the loops do not.
+
+**The ensemble is noisy and that part is recoverable.** Models of different people agree at
+0.62 to 0.64 where the expression agrees at 0.97. Averaging the nine people's models, ninety
+conformations of one shared map, raises the correlation from 0.30 to 0.37 on the RNAPOL2 arm
+and 0.28 to 0.34 on the CTCF arm on the common genes; averaging expression changes nothing.
+Ten conformations undersample the map by about 0.06 of correlation.
+
+**The feature saturates.** Corrected for the noise on both sides, the nearest enhancer
+distance tops out at 0.39 on the RNAPOL2 arm and 0.35 on the CTCF arm. The rest of expression
+is not in enhancer proximity as these models represent it, and ideas 1 to 4 showed no
+transformation of that proximity does better.
+
+So the order is: the design first, the ensemble second, the engine's information third, the
+feature last. What would move each. A target with person specific variance, the allelic
+ratio of idea 7 or an RNA-seq of the same cells under a stimulus, which is a data request.
+Fifty conformations a person on chr1, `PER_TASK=50` on the same `OUT`, about 0.06 for the
+price of forty conformations a person. Independent long range data in the energy, a real deep
+Hi-C as the contact background instead of the ChIA-PET derived map, GM12878's 4DN map for all
+nine as a shared prior, which is the one engine side lever that puts information into the
+models the loops do not hold, measurable as the 3D gain beyond the input on one arm.
+
 ## Why the ceiling is the feature
 
 RNAPOL2 ChIA-PET is a polymerase occupancy readout, so its loop count at a promoter predicts
@@ -84,4 +127,5 @@ day of work with 5 on top, and they run on the models there are.
 - 2026-09-20. Idea 4 tried: the person's own active elements raise the raw number, the active atlas 0.39 to 0.46 and the distal loop anchors 0.36 to 0.42, the unbound atlas is inert, but nothing beats the atlas beyond the input and most of every set's signal is an element inside the gene's own span. Adopted as the element set for idea 5. `playground/trio_rnapol2/own_keep/` and `own/`.
 - 2026-09-20. Idea 5 done: out of fold, the 3D block adds -0.01 to +0.01 beyond the input and +0.00 to +0.03 beyond linear, in every person. `playground/trio_rnapol2/model/`.
 - 2026-09-20. Idea 6 done in the same model with the silent genes kept: every fit up a few hundredths, the gain of 3D unchanged.
+- 2026-09-21. Where the limit sits: the design has no person specific expression (0.97 agreement, another person's model predicts as well as one's own), the engine relays the loops on both arms, the ensemble costs about 0.06, the feature saturates at 0.35 to 0.39. Three levers named.
 - 2026-09-20. Idea 7 inventoried: the phased loops are two to four percent of a person's loops and single read labels, and there is no allele specific expression. Blocked on two data requests to the lab.
