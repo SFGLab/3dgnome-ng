@@ -28,7 +28,8 @@ What is left, in the order to try it:
 2. Done and adopted, 2026-09-21: the person's own elements as the element table, idea 20.
    Raw up in every person on both arms, the person specific part doubled to +0.05..+0.06,
    the 3D part beyond the set's own linear proximity unchanged at -0.14..-0.17.
-3. The HGSVC Hi-C arm as the background, prepared, tests what the background contributes.
+3. Done, 2026-09-22: the HGSVC Hi-C arm. An independent contact map reproduces the ChIA-PET
+   map arm at 0.83 to 0.91 per gene and adds nothing beyond the loops.
 4. The data questions that can end the line: expression reliability from HGSVC's second
    RNA-seq (10, download in progress), the structural variant pre test on HGSVC's calls
    (9, done 2026-09-22, negative: too few and too small on chr1 in nine people).
@@ -160,6 +161,29 @@ ten conformations on the nine, `CONFIG_TAG=_trio_rnapol2_hgsvc OUT=out/trio_rnap
 and the judge is idea 5's model on it, the 3D block's gain beyond the input. The mcools are
 on the workstation under `/mnt/storagelinux/_hgsvc/mcool/`.
 
+**Run and measured, 2026-09-22.** Eden job 1809232, nine samples at ten conformations, 5 to 7
+minutes a conformation against 13 on the ChIA-PET derived map; the law measured 0.25 to 0.26 on
+every person's Hi-C where the ChIA-PET map gave 0.40. Models on the workstation under
+`/mnt/storagelinux/models_trio_rnapol2_hgsvc/`, enhancer3d with the person's own elements in
+`playground/trio_rnapol2_hgsvc/`, `hgsvc_arm.sh`, the pairs window capped at 3 Mb since the
+box held other jobs. Against the same arm on the ChIA-PET map, per person on chr1:
+
+| statistic, own elements | ChIA-PET map | HGSVC Hi-C |
+|---|---|---|
+| raw rho(3D, expr) | -0.40 to -0.46 | -0.38 to -0.46 |
+| partial beyond the set's linear distance, mean | -0.169 | -0.192 |
+| person specific deviation, 1,903 genes | +0.062 | +0.052 |
+| family separation, 3D | +0.030, p 0.005 | +0.025, p 0.014 |
+| nearest distance, agreement between the two arms | | 0.83 to 0.91 |
+| idea 5, the 3D block alone | 0.52 to 0.55 | 0.55 to 0.60 |
+| idea 5, the 3D block beyond the linear map | -0.001 to +0.011 | +0.006 to +0.025 |
+| idea 5, the 3D block beyond the loops at the promoter | -0.005 to +0.009 | -0.003 to +0.007 |
+
+So an independent contact map changes little: the two arms agree per gene at 0.83 to 0.91,
+the structures on the Hi-C are a shade more informative on their own and a shade deeper beyond
+linear, and the gain beyond the loops at the promoter is zero on both. The background is
+background.
+
 ## Why the ceiling is the feature
 
 RNAPOL2 ChIA-PET is a polymerase occupancy readout, so its loop count at a promoter predicts
@@ -234,6 +258,7 @@ line. 11 to 14 and 17 are afternoon tests on the models there are.
 - 2026-09-20. Idea 5 done: out of fold, the 3D block adds -0.01 to +0.01 beyond the input and +0.00 to +0.03 beyond linear, in every person. `playground/trio_rnapol2/model/`.
 - 2026-09-20. Idea 6 done in the same model with the silent genes kept: every fit up a few hundredths, the gain of 3D unchanged.
 - 2026-09-21. Summary section written; ideas 19 and 20 are the next arm, one eden array.
+- 2026-09-22. The HGSVC arm measured: agrees with the ChIA-PET map arm at 0.83 to 0.91 per gene, partial -0.19 against -0.17, deviation +0.05 against +0.06, the 3D block beyond the loops -0.003 to +0.007. The background is background.
 - 2026-09-22. The HGSVC chr1 arm ran on eden, job 1809232, the law measuring 0.25 to 0.26 on every person's Hi-C against 0.40 on the ChIA-PET derived map, 5 to 7 minutes a conformation; models on the workstation, enhancer3d running. Idea 9's pre test negative. HGSVC's trio ASE tables found for idea 7.
 - 2026-09-21, late. All nine 4DN mcools on the workstation, chr1 singletons at 25 kb on eden under `data/<S>/`, compartment tracks for nine; idea 16 rerun with nine. The HGSVC arm waits for the sbatch.
 - 2026-09-21. Idea 15 cheap form and idea 16 done: promoter CpG lifts the gene block and changes nothing for 3D; the person's own compartments carry a +0.08 person specific trace and add nothing out of fold.
