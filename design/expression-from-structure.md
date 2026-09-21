@@ -157,6 +157,40 @@ adopted, done and dropped. A result line gets the numbers and the date.
 Ideas 1 to 3 are features from the pairwise distances the pipeline already computes, about a
 day of work with 5 on top, and they run on the models there are.
 
+## Ideas, second list, 2026-09-21
+
+From the limit analysis and the literature. The 3D-GNOME line itself points at one of them:
+Szalaj 2016 (Genome Research, 10.1101/gr.205062.116) built the engine on ChIA-PET, and
+Sadowski 2019 (Genome Biology, 10.1186/s13059-019-1728-x) and 3D-GNOME 2.0 (Wlasnowolski 2020,
+NAR, 10.1093/nar/gkaa388) used it to model structural variants of 1000 Genomes individuals
+and relate the altered structure to expression. Delaneau 2019 (Science, 10.1126/science.aat8266)
+found in 317 lymphoblastoid lines that regulatory activity co-varies within 3D domains and
+mediates genetic effects on expression, at a sample size two orders above nine. Gorkin 2019
+(Genome Biology, 10.1186/s13059-019-1855-4) measured Hi-C across 20 Yoruba lines and found
+person to person 3D variation real and modest. Li 2012 (Cell, 10.1016/j.cell.2011.12.014),
+the RNAPII ChIA-PET paper, found promoters in multigene complexes more highly expressed. Zuin
+2022 (Nature, 10.1038/s41586-022-04570-y) found transcription a nonlinear, saturating function
+of enhancer contact probability. GraphReg (Karbalayghareh 2022, Genome Research,
+10.1101/gr.275870.121) predicts expression from 3D contacts and 1D epigenome and gains from
+3D mainly for distal elements, with element activity from the cell's own marks.
+
+| # | idea | what it adds | cost | status |
+|---|---|---|---|---|
+| 8 | The data ceiling, before any model: the person's own Hi-C at the promoter | Per gene per person the contact of the promoter with its enhancers from the 4DN mcool at 10 kb, its deviation from the panel against the expression deviation. If the raw Hi-C carries no person specific enhancer signal, no model of it can. | hours once the mcools are here | open |
+| 9 | Structural variants, the 3D-GNOME 2.0 design | HGSVC's haplotype resolved SV calls for these nine. Genes whose enhancer or loop anchor a person's deletion, duplication or inversion removes or moves; that person's expression deviation at those genes, sign by SV type. Person specific by construction and the lab's own lineage. A data only pre test needs no model. | a day for the pre test, a week with the engine | open |
+| 10 | Reliability of the person specific expression | HGSVC's mRNA-seq is a second measurement of each person. Quantified against the lab's counts, the agreement of the two on each person's deviation from the panel is the ceiling of anything person specific. | a day, salmon on the workstation | open |
+| 11 | Gene looping and gene compaction | 3D distance TSS to TES and the radius of gyration of the gene body, controlling length. RNAPII recycling by gene loops is old literature; the RNAPOL2 anchors put beads inside bodies. | hours | open |
+| 12 | Promoter hubs, transcription factories | Other active promoters within a 3D radius, and promoter to promoter loops in the RNAPOL2 set, Li 2012's multigene complexes. | hours | open |
+| 13 | Ensemble variability as the feature | The spread over conformations of the nearest enhancer distance, stable against fluctuating contacts, a bursting reading. | hours | open |
+| 14 | On and off before level | Zuin 2022's saturation says structure may set whether a gene is on more than how much. A classifier on silent against expressed with the 3D block, then level among the expressed. | hours | open |
+| 15 | Expression residual to sequence | Take out what promoter sequence predicts, CpG class as the cheap proxy and Enformer as the real one, and ask what structure explains of the residual. Changes the target rather than the feature. | a day cheap, a week with Enformer | open |
+| 16 | The person's compartments | 4DN ships a compartment and an insulation track per person from their Hi-C. Compartment deviation from the panel against expression deviation, and the tracks as features. | hours | open |
+| 17 | What the RNAPOL2 loops did to the structure | Per gene the CTCF arm distance minus the RNAPOL2 arm distance, the geometry the second factor added. Both arms exist. | hours | open |
+| 18 | Inter chromosomal | Li 2012's complexes cross chromosomes. The genome arms model chromosomes together at the top level, so a promoter's neighbours on other chromosomes are a feature only the genome run can give. | with the genome arms | open |
+
+8, 10 and 9's pre test are data questions and come first, since a negative on them ends the
+line. 11 to 14 and 17 are afternoon tests on the models there are.
+
 ## Log
 
 - 2026-09-20. Question raised, diagnostics run, baselines set, list written.
