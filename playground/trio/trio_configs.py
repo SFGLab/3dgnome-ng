@@ -13,6 +13,9 @@ line arm. The segments file is written by trio_segments.py.
 With `--factor RNAPOL2` the config carries two cluster files, the CTCF set and the sample's
 RNAPOL2 set as a second factor at full strength, on the shared anchor set trio_prepare.py
 writes for it, and is named `<sample>_trio_rnapol2.ini`. Everything else is the CTCF arm's.
+
+With `--half-saturation Q` the config pins `[distance] contact_half_saturation` to Q and the
+name carries `_qhQ`, the arm of idea 19 in design/expression-from-structure.md.
 """
 
 import argparse
@@ -61,8 +64,21 @@ HGSVC_NOTE = """\
 """
 
 
+QHALF_NOTE = """\
+#
+# contact_half_saturation {q}. The loop strength, in multiples of a typical loop at that span,
+# at which a pair sits halfway from the background to touching. At the default 1 a typical
+# loop is already halfway and the target is most sensitive to the count of a typical loop;
+# this value moves that sensitivity, design/expression-from-structure.md idea 19.
+"""
+
+
 def build(
-    sample: trio_samples.Sample, binsize: int, factor: str = "CTCF", singletons: str = "chiapet"
+    sample: trio_samples.Sample,
+    binsize: int,
+    factor: str = "CTCF",
+    singletons: str = "chiapet",
+    half_saturation: float | None = None,
 ) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
@@ -81,6 +97,8 @@ def build(
         params["data"]["clusters"] = f"{name}_clusters_3+.bedpe,{name}_{tag}_clusters_3+.bedpe"
         params["data"]["factors"] = f"CTCF,{factor}"
         params["springs"]["factor_strength"] = "1,1"
+    if half_saturation is not None:
+        params.setdefault("distance", {})["contact_half_saturation"] = f"{half_saturation:g}"
     params["simulation_backend"]["multigpu_mode"] = "groups"
     params["simulation_backend"]["mc_executor_jax_bucket_shapes"] = "yes"
     params["subanchor_heatmap"]["heat_min_reduction"] = "0.001"
@@ -97,11 +115,13 @@ def main() -> None:
     ap.add_argument("--factor", choices=("CTCF", "RNAPOL2"), default="CTCF")
     ap.add_argument("--singletons", choices=("chiapet", "hgsvc"), default="chiapet",
                     help="the contact map: the ChIA-PET derived one, or the HGSVC Hi-C")
+    ap.add_argument("--half-saturation", type=float, default=None,
+                    help="pin [distance] contact_half_saturation; the name carries _qh<value>")
     args = ap.parse_args()
     out_dir = ROOT / args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     for s in trio_samples.resolve(args.samples):
-        cfg = build(s, args.binsize, args.factor, args.singletons)
+        cfg = build(s, args.binsize, args.factor, args.singletons, args.half_saturation)
         # Distinct name so the fixed arm cannot be confused with, or overwrite, the
         # 2026-08-24 configs whose structures had zero between-block contact.
         tag = "_trio" if args.factor == "CTCF" else f"_trio_{args.factor.lower()}"
@@ -109,11 +129,14 @@ def main() -> None:
         if args.singletons == "hgsvc":
             tag += "_hgsvc"
             note += HGSVC_NOTE
+        if args.half_saturation is not None:
+            tag += f"_qh{args.half_saturation:g}"
+            note += QHALF_NOTE.format(q=f"{args.half_saturation:g}")
         path = out_dir / f"{s.name.lower()}{tag}.ini"
         with path.open("w") as fh:
             fh.write(HEADER.format(name=s.name, role=s.role, pop=s.pop, factor_note=note))
             cfg.write(fh)
-        print(f"wrote {path.relative_to(ROOT)}")
+        print(f"wrote {path.relative_to(ROOT) if path.is_relative_to(ROOT) else path}")
 
 
 if __name__ == "__main__":
