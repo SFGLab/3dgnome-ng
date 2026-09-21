@@ -162,7 +162,10 @@ sample = sys.argv[2]
 # Each of these fails silently rather than loudly if unset, producing a plausible structure that
 # answers a different question.
 assert sample in s.data_anchors, f"config is not for {sample}: anchors={s.data_anchors!r}"
-assert "hic" in s.data_singletons, f"singletons={s.data_singletons!r} does not look contact derived"
+# The ChIA-PET derived map is named _hic_, the HGSVC Hi-C arm _hgsvc_; anything else is a
+# config pointing somewhere it should not.
+assert "hic" in s.data_singletons or "hgsvc" in s.data_singletons, f"singletons={s.data_singletons!r} does not look contact derived"
+assert sample in s.data_singletons, f"singletons={s.data_singletons!r} are not {sample}'s"
 assert s.use_ctcf_motif and s.use_excluded_volume and s.use_dynamic_loop_density
 assert s.use_anchor_heatmap, "the anchor distance map is off"
 assert s.mc_executor_jax_bucket_shapes, "shape bucketing is off; this run would be ~5x slower"
