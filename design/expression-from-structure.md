@@ -8,6 +8,33 @@ lines, since a person has one sample. chr1 at ten conformations until the genome
 This note holds the numbers to beat, what has been ruled out, and the ideas in the order they
 are to be tried, each with its status, so it is the tracker.
 
+## Summary, 2026-09-21
+
+What the numbers say, per person on chr1 at ten conformations, RNAPOL2 arm. The nearest
+enhancer distance reaches 0.34 to 0.39 raw and the loops at the promoter alone 0.43 to 0.57.
+Out of fold the 3D block adds nothing beyond the loops and the linear map. The design has no
+person specific expression to explain, 0.97 agreement between people, and what person specific
+part the loops carry, +0.10 on the deviation statistic, the models keep 0.02 to 0.06 of.
+
+Tried and closed: enhancer load and hubs (1), contact frequency (2), polymer residual (3), the
+person's own elements (4, adopted as the element set), a cross validated model (5), the
+expression side (6), the ceiling in the forming data (8). Blocked on data: haplotypes (7).
+
+What is left, in the order to try it:
+
+1. The saturation lever in the engine, from idea 8. `contact_half_saturation` above 1 so a
+   thirty PET loop sits closer than a three PET loop, one chr1 arm, judged on the deviation
+   statistic and idea 5.
+2. The person's own elements as the feature set everywhere, from ideas 4 and 8, and no atlas.
+3. The HGSVC Hi-C arm as the background, prepared, tests what the background contributes.
+4. The data questions that can end the line: expression reliability from HGSVC's second
+   RNA-seq (10), the structural variant pre test on HGSVC's calls (9).
+5. Afternoon features on the models there are: gene looping (11), promoter hubs (12),
+   ensemble spread (13), on and off before level (14), CTCF minus RNAPOL2 (17).
+6. With more: the sequence residual (15), the person's 4DN compartments (16), the genome arms
+   for inter chromosomal neighbours (18), and haplotypes (7) once the lab gives per haplotype
+   PET counts and there is allele specific expression.
+
 ## Where it stands
 
 Per person, chr1, genes the person expresses at all, 2,268 to 2,467. `rnapol2_individual.py`
