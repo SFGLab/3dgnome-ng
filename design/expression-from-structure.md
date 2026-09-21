@@ -90,6 +90,43 @@ Hi-C as the contact background instead of the ChIA-PET derived map, GM12878's 4D
 nine as a shared prior, which is the one engine side lever that puts information into the
 models the loops do not hold, measurable as the 3D gain beyond the input on one arm.
 
+## The contact map, and an independent one, 2026-09-21
+
+The trio runs' contact singletons come from `ChIA-PET_hg38_<S>_merged_allres.hic`, which the
+lab built with juicer from the CTCF ChIA-PET read pairs of each sample for hicrep, its README
+and `make_hic.sh` say so, and the copies in the Drive folder `1QkrLRi7Xc92z_bquS8QcY5nt-tQEIgnm`
+are the files already fetched, same names and sizes. On chr1 a run loads 0.96 to 1.8 million
+of these pairs a sample and fits its exponent on them, 0.34 to 0.42. They are the same
+library as the loops, so the contact background and the segment heatmap hold nothing the loops
+do not.
+
+The Human Genome Structural Variation Consortium sequenced these nine lymphoblastoid lines
+independently, and all of it is public under
+`ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/hgsv_sv_discovery/`:
+
+- Hi-C, Ren lab 2016, GRCh38, two biological replicates a sample, several hundred million
+  read pairs a sample. BAMs under `working/20160822_HiC_bam_files/`, 18 to 47 GB each, 460 GB
+  in all, mapping quality 10 and duplicates removed; fastqs at ENA PRJEB11418; normalised 40 kb
+  dense matrices per chromosome under `working/20160817_HiC_contact_matrices/`, 128 MB for
+  chr1.
+- Haplotype resolved genotypes from that Hi-C, `working/20170302_hic_phase/`, one VCF a sample.
+- Strand specific mRNA-seq, paired, HiSeq 2500, one library a sample, `illumina_rna.sequence.index`,
+  fastqs at ENA ERP012633.
+
+The last two are what idea 7 was blocked on: allele specific expression per gene follows from
+the RNA-seq reads against the phased VCF, and the ChIA-PET reads could be phased on the same
+VCF with per haplotype counts.
+
+The first is the engine side lever. `playground/trio/hgsvc_singletons.py` draws contacts from
+a 40 kb matrix in proportion to its values, seeded, to the depth of the ChIA-PET map it
+replaces, and `trio_configs.py --factor RNAPOL2 --singletons hgsvc` writes
+`<s>_trio_rnapol2_hgsvc.ini`, which differs from the RNAPOL2 arm's config in the singletons
+line alone. The arm is chr1 at ten conformations on the nine, `CONFIG_TAG=_trio_rnapol2_hgsvc
+OUT=out/trio_rnapol2_hgsvc`, and the judge is idea 5's model on it, the 3D block's gain beyond
+the input. 40 kb is coarser than the 25 kb the ChIA-PET map used and the anchors are 1 to 13
+kb, so the contact background will hold fewer far pairs than a 10 kb map from the BAMs would;
+if the arm moves the gain, the BAMs are the next step, 460 GB and a pairs pipeline.
+
 ## Why the ceiling is the feature
 
 RNAPOL2 ChIA-PET is a polymerase occupancy readout, so its loop count at a promoter predicts
@@ -127,5 +164,6 @@ day of work with 5 on top, and they run on the models there are.
 - 2026-09-20. Idea 4 tried: the person's own active elements raise the raw number, the active atlas 0.39 to 0.46 and the distal loop anchors 0.36 to 0.42, the unbound atlas is inert, but nothing beats the atlas beyond the input and most of every set's signal is an element inside the gene's own span. Adopted as the element set for idea 5. `playground/trio_rnapol2/own_keep/` and `own/`.
 - 2026-09-20. Idea 5 done: out of fold, the 3D block adds -0.01 to +0.01 beyond the input and +0.00 to +0.03 beyond linear, in every person. `playground/trio_rnapol2/model/`.
 - 2026-09-20. Idea 6 done in the same model with the silent genes kept: every fit up a few hundredths, the gain of 3D unchanged.
+- 2026-09-21. The Drive folder's Hi-C is the ChIA-PET pair map already in use. HGSVC has independent Hi-C, RNA-seq and phased VCFs for the nine; the HGSVC chr1 arm is prepared and waits for the sbatch.
 - 2026-09-21. Where the limit sits: the design has no person specific expression (0.97 agreement, another person's model predicts as well as one's own), the engine relays the loops on both arms, the ensemble costs about 0.06, the feature saturates at 0.35 to 0.39. Three levers named.
 - 2026-09-20. Idea 7 inventoried: the phased loops are two to four percent of a person's loops and single read labels, and there is no allele specific expression. Blocked on two data requests to the lab.

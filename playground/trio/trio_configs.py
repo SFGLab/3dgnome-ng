@@ -52,15 +52,28 @@ FACTOR_NOTE = """\
 """
 
 
+HGSVC_NOTE = """\
+#
+# Contact singletons from the HGSVC Hi-C of this individual, 40 kb, chr1, drawn to the depth of
+# the ChIA-PET derived map they replace by playground/trio/hgsvc_singletons.py. The ChIA-PET
+# derived map holds nothing the loops do not, and this one is an independent experiment,
+# design/expression-from-structure.md.
+"""
+
+
 def build(
-    sample: trio_samples.Sample, binsize: int, factor: str = "CTCF"
+    sample: trio_samples.Sample, binsize: int, factor: str = "CTCF", singletons: str = "chiapet"
 ) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
     name = sample.name
     params["data"] = cell_data_section(name, "data")
     params["data"]["segment_split"] = f"{name}_segments.bed"
-    params["data"]["singletons"] = f"{name}_hic_{binsize // 1000}kb_singletons.bedpe"
+    params["data"]["singletons"] = (
+        f"{name}_hic_{binsize // 1000}kb_singletons.bedpe"
+        if singletons == "chiapet"
+        else f"{name}_hgsvc_40kb_chr1_singletons.bedpe"
+    )
     params["data"]["singletons_inter"] = ""
     if factor != "CTCF":
         tag = factor.lower()
@@ -82,15 +95,20 @@ def main() -> None:
     ap.add_argument("--out-dir", default="slurm/ensemble")
     ap.add_argument("--binsize", type=int, default=BINSIZE)
     ap.add_argument("--factor", choices=("CTCF", "RNAPOL2"), default="CTCF")
+    ap.add_argument("--singletons", choices=("chiapet", "hgsvc"), default="chiapet",
+                    help="the contact map: the ChIA-PET derived one, or the HGSVC Hi-C")
     args = ap.parse_args()
     out_dir = ROOT / args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     for s in trio_samples.resolve(args.samples):
-        cfg = build(s, args.binsize, args.factor)
+        cfg = build(s, args.binsize, args.factor, args.singletons)
         # Distinct name so the fixed arm cannot be confused with, or overwrite, the
         # 2026-08-24 configs whose structures had zero between-block contact.
         tag = "_trio" if args.factor == "CTCF" else f"_trio_{args.factor.lower()}"
         note = "" if args.factor == "CTCF" else FACTOR_NOTE.format(factor=args.factor)
+        if args.singletons == "hgsvc":
+            tag += "_hgsvc"
+            note += HGSVC_NOTE
         path = out_dir / f"{s.name.lower()}{tag}.ini"
         with path.open("w") as fh:
             fh.write(HEADER.format(name=s.name, role=s.role, pop=s.pop, factor_note=note))
