@@ -326,6 +326,44 @@ first is a control on that trace and comes before anything built on it.
 
 Then the deferred: 7 haplotypes, 18 inter chromosomal, 15 in its Enformer form, and the genome arms.
 
+## Ideas, fifth list, the engine, 2026-09-22
+
+The question turned to the engine: what change to 3dgnome itself could raise expression
+prediction, and would long range interactions. What the numbers say about where the engine
+stands. The law's target at the promoter keeps +0.08 of the loops' +0.10 person specific part
+(idea 19) and the realised structure keeps +0.02 to +0.06 (idea 8), so the loss is in the
+solve, not the law. The arcs solve on a trio chromosome hits its 800 iteration cap on every
+conformation, `STOP: TOTAL NO. OF ITERATIONS REACHED LIMIT` in every log of job 1809232, 23,080
+anchors on chr1. Loops beyond `max_pet_length`, 1 Mb, leave the arcs for the segment heatmap,
+and the contact background reads the thinned singletons, 930,000 pairs on chr1, so it holds
+few far pairs; the person's compartments, which are the same Hi-C at 100 kb, carry +0.06
+unique out of fold on the large deviations (idea 29) and the models track their person
+specific deviation at +0.02 (ideas 16 and 24). Every conformation of an ensemble solves the
+same targets from a different start, so the ensemble spread is annealing noise, and a loop's
+PET count, which is a frequency across cells, enters only as a target distance. RNAPOL2 loops
+enter as pairwise springs like CTCF's, with no many body form.
+
+Three ceilings to keep in view. A perfect relay of the promoter loops gives +0.10 person
+specific and 0 beyond the loops out of fold, since the loops are the input. The one source
+of person specific information not in the loops that the models could carry is the person's
+Hi-C beyond the loops, worth at most about +0.06 on 200 genes a person by idea 29. And the
+ensemble at ten conformations costs about 0.06 by attenuation.
+
+| # | idea | what to build | cost | status |
+|---|---|---|---|---|
+| 31 | Loop realisation fidelity, the diagnostic | On the models there are, per loop: the law's target distance against the realised mean distance over conformations, by strength, span and factor; and per person the deviation of the target from the panel against the deviation of the realised distance, which is where the +0.08 becomes +0.03. Names the loops the solve loses, weak, long or crowded, and decides between 32 and 33. | an afternoon | open, next |
+| 32 | Converge the arcs solve | The cap of 800 iterations binds on every trio chromosome. One chr1 arm at 3,000 or until converged, judged on 31's fidelity and the deviation statistics. Cheap if the device solve stays at seconds an iteration. | one eden array | open |
+| 33 | Loop presence sampled per conformation | A PET count is a frequency across cells. Each conformation draws each loop with a probability from its strength, so the ensemble mean over conformations encodes the frequency and a person's count of a shared loop survives into the mean distance, which the target distance alone cannot carry once it saturates. Opt in, the ensemble then needs more members. Judged on the deviation statistics and idea 5. | a few days of engine work, one array | open |
+| 34 | The person's Hi-C far pairs, the long range answer | Loops carry up to 1 Mb and the background reads a thinned map. The person's full 4DN map at anchor resolution as the contact background across blocks in the joint solve, the denser anchor level map that is open since September, on the HGSVC arm. The only person specific information beyond the loops that the models could take in; judged on whether the models' deviation tracks the person's compartment deviation, on the large deviations and on idea 5. | a few days, one array | open |
+| 35 | RNAPOL2 as a many body attraction | Encoding B of `rnapii-loops.md`: RNAPOL2 anchors attract as a group, transcription factories, rather than as pairwise springs, so promoter hubs form in the model. Judged on idea 12's hub features and on expression. | a week of engine work | open |
+| 36 | More conformations, idea 30 | The attenuation ceiling. Fifty conformations for one person. | 7 GPU hours | open |
+
+Long range interactions, then, are 34 and only 34: loops within a megabase are already in and
+the joint solve places blocks by the Hilbert start and a thin background, and the person's
+compartments show what the full map could add, about +0.06 on the large deviations and
+nothing on the rest. The larger lever for the person specific part is 33, since it is the
+only way a shared loop's person specific count reaches the structure.
+
 ## Log
 
 - 2026-09-20. Question raised, diagnostics run, baselines set, list written.
@@ -336,6 +374,7 @@ Then the deferred: 7 haplotypes, 18 inter chromosomal, 15 in its Enformer form, 
 - 2026-09-20. Idea 5 done: out of fold, the 3D block adds -0.01 to +0.01 beyond the input and +0.00 to +0.03 beyond linear, in every person. `playground/trio_rnapol2/model/`.
 - 2026-09-20. Idea 6 done in the same model with the silent genes kept: every fit up a few hundredths, the gain of 3D unchanged.
 - 2026-09-21. Summary section written; ideas 19 and 20 are the next arm, one eden array.
+- 2026-09-22. Fifth list, the engine: 31 loop fidelity diagnostic, 32 converge the arcs solve, 33 loop presence sampled per conformation, 34 the person's full Hi-C as the long range background, 35 RNAPOL2 many body, 36 more conformations.
 - 2026-09-22. Ideas 27 and 28 done and dropped: the eQTL variant is not what the models bring near, and the loops and peaks at the variant do not follow the genotype; the genetic part never enters the data.
 - 2026-09-22. Idea 29 done: one model of the person specific part reaches +0.20 to +0.31 out of fold from loops, compartments, genotype and peaks; the 3D block's unique gain is 0.
 - 2026-09-22. Idea 26 done: the person's own enhancer activity matches the nearest distance raw and adds nothing out of fold; its linear only form carries +0.08 of the person specific part, the contact weighted forms less.
