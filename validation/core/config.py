@@ -132,10 +132,15 @@ CANONICAL: dict[str, dict[str, object]] = {
         # the whole run from 1h57m to 1h13m. Where the energy is evaluated follows
         # mc_executor_arcs.
         "solver": "lbfgs",
-        # The default cap of 200 bound on every chromosome solve, chr1 still 6 percent above
-        # its energy at 800. On the device 800 iterations cost what 200 did on the CPU, and the
-        # 60 Mb battery is level between the two. Measured 2026-09-20.
-        "solver_iters": 800,
+        # The solve stops on the energy, not on a count. Traced on a trio chromosome of
+        # 23,080 anchors to 8,000 iterations, the relative improvement per iteration falls to
+        # 1e-5 by 830 and to 1e-6 by 2,400 and then sits near 1e-6 with no plateau, a long
+        # tail; the energy at 800 is 1.7 percent above the value at 8,000 and at 2,400 under
+        # one percent. The tolerance leaves the tail there and the count is a safety, which
+        # the tail never reaches. Adopted 2026-09-22, design/expression-from-structure.md
+        # idea 32. The 800 cap before it bound on every chromosome solve.
+        "solver_tol": 1e-6,
+        "solver_iters": 5000,
         # Solve every anchor of a chromosome together, from the block layout, each block's
         # anchors on a walk at the law's distance per gap. Three cell gate on chr1:1-60 Mb
         # against the deep maps, 2026-09-10: Pearson 0.271/0.282/0.301 to 0.291/0.318/0.304,

@@ -1100,6 +1100,15 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   smooth kernel's integer draws and its loop carries, so it is not used. Unit checks in
   `harness/test_arcs_solver.py`.
 
+  **The solve stops on the energy: `[simulation_arcs] solver_tol`, default 0, production 1e-6
+  with `solver_iters` 5000 as the safety, since 2026-09-22.** The cap bound on every trio
+  chromosome at 800 and at 3,000. Traced to 8,000 iterations on a chromosome of 23,080 anchors,
+  the relative improvement per iteration falls to 1e-5 by 830 and to 1e-6 by 2,400 and then
+  sits near 1e-6 with no plateau; the energy at 800 is 1.7 percent above the value at 8,000, at
+  2,400 under one percent. The tolerance is L-BFGS-B's own `ftol`, so at zero the options are
+  unchanged and the parity gate holds. `GNOME3D_ARCS_TRACE` names a file that receives every
+  evaluation's energy, which is how the value was chosen, `playground/trace_analysis.py`.
+
   The annealer is kept by decision, 2026-09-06, not as a leftover. The solver's justification
   is a funnel landscape measured on a few real blocks. A dataset or an energy change that
   breaks that assumption has the annealer to fall back on, and the annealer is the reference's
