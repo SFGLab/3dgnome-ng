@@ -16,6 +16,10 @@ writes for it, and is named `<sample>_trio_rnapol2.ini`. Everything else is the 
 
 With `--half-saturation Q` the config pins `[distance] contact_half_saturation` to Q and the
 name carries `_qhQ`, the arm of idea 19 in design/expression-from-structure.md.
+
+With `--compartments W` the compartment term runs at weight W on the sample's own eigenvector
+track, `<sample>_compartments.bedGraph` from the validation tracks study on the sample's 4DN
+Hi-C, phased by anchor density as the loader does; the name carries `_compW`, idea 24.
 """
 
 import argparse
@@ -64,6 +68,14 @@ HGSVC_NOTE = """\
 """
 
 
+COMP_NOTE = """\
+#
+# Compartment term at weight {w} on this sample's own eigenvector track from its 4DN Hi-C,
+# design/expression-from-structure.md idea 24. On the cell lines the term at 0.5 raised the
+# saddle and cost SCC and MultiMM; here the question is the person specific expression.
+"""
+
+
 QHALF_NOTE = """\
 #
 # contact_half_saturation {q}. The loop strength, in multiples of a typical loop at that span,
@@ -79,6 +91,7 @@ def build(
     factor: str = "CTCF",
     singletons: str = "chiapet",
     half_saturation: float | None = None,
+    compartments: float | None = None,
 ) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
@@ -99,6 +112,10 @@ def build(
         params["springs"]["factor_strength"] = "1,1"
     if half_saturation is not None:
         params.setdefault("distance", {})["contact_half_saturation"] = f"{half_saturation:g}"
+    if compartments is not None:
+        params["data"]["compartments"] = f"{name}_compartments.bedGraph"
+        params.setdefault("compartments", {})["use_compartments"] = "yes"
+        params["compartments"]["weight"] = f"{compartments:g}"
     params["simulation_backend"]["multigpu_mode"] = "groups"
     params["simulation_backend"]["mc_executor_jax_bucket_shapes"] = "yes"
     params["subanchor_heatmap"]["heat_min_reduction"] = "0.001"
@@ -117,11 +134,13 @@ def main() -> None:
                     help="the contact map: the ChIA-PET derived one, or the HGSVC Hi-C")
     ap.add_argument("--half-saturation", type=float, default=None,
                     help="pin [distance] contact_half_saturation; the name carries _qh<value>")
+    ap.add_argument("--compartments", type=float, default=None,
+                    help="the compartment term at this weight on the sample's own track; the name carries _comp<value>")
     args = ap.parse_args()
     out_dir = ROOT / args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     for s in trio_samples.resolve(args.samples):
-        cfg = build(s, args.binsize, args.factor, args.singletons, args.half_saturation)
+        cfg = build(s, args.binsize, args.factor, args.singletons, args.half_saturation, args.compartments)
         # Distinct name so the fixed arm cannot be confused with, or overwrite, the
         # 2026-08-24 configs whose structures had zero between-block contact.
         tag = "_trio" if args.factor == "CTCF" else f"_trio_{args.factor.lower()}"
@@ -132,6 +151,9 @@ def main() -> None:
         if args.half_saturation is not None:
             tag += f"_qh{args.half_saturation:g}"
             note += QHALF_NOTE.format(q=f"{args.half_saturation:g}")
+        if args.compartments is not None:
+            tag += f"_comp{args.compartments:g}"
+            note += COMP_NOTE.format(w=f"{args.compartments:g}")
         path = out_dir / f"{s.name.lower()}{tag}.ini"
         with path.open("w") as fh:
             fh.write(HEADER.format(name=s.name, role=s.role, pop=s.pop, factor_note=note))
