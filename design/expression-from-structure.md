@@ -400,7 +400,7 @@ structure tracks the large transitions, not the level (idea 23). Follow up meeti
 |---|---|---|---|---|
 | 38 | RNAPOL2 over the gene body, the colleague's feature | His table of gene body occupancy per gene per person, or the BAMs to count it from, since we hold peaks and loops but no BAMs. Then the feature goes into idea 29's person model and idea 5's model with the 3D block beside it. The honest reading first: RNAPOL2 over a gene body is transcription measured again, so as an explanation of expression it is near circular, and its value here is as the covariate that sets the ceiling for every cis modality, the loops and the models included. | an hour once the table arrives | open, table requested |
 | 39 | Gene length normalised expression as the target | The lab's counts are counts and our target is their log. Salmon TPM for the nine exists from idea 10, `/mnt/storagelinux/_hgsvc/salmon/quant/<S>`. Rerun the baselines on TPM: raw, deviation, idea 5. Expected: the deviation unchanged, since a gene's length cancels in a deviation from the panel, and the raw number moves a little at most, since gene length has no correlation with the distance (the processing check of 2026-09-20). Promised in the meeting. | an hour | open |
-| 40 | The colleague's gene wise statistic on our features | Per gene Spearman across the nine people, mean over genes and the count over 0.5 against its null, for the nearest own element distance on each arm, the linear distance, the loops at the promoter, the compartments and the genotype prediction, so the two tables merge on one statistic. Same for his statistic's null: about 1,500 of 14,000 genes at n 8. | an hour | open |
+| 40 | The colleague's gene wise statistic on our features | Per gene Spearman across the nine people, mean over genes and the count over 0.5 against its null, for the nearest own element distance on each arm, the linear distance, the loops at the promoter, the compartments and the genotype prediction, so the two tables merge on one statistic. Same for his statistic's null: about 1,500 of 14,000 genes at n 8. | an hour | done, 2026-09-22, `genewise_axis.py`, table below. On his statistic our 3D nearest own element is +0.06 to +0.09 gene wise where his models read 0, the RNAPOL2 loops at the promoter +0.165 match his gene body occupancy's +0.17, the linear map of active elements +0.12 sits above the 3D, and the genotype through GTEx eQTLs is the strongest per gene at +0.26 on the 278 eQTL genes. Every feature's share of genes over 0.5 is read against a within gene permutation null of about 0.08 at nine people; his 0.30 is against 0.11 at eight. |
 | 41 | EBV load as a trans covariate | The HGSVC RNA-seq on the workstation aligned to the EBV genome, NC_007605, total and BHRF1 per person, CPM. Test whether the person specific deviation tracks it, and put it in idea 29's model. A part of the deviation that is trans can never be carried by loops, compartments or models, so this sets the cis ceiling below +0.10 if it holds. On HPRC he finds 931 genes over 0.5 on 206 people. | half a day on the workstation | open |
 | 42 | Allelic expression, the trans free target, idea 7's missing input | The colleague's formalism: within a person the ratio of the two haplotypes' expression cancels the trans term, `y = log(E_h1 / E_h2)`, regressed on haplotype differences `X = x_h1 - x_h2`. The RNA-seq and the 1000G phased chr1 panel for the nine are on the workstation; the allele counts come from a diploid transcriptome per person with bcftools consensus and salmon, or from an aligner and counts at heterozygous sites. The 3D side of this stays thin, phased loops are 2 to 4 percent and the chr1 SVs few, so the ASE table is first a second view of the deviation with the trans part removed, and only then idea 7's target. | a day | open |
 | 43 | Loop strength normalised across people, 2D then 3D | Per loop, the PET count over the person's depth and over the typical count at its span, the law's q, as a person specific strength deviation. 2D: the strength deviation at the promoter against the expression deviation, which idea 19's ceiling analysis put at +0.10 with the law relaying +0.08. 3D: the engine's three forms, the saturating target (in), stiffness by strength (37, null), presence sampled per conformation (33, open, needs 50 to 100 conformations). Our resampled depth supersedes the providers' downsampling, which is his HG00512 anomaly. Promised in the meeting. | 2D an afternoon; 3D is idea 33 | open |
@@ -487,6 +487,44 @@ in the fibroblast, neuronal and developmental programs in the stem cell. The ind
 version is ideas 23 and 25 with the person's deviation from the panel in place of the fold
 change, and 22 for the part the genotype explains, which the cell line paper has no analogue of.
 
+### Idea 40, the two axes on our features, chr1, nine people, 2026-09-22
+
+`genewise_axis.py`, output `playground/trio_rnapol2_own/genewise_axis_chr1.csv`. Global is
+the per person Spearman across genes, mean of the nine; gene wise is the per gene Spearman
+across the nine people, mean and median over genes, with the share of genes over +0.5 and
+under -0.5 and the share over +0.5 under a null that permutes the people within each gene,
+twenty draws. Every feature is signed so that positive is the direction expression is
+expected to follow, so a distance reads positive. Genes are the chr1 genes expressed in all
+nine that carry the feature in all nine.
+
+| feature | genes | global | gene wise mean / median | over +0.5 | under -0.5 | null over +0.5 |
+|---|---|---|---|---|---|---|
+| 3D nearest own element, CTCF arm | 1,903 | +0.336 | +0.064 / +0.083 | 0.120 | 0.069 | 0.078 |
+| 3D nearest own element, CTCF with RNAPOL2 arm | 1,903 | +0.360 | +0.089 / +0.117 | 0.130 | 0.062 | 0.081 |
+| 3D nearest own element, HGSVC map arm | 1,903 | +0.348 | +0.080 / +0.083 | 0.126 | 0.048 | 0.082 |
+| 3D hub of own elements within 3 units | 1,903 | +0.327 | +0.081 / +0.104 | 0.135 | 0.075 | 0.091 |
+| linear nearest active atlas element | 1,903 | +0.357 | +0.118 / +0.137 | 0.170 | 0.054 | 0.096 |
+| linear nearest distal RNAPOL2 anchor | 1,903 | +0.260 | +0.078 / +0.100 | 0.127 | 0.060 | 0.079 |
+| RNAPOL2 PET at the TSS, log | 1,903 | +0.450 | +0.164 / +0.200 | 0.180 | 0.042 | 0.084 |
+| RNAPOL2 loops at the TSS | 1,903 | +0.467 | +0.165 / +0.197 | 0.188 | 0.041 | 0.088 |
+| CTCF PET at the TSS, log | 1,903 | +0.201 | -0.028 / -0.035 | 0.107 | 0.136 | 0.085 |
+| RNAPOL2 peak signal at the TSS | 1,903 | +0.464 | +0.121 / +0.150 | 0.178 | 0.071 | 0.081 |
+| own enhancer activity, ABC sum | 1,903 | +0.309 | +0.109 / +0.133 | 0.154 | 0.068 | 0.081 |
+| own enhancer activity, linear sum | 1,903 | +0.260 | +0.161 / +0.200 | 0.224 | 0.065 | 0.081 |
+| compartment E1 at the TSS, own Hi-C | 1,710 | +0.118 | +0.056 / +0.067 | 0.120 | 0.063 | 0.080 |
+| genotype, GTEx LCL eQTL prediction | 278 | +0.066 | +0.262 / +0.274 | 0.320 | 0.036 | 0.091 |
+| his RNAPOL2 over the gene body, eight people | ~14,000 | +0.74 | +0.17 | 0.30 | | 0.11 |
+| his 3D models, HiChIP CTCF loops | | -0.28 | 0 | | | |
+| his methylation of CpG islands, HPRC | | -0.43 | 0 | | | |
+
+Three readings. The gene wise axis orders the features differently from the global one:
+the RNAPOL2 peak signal is second on the global axis and fifth on the gene wise, the
+genotype is last on the global and first on the gene wise, so the two axes are two
+questions, as his slides say. Everything cis and epigenomic sits between +0.06 and +0.17
+gene wise, his gene body occupancy included, and only the genotype is above. And the CTCF
+PET at the promoter is the one feature that reads negative gene wise, more genes under -0.5
+than over, a small number worth one look in the genome arms.
+
 ## Log
 
 - 2026-09-20. Question raised, diagnostics run, baselines set, list written.
@@ -497,6 +535,7 @@ change, and 22 for the part the genotype explains, which the cell line paper has
 - 2026-09-20. Idea 5 done: out of fold, the 3D block adds -0.01 to +0.01 beyond the input and +0.00 to +0.03 beyond linear, in every person. `playground/trio_rnapol2/model/`.
 - 2026-09-20. Idea 6 done in the same model with the silent genes kept: every fit up a few hundredths, the gain of 3D unchanged.
 - 2026-09-21. Summary section written; ideas 19 and 20 are the next arm, one eden array.
+- 2026-09-22, late. Idea 40 done: on the colleague's gene wise statistic our 3D reads +0.06 to +0.09, the loops at the promoter +0.165 level with his gene body occupancy, the genotype +0.26; table in the note.
 - 2026-09-22, evening. Idea 44: the loop package built on the laptop with its README, awaiting the send.
 - 2026-09-22, evening. Sixth list after the lab meeting: 38 RNAPOL2 over the gene body, 39 length normalised target, 40 the colleague's gene wise statistic on our features, 41 EBV load, 42 allelic expression, 43 loop strength normalised across people, 44 the loop package, 45 genome arms, 46 the paper's 3D section. Deadline the Nature Genetics call, end of November.
 - 2026-09-22. Idea 37 done, null: exponent 1 lifts loop fidelity a hundredth or two and the strongest third not at all; every expression number level; left at 0.
