@@ -367,6 +367,49 @@ compartments show what the full map could add, about +0.06 on the large deviatio
 nothing on the rest. The larger lever for the person specific part is 33, since it is the
 only way a shared loop's person specific count reaches the structure.
 
+## Ideas, sixth list, after the lab meeting of 2026-09-22
+
+The colleague's modality survey on the same nine people (slides, `LabMeetingPietryga`) and the
+meeting. His two axes are ours: the global correlation across genes within a person, which is
+our raw number, and the gene wise correlation across people for one gene, which is our person
+specific deviation in another form. His table on the trios: methylation of CpG islands global
+-0.43 and gene wise 0; RNAPOL2 occupancy over the gene body, counts from the ChIA-PET RNAPOL2
+BAMs between TSS plus 300 bp and the gene end divided by the gene length, global 0.72 to 0.78
+in eight people and 0.36 in GM19238, gene wise mean +0.17 with 4,266 genes over 0.5; CTCF
+peak strength 0.05 and 0; the nearest enhancer distance on his 3DGnome models from the HiChIP
+CTCF loops -0.28 and 0; EBV expression in the HPRC panel gene wise +0.10 to +0.12. Two notes
+for his table. Under the null at eight people 11 percent of genes pass 0.5 by chance, so of
+about 14,000 genes 1,500 would, and his 4,266 is three times that, real but a smaller count
+than it reads. And GM19238 is not an outlier in our numbers, raw -0.44 and partial -0.22
+among the best of the nine, so the outlier is that library's gene body coverage, not its
+loops. On our side the same axes read: nearest own element -0.40 to -0.46 global and +0.05
+to +0.06 gene wise, the RNAPOL2 loops at the promoter +0.43 to +0.57 and +0.10, the person's
+compartments +0.08 gene wise, the genotype through GTEx eQTLs +0.29 gene wise.
+
+What the meeting settled. Loop strength enters the engine only as a target distance; 37 was
+the first answer to that and is null, 33 is the second. The colleague normalises loop counts
+on the 2D side and we were to try it on 2D and 3D. He gets the loops with PET counts. The
+paper is the trio ChIA-PET paper for the Nature Genetics 3D call, deadline the end of
+November, where the 3D part is ours, and its story is the NAR result ported to individuals:
+structure tracks the large transitions, not the level (idea 23). Follow up meeting Monday
+2026-09-28, then he is away a week.
+
+| # | idea | what to build | cost | status |
+|---|---|---|---|---|
+| 38 | RNAPOL2 over the gene body, the colleague's feature | His table of gene body occupancy per gene per person, or the BAMs to count it from, since we hold peaks and loops but no BAMs. Then the feature goes into idea 29's person model and idea 5's model with the 3D block beside it. The honest reading first: RNAPOL2 over a gene body is transcription measured again, so as an explanation of expression it is near circular, and its value here is as the covariate that sets the ceiling for every cis modality, the loops and the models included. | an hour once the table arrives | open, table requested |
+| 39 | Gene length normalised expression as the target | The lab's counts are counts and our target is their log. Salmon TPM for the nine exists from idea 10, `/mnt/storagelinux/_hgsvc/salmon/quant/<S>`. Rerun the baselines on TPM: raw, deviation, idea 5. Expected: the deviation unchanged, since a gene's length cancels in a deviation from the panel, and the raw number moves a little at most, since gene length has no correlation with the distance (the processing check of 2026-09-20). Promised in the meeting. | an hour | open |
+| 40 | The colleague's gene wise statistic on our features | Per gene Spearman across the nine people, mean over genes and the count over 0.5 against its null, for the nearest own element distance on each arm, the linear distance, the loops at the promoter, the compartments and the genotype prediction, so the two tables merge on one statistic. Same for his statistic's null: about 1,500 of 14,000 genes at n 8. | an hour | open |
+| 41 | EBV load as a trans covariate | The HGSVC RNA-seq on the workstation aligned to the EBV genome, NC_007605, total and BHRF1 per person, CPM. Test whether the person specific deviation tracks it, and put it in idea 29's model. A part of the deviation that is trans can never be carried by loops, compartments or models, so this sets the cis ceiling below +0.10 if it holds. On HPRC he finds 931 genes over 0.5 on 206 people. | half a day on the workstation | open |
+| 42 | Allelic expression, the trans free target, idea 7's missing input | The colleague's formalism: within a person the ratio of the two haplotypes' expression cancels the trans term, `y = log(E_h1 / E_h2)`, regressed on haplotype differences `X = x_h1 - x_h2`. The RNA-seq and the 1000G phased chr1 panel for the nine are on the workstation; the allele counts come from a diploid transcriptome per person with bcftools consensus and salmon, or from an aligner and counts at heterozygous sites. The 3D side of this stays thin, phased loops are 2 to 4 percent and the chr1 SVs few, so the ASE table is first a second view of the deviation with the trans part removed, and only then idea 7's target. | a day | open |
+| 43 | Loop strength normalised across people, 2D then 3D | Per loop, the PET count over the person's depth and over the typical count at its span, the law's q, as a person specific strength deviation. 2D: the strength deviation at the promoter against the expression deviation, which idea 19's ceiling analysis put at +0.10 with the law relaying +0.08. 3D: the engine's three forms, the saturating target (in), stiffness by strength (37, null), presence sampled per conformation (33, open, needs 50 to 100 conformations). Our resampled depth supersedes the providers' downsampling, which is his HG00512 anomaly. Promised in the meeting. | 2D an afternoon; 3D is idea 33 | open |
+| 44 | The loop package for the colleague | Nine people, CTCF and RNAPOL2, genome wide bedpe with PET counts, the hq filter and the resampled depth, the anchor sets, and a README on the resampling, from `data/<S>/<S>_clusters_3+.bedpe` and `<S>_rnapol2_clusters_3+.bedpe`. Klaudiusz packages, the user sends. Promised for 2026-09-23. | an hour | open |
+| 45 | Genome arms for the paper | Nine people genome wide on the CTCF plus RNAPOL2 arm with the HGSVC map, the user's sbatch, `--array=0-206%12` on `_trio_rnapol2_hgsvc`, then the own element distances genome wide on the workstation at one worker capped at 3 Mb, then ideas 23, 25, 29 and 40 on ten times the genes. The paper's 3D numbers. | a day or two on eden, a day on the workstation | open, the user submits |
+| 46 | The paper's 3D section | The NAR result ported to individuals: on the genes where a person differs from the panel by over one log2, the person's spatial deviation tracks the expression deviation at +0.15 to +0.19 and the compartments at +0.20 (23), the trace survives the null at z 6 to 12 (25), the genetic part is separate (22), the level is not tracked; one model of the person specific part from loops, compartments, genotype, peaks and, after 38 and 41, RNAPOL2 occupancy and EBV load (29). Figures from `large_deviations.py` and `person_model.py`. | writing | open |
+
+Order: 44 and 40 first, both for the Monday meeting; 39 and 43's 2D form the same day; 38 and
+41 when the table and the workstation allow; 45 as soon as eden is free, since everything in
+46 wants the genome; 42 after. The engine list, 33 to 36, stands behind 45.
+
 ## Log
 
 - 2026-09-20. Question raised, diagnostics run, baselines set, list written.
@@ -377,6 +420,7 @@ only way a shared loop's person specific count reaches the structure.
 - 2026-09-20. Idea 5 done: out of fold, the 3D block adds -0.01 to +0.01 beyond the input and +0.00 to +0.03 beyond linear, in every person. `playground/trio_rnapol2/model/`.
 - 2026-09-20. Idea 6 done in the same model with the silent genes kept: every fit up a few hundredths, the gain of 3D unchanged.
 - 2026-09-21. Summary section written; ideas 19 and 20 are the next arm, one eden array.
+- 2026-09-22, evening. Sixth list after the lab meeting: 38 RNAPOL2 over the gene body, 39 length normalised target, 40 the colleague's gene wise statistic on our features, 41 EBV load, 42 allelic expression, 43 loop strength normalised across people, 44 the loop package, 45 genome arms, 46 the paper's 3D section. Deadline the Nature Genetics call, end of November.
 - 2026-09-22. Idea 37 done, null: exponent 1 lifts loop fidelity a hundredth or two and the strongest third not at all; every expression number level; left at 0.
 - 2026-09-22. Idea 32 done: 3,000 iterations level with 800 on fidelity, deviation and idea 5; the tail is inert. Idea 37 built: `[springs] arc_weight_exponent`, weights in the solver on both backends and the numba annealer, tests, parity at zero.
 - 2026-09-22. Idea 37 added with its pre test: the under realised loops are the crowded ones; stiffness by strength is the targeted lever, 33 the distribution changing one.
