@@ -46,7 +46,9 @@ the RNA-seq now on the workstation, inter chromosomal neighbours (18) with a who
 process and the trans contacts, the Enformer form of 15, and the genome arms for ten times the
 genes. A second engine on the same loops, MultiMM, idea 21, lands a little under ours on one person and was stopped there. The engine's own two levers, a converged
 solve (32) and a spring per loop by its strength (37), each left every expression number where it
-was.
+was. The lab meeting of the same evening set the paper: the trio ChIA-PET paper for the Nature
+Genetics 3D call, deadline the end of November 2026, with this line as its 3D section; the
+sixth list below holds what it needs.
 
 ## Summary, 2026-09-21
 
@@ -405,10 +407,85 @@ structure tracks the large transitions, not the level (idea 23). Follow up meeti
 | 44 | The loop package for the colleague | Nine people, CTCF and RNAPOL2, genome wide bedpe with PET counts, the hq filter and the resampled depth, the anchor sets, and a README on the resampling, from `data/<S>/<S>_clusters_3+.bedpe` and `<S>_rnapol2_clusters_3+.bedpe`. Klaudiusz packages, the user sends. Promised for 2026-09-23. | an hour | open |
 | 45 | Genome arms for the paper | Nine people genome wide on the CTCF plus RNAPOL2 arm with the HGSVC map, the user's sbatch, `--array=0-206%12` on `_trio_rnapol2_hgsvc`, then the own element distances genome wide on the workstation at one worker capped at 3 Mb, then ideas 23, 25, 29 and 40 on ten times the genes. The paper's 3D numbers. | a day or two on eden, a day on the workstation | open, the user submits |
 | 46 | The paper's 3D section | The NAR result ported to individuals: on the genes where a person differs from the panel by over one log2, the person's spatial deviation tracks the expression deviation at +0.15 to +0.19 and the compartments at +0.20 (23), the trace survives the null at z 6 to 12 (25), the genetic part is separate (22), the level is not tracked; one model of the person specific part from loops, compartments, genotype, peaks and, after 38 and 41, RNAPOL2 occupancy and EBV load (29). Figures from `large_deviations.py` and `person_model.py`. | writing | open |
+| 47 | HPRC, the gene wise axis at 206 people | The design's limit is nine people. HPRC has 206 people of 27 ancestries with phased assemblies, methylation, Hi-C and Kinnex expression published, Fiber-seq for 38, and no ChIA-PET or HiChIP. Loops called from each person's Hi-C would give the engine its arcs, the law its exponent, and a model per person; the gene wise statistic then has 206 points per gene instead of nine and the eQTL, EBV and methylation covariates exist for all of them. A different project in compute and data, and the only way past n 9. | weeks; loop calling on 206 maps and 206 genomes of models | open, recorded |
 
 Order: 44 and 40 first, both for the Monday meeting; 39 and 43's 2D form the same day; 38 and
 41 when the table and the workstation allow; 45 as soon as eden is free, since everything in
 46 wants the genome; 42 after. The engine list, 33 to 36, stands behind 45.
+
+### Meeting record, 2026-09-22 evening
+
+His processing of the RNAPOL2 modality, since it is what lifted his number from nothing to
+0.74. The V3 files the lab distributes, Michał Waśniewski's processing, gave him a
+correlation near zero with expression; the raw bigWig signal too. What worked, following the
+published practice for RNAPOL2 occupancy: the BAMs of the ChIA-PET RNAPOL2 libraries mapped
+to hg38, reads counted from TSS plus 300 bp to the gene end so the paused polymerase at the
+promoter is excluded, the count divided by the gene length so genes compare within a person,
+GM19238 removed as an outlier at 0.36 against 0.72 to 0.78. Dariusz's stance is that the
+distributed processing is correct and not worth redoing; the colleague's view, and ours, is
+that a normalisation that turns 0 into 0.74 is worth owning. The same held for the loops:
+the providers' downsampling left HG00512 with the most loops before and the fewest after,
+which is why our inputs are resampled from the raw pairs.
+
+His other modalities on the trios. HiChIP CTCF, the strongest peak within the TSS: global
+0.05, gene wise 0, symmetric distributions, nothing. His 3D models, 3DGnome on the HiChIP
+CTCF loops with the nearest enhancer distance: global -0.26 to -0.29, gene wise 0. Methylation
+of CpG islands within 500 bp of the TSS on HPRC: global -0.43, gene wise 0, 28 genes under
+-0.5. EBV on HPRC, counts per EBV gene from the Kinnex BAMs mapped to hg38 plus EBV, CPM: total
+EBV expression gene wise +0.10 with 218 genes over 0.5, BHRF1 +0.12 with 1,865. His Xformer,
+a sequence to expression model on 1 Mb windows with cross attention between the person's
+haplotype and hg38: 0.5 to 0.6 on training chromosomes for seen and unseen people, 0 on held
+out chromosomes, so it generalises to people and not to regions. His causal order, top down:
+expression, RNAPOL2, methylation, TF binding, sequence; a variant breaks a motif, the factor
+does not bind, methylation changes as a side effect, RNAPOL2 follows; CTCF and structure sit
+between methylation and RNAPOL2. His data table: the trios have everything, nine people of
+three ancestries; HPRC has the published layers for 206 people of 27 ancestries and none of
+the lab's ChIA-PET or HiChIP.
+
+His haplotype formalism, slides 24 to 26, which is idea 7 written as a regression. For a
+sample s, each haplotype's expression is a shared trans term times a haplotype specific cis
+term, `E_h1 = T_s C_h1` and `E_h2 = T_s C_h2`, so the ratio `E_h1 / E_h2 = C_h1 / C_h2`
+cancels trans effects, TF abundance, EBV load, batch and depth. With additive cis effects on
+the log scale, `log(E_h1 / E_h2) = sum_i beta_i (x_h1,i - x_h2,i)`, a linear model with the
+allelic ratio as `y` and the haplotype difference of every feature as `X`, no expression
+normalisation needed. Total expression `E_s = T_s (C_h1 + C_h2)` keeps both. His ERAP2 example
+on HPRC: dosage alone R2 0.72, haplotype 0.82, haplotype plus TF 0.83.
+
+What we said. The models copy the loops and cannot pass the data ceiling, which on the nearest
+element is -0.40 to -0.46; every manipulation of the 3D feature, hubs, own elements, RNAPOL2
+peaks as elements, lands there. The NAR result: over all genes the distance change between
+cell types correlates with the fold change at nothing, and on the genes that jump a proximity
+tertile it reaches -0.6, structure tracks the transitions and not the level; the same on the
+individuals, idea 23. Loop strength enters only as a target distance; stiffness by strength
+was tried the same day and is null (37); the second idea, each conformation drawing each loop
+with a probability from its PET count so the ensemble mean carries the frequency (33), needs
+50 to 100 conformations and the GPU time we do not have. Compute as it stands: chr1 for nine
+people at ten conformations in about an hour on eight A100s, a genome a day or two, 20 Mb in
+ten minutes on the workstation; the engine is latency bound and slower than MultiMM, and more
+exact.
+
+Agreed. He gets the loops with PET counts, CTCF and RNAPOL2, via Klaudiusz's package, by
+2026-09-23 (44), and normalises them on 2D; we try the same on 2D and 3D (43) and the length
+normalised target (39). The presentation of the ideas tried went to him on Zulip. Dariusz
+wants the modalities combined in one model, a graph network over the counts in his plan; ours
+is idea 29, which already holds loops, compartments, genotype and peaks, and takes 38 and 41
+next. The paper: the Hi-C goes into Abhishek's paper, the ChIA-PET into the colleague's, where
+the 3D part is ours and a significant share; the target is the Nature Genetics call for 3D
+genome papers, open over a year with its deadline moved several times and now the end of
+November 2026, with three further journals in the call and NAR as the fallback. He is in
+Warsaw in person on Thursdays and for a week or more in November with the visiting professor;
+we meet any day but Monday for the user, and the follow up is Monday 2026-09-28 before his
+week away.
+
+The NAR manuscript, `NAR26_manuscript`, is the template for 46. Its numbers on the three cell
+lines from enhancer3D, 100 conformations a chromosome: all genes r -0.05 to -0.16, proximity
+transitions between the small and large tertiles about -0.3 with no expression threshold,
+|log2FC| over 2 up to -0.595 (GM12878 against H1ESC -0.591, H1ESC against HFFc6 -0.559,
+HFFc6 against GM12878 -0.580); Reactome enrichment of the genes that move to the small tertile
+and go up by over two log2 gives immune signalling in the lymphoblastoid, matrix and adhesion
+in the fibroblast, neuronal and developmental programs in the stem cell. The individual level
+version is ideas 23 and 25 with the person's deviation from the panel in place of the fold
+change, and 22 for the part the genotype explains, which the cell line paper has no analogue of.
 
 ## Log
 
