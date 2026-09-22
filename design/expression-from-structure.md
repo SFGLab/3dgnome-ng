@@ -280,6 +280,23 @@ of enhancer contact probability. GraphReg (Karbalayghareh 2022, Genome Research,
 8, 10 and 9's pre test are data questions and come first, since a negative on them ends the
 line. 11 to 14 and 17 are afternoon tests on the models there are.
 
+## Ideas, third list, 2026-09-22
+
+What is left after 21, in the order to try them. The first three need no new models.
+
+| # | idea | what to build | cost | status |
+|---|---|---|---|---|
+| 23 | The large deviations only | The deviation statistic of idea 8 ran over all 1,903 genes; enhancer3d's lesson was that the relation lives in the large changes. The same statistic, per person, on the genes where the person deviates from the panel by over one log2, and by over half, on the own element tables of all three arms and on the input features, with the sign test and the Mann-Whitney of the jump statistic. | an afternoon on tables that exist | open, next |
+| 22 | The genetic explanation of the person specific part | The deviation is stable to quantification at 0.91 and all nine are 1000 Genomes samples with phased genotypes. Public LCL eQTLs, GTEx v8 or Geuvadis, give a predicted deviation per gene per person from genotype alone. Two questions on existing tables: how much of the observed deviation the eQTLs explain, and whether the person's loops at the promoter and the nearest element distance track the eQTL genotype, Delaneau 2019's framing. The one test that says whether the person specific part is biology the structure could ever reach. | a day, data only | open |
+| 24 | The person's compartments in the energy | Each person has an E1 track from their own Hi-C now, `data/<S>/<S>_compartments.bedGraph`, and the compartment term has never run on a person's own track. One chr1 array on eden with `use_compartments` on the RNAPOL2 arm, judged on the deviation statistic and idea 5. Expected to give what the feature gave, +0.08 in the data and nothing out of fold; last among the cheap ones, and only if 22 says the loops track the genotype. | one eden array | open |
+| 7 | Haplotypes | See the first list. Buildable now, a day of alignment for allele counts against the phased VCFs, but a handful of genes per person on chr1. Only with the genome arms. | a day, then the genome arms | open, deferred |
+| 18 | Inter chromosomal | See the second list. Trans contacts as inter chromosomal singletons and a whole genome per process, days per conformation. A design change, not for this question. | a design change | open, deferred |
+| 15 | The Enformer form | See the second list. A week; the cheap form showed sequence lifts the gene block without touching the 3D gain. | a week | open, deferred |
+| genome arms | Ten times the genes for every number in this note, and the prerequisite for 7. The user submits; about 240 GPU hours on the ChIA-PET map or half on the HGSVC map. | 120 to 240 GPU hours | waits for the sbatch |
+
+Also open from `rnapii-loops.md`, not about expression: the per sample RNAPOL2 anchor arm, to
+separate the family signal drop from the shared bead set.
+
 ## Log
 
 - 2026-09-20. Question raised, diagnostics run, baselines set, list written.
@@ -290,6 +307,7 @@ line. 11 to 14 and 17 are afternoon tests on the models there are.
 - 2026-09-20. Idea 5 done: out of fold, the 3D block adds -0.01 to +0.01 beyond the input and +0.00 to +0.03 beyond linear, in every person. `playground/trio_rnapol2/model/`.
 - 2026-09-20. Idea 6 done in the same model with the silent genes kept: every fit up a few hundredths, the gain of 3D unchanged.
 - 2026-09-21. Summary section written; ideas 19 and 20 are the next arm, one eden array.
+- 2026-09-22. Third list written: 23 the large deviations, 22 the genetic explanation, 24 compartments in the energy, then 7, 18, 15 and the genome arms.
 - 2026-09-22. Idea 21 stopped after one person by decision: MultiMM -0.38 raw and -0.12 partial against ours -0.40 and -0.14, agreement 0.72. The engine is not the limit.
 - 2026-09-22. Write up of where the line stands at the top of the note; idea 21, MultiMM on the same loops, added and started.
 - 2026-09-22. Idea 10 done: the lab's counts are a count of the HGSVC libraries (column totals 1.44 to 1.52 times ENA's pairs in every sample); two quantifications agree on each person's deviation at 0.91.
