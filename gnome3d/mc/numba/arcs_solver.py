@@ -18,6 +18,7 @@ design/algorithm-improvements.md.
 
 from __future__ import annotations
 
+import os
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -208,16 +209,41 @@ def solve_arcs(
     else:
         fun = arcs_energy_grad
         fun_args = args
+    # The stop rule. With a tolerance the solve ends when an iteration improves the energy by
+    # less than that fraction of it, L-BFGS-B's own `ftol`, and the iteration count is a safety
+    # cap; without one the cap is the only stop, which on a chromosome it always is.
+    options: dict[str, Any] = {"maxiter": n_it, "maxfun": 4 * n_it, "maxcor": 20}
+    tol = float(s.arcs_solver_tol)
+    if tol > 0.0:
+        options["ftol"] = tol
+    # GNOME3D_ARCS_TRACE names a file that gets every evaluation's energy, for choosing the
+    # tolerance from a real solve's trajectory.
+    trace_path = os.environ.get("GNOME3D_ARCS_TRACE", "")
+    trace: list[float] = []
+    objective: Any = fun
+    if trace_path:
+
+        def traced(x: Any, *a: Any) -> Any:
+            e, grad = fun(x, *a)
+            trace.append(float(e))
+            return e, grad
+
+        objective = traced
+
     res: Any = minimize(
-        fun,
+        objective,
         pw.reshape(-1),
         args=fun_args,
         jac=True,
         method="L-BFGS-B",
-        options={"maxiter": n_it, "maxfun": 4 * n_it, "maxcor": 20},
+        options=options,
     )
-    # Whether the iteration cap bound is what decides if a faster energy buys anything, so
-    # the count is always visible for the large solves.
+    if trace_path:
+        with open(trace_path, "a") as fh:
+            fh.write(f"# {n} anchors, {int(res.nit)} iterations, {res.message}\n")
+            fh.write("\n".join(f"{e:.6f}" for e in trace) + "\n")
+    # Which rule stopped the solve is what decides whether more iterations buy anything, so
+    # it is always visible for the large solves.
     if n >= 2048:
         log.status(
             LOG,

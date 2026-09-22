@@ -169,6 +169,26 @@ def test_it_descends() -> None:
     )
 
 
+def test_the_tolerance_stops_the_solve_and_zero_leaves_it_alone() -> None:
+    """A loose tolerance ends the solve before the cap; at zero the cap is the only stop and
+    the result is the one the cap alone gives."""
+    pos, exp, s = block(n=120, seed=11)
+    s.use_excluded_volume = True
+    s.exclusion_apply_to_arcs = True
+    s.background_weight = 0.1
+    s.arcs_solver_tol = 0.0
+    e_cap, x_cap = solve_arcs(pos, exp, s, iters=400)
+    e_again, x_again = solve_arcs(pos, exp, s, iters=400)
+    check("at zero the solve repeats itself", np.array_equal(x_cap, x_again) and e_cap == e_again)
+    s.arcs_solver_tol = 1e-2
+    e_tol, _ = solve_arcs(pos, exp, s, iters=400)
+    check(
+        "a loose tolerance stops earlier, at a higher energy",
+        e_tol > e_cap * (1.0 + 1e-6),
+        f"{e_tol:,.3f} against {e_cap:,.3f}",
+    )
+
+
 def test_device_energy_matches_the_cpu_kernel() -> None:
     """The device evaluation is the CPU kernel's energy term for term, on a block carrying every
     kind of pair: springs, backgrounds, repulsion, excluded volume and confinement."""
@@ -301,6 +321,7 @@ def main() -> int:
     test_energy_is_the_one_the_mc_scores()
     test_gradient_matches_finite_differences()
     test_it_descends()
+    test_the_tolerance_stops_the_solve_and_zero_leaves_it_alone()
     test_device_energy_matches_the_cpu_kernel()
     test_off_by_default()
     test_an_unknown_name_is_refused()
