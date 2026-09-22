@@ -907,8 +907,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference has the three laws and their constants. This is what
   they were standing in for.
 
-- **Loop stiffness by strength: `[springs] arc_weight_exponent`, default 0, under measurement
-  since 2026-09-22.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
+- **Loop stiffness by strength: `[springs] arc_weight_exponent`, default 0, measured
+  2026-09-22 and left at 0.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
   `arc_weight_matrix`, [mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py),
   [mc/jax/arcs_energy.py](gnome3d/mc/jax/arcs_energy.py), the arc terms of
   [mc/numba/terms.py](gnome3d/mc/numba/terms.py))
@@ -922,6 +922,15 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   beside the target matrix as float32 and is None at zero, so the kernels take the path they
   took. The JAX annealer does not carry it and refuses a weighted problem rather than ignore
   the weights. Unit checks in `harness/test_arcs_solver.py`.
+
+  Measured at exponent 1 on the nine trio chr1 ensembles on the HGSVC map, ten conformations
+  each, against the same arm at zero: target against realised over all loops 0.55 to 0.67 from
+  0.54 to 0.66, within a span band up 0.01 to 0.06, the median realised over target 1.26 to 1.63
+  from 1.29 to 1.65, and the strongest third level at 0.33 to 0.49 from 0.35 to 0.49 while the
+  weak and middle thirds lose 0.005 to 0.02; every expression statistic level. A strong loop's
+  competition is with the background springs and the repulsion among its anchor's partners,
+  which the weight does not touch, so a stronger spring does not let a crowded loop close.
+  Numbers in `design/expression-from-structure.md`, idea 37.
 
   Why not in the reference: the reference has one spring constant per direction for every arc.
 
