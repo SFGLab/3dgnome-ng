@@ -21,7 +21,7 @@ from typing import Any, TypeVar, cast
 import numpy as np
 from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
 
-from gnome3d.types import BoolArray, F64Array, I8Array, I32Array, I64Array
+from gnome3d.types import BoolArray, F32Array, F64Array, I8Array, I32Array, I64Array
 
 # Typed wrapper around numba.njit so pyright sees decorated functions
 # with their original signatures.  At runtime this is just numba.njit.
@@ -184,6 +184,8 @@ def init_confine_nb(
 
 
 NO_MAT: F64Array = np.zeros((1, 1), dtype=np.float64)
+# The loop weight matrix's stand in when every pair is at one.
+NO_W: F32Array = np.zeros((1, 1), dtype=np.float32)
 NO_F64_3: F64Array = np.zeros(3, dtype=np.float64)
 NO_I64_3: I64Array = np.ones(3, dtype=np.int64)
 NO_I32: I32Array = np.zeros(1, dtype=np.int32)
@@ -561,6 +563,8 @@ def _local_arcs_nb(
     squeeze_k: float,
     rep_inv_cutoff: float = 0.0,
     bg_weight: float = 0.0,
+    use_w: bool = False,
+    w: F32Array = NO_W,
 ) -> float:
     n = pos.shape[0]
     sc = 0.0
@@ -583,7 +587,10 @@ def _local_arcs_nb(
             sc += max(0.0, 1.0 / (d if d > 1e-10 else 1e-10) - rep_inv_cutoff)
         elif e >= 1e-6:
             rel = (d - e) / e
-            sc += rel * rel * (stretch_k if rel >= 0.0 else squeeze_k)
+            k = stretch_k if rel >= 0.0 else squeeze_k
+            if use_w:
+                k *= w[i, p]
+            sc += rel * rel * k
     return sc
 
 
@@ -598,6 +605,8 @@ def init_arcs_nb(
     squeeze_k: float,
     rep_inv_cutoff: float = 0.0,
     bg_weight: float = 0.0,
+    use_w: bool = False,
+    w: F32Array = NO_W,
 ) -> float:
     n = pos.shape[0]
     sc = 0.0
@@ -619,7 +628,10 @@ def init_arcs_nb(
                 row_sc += max(0.0, 1.0 / (d if d > 1e-10 else 1e-10) - rep_inv_cutoff)
             else:
                 rel = (d - e) / e
-                row_sc += rel * rel * (stretch_k if rel >= 0.0 else squeeze_k)
+                k = stretch_k if rel >= 0.0 else squeeze_k
+                if use_w:
+                    k *= w[i, j]
+                row_sc += rel * rel * k
         sc += row_sc
     return sc
 
@@ -908,6 +920,8 @@ def batch_mc_nb(
     use_cap: bool = False,
     cap_home: F64Array = NO_F64_N3,
     cap_r: F64Array = NO_F64,
+    use_arc_w: bool = False,
+    arc_w: F32Array = NO_W,
 ) -> tuple[float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
     n_mov = movable.shape[0]
@@ -925,7 +939,7 @@ def batch_mc_nb(
         # --- prev local scores ---
         if struct_type == STRUCT_ARCS:
             loc_struct_prev = _local_arcs_nb(
-                pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight
+                pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight, use_arc_w, arc_w
             )
         elif struct_type == STRUCT_CHAIN:
             loc_struct_prev = local_smooth_nb(
@@ -1035,7 +1049,7 @@ def batch_mc_nb(
         # --- new local scores ---
         if struct_type == STRUCT_ARCS:
             loc_struct_curr = _local_arcs_nb(
-                pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight
+                pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight, use_arc_w, arc_w
             )
         elif struct_type == STRUCT_CHAIN:
             loc_struct_curr = local_smooth_nb(

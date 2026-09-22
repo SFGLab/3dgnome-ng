@@ -165,6 +165,7 @@ def joint_arcs_solve(
     if s.use_anchor_heatmap and state.singletons:
         anchor_heat, _ = cb.build_contact_heatmaps(state, active_all, chr_, with_subanchor=False)
     exp_dist = cb.calc_anchor_expected_distances(state, active_all, chr_, anchor_heat)
+    arc_w = cb.calc_anchor_arc_weights(state, active_all, chr_)
     anchor_genomic = [
         (clusters[a].start, clusters[a].end, clusters[a].genomic_pos) for a in active_all
     ]
@@ -177,6 +178,7 @@ def joint_arcs_solve(
         {
             "anchor_pos": pos0,
             "exp_dist": exp_dist,
+            "arc_w": arc_w,
             "step_size": _ARCS_NOISE,
             "settings": s_joint,
             "seed": seed,
@@ -266,6 +268,7 @@ def seed_for_ib(
         )
 
     exp_dist = cb.calc_anchor_expected_distances(state, active_region, chr_, anchor_heat)
+    arc_w = cb.calc_anchor_arc_weights(state, active_region, chr_)
 
     # Anchor seed positions (all at the IB centroid right now) + genomic spans.
     anchor_seed_pos = np.array([clusters[ci].pos for ci in active_region], dtype=np.float32)
@@ -330,6 +333,7 @@ def seed_for_ib(
         seed=(ib_idx * 2_654_435_761 + 40_503 + seed_offset) & 0x7FFFFFFF,
         anchor_seed_pos=anchor_seed_pos,
         exp_dist=exp_dist,
+        arc_w=arc_w,
         orientations=orientations,
         anchor_neighbors=anchor_neighbors,
         anchor_neighbor_weights=anchor_neighbor_weights,

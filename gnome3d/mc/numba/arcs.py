@@ -19,12 +19,13 @@ from gnome3d.mc.numba.common import (
     run_outer_loop,
 )
 from gnome3d.mc.numba.terms import (
+    NO_W,
     STRUCT_ARCS,
     init_arcs_nb,
     init_confine_nb,
     init_excl_nb,
 )
-from gnome3d.types import I32Array, I64Array
+from gnome3d.types import F32Array, I32Array, I64Array
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -35,6 +36,7 @@ def mc_arcs_numba(
     exp_dist_mat: np.ndarray[Any, Any],
     step_size: float,
     settings: Settings,
+    arc_w: F32Array | None = None,
 ) -> float:
     """Numba simulated-annealing implementation for arc-MC.  Single-counted
     structure (delta factor 1). Mirrors Reference LooperSolver::MonteCarloArcs().
@@ -82,7 +84,11 @@ def mc_arcs_numba(
 
     movable: I64Array = np.arange(n, dtype=np.int64)
     bg_weight = float(settings.background_weight)
-    score_struct = float(init_arcs_nb(pw, exp64, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight))
+    use_arc_w = arc_w is not None
+    w32 = np.ascontiguousarray(arc_w, dtype=np.float32) if arc_w is not None else NO_W
+    score_struct = float(
+        init_arcs_nb(pw, exp64, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight, use_arc_w, w32)
+    )
     excl_w = float(settings.exclusion_weight)
     excl_skip = int(settings.exclusion_skip_neighbors)
     if use_excl:
@@ -153,6 +159,8 @@ def mc_arcs_numba(
         score_orn=0.0,
         score_excl=score_excl,
         score_conf=score_conf,
+        use_arc_w=use_arc_w,
+        arc_w=w32,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

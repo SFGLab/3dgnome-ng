@@ -462,6 +462,55 @@ def add_contact_background(
     return out
 
 
+def _active_arcs(
+    state: CoarseState, active_region: list[int], chr_: str
+) -> tuple[list[int], list[tuple[int, int, int] | tuple[int, int, int, int]]]:
+    """The anchors' genomic midpoints and the arcs among them, in active region indices, each
+    arc once from its lower cluster."""
+    clusters = state.clusters
+    cluster_to_active = {ci: ai for ai, ci in enumerate(active_region)}
+    chr_arcs = state.arcs.get(chr_, [])
+    arcs: list[tuple[int, int, int] | tuple[int, int, int, int]] = []
+    for ai, ci in enumerate(active_region):
+        for arc_local in clusters[ci].arcs:
+            if arc_local >= len(chr_arcs):
+                continue
+            arc = chr_arcs[arc_local]
+            other = arc.end if arc.start == ci else arc.start
+            if other < ci or other not in cluster_to_active:
+                continue
+            arcs.append((ai, cluster_to_active[other], int(arc.score), int(arc.factor)))
+    mids = [int(clusters[ci].genomic_pos) for ci in active_region]
+    return mids, arcs
+
+
+def arc_weight_matrix(
+    s: Settings, mids: list[int], arcs: list[tuple[int, int, int] | tuple[int, int, int, int]]
+) -> F32Array | None:
+    """Each arc pair's spring weight, its strength to `arc_weight_exponent`, one everywhere
+    else; None at exponent zero, which the kernels take as every pair at one."""
+    alpha = float(s.arc_weight_exponent)
+    if alpha <= 0.0:
+        return None
+    law = s.polymer_law()
+    n = len(mids)
+    w: F32Array = np.ones((n, n), dtype=np.float32)
+    for arc in arcs:
+        i, j, score = arc[0], arc[1], arc[2]
+        factor = arc[3] if len(arc) > 3 else 0
+        q = law.arc_strength(score, abs(mids[i] - mids[j]), factor)
+        w[i, j] = w[j, i] = max(q, 1e-6) ** alpha
+    return w
+
+
+def calc_anchor_arc_weights(
+    state: CoarseState, active_region: list[int], chr_: str
+) -> F32Array | None:
+    """The spring weight matrix beside `calc_anchor_expected_distances`, on the same arcs."""
+    mids, arcs = _active_arcs(state, active_region, chr_)
+    return arc_weight_matrix(state.s, mids, arcs)
+
+
 def calc_anchor_expected_distances(
     state: CoarseState,
     active_region: list[int],
@@ -482,24 +531,8 @@ def calc_anchor_expected_distances(
       mat[i,j] > 0   -> expected distance from freqToDistance(score)
     """
     s = state.s
-    clusters = state.clusters
     n = len(active_region)
-    cluster_to_active = {ci: ai for ai, ci in enumerate(active_region)}
-    chr_arcs = state.arcs.get(chr_, [])
-
-    arcs: list[tuple[int, int, int] | tuple[int, int, int, int]] = []
-    for ai, ci in enumerate(active_region):
-        for arc_local in clusters[ci].arcs:
-            if arc_local >= len(chr_arcs):
-                continue
-            arc = chr_arcs[arc_local]
-            other = arc.end if arc.start == ci else arc.start
-
-            if other < ci or other not in cluster_to_active:
-                continue
-
-            arcs.append((ai, cluster_to_active[other], int(arc.score), int(arc.factor)))
-    mids = [int(clusters[ci].genomic_pos) for ci in active_region]
+    mids, arcs = _active_arcs(state, active_region, chr_)
     mat = arc_expected_matrix(s, mids, arcs)
 
     # Apply anchor heatmap: scale down expected distances for high-contact pairs.

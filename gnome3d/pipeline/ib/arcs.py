@@ -46,6 +46,7 @@ def _run_one(problem: Problem, backend: str) -> Result:
 
     pos0: F32Array = problem["anchor_pos"]
     exp_dist = problem["exp_dist"]
+    arc_w = problem.get("arc_w")
     step = float(problem["step_size"])
     s = settings_for_block(problem["settings"], problem["anchor_genomic"])
     seed = int(problem["seed"])
@@ -76,9 +77,9 @@ def _run_one(problem: Problem, backend: str) -> Result:
         if solver == "lbfgs":
             from gnome3d.mc.numba.arcs_solver import solve_arcs  # noqa: PLC0415
 
-            score, pos = solve_arcs(pos, exp_dist, s, backend=backend)
+            score, pos = solve_arcs(pos, exp_dist, s, backend=backend, arc_w=arc_w)
         else:
-            score = mc_numba.mc_arcs_numba(pos, exp_dist, step, s)  # mutates pos in place
+            score = mc_numba.mc_arcs_numba(pos, exp_dist, step, s, arc_w=arc_w)  # in place
         if score < best_score or best_score < 0.0:
             best_score = score
             best = pos.copy()
@@ -267,6 +268,11 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     expanded: list[Problem] = []
     owner: list[int] = []
     for gi, prob in enumerate(problems):
+        if prob.get("arc_w") is not None:
+            raise NotImplementedError(
+                "loop weights are not in the JAX annealer; the solver carries them on the "
+                "device, and the numba annealer on the CPU"
+            )
         seed_rng(int(prob["seed"]))  # deterministic restart noise for this IB
         pos = prob["anchor_pos"]
         step = float(prob["step_size"])
@@ -307,6 +313,7 @@ class ArcsStage:
         return {
             "anchor_pos": st.anchor_seed_pos,
             "exp_dist": st.exp_dist,
+            "arc_w": st.arc_w,
             "step_size": st.step_size_arcs,
             "settings": st.settings,
             "seed": st.seed,

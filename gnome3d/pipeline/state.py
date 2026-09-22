@@ -15,7 +15,7 @@ needs is copied in, which is what makes the task isolated.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import TYPE_CHECKING, TypeAlias
 
@@ -66,6 +66,9 @@ class Seeded:
     # it straight onto subanchor ranges.  None when the track is absent or its
     # term is off.
     track_compartments: list[CompartmentInterval] | None
+    # Each arc pair's spring weight beside exp_dist, None at exponent zero. Keyword only so
+    # the subclasses' positional fields stay where they are.
+    arc_w: F32Array | None = field(default=None, kw_only=True)
 
 
 @dataclass(frozen=True)

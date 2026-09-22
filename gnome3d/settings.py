@@ -94,6 +94,7 @@ class Settings:
     spring_squeeze: float
     spring_angular: float
     spring_stretch_arcs: float
+    arc_weight_exponent: float
     background_weight: float
     background_range_bp: int
     spring_squeeze_arcs: float
@@ -416,6 +417,9 @@ class Settings:
         self.spring_squeeze = 0.1
         self.spring_angular = 0.1
         self.spring_stretch_arcs = 1.0
+        # Each loop's spring scaled by its strength to this power, so a strong loop wins the
+        # competitions a weak one loses. Zero is every loop at the same spring, byte exact.
+        self.arc_weight_exponent = 0.0
         # A weak spring holding an arcless anchor pair inside `background_range_bp` at the
         # background for its separation, in the arcs stage, beside the repulsion that every
         # other arcless pair keeps. Zero is off. The all pairs version lost the battery because a
@@ -802,6 +806,7 @@ class Settings:
 
         # [springs]
         self.spring_stretch = getf("springs", "stretch_constant", self.spring_stretch)
+        self.arc_weight_exponent = getf("springs", "arc_weight_exponent", self.arc_weight_exponent)
         self.spring_squeeze = getf("springs", "squeeze_constant", self.spring_squeeze)
         self.spring_angular = getf("springs", "angular_constant", self.spring_angular)
         self.spring_stretch_arcs = getf(

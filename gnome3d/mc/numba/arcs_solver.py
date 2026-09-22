@@ -26,7 +26,7 @@ import numpy as np
 from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
-from gnome3d.mc.numba.terms import njit
+from gnome3d.mc.numba.terms import NO_W, njit
 from gnome3d.types import F32Array, F64Array
 
 if TYPE_CHECKING:
@@ -51,8 +51,13 @@ def arcs_energy_grad(
     excl_r0: float,
     excl_w: float,
     excl_skip: int,
+    use_w: bool = False,
+    arc_w: F32Array = NO_W,
 ) -> tuple[float, F64Array]:
     """The arcs energy over a whole structure and its gradient, for a flattened `(3N,)` vector.
+
+    With `use_w` each arc spring's constant is scaled by `arc_w[j, i]`, the loop's weight;
+    the other terms never read it.
 
     Two counting conventions, both taken from the initialisers the MC scores with. The arc term
     sums unordered pairs, so visiting each from both ends means halving its energy while its
@@ -105,6 +110,8 @@ def arcs_energy_grad(
             elif e >= 1e-6:
                 rel = (d - e) / e
                 k = stretch_k if rel >= 0.0 else squeeze_k
+                if use_w:
+                    k *= arc_w[j, i]
                 ei += 0.5 * rel * rel * k
                 w = 2.0 * k * rel / (e * dd)
                 gi0 += w * dx
@@ -145,12 +152,14 @@ def solve_arcs(
     s: Settings,
     iters: int | None = None,
     backend: str = "numba",
+    arc_w: F32Array | None = None,
 ) -> tuple[float, F32Array]:
     """Minimise the arcs energy from `pos`. Returns `(energy, positions)`.
 
     Mirrors the derivations in `mc_arcs_numba` so the energy is the one the annealer reports.
     `backend` is where the energy is evaluated, `numba` on the CPU or `jax` on the device; the
     minimiser itself always runs on the host. The arcs stage passes the executor's choice.
+    `arc_w` is each arc pair's spring weight, or None for every pair at one.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -204,11 +213,13 @@ def solve_arcs(
     if backend == "jax":
         from gnome3d.mc.jax.arcs_energy import DeviceArcsEnergy  # noqa: PLC0415
 
-        fun: Any = DeviceArcsEnergy(exp64, args[1:])
+        fun: Any = DeviceArcsEnergy(exp64, args[1:], arc_w)
         fun_args: tuple[Any, ...] = ()
     else:
         fun = arcs_energy_grad
-        fun_args = args
+        fun_args = (
+            args if arc_w is None else (*args, True, np.ascontiguousarray(arc_w, dtype=np.float32))
+        )
     # The stop rule. With a tolerance the solve ends when an iteration improves the energy by
     # less than that fraction of it, L-BFGS-B's own `ftol`, and the iteration count is a safety
     # cap; without one the cap is the only stop, which on a chromosome it always is.

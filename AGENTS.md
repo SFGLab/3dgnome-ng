@@ -907,6 +907,24 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference has the three laws and their constants. This is what
   they were standing in for.
 
+- **Loop stiffness by strength: `[springs] arc_weight_exponent`, default 0, under measurement
+  since 2026-09-22.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
+  `arc_weight_matrix`, [mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py),
+  [mc/jax/arcs_energy.py](gnome3d/mc/jax/arcs_energy.py), the arc terms of
+  [mc/numba/terms.py](gnome3d/mc/numba/terms.py))
+  Every loop pulls with the same spring and only its target differs, so once two targets sit
+  near one bead the stronger loop has nothing to win a competition with. Measured on the trio
+  chromosomes, the strongest third of loops is realised worst, at 0.35 to 0.49 against 0.7 to
+  0.8 for the rest, and the loss follows how many loops share an anchor. With the exponent
+  above zero each arc pair carries its strength to that power as a weight on its spring
+  constant, in the solver's energy on both backends and in the numba annealer's arc term; the
+  targets, the background springs and the repulsion never read it. The weight matrix rides
+  beside the target matrix as float32 and is None at zero, so the kernels take the path they
+  took. The JAX annealer does not carry it and refuses a weighted problem rather than ignore
+  the weights. Unit checks in `harness/test_arcs_solver.py`.
+
+  Why not in the reference: the reference has one spring constant per direction for every arc.
+
 - **Arcs confinement radius from the law: `[confinement] packing_factor_arcs = 0`, default 1.5.**
   ([pipeline/ib/arcs.py](gnome3d/pipeline/ib/arcs.py) `settings_for_block`,
   [polymer.py](gnome3d/polymer.py) `radius_of_gyration`, `confinement_radius`)

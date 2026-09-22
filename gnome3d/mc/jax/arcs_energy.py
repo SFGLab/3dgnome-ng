@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 
-from gnome3d.types import F64Array
+from gnome3d.types import F32Array, F64Array
 
 CHUNK_ROWS = 256
 
@@ -32,7 +32,7 @@ class DeviceArcsEnergy:
         The scalar parameters in `arcs_energy_grad`'s order after `exp`.
     """
 
-    def __init__(self, exp: F64Array, args: tuple[Any, ...]) -> None:
+    def __init__(self, exp: F64Array, args: tuple[Any, ...], w: F32Array | None = None) -> None:
         import jax
         import jax.numpy as jnp
 
@@ -43,11 +43,19 @@ class DeviceArcsEnergy:
         self.n = n
         # Rows of the transpose are what the CPU kernel reads for one anchor.
         self._exp_t = jnp.asarray(np.ascontiguousarray(exp.T, dtype=np.float32))
+        # The loop weights ride beside the targets, transposed the same way; None is every
+        # pair at one and the branch is fixed at trace time.
+        use_w = w is not None
+        self._w_t = (
+            jnp.asarray(np.ascontiguousarray(w.T, dtype=np.float32))
+            if w is not None
+            else jnp.zeros((1, 1), dtype=jnp.float32)
+        )
         idx_all = jnp.arange(n, dtype=jnp.int32)
         centre = jnp.asarray(np.array([cx, cy, cz], dtype=np.float32))
         use_excl = excl_w > 0.0
 
-        def row_terms(xi: Any, i: Any, e: Any, pos: Any) -> tuple[Any, Any]:
+        def row_terms(xi: Any, i: Any, e: Any, wi: Any, pos: Any) -> tuple[Any, Any]:
             """Anchor i's energy and gradient over every other anchor, then its confinement."""
             diff = xi[None, :] - pos
             d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
@@ -75,6 +83,8 @@ class DeviceArcsEnergy:
             e_safe = jnp.where(is_spr, e, 1.0)
             rel_s = (d - e) / e_safe
             k = jnp.where(rel_s >= 0.0, stretch, squeeze)
+            if use_w:
+                k = k * wi
             e_spr = 0.5 * rel_s * rel_s * k
             w_spr = 2.0 * k * rel_s / (e_safe * dd)
             ener = jnp.where(is_bg, e_bg, jnp.where(rep_on, e_rep, jnp.where(is_spr, e_spr, 0.0)))
@@ -99,13 +109,21 @@ class DeviceArcsEnergy:
             gi = gi + jnp.where(outside, w_c, 0.0) * rc
             return ei, gi
 
-        def energy_grad(x: Any, exp_t: Any) -> tuple[Any, Any]:
+        def energy_grad(x: Any, exp_t: Any, w_t: Any) -> tuple[Any, Any]:
             pos = x.reshape(n, 3)
 
-            def one(a: tuple[Any, Any, Any]) -> tuple[Any, Any]:
-                return row_terms(a[0], a[1], a[2], pos)
+            if use_w:
 
-            ei, gi = jax.lax.map(one, (pos, idx_all, exp_t), batch_size=CHUNK_ROWS)
+                def one(a: tuple[Any, Any, Any, Any]) -> tuple[Any, Any]:
+                    return row_terms(a[0], a[1], a[2], a[3], pos)
+
+                ei, gi = jax.lax.map(one, (pos, idx_all, exp_t, w_t), batch_size=CHUNK_ROWS)
+            else:
+
+                def one_plain(a: tuple[Any, Any, Any]) -> tuple[Any, Any]:
+                    return row_terms(a[0], a[1], a[2], 1.0, pos)
+
+                ei, gi = jax.lax.map(one_plain, (pos, idx_all, exp_t), batch_size=CHUNK_ROWS)
             return ei, gi.reshape(-1)
 
         self._fn = jax.jit(energy_grad)
@@ -114,6 +132,6 @@ class DeviceArcsEnergy:
     def __call__(self, x: F64Array) -> tuple[float, F64Array]:
         import jax.numpy as jnp
 
-        ei, g = self._fn(jnp.asarray(x, dtype=jnp.float32), self._exp_t)
+        ei, g = self._fn(jnp.asarray(x, dtype=jnp.float32), self._exp_t, self._w_t)
         self.evaluations += 1
         return float(np.asarray(ei, dtype=np.float64).sum()), np.asarray(g, dtype=np.float64)

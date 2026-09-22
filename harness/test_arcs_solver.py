@@ -189,6 +189,116 @@ def test_the_tolerance_stops_the_solve_and_zero_leaves_it_alone() -> None:
     )
 
 
+def test_loop_weights() -> None:
+    """Weights of one are the unweighted energy bit for bit; with weights the solver's energy
+    is still the annealer's, term for term, and the device carries the same weighted energy;
+    and where two loops compete for one anchor the weighted one wins: an anchor held by a
+    strong loop to one partner and a weak loop to another, the partners held apart, sits
+    midway without weights and nearer the strong partner with them."""
+    pos, exp, s = block(n=120, seed=11)
+    s.use_excluded_volume = True
+    s.exclusion_apply_to_arcs = True
+    s.background_weight = 0.1
+    rep_inv, cx, cy, cz, cr, r0, wv = terms(pos, exp, s)
+    skip = int(s.exclusion_skip_neighbors)
+    args = (
+        float(s.spring_stretch_arcs),
+        float(s.spring_squeeze_arcs),
+        rep_inv,
+        float(s.background_weight),
+        cx,
+        cy,
+        cz,
+        cr,
+        float(s.confinement_weight),
+        r0,
+        wv,
+        skip,
+    )
+    pw = pos.astype(np.float64)
+    ones = np.ones(exp.shape, dtype=np.float32)
+    e0, g0 = arcs_energy_grad(pw.reshape(-1), exp, *args)
+    e1, g1 = arcs_energy_grad(pw.reshape(-1), exp, *args, True, ones)
+    check("weights of one are the unweighted energy", e0 == e1 and np.array_equal(g0, g1))
+    rng = np.random.default_rng(3)
+    w = np.ones(exp.shape, dtype=np.float32)
+    arc = exp > 1e-6
+    w[arc] = rng.uniform(0.2, 5.0, int(arc.sum())).astype(np.float32)
+    w = np.maximum(w, w.T)
+    ew, gw = arcs_energy_grad(pw.reshape(-1), exp, *args, True, w)
+    want = (
+        float(init_arcs_nb(pw, exp, args[0], args[1], rep_inv, args[3], True, w))
+        + float(init_confine_nb(pw, cx, cy, cz, cr, float(s.confinement_weight)))
+        + float(init_excl_nb(pw, r0, wv, skip))
+    )
+    check(
+        "with weights the solver's energy is still the annealer's",
+        abs(ew - want) / max(abs(want), 1e-9) < 1e-12 and ew != e0,
+        f"{ew:.6f} against {want:.6f}",
+    )
+    try:
+        import jax  # noqa: F401, PLC0415
+
+        from gnome3d.mc.jax.arcs_energy import DeviceArcsEnergy  # noqa: PLC0415
+
+        ed, gd = DeviceArcsEnergy(exp, args, w)(pw.reshape(-1))
+        check(
+            "the device carries the weighted energy",
+            abs(ed - ew) < 1e-4 * max(1.0, abs(ew))
+            and float(np.max(np.abs(gd - gw))) < 1e-3 * (1.0 + float(np.abs(gw).max())),
+            f"{ed:,.4f} against {ew:,.4f}",
+        )
+    except ImportError:
+        pass
+    n = 3
+    exp3 = np.full((n, n), -0.5)
+    np.fill_diagonal(exp3, 0.0)
+    exp3[0, 1] = exp3[1, 0] = 1.0  # the strong loop
+    exp3[0, 2] = exp3[2, 0] = 1.0  # the weak loop
+    exp3[1, 2] = exp3[2, 1] = 3.0  # the partners held apart
+    start = np.array([[0.0, 0.5, 0.0], [-1.5, 0.0, 0.0], [1.5, 0.0, 0.0]], dtype=np.float32)
+    s3 = Settings()
+    s3.use_excluded_volume = False
+    s3.use_confinement = False
+    s3.background_weight = 0.0
+    s3.arcs_repulsion_cutoff_factor = 0.0
+    w3 = np.ones((n, n), dtype=np.float32)
+    w3[0, 1] = w3[1, 0] = 10.0
+    _, x_plain = solve_arcs(start.copy(), exp3, s3, iters=500)
+    _, x_w = solve_arcs(start.copy(), exp3, s3, iters=500, arc_w=w3)
+
+    def dist(x: np.ndarray, i: int, j: int) -> float:
+        return float(np.linalg.norm(x[i] - x[j]))
+
+    check(
+        "without weights the anchor sits midway, with them nearer the strong partner",
+        abs(dist(x_plain, 0, 1) - dist(x_plain, 0, 2)) < 1e-3
+        and dist(x_w, 0, 1) < dist(x_w, 0, 2) - 0.05,
+        f"plain {dist(x_plain, 0, 1):.3f} / {dist(x_plain, 0, 2):.3f}, "
+        f"weighted {dist(x_w, 0, 1):.3f} / {dist(x_w, 0, 2):.3f}",
+    )
+
+
+def test_the_weight_matrix_follows_the_strength() -> None:
+    """At exponent zero there is no matrix; above it an arc pair carries its strength to the
+    exponent and every other pair one."""
+    from gnome3d.pipeline.coarse.build import arc_weight_matrix  # noqa: PLC0415
+
+    s = Settings()
+    mids = [0, 50_000, 120_000, 400_000]
+    arcs = [(0, 1, 30), (1, 2, 3), (0, 3, 6)]
+    check("exponent zero gives no matrix", arc_weight_matrix(s, mids, arcs) is None)
+    s.arc_weight_exponent = 0.5
+    law = s.polymer_law()
+    w = arc_weight_matrix(s, mids, arcs)
+    assert w is not None
+    ok = w.shape == (4, 4) and w[2, 3] == 1.0 and w[0, 0] == 1.0
+    for i, j, sc in arcs:
+        q = law.arc_strength(sc, abs(mids[i] - mids[j]))
+        ok = ok and abs(w[i, j] - q**0.5) < 1e-6 and w[i, j] == w[j, i]
+    check("an arc pair carries its strength to the exponent, symmetric, others one", ok)
+
+
 def test_device_energy_matches_the_cpu_kernel() -> None:
     """The device evaluation is the CPU kernel's energy term for term, on a block carrying every
     kind of pair: springs, backgrounds, repulsion, excluded volume and confinement."""
@@ -322,6 +432,8 @@ def main() -> int:
     test_gradient_matches_finite_differences()
     test_it_descends()
     test_the_tolerance_stops_the_solve_and_zero_leaves_it_alone()
+    test_loop_weights()
+    test_the_weight_matrix_follows_the_strength()
     test_device_energy_matches_the_cpu_kernel()
     test_off_by_default()
     test_an_unknown_name_is_refused()

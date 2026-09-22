@@ -16,11 +16,12 @@ import numpy as np
 
 from gnome3d import log
 from gnome3d.mc.numba.terms import (
+    NO_W,
     batch_mc_nb,
     init_affinity_nb,
     score_orientation_full_nb,
 )
-from gnome3d.types import BoolArray, F64Array, I8Array, I32Array, I64Array
+from gnome3d.types import BoolArray, F32Array, F64Array, I8Array, I32Array, I64Array
 
 LOG = log.get("mc.numba")
 
@@ -265,6 +266,8 @@ def run_outer_loop(
     cap_home: F64Array = NO_F64_N3,
     cap_r: F64Array = NO_F64,
     on_round: Callable[[F64Array], None] | None = None,
+    use_arc_w: bool = False,
+    arc_w: F32Array = NO_W,
 ) -> float:
     """Drive the unified kernel until convergence; return the final total score."""
     score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
@@ -350,6 +353,8 @@ def run_outer_loop(
             use_cap,
             cap_home,
             cap_r,
+            use_arc_w,
+            arc_w,
         )
         score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
         step_i += stop_steps
