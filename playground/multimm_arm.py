@@ -209,13 +209,17 @@ def main() -> None:
     platform = _flag("--platform", "OpenCL")
     multimm = _flag("--multimm", "MultiMM")
     n_ensemble = int(_flag("--n", "5"))
+    n_beads_flag = int(_flag("--n-beads", "0"))
     loops, region, ours, out_root = (Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3]), Path(sys.argv[4]))
     chrom, span = region.split(":")
     lo, hi = (int(v) for v in span.split("-"))
     cifs = sorted(ours.glob("*.cif"))
-    if not cifs:
+    if n_beads_flag > 0:
+        n_beads = n_beads_flag
+    elif cifs:
+        n_beads = count_beads(cifs[0])
+    else:
         raise SystemExit(f"no cif in {ours} to take the bead count from")
-    n_beads = count_beads(cifs[0])
     out_root.parent.mkdir(parents=True, exist_ok=True)
     bed: Path | None = None
     if compartments:
@@ -236,7 +240,8 @@ def main() -> None:
         platform=platform,
         compartments=bed.resolve() if bed else None,
     )
-    print(f"MultiMM {region} at {n_beads} beads from {cifs[0].name}, {n_ensemble} members, {platform}", flush=True)
+    src = "the flag" if n_beads_flag > 0 else cifs[0].name
+    print(f"MultiMM {region} at {n_beads} beads from {src}, {n_ensemble} members, {platform}", flush=True)
     log = out_root.parent / f"{out_root.name}.log"
     with open(log, "w") as fh:
         rc = subprocess.run([multimm, "-c", str(cfg)], stdout=fh, stderr=subprocess.STDOUT).returncode
