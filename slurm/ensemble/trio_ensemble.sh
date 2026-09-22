@@ -152,6 +152,7 @@ fi
 
 python - "$CONFIG" "$SAMPLE" <<'PYCHECK'
 import sys
+from pathlib import Path
 
 from gnome3d.settings import Settings
 
@@ -169,10 +170,14 @@ assert sample in s.data_singletons, f"singletons={s.data_singletons!r} are not {
 assert s.use_ctcf_motif and s.use_excluded_volume and s.use_dynamic_loop_density
 assert s.use_anchor_heatmap, "the anchor distance map is off"
 assert s.mc_executor_jax_bucket_shapes, "shape bucketing is off; this run would be ~5x slower"
-assert not s.use_compartments, "use_compartments is on; these runs exclude epigenome terms"
+# The compartment term is off on every arm but the one that carries the sample's own
+# eigenvector track, design/expression-from-structure.md idea 24; a track from another sample
+# would answer a different question.
+if s.use_compartments:
+    assert sample in s.data_compartments, f"compartments={s.data_compartments!r} are not {sample}'s"
+    assert Path(s.data_path(s.data_compartments)).is_file(), f"compartment track missing: {s.data_path(s.data_compartments)}"
 # Every cluster file, so a two factor config whose second file never travelled fails here
 # rather than modelling the CTCF arm under the other arm's name.
-from pathlib import Path
 
 for path, _, factor in s.cluster_files():
     assert Path(path).is_file() and Path(path).stat().st_size, f"{factor} clusters missing: {path}"
