@@ -305,6 +305,23 @@ What is left after 21, in the order to try them. The first three need no new mod
 Also open from `rnapii-loops.md`, not about expression: the per sample RNAPOL2 anchor arm, to
 separate the family signal drop from the shared bead set.
 
+## Ideas, fourth list, 2026-09-22
+
+From what 22 to 24 taught: the person specific part is part genetic and part epigenomic, the
+structure tracks neither at the gene level, and its one trace is on the large deviations. The
+first is a control on that trace and comes before anything built on it.
+
+| # | idea | what to build | cost | status |
+|---|---|---|---|---|
+| 25 | A null for the large deviation trace | The +0.15 to +0.19 of idea 23 is a correlation of two deviations from the same panel of nine, and the Mann-Whitney was pooled. Permute the person labels of the model deviations within each gene and recompute the statistic on the same gene sets, a thousand times, for the 3D distance, the loops, the compartments and the linear floor. What survives the null is the result. | an hour on tables that exist | open, next |
+| 26 | The person's own enhancer activity, ABC style | Idea 1 weighted the atlas by GM12878's activity score and idea 4 used the person's RNAPOL2 peaks as positions. Not yet tried: the person's own RNAPOL2 signal at each element as its activity, times the contact from the person's model, summed over elements, the ABC form with person specific activity; and its deviation from the panel, since the enhancer's activity in the person is the epigenomic part the loops at the promoter do not see. | an afternoon on the models there are | open |
+| 27 | The eQTL variant as the element | For every eQTL gene the variant marks the regulatory element that matters for that gene, by genetics rather than by an atlas. The 3D distance from the TSS to the eQTL variant's bead in each person's model, its level against expression and its deviation against the genotype and the expression deviation, beside the nearest element distance. | an afternoon | open |
+| 28 | Loops at the variant, the mechanism test | Idea 22 asked whether the loops at the promoter track the genotype and found 0.04. The finer test: for eQTL variants that lie in a loop anchor or an own element, does the person's PET count at that anchor track the genotype? A loop that follows the variant is the mechanism 3D-GNOME 2.0 assumed; a loop that does not says the genetic part never enters this data. | an afternoon, data only | open |
+| 29 | One model of the person specific part | Everything together, genotype, loops, peak signal, compartments and the 3D deviations, out of fold on gene person pairs with folds by gene, on all genes and on the large deviations: the fraction of the person specific deviation that is explained, and each part's share. The summary number for the write up. | an afternoon on tables that exist | open |
+| 30 | Fifty conformations for one person | Idea 2's reopen condition. Ten conformations cost about 0.06 of the correlation by attenuation, and the ensemble spread of 13 was thin. One person on chr1 at fifty on eden, the deviation and idea 5 numbers against the ten. Low expectation, since the ceiling from attenuation was 0.39 against 0.36 kept. | 7 GPU hours, the user submits | open, last |
+
+Then the deferred: 7 haplotypes, 18 inter chromosomal, 15 in its Enformer form, and the genome arms.
+
 ## Log
 
 - 2026-09-20. Question raised, diagnostics run, baselines set, list written.
@@ -315,6 +332,7 @@ separate the family signal drop from the shared bead set.
 - 2026-09-20. Idea 5 done: out of fold, the 3D block adds -0.01 to +0.01 beyond the input and +0.00 to +0.03 beyond linear, in every person. `playground/trio_rnapol2/model/`.
 - 2026-09-20. Idea 6 done in the same model with the silent genes kept: every fit up a few hundredths, the gain of 3D unchanged.
 - 2026-09-21. Summary section written; ideas 19 and 20 are the next arm, one eden array.
+- 2026-09-22. Fourth list written: 25 a null for the large deviation trace, 26 the person's own enhancer activity, 27 the eQTL variant as the element, 28 loops at the variant, 29 one model of the person specific part, 30 fifty conformations.
 - 2026-09-22. Idea 24 done and dropped: the compartment term at 0.5 in the energy leaves every number where the HGSVC arm had it; the models' deviation tracks the person's E1 deviation at +0.02 with or without it.
 - 2026-09-22. Idea 24 prepared: the compartment term on each person's own track, HGSVC map arm, configs and tracks on eden, waits for the sbatch.
 - 2026-09-22. Idea 22 done: the person specific deviation is cis genetic in good part, GTEx eQTLs and the nine's genotypes predict it at +0.29; the loops, distances and compartments do not track the genetic part; E1 adds beyond genotype and loops on the large deviations.
