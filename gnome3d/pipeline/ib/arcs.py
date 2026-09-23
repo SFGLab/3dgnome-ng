@@ -47,6 +47,7 @@ def _run_one(problem: Problem, backend: str) -> Result:
     pos0: F32Array = problem["anchor_pos"]
     exp_dist = problem["exp_dist"]
     arc_w = problem.get("arc_w")
+    activity = problem.get("activity")
     step = float(problem["step_size"])
     s = settings_for_block(problem["settings"], problem["anchor_genomic"])
     seed = int(problem["seed"])
@@ -77,8 +78,15 @@ def _run_one(problem: Problem, backend: str) -> Result:
         if solver == "lbfgs":
             from gnome3d.mc.numba.arcs_solver import solve_arcs  # noqa: PLC0415
 
-            score, pos = solve_arcs(pos, exp_dist, s, backend=backend, arc_w=arc_w)
+            score, pos = solve_arcs(
+                pos, exp_dist, s, backend=backend, arc_w=arc_w, activity=activity
+            )
         else:
+            if activity is not None:
+                raise NotImplementedError(
+                    "the factory term is in the solver's energy, not the annealer's; set "
+                    "[simulation_arcs] solver = lbfgs or [factories] weight = 0"
+                )
             score = mc_numba.mc_arcs_numba(pos, exp_dist, step, s, arc_w=arc_w)  # in place
         if score < best_score or best_score < 0.0:
             best_score = score
@@ -273,6 +281,10 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
                 "loop weights are not in the JAX annealer; the solver carries them on the "
                 "device, and the numba annealer on the CPU"
             )
+        if prob.get("activity") is not None:
+            raise NotImplementedError(
+                "the factory term is not in the JAX annealer; the solver carries it on the device"
+            )
         seed_rng(int(prob["seed"]))  # deterministic restart noise for this IB
         pos = prob["anchor_pos"]
         step = float(prob["step_size"])
@@ -314,6 +326,7 @@ class ArcsStage:
             "anchor_pos": st.anchor_seed_pos,
             "exp_dist": st.exp_dist,
             "arc_w": st.arc_w,
+            "activity": st.activity,
             "step_size": st.step_size_arcs,
             "settings": st.settings,
             "seed": st.seed,

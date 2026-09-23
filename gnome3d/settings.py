@@ -51,6 +51,7 @@ class Settings:
     ib_refine_scope: str
     data_compartments: str
     data_phasing_track: str
+    data_anchor_activity: str
 
     # ---- template ----
 
@@ -96,6 +97,10 @@ class Settings:
     spring_stretch_arcs: float
     arc_weight_exponent: float
     background_weight: float
+    loop_dropout: bool
+    loop_dropout_scale: float
+    factory_weight: float
+    factory_radius: float
     background_range_bp: int
     spring_squeeze_arcs: float
     use_contact_background: bool
@@ -375,6 +380,9 @@ class Settings:
         self.ib_refine_scope = "segment"
         self.data_compartments = ""
         self.data_phasing_track = ""
+        # A BED with a signal column, a broadPeak or a bedGraph, giving each anchor the
+        # activity the factory term of [factories] reads; empty leaves the term inert.
+        self.data_anchor_activity = ""
 
         # ---- motif orientation ----
         self.use_ctcf_motif = False
@@ -420,6 +428,14 @@ class Settings:
         # Each loop's spring scaled by its strength to this power, so a strong loop wins the
         # competitions a weak one loses. Zero is every loop at the same spring, byte exact.
         self.arc_weight_exponent = 0.0
+        # Each conformation keeps a loop with probability q / (q + scale), q the law's
+        # strength, so the ensemble mean carries the loop's frequency. Off keeps every loop.
+        self.loop_dropout = False
+        self.loop_dropout_scale = 1.0
+        # The factory term: active anchors attract as a group with a saturating collective
+        # energy, weight zero off, radius in beads.
+        self.factory_weight = 0.0
+        self.factory_radius = 2.0
         # A weak spring holding an arcless anchor pair inside `background_range_bp` at the
         # background for its separation, in the arcs stage, beside the repulsion that every
         # other arcless pair keeps. Zero is off. The all pairs version lost the battery because a
@@ -793,6 +809,7 @@ class Settings:
         self.ib_refine_scope = gets("simulation_ib", "refine_scope", self.ib_refine_scope)
         self.data_compartments = gets("data", "compartments", self.data_compartments)
         self.data_phasing_track = gets("data", "phasing_track", self.data_phasing_track)
+        self.data_anchor_activity = gets("data", "anchor_activity", self.data_anchor_activity)
 
         # [template]
 
@@ -807,6 +824,10 @@ class Settings:
         # [springs]
         self.spring_stretch = getf("springs", "stretch_constant", self.spring_stretch)
         self.arc_weight_exponent = getf("springs", "arc_weight_exponent", self.arc_weight_exponent)
+        self.loop_dropout = getb("springs", "loop_dropout", self.loop_dropout)
+        self.loop_dropout_scale = getf("springs", "loop_dropout_scale", self.loop_dropout_scale)
+        self.factory_weight = getf("factories", "weight", self.factory_weight)
+        self.factory_radius = getf("factories", "radius", self.factory_radius)
         self.spring_squeeze = getf("springs", "squeeze_constant", self.spring_squeeze)
         self.spring_angular = getf("springs", "angular_constant", self.spring_angular)
         self.spring_stretch_arcs = getf(

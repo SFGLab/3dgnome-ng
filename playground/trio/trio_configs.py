@@ -23,6 +23,13 @@ binds on every trio chromosome; the name carries `_itN`, idea 32.
 With `--arc-weight A` each loop's spring is scaled by its strength to the power A,
 `[springs] arc_weight_exponent`; the name carries `_awA`, idea 37.
 
+With `--loop-dropout S` each conformation keeps a loop with probability q / (q + S),
+`[springs] loop_dropout` at `loop_dropout_scale` S; the name carries `_ldS`, idea 33.
+
+With `--factories W` the factory term runs at weight W on the sample's RNAPOL2 peak signal,
+`[factories] weight` with `[data] anchor_activity = <sample>_rnapol2_peaks.broadPeak`, which
+has to sit in the sample's data directory; the name carries `_facW`, idea 35.
+
 With `--compartments W` the compartment term runs at weight W on the sample's own eigenvector
 track, `<sample>_compartments.bedGraph` from the validation tracks study on the sample's 4DN
 Hi-C, phased by anchor density as the loader does; the name carries `_compW`, idea 24.
@@ -100,6 +107,8 @@ def build(
     compartments: float | None = None,
     solver_iters: int | None = None,
     arc_weight: float | None = None,
+    loop_dropout: float | None = None,
+    factories: float | None = None,
 ) -> configparser.ConfigParser:
     cfg = configparser.ConfigParser()
     params = {k: dict(v) for k, v in CANONICAL.items()}
@@ -124,6 +133,12 @@ def build(
         params["simulation_arcs"]["solver_iters"] = str(solver_iters)
     if arc_weight is not None:
         params["springs"]["arc_weight_exponent"] = f"{arc_weight:g}"
+    if loop_dropout is not None:
+        params["springs"]["loop_dropout"] = "yes"
+        params["springs"]["loop_dropout_scale"] = f"{loop_dropout:g}"
+    if factories is not None:
+        params["data"]["anchor_activity"] = f"{name}_rnapol2_peaks.broadPeak"
+        params.setdefault("factories", {})["weight"] = f"{factories:g}"
     if compartments is not None:
         params["data"]["compartments"] = f"{name}_compartments.bedGraph"
         params.setdefault("compartments", {})["use_compartments"] = "yes"
@@ -150,13 +165,17 @@ def main() -> None:
                     help="the arcs solve's iteration cap; the name carries _it<value>")
     ap.add_argument("--arc-weight", type=float, default=None,
                     help="scale each loop's spring by its strength to this power; the name carries _aw<value>")
+    ap.add_argument("--loop-dropout", type=float, default=None,
+                    help="keep each loop per conformation with probability q / (q + S); the name carries _ld<value>")
+    ap.add_argument("--factories", type=float, default=None,
+                    help="the factory term at this weight on the sample's RNAPOL2 peaks; the name carries _fac<value>")
     ap.add_argument("--compartments", type=float, default=None,
                     help="the compartment term at this weight on the sample's own track; the name carries _comp<value>")
     args = ap.parse_args()
     out_dir = ROOT / args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     for s in trio_samples.resolve(args.samples):
-        cfg = build(s, args.binsize, args.factor, args.singletons, args.half_saturation, args.compartments, args.solver_iters, args.arc_weight)
+        cfg = build(s, args.binsize, args.factor, args.singletons, args.half_saturation, args.compartments, args.solver_iters, args.arc_weight, args.loop_dropout, args.factories)
         # Distinct name so the fixed arm cannot be confused with, or overwrite, the
         # 2026-08-24 configs whose structures had zero between-block contact.
         tag = "_trio" if args.factor == "CTCF" else f"_trio_{args.factor.lower()}"
@@ -171,6 +190,10 @@ def main() -> None:
             tag += f"_it{args.solver_iters}"
         if args.arc_weight is not None:
             tag += f"_aw{args.arc_weight:g}"
+        if args.loop_dropout is not None:
+            tag += f"_ld{args.loop_dropout:g}"
+        if args.factories is not None:
+            tag += f"_fac{args.factories:g}"
         if args.compartments is not None:
             tag += f"_comp{args.compartments:g}"
             note += COMP_NOTE.format(w=f"{args.compartments:g}")

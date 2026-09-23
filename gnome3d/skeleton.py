@@ -164,8 +164,9 @@ def joint_arcs_solve(
     anchor_heat: F64Array | None = None
     if s.use_anchor_heatmap and state.singletons:
         anchor_heat, _ = cb.build_contact_heatmaps(state, active_all, chr_, with_subanchor=False)
-    exp_dist = cb.calc_anchor_expected_distances(state, active_all, chr_, anchor_heat)
-    arc_w = cb.calc_anchor_arc_weights(state, active_all, chr_)
+    exp_dist = cb.calc_anchor_expected_distances(state, active_all, chr_, anchor_heat, seed)
+    arc_w = cb.calc_anchor_arc_weights(state, active_all, chr_, seed)
+    activity = cb.calc_anchor_activity(state, active_all, chr_)
     anchor_genomic = [
         (clusters[a].start, clusters[a].end, clusters[a].genomic_pos) for a in active_all
     ]
@@ -179,6 +180,7 @@ def joint_arcs_solve(
             "anchor_pos": pos0,
             "exp_dist": exp_dist,
             "arc_w": arc_w,
+            "activity": activity,
             "step_size": _ARCS_NOISE,
             "settings": s_joint,
             "seed": seed,
@@ -267,8 +269,13 @@ def seed_for_ib(
             state, active_region, chr_, with_subanchor=bool(state.s.use_subanchor_heatmap)
         )
 
-    exp_dist = cb.calc_anchor_expected_distances(state, active_region, chr_, anchor_heat)
-    arc_w = cb.calc_anchor_arc_weights(state, active_region, chr_)
+    # The block's seed names the conformation for the loop dropout as well as the kernels.
+    block_seed = (ib_idx * 2_654_435_761 + 40_503 + seed_offset) & 0x7FFFFFFF
+    exp_dist = cb.calc_anchor_expected_distances(
+        state, active_region, chr_, anchor_heat, block_seed
+    )
+    arc_w = cb.calc_anchor_arc_weights(state, active_region, chr_, block_seed)
+    activity = cb.calc_anchor_activity(state, active_region, chr_)
 
     # Anchor seed positions (all at the IB centroid right now) + genomic spans.
     anchor_seed_pos = np.array([clusters[ci].pos for ci in active_region], dtype=np.float32)
@@ -330,10 +337,11 @@ def seed_for_ib(
         # salted per-process).  ib_idx is a globally-unique cluster index; spread
         # it so adjacent IBs get well-separated seeds.  seed_offset varies it per
         # ensemble member.
-        seed=(ib_idx * 2_654_435_761 + 40_503 + seed_offset) & 0x7FFFFFFF,
+        seed=block_seed,
         anchor_seed_pos=anchor_seed_pos,
         exp_dist=exp_dist,
         arc_w=arc_w,
+        activity=activity,
         orientations=orientations,
         anchor_neighbors=anchor_neighbors,
         anchor_neighbor_weights=anchor_neighbor_weights,

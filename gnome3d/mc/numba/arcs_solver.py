@@ -146,6 +146,64 @@ def arcs_energy_grad(
     return ener.sum(), g.reshape(-1)
 
 
+@njit(cache=True, fastmath=True, nogil=True, parallel=True)
+def factory_energy_grad(x: F64Array, act: F64Array, w: float, r: float) -> tuple[float, F64Array]:
+    """The factory term over a whole structure and its gradient, for a flattened `(3N,)` vector.
+
+    An active anchor, one with `act` above zero, gains from the active anchors near it through
+    `S_i = sum_j act_j exp(-d_ij / r)`, and its energy is `w act_i (log(1 + A) - log(1 + S_i))`
+    with `A` the total activity, so joining a group lowers it, a second group lowers it little,
+    and it is never below zero, which the Metropolis rule needs of every term. The gradient on
+    anchor i collects its own `S_i` and its part in every other anchor's, so `S` is built in a
+    first pass over the pairs and read in the second.
+    """
+    n = act.shape[0]
+    pos = x.reshape(n, 3)
+    sacc = np.zeros(n)
+    for i in prange(n):
+        if act[i] <= 0.0:
+            continue
+        si = 0.0
+        for j in range(n):
+            if j == i or act[j] <= 0.0:
+                continue
+            dx = pos[i, 0] - pos[j, 0]
+            dy = pos[i, 1] - pos[j, 1]
+            dz = pos[i, 2] - pos[j, 2]
+            si += act[j] * np.exp(-np.sqrt(dx * dx + dy * dy + dz * dz) / r)
+        sacc[i] = si
+    total = 0.0
+    for i in range(n):
+        total += act[i]
+    log_a = np.log1p(total)
+    ener = np.zeros(n)
+    g = np.zeros((n, 3))
+    for i in prange(n):
+        if act[i] <= 0.0:
+            continue
+        ener[i] = w * act[i] * (log_a - np.log1p(sacc[i]))
+        inv_i = 1.0 / (1.0 + sacc[i])
+        gi0 = 0.0
+        gi1 = 0.0
+        gi2 = 0.0
+        for j in range(n):
+            if j == i or act[j] <= 0.0:
+                continue
+            dx = pos[i, 0] - pos[j, 0]
+            dy = pos[i, 1] - pos[j, 1]
+            dz = pos[i, 2] - pos[j, 2]
+            d = np.sqrt(dx * dx + dy * dy + dz * dz)
+            dd = d if d > 1e-10 else 1e-10
+            coef = w * act[i] * act[j] * np.exp(-d / r) / (r * dd) * (inv_i + 1.0 / (1.0 + sacc[j]))
+            gi0 += coef * dx
+            gi1 += coef * dy
+            gi2 += coef * dz
+        g[i, 0] = gi0
+        g[i, 1] = gi1
+        g[i, 2] = gi2
+    return ener.sum(), g.reshape(-1)
+
+
 def solve_arcs(
     pos: F32Array,
     exp_dist: F64Array,
@@ -153,13 +211,15 @@ def solve_arcs(
     iters: int | None = None,
     backend: str = "numba",
     arc_w: F32Array | None = None,
+    activity: F32Array | None = None,
 ) -> tuple[float, F32Array]:
     """Minimise the arcs energy from `pos`. Returns `(energy, positions)`.
 
     Mirrors the derivations in `mc_arcs_numba` so the energy is the one the annealer reports.
     `backend` is where the energy is evaluated, `numba` on the CPU or `jax` on the device; the
     minimiser itself always runs on the host. The arcs stage passes the executor's choice.
-    `arc_w` is each arc pair's spring weight, or None for every pair at one.
+    `arc_w` is each arc pair's spring weight, or None for every pair at one. `activity` is
+    each anchor's activity for the factory term at `factory_weight`, or None for no term.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -210,16 +270,42 @@ def solve_arcs(
     if backend not in ("numba", "jax"):
         raise ValueError(f"solver backend must be numba or jax, got {backend!r}")
     t0 = time.perf_counter()
+    fac_w = float(s.factory_weight) if activity is not None else 0.0
+    fac_r = max(float(s.factory_radius), 1e-6)
+    act64 = np.ascontiguousarray(activity, dtype=np.float64) if fac_w > 0.0 else None
     if backend == "jax":
-        from gnome3d.mc.jax.arcs_energy import DeviceArcsEnergy  # noqa: PLC0415
+        from gnome3d.mc.jax.arcs_energy import (  # noqa: PLC0415
+            DeviceArcsEnergy,
+            DeviceFactoryEnergy,
+        )
 
-        fun: Any = DeviceArcsEnergy(exp64, args[1:], arc_w)
+        base_dev: Any = DeviceArcsEnergy(exp64, args[1:], arc_w)
+        fun: Any = base_dev
         fun_args: tuple[Any, ...] = ()
+        if act64 is not None:
+            fac_dev = DeviceFactoryEnergy(act64, fac_w, fac_r)
+
+            def with_factories_dev(x: Any) -> tuple[float, F64Array]:
+                e1, g1 = base_dev(x)
+                e2, g2 = fac_dev(x)
+                return e1 + e2, g1 + g2
+
+            fun = with_factories_dev
     else:
         fun = arcs_energy_grad
         fun_args = (
             args if arc_w is None else (*args, True, np.ascontiguousarray(arc_w, dtype=np.float32))
         )
+        if act64 is not None:
+            base_cpu, base_args = fun, fun_args
+
+            def with_factories_cpu(x: Any) -> tuple[float, F64Array]:
+                e1, g1 = base_cpu(x, *base_args)
+                e2, g2 = factory_energy_grad(x, act64, fac_w, fac_r)
+                return e1 + e2, g1 + g2
+
+            fun = with_factories_cpu
+            fun_args = ()
     # The stop rule. With a tolerance the solve ends when an iteration improves the energy by
     # less than that fraction of it, L-BFGS-B's own `ftol`, and the iteration count is a safety
     # cap; without one the cap is the only stop, which on a chromosome it always is.

@@ -55,6 +55,7 @@ Filenames are relative to `data_dir` unless absolute. The region string is `chr:
 | `segment_split` | str |  | BED of segment boundary breakpoints. |
 | `compartments` | str |  | bedGraph of a signed compartment eigenvector or a CALDER BED, for `[compartments]`. |
 | `phasing_track` | str |  | Track used to fix the eigenvector's arbitrary sign. Required with `compartments`. |
+| `anchor_activity` | str |  | A BED with a signal column giving each anchor an activity for `[factories]`: the seventh column when a line has seven or more, a broadPeak's signal, else the fourth, a bedGraph. An anchor takes the largest value of the intervals overlapping it, zero where none does. |
 
 ## [distance]
 
@@ -86,12 +87,28 @@ is too far and the squeeze constant when too close.
 | `stretch_constant_arcs` | float | 1.0 | 1.0 | Arcs stage, every target in the matrix, arcs and chain bonds alike. |
 | `squeeze_constant_arcs` | float | 1.0 | 1.0 | Arcs stage. |
 | `arc_weight_exponent` | float | 0.0 | 0.0 | Each loop's spring constant scaled by its strength, the PET count over the typical count at its span, to this power; zero is every loop at one spring, byte exact. Measured at 1 on the trio chromosomes, 2026-09-22, null on the strong loops and on expression, so it stays at 0, design/expression-from-structure.md idea 37. |
+| `loop_dropout` | bool | no | no | Each conformation keeps a loop with probability `q / (q + loop_dropout_scale)`, `q` the law's strength, and drops it otherwise, its pair arcless for that conformation, so the ensemble mean carries the loop's frequency; the draw is seeded by the conformation. Off keeps every loop, byte exact. Design/expression-from-structure.md idea 33, under measurement since 2026-09-23. |
+| `loop_dropout_scale` | float | 1.0 | 1.0 | The strength at which a loop is kept in half the conformations; a typical loop at 1. |
 | `background_weight` | float | 0.0 | 0.1 | A weak spring holding an arcless anchor pair inside `background_range_bp` at the background for its separation, in the arcs stage. Zero is off and every other arcless pair keeps the repulsion. |
 | `background_range_bp` | int | 100000 | 100000 | The separation under which an arcless pair is held at the background. Beyond it the pair keeps the repulsion, since a power law distance matrix cannot be embedded in three dimensions over every pair, only over a band. |
 | `factor_strength` | str |  |  | A multiplier on loop strength per cluster file, comma separated in file order, 1 each when empty. A factor whose contacts are more transient than CTCF's pulls less at the same PET count; 0 holds its loops at the background, which keeps its anchors as beads with no pull. |
 | `use_contact_background` | bool | no | yes | Beyond that range, hold an arcless pair whose contact cell puts it closer than the background at the law's contact distance, with the same spring. A pair at or below its expected contact keeps the repulsion, so the held set stays sparse, and on a thin map it holds next to nothing, which is allowed. Needs `use_anchor_heatmap`. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
+
+## [factories]
+
+The factory term of the arcs stage, design/expression-from-structure.md idea 35. An anchor with
+an activity from `[data] anchor_activity` is pulled toward the active anchors near it through a
+saturating collective energy, `w * a_i * (log(1 + A) - log(1 + S_i))` with
+`S_i = sum_j a_j exp(-d_ij / r)` and `A` the total activity, so a bead gains from joining one
+group and little from a second. It is in the solver's energy on both backends; the annealers
+refuse it. Under measurement since 2026-09-23.
+
+| key | type | default | production | what it does |
+| --- | --- | --- | --- | --- |
+| `weight` | float | 0.0 | 0.0 | The term's weight `w`. Zero is off, byte exact. |
+| `radius` | float | 2.0 | 2.0 | The reach `r` of a group, in beads. |
 
 ## [motif_orientation]
 

@@ -438,10 +438,141 @@ def main() -> int:
     test_off_by_default()
     test_an_unknown_name_is_refused()
     test_the_batched_runner_solves_on_the_device()
+    test_loop_dropout()
+    test_factories()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")
     return 1 if FAIL else 0
+
+
+def test_loop_dropout() -> None:
+    """Idea 33: with the setting off every arc is kept and no draw is made; on, a conformation
+    keeps each arc with probability q over q plus the scale, reproducibly by its seed."""
+    from gnome3d.pipeline.coarse.build import dropout_keep  # noqa: PLC0415
+
+    s = Settings()
+    s.polymer_exponent = 0.3
+    mids = [i * 20_000 for i in range(400)]
+    rng = np.random.default_rng(5)
+    # scores 1, 3 and 9 PETs at a law with no arc fit, where the strength is the count itself
+    arcs = [
+        (int(i), int(i + 1 + rng.integers(1, 5)), int(sc))
+        for i, sc in zip(rng.integers(0, 390, 3000), rng.choice([1, 3, 9], 3000))
+    ]
+    check("off keeps every arc", not s.loop_dropout)
+    s.loop_dropout = True
+    s.loop_dropout_scale = 1.0
+    k1 = dropout_keep(s, mids, arcs, seed=11)
+    k2 = dropout_keep(s, mids, arcs, seed=11)
+    k3 = dropout_keep(s, mids, arcs, seed=12)
+    check("the same seed keeps the same arcs", k1 == k2)
+    check("another seed keeps other arcs", k1 != k3)
+    for sc, want in ((1, 0.5), (3, 0.75), (9, 0.9)):
+        got = np.mean([k for a, k in zip(arcs, k1) if a[2] == sc])
+        check(
+            f"a {sc} PET loop is kept in {want:.2f} of conformations",
+            abs(got - want) < 0.05,
+            f"{got:.3f}",
+        )
+    s.loop_dropout_scale = 3.0
+    k4 = dropout_keep(s, mids, arcs, seed=11)
+    got = np.mean([k for a, k in zip(arcs, k4) if a[2] == 3])
+    check("the scale moves the halfway point", abs(got - 0.5) < 0.05, f"{got:.3f}")
+
+
+def test_factories() -> None:
+    """Idea 35: the factory term on three anchors against its closed form, its gradient against
+    finite differences, never below zero, the device against the CPU, and a solve with it pulls
+    the active anchors together."""
+    from gnome3d.mc.numba.arcs_solver import factory_energy_grad  # noqa: PLC0415
+
+    pos = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 3.0, 0.0], [5.0, 5.0, 5.0]])
+    act = np.array([2.0, 1.0, 0.5, 0.0])
+    w, r = 0.7, 2.0
+    d = lambda i, j: float(np.linalg.norm(pos[i] - pos[j]))  # noqa: E731
+    S = [
+        sum(act[j] * np.exp(-d(i, j) / r) for j in range(4) if j != i and act[j] > 0)
+        for i in range(4)
+    ]
+    want = sum(w * act[i] * (np.log1p(act.sum()) - np.log1p(S[i])) for i in range(4) if act[i] > 0)
+    e, g = factory_energy_grad(pos.reshape(-1), act, w, r)
+    check(
+        "the factory energy is its closed form",
+        abs(e - want) < 1e-10,
+        f"{e:.8f} against {want:.8f}",
+    )
+    check("the inactive anchor feels nothing", np.all(g[9:12] == 0.0))
+    x = pos.reshape(-1).copy()
+    num = np.zeros_like(x)
+    h = 1e-6
+    for k in range(len(x)):
+        xp = x.copy()
+        xp[k] += h
+        xm = x.copy()
+        xm[k] -= h
+        num[k] = (factory_energy_grad(xp, act, w, r)[0] - factory_energy_grad(xm, act, w, r)[0]) / (
+            2 * h
+        )
+    check(
+        "the factory gradient matches finite differences",
+        np.max(np.abs(num - g)) < 1e-6,
+        f"{np.max(np.abs(num - g)):.2e}",
+    )
+    rng = np.random.default_rng(2)
+    ok = True
+    for _ in range(50):
+        pr = rng.normal(0, 3, size=(30, 3))
+        ar = rng.uniform(0, 2, 30) * (rng.random(30) < 0.6)
+        ok &= factory_energy_grad(pr.reshape(-1), ar, w, r)[0] >= 0.0
+    check("the term is never below zero", ok)
+    try:
+        import jax  # noqa: F401, PLC0415
+
+        from gnome3d.mc.jax.arcs_energy import DeviceFactoryEnergy  # noqa: PLC0415
+
+        pr = rng.normal(0, 3, size=(300, 3))
+        ar = rng.uniform(0, 2, 300) * (rng.random(300) < 0.6)
+        ec, gc = factory_energy_grad(pr.reshape(-1), ar, w, r)
+        ed, gd = DeviceFactoryEnergy(ar, w, r)(pr.reshape(-1))
+        check(
+            "the device carries the factory term",
+            abs(ed - ec) / max(abs(ec), 1e-9) < 1e-4
+            and np.max(np.abs(gd - gc)) < 1e-3 * (1 + np.max(np.abs(gc))),
+            f"{ed:.5f} against {ec:.5f}",
+        )
+    except ImportError:
+        pass
+    # a solve: active anchors with no arcs among them end closer with the term than without
+    n = 60
+    exp = np.full((n, n), -0.5)
+    np.fill_diagonal(exp, 0.0)
+    for i in range(n - 1):
+        exp[i, i + 1] = exp[i + 1, i] = 1.0
+    s = Settings()
+    s.arcs_repulsion_cutoff_factor = 1.5
+    s.use_confinement = True
+    s.confinement_apply_to_arcs = True
+    start = np.ascontiguousarray(rng.normal(0, 4, size=(n, 3)).astype(np.float32))
+    active = np.zeros(n, dtype=np.float32)
+    active[::6] = 1.0
+    _, x0 = solve_arcs(start.copy(), exp, s, iters=300)
+    s.factory_weight = 2.0
+    s.factory_radius = 2.0
+    _, x1 = solve_arcs(start.copy(), exp, s, iters=300, activity=active)
+    s.factory_weight = 0.0
+    _, x2 = solve_arcs(start.copy(), exp, s, iters=300, activity=active)
+    idx = np.where(active > 0)[0]
+
+    def spread(x):
+        return float(np.mean([np.linalg.norm(x[i] - x[j]) for i in idx for j in idx if i < j]))
+
+    check("weight zero with an activity leaves the solve alone", np.array_equal(x0, x2))
+    check(
+        "with the term the active anchors sit closer",
+        spread(x1) < spread(x0),
+        f"{spread(x1):.2f} against {spread(x0):.2f}",
+    )
 
 
 if __name__ == "__main__":

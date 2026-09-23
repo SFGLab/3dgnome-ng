@@ -176,6 +176,11 @@ assert s.mc_executor_jax_bucket_shapes, "shape bucketing is off; this run would 
 if s.use_compartments:
     assert sample in s.data_compartments, f"compartments={s.data_compartments!r} are not {sample}'s"
     assert Path(s.data_path(s.data_compartments)).is_file(), f"compartment track missing: {s.data_path(s.data_compartments)}"
+# The factory term reads the sample's own activity track, which has to have travelled too.
+if s.factory_weight > 0:
+    assert s.data_anchor_activity, "[factories] weight is set with no [data] anchor_activity"
+    assert sample in s.data_anchor_activity, f"anchor_activity={s.data_anchor_activity!r} is not {sample}'s"
+    assert Path(s.data_path(s.data_anchor_activity)).is_file(), f"activity track missing: {s.data_path(s.data_anchor_activity)}"
 # Every cluster file, so a two factor config whose second file never travelled fails here
 # rather than modelling the CTCF arm under the other arm's name.
 

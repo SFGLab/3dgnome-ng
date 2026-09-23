@@ -69,6 +69,8 @@ class Seeded:
     # Each arc pair's spring weight beside exp_dist, None at exponent zero. Keyword only so
     # the subclasses' positional fields stay where they are.
     arc_w: F32Array | None = field(default=None, kw_only=True)
+    # Each anchor's activity for the factory term, None when the term is off.
+    activity: F32Array | None = field(default=None, kw_only=True)
 
 
 @dataclass(frozen=True)

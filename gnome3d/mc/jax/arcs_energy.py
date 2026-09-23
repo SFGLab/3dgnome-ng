@@ -135,3 +135,72 @@ class DeviceArcsEnergy:
         ei, g = self._fn(jnp.asarray(x, dtype=jnp.float32), self._exp_t, self._w_t)
         self.evaluations += 1
         return float(np.asarray(ei, dtype=np.float64).sum()), np.asarray(g, dtype=np.float64)
+
+
+class DeviceFactoryEnergy:
+    """The factory term of `gnome3d.mc.numba.arcs_solver.factory_energy_grad` on the device,
+    as a callable on flattened positions, two passes in row chunks: the groups every active
+    anchor sits in, then each anchor's energy and gradient from its own group and its part in
+    the others'. Float32 on the device, summed in float64 on the host.
+
+    Parameters
+    ----------
+    act
+        Each anchor's activity, zero for an anchor the term ignores.
+    weight, radius
+        `factory_weight` and `factory_radius`.
+    """
+
+    def __init__(self, act: F64Array, weight: float, radius: float) -> None:
+        import jax
+        import jax.numpy as jnp
+
+        n = int(act.shape[0])
+        self.n = n
+        act32 = jnp.asarray(np.ascontiguousarray(act, dtype=np.float32))
+        w = float(weight)
+        r = float(radius)
+        log_a = float(np.log1p(float(act.sum())))
+        idx_all = jnp.arange(n, dtype=jnp.int32)
+        active = act32 > 0.0
+
+        def group_row(xi: Any, i: Any, pos: Any) -> Any:
+            diff = xi[None, :] - pos
+            d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+            e = act32 * jnp.exp(-d / r)
+            e = jnp.where(jnp.logical_and(idx_all != i, active), e, 0.0)
+            return jnp.sum(e)
+
+        def energy_grad(x: Any) -> tuple[Any, Any]:
+            pos = x.reshape(n, 3)
+
+            def one_group(a: tuple[Any, Any]) -> Any:
+                return group_row(a[0], a[1], pos)
+
+            s_all = jax.lax.map(one_group, (pos, idx_all), batch_size=CHUNK_ROWS)
+            s_all = jnp.where(active, s_all, 0.0)
+            inv = 1.0 / (1.0 + s_all)
+
+            def row(a: tuple[Any, Any, Any, Any, Any]) -> tuple[Any, Any]:
+                xi, i, ai, si, inv_i = a
+                diff = xi[None, :] - pos
+                d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+                dd = jnp.maximum(d, 1e-10)
+                coef = w * ai * act32 * jnp.exp(-d / r) / (r * dd) * (inv_i + inv)
+                coef = jnp.where(jnp.logical_and(idx_all != i, active), coef, 0.0)
+                gi = jnp.sum(coef[:, None] * diff, axis=0)
+                ei = w * ai * (log_a - jnp.log1p(si))
+                return ei, gi
+
+            ei, gi = jax.lax.map(row, (pos, idx_all, act32, s_all, inv), batch_size=CHUNK_ROWS)
+            ei = jnp.where(active, ei, 0.0)
+            gi = jnp.where(active[:, None], gi, 0.0)
+            return ei, gi.reshape(-1)
+
+        self._fn = jax.jit(energy_grad)
+
+    def __call__(self, x: F64Array) -> tuple[float, F64Array]:
+        import jax.numpy as jnp
+
+        ei, g = self._fn(jnp.asarray(x, dtype=jnp.float32))
+        return float(np.asarray(ei, dtype=np.float64).sum()), np.asarray(g, dtype=np.float64)

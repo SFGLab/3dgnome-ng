@@ -934,6 +934,42 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: the reference has one spring constant per direction for every arc.
 
+- **Loop dropout per conformation: `[springs] loop_dropout`, default no, under measurement
+  since 2026-09-23.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
+  `dropout_keep`, `_active_arcs`)
+  A PET count is a frequency across cells, and every conformation of an ensemble solves the
+  same targets from a different start, so a loop's count reaches the ensemble only through
+  its target distance, which saturates. With the flag each conformation keeps a loop with
+  probability `q / (q + loop_dropout_scale)`, `q` the law's strength, and a dropped loop
+  leaves its pair arcless for that conformation, so the ensemble mean carries the loop's
+  frequency and a person's count of a shared loop reaches the mean structure. The draw comes
+  from a generator seeded by the conformation, the joint solve's seed or the block's, apart
+  from every other stream, so a run reproduces and the gate holds with the flag off. Kept
+  loops keep the law's target; the anchor set, the densification and the orientation term
+  never read the draw. Measured before it was built: idea 43's 2D form puts the shared loops'
+  strength at +0.03 to +0.06 of the loops' +0.10 person specific part, which bounds what it
+  can carry. Unit checks in `harness/test_arcs_solver.py`.
+
+  Why not in the reference: the reference solves every arc in every structure.
+
+- **Transcription factories: `[factories] weight`, default 0, with `radius` and
+  `[data] anchor_activity`, under measurement since 2026-09-23.**
+  ([mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py) `factory_energy_grad`,
+  [mc/jax/arcs_energy.py](gnome3d/mc/jax/arcs_energy.py) `DeviceFactoryEnergy`,
+  [pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `calc_anchor_activity`)
+  RNAPOL2 loops enter as pairwise springs like CTCF's, with no many body form. With the
+  weight above zero each anchor carries an activity, the largest value of the track's
+  intervals overlapping it, a broadPeak's signal or a bedGraph's value, and an active anchor
+  is pulled toward the active anchors near it through `w a_i (log(1 + A) - log(1 + S_i))`
+  with `S_i = sum_j a_j exp(-d_ij / r)` and `A` the total activity: a bead gains from joining
+  one group and little from a second, and the term is never below zero, which the Metropolis
+  rule needs. It is in the solver's energy on both backends, the gradient built in two passes
+  since an anchor's move changes every group it is in; the annealers refuse it rather than
+  ignore it, since the term needs a group sum kept per anchor that the local scorer does not
+  have. Weight zero is byte exact. Unit checks in `harness/test_arcs_solver.py`.
+
+  Why not in the reference: the reference has pairwise arc springs and nothing collective.
+
 - **Arcs confinement radius from the law: `[confinement] packing_factor_arcs = 0`, default 1.5.**
   ([pipeline/ib/arcs.py](gnome3d/pipeline/ib/arcs.py) `settings_for_block`,
   [polymer.py](gnome3d/polymer.py) `radius_of_gyration`, `confinement_radius`)

@@ -29,6 +29,7 @@ from gnome3d import log
 from gnome3d.io import (
     compartment_from_label,
     filter_singletons,
+    load_activity,
     load_anchors,
     load_arcs,
     load_breakpoints,
@@ -78,6 +79,8 @@ class ContactData:
     # Epigenomic track driving the opt-in compartment energy term.  Empty when
     # no track is configured, which leaves the term inert.
     compartments: CompartmentMap = field(default_factory=empty_compartment_map)
+    # The anchor activity track for the factory term, empty when none is configured.
+    activity: SignalMap = field(default_factory=empty_signal_map)
 
     @classmethod
     def from_files(
@@ -150,6 +153,11 @@ class ContactData:
             LOG.info("load compartments")
             compartments = load_compartments(s.data_path(s.data_compartments), chr_set, region)
 
+        activity: SignalMap = {}
+        if s.data_anchor_activity:
+            LOG.info("load anchor activity")
+            activity = load_activity(s.data_path(s.data_anchor_activity), chr_set, region)
+
         phasing: SignalMap = {}
         if s.data_phasing_track:
             LOG.info("load phasing track")
@@ -167,6 +175,7 @@ class ContactData:
             arc_fits=arc_fits,
             long_arcs=long_arcs,
             compartments=compartments,
+            activity=activity,
         )
 
     @classmethod
