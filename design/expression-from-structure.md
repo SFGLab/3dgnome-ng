@@ -541,6 +541,7 @@ than over, a small number worth one look in the genome arms.
 - 2026-09-20. Idea 5 done: out of fold, the 3D block adds -0.01 to +0.01 beyond the input and +0.00 to +0.03 beyond linear, in every person. `playground/trio_rnapol2/model/`.
 - 2026-09-20. Idea 6 done in the same model with the silent genes kept: every fit up a few hundredths, the gain of 3D unchanged.
 - 2026-09-21. Summary section written; ideas 19 and 20 are the next arm, one eden array.
+- 2026-09-23. Both arms submitted by the user: the loop dropout arm job 1809806, `out/trio_rnapol2_hgsvc_ld1`, and the factory arm job 1809813, `out/trio_rnapol2_hgsvc_fac1`; the follow up is chained on the laptop, `ld1_arm.sh` and `fac1_arm.sh` on the workstation.
 - 2026-09-23. Ideas 33 and 35 built as `[springs] loop_dropout` and `[factories]`, opt in, byte exact off, tests and docs; arms `_ld1` and `_fac1` await the sbatch.
 - 2026-09-23. Idea 48 resolved on GM19238 and GM19239 with the independent Pol II ChIP-seq of GSE47991, hg18 lifted: the structure reads the independent occupancy at +0.42 to +0.50 where it reads expression at +0.46; the +0.53 was the library.
 - 2026-09-23. Idea 49 done: coverage as activity lifts the linear person specific signal to +0.114 from +0.084, the 3D forms trail it, no out of fold gain.
