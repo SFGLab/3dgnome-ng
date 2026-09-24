@@ -11,6 +11,13 @@
 #
 #   CONFIG_TAG=_trio_rnapol2 OUT=out/trio_rnapol2 CHROMS=chr1 sbatch --array=0-8%12 ...
 #
+# A chr1 arm on the GPU solver takes under two hours a task and fits the short partition, whose
+# nodes are the same and whose queue the long one waits behind. The partition, the time and the
+# CPU count are overridden on the command line, since the arcs solve runs on the device there
+# and needs few CPUs:
+#
+#   ... sbatch -p short -t 03:00:00 --cpus-per-task=8 --array=0-8%9 slurm/ensemble/trio_ensemble.sh
+#
 # One array task is one chromosome by one sample by a block of PER_TASK conformations. The
 # chromosome is the slowest varying dimension, so the first 9*CHUNKS tasks cover one chromosome
 # across every sample. That ordering is deliberate: a trio comparison on that chromosome becomes
