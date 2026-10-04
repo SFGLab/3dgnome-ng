@@ -14,7 +14,8 @@ Anchors. The distinct anchor intervals of the loops, as on the cell lines and th
 orientation column comes from a scan of the JASPAR MA0139.1 CTCF matrix over the mm10 sequence
 of the chromosomes being modelled. An anchor takes the strand of its best scoring hit, and N
 where nothing scores above the threshold or the chromosome was not scanned. The strand to
-letter mapping is the one trio_orient recovered from the GM12878 anchors, plus is R and minus
+letter mapping is the one the trio loaders, now in the triosformer project, recovered from the
+GM12878 anchors, plus is R and minus
 is L.
 
 The motif term treats N as R rather than as absent, so a chromosome that was not scanned must

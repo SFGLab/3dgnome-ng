@@ -42,6 +42,8 @@ class Settings:
     data_dir: str
     data_anchors: str
     data_pet_clusters: str
+    data_factors: str
+    factor_strength: str
     data_singletons: str
     data_singletons_inter: str
     data_centromeres: str
@@ -49,6 +51,7 @@ class Settings:
     ib_refine_scope: str
     data_compartments: str
     data_phasing_track: str
+    data_anchor_activity: str
 
     # ---- template ----
 
@@ -92,7 +95,12 @@ class Settings:
     spring_squeeze: float
     spring_angular: float
     spring_stretch_arcs: float
+    arc_weight_exponent: float
     background_weight: float
+    loop_dropout: bool
+    loop_dropout_scale: float
+    factory_weight: float
+    factory_radius: float
     background_range_bp: int
     spring_squeeze_arcs: float
     use_contact_background: bool
@@ -102,6 +110,13 @@ class Settings:
     steps_lvl2: int
     steps_arcs: int
     steps_smooth: int
+    # Smooth stage levers against within block overlaps, all off by default.
+    smooth_hard_wall: bool
+    smooth_anchor_cap: float
+    smooth_start: str
+    smooth_prefetch: int
+    smooth_jax_grid: bool
+    smooth_jax_grid_min_beads: int
 
     # ---- noise coefficients ----
     noise_lvl1: float
@@ -321,6 +336,7 @@ class Settings:
     polymer: PolymerLaw | None
     arcs_solver: str
     arcs_solver_iters: int
+    arcs_solver_tol: float
     arcs_start: str
     arcs_scope: str
     mc_stop_ratio_arcs: float
@@ -346,6 +362,10 @@ class Settings:
         self.data_dir = ""
         self.data_anchors = ""
         self.data_pet_clusters = ""
+        self.data_factors = ""  # one name per cluster file, comma separated; CTCF when empty
+        self.factor_strength = (
+            ""  # per factor multiplier on loop strength, comma separated; 1 each when empty
+        )
         self.data_singletons = ""
         self.data_singletons_inter = ""
         self.data_centromeres = ""
@@ -360,6 +380,9 @@ class Settings:
         self.ib_refine_scope = "segment"
         self.data_compartments = ""
         self.data_phasing_track = ""
+        # A BED with a signal column, a broadPeak or a bedGraph, giving each anchor the
+        # activity the factory term of [factories] reads; empty leaves the term inert.
+        self.data_anchor_activity = ""
 
         # ---- motif orientation ----
         self.use_ctcf_motif = False
@@ -402,6 +425,17 @@ class Settings:
         self.spring_squeeze = 0.1
         self.spring_angular = 0.1
         self.spring_stretch_arcs = 1.0
+        # Each loop's spring scaled by its strength to this power, so a strong loop wins the
+        # competitions a weak one loses. Zero is every loop at the same spring, byte exact.
+        self.arc_weight_exponent = 0.0
+        # Each conformation keeps a loop with probability q / (q + scale), q the law's
+        # strength, so the ensemble mean carries the loop's frequency. Off keeps every loop.
+        self.loop_dropout = False
+        self.loop_dropout_scale = 1.0
+        # The factory term: active anchors attract as a group with a saturating collective
+        # energy, weight zero off, radius in beads.
+        self.factory_weight = 0.0
+        self.factory_radius = 2.0
         # A weak spring holding an arcless anchor pair inside `background_range_bp` at the
         # background for its separation, in the arcs stage, beside the repulsion that every
         # other arcless pair keeps. Zero is off. The all pairs version lost the battery because a
@@ -428,6 +462,12 @@ class Settings:
         self.noise_lvl1 = 1.0
         self.noise_lvl2 = 0.1
         self.noise_smooth = 0.5
+        self.smooth_hard_wall = False  # reject a move that adds or deepens a pair under the radius
+        self.smooth_anchor_cap = 0.0  # anchors may move this many mean bonds from the arcs position
+        self.smooth_start = "line"  # line | coil, where a gap's subanchors start
+        self.smooth_prefetch = 1  # proposals one JAX step evaluates at once, first accepted kept
+        self.smooth_jax_grid = False  # excluded volume on a cell grid in the JAX kernel
+        self.smooth_jax_grid_min_beads = 4096  # the grid only pays above this many beads
 
         # ---- MC heatmap ----
         self.max_temp_heatmap = 20.0
@@ -642,6 +682,10 @@ class Settings:
         self.polymer = None
         self.arcs_solver = "mc"
         self.arcs_solver_iters = 200
+        # The solve's stop rule. A positive value stops it when the energy's relative
+        # improvement in an iteration falls under it, and the iteration count is then a
+        # safety cap; at zero the cap alone stops it.
+        self.arcs_solver_tol = 0.0
         # Where a block's anchors start. centroid is every anchor at the block centroid; walk is
         # a random walk at the law's distance per gap. Under measurement.
         self.arcs_start = "centroid"
@@ -756,6 +800,8 @@ class Settings:
         self.data_dir = gets("data", "data_dir", self.data_dir)
         self.data_anchors = gets("data", "anchors", self.data_anchors)
         self.data_pet_clusters = gets("data", "clusters", self.data_pet_clusters)
+        self.data_factors = gets("data", "factors", self.data_factors)
+        self.factor_strength = gets("springs", "factor_strength", self.factor_strength)
         self.data_singletons = gets("data", "singletons", self.data_singletons)
         self.data_singletons_inter = gets("data", "singletons_inter", self.data_singletons_inter)
         self.data_centromeres = gets("data", "centromeres", self.data_centromeres)
@@ -763,6 +809,7 @@ class Settings:
         self.ib_refine_scope = gets("simulation_ib", "refine_scope", self.ib_refine_scope)
         self.data_compartments = gets("data", "compartments", self.data_compartments)
         self.data_phasing_track = gets("data", "phasing_track", self.data_phasing_track)
+        self.data_anchor_activity = gets("data", "anchor_activity", self.data_anchor_activity)
 
         # [template]
 
@@ -776,6 +823,11 @@ class Settings:
 
         # [springs]
         self.spring_stretch = getf("springs", "stretch_constant", self.spring_stretch)
+        self.arc_weight_exponent = getf("springs", "arc_weight_exponent", self.arc_weight_exponent)
+        self.loop_dropout = getb("springs", "loop_dropout", self.loop_dropout)
+        self.loop_dropout_scale = getf("springs", "loop_dropout_scale", self.loop_dropout_scale)
+        self.factory_weight = getf("factories", "weight", self.factory_weight)
+        self.factory_radius = getf("factories", "radius", self.factory_radius)
         self.spring_squeeze = getf("springs", "squeeze_constant", self.spring_squeeze)
         self.spring_angular = getf("springs", "angular_constant", self.spring_angular)
         self.spring_stretch_arcs = getf(
@@ -1092,6 +1144,22 @@ class Settings:
         )
 
         # [simulation_arcs_smooth]
+        self.smooth_hard_wall = getb("simulation_arcs_smooth", "hard_wall", self.smooth_hard_wall)
+        self.smooth_anchor_cap = getf(
+            "simulation_arcs_smooth", "anchor_cap", self.smooth_anchor_cap
+        )
+        self.smooth_start = gets("simulation_arcs_smooth", "start", self.smooth_start)
+        self.smooth_prefetch = geti("simulation_arcs_smooth", "prefetch", self.smooth_prefetch)
+        if self.smooth_prefetch < 1:
+            raise ValueError("[simulation_arcs_smooth] prefetch must be at least 1")
+        self.smooth_jax_grid = getb("simulation_arcs_smooth", "jax_grid", self.smooth_jax_grid)
+        self.smooth_jax_grid_min_beads = geti(
+            "simulation_arcs_smooth", "jax_grid_min_beads", self.smooth_jax_grid_min_beads
+        )
+        if self.smooth_start not in ("line", "coil"):
+            raise ValueError(
+                f"[simulation_arcs_smooth] start must be line or coil, got {self.smooth_start!r}"
+            )
         self.smooth_dist_weight = getf(
             "simulation_arcs_smooth", "dist_weight", self.smooth_dist_weight
         )
@@ -1118,6 +1186,7 @@ class Settings:
         )
         self.arcs_solver = gets("simulation_arcs", "solver", self.arcs_solver)
         self.arcs_solver_iters = geti("simulation_arcs", "solver_iters", self.arcs_solver_iters)
+        self.arcs_solver_tol = getf("simulation_arcs", "solver_tol", self.arcs_solver_tol)
         self.arcs_start = gets("simulation_arcs", "start", self.arcs_start)
         self.arcs_scope = gets("simulation_arcs", "scope", self.arcs_scope)
         self.mc_stop_improvement_smooth = getf(
@@ -1181,13 +1250,34 @@ class Settings:
             )
         return self.polymer
 
+    def cluster_files(self) -> list[tuple[str, int, str]]:
+        """The cluster files as (path, factor index, factor name). `[data] clusters` holds one
+        or more paths, comma separated, and `factors` one name each; the first is the CTCF set,
+        which is the one the orientation term reads, so factor 0 is CTCF by convention."""
+        paths = [p.strip() for p in str(self.data_pet_clusters).split(",") if p.strip()]
+        names = [n.strip() for n in str(self.data_factors).split(",") if n.strip()]
+        if names and len(names) != len(paths):
+            raise ValueError(
+                f"[data] factors names {len(names)} sets for {len(paths)} cluster files"
+            )
+        if not names:
+            names = ["CTCF"] + [f"factor{i}" for i in range(1, len(paths))]
+        return [(self.data_path(p), i, names[i]) for i, p in enumerate(paths)]
+
+    def factor_strengths(self) -> dict[int, float]:
+        """The multiplier on loop strength per factor index from `[springs] factor_strength`,
+        one value per cluster file in order; a factor not named keeps 1."""
+        vals = [v.strip() for v in str(self.factor_strength).split(",") if v.strip()]
+        return {i: float(v) for i, v in enumerate(vals)}
+
     def genomic_length_to_distance(self, length_bp: int) -> float:
         """The distance two beads that far apart hold with nothing between them, in beads."""
         return self.polymer_law().background(length_bp)
 
-    def arc_expected_distance(self, score: int, sep_bp: int) -> float:
-        """The target for an arc of `score` PETs spanning `sep_bp`, in beads."""
-        return self.polymer_law().arc_distance(score, sep_bp)
+    def arc_expected_distance(self, score: int, sep_bp: int, factor: int = 0) -> float:
+        """The target for an arc of `score` PETs spanning `sep_bp`, in beads, the count read
+        against the strength fit of the arc's own factor."""
+        return self.polymer_law().arc_distance(score, sep_bp, factor)
 
     def data_path(self, filename: str) -> str:
         """Resolve a data filename relative to data_dir."""

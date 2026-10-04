@@ -78,6 +78,17 @@ def _resolve_strategy(value: str, kind: StageKind, settings: Settings) -> Execut
     return chosen
 
 
+def stage_strategy(settings: Settings, kind: StageKind) -> ExecutorStrategy:
+    """The strategy one stage runs under, from its `mc_executor_<stage>` value."""
+    value = {
+        StageKind.ARCS: settings.mc_executor_arcs,
+        StageKind.DENSIFY: settings.mc_executor_densify,
+        StageKind.ESTIMATE_DIST: settings.mc_executor_estimate_dist,
+        StageKind.SMOOTH: settings.mc_executor_smooth,
+    }[kind]
+    return _resolve_strategy(value, kind, settings)
+
+
 def pick_executor(settings: Settings) -> Executor:
     """Build the executor from the per-stage ``mc_executor_*`` settings.
 

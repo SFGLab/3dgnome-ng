@@ -77,6 +77,11 @@ def _relax_settings(s: Settings, bond: float) -> Settings:
     r.use_confinement = False
     r.use_compartments = False
     r.max_temp_smooth = float(s.max_temp_smooth) * float(s.relax_temp)
+    # The smooth stage's levers are its own. The pass pins anchors and starts from the chain
+    # as it is, and its wider radius is not the one the wall should act at.
+    r.smooth_hard_wall = False
+    r.smooth_anchor_cap = 0.0
+    r.smooth_start = "line"
     r.mc_smooth_chains = 1
     return r
 

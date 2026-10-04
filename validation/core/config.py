@@ -82,7 +82,8 @@ CANONICAL: dict[str, dict[str, object]] = {
         "ib_workers": "auto",
         "heatmap_chains": 1,
         "smooth_chains": 1,
-        # Arcs runs on the CPU, not the GPU, and it is the one stage where that is true.
+        # The arcs annealer ran on the CPU, not the GPU, and it was the one stage where that
+        # was true.
         # Measured on a genome scale trio run, where arcs is 89.6 percent of the wall: one
         # launch put 54 blocks together, 53 of them converged by round 2 and one needed 3,753,
         # and a vmapped launch cannot retire a converged chain, so all 54 ran 3,753 rounds.
@@ -91,7 +92,11 @@ CANONICAL: dict[str, dict[str, object]] = {
         # 2,048 anchors, which is a tight cache resident loop on a core at about 1.8 us and a
         # whole kernel dispatch on the device at 18.4 us measured. Smooth is the opposite shape,
         # eighty chains of 16,384 beads with similar convergence, and stays on the GPU.
-        "mc_executor_arcs": "threaded",
+        # With the solver, batch means its energy on the JAX device, one read of the target
+        # matrix per evaluation, which is what makes a chromosome solve cheap; the annealer's
+        # reasons above are for the vmapped kernel and do not apply. Measured 2026-09-20 on
+        # GM12878 chr1:1-60 Mb, three structures per arm, level with the CPU on every number.
+        "mc_executor_arcs": "batch",
         "mc_executor_densify": "threaded",
         "mc_executor_estimate_dist": "batch",
         "mc_executor_smooth": "batch",
@@ -124,9 +129,18 @@ CANONICAL: dict[str, dict[str, object]] = {
         # two arms agree on every quality number, Hi-C Pearson 0.403 against 0.405, distance
         # exponent 0.240 against 0.249, and the anchor overlap rate 89.2 against 89.1 per
         # thousand beads. The stage's two calls went from 492s to 6s and from 500s to 23s, and
-        # the whole run from 1h57m to 1h13m. The batch executor has no solver in it, so this
-        # needs mc_executor_arcs serial or threaded, which is what it is set to above.
+        # the whole run from 1h57m to 1h13m. Where the energy is evaluated follows
+        # mc_executor_arcs.
         "solver": "lbfgs",
+        # The solve stops on the energy, not on a count. Traced on a trio chromosome of
+        # 23,080 anchors to 8,000 iterations, the relative improvement per iteration falls to
+        # 1e-5 by 830 and to 1e-6 by 2,400 and then sits near 1e-6 with no plateau, a long
+        # tail; the energy at 800 is 1.7 percent above the value at 8,000 and at 2,400 under
+        # one percent. The tolerance leaves the tail there and the count is a safety, which
+        # the tail never reaches. Adopted 2026-09-22, the triosformer project's tracker,
+        # idea 32. The 800 cap before it bound on every chromosome solve.
+        "solver_tol": 1e-6,
+        "solver_iters": 5000,
         # Solve every anchor of a chromosome together, from the block layout, each block's
         # anchors on a walk at the law's distance per gap. Three cell gate on chr1:1-60 Mb
         # against the deep maps, 2026-09-10: Pearson 0.271/0.282/0.301 to 0.291/0.318/0.304,
@@ -160,6 +174,17 @@ CANONICAL: dict[str, dict[str, object]] = {
         "stop_condition_improvement_threshold": 0.999,
         "stop_condition_successes_threshold": 50,
         "stop_condition_steps": 50000,
+        # Each gap's subanchors start on a compact random bridge between its anchors instead of
+        # the straight line, and a move that adds a non neighbour pair under the excluded
+        # volume radius, or deepens one, is rejected. Together, on three cells, they raised
+        # Pearson 0.011 to 0.022 and MultiMM's metric 0.033 to 0.043 and cut overlaps five to
+        # seven times within blocks at the same Rg. The cap on anchor moves added nothing
+        # beyond them and stays off. Production since 2026-09-12.
+        "start": "coil",
+        "hard_wall": "yes",
+        "prefetch": 32,  # 32 proposals per JAX step; 3.4x on 60 Mb blocks, level on every measure
+        "jax_grid": "yes",  # excluded volume on a cell grid in the JAX kernel; 116 s to ~50 s on 60 Mb
+        "anchor_cap": 0.0,
     },
     "excluded_volume": {
         "use_excluded_volume": "yes",
@@ -170,6 +195,11 @@ CANONICAL: dict[str, dict[str, object]] = {
         # overlaps further but cost more Rg. Earlier weights of 1.0 to 2.0 over-expanded. The old
         # explosion was a config divergence bug, not EV. See [[project_config_unification]].
         "weight": 0.1,
+        # 0.7 of a bond. A radius of one bond was gated on 2026-09-11 and reverted the same
+        # day: it clears the within block overlaps but pushes every pair under a bond outward,
+        # contacts included, and costs Pearson 0.015, SCC 0.02 to 0.03 and the distance
+        # exponent 0.045 on all three cells. The overlaps are addressed by the coil start and
+        # the hard wall instead, which act on the pairs inside the radius only.
         "auto_factor_smooth": 0.7,
         "apply_to_heatmap": "yes",
         "apply_to_arcs": "yes",
@@ -199,11 +229,13 @@ CANONICAL: dict[str, dict[str, object]] = {
         "apply_to_ib": "yes",
         "packing_factor_ib": 0.75,
     },
-    "boundary_stitch": {"use_boundary_stitch": "yes"},
+    # Both end passes are off at chromosome scope, measured null on Hi-C and the stitch a tenth
+    # of Rg on 2026-09-19; at block scope they are what places one block against the next.
+    "boundary_stitch": {"use_boundary_stitch": "no"},
     # Excluded volume across blocks, so the stitched globules cannot interpenetrate. Without it
     # nothing acts between the beads of two blocks once the stitch has moved them together.
     "relax": {
-        "use_cross_block_relax": "yes",
+        "use_cross_block_relax": "no",
         # Only the beads touching another block move, plus one chain neighbour either side.
         # With every subanchor movable the pass took an hour and fifty five minutes per
         # structure on a trio chr1 whatever the workload, and the last trio array timed out at

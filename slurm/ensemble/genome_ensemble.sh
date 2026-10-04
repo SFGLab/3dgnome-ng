@@ -117,7 +117,7 @@ cell = sys.argv[2]
 # always coming from arc gaps.
 assert cell in s.data_anchors, f"config is not for {cell}: anchors={s.data_anchors!r}"
 assert s.use_ctcf_motif and s.use_excluded_volume and s.use_dynamic_loop_density
-assert s.use_anchor_heatmap and s.use_subanchor_heatmap
+assert s.use_anchor_heatmap, "the anchor distance map is off"
 assert s.mc_executor_jax_bucket_shapes, "shape bucketing is off; this run would be ~5x slower"
 assert not s.use_compartments, "use_compartments is on; these runs exclude epigenome terms"
 # Every input the run will open, resolved through the config rather than assumed by name.

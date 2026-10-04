@@ -38,6 +38,38 @@ LOG = log.get("mc.jax")
 _kernel_cache: dict[Any, Any] = {}
 
 
+GRID_BUCKETS: tuple[int, ...] = (8, 16, 24, 32, 48)
+
+
+def _grid_static(structs: list[tuple[np.ndarray[Any, Any], float]]) -> tuple[int, int]:
+    """Cells per axis and beads per cell for a launch, from its starting structures.
+
+    The grid is bucketed so a launch's compiled shape depends on the coarse size of what it
+    holds and not on every structure's extent. Cells are at least `r0` wide, wider when the
+    structure does not fit 48 cells across at that width; a finer axis was measured slower,
+    since the rebuild writes the whole table. A finished chromosome holds about one bead per
+    cell at `r0` and never more than a handful, so the capacity is twice the fullest starting
+    cell plus four, rounded up to four. A cell filling past it later is not detected inside
+    the kernel.
+    """
+    g_all = 0
+    cap = 0
+    for pos, r0 in structs:
+        if pos.shape[0] == 0:
+            continue
+        ext = float(np.max(pos.max(axis=0) - pos.min(axis=0)))
+        need = int(np.ceil(ext / max(r0, 1e-6))) + 3
+        g = next((b for b in GRID_BUCKETS if b >= need), GRID_BUCKETS[-1])
+        w = max(r0, ext / (g - 2)) * (1.0 + 1e-5)
+        lo = pos.min(axis=0) - w
+        c = np.clip(np.floor((pos - lo) / w).astype(np.int64), 0, g - 1)
+        lin = (c[:, 0] * g + c[:, 1]) * g + c[:, 2]
+        occ = int(np.bincount(lin).max())
+        g_all = max(g_all, g)
+        cap = max(cap, 2 * occ + 4)
+    return g_all, int(np.ceil(cap / 4.0) * 4)
+
+
 def _build_smooth_kernel(
     n_steps_per_batch: int,
     excl_skip: int,
@@ -45,8 +77,32 @@ def _build_smooth_kernel(
     use_orn: bool,
     max_nbrs: int,
     use_aff: bool = False,
+    use_wall: bool = False,
+    use_cap: bool = False,
+    prefetch: int = 1,
+    grid_g: int = 0,
+    grid_cap: int = 0,
 ) -> Any:
     """Build (or look up cached) compiled smooth-MC kernel.
+
+    `grid_g` above zero puts the excluded volume and the wall on a cell grid of that many cells
+    per axis, each cell holding up to `grid_cap` beads, so a proposal visits the 27 cells
+    around it instead of every bead. The grid is built once per batch from the positions and
+    kept exact by relinking the bead an accepted move carries into another cell. Both are
+    static because they are array shapes; `_grid_static` picks them from the launch.
+
+    `prefetch` is how many proposals one step evaluates against the current state at once.
+    Above 1 the step keeps the first proposal in draw order that passes the Metropolis test
+    and the hard rules and discards the rest, so every applied move is a Metropolis move from
+    the state it was drawn on and the chain has the law of the serial one. The step costs
+    about one serial step on a latency bound device, so where acceptance is rare it advances
+    the chain by close to `prefetch` steps. At 1 the body is the serial one.
+
+    `use_wall` and `use_cap` are the smooth stage's hard rules, static like `use_aff` because
+    each costs a pass per step. The wall rejects a move that adds a non neighbour pair under
+    the excluded volume radius or deepens one that is there. The cap rejects a move that takes
+    a capped bead further than `cap_r` from `cap_home`. Neither draws a random number, so with
+    both off the kernel is the one it was.
 
     Returns (kernel, init_smooth, init_excl, init_heat, init_orn) - the four
     init functions compute initial scores on-device, vmapped across K chains.
@@ -66,7 +122,19 @@ def _build_smooth_kernel(
     incur per-shape compile cost (cached persistently via
     jax.experimental.compilation_cache).
     """
-    cache_key = (n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs, use_aff)
+    cache_key = (
+        n_steps_per_batch,
+        excl_skip,
+        use_heat,
+        use_orn,
+        max_nbrs,
+        use_aff,
+        use_wall,
+        use_cap,
+        int(prefetch),
+        int(grid_g),
+        int(grid_cap),
+    )
     if cache_key in _kernel_cache:
         return _kernel_cache[cache_key]
 
@@ -155,6 +223,109 @@ def _build_smooth_kernel(
         # n_active == n, so this is a no-op.
         in_range = jnp.logical_and(jnp.abs(idx - p) > excl_skip, idx < n_active)
         return jnp.sum(jnp.where(in_range, contrib, 0.0))
+
+    def _wall_at(pos: Any, p_pos: Any, p: Any, r0: Any, n_active: Any) -> tuple[Any, Any]:
+        """How many non neighbour beads sit under `r0` from `p_pos`, and by how much."""
+        n = pos.shape[0]
+        diff = pos - p_pos
+        d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
+        idx = jnp.arange(n)
+        in_range = jnp.logical_and(jnp.abs(idx - p) > excl_skip, idx < n_active)
+        under = jnp.logical_and(in_range, d < r0)
+        cnt = jnp.sum(under.astype(jnp.int32))
+        depth = jnp.sum(jnp.where(under, r0 - d, 0.0))
+        return cnt, depth
+
+    # ---- the cell grid ----
+    #
+    # Cells are `w` wide, at least `r0`, so the 27 cells around a point hold every bead within
+    # `r0` of it. Beads outside the box are clamped into the edge cells, and a query's cell is
+    # clamped the same way, so a pair under `r0` still lands in adjacent cells. Row `C` holds
+    # the pad beads and is never queried; row `C + 1` is empty and is what an out of range
+    # neighbour cell points at.
+    #
+    # The table is never written between rebuilds. A bead an accepted move carries away is
+    # flagged and listed instead, and a query takes flagged beads from the list at their
+    # current position and skips them in the cells, so the sum stays exact. The table is
+    # rebuilt every `grid_period` batches, which bounds the list. A per move write into the
+    # table would be a batched scatter under the chain vmap, which XLA does out of place and
+    # which copied the whole table every step.
+    n_cells = int(grid_g) ** 3
+    grid_period = max(1, 2048 // max(int(prefetch), 1)) if grid_g > 0 else 1
+    offs27 = jnp.asarray(
+        [[a, b, c] for a in (-1, 0, 1) for b in (-1, 0, 1) for c in (-1, 0, 1)], dtype=jnp.int32
+    )
+
+    def _cell_of(x: Any, lo3: Any, w: Any) -> Any:
+        c3 = jnp.clip(jnp.floor((x - lo3) / w).astype(jnp.int32), 0, grid_g - 1)
+        return (c3[..., 0] * grid_g + c3[..., 1]) * grid_g + c3[..., 2]
+
+    def _grid_build(pos: Any, n_active: Any, r0: Any) -> tuple[Any, ...]:
+        n = pos.shape[0]
+        valid = jnp.arange(n) < n_active
+        big = jnp.float32(3e38)
+        lo3 = jnp.min(jnp.where(valid[:, None], pos, big), axis=0)
+        hi3 = jnp.max(jnp.where(valid[:, None], pos, -big), axis=0)
+        extent = jnp.max(hi3 - lo3)
+        w = jnp.maximum(r0, extent / (grid_g - 2)) * (1.0 + 1e-5)
+        lo3 = lo3 - w
+        cid = jnp.where(valid, _cell_of(pos, lo3, w), n_cells)
+        order = jnp.argsort(cid)
+        sc = cid[order]
+        first = jnp.searchsorted(sc, sc, side="left")
+        rank_c = jnp.minimum(jnp.arange(n) - first, grid_cap - 1)
+        cell_beads = jnp.full((n_cells + 2, grid_cap), -1, dtype=jnp.int32)
+        cell_beads = cell_beads.at[sc, rank_c].set(order.astype(jnp.int32))
+        moved = jnp.full((grid_period,), -1, dtype=jnp.int32)
+        flag = jnp.zeros((n,), dtype=jnp.bool_)
+        return cell_beads, lo3, w, moved, flag
+
+    def _grid_candidates(grid: Any, x: Any) -> tuple[Any, Any]:
+        cell_beads, lo3, w, moved, _flag = grid
+        c3 = jnp.clip(jnp.floor((x - lo3) / w).astype(jnp.int32), 0, grid_g - 1)
+        nb = c3[None, :] + offs27
+        inr = jnp.all(jnp.logical_and(nb >= 0, nb < grid_g), axis=1)
+        lin = (nb[:, 0] * grid_g + nb[:, 1]) * grid_g + nb[:, 2]
+        lin = jnp.where(inr, lin, n_cells + 1)
+        return cell_beads[lin].reshape(-1), moved
+
+    def _grid_pairs(pos: Any, p_pos: Any, p: Any, n_active: Any, grid: Any) -> tuple[Any, Any]:
+        """Candidate distances from `p_pos` and which of them count."""
+        flag = grid[4]
+        idx_c, idx_m = _grid_candidates(grid, p_pos)
+        idx = jnp.concatenate([idx_c, idx_m])
+        idx_i = jnp.maximum(idx, 0)
+        listed = jnp.concatenate(
+            [jnp.logical_not(flag[jnp.maximum(idx_c, 0)]), jnp.ones(idx_m.shape, dtype=jnp.bool_)]
+        )
+        ok = jnp.logical_and(
+            jnp.logical_and(idx >= 0, listed),
+            jnp.logical_and(idx < n_active, jnp.abs(idx - p) > excl_skip),
+        )
+        diff = pos[idx_i] - p_pos
+        return jnp.sqrt(jnp.sum(diff * diff, axis=1)), ok
+
+    def _local_excl_grid(
+        pos: Any, p_pos: Any, p: Any, r0: Any, weight: Any, n_active: Any, grid: Any
+    ) -> Any:
+        d, ok = _grid_pairs(pos, p_pos, p, n_active, grid)
+        rel = jnp.maximum(0.0, (r0 - d) / r0)
+        return jnp.sum(jnp.where(ok, weight * rel * rel, 0.0))
+
+    def _wall_grid(
+        pos: Any, p_pos: Any, p: Any, r0: Any, n_active: Any, grid: Any
+    ) -> tuple[Any, Any]:
+        d, ok = _grid_pairs(pos, p_pos, p, n_active, grid)
+        under = jnp.logical_and(ok, d < r0)
+        return jnp.sum(under.astype(jnp.int32)), jnp.sum(jnp.where(under, r0 - d, 0.0))
+
+    def _grid_note(grid: Any, p: Any, ok: Any, slot: Any) -> tuple[Any, ...]:
+        """Record that bead `p` moved in this period's slot, once per bead per period."""
+        cell_beads, lo3, w, moved, flag = grid
+        first_time = jnp.logical_and(ok, jnp.logical_not(flag[p]))
+        moved = moved.at[slot].set(jnp.where(first_time, p, moved[slot]))
+        flag = flag.at[p].set(jnp.logical_or(flag[p], ok))
+        return cell_beads, lo3, w, moved, flag
 
     # ---- confinement helper ----
     #
@@ -262,16 +433,27 @@ def _build_smooth_kernel(
         nbr_valid: Any,
         motif_weight: Any,
         symmetric: Any,
+        a_vec: Any = None,
     ) -> Any:
         """Local orientation score for anchor k, summed over its (padded)
-        neighbors.  Mirrors gnome3d.mc._local_score_orientation_nb."""
+        neighbors.  Mirrors gnome3d.mc._local_score_orientation_nb.
+
+        `a_vec` stands in for anchor k's own vector when given. A trial move changes that
+        vector alone, so the trial score reads the neighbours from the array as it is and
+        never writes a copy of it. Written as a copy, `anchor_orn.at[k].set(trial)` under the
+        proposal vmap became a broadcast of the whole array to one copy per proposal, 82 MB
+        a batch on a chromosome, and was half of every batch's time."""
         # nbr_idx[k, :] are the neighbor anchor indices (max_nbrs wide, padded
         # with 0 + nbr_valid=False).  nbr_w[k, :] are the per-edge weights.
         neighbors_k = nbr_idx[k]  # (max_nbrs,)
         weights_k = nbr_w[k]  # (max_nbrs,)
         valid_k = nbr_valid[k]  # (max_nbrs,)
-        a = anchor_orn[k]  # (3,)
+        a = anchor_orn[k] if a_vec is None else a_vec  # (3,)
         b = anchor_orn[neighbors_k]  # (max_nbrs, 3)
+        if a_vec is not None:
+            # A loop whose two ends map to one anchor lists k as its own neighbour, and the
+            # copy would have shown the trial vector there too.
+            b = jnp.where((neighbors_k == k)[:, None], a[None, :], b)
         b_signed = jnp.where(symmetric, b, -b)
         dot = jnp.sum(a[None, :] * b_signed, axis=1)  # (max_nbrs,)
         ang = 1.0 - (dot + 1.0) * 0.5
@@ -330,32 +512,34 @@ def _build_smooth_kernel(
         # real bead count + real movable count (< padded lengths when bucketed)
         n_active: Any,
         n_movable_active: Any,
+        cap_home: Any,
+        cap_r: Any,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         """One batch of `n_steps_per_batch` MC steps for ONE chain.  Returns
         (pos_f, ss_f, se_f, sh_f, so_f, sc_f, anchor_orn_f, T_f, n_ok)."""
+
         # `movable` is padded to the bucket; n_movable_active is the real count so
         # the sampler only draws real movable beads (no-op when unbucketed).
-        k_p, k_d, k_a = jax.random.split(key, 3)
-        idx_picks = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_movable_active)
-        ps = movable[idx_picks]
-        disps = jax.random.uniform(
-            k_d,
-            (n_steps_per_batch, 3),
-            minval=-step_size,
-            maxval=step_size,
-            dtype=pos0.dtype,
-        )
-        accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
-
-        def body(i: Any, carry: Any) -> Any:
-            pos, ss, se, sh, so, sc, anchor_orn, T, n_ok = carry
-            p = ps[i]
-            delta = disps[i]
-            u = accs[i]
-
+        def evaluate(
+            pos: Any,
+            ss: Any,
+            se: Any,
+            sh: Any,
+            so: Any,
+            sc: Any,
+            anchor_orn: Any,
+            T: Any,
+            p: Any,
+            disp: Any,
+            u: Any,
+            grid: Any = None,
+        ) -> tuple[Any, ...]:
+            """One proposal against the state as it is. Returns whether it is accepted, the
+            bead's new position, the five scores it would leave, and for the orientation term
+            the anchor slot it rewrites and the vector it writes there."""  # fmt: skip
             score = ss + se + sh + so + sc
             old_p = pos[p]
-            new_p = old_p + delta
+            new_p = old_p + disp
 
             # ---- struct (chain bonds + angles) ----
             loc_s_prev = _local_smooth_at(
@@ -367,8 +551,12 @@ def _build_smooth_kernel(
             ss_new = ss + (loc_s_curr - loc_s_prev)
 
             # ---- excluded volume ----
-            loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w, n_active)
-            loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w, n_active)
+            if grid_g > 0:
+                loc_e_prev = _local_excl_grid(pos, old_p, p, r0, excl_w, n_active, grid)
+                loc_e_curr = _local_excl_grid(pos, new_p, p, r0, excl_w, n_active, grid)
+            else:
+                loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w, n_active)
+                loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w, n_active)
             if use_aff:
                 # Same counting convention as EV, so it rides the same accumulator.
                 loc_e_prev = loc_e_prev + _local_affinity_at(
@@ -394,12 +582,14 @@ def _build_smooth_kernel(
                     n_active,
                 )
             se_new = se + 2.0 * (loc_e_curr - loc_e_prev)
+            delta = (loc_s_curr - loc_s_prev) + 2.0 * (loc_e_curr - loc_e_prev)
 
             # ---- heat ----
             if use_heat:
                 loc_h_prev = _local_heat_at(pos, old_p, p, heat_dist, heat_weight)
                 loc_h_curr = _local_heat_at(pos, new_p, p, heat_dist, heat_weight)
                 sh_new = sh + 2.0 * (loc_h_curr - loc_h_prev)
+                delta = delta + 2.0 * (loc_h_curr - loc_h_prev)
             else:
                 sh_new = sh
 
@@ -426,24 +616,26 @@ def _build_smooth_kernel(
                 ar_p = anchor_ar[safe_k]
                 is_L_ar = is_L[ar_p]
                 new_orn_vec = _calc_orientation_at(pos, p, new_p, ar_p, is_L_ar)
-                # Update only that slot in anchor_orn (functional, single scatter)
-                anchor_orn_trial = anchor_orn.at[safe_k].set(new_orn_vec)
+                # Anchor k's neighbour list never holds k itself, so the trial score is the
+                # same sum with k's vector swapped, and the array is left untouched.
                 loc_o_curr_raw = _local_orientation_at(
-                    anchor_orn_trial,
+                    anchor_orn,
                     safe_k,
                     nbr_idx,
                     nbr_w,
                     nbr_valid,
                     motif_weight,
                     symmetric,
+                    a_vec=new_orn_vec,
                 )
                 loc_o_curr = jnp.where(has_orn, loc_o_curr_raw, 0.0)
                 so_new = so + 2.0 * (loc_o_curr - loc_o_prev)
+                delta = delta + 2.0 * (loc_o_curr - loc_o_prev)
             else:
-                anchor_orn_trial = anchor_orn
                 so_new = so
-                has_orn = False
+                has_orn = jnp.bool_(False)
                 safe_k = jnp.int32(0)
+                new_orn_vec = jnp.zeros((3,), dtype=pos.dtype)
 
             # ---- confinement (per-bead, single-counted, delta factor 1) ----
             # When conf_w == 0 the entire contribution folds to zero; XLA
@@ -451,28 +643,60 @@ def _build_smooth_kernel(
             loc_c_prev = _local_confine_at(old_p, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
             loc_c_curr = _local_confine_at(new_p, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
             sc_new = sc + (loc_c_curr - loc_c_prev)
+            delta = delta + (loc_c_curr - loc_c_prev)
 
-            score_new = ss_new + se_new + sh_new + so_new + sc_new
-
-            ok_unc = score_new < score  # smooth uses STRICT less-than
+            # Accept on the summed local delta, not on the difference of two running totals.
+            # The totals are float32 and on a large block with the orientation term at its
+            # production weight they are large enough that one unit in the last place exceeds
+            # the gain of resolving a shallow overlap, so a move that lowered the energy read as
+            # no change and was refused. The delta is a sum of local terms and stays at the
+            # scale of the change. The totals are still carried for the Metropolis ratio and
+            # the plateau test, where a unit in the last place does not matter.
+            score_new = score + delta
+            ok_unc = delta < 0.0  # smooth uses STRICT less-than
             can_jump = jnp.logical_and(T > 0, score > 0)
             exponent = -jc * (score_new / jnp.maximum(score, 1e-30)) / jnp.maximum(T, 1e-30)
             exponent = jnp.clip(exponent, -80.0, 80.0)
             p_acc = js * jnp.exp(exponent)
             ok = jnp.logical_or(ok_unc, jnp.logical_and(can_jump, u < p_acc))
+            # The hard rules, decided on the same draw so the stream is untouched.
+            if use_cap:
+                hd = new_p - cap_home[p]
+                cap_reject = jnp.logical_and(cap_r[p] > 0.0, jnp.sum(hd * hd) > cap_r[p] * cap_r[p])
+                ok = jnp.logical_and(ok, jnp.logical_not(cap_reject))
+            if use_wall:
+                if grid_g > 0:
+                    cnt0, dep0 = _wall_grid(pos, old_p, p, r0, n_active, grid)
+                    cnt1, dep1 = _wall_grid(pos, new_p, p, r0, n_active, grid)
+                else:
+                    cnt0, dep0 = _wall_at(pos, old_p, p, r0, n_active)
+                    cnt1, dep1 = _wall_at(pos, new_p, p, r0, n_active)
+                worse = jnp.logical_or(
+                    cnt1 > cnt0,
+                    jnp.logical_and(jnp.logical_and(cnt1 == cnt0, cnt1 > 0), dep1 > dep0),
+                )
+                ok = jnp.logical_and(ok, jnp.logical_not(worse))
 
-            final_p = jnp.where(ok, new_p, old_p)
-            pos_next = pos.at[p].set(final_p)
+            return ok, new_p, ss_new, se_new, sh_new, so_new, sc_new, has_orn, safe_k, new_orn_vec
+
+        def apply(
+            carry: Any, p: Any, ok: Any, res: tuple[Any, ...], T_next: Any, slot: Any = 0
+        ) -> Any:
+            (pos, ss, se, sh, so, sc, anchor_orn, _T, n_ok), grid = carry
+            _ok, new_p, ss_new, se_new, sh_new, so_new, sc_new, has_orn, safe_k, new_orn_vec = res
+            pos_next = pos.at[p].set(jnp.where(ok, new_p, pos[p]))
+            if grid_g > 0:
+                grid = _grid_note(grid, p, ok, slot)
             ss_next = jnp.where(ok, ss_new, ss)
             se_next = jnp.where(ok, se_new, se)
             sh_next = jnp.where(ok, sh_new, sh)
             so_next = jnp.where(ok, so_new, so)
             sc_next = jnp.where(ok, sc_new, sc)
             if use_orn:
-                # Accept = keep anchor_orn_trial; reject = keep anchor_orn.
-                # We only modified anchor_orn[safe_k], so equivalently:
-                #   anchor_orn_next = anchor_orn_trial if ok else anchor_orn
-                anchor_orn_next = jnp.where(ok, anchor_orn_trial, anchor_orn)
+                write = jnp.logical_and(ok, has_orn)
+                anchor_orn_next = anchor_orn.at[safe_k].set(
+                    jnp.where(write, new_orn_vec, anchor_orn[safe_k])
+                )
             else:
                 anchor_orn_next = anchor_orn
             n_ok_next = n_ok + jnp.where(ok, 1, 0)
@@ -484,12 +708,122 @@ def _build_smooth_kernel(
                 so_next,
                 sc_next,
                 anchor_orn_next,
-                T * dt,
+                T_next,
                 n_ok_next,
-            )
+            ), grid
 
-        init = (pos0, ss0, se0, sh0, so0, sc0, anchor_orn0, T0_, jnp.int32(0))
-        return jax.lax.fori_loop(0, n_steps_per_batch, body, init)
+        init = ((pos0, ss0, se0, sh0, so0, sc0, anchor_orn0, T0_, jnp.int32(0)), None)
+        if prefetch <= 1:
+            k_p, k_d, k_a = jax.random.split(key, 3)
+            idx_picks = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_movable_active)
+            ps = movable[idx_picks]
+            disps = jax.random.uniform(
+                k_d,
+                (n_steps_per_batch, 3),
+                minval=-step_size,
+                maxval=step_size,
+                dtype=pos0.dtype,
+            )
+            accs = jax.random.uniform(k_a, (n_steps_per_batch,), dtype=pos0.dtype)
+
+            if grid_g == 0:
+
+                def body(i: Any, carry: Any) -> Any:
+                    (pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok), grid = carry
+                    p = ps[i]
+                    res = evaluate(
+                        pos, ss, se, sh, so, sc, anchor_orn, T, p, disps[i], accs[i], grid
+                    )
+                    return apply(carry, p, res[0], res, T * dt)
+
+                return jax.lax.fori_loop(0, n_steps_per_batch, body, init)[0]
+
+            # With the grid the steps run in periods, the table rebuilt at the start of each.
+            n_periods = -(-n_steps_per_batch // grid_period)
+
+            def period(q: Any, state: Any) -> Any:
+                pos_q = state[0]
+                grid_q = _grid_build(pos_q, n_active, r0)
+
+                def step(r: Any, carry: Any) -> Any:
+                    (pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok), grid = carry
+                    i = q * grid_period + r
+                    live = i < n_steps_per_batch
+                    ii = jnp.minimum(i, n_steps_per_batch - 1)
+                    p = ps[ii]
+                    res = evaluate(
+                        pos, ss, se, sh, so, sc, anchor_orn, T, p, disps[ii], accs[ii], grid
+                    )
+                    ok = jnp.logical_and(res[0], live)
+                    return apply(carry, p, ok, res, jnp.where(live, T * dt, T), r)
+
+                out, _g = jax.lax.fori_loop(0, grid_period, step, (state, grid_q))
+                return out
+
+            return jax.lax.fori_loop(0, n_periods, period, init[0])
+
+        # `prefetch` proposals against one state, each on its own rung of the temperature
+        # ladder. The first accepted in draw order is applied and the proposals up to it are
+        # what the batch consumed; the rest are discarded and drawn afresh, so a round still
+        # delivers `n_steps_per_batch` serial steps and loses nothing where acceptance is high.
+        eval_many = jax.vmap(evaluate, in_axes=(None,) * 7 + (0, 0, 0, 0, None))
+        ladder = dt ** jnp.arange(prefetch, dtype=pos0.dtype)
+
+        def cond_many(state: Any) -> Any:
+            return state[1] < n_steps_per_batch
+
+        def batch(b: Any, carry: Any, slot: Any) -> tuple[Any, Any]:
+            (pos, ss, se, sh, so, sc, anchor_orn, T, _n_ok), grid = carry
+            kb_p, kb_d, kb_a = jax.random.split(jax.random.fold_in(key, b), 3)
+            pk = movable[jax.random.randint(kb_p, (prefetch,), 0, n_movable_active)]
+            dk = jax.random.uniform(
+                kb_d, (prefetch, 3), minval=-step_size, maxval=step_size, dtype=pos0.dtype
+            )
+            uk = jax.random.uniform(kb_a, (prefetch,), dtype=pos0.dtype)
+            res = eval_many(pos, ss, se, sh, so, sc, anchor_orn, T * ladder, pk, dk, uk, grid)
+            ok_v = res[0]
+            any_ok = jnp.any(ok_v)
+            j = jnp.argmax(ok_v)
+            used = jnp.where(any_ok, j + 1, prefetch)
+
+            def at_j(a: Any) -> Any:
+                return a[j]
+
+            pick = jax.tree_util.tree_map(at_j, res)
+            return apply(carry, pk[j], any_ok, pick, T * (dt**used), slot), used
+
+        if grid_g == 0:
+
+            def body_many(state: Any) -> Any:
+                carry, consumed, b = state
+                carry, used = batch(b, carry, 0)
+                return carry, consumed + used, b + 1
+
+            final, _consumed, _b = jax.lax.while_loop(
+                cond_many, body_many, (init, jnp.int32(0), jnp.int32(0))
+            )
+            return final[0]
+
+        # With the grid the batches run in periods of `grid_period`, the table rebuilt at the
+        # start of each, so a round may overshoot its step count by less than one period.
+        def body_period(state: Any) -> Any:
+            carry, consumed, b = state
+            grid_q = _grid_build(carry[0][0], n_active, r0)
+
+            def one(r: Any, st: Any) -> Any:
+                c, used_sum = st
+                c, used = batch(b + r, c, r)
+                return c, used_sum + used
+
+            (carry, used_sum) = jax.lax.fori_loop(
+                0, grid_period, one, ((carry[0], grid_q), jnp.int32(0))
+            )
+            return (carry[0], None), consumed + used_sum, b + grid_period
+
+        final, _consumed, _b = jax.lax.while_loop(
+            cond_many, body_period, (init, jnp.int32(0), jnp.int32(0))
+        )
+        return final[0]
 
     # vmap over K chains; problem data and schedule are shared (None).
     # Per-chain: pos, all 5 scores, anchor_orn, key.  T is shared (deterministic).
@@ -501,7 +835,7 @@ def _build_smooth_kernel(
         0,
         0,  # pos, ss, se, sh, so, sc
         0,  # anchor_orn
-        None,  # T0
+        0,  # T0, per chain since a prefetching batch cools by what it consumed
         None,
         None,  # dtn, movable
         None,  # heat_dist
@@ -538,8 +872,10 @@ def _build_smooth_kernel(
         0,  # key
         None,  # n_active (shared)
         None,  # n_movable_active (shared)
+        None,  # cap_home (shared across restarts)
+        None,  # cap_r (shared)
     )
-    out_axes = (0, 0, 0, 0, 0, 0, 0, None, 0)
+    out_axes = (0, 0, 0, 0, 0, 0, 0, 0, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
 
     @jax.jit
@@ -588,6 +924,8 @@ def _build_smooth_kernel(
         keys: Any,
         n_active: Any,
         n_movable_active: Any,
+        cap_home: Any,
+        cap_r: Any,
     ) -> Any:
         return batched(
             pos_k,
@@ -634,6 +972,8 @@ def _build_smooth_kernel(
             keys,
             n_active,
             n_movable_active,
+            cap_home,
+            cap_r,
         )
 
     # ---- full convergence loop, on device ----
@@ -699,6 +1039,8 @@ def _build_smooth_kernel(
         score_eps: Any,
         n_active: Any,
         n_movable_active: Any,
+        cap_home: Any,
+        cap_r: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -756,6 +1098,8 @@ def _build_smooth_kernel(
                 keys,
                 n_active,
                 n_movable_active,
+                cap_home,
+                cap_r,
             )
             score_per_chain = ss + se + sh + so + sc
             best_idx = jnp.argmin(score_per_chain)
@@ -779,7 +1123,7 @@ def _build_smooth_kernel(
             so_k,
             sc_k,
             anchor_orn_k,
-            T_init,
+            jnp.full((K,), T_init, dtype=jnp.float32),
             jnp.float32(1e30),  # ms_score
             jnp.int32(0),  # iter_i
             jnp.int32(0),  # n_ok_best (filler)
@@ -994,6 +1338,23 @@ def _build_smooth_kernel(
             in_axes=(0, None, None, None, None, None),
         )
     )
+    # The same initialisers over K chains that each carry their own problem data, so a launch
+    # scores its chains in one call. Each chain's scan is the single chain's, run side by side.
+    # Called one chain at a time on a chromosome these took a minute a structure, each call a
+    # scan of B rows with a host sync between chains.
+    init_k = {
+        "smooth": jax.jit(jax.vmap(_init_smooth_single, in_axes=(0, 0, 0, 0, 0, None, None, 0))),
+        "excl": jax.jit(jax.vmap(_init_excl_single, in_axes=(0, 0, None, 0))),
+        "affinity": jax.jit(
+            jax.vmap(_init_affinity_single, in_axes=(0, 0, 0, None, None, None, 0))
+        ),
+        "heat": jax.jit(jax.vmap(_init_heat_single, in_axes=(0, 0, None))),
+        "confine": jax.jit(jax.vmap(_init_confine_single, in_axes=(0, 0, 0, 0, 0, 0, 0))),
+        "anchor_orn": jax.jit(jax.vmap(_init_anchor_orientations_single, in_axes=(0, 0, 0))),
+        "orn_score": jax.jit(
+            jax.vmap(_init_orientation_score_single, in_axes=(0, 0, 0, 0, None, None))
+        ),
+    }
 
     # ---- multi-problem variant: K DIFFERENT IBs in one kernel ----
     #
@@ -1022,7 +1383,7 @@ def _build_smooth_kernel(
         0,
         0,  # pos, ss, se, sh, so, sc  (per-chain)
         0,  # anchor_orn (per-chain)
-        None,  # T0 (shared schedule start)
+        0,  # T0, per chain
         0,
         0,  # dtn, movable (per-IB)
         0,  # heat_dist (per-IB)
@@ -1059,6 +1420,8 @@ def _build_smooth_kernel(
         0,  # keys (per-chain)
         0,  # n_active (per-IB)
         0,  # n_movable_active (per-IB)
+        0,  # cap_home (per-IB)
+        0,  # cap_r (per-IB)
     )
     batched_mp = jax.vmap(chain_batch, in_axes=in_axes_mp, out_axes=out_axes)
 
@@ -1112,6 +1475,8 @@ def _build_smooth_kernel(
         score_eps: Any,
         n_active: Any,
         n_movable_active: Any,
+        cap_home: Any,
+        cap_r: Any,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -1181,6 +1546,8 @@ def _build_smooth_kernel(
                 keys,
                 n_active,
                 n_movable_active,
+                cap_home,
+                cap_r,
             )
             # A converged chain keeps its previous state while the rest of the launch runs on,
             # so it ends where it would have ended alone.  The loop still evaluates it, which
@@ -1212,7 +1579,7 @@ def _build_smooth_kernel(
             so_k,
             sc_k,
             anchor_orn_k,
-            T_init,
+            jnp.full((K,), T_init, dtype=jnp.float32),
             jnp.full((K,), 1e30, dtype=jnp.float32),  # ms_score per-chain
             jnp.int32(0),  # iter_i
             jnp.zeros((K,), dtype=jnp.int32),  # n_ok (filler)
@@ -1246,6 +1613,7 @@ def _build_smooth_kernel(
         init_orn_score,
         kernel_full_mp,  # region-batched (K different IBs); per-chain convergence
         init_affinity,
+        init_k,
     )
     _kernel_cache[cache_key] = bundle
     return bundle
@@ -1291,7 +1659,15 @@ def mc_smooth_jax(
     if n <= 2:
         return 0.0
 
-    movable_np: I64Array = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    use_wall: bool = bool(getattr(settings, "smooth_hard_wall", False))
+    cap_frac: float = float(getattr(settings, "smooth_anchor_cap", 0.0))
+    use_cap: bool = cap_frac > 0.0
+    prefetch: int = max(1, int(getattr(settings, "smooth_prefetch", 1)))
+    movable_np: I64Array = (
+        np.arange(n, dtype=np.int64)
+        if use_cap
+        else np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    )
     if len(movable_np) == 0:
         return 0.0
 
@@ -1461,9 +1837,17 @@ def mc_smooth_jax(
             [movable_np, np.zeros(B - movable_np.shape[0], dtype=movable_np.dtype)]
         )
 
+    grid_g, grid_cap = 0, 0
+    if (
+        bool(getattr(settings, "smooth_jax_grid", False))
+        and use_excl
+        and B >= int(getattr(settings, "smooth_jax_grid_min_beads", 4096))
+    ):
+        grid_g, grid_cap = _grid_static([(pos_f32, excl_r0)])
     bundle = _build_smooth_kernel(
-        n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs, use_aff
-    )
+        n_steps_per_batch, excl_skip, use_heat, use_orn, max_nbrs, use_aff, use_wall, use_cap,
+        prefetch, grid_g, grid_cap,
+    )  # fmt: skip
     (
         _kernel_one_batch,
         kernel_full,
@@ -1475,11 +1859,18 @@ def mc_smooth_jax(
         init_orn_score,
         _kernel_full_mp,  # region-batched entry uses this; single-problem path ignores it
         init_affinity,
+        _init_k,
     ) = bundle
 
     pos_k = jnp.asarray(pos_k_np)
     dtn_j = jnp.asarray(dtn_np)
     movable_j = jnp.asarray(movable_np)
+    # The cap's home is where the anchors stand now, which is where the arcs put them.
+    cap_r_np = np.zeros(pos_k_np.shape[1], dtype=np.float32)
+    if use_cap:
+        cap_r_np[:n] = np.where(fixed, cap_frac * float(dtn_np[:n].mean()), 0.0)
+    cap_home_j = jnp.asarray(pos_k_np[0])
+    cap_r_j = jnp.asarray(cap_r_np)
     heat_j = jnp.asarray(heat_np)
     anchor_ar_j = jnp.asarray(anchor_ar_np)
     bead_to_anchor_k_j = jnp.asarray(bead_to_anchor_k_np)
@@ -1654,6 +2045,8 @@ def mc_smooth_jax(
         score_eps,
         n_active_j,
         n_movable_active_j,
+        cap_home_j,
+        cap_r_j,
     )
 
     score_per_chain = np.asarray(ss_k + se_k + sh_k + so_k + sc_k)
@@ -1797,7 +2190,12 @@ def _prep_smooth_problem_np(
         is_L = np.zeros(n, dtype=np.bool_)
 
     # --- bead-indexed arrays, padded to B ---
-    movable = np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    cap_frac = float(getattr(settings, "smooth_anchor_cap", 0.0))
+    movable = (
+        np.arange(n, dtype=np.int64)
+        if cap_frac > 0.0
+        else np.ascontiguousarray(np.where(~fixed)[0], dtype=np.int64)
+    )
     n_movable = int(movable.shape[0])
     pos_pad = pos.astype(np.float32)
     dtn_pad = dtn.astype(np.float32)
@@ -1842,6 +2240,8 @@ def _prep_smooth_problem_np(
         "n_active": n,
         "n_movable": n_movable,
         "excl_r0": excl_r0,
+        "cap_home": pos_pad.copy(),  # (B, 3)
+        "cap_r": _cap_radii(fixed, dtn, cap_frac, B),  # (B,)
         # Pad entries are class 0, which contributes nothing.
         "comp_cls": _pad_track(compartment, B, np.int8),
         "conf_cx": conf_cx,
@@ -1850,6 +2250,18 @@ def _prep_smooth_problem_np(
         "conf_R": conf_R,
         "conf_w": conf_w,
     }
+
+
+def _cap_radii(
+    fixed: np.ndarray[Any, Any], dtn: np.ndarray[Any, Any], cap_frac: float, B: int
+) -> np.ndarray[Any, Any]:
+    """Per bead cap radius padded to B: `cap_frac` mean bonds for an anchor, zero otherwise."""
+    out = np.zeros(B, dtype=np.float32)
+    if cap_frac > 0.0:
+        n = int(fixed.shape[0])
+        scale = float(np.asarray(dtn).mean()) if np.asarray(dtn).size else 1.0
+        out[:n] = np.where(fixed, cap_frac * scale, 0.0)
+    return out
 
 
 def _smooth_tensor_bytes(B: int, A: int, M: int, use_heat: bool, use_orn: bool) -> int:
@@ -1868,6 +2280,8 @@ def _smooth_tensor_bytes(B: int, A: int, M: int, use_heat: bool, use_orn: bool) 
         + A_ * 3 * f4  # anchor_orn_k
         + B * f4  # dtn_k
         + B * i4  # movable_k
+        + B * 3 * f4  # cap_home
+        + B * f4  # cap_r
         + (B * B * f4 if use_heat else f4)  # heat_k
         + A_ * i4  # anchor_ar_k
         + B * i4  # bead_to_anchor_k
@@ -2038,6 +2452,9 @@ def _mc_smooth_jax_batch_chunk(
     # Uniform across the batch: SmoothStage.batch_key includes the track flag, so
     # every problem in a group agrees with problems[0].
     use_aff = problems[0].get("compartment") is not None and bool(settings.use_compartments)
+    use_wall = bool(getattr(settings, "smooth_hard_wall", False))
+    use_cap = float(getattr(settings, "smooth_anchor_cap", 0.0)) > 0.0
+    prefetch = max(1, int(getattr(settings, "smooth_prefetch", 1)))
 
     Bs, As, Ms = [], [], []
     for p in problems:
@@ -2092,6 +2509,8 @@ def _mc_smooth_jax_batch_chunk(
     comp_cls_k = stack("comp_cls")  # (K, B)
     dtn_k = stack("dtn")
     movable_k = stack("movable")
+    cap_home_k = stack("cap_home")
+    cap_r_k = stack("cap_r")
     heat_k = jnp.asarray(heat_all)  # already (K, B, B); prep wrote into it
     anchor_ar_k = stack("anchor_ar")
     b2a_k = stack("bead_to_anchor_k")
@@ -2139,18 +2558,34 @@ def _mc_smooth_jax_batch_chunk(
     motif_weight_v = float(settings.motif_weight) if use_orn else 0.0
     excl_w_v = float(settings.exclusion_weight) if use_excl else 0.0
 
-    bundle = _build_smooth_kernel(n_steps_per_batch, excl_skip, use_heat, use_orn, M, use_aff)
+    grid_g, grid_cap = 0, 0
+    if (
+        bool(getattr(settings, "smooth_jax_grid", False))
+        and use_excl
+        and B >= int(getattr(settings, "smooth_jax_grid_min_beads", 4096))
+    ):
+        grid_g, grid_cap = _grid_static(
+            [
+                (np.asarray(p["pos"], dtype=np.float32), float(pr["excl_r0"]))
+                for p, pr in zip(problems, preps, strict=True)
+            ]
+        )
+    bundle = _build_smooth_kernel(
+        n_steps_per_batch, excl_skip, use_heat, use_orn, M, use_aff, use_wall, use_cap, prefetch,
+        grid_g, grid_cap,
+    )  # fmt: skip
     (
         _kb,
         _kf,
-        init_smooth,
-        init_excl,
-        init_heat,
-        init_confine,
-        init_anchor_orn,
-        init_orn_score,
+        _init_smooth,
+        _init_excl,
+        _init_heat,
+        _init_confine,
+        _init_anchor_orn,
+        _init_orn_score,
         kernel_full_mp,
-        init_affinity,
+        _init_affinity,
+        init_k,
     ) = bundle
 
     # --- per-IB initial scores (one-shot; reuse the validated init helpers) ---
@@ -2158,53 +2593,36 @@ def _mc_smooth_jax_batch_chunk(
     ang_w = jnp.float32(settings.smooth_angle_weight)
     symmetric = jnp.bool_(bool(getattr(settings, "motifs_symmetric", True)))
 
-    def init_one(i: int) -> tuple[Any, Any, Any, Any, Any, Any]:
-        p1 = pos_k[i : i + 1]  # (1, B, 3)
-        na = jnp.int32(int(np.asarray(n_active_k[i])))
-        ss = init_smooth(p1, dtn_k[i], stretch_k[i], squeeze_k[i], ang_k[i], dist_w, ang_w, na)
-        se = (
-            init_excl(p1, excl_r0_k[i], jnp.float32(excl_w_v), na)
-            if use_excl
-            else jnp.zeros((1,), jnp.float32)
+    zeros_k = jnp.zeros((K,), jnp.float32)
+    ss_k = init_k["smooth"](pos_k, dtn_k, stretch_k, squeeze_k, ang_k, dist_w, ang_w, n_active_k)
+    se_k = (
+        init_k["excl"](pos_k, excl_r0_k, jnp.float32(excl_w_v), n_active_k) if use_excl else zeros_k
+    )
+    if use_aff:
+        # Rides the excluded-volume accumulator; same counting convention.
+        se_k = se_k + init_k["affinity"](
+            pos_k,
+            comp_cls_k,
+            comp_r0_k,
+            jnp.float32(comp_w_v),
+            jnp.float32(comp_ea_v),
+            jnp.float32(comp_eb_v),
+            n_active_k,
         )
-        if use_aff:
-            # Rides the excluded-volume accumulator; same counting convention.
-            se = se + init_affinity(
-                p1,
-                comp_cls_k[i],
-                comp_r0_k[i],
-                jnp.float32(comp_w_v),
-                jnp.float32(comp_ea_v),
-                jnp.float32(comp_eb_v),
-                na,
-            )
-        sh = (
-            init_heat(p1, heat_k[i], jnp.float32(heat_weight_v))
-            if use_heat
-            else jnp.zeros((1,), jnp.float32)
+    sh_k = init_k["heat"](pos_k, heat_k, jnp.float32(heat_weight_v)) if use_heat else zeros_k
+    sc_k = (
+        init_k["confine"](pos_k, conf_cx_k, conf_cy_k, conf_cz_k, conf_R_k, conf_w_k, n_active_k)
+        if use_conf
+        else zeros_k
+    )
+    if use_orn:
+        anchor_orn_k = init_k["anchor_orn"](pos_k, anchor_ar_k, is_L_k)
+        so_k = init_k["orn_score"](
+            anchor_orn_k, nbr_idx_k, nbr_w_k, nbr_valid_k, jnp.float32(motif_weight_v), symmetric
         )
-        sc = (
-            init_confine(p1, conf_cx_k[i], conf_cy_k[i], conf_cz_k[i], conf_R_k[i], conf_w_k[i], na)
-            if use_conf
-            else jnp.zeros((1,), jnp.float32)
-        )
-        if use_orn:
-            ao = init_anchor_orn(p1, anchor_ar_k[i], is_L_k[i])
-            so = init_orn_score(
-                ao, nbr_idx_k[i], nbr_w_k[i], nbr_valid_k[i], jnp.float32(motif_weight_v), symmetric
-            )
-        else:
-            ao = jnp.zeros((1, A, 3), jnp.float32)
-            so = jnp.zeros((1,), jnp.float32)
-        return ss, se, sh, so, sc, ao
-
-    inits = [init_one(i) for i in range(K)]
-    ss_k = jnp.concatenate([x[0] for x in inits])
-    se_k = jnp.concatenate([x[1] for x in inits])
-    sh_k = jnp.concatenate([x[2] for x in inits])
-    so_k = jnp.concatenate([x[3] for x in inits])
-    sc_k = jnp.concatenate([x[4] for x in inits])
-    anchor_orn_k = jnp.concatenate([x[5] for x in inits])
+    else:
+        anchor_orn_k = jnp.zeros((K, A, 3), jnp.float32)
+        so_k = zeros_k
 
     # Scope path distinguishes concurrent kernels; the node seed makes the draw
     # follow from Seeded.seed. Chains within a batch are separated by the kernel's
@@ -2278,6 +2696,8 @@ def _mc_smooth_jax_batch_chunk(
         jnp.float32(1e-6),
         n_active_k,
         n_movable_k,
+        cap_home_k,
+        cap_r_k,
     )
     pos_f, ss_f, se_f, sh_f, so_f, sc_f, _ao_f, _final_score, iter_count, converged = out
     score_per_chain = np.asarray(ss_f + se_f + sh_f + so_f + sc_f)  # forces device sync

@@ -9,17 +9,19 @@ contiguous / placeholder arrays the kernel's fixed signature expects.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, NamedTuple, cast
 
 import numpy as np
 
 from gnome3d import log
 from gnome3d.mc.numba.terms import (
+    NO_W,
     batch_mc_nb,
     init_affinity_nb,
     score_orientation_full_nb,
 )
-from gnome3d.types import BoolArray, F64Array, I8Array, I32Array, I64Array
+from gnome3d.types import BoolArray, F32Array, F64Array, I8Array, I32Array, I64Array
 
 LOG = log.get("mc.numba")
 
@@ -46,6 +48,7 @@ NO_I8: I8Array = np.zeros(1, dtype=np.int8)
 NO_F64: F64Array = np.zeros(1, dtype=np.float64)
 NO_MAT: F64Array = np.zeros((1, 1), dtype=np.float64)
 NO_F64_3: F64Array = np.zeros(3, dtype=np.float64)
+NO_F64_N3: F64Array = np.zeros((1, 3), dtype=np.float64)
 NO_I64_3: I64Array = np.ones(3, dtype=np.int64)
 NO_I32: I32Array = np.zeros(1, dtype=np.int32)
 
@@ -258,6 +261,13 @@ def run_outer_loop(
     cell_next: I32Array = NO_I32,
     cell_where: I32Array = NO_I32,
     cell_buf: I32Array = NO_I32,
+    use_wall: bool = False,
+    use_cap: bool = False,
+    cap_home: F64Array = NO_F64_N3,
+    cap_r: F64Array = NO_F64,
+    on_round: Callable[[F64Array], None] | None = None,
+    use_arc_w: bool = False,
+    arc_w: F32Array = NO_W,
 ) -> float:
     """Drive the unified kernel until convergence; return the final total score."""
     score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
@@ -339,10 +349,18 @@ def run_outer_loop(
             cell_next,
             cell_where,
             cell_buf,
+            use_wall,
+            use_cap,
+            cap_home,
+            cap_r,
+            use_arc_w,
+            arc_w,
         )
         score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
         step_i += stop_steps
         round_i += 1
+        if on_round is not None:
+            on_round(pw)
         ratio = score / ms_score if ms_score > 0 else 1.0
         converged = (
             (score > stop_improvement * ms_score and n_ok < stop_successes)

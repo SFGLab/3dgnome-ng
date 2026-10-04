@@ -96,6 +96,8 @@ class CoarseState:
     # Compartment track for the opt-in compartment term.  Empty when no track
     # is configured, which leaves the term inert.
     compartments: CompartmentMap = field(default_factory=empty_compartment_map)
+    # Anchor activity track for the factory term, empty when none is configured.
+    activity: SignalMap = field(default_factory=empty_signal_map)
 
 
 def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
@@ -135,6 +137,8 @@ def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
         s0_bp=int(settings.target_bp_per_subanchor),
         q_half=float(settings.contact_half_saturation),
         arcs=arcs,
+        arcs_by_factor=dict(data.arc_fits),
+        strength_by_factor=settings.factor_strengths(),
     )
 
 
@@ -171,6 +175,7 @@ def build_state(
         long_arcs=data.long_arcs,
         selected_region=region,
         compartments=data.compartments,
+        activity=data.activity,
     )
 
 
@@ -372,7 +377,9 @@ def add_long_pet_to_segment_heatmap(
         LOG.info("long-PET folded into segment heatmap: %d arcs", n_added)
 
 
-def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int, int]]) -> F64Array:
+def arc_expected_matrix(
+    s: Settings, mids: list[int], arcs: list[tuple[int, int, int] | tuple[int, int, int, int]]
+) -> F64Array:
     """The arc target matrix for one active region.
 
     An arc pair carries `Settings.arc_expected_distance` of its PET count and span, positive.
@@ -387,7 +394,7 @@ def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int,
     mids
         Genomic midpoint in bp per anchor, in active region order.
     arcs
-        (i, j, score) per arc in active region indices.
+        (i, j, score) or (i, j, score, factor) per arc in active region indices.
     """
     n = len(mids)
     mat: F64Array = np.full((n, n), -0.5, dtype=np.float64)
@@ -399,8 +406,10 @@ def arc_expected_matrix(s: Settings, mids: list[int], arcs: list[tuple[int, int,
         for i, j in zip(*np.nonzero((sep > 0.0) & (sep < rng)), strict=True):
             mat[i, j] = -law.background(int(sep[i, j]))
     np.fill_diagonal(mat, 0.0)
-    for i, j, score in arcs:
-        exp_d = s.arc_expected_distance(score, mids[j] - mids[i])
+    for arc in arcs:
+        i, j, score = arc[0], arc[1], arc[2]
+        factor = arc[3] if len(arc) > 3 else 0
+        exp_d = s.arc_expected_distance(score, mids[j] - mids[i], factor)
         mat[i, j] = exp_d
         mat[j, i] = exp_d
     return mat
@@ -456,14 +465,124 @@ def add_contact_background(
     return out
 
 
+def dropout_keep(
+    s: Settings,
+    mids: list[int],
+    arcs: list[tuple[int, int, int] | tuple[int, int, int, int]],
+    seed: int,
+) -> list[bool]:
+    """Which arcs one conformation keeps under `loop_dropout`: each with probability
+    `q / (q + loop_dropout_scale)`, `q` the law's strength, so a typical loop is in half the
+    conformations at scale one and a strong one in nearly all. The draw comes from a generator
+    seeded by the conformation, apart from every other stream, so a run reproduces and the
+    parity gate holds with the setting off.
+    """
+    law = s.polymer_law()
+    scale = max(float(s.loop_dropout_scale), 1e-9)
+    rng = np.random.default_rng((int(seed) * 0x9E3779B1 + 0x7F4A7C15) & 0xFFFFFFFF)
+    keep: list[bool] = []
+    for arc in arcs:
+        i, j, score = arc[0], arc[1], arc[2]
+        factor = arc[3] if len(arc) > 3 else 0
+        q = max(law.arc_strength(score, abs(mids[i] - mids[j]), factor), 0.0)
+        keep.append(bool(rng.random() < q / (q + scale)))
+    return keep
+
+
+def _active_arcs(
+    state: CoarseState, active_region: list[int], chr_: str, seed: int | None = None
+) -> tuple[list[int], list[tuple[int, int, int] | tuple[int, int, int, int]]]:
+    """The anchors' genomic midpoints and the arcs among them, in active region indices, each
+    arc once from its lower cluster. With `loop_dropout` on and a conformation `seed`, the arcs
+    that conformation drops are left out, so its pairs are arcless for it."""
+    clusters = state.clusters
+    cluster_to_active = {ci: ai for ai, ci in enumerate(active_region)}
+    chr_arcs = state.arcs.get(chr_, [])
+    arcs: list[tuple[int, int, int] | tuple[int, int, int, int]] = []
+    for ai, ci in enumerate(active_region):
+        for arc_local in clusters[ci].arcs:
+            if arc_local >= len(chr_arcs):
+                continue
+            arc = chr_arcs[arc_local]
+            other = arc.end if arc.start == ci else arc.start
+            if other < ci or other not in cluster_to_active:
+                continue
+            arcs.append((ai, cluster_to_active[other], int(arc.score), int(arc.factor)))
+    mids = [int(clusters[ci].genomic_pos) for ci in active_region]
+    if state.s.loop_dropout and seed is not None and arcs:
+        keep = dropout_keep(state.s, mids, arcs, seed)
+        arcs = [a for a, k in zip(arcs, keep, strict=True) if k]
+    return mids, arcs
+
+
+def arc_weight_matrix(
+    s: Settings, mids: list[int], arcs: list[tuple[int, int, int] | tuple[int, int, int, int]]
+) -> F32Array | None:
+    """Each arc pair's spring weight, its strength to `arc_weight_exponent`, one everywhere
+    else; None at exponent zero, which the kernels take as every pair at one."""
+    alpha = float(s.arc_weight_exponent)
+    if alpha <= 0.0:
+        return None
+    law = s.polymer_law()
+    n = len(mids)
+    w: F32Array = np.ones((n, n), dtype=np.float32)
+    for arc in arcs:
+        i, j, score = arc[0], arc[1], arc[2]
+        factor = arc[3] if len(arc) > 3 else 0
+        q = law.arc_strength(score, abs(mids[i] - mids[j]), factor)
+        w[i, j] = w[j, i] = max(q, 1e-6) ** alpha
+    return w
+
+
+def calc_anchor_arc_weights(
+    state: CoarseState, active_region: list[int], chr_: str, seed: int | None = None
+) -> F32Array | None:
+    """The spring weight matrix beside `calc_anchor_expected_distances`, on the same arcs."""
+    mids, arcs = _active_arcs(state, active_region, chr_, seed)
+    return arc_weight_matrix(state.s, mids, arcs)
+
+
+def calc_anchor_activity(
+    state: CoarseState, active_region: list[int], chr_: str
+) -> F32Array | None:
+    """Each anchor's activity for the factory term, the largest value of the track's intervals
+    overlapping the anchor and zero where none does, in active region order, scaled so the
+    active anchors average one, which gives `factory_weight` a scale a peak caller's signal
+    does not; None when the term is off or the chromosome has no track, which the kernels
+    take as no term."""
+    s = state.s
+    track = state.activity.get(chr_)
+    if float(s.factory_weight) <= 0.0 or not track:
+        return None
+    starts = np.array([iv.start for iv in track], dtype=np.int64)
+    ends = np.array([iv.end for iv in track], dtype=np.int64)
+    vals = np.array([iv.value for iv in track], dtype=np.float64)
+    end_max = np.maximum.accumulate(ends)
+    act = np.zeros(len(active_region), dtype=np.float32)
+    for k, ci in enumerate(active_region):
+        a, b = int(state.clusters[ci].start), int(state.clusters[ci].end)
+        lo = int(np.searchsorted(end_max, a))
+        hi = int(np.searchsorted(starts, b, side="right"))
+        if hi > lo:
+            m = (ends[lo:hi] >= a) & (starts[lo:hi] <= b)
+            if m.any():
+                act[k] = float(vals[lo:hi][m].max())
+    on = act > 0.0
+    if on.any():
+        act[on] /= float(act[on].mean())
+    return act
+
+
 def calc_anchor_expected_distances(
     state: CoarseState,
     active_region: list[int],
     chr_: str,
     anchor_heatmap: F64Array | None = None,
+    seed: int | None = None,
 ) -> F64Array:
     """
-    Build expected distance matrix for anchor-level active region.
+    Build expected distance matrix for anchor-level active region. `seed` names the
+    conformation for `loop_dropout`; without one every arc is kept.
     Mirrors Reference calcAnchorExpectedDistancesHeatmap().
 
     If anchor_heatmap (n x n) is provided and use_anchor_heatmap is True,
@@ -476,24 +595,8 @@ def calc_anchor_expected_distances(
       mat[i,j] > 0   -> expected distance from freqToDistance(score)
     """
     s = state.s
-    clusters = state.clusters
     n = len(active_region)
-    cluster_to_active = {ci: ai for ai, ci in enumerate(active_region)}
-    chr_arcs = state.arcs.get(chr_, [])
-
-    arcs: list[tuple[int, int, int]] = []
-    for ai, ci in enumerate(active_region):
-        for arc_local in clusters[ci].arcs:
-            if arc_local >= len(chr_arcs):
-                continue
-            arc = chr_arcs[arc_local]
-            other = arc.end if arc.start == ci else arc.start
-
-            if other < ci or other not in cluster_to_active:
-                continue
-
-            arcs.append((ai, cluster_to_active[other], int(arc.score)))
-    mids = [int(clusters[ci].genomic_pos) for ci in active_region]
+    mids, arcs = _active_arcs(state, active_region, chr_, seed)
     mat = arc_expected_matrix(s, mids, arcs)
 
     # Apply anchor heatmap: scale down expected distances for high-contact pairs.

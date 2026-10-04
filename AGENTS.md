@@ -455,6 +455,22 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
 ### Algorithm divergences
 
+- **Loops of more than one factor: `[data] clusters` takes several files, `[data] factors`
+  names them, the first is CTCF.** ([io.load_arcs](gnome3d/io.py),
+  [data.fit_arc_strengths](gnome3d/data.py), [polymer.PolymerLaw.arc_distance](gnome3d/polymer.py),
+  [skeleton.py](gnome3d/skeleton.py)) Every arc carries the index of its file. Each factor gets
+  its own strength fit, so a second library's PET counts are read against its own typical
+  count at each span rather than the first's, and the target matrix converts each arc under
+  its factor's fit. The orientation term reads factor 0's loops alone, since a loop held by
+  anything but CTCF has no motif orientation. One file keeps the arc order it was read in,
+  byte identical by the parity gate. Built 2026-09-19 for RNAPII ChIA-PET as a second factor,
+  `design/rnapii-loops.md`. Unit checks in `harness/test_factors.py`.
+
+  Why not in the reference: the reference declares `[data] factors` and, for an anchor pair
+  carried by more than one factor, writes a summary arc with `eff_score` zero
+  (`InteractionArcs.cpp:98-141`); it fits no strength per factor and its orientation term
+  reads every arc.
+
 - **IB placement scope: `[simulation_ib] refine_scope = segment | chromosome`, default `segment`.**
   `segment` is the prior behaviour: each segment's blocks are refined as a separate chain and any
   segment holding one block or fewer is skipped, so segment grouping decides which blocks get
@@ -655,6 +671,56 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   - **Per-shape XLA compile cost** (~1–60s per (N, K, n_anchors) combo) is paid once per machine via the persistent compile cache at `~/.cache/gnome3d/jax` (override with `GNOME3D_JAX_CACHE`).
   - **Convergence loop runs on-device** via `lax.while_loop` — one JAX call drives the full annealing, no Python sync between batches.
   - **Float32 throughout the JAX path** — bench showed f64 is 2× slower on consumer GPUs (1/32 throughput) with no quality benefit at production run lengths.
+  - **The smooth kernel accepts a move on the summed local delta, not on `score_new < score`
+    between two running totals.** On a whole chromosome block with the orientation term at its
+    production weight the float32 totals are large enough that one unit in the last place
+    exceeds the gain of resolving a shallow overlap, so such moves read as no change and were
+    refused, and the stage plateaued early: with the coil start and the wall the JAX executor
+    left 254 overlapping pairs per thousand beads on GM12878 chr1:1-60 Mb against 103 on numba,
+    the same profile scaled by 2.4, while the two kernels agreed on any block whose totals
+    stayed small. Deciding on the delta, 2026-09-12, brings JAX to 110 with numba's Hi-C. The
+    totals are still carried for the Metropolis ratio and the plateau test. The JAX parity dump
+    changed with it, by design.
+  - **The smooth kernel prefetches: `[simulation_arcs_smooth] prefetch`, default 1, production
+    32 since 2026-09-19.** Measured on GM12878 chr1:1-8 Mb, 93 percent of the stage's rounds
+    accept under one percent of their proposals, and a step on the GPU costs its latency
+    whatever the arithmetic. Above 1 a step evaluates that many proposals against the current
+    state in one vectorised pass, applies the first accepted in draw order, counts only the
+    proposals up to it as consumed and draws the rest afresh, so a round still delivers its
+    serial step count and every applied move is a Metropolis move from the state it was drawn
+    on; the chain has the serial law and the temperature is carried per chain. At 1 the body
+    and its draws are the serial ones, byte identical to before. Smooth wall on the RTX 4060 Ti:
+    chr1:1-8 Mb 57 s to 6 s at 32, chr1:1-60 Mb 420 s to 125 s at 32 and slower at 64, since
+    the kernel's full excluded volume scan is paid once per proposal. Three structures on 60 Mb
+    at 32 against 1: every battery number level, MultiMM 0.665 against 0.669. Numba ignores the
+    key. Unit checks in `harness/test_smooth_levers.py`, sweep in `slurm/ensemble/prefetch_sweep.sh`,
+    reading and numbers in `design/parallel-mc-and-nn-reading.md`.
+  - **The excluded volume and the wall run on a cell grid in the JAX kernel:
+    `[simulation_arcs_smooth] jax_grid`, default no, production yes since 2026-09-19, on
+    launches of `jax_grid_min_beads` (4096) beads or more.** Cells at least `r0` wide on up to
+    48 per axis, capacity twice the fullest starting cell plus four, a table rebuilt every
+    period of about 2,048 proposals and never written between rebuilds: a bead an accepted
+    move carries away is flagged and listed, and a query takes listed beads from the list at
+    their current position and skips them in the cells, so the sum is exact. Bit identical to
+    the full scan on the GPU. Smooth wall on GM12878 chr1:1-60 Mb at prefetch 32: 116 s to 47
+    to 85 s, three structures level with the full scan on every battery number. Two designs
+    lost on the way and are recorded in `design/parallel-mc-and-nn-reading.md`: a per move
+    relink is a batched scatter under the chain vmap that XLA does out of place and copied the
+    table every step, an hour where the scan took two minutes; a sorted order with a binary
+    search per cell was slower and a finer axis was slower, since the rebuild writes the table.
+    Past 32 proposals a batch gets slower, so the floor is now the number of kernel launches in
+    one step. The check needs a GPU, `harness/test_jax_grid.py`.
+  - **Two host and device costs the profile of 2026-09-20 removed, both byte identical by the
+    parity gate on GM12878 chr1:1-60 Mb.** The orientation term scored a trial move by writing
+    the anchor's new vector into a copy of the whole orientation array, and under the proposal
+    vmap XLA materialised that as a broadcast of the array to one copy per proposal, 82 MB a
+    batch on a chromosome and half of every batch's time; the trial score now takes the vector
+    as an argument and the array is never copied. And the launch's initial energies were
+    computed one chain at a time, each a scan of the chain's beads with a host sync between
+    chains, a minute a structure on a trio chromosome; they are one vectorised call per term
+    now. Kernel on chr1:1-60 Mb, 11 chains, 49.0 s to 35.5 s and the preparation before it 6 s
+    to 1 s on the RTX 4060 Ti. Numbers and the per batch composition in
+    `design/kernel-performance.md`.
   - **`cli.py` auto-forces `ib_workers=1` when `mc_backend=jax`** — multiple Python threads contending for a single GPU is net-negative; restarts go inside JAX via `mc_smooth_chains` (vmap), not via thread pools.
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
 
@@ -737,7 +803,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: 3dgnome is CPU-only and single-process.
 
-- **Boundary stitch: `[boundary_stitch] use_boundary_stitch = yes`, default no.**
+- **Boundary stitch: `[boundary_stitch] use_boundary_stitch = yes`, default no, production no since 2026-09-19.** Off at chromosome scope, kept for block scope, see the relaxation entry.
   ([gnome3d/pipeline/stitch.py](gnome3d/pipeline/stitch.py))
   The per block chains place anchors only through their own block, so the last anchor of one
   block and the first anchor of the next have no term coupling them. Measured on GM12878
@@ -841,6 +907,70 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Why not in the reference: the reference has the three laws and their constants. This is what
   they were standing in for.
 
+- **Loop stiffness by strength: `[springs] arc_weight_exponent`, default 0, measured
+  2026-09-22 and left at 0.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
+  `arc_weight_matrix`, [mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py),
+  [mc/jax/arcs_energy.py](gnome3d/mc/jax/arcs_energy.py), the arc terms of
+  [mc/numba/terms.py](gnome3d/mc/numba/terms.py))
+  Every loop pulls with the same spring and only its target differs, so once two targets sit
+  near one bead the stronger loop has nothing to win a competition with. Measured on the trio
+  chromosomes, the strongest third of loops is realised worst, at 0.35 to 0.49 against 0.7 to
+  0.8 for the rest, and the loss follows how many loops share an anchor. With the exponent
+  above zero each arc pair carries its strength to that power as a weight on its spring
+  constant, in the solver's energy on both backends and in the numba annealer's arc term; the
+  targets, the background springs and the repulsion never read it. The weight matrix rides
+  beside the target matrix as float32 and is None at zero, so the kernels take the path they
+  took. The JAX annealer does not carry it and refuses a weighted problem rather than ignore
+  the weights. Unit checks in `harness/test_arcs_solver.py`.
+
+  Measured at exponent 1 on the nine trio chr1 ensembles on the HGSVC map, ten conformations
+  each, against the same arm at zero: target against realised over all loops 0.55 to 0.67 from
+  0.54 to 0.66, within a span band up 0.01 to 0.06, the median realised over target 1.26 to 1.63
+  from 1.29 to 1.65, and the strongest third level at 0.33 to 0.49 from 0.35 to 0.49 while the
+  weak and middle thirds lose 0.005 to 0.02; every expression statistic level. A strong loop's
+  competition is with the background springs and the repulsion among its anchor's partners,
+  which the weight does not touch, so a stronger spring does not let a crowded loop close.
+  Numbers in the triosformer project's tracker, `design/expression-from-structure.md` there,
+  idea 37.
+
+  Why not in the reference: the reference has one spring constant per direction for every arc.
+
+- **Loop dropout per conformation: `[springs] loop_dropout`, default no, under measurement
+  since 2026-09-23.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
+  `dropout_keep`, `_active_arcs`)
+  A PET count is a frequency across cells, and every conformation of an ensemble solves the
+  same targets from a different start, so a loop's count reaches the ensemble only through
+  its target distance, which saturates. With the flag each conformation keeps a loop with
+  probability `q / (q + loop_dropout_scale)`, `q` the law's strength, and a dropped loop
+  leaves its pair arcless for that conformation, so the ensemble mean carries the loop's
+  frequency and a person's count of a shared loop reaches the mean structure. The draw comes
+  from a generator seeded by the conformation, the joint solve's seed or the block's, apart
+  from every other stream, so a run reproduces and the gate holds with the flag off. Kept
+  loops keep the law's target; the anchor set, the densification and the orientation term
+  never read the draw. Measured before it was built, triosformer's tracker idea 43: its 2D form puts the shared loops'
+  strength at +0.03 to +0.06 of the loops' +0.10 person specific part, which bounds what it
+  can carry. Unit checks in `harness/test_arcs_solver.py`.
+
+  Why not in the reference: the reference solves every arc in every structure.
+
+- **Transcription factories: `[factories] weight`, default 0, with `radius` and
+  `[data] anchor_activity`, under measurement since 2026-09-23.**
+  ([mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py) `factory_energy_grad`,
+  [mc/jax/arcs_energy.py](gnome3d/mc/jax/arcs_energy.py) `DeviceFactoryEnergy`,
+  [pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `calc_anchor_activity`)
+  RNAPOL2 loops enter as pairwise springs like CTCF's, with no many body form. With the
+  weight above zero each anchor carries an activity, the largest value of the track's
+  intervals overlapping it, a broadPeak's signal or a bedGraph's value, and an active anchor
+  is pulled toward the active anchors near it through `w a_i (log(1 + A) - log(1 + S_i))`
+  with `S_i = sum_j a_j exp(-d_ij / r)` and `A` the total activity: a bead gains from joining
+  one group and little from a second, and the term is never below zero, which the Metropolis
+  rule needs. It is in the solver's energy on both backends, the gradient built in two passes
+  since an anchor's move changes every group it is in; the annealers refuse it rather than
+  ignore it, since the term needs a group sum kept per anchor that the local scorer does not
+  have. Weight zero is byte exact. Unit checks in `harness/test_arcs_solver.py`.
+
+  Why not in the reference: the reference has pairwise arc springs and nothing collective.
+
 - **Arcs confinement radius from the law: `[confinement] packing_factor_arcs = 0`, default 1.5.**
   ([pipeline/ib/arcs.py](gnome3d/pipeline/ib/arcs.py) `settings_for_block`,
   [polymer.py](gnome3d/polymer.py) `radius_of_gyration`, `confinement_radius`)
@@ -906,6 +1036,23 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   25 kb pixels, so even a dense map reaches only about 4 percent of the far pairs through
   the singletons; a denser anchor level map is a data path change and is not built.
 
+  **Tried and dropped, 2026-09-19: the map itself as the background's source.** The run's
+  singletons are thinned 230 fold and binned to anchors that hold few bin centres, so they hold
+  no pair beyond 100 kb, while the raw 25 kb map has 70 million contacts in GM12878 chr1:1-60 Mb
+  and a quarter of the 0.5 to 2 Mb anchor pairs and a tenth of the 2 to 10 Mb pairs three
+  Poisson standard deviations over the expectation at their separation. Reading each pair's
+  pixel from the mcool and holding the significant ones at the law's contact distance was
+  measured over fourteen arms, thresholds 2 to 12 sigma, pooled and not, symmetric with pairs
+  under expected held out, at a tenth to full pull, and across blocks only: SCC 0.374 to 0.39
+  or 0.40 and Pearson 0.312 to up to 0.346, the first compartment eigenvector correlation of
+  ours above 0.1, and on every arm Rg down 15 to 20 percent, within block overlaps two to four
+  times and cross block four to eight times production, the saddle down. A held pair can only
+  pull in, since beyond a few megabases the expectation is under a count and nothing is ever
+  significantly below it; the within block pairs carry the correlation and the across block
+  pairs the shrinkage, and weakening the pull loses both together. Removed the same day.
+  Tables in `design/validation-2026-09.md`; `playground/far_pairs_from_map.py` measures what a
+  map holds.
+
   Why not in the reference: the reference scales arc targets by the anchor heatmap and has no
   term on an arcless pair beyond its 1/d.
 
@@ -921,7 +1068,13 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: the reference has no block layout pass at all.
 
-- **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no.**
+- **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no, production no since 2026-09-19.**
+  Both end passes were measured at chromosome scope on GM12878 chr1:1-60 Mb, three structures
+  per arm: Hi-C level on all four arms, the joint solve already holding boundary pairs at a
+  median of 1.03 times the curve and none over 2.34, the stitch adding a tenth of Rg through its
+  centroid excluded volume and 17 cross block overlaps per thousand that the relaxation then
+  removed. Both are kept, off, because a chromosome too large for one joint solve is solved by
+  block, and there they are what places one block against the next. `design/validation-2026-09.md`.
   ([gnome3d/pipeline/relax.py](gnome3d/pipeline/relax.py))
   The smooth stage's excluded volume acts within one block and the stitch guards block
   centroids only, so once blocks are stitched together nothing acts between their beads and two
@@ -988,6 +1141,38 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   `mc_executor_arcs = serial` or `threaded`, which is what `CANONICAL` sets. Unit checks in
   `harness/test_arcs_solver.py`.
 
+  **The solver's energy on the device: `mc_executor_arcs = batch` with the solver, production
+  since 2026-09-20 with `solver_iters` 800.** ([gnome3d/mc/jax/arcs_energy.py](gnome3d/mc/jax/arcs_energy.py))
+  The executor setting decides where every stage runs and `batch` means JAX, so the solver
+  follows it: under `batch` each block is solved in turn with its energy on the device, on its
+  own settings and from its own start, and under `serial` or `threaded` on the CPU. At
+  chromosome scope the solve was most of a conformation's wall and ran on the CPU while the
+  GPU idled: every pair of the chromosome visited against a dense target, up to 450 ms an
+  evaluation on a trio chromosome, and the 200 iteration cap binding on every solve, which
+  the solver's log line now reports. The device evaluates the same energy term for term in row
+  chunks in float32, the rows summed in float64 on the host, so an evaluation costs one read
+  of the target matrix; L-BFGS-B stays on the host. The energy and gradient agree with the
+  numba kernel to about 1e-6 relative on a block carrying every kind of pair, and a solve on
+  either side reaches the same energy; the two are not byte identical, since the summation
+  order differs. On the RTX 4060 Ti, GM12878 chr1, 9,195 anchors: 200 iterations 31.6 s on
+  the CPU to 4.8 s, 800 iterations 104.8 s to 13.4 s at energy 6274 against 6266, and a whole
+  conformation 419 s to 144 s with the cap at 800. Three structures on chr1:1-60 Mb, CPU at
+  200 against device at 200 and at 800: Pearson 0.312, 0.311, 0.312, SCC 0.374, 0.366,
+  0.366, MultiMM 0.666, 0.663, 0.665, Rg 23.4, 23.3, 23.2, anchor overlaps 2.8, 2.7, 2.5 per
+  thousand; the saddle 1.31, 1.38, 1.00 on three structures, which is noise at that count.
+  Float64 on the device would need JAX's 64 bit mode, which is process wide and changes the
+  smooth kernel's integer draws and its loop carries, so it is not used. Unit checks in
+  `harness/test_arcs_solver.py`.
+
+  **The solve stops on the energy: `[simulation_arcs] solver_tol`, default 0, production 1e-6
+  with `solver_iters` 5000 as the safety, since 2026-09-22.** The cap bound on every trio
+  chromosome at 800 and at 3,000. Traced to 8,000 iterations on a chromosome of 23,080 anchors,
+  the relative improvement per iteration falls to 1e-5 by 830 and to 1e-6 by 2,400 and then
+  sits near 1e-6 with no plateau; the energy at 800 is 1.7 percent above the value at 8,000, at
+  2,400 under one percent. The tolerance is L-BFGS-B's own `ftol`, so at zero the options are
+  unchanged and the parity gate holds. `GNOME3D_ARCS_TRACE` names a file that receives every
+  evaluation's energy, which is how the value was chosen, `playground/trace_analysis.py`.
+
   The annealer is kept by decision, 2026-09-06, not as a leftover. The solver's justification
   is a funnel landscape measured on a few real blocks. A dataset or an energy change that
   breaks that assumption has the annealer to fall back on, and the annealer is the reference's
@@ -1033,7 +1218,51 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   term at 0.5 on top the saddle rises on H1ESC 1.02 to 2.15 and HFFC6 0.71 to 1.09, not on
   GM12878, and SCC and MultiMM fall 0.07 to 0.10 on every cell, so the term stays opt in.
 
+  **Tried and dropped, 2026-09-19: the loops beyond `max_pet_length` in the joint solve.**
+  The loader sets those loops aside for the segment heatmap, a block scope rule, and at
+  chromosome scope they could join the target matrix as arcs between the anchors holding
+  their ends, 984 loops over 1 Mb on GM12878 chr1. Measured on chr1:1-60 Mb, three
+  structures: Pearson 0.312 to 0.305, SCC 0.374 to 0.360, MultiMM 0.666 to 0.630, Rg 23.4 to
+  19.4, cross block overlaps 20 to 47 per thousand. The arc law sets a loop's target by its
+  PET count alone, so a 3 to 5 PET loop spanning megabases is asked to close to a bead or two
+  and compacts the chromosome. Removed the same day; a span aware target would be option D
+  of `design/anchor-placement.md` again.
+
   Why not in the reference: the reference solves every block alone.
+
+- **Three smooth stage levers against within block overlaps: `[simulation_arcs_smooth]
+  hard_wall` (default no, production yes), `anchor_cap` (0) and `start` (default line,
+  production coil). The wall and the coil start are production since 2026-09-12.**
+  ([gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py) `batch_mc_nb`,
+  [gnome3d/pipeline/ib/start.py](gnome3d/pipeline/ib/start.py))
+  The smooth stage ended with about 1,200 non neighbour pairs per thousand beads under 0.7 of
+  a bond, twice an ideal chain with no excluded volume, on every cell and every gate. Traced
+  on 2026-09-11: 94 percent are subanchor pairs 4 to 100 beads apart and 86 percent sit in the
+  outer quarter of the radius, where the soft term `0.1 ((r0 - d) / r0)^2` has no force; the
+  stage starts every coil on a straight line, 14,000 pairs per thousand, and pushes out
+  against that term; and the anchors are pinned at 0.4 of an ideal coil's end to end. Widening
+  the soft radius to one bond clears the count but flattens the distance curve and costs Hi-C
+  on three cells, because it pushes every pair under a bond outward, contacts included.
+
+  The wall rejects a move that adds a non neighbour pair under the excluded volume radius or
+  deepens one that is there, so the count only falls and is a hard core once zero. It costs
+  the same neighbour query the soft term makes, on the cell grid. The cap lets anchors move
+  within that many mean bonds of where the arcs put them. The coil start places each gap's
+  subanchors on a compact random bridge between its anchors at the bond targets, drawn from a
+  generator seeded by the problem. Neither rule draws a random number, so with all three off
+  the kernel's stream and the parity gate are untouched. One block, from the stage's own
+  start: soft term alone 766 per thousand; wall 92; compact coil 487; compact coil with the
+  wall 43 at the same Rg and bonds as production; a first clear coil with the wall reaches 0
+  but swells the block by a third, which is why the compact rule is the one built. Both
+  kernels carry the wall and the cap, as static flags on the JAX side since each is a pass per
+  step; the relaxation pass does not. Three cells on the numba kernel, 2026-09-11: coil with
+  the wall against the plain start raises Pearson 0.011 to 0.022 and MultiMM's own metric
+  0.033 to 0.043, cuts overlaps five to seven times within blocks and three to four across at
+  the same Rg, and flattens the short band exponent from 0.33 to 0.21; the cap adds a few
+  percent fewer overlaps and nothing else. Unit checks in `harness/test_smooth_levers.py`;
+  three cell arms in `slurm/ensemble/overlap_levers.sh`.
+
+  Why not in the reference: the reference has no excluded volume at all.
 
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
   `[simulation_backend] neighbour_grid`, default yes)

@@ -149,9 +149,11 @@ def load_arcs(
     chr_set: set[str],
     region: BedRegion | None = None,
     max_pet_length: int = 1_000_000,
+    factor: int = 0,
 ) -> tuple[RawArcMap, RawArcMap]:
     """
     Load PET cluster BEDPE file.  Format: chr_a start_a end_a chr_b start_b end_b score
+    Every arc carries `factor`, the index of the cluster file it came from.
 
     Returns (raw, long_arcs) where:
       raw       : dict[chr -> list[RawArc]], sorted by start, intra only
@@ -194,7 +196,7 @@ def load_arcs(
                 if not (region.contains(posa) and region.contains(posb)):
                     continue
 
-            arc = RawArc(posa, posb, score)
+            arc = RawArc(posa, posb, score, factor)
 
             if posb - posa > max_pet_length:
                 long_cnt += 1
@@ -320,6 +322,44 @@ def load_compartments(
         lst.sort(key=lambda iv: iv.start)
         LOG.info("compartments loaded: %s: %d", chr_, len(lst))
 
+    return out
+
+
+def load_activity(
+    path: str,
+    chr_set: set[str],
+    region: BedRegion | None = None,
+) -> SignalMap:
+    """
+    Load an anchor activity track.  Format: a BED whose value is the seventh column when the
+    line has seven or more, the broadPeak signal, and the fourth otherwise, a bedGraph.
+
+    Returns dict[chr -> list[SignalInterval]] for chromosomes in chr_set, sorted by start.
+    """
+    out: SignalMap = {}
+    if not path or not os.path.exists(path):
+        LOG.warning("activity file not found: %s", path)
+        return out
+    with open(path) as f:
+        for line in f:
+            parts = line.split()
+            if len(parts) < 4:
+                continue
+            chr_ = parts[0]
+            if chr_ not in chr_set:
+                continue
+            try:
+                start, end = int(float(parts[1])), int(float(parts[2]))
+                value = float(parts[6] if len(parts) >= 7 else parts[3])
+            except ValueError:
+                continue
+            if value != value:
+                continue
+            if not _overlaps(start, end, region):
+                continue
+            out.setdefault(chr_, []).append(SignalInterval(chr_, start, end, value))
+    for lst in out.values():
+        lst.sort(key=lambda iv: iv.start)
     return out
 
 

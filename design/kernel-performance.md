@@ -409,6 +409,111 @@ launches would pay is unknown. Its cell grid is refuted above and its convergenc
 Repeat the stage breakdown with whatever the earlier steps changed, measure the cross block
 relaxation's cost with the cell grid, and only then start the trios.
 
+### 12. The profile of 2026-09-20, with the grid and prefetching in
+
+Section 5 measured a kernel that evaluated one proposal a step against a full excluded volume
+scan and found it latency bound. With prefetching at 32 and the cell grid the step is a
+different object, and it was profiled on the workstation with nvidia-smi sampling, cProfile
+for the host and Nsight Systems with node level graph tracing for the device; the plain trace
+lists only the kernels XLA runs outside its CUDA graphs and misses the loop body, which is
+where every step is. GM12878 whole chr1, one conformation, 52 chains padded to 16,384 beads,
+the RTX 4060 Ti.
+
+The host, 419 s in all: the smooth kernel 338 s, the arcs solve 31 s, the dense anchor target
+matrices 25 s, built once for the joint solve and again for every block, the initial energies
+before the kernel 22 s, one chain at a time, and the singletons 5 s.
+
+The device during the kernel: streaming multiprocessors busy 100 percent of the time and the
+memory controller 98 percent. Not latency bound any more, memory bound, and this is what one
+batch of 32 proposals over 52 chains cost, about 490 us:
+
+| kernel | us a batch | share | what it is |
+|---|---|---|---|
+| wrapped_broadcast_1 | 267 | 54% | the orientation array broadcast to one copy per proposal, 82 MB |
+| loop_and_reduce_fusion | 111 | 22% | the proposals' candidate distances over the grid cells |
+| loop_broadcast_fusion_2 and the sort, per period of 64 batches | 58 | 12% | the grid table filled and scattered |
+| about twenty small fusions and two 3.4 MB copies | 50 | 10% | bookkeeping, argmax, the consumed count |
+
+The broadcast was `anchor_orn.at[k].set(trial)` in the trial evaluation, a functional update
+of one slot that under the proposal vmap becomes a full copy for each of the 32 proposals. The
+trial score only needs the anchor's own vector swapped, so it now takes that vector as an
+argument, with the one anchor that a loop maps onto both of its ends handled the way the copy
+would have. The initial energies are the same scans vectorised over the chains in one call per
+term. Both are byte identical on chr1:1-60 Mb by the parity gate.
+
+The arcs solver at chromosome scope, from the same profile. `arcs_energy_grad` visits every
+pair of the chromosome against a dense N by N float64 target, 4 GB at the two factor arm's
+23,080 anchors, and the L-BFGS-B cap of 200 iterations binds on every solve: the solver log
+line now reports it. Energy against the cap, one structure each:
+
+| region | anchors | 200 | 400 | 800 | 1600 | s per iteration |
+|---|---|---|---|---|---|---|
+| chr1:1-60 Mb | 3,158 | 1864 | 1842 | 1835 | 1831 | 0.054 |
+| chr1 | 9,195 | 6677 | | 6274 | | 0.13 to 0.16 |
+
+A 60 Mb region is within a percent by 400, a chromosome is still 6 percent above at 800, and
+the cost per iteration is the dense visit. The springs and the backgrounds are sparse and the
+repulsion and excluded volume are truncated, so a neighbour list or cell grid over the anchors
+makes an evaluation cost what it touches, about a hundred times less at 23,000 anchors, and a
+longer cap becomes free. The earlier refutation of an arcs cell grid, section 7, was measured
+on blocks of 500 to 2,000 anchors in the annealer; this is a gradient solver on 13,000 to
+23,000. Not built yet.
+
+The same run profiled again with both fixes in, the memory controller at 48 percent now and
+the batch at about 176 us of kernel time, 2.7 times less:
+
+| kernel | us a batch | share | what it is |
+|---|---|---|---|
+| loop_and_reduce_fusion | 70 | 40% | the candidate evaluation, 111 before with the copy contending for the bus |
+| the grid rebuild, per period of 64 batches | 58 | 33% | the table fill 2.97 ms, the sort 0.3, the ranks and scatter 0.4 |
+| input_reduce_fusion_2 | 14 | 8% | the first accepted proposal and its state picked out |
+| about twenty small fusions | 34 | 19% | bookkeeping |
+
+The preparation before the kernel went from 23 s to 4 s on this run, and on eden, where it was
+56 to 67 s a structure at 65 chains of 25,600 beads, it should be a few seconds.
+
+What is left. The candidate evaluation is the honest work. The grid table is `(cells + 2) x
+capacity` per chain, 48 cells an axis on a chromosome, filled with minus one and scattered into
+every period, 736 MB across a launch of 52 chains; a longer period trades it against a longer
+moved list in every query, and a table of 16 bit indices, enough for any launch under 65,536
+beads, halves both the fill and the candidate gathers. The small fusions are the launch floor,
+and the lever there is width: ten conformations of a sample in one launch would share them.
+Neither is measured.
+
+### 13. The arcs energy on the device. Built, measured on one region
+
+The solver's cost is its energy evaluation and nothing else; L-BFGS-B's own work is twenty
+vector operations on 69k numbers. `gnome3d/mc/jax/arcs_energy.py` evaluates the same energy on
+the device in row chunks, float32 with the rows summed in float64 on the host, and scipy keeps
+the minimiser. Agreement with the numba kernel 2.6e-8 relative on the energy and 3.7e-7 on
+the gradient over a block carrying every kind of pair. Float64 on the device needs JAX's 64
+bit mode, which is process wide: it turned the smooth kernel's integer draws 64 bit, broke a
+loop carry's dtype and, where it ran, changed the structure, so float32 it is.
+
+| solve | anchors | cap | CPU | device | energy CPU | energy device |
+|---|---|---|---|---|---|---|
+| chr1:1-60 Mb | 3,158 | 200 | 10.9 s | 1.7 s | 1864 | 1868 |
+| chr1 | 9,195 | 200 | 31.6 s | 4.8 s | 6677 | 6742 |
+| chr1 | 9,195 | 800 | 104.8 s | 13.4 s | 6274 | 6266 |
+
+A whole chr1 conformation on the workstation with the cap at 800: 419 s this morning to
+144 s, of which the solve 13 s, the dense target matrices 17 s and the smooth kernel 107 s.
+The A100 should do better still; its float32 rate is higher and the evaluation is a memory
+read.
+
+The battery on chr1:1-60 Mb, three structures per arm, the same seeds:
+
+| arm | Pearson | Spearman | SCC | MultiMM | exponent | Rg | wb-aa | xb | saddle |
+|---|---|---|---|---|---|---|---|---|---|
+| CPU, 200 | 0.312 | 0.135 | 0.374 | 0.666 | 0.364 | 23.35 | 2.8 | 20.0 | 1.31 |
+| device, 200 | 0.311 | 0.135 | 0.366 | 0.663 | 0.364 | 23.33 | 2.7 | 20.0 | 1.38 |
+| device, 800 | 0.312 | 0.136 | 0.366 | 0.665 | 0.360 | 23.15 | 2.5 | 20.6 | 1.00 |
+
+Level on every Hi-C number; the saddle on three structures is noise, it read 1.15 on five
+this morning. Production from 2026-09-20: `mc_executor_arcs = batch`, the solver's energy on
+the device, and `solver_iters` 800. The setting is the executor's, not a new key: `batch`
+already means JAX for every stage, and the solver follows it.
+
 ## Outcomes
 
 ### The numba excluded volume cell grid. Done

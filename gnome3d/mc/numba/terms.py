@@ -21,7 +21,7 @@ from typing import Any, TypeVar, cast
 import numpy as np
 from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
 
-from gnome3d.types import BoolArray, F64Array, I8Array, I32Array, I64Array
+from gnome3d.types import BoolArray, F32Array, F64Array, I8Array, I32Array, I64Array
 
 # Typed wrapper around numba.njit so pyright sees decorated functions
 # with their original signatures.  At runtime this is just numba.njit.
@@ -184,9 +184,13 @@ def init_confine_nb(
 
 
 NO_MAT: F64Array = np.zeros((1, 1), dtype=np.float64)
+# The loop weight matrix's stand in when every pair is at one.
+NO_W: F32Array = np.zeros((1, 1), dtype=np.float32)
 NO_F64_3: F64Array = np.zeros(3, dtype=np.float64)
 NO_I64_3: I64Array = np.ones(3, dtype=np.int64)
 NO_I32: I32Array = np.zeros(1, dtype=np.int32)
+NO_F64: F64Array = np.zeros(1, dtype=np.float64)
+NO_F64_N3: F64Array = np.zeros((1, 3), dtype=np.float64)
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -213,6 +217,75 @@ def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -
         d = math.sqrt(dx * dx + dy * dy + dz * dz)
         err += _excl_pair_nb(d, r0, weight)
     return err
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def _wall_local_nb(pos: F64Array, p: int, r0: float, skip: int) -> tuple[int, float]:
+    """How many non neighbour beads sit under `r0` from `p`, and by how much in total."""
+    n = pos.shape[0]
+    cnt = 0
+    depth = 0.0
+    for i in range(n):
+        diff = i - p
+        if diff < 0:
+            diff = -diff
+        if diff <= skip:
+            continue
+        dx = pos[i, 0] - pos[p, 0]
+        dy = pos[i, 1] - pos[p, 1]
+        dz = pos[i, 2] - pos[p, 2]
+        d = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if d < r0:
+            cnt += 1
+            depth += r0 - d
+    return cnt, depth
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def _wall_local_cells_nb(
+    pos: F64Array,
+    p: int,
+    r0: float,
+    skip: int,
+    lo: F64Array,
+    dim: I64Array,
+    c: float,
+    head: I32Array,
+    nxt: I32Array,
+) -> tuple[int, float]:
+    """`_wall_local_nb` over the grid's twenty seven cell neighbourhood. Exact, since a count
+    and a sum of depths do not depend on the order beads are visited in."""
+    px = pos[p, 0]
+    py = pos[p, 1]
+    pz = pos[p, 2]
+    r2 = r0 * r0
+    nx = int(dim[0])
+    ny = int(dim[1])
+    nz = int(dim[2])
+    ix = int((px - lo[0]) / c)
+    iy = int((py - lo[1]) / c)
+    iz = int((pz - lo[2]) / c)
+    cnt = 0
+    depth = 0.0
+    for jz in range(max(iz - 1, 0), min(iz + 2, nz)):
+        for jy in range(max(iy - 1, 0), min(iy + 2, ny)):
+            base = nx * (jy + ny * jz)
+            for jx in range(max(ix - 1, 0), min(ix + 2, nx)):
+                i = int(head[jx + base])
+                while i != -1:
+                    diff = i - p
+                    if diff < 0:
+                        diff = -diff
+                    if diff > skip:
+                        dx = pos[i, 0] - px
+                        dy = pos[i, 1] - py
+                        dz = pos[i, 2] - pz
+                        d2 = dx * dx + dy * dy + dz * dz
+                        if d2 < r2:
+                            cnt += 1
+                            depth += r0 - math.sqrt(d2)
+                    i = int(nxt[i])
+    return cnt, depth
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -490,6 +563,8 @@ def _local_arcs_nb(
     squeeze_k: float,
     rep_inv_cutoff: float = 0.0,
     bg_weight: float = 0.0,
+    use_w: bool = False,
+    w: F32Array = NO_W,
 ) -> float:
     n = pos.shape[0]
     sc = 0.0
@@ -512,7 +587,10 @@ def _local_arcs_nb(
             sc += max(0.0, 1.0 / (d if d > 1e-10 else 1e-10) - rep_inv_cutoff)
         elif e >= 1e-6:
             rel = (d - e) / e
-            sc += rel * rel * (stretch_k if rel >= 0.0 else squeeze_k)
+            k = stretch_k if rel >= 0.0 else squeeze_k
+            if use_w:
+                k *= w[i, p]
+            sc += rel * rel * k
     return sc
 
 
@@ -527,6 +605,8 @@ def init_arcs_nb(
     squeeze_k: float,
     rep_inv_cutoff: float = 0.0,
     bg_weight: float = 0.0,
+    use_w: bool = False,
+    w: F32Array = NO_W,
 ) -> float:
     n = pos.shape[0]
     sc = 0.0
@@ -548,7 +628,10 @@ def init_arcs_nb(
                 row_sc += max(0.0, 1.0 / (d if d > 1e-10 else 1e-10) - rep_inv_cutoff)
             else:
                 rel = (d - e) / e
-                row_sc += rel * rel * (stretch_k if rel >= 0.0 else squeeze_k)
+                k = stretch_k if rel >= 0.0 else squeeze_k
+                if use_w:
+                    k *= w[i, j]
+                row_sc += rel * rel * k
         sc += row_sc
     return sc
 
@@ -833,10 +916,18 @@ def batch_mc_nb(
     cell_next: I32Array = NO_I32,
     cell_where: I32Array = NO_I32,
     cell_buf: I32Array = NO_I32,
+    use_wall: bool = False,
+    use_cap: bool = False,
+    cap_home: F64Array = NO_F64_N3,
+    cap_r: F64Array = NO_F64,
+    use_arc_w: bool = False,
+    arc_w: F32Array = NO_W,
 ) -> tuple[float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
     n_mov = movable.shape[0]
     n_ok = 0
+    wall_cnt0 = 0
+    wall_depth0 = 0.0
     score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
 
     for _ in range(n_steps):
@@ -848,7 +939,7 @@ def batch_mc_nb(
         # --- prev local scores ---
         if struct_type == STRUCT_ARCS:
             loc_struct_prev = _local_arcs_nb(
-                pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight
+                pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight, use_arc_w, arc_w
             )
         elif struct_type == STRUCT_CHAIN:
             loc_struct_prev = local_smooth_nb(
@@ -882,6 +973,13 @@ def batch_mc_nb(
             else:
                 loc_excl_prev = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
 
+        if use_wall:
+            if use_cells:
+                wall_cnt0, wall_depth0 = _wall_local_cells_nb(
+                    pos, p, excl_r0, excl_skip, cell_lo, cell_dim, cell_size, cell_head, cell_next
+                )
+            else:
+                wall_cnt0, wall_depth0 = _wall_local_nb(pos, p, excl_r0, excl_skip)
         loc_conf_prev = 0.0
         if use_conf:
             loc_conf_prev = _local_confine_nb(
@@ -926,11 +1024,32 @@ def batch_mc_nb(
         pos[p, 0] += dx
         pos[p, 1] += dy
         pos[p, 2] += dz
+        # The hard rules. A capped bead may not leave its sphere, and under the wall a move may
+        # not add a pair under the radius nor deepen the ones there are, so the count only ever
+        # falls. Neither draws a random number, so with both off the stream is untouched.
+        hard_reject = False
+        if use_cap and cap_r[p] > 0.0:
+            hx = pos[p, 0] - cap_home[p, 0]
+            hy = pos[p, 1] - cap_home[p, 1]
+            hz = pos[p, 2] - cap_home[p, 2]
+            if hx * hx + hy * hy + hz * hz > cap_r[p] * cap_r[p]:
+                hard_reject = True
+        if use_wall and not hard_reject:
+            if use_cells:
+                wall_cnt1, wall_depth1 = _wall_local_cells_nb(
+                    pos, p, excl_r0, excl_skip, cell_lo, cell_dim, cell_size, cell_head, cell_next
+                )
+            else:
+                wall_cnt1, wall_depth1 = _wall_local_nb(pos, p, excl_r0, excl_skip)
+            if wall_cnt1 > wall_cnt0 or (
+                wall_cnt1 == wall_cnt0 and wall_cnt1 > 0 and wall_depth1 > wall_depth0
+            ):
+                hard_reject = True
 
         # --- new local scores ---
         if struct_type == STRUCT_ARCS:
             loc_struct_curr = _local_arcs_nb(
-                pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight
+                pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight, use_arc_w, arc_w
             )
         elif struct_type == STRUCT_CHAIN:
             loc_struct_curr = local_smooth_nb(
@@ -1015,12 +1134,17 @@ def batch_mc_nb(
             + score_comp_new
         )
 
-        if strict_better:
-            ok = score_new < score
+        if hard_reject:
+            ok = False
         else:
-            ok = score_new <= score
-        if not ok and T > 0.0 and score > 0.0:
-            ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T)
+            if strict_better:
+                ok = score_new < score
+            else:
+                ok = score_new <= score
+            if not ok and T > 0.0 and score > 0.0:
+                ok = np.random.random() < jump_scale * math.exp(
+                    -jump_coef * (score_new / score) / T
+                )
 
         if ok:
             n_ok += 1

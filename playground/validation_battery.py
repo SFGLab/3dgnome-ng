@@ -27,7 +27,12 @@ smooth stage's own excluded volume failing to exclude. A pair across two blocks 
 placement, which the boundary stitch and the cross block relaxation own. Collapsing the three
 lets an arm that improves block placement read as though it improved block shape.
 
-    python playground/validation_battery.py <mcool> <region> <binsize> <arm_dir> [<arm_dir> ...]
+    python playground/validation_battery.py [--singletons <bedpe>] [--balance no] \\
+        <mcool> <region> <binsize> <arm_dir> [<arm_dir> ...]
+
+`--singletons` names the run's own singletons file, and the exponent yardstick is then the fit a
+run makes on it. Without it the yardstick is the polymer law's named fallback, and the report
+says so.
 
 Contact maps are read balanced. Not every 4DN mcool carries balancing weights, and none of the
 H1ESC file's thirteen resolutions does, so `--balance no` reads raw counts instead. Raw and
@@ -49,14 +54,36 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scipy.spatial import KDTree  # noqa: E402
 
+from gnome3d.polymer import FALLBACK_NU, ContactFit, fit_contact_exponent  # noqa: E402
+from gnome3d.types import SingletonContact  # noqa: E402
 from validation.metrics.hic import (  # noqa: E402
     hic_correlation,
     multimm_faithful_pearson,
     observed_hic,
 )
-
-NU_HIC = 0.285  # ps_curve.py, mean over three cell lines, 20 kb to 1 Mb
 CONTACT_BEADS = 1.33  # a contact is two beads within this many chain bonds; 2.0 units at the old 1.5 unit bead
+
+
+def read_singletons(path: Path) -> list[SingletonContact]:
+    """Seven column BEDPE rows as the loader returns them, midpoints and score."""
+    out: list[SingletonContact] = []
+    with open(path) as fh:
+        for line in fh:
+            p = line.split()
+            if len(p) < 7 or p[0].startswith("#"):
+                continue
+            out.append(
+                (p[0], (int(p[1]) + int(p[2])) // 2, p[3], (int(p[4]) + int(p[5])) // 2, int(float(p[6])))
+            )
+    return out
+
+
+def cell_nu(singletons: Path) -> ContactFit:
+    """The exponent yardstick, the fit a run makes on the same singletons file.
+
+    A refused fit carries the named fallback, which the report then says.
+    """
+    return fit_contact_exponent(read_singletons(singletons))
 
 
 def load(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -104,32 +131,34 @@ def block_owner(mid: np.ndarray, anchor: np.ndarray, target_bp: int) -> np.ndarr
     return np.concatenate(([0], np.cumsum(cut)))
 
 
-def block_bonds(pos: np.ndarray, owner: np.ndarray) -> np.ndarray:
-    """The mean realised chain bond of each block, which is the scale its excluded volume used.
+def bead_scale(pos: np.ndarray, anchor: np.ndarray) -> float:
+    """The structure's own bead spacing, the median bond between two subanchors.
 
     One proxy is unavoidable here. The kernel takes the mean of the chain bond targets and a
-    finished structure only carries the realised distances.
+    finished structure only carries the realised distances. Subanchor bonds sit at 1.03 of the
+    bead on a real structure. The bonds touching an anchor sit near 1.6 and the few sub
+    kilobase bonds at 2.7, and a mean over a block that includes them grew from 1.24 to 1.36
+    on an arm whose wall stretched them further, so a radius taken from it moved with the arm
+    and an arm with fewer close pairs scored more overlaps. A structure with no subanchor bond,
+    which is what MultiMM's uniform chain is once every bead is a subanchor, or one with none at
+    all, falls back to the median of every bond.
 
     Parameters
     ----------
     pos
         Bead positions in genomic order.
-    owner
-        Block index per bead.
+    anchor
+        True where that bead is an anchor.
     """
     step = np.linalg.norm(np.diff(pos, axis=0), axis=1)
-    fallback = float(np.median(step))
-    same = owner[:-1] == owner[1:]
-    out = np.full(int(owner.max()) + 1, fallback)
-    for k in range(out.size):
-        inner = step[same & (owner[:-1] == k)]
-        if inner.size:
-            out[k] = float(inner.mean())
-    return out
+    inner = ~anchor[:-1] & ~anchor[1:]
+    if inner.any():
+        return float(np.median(step[inner]))
+    return float(np.median(step)) if step.size else 1.0
 
 
 def overlaps(
-    pos: np.ndarray, anchor: np.ndarray, owner: np.ndarray, rad: np.ndarray
+    pos: np.ndarray, anchor: np.ndarray, owner: np.ndarray, rad: float
 ) -> tuple[float, float, float]:
     """Overlapping pairs per thousand beads, split by which stage owns them.
 
@@ -137,15 +166,13 @@ def overlaps(
     subanchor, and the cross block rate.
 
     A pair overlaps when it is more than one bead apart along the chain, which is what
-    `exclusion_skip_neighbors` skips, and closer than its block's radius. A cross block pair
-    uses the mean of its two blocks' radii.
+    `exclusion_skip_neighbors` skips, and closer than the radius, `ev_factor` times the
+    structure's own bead spacing from `bead_scale`.
 
-    Radii are the structure's own, `ev_factor` times its own block bonds. Pinning one set across
-    arms was tried and is wrong whenever arms differ in model unit: the polymer law's bead is
-    about two thirds of the old chain law's, and pinned radii scored its subanchor overlaps at
-    its whole bond instead of 0.7 of it, reporting a rise where there was a halving. Within one
-    unit a pinned set removes a 4.8 percent drift from expansion; across units it inverts the
-    answer, and the second failure is the worse one.
+    The radius is the structure's own rather than one pinned across arms, which was tried and
+    is wrong whenever arms differ in model unit: the polymer law's bead is about two thirds of
+    the old chain law's, and pinned radii scored its subanchor overlaps at its whole bond
+    instead of 0.7 of it, reporting a rise where there was a halving.
 
     Parameters
     ----------
@@ -156,17 +183,12 @@ def overlaps(
     owner
         Block index per bead.
     rad
-        The excluded volume radius of each block.
+        The radius, in the structure's own units.
     """
     n = len(pos)
-    q = KDTree(pos).query_pairs(float(rad.max()), output_type="ndarray")
+    q = KDTree(pos).query_pairs(float(rad), output_type="ndarray")
     if q.size:
         q = q[np.abs(q[:, 0] - q[:, 1]) > 1]
-    if not q.size:
-        return 0.0, 0.0, 0.0
-    i, j = q[:, 0], q[:, 1]
-    d = np.linalg.norm(pos[i] - pos[j], axis=1)
-    q = q[d < 0.5 * (rad[owner[i]] + rad[owner[j]])]
     if not q.size:
         return 0.0, 0.0, 0.0
     i, j = q[:, 0], q[:, 1]
@@ -226,12 +248,25 @@ def main() -> None:
     target_bp = int(_flag("--target-bp", 1000))  # the run's target_bp_per_subanchor
     ev_factor = _flag("--ev-factor", 0.7)  # the run's exclusion_auto_factor_smooth
     balance = "--balance" not in sys.argv or _str_flag("--balance") != "no"
+    singletons = _str_flag("--singletons")  # the run's own singletons file, for the exponent yardstick
     mcool, region, binsize = sys.argv[1], sys.argv[2], int(sys.argv[3])
+    if singletons:
+        fit = cell_nu(Path(singletons))
+        nu = fit.nu
+        yardstick = (
+            f"nu {nu:.3f} fitted on {Path(singletons).name}"
+            if fit.ok
+            else f"nu {nu:.3f}, the fallback, since the fit on {Path(singletons).name} was refused: {fit.reason}"
+        )
+    else:
+        nu = FALLBACK_NU
+        yardstick = f"nu {nu:.3f}, the fallback, since no --singletons file was given"
     c_obs, bin_starts = observed_hic(mcool, region, binsize, balance=balance)
     print(
         f"observed Hi-C {region} at {binsize:,} bp: {c_obs.shape[0]} bins"
-        f"{'' if balance else ', raw counts, not comparable with a balanced run'}\n"
+        f"{'' if balance else ', raw counts, not comparable with a balanced run'}"
     )
+    print(f"exponent yardstick: {yardstick}\n")
     contact_r: float = 0.0  # in bead units of each structure, since arms may differ in model unit
     print(
         f"  {'arm':>10s} {'n':>3s} {'pearson':>9s} {'spearman':>9s} {'SCC':>8s} "
@@ -250,7 +285,7 @@ def main() -> None:
         for c in cifs:
             p, m, bmid, anchor = load(c)
             owner = block_owner(bmid, anchor, target_bp)
-            rad = ev_factor * block_bonds(p, owner)
+            rad = ev_factor * bead_scale(p, anchor)
             contact_r = CONTACT_BEADS * float(np.median(np.linalg.norm(np.diff(p, axis=0), axis=1)))
             coords.append(p)
             mids = m
@@ -273,20 +308,21 @@ def main() -> None:
         print(
             f"  {Path(d).name:>10s} {len(cifs):>3d} {np.nanmean(pear):>9.3f} "
             f"{np.nanmean(spear):>9.3f} {np.nanmean(scc):>8.3f} {mm:>9.3f} "
-            f"{e:>9.3f} {e / NU_HIC:>7.2f}x {np.nanmean(elo):>9.3f} {np.nanmean(ehi):>9.3f} {np.mean(rgs):>8.2f} "
+            f"{e:>9.3f} {e / nu:>7.2f}x {np.nanmean(elo):>9.3f} {np.nanmean(ehi):>9.3f} {np.mean(rgs):>8.2f} "
             f"{np.mean(waa):>7.1f} {np.mean(wsa):>7.1f} {np.mean(xb):>7.1f}",
             flush=True,
         )
-    print(f"\n  exponent target is {NU_HIC} from the cell lines' own contact probability curves;")
+    print(f"\n  exponent target is {nu:.3f}, {yardstick.split(', ', 1)[-1] if not singletons else 'the fit a run makes on the same file'};")
     print("  the project's structures have measured flatter than that, so higher is better here.")
     print("  e20-100k and e100k-1M are the exponent fitted on each band alone; the two should agree")
     print("  with each other and with the cell's measured nu, and a flat short band under a steep")
     print("  long one is loops pulling pairs in with nothing holding the rest at the background.")
-    print(f"  the overlap columns count pairs closer than {ev_factor} of their block's mean chain")
-    print("  bond, per thousand beads, each structure on its own radii. wb-aa is")
+    print(f"  the overlap columns count pairs closer than {ev_factor} of the structure's own subanchor")
+    print("  bond, per thousand beads. wb-aa is")
     print("  anchors inside one block, which only the arcs")
     print("  stage can move; wb-sa is the smooth stage's own excluded volume; xb is across two")
-    print("  blocks, which the boundary stitch and the cross block relaxation own.")
+    print("  blocks, which the boundary stitch and the cross block relaxation own. an arm whose")
+    print("  beads carry no anchors and no blocks, such as MultiMM, has all its overlaps in wb-sa.")
 
 
 if __name__ == "__main__":

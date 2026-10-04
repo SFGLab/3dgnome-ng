@@ -32,7 +32,12 @@ if TYPE_CHECKING:
 
 
 def _run(problem: Problem) -> Result:
-    """Serial runner: anneal one IB's anchors.  Returns `(best_score, best_pos)`.
+    """Serial runner on the CPU. Returns `(best_score, best_pos)`."""
+    return _run_one(problem, "numba")
+
+
+def _run_one(problem: Problem, backend: str) -> Result:
+    """Anneal or solve one IB's anchors, the solver's energy on `backend`.
 
     Mirrors `Solver._reconstruct_cluster_arcs` exactly (initial per-anchor noise,
     `steps_arcs` restarts, best-of), with deterministic seeding added.
@@ -41,6 +46,8 @@ def _run(problem: Problem) -> Result:
 
     pos0: F32Array = problem["anchor_pos"]
     exp_dist = problem["exp_dist"]
+    arc_w = problem.get("arc_w")
+    activity = problem.get("activity")
     step = float(problem["step_size"])
     s = settings_for_block(problem["settings"], problem["anchor_genomic"])
     seed = int(problem["seed"])
@@ -71,9 +78,16 @@ def _run(problem: Problem) -> Result:
         if solver == "lbfgs":
             from gnome3d.mc.numba.arcs_solver import solve_arcs  # noqa: PLC0415
 
-            score, pos = solve_arcs(pos, exp_dist, s)
+            score, pos = solve_arcs(
+                pos, exp_dist, s, backend=backend, arc_w=arc_w, activity=activity
+            )
         else:
-            score = mc_numba.mc_arcs_numba(pos, exp_dist, step, s)  # mutates pos in place
+            if activity is not None:
+                raise NotImplementedError(
+                    "the factory term is in the solver's energy, not the annealer's; set "
+                    "[simulation_arcs] solver = lbfgs or [factories] weight = 0"
+                )
+            score = mc_numba.mc_arcs_numba(pos, exp_dist, step, s, arc_w=arc_w)  # in place
         if score < best_score or best_score < 0.0:
             best_score = score
             best = pos.copy()
@@ -162,9 +176,22 @@ def hilbert_start(pos0: F32Array, anchor_genomic: object, law: PolymerLaw) -> F3
     return np.ascontiguousarray(out, dtype=np.float32)
 
 
+def arcs_backend(s: Settings) -> str:
+    """Where the arcs stage's solver evaluates its energy, from `mc_executor_arcs`: the batch
+    executor is the JAX device, serial and threaded are the CPU."""
+    from gnome3d.pipeline.executor import ExecutorStrategy  # noqa: PLC0415
+    from gnome3d.pipeline.stage import StageKind  # noqa: PLC0415
+    from gnome3d.reconstruct import stage_strategy  # noqa: PLC0415
+
+    return "jax" if stage_strategy(s, StageKind.ARCS) == ExecutorStrategy.BATCH else "numba"
+
+
 def run_arcs_problem(problem: Problem) -> Result:
     """Solve or anneal one arcs problem on the calling thread. The joint chromosome solve in
-    the skeleton uses it directly, outside the executor."""
+    the skeleton uses it directly, outside the executor, so it reads the executor's choice of
+    backend itself."""
+    if arcs_backend(problem["settings"]) == "jax":
+        return _run_one(problem, "jax")
     return _run(problem)
 
 
@@ -224,16 +251,16 @@ def arcs_solver(s: Settings) -> str:
 
 
 def _batch_run(problems: list[Problem]) -> list[Result]:
-    """Batched (JAX) runner: anneal a whole bucket of IBs' arcs in one vmapped
-    kernel.  Each IB is fanned out to `steps_arcs` noised restarts (best kept),
-    mirroring the serial loop.  Returns one `(score, pos)` per input problem.
-    Lazy `mc_jax` import so the numba path never requires JAX.
-
-    There is no solver here, only the JAX annealer, so a run that asked for one is refused. It
-    would otherwise anneal and look like it had solved."""
+    """Batched (JAX) runner. With the solver, each block is solved in turn with its energy on
+    the device, on its own settings and from its own start. With the annealer, a whole bucket
+    of IBs' arcs anneal in one vmapped kernel, each IB fanned out to `steps_arcs` noised
+    restarts (best kept), mirroring the serial loop. Returns one `(score, pos)` per input
+    problem. Lazy `mc_jax` import so the numba path never requires JAX."""
     s = problems[0]["settings"]
     if s.arcs_scope == "chromosome":
         return [(0.0, np.asarray(p["anchor_pos"], dtype=np.float32)) for p in problems]
+    if arcs_solver(s) == "lbfgs":
+        return [_run_one(p, "jax") for p in problems]
     if s.arcs_start != "centroid":
         raise NotImplementedError("the batched arcs runner starts at the centroid only")
     if settings_for_block(s, problems[0]["anchor_genomic"]) is not s:
@@ -242,13 +269,6 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
             "confinement radius the law derives for its span; set mc_executor_arcs to serial "
             "or threaded, or give confinement_packing_factor_arcs a positive value"
         )
-    if arcs_solver(s) != "mc":
-        raise NotImplementedError(
-            f"[simulation_arcs] solver = {s.arcs_solver} needs "
-            "[simulation_backend] mc_executor_arcs = serial or threaded; "
-            "the batch executor has no solver"
-        )
-
     from gnome3d.mc import jax as mc_jax  # noqa: PLC0415
 
     n_restarts = max(1, int(s.steps_arcs))
@@ -256,6 +276,15 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     expanded: list[Problem] = []
     owner: list[int] = []
     for gi, prob in enumerate(problems):
+        if prob.get("arc_w") is not None:
+            raise NotImplementedError(
+                "loop weights are not in the JAX annealer; the solver carries them on the "
+                "device, and the numba annealer on the CPU"
+            )
+        if prob.get("activity") is not None:
+            raise NotImplementedError(
+                "the factory term is not in the JAX annealer; the solver carries it on the device"
+            )
         seed_rng(int(prob["seed"]))  # deterministic restart noise for this IB
         pos = prob["anchor_pos"]
         step = float(prob["step_size"])
@@ -296,6 +325,8 @@ class ArcsStage:
         return {
             "anchor_pos": st.anchor_seed_pos,
             "exp_dist": st.exp_dist,
+            "arc_w": st.arc_w,
+            "activity": st.activity,
             "step_size": st.step_size_arcs,
             "settings": st.settings,
             "seed": st.seed,

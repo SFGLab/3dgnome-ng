@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from gnome3d.pipeline.ib.buckets import batch_bucket
+from gnome3d.pipeline.ib.start import coil_start
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import AnchorMapEntry, Densified, Orientation, Smoothed, State
 from gnome3d.types import BeadOut
@@ -92,7 +93,7 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     owner: list[int] = []
     for gi, prob in enumerate(problems):
         seed_rng(int(prob["seed"]))  # deterministic restart noise for this IB
-        pos = prob["pos"]
+        pos = _start_positions(prob)
         fixed = prob["fixed"]
         step = float(prob["step_size"])
         for _ in range(n_restarts):
@@ -110,12 +111,28 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     return [best[gi] for gi in range(len(problems))]
 
 
+def _start_positions(prob: Problem) -> F32Array:
+    """The chain the stage starts from. The densified line by default, or under
+    `smooth_start = coil` each gap's subanchors on a compact bridge between its anchors, drawn
+    from a generator seeded by the problem so the start is reproducible and the kernel's own
+    stream is untouched."""
+    pos: F32Array = prob["pos"]
+    s = prob["settings"]
+    if str(getattr(s, "smooth_start", "line")) != "coil":
+        return pos
+    dtn = prob["dtn"]
+    r = float(s.exclusion_radius_smooth)
+    if r <= 0.0:
+        r = float(s.exclusion_auto_factor_smooth) * float(np.mean(dtn))
+    return coil_start(pos, prob["fixed"], dtn, r, np.random.default_rng(int(prob["seed"])))
+
+
 def _run(problem: Problem) -> Result:
     """Serial runner: steps_smooth restarts from the running best; returns
     ``(best_score, best_pos)``.  Mirrors `Solver._run_smooth_serial`."""
     from gnome3d.mc import numba as mc_numba
 
-    pos: F32Array = problem["pos"]
+    pos: F32Array = _start_positions(problem)
     dtn = problem["dtn"]
     fixed = problem["fixed"]
     step = float(problem["step_size"])
