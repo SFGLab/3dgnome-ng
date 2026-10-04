@@ -137,7 +137,7 @@ CANONICAL: dict[str, dict[str, object]] = {
         # 1e-5 by 830 and to 1e-6 by 2,400 and then sits near 1e-6 with no plateau, a long
         # tail; the energy at 800 is 1.7 percent above the value at 8,000 and at 2,400 under
         # one percent. The tolerance leaves the tail there and the count is a safety, which
-        # the tail never reaches. Adopted 2026-09-22, design/expression-from-structure.md
+        # the tail never reaches. Adopted 2026-09-22, the triosformer project's tracker,
         # idea 32. The 800 cap before it bound on every chromosome solve.
         "solver_tol": 1e-6,
         "solver_iters": 5000,

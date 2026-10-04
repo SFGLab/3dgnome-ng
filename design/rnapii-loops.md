@@ -1,5 +1,9 @@
 # RNAPII ChIA-PET in the model, plan of 2026-09-19
 
+The engine side of this note, loops of more than one factor, lives in this repository. The trio
+arm, its loaders, configs, arrays and results moved to the triosformer project on 2026-09-25 and
+are continued there; the sections below on the trios are kept as the record of how it was built.
+
 Request: recompute the trio models on ChIA-PET CTCF, then on CTCF together with RNAPII loops,
 and use the RNAPII data in the expression work. Status: planned, nothing built.
 

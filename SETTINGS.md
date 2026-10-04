@@ -6,7 +6,7 @@ Booleans accept `yes`, `no`, `true`, `false`, `1` and `0`. Filenames in the data
 taken relative to `data_dir` unless they are absolute.
 
 The production column is `validation.core.config.CANONICAL`, which every validation run and
-the ensemble configs share. The ensemble configs written by `playground/trio/trio_configs.py`
+the ensemble configs share. The ensemble configs written by the triosformer project's `trio_configs.py`
 add three overrides on top: `mc_executor_jax_bucket_shapes = yes`, `multigpu_mode = groups`
 and `heat_min_reduction = 0.001`. `python harness/check_settings_doc.py` checks every row
 against the loader, the defaults and the production config, and is run before a commit that
@@ -98,7 +98,7 @@ is too far and the squeeze constant when too close.
 
 ## [factories]
 
-The factory term of the arcs stage, design/expression-from-structure.md idea 35. An anchor with
+The factory term of the arcs stage, the triosformer project's tracker, idea 35. An anchor with
 an activity from `[data] anchor_activity` is pulled toward the active anchors near it through a
 saturating collective energy, `w * a_i * (log(1 + A) - log(1 + S_i))` with
 `S_i = sum_j a_j exp(-d_ij / r)` and `A` the total activity, so a bead gains from joining one

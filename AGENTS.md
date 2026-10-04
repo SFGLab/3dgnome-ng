@@ -930,7 +930,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   weak and middle thirds lose 0.005 to 0.02; every expression statistic level. A strong loop's
   competition is with the background springs and the repulsion among its anchor's partners,
   which the weight does not touch, so a stronger spring does not let a crowded loop close.
-  Numbers in `design/expression-from-structure.md`, idea 37.
+  Numbers in the triosformer project's tracker, `design/expression-from-structure.md` there,
+  idea 37.
 
   Why not in the reference: the reference has one spring constant per direction for every arc.
 
@@ -946,7 +947,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   from a generator seeded by the conformation, the joint solve's seed or the block's, apart
   from every other stream, so a run reproduces and the gate holds with the flag off. Kept
   loops keep the law's target; the anchor set, the densification and the orientation term
-  never read the draw. Measured before it was built: idea 43's 2D form puts the shared loops'
+  never read the draw. Measured before it was built, triosformer's tracker idea 43: its 2D form puts the shared loops'
   strength at +0.03 to +0.06 of the loops' +0.10 person specific part, which bounds what it
   can carry. Unit checks in `harness/test_arcs_solver.py`.
 
