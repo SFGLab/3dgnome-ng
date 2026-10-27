@@ -466,6 +466,13 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   byte identical by the parity gate. Built 2026-09-19 for RNAPII ChIA-PET as a second factor,
   `design/rnapii-loops.md`. Unit checks in `harness/test_factors.py`.
 
+  The summary arc the reader writes for a pair two factors join scores 0 with factor -1. The
+  arcs stage leaves it out, since as an arc it gave the pair the background as its target, and
+  a pair two factors join takes the closer of its factors' targets instead of the one written
+  last. Found 2026-10-27 by the trio study: on a trio chr1 406 pairs, strong ones with a median
+  of 14 CTCF and 6 RNAPII PETs, had been held at the background in every run without loop
+  dropout, which drops the summary arc by its score. Unit checks in `harness/test_arc_matrix.py`.
+
   Why not in the reference: the reference declares `[data] factors` and, for an anchor pair
   carried by more than one factor, writes a summary arc with `eff_score` zero
   (`InteractionArcs.cpp:98-141`); it fits no strength per factor and its orientation term

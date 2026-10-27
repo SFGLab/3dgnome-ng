@@ -410,6 +410,10 @@ def arc_expected_matrix(
         i, j, score = arc[0], arc[1], arc[2]
         factor = arc[3] if len(arc) > 3 else 0
         exp_d = s.arc_expected_distance(score, mids[j] - mids[i], factor)
+        # Two factors' arcs on one pair are two loops for one contact, so the pair takes the
+        # closer of their targets and not the one written last.
+        if mat[i, j] > 0.0:
+            exp_d = min(exp_d, float(mat[i, j]))
         mat[i, j] = exp_d
         mat[j, i] = exp_d
     return mat
@@ -504,6 +508,10 @@ def _active_arcs(
             if arc_local >= len(chr_arcs):
                 continue
             arc = chr_arcs[arc_local]
+            # A pair two factors join also carries a summary arc of score 0, which as an arc
+            # would hold the pair at the background. The pair's own arcs carry it.
+            if arc.factor < 0:
+                continue
             other = arc.end if arc.start == ci else arc.start
             if other < ci or other not in cluster_to_active:
                 continue

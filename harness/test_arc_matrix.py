@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -24,6 +25,7 @@ from gnome3d.mc.numba.terms import (
     init_arcs_nb,  # noqa: E402
 )
 from gnome3d.pipeline.coarse.build import (  # noqa: E402
+    _active_arcs,
     add_contact_background,
     arc_expected_matrix,
 )
@@ -68,6 +70,30 @@ def test_matrix() -> None:
         f"{m[1, 3]:.3f} against background {s.polymer.background(190_000):.3f}",
     )
     check("no arc target is under one bead", float(m[m > 0].min()) >= 1.0 - 1e-12)
+
+
+def test_two_factors() -> None:
+    print("\n[two factors] a pair joined by a CTCF and an RNAPII loop is held by the closer")
+    s = settings()
+    mids = [0, 10_000, 50_000]
+    weak, strong = s.arc_expected_distance(3, 50_000, 0), s.arc_expected_distance(40, 50_000, 1)
+    for order in ([(0, 2, 3, 0), (0, 2, 40, 1)], [(0, 2, 40, 1), (0, 2, 3, 0)]):
+        m = arc_expected_matrix(s, mids, order)
+        check(
+            "the pair takes the closer target in either order",
+            abs(m[0, 2] - min(weak, strong)) < 1e-12 and m[0, 2] == m[2, 0],
+            f"{m[0, 2]:.3f} against {weak:.3f} and {strong:.3f}",
+        )
+    check("which is under the background", min(weak, strong) < s.polymer.background(50_000))
+
+    # The summary arc data.py adds after a pair's per factor arcs scores 0 with factor -1.
+    arc = lambda a, b, score, factor: SimpleNamespace(start=a, end=b, score=score, factor=factor)  # noqa: E731
+    clusters = [SimpleNamespace(arcs=[0, 1, 2], genomic_pos=0), SimpleNamespace(arcs=[], genomic_pos=10_000), SimpleNamespace(arcs=[0, 1, 2], genomic_pos=50_000)]
+    state = SimpleNamespace(clusters=clusters, arcs={"chr1": [arc(0, 2, 3, 0), arc(0, 2, 40, 1), arc(0, 2, 0, -1)]}, s=s)
+    got_mids, got = _active_arcs(state, [0, 1, 2], "chr1")
+    check("the summary arc is left out of the active arcs", got == [(0, 2, 3, 0), (0, 2, 40, 1)], str(got))
+    m = arc_expected_matrix(s, got_mids, got)
+    check("so the pair is not held at the background", m[0, 2] < s.polymer.background(50_000) - 1e-9, f"{m[0, 2]:.3f}")
 
 
 def test_short_range_background() -> None:
@@ -257,6 +283,7 @@ def test_jax_batched_driver_runs() -> None:
 def main() -> int:
     print("arc matrix checks")
     test_matrix()
+    test_two_factors()
     test_short_range_background()
     test_contact_background()
     test_jax_matches_numba()
