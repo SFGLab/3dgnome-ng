@@ -958,6 +958,16 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   strength at +0.03 to +0.06 of the loops' +0.10 person specific part, which bounds what it
   can carry. Unit checks in `harness/test_arcs_solver.py`.
 
+  **Kept loops at contact: `[springs] loop_contact`, default no, under measurement since
+  2026-10-27.** With it a loop a conformation keeps is held at one bead, touching, instead of
+  the law's part way target, so with the dropout a loop's strength sets how often its anchors
+  are in contact rather than how far they are pulled. Measured by triosformer's loop bench
+  before it was built: a CTCF loop of 3 to 4 PETs asked for two thirds of the background in
+  every conformation sits closer than a control pair on the mean and meets its anchors 0.60
+  times as often within 1.5 beads, since the spring holds it at four to five beads and the
+  control reaches contact by its spread. Off is byte exact. Unit checks in
+  `harness/test_arc_matrix.py`.
+
   Why not in the reference: the reference solves every arc in every structure.
 
 - **Transcription factories: `[factories] weight`, default 0, with `radius` and

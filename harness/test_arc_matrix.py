@@ -88,12 +88,45 @@ def test_two_factors() -> None:
 
     # The summary arc data.py adds after a pair's per factor arcs scores 0 with factor -1.
     arc = lambda a, b, score, factor: SimpleNamespace(start=a, end=b, score=score, factor=factor)  # noqa: E731
-    clusters = [SimpleNamespace(arcs=[0, 1, 2], genomic_pos=0), SimpleNamespace(arcs=[], genomic_pos=10_000), SimpleNamespace(arcs=[0, 1, 2], genomic_pos=50_000)]
-    state = SimpleNamespace(clusters=clusters, arcs={"chr1": [arc(0, 2, 3, 0), arc(0, 2, 40, 1), arc(0, 2, 0, -1)]}, s=s)
+    clusters = [
+        SimpleNamespace(arcs=[0, 1, 2], genomic_pos=0),
+        SimpleNamespace(arcs=[], genomic_pos=10_000),
+        SimpleNamespace(arcs=[0, 1, 2], genomic_pos=50_000),
+    ]
+    state = SimpleNamespace(
+        clusters=clusters, arcs={"chr1": [arc(0, 2, 3, 0), arc(0, 2, 40, 1), arc(0, 2, 0, -1)]}, s=s
+    )
     got_mids, got = _active_arcs(state, [0, 1, 2], "chr1")
-    check("the summary arc is left out of the active arcs", got == [(0, 2, 3, 0), (0, 2, 40, 1)], str(got))
+    check(
+        "the summary arc is left out of the active arcs",
+        got == [(0, 2, 3, 0), (0, 2, 40, 1)],
+        str(got),
+    )
     m = arc_expected_matrix(s, got_mids, got)
-    check("so the pair is not held at the background", m[0, 2] < s.polymer.background(50_000) - 1e-9, f"{m[0, 2]:.3f}")
+    check(
+        "so the pair is not held at the background",
+        m[0, 2] < s.polymer.background(50_000) - 1e-9,
+        f"{m[0, 2]:.3f}",
+    )
+
+
+def test_loop_contact() -> None:
+    print("\n[loop contact] a kept loop is held at contact, one bead, whatever its strength")
+    s = settings()
+    mids = [0, 10_000, 50_000, 200_000]
+    arcs = [(0, 2, 3, 0), (1, 3, 40, 1)]
+    off = arc_expected_matrix(s, mids, arcs)
+    s.loop_contact = True
+    on = arc_expected_matrix(s, mids, arcs)
+    check(
+        "off, the law's part way targets",
+        off[0, 2] > 1.0 + 1e-6 and off[1, 3] > 1.0 + 1e-6,
+        f"{off[0, 2]:.3f} {off[1, 3]:.3f}",
+    )
+    check(
+        "on, every loop pair at one bead", on[0, 2] == 1.0 and on[1, 3] == 1.0 and on[2, 0] == 1.0
+    )
+    check("and the arcless pairs as they were", np.array_equal(on[off <= 0], off[off <= 0]))
 
 
 def test_short_range_background() -> None:
@@ -284,6 +317,7 @@ def main() -> int:
     print("arc matrix checks")
     test_matrix()
     test_two_factors()
+    test_loop_contact()
     test_short_range_background()
     test_contact_background()
     test_jax_matches_numba()

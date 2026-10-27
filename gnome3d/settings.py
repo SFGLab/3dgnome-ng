@@ -99,6 +99,7 @@ class Settings:
     background_weight: float
     loop_dropout: bool
     loop_dropout_scale: float
+    loop_contact: bool
     factory_weight: float
     factory_radius: float
     background_range_bp: int
@@ -432,6 +433,9 @@ class Settings:
         # strength, so the ensemble mean carries the loop's frequency. Off keeps every loop.
         self.loop_dropout = False
         self.loop_dropout_scale = 1.0
+        # A loop a conformation keeps is held at contact, one bead, and not at the law's part
+        # way target, so with the dropout a loop's strength sets how often it is in contact.
+        self.loop_contact = False
         # The factory term: active anchors attract as a group with a saturating collective
         # energy, weight zero off, radius in beads.
         self.factory_weight = 0.0
@@ -826,6 +830,7 @@ class Settings:
         self.arc_weight_exponent = getf("springs", "arc_weight_exponent", self.arc_weight_exponent)
         self.loop_dropout = getb("springs", "loop_dropout", self.loop_dropout)
         self.loop_dropout_scale = getf("springs", "loop_dropout_scale", self.loop_dropout_scale)
+        self.loop_contact = getb("springs", "loop_contact", self.loop_contact)
         self.factory_weight = getf("factories", "weight", self.factory_weight)
         self.factory_radius = getf("factories", "radius", self.factory_radius)
         self.spring_squeeze = getf("springs", "squeeze_constant", self.spring_squeeze)

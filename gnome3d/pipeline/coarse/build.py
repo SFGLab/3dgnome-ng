@@ -409,7 +409,7 @@ def arc_expected_matrix(
     for arc in arcs:
         i, j, score = arc[0], arc[1], arc[2]
         factor = arc[3] if len(arc) > 3 else 0
-        exp_d = s.arc_expected_distance(score, mids[j] - mids[i], factor)
+        exp_d = 1.0 if s.loop_contact else s.arc_expected_distance(score, mids[j] - mids[i], factor)
         # Two factors' arcs on one pair are two loops for one contact, so the pair takes the
         # closer of their targets and not the one written last.
         if mat[i, j] > 0.0:
