@@ -287,3 +287,35 @@ Arm E is the existing cudaMMC models of each line's chr1 on ARCH, `/data/mw868/m
 Arm M at the spec's absorb distance of 1 kb moves few ends (GM12878 66,608 new RNAPII anchors
 against 69,867 for R). Decide the distance before submitting tasks 2, 5 and 8; the prep takes
 `--absorb-bp`.
+
+## Readouts, the commands
+
+Run after the arrays finish, on the machine holding `out/xc` and the deep maps. `<M>` is the
+line's deep mcool, `<T>` its compartment track, `L` the line.
+
+```bash
+# structure and pile-up, per line
+python playground/rnapii/e3d_export.py --subsample /data/mw868/models_fixed/$L/chr1 out/xc/${L}_E/chr1 --n 10   # arm E, on ARCH
+python playground/slice_arm.py out/xc/${L}_E/chr1 out/xc/${L}_E_60mb chr1:1-60000000
+python playground/validation_battery.py --balance no --ev-factor 0.7 --singletons data/$L/${L}_hic_25kb_singletons.bedpe \
+  --json out/xc/${L}_battery.json <M> chr1:1-60000000 25000 out/xc/${L}_{E,C,R,M}_60mb
+python playground/saddle_offline.py --json out/xc/${L}_saddle.json <M> chr1:1-60000000 100000 <T> out/xc/${L}_{E,C,R,M}_60mb
+python playground/rnapii/pileup.py --json out/xc/${L}_pileup.json <M> chr1:1-60000000 10000 \
+  data/$L/${L}_xc_rnapii_clusters_3+.bedpe out/xc/${L}_{E,C,R,M}_60mb
+python playground/rnapii/figure_rnapii.py --loci <M> chr1:1-60000000 data/$L/${L}_xc_rnapii_clusters_3+.bedpe \
+  out/xc/${L}_C_60mb out/xc/${L}_R_60mb
+
+# expression: export each gnome3d arm to the enhancer3d layout, then run their CLI with --n-models 10
+for A in C R M; do python playground/rnapii/e3d_export.py out/xc/${L}_$A/chr1 out/xc/e3d/${L}_$A chr1; done
+```
+
+The trio structure readouts are the same battery, saddle and pile-up per person, against the
+person's HGSVC mcool under `$TRIOS_HGSVC/mcool/`, with that person's
+`_rnapol2_clusters_3+.bedpe` as the pile-up loops, on `out/xc_trio_ctcf_hgsvc` and
+`out/xc_trio_rnapol2_hgsvc`. The trio expression statistics come from
+`analysis/trio_arms_compare.py` and `trio_arms_jump.py`.
+
+Each expression table is reduced to a CSV of arm, metric, value and n, metric one of `partial`,
+`rho_3d`, `e1`, `e3`, `jump_rho`, `family_sep`, and listed in a manifest with the JSON files
+above; then `python playground/rnapii/figure_rnapii.py manifest.json out/xc/figures`. The
+manifest format is in that script's docstring.
