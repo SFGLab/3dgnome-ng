@@ -8,11 +8,12 @@ import secrets
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from .catalog import FACTOR_CHOICES, Catalog
-from .jobs import JobRequest, request_key
+from .jobs import JobRequest, _member, request_key
+from .marks import cif_to_pdb
 from .queue import enqueue, sweep_private
 from .regions import RegionError, parse_region
 from .settings import Settings
@@ -117,7 +118,14 @@ def create_app() -> FastAPI:
         req = json.loads((d / "request.json").read_text()) if (d / "request.json").is_file() else {}
         cell = catalog.cell_types.get(str(req.get("cell_type", "")))
         marks = json.loads((d / "marks.json").read_text()) if (d / "marks.json").is_file() else None
-        ep = (d / "ep.tsv").read_text().splitlines()[:26] if (d / "ep.tsv").is_file() else []
+        ep: list[list[str]] = []
+        if (d / "ep.tsv").is_file():
+            import csv
+
+            with (d / "ep.tsv").open() as fh:
+                for r in list(csv.DictReader(fh, delimiter="\t"))[:25]:
+                    name = r["name"] if r["name"] and r["name"] != r["gene_id"] else r["gene_id"]
+                    ep.append([name, f"{int(r['tss']):,}", f"{int(r['enhancer_centre']):,}", f"{int(r['linear_bp']) / 1000:.1f}", f"{float(r['distance']):.2f}"])
         return templates.TemplateResponse(
             request,
             "job.html",
@@ -127,7 +135,7 @@ def create_app() -> FastAPI:
                 "req": req,
                 "cell": cell,
                 "marks": marks,
-                "ep": [row.split("\t") for row in ep],
+                "ep": ep,
                 "private": kind == "private",
                 "retention": s.retention_days,
             },
@@ -143,7 +151,7 @@ def create_app() -> FastAPI:
 
     def files(d: Path) -> list[str]:
         out = [p.name for p in d.iterdir() if p.is_file() and FILES.match(p.name) and p.name != "upload.vcf.gz"]
-        out += sorted(p.name for p in (d / "models").glob("*.cif"))
+        out += [p.name for p in sorted((d / "models").glob("*.cif"), key=_member)]
         return sorted(set(out))
 
     def send(d: Path, name: str) -> FileResponse:
@@ -153,6 +161,20 @@ def create_app() -> FastAPI:
         if not p.is_file():
             raise HTTPException(404)
         return FileResponse(p, filename=name)
+
+    def view(d: Path, name: str) -> PlainTextResponse:
+        cif = name.removesuffix(".pdb") + ".cif"
+        if not name.endswith(".pdb") or not FILES.match(cif) or not (d / "models" / cif).is_file():
+            raise HTTPException(404)
+        return PlainTextResponse(cif_to_pdb(d / "models" / cif))
+
+    @app.get("/jobs/{key}/view/{name}")
+    def shared_view(key: str, name: str) -> PlainTextResponse:
+        return view(job_dir("jobs", key), name)
+
+    @app.get("/p/{key}/view/{name}")
+    def private_view(key: str, name: str) -> PlainTextResponse:
+        return view(job_dir("private", key), name)
 
     @app.get("/jobs/{key}/files/{name}")
     def shared_file(key: str, name: str) -> FileResponse:

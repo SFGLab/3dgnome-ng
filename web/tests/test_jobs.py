@@ -22,8 +22,8 @@ FAKE = [str(Path(__file__).resolve().parents[2] / ".venv" / "bin" / "python"), s
 def main() -> int:
     with tempfile.TemporaryDirectory() as d:
         cat = Catalog.load(make_data(Path(d) / "data"))
-        req = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF+RNAPII", sv_set="DEMO", sample="P1", haplotype=0, n_models=2)
-        same = JobRequest(cell_type="GMX", region="chr1:0-3,000,000", factors="CTCF+RNAPII", sv_set="DEMO", sample="P1", haplotype=0, n_models=2)
+        req = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF+RNAPII", sv_set="DEMO", sample="P1", haplotype=0, n_models=11)
+        same = JobRequest(cell_type="GMX", region="chr1:0-3,000,000", factors="CTCF+RNAPII", sv_set="DEMO", sample="P1", haplotype=0, n_models=11)
         check("the cache key ignores how the region was typed", request_key(req, cat) == request_key(same, cat))
         other = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=2)
         check("a different factor choice is a different key", request_key(req, cat) != request_key(other, cat))
@@ -31,7 +31,9 @@ def main() -> int:
         res = run_job(req, cat, Path(d) / "results" / request_key(req, cat), engine=FAKE)
         status = json.loads((res / "status.json").read_text())
         check("the job finishes", status["state"] == "done", str(status))
-        check("two structures are written", len(list((res / "models").glob("*.cif"))) == 2)
+        check("eleven structures are written", len(list((res / "models").glob("*.cif"))) == 11)
+        order = json.loads((res / "marks.json").read_text())["models"]
+        check("structures are listed in their own order, s2 before s10", order.index(next(m for m in order if m.endswith("_s2.cif"))) < order.index(next(m for m in order if m.endswith("_s10.cif"))), str(order[:3]))
         check("the SVs applied and skipped are reported", status["n_svs"] == 1 and status["skipped_svs"] == 1, str(status))
         ep = [ln.split("\t") for ln in (res / "ep.tsv").read_text().splitlines()]
         beta = next((r for r in ep if r[1] == "BETA"), None)

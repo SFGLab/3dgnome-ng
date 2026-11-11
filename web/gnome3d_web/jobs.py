@@ -61,6 +61,14 @@ def request_key(req: JobRequest, catalog: Catalog) -> str:
     return hashlib.sha256(json.dumps(d, sort_keys=True).encode()).hexdigest()[:16]
 
 
+def _member(p: Path) -> tuple[int, str]:
+    """A structure file's member number, from the engine's `_s<k>.cif` suffix, for natural order."""
+    import re
+
+    m = re.search(r"_s(\d+)\.cif$", p.name)
+    return (int(m.group(1)) if m else 0, p.name)
+
+
 def _status(job: Path, **fields: object) -> None:
     path = job / "status.json"
     cur = json.loads(path.read_text()) if path.is_file() else {}
@@ -135,7 +143,7 @@ def run_job(req: JobRequest, catalog: Catalog, job: Path, engine: list[str] | No
             raise RuntimeError(f"the engine exited with {rc}")
 
         _status(job, stage="marks")
-        cifs = sorted((job / "models").glob("*.cif"))
+        cifs = sorted((job / "models").glob("*.cif"), key=_member)
         models = [read_cif(c) for c in cifs]
         pos0, starts, ends, _ = models[0]
         genes, enh = _lifted_marks(cell, region.chrom, svs)

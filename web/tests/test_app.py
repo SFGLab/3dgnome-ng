@@ -49,6 +49,18 @@ def main() -> int:
         names = c.get("/api" + job + "/files").json()
         check("the files API lists the structures and the table", "ep.tsv" in names and any(n.endswith(".cif") for n in names), str(names))
         check("a listed file downloads", c.get(job + "/files/ep.tsv").status_code == 200)
+        cif = next(n for n in names if n.endswith(".cif"))
+        pdb = c.get(job + "/view/" + cif.replace(".cif", ".pdb"))
+        lines = pdb.text.splitlines()
+        atoms = [ln for ln in lines if ln.startswith("ATOM")]
+        conect = [ln for ln in lines if ln.startswith("CONECT")]
+        check(
+            "the viewer gets a PDB with one atom per bead, in file order, and the chain bonds",
+            pdb.status_code == 200 and len(atoms) > 100 and len(conect) == len(atoms) - 1,
+            f"{pdb.status_code} {len(atoms)} atoms {len(conect)} bonds",
+        )
+        page = c.get(job).text
+        check("the gene table shows distances to two decimals", "<td class=\"num\">" in page and ".0000" not in page)
         check("a path outside the job is refused", c.get(job + "/files/..%2F..%2Fcatalog.json").status_code == 404)
         vcf = (root / "data" / "svs" / "demo.vcf.gz").read_bytes()
         r = c.post("/jobs", data={**form, "sample": "P1"}, files={"vcf": ("mine.vcf.gz", vcf)}, follow_redirects=False)
