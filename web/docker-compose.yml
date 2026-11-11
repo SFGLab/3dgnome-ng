@@ -1,0 +1,39 @@
+# Web, one worker and Redis. Run from web/:
+#   DATA_DIR=/srv/gnome3d/data RESULTS_DIR=/srv/gnome3d/results docker compose up -d --build
+# The worker asks for one GPU; drop the deploy block on a machine without one and set the
+# cell types' configs to the serial executor, see README.md.
+services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+
+  web:
+    build: { context: .., dockerfile: web/Dockerfile, args: { GPU: "${GPU:-1}" } }
+    image: gnome3d-web
+    restart: unless-stopped
+    ports: ["${PORT:-8000}:8000"]
+    environment:
+      QUEUE: rq
+      REDIS_URL: redis://redis:6379/0
+      RETENTION_DAYS: "${RETENTION_DAYS:-14}"
+    volumes:
+      - "${DATA_DIR:-./site-data}:/data:ro"
+      - "${RESULTS_DIR:-./site-results}:/results"
+    depends_on: [redis]
+
+  worker:
+    image: gnome3d-web
+    restart: unless-stopped
+    command: ["rq", "worker", "gnome3d", "--url", "redis://redis:6379/0"]
+    environment:
+      QUEUE: rq
+      REDIS_URL: redis://redis:6379/0
+      RETENTION_DAYS: "${RETENTION_DAYS:-14}"
+    volumes:
+      - "${DATA_DIR:-./site-data}:/data:ro"
+      - "${RESULTS_DIR:-./site-results}:/results"
+    depends_on: [redis, web]
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
