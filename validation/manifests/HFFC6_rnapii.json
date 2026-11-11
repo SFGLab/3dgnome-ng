@@ -1,0 +1,43 @@
+{
+  "_note": "RNAPII ChIA-PET loops and peaks per replicate from ENCODE ENCSR956IXE, and CTCF ChIP-seq conservative IDR peaks from ENCSR163ULN, the inputs of playground/rnapii/crosscell_prep.py. Fetch with: python -m validation fetch --manifest validation/manifests/HFFC6_rnapii.json --out data/_rnapii",
+  "_rnapii_source": "RNAPII from BJ, ENCSR956IXE, a different foreskin fibroblast line from HFFc6. HFFc6 RNAPII ChIA-PET is 4DN 4DNESI1WZ5HT, unreachable on 2026-11-11.",
+  "cell_line": "HFFC6",
+  "assembly": "GRCh38",
+  "assays": [
+    {
+      "name": "RNAPII_loops_r1",
+      "source": "encode",
+      "accession": "ENCFF601NEC"
+    },
+    {
+      "name": "RNAPII_loops_r2",
+      "source": "encode",
+      "accession": "ENCFF808QOQ"
+    },
+    {
+      "name": "RNAPII_loops_r3",
+      "source": "encode",
+      "accession": "ENCFF775SCY"
+    },
+    {
+      "name": "RNAPII_peaks_r1",
+      "source": "encode",
+      "accession": "ENCFF428VXI"
+    },
+    {
+      "name": "RNAPII_peaks_r2",
+      "source": "encode",
+      "accession": "ENCFF084CXY"
+    },
+    {
+      "name": "RNAPII_peaks_r3",
+      "source": "encode",
+      "accession": "ENCFF953MBK"
+    },
+    {
+      "name": "CTCF_peaks",
+      "source": "encode",
+      "accession": "ENCFF414XTM"
+    }
+  ]
+}

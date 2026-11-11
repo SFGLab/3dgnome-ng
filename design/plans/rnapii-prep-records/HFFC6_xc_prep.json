@@ -1,0 +1,42 @@
+{
+  "line": "HFFC6",
+  "rnapii_source": "RNAPII from BJ, ENCSR956IXE, a different foreskin fibroblast line from HFFc6. HFFc6 RNAPII ChIA-PET is 4DN 4DNESI1WZ5HT, unreachable on 2026-11-11.",
+  "accessions": [
+    "ENCFF601NEC",
+    "ENCFF808QOQ",
+    "ENCFF775SCY",
+    "ENCFF428VXI",
+    "ENCFF084CXY",
+    "ENCFF953MBK",
+    "ENCFF414XTM"
+  ],
+  "seed": 20261111,
+  "max_span": 1000000,
+  "absorb_bp": 1000,
+  "ctcf": {
+    "loops_before": 61358,
+    "loops_filtered": 53070,
+    "depth_before": 4329078,
+    "keep_fraction": 1.0,
+    "loops_after": 53070,
+    "depth_after": 4329078
+  },
+  "rnapii": {
+    "loops_before": 315174,
+    "loops_filtered": 226679,
+    "depth_before": 1251075,
+    "keep_fraction": 1.0,
+    "loops_after": 226679,
+    "depth_after": 1251075
+  },
+  "anchors_plain": {
+    "added": 230521,
+    "summary": "77377 loop ends overlap a CTCF anchor (74433 with the midpoint inside it, 2944 lost), 375981 on no CTCF anchor -> 230521 new anchors, mean width 0.8 kb"
+  },
+  "anchors_absorbed": {
+    "added": 224805,
+    "summary": "78874 loop ends overlap a CTCF anchor (78874 with the midpoint inside it, 0 lost), 365260 on no CTCF anchor -> 224805 new anchors, mean width 0.8 kb"
+  },
+  "ends_absorbed": 88044,
+  "loops_absorbed_arm": 222067
+}

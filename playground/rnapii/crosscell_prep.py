@@ -190,3 +190,149 @@ def absorb_ends(
         joined[key] = joined.get(key, 0) + p
     out = [(c, a, b, c, x, y, p) for (c, a, b, x, y), p in sorted(joined.items())]
     return out, moved
+
+
+# The driver. Writes, per line, under data/<C>/
+#   <C>_xc_ctcf_clusters_3+.bedpe, <C>_xc_rnapii_clusters_3+.bedpe,
+#   <C>_xc_rnapii_absorbed_clusters_3+.bedpe, <C>_xc_anchors_ctcf_rnapii.bed,
+#   <C>_xc_anchors_ctcf_rnapii_absorbed.bed and the record <C>_xc_prep.json.
+#
+#     python playground/rnapii/crosscell_prep.py [--max-span 1000000] [--seed 20261111] [--dry-run]
+#
+# Inputs are the production CTCF loops and anchors under data/<C>/ and the ENCODE files the
+# manifests validation/manifests/<C>_rnapii.json fetch into data/_rnapii/<C>/.
+
+LINES = ("GM12878", "H1ESC", "HFFC6")
+FACTORS = ("ctcf", "rnapii")
+ENDS_ON_PEAKS = {"ctcf": 2, "rnapii": 1}
+KEEP_FLOOR = 0.2
+
+
+def check_keep_fractions(depths: dict[str, int], floor: float) -> dict[str, float]:
+    """Each line's keep fraction when thinned to the lowest depth. Exits naming the lines under
+    `floor`, since thinning them all to one shallow line would leave the others nearly empty."""
+    low = min(depths.values())
+    frac = {k: low / v if v else 0.0 for k, v in depths.items()}
+    under = [k for k, f in frac.items() if f < floor]
+    if under:
+        raise SystemExit(
+            f"keep fraction under {floor} for {', '.join(under)}: depths {depths}. "
+            "Thinning every line to the shallowest would leave these nearly empty; stopping."
+        )
+    return frac
+
+
+def build_record(line: str, **fields: object) -> dict[str, object]:
+    """The prep record of one line, the line first."""
+    return {"line": line, **fields}
+
+
+def _manifest(root: Path, line: str) -> dict[str, object]:
+    import json
+
+    return json.loads((root / "validation" / "manifests" / f"{line}_rnapii.json").read_text())
+
+
+def _fetched(root: Path, line: str, prefix: str) -> list[Path]:
+    paths = sorted((root / "data" / "_rnapii" / line).glob(f"{prefix}*.ENCFF*"))
+    if not paths:
+        raise SystemExit(f"{line}: no {prefix} file under data/_rnapii/{line}, run the fetch first")
+    return paths
+
+
+def main() -> None:
+    import argparse
+    import json
+    import sys
+
+    root = Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root))
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from anchor_union import read_anchors, union_anchors
+
+    from validation.core.config import CANONICAL
+
+    ap = argparse.ArgumentParser(description="cross line RNAPII inputs")
+    ap.add_argument("--max-span", type=int, default=1_000_000)
+    ap.add_argument("--seed", type=int, default=20261111)
+    ap.add_argument("--absorb-bp", type=int, default=0, help="0 takes target_bp_per_subanchor")
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+    absorb_bp = args.absorb_bp or int(CANONICAL["main"]["target_bp_per_subanchor"])  # type: ignore[call-overload]
+
+    filtered: dict[tuple[str, str], list[Loop]] = {}
+    before: dict[tuple[str, str], int] = {}
+    for line in LINES:
+        data = root / "data" / line
+        ctcf_loops = read_bedpe(data / f"{line}_clusters_3+.bedpe")
+        rnapii_loops = pool_replicates([read_bedpe(p) for p in _fetched(root, line, "RNAPII_loops")])
+        peaks = {
+            "ctcf": PeakIndex.from_beds(_fetched(root, line, "CTCF_peaks")),
+            "rnapii": PeakIndex.from_beds(_fetched(root, line, "RNAPII_peaks")),
+        }
+        for fac, loops in (("ctcf", ctcf_loops), ("rnapii", rnapii_loops)):
+            before[(line, fac)] = len(loops)
+            filtered[(line, fac)] = filter_loops(loops, peaks[fac], ENDS_ON_PEAKS[fac], args.max_span)
+
+    fractions: dict[tuple[str, str], float] = {}
+    for fac in FACTORS:
+        depths = {line: depth(filtered[(line, fac)]) for line in LINES}
+        print(f"{fac} filtered depths: {depths}")
+        for line, f in check_keep_fractions(depths, KEEP_FLOOR).items():
+            fractions[(line, fac)] = f
+
+    print(f"\n{'line':<8} {'factor':<7} {'loops in':>9} {'filtered':>9} {'depth':>10} {'keep':>6} {'thinned':>9} {'PETs':>10}")
+    for li, line in enumerate(LINES):
+        data = root / "data" / line
+        man = _manifest(root, line)
+        record = build_record(
+            line,
+            rnapii_source=str(man.get("_rnapii_source", man["_note"])),
+            accessions=[a["accession"] for a in man["assays"]],  # type: ignore[index, union-attr]
+            seed=args.seed,
+            max_span=args.max_span,
+            absorb_bp=absorb_bp,
+        )
+        thinned: dict[str, list[Loop]] = {}
+        for fi, fac in enumerate(FACTORS):
+            loops = filtered[(line, fac)]
+            rng = np.random.default_rng([args.seed, li, fi])
+            thinned[fac] = thin(loops, fractions[(line, fac)], rng)
+            record[fac] = {
+                "loops_before": before[(line, fac)],
+                "loops_filtered": len(loops),
+                "depth_before": depth(loops),
+                "keep_fraction": fractions[(line, fac)],
+                "loops_after": len(thinned[fac]),
+                "depth_after": depth(thinned[fac]),
+            }
+            print(
+                f"{line:<8} {fac:<7} {before[(line, fac)]:>9} {len(loops):>9} {depth(loops):>10} "
+                f"{fractions[(line, fac)]:>6.3f} {len(thinned[fac]):>9} {depth(thinned[fac]):>10}"
+            )
+        ctcf_anchors = read_anchors(data / f"{line}_anchors_3+_oriented.bed")
+        absorbed, moved = absorb_ends(thinned["rnapii"], ctcf_anchors, absorb_bp)
+        anchor_sets = {}
+        for tag, loops in (("", thinned["rnapii"]), ("_absorbed", absorbed)):
+            ends = [(lp[0], s, e) for lp in loops for s, e in ((lp[1], lp[2]), (lp[4], lp[5]))]
+            rows, st = union_anchors(ctcf_anchors, ends)
+            anchor_sets[tag] = rows
+            record[f"anchors{tag or '_plain'}"] = {"added": st.added, "summary": st.describe()}
+            print(f"  {line} RNAPII{tag or ''}: {st.describe()}")
+        record["ends_absorbed"] = moved
+        record["loops_absorbed_arm"] = len(absorbed)
+        if args.dry_run:
+            continue
+        write_bedpe(data / f"{line}_xc_ctcf_clusters_3+.bedpe", thinned["ctcf"])
+        write_bedpe(data / f"{line}_xc_rnapii_clusters_3+.bedpe", thinned["rnapii"])
+        write_bedpe(data / f"{line}_xc_rnapii_absorbed_clusters_3+.bedpe", absorbed)
+        for tag, rows in anchor_sets.items():
+            with open(data / f"{line}_xc_anchors_ctcf_rnapii{tag}.bed", "w") as out:
+                for c, s, e, o in rows:
+                    out.write(f"{c}\t{s}\t{e}\t{o}\n")
+        (data / f"{line}_xc_prep.json").write_text(json.dumps(record, indent=2) + "\n")
+    print("\ndry run, nothing written" if args.dry_run else "\nwritten under data/<line>/")
+
+
+if __name__ == "__main__":
+    main()

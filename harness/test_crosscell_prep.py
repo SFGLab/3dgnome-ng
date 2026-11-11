@@ -21,6 +21,8 @@ sys.path.insert(0, str(ROOT / "playground" / "rnapii"))
 from crosscell_prep import (  # noqa: E402
     PeakIndex,
     absorb_ends,
+    build_record,
+    check_keep_fractions,
     depth,
     filter_loops,
     pool_replicates,
@@ -107,6 +109,25 @@ def test_absorb() -> None:
     check("an end beyond the absorb distance is left as it is", out == loops and n == 0)
 
 
+def test_keep_fraction_guard() -> None:
+    try:
+        check_keep_fractions({"A": 100, "B": 1000, "C": 1000}, floor=0.2)
+        stopped = False
+    except SystemExit as e:
+        stopped = "B" in str(e)
+    check("a line kept at a tenth of its depth stops the prep and is named", stopped)
+    got = check_keep_fractions({"A": 800, "B": 1000}, floor=0.2)
+    check("fractions above the floor come back", got == {"A": 1.0, "B": 0.8}, str(got))
+
+
+def test_record_names_bj() -> None:
+    rec = build_record("HFFC6", rnapii_source="BJ ENCSR956IXE", seed=1)
+    check(
+        "the record carries the line and the BJ source",
+        rec["line"] == "HFFC6" and "BJ" in str(rec["rnapii_source"]) and rec["seed"] == 1,
+    )
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as d:
         test_read_normalises(Path(d))
@@ -114,6 +135,8 @@ def main() -> int:
     test_filter_rules()
     test_thin_keeps_expectation()
     test_absorb()
+    test_keep_fraction_guard()
+    test_record_names_bj()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     return 1 if FAIL else 0
 

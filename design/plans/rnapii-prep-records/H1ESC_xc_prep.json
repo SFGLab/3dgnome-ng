@@ -1,0 +1,40 @@
+{
+  "line": "H1ESC",
+  "rnapii_source": "RNAPII ChIA-PET loops and peaks per replicate from ENCODE ENCSR782EKZ, and CTCF ChIP-seq conservative IDR peaks from ENCSR000BNH, the inputs of playground/rnapii/crosscell_prep.py. Fetch with: python -m validation fetch --manifest validation/manifests/H1ESC_rnapii.json --out data/_rnapii",
+  "accessions": [
+    "ENCFF324UIT",
+    "ENCFF753NSM",
+    "ENCFF665IXY",
+    "ENCFF116RLS",
+    "ENCFF497ZGV"
+  ],
+  "seed": 20261111,
+  "max_span": 1000000,
+  "absorb_bp": 1000,
+  "ctcf": {
+    "loops_before": 75473,
+    "loops_filtered": 48970,
+    "depth_before": 7574383,
+    "keep_fraction": 0.5715419988664423,
+    "loops_after": 40273,
+    "depth_after": 4317310
+  },
+  "rnapii": {
+    "loops_before": 1257787,
+    "loops_filtered": 358033,
+    "depth_before": 2706004,
+    "keep_fraction": 0.46233301946338584,
+    "loops_after": 119570,
+    "depth_after": 941559
+  },
+  "anchors_plain": {
+    "added": 65400,
+    "summary": "45813 loop ends overlap a CTCF anchor (42107 with the midpoint inside it, 3706 lost), 193327 on no CTCF anchor -> 65400 new anchors, mean width 2.3 kb"
+  },
+  "anchors_absorbed": {
+    "added": 63607,
+    "summary": "43670 loop ends overlap a CTCF anchor (43670 with the midpoint inside it, 0 lost), 186570 on no CTCF anchor -> 63607 new anchors, mean width 2.3 kb"
+  },
+  "ends_absorbed": 52553,
+  "loops_absorbed_arm": 115120
+}
