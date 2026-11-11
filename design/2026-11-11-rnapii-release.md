@@ -145,6 +145,15 @@ Structure, for C, R and M, and for E where its models convert.
   target map and in each arm's simulated contact map, at the loop and against a local
   background. This is the readout that asks directly whether RNAPII loops are realised.
 
+Fine scale, added 2026-11-12. "Closer to reality" depends on the yardstick, and bulk Hi-C at
+25 kb rewards the CTCF and domain scaffold while RNAPII acts under 100 kb, through contacts
+ligation captures weakly. Micro-C resolves that range. For H1 and HFFc6, 4DN Micro-C
+(4DNFI2TK7L2F, 4DNFI18Q799K, mirrored on UCSC) is cut to chr1:0-60 Mb at 5 kb by
+`playground/rnapii/hic_slice.py`, and `microc_readout.py` gives each arm the pile-up at RNAPII
+loops on that grid and `r_fine`, the agreement of distance normalised contacts 20 kb to 1 Mb
+apart in 2 Mb windows. Each claim names its yardstick: the scaffold by bulk Hi-C, the fine
+contacts by Micro-C, function by expression.
+
 Expression.
 
 - Cell lines: E1, E2, E3 and the cross line jump statistic, by the enhancer3d analysis code,
