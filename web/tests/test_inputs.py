@@ -56,6 +56,25 @@ def main() -> int:
         check("a deletion shifts the anchors after it by its length", 1_040_000 in starts and 1_100_000 not in starts, str(starts[:8]))
         check("the region shrinks by the deletion", inp.region == "chr1:0-2940000", inp.region)
         check("the variants applied are counted", inp.n_svs == 1)
+
+        # On HG00512's first haplotype over chr1:1-3 Mb the rules' own cutoff of 0 turned 54 CTCF
+        # loops into 101, 46 of them on 19 bp anchors at weak motifs inside inserted repeats;
+        # triosformer's cutoff of 10 leaves 54 and one new anchor.
+        from personal3d import motifs, rewrite
+
+        seen: list[float] = []
+        real = rewrite.apply
+
+        def spy(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+            seen.append(kwargs.get("motif_cut", args[6] if len(args) > 6 else 0.0))
+            return real(*args, **kwargs)
+
+        rewrite.apply = spy
+        try:
+            build_inputs(ct, region, "CTCF", [dele], Path(d) / "spy")
+        finally:
+            rewrite.apply = real
+        check("the rules run with triosformer's motif cutoff", seen == [motifs.THRESHOLD], str(seen))
     return done()
 
 

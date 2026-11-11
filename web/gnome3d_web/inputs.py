@@ -17,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from personal3d import engine, hicdiffusion, rewrite
+from personal3d import engine, hicdiffusion, motifs, rewrite
 from personal3d.lift import Lift
 from personal3d.variants import SV
 
@@ -82,7 +82,9 @@ def build_inputs(
     for fac, path in cell.clusters_for(factors):
         clusters = _clusters(_read(path, chrom, 7), anchors)
         if svs:
-            got = rewrite.apply(clusters, rewrite.domains(clusters), {chrom: length}, svs)
+            # An inserted motif becomes an anchor only above triosformer's score cutoff. At the
+            # rules' own 0, repeats inside insertions made dozens of 19 bp anchors per region.
+            got = rewrite.apply(clusters, rewrite.domains(clusters), {chrom: length}, svs, None, None, motifs.THRESHOLD)
         else:
             got = [rewrite.Loop(c[0], (c[1], c[2]), (c[4], c[5]), (c[6], c[7]), float(c[8]), (c[1], c[2]), (c[4], c[5])) for c in clusters]
         kept = [lp for lp in got if region.start <= (lp.ref_a or lp.a)[0] and (lp.ref_b or lp.b)[1] <= region.end]
