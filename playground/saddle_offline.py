@@ -4,7 +4,7 @@ compartmentalisation without a reconstruction.
 Every arm is scored at the first arm's contact radius, the rule the epigenome study uses, so a
 term that shortens bonds does not change the effective resolution of its own map.
 
-    python playground/saddle_offline.py <mcool> <region> <binsize> <compartment bedGraph> <dir> [<dir> ...]
+    python playground/saddle_offline.py [--json <path>] <mcool> <region> <binsize> <compartment bedGraph> <dir> [<dir> ...]
 """
 
 from __future__ import annotations
@@ -23,6 +23,11 @@ from validation.studies.epigenome import _track_on_bins  # noqa: E402
 
 
 def main() -> None:
+    json_out = ""
+    if "--json" in sys.argv:
+        k = sys.argv.index("--json")
+        json_out = sys.argv[k + 1]
+        del sys.argv[k : k + 2]
     mcool, region, binsize, track = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
     dirs = sys.argv[5:]
     chrom = region.split(":")[0]
@@ -32,6 +37,7 @@ def main() -> None:
     print(f"{region} @ {binsize // 1000} kb: experimental saddle {obs:.3f}")
     print(f"  {'arm':<28}{'saddle':>8}{'eig |r|':>9}{'kappa':>8}{'n':>4}")
     radius: float | None = None
+    rows: list[dict[str, object]] = []
     for d in dirs:
         cifs = sorted(Path(d).glob("*.cif"))
         c_sim = np.zeros_like(c_obs)
@@ -46,6 +52,19 @@ def main() -> None:
             f"  {Path(d).name:<28}{sad:>8.3f}{cc['eig_pearson_abs']:>9.3f}"
             f"{cc['agreement_kappa']:>8.3f}{len(cifs):>4}"
         )
+        rows.append(
+            {
+                "arm": Path(d).name,
+                "n": len(cifs),
+                "saddle": float(sad),
+                "eig_r": float(cc["eig_pearson_abs"]),
+                "kappa": float(cc["agreement_kappa"]),
+            }
+        )
+    if json_out:
+        import json
+
+        Path(json_out).write_text(json.dumps(rows, indent=2) + "\n")
 
 
 if __name__ == "__main__":
