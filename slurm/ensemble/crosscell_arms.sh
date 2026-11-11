@@ -58,6 +58,8 @@ fi
 cd "$ROOT"
 mkdir -p slurm/ensemble/logs "$DEST"
 source .venv/bin/activate
+# The venv may hold an editable install of another checkout; this checkout's engine goes first.
+export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 export GNOME3D_JAX_CACHE="${GNOME3D_JAX_CACHE:-$ROOT/.cache/gnome3d-jax}"
 mkdir -p "$GNOME3D_JAX_CACHE"
 export PYTHONFAULTHANDLER=1
@@ -82,7 +84,7 @@ PYCHECK
 
 for C in $CHROMS; do
   echo "[launch] node=$(hostname) $LINE $ARM $C members=0-$((N - 1))"
-  srun gnome3d-ng --config "$CONFIG" --data-dir "data/$LINE" --region "$C" \
+  srun python -m gnome3d.cli --config "$CONFIG" --data-dir "data/$LINE" --region "$C" \
     --members "0-$((N - 1))" --out "$DEST/$C" \
     --log-file "$ROOT/slurm/ensemble/logs/xc_${SLURM_ARRAY_JOB_ID:-0}_${TASK}_${C}.detail.log"
   if [ "$C" = "chr1" ]; then
