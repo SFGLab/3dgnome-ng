@@ -52,7 +52,7 @@ expression() {
   local DIRS=()
   for A in E C R M; do for L in GM12878 H1ESC HFFC6; do
     local SRC="$ROOT/out/xc/${L}_${A}/chr1" DST="$ROOT/out/e3d/${L}_${A}"
-    [ -d "$DST" ] || "$PY" playground/rnapii/e3d_export.py "$SRC" "$DST" chr1 --min-covered 0.2 | tail -n 1
+    ls "$DST"/*.txt > /dev/null 2>&1 || "$PY" playground/rnapii/e3d_export.py "$SRC" "$DST" chr1 --min-covered 0.2 | tail -n 1
     DIRS+=("$DST")
   done; done
   local COMMON="$OUT/genes_chr1_common.tsv"
