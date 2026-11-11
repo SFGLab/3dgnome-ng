@@ -140,6 +140,52 @@ def test_loci() -> None:
     )
 
 
+def test_structure_only(tmp: Path) -> None:
+    df = table()
+    df = df[df["metric"] != "partial"]
+    try:
+        figure_main(df, {}, {}, tmp / "s.png")
+        ok = (tmp / "s.png").is_file()
+    except Exception as e:  # noqa: BLE001
+        ok = False
+        print(f"    {type(e).__name__}: {e}")
+    check("a figure without expression rows still draws", ok)
+
+
+def test_duplicate_rows_refused(tmp: Path) -> None:
+    (tmp / "b1.json").write_text(json.dumps([{"arm": "chr1", "n": 10, "scc": 0.36}]))
+    (tmp / "b2.json").write_text(json.dumps([{"arm": "chr1", "n": 10, "scc": 0.28}]))
+    man = {
+        "battery": [
+            {
+                "dataset": "HG00512",
+                "kind": "person",
+                "path": str(tmp / "b1.json"),
+                "arms": {"chr1": "C"},
+            },
+            {
+                "dataset": "HG00512",
+                "kind": "person",
+                "path": str(tmp / "b2.json"),
+                "arms": {"chr1": "C"},
+            },
+        ]
+    }
+    try:
+        collect(man)
+        refused = False
+    except ValueError:
+        refused = True
+    check("two rows for one dataset, arm and metric are refused", refused)
+
+
+def test_each_arm_marked(tmp: Path) -> None:
+    df = table()
+    df.loc[(df["arm"] == "C") & (df["dataset"] == "GM12878"), "n"] = 6
+    fig = figure_main(df, {}, {}, tmp / "n.png")
+    check("a C arm of six models is marked in the paired panels", "n=6" in " ".join(texts(fig)))
+
+
 def main() -> int:
     test_label_bj()
     test_loci()
@@ -147,6 +193,9 @@ def main() -> int:
         test_grid(Path(d))
         test_main(Path(d))
         test_collect(Path(d))
+        test_structure_only(Path(d))
+        test_duplicate_rows_refused(Path(d))
+        test_each_arm_marked(Path(d))
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     return 1 if FAIL else 0
 

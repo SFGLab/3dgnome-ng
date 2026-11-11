@@ -2,7 +2,9 @@
 
 Every pixel is divided by the mean of its diagonal, then the window of `2 flank + 1` bins
 around each loop's pixel is averaged over the loops. The score is the centre pixel over the mean
-of the 3 by 3 lower left corner, the corner nearer the diagonal, as in Juicer's APA. A map with
+of the 3 by 3 lower left corner, the corner nearer the diagonal, Juicer's P2LL. Juicer skips
+loops under 30 bins; here the floor is 5, so the windows of loops under 150 kb reach the
+diagonal, which the division by the diagonal's mean puts on the same footing. A map with
 nothing at the loops scores one. Loops closer than `min_sep` bins, or whose window leaves the
 map, are not used.
 
@@ -96,6 +98,8 @@ def main() -> None:
 
     chrom = region.split(":")[0]
     c_obs, bin_starts = observed_hic(mcool, region, binsize, balance=False)
+    # observed_hic snaps to the nearest resolution the file holds
+    binsize = int(bin_starts[1] - bin_starts[0]) if len(bin_starts) > 1 else binsize
     lo, hi = int(bin_starts[0]), int(bin_starts[-1]) + binsize
     loops = [lp for lp in read_bedpe(Path(loops_path)) if lp[0] == chrom and lp[1] >= lo and lp[5] <= hi]
 

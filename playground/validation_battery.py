@@ -61,6 +61,9 @@ from validation.metrics.hic import (  # noqa: E402
     multimm_faithful_pearson,
     observed_hic,
 )
+METRIC_KEYS = (
+    "pearson", "spearman", "scc", "multimm", "exponent", "e_short", "e_long", "rg", "wb_aa", "wb_sa", "xb",
+)  # fmt: skip
 CONTACT_BEADS = 1.33  # a contact is two beads within this many chain bonds; 2.0 units at the old 1.5 unit bead
 
 
@@ -279,6 +282,7 @@ def main() -> None:
         cifs = sorted(Path(d).glob("*.cif"))
         if not cifs:
             print(f"  {Path(d).name:>10s}  no cif files")
+            rows.append({"arm": Path(d).name, "n": 0, **{k: float("nan") for k in METRIC_KEYS}})
             continue
         coords, mids = [], None
         pear, spear, scc, expo, rgs = [], [], [], [], []

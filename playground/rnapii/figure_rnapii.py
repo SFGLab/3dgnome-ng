@@ -38,7 +38,7 @@ INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 # +1 higher is better, -1 lower is better, 0 closest to one is better.
 DIRECTION = {
     "pearson": 1, "spearman": 1, "scc": 1, "multimm": 1, "exponent": 1, "eig_r": 1,
-    "saddle": 1, "apa_vs_map": 0, "wb_aa": -1, "wb_sa": -1, "xb": -1, "rg": 0,
+    "saddle": 1, "apa_vs_map": 0, "wb_aa": -1, "wb_sa": -1, "xb": -1,
     "partial": -1, "rho_3d": -1, "e1": -1, "e2": 1, "e3": -1, "jump_rho": -1, "family_sep": 1,
 }  # fmt: skip
 STRUCTURE = ("scc", "pearson", "multimm", "saddle", "eig_r", "apa_vs_map", "wb_aa", "xb")
@@ -78,12 +78,20 @@ def collect(manifest: dict[str, list[dict[str, object]]]) -> pd.DataFrame:
         for r in pd.read_csv(str(e["path"])).itertuples():
             rows.append({"dataset": e["dataset"], "kind": e["kind"], "arm": str(r.arm),
                          "metric": str(r.metric), "value": float(r.value), "n": int(r.n)})  # fmt: skip
-    return pd.DataFrame(rows, columns=["dataset", "kind", "arm", "metric", "value", "n"])
+    df = pd.DataFrame(rows, columns=["dataset", "kind", "arm", "metric", "value", "n"])
+    dup = df[df.duplicated(["dataset", "arm", "metric"], keep=False)]
+    if len(dup):
+        raise ValueError(
+            "two rows for one dataset, arm and metric; give every arm directory a unique name:\n"
+            + dup.to_string(index=False)
+        )
+    return df
 
 
 def best_arm(values: dict[str, float], metric: str) -> str | None:
     """The arm whose value is best for the metric, None when the metric has no direction."""
     d = DIRECTION.get(metric)
+    values = {a: v for a, v in values.items() if np.isfinite(v)}
     if d is None or not values:
         return None
     if d == 0:
@@ -168,11 +176,14 @@ def _paired(ax: plt.Axes, df: pd.DataFrame, metric: str, records: dict[str, dict
         ax.plot(xs, ys, color=MUTED if line else GRID, linewidth=2 if line else 1, zorder=2 if line else 1)
         for a in arms:
             if a in d.index:
-                ax.scatter(x[a], float(d.loc[a, "value"]), s=40 if line else 12, color=COLOUR[a],
+                v, n = float(d.loc[a, "value"]), int(d.loc[a, "n"])
+                ax.scatter(x[a], v, s=40 if line else 12, color=COLOUR[a],
                            edgecolor="white", linewidth=1.5 if line else 0.5, zorder=3 if line else 1)  # fmt: skip
+                if n < 10:
+                    ax.annotate(f"n={n}", (x[a], v), xytext=(-4, 5), textcoords="offset points",
+                                fontsize=6, color=MUTED, ha="right")  # fmt: skip
         if line and ys:
-            n = int(d.loc[arms[xs[-1]], "n"])
-            ends.append((dataset_label(ds, records) + (f", n={n}" if n < 10 else ""), xs[-1], ys[-1]))
+            ends.append((dataset_label(ds, records), xs[-1], ys[-1]))
     lo, hi = ax.get_ylim()
     for (text, x0, y0), y in zip(ends, _spread([e[2] for e in ends], (hi - lo) * 0.045), strict=True):
         ax.annotate(text, (x0, y0), xytext=(x0 + 0.15, y), textcoords="data", fontsize=7, color=INK,
@@ -209,7 +220,15 @@ def figure_main(
         ax_c.text(0.5, 0.5, "no pile-ups given", ha="center", color=MUTED, fontsize=8)
 
     _paired(ax_d, df, "scc", records, "d  structure, SCC against Hi-C")
-    expr = next((m for m in ("partial", "e3", "rho_3d") if m in set(df["metric"])), "partial")
+    expr = next((m for m in ("partial", "e3", "rho_3d") if m in set(df["metric"])), None)
+    if expr is None:
+        for ax, name in ((ax_e, "e  expression"), (ax_f, "f  trade-off")):
+            ax.axis("off")
+            ax.set_title(name, fontsize=9, color=INK, loc="left")
+            ax.text(0.5, 0.5, "no expression readout yet", ha="center", color=MUTED, fontsize=8, transform=ax.transAxes)
+        fig.tight_layout()
+        fig.savefig(out, dpi=200)
+        return fig
     _paired(ax_e, df, expr, records, f"e  expression, {expr}")
 
     ax_f.axhline(0, color=GRID, linewidth=1)
@@ -223,7 +242,7 @@ def figure_main(
             if (ds, arm) in piv.index:
                 p = piv.loc[(ds, arm)]
                 dx = float(p["scc"] - base["scc"])
-                dy = -float(p[expr] - base[expr])
+                dy = DIRECTION[expr] * float(p[expr] - base[expr])
                 line = df[df["dataset"] == ds]["kind"].iloc[0] == "line"
                 ax_f.scatter(dx, dy, s=40 if line else 14, color=COLOUR[arm], edgecolor="white",
                              linewidth=1.5 if line else 0.5, zorder=2 if line else 1)  # fmt: skip
@@ -309,6 +328,9 @@ def main() -> None:
     records = {k: json.loads(Path(v).read_text()) for k, v in manifest.get("records", {}).items()}
     piles = {k: np.load(v["path"])[v["key"]] for k, v in manifest.get("piles", {}).items()}
     df = collect(manifest)
+    missing = sorted(set(df.loc[df["kind"] == "line", "dataset"]) - set(records))
+    if missing:
+        raise SystemExit(f"no prep record in the manifest for {missing}; labels would hide a stand in line")
     df.to_csv(out / "rnapii_long.csv", index=False)
     figure_main(df, piles, records, out / "rnapii_main.png")
     figure_main(df, piles, records, out / "rnapii_main.pdf")

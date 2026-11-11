@@ -40,8 +40,8 @@ def check(name: str, cond: bool, detail: str = "") -> None:
     print(f"  {mark}  {name}   {detail}")
 
 
-def make_cooler(path: Path, binsize: int) -> None:
-    """A balanced cooler on chr1:0-5 Mb whose contacts decay with separation."""
+def make_cooler(path: Path, binsize: int, balanced: bool = True) -> None:
+    """A cooler on chr1:0-5 Mb whose contacts decay with separation, balanced unless asked not."""
     import cooler
 
     starts = np.arange(0, SPAN, binsize)
@@ -51,8 +51,8 @@ def make_cooler(path: Path, binsize: int) -> None:
     count = np.maximum(1, (1000 / (1 + sep) ** 1.0).astype(np.int64))
     pixels = pd.DataFrame({"bin1_id": i, "bin2_id": j, "count": count})
     cooler.create_cooler(str(path), bins, pixels, ordered=True)
-    clr = cooler.Cooler(str(path))
-    cooler.balance_cooler(clr, store=True, ignore_diags=1)
+    if balanced:
+        cooler.balance_cooler(cooler.Cooler(str(path)), store=True, ignore_diags=1)
 
 
 def make_arm(d: Path, seed: int) -> None:
@@ -113,6 +113,27 @@ def main() -> int:
             "the saddle writes one row per arm with every key",
             len(rows) == 2 and all(set(r) == SADDLE_KEYS for r in rows) and rows[0]["n"] == 3,
             str(rows[:1]),
+        )
+        make_cooler(tmp / "raw.cool", 25_000, balanced=False)
+        (tmp / "empty").mkdir()
+        out = tmp / "saddle_raw.json"
+        subprocess.run(
+            [sys.executable, str(ROOT / "playground" / "saddle_offline.py"), "--balance", "no", "--json", str(out),
+             str(tmp / "raw.cool"), f"chr1:0-{SPAN}", "25000", str(track), arms[0]],
+            check=False, capture_output=True, cwd=ROOT,
+        )  # fmt: skip
+        check("the saddle reads a map with no weights under --balance no", out.is_file())
+        out = tmp / "battery_empty.json"
+        subprocess.run(
+            [sys.executable, str(ROOT / "playground" / "validation_battery.py"), "--balance", "no",
+             "--json", str(out), str(tmp / "map.cool"), f"chr1:0-{SPAN}", "25000", arms[0], str(tmp / "empty")],
+            check=False, capture_output=True, cwd=ROOT,
+        )  # fmt: skip
+        rows = json.loads(out.read_text()) if out.is_file() else []
+        check(
+            "an arm with no structures is a row with n zero, not a missing row",
+            len(rows) == 2 and rows[1]["arm"] == "empty" and rows[1]["n"] == 0,
+            str([(r.get("arm"), r.get("n")) for r in rows]),
         )
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     return 1 if FAIL else 0

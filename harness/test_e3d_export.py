@@ -19,7 +19,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "playground" / "rnapii"))
 
-from e3d_export import subsample, to_grid, write_model  # noqa: E402
+from e3d_export import hcm_level3, subsample, to_grid, write_model  # noqa: E402
 
 PASS: list[str] = []
 FAIL: list[str] = []
@@ -96,12 +96,52 @@ def test_subsample(tmp: Path) -> None:
     )
 
 
+def test_hcm_level3(tmp: Path) -> None:
+    # previous format: n n_arcs root n_factors, factor names, then per cluster
+    # genomic_pos start end x y z n_children children..., then 8 ints per arc
+    rows = [
+        "0 0 300 0 0 0 1 1",
+        "0 0 300 0 0 0 1 2",
+        "0 0 300 0 0 0 3 3 4 5",
+        "50 0 100 1.0 0 0 0",
+        "150 100 200 2.0 0 0 0",
+        "250 200 300 3.0 0 0 0",
+    ]
+    f = tmp / "loops_chr1_0.hcm"
+    f.write_text("6 1 0 1 CTCF\n" + "\n".join(rows) + "\n3 5 9 0 50 250 0 0\n")
+    pos, start, end = hcm_level3(f)
+    check(
+        "the third level of the tree is the leaf beads with their spans",
+        pos[:, 0].tolist() == [1.0, 2.0, 3.0]
+        and start.tolist() == [0, 100, 200]
+        and end.tolist() == [100, 200, 300],
+        str(pos[:, 0].tolist()),
+    )
+
+
+def test_subsample_hcm(tmp: Path) -> None:
+    src = tmp / "H"
+    src.mkdir()
+    for i in range(20):
+        (src / f"loops_chr1_{i}.hcm").write_text("x")
+    dest = tmp / "h10"
+    got = subsample(src, dest, n=10, seed=1, pattern="loops_*.hcm")
+    again = subsample(src, dest, n=10, seed=1, pattern="loops_*.hcm")
+    check(
+        "hcm models subsample without companions and a rerun is a no op",
+        len(got) == 10 and got == again and not list(dest.glob("*.txt")),
+    )
+
+
 def main() -> int:
     test_grid_gap()
     with tempfile.TemporaryDirectory() as d:
         test_write_read_back(Path(d))
     with tempfile.TemporaryDirectory() as d:
         test_subsample(Path(d))
+    with tempfile.TemporaryDirectory() as d:
+        test_hcm_level3(Path(d))
+        test_subsample_hcm(Path(d))
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     return 1 if FAIL else 0
 
