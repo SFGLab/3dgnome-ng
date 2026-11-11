@@ -28,6 +28,8 @@ from crosscell_prep import (  # noqa: E402
     pool_replicates,
     read_bedpe,
     thin,
+    thin_to_depth,
+    top_peaks,
 )
 
 PASS: list[str] = []
@@ -128,6 +130,41 @@ def test_record_names_bj() -> None:
     )
 
 
+def test_thin_to_depth() -> None:
+    rng = np.random.default_rng(3)
+    loops = [
+        ("chr1", i * 1000, i * 1000 + 100, "chr1", i * 1000 + 50_000, i * 1000 + 50_100, int(n))
+        for i, n in enumerate(rng.integers(3, 12, size=3000))
+    ]
+    target = depth(loops) // 3
+    out, p = thin_to_depth(loops, target, np.random.default_rng(5), min_pets=3)
+    got = depth(out)
+    check(
+        "thinning to a depth lands on it after the three PET floor",
+        abs(got - target) / target < 0.005 and all(lp[6] >= 3 for lp in out),
+        f"target {target} got {got} p {p:.3f}",
+    )
+    out, p = thin_to_depth(loops, depth(loops) * 2, np.random.default_rng(5), min_pets=3)
+    check("a target above the depth keeps every loop", out == loops and p == 1.0)
+
+
+def test_top_peaks(tmp: Path) -> None:
+    f = tmp / "p.narrowPeak"
+    f.write_text(
+        "".join(
+            f"chr1\t{i * 1000}\t{i * 1000 + 200}\t.\t0\t.\t{s}\t-1\t-1\n"
+            for i, s in enumerate([5, 1, 9, 3])
+        )
+    )
+    got = top_peaks([f], 2)
+    check(
+        "the cap keeps the strongest peaks per file",
+        got == {"chr1": [(0, 200), (2000, 2200)]},
+        str(got),
+    )
+    check("no cap keeps every peak", sum(len(v) for v in top_peaks([f], None).values()) == 4)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as d:
         test_read_normalises(Path(d))
@@ -137,6 +174,9 @@ def main() -> int:
     test_absorb()
     test_keep_fraction_guard()
     test_record_names_bj()
+    test_thin_to_depth()
+    with tempfile.TemporaryDirectory() as d:
+        test_top_peaks(Path(d))
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     return 1 if FAIL else 0
 

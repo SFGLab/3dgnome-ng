@@ -10,31 +10,39 @@
   ],
   "seed": 20261111,
   "max_span": 1000000,
-  "absorb_bp": 1000,
+  "absorb_bp": 25000,
+  "rnapii_peak_cap": 38782,
+  "peak_counts": {
+    "RNAPII_peaks_r1.ENCFF109HCZ.gz": 55562,
+    "RNAPII_peaks_r2.ENCFF578JKO.gz": 43425,
+    "CTCF_peaks.ENCFF796WRU.gz": 44217
+  },
   "ctcf": {
     "loops_before": 123274,
     "loops_filtered": 61666,
     "depth_before": 10284460,
     "keep_fraction": 0.42093391388560997,
-    "loops_after": 45567,
-    "depth_after": 4303157
+    "keep_probability": 0.4231659552318591,
+    "loops_after": 45797,
+    "depth_after": 4329078
   },
   "rnapii": {
     "loops_before": 706908,
-    "loops_filtered": 316122,
-    "depth_before": 2201634,
-    "keep_fraction": 0.5682484009603777,
-    "loops_after": 144408,
-    "depth_after": 998623
+    "loops_filtered": 289666,
+    "depth_before": 2074357,
+    "keep_fraction": 0.3125734866274224,
+    "keep_probability": 0.4318134871306078,
+    "loops_after": 92310,
+    "depth_after": 648390
   },
   "anchors_plain": {
-    "added": 69867,
-    "summary": "103478 loop ends overlap a CTCF anchor (99494 with the midpoint inside it, 3984 lost), 185338 on no CTCF anchor -> 69867 new anchors, mean width 1.6 kb"
+    "added": 47807,
+    "summary": "70165 loop ends overlap a CTCF anchor (67343 with the midpoint inside it, 2822 lost), 114455 on no CTCF anchor -> 47807 new anchors, mean width 1.8 kb"
   },
   "anchors_absorbed": {
-    "added": 66608,
-    "summary": "94225 loop ends overlap a CTCF anchor (94225 with the midpoint inside it, 0 lost), 175097 on no CTCF anchor -> 66608 new anchors, mean width 1.6 kb"
+    "added": 18914,
+    "summary": "73813 loop ends overlap a CTCF anchor (73813 with the midpoint inside it, 0 lost), 42863 on no CTCF anchor -> 18914 new anchors, mean width 1.7 kb"
   },
-  "ends_absorbed": 113697,
-  "loops_absorbed_arm": 134661
+  "ends_absorbed": 141746,
+  "loops_absorbed_arm": 58338
 }

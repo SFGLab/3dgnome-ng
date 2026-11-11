@@ -81,27 +81,9 @@ class PeakIndex:
         self.ends = {c: [e for _, e in lst] for c, lst in union.items()}
 
     @classmethod
-    def from_beds(cls, paths: list[Path]) -> PeakIndex:
-        """The merged union of every peak file, gzip aware."""
-        by: dict[str, list[Interval]] = {}
-        for path in paths:
-            opener = gzip.open if str(path).endswith(".gz") else open
-            with opener(path, "rt") as fh:
-                for line in fh:
-                    f = line.split()
-                    if len(f) >= 3 and not line.startswith(("#", "track")):
-                        by.setdefault(f[0], []).append((int(float(f[1])), int(float(f[2]))))
-        union: dict[str, list[Interval]] = {}
-        for c, lst in by.items():
-            lst.sort()
-            merged: list[list[int]] = []
-            for s, e in lst:
-                if merged and s <= merged[-1][1]:
-                    merged[-1][1] = max(merged[-1][1], e)
-                else:
-                    merged.append([s, e])
-            union[c] = [(s, e) for s, e in merged]
-        return cls(union)
+    def from_beds(cls, paths: list[Path], max_per_file: int | None = None) -> PeakIndex:
+        """The merged union of every peak file, each capped by `top_peaks`."""
+        return cls(top_peaks(paths, max_per_file))
 
     def overlaps(self, chrom: str, start: int, end: int) -> bool:
         starts = self.starts.get(chrom)
@@ -109,6 +91,37 @@ class PeakIndex:
             return False
         k = bisect.bisect_right(starts, end - 1) - 1
         return k >= 0 and self.ends[chrom][k] > start
+
+
+def top_peaks(paths: list[Path], max_per_file: int | None) -> dict[str, list[Interval]]:
+    """Merged intervals per chromosome over the peak files, gzip aware. With `max_per_file` each
+    file keeps only its strongest peaks by the signal in column 7."""
+    by: dict[str, list[Interval]] = {}
+    for path in paths:
+        opener = gzip.open if str(path).endswith(".gz") else open
+        rows: list[tuple[float, str, int, int]] = []
+        with opener(path, "rt") as fh:
+            for line in fh:
+                f = line.split()
+                if len(f) >= 3 and not line.startswith(("#", "track")):
+                    signal = float(f[6]) if len(f) > 6 else 0.0
+                    rows.append((signal, f[0], int(float(f[1])), int(float(f[2]))))
+        if max_per_file is not None and len(rows) > max_per_file:
+            rows.sort(key=lambda r: -r[0])
+            rows = rows[:max_per_file]
+        for _, c, a, b in rows:
+            by.setdefault(c, []).append((a, b))
+    union: dict[str, list[Interval]] = {}
+    for c, lst in by.items():
+        lst.sort()
+        merged: list[list[int]] = []
+        for a, b in lst:
+            if merged and a <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], b)
+            else:
+                merged.append([a, b])
+        union[c] = [(a, b) for a, b in merged]
+    return union
 
 
 def filter_loops(
@@ -137,6 +150,38 @@ def thin(loops: list[Loop], p: float, rng: np.random.Generator, min_pets: int = 
         return list(loops)
     drawn = rng.binomial(np.array([lp[6] for lp in loops], dtype=np.int64), p)
     return [(*lp[:6], int(d)) for lp, d in zip(loops, drawn, strict=True) if d >= min_pets]
+
+
+def thin_to_depth(
+    loops: list[Loop], target: int, rng: np.random.Generator, min_pets: int = 3
+) -> tuple[list[Loop], float]:
+    """Loops thinned so their PET total after the `min_pets` floor is `target`, and the keep
+    probability used.
+
+    Every PET draws one uniform number, and at probability p a loop keeps the PETs whose number
+    is under p. The total is then monotone in p, so p is found by bisection, and the floor is
+    counted in the total rather than applied after it. A target at or above the depth keeps
+    every loop as it is.
+    """
+    if target >= depth(loops):
+        return list(loops), 1.0
+    counts = np.array([lp[6] for lp in loops], dtype=np.int64)
+    starts = np.concatenate([[0], np.cumsum(counts)[:-1]])
+    u = rng.random(int(counts.sum()))
+
+    def kept(p: float) -> np.ndarray:
+        k = np.add.reduceat((u < p).astype(np.int64), starts)
+        return np.where(k >= min_pets, k, 0)
+
+    lo, hi = 0.0, 1.0
+    for _ in range(60):
+        mid = (lo + hi) / 2
+        if kept(mid).sum() < target:
+            lo = mid
+        else:
+            hi = mid
+    k = kept(hi)
+    return [(*lp[:6], int(n)) for lp, n in zip(loops, k, strict=True) if n > 0], hi
 
 
 def _nearest(
@@ -255,29 +300,43 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="cross line RNAPII inputs")
     ap.add_argument("--max-span", type=int, default=1_000_000)
     ap.add_argument("--seed", type=int, default=20261111)
-    ap.add_argument("--absorb-bp", type=int, default=0, help="0 takes target_bp_per_subanchor")
+    # 25 kb, the Hi-C pixel the battery reads; at the spec's 1 kb arm M barely differs from R
+    ap.add_argument("--absorb-bp", type=int, default=25_000, help="0 takes target_bp_per_subanchor")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
     absorb_bp = args.absorb_bp or int(CANONICAL["main"]["target_bp_per_subanchor"])  # type: ignore[call-overload]
 
+    # Every RNAPII peak file is capped at the median peak count of the thresholded ENCODE sets of
+    # GM12878 and H1ESC. BJ's files are unthresholded MACS2 calls with ten times as many peaks,
+    # which would let three times as many RNAPII loops through the filter.
+    native = [p for line in ("GM12878", "H1ESC") for p in _fetched(root, line, "RNAPII_peaks")]
+    peak_cap = int(np.median([sum(1 for _ in gzip.open(p, "rt")) for p in native]))
+    print(f"RNAPII peaks capped at {peak_cap} per file")
     filtered: dict[tuple[str, str], list[Loop]] = {}
     before: dict[tuple[str, str], int] = {}
+    peak_counts: dict[str, dict[str, int]] = {}
     for line in LINES:
         data = root / "data" / line
         ctcf_loops = read_bedpe(data / f"{line}_clusters_3+.bedpe")
         rnapii_loops = pool_replicates([read_bedpe(p) for p in _fetched(root, line, "RNAPII_loops")])
         peaks = {
             "ctcf": PeakIndex.from_beds(_fetched(root, line, "CTCF_peaks")),
-            "rnapii": PeakIndex.from_beds(_fetched(root, line, "RNAPII_peaks")),
+            "rnapii": PeakIndex.from_beds(_fetched(root, line, "RNAPII_peaks"), peak_cap),
+        }
+        peak_counts[line] = {
+            p.name: sum(1 for _ in gzip.open(p, "rt"))
+            for p in _fetched(root, line, "RNAPII_peaks") + _fetched(root, line, "CTCF_peaks")
         }
         for fac, loops in (("ctcf", ctcf_loops), ("rnapii", rnapii_loops)):
             before[(line, fac)] = len(loops)
             filtered[(line, fac)] = filter_loops(loops, peaks[fac], ENDS_ON_PEAKS[fac], args.max_span)
 
     fractions: dict[tuple[str, str], float] = {}
+    targets: dict[str, int] = {}
     for fac in FACTORS:
         depths = {line: depth(filtered[(line, fac)]) for line in LINES}
         print(f"{fac} filtered depths: {depths}")
+        targets[fac] = min(depths.values())
         for line, f in check_keep_fractions(depths, KEEP_FLOOR).items():
             fractions[(line, fac)] = f
 
@@ -292,17 +351,20 @@ def main() -> None:
             seed=args.seed,
             max_span=args.max_span,
             absorb_bp=absorb_bp,
+            rnapii_peak_cap=peak_cap,
+            peak_counts=peak_counts[line],
         )
         thinned: dict[str, list[Loop]] = {}
         for fi, fac in enumerate(FACTORS):
             loops = filtered[(line, fac)]
             rng = np.random.default_rng([args.seed, li, fi])
-            thinned[fac] = thin(loops, fractions[(line, fac)], rng)
+            thinned[fac], p_keep = thin_to_depth(loops, targets[fac], rng)
             record[fac] = {
                 "loops_before": before[(line, fac)],
                 "loops_filtered": len(loops),
                 "depth_before": depth(loops),
                 "keep_fraction": fractions[(line, fac)],
+                "keep_probability": p_keep,
                 "loops_after": len(thinned[fac]),
                 "depth_after": depth(thinned[fac]),
             }
