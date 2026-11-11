@@ -40,9 +40,10 @@ DIRECTION = {
     "pearson": 1, "spearman": 1, "scc": 1, "multimm": 1, "exponent": 1, "eig_r": 1,
     "saddle": 1, "apa_vs_map": 0, "wb_aa": -1, "wb_sa": -1, "xb": -1,
     "partial": -1, "rho_3d": -1, "e1": -1, "e2": 1, "e3": -1, "jump_rho": -1, "family_sep": 1,
+    "r_total": -1, "r_set": -1, "r_conf": -1, "jump_r_conf": -1,
 }  # fmt: skip
 STRUCTURE = ("scc", "pearson", "multimm", "saddle", "eig_r", "apa_vs_map", "wb_aa", "xb")
-EXPRESSION = ("partial", "rho_3d", "e1", "e3", "jump_rho", "family_sep")
+EXPRESSION = ("r_conf", "r_total", "jump_r_conf", "partial", "rho_3d", "e1", "e3", "jump_rho", "family_sep")
 NAMES = {"HFFC6": "HFFc6", "H1ESC": "H1"}
 
 
@@ -220,7 +221,7 @@ def figure_main(
         ax_c.text(0.5, 0.5, "no pile-ups given", ha="center", color=MUTED, fontsize=8)
 
     _paired(ax_d, df, "scc", records, "d  structure, SCC against Hi-C")
-    expr = next((m for m in ("partial", "e3", "rho_3d") if m in set(df["metric"])), None)
+    expr = next((m for m in ("r_conf", "partial", "e3", "rho_3d") if m in set(df["metric"])), None)
     if expr is None:
         for ax, name in ((ax_e, "e  expression"), (ax_f, "f  trade-off")):
             ax.axis("off")
