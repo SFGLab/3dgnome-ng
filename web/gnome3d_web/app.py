@@ -26,6 +26,13 @@ def create_app() -> FastAPI:
     s = Settings.from_env()
     catalog = Catalog.load(s.data_dir)
     templates = Jinja2Templates(directory=str(HERE / "templates"))
+
+    def pretty_region(text: str) -> str:
+        """chr1:1000000-3000000 as chr1:1,000,000-3,000,000."""
+        m = re.fullmatch(r"(\w+):(\d+)-(\d+)", str(text))
+        return f"{m[1]}:{int(m[2]):,}-{int(m[3]):,}" if m else str(text)
+
+    templates.env.filters["region"] = pretty_region
     app = FastAPI(title="3D-GNOME")
     shared = s.results_dir / "jobs"
     private = s.results_dir / "private"
