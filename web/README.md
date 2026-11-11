@@ -80,6 +80,14 @@ the hg38 FASTA with its `.fai`. Mount them into the worker and set the variables
 a contact background from sequence spliced into the cell type's map over a 2 Mb window from the
 region's start; the site never presents it as individual specific.
 
+## How long a job takes
+
+Measured 2026-11-11 on an RTX 3090 with a warm JAX cache: GM12878 chr1:1-3 Mb, CTCF and
+RNAPII loops, HG00512's first haplotype from HGSVC (69 variants), ten structures, 58 s from
+submission to the finished page. Jobs run on the queue and the page refreshes itself, so a user
+waits about a minute. The first job after a restart also pays the JAX compile, which the cache
+under `RESULTS_DIR/.jax-cache` keeps for the next.
+
 ## Caching and privacy
 
 A request on hosted inputs is keyed by a hash of the normalised request, so an identical request
