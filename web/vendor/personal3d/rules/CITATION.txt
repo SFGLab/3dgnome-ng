@@ -1,0 +1,9 @@
+message: If you use this software, please cite it as below.
+authors:
+    family-names: Sadowski
+    given-names: Michal
+title: Spatial chromatin architecture alteration by structural variations in
+human genomes at the population scale [code]
+doi: http://doi.org/10.5281/zenodo.2837248
+date-released: 2019-05-15
+repository-code: https://bitbucket.org/4dnucleome/spatial_chromatin_architecture
