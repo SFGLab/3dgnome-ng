@@ -46,14 +46,23 @@ expression() {
   [ -s "$GENES" ] || awk -F'\t' 'BEGIN{OFS="\t"; print "gene_id","chrom","start","end","strand"}
     $3=="gene" && $1=="chr1" {match($9,/gene_id "[^"]+"/); id=substr($9,RSTART+9,RLENGTH-10); print id,$1,$4-1,$5,$7}' \
     "$E3D/gencode.v40.basic.annotation.gtf" > "$GENES"
+  # Every arm of every line is exported first. Arm E's cudaMMC beads leave about a third of chr1
+  # within 5 kb of a bead against about three quarters for gnome3d, so the floor is 0.2 and the
+  # statistics run on the genes covered in all twelve ensembles, one gene set for every arm.
+  local DIRS=()
+  for A in E C R M; do for L in GM12878 H1ESC HFFC6; do
+    local SRC="$ROOT/out/xc/${L}_${A}/chr1" DST="$ROOT/out/e3d/${L}_${A}"
+    [ -d "$DST" ] || "$PY" playground/rnapii/e3d_export.py "$SRC" "$DST" chr1 --min-covered 0.2 | tail -n 1
+    DIRS+=("$DST")
+  done; done
+  local COMMON="$OUT/genes_chr1_common.tsv"
+  "$PY" playground/rnapii/e3d_export.py --common-genes "$GENES" "$COMMON" "${DIRS[@]}"
   for A in E C R M; do
     local MODELS=() ATL=()
     for L in GM12878 H1ESC HFFC6; do
-      local SRC="$ROOT/out/xc/${L}_${A}/chr1" DST="$ROOT/out/e3d/${L}_${A}"
-      [ -d "$DST" ] || "$PY" playground/rnapii/e3d_export.py "$SRC" "$DST" chr1 | tail -n 2
-      MODELS+=(--model "$L=$DST"); ATL+=(--atlas "$L=$E3D/enhancer_atlas/${L}_enhancers_hg38.bed")
+      MODELS+=(--model "$L=$ROOT/out/e3d/${L}_${A}"); ATL+=(--atlas "$L=$E3D/enhancer_atlas/${L}_enhancers_hg38.bed")
     done
-    (cd "$E3DX" && "$PY" -m enhancer3d.cli "${MODELS[@]}" --genes "$GENES" --enh-mode atlas "${ATL[@]}" \
+    (cd "$E3DX" && "$PY" -m enhancer3d.cli "${MODELS[@]}" --genes "$COMMON" --enh-mode atlas "${ATL[@]}" \
       --deseq "GM12878:H1ESC=$E3D/deseq/gm12878_vs_h1esc_results.parquet" \
       --deseq "H1ESC:HFFC6=$E3D/deseq/h1esc_vs_hffc6_results.parquet" \
       --deseq "GM12878:HFFC6=$E3D/deseq/gm12878_vs_hffc6_results.parquet" \

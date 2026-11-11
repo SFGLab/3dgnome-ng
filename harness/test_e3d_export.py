@@ -19,7 +19,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "playground" / "rnapii"))
 
-from e3d_export import hcm_level3, subsample, to_grid, write_model  # noqa: E402
+from e3d_export import common_genes, hcm_level3, subsample, to_grid, write_model  # noqa: E402
 
 PASS: list[str] = []
 FAIL: list[str] = []
@@ -133,6 +133,24 @@ def test_subsample_hcm(tmp: Path) -> None:
     )
 
 
+def test_common_genes(tmp: Path) -> None:
+    pos, mids = chain()
+    for k, gap in enumerate((5000, 2000)):
+        grid, positions, _ = to_grid(pos, mids, 0, 200_000, max_gap=gap)
+        write_model(tmp / f"arm{k}" / "loops_chr1_0.hcm.smooth", grid, positions) if (
+            tmp / f"arm{k}"
+        ).mkdir() is None else None
+    genes = tmp / "genes.tsv"
+    genes.write_text(
+        "gene_id\tchrom\tstart\tend\tstrand\nA\tchr1\t50000\t60000\t+\nB\tchr1\t100000\t104000\t-\nC\tchr1\t110000\t111000\t+\n"
+    )
+    out = tmp / "common.tsv"
+    n = common_genes(genes, out, [tmp / "arm0", tmp / "arm1"])
+    kept = [ln.split("\t")[0] for ln in out.read_text().splitlines()[1:]]
+    # B's TSS (end, minus strand) at 104,000 is 4 kb from a bead: covered at 5 kb, not at 2 kb
+    check("only genes covered in every arm are kept", kept == ["A"] and n == 1, str(kept))
+
+
 def main() -> int:
     test_grid_gap()
     with tempfile.TemporaryDirectory() as d:
@@ -142,6 +160,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as d:
         test_hcm_level3(Path(d))
         test_subsample_hcm(Path(d))
+    with tempfile.TemporaryDirectory() as d:
+        test_common_genes(Path(d))
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     return 1 if FAIL else 0
 

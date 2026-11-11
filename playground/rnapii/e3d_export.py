@@ -11,6 +11,7 @@ every arm, E included, since E's chain is already uniform at 1 kb and every posi
     python playground/rnapii/e3d_export.py <arm_dir> <out_dir> <chrom> [--min-covered 0.5]
     python playground/rnapii/e3d_export.py --subsample <E_dir> <out_dir> [--n 10] [--seed 20261111]
     python playground/rnapii/e3d_export.py --hcm-to-cif <hcm_dir> <out_dir> [--n 10] [--seed 20261111]
+    python playground/rnapii/e3d_export.py --common-genes <genes.tsv> <out.tsv> <export_dir> ...
 
 Arm E's models are cudaMMC `.hcm` trees. `--hcm-to-cif` links a seeded ten of them under
 `<out_dir>/hcm` and writes each one's third level, anchors and loop beads, as a gnome3d cif in
@@ -114,6 +115,31 @@ def hcm_to_cif(src: Path, dest: Path) -> None:
     write_cif(str(dest), [BeadOut(int(a), int(b), *map(float, p), "subanchor") for p, a, b in zip(pos, start, end, strict=True)])
 
 
+def common_genes(genes: Path, out: Path, dirs: list[Path]) -> int:
+    """Write the genes whose TSS sits on a covered grid position in every exported arm, and
+    return how many. The genes file has gene_id, chrom, start, end and strand; the TSS is start
+    on the plus strand and end on the minus strand, the rule of the cross line CLI."""
+    import pandas as pd
+
+    g = pd.read_csv(genes, sep="\t")
+    tss = np.where(g["strand"] == "+", g["start"], g["end"]).astype(np.int64)
+    keep = np.ones(len(g), dtype=bool)
+    for d in dirs:
+        txt = sorted(Path(d).glob("*.txt"))[0]
+        rows = txt.read_text().split("\n")[1:]
+        vals = np.array([r.split() for r in rows if r.strip()], dtype=object)
+        x = vals[:, 0].astype(np.float64)
+        pos = vals[:, 3].astype(np.int64)
+        res = int(pos[1] - pos[0])
+        idx = (tss - pos[0]) // res
+        inside = (idx >= 0) & (idx < len(pos))
+        ok = np.zeros(len(g), dtype=bool)
+        ok[inside] = ~np.isnan(x[idx[inside]])
+        keep &= ok
+    g[keep].to_csv(out, sep="\t", index=False)
+    return int(keep.sum())
+
+
 def main() -> None:
     args = sys.argv[1:]
     n = int(args[args.index("--n") + 1]) if "--n" in args else 10
@@ -121,6 +147,10 @@ def main() -> None:
     if args and args[0] == "--subsample":
         for p in subsample(Path(args[1]), Path(args[2]), n, seed):
             print(p.name)
+        return
+    if args and args[0] == "--common-genes":
+        n_kept = common_genes(Path(args[1]), Path(args[2]), [Path(x) for x in args[3:]])
+        print(f"{n_kept} genes covered in all {len(args) - 3} arms")
         return
     if args and args[0] == "--hcm-to-cif":
         dest = Path(args[2])
