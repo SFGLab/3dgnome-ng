@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Model a region</h1>
+<p class="lead">Pick a cell type and a region, choose the loops, optionally apply structural variants, and get an ensemble of 3D structures with promoters and enhancers marked.</p>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+<form method="post" action="/jobs" enctype="multipart/form-data">
+<fieldset><legend>Cell type and region</legend>
+  <div class="row">
+    <div><label for="cell_type">Cell type</label>
+      <select id="cell_type" name="cell_type">
+      {% for name, c in catalog.cell_types.items() %}
+        <option value="{{ name }}" data-lcl="{{ 1 if c.lymphoblastoid else 0 }}" data-note="{{ c.note }}" {% if v.cell_type == name %}selected{% endif %}>{{ c.label }}</option>
+      {% endfor %}
+      </select>
+      <div id="cell-note" class="muted"></div>
+    </div>
+    <div><label for="region">Region, chr:start-end or a gene name, up to 3 Mb</label>
+      <input id="region" name="region" type="text" required placeholder="chr1:1,000,000-3,000,000 or MYC" value="{{ v.region or '' }}"></div>
+  </div>
+  <label>Loops</label>
+  {% for f in factors %}<label style="display:inline-block;margin-right:16px;color:var(--ink)"><input type="radio" name="factors" value="{{ f }}" {% if (v.factors or 'CTCF') == f %}checked{% endif %}> {{ f.replace('+', ' and ') }}</label>{% endfor %}
+</fieldset>
+<fieldset><legend>Structural variants, optional</legend>
+  <div class="row">
+    <div><label for="sv_set">Hosted call set</label>
+      <select id="sv_set" name="sv_set"><option value="">none</option>
+      {% for name, sv in catalog.sv_sets.items() %}<option value="{{ name }}" data-samples="{{ sv.samples|join(',') }}" {% if v.sv_set == name %}selected{% endif %}>{{ sv.label }}</option>{% endfor %}
+      </select></div>
+    <div><label for="sample">Sample</label><input id="sample" name="sample" type="text" list="samples" value="{{ v.sample or '' }}"><datalist id="samples"></datalist></div>
+    <div><label for="haplotype">Haplotype</label><select id="haplotype" name="haplotype"><option value="0">first</option><option value="1">second</option></select></div>
+  </div>
+  <label for="vcf">Or upload your own VCF, bgzipped, with SVTYPE of DEL, INS or INV</label>
+  <input id="vcf" name="vcf" type="file" accept=".vcf,.gz">
+  <p class="muted">An uploaded VCF and everything built from it are private, reachable only through the job's link, and deleted after {{ retention }} days.</p>
+</fieldset>
+<fieldset><legend>Contacts and ensemble</legend>
+  <div class="row">
+    <div><label for="n_models">Structures</label><input id="n_models" name="n_models" type="number" min="1" max="10" value="{{ v.n_models or 10 }}"></div>
+    <div><label>&nbsp;</label>
+      {% if hicdiffusion_missing %}<span class="muted">HiCDiffusion is not set up on this server.</span>
+      {% else %}<label style="color:var(--ink)"><input type="checkbox" id="hicdiffusion" name="hicdiffusion"> Predict the contact background with HiCDiffusion</label>{% endif %}
+    </div>
+  </div>
+  <div id="hic-notice" class="notice" hidden>HiCDiffusion was trained on GM12878, a lymphoblastoid line. For this cell type its prediction is outside what it was trained on. It gives a contact background from sequence, not an individual specific map.</div>
+</fieldset>
+<button type="submit">Build the models</button>
+</form>
+<script>
+const ct = document.getElementById('cell_type'), note = document.getElementById('cell-note');
+const hic = document.getElementById('hicdiffusion'), hn = document.getElementById('hic-notice');
+const svs = document.getElementById('sv_set'), dl = document.getElementById('samples');
+function update() {
+  const o = ct.options[ct.selectedIndex];
+  note.textContent = o.dataset.note || '';
+  if (hic) hn.hidden = !(hic.checked && o.dataset.lcl === '0');
+  const s = svs.options[svs.selectedIndex];
+  dl.innerHTML = (s.dataset.samples || '').split(',').filter(Boolean).map(x => `<option value="${x}">`).join('');
+}
+[ct, svs].forEach(e => e.addEventListener('change', update)); if (hic) hic.addEventListener('change', update); update();
+</script>
+{% endblock %}

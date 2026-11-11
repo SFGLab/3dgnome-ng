@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}3D-GNOME{% endblock %}</title>
+<style>
+:root {
+  --bg: #fcfcfb; --surface: #ffffff; --ink: #0b0b0b; --muted: #52514e; --line: #e4e3df;
+  --accent: #2a78d6; --promoter: #eb6834; --enhancer: #1baf7a; --warn-bg: #fff4dc; --warn-ink: #6b4a00;
+  --err-bg: #fde8e7; --err-ink: #8a1c1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1a1a19; --surface: #222220; --ink: #f0efec; --muted: #c3c2b7; --line: #3a3936;
+    --accent: #3987e5; --promoter: #d95926; --enhancer: #199e70; --warn-bg: #3a2f12; --warn-ink: #f3d38a;
+    --err-bg: #3d1a19; --err-ink: #f2b8b5; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { border-bottom: 1px solid var(--line); padding: 14px 16px; }
+header a { color: var(--ink); text-decoration: none; font-weight: 600; }
+main { max-width: 980px; margin: 0 auto; padding: 20px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 6px; } h2 { font-size: 17px; margin: 28px 0 8px; }
+p.lead { color: var(--muted); margin: 0 0 20px; }
+fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 0 0 14px; background: var(--surface); }
+legend { padding: 0 6px; color: var(--muted); font-size: 13px; }
+label { display: block; margin: 6px 0 2px; font-size: 13px; color: var(--muted); }
+input[type=text], input[type=number], select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; } .row > div { flex: 1 1 200px; }
+button { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 10px 18px; font: inherit; cursor: pointer; }
+.notice { background: var(--warn-bg); color: var(--warn-ink); border-radius: 6px; padding: 8px 12px; margin: 8px 0; font-size: 14px; }
+.error { background: var(--err-bg); color: var(--err-ink); border-radius: 6px; padding: 8px 12px; margin: 0 0 14px; }
+.muted { color: var(--muted); font-size: 13px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table-wrap { overflow-x: auto; }
+#viewer { width: 100%; height: 480px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.key { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; font-size: 13px; color: var(--muted); }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+a { color: var(--accent); }
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<header><a href="/">3D-GNOME</a> <span class="muted">3D chromatin models from loops, contacts and structural variants</span></header>
+<main>{% block body %}{% endblock %}</main>
+</body>
+</html>

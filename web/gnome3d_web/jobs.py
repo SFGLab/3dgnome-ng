@@ -140,7 +140,21 @@ def run_job(req: JobRequest, catalog: Catalog, job: Path, engine: list[str] | No
         pos0, starts, ends, _ = models[0]
         genes, enh = _lifted_marks(cell, region.chrom, svs)
         marks = mark_beads(region.chrom, starts, ends, genes, enh)
-        (job / "marks.json").write_text(json.dumps({"promoters": marks.promoters, "enhancers": marks.enhancers, "models": [c.name for c in cifs]}))
+        # read_cif sorts beads by start; the viewer selects atoms in file order
+        order = np.argsort([int(r.split()[16]) for r in cifs[0].read_text().splitlines() if r.startswith("ATOM")], kind="stable")
+        (job / "marks.json").write_text(
+            json.dumps(
+                {
+                    "promoters": marks.promoters,
+                    "enhancers": marks.enhancers,
+                    "viewer": {
+                        "promoters": sorted(int(order[k]) for k in marks.promoters.values()),
+                        "enhancers": sorted(int(order[k]) for k in marks.enhancers),
+                    },
+                    "models": [c.name for c in cifs],
+                }
+            )
+        )
         ep_table([m[0] for m in models], marks, genes, starts, ends).to_csv(job / "ep.tsv", sep="\t", index=False)
         _status(job, state="done", stage="done", finished=time.time())
     except Exception as e:  # noqa: BLE001

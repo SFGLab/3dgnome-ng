@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Job {{ status.state }}{% endblock %}
+{% block head %}
+{% if status.state not in ("done", "failed") %}<meta http-equiv="refresh" content="10">{% endif %}
+{% if status.state == "done" %}<script src="https://cdn.jsdelivr.net/npm/ngl@2.3.1/dist/ngl.js"></script>{% endif %}
+{% endblock %}
+{% block body %}
+<h1>{{ req.cell_type }} {{ status.region or req.region }}</h1>
+<p class="lead">{{ req.factors.replace('+', ' and ') if req.factors else '' }} loops{% if req.sample %}, {{ req.sample }} haplotype {{ req.haplotype + 1 }}{% endif %}, {{ req.n_models }} structures. State: <strong>{{ status.state }}</strong>{% if status.stage and status.state != "done" %}, {{ status.stage }}{% endif %}.</p>
+{% if private %}<div class="notice">This job is private. Keep the link; it is deleted after {{ retention }} days.</div>{% endif %}
+{% if cell and cell.note %}<div class="notice">{{ cell.note }}</div>{% endif %}
+{% if req.hicdiffusion %}<div class="notice">The contact background was predicted from sequence by HiCDiffusion, trained on GM12878. It is not an individual specific map{% if cell and not cell.lymphoblastoid %}, and for this cell type it is outside what the model was trained on{% endif %}.</div>{% endif %}
+{% if status.n_svs is defined %}<p class="muted">{{ status.n_svs }} structural variants applied{% if status.skipped_svs %}, {{ status.skipped_svs }} skipped for an unsupported type{% endif %}. Loops modelled: {% for k, n in (status.loops or {}).items() %}{{ k }} {{ n }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+{% if status.state == "failed" %}
+  <div class="error">{{ status.error }}</div>
+  <pre style="white-space:pre-wrap;font-size:12px">{{ status.log_tail }}</pre>
+{% elif status.state == "done" %}
+  <h2>Structures</h2>
+  <div class="row" style="align-items:end">
+    <div><label for="model">Structure</label><select id="model">{% for m in marks.models %}<option value="{{ m }}">{{ loop.index }}</option>{% endfor %}</select></div>
+    <div><span class="key"><span class="dot" style="background:var(--promoter)"></span>promoters</span><span class="key"><span class="dot" style="background:var(--enhancer)"></span>enhancers</span></div>
+  </div>
+  <div id="viewer" style="margin-top:8px"></div>
+  <h2>Nearest enhancer per gene</h2>
+  <p class="muted">Ensemble mean 3D distance, model units, to the nearest enhancer within 1 Mb. A TSS or enhancer more than 5 kb from any bead is left out.</p>
+  <div class="table-wrap"><table>
+    {% if ep %}<tr>{% for h in ep[0] %}<th{% if loop.index0 >= 2 %} class="num"{% endif %}>{{ h }}</th>{% endfor %}</tr>{% endif %}
+    {% for row in ep[1:] %}<tr>{% for x in row %}<td{% if loop.index0 >= 2 %} class="num"{% endif %}>{{ x }}</td>{% endfor %}</tr>{% endfor %}
+  </table></div>
+  <h2>Downloads</h2>
+  <p><a href="{{ base }}/files/ep.tsv">ep.tsv</a> · <a href="{{ base }}/files/marks.json">marks.json</a> · <a href="{{ base }}/files/engine.log">engine.log</a> · {% for m in marks.models %}<a href="{{ base }}/files/{{ m }}">{{ m }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  <script>
+  const stage = new NGL.Stage('viewer', {backgroundColor: getComputedStyle(document.body).backgroundColor});
+  const prom = {{ marks.viewer.promoters|tojson }}, enh = {{ marks.viewer.enhancers|tojson }};
+  const css = getComputedStyle(document.documentElement);
+  function sel(ix) { return ix.length ? '@' + ix.join(',') : 'none'; }
+  function show(name) {
+    stage.removeAllComponents();
+    stage.loadFile('{{ base }}/files/' + name, {ext: 'cif'}).then(c => {
+      c.addRepresentation('line', {color: '#9a9a96', linewidth: 2});
+      c.addRepresentation('spacefill', {sele: sel(prom), color: css.getPropertyValue('--promoter').trim(), radiusScale: 1.2});
+      c.addRepresentation('spacefill', {sele: sel(enh), color: css.getPropertyValue('--enhancer').trim(), radiusScale: 1.0});
+      c.autoView();
+    });
+  }
+  document.getElementById('model').addEventListener('change', e => show(e.target.value));
+  show(document.getElementById('model').value);
+  window.addEventListener('resize', () => stage.handleResize());
+  </script>
+{% else %}
+  <p class="muted">This page refreshes every 10 seconds.</p>
+{% endif %}
+{% endblock %}
