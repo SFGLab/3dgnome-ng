@@ -32,17 +32,25 @@
   <p><a href="{{ base }}/files/ep.tsv">ep.tsv</a> · <a href="{{ base }}/files/marks.json">marks.json</a> · <a href="{{ base }}/files/engine.log">engine.log</a> · {% for m in marks.models %}<a href="{{ base }}/files/{{ m }}">{{ m }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
   <script>
   const stage = new NGL.Stage('viewer', {backgroundColor: getComputedStyle(document.body).backgroundColor});
-  const prom = {{ marks.viewer.promoters|tojson }}, enh = {{ marks.viewer.enhancers|tojson }};
   const css = getComputedStyle(document.documentElement);
-  function sel(ix) { return ix.length ? '@' + ix.join(',') : 'none'; }
+  const rgb = v => { const c = new NGL.Color(css.getPropertyValue(v).trim()); return [c.r, c.g, c.b]; };
   function show(name) {
-    stage.removeAllComponents();
-    stage.loadFile('{{ base }}/view/' + name.replace(/\.cif$/, '.pdb'), {ext: 'pdb'}).then(c => {
-      // beads sit about one model unit apart, so radii are absolute, not atomic
-      c.addRepresentation('licorice', {color: '#9a9a96', radiusType: 'size', radiusSize: 0.06, multipleBond: 'off'});
-      c.addRepresentation('spacefill', {sele: sel(prom), color: css.getPropertyValue('--promoter').trim(), radiusType: 'size', radiusSize: 0.3});
-      c.addRepresentation('spacefill', {sele: sel(enh), color: css.getPropertyValue('--enhancer').trim(), radiusType: 'size', radiusSize: 0.22});
-      c.autoView();
+    fetch('{{ base }}/view/' + name.replace(/\.cif$/, '.json')).then(r => r.json()).then(p => {
+      stage.removeAllComponents();
+      // the chain, smoothed with the figures' Catmull-Rom spline, as a tube of short cylinders
+      const chain = new NGL.Shape('chain');
+      const grey = [0.62, 0.62, 0.6];
+      for (let i = 0; i + 1 < p.chain.length; i++) chain.addCylinder(p.chain[i], p.chain[i + 1], grey, 0.07);
+      stage.addComponentFromObject(chain).addRepresentation('buffer');
+      // promoters and enhancers as translucent boxes around their stretch of the chain
+      const boxes = new NGL.Shape('elements');
+      const col = {promoter: rgb('--promoter'), enhancer: rgb('--enhancer')};
+      for (const b of p.boxes) {
+        const c = [0, 1, 2].map(k => (b.min[k] + b.max[k]) / 2), s = [0, 1, 2].map(k => b.max[k] - b.min[k]);
+        boxes.addBox(c, col[b.kind], s[0], [0, s[1], 0], [0, 0, s[2]], b.name || b.kind);
+      }
+      stage.addComponentFromObject(boxes).addRepresentation('buffer', {opacity: 0.35, depthWrite: false});
+      stage.autoView();
     });
   }
   document.getElementById('model').addEventListener('change', e => show(e.target.value));

@@ -147,6 +147,7 @@ def run_job(req: JobRequest, catalog: Catalog, job: Path, engine: list[str] | No
         models = [read_cif(c) for c in cifs]
         pos0, starts, ends, _ = models[0]
         genes, enh = _lifted_marks(cell, region.chrom, svs)
+        inputs_lo, inputs_hi = (int(x) for x in inputs.region.split(":")[1].split("-"))
         marks = mark_beads(region.chrom, starts, ends, genes, enh)
         # read_cif sorts beads by start; the viewer selects atoms in file order
         order = np.argsort([int(r.split()[16]) for r in cifs[0].read_text().splitlines() if r.startswith("ATOM")], kind="stable")
@@ -160,6 +161,17 @@ def run_job(req: JobRequest, catalog: Catalog, job: Path, engine: list[str] | No
                         "enhancers": sorted(int(order[k]) for k in marks.enhancers),
                     },
                     "models": [c.name for c in cifs],
+                    # haplotype coordinates; a promoter is its TSS and a kilobase either side
+                    "elements": [
+                        {"kind": "promoter", "name": str(g.name), "start": int(g.tss) - 1000, "end": int(g.tss) + 1000}
+                        for g in genes.itertuples(index=False)
+                        if inputs_lo <= int(g.tss) < inputs_hi
+                    ]
+                    + [
+                        {"kind": "enhancer", "name": "", "start": int(a), "end": int(b)}
+                        for a, b in zip(enh[1], enh[2], strict=True)
+                        if inputs_lo <= int(a) and int(b) <= inputs_hi
+                    ],
                 }
             )
         )

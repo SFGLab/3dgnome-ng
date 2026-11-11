@@ -8,12 +8,12 @@ import secrets
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from .catalog import FACTOR_CHOICES, Catalog
 from .jobs import JobRequest, _member, request_key
-from .marks import cif_to_pdb
+from .viewer import viewer_payload
 from .queue import enqueue, sweep_private
 from .regions import RegionError, parse_region
 from .settings import Settings
@@ -169,18 +169,19 @@ def create_app() -> FastAPI:
             raise HTTPException(404)
         return FileResponse(p, filename=name)
 
-    def view(d: Path, name: str) -> PlainTextResponse:
-        cif = name.removesuffix(".pdb") + ".cif"
-        if not name.endswith(".pdb") or not FILES.match(cif) or not (d / "models" / cif).is_file():
+    def view(d: Path, name: str) -> JSONResponse:
+        cif = name.removesuffix(".json") + ".cif"
+        if not name.endswith(".json") or not FILES.match(cif) or not (d / "models" / cif).is_file():
             raise HTTPException(404)
-        return PlainTextResponse(cif_to_pdb(d / "models" / cif))
+        marks = json.loads((d / "marks.json").read_text()) if (d / "marks.json").is_file() else {}
+        return JSONResponse(viewer_payload(d / "models" / cif, marks.get("elements", [])))
 
     @app.get("/jobs/{key}/view/{name}")
-    def shared_view(key: str, name: str) -> PlainTextResponse:
+    def shared_view(key: str, name: str) -> JSONResponse:
         return view(job_dir("jobs", key), name)
 
     @app.get("/p/{key}/view/{name}")
-    def private_view(key: str, name: str) -> PlainTextResponse:
+    def private_view(key: str, name: str) -> JSONResponse:
         return view(job_dir("private", key), name)
 
     @app.get("/jobs/{key}/files/{name}")

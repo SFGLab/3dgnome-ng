@@ -50,14 +50,12 @@ def main() -> int:
         check("the files API lists the structures and the table", "ep.tsv" in names and any(n.endswith(".cif") for n in names), str(names))
         check("a listed file downloads", c.get(job + "/files/ep.tsv").status_code == 200)
         cif = next(n for n in names if n.endswith(".cif"))
-        pdb = c.get(job + "/view/" + cif.replace(".cif", ".pdb"))
-        lines = pdb.text.splitlines()
-        atoms = [ln for ln in lines if ln.startswith("ATOM")]
-        conect = [ln for ln in lines if ln.startswith("CONECT")]
+        view = c.get(job + "/view/" + cif.replace(".cif", ".json"))
+        payload = view.json() if view.status_code == 200 else {}
         check(
-            "the viewer gets a PDB with one atom per bead, in file order, and the chain bonds",
-            pdb.status_code == 200 and len(atoms) > 100 and len(conect) == len(atoms) - 1,
-            f"{pdb.status_code} {len(atoms)} atoms {len(conect)} bonds",
+            "the viewer gets the smoothed chain and boxes around the marked elements",
+            view.status_code == 200 and len(payload.get("chain", [])) > 100 and {b["kind"] for b in payload.get("boxes", [])} == {"promoter", "enhancer"},
+            f"{view.status_code} {len(payload.get('chain', []))} points {len(payload.get('boxes', []))} boxes",
         )
         page = c.get(job).text
         check("the gene table shows distances to two decimals", "<td class=\"num\">" in page and ".0000" not in page)

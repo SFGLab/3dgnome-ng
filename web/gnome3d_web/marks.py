@@ -44,23 +44,6 @@ def read_cif(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray
     return pos[o], start[o], end[o], anchor[o]
 
 
-def cif_to_pdb(path: Path) -> str:
-    """A gnome3d cif as PDB text for the viewer, one atom per bead in file order, so the marks'
-    viewer indices hold, and a CONECT record between beads adjacent in genomic order. NGL's mmCIF
-    reader does not take the engine's cif."""
-    rows = [ln.split() for ln in Path(path).read_text().splitlines() if ln.startswith("ATOM")]
-    out = []
-    for i, r in enumerate(rows):
-        res = "ALA" if r[18] == "anchor" else "GLY"
-        x, y, z = (float(v) for v in r[10:13])
-        out.append(f"ATOM  {(i + 1) % 100000:5d}  CA  {res} A{(i + 1) % 10000:4d}    {x:8.3f}{y:8.3f}{z:8.3f}  1.00  0.00           C")
-    order = np.argsort([int(r[16]) for r in rows], kind="stable")
-    for a, b in zip(order[:-1], order[1:], strict=True):
-        out.append(f"CONECT{int(a) + 1:5d}{int(b) + 1:5d}")
-    out.append("END")
-    return "\n".join(out) + "\n"
-
-
 def _nearest(mids: np.ndarray, p: int) -> int | None:
     k = int(np.argmin(np.abs(mids - p)))
     return k if abs(int(mids[k]) - p) <= MAX_GAP else None

@@ -7,6 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "vendor"))
+sys.path.append(str(Path(__file__).resolve().parents[2]))  # the engine, installed in the image
 
 PASS: list[str] = []
 FAIL: list[str] = []
