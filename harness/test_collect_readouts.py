@@ -41,6 +41,20 @@ def main() -> int:
                 )
             )
         (r / "HG00512_battery.json").write_text("[]")
+        (r / "H1ESC_microc.json").write_text(
+            json.dumps(
+                [
+                    {"arm": "map", "n": 0, "n_loops": 900, "apa_microc": 2.0, "r_fine": 1.0},
+                    {
+                        "arm": "H1ESC_R_60mb",
+                        "n": 10,
+                        "n_loops": 900,
+                        "apa_microc": 1.5,
+                        "r_fine": 0.4,
+                    },
+                ]
+            )
+        )
         (r / "trio" / "HG00512_battery.json").write_text(
             json.dumps(
                 [
@@ -79,6 +93,12 @@ def main() -> int:
             "a pair's SCC is the mean of its two lines'",
             abs(got.get(("GM12878 vs H1ESC", "R", "scc"), 0) - (0.38 + 0.32) / 2) < 1e-9,
             str(got.get(("GM12878 vs H1ESC", "R", "scc"))),
+        )
+        check(
+            "Micro-C rows give the pile-up over the map's and the fine agreement",
+            got.get(("H1ESC", "R", "apa_microc_vs_map")) == 0.75
+            and got.get(("H1ESC", "R", "r_fine")) == 0.4,
+            str(sorted(k for k in got if k[0] == "H1ESC")),
         )
         check(
             "the manifest carries a record for every line",

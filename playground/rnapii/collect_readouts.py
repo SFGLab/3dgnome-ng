@@ -36,13 +36,13 @@ def _arms(path: Path) -> dict[str, str]:
 
 def build(readouts: Path, records: Path, out: Path) -> dict[str, object]:
     out.mkdir(parents=True, exist_ok=True)
-    man: dict[str, object] = {"battery": [], "saddle": [], "pileup": [], "expression": [], "records": {}, "piles": {}}
+    man: dict[str, object] = {"battery": [], "saddle": [], "pileup": [], "microc": [], "expression": [], "records": {}, "piles": {}}
     for kind, base, names in (("line", readouts, LINES), ("person", readouts / "trio", None)):
-        for f in sorted(base.glob("*_battery.json")) if base.is_dir() else []:
-            ds = f.name.split("_")[0]
+        found = sorted({f.name.split("_")[0] for f in base.glob("*_*.json")}) if base.is_dir() else []
+        for ds in found:
             if names is not None and ds not in names:
                 continue
-            for what in ("battery", "saddle", "pileup"):
+            for what in ("battery", "saddle", "pileup", "microc"):
                 p = base / f"{ds}_{what}.json"
                 if p.is_file() and p.stat().st_size > 2:
                     man[what].append({"dataset": ds, "kind": kind, "path": str(p), "arms": _arms(p)})  # type: ignore[union-attr]

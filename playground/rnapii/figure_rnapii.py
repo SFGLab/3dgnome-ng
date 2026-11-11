@@ -40,9 +40,9 @@ DIRECTION = {
     "pearson": 1, "spearman": 1, "scc": 1, "multimm": 1, "exponent": 1, "eig_r": 1,
     "saddle": 1, "apa_vs_map": 0, "wb_aa": -1, "wb_sa": -1, "xb": -1,
     "partial": -1, "rho_3d": -1, "e1": -1, "e2": 1, "e3": -1, "jump_rho": -1, "family_sep": 1,
-    "r_total": -1, "r_set": -1, "r_conf": -1, "jump_r_conf": -1,
+    "r_total": -1, "r_set": -1, "r_conf": -1, "jump_r_conf": -1, "apa_microc_vs_map": 0, "r_fine": 1,
 }  # fmt: skip
-STRUCTURE = ("scc", "pearson", "multimm", "saddle", "eig_r", "apa_vs_map", "wb_aa", "xb")
+STRUCTURE = ("scc", "pearson", "multimm", "saddle", "eig_r", "apa_vs_map", "r_fine", "apa_microc_vs_map", "wb_aa", "xb")
 EXPRESSION = ("r_conf", "r_total", "jump_r_conf", "partial", "rho_3d", "e1", "e3", "jump_rho", "family_sep")
 NAMES = {"HFFC6": "HFFc6", "H1ESC": "H1"}
 
@@ -75,6 +75,15 @@ def collect(manifest: dict[str, list[dict[str, object]]]) -> pd.DataFrame:
             if r["arm"] in arms:
                 rows.append({"dataset": e["dataset"], "kind": e["kind"], "arm": arms[r["arm"]],
                              "metric": "apa_vs_map", "value": float(r["apa"]) / ref, "n": int(r["n_models"])})  # fmt: skip
+    for e in manifest.get("microc", []):
+        arms = dict(e["arms"])  # type: ignore[arg-type]
+        data = json.loads(Path(str(e["path"])).read_text())
+        ref = next((float(r["apa_microc"]) for r in data if r["arm"] == "map"), float("nan"))
+        for r in data:
+            if r["arm"] in arms:
+                for metric, v in (("apa_microc_vs_map", float(r["apa_microc"]) / ref), ("r_fine", float(r["r_fine"]))):
+                    rows.append({"dataset": e["dataset"], "kind": e["kind"], "arm": arms[r["arm"]],
+                                 "metric": metric, "value": v, "n": int(r["n"])})  # fmt: skip
     for e in manifest.get("expression", []):
         for r in pd.read_csv(str(e["path"])).itertuples():
             rows.append({"dataset": e["dataset"], "kind": e["kind"], "arm": str(r.arm),

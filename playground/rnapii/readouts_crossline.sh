@@ -70,8 +70,17 @@ expression() {
   done
 }
 
+microc() {
+  # Fine scale against Micro-C at 5 kb, from the slice hic_slice.py cut, $ROOT/microc/microc_<LINE>_5000.npz
+  local L=$1 ARMS=()
+  for A in E C R M; do [ -d "$ROOT/out/xc/${L}_${A}_60mb" ] && ARMS+=("$ROOT/out/xc/${L}_${A}_60mb"); done
+  "$PY" playground/rnapii/microc_readout.py --json "$OUT/${L}_microc.json" "$ROOT/microc/microc_${L}_5000.npz" \
+    "$ROOT/loops/${L}_xc_rnapii_clusters_3+.bedpe" "${ARMS[@]}" 2>&1 | tee "$OUT/${L}_microc.txt" | tail -n 6
+}
+
 case "${1:-}" in
   structure) structure "$2" ;;
+  microc) microc "$2" ;;
   expression) expression ;;
-  *) echo "usage: $0 structure <LINE> | expression" >&2; exit 2 ;;
+  *) echo "usage: $0 structure <LINE> | microc <LINE> | expression" >&2; exit 2 ;;
 esac
