@@ -36,6 +36,8 @@ def main() -> int:
         r = c.post("/jobs", data={**form, "region": "chr1:0-9000000"})
         check("an over long region is a form error", r.status_code == 400 and "limit" in r.text)
         r = c.post("/jobs", data={**form, "hicdiffusion": "on"})
+        check("HiCDiffusion on a region over 2 Mb is a form error naming the limit", r.status_code == 400 and "2,000,000" in r.text and "HICDIFFUSION_DIR" not in r.text)
+        r = c.post("/jobs", data={**form, "region": "chr1:0-2000000", "hicdiffusion": "on"})
         check("HiCDiffusion without its setup is a form error naming it", r.status_code == 400 and "HICDIFFUSION_DIR" in r.text)
         r = c.post("/jobs", data=form, follow_redirects=False)
         check("a valid request redirects to its job", r.status_code == 303 and r.headers["location"].startswith("/jobs/"))

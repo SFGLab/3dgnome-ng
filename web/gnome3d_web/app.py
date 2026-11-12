@@ -15,7 +15,7 @@ from .catalog import FACTOR_CHOICES, Catalog
 from .jobs import JobRequest, _member, request_key
 from .viewer import viewer_payload
 from .queue import enqueue, sweep_private
-from .regions import RegionError, parse_region
+from .regions import HICDIFFUSION_SPAN, RegionError, parse_region
 from .settings import Settings
 
 HERE = Path(__file__).resolve().parent
@@ -78,7 +78,12 @@ def create_app() -> FastAPI:
                 raise RegionError(f"unknown cell type {cell_type!r}")
             if factors not in FACTOR_CHOICES:
                 raise RegionError(f"unknown factor choice {factors!r}")
-            parse_region(region, catalog.cell_types[cell_type].genes())
+            r = parse_region(region, catalog.cell_types[cell_type].genes())
+            if hicdiffusion and r.end - r.start > HICDIFFUSION_SPAN:
+                raise RegionError(
+                    f"{region!r} spans {r.end - r.start:,} bp. HiCDiffusion predicts up to {HICDIFFUSION_SPAN:,} bp. "
+                    "Pick a region of up to 2 Mb, or the Hi-C of the cell type as the contact background."
+                )
             if hicdiffusion and Settings.hicdiffusion_missing():
                 raise RegionError("HiCDiffusion is not set up on this server: " + ", ".join(Settings.hicdiffusion_missing()))
             if sv_set and sv_set not in catalog.sv_sets:

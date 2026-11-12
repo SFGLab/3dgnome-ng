@@ -38,7 +38,7 @@
     <div><label for="n_models">Structures</label><input id="n_models" name="n_models" type="number" min="1" max="10" value="{{ v.n_models or 10 }}"></div>
     <div><label>&nbsp;</label>
       {% if hicdiffusion_missing %}<span class="muted">HiCDiffusion is not set up on this server.</span>
-      {% else %}<label style="color:var(--ink)"><input type="checkbox" id="hicdiffusion" name="hicdiffusion"> Predict the contact background with HiCDiffusion</label>{% endif %}
+      {% else %}<label style="color:var(--ink)"><input type="checkbox" id="hicdiffusion" name="hicdiffusion"> Predict the contact background with HiCDiffusion, for regions up to 2 Mb</label>{% endif %}
     </div>
   </div>
   <div id="hic-notice" class="notice" hidden>HiCDiffusion was trained on GM12878, a lymphoblastoid line. For this cell type its prediction is outside what it was trained on. It gives a contact background from sequence, not an individual specific map.</div>
