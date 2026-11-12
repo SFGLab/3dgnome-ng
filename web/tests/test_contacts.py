@@ -108,7 +108,8 @@ def main() -> int:
         job = root / "results" / "jobs" / url.split("/")[-1]
         deep = ex.contact_maps(job, "chr1:0-3000000", 25000, "hic", "model", "raw", hic_url="https://example.org/deep.mcool", hic_name="4DN deep map")
         ex.contact_maps(job, "chr1:0-3000000", 25000, "hic", "model", "raw", hic_url="https://example.org/deep.mcool", hic_name="4DN deep map")
-        check("a deep map link is read once per window and resolution", len(reads) == 1, str(reads))
+        ex.contact_maps(job, "chr1:500000-1500000", 25000, "hic", "model", "raw", hic_url="https://example.org/deep.mcool", hic_name="4DN deep map")
+        check("a deep map is read once per resolution over the job's region, and windows are cut from it", len(reads) == 1 and reads[0][1:3] == (0, 3000000), str(reads))
         check("the Hi-C half names the deep map", "4DN deep map" in deep["upper_label"] and "4DN deep map" in deep["scc_about"], deep["upper_label"])
         check("the agreement is a number or null", r["scc"] is None or -1 <= r["scc"] <= 1, str(r["scc"]))
         bad = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 2000, "upper": "hic", "lower": "model"})

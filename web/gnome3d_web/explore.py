@@ -322,21 +322,27 @@ def _read_deep(url: str, chrom: str, start: int, end: int, res: int, allow_priva
 
 
 def _deep_map(job: Path, url: str, chrom: str, start: int, end: int, res: int, allow_private: bool) -> np.ndarray:
-    """A deep map's window on the job's grid, read once per window and resolution and kept in the
-    job directory."""
-    edges = cm.bins_for(start, end, res)
-    cache = job / f"explore_deep_{chrom}_{edges[0]}_{end}_{res}.npy"
+    """A deep map's window on the job's grid. The pixels of the job's whole region are read once
+    per resolution and kept in the job directory, so zooming and panning cut windows from them
+    instead of reading the remote file again."""
+    status = _json(job / "status.json").get("region") or f"{chrom}:{start}-{end}"
+    jr = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", str(status))
+    rs, re_ = (int(jr[2]), int(jr[3])) if jr else (start, end)
+    cache = job / f"explore_deep_{chrom}_{rs}_{re_}_{res}.npz"
     if cache.is_file():
-        return np.load(cache)
-    b1, b2, counts = _read_deep(url, chrom, start, end, res, allow_private)
+        z = np.load(cache)
+        b1, b2, counts = z["b1"], z["b2"], z["counts"]
+    else:
+        b1, b2, counts = (np.asarray(x) for x in _read_deep(url, chrom, rs, re_, res, allow_private))
+        np.savez(cache, b1=b1, b2=b2, counts=counts)
+    edges = cm.bins_for(start, end, res)
     n = len(edges)
-    i, j = (np.asarray(b1) - edges[0]) // res, (np.asarray(b2) - edges[0]) // res
+    i, j = (b1 - edges[0]) // res, (b2 - edges[0]) // res
     ok = (i >= 0) & (i < n) & (j >= 0) & (j < n)
     m = np.zeros((n, n))
     np.add.at(m, (i[ok], j[ok]), counts[ok])
     off = i[ok] != j[ok]
-    np.add.at(m, (j[ok][off], i[ok][off]), np.asarray(counts)[ok][off])
-    np.save(cache, m)
+    np.add.at(m, (j[ok][off], i[ok][off]), counts[ok][off])
     return m
 
 
