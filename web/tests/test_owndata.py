@@ -94,6 +94,26 @@ def main() -> int:
         marks = json.loads((root / "results" / "private" / url.split("/")[-1] / "marks.json").read_text())
         enh_marks = [e for e in marks["elements"] if e["kind"] == "enhancer"]
         check("own enhancers replace the cell type's", [(e["start"], e["end"]) for e in enh_marks] == [(1300000, 1302000)], str(enh_marks))
+        def enhancer_spans(u: str) -> list[tuple[int, int]]:
+            m = json.loads((root / "results" / "private" / u.split("/")[-1] / "marks.json").read_text())
+            return [(e["start"], e["end"]) for e in m["elements"] if e["kind"] == "enhancer"]
+
+        borrow = {"cell_type": "own", "region": "chr1:0-3000000", "n_models": "2", "factors": "CTCF"}
+        r = c.post("/api/jobs", data=borrow | {"own": json.dumps({"contacts": contacts, "loops_from": "GMX", "enhancers_from": "GMX"})})
+        u = r.json().get("url", "")
+        s = c.get(f"/api{u}/summary").json() if u else {}
+        check("your own cell type takes a listed cell type's loops", r.status_code == 201 and s.get("state") == "done" and s.get("loops") == {"CTCF": 14}, r.text + str(s)[:300])
+        check("and its enhancers when asked", u and enhancer_spans(u) == [(1490000, 1492000), (2700000, 2702000)], str(u and enhancer_spans(u)))
+        check("the summary names where loops and enhancers come from", s.get("request", {}).get("own", {}).get("loops_from") == "GMX" and s["request"]["own"].get("enhancers_from") == "GMX", str(s.get("request")))
+        r = c.post("/api/jobs", data=borrow | {"own": json.dumps({"contacts": contacts, "loops_from": "GMX", "enhancers_from": "none"})})
+        u = r.json().get("url", "")
+        check("enhancers from none marks none", r.status_code == 201 and enhancer_spans(u) == [], r.text)
+        for key in ("loops_from", "enhancers_from"):
+            r = c.post("/api/jobs", data=borrow | {"own": json.dumps({"contacts": contacts, "loops_from": "GMX", key: "NOSUCH"})})
+            check(f"an unknown cell type in {key} is a 400 on own", r.status_code == 400 and r.json()["field"] == "own" and "NOSUCH" in r.json()["error"], r.text)
+        r = c.post("/api/jobs", data=borrow | {"own": json.dumps({"contacts": contacts})})
+        check("your own cell type with neither loops nor a listed set is a 400 on loops", r.status_code == 400 and r.json()["field"] == "loops", r.text)
+
         r = c.post("/api/jobs", data=form | {"own": json.dumps({"loops": own["loops"]})})
         check("an own data job without contacts on cell type own is a 400 on contacts", r.status_code == 400 and r.json()["field"] == "contacts", r.text)
         r = c.post("/api/jobs", data=form | {"own": json.dumps({"loops": [{"factor": "CTCF", "upload": "nothing12345"}], "contacts": contacts})})

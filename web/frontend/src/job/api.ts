@@ -20,7 +20,7 @@ export type Summary = {
     sample: string
     haplotype: number
     n_models: number
-    own?: { loops: string[]; anchors: boolean; contacts: boolean; enhancers: boolean }
+    own?: { loops: string[]; anchors: boolean; contacts: boolean; enhancers: boolean; loops_from?: string; enhancers_from?: string }
   }
   loops: Record<string, number>
   n_svs: number | null

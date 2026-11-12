@@ -13,12 +13,16 @@ export type UploadResult = {
   samples: string[]
 }
 
-/** The uploads a job uses in place of the data of a listed cell type. */
+/** The uploads a job uses in place of the data of a listed cell type. On your own cell type
+ * loopsFrom and enhancersFrom name a listed cell type whose loops or enhancers it takes in place
+ * of an upload, enhancersFrom none for no enhancers. */
 export type OwnChoice = {
   loops: { factor: string; upload: UploadResult }[]
   anchors: UploadResult | null
   contacts: UploadResult | null
   enhancers: UploadResult | null
+  loopsFrom?: string
+  enhancersFrom?: string
 }
 
 export const NO_OWN: OwnChoice = { loops: [], anchors: null, contacts: null, enhancers: null }
@@ -50,6 +54,8 @@ export function ownField(own: OwnChoice): string {
     anchors: own.anchors?.id ?? null,
     contacts: own.contacts?.id ?? null,
     enhancers: own.enhancers?.id ?? null,
+    loops_from: own.loops.length ? undefined : own.loopsFrom,
+    enhancers_from: own.enhancers ? undefined : own.enhancersFrom,
   })
 }
 
@@ -63,11 +69,7 @@ export function guessFactor(name: string, index: number): string {
 
 /** A file size in MB, in kB below a tenth of a MB and in GB from one GB. */
 export const megabytes = (bytes: number) =>
-  bytes < 104_858
-    ? `${Math.max(1, Math.round(bytes / 1024))} kB`
-    : bytes < 1_073_741_824
-      ? `${(bytes / 1_048_576).toFixed(1)} MB`
-      : `${(bytes / 1_073_741_824).toFixed(1)} GB`
+  bytes < 104_858 ? `${Math.max(1, Math.round(bytes / 1024))} kB` : bytes < 1_073_741_824 ? `${(bytes / 1_048_576).toFixed(1)} MB` : `${(bytes / 1_073_741_824).toFixed(1)} GB`
 
 /** A link the server refused, with the way to fix it. */
 export class LinkRefused extends Error {

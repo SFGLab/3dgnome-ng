@@ -25,6 +25,11 @@ function ownLoops(s: Summary): string | null {
   return `${words}, your files`
 }
 
+function listedLoops(s: Summary): string {
+  const set = FACTORS[s.request.factors] ?? s.request.factors
+  return s.request.own?.loops_from ? `${set} of ${s.request.own.loops_from}` : set
+}
+
 function variants(s: Summary): string {
   if (!s.n_svs) return 'none'
   const who = s.request.sample ? `${s.request.sample}, haplotype ${s.request.haplotype + 1}` : 'uploaded VCF'
@@ -86,7 +91,7 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
       </button>
       <dl className="facts">
         <dt>Loops</dt>
-        <dd>{ownLoops(summary) ?? FACTORS[summary.request.factors] ?? summary.request.factors}</dd>
+        <dd>{ownLoops(summary) ?? listedLoops(summary)}</dd>
         <dt>Loops in region</dt>
         <dd>{loops || 'none'}</dd>
         <dt>Structural variants</dt>

@@ -339,6 +339,26 @@
   color: #F2A29C;
 }
 
+.own-select {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.own-select select {
+  align-self: flex-start;
+  min-width: 200px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
 .routes {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

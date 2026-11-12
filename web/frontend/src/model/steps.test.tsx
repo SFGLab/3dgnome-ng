@@ -13,7 +13,7 @@ describe('LoopOptions', () => {
   it('offers the four loop sets and opens the uploads for own loops', () => {
     const onChange = vi.fn()
     const onOwn = vi.fn()
-    render(<LoopOptions value="CTCF+RNAPII" ownCell={false} onChange={onChange} onOwn={onOwn} />)
+    render(<LoopOptions value="CTCF+RNAPII" ownCell={false} cells={[]} loopsFrom="" onLoopsFrom={() => {}} onChange={onChange} onOwn={onOwn} />)
     expect(screen.getAllByRole('radio').map((r) => r.querySelector('.option-title')?.textContent)).toEqual(['CTCF', 'RNAPII', 'CTCF and RNAPII', 'Your own loops'])
     expect(screen.getByRole('radio', { name: /CTCF and RNAPII/ })).toBeChecked()
     fireEvent.click(screen.getByRole('radio', { name: /Your own loops/ }))
@@ -22,10 +22,22 @@ describe('LoopOptions', () => {
     expect(onChange).toHaveBeenCalledWith('RNAPII')
   })
 
-  it('leaves only own loops on your own cell type', () => {
-    render(<LoopOptions value="own" ownCell onChange={() => {}} onOwn={() => {}} />)
-    expect(screen.getAllByRole('radio').slice(0, 3).every((r) => (r as HTMLButtonElement).disabled)).toBe(true)
-    expect(screen.getByRole('radio', { name: /Your own loops/ })).toBeChecked()
+  it('offers the listed loop sets of a chosen cell type on your own cell type', () => {
+    const onLoopsFrom = vi.fn()
+    const onChange = vi.fn()
+    render(<LoopOptions value="CTCF" ownCell cells={['GM12878', 'H1ESC']} loopsFrom="GM12878" onLoopsFrom={onLoopsFrom} onChange={onChange} onOwn={() => {}} />)
+    expect(screen.getAllByRole('radio').every((r) => !(r as HTMLButtonElement).disabled)).toBe(true)
+    fireEvent.change(screen.getByLabelText('Loops of'), { target: { value: 'H1ESC' } })
+    expect(onLoopsFrom).toHaveBeenCalledWith('H1ESC')
+    fireEvent.click(screen.getByRole('radio', { name: /^RNAPII/ }))
+    expect(onChange).toHaveBeenCalledWith('RNAPII')
+  })
+
+  it('hides the cell type select when own loops are chosen or the cell type is listed', () => {
+    const { rerender } = render(<LoopOptions value="own" ownCell cells={['GM12878']} loopsFrom="GM12878" onLoopsFrom={() => {}} onChange={() => {}} onOwn={() => {}} />)
+    expect(screen.queryByLabelText('Loops of')).toBeNull()
+    rerender(<LoopOptions value="CTCF" ownCell={false} cells={['GM12878']} loopsFrom="" onLoopsFrom={() => {}} onChange={() => {}} onOwn={() => {}} />)
+    expect(screen.queryByLabelText('Loops of')).toBeNull()
   })
 })
 
@@ -84,7 +96,7 @@ describe('Background', () => {
   it('keeps to the writing rules', () => {
     const { container } = render(
       <>
-        <LoopOptions value="CTCF" ownCell={false} onChange={() => {}} onOwn={() => {}} />
+        <LoopOptions value="CTCF" ownCell={false} cells={[]} loopsFrom="" onLoopsFrom={() => {}} onChange={() => {}} onOwn={() => {}} />
         <Variants catalog={CATALOG} svSet="" sample="" haplotype={0} vcfUpload={null} onChange={() => {}} onOpen={() => {}} />
         <Background value="hic" region={REGION_3MB} available={false} lymphoblastoid={false} onChange={() => {}} />
       </>,

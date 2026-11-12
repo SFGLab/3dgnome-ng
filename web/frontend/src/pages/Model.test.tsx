@@ -165,6 +165,28 @@ describe('Model a region page', () => {
     expect(body.get('sv_set')).toBe('')
   })
 
+  it('posts your own cell type with a listed loop set and its contacts', async () => {
+    const fetchMock = mockApi([
+      [/^\/api\/uploads$/, () => [201, { id: 'contactsup1', kind: 'contacts', name: 'region.bedpe', size: 1000, ok: true, summary: '12 contact pairs read.', error: null, samples: [] }]],
+      [/^\/api\/jobs$/, () => [201, { url: '/p/token' }]],
+    ])
+    renderModel('/model?example=TNFRSF8')
+    fireEvent.click(await screen.findByRole('radio', { name: /Your own data/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /BEDPE of the region/ }))
+    fireEvent.change(screen.getByLabelText(/Choose a BEDPE file/), { target: { files: [new File(['x'], 'region.bedpe')] } })
+    await screen.findByText('12 contact pairs read.')
+    fireEvent.click(screen.getByRole('button', { name: 'Use this map' }))
+    fireEvent.click(screen.getByRole('radio', { name: /^CTCF CTCF ChIA/ }))
+    fireEvent.change(screen.getByLabelText('Loops of'), { target: { value: 'H1ESC' } })
+    fireEvent.click(screen.getByRole('button', { name: /Build 100 structures/ }))
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u) === '/api/jobs')).toBe(true))
+    const body = fetchMock.mock.calls.find(([u]) => String(u) === '/api/jobs')![1]!.body as FormData
+    expect(body.get('cell_type')).toBe('own')
+    expect(body.get('factors')).toBe('CTCF')
+    expect(JSON.parse(String(body.get('own')))).toMatchObject({ loops: [], contacts: 'contactsup1', loops_from: 'H1ESC', enhancers_from: 'none' })
+  })
+
   it('keeps to the writing rules', async () => {
     const { container } = renderModel()
     await screen.findByRole('radio', { name: /GM12878/ })

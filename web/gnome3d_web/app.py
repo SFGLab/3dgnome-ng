@@ -92,11 +92,11 @@ def create_app() -> FastAPI:
         if fields.get("vcf_upload"):
             vcf = owndata.data_file(checked_upload(fields["vcf_upload"], "vcf", "vcf_upload"))
         if cell_type == "own":
-            if not own_dirs.get("loops"):
-                raise JobError("Your own data needs loops.", "loops")
+            if not own_dirs.get("loops") and not own_dirs.get("loops_from"):
+                raise JobError("Your own data needs loops, uploaded or a listed set.", "loops")
             if "contacts" not in own_dirs:
                 raise JobError("Your own data needs contacts, as .hic, .mcool or BEDPE.", "contacts")
-            base = next(iter(catalog.cell_types))
+            base = own_dirs.get("loops_from") or next(iter(catalog.cell_types))
         else:
             base = cell_type
         background = fields.get("background", "hic")
@@ -146,6 +146,9 @@ def create_app() -> FastAPI:
             for kind in ("anchors", "contacts", "enhancers"):
                 if kind in own_dirs:
                     own[kind] = str(owndata.clean_copy(own_dirs[kind], job / "own" / f"{kind}.txt"))
+            for key in ("loops_from", "enhancers_from"):
+                if key in own_dirs:
+                    own[key] = own_dirs[key]
             req.own = own
             if vcf is not None:
                 req.upload_vcf = str(put_vcf(vcf, job))
@@ -209,6 +212,13 @@ def create_app() -> FastAPI:
         for kind in ("anchors", "contacts", "enhancers"):
             if raw.get(kind):
                 out[kind] = one(raw[kind], kind)
+        # Your own cell type may take a listed cell type's loops and enhancers in place of uploads.
+        for key, allowed in (("loops_from", set(catalog.cell_types)), ("enhancers_from", {*catalog.cell_types, "none"})):
+            name = raw.get(key)
+            if name:
+                if name not in allowed:
+                    raise JobError(f"{key} names {name!r}, which is not a listed cell type", "own")
+                out[key] = str(name)
         return out
 
     @app.post("/jobs")

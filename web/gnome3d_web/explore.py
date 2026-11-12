@@ -56,7 +56,11 @@ def _public_request(req: dict) -> dict:
     out = {k: v for k, v in req.items() if k not in ("upload_vcf", "own")}
     own = req.get("own") or {}
     if own:
-        out["own"] = {"loops": [f for f, _ in own.get("loops", [])], **{k: bool(own.get(k)) for k in ("anchors", "contacts", "enhancers")}}
+        out["own"] = {
+            "loops": [f for f, _ in own.get("loops", [])],
+            **{k: bool(own.get(k)) for k in ("anchors", "contacts", "enhancers")},
+            **{k: own[k] for k in ("loops_from", "enhancers_from") if own.get(k)},
+        }
     return out
 
 

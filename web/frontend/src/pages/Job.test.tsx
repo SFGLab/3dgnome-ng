@@ -54,6 +54,13 @@ describe('Job explorer', () => {
     expect(screen.getByText('your map')).toBeInTheDocument()
   })
 
+  it('names the listed cell type your own cell type took its loops from', async () => {
+    const own = { ...SUMMARY_DONE, request: { ...SUMMARY_DONE.request, cell_type: 'own', factors: 'CTCF', own: { loops: [], anchors: false, contacts: true, enhancers: false, loops_from: 'H1ESC' } } }
+    mockApi([[/summary$/, () => [200, own]]])
+    renderJob()
+    expect(await screen.findByText('CTCF of H1ESC')).toBeInTheDocument()
+  })
+
   it('moves between structures and to the picks', async () => {
     mockApi([[/summary$/, () => [200, SUMMARY_DONE]], [/picks$/, () => [200, PICKS]]])
     renderJob()

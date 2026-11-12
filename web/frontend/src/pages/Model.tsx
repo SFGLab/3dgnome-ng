@@ -51,7 +51,7 @@ function toFormData(form: FormState, overrides: Record<string, string>): FormDat
   d.append('overrides', JSON.stringify(overrides))
   if (form.vcfUpload) d.append('vcf_upload', form.vcfUpload.id)
   const own = form.own
-  if (own.loops.length || own.anchors || own.contacts || own.enhancers) d.append('own', ownField(own))
+  if (own.loops.length || own.anchors || own.contacts || own.enhancers || (form.cell === 'own' && (own.loopsFrom || own.enhancersFrom))) d.append('own', ownField(own))
   return d
 }
 
@@ -83,7 +83,8 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   } | null>(null)
   const ownCell = form.cell === 'own'
   // Your own cell type takes its gene names and server settings from the first listed cell type.
-  const lookup = ownCell ? (Object.keys(catalog.data?.cell_types ?? {})[0] ?? 'GM12878') : form.cell
+  const cells = Object.keys(catalog.data?.cell_types ?? {})
+  const lookup = ownCell ? form.own.loopsFrom || cells[0] || 'GM12878' : form.cell
   const region = useRegion(lookup, form.region)
   const schema = useQuery({
     queryKey: ['settings', lookup],
@@ -129,16 +130,26 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           </p>
         </header>
         <Step n={1} title="Cell type and region">
-          {catalog.data && <CellTypes catalog={catalog.data} value={form.cell} onChange={(cell) => set({ cell })} onOwn={() => setDialog({ tab: 'loops', cell: true })} />}
+          {catalog.data && (
+            <CellTypes
+              catalog={catalog.data}
+              value={form.cell}
+              onChange={(cell) => set({ cell, own: { ...form.own, loopsFrom: undefined, enhancersFrom: undefined } })}
+              onOwn={() => setDialog({ tab: 'loops', cell: true })}
+            />
+          )}
           <RegionField cell={lookup} value={form.region} onChange={(region) => set({ region })} />
-          {region.data && !ownCell && !form.own.loops.length && <LoopPreview cell={form.cell} region={region.data} factors={form.factors} />}
+          {region.data && !form.own.loops.length && <LoopPreview cell={lookup} region={region.data} factors={form.factors} />}
           {stepError(1)}
         </Step>
         <Step n={2} title="Loops">
           <LoopOptions
             value={form.own.loops.length ? 'own' : form.factors}
             ownCell={ownCell}
-            onChange={(factors) => set({ factors, own: { ...form.own, loops: [] } })}
+            cells={cells}
+            loopsFrom={lookup}
+            onLoopsFrom={(loopsFrom) => set({ own: { ...form.own, loopsFrom } })}
+            onChange={(factors) => set({ factors, own: { ...form.own, loops: [], loopsFrom: ownCell ? lookup : undefined } })}
             onOwn={() => setDialog({ tab: 'loops', cell: false })}
           />
           {form.own.loops.length > 0 && (
@@ -214,9 +225,13 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           initial={form.own}
           tab={dialog.tab}
           maxMb={catalog.data?.max_region_mb ?? 20}
+          ownCell={dialog.cell || ownCell}
+          cells={cells}
           onClose={() => setDialog(null)}
           onUse={(own) => {
-            set(dialog.cell ? { own, cell: 'own' } : { own })
+            const asOwn = dialog.cell || ownCell
+            const chosen = asOwn ? { ...own, loopsFrom: own.loops.length ? undefined : own.loopsFrom || cells[0], enhancersFrom: own.enhancersFrom ?? 'none' } : own
+            set(dialog.cell ? { own: chosen, cell: 'own' } : { own: chosen })
             setDialog(null)
           }}
         />

@@ -112,6 +112,13 @@ function OneFile({ kind, rule, entry, onFile, onRemove }: { kind: string; rule: 
   )
 }
 
+type EnhSource = 'upload' | 'listed' | 'none'
+const ENH_SOURCES: [EnhSource, string, string][] = [
+  ['upload', 'Upload a BED file', 'your enhancers'],
+  ['listed', 'Enhancers of a listed cell type', 'hosted'],
+  ['none', 'None', 'promoters only'],
+]
+
 const CONTACT_RES = 25_000
 const USE_LABEL: Record<OwnTab, string> = { loops: 'Use these loops', anchors: 'Use these files', contacts: 'Use this map', enhancers: 'Use these files' }
 type Route = 'link' | 'local' | 'bedpe'
@@ -191,13 +198,21 @@ function ContactsTab({
           <div className="link-row">
             <span className="link-input">
               <Link2 size={14} aria-hidden />
-              <input id="contact-link" type="url" value={url} placeholder="https://4dn-open-data-public.s3.amazonaws.com/…/4DNFI1UEG1HD.hic" onChange={(e) => setUrl(e.target.value)} />
+              <input
+                id="contact-link"
+                type="url"
+                value={url}
+                placeholder="https://4dn-open-data-public.s3.amazonaws.com/…/4DNFI1UEG1HD.hic"
+                onChange={(e) => setUrl(e.target.value)}
+              />
             </span>
             <button type="submit" className="read-button">
               Read
             </button>
           </div>
-          <p className="hint">The server must answer range requests. 4DN, ENCODE, GEO and S3 links do. The file is not copied, and the server keeps only the bins of your region.</p>
+          <p className="hint">
+            The server must answer range requests. 4DN, ENCODE, GEO and S3 links do. The file is not copied, and the server keeps only the bins of your region.
+          </p>
         </form>
       )}
       {route === 'local' && (
@@ -232,6 +247,8 @@ export function OwnData({
   initial,
   tab = 'loops',
   maxMb = 20,
+  ownCell = false,
+  cells = [],
   onClose,
   onUse,
 }: {
@@ -240,6 +257,8 @@ export function OwnData({
   initial: OwnChoice | null
   tab?: OwnTab
   maxMb?: number
+  ownCell?: boolean
+  cells?: string[]
   onClose: () => void
   onUse: (own: OwnChoice) => void
 }) {
@@ -253,6 +272,9 @@ export function OwnData({
     enhancers: start.enhancers && fromResult(92, '', start.enhancers),
   })
   const where = { cell, region: region ? `${region.chrom}:${region.start}-${region.end}` : '' }
+  const borrowed = start.enhancersFrom && start.enhancersFrom !== 'none' ? start.enhancersFrom : ''
+  const [enhSource, setEnhSource] = useState<EnhSource>(start.enhancers || !ownCell ? 'upload' : borrowed ? 'listed' : 'none')
+  const [enhFrom, setEnhFrom] = useState(borrowed || cells[0] || '')
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -304,17 +326,18 @@ export function OwnData({
       .catch((e: Error) => put({ failure: `${file.name} could not be read`, fix: e.message }))
   }
 
-  const blocking = [...loops.map((l) => [l, `${l.factor} file`] as const), ...(['anchors', 'contacts', 'enhancers'] as const).map((k) => [single[k], `${k} file`] as const)].find(
-    ([e]) => !passed(e) && !pending(e),
-  )
+  const kinds = enhSource === 'upload' ? (['anchors', 'contacts', 'enhancers'] as const) : (['anchors', 'contacts'] as const)
+  const blocking = [...loops.map((l) => [l, `${l.factor} file`] as const), ...kinds.map((k) => [single[k], `${k} file`] as const)].find(([e]) => !passed(e) && !pending(e))
   const checking = loops.some(pending) || Object.values(single).some(pending)
-  const anything = loops.length > 0 || Object.values(single).some(Boolean)
+  const anything = loops.length > 0 || Object.values(single).some(Boolean) || (ownCell && enhSource === 'listed')
   const use = () =>
     onUse({
       loops: loops.map((l) => ({ factor: l.factor.trim() || 'loops', upload: l.result! })),
       anchors: single.anchors?.result ?? null,
       contacts: single.contacts?.result ?? null,
-      enhancers: single.enhancers?.result ?? null,
+      enhancers: enhSource === 'upload' ? (single.enhancers?.result ?? null) : null,
+      loopsFrom: start.loopsFrom,
+      enhancersFrom: ownCell ? (enhSource === 'listed' ? enhFrom : enhSource === 'none' ? 'none' : undefined) : undefined,
     })
 
   const count = (n: number) => `${n} file${n === 1 ? '' : 's'}`
@@ -322,7 +345,11 @@ export function OwnData({
     ['loops', 'Loops', count(loops.length)],
     ['anchors', 'Anchors', single.anchors ? '1 file' : 'loop ends'],
     ['contacts', 'Contacts', single.contacts ? '1 file' : '.hic, .mcool or BEDPE'],
-    ['enhancers', 'Enhancers', single.enhancers ? '1 file' : 'cell type'],
+    [
+      'enhancers',
+      'Enhancers',
+      !ownCell ? (single.enhancers ? '1 file' : 'cell type') : enhSource === 'upload' ? (single.enhancers ? '1 file' : 'upload') : enhSource === 'listed' ? enhFrom : 'none',
+    ],
   ]
 
   return (
@@ -399,10 +426,37 @@ export function OwnData({
               onRemove={() => setSingle((s) => ({ ...s, contacts: null }))}
             />
           )}
-          {active === 'enhancers' && (
+          {active === 'enhancers' && ownCell && (
+            <div className="own-tab">
+              <div className="routes" role="radiogroup" aria-label="Enhancers from">
+                {ENH_SOURCES.map(([id, title, sub]) => (
+                  <button key={id} type="button" role="radio" aria-checked={enhSource === id} className="route" onClick={() => setEnhSource(id)}>
+                    <span>
+                      <span className="route-title">{title}</span>
+                      <span className="route-sub">{sub}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {enhSource === 'listed' && (
+                <label className="own-select">
+                  <span>Enhancers of</span>
+                  <select value={enhFrom} onChange={(e) => setEnhFrom(e.target.value)}>
+                    {cells.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {enhSource === 'none' && <p className="rule">The job marks promoters only.</p>}
+            </div>
+          )}
+          {active === 'enhancers' && (!ownCell || enhSource === 'upload') && (
             <OneFile
               kind="enhancers"
-              rule="One BED file, columns chr start end. Without a file the job marks the enhancers of the cell type, and none on your own cell type."
+              rule={ownCell ? 'One BED file, columns chr start end.' : 'One BED file, columns chr start end. Without a file the job marks the enhancers of the cell type.'}
               entry={single.enhancers}
               onFile={(f) => addSingle('enhancers', f)}
               onRemove={() => setSingle((s) => ({ ...s, enhancers: null }))}
@@ -411,7 +465,13 @@ export function OwnData({
         </div>
         <footer className="dialog-foot">
           <p className={`foot-note${blocking ? ' bad' : ''}`}>
-            {blocking ? `Fix or remove the ${blocking[1]} to continue.` : checking ? 'Checking the files.' : active === 'contacts' ? "The map replaces the cell type's map for this job." : ''}
+            {blocking
+              ? `Fix or remove the ${blocking[1]} to continue.`
+              : checking
+                ? 'Checking the files.'
+                : active === 'contacts'
+                  ? "The map replaces the cell type's map for this job."
+                  : ''}
           </p>
           <button type="button" className="secondary" onClick={onClose}>
             Cancel

@@ -148,8 +148,11 @@ def run_job(
     _status(job, state="running", stage="inputs", started=time.time())
     log = job / "engine.log"
     try:
-        cell = catalog.cell_types[req.cell_type] if req.cell_type != "own" else next(iter(catalog.cell_types.values()))
         o = req.own
+        if req.cell_type != "own":
+            cell = catalog.cell_types[req.cell_type]
+        else:
+            cell = catalog.cell_types[str(o["loops_from"])] if o and o.get("loops_from") else next(iter(catalog.cell_types.values()))
         own = Own(
             loops=[(str(f), Path(p)) for f, p in o.get("loops", [])],  # type: ignore[union-attr]
             anchors=Path(str(o["anchors"])) if o.get("anchors") else None,
@@ -185,7 +188,11 @@ def run_job(
         cifs = sorted((job / "models").glob("*.cif"), key=_member)
         models = [read_cif(c) for c in cifs]
         pos0, starts, ends, _ = models[0]
-        genes, enh = _lifted_marks(cell, region.chrom, svs, own.enhancers if own else None, cell_enhancers=req.cell_type != "own")
+        borrowed = str(o.get("enhancers_from") or "none") if o else "none"
+        enh_file = own.enhancers if own and own.enhancers else None
+        if enh_file is None and req.cell_type == "own" and borrowed != "none":
+            enh_file = catalog.cell_types[borrowed].path("enhancers")
+        genes, enh = _lifted_marks(cell, region.chrom, svs, enh_file, cell_enhancers=req.cell_type != "own")
         inputs_lo, inputs_hi = (int(x) for x in inputs.region.split(":")[1].split("-"))
         marks = mark_beads(region.chrom, starts, ends, genes, enh)
         # read_cif sorts beads by start; the viewer selects atoms in file order

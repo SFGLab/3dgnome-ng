@@ -95,6 +95,27 @@ describe('Your own data dialog', () => {
     expect(await screen.findByText('71 enhancers read.')).toBeInTheDocument()
   })
 
+  it('offers an upload, a listed cell type or none for enhancers on your own cell type', async () => {
+    const onUse = vi.fn()
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <OwnData cell="GM12878" region={null} initial={null} tab="enhancers" ownCell cells={['GM12878', 'H1ESC']} onClose={vi.fn()} onUse={onUse} />
+      </QueryClientProvider>,
+    )
+    expect(screen.getByRole('radio', { name: /None/ })).toBeChecked()
+    fireEvent.click(screen.getByRole('radio', { name: /Enhancers of a listed cell type/ }))
+    fireEvent.change(screen.getByLabelText('Enhancers of'), { target: { value: 'H1ESC' } })
+    expect(screen.getByRole('tab', { name: /Enhancers/ })).toHaveTextContent('H1ESC')
+    fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /BEDPE of the region/ }))
+    fireEvent.change(screen.getByLabelText(/Choose a BEDPE file/), { target: { files: [new File(['x'], 'region.bedpe')] } })
+    await screen.findByText('5,500 contacts read.')
+    fireEvent.click(screen.getByRole('button', { name: 'Use this map' }))
+    expect(onUse.mock.calls[0][0]).toMatchObject({ enhancersFrom: 'H1ESC', enhancers: null })
+    expect(checkCopy(document.body)).toEqual([])
+  })
+
   it('hands the uploads to the form', async () => {
     const onUse = vi.fn()
     renderDialog(onUse)

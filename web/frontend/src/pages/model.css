@@ -774,3 +774,21 @@
   font: inherit;
   cursor: pointer;
 }
+
+.loops-of {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.loops-of select {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
