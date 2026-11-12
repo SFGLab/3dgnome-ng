@@ -388,38 +388,69 @@ def figure_two(inputs: Path, readouts: Path, out: Path) -> Figure:
     return fig
 
 
+def _forest(ax: plt.Axes, values: dict[str, tuple[float, float, float] | None], arms: tuple[str, ...]) -> None:
+    """One row per model set: the value as a dot, with its interval when one is given, and the
+    value written beside it. A panel with no values at all says so once."""
+    if all(values.get(x) is None for x in arms):
+        ax.text(0.5, 0.5, "no Micro-C map for this line", transform=ax.transAxes, ha="center", va="center",
+                color=MUTED, fontsize=7, style="italic")
+    for row, a in enumerate(arms[::-1]):
+        v = values.get(a)
+        if v is None:
+            ax.text(0.5, row, "no data", transform=ax.get_yaxis_transform(), ha="center", va="center",
+                    color=MUTED, fontsize=7, style="italic")
+            continue
+        mid, lo, hi = v
+        if np.isfinite(lo):
+            ax.plot([lo, hi], [row, row], color=ARM_COLOUR[a], lw=2, alpha=0.5, solid_capstyle="round")
+        ax.plot(mid, row, "o", color=ARM_COLOUR[a], ms=7, zorder=3)
+        ax.text(mid, row + 0.3, f"{mid:.2f}", ha="center", fontsize=7, color=INK)
+    ax.set_ylim(-0.6, len(arms) - 0.3)
+    ax.set_yticks(range(len(arms)))
+    ax.grid(axis="x", color=GRID, lw=0.6)
+    ax.set_axisbelow(True)
+    ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(4))
+
+
 def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
-    """The merged anchors arm beside the other three on agreement and the link to expression."""
+    """All four model sets on agreement with Hi-C, with Micro-C and on the link to expression,
+    one small panel per cell line or line pair."""
     ag = agreement(readouts)
     arms = ("E", "C", "R", "M")
     draws = link_draws(readouts, arms, n=1000)
-    fig = plt.figure(figsize=(7.2, 7.0), layout="constrained")
-    rows = fig.subfigures(2, 1, height_ratios=[1.0, 1.4], hspace=0.04)
-    _row_title(rows[0], "a", "Correlation of simulated contact maps with Hi-C and Micro-C, all four model sets")
-    for k, (ax, measure) in enumerate(zip(rows[0].subplots(1, 2, sharey=True), ("hic", "microc"), strict=True)):
-        sub = ag[ag.measure == measure]
-        for row, line in enumerate(LINES[::-1]):
-            s = sub[sub.line == line].set_index("arm").value
-            if s.empty:
-                ax.text(0.5, row, "no Micro-C", transform=ax.get_yaxis_transform(), ha="center", va="center",
-                        color=MUTED, fontsize=7, style="italic")
-                continue
-            for j, a in enumerate(arms):
-                if a in s:
-                    ax.plot(s[a], row + (1.5 - j) * 0.14, "o", color=ARM_COLOUR[a], ms=6)
-        ax.set_yticks(range(len(LINES)))
-        ax.set_yticklabels([LINE_LABEL[x] for x in LINES[::-1]])
-        ax.set_ylim(-0.6, len(LINES) - 0.4)
-        ax.set_xlabel(MEASURE_LABEL[measure] + ", higher is better")
-        ax.grid(axis="x", color=GRID, lw=0.6)
-    _row_title(
-        rows[1], "b",
-        "Correlation between the change in enhancer to promoter distance and the change in gene expression, "
-        "all four model sets",
+    fig = plt.figure(figsize=(7.2, 8.4), layout="constrained")
+    rows = fig.subfigures(3, 1, hspace=0.05)
+    specs = (
+        ("a", "Stratum adjusted correlation of simulated contact maps with Hi-C at 25 kb, per cell line, "
+              "higher is better", "hic"),
+        ("b", "Correlation of simulated contact maps with Micro-C at 5 kb, per cell line, higher is better",
+         "microc"),
     )
-    joy(rows[1].subplots(), _joy_groups(draws, arms),
-        "minus Spearman correlation over genes, 1,000 block bootstrap draws, larger is a stronger link")
-    rows[1].legend(handles=_handles(arms), loc="outside lower center", ncol=2, fontsize=7)
+    for sub, (letter, title, measure) in zip(rows[:2], specs, strict=True):
+        _row_title(sub, letter, title)
+        axes = sub.subplots(1, 3, sharey=True)
+        m = ag[ag.measure == measure]
+        allv = m.value
+        for ax, line in zip(axes, LINES, strict=True):
+            s_ = m[m.line == line].set_index("arm").value
+            _forest(ax, {a: (float(s_[a]), np.nan, np.nan) if a in s_ else None for a in arms}, arms)
+            ax.set_title(LINE_LABEL[line].replace("\n", " "), fontsize=8, color=INK)
+            ax.set_xlim(allv.min() - 0.03, allv.max() + 0.03)
+        axes[0].set_yticklabels([textwrap.fill(ARM_NAME[a], 26) for a in arms[::-1]], fontsize=7)
+    _row_title(
+        rows[2], "c",
+        "Correlation between the change in enhancer to promoter distance and the change in gene expression, "
+        "sign reversed so larger is a stronger link, median and 95 percent bootstrap interval",
+    )
+    axes = rows[2].subplots(1, 3, sharey=True, sharex=True)
+    for ax, pair in zip(axes, PAIR_LABEL, strict=True):
+        vals = {}
+        for a in arms:
+            v = draws[(draws.pair == pair) & (draws.arm == a)].value.to_numpy()
+            vals[a] = (float(np.median(v)), *(float(x) for x in np.percentile(v, [2.5, 97.5])))
+        _forest(ax, vals, arms)
+        ax.set_title(PAIR_LABEL[pair], fontsize=8, color=INK)
+    axes[0].set_yticklabels([textwrap.fill(ARM_NAME[a], 26) for a in arms[::-1]], fontsize=7)
     _save(fig, out / "rnapii_supplement")
     return fig
 
