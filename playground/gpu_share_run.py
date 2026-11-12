@@ -32,7 +32,9 @@ wall = time.time() - t0
 
 import jax  # noqa: E402
 
-pool = (jax.devices()[0].memory_stats() or {}).get("bytes_limit", 0)
+stats = jax.devices()[0].memory_stats() or {}
+pool = stats.get("bytes_limit", 0)
+peak = stats.get("peak_bytes_in_use", 0)
 beads = np.array([[(b.start, b.end, b.x, b.y, b.z) for b in e] for e in ens], dtype=np.float64)
-np.savez(sys.argv[2], beads=beads, wall=wall, pool=pool, fraction=os.environ.get("XLA_PYTHON_CLIENT_MEM_FRACTION", ""))
-print(f"{sys.argv[2]}: {beads.shape[0]} structures of {beads.shape[1]} beads in {wall:.0f} s, pool {pool / 2**30:.1f} GiB")
+np.savez(sys.argv[2], beads=beads, wall=wall, pool=pool, peak=peak, fraction=os.environ.get("XLA_PYTHON_CLIENT_MEM_FRACTION", ""))
+print(f"{sys.argv[2]}: {beads.shape[0]} structures of {beads.shape[1]} beads in {wall:.0f} s, pool {pool / 2**30:.1f} GiB, peak in use {peak / 2**30:.2f} GiB")

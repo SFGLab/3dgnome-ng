@@ -50,6 +50,36 @@ and batching across jobs in one worker, which merges the smooth launches of the 
 the way one job merges its blocks, with the host stages of the next job on other threads.
 MPS is tested first.
 
+Measured 2026-11-12 on team-frodo, one RTX 3090, the same job with 10 structures over chr1:1-20 Mb,
+each of K jobs at an equal share of 0.9 of the card, `playground/gpu_throughput.sh`:
+
+| Jobs at once | Without MPS | With MPS |
+|---|---|---|
+| 1 | 39.3 jobs per hour, 92 s | 42.8 |
+| 2 | 37.3 | 46.5 |
+| 3 | 39.4 | 47.3 |
+
+Every structure of the twelve jobs equals the job alone bit for bit. One job keeps the card busy
+most of the time. MPS with two jobs fills the host stages of each with the other's kernels and
+gains 18 percent over one job; a third job adds nothing. Batching across jobs in one worker is not
+worth building on this evidence.
+
+The floor, `playground/gpu_floor.sh`, the same job alone at a fixed pool:
+
+| Pool | Result |
+|---|---|
+| 21, 3, 2, 1.5, 1 GiB | finishes in 80 to 81 s, 0.65 GiB peak in use |
+| 0.75 GiB | finishes in 80 s, 0.73 GiB peak in use |
+| 0.5 GiB | out of memory on one array of 638 MiB, a clean error |
+
+All finished runs equal the default pool bit for bit. The 638 MiB array is N by N in float32 over
+the 13,178 beads, and it grows with the square of the window: 2.6 GiB at 40 Mb. Memory does not
+bound the worker count at the 20 Mb limit. A pool of 1.5 GiB per worker leaves twice the need.
+
+Decision for the production server, to confirm there: two workers per card with MPS, each at a
+pool of 1.5 GiB, each worker pinned to its card. One worker per card without MPS is the fallback
+at about 85 percent of the throughput.
+
 With the window limit every job fits the floor of the largest job, and a worker needs no
 prediction per job. A prediction per job from the exact tensor bytes of `memory.py` is needed
 only if the site later takes jobs of very different sizes, whole chromosomes for example.
