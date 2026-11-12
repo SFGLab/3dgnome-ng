@@ -80,6 +80,21 @@ describe('Measure, find a gene and the gene card', () => {
     expect(screen.getByTestId('markers')).toHaveTextContent('AB')
   })
 
+  it('labels the enhancer of a selected gene as the enhancer even next to a TSS', async () => {
+    fetchMock = mockApi([
+      [/structure\/\d+$/, () => [200, STRUCTURE]],
+      [/annotations$/, () => [200, { ...ANNOTATIONS, genes: [...ANNOTATIONS.genes, { name: 'NEARBY', tss: 12_450_000 }] }]],
+      [/distance$/, () => [200, DISTANCE]],
+      [/genes$/, () => [200, GENES]],
+    ])
+    renderTab()
+    const find = await screen.findByPlaceholderText('Find a gene')
+    fireEvent.change(find, { target: { value: 'TNFRSF8' } })
+    fireEvent.keyDown(find, { key: 'Enter' })
+    const card = await screen.findByRole('region', { name: 'Distance A to B' })
+    expect(within(card).getByText(/^\s*enhancer, chr1:12,449,000/)).toBeInTheDocument()
+  })
+
   it('opens the gene in the Genes tab', async () => {
     const onOpenGenes = vi.fn()
     renderTab(onOpenGenes)

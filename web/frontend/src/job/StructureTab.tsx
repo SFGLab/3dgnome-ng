@@ -86,7 +86,11 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
           <DistanceCard
             d={distance.data}
             current={selected}
-            labels={[describe(distance.data.a.bp, region.chrom, annotations.data), describe(distance.data.b.bp, region.chrom, annotations.data)]}
+            labels={
+              row
+                ? [`${row.gene} TSS, ${region.chrom}:${bp(distance.data.a.bp)}`, `enhancer, ${region.chrom}:${bp(distance.data.b.bp)}`]
+                : [describe(distance.data.a.bp, region.chrom, annotations.data), describe(distance.data.b.bp, region.chrom, annotations.data)]
+            }
           />
         )}
         {row && <GeneCard row={row} chrom={region.chrom} onOpenGenes={onOpenGenes} />}

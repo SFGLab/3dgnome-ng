@@ -92,6 +92,14 @@ answers with the job's url or the field a request fails on. The settings a user 
 their ranges, are listed in `gnome3d_web/settings_schema.py`; every other setting keeps the cell
 type's value. The old form is at `/model/classic`.
 
+A job's page at `/jobs/<key>`, or `/p/<token>` for a private job, is the explorer: the Structure
+tab in 3D with hover, two point measurement and a gene card, and the Genes, Contact map, Loops
+and Log tabs, and a compare view of two jobs. It reads `GET /api/jobs/<key>/` followed by
+`summary`, `structure/<i>`, `annotations`, `picks`, `distance?a=&b=`, `genes`, `contacts`,
+`loops`, `log` and `files.zip`, the same under `/api/p/<token>/`, and `GET /api/compare?a=&b=`.
+Results that read every structure, the picks and the gene statistics, are written to the job
+directory as `explore_<name>.json`. The old job pages are at `.../classic`.
+
 ## Populate the data directory
 
 ```
