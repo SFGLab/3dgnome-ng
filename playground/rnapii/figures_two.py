@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from fig_data import ARM_COLOUR, ARM_NAME, agreement, link_draws, trio_paired  # noqa: E402
 
-from gnome3d.geometry import smooth_chain  # noqa: E402
+from playground.figures.tube import draw, tube_pieces  # noqa: E402
 
 LINES = ("GM12878", "H1ESC", "HFFC6")
 LINE_LABEL = {"GM12878": "GM12878", "H1ESC": "H1", "HFFC6": "HFFc6\n(RNAPII loops from BJ)"}
@@ -159,7 +159,7 @@ def _triangle(ax: plt.Axes, mat: np.ndarray, held: np.ndarray, start: int, binsi
     ax.text(0.01, 0.92, label, transform=ax.transAxes, fontsize=8, color=INK, va="top")
 
 
-def panel_inputs(ax: plt.Axes, chains: list[np.ndarray]) -> None:
+def panel_inputs(ax: plt.Axes, chains: list[tuple[np.ndarray, np.ndarray]]) -> None:
     """Schematic: the inputs each engine reads and the ensemble gnome3d produces."""
     ax.set_xlim(0, 10)
     ax.set_ylim(0.3, 6)
@@ -182,49 +182,56 @@ def panel_inputs(ax: plt.Axes, chains: list[np.ndarray]) -> None:
     ax.text(0.3, 0.55, "Hi-C contacts", color="#b0452a", fontsize=8)
     ax.text(3.3, 1.0, "structural\nvariants", color="#6b4fa1", fontsize=7, va="top")
     ax.add_patch(FancyArrowPatch((4.9, 2.4), (6.0, 2.4), arrowstyle="-|>", mutation_scale=14, color=MUTED, lw=1.4))
-    for k, xyz in enumerate(chains):
-        pts = xyz[::40] - xyz[::40].mean(0)
-        _, _, vt = np.linalg.svd(pts)
-        flat = pts @ vt.T[:, :2]
-        flat = flat / np.abs(flat).max() * 0.85
-        curve = smooth_chain(np.column_stack([flat, np.zeros(len(flat))]), per_bond=6)[:, :2]
-        ax.plot(curve[:, 0] + 6.9 + k * 1.05, curve[:, 1] + 2.4, color=ARM_COLOUR["C"], lw=1.6, alpha=0.9,
-                solid_capstyle="round")
-    ax.text(7.95, 0.9, "structure ensemble", ha="center", fontsize=8, color=INK)
+    for k, (xyz, mid) in enumerate(chains):
+        inset = ax.inset_axes((6.3 + k * 1.3, 1.2, 1.25, 3.0), transform=ax.transData)
+        cols = plt.get_cmap("viridis")((mid - mid.min()) / max(np.ptp(mid), 1))
+        _tube(inset, xyz[::3], cols[::3], 1.4)
+    ax.text(8.15, 0.55, "ensemble of structures, coloured by genomic position", ha="center", fontsize=8, color=INK)
     ax.text(0.3, 5.5, "cudaMMC: CTCF loops", fontsize=8, color=MUTED)
     ax.text(0.3, 5.0, "gnome3d: CTCF loops, RNAPII loops, Hi-C contacts, structural variants", fontsize=8,
             color=INK)
 
 
-def _render(ax: plt.Axes, xyz: np.ndarray, mid: np.ndarray, rot: np.ndarray, colour: str, title: str) -> None:
-    """One locus conformation in projection, chr1:11.99-12.52 Mb, every third bead. The smooth chain
-    and boxes around the promoter and the enhancer, the website viewer's rule of the bead stretch
-    covering each element, with their 3D distance in the caption."""
+def _tube(ax: plt.Axes, xyz: np.ndarray, colours: np.ndarray, width: float) -> tuple[np.ndarray, np.ndarray]:
+    """Draw one chain with the conference tube renderer, viewed along its smallest principal
+    axis. Returns the view rotation and centre so callers can place marks on the same view."""
+    centre = xyz.mean(0)
+    _, _, vt = np.linalg.svd(xyz - centre)
+    rot = vt.copy()
+    draw(ax, [tube_pieces(xyz, colours, rot, centre, width)], background="white")
+    ax.axis("off")
+    return rot, centre
+
+
+def _render(ax: plt.Axes, xyz: np.ndarray, mid: np.ndarray, colour: str, title: str) -> None:
+    """One conformation of chr1:11.99-12.52 Mb, every third bead, as a tube. The promoter and
+    the enhancer are drawn dark and boxed by the bead stretch covering each element, the
+    website viewer's rule, and their 3D distance is given in the caption."""
     keep = (mid > 11_990_000) & (mid < 12_520_000)
-    xyz, mid = xyz[keep][::3], mid[keep][::3]
-    p = (xyz - xyz.mean(0)) @ rot
-    centres: list[np.ndarray] = []
-    curve = smooth_chain(p, per_bond=6)
-    depth = curve[:, 2]
-    shade = (depth - depth.min()) / max(np.ptp(depth), 1e-9)
-    for k in range(len(curve) - 1):
-        ax.plot(curve[k : k + 2, 0], curve[k : k + 2, 1], color=colour, lw=0.6 + 1.4 * shade[k], alpha=0.3 + 0.65 * shade[k],
-                solid_capstyle="round")
-    for (s, e), name, c in (
+    full_xyz, full_mid = xyz[keep], mid[keep]
+    xyz, mid = full_xyz[::3], full_mid[::3]
+    base = np.array(matplotlib.colors.to_rgba(colour))
+    light = base.copy()
+    light[:3] = 1 - 0.55 * (1 - base[:3])
+    cols = np.tile(light, (len(xyz), 1))
+    elements = (
         ((LOCUS["tss"] - 1000, LOCUS["tss"] + 1000), "promoter", "#111111"),
         (LOCUS["enhancer"], "enhancer", "#7a3fb0"),
-    ):
-        k = int(np.argmin(np.abs(mid - (s + e) / 2)))
-        pts = p[max(0, k - 2) : k + 3, :2]
-        lo, hi = pts.min(0) - 0.6, pts.max(0) + 0.6
-        ax.add_patch(Rectangle(lo, *(hi - lo), fill=True, facecolor=c, alpha=0.18, edgecolor=c, lw=1.5))
-        ax.text(lo[0], hi[1] + 0.3, name, fontsize=7, color=c, va="bottom")
-        centres.append(p[k])
+    )
+    for (s, e), _, c in elements:
+        on = np.abs(mid - (s + e) / 2) <= 4000
+        cols[on] = matplotlib.colors.to_rgba(c)
+    rot, centre = _tube(ax, xyz, cols, 3.0)
+    centres = []
+    for (s, e), name, c in elements:
+        k = int(np.argmin(np.abs(full_mid - (s + e) / 2)))
+        centres.append(full_xyz[k])
+        pts = (full_xyz[max(0, k - 4) : k + 5] - centre) @ rot.T
+        lo, hi = pts[:, :2].min(0) - 0.8, pts[:, :2].max(0) + 0.8
+        ax.add_patch(Rectangle(lo, *(hi - lo), fill=False, edgecolor=c, lw=1.3, zorder=5))
+        ax.text(lo[0], hi[1] + 0.3, name, fontsize=7, color=c, va="bottom", zorder=6)
     gap = float(np.linalg.norm(centres[0] - centres[1]))
-    ax.plot([centres[0][0], centres[1][0]], [centres[0][1], centres[1][1]], ls=":", color=INK, lw=1)
-    ax.set_aspect("equal")
-    ax.axis("off")
-    ax.text(0.5, -0.04, f"{textwrap.fill(title, 22)}\nenhancer to promoter {gap:.1f} bead units",
+    ax.text(0.5, -0.02, f"{textwrap.fill(title, 24)}\nenhancer to promoter {gap:.1f} bead units",
             transform=ax.transAxes, ha="center", va="top", fontsize=7, color=INK)
 
 
@@ -267,7 +274,7 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
     rows = fig.subfigures(4, 1, height_ratios=[0.8, 1.55, 1.05, 1.45], hspace=0.04)
 
     _row_title(rows[0], "a", "Input data read by cudaMMC and by gnome3d")
-    panel_inputs(rows[0].subplots(), [maps["locus_C_xyz"], maps["locus_R_xyz"], maps["locus_C_xyz"][::-1]])
+    panel_inputs(rows[0].subplots(), [(maps[f"ensemble_R_{j}_xyz"], maps[f"ensemble_R_{j}_mid"]) for j in range(3)])
 
     _row_title(
         rows[1], "b",
@@ -346,30 +353,37 @@ def figure_two(inputs: Path, readouts: Path, out: Path) -> Figure:
     _agreement_row(rows[1], ag, "C", "R")
 
     bottom = rows[2].subfigures(1, 2, width_ratios=[0.85, 1.15], wspace=0.03)
-    _row_title(bottom[0], "g", "Nine trio individuals, each model set against the individual's own Hi-C", 40)
-    titles = {
-        "loop_pileup": "pile-up at RNAPII loops,\nmodel relative to Hi-C",
-        "hic": "stratum adjusted\ncorrelation with Hi-C",
-    }
-    for ax, measure in zip(bottom[0].subplots(1, 2), ("loop_pileup", "hic"), strict=True):
+    _row_title(
+        bottom[0], "g",
+        "Nine trio individuals, change from adding RNAPII loops, each against the individual's own Hi-C", 40,
+    )
+    ax = bottom[0].subplots()
+    rows_g = (
+        ("loop_pileup", "contact enrichment\nat RNAPII loops"),
+        ("hic", "correlation with\nthe whole Hi-C map"),
+    )
+    for row, (measure, label) in enumerate(rows_g[::-1]):
         w = trio[trio.measure == measure].pivot(index="person", columns="arm", values="value")
-        up = int((w.R > w.C).sum())
-        for _, r in w.iterrows():
-            ax.plot([0, 1], [r.C, r.R], color="#9a9893", lw=0.9, zorder=1)
-        ax.scatter(np.zeros(len(w)), w.C, color=ARM_COLOUR["C"], s=14, zorder=2)
-        ax.scatter(np.ones(len(w)), w.R, color=ARM_COLOUR["R"], s=14, zorder=2)
-        ax.set_xticks([0, 1])
-        ax.set_xticklabels(["CTCF\nloops", "CTCF and\nRNAPII loops"], fontsize=7)
-        ax.set_xlim(-0.35, 1.35)
-        ax.set_title(f"{titles[measure]}\nhigher in {up} of {len(w)}", fontsize=7, color=INK)
-        ax.grid(axis="y", color=GRID, lw=0.6)
-        ax.set_axisbelow(True)
+        change = 100 * (w.R - w.C) / w.C
+        jitter = np.linspace(-0.12, 0.12, len(change))
+        ax.scatter(change, row + jitter, color=ARM_COLOUR["R"], s=16, zorder=3)
+        up = int((change > 0).sum())
+        ax.text(1.0, row + 0.32, f"higher in {up} of {len(change)}", transform=ax.get_yaxis_transform(),
+                ha="right", va="center", fontsize=7, color=INK)
+        ax.text(-0.02, row, label, transform=ax.get_yaxis_transform(), ha="right", va="center", fontsize=7.5,
+                color=INK)
+    ax.axvline(0, color=MUTED, lw=1)
+    ax.set_yticks([])
+    ax.spines["left"].set_visible(False)
+    ax.set_ylim(-0.6, 1.6)
+    ax.set_xlim(None, ax.get_xlim()[1] + 18)
+    ax.set_xlabel("change with RNAPII loops, percent of the\nvalue with CTCF loops alone")
+    ax.grid(axis="x", color=GRID, lw=0.6)
+    ax.set_axisbelow(True)
 
     _row_title(bottom[1], "h", f"The {LOCUS['gene']} locus in GM12878, medoid of ten structures per model set", 52)
-    xyz_c = maps["locus_C_xyz"]
-    _, _, vt = np.linalg.svd(xyz_c - xyz_c.mean(0))
     for ax, arm in zip(bottom[1].subplots(1, 2), ("C", "R"), strict=True):
-        _render(ax, maps[f"locus_{arm}_xyz"], maps[f"locus_{arm}_mid"], vt.T, ARM_COLOUR[arm], ARM_NAME[arm])
+        _render(ax, maps[f"locus_{arm}_xyz"], maps[f"locus_{arm}_mid"], ARM_COLOUR[arm], ARM_NAME[arm])
     _save(fig, out / "rnapii_figure2")
     return fig
 
