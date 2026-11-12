@@ -44,9 +44,15 @@ Measured 2026-11-12 on an RTX 3090 with the same job:
 
 Without MPS the processes on a card take turns and a second worker gains nothing. With the
 NVIDIA MPS daemon running on the host, kernels of several processes run at once and two workers
-per card give 18 percent more than one. A third adds nothing. MPS in containers needs the host
-daemon's pipe directory mounted and `ipc: host` on the workers. Without MPS set
-`WORKERS_PER_GPU=1`.
+per card give 18 percent more than one. A third adds nothing. Start the daemon on the host with
+`nvidia-cuda-mps-control -d` and add docker-compose.mps.yml, which gives the workers the host
+IPC namespace and the daemon's pipe directory:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.mps.yml up -d
+```
+
+Without MPS set `WORKERS_PER_GPU=1`. MPS in containers has not been run on a GPU yet.
 
 Without Docker, `QUEUE=thread` runs jobs in the web process on the slots of `GPU_SLOTS`, one GPU
 id per slot, `0,0,1,1` for two jobs at once on each of two cards. Waiting jobs are lost when the

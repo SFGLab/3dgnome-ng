@@ -1,0 +1,15 @@
+# The workers' engines on the host's NVIDIA MPS daemon. Use together with docker-compose.yml:
+#   nvidia-cuda-mps-control -d          # on the host, once, as root or the GPU owner
+#   docker compose -f docker-compose.yml -f docker-compose.mps.yml up -d
+# The workers share the host IPC namespace and the daemon's pipe directory, /tmp/nvidia-mps by
+# default, MPS_PIPE_DIRECTORY to change it.
+x-mps: &mps
+  ipc: host
+  environment:
+    CUDA_MPS_PIPE_DIRECTORY: /tmp/nvidia-mps
+  volumes:
+    - "${MPS_PIPE_DIRECTORY:-/tmp/nvidia-mps}:/tmp/nvidia-mps"
+
+services:
+  worker-gpu0: *mps
+  worker-gpu1: *mps
