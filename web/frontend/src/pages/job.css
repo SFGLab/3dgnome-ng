@@ -784,7 +784,7 @@
 
 .contacts-tab {
   display: grid;
-  grid-template-columns: minmax(0, 620px) 300px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 20px;
   align-items: start;
 }
@@ -833,7 +833,7 @@
 
 .loop-track {
   display: block;
-  width: 100%;
+  width: min(100%, calc(100vh - 230px));
   height: 34px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -856,7 +856,8 @@
 
 .contact-canvas {
   display: block;
-  width: 100%;
+  /* As wide as the panel, and short enough that the whole square fits on the screen. */
+  width: min(100%, calc(100vh - 230px));
   aspect-ratio: 1;
   image-rendering: pixelated;
   border: 1px solid var(--line);
@@ -1047,4 +1048,14 @@
   .compare-panels {
     grid-template-columns: 1fr;
   }
+}
+
+.map-labels {
+  max-width: min(100%, calc(100vh - 230px));
+}
+
+.map-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
 }

@@ -61,6 +61,8 @@ def ice(m: np.ndarray, iterations: int = 200) -> np.ndarray:
     """Iterative correction: rows and columns scaled until every non empty row has one sum."""
     out = m.astype(float).copy()
     live = out.sum(axis=1) > 0
+    if not live.any():
+        return out
     for _ in range(iterations):
         s = out.sum(axis=1)
         s[~live] = 1

@@ -296,6 +296,14 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
     if not m:
         raise ExploreError(f"{region!r} is not chr:start-end")
     chrom, start, end = m[1], int(m[2]), int(m[3])
+    # The window is cut to the job's region: outside it there are no beads to count.
+    job_region = _json(job / "status.json").get("region") or ""
+    jr = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", str(job_region))
+    if jr:
+        jc, js, je = jr[1], int(jr[2]), int(jr[3])
+        if chrom != jc or end <= js or start >= je:
+            raise ExploreError(f"{chrom}:{start:,}-{end:,} lies outside the job's region {jc}:{js:,}-{je:,}.")
+        start, end = max(start, js), min(end, je)
     if res not in cm.RESOLUTIONS:
         raise ExploreError(f"resolution {res} is not one of {', '.join(f'{r // 1000} kb' for r in cm.RESOLUTIONS)}")
     if len(cm.bins_for(start, end, res)) > cm.MAX_BINS:

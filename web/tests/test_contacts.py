@@ -63,6 +63,11 @@ def main() -> int:
         check("the agreement is a number or null", r["scc"] is None or -1 <= r["scc"] <= 1, str(r["scc"]))
         bad = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 2000, "upper": "hic", "lower": "model"})
         check("too many bins is a 400 naming a resolution that fits", bad.status_code == 400 and "5 kb" in bad.json()["error"], bad.text)
+        out = c.get(f"/api{url}/contacts", params={"region": "chr1:3500000-4000000", "res": 25000, "upper": "hic", "lower": "model", "norm": "ice"})
+        check("a window outside the job's region is a 400 naming the region", out.status_code == 400 and "chr1:0-3,000,000" in out.json()["error"], out.text)
+        part = c.get(f"/api{url}/contacts", params={"region": "chr1:2900000-3400000", "res": 25000, "upper": "hic", "lower": "model", "norm": "ice"})
+        check("a window reaching past the region is cut to it", part.status_code == 200 and part.json()["bins"][-1] < 3_000_000, part.text[:200])
+        check("ICE of an empty map is an empty map", float(ice(np.zeros((4, 4))).sum()) == 0.0)
     return done()
 
 

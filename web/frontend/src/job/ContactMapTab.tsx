@@ -7,6 +7,20 @@ import { colour, percentile, transform, type Show } from './heatmap'
 import { parseRegion } from './StructureTab'
 
 const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]
+const MAX_BINS = 800
+const SETTLE_MS = 250
+
+/** A window cut to the job's region and at least ten bins wide, or the whole region when it
+ * does not overlap it. */
+function clamp(l: Locus, job: Locus, res: number): Locus {
+  if (l.chrom !== job.chrom || l.end <= job.start || l.start >= job.end) return job
+  const width = Math.min(Math.max(l.end - l.start, res * 10), job.end - job.start)
+  const start = Math.min(Math.max(l.start, job.start), job.end - width)
+  return { chrom: job.chrom, start: Math.round(start), end: Math.round(start + width) }
+}
+
+/** The finest resolution not finer than `res` that keeps a window under MAX_BINS bins. */
+const fitting = (l: Locus, res: number) => RESOLUTIONS.find((r) => r >= res && (l.end - l.start) / r <= MAX_BINS) ?? RESOLUTIONS[RESOLUTIONS.length - 1]
 const SHOWS: [Show, string][] = [
   ['observed', 'Observed'],
   ['expected', 'Expected'],
@@ -53,8 +67,15 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
   const [log, setLog] = useState(true)
   const [range, setRange] = useState<[number, number] | null>(null)
   const [hover, setHover] = useState<string | null>(null)
+  const [note, setNote] = useState('')
   const canvas = useRef<HTMLCanvasElement>(null)
-  const region = `${locus.chrom}:${locus.start}-${locus.end}`
+  // The map follows the window once a burst of wheel steps settles, not at every step.
+  const [settled, setSettled] = useState<Locus>(job)
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(locus), SETTLE_MS)
+    return () => clearTimeout(t)
+  }, [locus])
+  const region = `${settled.chrom}:${settled.start}-${settled.end}`
   const maps = useQuery<Contacts, Error>({
     queryKey: ['contacts', api.base, region, res, upperKind, lowerKind, norm],
     queryFn: () => api.contacts({ region, res, upper: upperKind, lower: lowerKind, norm }),
@@ -68,19 +89,49 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
   useEffect(() => {
     if (canvas.current && maps.data) draw(canvas.current, upper, lower, shownRange, log)
   })
-  const zoom = (f: number, centre = (locus.start + locus.end) / 2) => {
-    const half = Math.max(((locus.end - locus.start) * f) / 2, res * 10)
-    const next = { chrom: locus.chrom, start: Math.max(0, Math.round(centre - half)), end: Math.round(centre + half) }
+  const moveTo = (want: Locus) => {
+    const next = clamp(want, job, res)
+    const r = fitting(next, res)
+    if (r !== res) setRes(r)
     setLocus(next)
     setText(fmt(next))
+    return next
   }
+  const zoom = (f: number, centre = (locus.start + locus.end) / 2, frac?: number) => {
+    const width = (locus.end - locus.start) * f
+    // Under the pointer the genomic position stays where it was.
+    const anchor = frac === undefined ? centre : locus.start + frac * (locus.end - locus.start)
+    const start = frac === undefined ? centre - width / 2 : anchor - frac * width
+    moveTo({ chrom: locus.chrom, start, end: start + width })
+  }
+  const go = () => {
+    const want = parse(text)
+    if (!want) return
+    const next = moveTo(want)
+    setNote(next.start !== want.start || next.end !== want.end || next.chrom !== want.chrom ? `The job covers ${fmt(job)}. The map shows only that region.` : '')
+  }
+  // A native listener, since React's wheel handler is passive and cannot stop the page scrolling.
+  const zoomRef = useRef(zoom)
+  zoomRef.current = zoom
+  useEffect(() => {
+    const c = canvas.current
+    if (!c) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const box = c.getBoundingClientRect()
+      const frac = box.width ? (e.clientX - box.left) / box.width : 0.5
+      zoomRef.current(e.deltaY > 0 ? 1.25 : 0.8, undefined, frac)
+    }
+    c.addEventListener('wheel', onWheel, { passive: false })
+    return () => c.removeEventListener('wheel', onWheel)
+  }, [])
   const at = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const box = e.currentTarget.getBoundingClientRect()
     const n = maps.data?.bins.length ?? 0
     return [Math.floor(((e.clientY - box.top) / box.height) * n), Math.floor(((e.clientX - box.left) / box.width) * n)]
   }
-  const loops = (annotations.data?.loops ?? []).filter((l) => l.a[0] >= locus.start && l.b[1] <= locus.end)
-  const x = (p: number) => ((p - locus.start) / (locus.end - locus.start)) * 600
+  const loops = (annotations.data?.loops ?? []).filter((l) => l.a[0] >= settled.start && l.b[1] <= settled.end)
+  const x = (p: number) => ((p - settled.start) / (settled.end - settled.start)) * 600
   return (
     <div className="contacts-tab">
       <div className="contacts-main">
@@ -88,8 +139,8 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           <label className="field">
             <span>Locus</span>
             <span className="locus-input">
-              <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && parse(text) && setLocus(parse(text)!)} />
-              <button type="button" onClick={() => parse(text) && setLocus(parse(text)!)}>
+              <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && go()} />
+              <button type="button" onClick={go}>
                 Go
               </button>
             </span>
@@ -113,7 +164,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           </label>
           <label className="field">
             <span>Resolution</span>
-            <select aria-label="Resolution" value={res} onChange={(e) => setRes(Number(e.target.value))}>
+            <select aria-label="Resolution" value={res} onChange={(e) => setRes(fitting(locus, Number(e.target.value)))}>
               {RESOLUTIONS.map((r) => (
                 <option key={r} value={r}>{`${r / 1000} kb`}</option>
               ))}
@@ -131,8 +182,8 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
               className="icon-tool"
               aria-label="Back to the job region"
               onClick={() => {
-                setLocus(job)
-                setText(fmt(job))
+                moveTo(job)
+                setNote('')
               }}
             >
               <RefreshCw size={15} aria-hidden />
@@ -155,6 +206,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             <span>{maps.data.upper_label}</span>
           </p>
         )}
+        {note && <p className="map-note">{note}</p>}
         {maps.isError && <p className="field-error">{maps.error.message}</p>}
         <canvas
           ref={canvas}
@@ -166,11 +218,10 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             if (i < 0 || j < 0 || i >= d.bins.length || j >= d.bins.length) return
             const [r, c] = [Math.min(i, j), Math.max(i, j)]
             setHover(
-              `x ${locus.chrom}:${bp(d.bins[j])}   y ${locus.chrom}:${bp(d.bins[i])}   ${d.upper_label.split(' ')[0]} ${d.upper[r][c].toFixed(1)}   model ${d.lower[c][r].toFixed(1)}   apart ${(Math.abs(d.bins[j] - d.bins[i]) / 1e6).toFixed(2)} Mb`,
+              `x ${settled.chrom}:${bp(d.bins[j])}   y ${settled.chrom}:${bp(d.bins[i])}   ${d.upper_label.split(' ')[0]} ${d.upper[r][c].toFixed(1)}   model ${d.lower[c][r].toFixed(1)}   apart ${(Math.abs(d.bins[j] - d.bins[i]) / 1e6).toFixed(2)} Mb`,
             )
           }}
           onMouseLeave={() => setHover(null)}
-          onWheel={(e) => zoom(e.deltaY > 0 ? 1.25 : 0.8)}
           onDoubleClick={(e) => {
             if (!maps.data) return
             const [, j] = at(e)

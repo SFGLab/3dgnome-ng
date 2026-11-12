@@ -48,6 +48,45 @@ describe('ContactMapTab', () => {
     expect(document.querySelector('.map-labels')?.textContent).toBe('This job, sum of 100 structuresHi-C of GM12878')
   })
 
+  it('keeps zooming out inside the job region', async () => {
+    const f = mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    renderTab()
+    await screen.findByText('0.37')
+    const canvas = document.querySelector('canvas')!
+    for (let i = 0; i < 6; i++) fireEvent.wheel(canvas, { deltaY: 100 })
+    await new Promise((r) => setTimeout(r, 400))
+    const asked = f.mock.calls.filter(([u]) => String(u).includes('/contacts')).map(([u]) => new URL(String(u), 'http://x').searchParams.get('region')!)
+    for (const r of asked) {
+      const [, a, b] = r.match(/:(\d+)-(\d+)/)!.map(Number)
+      expect(a).toBeGreaterThanOrEqual(11_500_000)
+      expect(b).toBeLessThanOrEqual(11_575_000)
+    }
+  })
+
+  it('asks once for a burst of wheel steps', async () => {
+    const f = mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ContactMapTab api={jobApi('jobs', KEY)} summary={{ ...SUMMARY_DONE, region: 'chr1:10000000-14000000' }} />
+      </QueryClientProvider>,
+    )
+    await screen.findByText('0.37')
+    const before = f.mock.calls.filter(([u]) => String(u).includes('/contacts')).length
+    const canvas = document.querySelector('canvas')!
+    for (let i = 0; i < 5; i++) fireEvent.wheel(canvas, { deltaY: -100 })
+    await new Promise((r) => setTimeout(r, 500))
+    expect(f.mock.calls.filter(([u]) => String(u).includes('/contacts')).length - before).toBe(1)
+  })
+
+  it('keeps a typed locus inside the job region and says so', async () => {
+    mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    renderTab()
+    await screen.findByText('0.37')
+    fireEvent.change(screen.getByLabelText('Locus'), { target: { value: 'chr1:13,781,651-14,281,651' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+    expect(screen.getByText('The job covers chr1:11,500,000-11,575,000. The map shows only that region.')).toBeInTheDocument()
+  })
+
   it('shows the server message for a resolution it refuses', async () => {
     mockApi([
       [/contacts$/, (u) => (u.searchParams.get('res') === '5000' ? [400, { error: 'chr1:1-20000000 at 5 kb is more than 800 bins on a side. Use 25 kb or a shorter window.' }] : [200, MAP])],
