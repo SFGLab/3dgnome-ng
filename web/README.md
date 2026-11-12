@@ -5,7 +5,7 @@ optionally applies structural variants from a hosted call set or an uploaded VCF
 ensemble of gnome3d structures with promoters and enhancers marked, an enhancer to promoter
 distance table and the CIF files.
 
-Three processes: the web app (FastAPI), one worker per GPU (rq), and Redis. No database. The
+Three processes: the web app (FastAPI), one or more workers per GPU (rq), and Redis. No database. The
 hosted data is a read only directory with a `catalog.json`; jobs and their results are files
 under a results directory.
 
@@ -20,6 +20,17 @@ DATA_DIR=/srv/gnome3d/data RESULTS_DIR=/srv/gnome3d/results PORT=8000 docker com
 
 The image builds from the repository root, so the engine it runs is the checkout's. `GPU=0`
 builds a CPU image; then remove the worker's `deploy` block and see "CPU only" below.
+
+Several workers can share one GPU. Give each a share of the card's memory, for example two
+workers at 0.45 each:
+
+```bash
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.45 docker compose up -d --scale worker=2
+```
+
+The shares add up to less than 1, and the rest of the card is for the CUDA context of each
+process. Without the variable the first job takes 75 percent of the card and a job that starts
+next to it takes what is free, at least 1 GiB, and logs the pool it got.
 
 ## Populate the data directory
 

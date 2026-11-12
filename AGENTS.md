@@ -729,6 +729,19 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     to 1 s on the RTX 4060 Ti. Numbers and the per batch composition in
     `design/kernel-performance.md`.
   - **`cli.py` auto-forces `ib_workers=1` when `mc_backend=jax`** — multiple Python threads contending for a single GPU is net-negative; restarts go inside JAX via `mc_smooth_chains` (vmap), not via thread pools.
+  - **Several processes on one card: `XLA_PYTHON_CLIENT_MEM_FRACTION`, JAX's own variable, no
+    setting.** ([mc/jax/share.py](gnome3d/mc/jax/share.py)) JAX preallocates 75 percent of the
+    card when its backend starts. Measured 2026-11-12 on the RTX 4060 Ti with JAX 0.11: a second
+    process on a held card gets a smaller pool than it asked for, `memory_stats()` still reports
+    the full 11.7 GiB, the kernels size their launches from that and XLA aborts the process with
+    a failed check in the allocator. Before the backend starts, `configure_gpu_pool` reads the
+    free memory with nvidia-smi. On a free card it changes nothing. On a held card it sets the
+    pool to the free memory less 0.5 GiB for the CUDA context and logs it, and refuses under
+    1 GiB. A fraction set by hand that does not fit the free memory is refused with the numbers.
+    Several instances that share a card on purpose set the variable in each, adding up to less
+    than 1. A process with a smaller pool packs its launches differently, so its structures are
+    not bit identical to a run on a free card; at a fixed pool it reproduces. Unit checks in
+    `harness/test_gpu_share.py`, two instances on one card in `playground/gpu_share_run.py`.
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
 
   **Kernel seeding is process-stable.** Every JAX kernel takes its PRNG offset from

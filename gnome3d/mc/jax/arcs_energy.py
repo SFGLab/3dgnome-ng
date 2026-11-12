@@ -34,6 +34,10 @@ class DeviceArcsEnergy:
 
     def __init__(self, exp: F64Array, args: tuple[Any, ...], w: F32Array | None = None) -> None:
         import jax
+
+        from gnome3d.mc.jax.util import jax_is_available
+
+        jax_is_available()
         import jax.numpy as jnp
 
         stretch, squeeze, rep_inv, bg_w = (float(a) for a in args[:4])
@@ -153,6 +157,10 @@ class DeviceFactoryEnergy:
 
     def __init__(self, act: F64Array, weight: float, radius: float) -> None:
         import jax
+
+        from gnome3d.mc.jax.util import jax_is_available
+
+        jax_is_available()
         import jax.numpy as jnp
 
         n = int(act.shape[0])
