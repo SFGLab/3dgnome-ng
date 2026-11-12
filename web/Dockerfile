@@ -1,8 +1,16 @@
 # Versions as on the team-frodo CUDA venv the smoke test ran on: Python 3.12, numpy 2.4.4,
 # numba 0.65.1, scipy 1.17.1, jax 0.10.1.
-# The 3D-GNOME site and its worker in one image. Build from the repository root:
+# The 3D-GNOME site and its worker in one image, the frontend built in a Node stage. Build from
+# the repository root:
 #   docker build -f web/Dockerfile -t gnome3d-web .
 #   docker build -f web/Dockerfile --build-arg GPU=1 -t gnome3d-web:gpu .
+FROM node:22-slim AS frontend
+WORKDIR /web/frontend
+COPY web/frontend/package.json web/frontend/package-lock.json ./
+RUN npm ci
+COPY web/frontend ./
+RUN npm run build
+
 FROM python:3.12-slim
 
 RUN apt-get update \
@@ -21,6 +29,7 @@ RUN pip install --no-cache-dir --no-deps .
 COPY web/requirements.txt ./web/requirements.txt
 RUN pip install --no-cache-dir -r web/requirements.txt
 COPY web ./web
+COPY --from=frontend /web/frontend/dist ./web/frontend/dist
 
 ENV PYTHONPATH=/app/web:/app/web/vendor \
     ENGINE_PYTHON=python \

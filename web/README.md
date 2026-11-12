@@ -64,6 +64,27 @@ Without Docker, `QUEUE=thread` runs jobs in the web process on the slots of `GPU
 id per slot, `0,0,1,1` for two jobs at once on each of two cards. Waiting jobs are lost when the
 process stops.
 
+## Frontend
+
+The pages are a React app in `web/frontend/`, built with Vite to `web/frontend/dist/`. FastAPI
+serves the build: every client route returns `dist/index.html`, and the API, the job pages, the
+private job pages and the old form at `/model` keep their own handlers. Without a build the app
+answers 503 and says how to build. `FRONTEND_DIST` points the app at another build. The Docker
+image builds the frontend in a Node stage.
+
+Development needs Node 18 or newer:
+
+```bash
+cd web/frontend
+npm ci
+npm test            # Vitest, the pages and their text against design/writing-rules.md
+npm run dev         # Vite on port 5173, passing /api, /jobs, /p and /model to FastAPI on 8000
+npm run build       # writes dist/ for FastAPI
+```
+
+The page text, the colours and the figures come from the approved design in web/design/site.pen.
+A change of wording goes into the design first.
+
 ## Populate the data directory
 
 ```
