@@ -10,6 +10,7 @@ import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
 import { RegionField, useRegion } from '../model/RegionField'
 import { SidePanel } from '../model/SidePanel'
+import { EnsembleFields, SettingsTree } from '../model/SettingsTree'
 import { Step } from '../model/Step'
 import { Variants } from '../model/Variants'
 import '../styles/doc.css'
@@ -26,6 +27,7 @@ export function Model() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }))
   const region = useRegion(form.cell, form.region)
+  const schema = useQuery({ queryKey: ['settings', form.cell], queryFn: () => api.settings(form.cell) })
 
   useEffect(() => {
     const e = EXAMPLES.find((x) => x.id === params.get('example'))
@@ -69,7 +71,8 @@ export function Model() {
           />
         </Step>
         <Step n={5} title="Ensemble and simulation settings">
-          <div />
+          <EnsembleFields structures={form.structures} name={form.name} max={catalog.data?.max_structures ?? 100} onChange={set} />
+          {schema.data && <SettingsTree schema={schema.data} values={form.settings} onChange={(settings) => set({ settings })} />}
         </Step>
       </div>
     </div>
