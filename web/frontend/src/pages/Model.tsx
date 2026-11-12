@@ -9,12 +9,14 @@ import { EXAMPLES, type Example } from '../model/examples'
 import { EMPTY_FORM, type FormState } from '../model/form'
 import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
+import { OwnData, type OwnTab } from '../model/OwnData'
 import { rememberJob } from '../model/recent'
 import { RegionField, useRegion } from '../model/RegionField'
 import { changedSettings } from '../model/settings'
 import { SidePanel } from '../model/SidePanel'
 import { EnsembleFields, SettingsTree } from '../model/SettingsTree'
 import { Step } from '../model/Step'
+import { ownField } from '../model/upload'
 import { Variants } from '../model/Variants'
 import '../styles/doc.css'
 import './model.css'
@@ -22,7 +24,10 @@ import './model.css'
 const FIELD_STEP: Record<string, number> = {
   cell_type: 1,
   region: 1,
+  own: 1,
+  contacts: 1,
   factors: 2,
+  loops: 2,
   sv_set: 3,
   sample: 3,
   background: 4,
@@ -43,6 +48,8 @@ function toFormData(form: FormState, overrides: Record<string, string>): FormDat
   d.append('n_models', String(form.structures))
   d.append('overrides', JSON.stringify(overrides))
   if (form.vcf) d.append('vcf', form.vcf)
+  const own = form.own
+  if (own.loops.length || own.anchors || own.contacts || own.enhancers) d.append('own', ownField(own))
   return d
 }
 
@@ -60,8 +67,12 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: api.catalog })
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }))
-  const region = useRegion(form.cell, form.region)
-  const schema = useQuery({ queryKey: ['settings', form.cell], queryFn: () => api.settings(form.cell) })
+  const [dialog, setDialog] = useState<{ tab: OwnTab; cell: boolean } | null>(null)
+  const ownCell = form.cell === 'own'
+  // Your own cell type takes its gene names and server settings from the first listed cell type.
+  const lookup = ownCell ? (Object.keys(catalog.data?.cell_types ?? {})[0] ?? 'GM12878') : form.cell
+  const region = useRegion(lookup, form.region)
+  const schema = useQuery({ queryKey: ['settings', lookup], queryFn: () => api.settings(lookup) })
 
   useEffect(() => {
     const e = EXAMPLES.find((x) => x.id === params.get('example'))
@@ -102,13 +113,28 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           </p>
         </header>
         <Step n={1} title="Cell type and region">
-          {catalog.data && <CellTypes catalog={catalog.data} value={form.cell} onChange={(cell) => set({ cell })} />}
-          <RegionField cell={form.cell} value={form.region} onChange={(region) => set({ region })} />
-          {region.data && <LoopPreview cell={form.cell} region={region.data} factors={form.factors} />}
+          {catalog.data && (
+            <CellTypes catalog={catalog.data} value={form.cell} onChange={(cell) => set({ cell })} onOwn={() => setDialog({ tab: 'loops', cell: true })} />
+          )}
+          <RegionField cell={lookup} value={form.region} onChange={(region) => set({ region })} />
+          {region.data && !ownCell && !form.own.loops.length && <LoopPreview cell={form.cell} region={region.data} factors={form.factors} />}
           {stepError(1)}
         </Step>
         <Step n={2} title="Loops">
-          <LoopOptions value={form.factors} onChange={(factors) => set({ factors })} />
+          <LoopOptions
+            value={form.own.loops.length ? 'own' : form.factors}
+            ownCell={ownCell}
+            onChange={(factors) => set({ factors, own: { ...form.own, loops: [] } })}
+            onOwn={() => setDialog({ tab: 'loops', cell: false })}
+          />
+          {form.own.loops.length > 0 && (
+            <p className="own-summary">
+              {`Your own loops: ${form.own.loops.map((l) => `${l.factor} from ${l.upload.name}`).join(', ')}.`}{' '}
+              <button type="button" className="link-button" onClick={() => setDialog({ tab: 'loops', cell: ownCell })}>
+                Change the files
+              </button>
+            </p>
+          )}
           {stepError(2)}
         </Step>
         <Step n={3} title="Structural variants" note="optional">
@@ -130,6 +156,19 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           {schema.data && <SettingsTree schema={schema.data} values={form.settings} onChange={(settings) => set({ settings })} />}
           {stepError(5)}
         </Step>
+        {dialog && (
+          <OwnData
+            cell={lookup}
+            region={region.data ?? null}
+            initial={form.own}
+            tab={dialog.tab}
+            onClose={() => setDialog(null)}
+            onUse={(own) => {
+              set(dialog.cell ? { own, cell: 'own' } : { own })
+              setDialog(null)
+            }}
+          />
+        )}
         <div className="submit-row">
           <button type="button" className="submit" disabled={!form.region.trim() || submit.isPending} onClick={() => submit.mutate()}>
             {`Build ${form.structures} structure${form.structures === 1 ? '' : 's'}`} <ArrowRight size={16} aria-hidden />

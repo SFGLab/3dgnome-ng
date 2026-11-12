@@ -1,8 +1,8 @@
 import { Upload } from 'lucide-react'
 import type { Catalog } from '../api'
 
-/** The cell type cards of step 1, a radio group, with the own data card disabled. */
-export function CellTypes({ catalog, value, onChange }: { catalog: Catalog; value: string; onChange: (cell: string) => void }) {
+/** The cell type cards of step 1, a radio group. The own data card opens the uploads. */
+export function CellTypes({ catalog, value, onChange, onOwn }: { catalog: Catalog; value: string; onChange: (cell: string) => void; onOwn: () => void }) {
   return (
     <div className="cell-types" role="radiogroup" aria-label="Cell type">
       {Object.entries(catalog.cell_types).map(([name, c]) => (
@@ -18,7 +18,7 @@ export function CellTypes({ catalog, value, onChange }: { catalog: Catalog; valu
           </span>
         </button>
       ))}
-      <button type="button" role="radio" aria-checked={false} className="cell-card own" disabled title="Uploads open in a later version.">
+      <button type="button" role="radio" aria-checked={value === 'own'} className="cell-card own" onClick={onOwn}>
         <span className="cell-name">
           <Upload size={14} aria-hidden /> Your own data
         </span>

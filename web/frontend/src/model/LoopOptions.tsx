@@ -7,8 +7,18 @@ const OPTIONS: [Factors | 'own', string, string][] = [
   ['own', 'Your own loops', 'Any loop set in BEDPE, for example ChIA-PET, HiChIP, Micro-C or Hi-C loop calls.'],
 ]
 
-/** Step 2, the loop set of the job. Own loops open with the uploads. */
-export function LoopOptions({ value, onChange }: { value: Factors; onChange: (f: Factors) => void }) {
+/** Step 2, the loop set of the job. Own loops open the uploads. On your own cell type only own loops apply. */
+export function LoopOptions({
+  value,
+  ownCell,
+  onChange,
+  onOwn,
+}: {
+  value: Factors | 'own'
+  ownCell: boolean
+  onChange: (f: Factors) => void
+  onOwn: () => void
+}) {
   return (
     <div className="options two" role="radiogroup" aria-label="Loops">
       {OPTIONS.map(([id, title, desc]) => (
@@ -18,9 +28,8 @@ export function LoopOptions({ value, onChange }: { value: Factors; onChange: (f:
           role="radio"
           aria-checked={value === id}
           className="option"
-          disabled={id === 'own'}
-          title={id === 'own' ? 'Uploads open in a later version.' : undefined}
-          onClick={() => id !== 'own' && onChange(id)}
+          disabled={ownCell && id !== 'own'}
+          onClick={() => (id === 'own' ? onOwn() : onChange(id))}
         >
           <span className="radio-dot" aria-hidden />
           <span className="option-text">

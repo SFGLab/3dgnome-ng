@@ -10,14 +10,22 @@ const REGION_1MB = { chrom: 'chr1', start: 11500000, end: 12600000, label: '' }
 const REGION_3MB = { chrom: 'chr1', start: 10000000, end: 13000000, label: '' }
 
 describe('LoopOptions', () => {
-  it('offers the four loop sets with own loops disabled', () => {
+  it('offers the four loop sets and opens the uploads for own loops', () => {
     const onChange = vi.fn()
-    render(<LoopOptions value="CTCF+RNAPII" onChange={onChange} />)
+    const onOwn = vi.fn()
+    render(<LoopOptions value="CTCF+RNAPII" ownCell={false} onChange={onChange} onOwn={onOwn} />)
     expect(screen.getAllByRole('radio').map((r) => r.querySelector('.option-title')?.textContent)).toEqual(['CTCF', 'RNAPII', 'CTCF and RNAPII', 'Your own loops'])
     expect(screen.getByRole('radio', { name: /CTCF and RNAPII/ })).toBeChecked()
-    expect(screen.getByRole('radio', { name: /Your own loops/ })).toBeDisabled()
+    fireEvent.click(screen.getByRole('radio', { name: /Your own loops/ }))
+    expect(onOwn).toHaveBeenCalled()
     fireEvent.click(screen.getByRole('radio', { name: /^RNAPII/ }))
     expect(onChange).toHaveBeenCalledWith('RNAPII')
+  })
+
+  it('leaves only own loops on your own cell type', () => {
+    render(<LoopOptions value="own" ownCell onChange={() => {}} onOwn={() => {}} />)
+    expect(screen.getAllByRole('radio').slice(0, 3).every((r) => (r as HTMLButtonElement).disabled)).toBe(true)
+    expect(screen.getByRole('radio', { name: /Your own loops/ })).toBeChecked()
   })
 })
 
@@ -69,7 +77,7 @@ describe('Background', () => {
   it('keeps to the writing rules', () => {
     const { container } = render(
       <>
-        <LoopOptions value="CTCF" onChange={() => {}} />
+        <LoopOptions value="CTCF" ownCell={false} onChange={() => {}} onOwn={() => {}} />
         <Variants catalog={CATALOG} svSet="" sample="" haplotype={0} vcf={null} onChange={() => {}} />
         <Background value="hic" region={REGION_3MB} available={false} lymphoblastoid={false} onChange={() => {}} />
       </>,

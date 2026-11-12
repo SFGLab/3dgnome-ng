@@ -45,7 +45,7 @@ describe('Model a region page', () => {
     const card = await screen.findByRole('radio', { name: /GM12878/ })
     expect(within(card).getByText('lymphoblastoid')).toBeInTheDocument()
     expect(within(card).getByText('enhancers')).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: /Your own data/ })).toBeDisabled()
+    expect(screen.getByRole('radio', { name: /Your own data/ })).toBeEnabled()
   })
 
   it('resolves a gene name to its region', async () => {
@@ -111,6 +111,37 @@ describe('Model a region page', () => {
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('takes a number from 0 to 0.6')
     expect(alert.closest('section')?.querySelector('h2')?.textContent).toBe('5Ensemble and simulation settings')
+  })
+
+  it('opens the own data dialog from the card and from the loops option', async () => {
+    renderModel()
+    fireEvent.click(await screen.findByRole('radio', { name: /Your own data/ }))
+    expect(screen.getByRole('dialog', { name: 'Your own data' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: /Your own loops/ }))
+    expect(screen.getByRole('dialog', { name: 'Your own data' })).toBeInTheDocument()
+  })
+
+  it('posts the uploads of the dialog as own', async () => {
+    const fetchMock = mockApi([
+      [/^\/api\/uploads$/, () => [201, { id: 'loopsupload1', kind: 'loops', name: 'my_loops.bedpe', size: 1000, ok: true, summary: '12 loops read.', error: null, samples: [] }]],
+      [/^\/api\/uploads\/[\w-]+\/preview$/, () => [200, []]],
+      [/^\/api\/jobs$/, () => [201, { url: '/p/token' }]],
+    ])
+    renderModel('/model?example=TNFRSF8')
+    fireEvent.click(await screen.findByRole('radio', { name: /Your own loops/ }))
+    fireEvent.change(screen.getByLabelText(/Add a factor, or drop a BEDPE file here/), { target: { files: [new File(['x'], 'my_loops.bedpe')] } })
+    await screen.findByText('12 loops read.')
+    fireEvent.click(screen.getByRole('button', { name: 'Use these loops' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /Your own loops/ })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText(/CTCF from my_loops.bedpe/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Build 100 structures/ }))
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u) === '/api/jobs')).toBe(true))
+    const body = fetchMock.mock.calls.find(([u]) => String(u) === '/api/jobs')![1]!.body as FormData
+    expect(JSON.parse(String(body.get('own')))).toEqual({ loops: [{ factor: 'CTCF', upload: 'loopsupload1' }], anchors: null, contacts: null, enhancers: null })
+    expect(body.get('cell_type')).toBe('GM12878')
   })
 
   it('keeps to the writing rules', async () => {
