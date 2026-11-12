@@ -14,7 +14,15 @@ type Props = {
 
 function background(s: Summary): string {
   const b = s.request.background ?? (s.request.hicdiffusion ? 'hicdiffusion' : 'hic')
+  if (b === 'hic' && s.request.own?.contacts) return 'your map'
   return { hic: 'Hi-C, 4DN', hicdiffusion: 'HiCDiffusion', none: 'none' }[b] ?? b
+}
+
+function ownLoops(s: Summary): string | null {
+  const f = s.request.own?.loops ?? []
+  if (!f.length) return null
+  const words = f.length === 1 ? f[0] : `${f.slice(0, -1).join(', ')} and ${f.at(-1)}`
+  return `${words}, your files`
 }
 
 function variants(s: Summary): string {
@@ -78,7 +86,7 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
       </button>
       <dl className="facts">
         <dt>Loops</dt>
-        <dd>{FACTORS[summary.request.factors] ?? summary.request.factors}</dd>
+        <dd>{ownLoops(summary) ?? FACTORS[summary.request.factors] ?? summary.request.factors}</dd>
         <dt>Loops in region</dt>
         <dd>{loops || 'none'}</dd>
         <dt>Structural variants</dt>

@@ -117,9 +117,10 @@ def _hicdiffusion(region_start: int, chrom: str, svs: list, fasta: Path) -> tupl
     return cond[0], region_start
 
 
-def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None):  # noqa: ANN001, ANN202
+def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, cell_enhancers: bool = True):  # noqa: ANN001, ANN202
     """The cell type's genes and enhancers on `chrom` in the haplotype's coordinates, the beads'
-    coordinates, those inside a deletion dropped."""
+    coordinates, those inside a deletion dropped. An enhancers upload replaces the cell type's;
+    with `cell_enhancers` off and no upload there are none, as on your own cell type."""
     import pandas as pd
     from personal3d.lift import Lift
 
@@ -128,6 +129,8 @@ def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None):  
     genes = genes[genes["chrom"] == chrom].copy()
     genes["tss"] = L.many(genes["tss"].to_numpy())
     genes = genes[genes["tss"] >= 0]
+    if enhancers is None and not cell_enhancers:
+        return genes, pd.DataFrame({0: pd.Series(dtype=str), 1: pd.Series(dtype=int), 2: pd.Series(dtype=int)})
     enh = pd.read_csv(enhancers or cell.path("enhancers"), sep="\t", header=None, usecols=[0, 1, 2])
     enh = enh[enh[0] == chrom].copy()
     enh[1], enh[2] = L.many(enh[1].to_numpy()), L.many(enh[2].to_numpy() - 1) + 1
@@ -182,7 +185,7 @@ def run_job(
         cifs = sorted((job / "models").glob("*.cif"), key=_member)
         models = [read_cif(c) for c in cifs]
         pos0, starts, ends, _ = models[0]
-        genes, enh = _lifted_marks(cell, region.chrom, svs, own.enhancers if own else None)
+        genes, enh = _lifted_marks(cell, region.chrom, svs, own.enhancers if own else None, cell_enhancers=req.cell_type != "own")
         inputs_lo, inputs_hi = (int(x) for x in inputs.region.split(":")[1].split("-"))
         marks = mark_beads(region.chrom, starts, ends, genes, enh)
         # read_cif sorts beads by start; the viewer selects atoms in file order

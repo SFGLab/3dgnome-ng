@@ -22,8 +22,9 @@ from _check import check, done
 from fixture import make_data
 
 
-def serve(root: Path, ranges: bool, html: bool = False) -> tuple[ThreadingHTTPServer, str]:
-    """A file server on a free port that answers range requests, or answers every request whole."""
+def serve(root: Path, ranges: bool, html: bool = False, head: bool = True) -> tuple[ThreadingHTTPServer, str]:
+    """A file server on a free port that answers range requests, or answers every request whole.
+    Without head it refuses HEAD requests, as an S3 link signed for GET does."""
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_: object) -> None:
@@ -73,6 +74,11 @@ def serve(root: Path, ranges: bool, html: bool = False) -> tuple[ThreadingHTTPSe
             self._send(False)
 
         def do_HEAD(self) -> None:  # noqa: N802
+            if not head:
+                self.send_response(403)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             self._send(True)
 
     srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -108,6 +114,7 @@ def main() -> int:
         with_ranges, url = serve(files, ranges=True)
         whole, url_whole = serve(files, ranges=False)
         page, url_page = serve(files, ranges=True, html=True)
+        signed, url_signed = serve(files, ranges=True, head=False)
 
         from gnome3d_web import remote
 
@@ -156,6 +163,9 @@ def main() -> int:
         pairs = pd.read_csv(owndata.data_file(stored), sep="\t", header=None)
         check("the window's off diagonal bin pairs are stored at 25 kb", len(pairs) == 10 and set(pairs[2] - pairs[1]) == {25_000} and int(pairs[6].sum()) == 30, pairs.to_string())
 
+        r = link(f"{url_signed}/test.mcool")
+        check("an .mcool link whose server refuses HEAD is read", r.status_code == 201 and r.json()["ok"], r.text)
+
         r = link(f"{url_whole}/test.mcool")
         check("a link without range requests is a 400 naming it", r.status_code == 400 and "does not answer range requests" in r.json()["error"] and r.json()["fix"], r.text)
         r = link(f"{url_page}/test.mcool")
@@ -171,7 +181,7 @@ def main() -> int:
         strict = TestClient(create_app())
         r = link(f"{url}/test.mcool", client=strict)
         check("a link to a private address is refused by default", r.status_code == 400 and "private" in r.json()["error"], r.text)
-        for srv in (with_ranges, whole, page):
+        for srv in (with_ranges, whole, page, signed):
             srv.shutdown()
     return done()
 

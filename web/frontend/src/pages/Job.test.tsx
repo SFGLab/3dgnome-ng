@@ -46,6 +46,14 @@ describe('Job explorer', () => {
     expect(screen.getByRole('link', { name: /all files, zip/ })).toHaveAttribute('href', `/api/jobs/${KEY}/files.zip`)
   })
 
+  it('names own loops and an uploaded contact map in the side panel', async () => {
+    const own = { ...SUMMARY_DONE, request: { ...SUMMARY_DONE.request, cell_type: 'own', own: { loops: ['CTCF', 'H3K27ac'], anchors: false, contacts: true, enhancers: false } } }
+    mockApi([[/summary$/, () => [200, own]]])
+    renderJob()
+    expect(await screen.findByText('CTCF and H3K27ac, your files')).toBeInTheDocument()
+    expect(screen.getByText('your map')).toBeInTheDocument()
+  })
+
   it('moves between structures and to the picks', async () => {
     mockApi([[/summary$/, () => [200, SUMMARY_DONE]], [/picks$/, () => [200, PICKS]]])
     renderJob()

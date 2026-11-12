@@ -53,6 +53,14 @@ def main() -> int:
         marks = json.loads((res / "marks.json").read_text())
         check("marks list promoter and enhancer beads", marks["promoters"] and marks["enhancers"])
 
+        from gnome3d_web.jobs import _lifted_marks
+
+        ct = cat.cell_types["GMX"]
+        _, enh = _lifted_marks(ct, "chr1", [], None)
+        check("a listed cell type marks its own enhancers", len(enh) == 2, str(enh))
+        _, enh = _lifted_marks(ct, "chr1", [], None, cell_enhancers=False)
+        check("your own cell type without an enhancers upload marks none", len(enh) == 0, str(enh))
+
         bad = JobRequest(cell_type="GMX", region="chr9:0-1000000", factors="CTCF", n_models=1)
         res = run_job(bad, cat, Path(d) / "results" / "bad", engine=FAKE)
         status = json.loads((res / "status.json").read_text())

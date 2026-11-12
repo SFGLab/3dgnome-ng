@@ -153,6 +153,9 @@ All by environment, see `gnome3d_web/settings.py`. The ones that matter:
 | `MAX_REGION_MB` | 20 | the longest region the form accepts |
 | `GPU_SLOTS` | `0` | the slots of the `thread` queue, one GPU id per slot |
 | `GNOME3D_GPU_POOL_GIB` | unset | the GPU memory pool of each engine process in GiB |
+| `MAX_STRUCTURES` | 100 | the most structures a job may ask for |
+| `UPLOAD_MAX_MB` | 200 | the largest upload; set the proxy's body limit to match |
+| `LINK_ALLOW_PRIVATE` | off | `1` lets a contact map link point at a private address, for tests only |
 
 HiCDiffusion is offered only when `HICDIFFUSION_DIR`, `HICDIFFUSION_PYTHON`,
 `HICDIFFUSION_MODELS` and `REFERENCE_FASTA` are all set, the checkout, its own interpreter (its
@@ -172,10 +175,37 @@ under `RESULTS_DIR/.jax-cache` keeps for the next.
 
 ## Caching and privacy
 
-A request on hosted inputs is keyed by a hash of the normalised request, so an identical request
-finds the finished job instead of running again. A request with an uploaded VCF gets a random
-link under `/p/`, never enters the shared cache, and is removed by the retention sweep the app
-runs at start. Shared jobs are never removed by the site.
+A request on hosted inputs is keyed by a hash of the normalised request. An identical request
+finds the finished job instead of running again. A request with an uploaded VCF or any of your
+own data gets a random link under `/p/`, never enters the shared cache, and is removed by the
+retention sweep the app runs at start. Uploads waiting for a job sit under `RESULTS_DIR/uploads`
+and are swept after the same retention period. Shared jobs are never removed by the site.
+
+## Uploads
+
+The Your own data dialog takes loops, one seven column BEDPE per factor, anchors in BED with an
+optional orientation column, contacts and enhancers in BED. The structural variants dialog takes
+a VCF compressed with bgzip. `POST /api/uploads` stores each file in chunks under the
+`UPLOAD_MAX_MB` cap and checks it on arrival; the dialog shows the check and holds the job until
+every file passes. A job copies the files it uses into its own directory.
+
+Contacts come by one of three routes, and each ends as the region's bin pairs at 25 kb without
+the diagonal, the way the hosted maps hold them.
+
+| route | where the window is read |
+|---|---|
+| link to a .hic or .mcool | on the server, `POST /api/uploads/link`, over HTTP range requests: hic-straw for .hic, h5py on an fsspec file for .mcool. The link must be http or https and resolve to a public address at every redirect, and the read gives up after 2 minutes. |
+| local .hic file | in the browser, with the hic-straw JavaScript reader, uploaded as a BEDPE |
+| BEDPE of the region | on the user's computer; `gnome3d-ng extract --mcool FILE --region chr:start-end --out region.bedpe` writes it from a local .mcool, with `pip install gnome3d-ng[extract]` for cooler |
+
+At job build the pairs are thinned to the contacts per Mb of the cell type's hosted map on the
+region's chromosome, by drawing contacts without replacement. A deep map and a shallow one then
+reach the engine at the density its maps are read at. The whole remote file never comes to the
+server.
+
+Checked 2026-11-12 on team-frodo through the page: an own data job with CTCF and RNAPII loops
+and contacts read from a local .hic, a job with an uploaded HGSVC VCF, and a job with contacts by
+link to ENCODE ENCFF718AWL.hic, 37 GB, whose 2 Mb window read in about 9 s.
 
 ## CPU only
 

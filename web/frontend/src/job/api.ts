@@ -10,7 +10,18 @@ export type Summary = {
   started: number | null
   finished: number | null
   region: string | null
-  request: { cell_type: string; region: string; factors: string; background?: string; hicdiffusion?: boolean; sv_set: string; sample: string; haplotype: number; n_models: number }
+  request: {
+    cell_type: string
+    region: string
+    factors: string
+    background?: string
+    hicdiffusion?: boolean
+    sv_set: string
+    sample: string
+    haplotype: number
+    n_models: number
+    own?: { loops: string[]; anchors: boolean; contacts: boolean; enhancers: boolean }
+  }
   loops: Record<string, number>
   n_svs: number | null
   structures: number
