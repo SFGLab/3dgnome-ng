@@ -68,6 +68,8 @@ def main() -> int:
             (r / f"e3d_{a}" / "summary.tsv").write_text(
                 "pair\tn_with_deseq\tr_total\tr_conf\tjump_r_conf\nGM12878->H1ESC\t700\t-0.2\t-0.1\t-0.19\n"
             )
+        (r / "e3d_E_test").mkdir()
+        (r / "e3d_E_test" / "summary.tsv").write_text("pair\tn_with_deseq\tr_total\nGM12878->H1ESC\t700\t-0.9\n")
         records = Path(d) / "records"
         records.mkdir()
         for line in ("GM12878", "H1ESC", "HFFC6"):
@@ -100,6 +102,7 @@ def main() -> int:
             and got.get(("H1ESC", "R", "r_fine")) == 0.4,
             str(sorted(k for k in got if k[0] == "H1ESC")),
         )
+        check("a summary outside the four arms is ignored", set(df["arm"]) <= {"E", "C", "R", "M"}, str(sorted(set(df["arm"]))))
         check(
             "the manifest carries a record for every line",
             set(man["records"]) == {"GM12878", "H1ESC", "HFFC6"},

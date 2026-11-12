@@ -57,6 +57,8 @@ def build(readouts: Path, records: Path, out: Path) -> dict[str, object]:
         if not s.is_file():
             continue
         arm = d.name.split("_", 1)[1]
+        if arm not in ("E", "C", "R", "M"):
+            continue
         t = pd.read_csv(s, sep="\t")
         for r in t.itertuples(index=False):
             pair = str(r.pair).replace("->", " vs ")
