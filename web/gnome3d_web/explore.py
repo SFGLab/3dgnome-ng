@@ -311,9 +311,43 @@ def zip_bytes(job: Path) -> bytes:
     return buf.getvalue()
 
 
-def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str) -> dict[str, object]:
-    """Two contact maps of a window on one grid, each the job's Hi-C or its model, raw or ICE
-    balanced, and their stratum adjusted correlation."""
+def _read_deep(url: str, chrom: str, start: int, end: int, res: int, allow_private: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The bin pairs of a window of a remote deep map, bin starts and raw counts."""
+    from . import remote
+
+    kind = remote.check_link(url, allow_private)
+    size, final = remote.probe(url, allow_private)
+    w = remote.read_window(final, kind, chrom, start, end, size, allow_private, res=res)
+    return w.bin1, w.bin2, w.counts
+
+
+def _deep_map(job: Path, url: str, chrom: str, start: int, end: int, res: int, allow_private: bool) -> np.ndarray:
+    """A deep map's window on the job's grid, read once per window and resolution and kept in the
+    job directory."""
+    edges = cm.bins_for(start, end, res)
+    cache = job / f"explore_deep_{chrom}_{edges[0]}_{end}_{res}.npy"
+    if cache.is_file():
+        return np.load(cache)
+    b1, b2, counts = _read_deep(url, chrom, start, end, res, allow_private)
+    n = len(edges)
+    i, j = (np.asarray(b1) - edges[0]) // res, (np.asarray(b2) - edges[0]) // res
+    ok = (i >= 0) & (i < n) & (j >= 0) & (j < n)
+    m = np.zeros((n, n))
+    np.add.at(m, (i[ok], j[ok]), counts[ok])
+    off = i[ok] != j[ok]
+    np.add.at(m, (j[ok][off], i[ok][off]), np.asarray(counts)[ok][off])
+    np.save(cache, m)
+    return m
+
+
+def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str, hic_url: str = "", hic_name: str = "", allow_private: bool = False) -> dict[str, object]:
+    """Two contact maps of a window on one grid, each the Hi-C, the model's MultiMM map or its
+    counted contacts, raw or ICE balanced, and the agreement the battery reports: the stratum
+    adjusted correlation of raw Hi-C against contacts within the structures' median bond.
+
+    @param hic_url a deep map of the cell type in place of the job's own input contacts
+    @param hic_name the deep map's name for the labels
+    """
     m = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", region.replace(",", ""))
     if not m:
         raise ExploreError(f"{region!r} is not chr:start-end")
@@ -333,15 +367,29 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         raise ExploreError(f"{region} at {res // 1000} kb is more than {cm.MAX_BINS} bins on a side. Use {fit // 1000} kb or a shorter window.")
     n_models = len(models(job))
     cell = _json(job / "request.json").get("cell_type", "")
+    pos, mid = _positions(job)
+    bond = cm.median_bond(pos)
+    hic = None
+    if hic_url:
+        try:
+            hic, hic_label = _deep_map(job, hic_url, chrom, start, end, res, allow_private), f"Hi-C of {cell}, {hic_name or 'deep map'}"
+        except Exception:  # noqa: BLE001
+            # A deep map that cannot be read leaves the contacts the job read, and the label says so.
+            hic = None
+    if hic is None:
+        sing = pd.read_csv(job / "inputs" / "singletons.bedpe", sep="\t", header=None, usecols=range(7))
+        hic = cm.hic_map(sing, chrom, start, end, res)
+        hic_label = f"Hi-C of {cell}, the contacts this job read" + (", the deep map could not be read" if hic_url else "")
+    counted = cm.model_map(pos, mid, start, end, res, bond)
 
     def one(kind: str) -> tuple[np.ndarray, str]:
         if kind == "hic":
-            sing = pd.read_csv(job / "inputs" / "singletons.bedpe", sep="\t", header=None, usecols=range(7))
-            return cm.hic_map(sing, chrom, start, end, res), f"Hi-C of {cell}"
+            return hic, hic_label
         if kind == "model":
-            pos, mid = _positions(job)
-            return cm.model_map(pos, mid, start, end, res), f"This job, sum of {n_models} structures"
-        raise ExploreError(f"{kind!r} is not hic or model")
+            return cm.multimm_map(pos, mid, start, end, res), f"This job, 1/(d+1)³ between bins, mean of {n_models} structures"
+        if kind == "model_count":
+            return counted, f"This job, contacts within the median bond, sum of {n_models} structures"
+        raise ExploreError(f"{kind!r} is not hic, model or model_count")
 
     a, la = one(upper)
     b, lb = one(lower)
@@ -351,11 +399,13 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         raise ExploreError(f"{norm!r} is not ice or raw")
     return {
         "bins": cm.bins_for(start, end, res).tolist(),
-        "upper": np.round(a, 4).tolist(),
-        "lower": np.round(b, 4).tolist(),
+        "upper": np.round(a, 6).tolist(),
+        "lower": np.round(b, 6).tolist(),
         "upper_label": la,
         "lower_label": lb,
-        "scc": cm.scc(a, b, res),
+        # The battery's number, whatever the halves shown: raw counts on both sides.
+        "scc": cm.scc(hic, counted, res),
+        "scc_about": f"{hic_label} against this job's contacts within the median bond, raw counts, diagonals up to 2 Mb, as the validation battery computes it",
     }
 
 

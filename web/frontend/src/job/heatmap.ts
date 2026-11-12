@@ -48,6 +48,11 @@ function pearson(m: number[][]): number[][] {
   return centred.map((a) => centred.map((b) => a.reduce((s, v, k) => s + v * b[k], 0)))
 }
 
+/** The rows of a map with no contact off the diagonal, a bin with no bead or no read. */
+export function emptyRows(m: number[][]): boolean[] {
+  return m.map((row, i) => !row.some((v, j) => j !== i && v > 0))
+}
+
 export function transform(m: number[][], show: Show): number[][] {
   if (show === 'expected') return expected(m)
   if (show === 'oe') return oe(m)

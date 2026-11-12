@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DARKEST, colour, transform } from './heatmap'
+import { DARKEST, colour, emptyRows, transform } from './heatmap'
 
 const M = [
   [4, 2, 1],
@@ -58,5 +58,11 @@ describe('colour', () => {
     expect(colour(0, 0, 10, false)).toEqual([255, 255, 255])
     expect(colour(10, 0, 10, false)).toEqual(DARKEST)
     expect(colour(20, 0, 10, true)).toEqual(DARKEST)
+  })
+})
+
+describe('emptyRows', () => {
+  it('marks the rows with no contact off the diagonal', () => {
+    expect(emptyRows([[3, 0, 0], [0, 0, 2], [0, 2, 0]])).toEqual([true, false, false])
   })
 })

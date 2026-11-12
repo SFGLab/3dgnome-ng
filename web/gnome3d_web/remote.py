@@ -370,10 +370,10 @@ def _local(url: str, allow_private: bool) -> tuple[str, str]:
     return _proxy.add(url, allow_private)
 
 
-def _child(kind: str, url: str, chrom: str, start: int, end: int, size: int, out) -> None:  # noqa: ANN001, PLR0913
+def _child(kind: str, url: str, chrom: str, start: int, end: int, size: int, out, res: int = RES) -> None:  # noqa: ANN001, PLR0913
     """Runs one reader in a child process and sends back its window or its refusal."""
     try:
-        w = read_hic(url, chrom, start, end) if kind == ".hic" else read_mcool(url, chrom, start, end, RES, size)
+        w = read_hic(url, chrom, start, end, res) if kind == ".hic" else read_mcool(url, chrom, start, end, res, size)
         out.send(("ok", w))
     except RemoteError as e:
         out.send(("refused", str(e), e.fix))
@@ -381,14 +381,14 @@ def _child(kind: str, url: str, chrom: str, start: int, end: int, size: int, out
         out.send(("failed", str(e)))
 
 
-def read_window(url: str, kind: str, chrom: str, start: int, end: int, size: int, allow_private: bool, seconds: float = READ_SECONDS) -> Window:
+def read_window(url: str, kind: str, chrom: str, start: int, end: int, size: int, allow_private: bool, seconds: float = READ_SECONDS, res: int = RES) -> Window:
     """The window of a remote map, read in a child process through the local proxy and stopped
     after the time limit. hic-straw holds the interpreter lock while it waits on the network, so
     in this process it would stall the proxy it reads through."""
     local, token = _local(url, allow_private)
     ctx = multiprocessing.get_context("spawn")
     recv, send = ctx.Pipe(duplex=False)
-    proc = ctx.Process(target=_child, args=(kind, local, chrom, start, end, size, send), daemon=True)
+    proc = ctx.Process(target=_child, args=(kind, local, chrom, start, end, size, send, res), daemon=True)
     proc.start()
     send.close()
     try:

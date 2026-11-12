@@ -560,8 +560,15 @@ def create_app() -> FastAPI:
         @app.get(base + "/contacts", name=f"{kind}_contacts")
         def ex_contacts(key: str, region: str, res: int = 25000, upper: str = "hic", lower: str = "model", norm: str = "ice") -> JSONResponse:
             d = guard(key)
+            req = json.loads((d / "request.json").read_text()) if (d / "request.json").is_file() else {}
+            ct = catalog.cell_types.get(str(req.get("cell_type", "")))
+            # The cell type's deep map stands for the Hi-C only where the job read that cell type's
+            # hosted map: not with own contacts, not with a predicted background.
+            deep = ct is not None and ct.hic_url and not (req.get("own") or {}).get("contacts") and req.get("background", "hic") == "hic"
             try:
-                return JSONResponse(explore.contact_maps(d, region, res, upper, lower, norm))
+                return JSONResponse(
+                    explore.contact_maps(d, region, res, upper, lower, norm, ct.hic_url if deep else "", ct.hic_name if deep else "", s.link_allow_private)  # type: ignore[union-attr]
+                )
             except explore.ExploreError as e:
                 return JSONResponse({"error": str(e)}, 400)
 

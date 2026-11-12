@@ -48,10 +48,23 @@ export type Annotations = {
 export type Loop = { factor: string; chrom: string; a: [number, number]; b: [number, number]; span: number; pets: number }
 export type Distance = { a: { bead: number; bp: number; offset: number }; b: { bead: number; bp: number; offset: number }; values: number[]; mean: number; sd: number; n: number }
 export type GeneRow = {
-  gene: string; tss: number; enhancer: number; linear_bp: number; distance: number; promoter_bead: number; enhancer_bead: number
-  min: number; q1: number; median: number; q3: number; max: number; sd: number; n: number; joined_by: string
+  gene: string
+  tss: number
+  enhancer: number
+  linear_bp: number
+  distance: number
+  promoter_bead: number
+  enhancer_bead: number
+  min: number
+  q1: number
+  median: number
+  q3: number
+  max: number
+  sd: number
+  n: number
+  joined_by: string
 }
-export type Contacts = { bins: number[]; upper: number[][]; lower: number[][]; upper_label: string; lower_label: string; scc: number | null }
+export type Contacts = { bins: number[]; upper: number[][]; lower: number[][]; upper_label: string; lower_label: string; scc: number | null; scc_about?: string }
 export type Compare = { same_region: boolean; rows: { gene: string; linear_bp: number; a: { mean: number; sd: number }; b: { mean: number; sd: number }; ratio: number }[] }
 
 async function call<T>(path: string, text = false): Promise<T> {

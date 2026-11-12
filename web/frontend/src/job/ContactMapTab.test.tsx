@@ -12,8 +12,9 @@ const MAP = {
   upper: [[5, 2, 1], [2, 6, 3], [1, 3, 7]],
   lower: [[9, 4, 1], [4, 8, 2], [1, 2, 9]],
   upper_label: 'Hi-C of GM12878',
-  lower_label: 'This job, sum of 100 structures',
+  lower_label: 'This job, 1/(d+1)³ between bins, mean of 100 structures',
   scc: 0.37,
+  scc_about: 'Hi-C of GM12878, 4DN 4DNFIXP4QG5B against this job\'s contacts within the median bond, raw counts, diagonals up to 2 Mb, as the validation battery computes it',
 }
 
 function renderTab() {
@@ -44,8 +45,8 @@ describe('ContactMapTab', () => {
     renderTab()
     const card = await screen.findByRole('region', { name: 'Agreement with Hi-C' })
     expect(within(card).getByText('0.37')).toBeInTheDocument()
-    expect(within(card).getByText('Computed on 25 kb bins up to 2 Mb apart in this view.')).toBeInTheDocument()
-    expect(document.querySelector('.map-labels')?.textContent).toBe('This job, sum of 100 structuresHi-C of GM12878')
+    expect(within(card).getByText(/4DN 4DNFIXP4QG5B against this job's contacts within the median bond/)).toBeInTheDocument()
+    expect(document.querySelector('.map-labels')?.textContent).toBe('This job, 1/(d+1)³ between bins, mean of 100 structuresHi-C of GM12878')
   })
 
   it('keeps zooming out inside the job region', async () => {
@@ -85,6 +86,24 @@ describe('ContactMapTab', () => {
     fireEvent.change(screen.getByLabelText('Locus'), { target: { value: 'chr1:13,781,651-14,281,651' } })
     fireEvent.click(screen.getByRole('button', { name: 'Go' }))
     expect(screen.getByText('The job covers chr1:11,500,000-11,575,000. The map shows only that region.')).toBeInTheDocument()
+  })
+
+  it('offers the model as the MultiMM map or as counted contacts', async () => {
+    const f = mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    renderTab()
+    await screen.findByText('0.37')
+    const lower = screen.getByLabelText('Lower half')
+    expect(within(lower).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['model', 'model_count', 'hic'])
+    fireEvent.change(lower, { target: { value: 'model_count' } })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(f.mock.calls.some(([u]) => String(u).includes('lower=model_count'))).toBe(true)
+  })
+
+  it('starts the log colour range at a low percentile, not at zero', async () => {
+    mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    renderTab()
+    await screen.findByText('0.37')
+    expect(Number((screen.getByLabelText(/min/) as HTMLInputElement).value)).toBeGreaterThan(0)
   })
 
   it('shows the server message for a resolution it refuses', async () => {

@@ -33,6 +33,8 @@ class CellType:
     clusters: dict[str, str] = field(default_factory=_no_strings)
     note: str = ""
     description: str = ""
+    hic_url: str = ""
+    hic_name: str = ""
     data: list[str] = field(default_factory=list)
 
     def path(self, key: str) -> Path:
@@ -84,6 +86,8 @@ class Catalog:
                 anchors=dict(c["anchors"]),
                 clusters=dict(c["clusters"]),
                 note=c.get("note", ""),
+                hic_url=c.get("hic_url", ""),
+                hic_name=c.get("hic_name", ""),
                 description=c.get("description", c.get("label", name).partition(", ")[2]),
                 data=list(c.get("data", [*c["clusters"], "Hi-C", *(["enhancers"] if c.get("enhancers") else [])])),
             )

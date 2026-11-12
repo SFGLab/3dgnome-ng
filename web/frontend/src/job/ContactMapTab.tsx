@@ -3,7 +3,7 @@ import { RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Contacts, JobApi, Summary } from './api'
 import { bp } from './format'
-import { colour, percentile, transform, type Show } from './heatmap'
+import { colour, emptyRows, percentile, transform, type Show } from './heatmap'
 import { parseRegion } from './StructureTab'
 
 const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]
@@ -44,12 +44,14 @@ function draw(canvas: HTMLCanvasElement, upper: number[][], lower: number[][], r
   canvas.height = n
   // Each half on its own scale: the lower half's values are brought to the upper half's range.
   const ratio = percentile(upper, 0.99) / (percentile(lower, 0.99) || 1)
+  const [emptyUp, emptyLow] = [emptyRows(upper), emptyRows(lower)]
   const img = ctx.createImageData(n, n)
   for (let i = 0; i < n; i++)
     for (let j = 0; j < n; j++) {
       const v = j >= i ? upper[i][j] : lower[i][j] * ratio
       // The maps hold no pair within one bin, so the main diagonal is drawn as no data.
-      const [r, g, b] = i === j ? NO_DATA : colour(v, range[0], range[1], log)
+      const empty = j >= i ? emptyUp[i] || emptyUp[j] : emptyLow[i] || emptyLow[j]
+      const [r, g, b] = i === j || empty ? NO_DATA : colour(v, range[0], range[1], log)
       const k = (i * n + j) * 4
       img.data.set([r, g, b, 255], k)
     }
@@ -87,7 +89,11 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
   const upper = maps.data ? transform(maps.data.upper, show) : []
   const lower = maps.data ? transform(maps.data.lower, show) : []
   const top = maps.data ? percentile(upper, 0.99) : 1
-  const shownRange: [number, number] = range ?? [0, Math.round(top * 100) / 100]
+  // On a log scale a range from zero puts a deep map's whole body mid ramp; the 5th percentile
+  // of the nonzero values spreads it over the colours.
+  const bottom = maps.data && log && show === 'observed' ? percentile(upper, 0.05) : 0
+  const round = (v: number) => Math.round(v * 100) / 100
+  const shownRange: [number, number] = range ?? [round(bottom), round(top)]
   useEffect(() => {
     if (canvas.current && maps.data) draw(canvas.current, upper, lower, shownRange, log)
   })
@@ -251,13 +257,15 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           <span>Upper half</span>
           <select value={upperKind} onChange={(e) => setUpper(e.target.value)}>
             <option value="hic">{`Hi-C, ${summary.request.cell_type}`}</option>
-            <option value="model">This job, sum of structures</option>
+            <option value="model">This job, 1/(d+1)³ between bins</option>
+            <option value="model_count">This job, contacts within the median bond</option>
           </select>
         </label>
         <label className="field">
           <span>Lower half</span>
-          <select value={lowerKind} onChange={(e) => setLower(e.target.value)}>
-            <option value="model">{`This job, sum of ${summary.structures} structures`}</option>
+          <select aria-label="Lower half" value={lowerKind} onChange={(e) => setLower(e.target.value)}>
+            <option value="model">This job, 1/(d+1)³ between bins</option>
+            <option value="model_count">This job, contacts within the median bond</option>
             <option value="hic">{`Hi-C, ${summary.request.cell_type}`}</option>
           </select>
         </label>
@@ -267,7 +275,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             <p className="big">
               <span className="big-value">{maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}</span> <span className="unit">stratum adjusted correlation</span>
             </p>
-            <p className="card-text">{`Computed on ${res / 1000} kb bins up to 2 Mb apart in this view.`}</p>
+            <p className="card-text">{`Stratum adjusted correlation at ${res / 1000} kb of ${maps.data.scc_about ?? 'the two maps'}. The halves shown do not change it.`}</p>
           </section>
         )}
         <p className="card-text">Scroll to zoom and double click to centre. Grey bins contain no bead.</p>
