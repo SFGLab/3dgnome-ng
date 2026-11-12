@@ -25726,11 +25726,11 @@
       "type": "frame",
       "id": "RjlvI",
       "x": 0,
-      "y": -1280,
+      "y": -1300,
       "name": "Title page",
       "clip": true,
       "width": 1440,
-      "height": 1180,
+      "height": 1200,
       "fill": "$bg",
       "layout": "vertical",
       "children": [
@@ -26127,67 +26127,145 @@
             },
             {
               "type": "frame",
-              "id": "LMbYX",
-              "name": "Previous server",
+              "id": "JQqWo",
+              "name": "Previous services",
               "width": "fill_container",
-              "fill": "$panel",
-              "cornerRadius": 10,
-              "gap": 10,
-              "padding": [
-                12,
-                16
-              ],
-              "alignItems": "center",
+              "layout": "vertical",
+              "gap": 8,
               "children": [
                 {
-                  "type": "icon",
-                  "id": "FnKFS",
-                  "name": "I",
-                  "width": 16,
-                  "height": 16,
-                  "icon": "history",
-                  "library": "lucide",
-                  "fill": "$muted"
-                },
-                {
-                  "type": "text",
-                  "id": "KxcYR",
-                  "name": "T",
-                  "fill": "$muted",
-                  "textGrowth": "fixed-width",
-                  "width": "fill_container",
-                  "content": "3D-GNOME 3.0, the previous server with its 1000 Genomes structures, is still available at 3dgnome.mini.pw.edu.pl/old.",
-                  "lineHeight": 1.45,
-                  "fontFamily": "$font",
-                  "fontSize": 13,
-                  "fontWeight": "normal"
-                },
-                {
                   "type": "frame",
-                  "id": "vAtg2",
-                  "name": "Link",
-                  "gap": 5,
+                  "id": "LMbYX",
+                  "name": "Previous server",
+                  "width": "fill_container",
+                  "fill": "$panel",
+                  "cornerRadius": 10,
+                  "gap": 10,
+                  "padding": [
+                    12,
+                    16
+                  ],
                   "alignItems": "center",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "kWMwA",
-                      "name": "T",
-                      "fill": "$accent",
-                      "content": "Open 3D-GNOME 3.0",
-                      "fontFamily": "$font",
-                      "fontSize": 13,
-                      "fontWeight": "500"
+                      "type": "icon",
+                      "id": "FnKFS",
+                      "name": "I",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "history",
+                      "library": "lucide",
+                      "fill": "$muted"
                     },
                     {
+                      "type": "text",
+                      "id": "KxcYR",
+                      "name": "T",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "3D-GNOME 3.0, the previous server with its 1000 Genomes structures, is still available at 3dgnome.mini.pw.edu.pl/old.",
+                      "lineHeight": 1.45,
+                      "fontFamily": "$font",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "vAtg2",
+                      "name": "Link",
+                      "gap": 5,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "kWMwA",
+                          "name": "T",
+                          "fill": "$accent",
+                          "content": "Open 3D-GNOME 3.0",
+                          "fontFamily": "$font",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "icon",
+                          "id": "NtSbb",
+                          "name": "I",
+                          "width": 13,
+                          "height": 13,
+                          "icon": "external-link",
+                          "library": "lucide",
+                          "fill": "$accent"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "YZ6o3",
+                  "name": "enhancer3D link",
+                  "width": "fill_container",
+                  "fill": "$panel",
+                  "cornerRadius": 10,
+                  "gap": 10,
+                  "padding": [
+                    12,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
                       "type": "icon",
-                      "id": "NtSbb",
+                      "id": "IKrDG",
                       "name": "I",
-                      "width": 13,
-                      "height": 13,
-                      "icon": "external-link",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "database",
                       "library": "lucide",
-                      "fill": "$accent"
+                      "fill": "$muted"
+                    },
+                    {
+                      "type": "text",
+                      "id": "yIeoM",
+                      "name": "T",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "enhancer3D, the 3D chromatin structures and enhancer to promoter distance profiles of archaic and modern human genomes, is available at 3dgnome.mini.pw.edu.pl/old/enhancer3D.",
+                      "lineHeight": 1.45,
+                      "fontFamily": "$font",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "qH7yZ",
+                      "name": "Link",
+                      "gap": 5,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "DSLRQ",
+                          "name": "T",
+                          "fill": "$accent",
+                          "content": "Open enhancer3D",
+                          "fontFamily": "$font",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "icon",
+                          "id": "OBHHi",
+                          "name": "I",
+                          "width": 13,
+                          "height": 13,
+                          "icon": "external-link",
+                          "library": "lucide",
+                          "fill": "$accent"
+                        }
+                      ]
                     }
                   ]
                 }
