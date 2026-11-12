@@ -7,18 +7,37 @@ const M = [
   [1, 3, 8],
 ]
 
+/** A map whose contacts fall off as one over the separation, with empty rows and columns. */
+function decay(n: number, empty: number[] = []): number[][] {
+  return Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => (empty.includes(i) || empty.includes(j) || i === j ? 0 : 1 / Math.abs(i - j))))
+}
+
 describe('transform', () => {
-  it('gives each diagonal its mean as the expectation', () => {
+  it('gives each off diagonal its mean as the expectation and leaves the main diagonal empty', () => {
     expect(transform(M, 'expected')).toEqual([
-      [6, 2.5, 1],
-      [2.5, 6, 2.5],
-      [1, 2.5, 6],
+      [0, 2.5, 1],
+      [2.5, 0, 2.5],
+      [1, 2.5, 0],
     ])
   })
 
-  it('gives ones for a map that equals its expectation', () => {
+  it('gives ones off the diagonal for a map that equals its expectation', () => {
     const e = transform(M, 'expected')
-    expect(transform(e, 'oe').flat().every((v) => Math.abs(v - 1) < 1e-12)).toBe(true)
+    const oe = transform(e, 'oe')
+    expect(oe.flatMap((r, i) => r.filter((_, j) => j !== i)).every((v) => Math.abs(v - 1) < 1e-12)).toBe(true)
+  })
+
+  it('averages each separation over rows that hold contacts', () => {
+    const e = transform(decay(10, [9]), 'expected')
+    expect(e[0][1]).toBeCloseTo(1, 5)
+    expect(e[0][4]).toBeCloseTo(0.25, 2)
+  })
+
+  it('smooths a lone stratum over its neighbours', () => {
+    const m = decay(40)
+    for (let i = 0; i + 16 < 40; i++) m[i][i + 16] = m[i + 16][i] = 5
+    const e = transform(m, 'expected')
+    expect(e[0][16] / e[0][14]).toBeLessThan(3)
   })
 
   it('gives a symmetric Pearson map with ones on the diagonal', () => {

@@ -4,14 +4,31 @@ export type Show = 'observed' | 'expected' | 'oe' | 'pearson'
 export const DARKEST: [number, number, number] = [110, 18, 8]
 const STOPS: [number, number, number][] = [[255, 255, 255], [241, 120, 60], DARKEST]
 
+/** The expected contact at each separation: the mean over pairs whose rows both hold contacts,
+ * and from three bins apart the median of the neighbouring separations, so one sparse stratum
+ * does not stand out as a stripe. The main diagonal is left empty; the maps hold no pair within
+ * one bin. */
 function expected(m: number[][]): number[][] {
   const n = m.length
+  const live = m.map((row, i) => row.some((v, j) => j !== i && v > 0))
   const mean = Array.from({ length: n }, (_, k) => {
+    if (k === 0) return 0
     let s = 0
-    for (let i = 0; i + k < n; i++) s += m[i][i + k]
-    return s / (n - k)
+    let c = 0
+    for (let i = 0; i + k < n; i++)
+      if (live[i] && live[i + k]) {
+        s += m[i][i + k]
+        c++
+      }
+    return c ? s / c : 0
   })
-  return m.map((row, i) => row.map((_, j) => mean[Math.abs(i - j)]))
+  const smooth = mean.map((v, k) => {
+    if (k < 3) return v
+    const w = Math.max(1, Math.round(0.15 * k))
+    const near = mean.slice(Math.max(1, k - w), Math.min(n, k + w + 1)).sort((a, b) => a - b)
+    return near[Math.floor(near.length / 2)]
+  })
+  return m.map((row, i) => row.map((_, j) => smooth[Math.abs(i - j)]))
 }
 
 function oe(m: number[][]): number[][] {

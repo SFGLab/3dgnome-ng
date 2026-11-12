@@ -833,7 +833,7 @@
 
 .loop-track {
   display: block;
-  width: min(100%, calc(100vh - 230px));
+  width: min(100%, max(320px, calc(100vh - 360px)));
   height: 34px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -857,7 +857,7 @@
 .contact-canvas {
   display: block;
   /* As wide as the panel, and short enough that the whole square fits on the screen. */
-  width: min(100%, calc(100vh - 230px));
+  width: min(100%, max(320px, calc(100vh - 360px)));
   aspect-ratio: 1;
   image-rendering: pixelated;
   border: 1px solid var(--line);
@@ -865,6 +865,8 @@
 }
 
 .hover-bar {
+  width: min(100%, max(320px, calc(100vh - 360px)));
+  box-sizing: border-box;
   min-height: 30px;
   margin: 0;
   padding: 7px 10px;
@@ -1051,7 +1053,7 @@
 }
 
 .map-labels {
-  max-width: min(100%, calc(100vh - 230px));
+  max-width: min(100%, max(320px, calc(100vh - 360px)));
 }
 
 .map-note {

@@ -8,6 +8,7 @@ import { parseRegion } from './StructureTab'
 
 const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]
 const MAX_BINS = 800
+const NO_DATA: [number, number, number] = [226, 225, 221]
 const SETTLE_MS = 250
 
 /** A window cut to the job's region and at least ten bins wide, or the whole region when it
@@ -47,7 +48,8 @@ function draw(canvas: HTMLCanvasElement, upper: number[][], lower: number[][], r
   for (let i = 0; i < n; i++)
     for (let j = 0; j < n; j++) {
       const v = j >= i ? upper[i][j] : lower[i][j] * ratio
-      const [r, g, b] = colour(v, range[0], range[1], log)
+      // The maps hold no pair within one bin, so the main diagonal is drawn as no data.
+      const [r, g, b] = i === j ? NO_DATA : colour(v, range[0], range[1], log)
       const k = (i * n + j) * 4
       img.data.set([r, g, b, 255], k)
     }
@@ -269,6 +271,9 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           </section>
         )}
         <p className="card-text">Scroll to zoom and double click to centre. Grey bins contain no bead.</p>
+        <p className="card-text">
+          Expected is the average contact at each distance in this view, the decay with distance alone. O/E divides the observed map by it, and Pearson correlates the rows of O/E.
+        </p>
       </div>
     </div>
   )
