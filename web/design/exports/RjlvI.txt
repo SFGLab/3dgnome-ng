@@ -1,0 +1,33 @@
+3D-GNOME
+NG
+3D chromatin models from loops, contacts and structural variants
+Model a region
+My jobs
+Method
+Results
+Help
+Cite
+3D-GNOME
+NG
+3D-GNOMEᴺᴳ computes 3D structures of genomic regions up to 20 Mb from CTCF and RNAPII loops, Hi-C contacts and structural variants. Each job returns an ensemble of structures with promoters and enhancers marked, and the 3D distances between them.
+Model a region
+Open the TNFRSF8 example
+Jobs with uploaded data stay private.
+TNFRSF8 promoter
+its enhancer, 385 kb away
+3D-GNOME 3.0, the previous server with its 1000 Genomes structures, is still available at 3dgnome.mini.pw.edu.pl/old.
+Open 3D-GNOME 3.0
+enhancer3D, the 3D chromatin structures and enhancer to promoter distance profiles of archaic and modern human genomes, is available at 3dgnome.mini.pw.edu.pl/old/enhancer3D.
+Open enhancer3D
+Comparison with Hi-C and expression data
+Examples
+All examples
+TNFRSF8, CTCF and RNAPII loops
+GM12878, chr1:11.5-12.6 Mb
+The same locus, CTCF loops alone
+GM12878, compare screen
+Contacts against Hi-C
+GM12878, chr1:20-25 Mb
+The Laboratory of Functional and Structural Genomics at Warsaw University of Technology and the University of Warsaw develops 3D-GNOMEᴺᴳ, the successor of 3D-GNOME 1.0, 2.0 and 3.0.
+If you use these models, please cite 3D-GNOMEᴺᴳ and the method and data papers on the Cite page.
+All citations

@@ -1,0 +1,91 @@
+3D-GNOME
+NG
+3D chromatin models from loops, contacts and structural variants
+Model a region
+My jobs
+Method
+Results
+Help
+Cite
+Done in 6 min 12 s
+TNFRSF8 with RNAPII loops
+GM12878, chr1:11,500,000-12,600,000
+Rename job
+Loops
+CTCF and RNAPII
+Loops in region
+118 CTCF, 64 RNAPII
+Structural variants
+none
+Contact background
+Hi-C, 4DN
+Structures
+100
+Structure
+3 of 100
+Medoid
+Most compact
+Random
+Files
+structures
+100 files
+model_003.cif
+412 KB
+97 more
+ep.tsv
+38 KB
+marks.json
+6 KB
+engine.log
+22 KB
+all files, zip
+4.1 MB
+Structure
+Genes
+312
+Contact map
+Loops
+182
+Log
+Compare with another job
+Copy link
+Download all
+Find a gene
+Promoters and enhancers
+Genomic position
+Loop factor
+Measure
+promoters
+enhancers
+chromatin
+A
+B
+6.7 ± 1.9
+chr1:12,301,000-12,302,000
+bead 4,812, inside VPS13D
+CTCF anchor, 3 loops
+Structure 3 of 100, about one bead per kb. Drag to rotate and scroll to zoom. Hover over a bead to see its position. Click two beads to measure the distance between them.
+Distance A to B
+6.7 ± 1.9
+bead units
+Mean and standard deviation over 100 structures. The value in this structure is 5.9.
+A
+TNFRSF8 TSS, chr1:12,063,302
+B
+enhancer, chr1:12,449,000
+Selected gene
+TNFRSF8
+TSS chr1:12,063,302, plus strand
+6.7
+bead units to the nearest enhancer, mean over 100 structures
+Nearest enhancer
+chr1:12,448,194-12,450,774
+Separation
+385 kb
+Range over structures
+4.1 to 9.8
+Joined by
+RNAPII loop, 7 PETs
+All enhancers of this gene
+If you use these models, please cite 3D-GNOMEᴺᴳ and the method and data papers on the Cite page.
+All citations

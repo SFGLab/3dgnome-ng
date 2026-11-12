@@ -1,0 +1,167 @@
+3D-GNOME
+NG
+3D chromatin models from loops, contacts and structural variants
+Model a region
+My jobs
+Method
+Results
+Help
+Cite
+Start from an example
+TNFRSF8
+GM12878
+An enhancer 385 kb away joined by an RNAPII loop
+MYC
+GM12878
+The MYC locus and its distal enhancers
+HOXA cluster
+H1ESC
+A dense cluster of CTCF loops
+Deletion at TAL1
+GM12878, HGSVC
+A sample deletion that removes a loop anchor
+Your recent jobs
+GM12878 chr1:11.5-12.6 Mb
+done
+H1ESC chr7:27.0-27.4 Mb
+running, smooth stage
+GM12878 chr8:127.5-129.0 Mb
+queued, 2 ahead
+Jobs are kept for 14 days. A job with an uploaded VCF is private and reachable only through its link.
+Model a region
+Pick a cell type and a region of up to 20 Mb, then choose the loops. A job returns an ensemble of 3D structures with promoters and enhancers marked.
+1
+Cell type and region
+GM12878
+lymphoblastoid
+CTCF
+RNAPII
+Hi-C
+enhancers
+H1ESC
+embryonic stem cell
+CTCF
+RNAPII
+Hi-C
+Micro-C
+HFFc6
+foreskin fibroblast, RNAPII loops from BJ
+CTCF
+RNAPII
+Hi-C
+Micro-C
+Your own data
+Loops and anchors in BEDPE and BED, contacts as .mcool or BEDPE, enhancers in BED
+private
+kept 14 days
+For a cell type that is not listed, upload its loops and contacts as your own data.
+Region, chr:start-end or a gene name
+TNFRSF8
+chr1:11,500,000-12,600,000, 1.1 Mb
+TNFRSF8
+CTCF loops
+RNAPII loops
+118 CTCF loops
+64 RNAPII loops
+2
+Loops
+CTCF
+CTCF ChIA-PET loops, the loop set of the original 3D-GNOME.
+RNAPII
+RNAPII ChIA-PET loops only.
+CTCF and RNAPII
+Both loop sets. Enhancers are closer to their genes.
+Your own loops
+Any loop set in BEDPE, for example ChIA-PET, HiChIP, Micro-C or Hi-C loop calls.
+3
+Structural variants
+optional
+Hosted call set
+none
+Sample
+e.g. HG00733
+Haplotype
+first
+Or drop your own VCF here. The file must be compressed with bgzip and have SVTYPE of DEL, INS or INV.
+4
+Contact background
+Hi-C of this cell type
+4DN, measured. The default.
+Predicted by HiCDiffusion
+Predicted from the DNA sequence, for regions up to 2 Mb. Structural variants change the prediction.
+None
+Loops only. Pairs without a loop get the distance law target.
+HiCDiffusion was trained on GM12878. Its predictions for H1ESC and HFFc6 are outside its training data, and the job page shows a warning.
+5
+Ensemble and simulation settings
+Structures
+100
+Job name, optional
+e.g. TNFRSF8 with RNAPII loops
+3D-GNOMEᴺᴳ settings
+5 changed
+Reset all
+Upload config.ini
+Download
+Filter 161 settings
+Distance law
+1
+polymer_exponent
+contact_half_saturation
+Loops
+2
+Pairs without a loop
+1
+Anchor fit
+Chains
+Excluded volume
+Confinement
+Compartments
+1
+Ensemble
+Distance law
+One law sets every target distance. The target for a pair without a loop is (s / 1 kb) to the power nu, in bead units.
+polymer_exponent
+default 0
+0.30
+0
+0.6
+A value of 0 fits the exponent to the Hi-C of this cell type at load. A value above 0 sets the exponent.
+contact_half_saturation
+1.0
+0.1
+5
+The loop strength at which a loop pulls its pair halfway from the background distance to contact. Strength is relative to a typical loop of the same span.
+The exponent measured on GM12878 Hi-C at load is 0.34. A value in polymer_exponent replaces it.
+Build 100 structures
+The job page shows the progress of the job and its place in the queue.
+If you use these models, please cite 3D-GNOMEᴺᴳ and the method and data papers on the Cite page.
+All citations
+Your own data
+Files stay private to this job and are deleted after 14 days.
+Loops
+2 files
+Anchors
+1 file
+Contacts
+.hic, .mcool or BEDPE
+Enhancers
+cell type
+One BEDPE file per factor, columns chr1 start1 end1 chr2 start2 end2 count. The first factor is read as CTCF and its loops get the motif orientation term.
+CTCF
+GM12878_CTCF_loops.bedpe
+2.1 MB
+12,433 loops read. 118 are in the region. 37 loops between chromosomes are skipped, and 4 loops longer than 1 Mb go to the coarse contact map.
+RNAPII
+GM12878_RNAPII_loops.bedpe
+5.8 MB
+31,902 loops read. 64 are in the region. 211 loops between chromosomes are skipped.
+H3K27ac
+hichip_loops.txt
+0.4 MB
+Line 1 has 10 columns, and column 7 is the letter R where a count is expected. This is the loop format of 3D-GNOME 3.0. Move the orientations to the anchors file and keep one file per factor with seven columns.
+Add a factor, or drop a BEDPE file here
+Loops in chr1:11,500,000-12,600,000
+Fix or remove the H3K27ac file to continue.
+Cancel
+Use these loops
