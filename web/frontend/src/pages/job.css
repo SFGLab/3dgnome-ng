@@ -418,3 +418,178 @@
   color: #FFFFFF;
   font: 700 11px var(--font);
 }
+
+.structure-tab {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.side-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.side-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.side-card.dark-border {
+  border: 1.5px solid var(--ink);
+}
+
+.side-card p {
+  margin: 0;
+}
+
+.card-label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.big {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.big-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.unit,
+.card-text {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.strip {
+  position: relative;
+  height: 16px;
+  margin: 6px 0;
+}
+
+.strip .axis {
+  position: absolute;
+  top: 7px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--line);
+}
+
+.strip .dot {
+  position: absolute;
+  top: 4px;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 50%;
+  background: #A8C8F0;
+}
+
+.strip .dot.current {
+  background: var(--ink);
+}
+
+.point {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 12px var(--mono);
+}
+
+.point .marker {
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+}
+
+.gene-name {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.gene-facts {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0;
+  font-size: 12px;
+}
+
+.gene-facts dt {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.gene-facts dd {
+  margin: 0;
+}
+
+.find-gene {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--faint);
+}
+
+.find-gene.miss {
+  border-color: #C2410C;
+}
+
+.find-gene input {
+  width: 110px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 13px var(--font);
+  outline: none;
+}
+
+.measure {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 13px var(--font);
+  cursor: pointer;
+}
+
+.measure.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+
+@media (max-width: 1200px) {
+  .structure-tab {
+    grid-template-columns: 1fr;
+  }
+}

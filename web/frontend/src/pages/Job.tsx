@@ -15,6 +15,8 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   const tab = (params.get('tab') as Tab) ?? 'structure'
   const [selected, setSelected] = useState(1)
   const [comparing, setComparing] = useState(false)
+  const [gene, setGene] = useState<string | null>(null)
+  const [, setGeneFilter] = useState('')
   const summary = useQuery({
     queryKey: ['summary', api.base],
     queryFn: api.summary,
@@ -39,7 +41,19 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
               onCompare={() => setComparing((c) => !c)}
             />
             <div className="tab-body" role="tabpanel">
-              {tab === 'structure' && <StructureTab api={api} summary={s} selected={selected} />}
+              {tab === 'structure' && (
+                <StructureTab
+                  api={api}
+                  summary={s}
+                  selected={selected}
+                  gene={gene}
+                  onGene={setGene}
+                  onOpenGenes={(g) => {
+                    setGeneFilter(g)
+                    setParams({ tab: 'genes' }, { replace: true })
+                  }}
+                />
+              )}
             </div>
           </>
         ) : s.state === 'failed' ? (
