@@ -28,13 +28,20 @@ JAX build is checked for compute capability 7.5.
 
 | Step | Measure |
 |---|---|
-| Peak memory | the largest web job alone, GPU memory sampled every second with nvidia-smi |
+| Memory floor | the largest web job alone at pools of 0.75, 1, 1.5, 2 and 3 GiB: whether it finishes, its wall time, and its structures against the job at the default pool. The kernels size their launches from the pool through `gnome3d/mc/jax/memory.py`, and a smaller pool gives narrower launches. The floor is the smallest pool with a wall time near the default's |
+| Peak memory | the same job at the default pool, GPU memory sampled every second with nvidia-smi |
 | Throughput | jobs per hour at 1, 2, 3 and 4 workers, each worker running the same queue of web sized jobs |
 | MPS | the same at the best worker count with the NVIDIA MPS daemon running, which lets kernels of several processes run at once instead of in turns; MPS is not documented for GeForce cards and is tested here |
 | CPU threads | numba threads per worker set to the cores over the workers, against no cap |
 
 Measured 2026-11-12 before this plan: two 60 Mb jobs of 10 structures at once took 956 s each
 and gave the structures of a job on a free card bit for bit; the job peaked near 2.8 GiB.
+
+With the window limit every job fits the floor of the largest job, and a worker needs no
+prediction per job. A prediction per job from the exact tensor bytes of `memory.py` is needed
+only if the site later takes jobs of very different sizes, whole chromosomes for example.
+A pool in GiB, `GNOME3D_GPU_POOL_GIB`, turned into the fraction of the card the process sees,
+keeps one setting valid on the 16 GiB workstation and the 8 GiB 2080.
 
 ## Output
 
