@@ -16365,7 +16365,7 @@
                                   "fill": "$muted",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "All anchors of a chromosome are fitted together with L-BFGS-B. Ten annealing runs from perturbed starts end within one percent of the same energy, and L-BFGS-B reaches that minimum in seconds. The GPU evaluates the energy and its gradient in float32 row chunks, and the optimiser runs on the CPU. The fit stops when the relative improvement per iteration drops below 1e-6.",
+                                  "content": "All anchors of a chromosome are fitted together with L-BFGS-B. Ten annealing runs from perturbed starts end within one percent of the same energy, and L-BFGS-B reaches that minimum. The GPU evaluates the energy and its gradient in float32 row chunks, and the optimiser runs on the CPU. The fit stops when the relative improvement per iteration drops below 1e-6.",
                                   "lineHeight": 1.55,
                                   "fontFamily": "$font",
                                   "fontSize": 13,
@@ -16452,7 +16452,7 @@
                                   "fill": "$muted",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "Each annealing step tests 32 proposals against the current state at once and applies the first accepted one. The chain follows the serial Metropolis rule. On chr1:1-60 Mb this cut the chain stage from 420 s to 125 s.",
+                                  "content": "Each annealing step tests 32 proposals against the current state at once and applies the first accepted one. The chain follows the serial Metropolis rule.",
                                   "lineHeight": 1.55,
                                   "fontFamily": "$font",
                                   "fontSize": 13,
@@ -23374,7 +23374,7 @@
                               "fill": "$muted",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "content": "Measured on one RTX 4060 Ti and the CPU of the same machine, GM12878.",
+                              "content": "cudaMMC and 3D-GNOMEᴺᴳ on the same GM12878 inputs and the same RTX 4060 Ti. The values are placeholders until the timing run is done.",
                               "lineHeight": 1.45,
                               "fontFamily": "$font",
                               "fontSize": 13,
@@ -23384,17 +23384,17 @@
                         },
                         {
                           "type": "frame",
-                          "id": "JGgv9",
+                          "id": "MsYi9",
                           "name": "Row 3",
                           "width": "fill_container",
                           "gap": 16,
                           "children": [
                             {
                               "type": "frame",
-                              "id": "Bboea",
-                              "name": "Chart Anchor fit",
+                              "id": "eeiFU",
+                              "name": "Chart One structure, 1 Mb",
                               "width": "fill_container",
-                              "height": 196,
+                              "height": 157,
                               "fill": "$surface",
                               "cornerRadius": 12,
                               "stroke": "$line",
@@ -23405,12 +23405,12 @@
                               "children": [
                                 {
                                   "type": "text",
-                                  "id": "bBYVo",
+                                  "id": "LFJJh",
                                   "name": "Title",
                                   "fill": "$ink",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "Anchor fit",
+                                  "content": "One structure, 1 Mb",
                                   "lineHeight": 1.45,
                                   "fontFamily": "$font",
                                   "fontSize": 14,
@@ -23418,12 +23418,12 @@
                                 },
                                 {
                                   "type": "text",
-                                  "id": "QTHpa",
+                                  "id": "DSYvo",
                                   "name": "Sub",
                                   "fill": "$faint",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "chr1:1-60 Mb, seconds, lower is better.",
+                                  "content": "chr1:11.5-12.6 Mb, minutes, lower is better.",
                                   "lineHeight": 1.45,
                                   "fontFamily": "$font",
                                   "fontSize": 12,
@@ -23431,25 +23431,25 @@
                                 },
                                 {
                                   "type": "frame",
-                                  "id": "XANpW",
-                                  "name": "Bar Simulated annealing, CPU",
+                                  "id": "IuYba",
+                                  "name": "Bar cudaMMC",
                                   "width": "fill_container",
                                   "layout": "vertical",
                                   "gap": 3,
                                   "children": [
                                     {
                                       "type": "text",
-                                      "id": "SobLK",
+                                      "id": "brRag",
                                       "name": "L",
                                       "fill": "$muted",
-                                      "content": "Simulated annealing, CPU",
+                                      "content": "cudaMMC",
                                       "fontFamily": "$font",
                                       "fontSize": 11,
                                       "fontWeight": "600"
                                     },
                                     {
                                       "type": "frame",
-                                      "id": "dvXR5",
+                                      "id": "L9KKR4",
                                       "name": "Row",
                                       "gap": 6,
                                       "alignItems": "center",
@@ -23462,21 +23462,24 @@
                                             3,
                                             0
                                           ],
-                                          "id": "j4xDZI",
+                                          "id": "CoKk8",
                                           "name": "R",
-                                          "fill": "#A9A8A3",
-                                          "width": 177,
-                                          "height": 10
+                                          "fill": "#A9A8A355",
+                                          "width": 150,
+                                          "height": 10,
+                                          "stroke": "#A9A8A3",
+                                          "strokeWidth": 1
                                         },
                                         {
                                           "type": "text",
-                                          "id": "Y1oXO",
+                                          "id": "QUW1j",
                                           "name": "V",
-                                          "fill": "$ink",
-                                          "content": "492 s",
+                                          "fill": "$faint",
+                                          "content": "placeholder",
                                           "fontFamily": "$font",
                                           "fontSize": 11,
-                                          "fontWeight": "600"
+                                          "fontWeight": "normal",
+                                          "fontStyle": "italic"
                                         }
                                       ]
                                     }
@@ -23484,25 +23487,25 @@
                                 },
                                 {
                                   "type": "frame",
-                                  "id": "DJu2B",
-                                  "name": "Bar L-BFGS-B, CPU",
+                                  "id": "I2uEj",
+                                  "name": "Bar 3D-GNOMEᴺᴳ, CTCF loops",
                                   "width": "fill_container",
                                   "layout": "vertical",
                                   "gap": 3,
                                   "children": [
                                     {
                                       "type": "text",
-                                      "id": "aDgQm",
+                                      "id": "s8gke",
                                       "name": "L",
                                       "fill": "$muted",
-                                      "content": "L-BFGS-B, CPU",
+                                      "content": "3D-GNOMEᴺᴳ, CTCF loops",
                                       "fontFamily": "$font",
                                       "fontSize": 11,
                                       "fontWeight": "600"
                                     },
                                     {
                                       "type": "frame",
-                                      "id": "YmtT1",
+                                      "id": "ttQLk",
                                       "name": "Row",
                                       "gap": 6,
                                       "alignItems": "center",
@@ -23515,370 +23518,332 @@
                                             3,
                                             0
                                           ],
-                                          "id": "IFHMo",
+                                          "id": "zuXum",
                                           "name": "R",
-                                          "fill": "$accent",
-                                          "width": 3,
-                                          "height": 10
-                                        },
-                                        {
-                                          "type": "text",
-                                          "id": "nFy4c",
-                                          "name": "V",
-                                          "fill": "$ink",
-                                          "content": "6 s",
-                                          "fontFamily": "$font",
-                                          "fontSize": 11,
-                                          "fontWeight": "600"
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "XGNop",
-                              "name": "Chart Chain stage",
-                              "width": "fill_container",
-                              "height": 196,
-                              "fill": "$surface",
-                              "cornerRadius": 12,
-                              "stroke": "$line",
-                              "strokeWidth": 1,
-                              "layout": "vertical",
-                              "gap": 10,
-                              "padding": 16,
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "I5Y6p",
-                                  "name": "Title",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "Chain stage",
-                                  "lineHeight": 1.45,
-                                  "fontFamily": "$font",
-                                  "fontSize": 14,
-                                  "fontWeight": "600"
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "Q2Fqz",
-                                  "name": "Sub",
-                                  "fill": "$faint",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "chr1:1-60 Mb, seconds, lower is better.",
-                                  "lineHeight": 1.45,
-                                  "fontFamily": "$font",
-                                  "fontSize": 12,
-                                  "fontWeight": "normal"
-                                },
-                                {
-                                  "type": "frame",
-                                  "id": "e5tBQ",
-                                  "name": "Bar One proposal per step",
-                                  "width": "fill_container",
-                                  "layout": "vertical",
-                                  "gap": 3,
-                                  "children": [
-                                    {
-                                      "type": "text",
-                                      "id": "yPWew",
-                                      "name": "L",
-                                      "fill": "$muted",
-                                      "content": "One proposal per step",
-                                      "fontFamily": "$font",
-                                      "fontSize": 11,
-                                      "fontWeight": "600"
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "p6QNK",
-                                      "name": "Row",
-                                      "gap": 6,
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "rectangle",
-                                          "cornerRadius": [
-                                            0,
-                                            3,
-                                            3,
-                                            0
-                                          ],
-                                          "id": "UbbiC",
-                                          "name": "R",
-                                          "fill": "#A9A8A3",
-                                          "width": 176,
-                                          "height": 10
-                                        },
-                                        {
-                                          "type": "text",
-                                          "id": "tPBVf",
-                                          "name": "V",
-                                          "fill": "$ink",
-                                          "content": "420 s",
-                                          "fontFamily": "$font",
-                                          "fontSize": 11,
-                                          "fontWeight": "600"
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "frame",
-                                  "id": "A0g7Y",
-                                  "name": "Bar 32 proposals per step",
-                                  "width": "fill_container",
-                                  "layout": "vertical",
-                                  "gap": 3,
-                                  "children": [
-                                    {
-                                      "type": "text",
-                                      "id": "GTRQO",
-                                      "name": "L",
-                                      "fill": "$muted",
-                                      "content": "32 proposals per step",
-                                      "fontFamily": "$font",
-                                      "fontSize": 11,
-                                      "fontWeight": "600"
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "S6c0b",
-                                      "name": "Row",
-                                      "gap": 6,
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "rectangle",
-                                          "cornerRadius": [
-                                            0,
-                                            3,
-                                            3,
-                                            0
-                                          ],
-                                          "id": "oPZ7X",
-                                          "name": "R",
-                                          "fill": "#7FAFE8",
-                                          "width": 52,
-                                          "height": 10
-                                        },
-                                        {
-                                          "type": "text",
-                                          "id": "ptxbN",
-                                          "name": "V",
-                                          "fill": "$ink",
-                                          "content": "125 s",
-                                          "fontFamily": "$font",
-                                          "fontSize": 11,
-                                          "fontWeight": "600"
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "frame",
-                                  "id": "Fer0P",
-                                  "name": "Bar 32 proposals and the cell grid",
-                                  "width": "fill_container",
-                                  "layout": "vertical",
-                                  "gap": 3,
-                                  "children": [
-                                    {
-                                      "type": "text",
-                                      "id": "dCiCd",
-                                      "name": "L",
-                                      "fill": "$muted",
-                                      "content": "32 proposals and the cell grid",
-                                      "fontFamily": "$font",
-                                      "fontSize": 11,
-                                      "fontWeight": "600"
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "IRt9q",
-                                      "name": "Row",
-                                      "gap": 6,
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "rectangle",
-                                          "cornerRadius": [
-                                            0,
-                                            3,
-                                            3,
-                                            0
-                                          ],
-                                          "id": "y3B8Y",
-                                          "name": "R",
-                                          "fill": "$accent",
-                                          "width": 20,
-                                          "height": 10
-                                        },
-                                        {
-                                          "type": "text",
-                                          "id": "r92RcS",
-                                          "name": "V",
-                                          "fill": "$ink",
-                                          "content": "47 s",
-                                          "fontFamily": "$font",
-                                          "fontSize": 11,
-                                          "fontWeight": "600"
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "V5vNDk",
-                              "name": "Chart One structure of the whole chromosome",
-                              "width": "fill_container",
-                              "height": 196,
-                              "fill": "$surface",
-                              "cornerRadius": 12,
-                              "stroke": "$line",
-                              "strokeWidth": 1,
-                              "layout": "vertical",
-                              "gap": 10,
-                              "padding": 16,
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "VZk0T",
-                                  "name": "Title",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "One structure of the whole chromosome",
-                                  "lineHeight": 1.45,
-                                  "fontFamily": "$font",
-                                  "fontSize": 14,
-                                  "fontWeight": "600"
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "u4eFN",
-                                  "name": "Sub",
-                                  "fill": "$faint",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "GM12878 chr1, 9,195 anchors, seconds, lower is better.",
-                                  "lineHeight": 1.45,
-                                  "fontFamily": "$font",
-                                  "fontSize": 12,
-                                  "fontWeight": "normal"
-                                },
-                                {
-                                  "type": "frame",
-                                  "id": "NYJbQ",
-                                  "name": "Bar Anchor fit energy on the CPU",
-                                  "width": "fill_container",
-                                  "layout": "vertical",
-                                  "gap": 3,
-                                  "children": [
-                                    {
-                                      "type": "text",
-                                      "id": "ZaC9P",
-                                      "name": "L",
-                                      "fill": "$muted",
-                                      "content": "Anchor fit energy on the CPU",
-                                      "fontFamily": "$font",
-                                      "fontSize": 11,
-                                      "fontWeight": "600"
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "eqQyC",
-                                      "name": "Row",
-                                      "gap": 6,
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "rectangle",
-                                          "cornerRadius": [
-                                            0,
-                                            3,
-                                            3,
-                                            0
-                                          ],
-                                          "id": "qaitC",
-                                          "name": "R",
-                                          "fill": "#A9A8A3",
-                                          "width": 175,
-                                          "height": 10
-                                        },
-                                        {
-                                          "type": "text",
-                                          "id": "GV6XS",
-                                          "name": "V",
-                                          "fill": "$ink",
-                                          "content": "419 s",
-                                          "fontFamily": "$font",
-                                          "fontSize": 11,
-                                          "fontWeight": "600"
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "frame",
-                                  "id": "gI3dk",
-                                  "name": "Bar Anchor fit energy on the GPU",
-                                  "width": "fill_container",
-                                  "layout": "vertical",
-                                  "gap": 3,
-                                  "children": [
-                                    {
-                                      "type": "text",
-                                      "id": "z0iflL",
-                                      "name": "L",
-                                      "fill": "$muted",
-                                      "content": "Anchor fit energy on the GPU",
-                                      "fontFamily": "$font",
-                                      "fontSize": 11,
-                                      "fontWeight": "600"
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "fafF9",
-                                      "name": "Row",
-                                      "gap": 6,
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "rectangle",
-                                          "cornerRadius": [
-                                            0,
-                                            3,
-                                            3,
-                                            0
-                                          ],
-                                          "id": "Q7Kc1",
-                                          "name": "R",
-                                          "fill": "$accent",
+                                          "fill": "#2A78D655",
                                           "width": 60,
-                                          "height": 10
+                                          "height": 10,
+                                          "stroke": "#2A78D6",
+                                          "strokeWidth": 1
                                         },
                                         {
                                           "type": "text",
-                                          "id": "qts5Z",
+                                          "id": "nigZ6",
                                           "name": "V",
-                                          "fill": "$ink",
-                                          "content": "144 s",
+                                          "fill": "$faint",
+                                          "content": "placeholder",
                                           "fontFamily": "$font",
                                           "fontSize": 11,
-                                          "fontWeight": "600"
+                                          "fontWeight": "normal",
+                                          "fontStyle": "italic"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "bdivY",
+                              "name": "Chart Ten structures, 60 Mb",
+                              "width": "fill_container",
+                              "height": 157,
+                              "fill": "$surface",
+                              "cornerRadius": 12,
+                              "stroke": "$line",
+                              "strokeWidth": 1,
+                              "layout": "vertical",
+                              "gap": 10,
+                              "padding": 16,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "V8BvIE",
+                                  "name": "Title",
+                                  "fill": "$ink",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Ten structures, 60 Mb",
+                                  "lineHeight": 1.45,
+                                  "fontFamily": "$font",
+                                  "fontSize": 14,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "CRDqy",
+                                  "name": "Sub",
+                                  "fill": "$faint",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "chr1:1-60 Mb, hours, lower is better.",
+                                  "lineHeight": 1.45,
+                                  "fontFamily": "$font",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "x1HXQ",
+                                  "name": "Bar cudaMMC",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 3,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "t0hbNi",
+                                      "name": "L",
+                                      "fill": "$muted",
+                                      "content": "cudaMMC",
+                                      "fontFamily": "$font",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "XPjGp",
+                                      "name": "Row",
+                                      "gap": 6,
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "rectangle",
+                                          "cornerRadius": [
+                                            0,
+                                            3,
+                                            3,
+                                            0
+                                          ],
+                                          "id": "bwNoj",
+                                          "name": "R",
+                                          "fill": "#A9A8A355",
+                                          "width": 170,
+                                          "height": 10,
+                                          "stroke": "#A9A8A3",
+                                          "strokeWidth": 1
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "QqUlN",
+                                          "name": "V",
+                                          "fill": "$faint",
+                                          "content": "placeholder",
+                                          "fontFamily": "$font",
+                                          "fontSize": 11,
+                                          "fontWeight": "normal",
+                                          "fontStyle": "italic"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "UXNkz",
+                                  "name": "Bar 3D-GNOMEᴺᴳ, CTCF loops",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 3,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "w70gV",
+                                      "name": "L",
+                                      "fill": "$muted",
+                                      "content": "3D-GNOMEᴺᴳ, CTCF loops",
+                                      "fontFamily": "$font",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "JguHT",
+                                      "name": "Row",
+                                      "gap": 6,
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "rectangle",
+                                          "cornerRadius": [
+                                            0,
+                                            3,
+                                            3,
+                                            0
+                                          ],
+                                          "id": "bxkJo",
+                                          "name": "R",
+                                          "fill": "#2A78D655",
+                                          "width": 70,
+                                          "height": 10,
+                                          "stroke": "#2A78D6",
+                                          "strokeWidth": 1
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "KP8Yr",
+                                          "name": "V",
+                                          "fill": "$faint",
+                                          "content": "placeholder",
+                                          "fontFamily": "$font",
+                                          "fontSize": 11,
+                                          "fontWeight": "normal",
+                                          "fontStyle": "italic"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "cFtHZ",
+                              "name": "Chart One structure, whole chromosome",
+                              "width": "fill_container",
+                              "height": 157,
+                              "fill": "$surface",
+                              "cornerRadius": 12,
+                              "stroke": "$line",
+                              "strokeWidth": 1,
+                              "layout": "vertical",
+                              "gap": 10,
+                              "padding": 16,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Z2I3tM",
+                                  "name": "Title",
+                                  "fill": "$ink",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "One structure, whole chromosome",
+                                  "lineHeight": 1.45,
+                                  "fontFamily": "$font",
+                                  "fontSize": 14,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "rhx36",
+                                  "name": "Sub",
+                                  "fill": "$faint",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "chr1, 248 Mb, hours, lower is better.",
+                                  "lineHeight": 1.45,
+                                  "fontFamily": "$font",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "s8U8WD",
+                                  "name": "Bar cudaMMC",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 3,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "Q6aBCe",
+                                      "name": "L",
+                                      "fill": "$muted",
+                                      "content": "cudaMMC",
+                                      "fontFamily": "$font",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "OQtPP",
+                                      "name": "Row",
+                                      "gap": 6,
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "rectangle",
+                                          "cornerRadius": [
+                                            0,
+                                            3,
+                                            3,
+                                            0
+                                          ],
+                                          "id": "Ddo6X",
+                                          "name": "R",
+                                          "fill": "#A9A8A355",
+                                          "width": 180,
+                                          "height": 10,
+                                          "stroke": "#A9A8A3",
+                                          "strokeWidth": 1
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "t7bvqW",
+                                          "name": "V",
+                                          "fill": "$faint",
+                                          "content": "placeholder",
+                                          "fontFamily": "$font",
+                                          "fontSize": 11,
+                                          "fontWeight": "normal",
+                                          "fontStyle": "italic"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "jEEZp",
+                                  "name": "Bar 3D-GNOMEᴺᴳ, CTCF loops",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 3,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "u78be",
+                                      "name": "L",
+                                      "fill": "$muted",
+                                      "content": "3D-GNOMEᴺᴳ, CTCF loops",
+                                      "fontFamily": "$font",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "ya4gT",
+                                      "name": "Row",
+                                      "gap": 6,
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "rectangle",
+                                          "cornerRadius": [
+                                            0,
+                                            3,
+                                            3,
+                                            0
+                                          ],
+                                          "id": "n7Voo",
+                                          "name": "R",
+                                          "fill": "#2A78D655",
+                                          "width": 80,
+                                          "height": 10,
+                                          "stroke": "#2A78D6",
+                                          "strokeWidth": 1
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "vWzlv",
+                                          "name": "V",
+                                          "fill": "$faint",
+                                          "content": "placeholder",
+                                          "fontFamily": "$font",
+                                          "fontSize": 11,
+                                          "fontWeight": "normal",
+                                          "fontStyle": "italic"
                                         }
                                       ]
                                     }
