@@ -22,8 +22,10 @@ mkdir -p "$RESULTS"
 if [ "${MPS:-0}" = 1 ]; then
   export CUDA_MPS_PIPE_DIRECTORY="$RESULTS/.mps/pipe" CUDA_MPS_LOG_DIRECTORY="$RESULTS/.mps/log"
   mkdir -p "$CUDA_MPS_PIPE_DIRECTORY" "$CUDA_MPS_LOG_DIRECTORY"
-  nvidia-cuda-mps-control -d
-  trap 'echo quit | nvidia-cuda-mps-control' EXIT
+  # A daemon already running in this pipe directory is reused and left running.
+  if nvidia-cuda-mps-control -d; then
+    trap 'echo quit | nvidia-cuda-mps-control' EXIT
+  fi
 fi
 
 "$VENV/bin/uvicorn" gnome3d_web.app:create_app --factory --host 127.0.0.1 --port "$PORT"

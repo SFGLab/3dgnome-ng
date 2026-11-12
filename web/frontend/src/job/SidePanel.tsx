@@ -28,7 +28,8 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
   const remembered = recentJobs().find((j) => j.url === api.url)
   const [name, setName] = useState(remembered?.name ?? '')
   const [editing, setEditing] = useState(false)
-  const region = summary.request.region
+  const m = summary.region?.match(/^(\w+):(\d+)-(\d+)$/)
+  const region = m ? `${m[1]}:${bp(Number(m[2]))}-${bp(Number(m[3]))}` : summary.request.region
   const title = name || `${summary.request.cell_type} ${region}`
   const n = summary.structures
   const model = summary.models[selected - 1]

@@ -1,19 +1,23 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Cite } from './pages/Cite'
 import { Help } from './pages/Help'
-import { Job } from './pages/Job'
 import { Method } from './pages/Method'
 import { Model } from './pages/Model'
 import { Results } from './pages/Results'
 import { Title } from './pages/Title'
 import { ROUTES } from './routes'
 
-/** The site's routes. Pages are added by the tasks that build them. */
+// The explorer carries three.js and loads only on a job page.
+const Job = lazy(() => import('./pages/Job').then((m) => ({ default: m.Job })))
+
+/** The site's routes. */
 export function App() {
   return (
     <BrowserRouter>
       <Layout>
+        <Suspense fallback={null}>
         <Routes>
           <Route path={ROUTES.title} element={<Title />} />
           <Route path={ROUTES.cite} element={<Cite />} />
@@ -25,6 +29,7 @@ export function App() {
           <Route path="/p/:key" element={<Job kind="p" />} />
           <Route path="*" element={null} />
         </Routes>
+        </Suspense>
       </Layout>
     </BrowserRouter>
   )

@@ -287,3 +287,134 @@
     border-bottom: 1px solid var(--line);
   }
 }
+
+.structure-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.view-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--panel);
+  border-radius: 8px;
+}
+
+.segmented button {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: 13px var(--font);
+  cursor: pointer;
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.icon-tool {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.view-box {
+  position: relative;
+  height: 640px;
+  background: #FFFFFF;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.view-box:fullscreen {
+  height: 100vh;
+  border-radius: 0;
+}
+
+.hover-box {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: #FFFFFF;
+  border: 1px solid #E4E3DF;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.08);
+  color: #5B5A56;
+  font-size: 12px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.hover-box .mono {
+  font-family: var(--mono);
+  color: #151514;
+}
+
+.view-legend {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 6px 10px;
+  list-style: none;
+  background: #FFFFFFE6;
+  border: 1px solid #E4E3DF;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #5B5A56;
+}
+
+.view-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.view-legend .swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.view-caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.marker {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #151514;
+  color: #FFFFFF;
+  font: 700 11px var(--font);
+}

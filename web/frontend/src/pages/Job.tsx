@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { jobApi } from '../job/api'
 import { JobSidePanel } from '../job/SidePanel'
+import { StructureTab } from '../job/StructureTab'
 import { JobTabs, type Tab } from '../job/Tabs'
 import './job.css'
 
@@ -37,7 +38,9 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
               onTab={(t) => setParams({ tab: t }, { replace: true })}
               onCompare={() => setComparing((c) => !c)}
             />
-            <div className="tab-body" role="tabpanel" />
+            <div className="tab-body" role="tabpanel">
+              {tab === 'structure' && <StructureTab api={api} summary={s} selected={selected} />}
+            </div>
           </>
         ) : s.state === 'failed' ? (
           <div className="job-message">
