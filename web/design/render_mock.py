@@ -6,7 +6,9 @@
 Writes `structure.png`, the medoid conformation of the TNFRSF8 locus with CTCF and RNAPII loops as
 a grey tube with the promoter beads in the site's promoter colour and the enhancer beads in its
 enhancer colour, and `contacts.png`, the Hi-C map of chr1:20-25 Mb above the diagonal and the
-summed model map of the same arm below it, each on its own log scale.
+summed model map of the same arm below it, each on its own log scale. `structure_ctcf.png`
+is the same locus modelled with CTCF loops alone, for the compare screen. The
+`method_*.png` panels illustrate the Method page.
 """
 
 from __future__ import annotations
@@ -31,8 +33,8 @@ GREY, PROMOTER, ENH = "#a9a8a3", "#eb6834", "#1baf7a"
 CONTACTS = LinearSegmentedColormap.from_list("contacts", ["#ffffff", "#f6c9a8", "#d9542b", "#7a1f0c"])
 
 
-def structure(maps: np.lib.npyio.NpzFile, out: Path) -> None:
-    xyz, mid = maps["locus_R_xyz"], maps["locus_R_mid"]
+def structure(maps: np.lib.npyio.NpzFile, out: Path, arm: str = "R") -> None:
+    xyz, mid = maps[f"locus_{arm}_xyz"], maps[f"locus_{arm}_mid"]
     keep = (mid > 11_990_000) & (mid < 12_520_000)
     xyz, mid = xyz[keep][::2], mid[keep][::2]
     cols = np.tile(matplotlib.colors.to_rgba(GREY), (len(mid), 1))
@@ -74,11 +76,63 @@ def contacts(maps: np.lib.npyio.NpzFile, out: Path) -> None:
     fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=0.02, facecolor="white")
 
 
+def method_steps(maps: np.lib.npyio.NpzFile, out: Path) -> None:
+    """Three panels for the Method page from the CTCF and RNAPII locus: the anchors alone as
+    points joined in genomic order, the full chain, and three structures of the ensemble
+    superposed on the first by the Kabsch rotation, all on one view."""
+    xyz, mid, anc = maps["locus_R_xyz"], maps["locus_R_mid"], maps["locus_R_anchor"]
+    keep = (mid > 11_990_000) & (mid < 12_520_000)
+    xyz, mid, anc = xyz[keep], mid[keep], anc[keep]
+    centre = xyz.mean(0)
+    _, _, vt = np.linalg.svd(xyz - centre)
+    grey = np.tile(matplotlib.colors.to_rgba(GREY), (len(mid[::2]), 1))
+
+    fig, ax = plt.subplots(figsize=(4, 4))
+    a = (xyz[anc] - centre) @ vt.T
+    ax.plot(a[:, 0], a[:, 1], color="#c9c8c3", lw=0.8, zorder=1)
+    ax.scatter(a[:, 0], a[:, 1], s=14, color="#151514", zorder=2)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    fig.savefig(out / "method_anchors.png", dpi=200, bbox_inches="tight", pad_inches=0.1, facecolor="white")
+    plt.close(fig)
+
+    fig, ax = plt.subplots(figsize=(4, 4))
+    draw(ax, [tube_pieces(xyz[::2], grey, vt, centre, 3.0)], background="white")
+    ax.scatter(*((xyz[anc] - centre) @ vt.T)[:, :2].T, s=10, color="#151514", zorder=5)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    fig.savefig(out / "method_chain.png", dpi=200, bbox_inches="tight", pad_inches=0.1, facecolor="white")
+    plt.close(fig)
+
+    fig, ax = plt.subplots(figsize=(4, 4))
+    chains = []
+    for j in range(3):
+        x, m = maps[f"ensemble_R_{j}_xyz"], maps[f"ensemble_R_{j}_mid"]
+        chains.append(x[(m > 11_990_000) & (m < 12_520_000)][::3])
+    n = min(len(c) for c in chains)
+    ref = chains[0][:n] - chains[0][:n].mean(0)
+    _, _, v = np.linalg.svd(ref)
+    pieces = []
+    for x, col in zip(chains, ["#151514", "#2a78d6", "#9fc3ee"], strict=True):
+        b = x[:n] - x[:n].mean(0)
+        u, _, wt = np.linalg.svd(b.T @ ref)
+        d = np.sign(np.linalg.det(u @ wt))
+        b = b @ (u @ np.diag([1, 1, d]) @ wt)
+        pieces.append(tube_pieces(b, np.tile(matplotlib.colors.to_rgba(col), (n, 1)), v, np.zeros(3), 1.8))
+    draw(ax, pieces, background="white")
+    ax.set_aspect("equal")
+    ax.axis("off")
+    fig.savefig(out / "method_ensemble.png", dpi=200, bbox_inches="tight", pad_inches=0.1, facecolor="white")
+    plt.close(fig)
+
+
 def main() -> None:
     maps, out = np.load(sys.argv[1]), Path(sys.argv[2])
     out.mkdir(parents=True, exist_ok=True)
     structure(maps, out / "structure.png")
+    structure(maps, out / "structure_ctcf.png", "C")
     contacts(maps, out / "contacts.png")
+    method_steps(maps, out)
     print(out)
 
 
