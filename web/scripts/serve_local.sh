@@ -1,0 +1,29 @@
+#!/bin/bash
+# The site without Docker or Redis: uvicorn with the thread queue on fixed GPU slots, and the
+# NVIDIA MPS daemon for the engines when MPS=1. Run from the repository root.
+#
+#   SITE=~/site-data RESULTS=~/results VENV=~/venv PORT=8766 GPU_SLOTS=0,0 POOL_GIB=1.5 MPS=1 \
+#     bash web/scripts/serve_local.sh
+#
+# With MPS=1 the daemon runs as this user in a pipe directory under RESULTS, which only these
+# engines use, and stops when the site stops.
+set -euo pipefail
+SITE="${SITE:?set SITE to the site data directory}"
+RESULTS="${RESULTS:?set RESULTS to the results directory}"
+VENV="${VENV:?set VENV to the virtual environment}"
+PORT="${PORT:-8766}"
+ROOT="$PWD"
+
+export PYTHONPATH="$ROOT/web:$ROOT/web/vendor" DATA_DIR="$SITE" RESULTS_DIR="$RESULTS" QUEUE=thread
+export GPU_SLOTS="${GPU_SLOTS:-0}" GNOME3D_GPU_POOL_GIB="${POOL_GIB:-1.5}"
+export ENGINE_PYTHON="$VENV/bin/python" ENGINE_ROOT="$ROOT" GNOME3D_JAX_CACHE="$RESULTS/.jax-cache"
+mkdir -p "$RESULTS"
+
+if [ "${MPS:-0}" = 1 ]; then
+  export CUDA_MPS_PIPE_DIRECTORY="$RESULTS/.mps/pipe" CUDA_MPS_LOG_DIRECTORY="$RESULTS/.mps/log"
+  mkdir -p "$CUDA_MPS_PIPE_DIRECTORY" "$CUDA_MPS_LOG_DIRECTORY"
+  nvidia-cuda-mps-control -d
+  trap 'echo quit | nvidia-cuda-mps-control' EXIT
+fi
+
+"$VENV/bin/uvicorn" gnome3d_web.app:create_app --factory --host 127.0.0.1 --port "$PORT"

@@ -76,6 +76,11 @@ All finished runs equal the default pool bit for bit. The 638 MiB array is N by 
 the 13,178 beads, and it grows with the square of the window: 2.6 GiB at 40 Mb. Memory does not
 bound the worker count at the 20 Mb limit. A pool of 1.5 GiB per worker leaves twice the need.
 
+The site on team-frodo with that setup, `web/scripts/serve_local.sh` with GPU_SLOTS=0,0, a
+pool of 1.5 GiB and MPS, took six jobs posted at once, GM12878, CTCF and RNAPII, 10 structures,
+3 Mb windows, `web/scripts/load_test.py`: all six done in 251 s, two at a time, 46 to 96 s each,
+86 jobs per hour, every engine at its 1.5 GiB pool.
+
 Decision for the production server, to confirm there: two workers per card with MPS, each at a
 pool of 1.5 GiB, each worker pinned to its card. One worker per card without MPS is the fallback
 at about 85 percent of the throughput.
