@@ -48,7 +48,7 @@ def main() -> int:
         r = c.post("/jobs", data=form, follow_redirects=False)
         check("a valid request redirects to its job", r.status_code == 303 and r.headers["location"].startswith("/jobs/"))
         job = r.headers["location"]
-        page = c.get(job)
+        page = c.get(job + "/classic")
         check("the job page shows the finished job with its viewer", page.status_code == 200 and "done" in page.text and "ngl" in page.text.lower())
         st = c.get("/api" + job).json()
         check("the status API reports done", st["state"] == "done", str(st)[:120])
@@ -65,14 +65,15 @@ def main() -> int:
             view.status_code == 200 and len(payload.get("chain", [])) > 100 and {b["kind"] for b in payload.get("boxes", [])} == {"promoter", "enhancer"},
             f"{view.status_code} {len(payload.get('chain', []))} points {len(payload.get('boxes', []))} boxes",
         )
-        page = c.get(job).text
+        page = c.get(job + "/classic").text
         check("the gene table shows distances to two decimals", "<td class=\"num\">" in page and ".0000" not in page)
         check("a path outside the job is refused", c.get(job + "/files/..%2F..%2Fcatalog.json").status_code == 404)
         vcf = (root / "data" / "svs" / "demo.vcf.gz").read_bytes()
         r = c.post("/jobs", data={**form, "sample": "P1"}, files={"vcf": ("mine.vcf.gz", vcf)}, follow_redirects=False)
         loc = r.headers.get("location", "")
         check("an upload makes a private job behind a secret link", r.status_code == 303 and loc.startswith("/p/") and len(loc) > 20, loc)
-        check("the private job is not under the shared jobs", c.get("/jobs/" + loc.split("/")[-1]).status_code == 404)
+        token = loc.split("/")[-1]
+        check("the private job is not under the shared jobs", c.get(f"/jobs/{token}/classic").status_code == 404 and c.get(f"/api/jobs/{token}/summary").status_code == 404)
     return done()
 
 

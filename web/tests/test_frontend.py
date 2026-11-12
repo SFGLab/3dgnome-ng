@@ -47,11 +47,13 @@ def main() -> int:
         form = {"cell_type": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "n_models": "2"}
         r = c.post("/jobs", data=form, follow_redirects=False)
         check("a job post redirects to its job", r.status_code == 303 and r.headers["location"].startswith("/jobs/"))
-        page = c.get(r.headers["location"])
+        page = c.get(r.headers["location"] + "/classic")
         check("the job page is the server's, not the app", page.status_code == 200 and "FRONTEND-OK" not in page.text and "done" in page.text)
         check("an unknown API path is a 404, not the app", c.get("/api/nothing").status_code == 404)
         check("a path under a job is a 404, not the app", c.get(r.headers["location"] + "/files/..%2F..%2Fcatalog.json").status_code == 404)
         check("a path under a private job is a 404, not the app", c.get("/p/nothing/files/x").status_code == 404)
+        check("a job's page is the app", "FRONTEND-OK" in c.get(r.headers["location"]).text)
+        check("a job's file is the server's", c.get(r.headers["location"] + "/files/ep.tsv").status_code == 200)
 
         os.environ["FRONTEND_DIST"] = str(root / "missing")
         bare = TestClient(create_app())

@@ -1,0 +1,55 @@
+import { useQuery } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { jobApi } from '../job/api'
+import { JobSidePanel } from '../job/SidePanel'
+import { JobTabs, type Tab } from '../job/Tabs'
+import './job.css'
+
+/** The explorer of one job: its side panel, its tabs, and its state while it is not done. */
+export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: number }) {
+  const { key = '' } = useParams()
+  const api = useMemo(() => jobApi(kind, key), [kind, key])
+  const [params, setParams] = useSearchParams()
+  const tab = (params.get('tab') as Tab) ?? 'structure'
+  const [selected, setSelected] = useState(1)
+  const [comparing, setComparing] = useState(false)
+  const summary = useQuery({
+    queryKey: ['summary', api.base],
+    queryFn: api.summary,
+    refetchInterval: (q) => (q.state.data && ['done', 'failed'].includes(q.state.data.state) ? false : pollMs),
+  })
+  if (summary.isError) return <div className="job-page"><p className="job-message">{summary.error.message}</p></div>
+  if (!summary.data) return <div className="job-page" aria-busy="true" />
+  const s = summary.data
+  const pick = async (which: 'medoid' | 'compact' | 'random') => setSelected((await api.picks())[which])
+  return (
+    <div className="job-page">
+      <JobSidePanel api={api} summary={s} selected={selected} onSelect={setSelected} onPick={(w) => void pick(w)} />
+      <div className="job-main">
+        {s.state === 'done' ? (
+          <>
+            <JobTabs
+              tab={tab}
+              counts={{ genes: s.genes, loops: s.loop_count }}
+              comparing={comparing}
+              zipUrl={api.zipUrl}
+              onTab={(t) => setParams({ tab: t }, { replace: true })}
+              onCompare={() => setComparing((c) => !c)}
+            />
+            <div className="tab-body" role="tabpanel" />
+          </>
+        ) : s.state === 'failed' ? (
+          <div className="job-message">
+            <p className="field-error">{s.error}</p>
+            {s.log_tail && <pre className="log-tail">{s.log_tail}</pre>}
+          </div>
+        ) : (
+          <div className="job-message">
+            <p>The job page refreshes itself and opens the structures when the job is done.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

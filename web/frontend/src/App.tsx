@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Cite } from './pages/Cite'
 import { Help } from './pages/Help'
+import { Job } from './pages/Job'
 import { Method } from './pages/Method'
 import { Model } from './pages/Model'
 import { Results } from './pages/Results'
@@ -20,6 +21,8 @@ export function App() {
           <Route path={ROUTES.results} element={<Results />} />
           <Route path={ROUTES.help} element={<Help />} />
           <Route path={ROUTES.model} element={<Model />} />
+          <Route path="/jobs/:key" element={<Job kind="jobs" />} />
+          <Route path="/p/:key" element={<Job kind="p" />} />
           <Route path="*" element={null} />
         </Routes>
       </Layout>

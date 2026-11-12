@@ -235,11 +235,11 @@ def create_app() -> FastAPI:
             },
         )
 
-    @app.get("/jobs/{key}", response_class=HTMLResponse)
+    @app.get("/jobs/{key}/classic", response_class=HTMLResponse)
     def shared_job(request: Request, key: str) -> HTMLResponse:
         return page(request, "jobs", key)
 
-    @app.get("/p/{key}", response_class=HTMLResponse)
+    @app.get("/p/{key}/classic", response_class=HTMLResponse)
     def private_job(request: Request, key: str) -> HTMLResponse:
         return page(request, "private", key)
 
@@ -396,7 +396,8 @@ def create_app() -> FastAPI:
     # Registered last: every path no route above answers is a client route of the frontend.
     @app.get("/{path:path}", response_class=HTMLResponse, include_in_schema=False)
     def frontend(path: str) -> HTMLResponse:
-        if path.startswith(("api/", "jobs/", "p/", "assets/")):
+        # A job's own page is the app's; the paths below it are the server's.
+        if path.startswith(("api/", "assets/")) or re.match(r"(jobs|p)/[^/]+/", path):
             raise HTTPException(404)
         if not index_html.is_file():
             return HTMLResponse(f"The frontend is not built. Run npm run build in web/frontend, or set FRONTEND_DIST. Expected {index_html}.", 503)

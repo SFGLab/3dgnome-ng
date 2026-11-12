@@ -1,0 +1,100 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { mockApi } from '../test/api'
+import { checkCopy } from '../test/copy'
+import { KEY, PICKS, SUMMARY_DONE } from '../test/job'
+import { recentJobs } from '../model/recent'
+import { Job } from './Job'
+
+function renderJob(path = `/jobs/${KEY}`) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/jobs/:key" element={<Job kind="jobs" pollMs={50} />} />
+          <Route path="/p/:key" element={<Job kind="p" pollMs={50} />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+}
+
+describe('Job explorer', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    localStorage.clear()
+  })
+
+  it('shows the tabs of a done job with their counts', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+    renderJob()
+    const tabs = await screen.findByRole('tablist')
+    expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Structure', 'Genes312', 'Contact map', 'Loops182', 'Log'])
+  })
+
+  it('shows the facts and the files in the side panel', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+    renderJob()
+    expect(await screen.findByText('Done in 6 min 12 s')).toBeInTheDocument()
+    expect(screen.getByText('118 CTCF, 64 RNAPII')).toBeInTheDocument()
+    expect(screen.getByText('CTCF and RNAPII')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /ep\.tsv/ })).toHaveAttribute('href', `/jobs/${KEY}/files/ep.tsv`)
+    expect(screen.getByText('99 more')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /all files, zip/ })).toHaveAttribute('href', `/api/jobs/${KEY}/files.zip`)
+  })
+
+  it('moves between structures and to the picks', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]], [/picks$/, () => [200, PICKS]]])
+    renderJob()
+    const select = await screen.findByLabelText('Structure')
+    expect(select).toHaveValue('1')
+    fireEvent.click(screen.getByRole('button', { name: 'Next structure' }))
+    expect(select).toHaveValue('2')
+    fireEvent.click(screen.getByRole('button', { name: 'Previous structure' }))
+    expect(select).toHaveValue('1')
+    fireEvent.click(screen.getByRole('button', { name: 'Medoid' }))
+    await waitFor(() => expect(select).toHaveValue('17'))
+  })
+
+  it('shows a queued job and its tabs once it is done, without a reload', async () => {
+    let calls = 0
+    mockApi([[/summary$/, () => [200, ++calls < 3 ? { ...SUMMARY_DONE, state: 'queued', ahead: 2, models: [], structures: 0 } : SUMMARY_DONE]]])
+    renderJob()
+    expect(await screen.findByText('Queued, 2 jobs ahead')).toBeInTheDocument()
+    expect(await screen.findByRole('tablist', {}, { timeout: 3000 })).toBeInTheDocument()
+  })
+
+  it('shows a failed job with its error and log', async () => {
+    mockApi([[/summary$/, () => [200, { ...SUMMARY_DONE, state: 'failed', error: 'RuntimeError: engine exploded', log_tail: 'line 1\nengine exploded', models: [] }]]])
+    renderJob()
+    expect(await screen.findByText('RuntimeError: engine exploded')).toBeInTheDocument()
+    expect(document.querySelector('pre.log-tail')?.textContent).toBe('line 1\nengine exploded')
+  })
+
+  it('renames the job in this browser', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+    renderJob()
+    fireEvent.click(await screen.findByRole('button', { name: /Rename job/ }))
+    fireEvent.change(screen.getByLabelText('Job name'), { target: { value: 'TNFRSF8 with RNAPII loops' } })
+    fireEvent.keyDown(screen.getByLabelText('Job name'), { key: 'Enter' })
+    expect(await screen.findByRole('heading', { level: 1, name: 'TNFRSF8 with RNAPII loops' })).toBeInTheDocument()
+    expect(recentJobs()[0]).toMatchObject({ url: `/jobs/${KEY}`, name: 'TNFRSF8 with RNAPII loops' })
+  })
+
+  it('reads a private job under /api/p', async () => {
+    const f = mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+    renderJob(`/p/${KEY}`)
+    await screen.findByRole('tablist')
+    expect(f.mock.calls.some(([u]) => String(u) === `/api/p/${KEY}/summary`)).toBe(true)
+  })
+
+  it('keeps to the writing rules', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+    const { container } = renderJob()
+    await screen.findByRole('tablist')
+    expect(checkCopy(container)).toEqual([])
+  })
+})
