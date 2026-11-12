@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { jobApi } from '../job/api'
 import { JobSidePanel } from '../job/SidePanel'
+import { GenesPanel } from '../job/GenesPanel'
 import { StructureTab } from '../job/StructureTab'
 import { JobTabs, type Tab } from '../job/Tabs'
 import './job.css'
@@ -16,7 +17,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   const [selected, setSelected] = useState(1)
   const [comparing, setComparing] = useState(false)
   const [gene, setGene] = useState<string | null>(null)
-  const [, setGeneFilter] = useState('')
+  const [geneFilter, setGeneFilter] = useState('')
   const summary = useQuery({
     queryKey: ['summary', api.base],
     queryFn: api.summary,
@@ -51,6 +52,18 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
                   onOpenGenes={(g) => {
                     setGeneFilter(g)
                     setParams({ tab: 'genes' }, { replace: true })
+                  }}
+                />
+              )}
+              {tab === 'genes' && (
+                <GenesPanel
+                  api={api}
+                  summary={s}
+                  filter={geneFilter}
+                  selected={gene}
+                  onSelect={(g) => {
+                    setGene(g)
+                    setParams({ tab: 'structure' }, { replace: true })
                   }}
                 />
               )}
