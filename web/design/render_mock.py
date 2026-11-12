@@ -8,7 +8,7 @@ a grey tube with the promoter beads in the site's promoter colour and the enhanc
 enhancer colour, and `contacts.png`, the Hi-C map of chr1:20-25 Mb above the diagonal and the
 summed model map of the same arm below it, each on its own log scale. `structure_ctcf.png`
 is the same locus modelled with CTCF loops alone, for the compare screen. The
-`method_*.png` panels illustrate the Method page.
+`method_*.png` panels illustrate the Method page, `method_law.png` its distance law.
 """
 
 from __future__ import annotations
@@ -126,6 +126,28 @@ def method_steps(maps: np.lib.npyio.NpzFile, out: Path) -> None:
     plt.close(fig)
 
 
+def distance_law(out: Path, nu: float = 0.34) -> None:
+    """Target distance against genomic separation for a pair without a loop and for loops of
+    three strengths, by the formulas of `gnome3d.polymer.PolymerLaw` with one bead at 1 kb and
+    the exponent measured on GM12878 Hi-C."""
+    sep = np.logspace(3, 7, 200)
+    bg = np.maximum(1.0, (sep / 1000.0) ** nu)
+    fig, ax = plt.subplots(figsize=(6.2, 3.6))
+    ax.plot(sep, bg, color="#151514", lw=2, label="no loop")
+    for q, col in [(0.5, "#9fc3ee"), (2.0, "#5a9be0"), (8.0, "#2a78d6")]:
+        ax.plot(sep, 1.0 + (bg - 1.0) / (1.0 + q), color=col, lw=2, label=f"loop, strength {q:g}")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("genomic separation, bp")
+    ax.set_ylabel("target distance, bead units")
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(True, which="major", color="#e4e3df", lw=0.6)
+    ax.legend(frameon=False, fontsize=9)
+    fig.tight_layout()
+    fig.savefig(out / "method_law.png", dpi=200, facecolor="white")
+    plt.close(fig)
+
+
 def main() -> None:
     maps, out = np.load(sys.argv[1]), Path(sys.argv[2])
     out.mkdir(parents=True, exist_ok=True)
@@ -133,6 +155,7 @@ def main() -> None:
     structure(maps, out / "structure_ctcf.png", "C")
     contacts(maps, out / "contacts.png")
     method_steps(maps, out)
+    distance_law(out)
     print(out)
 
 
