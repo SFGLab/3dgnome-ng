@@ -42,3 +42,11 @@ Final: minor (deferred): pool_replicates greedy, not transitive (review 9)
 Final: minor (deferred): CTCF loop provenance not in the prep record (review 14)
 Final: minor (deferred): exporter leaves partial output on refusal (review 15), keep-fraction print (16), guard skips segment_split/centromeres and DRY skips the guard (17)
 Final: Ruling: expression statistics on the genes covered in all twelve ensembles, export floor 0.2 — arm E covers ~33% of chr1 within 5 kb, gnome3d ~75%; per arm gene sets would not compare — cost if wrong: fewer genes, the published E statistic is not reproduced on its own gene set
+
+## Autosomes, 2026-11-12
+
+Ruling: M goes to the autosomes and to the trios: the spec's rule pooled over lines, M recovers 67% of R's SCC loss and 53% of its MultiMM loss from C and keeps 58% of R's jump_r_conf gain (the headline expression statistic, pooled over the three pairs) — per line H1ESC SCC (37%) and HFFC6 MultiMM (40%) fall short, and the GM12878 vs HFFC6 pair keeps 16% — cost if wrong: one arm's compute.
+Ruling: autosomes are chr2 to chr22, all 21, not the 20 discovery autosomes alone — the user asked for whole genome runs and the enhancer3d analysis also reads chr2 and chr13 as its validation set; chrX stays out because the lines differ in sex — cost if wrong: two chromosomes' compute.
+Ruling: cell lines run one task per line, arm and chromosome (SPLIT=1, 189 tasks), throttled to 12 at once on a shared cluster — a task chaining 21 chromosomes would run past a day.
+Ruling: the trio M arm is not run yet — it needs per person absorbed anchors that no prep has built; C and R go now, M after its prep.
+Ruling: the eden staging is not overwritten; the new array script is sent to sbatch on standard input from this branch's commit, recorded in STAGED_COMMIT_AUTOSOMES beside STAGED_COMMIT; the engine is the staged 6005f64, identical to HEAD under gnome3d/ save the unused geometry.py.

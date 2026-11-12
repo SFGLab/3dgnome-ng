@@ -291,6 +291,18 @@ CONFIG_TAG=_trio_rnapol2_hgsvc OUT=out/xc_trio_rnapol2_hgsvc CHROMS=chr1 \
   sbatch --array=0-8 /path/to/triosformer/slurm/trio_ensemble.sh
 ```
 
+The autosomes, chr2 to chr22, one task per line, arm and chromosome, and the trios' C and R
+on the same chromosomes:
+
+```bash
+A="chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22"
+SPLIT=1 CHROMS="$A" sbatch --array=0-188%12 slurm/ensemble/crosscell_arms.sh
+CONFIG_TAG=_trio_xc_hgsvc OUT=out/xc_trio_ctcf_hgsvc CHROMS="${A// /,}" \
+  sbatch --array=0-188%6 /path/to/triosformer/slurm/trio_ensemble.sh
+CONFIG_TAG=_trio_xc_rnapol2_hgsvc OUT=out/xc_trio_rnapol2_hgsvc CHROMS="${A// /,}" \
+  sbatch --array=0-188%6 /path/to/triosformer/slurm/trio_ensemble.sh
+```
+
 Arm E is the existing cudaMMC models of each line's chr1 on ARCH, `/data/mw868/models_fixed/<line>/chr1`.
 
 Arm M at the spec's absorb distance of 1 kb moves few ends (GM12878 66,608 new RNAPII anchors

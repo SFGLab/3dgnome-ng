@@ -8,7 +8,12 @@
 #   CHROMS="chr2 chr3" sbatch --array=0-8 slurm/ensemble/crosscell_arms.sh
 #   DRY=1 SLURM_ARRAY_TASK_ID=4 bash slurm/ensemble/crosscell_arms.sh   # print, run nothing
 #
-# Task i runs line i / 3 of GM12878 H1ESC HFFC6 and arm i % 3 of C R M. A member whose .cif
+# The autosomes, one task per line, arm and chromosome, 9 times the chromosome count:
+#
+#   SPLIT=1 CHROMS="chr2 chr3 ... chr22" sbatch --array=0-188%24 slurm/ensemble/crosscell_arms.sh
+#
+# Task i runs line i / 3 of GM12878 H1ESC HFFC6 and arm i % 3 of C R M. With SPLIT=1 it runs
+# line and arm i % 9 on chromosome i / 9 of CHROMS. A member whose .cif
 # exists is skipped by gnome3d-ng, so resubmitting the array fills the gaps. After chr1 the arm
 # is sliced to chr1:1-60000000, the battery's region.
 #
@@ -36,12 +41,20 @@ OUT="${OUT:-$ROOT/out/xc}"
 CHROMS="${CHROMS:-chr1}"
 N="${N:-10}"
 DRY="${DRY:-0}"
+SPLIT="${SPLIT:-0}"
 
 LINES=(GM12878 H1ESC HFFC6)
 ARMS=(C R M)
 TASK="${SLURM_ARRAY_TASK_ID:-0}"
-LINE="${LINES[$((TASK / 3))]}"
-ARM="${ARMS[$((TASK % 3))]}"
+COMBO="$TASK"
+if [ "$SPLIT" = "1" ]; then
+  read -r -a CHROM_LIST <<< "$CHROMS"
+  COMBO=$((TASK % 9))
+  [ $((TASK / 9)) -lt ${#CHROM_LIST[@]} ] || { echo "task $TASK beyond ${#CHROM_LIST[@]} chromosomes"; exit 1; }
+  CHROMS="${CHROM_LIST[$((TASK / 9))]}"
+fi
+LINE="${LINES[$((COMBO / 3))]}"
+ARM="${ARMS[$((COMBO % 3))]}"
 LOWER="$(echo "$LINE" | tr '[:upper:]' '[:lower:]')"
 CONFIG="$ROOT/slurm/ensemble/${LOWER}_xc_${ARM}.ini"
 DEST="$OUT/${LINE}_${ARM}"
