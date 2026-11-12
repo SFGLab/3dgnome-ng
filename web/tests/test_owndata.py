@@ -147,6 +147,10 @@ def main() -> int:
         r = c.post("/api/jobs", data=job | {"vcf_upload": notvcf})
         check("a VCF upload that failed its check is a 400", r.status_code == 400 and r.json()["field"] == "vcf_upload", r.text)
 
+        v = c.post("/api/variants/check", data={"cell": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "sample": "P1", "haplotype": "0", "upload": loops_a})
+        check("a variant check on an upload that is not a VCF is a 400 naming it", v.status_code == 400 and v.json()["field"] == "upload", v.text)
+        r = c.post("/api/jobs", data=form | {"own": json.dumps({"loops": ["not an object"], "contacts": contacts})})
+        check("an own loops entry that is not an object is a 400 on own", r.status_code == 400 and r.json()["field"] == "own", r.text)
         v = c.post("/api/variants/check", data={"cell": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "sample": "NOBODY", "haplotype": "0", "upload": vid})
         check("a sample not in the VCF is a 400 on the sample field", v.status_code == 400 and v.json()["field"] == "sample", v.text)
 

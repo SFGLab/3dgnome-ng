@@ -7,12 +7,20 @@ import json
 import re
 import secrets
 import shutil
+import threading
 from pathlib import Path
 from urllib.parse import urlparse
 
 import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -207,6 +215,8 @@ def create_app() -> FastAPI:
             return checked_upload(uid, kind, "own")
 
         loops = raw.get("loops") or []
+        if not isinstance(loops, list) or not all(isinstance(x, dict) for x in loops):
+            raise JobError("own loops must be a list of objects with a factor and an upload", "own")
         if loops:
             out["loops"] = [(str(x.get("factor") or "loops"), one(x.get("upload"), "loops")) for x in loops]
         for kind in ("anchors", "contacts", "enhancers"):
@@ -269,8 +279,20 @@ def create_app() -> FastAPI:
         owndata.record_check(d, c)
         return JSONResponse(owndata.result(d, c), 201)
 
+    # A link read holds a worker thread for up to READ_SECONDS; past the limit a read is refused
+    # at once rather than queued behind the others.
+    link_slots = threading.BoundedSemaphore(max(1, s.link_reads))
+
     @app.post("/api/uploads/link")
     def api_upload_link(url: str = Form(...), cell: str = Form(""), region: str = Form("")) -> JSONResponse:
+        if not link_slots.acquire(blocking=False):
+            return JSONResponse({"error": "The server is reading other links. Try again in a minute.", "fix": "Or choose Local .hic file or BEDPE of the region.", "field": "url"}, 503)
+        try:
+            return read_link(url, cell, region)
+        finally:
+            link_slots.release()
+
+    def read_link(url: str, cell: str, region: str) -> JSONResponse:
         try:
             reg = region_of(cell, region)
         except RegionError as e:
@@ -312,7 +334,10 @@ def create_app() -> FastAPI:
         except RegionError as e:
             return JSONResponse({"error": str(e), "field": "region"}, 400)
         if upload:
-            vcf = owndata.data_file(upload_dir(upload))
+            try:
+                vcf = owndata.data_file(checked_upload(upload, "vcf", "upload"))
+            except JobError as e:
+                return JSONResponse({"error": str(e), "field": e.field}, 400)
         elif sv_set in catalog.sv_sets:
             vcf = catalog.sv_sets[sv_set].vcf
         else:

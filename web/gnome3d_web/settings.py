@@ -12,6 +12,7 @@ MAX_REGION_MB   the longest region the form accepts, in Mb, default 20
 FRONTEND_DIST   the frontend build, default web/frontend/dist
 MAX_STRUCTURES  the most structures a job may ask for, default 100
 UPLOAD_MAX_MB   the largest upload, in MB, default 200
+LINK_READS    how many contact map links the server reads at once, default 4
 LINK_ALLOW_PRIVATE  1 lets a contact map link point at a private or loopback address, for tests;
               off by default
 HICDIFFUSION_DIR, HICDIFFUSION_PYTHON, HICDIFFUSION_MODELS, REFERENCE_FASTA  the optional
@@ -42,6 +43,7 @@ class Settings:
     max_structures: int
     upload_max_mb: int
     link_allow_private: bool = False
+    link_reads: int = 4
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -58,6 +60,7 @@ class Settings:
             max_structures=int(os.environ.get("MAX_STRUCTURES", "100")),
             upload_max_mb=int(os.environ.get("UPLOAD_MAX_MB", "200")),
             link_allow_private=os.environ.get("LINK_ALLOW_PRIVATE", "") == "1",
+            link_reads=int(os.environ.get("LINK_READS", "4")),
             frontend_dist=Path(os.environ.get("FRONTEND_DIST", Path(__file__).resolve().parents[1] / "frontend" / "dist")),
         )
 

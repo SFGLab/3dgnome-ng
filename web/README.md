@@ -156,6 +156,7 @@ All by environment, see `gnome3d_web/settings.py`. The ones that matter:
 | `MAX_STRUCTURES` | 100 | the most structures a job may ask for |
 | `UPLOAD_MAX_MB` | 200 | the largest upload; set the proxy's body limit to match |
 | `LINK_ALLOW_PRIVATE` | off | `1` lets a contact map link point at a private address, for tests only |
+| `LINK_READS` | 4 | contact map links read at once |
 
 HiCDiffusion is offered only when `HICDIFFUSION_DIR`, `HICDIFFUSION_PYTHON`,
 `HICDIFFUSION_MODELS` and `REFERENCE_FASTA` are all set, the checkout, its own interpreter (its
@@ -194,9 +195,13 @@ the diagonal, the way the hosted maps hold them.
 
 | route | where the window is read |
 |---|---|
-| link to a .hic or .mcool | on the server, `POST /api/uploads/link`, over HTTP range requests: hic-straw for .hic, h5py on an fsspec file for .mcool. The link must be http or https and resolve to a public address at every redirect, and the read gives up after 2 minutes. |
+| link to a .hic or .mcool | on the server, `POST /api/uploads/link`, over HTTP range requests: hic-straw for .hic, h5py on an fsspec file for .mcool, each in a child process that reads through a range proxy on the loopback interface. Every connection resolves the host once and goes only to the public address it checked, redirects included. A read is stopped after 2 minutes, and at most `LINK_READS` run at once; one more is refused at once. |
 | local .hic file | in the browser, with the hic-straw JavaScript reader, uploaded as a BEDPE |
 | BEDPE of the region | on the user's computer; `gnome3d-ng extract --mcool FILE --region chr:start-end --out region.bedpe` writes it from a local .mcool, with `pip install gnome3d-ng[extract]` for cooler |
+
+In production the worker's network should also refuse private ranges, as a second guard
+behind the address check: with Docker, a network whose egress rule drops 10.0.0.0/8,
+172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 and the host's own addresses.
 
 At job build the pairs are thinned to the contacts per Mb of the cell type's hosted map on the
 region's chromosome, by drawing contacts without replacement. A deep map and a shallow one then

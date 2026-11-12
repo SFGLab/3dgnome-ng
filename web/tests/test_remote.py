@@ -13,6 +13,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -22,7 +23,7 @@ from _check import check, done
 from fixture import make_data
 
 
-def serve(root: Path, ranges: bool, html: bool = False, head: bool = True) -> tuple[ThreadingHTTPServer, str]:
+def serve(root: Path, ranges: bool, html: bool = False, head: bool = True, slow: float = 0.0) -> tuple[ThreadingHTTPServer, str]:
     """A file server on a free port that answers range requests, or answers every request whole.
     Without head it refuses HEAD requests, as an S3 link signed for GET does."""
 
@@ -31,6 +32,7 @@ def serve(root: Path, ranges: bool, html: bool = False, head: bool = True) -> tu
             pass
 
         def _send(self, head: bool) -> None:
+            time.sleep(slow)
             if html:
                 body = b"<!doctype html><html><body>Sign in</body></html>"
                 self.send_response(200)
@@ -115,6 +117,7 @@ def main() -> int:
         whole, url_whole = serve(files, ranges=False)
         page, url_page = serve(files, ranges=True, html=True)
         signed, url_signed = serve(files, ranges=True, head=False)
+        slow, url_slow = serve(files, ranges=True, slow=1.5)
 
         from gnome3d_web import remote
 
@@ -128,11 +131,19 @@ def main() -> int:
         hop = f"{url}/go/to-{url.removeprefix('http://')}/test.mcool"
         size_seen, final = remote.probe(hop, allow_private=True)
         check("a redirect is followed to the file it names", size_seen == size and final == f"{url}/test.mcool", final)
+        seen: list[str] = []
+        real_resolve = remote._resolve
+        remote._resolve = lambda host, p: seen.append(host) or real_resolve(host, p)
         try:
-            remote.probe(hop, allow_private=False, first_hop_checked=True)
-            check("a redirect to a private address is refused", False)
+            remote.probe(hop.replace("127.0.0.1", "localhost"), allow_private=True)
+        finally:
+            remote._resolve = real_resolve
+        check("every connection, the redirect's too, resolves through the checked resolver", seen == ["localhost", "localhost"], str(seen))
+        try:
+            remote.probe(hop.replace("127.0.0.1", "localhost", 1), allow_private=False)
+            check("a private address is refused at connect", False)
         except remote.RemoteError as e:
-            check("a redirect to a private address is refused", "private address" in str(e), str(e))
+            check("a private address is refused at connect", "private address" in str(e), str(e))
 
         thinned = remote.thin(np.array([500, 300, 200, 0]), 100, seed=7)
         check("thinning keeps the target total, never above a count", thinned.sum() == 100 and bool((thinned <= [500, 300, 200, 0]).all()), str(thinned))
@@ -177,11 +188,39 @@ def main() -> int:
         r = link("file:///etc/passwd")
         check("a link that is not http or https is refused", r.status_code == 400 and "http" in r.json()["error"], r.text)
 
+        os.environ["LINK_READS"] = "1"
+        limited = TestClient(create_app())
+        os.environ.pop("LINK_READS")
+        answers: list[tuple[int, float]] = []
+
+        def timed() -> None:
+            t = time.time()
+            answers.append((link(f"{url_slow}/test.mcool", client=limited).status_code, time.time() - t))
+
+        pair = [threading.Thread(target=timed) for _ in range(2)]
+        for th in pair:
+            th.start()
+            time.sleep(0.3)
+        for th in pair:
+            th.join()
+        busy = [a for a in answers if a[0] == 503]
+        check("a link read over the limit is refused at once", sorted(a[0] for a in answers) == [201, 503] and busy[0][1] < 1.0, str(answers))
+
         os.environ.pop("LINK_ALLOW_PRIVATE")
         strict = TestClient(create_app())
         r = link(f"{url}/test.mcool", client=strict)
         check("a link to a private address is refused by default", r.status_code == 400 and "private" in r.json()["error"], r.text)
-        for srv in (with_ranges, whole, page, signed):
+
+        port = url.rsplit(":", 1)[1]
+        answers_dns = iter([["8.8.8.8"]])
+        real = remote._resolve
+        remote._resolve = lambda host, p: next(answers_dns, ["127.0.0.1"]) if host == "rebind.test" else real(host, p)
+        try:
+            r = link(f"http://rebind.test:{port}/test.mcool", client=strict)
+        finally:
+            remote._resolve = real
+        check("a name that resolves public at the check and private at the read is refused", r.status_code == 400 and "private" in r.json()["error"], r.text)
+        for srv in (with_ranges, whole, page, signed, slow):
             srv.shutdown()
     return done()
 

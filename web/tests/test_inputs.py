@@ -92,6 +92,12 @@ def main() -> int:
         hosted = 39 * 3 / 3.875
         check("deep own contacts are thinned to the hosted map's contacts per Mb", total == round(hosted * 2.95), f"{total} against {hosted * 2.95:.1f}")
         check("thinning keeps every pair at or under its count", all(0 < int(r[6]) <= 500 for r in sing), str(sing[:3]))
+        (own_dir / "short.bedpe").write_text("chr1\t100000\t102000\tchr1\t104000\t106000\t50\n")
+        inp = build_inputs(ct, region, "own", [], Path(d) / "short", own=Own(loops=own.loops, contacts=own_dir / "short.bedpe"))
+        cfg = configparser.ConfigParser()
+        cfg.read(inp.config)
+        sing = rows(Path(cfg["data"]["data_dir"]) / "singletons.bedpe")
+        check("contacts over a span too short for one hosted contact keep at least one", len(sing) == 1 and int(sing[0][6]) >= 1, str(sing))
         own2 = Own(loops=[("H3K27ac", own_dir / "b.bedpe")])
         inp = build_inputs(ct, region, "own", [], Path(d) / "own2", own=own2)
         cfg = configparser.ConfigParser()

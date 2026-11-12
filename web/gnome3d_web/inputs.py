@@ -83,7 +83,8 @@ def _thin_to_hosted(sing: pd.DataFrame, cell: CellType, chrom: str) -> pd.DataFr
     from .remote import hosted_density, thin
 
     span = (int(sing[5].max()) - int(sing[1].min())) / 1e6
-    target = round(hosted_density(cell.path("singletons"), chrom) * span)
+    # At least one contact, or a short span would be thinned to nothing.
+    target = max(1, round(hosted_density(cell.path("singletons"), chrom) * span))
     seed = int.from_bytes(hashlib.blake2b(f"{chrom} {len(sing)} {int(sing[6].sum())}".encode(), digest_size=8).digest(), "little")
     out = sing.copy()
     out[6] = thin(out[6].to_numpy(dtype=np.int64), target, seed)
