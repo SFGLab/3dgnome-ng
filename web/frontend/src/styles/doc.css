@@ -5,6 +5,8 @@
   max-width: 1440px;
   margin: 0 auto;
   padding: 40px 48px 56px 0;
+}
+
 .side-panel {
   position: sticky;
   top: 0;
@@ -18,51 +20,73 @@
   background: var(--panel);
   border-right: 1px solid var(--line);
   min-height: 60vh;
+}
+
 .side-panel .eyebrow {
   margin: 0 0 8px 10px;
   font-size: 11px;
   font-weight: 600;
   color: var(--faint);
+}
+
 .side-panel a {
   padding: 7px 10px;
   border-radius: 6px;
   color: var(--ink);
   font-size: 13px;
   text-decoration: none;
+}
+
 .side-panel a:hover {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
 .reading {
   flex: 1;
   max-width: 820px;
   display: flex;
   flex-direction: column;
   gap: 36px;
+}
+
 .page-head h1 {
   margin: 0 0 8px;
   font-size: 30px;
   font-weight: 700;
+}
+
 .page-head .lead {
   margin: 0;
   font-size: 15px;
   color: var(--muted);
+}
+
 .reading h2 {
   margin: 0 0 12px;
   font-size: 18px;
   font-weight: 700;
+}
+
 .reading h2 sup {
   font-size: 10px;
   color: var(--accent);
+}
+
 .reading .intro {
   margin: 0 0 14px;
   font-size: 14px;
   color: var(--muted);
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
   background: var(--surface);
   border: 1px solid var(--line);
   font-size: 13px;
+}
+
 .data-table th {
   padding: 8px 12px;
   background: var(--panel);
@@ -70,13 +94,19 @@
   font-size: 11px;
   font-weight: 600;
   text-align: left;
+}
+
 .data-table td {
   padding: 10px 12px;
   border-top: 1px solid var(--line);
   color: var(--muted);
+}
+
 .data-table .data-name {
   color: var(--ink);
   font-weight: 500;
+}
+
 @media (max-width: 960px) {
   .doc-page {
     flex-direction: column;
@@ -90,6 +120,7 @@
     border-right: 0;
     border-radius: 8px;
   }
+}
 
 .doc-table {
   width: 100%;
@@ -227,4 +258,12 @@
   .cards {
     grid-template-columns: 1fr;
   }
+}
+
+/* The equations are dark ink on a transparent image, readable on white in both themes. */
+img.equation {
+  box-sizing: content-box;
+  padding: 2px 4px;
+  background: #FFFFFF;
+  border-radius: 4px;
 }
