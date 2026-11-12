@@ -144,6 +144,26 @@ describe('Model a region page', () => {
     expect(body.get('cell_type')).toBe('GM12878')
   })
 
+  it('applies a dropped VCF through the variants dialog', async () => {
+    const fetchMock = mockApi([
+      [/^\/api\/uploads$/, () => [201, { id: 'vcfupload1', kind: 'vcf', name: 'mine.vcf.gz', size: 1000, ok: true, summary: 'VCF with 1 sample.', error: null, samples: ['HG00733'] }]],
+      [/^\/api\/variants\/check$/, () => [200, { summary: '1 variant of HG00733 on the first haplotype lies inside chr1:11,500,000-12,600,000.', applied: { DEL: 1 }, skipped: {}, variants: [{ type: 'DEL', pos: 11_812_400, end: 11_829_600, length: 17_200, genotype: '1|0', change: 'no anchor inside' }] }]],
+      [/^\/api\/jobs$/, () => [201, { url: '/p/token' }]],
+    ])
+    renderModel('/model?example=TNFRSF8')
+    await screen.findByText('chr1:11,500,000-12,600,000, 1.1 Mb')
+    fireEvent.change(screen.getByLabelText(/Or drop your own VCF here/), { target: { files: [new File(['x'], 'mine.vcf.gz')] } })
+    expect(screen.getByRole('dialog', { name: 'Structural variants' })).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: 'Apply 1 variant' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Build 100 structures/ }))
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u) === '/api/jobs')).toBe(true))
+    const body = fetchMock.mock.calls.find(([u]) => String(u) === '/api/jobs')![1]!.body as FormData
+    expect((body.get('vcf') as File).name).toBe('mine.vcf.gz')
+    expect(body.get('sample')).toBe('HG00733')
+    expect(body.get('sv_set')).toBe('')
+  })
+
   it('keeps to the writing rules', async () => {
     const { container } = renderModel()
     await screen.findByRole('radio', { name: /GM12878/ })

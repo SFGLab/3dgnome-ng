@@ -24,6 +24,8 @@ export type Setting = {
   meaning: string
 }
 export type SettingGroup = { name: string; settings: Setting[] }
+export type VariantRow = { type: string; pos: number; end: number; length: number; genotype: string; change: string }
+export type VariantCheck = { summary: string; applied: Record<string, number>; skipped: Record<string, number>; variants: VariantRow[] }
 export type JobStatus = { state: string; stage?: string; error?: string }
 
 /** An answer of the API that is not 2xx, with its message and the form field it concerns. */
@@ -57,5 +59,10 @@ export const api = {
     return call<{ overrides: Record<string, string>; refused: string[] }>('/api/settings/ini', { method: 'POST', body: form })
   },
   submit: (form: FormData) => call<{ url: string }>('/api/jobs', { method: 'POST', body: form }),
+  variants: (fields: Record<string, string>) => {
+    const form = new FormData()
+    for (const [k, v] of Object.entries(fields)) form.append(k, v)
+    return call<VariantCheck>('/api/variants/check', { method: 'POST', body: form })
+  },
   status: (url: string) => call<JobStatus>(`/api${url}`),
 }
