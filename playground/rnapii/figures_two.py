@@ -397,6 +397,8 @@ def _forest(ax: plt.Axes, values: dict[str, tuple[float, float, float] | None], 
     for row, a in enumerate(arms[::-1]):
         v = values.get(a)
         if v is None:
+            if all(values.get(x) is None for x in arms):
+                continue
             ax.text(0.5, row, "no data", transform=ax.get_yaxis_transform(), ha="center", va="center",
                     color=MUTED, fontsize=7, style="italic")
             continue
