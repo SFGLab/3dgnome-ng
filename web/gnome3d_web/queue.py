@@ -55,6 +55,12 @@ class LocalPool:
         """Waits until every queued job has finished."""
         self._jobs.join()
 
+    def position(self, job_dir: str) -> int | None:
+        """The number of waiting jobs in front of a job, None when it is not waiting."""
+        with self._jobs.mutex:
+            waiting = [d for _, d in self._jobs.queue]
+        return waiting.index(job_dir) if job_dir in waiting else None
+
 
 _POOL: LocalPool | None = None
 _POOL_LOCK = threading.Lock()
@@ -66,6 +72,22 @@ def _local_pool(s: Settings) -> LocalPool:
         if _POOL is None:
             _POOL = LocalPool(s.gpu_slots, s.engine_cmd)
         return _POOL
+
+
+def queue_position(s: Settings, job_dir: Path) -> int | None:
+    """The number of jobs waiting in front of a job, None when it is not waiting."""
+    if s.queue == "thread":
+        return _local_pool(s).position(str(job_dir))
+    if s.queue == "inline":
+        return None
+    from redis import Redis
+    from rq import Queue
+
+    q = Queue("gnome3d", connection=Redis.from_url(s.redis_url))
+    for i, job in enumerate(q.jobs):
+        if len(job.args) > 1 and job.args[1] == str(job_dir):
+            return i
+    return None
 
 
 def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:

@@ -55,6 +55,16 @@ def main() -> int:
         check("GPU 0 runs at most its two slots", most_at_once(spans, "0") <= 2, str(most_at_once(spans, "0")))
         check("GPU 1 runs at most its one slot", most_at_once(spans, "1") <= 1, str(most_at_once(spans, "1")))
         check("every engine sees one GPU of the slots", set(Counter(g for _, _, g in spans)) <= {"0", "1"}, str(Counter(g for _, _, g in spans)))
+        busy = LocalPool(["0"], engine=FAKE)
+        dirs = [str(root / "results" / "jobs" / f"q{i}") for i in range(3)]
+        for i, jd in enumerate(dirs):
+            busy.submit(asdict(JobRequest(cell_type="GMX", region=f"chr1:{i * 1000}-2000000", factors="CTCF", n_models=1)), jd)
+        import time
+
+        time.sleep(0.2)
+        check("the queue gives the jobs in front of a waiting job", busy.position(dirs[2]) == 1 and busy.position(dirs[0]) is None, str([busy.position(x) for x in dirs]))
+        busy.join()
+
         one = LocalPool(["0"], engine=FAKE)
         one.submit({"not_a_field": 1}, str(root / "results" / "jobs" / "bad"))
         good = root / "results" / "jobs" / "after_bad"

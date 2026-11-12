@@ -9,13 +9,14 @@ from pathlib import Path
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from . import explore
 from .catalog import BACKGROUNDS, FACTOR_CHOICES, Catalog
 from .jobs import JobRequest, _member, request_key
-from .queue import enqueue, sweep_private
+from .queue import enqueue, queue_position, sweep_private
 from .regions import HICDIFFUSION_SPAN, RegionError, parse_region
 from .settings import Settings
 from .settings_schema import SettingError, parse_ini, schema, validate_overrides
@@ -316,6 +317,59 @@ def create_app() -> FastAPI:
     async def api_settings_ini(file: UploadFile = File(...)) -> JSONResponse:  # noqa: B008
         overrides, refused = parse_ini((await file.read(1_000_000)).decode("utf-8", "replace"))
         return JSONResponse({"overrides": overrides, "refused": refused})
+
+    def explore_routes(kind: str) -> None:
+        base = f"/api/{kind}/{{key}}"
+
+        def guard(key: str):  # noqa: ANN202
+            return job_dir(kind, key)
+
+        @app.get(base + "/summary", name=f"{kind}_summary")
+        def ex_summary(key: str) -> JSONResponse:
+            d = guard(key)
+            return JSONResponse(explore.summary(d, queue_position(s, d)))
+
+        @app.get(base + "/structure/{i}", name=f"{kind}_structure")
+        def ex_structure(key: str, i: int) -> JSONResponse:
+            try:
+                return JSONResponse(explore.structure(guard(key), i))
+            except explore.ExploreError as e:
+                return JSONResponse({"error": str(e)}, 404)
+
+        @app.get(base + "/annotations", name=f"{kind}_annotations")
+        def ex_annotations(key: str) -> JSONResponse:
+            return JSONResponse(explore.annotations(guard(key)))
+
+        @app.get(base + "/picks", name=f"{kind}_picks")
+        def ex_picks(key: str) -> JSONResponse:
+            return JSONResponse(explore.picks(guard(key)))
+
+        @app.get(base + "/distance", name=f"{kind}_distance")
+        def ex_distance(key: str, a: int, b: int) -> JSONResponse:
+            try:
+                return JSONResponse(explore.distance(guard(key), a, b))
+            except explore.ExploreError as e:
+                return JSONResponse({"error": str(e)}, 400)
+
+        @app.get(base + "/genes", name=f"{kind}_genes")
+        def ex_genes(key: str) -> JSONResponse:
+            return JSONResponse(explore.genes(guard(key)))
+
+        @app.get(base + "/loops", name=f"{kind}_loops")
+        def ex_loops(key: str) -> JSONResponse:
+            return JSONResponse(explore.loops(guard(key)))
+
+        @app.get(base + "/log", name=f"{kind}_log", response_class=PlainTextResponse)
+        def ex_log(key: str) -> PlainTextResponse:
+            return PlainTextResponse(explore.log_text(guard(key)))
+
+        @app.get(base + "/files.zip", name=f"{kind}_zip")
+        def ex_zip(key: str) -> Response:
+            d = guard(key)
+            return Response(explore.zip_bytes(d), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{d.name}.zip"'})
+
+    explore_routes("jobs")
+    explore_routes("p")
 
     index_html = s.frontend_dist / "index.html"
     if (s.frontend_dist / "assets").is_dir():
