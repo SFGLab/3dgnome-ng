@@ -107,15 +107,15 @@ def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
 
 
 def sweep_private(results_dir: Path, retention_days: int) -> list[str]:
-    """Remove private jobs older than the retention period, as the form promises users, and
-    return their names. Shared jobs are never removed here."""
+    """Remove private jobs and uploads older than the retention period, as the form promises
+    users, and return their names. Shared jobs are never removed here."""
     gone = []
     cutoff = time.time() - retention_days * 86400
-    root = results_dir / "private"
-    if not root.is_dir():
-        return gone
-    for d in root.iterdir():
-        if d.is_dir() and d.stat().st_mtime < cutoff:
-            shutil.rmtree(d)
-            gone.append(d.name)
+    for root in (results_dir / "private", results_dir / "uploads"):
+        if not root.is_dir():
+            continue
+        for d in root.iterdir():
+            if d.is_dir() and d.stat().st_mtime < cutoff:
+                shutil.rmtree(d)
+                gone.append(d.name)
     return gone

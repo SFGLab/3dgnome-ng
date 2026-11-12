@@ -8,12 +8,12 @@ import secrets
 from pathlib import Path
 
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import explore
+from . import explore, owndata
 from .catalog import BACKGROUNDS, FACTOR_CHOICES, Catalog
 from .jobs import JobRequest, _member, request_key
 from .queue import enqueue, queue_position, sweep_private
@@ -156,6 +156,46 @@ def create_app() -> FastAPI:
         except JobError as e:
             return JSONResponse({"error": str(e), "field": e.field}, 400)
         return JSONResponse({"url": url}, 201)
+
+    uploads = s.results_dir / "uploads"
+
+    def region_of(cell: str, text: str) -> tuple[str, int, int] | None:
+        if not text:
+            return None
+        genes = catalog.cell_types[cell].genes() if cell in catalog.cell_types else next(iter(catalog.cell_types.values())).genes()
+        r = parse_region(text, genes, s.max_span)
+        return (r.chrom, r.start, r.end)
+
+    @app.post("/api/uploads")
+    async def api_upload(request: Request, kind: str = Form(...), file: UploadFile = File(...), cell: str = Form(""), region: str = Form(""), factor: str = Form("")) -> JSONResponse:  # noqa: B008
+        cap = s.upload_max_mb << 20
+        if int(request.headers.get("content-length", "0")) > cap + (1 << 16):
+            return JSONResponse({"error": f"{file.filename} is more than {s.upload_max_mb} MB, the largest upload this server takes"}, 413)
+        if kind not in owndata.KINDS:
+            return JSONResponse({"error": f"{kind!r} is not one of {', '.join(owndata.KINDS)}", "field": "kind"}, 400)
+        try:
+            reg = region_of(cell, region)
+        except RegionError as e:
+            return JSONResponse({"error": str(e), "field": "region"}, 400)
+        try:
+            d = owndata.store(file.file, file.filename or kind, kind, uploads, cap, {"factor": factor} if factor else None)
+        except owndata.UploadTooLarge as e:
+            return JSONResponse({"error": str(e)}, 413)
+        return JSONResponse(owndata.result(d, owndata.check(kind, owndata.data_file(d), reg)), 201)
+
+    def upload_dir(uid: str) -> Path:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{8,64}", uid) or not (uploads / uid / "meta.json").is_file():
+            raise HTTPException(404)
+        return uploads / uid
+
+    @app.get("/api/uploads/{uid}/preview")
+    def api_upload_preview(uid: str, region: str, cell: str = "") -> JSONResponse:
+        d = upload_dir(uid)
+        try:
+            reg = region_of(cell, region)
+        except RegionError as e:
+            return JSONResponse({"error": str(e)}, 400)
+        return JSONResponse(owndata.preview(d, reg) if reg else [])
 
     @app.get("/api/region")
     def api_region(cell: str, q: str) -> JSONResponse:
