@@ -9119,7 +9119,7 @@
       "name": "Cite page",
       "clip": true,
       "width": 1440,
-      "height": 3350,
+      "height": 3600,
       "fill": "$bg",
       "layout": "vertical",
       "children": [
@@ -10829,6 +10829,154 @@
                               "name": "DOI",
                               "fill": "$accent",
                               "content": "github.com/jax-ml/jax",
+                              "fontFamily": "$mono",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "sAUqs",
+                      "name": "Ref Dynamics of entangled linear p",
+                      "width": "fill_container",
+                      "stroke": "$line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "layout": "vertical",
+                      "gap": 3,
+                      "padding": [
+                        12,
+                        0
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Snyoc",
+                          "name": "Title",
+                          "fill": "$ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Dynamics of entangled linear polymer melts: a molecular-dynamics simulation",
+                          "lineHeight": 1.4,
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "YrYdS",
+                          "name": "Authors",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Kremer K, Grest GS",
+                          "lineHeight": 1.4,
+                          "fontFamily": "$font",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "fuBVH",
+                          "name": "Venue",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "VFiH5",
+                              "name": "Journal",
+                              "fill": "$muted",
+                              "content": "Journal of Chemical Physics 92, 5057-5086 (1990)",
+                              "fontFamily": "$font",
+                              "fontSize": 13,
+                              "fontWeight": "normal",
+                              "fontStyle": "italic"
+                            },
+                            {
+                              "type": "text",
+                              "id": "QTj39",
+                              "name": "DOI",
+                              "fill": "$accent",
+                              "content": "doi:10.1063/1.458541",
+                              "fontFamily": "$mono",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "r1JXB",
+                      "name": "Ref Structure and dynamics of inte",
+                      "width": "fill_container",
+                      "stroke": "$line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "layout": "vertical",
+                      "gap": 3,
+                      "padding": [
+                        12,
+                        0
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "R4oFUX",
+                          "name": "Title",
+                          "fill": "$ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Structure and dynamics of interphase chromosomes",
+                          "lineHeight": 1.4,
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "NcdjN",
+                          "name": "Authors",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Rosa A, Everaers R",
+                          "lineHeight": 1.4,
+                          "fontFamily": "$font",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "g1I7gw",
+                          "name": "Venue",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "x01uN",
+                              "name": "Journal",
+                              "fill": "$muted",
+                              "content": "PLoS Computational Biology 4, e1000153 (2008)",
+                              "fontFamily": "$font",
+                              "fontSize": 13,
+                              "fontWeight": "normal",
+                              "fontStyle": "italic"
+                            },
+                            {
+                              "type": "text",
+                              "id": "k8IoS",
+                              "name": "DOI",
+                              "fill": "$accent",
+                              "content": "doi:10.1371/journal.pcbi.1000153",
                               "fontFamily": "$mono",
                               "fontSize": 12,
                               "fontWeight": "normal"
@@ -15701,11 +15849,11 @@
       "type": "frame",
       "id": "n6RrWu",
       "x": 0,
-      "y": 4770,
+      "y": 5020,
       "name": "Method page",
       "clip": true,
       "width": 1440,
-      "height": 4988,
+      "height": 5810,
       "fill": "$bg",
       "layout": "vertical",
       "children": [
@@ -16644,37 +16792,43 @@
                     },
                     {
                       "type": "frame",
-                      "id": "j3QLK",
+                      "id": "stWsF",
                       "name": "Formulas",
                       "width": "fill_container",
                       "fill": "$panel",
                       "cornerRadius": 8,
                       "layout": "vertical",
-                      "gap": 6,
+                      "gap": 14,
                       "padding": [
-                        12,
-                        16
+                        16,
+                        20
                       ],
                       "children": [
                         {
-                          "type": "text",
-                          "id": "R9ZPw",
-                          "name": "F1",
-                          "fill": "$ink",
-                          "content": "b(s) = max(1, (s / 1 kb) ^ nu)",
-                          "fontFamily": "$mono",
-                          "fontSize": 13,
-                          "fontWeight": "normal"
+                          "type": "frame",
+                          "id": "L0uVd",
+                          "name": "Eq background",
+                          "width": 296,
+                          "height": 30,
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "images/eq/background.png",
+                            "mode": "stretch"
+                          }
                         },
                         {
-                          "type": "text",
-                          "id": "jJRD0",
-                          "name": "F2",
-                          "fill": "$ink",
-                          "content": "d(s, q) = 1 + (b(s) - 1) / (1 + q)",
-                          "fontFamily": "$mono",
-                          "fontSize": 13,
-                          "fontWeight": "normal"
+                          "type": "frame",
+                          "id": "AeCgn",
+                          "name": "Eq loop_target",
+                          "width": 264,
+                          "height": 40,
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "images/eq/loop_target.png",
+                            "mode": "stretch"
+                          }
                         }
                       ]
                     },
@@ -16690,6 +16844,33 @@
                       "fontFamily": "$font",
                       "fontSize": 14,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "I0rsu",
+                      "name": "Contact law",
+                      "width": "fill_container",
+                      "fill": "$panel",
+                      "cornerRadius": 8,
+                      "padding": [
+                        10,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "gHtVd",
+                          "name": "Eq contact_prob",
+                          "width": 106,
+                          "height": 30,
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "images/eq/contact_prob.png",
+                            "mode": "stretch"
+                          }
+                        }
+                      ]
                     },
                     {
                       "type": "frame",
@@ -16779,11 +16960,38 @@
                       "fill": "#3F3E3B",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "All anchors of a chromosome are placed in one fit. The start is a Hilbert curve [4] scaled to b(s), as in MultiMM [5]. L-BFGS-B [6, 7] then minimises the sum of the terms below. Ten annealing runs from perturbed starts end within one percent of the same energy, and L-BFGS-B reaches that minimum. The GPU evaluates the energy and its gradient, the optimiser runs on the CPU, and the fit stops when the relative improvement per iteration drops below 1e-6.",
+                      "content": "All anchors of a chromosome are placed in one fit. The start is a Hilbert curve [4] scaled to b(s), as in MultiMM [5]. L-BFGS-B [6, 7] then minimises the anchor energy below, with L the anchor pairs joined by a loop, B the pairs held at the background and R all other pairs. A loop spring uses k_s when the pair is further apart than its target t and k_q otherwise. Ten annealing runs from perturbed starts end within one percent of the same energy, and L-BFGS-B reaches that minimum. The GPU evaluates the energy and its gradient, the optimiser runs on the CPU, and the fit stops when the relative improvement per iteration drops below 1e-6.",
                       "lineHeight": 1.6,
                       "fontFamily": "$font",
                       "fontSize": 14,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Vxzfv",
+                      "name": "Anchor energy",
+                      "width": "fill_container",
+                      "fill": "$panel",
+                      "cornerRadius": 8,
+                      "padding": [
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "wMq0P",
+                          "name": "Eq anchor_energy",
+                          "width": 453,
+                          "height": 116,
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "images/eq/anchor_energy.png",
+                            "mode": "stretch"
+                          }
+                        }
+                      ]
                     },
                     {
                       "type": "frame",
@@ -16849,7 +17057,7 @@
                                   "fill": "$muted",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "Energy",
+                                  "content": "Energy of one pair",
                                   "lineHeight": 1.4,
                                   "fontFamily": "$font",
                                   "fontSize": 11,
@@ -16949,16 +17157,17 @@
                               "layout": "vertical",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "BFM6o",
-                                  "name": "T",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "k ((d - t) / t)², k is k_stretch for d > t and k_squeeze otherwise",
-                                  "lineHeight": 1.4,
-                                  "fontFamily": "$mono",
-                                  "fontSize": 12
+                                  "type": "frame",
+                                  "id": "AB2rq",
+                                  "name": "Eq t_loop_simple",
+                                  "width": 77,
+                                  "height": 35,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "images/eq/t_loop_simple.png",
+                                    "mode": "stretch"
+                                  }
                                 }
                               ]
                             },
@@ -17052,16 +17261,17 @@
                               "layout": "vertical",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "P1K2H5",
-                                  "name": "T",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "w_b ((d - b) / min(d, b))²",
-                                  "lineHeight": 1.4,
-                                  "fontFamily": "$mono",
-                                  "fontSize": 12
+                                  "type": "frame",
+                                  "id": "aWvbo",
+                                  "name": "Eq t_background",
+                                  "width": 107,
+                                  "height": 37,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "images/eq/t_background.png",
+                                    "mode": "stretch"
+                                  }
                                 }
                               ]
                             },
@@ -17155,16 +17365,17 @@
                               "layout": "vertical",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "F1uv2",
-                                  "name": "T",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "max(0, 1/d - 1/r_c)",
-                                  "lineHeight": 1.4,
-                                  "fontFamily": "$mono",
-                                  "fontSize": 12
+                                  "type": "frame",
+                                  "id": "ul2W0",
+                                  "name": "Eq t_repulsion",
+                                  "width": 119,
+                                  "height": 29,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "images/eq/t_repulsion.png",
+                                    "mode": "stretch"
+                                  }
                                 }
                               ]
                             },
@@ -17203,7 +17414,7 @@
                                   "fill": "$muted",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "[1], truncated in this work",
+                                  "content": "[1, 5]",
                                   "lineHeight": 1.4,
                                   "fontFamily": "$font",
                                   "fontSize": 13
@@ -17255,16 +17466,17 @@
                               "layout": "vertical",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "F0ckys",
-                                  "name": "T",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "w_ev ((r_0 - d) / r_0)² for d < r_0",
-                                  "lineHeight": 1.4,
-                                  "fontFamily": "$mono",
-                                  "fontSize": 12
+                                  "type": "frame",
+                                  "id": "x4NzwU",
+                                  "name": "Eq t_ev",
+                                  "width": 153,
+                                  "height": 33,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "images/eq/t_ev.png",
+                                    "mode": "stretch"
+                                  }
                                 }
                               ]
                             },
@@ -17303,7 +17515,7 @@
                                   "fill": "$muted",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "this work",
+                                  "content": "[5, 14]",
                                   "lineHeight": 1.4,
                                   "fontFamily": "$font",
                                   "fontSize": 13
@@ -17341,11 +17553,53 @@
                       "fill": "#3F3E3B",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "The beads between two anchors start on a compact random coil at the bond targets, and the anchors stay where the anchor phase put them. Simulated annealing [8] moves one bead at a time. A move that lowers the energy is accepted. A move that raises it is accepted with probability exp(-c E_new / (E_old T)), and the temperature T falls by a constant factor each step [1, 9]. A wall rejects any move that brings two beads closer than the excluded volume radius.",
+                      "content": "The beads between two anchors start on a compact random coil at the bond targets, and the anchors stay where the anchor phase put them. Simulated annealing [8] moves one bead at a time and scores the chain energy below, with C the anchor pairs joined by a CTCF loop and o the direction of the CTCF motif at an anchor. A move that lowers the energy is accepted, and a move that raises it is accepted with the probability below, where E' is the energy after the move. The temperature T falls by a constant factor each step [1, 9]. A wall rejects any move that brings two beads closer than the excluded volume radius.",
                       "lineHeight": 1.6,
                       "fontFamily": "$font",
                       "fontSize": 14,
                       "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "T1LGa",
+                      "name": "Chain energy",
+                      "width": "fill_container",
+                      "fill": "$panel",
+                      "cornerRadius": 8,
+                      "layout": "vertical",
+                      "gap": 14,
+                      "padding": [
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "v4VnHC",
+                          "name": "Eq chain_energy",
+                          "width": 570,
+                          "height": 112,
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "images/eq/chain_energy.png",
+                            "mode": "stretch"
+                          }
+                        },
+                        {
+                          "type": "frame",
+                          "id": "uIiVh",
+                          "name": "Eq acceptance_plain",
+                          "width": 374,
+                          "height": 32,
+                          "fill": {
+                            "type": "image",
+                            "enabled": true,
+                            "url": "images/eq/acceptance_plain.png",
+                            "mode": "stretch"
+                          }
+                        }
+                      ]
                     },
                     {
                       "type": "frame",
@@ -17411,7 +17665,7 @@
                                   "fill": "$muted",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "Energy",
+                                  "content": "Energy of one pair",
                                   "lineHeight": 1.4,
                                   "fontFamily": "$font",
                                   "fontSize": 11,
@@ -17511,16 +17765,17 @@
                               "layout": "vertical",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "WS1pi",
-                                  "name": "T",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "w_d k ((d - t) / t)²",
-                                  "lineHeight": 1.4,
-                                  "fontFamily": "$mono",
-                                  "fontSize": 12
+                                  "type": "frame",
+                                  "id": "nmRjN",
+                                  "name": "Eq t_bond",
+                                  "width": 108,
+                                  "height": 34,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "images/eq/t_bond.png",
+                                    "mode": "stretch"
+                                  }
                                 }
                               ]
                             },
@@ -17614,16 +17869,17 @@
                               "layout": "vertical",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "v894Lx",
-                                  "name": "T",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "w_a ((1 - cos θ) / 2)³",
-                                  "lineHeight": 1.4,
-                                  "fontFamily": "$mono",
-                                  "fontSize": 12
+                                  "type": "frame",
+                                  "id": "IJVKD",
+                                  "name": "Eq t_bending",
+                                  "width": 95,
+                                  "height": 31,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "images/eq/t_bending.png",
+                                    "mode": "stretch"
+                                  }
                                 }
                               ]
                             },
@@ -17717,16 +17973,17 @@
                               "layout": "vertical",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "PwSdr",
-                                  "name": "T",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "w_m ((1 + o_i · o_j) / 2)²",
-                                  "lineHeight": 1.4,
-                                  "fontFamily": "$mono",
-                                  "fontSize": 12
+                                  "type": "frame",
+                                  "id": "eRkcr",
+                                  "name": "Eq t_orientation",
+                                  "width": 99,
+                                  "height": 32,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "images/eq/t_orientation.png",
+                                    "mode": "stretch"
+                                  }
                                 }
                               ]
                             },
@@ -17820,16 +18077,17 @@
                               "layout": "vertical",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "h3CVAl",
-                                  "name": "T",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "w_ev ((r_0 - d) / r_0)² for d < r_0",
-                                  "lineHeight": 1.4,
-                                  "fontFamily": "$mono",
-                                  "fontSize": 12
+                                  "type": "frame",
+                                  "id": "xUNr1",
+                                  "name": "Eq t_ev",
+                                  "width": 153,
+                                  "height": 33,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "images/eq/t_ev.png",
+                                    "mode": "stretch"
+                                  }
                                 }
                               ]
                             },
@@ -17868,7 +18126,7 @@
                                   "fill": "$muted",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "this work",
+                                  "content": "[5, 14]",
                                   "lineHeight": 1.4,
                                   "fontFamily": "$font",
                                   "fontSize": 13
@@ -17920,16 +18178,17 @@
                               "layout": "vertical",
                               "children": [
                                 {
-                                  "type": "text",
-                                  "id": "SHeW2",
-                                  "name": "T",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "w_c ((r - R) / R)² for r > R",
-                                  "lineHeight": 1.4,
-                                  "fontFamily": "$mono",
-                                  "fontSize": 12
+                                  "type": "frame",
+                                  "id": "cfALm",
+                                  "name": "Eq t_confinement",
+                                  "width": 135,
+                                  "height": 31,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "images/eq/t_confinement.png",
+                                    "mode": "stretch"
+                                  }
                                 }
                               ]
                             },
@@ -17968,7 +18227,7 @@
                                   "fill": "$muted",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "this work",
+                                  "content": "[5, 15]",
                                   "lineHeight": 1.4,
                                   "fontFamily": "$font",
                                   "fontSize": 13
@@ -18291,7 +18550,7 @@
                       "fill": "#3F3E3B",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "The chain tasks of many blocks run in one JAX [11] launch on the GPU. Each chain has its own random stream, and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues, figure 3b. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. Excluded volume uses a grid of cells rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU, and the output does not depend on the number of GPUs.",
+                      "content": "The chain tasks of many blocks run together in JAX [11] launches on the GPU, figure 3b. Each block is padded to the next size on a fixed ladder, and blocks with the same energy terms are packed into as few launches as GPU memory allows. Each chain has its own random stream, and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. Excluded volume uses a grid of cells rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU, and the output does not depend on the number of GPUs.",
                       "lineHeight": 1.6,
                       "fontFamily": "$font",
                       "fontSize": 14,
@@ -18863,32 +19122,32 @@
                         },
                         {
                           "type": "frame",
-                          "id": "cIcPt",
+                          "id": "J9NIBw",
                           "name": "Panel f",
                           "width": 766,
-                          "height": 200,
+                          "height": 280,
                           "layout": "none",
                           "children": [
                             {
                               "type": "text",
-                              "id": "GS4ur",
+                              "id": "RlPTC",
                               "x": 0,
                               "y": 0,
-                              "name": "Title L",
+                              "name": "H1",
                               "fill": "$ink",
-                              "content": "One GPU launch, 8 chains",
+                              "content": "Blocks as the graph adds them",
                               "fontFamily": "$font",
                               "fontSize": 11,
                               "fontWeight": "600"
                             },
                             {
                               "type": "text",
-                              "id": "wollY",
+                              "id": "G513M",
                               "x": 0,
-                              "y": 24,
-                              "name": "Row label",
+                              "y": 25,
+                              "name": "N",
                               "fill": "$muted",
-                              "content": "chain 1",
+                              "content": "380",
                               "fontFamily": "$font",
                               "fontSize": 10,
                               "fontWeight": "normal"
@@ -18896,32 +19155,35 @@
                             {
                               "type": "rectangle",
                               "cornerRadius": 3,
-                              "id": "a4mMe",
-                              "x": 60,
+                              "id": "p75uKX",
+                              "x": 40,
                               "y": 26,
-                              "name": "Active",
-                              "fill": "$accent",
-                              "width": 172.2,
-                              "height": 10
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 0,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
                             },
                             {
                               "type": "rectangle",
-                              "id": "z1Evz",
-                              "x": 232.2,
-                              "y": 30,
-                              "name": "Held",
-                              "fill": "#B9B8B2",
-                              "width": 237.80000000000004,
-                              "height": 2
+                              "cornerRadius": 3,
+                              "id": "I4cavn",
+                              "x": 40,
+                              "y": 26,
+                              "name": "Beads",
+                              "fill": "#8A8984",
+                              "width": 15,
+                              "height": 11
                             },
                             {
                               "type": "text",
-                              "id": "j151v",
+                              "id": "noMyW",
                               "x": 0,
                               "y": 42,
-                              "name": "Row label",
+                              "name": "N",
                               "fill": "$muted",
-                              "content": "chain 2",
+                              "content": "2900",
                               "fontFamily": "$font",
                               "fontSize": 10,
                               "fontWeight": "normal"
@@ -18929,65 +19191,71 @@
                             {
                               "type": "rectangle",
                               "cornerRadius": 3,
-                              "id": "t53fE",
-                              "x": 60,
-                              "y": 44,
-                              "name": "Active",
-                              "fill": "$accent",
-                              "width": 225.50000000000003,
-                              "height": 10
+                              "id": "vL3mU",
+                              "x": 40,
+                              "y": 43,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 0,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
                             },
                             {
                               "type": "rectangle",
-                              "id": "G54m3",
-                              "x": 285.5,
-                              "y": 48,
-                              "name": "Held",
-                              "fill": "#B9B8B2",
-                              "width": 184.49999999999997,
-                              "height": 2
+                              "cornerRadius": 3,
+                              "id": "TJDGX",
+                              "x": 40,
+                              "y": 43,
+                              "name": "Beads",
+                              "fill": "#8A8984",
+                              "width": 113,
+                              "height": 11
                             },
                             {
                               "type": "text",
-                              "id": "NN1HD",
+                              "id": "mbNHR",
                               "x": 0,
+                              "y": 59,
+                              "name": "N",
+                              "fill": "$muted",
+                              "content": "700",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "ZgntP",
+                              "x": 40,
                               "y": 60,
-                              "name": "Row label",
-                              "fill": "$muted",
-                              "content": "chain 3",
-                              "fontFamily": "$font",
-                              "fontSize": 10,
-                              "fontWeight": "normal"
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 0,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
                             },
                             {
                               "type": "rectangle",
                               "cornerRadius": 3,
-                              "id": "v3L6z0",
-                              "x": 60,
-                              "y": 62,
-                              "name": "Active",
-                              "fill": "$accent",
-                              "width": 250.1,
-                              "height": 10
-                            },
-                            {
-                              "type": "rectangle",
-                              "id": "tgPnL",
-                              "x": 310.1,
-                              "y": 66,
-                              "name": "Held",
-                              "fill": "#B9B8B2",
-                              "width": 159.9,
-                              "height": 2
+                              "id": "REAkb",
+                              "x": 40,
+                              "y": 60,
+                              "name": "Beads",
+                              "fill": "#8A8984",
+                              "width": 27,
+                              "height": 11
                             },
                             {
                               "type": "text",
-                              "id": "m69449",
+                              "id": "H9qZJ",
                               "x": 0,
-                              "y": 78,
-                              "name": "Row label",
+                              "y": 76,
+                              "name": "N",
                               "fill": "$muted",
-                              "content": "chain 4",
+                              "content": "1500",
                               "fontFamily": "$font",
                               "fontSize": 10,
                               "fontWeight": "normal"
@@ -18995,32 +19263,35 @@
                             {
                               "type": "rectangle",
                               "cornerRadius": 3,
-                              "id": "psbWi",
-                              "x": 60,
-                              "y": 80,
-                              "name": "Active",
-                              "fill": "$accent",
-                              "width": 287,
-                              "height": 10
+                              "id": "D0Buz",
+                              "x": 40,
+                              "y": 77,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 0,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
                             },
                             {
                               "type": "rectangle",
-                              "id": "Eizg0",
-                              "x": 347,
-                              "y": 84,
-                              "name": "Held",
-                              "fill": "#B9B8B2",
-                              "width": 123.00000000000001,
-                              "height": 2
+                              "cornerRadius": 3,
+                              "id": "X2NTSm",
+                              "x": 40,
+                              "y": 77,
+                              "name": "Beads",
+                              "fill": "#8A8984",
+                              "width": 59,
+                              "height": 11
                             },
                             {
                               "type": "text",
-                              "id": "kyLBW",
+                              "id": "VMHgK",
                               "x": 0,
-                              "y": 96,
-                              "name": "Row label",
+                              "y": 93,
+                              "name": "N",
                               "fill": "$muted",
-                              "content": "chain 5",
+                              "content": "450",
                               "fontFamily": "$font",
                               "fontSize": 10,
                               "fontWeight": "normal"
@@ -19028,32 +19299,35 @@
                             {
                               "type": "rectangle",
                               "cornerRadius": 3,
-                              "id": "WRMVp",
-                              "x": 60,
-                              "y": 98,
-                              "name": "Active",
-                              "fill": "$accent",
-                              "width": 319.8,
-                              "height": 10
+                              "id": "AlW7o",
+                              "x": 40,
+                              "y": 94,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 0,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
                             },
                             {
                               "type": "rectangle",
-                              "id": "hEhDE",
-                              "x": 379.8,
-                              "y": 102,
-                              "name": "Held",
-                              "fill": "#B9B8B2",
-                              "width": 90.19999999999999,
-                              "height": 2
+                              "cornerRadius": 3,
+                              "id": "mmLDn",
+                              "x": 40,
+                              "y": 94,
+                              "name": "Beads",
+                              "fill": "#8A8984",
+                              "width": 18,
+                              "height": 11
                             },
                             {
                               "type": "text",
-                              "id": "wzfb7",
+                              "id": "oVOiC",
                               "x": 0,
-                              "y": 114,
-                              "name": "Row label",
+                              "y": 110,
+                              "name": "N",
                               "fill": "$muted",
-                              "content": "chain 6",
+                              "content": "3600",
                               "fontFamily": "$font",
                               "fontSize": 10,
                               "fontWeight": "normal"
@@ -19061,32 +19335,35 @@
                             {
                               "type": "rectangle",
                               "cornerRadius": 3,
-                              "id": "eLrow",
-                              "x": 60,
-                              "y": 116,
-                              "name": "Active",
-                              "fill": "$accent",
-                              "width": 352.6,
-                              "height": 10
+                              "id": "NJNGH",
+                              "x": 40,
+                              "y": 111,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 0,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
                             },
                             {
                               "type": "rectangle",
-                              "id": "f36SFb",
-                              "x": 412.6,
-                              "y": 120,
-                              "name": "Held",
-                              "fill": "#B9B8B2",
-                              "width": 57.400000000000006,
-                              "height": 2
+                              "cornerRadius": 3,
+                              "id": "B0KJ2G",
+                              "x": 40,
+                              "y": 111,
+                              "name": "Beads",
+                              "fill": "#8A8984",
+                              "width": 141,
+                              "height": 11
                             },
                             {
                               "type": "text",
-                              "id": "zpKmX",
+                              "id": "rwEf6",
                               "x": 0,
-                              "y": 132,
-                              "name": "Row label",
+                              "y": 127,
+                              "name": "N",
                               "fill": "$muted",
-                              "content": "chain 7",
+                              "content": "900",
                               "fontFamily": "$font",
                               "fontSize": 10,
                               "fontWeight": "normal"
@@ -19094,32 +19371,35 @@
                             {
                               "type": "rectangle",
                               "cornerRadius": 3,
-                              "id": "puYMj",
-                              "x": 60,
-                              "y": 134,
-                              "name": "Active",
-                              "fill": "$accent",
-                              "width": 381.3,
-                              "height": 10
+                              "id": "krN94",
+                              "x": 40,
+                              "y": 128,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 0,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
                             },
                             {
                               "type": "rectangle",
-                              "id": "E9Ki3",
-                              "x": 441.3,
-                              "y": 138,
-                              "name": "Held",
-                              "fill": "#B9B8B2",
-                              "width": 28.69999999999998,
-                              "height": 2
+                              "cornerRadius": 3,
+                              "id": "Bs8ME",
+                              "x": 40,
+                              "y": 128,
+                              "name": "Beads",
+                              "fill": "#8A8984",
+                              "width": 35,
+                              "height": 11
                             },
                             {
                               "type": "text",
-                              "id": "BpfGt",
+                              "id": "uI2Qy",
                               "x": 0,
-                              "y": 150,
-                              "name": "Row label",
+                              "y": 144,
+                              "name": "N",
                               "fill": "$muted",
-                              "content": "chain 8",
+                              "content": "1900",
                               "fontFamily": "$font",
                               "fontSize": 10,
                               "fontWeight": "normal"
@@ -19127,547 +19407,746 @@
                             {
                               "type": "rectangle",
                               "cornerRadius": 3,
-                              "id": "gqgny",
-                              "x": 60,
-                              "y": 152,
-                              "name": "Active",
-                              "fill": "$accent",
-                              "width": 410,
-                              "height": 10
+                              "id": "hqNc4",
+                              "x": 40,
+                              "y": 145,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 0,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
                             },
                             {
                               "type": "rectangle",
-                              "id": "Irmmm",
-                              "x": 60,
-                              "y": 172,
-                              "name": "Axis",
-                              "fill": "$faint",
-                              "width": 410,
-                              "height": 1
+                              "cornerRadius": 3,
+                              "id": "vytIo",
+                              "x": 40,
+                              "y": 145,
+                              "name": "Beads",
+                              "fill": "#8A8984",
+                              "width": 74,
+                              "height": 11
                             },
                             {
                               "type": "text",
-                              "id": "KmihK",
-                              "x": 60,
-                              "y": 178,
-                              "name": "Axis label",
+                              "id": "HPEQn",
+                              "x": 0,
+                              "y": 161,
+                              "name": "N",
                               "fill": "$muted",
-                              "content": "annealing rounds",
+                              "content": "300",
                               "fontFamily": "$font",
                               "fontSize": 10,
                               "fontWeight": "normal"
                             },
                             {
-                              "type": "text",
-                              "id": "C2dY3Q",
-                              "x": 418,
-                              "y": 178,
-                              "name": "End label",
-                              "fill": "$muted",
-                              "content": "launch ends",
-                              "fontFamily": "$font",
-                              "fontSize": 10,
-                              "fontWeight": "normal"
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "QEs4X",
+                              "x": 40,
+                              "y": 162,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 0,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "SVcb9",
+                              "x": 40,
+                              "y": 162,
+                              "name": "Beads",
+                              "fill": "#8A8984",
+                              "width": 12,
+                              "height": 11
                             },
                             {
                               "type": "text",
-                              "id": "gnDdx",
-                              "x": 530,
+                              "id": "dTlIx",
+                              "x": 250,
                               "y": 0,
-                              "name": "Title R",
+                              "name": "H2",
                               "fill": "$ink",
-                              "content": "One step, 32 proposals",
+                              "content": "Sorted, each padded to the ladder",
+                              "fontFamily": "$font",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "W8skf",
+                              "x": 250,
+                              "y": 25,
+                              "name": "Bucket",
+                              "fill": "$muted",
+                              "content": "4096",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "phgwF",
+                              "x": 290,
+                              "y": 26,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 160,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "fo0Pb",
+                              "x": 290,
+                              "y": 26,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 141,
+                              "height": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "rZJ2P",
+                              "x": 250,
+                              "y": 42,
+                              "name": "Bucket",
+                              "fill": "$muted",
+                              "content": "4096",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "bSajy",
+                              "x": 290,
+                              "y": 43,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 160,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "ADrDj",
+                              "x": 290,
+                              "y": 43,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 113,
+                              "height": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "NhKZ6",
+                              "x": 250,
+                              "y": 59,
+                              "name": "Bucket",
+                              "fill": "$muted",
+                              "content": "2048",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "KDWEV",
+                              "x": 290,
+                              "y": 60,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 80,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "F7WgK",
+                              "x": 290,
+                              "y": 60,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 74,
+                              "height": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "bXYSa",
+                              "x": 250,
+                              "y": 76,
+                              "name": "Bucket",
+                              "fill": "$muted",
+                              "content": "2048",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "s3RgdT",
+                              "x": 290,
+                              "y": 77,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 80,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "TqExb",
+                              "x": 290,
+                              "y": 77,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 59,
+                              "height": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "NI8s9",
+                              "x": 250,
+                              "y": 93,
+                              "name": "Bucket",
+                              "fill": "$muted",
+                              "content": "1024",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "XpoYm",
+                              "x": 290,
+                              "y": 94,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 40,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "uKTnM",
+                              "x": 290,
+                              "y": 94,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 35,
+                              "height": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "SimnM",
+                              "x": 250,
+                              "y": 110,
+                              "name": "Bucket",
+                              "fill": "$muted",
+                              "content": "1024",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "GIdG8",
+                              "x": 290,
+                              "y": 111,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 40,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "EymJf",
+                              "x": 290,
+                              "y": 111,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 27,
+                              "height": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "ihMKO",
+                              "x": 250,
+                              "y": 127,
+                              "name": "Bucket",
+                              "fill": "$muted",
+                              "content": "512",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "lcuRk",
+                              "x": 290,
+                              "y": 128,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 20,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "yXuxJ",
+                              "x": 290,
+                              "y": 128,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 18,
+                              "height": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "SENWZ",
+                              "x": 250,
+                              "y": 144,
+                              "name": "Bucket",
+                              "fill": "$muted",
+                              "content": "512",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "lwydp",
+                              "x": 290,
+                              "y": 145,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 20,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "oq3wa",
+                              "x": 290,
+                              "y": 145,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 15,
+                              "height": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "efHjP",
+                              "x": 250,
+                              "y": 161,
+                              "name": "Bucket",
+                              "fill": "$muted",
+                              "content": "512",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "i1NT4M",
+                              "x": 290,
+                              "y": 162,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 20,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "x5LnnR",
+                              "x": 290,
+                              "y": 162,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 12,
+                              "height": 11
+                            },
+                            {
+                              "type": "text",
+                              "id": "SyBjA",
+                              "x": 520,
+                              "y": 0,
+                              "name": "H3",
+                              "fill": "$ink",
+                              "content": "Packed into launches",
                               "fontFamily": "$font",
                               "fontSize": 11,
                               "fontWeight": "600"
                             },
                             {
                               "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "UKIJ5",
-                              "x": 530,
-                              "y": 26,
-                              "name": "Proposal 1",
-                              "fill": "#D9D8D3",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "kHNwO",
-                              "x": 556,
-                              "y": 26,
-                              "name": "Proposal 2",
-                              "fill": "#D9D8D3",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "HQuGp",
-                              "x": 582,
-                              "y": 26,
-                              "name": "Proposal 3",
-                              "fill": "#D9D8D3",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "k16T7",
-                              "x": 608,
-                              "y": 26,
-                              "name": "Proposal 4",
-                              "fill": "#D9D8D3",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "qO9oD",
-                              "x": 634,
-                              "y": 26,
-                              "name": "Proposal 5",
-                              "fill": "#D9D8D3",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "dhygQ",
-                              "x": 660,
-                              "y": 26,
-                              "name": "Proposal 6",
-                              "fill": "#D9D8D3",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "mmLgG",
-                              "x": 686,
-                              "y": 26,
-                              "name": "Proposal 7",
-                              "fill": "#D9D8D3",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "fmWPQ",
-                              "x": 712,
-                              "y": 26,
-                              "name": "Proposal 8",
-                              "fill": "#D9D8D3",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "JkFJ3",
-                              "x": 530,
-                              "y": 52,
-                              "name": "Proposal 9",
-                              "fill": "#D9D8D3",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "y2OjRg",
-                              "x": 556,
-                              "y": 52,
-                              "name": "Proposal 10",
-                              "fill": "#D9D8D3",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "aOY6o",
-                              "x": 582,
-                              "y": 52,
-                              "name": "Proposal 11",
-                              "fill": "#D9D8D3",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "DDPje",
-                              "x": 608,
-                              "y": 52,
-                              "name": "Proposal 12",
-                              "fill": "$accent",
-                              "width": 20,
-                              "height": 20,
+                              "cornerRadius": 8,
+                              "id": "aOvkA",
+                              "x": 520,
+                              "y": 20,
+                              "name": "Launch 1",
+                              "fill": "#FFFFFF00",
+                              "width": 246,
+                              "height": 90,
                               "stroke": "$accent",
-                              "strokeWidth": 1
+                              "strokeWidth": 1.2
                             },
                             {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "wyEAX",
-                              "x": 634,
-                              "y": 52,
-                              "name": "Proposal 13",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "YxVsX",
-                              "x": 660,
-                              "y": 52,
-                              "name": "Proposal 14",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "CIgA9",
-                              "x": 686,
-                              "y": 52,
-                              "name": "Proposal 15",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "KPTuK",
-                              "x": 712,
-                              "y": 52,
-                              "name": "Proposal 16",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "thhCG",
+                              "type": "text",
+                              "id": "B7LPbP",
                               "x": 530,
-                              "y": 78,
-                              "name": "Proposal 17",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
+                              "y": 24,
+                              "name": "L",
+                              "fill": "$accent",
+                              "content": "launch 1, padded to 4096",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "600"
                             },
                             {
                               "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "bWoum",
-                              "x": 556,
-                              "y": 78,
-                              "name": "Proposal 18",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "eljOm",
-                              "x": 582,
-                              "y": 78,
-                              "name": "Proposal 19",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "yUfSq",
-                              "x": 608,
-                              "y": 78,
-                              "name": "Proposal 20",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "SJ5FP",
-                              "x": 634,
-                              "y": 78,
-                              "name": "Proposal 21",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "ZHrSF",
-                              "x": 660,
-                              "y": 78,
-                              "name": "Proposal 22",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "i8MnIj",
-                              "x": 686,
-                              "y": 78,
-                              "name": "Proposal 23",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "jY5N0",
-                              "x": 712,
-                              "y": 78,
-                              "name": "Proposal 24",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "jzJaR",
+                              "cornerRadius": 3,
+                              "id": "JTFSw",
                               "x": 530,
-                              "y": 104,
-                              "name": "Proposal 25",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "XuwYH",
-                              "x": 556,
-                              "y": 104,
-                              "name": "Proposal 26",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "duLxu",
-                              "x": 582,
-                              "y": 104,
-                              "name": "Proposal 27",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "y7QKjp",
-                              "x": 608,
-                              "y": 104,
-                              "name": "Proposal 28",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "H272V",
-                              "x": 634,
-                              "y": 104,
-                              "name": "Proposal 29",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "p6BRc9",
-                              "x": 660,
-                              "y": 104,
-                              "name": "Proposal 30",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "h1ryz",
-                              "x": 686,
-                              "y": 104,
-                              "name": "Proposal 31",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
-                            },
-                            {
-                              "type": "rectangle",
-                              "cornerRadius": 4,
-                              "id": "edrPD",
-                              "x": 712,
-                              "y": 104,
-                              "name": "Proposal 32",
-                              "fill": "$surface",
-                              "width": 20,
-                              "height": 20,
-                              "stroke": "#B9B8B2",
+                              "y": 40,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 160,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
                               "strokeWidth": 1
                             },
                             {
                               "type": "rectangle",
                               "cornerRadius": 3,
-                              "id": "yxNAd",
+                              "id": "sH5qt",
+                              "x": 530,
+                              "y": 40,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 141,
+                              "height": 11
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "g2tVAs",
+                              "x": 530,
+                              "y": 57,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 160,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "Iv2FI",
+                              "x": 530,
+                              "y": 57,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 113,
+                              "height": 11
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "S61mZ",
+                              "x": 530,
+                              "y": 74,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 160,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "p7Hrn",
+                              "x": 530,
+                              "y": 74,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 74,
+                              "height": 11
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "TFETL",
+                              "x": 530,
+                              "y": 91,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 160,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "AC6SK",
+                              "x": 530,
+                              "y": 91,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 59,
+                              "height": 11
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 8,
+                              "id": "mAmyT",
+                              "x": 520,
+                              "y": 118,
+                              "name": "Launch 2",
+                              "fill": "#FFFFFF00",
+                              "width": 246,
+                              "height": 107,
+                              "stroke": "$accent",
+                              "strokeWidth": 1.2
+                            },
+                            {
+                              "type": "text",
+                              "id": "InYnd",
+                              "x": 530,
+                              "y": 122,
+                              "name": "L",
+                              "fill": "$accent",
+                              "content": "launch 2, padded to 1024",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "JQ7lt",
                               "x": 530,
                               "y": 138,
-                              "name": "Key rejected",
-                              "fill": "#D9D8D3",
-                              "width": 12,
-                              "height": 12,
-                              "stroke": "#B9B8B2",
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 40,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
                               "strokeWidth": 1
-                            },
-                            {
-                              "type": "text",
-                              "id": "VXlQu",
-                              "x": 548,
-                              "y": 137,
-                              "name": "Key label",
-                              "fill": "$muted",
-                              "content": "rejected",
-                              "fontFamily": "$font",
-                              "fontSize": 10,
-                              "fontWeight": "normal"
                             },
                             {
                               "type": "rectangle",
                               "cornerRadius": 3,
-                              "id": "VyNvl",
+                              "id": "s5hM2",
                               "x": 530,
-                              "y": 156,
-                              "name": "Key first accepted, applied",
+                              "y": 138,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 35,
+                              "height": 11
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "TfU4F",
+                              "x": 530,
+                              "y": 155,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 40,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "Q2u4iP",
+                              "x": 530,
+                              "y": 155,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 27,
+                              "height": 11
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "p8a4p",
+                              "x": 530,
+                              "y": 172,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 40,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "V2QyQ0",
+                              "x": 530,
+                              "y": 172,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 18,
+                              "height": 11
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "NL2z1",
+                              "x": 530,
+                              "y": 189,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 40,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "gBxBw",
+                              "x": 530,
+                              "y": 189,
+                              "name": "Beads",
+                              "fill": "$accent",
+                              "width": 15,
+                              "height": 11
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "vmfsq",
+                              "x": 530,
+                              "y": 206,
+                              "name": "Pad",
+                              "fill": "#E6EEF9",
+                              "width": 40,
+                              "height": 11,
+                              "stroke": "#B8CDEA",
+                              "strokeWidth": 1
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 3,
+                              "id": "kFfQY",
+                              "x": 530,
+                              "y": 206,
+                              "name": "Beads",
                               "fill": "$accent",
                               "width": 12,
-                              "height": 12,
-                              "stroke": "#B9B8B2",
-                              "strokeWidth": 1
+                              "height": 11
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 2,
+                              "id": "UUy3D",
+                              "x": 0,
+                              "y": 262,
+                              "name": "Key",
+                              "fill": "#8A8984",
+                              "width": 12,
+                              "height": 10,
+                              "stroke": "#B8CDEA"
                             },
                             {
                               "type": "text",
-                              "id": "vZHws",
-                              "x": 548,
-                              "y": 155,
+                              "id": "HstgO",
+                              "x": 18,
+                              "y": 260,
                               "name": "Key label",
                               "fill": "$muted",
-                              "content": "first accepted, applied",
+                              "content": "beads of a block",
                               "fontFamily": "$font",
                               "fontSize": 10,
                               "fontWeight": "normal"
                             },
                             {
                               "type": "rectangle",
-                              "cornerRadius": 3,
-                              "id": "T6e44q",
-                              "x": 530,
-                              "y": 174,
-                              "name": "Key drawn again next step",
-                              "fill": "$surface",
+                              "cornerRadius": 2,
+                              "id": "Hqq68",
+                              "x": 170,
+                              "y": 262,
+                              "name": "Key",
+                              "fill": "$accent",
                               "width": 12,
-                              "height": 12,
-                              "stroke": "#B9B8B2",
+                              "height": 10,
+                              "stroke": "#B8CDEA"
+                            },
+                            {
+                              "type": "text",
+                              "id": "N29pqS",
+                              "x": 188,
+                              "y": 260,
+                              "name": "Key label",
+                              "fill": "$muted",
+                              "content": "beads in a launch",
+                              "fontFamily": "$font",
+                              "fontSize": 10,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 2,
+                              "id": "s7Puhk",
+                              "x": 340,
+                              "y": 262,
+                              "name": "Key",
+                              "fill": "#E6EEF9",
+                              "width": 12,
+                              "height": 10,
+                              "stroke": "#B8CDEA",
                               "strokeWidth": 1
                             },
                             {
                               "type": "text",
-                              "id": "V2NBEI",
-                              "x": 548,
-                              "y": 173,
+                              "id": "sXRGM",
+                              "x": 358,
+                              "y": 260,
                               "name": "Key label",
                               "fill": "$muted",
-                              "content": "drawn again next step",
+                              "content": "padding",
                               "fontFamily": "$font",
                               "fontSize": 10,
                               "fontWeight": "normal"
@@ -19698,7 +20177,7 @@
                               "fill": "$muted",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "content": "Left, one GPU launch of eight chains. Right, one annealing step with 32 proposals.",
+                              "content": "Bucketing and batching of chain tasks. Each block is padded up to the next size on a fixed ladder, which limits how many shapes the GPU compiles. Blocks with the same energy terms are sorted largest first and packed into as few launches as GPU memory allows, and a launch pads its members to the size of the first.",
                               "lineHeight": 1.4,
                               "fontFamily": "$font",
                               "fontSize": 12,
@@ -20507,6 +20986,74 @@
                           "fontWeight": "normal"
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "TKsBk",
+                      "name": "Ref 14",
+                      "width": "fill_container",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "LEStX",
+                          "name": "N",
+                          "fill": "$faint",
+                          "textGrowth": "fixed-width",
+                          "width": 34,
+                          "content": "[14]",
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "u1W1ki",
+                          "name": "T",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Kremer K, Grest GS. Dynamics of entangled linear polymer melts: a molecular-dynamics simulation. Journal of Chemical Physics 92, 5057-5086 (1990). doi:10.1063/1.458541",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "A9tCL",
+                      "name": "Ref 15",
+                      "width": "fill_container",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "c5iWY",
+                          "name": "N",
+                          "fill": "$faint",
+                          "textGrowth": "fixed-width",
+                          "width": 34,
+                          "content": "[15]",
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "fxVU2",
+                          "name": "T",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Rosa A, Everaers R. Structure and dynamics of interphase chromosomes. PLoS Computational Biology 4, e1000153 (2008). doi:10.1371/journal.pcbi.1000153",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -20598,7 +21145,7 @@
       "type": "frame",
       "id": "n7ivTu",
       "x": 1540,
-      "y": 4770,
+      "y": 5020,
       "name": "Help page",
       "clip": true,
       "width": 1440,
@@ -24976,7 +25523,7 @@
       "type": "frame",
       "id": "g7Kqf",
       "x": 3080,
-      "y": 4770,
+      "y": 5020,
       "name": "Results page",
       "clip": true,
       "width": 1440,

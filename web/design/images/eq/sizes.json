@@ -1,0 +1,58 @@
+{
+ "background": [
+  296,
+  30
+ ],
+ "loop_target": [
+  264,
+  40
+ ],
+ "contact_prob": [
+  106,
+  30
+ ],
+ "anchor_energy": [
+  453,
+  116
+ ],
+ "chain_energy": [
+  570,
+  112
+ ],
+ "acceptance_plain": [
+  374,
+  32
+ ],
+ "t_loop_simple": [
+  77,
+  35
+ ],
+ "t_background": [
+  107,
+  37
+ ],
+ "t_repulsion": [
+  119,
+  29
+ ],
+ "t_ev": [
+  153,
+  33
+ ],
+ "t_bond": [
+  108,
+  34
+ ],
+ "t_bending": [
+  95,
+  31
+ ],
+ "t_orientation": [
+  99,
+  32
+ ],
+ "t_confinement": [
+  135,
+  31
+ ]
+}
