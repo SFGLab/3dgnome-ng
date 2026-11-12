@@ -1,8 +1,8 @@
 // The own data dialogs end to end through a running site: a job with own loops of two factors
 // and contacts from a local .hic, a job with an uploaded VCF and its variants table, and a job
-// with contacts by link. Each step screenshots its dialog at 1440 px and prints the job's url.
+// with contacts by link, and your own cell type with listed loops and enhancers. Each step screenshots its dialog at 1440 px and prints the job's url.
 //
-//   SITE=http://127.0.0.1:8796 FILES=dir SHOTS=dir node web/scripts/e2e_own_data.mjs own|vcf|link
+//   SITE=http://127.0.0.1:8796 FILES=dir SHOTS=dir node web/scripts/e2e_own_data.mjs own|vcf|link|owncell
 //
 // FILES holds GM12878_CTCF_loops.bedpe, GM12878_RNAPII_loops.bedpe, ENCFF011KAF.hic and
 // HGSVC.vcf.gz. Needs puppeteer-core and a local Chrome.
@@ -64,6 +64,24 @@ if (which === 'own') {
   await p.screenshot({ path: `${SHOTS}/e2e_variants.png` })
   console.log(await p.$eval('.sv-box.good', (n) => n.textContent))
   await click('.dialog-foot button', 'Apply')
+  await structures(5)
+} else if (which === 'owncell') {
+  // Your own cell type: H1ESC CTCF loops, contacts by link to a 4DN file in its bucket, GM12878 enhancers.
+  await region('TNFRSF8')
+  await click('button[role=radio]', 'Your own data')
+  await click('button[role=tab]', 'Contacts')
+  await p.type('#contact-link', process.env.LINK ?? 'https://4dn-open-data-public.s3.amazonaws.com/fourfront-webprod/wfoutput/a98ca64a-861a-4a8c-92e9-586af457b1fb/4DNFI1UEG1HD.hic')
+  await click('button', 'Read')
+  await p.waitForSelector('.contact-card.good, .contact-card.bad', { timeout: 180000 })
+  console.log(await p.$eval('.contact-card:not(.hint-card)', (n) => n.textContent))
+  await click('button[role=tab]', 'Enhancers')
+  await click('.route', 'Enhancers of a listed')
+  await p.select('.own-select select', 'GM12878')
+  await wait(300)
+  await p.screenshot({ path: `${SHOTS}/e2e_owncell_enhancers.png` })
+  await click('.dialog-foot button', 'Use these files')
+  await click('button[role=radio]', 'CTCF ChIA-PET')
+  await p.select('.loops-of select', 'H1ESC')
   await structures(5)
 } else if (which === 'link') {
   await region('TNFRSF8')
