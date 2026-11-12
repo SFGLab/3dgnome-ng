@@ -91,6 +91,17 @@ User report 2026-11-13: the model half is mostly white and the agreement reads -
 
 - Tests: the MultiMM map has no zero cell off the diagonal and equals a hand computed value on a three bead chain; the agreement equals the battery's `_scc` on the same pair of maps; a deep map link is read once and cached; the card names the map.
 
+### Task 10: Views, loop halves and an agreement that follows the halves
+
+**Files:** `web/gnome3d_web/explore.py`, `contacts.py`; `web/frontend/src/job/ContactMapTab.tsx`, `heatmap.ts`. Tests `web/tests/test_contacts.py`, `src/job/ContactMapTab.test.tsx`, `src/job/heatmap.test.ts`.
+
+User report 2026-11-13: Expected shows solid red and says nothing; the halves should offer the CTCF and RNAPII loops; the agreement should follow the halves shown.
+
+- Show offers Observed, O/E and Pearson. Expected goes: it is the decay O/E divides by, a smooth gradient with nothing to read. O/E is drawn on log2 and Pearson on its own value, both on a two sided ramp, blue below and red above, white at no change.
+- Either half may show a factor's loops, PET counts binned at the anchor midpoints, for each factor the job read.
+- The agreement is the stratum adjusted correlation of the two halves shown, on raw values, and names them; Hi-C against the counted model is the battery's number. With loops on one side, the card adds the loop enrichment: the mean observed over expected of the other half at the loop pixels, expected per diagonal.
+- Tests: the loop half bins each loop at its anchors; the agreement changes with the halves and equals the battery's for Hi-C against the counted model; the enrichment of a map with raised loop pixels exceeds 1; no Expected button; the diverging ramp is white at zero.
+
 ### Task 8: On team-frodo
 
 - Deploy; open each example through the title page and the Examples page; the wizard at 1440 and 390 px in both themes; My jobs empty and filled. Ledger copied to design/plans.
