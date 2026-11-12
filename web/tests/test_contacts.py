@@ -106,6 +106,8 @@ def main() -> int:
         lp = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "loops_ctcf", "lower": "model", "norm": "raw"}).json()
         up = np.array(lp["upper"])
         check("a loop half bins each CTCF loop at its anchors", up.sum() > 0 and "CTCF loops" in lp["upper_label"], lp.get("upper_label", lp))
+        lp_ice = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "loops_ctcf", "lower": "model", "norm": "ice"}).json()
+        check("a loop half is never balanced", lp_ice["upper"] == lp["upper"], "ice changed the loop half")
         check("with loops on one side the card has the enrichment", isinstance(lp.get("loop_enrichment"), float), str(lp.get("loop_enrichment")))
 
         from gnome3d_web import explore as ex

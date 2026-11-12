@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DARKEST, colour, diverging, emptyRows, transform } from './heatmap'
+import { DARKEST, colour, diverging, emptyRows, halfRange, transform } from './heatmap'
 
 const M = [
   [4, 2, 1],
@@ -53,6 +53,14 @@ describe('transform', () => {
   })
 })
 
+describe('colour on a log scale', () => {
+  it('spreads values below one as it spreads values above, by ratio', () => {
+    const small = colour(0.01, 0.001, 0.1, true)
+    const big = colour(10, 1, 100, true)
+    expect(small).toEqual(big)
+  })
+})
+
 describe('colour', () => {
   it('runs from white at the low end to the darkest red at the high end', () => {
     expect(colour(0, 0, 10, false)).toEqual([255, 255, 255])
@@ -74,5 +82,18 @@ describe('diverging', () => {
     const [r2, , b2] = diverging(2, 2)
     expect(b1).toBeGreaterThan(r1)
     expect(r2).toBeGreaterThan(b2)
+  })
+})
+
+describe('halfRange', () => {
+  const m = Array.from({ length: 10 }, (_, i) => Array.from({ length: 10 }, (_, j) => (i === j ? 0 : 1 + ((i * 10 + j) % 100))))
+  it('runs from a low to a high percentile of the nonzero values on a log scale', () => {
+    const [lo, hi] = halfRange(m, true)
+    expect(lo).toBeGreaterThan(0)
+    expect(hi).toBeGreaterThan(lo)
+  })
+
+  it('starts at zero on a linear scale', () => {
+    expect(halfRange(m, false)[0]).toBe(0)
   })
 })

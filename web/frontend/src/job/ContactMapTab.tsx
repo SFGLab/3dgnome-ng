@@ -3,7 +3,7 @@ import { RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Contacts, JobApi, Summary } from './api'
 import { bp } from './format'
-import { colour, diverging, emptyRows, percentile, transform, type Show } from './heatmap'
+import { colour, diverging, emptyRows, halfRange, percentile, transform, type Show } from './heatmap'
 import { parseRegion } from './StructureTab'
 
 const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]
@@ -35,22 +35,26 @@ const parse = (t: string): Locus | null => {
   return m && Number(m[3]) > Number(m[2]) ? { chrom: m[1], start: Number(m[2]), end: Number(m[3]) } : null
 }
 
-function draw(canvas: HTMLCanvasElement, upper: number[][], lower: number[][], range: [number, number], log: boolean, show: Show) {
+type Half = { m: number[][]; range: [number, number]; loops: boolean }
+
+/** Each half on its own colour range. A loop half has no empty bins to grey: a row without a loop
+ * is a row of zeros, drawn white. */
+function draw(canvas: HTMLCanvasElement, up: Half, low: Half, log: boolean, show: Show) {
+  const [upper, lower] = [up.m, low.m]
   const ctx = canvas.getContext('2d')
   const n = upper.length
   if (!ctx || !n) return
   canvas.width = n
   canvas.height = n
   // Each half on its own scale: the lower half's values are brought to the upper half's range.
-  // Observed counts of the two halves differ in scale, so the lower half is brought to the upper
-  // half's range; O/E and Pearson are already on one scale.
-  const ratio = show === 'observed' ? percentile(upper, 0.99) / (percentile(lower, 0.99) || 1) : 1
-  const span = Math.max(Math.abs(range[0]), Math.abs(range[1]))
-  const [emptyUp, emptyLow] = [emptyRows(upper), emptyRows(lower)]
+  const span = Math.max(Math.abs(up.range[0]), Math.abs(up.range[1]))
+  const none = upper.map(() => false)
+  const [emptyUp, emptyLow] = [up.loops ? none : emptyRows(upper), low.loops ? none : emptyRows(lower)]
   const img = ctx.createImageData(n, n)
   for (let i = 0; i < n; i++)
     for (let j = 0; j < n; j++) {
-      const v = j >= i ? upper[i][j] : lower[i][j] * ratio
+      const v = j >= i ? upper[i][j] : lower[i][j]
+      const range = j >= i ? up.range : low.range
       // The maps hold no pair within one bin, so the main diagonal is drawn as no data.
       const empty = j >= i ? emptyUp[i] || emptyUp[j] : emptyLow[i] || emptyLow[j]
       const [r, g, b] =
@@ -97,12 +101,9 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
   const annotations = useQuery({ queryKey: ['annotations', api.base], queryFn: api.annotations })
   const upper = maps.data ? transform(maps.data.upper, show) : []
   const lower = maps.data ? transform(maps.data.lower, show) : []
-  const top = maps.data ? percentile(upper, 0.99) : 1
-  // On a log scale a range from zero puts a deep map's whole body mid ramp; the 5th percentile
-  // of the nonzero values spreads it over the colours.
-  const bottom = maps.data && log && show === 'observed' ? percentile(upper, 0.05) : 0
   const round = (v: number) => Math.round(v * 100) / 100
-  // O/E is drawn as log2 and Pearson as itself, both symmetric about no change.
+  // Each half gets its own range; a range typed in applies to the upper half and the lower half
+  // keeps the same share of its own spread.
   const oeSpan =
     maps.data && show === 'oe'
       ? Math.max(
@@ -115,9 +116,15 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           ),
         )
       : 1
-  const shownRange: [number, number] = range ?? (show === 'oe' ? [-oeSpan, oeSpan] : show === 'pearson' ? [-1, 1] : [round(bottom), round(top)])
+  const auto = (m: number[][]): [number, number] => (show === 'oe' ? [-oeSpan, oeSpan] : show === 'pearson' ? [-1, 1] : halfRange(m, log))
+  const autoUp = maps.data ? auto(upper) : ([0, 1] as [number, number])
+  const autoLow = maps.data ? auto(lower) : ([0, 1] as [number, number])
+  const shownRange: [number, number] = range ?? [round(autoUp[0]), round(autoUp[1])]
+  const scale = show === 'observed' && autoUp[1] > 0 ? autoLow[1] / autoUp[1] : 1
+  const lowRange: [number, number] = range ? [range[0] * scale, range[1] * scale] : autoLow
   useEffect(() => {
-    if (canvas.current && maps.data) draw(canvas.current, upper, lower, shownRange, log, show)
+    if (canvas.current && maps.data)
+      draw(canvas.current, { m: upper, range: shownRange, loops: upperKind.startsWith('loops_') }, { m: lower, range: lowRange, loops: lowerKind.startsWith('loops_') }, log, show)
   })
   const moveTo = (want: Locus) => {
     const next = clamp(want, job, res)

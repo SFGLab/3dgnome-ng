@@ -413,7 +413,9 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
     b, lb = one(lower)
     raw_a, raw_b = a, b
     if norm == "ice":
-        a, b = cm.ice(a), cm.ice(b)
+        # A loop half is a list of loops, not a contact map, and is never balanced.
+        a = a if upper in loop_sets else cm.ice(a)
+        b = b if lower in loop_sets else cm.ice(b)
     elif norm != "raw":
         raise ExploreError(f"{norm!r} is not ice or raw")
     return {

@@ -73,7 +73,10 @@ export function diverging(v: number, span: number): [number, number, number] {
 
 /** The ramp colour of a value between lo and hi, on a log scale when asked. */
 export function colour(v: number, lo: number, hi: number, log: boolean): [number, number, number] {
-  const f = (x: number) => (log ? Math.log1p(Math.max(0, x)) : x)
+  // A true log, so a map of values below one spreads as one of counts does; a lower end of zero
+  // takes a floor a thousandth of the upper end.
+  const floor = lo > 0 ? lo : hi / 1000
+  const f = (x: number) => (log ? Math.log(Math.max(x, floor)) : x)
   const span = f(hi) - f(lo)
   const t = Math.min(1, Math.max(0, span > 0 ? (f(v) - f(lo)) / span : 0))
   const s = t * (STOPS.length - 1)
@@ -89,4 +92,12 @@ export function percentile(m: number[][], p: number): number {
     .filter((v) => v > 0)
     .sort((a, b) => a - b)
   return xs.length ? xs[Math.min(xs.length - 1, Math.floor(p * xs.length))] : 1
+}
+
+/** The default colour range of one half: from the 5th to the 99th percentile of its nonzero
+ * values on a log scale, from zero on a linear one. */
+export function halfRange(m: number[][], log: boolean): [number, number] {
+  const hi = percentile(m, 0.99)
+  const lo = log ? Math.min(percentile(m, 0.05), hi / 10) : 0
+  return [lo, hi]
 }
