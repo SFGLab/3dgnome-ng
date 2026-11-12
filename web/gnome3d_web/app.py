@@ -359,6 +359,14 @@ def create_app() -> FastAPI:
         def ex_loops(key: str) -> JSONResponse:
             return JSONResponse(explore.loops(guard(key)))
 
+        @app.get(base + "/contacts", name=f"{kind}_contacts")
+        def ex_contacts(key: str, region: str, res: int = 25000, upper: str = "hic", lower: str = "model", norm: str = "ice") -> JSONResponse:
+            d = guard(key)
+            try:
+                return JSONResponse(explore.contact_maps(d, region, res, upper, lower, norm))
+            except explore.ExploreError as e:
+                return JSONResponse({"error": str(e)}, 400)
+
         @app.get(base + "/log", name=f"{kind}_log", response_class=PlainTextResponse)
         def ex_log(key: str) -> PlainTextResponse:
             return PlainTextResponse(explore.log_text(guard(key)))

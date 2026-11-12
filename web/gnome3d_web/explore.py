@@ -19,6 +19,7 @@ import pandas as pd
 
 from gnome3d.geometry import smooth_chain
 
+from . import contacts as cm
 from .marks import read_cif
 
 MAX_GAP = 5_000
@@ -273,3 +274,43 @@ def zip_bytes(job: Path) -> bytes:
             if p.is_file() and not rel.name.startswith(("explore_", "upload.")) and not re.match(r"inputs/", str(rel)):
                 z.write(p, str(rel))
     return buf.getvalue()
+
+
+def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str) -> dict[str, object]:
+    """Two contact maps of a window on one grid, each the job's Hi-C or its model, raw or ICE
+    balanced, and their stratum adjusted correlation."""
+    m = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", region.replace(",", ""))
+    if not m:
+        raise ExploreError(f"{region!r} is not chr:start-end")
+    chrom, start, end = m[1], int(m[2]), int(m[3])
+    if res not in cm.RESOLUTIONS:
+        raise ExploreError(f"resolution {res} is not one of {', '.join(f'{r // 1000} kb' for r in cm.RESOLUTIONS)}")
+    if len(cm.bins_for(start, end, res)) > cm.MAX_BINS:
+        fit = cm.coarsest_fit(start, end)
+        raise ExploreError(f"{region} at {res // 1000} kb is more than {cm.MAX_BINS} bins on a side. Use {fit // 1000} kb or a shorter window.")
+    n_models = len(models(job))
+    cell = _json(job / "request.json").get("cell_type", "")
+
+    def one(kind: str) -> tuple[np.ndarray, str]:
+        if kind == "hic":
+            sing = pd.read_csv(job / "inputs" / "singletons.bedpe", sep="\t", header=None, usecols=range(7))
+            return cm.hic_map(sing, chrom, start, end, res), f"Hi-C of {cell}"
+        if kind == "model":
+            pos, mid = _positions(job)
+            return cm.model_map(pos, mid, start, end, res), f"This job, sum of {n_models} structures"
+        raise ExploreError(f"{kind!r} is not hic or model")
+
+    a, la = one(upper)
+    b, lb = one(lower)
+    if norm == "ice":
+        a, b = cm.ice(a), cm.ice(b)
+    elif norm != "raw":
+        raise ExploreError(f"{norm!r} is not ice or raw")
+    return {
+        "bins": cm.bins_for(start, end, res).tolist(),
+        "upper": np.round(a, 4).tolist(),
+        "lower": np.round(b, 4).tolist(),
+        "upper_label": la,
+        "lower_label": lb,
+        "scc": cm.scc(a, b, res),
+    }
