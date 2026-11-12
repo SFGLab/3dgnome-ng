@@ -9,18 +9,18 @@
 set -uo pipefail
 SITE="${SITE:?set SITE to the site data directory}"
 RESULTS="${RESULTS:?set RESULTS to the results directory}"
-PORT="${PORT:-8767}"
+HOST_PORT="${PORT:-8767}"
 PY="${PY:-python3}"
-export DATA_DIR="$SITE" RESULTS_DIR="$RESULTS" PORT="127.0.0.1:$PORT" WORKERS_PER_GPU=2 GPU_POOL_GIB=1.5
+export DATA_DIR="$SITE" RESULTS_DIR="$RESULTS" PORT="127.0.0.1:$HOST_PORT" WORKERS_PER_GPU=2 GPU_POOL_GIB=1.5
 export MPS_PIPE_DIRECTORY="$RESULTS/.mps/pipe" MPS_USER="$(id -u):$(id -g)"
 mkdir -p "$RESULTS" "$MPS_PIPE_DIRECTORY" "$RESULTS/.mps/log"
 
 CUDA_MPS_PIPE_DIRECTORY="$MPS_PIPE_DIRECTORY" CUDA_MPS_LOG_DIRECTORY="$RESULTS/.mps/log" nvidia-cuda-mps-control -d
 compose=(docker compose -p g3dmps -f docker-compose.yml -f docker-compose.mps.yml)
 "${compose[@]}" up -d --no-build redis web worker-gpu0
-for _ in $(seq 60); do curl -sf "http://127.0.0.1:$PORT/" > /dev/null && break; sleep 2; done
+for _ in $(seq 60); do curl -sf "http://127.0.0.1:$HOST_PORT/" > /dev/null && break; sleep 2; done
 
-"$PY" scripts/load_test.py "http://127.0.0.1:$PORT" "$RESULTS" GM12878 \
+"$PY" scripts/load_test.py "http://127.0.0.1:$HOST_PORT" "$RESULTS" GM12878 \
   chr1:1000000-4000000 chr1:5000000-8000000 chr1:10000000-13000000 chr1:20000000-23000000 \
   chr2:5000000-8000000 chr3:5000000-8000000 &
 load=$!
