@@ -81,3 +81,44 @@ def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV]
             if on:
                 hap[h].append(sv)
     return sorted(hap[0], key=lambda s: s.start), sorted(hap[1], key=lambda s: s.start), skipped
+
+
+def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[dict[str, object]], dict[str, int]]:
+    """The records of one sample inside the region with their genotype and the haplotypes that
+    carry them, and the count of records of other types the sample carries, by type.
+
+    @raises KeyError when the sample is not a column of the VCF
+    """
+    records: list[dict[str, object]] = []
+    skipped: dict[str, int] = {}
+    col = -1
+    for line in _lines(vcf, region):
+        x = line.split("\t")
+        if line.startswith("#"):
+            if sample not in x[9:]:
+                raise KeyError(sample)
+            col = x.index(sample)
+            continue
+        info = dict(kv.split("=", 1) if "=" in kv else (kv, "") for kv in x[7].split(";"))
+        kind = info.get("SVTYPE", "")
+        pos = int(x[1])
+        gt = x[col].split(":", 1)[0]
+        haps = _alleles(gt)
+        if not any(haps) or not (x[0] == region.chrom and region.start <= pos < region.end):
+            continue
+        if kind not in KINDS:
+            skipped[kind or "unknown"] = skipped.get(kind or "unknown", 0) + 1
+            continue
+        if kind == "INS":
+            alt = x[4]
+            seq = alt[1:] if not alt.startswith("<") else "N" * abs(int(info.get("SVLEN", "0").split(",")[0]))
+            sv = SV(x[0], pos + 1, pos + 1, "INS", seq)
+            length = len(seq)
+        else:
+            end = int(info["END"]) if "END" in info else pos + abs(int(info["SVLEN"].split(",")[0]))
+            sv = SV(x[0], pos + 1, end + 1, kind)
+            length = end - pos
+        if sv.end > region.end:
+            continue
+        records.append({"sv": sv, "type": kind, "pos": pos, "length": length, "genotype": gt, "haps": haps})
+    return records, skipped

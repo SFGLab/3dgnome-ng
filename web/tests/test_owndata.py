@@ -104,6 +104,27 @@ def main() -> int:
         r = c.post("/api/jobs", data={"cell_type": "GMX", "region": "chr1:0-3000000", "n_models": "2", "own": json.dumps({"loops": [{"factor": "CTCF", "upload": loops_a}]})})
         check("a hosted cell type with own loops keeps its contacts and runs", r.status_code == 201 and c.get(f"/api{r.json()['url']}/summary").json()["state"] == "done", r.text)
 
+        v = c.post("/api/variants/check", data={"cell": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "sample": "P1", "haplotype": "0", "sv_set": "DEMO"})
+        j = v.json()
+        check("the variant check counts what applies and what is skipped", v.status_code == 200 and j["applied"] == {"DEL": 1} and j["skipped"] == {"CNV": 1}, v.text[:300])
+        dele = next(x for x in j["variants"] if x["type"] == "DEL")
+        check("a deletion's change names the anchor and loops it removes", dele["change"] == "removes 1 CTCF anchor and its 2 loops" and dele["genotype"] == "1|0", str(dele))
+        check("the summary sentence names the sample and haplotype", j["summary"].startswith("1 variant of P1 on the first haplotype lies inside chr1:0-3,000,000."), j["summary"])
+        v1 = c.post("/api/variants/check", data={"cell": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "sample": "P1", "haplotype": "1", "sv_set": "DEMO"}).json()
+        check("the second haplotype carries the insertion", v1["applied"] == {"INS": 1}, str(v1)[:200])
+        vid = up("vcf", "demo.vcf.gz", (data / "svs" / "demo.vcf.gz").read_bytes()).json()["id"]
+        v = c.post("/api/variants/check", data={"cell": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "sample": "P1", "haplotype": "0", "upload": vid})
+        check("an uploaded VCF is checked the same way", v.status_code == 200 and v.json()["applied"] == {"DEL": 1}, v.text[:200])
+        v = c.post("/api/variants/check", data={"cell": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "sample": "NOBODY", "haplotype": "0", "upload": vid})
+        check("a sample not in the VCF is a 400 on the sample field", v.status_code == 400 and v.json()["field"] == "sample", v.text)
+
+        from gnome3d_web.owndata import combine_changes
+
+        check("one verb over two factors is summed with the split", combine_changes([("CTCF", "lengthens 9 loops"), ("RNAPII", "lengthens 2 loops")]) == "lengthens 11 loops, 9 CTCF and 2 RNAPII")
+        check("different changes are listed by factor", combine_changes([("CTCF", "removes 1 CTCF anchor and its 2 loops"), ("RNAPII", "shortens 1 loop")]) == "removes 1 CTCF anchor and its 2 loops; shortens 1 loop")
+        check("no change in one factor is left out", combine_changes([("CTCF", "shortens 3 loops"), ("RNAPII", "no anchor inside")]) == "shortens 3 loops")
+        check("no change in every factor is said once", combine_changes([("CTCF", "no anchor inside"), ("RNAPII", "no anchor inside")]) == "no anchor inside")
+
         from gnome3d_web.queue import sweep_private
 
         stale = uploads / lid
