@@ -3,6 +3,7 @@
 *
 !pyproject.toml
 !README.md
+!SETTINGS.md
 !gnome3d
 !web
 web/frontend/node_modules

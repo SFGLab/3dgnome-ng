@@ -22,7 +22,7 @@ ARG GPU=0
 RUN pip install --no-cache-dir numpy==2.4.4 numba==0.65.1 scipy==1.17.1 \
  && if [ "$GPU" = "1" ]; then pip install --no-cache-dir "jax[cuda12]==0.10.1"; else pip install --no-cache-dir jax==0.10.1; fi
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md SETTINGS.md ./
 COPY gnome3d ./gnome3d
 RUN pip install --no-cache-dir --no-deps .
 

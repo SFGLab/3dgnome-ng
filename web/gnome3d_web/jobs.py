@@ -16,7 +16,7 @@ import os
 import subprocess
 import time
 import traceback
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -26,9 +26,14 @@ from .inputs import build_inputs
 from .marks import ep_table, mark_beads, read_cif
 from .regions import parse_region
 from .settings import Settings
+from .settings_schema import apply_overrides, validate_overrides
 from .svs import read_svs
 
 ENGINE_VERSION = "gnome3d-ng"
+
+
+def _no_overrides() -> dict[str, str]:
+    return {}
 
 
 @dataclass
@@ -42,6 +47,7 @@ class JobRequest:
     n_models: int = 10
     hicdiffusion: bool = False
     upload_vcf: str = ""
+    overrides: dict[str, str] = field(default_factory=_no_overrides)
 
 
 def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
@@ -134,6 +140,7 @@ def run_job(
             _status(job, stage="hicdiffusion")
             hic = _hicdiffusion(region.start, region.chrom, svs, Path(os.environ["REFERENCE_FASTA"]))
         inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic)
+        apply_overrides(inputs.config, validate_overrides(req.overrides))
         _status(job, stage="modelling", region=inputs.region, n_svs=inputs.n_svs, skipped_svs=skipped, loops=inputs.loops)
 
         cmd = list(engine) if engine else [os.environ.get("ENGINE_PYTHON", "python"), "-m", "gnome3d.cli"]

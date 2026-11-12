@@ -18,6 +18,7 @@ from .viewer import viewer_payload
 from .queue import enqueue, sweep_private
 from .regions import HICDIFFUSION_SPAN, RegionError, parse_region
 from .settings import Settings
+from .settings_schema import parse_ini, schema
 
 HERE = Path(__file__).resolve().parent
 FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|[A-Za-z0-9_.:-]+\.cif)$")
@@ -220,6 +221,17 @@ def create_app() -> FastAPI:
             "cell_types": {k: {"label": c.label, "lymphoblastoid": c.lymphoblastoid, "note": c.note} for k, c in catalog.cell_types.items()},
             "sv_sets": {k: {"label": v.label, "samples": v.samples} for k, v in catalog.sv_sets.items()},
         }
+
+    @app.get("/api/settings")
+    def api_settings(cell: str) -> JSONResponse:
+        if cell not in catalog.cell_types:
+            return JSONResponse({"error": f"unknown cell type {cell!r}"}, 404)
+        return JSONResponse(schema(catalog.cell_types[cell].path("config")))
+
+    @app.post("/api/settings/ini")
+    async def api_settings_ini(file: UploadFile = File(...)) -> JSONResponse:  # noqa: B008
+        overrides, refused = parse_ini((await file.read(1_000_000)).decode("utf-8", "replace"))
+        return JSONResponse({"overrides": overrides, "refused": refused})
 
     index_html = s.frontend_dist / "index.html"
     if (s.frontend_dist / "assets").is_dir():
