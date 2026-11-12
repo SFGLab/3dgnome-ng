@@ -10,6 +10,7 @@ ENGINE_CMD    the command that starts the engine, default ENGINE_PYTHON -m gnome
 RETENTION_DAYS  how long a private job is kept, default 14
 MAX_REGION_MB   the longest region the form accepts, in Mb, default 20
 FRONTEND_DIST   the frontend build, default web/frontend/dist
+MAX_STRUCTURES  the most structures a job may ask for, default 100
 HICDIFFUSION_DIR, HICDIFFUSION_PYTHON, HICDIFFUSION_MODELS, REFERENCE_FASTA  the optional
               HiCDiffusion step; it is offered only when all four are set
 """
@@ -35,6 +36,7 @@ class Settings:
     gpu_slots: list[str]
     max_span: int
     frontend_dist: Path
+    max_structures: int
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -48,6 +50,7 @@ class Settings:
             retention_days=int(os.environ.get("RETENTION_DAYS", "14")),
             gpu_slots=[g.strip() for g in os.environ.get("GPU_SLOTS", "0").split(",") if g.strip()],
             max_span=int(float(os.environ.get("MAX_REGION_MB", "20")) * 1_000_000),
+            max_structures=int(os.environ.get("MAX_STRUCTURES", "100")),
             frontend_dist=Path(os.environ.get("FRONTEND_DIST", Path(__file__).resolve().parents[1] / "frontend" / "dist")),
         )
 

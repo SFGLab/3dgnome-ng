@@ -47,6 +47,26 @@ def main() -> int:
             cfg["data"]["factors"] == "CTCF,RNAPOL2" and cfg["data"]["clusters"].split(",")[0].endswith("ctcf_clusters.bedpe"),
         )
 
+        inp = build_inputs(ct, region, "RNAPII", [], Path(d) / "rnapii")
+        cfg = configparser.ConfigParser()
+        cfg.read(inp.config)
+        data = cfg["data"]
+        check("an RNAPII run reads the RNAPII loops alone", data["clusters"] == "rnapii_clusters.bedpe" and data["factors"] == "RNAPOL2", dict(data).__repr__())
+        anchors = rows(Path(data["data_dir"]) / data["anchors"])
+        check("its anchors are the RNAPII loop ends", [(a[1], a[2]) for a in anchors] == [("1300000", "1301000"), ("1500000", "1501000")], str(anchors))
+        check("every anchor has orientation N", all(a[3] == "N" for a in anchors), str(anchors))
+        check("the CTCF orientation term is off", cfg["motif_orientation"]["use_motif_orientation"] == "no")
+
+        inp = build_inputs(ct, region, "CTCF", [], Path(d) / "none", background="none")
+        cfg = configparser.ConfigParser()
+        cfg.read(inp.config)
+        check("background none turns both contact terms off", cfg["springs"]["use_contact_background"] == "no" and cfg["anchor_heatmap"]["use_anchor_heatmap"] == "no")
+        check("background none keeps the singletons for the exponent fit", (Path(cfg["data"]["data_dir"]) / "singletons.bedpe").stat().st_size > 0)
+        inp = build_inputs(ct, region, "CTCF", [], Path(d) / "hic", background="hic")
+        cfg = configparser.ConfigParser()
+        cfg.read(inp.config)
+        check("background hic leaves the config as the cell type has it", not cfg.has_section("springs") and not cfg.has_section("anchor_heatmap"))
+
         dele = SV("chr1", 900_001, 960_001, "DEL")
         inp = build_inputs(ct, region, "CTCF", [dele], Path(d) / "del")
         cfg = configparser.ConfigParser()

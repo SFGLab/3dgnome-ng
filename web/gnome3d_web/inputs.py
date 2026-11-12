@@ -21,6 +21,7 @@ from personal3d import engine, hicdiffusion, motifs, rewrite
 from personal3d.lift import Lift
 from personal3d.variants import SV
 
+from .settings_schema import apply_overrides
 from .catalog import CellType
 from .regions import Region
 
@@ -66,13 +67,24 @@ def build_inputs(
     svs: list[SV],
     out: Path,
     hic: tuple[np.ndarray, int] | None = None,
+    background: str = "hic",
 ) -> Inputs:
     """Write the inputs for one haplotype under `out` and return the config and the region in
-    the haplotype's coordinates. `hic` is a predicted HiCDiffusion window and its reference start."""
+    the haplotype's coordinates. `hic` is a predicted HiCDiffusion window and its reference start.
+    `background` none turns off the contact terms and keeps the singletons for the exponent fit.
+    RNAPII alone has its loop ends as anchors, orientation N, and no CTCF orientation term."""
     out.mkdir(parents=True, exist_ok=True)
     chrom = region.chrom
     L = Lift(svs)
     anchors = _read(cell.anchors_for(factors), chrom, 4).sort_values(1).reset_index(drop=True)
+    if factors == "RNAPII":
+        ends = _read(cell.clusters_for("RNAPII")[0][1], chrom, 7)
+        spans = list(zip(ends[1], ends[2], strict=True)) + list(zip(ends[4], ends[5], strict=True))
+        hit = np.zeros(len(anchors), dtype=bool)
+        for s, e in spans:
+            hit |= (anchors[1].to_numpy() < e) & (anchors[2].to_numpy() > s)
+        anchors = anchors[hit].reset_index(drop=True)
+        anchors[3] = "N"
     length = int(anchors[2].max()) + 10_000_000 if len(anchors) else region.end + 10_000_000
 
     files: list[str] = []
@@ -132,8 +144,15 @@ def build_inputs(
         "segment_split": "segments.bed",
         "centromeres": "centromeres.bed",
     }
-    if len(names) > 1:
+    if len(names) > 1 or factors == "RNAPII":
         data["factors"] = ",".join(names)
     config = engine.write_config(cell.path("config"), data, out / "config.ini", header=f"{cell.name} {region} {factors}")
+    fixed = {}
+    if factors == "RNAPII":
+        fixed["motif_orientation.use_motif_orientation"] = "no"
+    if background == "none":
+        fixed |= {"springs.use_contact_background": "no", "anchor_heatmap.use_anchor_heatmap": "no"}
+    if fixed:
+        apply_overrides(config, fixed)
     hap_region = f"{chrom}:{L.edge(region.start)}-{L.edge(region.end - 1) + 1}"
     return Inputs(config=config, region=hap_region, n_svs=len(svs), loops=counts)

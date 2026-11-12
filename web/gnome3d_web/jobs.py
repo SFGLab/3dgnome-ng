@@ -48,6 +48,13 @@ class JobRequest:
     hicdiffusion: bool = False
     upload_vcf: str = ""
     overrides: dict[str, str] = field(default_factory=_no_overrides)
+    background: str = "hic"
+
+    def __post_init__(self) -> None:
+        # The old form sent HiCDiffusion as a flag; request.json files of that form still read.
+        if self.hicdiffusion:
+            self.background, self.hicdiffusion = "hicdiffusion", False
+        self.n_models = max(1, min(Settings.from_env().max_structures, int(self.n_models)))
 
 
 def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
@@ -55,6 +62,12 @@ def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
     region = parse_region(req.region, catalog.cell_types[req.cell_type].genes(), Settings.from_env().max_span)
     d = asdict(req)
     d["region"] = str(region)
+    # Keys of requests made before overrides and background existed stay the same.
+    if not d["overrides"]:
+        del d["overrides"]
+    d["hicdiffusion"] = d["background"] == "hicdiffusion"
+    if d["background"] in ("hic", "hicdiffusion"):
+        del d["background"]
     if not (req.sv_set or req.upload_vcf):
         d["sample"], d["haplotype"] = "", 0
     return d
@@ -136,10 +149,10 @@ def run_job(
             haps = read_svs(vcf, req.sample, region)
             svs, skipped = haps[req.haplotype], haps[2]
         hic = None
-        if req.hicdiffusion:
+        if req.background == "hicdiffusion":
             _status(job, stage="hicdiffusion")
             hic = _hicdiffusion(region.start, region.chrom, svs, Path(os.environ["REFERENCE_FASTA"]))
-        inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic)
+        inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background)
         apply_overrides(inputs.config, validate_overrides(req.overrides))
         _status(job, stage="modelling", region=inputs.region, n_svs=inputs.n_svs, skipped_svs=skipped, loops=inputs.loops)
 

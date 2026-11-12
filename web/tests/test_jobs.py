@@ -27,6 +27,13 @@ def main() -> int:
         check("the cache key ignores how the region was typed", request_key(req, cat) == request_key(same, cat))
         other = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=2)
         check("a different factor choice is a different key", request_key(req, cat) != request_key(other, cat))
+        check("100 structures are kept", JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=100).n_models == 100)
+        check("101 structures become 100", JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=101).n_models == 100)
+        none = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=2, background="none")
+        check("the contact background is in the key", request_key(none, cat) != request_key(other, cat))
+        old = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=2, hicdiffusion=True)
+        new = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=2, background="hicdiffusion")
+        check("the old HiCDiffusion flag and the new background give one key", request_key(old, cat) == request_key(new, cat))
 
         res = run_job(req, cat, Path(d) / "results" / request_key(req, cat), engine=FAKE)
         status = json.loads((res / "status.json").read_text())

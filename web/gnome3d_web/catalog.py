@@ -14,7 +14,8 @@ from pathlib import Path
 
 import pandas as pd
 
-FACTOR_CHOICES = ("CTCF", "CTCF+RNAPII")
+FACTOR_CHOICES = ("CTCF", "RNAPII", "CTCF+RNAPII")
+BACKGROUNDS = ("hic", "hicdiffusion", "none")
 
 
 def _no_strings() -> dict[str, str]:
@@ -37,11 +38,13 @@ class CellType:
         return self.root / self.files[key]
 
     def anchors_for(self, factors: str) -> Path:
-        return self.root / self.anchors[factors]
+        """The anchors file of a factor choice. RNAPII alone reads the CTCF and RNAPII anchors,
+        which hold the RNAPII loop ends."""
+        return self.root / self.anchors["CTCF+RNAPII" if factors == "RNAPII" else factors]
 
     def clusters_for(self, factors: str) -> list[tuple[str, Path]]:
         """The loop files a factor choice reads, CTCF first."""
-        names = ["CTCF"] if factors == "CTCF" else ["CTCF", "RNAPII"]
+        names = {"CTCF": ["CTCF"], "RNAPII": ["RNAPII"]}.get(factors, ["CTCF", "RNAPII"])
         return [(n, self.root / self.clusters[n]) for n in names]
 
     def genes(self) -> pd.DataFrame:
