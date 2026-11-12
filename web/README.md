@@ -85,6 +85,13 @@ npm run build       # writes dist/ for FastAPI
 The page text, the colours and the figures come from the approved design in web/design/site.pen.
 A change of wording goes into the design first.
 
+The Model a region page at `/model` reads the JSON API: `GET /api/catalog`, `GET /api/region`,
+`GET /api/preview` for the loop arcs of a region, `GET /api/settings` for the engine settings a
+user may change, `POST /api/settings/ini` to read an uploaded config, and `POST /api/jobs`, which
+answers with the job's url or the field a request fails on. The settings a user may change, with
+their ranges, are listed in `gnome3d_web/settings_schema.py`; every other setting keeps the cell
+type's value. The old form is at `/model/classic`.
+
 ## Populate the data directory
 
 ```

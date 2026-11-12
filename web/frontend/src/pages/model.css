@@ -729,3 +729,33 @@
     border-bottom: 1px solid var(--line);
   }
 }
+
+.submit-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #FFFFFF;
+  font: 600 14px var(--font);
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.timing {
+  font-size: 12px;
+  color: var(--faint);
+}
