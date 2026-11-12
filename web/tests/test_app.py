@@ -33,8 +33,14 @@ def main() -> int:
         r = c.get("/")
         check("the form lists the cell type and the retention period", r.status_code == 200 and "GMX, lymphoblastoid" in r.text and "14 days" in r.text)
         form = {"cell_type": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "n_models": "2"}
-        r = c.post("/jobs", data={**form, "region": "chr1:0-9000000"})
-        check("an over long region is a form error", r.status_code == 400 and "limit" in r.text)
+        check("the form states the 20 Mb limit", "up to 20 Mb" in c.get("/").text)
+        r = c.post("/jobs", data={**form, "region": "chr1:0-25000000"})
+        check("a region over 20 Mb is a form error", r.status_code == 400 and "20,000,000" in r.text)
+        os.environ["MAX_REGION_MB"] = "2.5"
+        small = TestClient(create_app())
+        r = small.post("/jobs", data={**form, "region": "chr1:0-3000000"})
+        check("MAX_REGION_MB sets the limit", r.status_code == 400 and "2,500,000" in r.text and "up to 2.5 Mb" in small.get("/").text)
+        del os.environ["MAX_REGION_MB"]
         r = c.post("/jobs", data={**form, "hicdiffusion": "on"})
         check("HiCDiffusion on a region over 2 Mb is a form error naming the limit", r.status_code == 400 and "2,000,000" in r.text and "HICDIFFUSION_DIR" not in r.text)
         r = c.post("/jobs", data={**form, "region": "chr1:0-2000000", "hicdiffusion": "on"})

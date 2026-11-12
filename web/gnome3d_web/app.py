@@ -48,6 +48,7 @@ def create_app() -> FastAPI:
                 "catalog": catalog,
                 "factors": FACTOR_CHOICES,
                 "retention": s.retention_days,
+                "max_region_mb": f"{s.max_span / 1e6:g}",
                 "hicdiffusion_missing": Settings.hicdiffusion_missing(),
                 "error": error,
                 "v": values or {},
@@ -78,7 +79,7 @@ def create_app() -> FastAPI:
                 raise RegionError(f"unknown cell type {cell_type!r}")
             if factors not in FACTOR_CHOICES:
                 raise RegionError(f"unknown factor choice {factors!r}")
-            r = parse_region(region, catalog.cell_types[cell_type].genes())
+            r = parse_region(region, catalog.cell_types[cell_type].genes(), s.max_span)
             if hicdiffusion and r.end - r.start > HICDIFFUSION_SPAN:
                 raise RegionError(
                     f"{region!r} spans {r.end - r.start:,} bp. HiCDiffusion predicts up to {HICDIFFUSION_SPAN:,} bp. "
@@ -150,6 +151,7 @@ def create_app() -> FastAPI:
                 "ep": ep,
                 "private": kind == "private",
                 "retention": s.retention_days,
+                "max_region_mb": f"{s.max_span / 1e6:g}",
             },
         )
 

@@ -40,8 +40,8 @@ chunks after this change, or hash the extracted window.
 
 ## Window limits
 
-The form limits a region to 3 Mb. That number was not measured. The only timing is 58 s for a 2 Mb region on an RTX
-3090 in web/README.md. The design offers 20 Mb. A timed 20 Mb job on the workstation sets the limit. With HiCDiffusion
+The form limits a region to 20 Mb, `MAX_REGION_MB` in the server settings. A 20 Mb job of 10 structures takes 80 to
+90 s alone on the RTX 3090 and needs 0.65 GiB of GPU memory, design/plans/2026-11-12-web-gpu-throughput.md. With HiCDiffusion
 as the contact background the limit is 2 Mb, the window HiCDiffusion predicts, and the form refuses a longer region.
 
 ## Checks and messages

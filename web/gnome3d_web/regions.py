@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
-MAX_SPAN = 3_000_000
+MAX_SPAN = 20_000_000
 # HiCDiffusion predicts 2,097,152 bp of the haplotype. The margin leaves room for insertions.
 HICDIFFUSION_SPAN = 2_000_000
 GENE_WINDOW = 2_000_000
@@ -27,9 +27,9 @@ class Region:
         return f"{self.chrom}:{self.start}-{self.end}"
 
 
-def parse_region(text: str, genes: pd.DataFrame) -> Region:
+def parse_region(text: str, genes: pd.DataFrame, max_span: int = MAX_SPAN) -> Region:
     """`chr:start-end`, commas allowed, or a gene name, which gives a 2 Mb window centred on its
-    TSS. Spans over 3 Mb are refused."""
+    TSS. Spans over `max_span` bp are refused."""
     t = text.strip().replace(",", "")
     m = re.fullmatch(r"(chr[0-9XYM]+):(\d+)-(\d+)", t)
     if m:
@@ -43,6 +43,6 @@ def parse_region(text: str, genes: pd.DataFrame) -> Region:
         r = Region(str(g["chrom"]), start, start + GENE_WINDOW)
     if r.end <= r.start:
         raise RegionError(f"{text!r} ends before it starts")
-    if r.end - r.start > MAX_SPAN:
-        raise RegionError(f"{text!r} spans {r.end - r.start:,} bp, over the {MAX_SPAN:,} bp limit")
+    if r.end - r.start > max_span:
+        raise RegionError(f"{text!r} spans {r.end - r.start:,} bp, over the {max_span:,} bp limit")
     return r

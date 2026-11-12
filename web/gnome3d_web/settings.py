@@ -8,6 +8,7 @@ GPU_SLOTS     the slots of the "thread" queue, one GPU id per slot, default "0";
               two jobs at once on each of two GPUs
 ENGINE_CMD    the command that starts the engine, default ENGINE_PYTHON -m gnome3d.cli
 RETENTION_DAYS  how long a private job is kept, default 14
+MAX_REGION_MB   the longest region the form accepts, in Mb, default 20
 HICDIFFUSION_DIR, HICDIFFUSION_PYTHON, HICDIFFUSION_MODELS, REFERENCE_FASTA  the optional
               HiCDiffusion step; it is offered only when all four are set
 """
@@ -31,6 +32,7 @@ class Settings:
     engine_cmd: list[str] | None
     retention_days: int
     gpu_slots: list[str]
+    max_span: int
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -43,6 +45,7 @@ class Settings:
             engine_cmd=shlex.split(cmd) if cmd else None,
             retention_days=int(os.environ.get("RETENTION_DAYS", "14")),
             gpu_slots=[g.strip() for g in os.environ.get("GPU_SLOTS", "0").split(",") if g.strip()],
+            max_span=int(float(os.environ.get("MAX_REGION_MB", "20")) * 1_000_000),
         )
 
     @staticmethod

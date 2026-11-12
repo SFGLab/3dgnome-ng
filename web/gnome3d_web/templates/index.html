@@ -14,7 +14,7 @@
       </select>
       <div id="cell-note" class="muted"></div>
     </div>
-    <div><label for="region">Region, chr:start-end or a gene name, up to 3 Mb</label>
+    <div><label for="region">Region, chr:start-end or a gene name, up to {{ max_region_mb }} Mb</label>
       <input id="region" name="region" type="text" required placeholder="chr1:1,000,000-3,000,000 or MYC" value="{{ v.region or '' }}"></div>
   </div>
   <label>Loops</label>

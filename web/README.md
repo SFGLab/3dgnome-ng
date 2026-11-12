@@ -102,6 +102,7 @@ All by environment, see `gnome3d_web/settings.py`. The ones that matter:
 | `QUEUE` | `rq` | `rq` with `REDIS_URL`, `thread` or `inline` for development |
 | `RETENTION_DAYS` | 14 | a private job is deleted after this many days, as the form says |
 | `ENGINE_CMD` | `python -m gnome3d.cli` | how the worker starts the engine |
+| `MAX_REGION_MB` | 20 | the longest region the form accepts |
 | `GPU_SLOTS` | `0` | the slots of the `thread` queue, one GPU id per slot |
 | `GNOME3D_GPU_POOL_GIB` | unset | the GPU memory pool of each engine process in GiB |
 

@@ -25,6 +25,7 @@ from .catalog import Catalog
 from .inputs import build_inputs
 from .marks import ep_table, mark_beads, read_cif
 from .regions import parse_region
+from .settings import Settings
 from .svs import read_svs
 
 ENGINE_VERSION = "gnome3d-ng"
@@ -45,7 +46,7 @@ class JobRequest:
 
 def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
     """The request with its region resolved, so equivalent requests compare equal."""
-    region = parse_region(req.region, catalog.cell_types[req.cell_type].genes())
+    region = parse_region(req.region, catalog.cell_types[req.cell_type].genes(), Settings.from_env().max_span)
     d = asdict(req)
     d["region"] = str(region)
     if not (req.sv_set or req.upload_vcf):
@@ -121,7 +122,7 @@ def run_job(
     log = job / "engine.log"
     try:
         cell = catalog.cell_types[req.cell_type]
-        region = parse_region(req.region, cell.genes())
+        region = parse_region(req.region, cell.genes(), Settings.from_env().max_span)
         svs: list = []
         skipped = 0
         vcf = Path(req.upload_vcf) if req.upload_vcf else (catalog.sv_sets[req.sv_set].vcf if req.sv_set else None)

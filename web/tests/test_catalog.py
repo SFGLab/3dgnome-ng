@@ -27,7 +27,7 @@ def main() -> int:
         check("coordinates with commas parse", (r.chrom, r.start, r.end) == ("chr1", 1_000_000, 2_500_000))
         r = parse_region("alpha", genes)
         check("a gene name centres a 2 Mb window on its TSS", (r.chrom, r.start, r.end) == ("chr1", 310_000, 2_310_000), str(r))
-        for bad in ("chr1:0-3500001", "NOPE", "chr1:500-100"):
+        for bad in ("chr1:0-20000001", "NOPE", "chr1:500-100"):
             try:
                 parse_region(bad, genes)
                 ok = False
