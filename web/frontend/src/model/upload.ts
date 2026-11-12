@@ -61,6 +61,32 @@ export function guessFactor(name: string, index: number): string {
   return index === 0 ? 'CTCF' : `factor ${index + 1}`
 }
 
-/** A file size in MB, or in kB below a tenth of a MB. */
+/** A file size in MB, in kB below a tenth of a MB and in GB from one GB. */
 export const megabytes = (bytes: number) =>
-  bytes < 104_858 ? `${Math.max(1, Math.round(bytes / 1024))} kB` : `${(bytes / 1_048_576).toFixed(1)} MB`
+  bytes < 104_858
+    ? `${Math.max(1, Math.round(bytes / 1024))} kB`
+    : bytes < 1_073_741_824
+      ? `${(bytes / 1_048_576).toFixed(1)} MB`
+      : `${(bytes / 1_073_741_824).toFixed(1)} GB`
+
+/** A link the server refused, with the way to fix it. */
+export class LinkRefused extends Error {
+  constructor(
+    message: string,
+    readonly fix: string,
+  ) {
+    super(message)
+  }
+}
+
+/** Asks the server to read the region of a remote .hic or .mcool file into a contacts upload. */
+export async function uploadLink(url: string, where: { cell: string; region: string }): Promise<UploadResult> {
+  const form = new FormData()
+  form.append('url', url)
+  form.append('cell', where.cell)
+  form.append('region', where.region)
+  const r = await fetch('/api/uploads/link', { method: 'POST', body: form })
+  const body = await r.json().catch(() => ({}))
+  if (!r.ok) throw new LinkRefused(body.error ?? `${r.status} from /api/uploads/link`, body.fix ?? '')
+  return body as UploadResult
+}

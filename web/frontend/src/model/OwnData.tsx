@@ -1,14 +1,15 @@
 import { useQueries } from '@tanstack/react-query'
-import { CircleAlert, CircleCheck, FileText, LoaderCircle, Plus, Trash2, X } from 'lucide-react'
+import { CircleAlert, CircleCheck, FileText, HardDrive, Link2, LoaderCircle, Plus, SquareTerminal, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Region } from '../api'
-import { guessFactor, megabytes, NO_OWN, type OwnChoice, type UploadKind, type UploadResult, uploadFile, uploadPreview } from './upload'
+import { readHicWindow } from './hicLocal'
+import { guessFactor, LinkRefused, megabytes, NO_OWN, type OwnChoice, type UploadKind, type UploadResult, uploadFile, uploadLink, uploadPreview } from './upload'
 import './owndata.css'
 
 export type OwnTab = 'loops' | 'anchors' | 'contacts' | 'enhancers'
 
 /** One uploaded file in the dialog: checking, checked, or refused by the server. */
-type Entry = { key: number; factor: string; name: string; size: number; result?: UploadResult; failure?: string }
+type Entry = { key: number; factor: string; name: string; size: number; result?: UploadResult; failure?: string; fix?: string }
 
 const fromResult = (key: number, factor: string, r: UploadResult): Entry => ({ key, factor, name: r.name, size: r.size, result: r })
 const passed = (e: Entry | null) => !e || !!e.result?.ok
@@ -111,6 +112,118 @@ function OneFile({ kind, rule, entry, onFile, onRemove }: { kind: string; rule: 
   )
 }
 
+const CONTACT_RES = 25_000
+const USE_LABEL: Record<OwnTab, string> = { loops: 'Use these loops', anchors: 'Use these files', contacts: 'Use this map', enhancers: 'Use these files' }
+type Route = 'link' | 'local' | 'bedpe'
+const ROUTES: [Route, string, string, typeof Link2][] = [
+  ['link', 'Link to a file', '.hic or .mcool', Link2],
+  ['local', 'Local .hic file', 'read in your browser', HardDrive],
+  ['bedpe', 'BEDPE of the region', 'upload', Upload],
+]
+
+/** A contact map with its check: name and size over the summary, or the refusal and its fix. */
+function ContactCard({ entry, onRemove }: { entry: Entry; onRemove: () => void }) {
+  const r = entry.result
+  const bad = !!entry.failure || r?.ok === false
+  const title = entry.failure ?? (r ? `${r.name}, ${megabytes(r.size)}` : entry.name)
+  const body = entry.failure ? entry.fix : r ? (r.ok ? r.summary : `${r.error?.found} ${r.error?.fix}`) : 'Reading the region.'
+  const Icon = bad ? CircleAlert : r ? CircleCheck : LoaderCircle
+  return (
+    <div className={`contact-card${bad ? ' bad' : r ? ' good' : ''}`} role="group" aria-label="Contact map">
+      <Icon size={15} aria-hidden className={r || bad ? undefined : 'spin'} />
+      <div className="contact-text">
+        <p className="contact-title">{title}</p>
+        {body && <p className="contact-body">{body}</p>}
+      </div>
+      <button type="button" className="icon-button" aria-label="Remove the contact map" onClick={onRemove}>
+        <Trash2 size={15} aria-hidden />
+      </button>
+    </div>
+  )
+}
+
+/** The contacts tab: a map by link, a local .hic read in the browser, or a BEDPE of the region. */
+function ContactsTab({
+  region,
+  maxMb,
+  entry,
+  onLink,
+  onLocal,
+  onFile,
+  onRemove,
+}: {
+  region: Region | null
+  maxMb: number
+  entry: Entry | null
+  onLink: (url: string) => void
+  onLocal: (f: File) => void
+  onFile: (f: File) => void
+  onRemove: () => void
+}) {
+  const [route, setRoute] = useState<Route>('link')
+  const [url, setUrl] = useState('')
+  const span = region ? `${region.chrom}:${region.start}-${region.end}` : 'chr1:11500000-12600000'
+  return (
+    <div className="own-tab">
+      <p className="rule">
+        {`A contact map at 25 kb is used for the contacts between loops. The server reads only the bins of your region, up to ${maxMb} Mb, and thins a deep map to the density the cell type maps use.`}
+      </p>
+      <div className="routes" role="radiogroup" aria-label="Contact map from">
+        {ROUTES.map(([id, title, sub, Icon]) => (
+          <button key={id} type="button" role="radio" aria-checked={route === id} className="route" onClick={() => setRoute(id)}>
+            <Icon size={16} aria-hidden />
+            <span>
+              <span className="route-title">{title}</span>
+              <span className="route-sub">{sub}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+      {route === 'link' && (
+        <form
+          className="link-field"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (url.trim()) onLink(url.trim())
+          }}
+        >
+          <label htmlFor="contact-link">Link to a .hic or .mcool file</label>
+          <div className="link-row">
+            <span className="link-input">
+              <Link2 size={14} aria-hidden />
+              <input id="contact-link" type="url" value={url} placeholder="https://4dn-open-data-public.s3.amazonaws.com/…/4DNFI1UEG1HD.hic" onChange={(e) => setUrl(e.target.value)} />
+            </span>
+            <button type="submit" className="read-button">
+              Read
+            </button>
+          </div>
+          <p className="hint">The server must answer range requests. 4DN, ENCODE, GEO and S3 links do. The file is not copied, and the server keeps only the bins of your region.</p>
+        </form>
+      )}
+      {route === 'local' && (
+        <label className="add-file">
+          <Plus size={15} aria-hidden /> Choose a .hic file. The page reads only your region and uploads it.
+          <input type="file" accept=".hic" className="visually-hidden" onChange={(e) => e.target.files?.[0] && onLocal(e.target.files[0])} />
+        </label>
+      )}
+      {route === 'bedpe' && (
+        <label className="add-file">
+          <Plus size={15} aria-hidden /> Choose a BEDPE file, columns chr1 start1 end1 chr2 start2 end2 count
+          <input type="file" className="visually-hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+        </label>
+      )}
+      {entry && <ContactCard entry={entry} onRemove={onRemove} />}
+      <div className="contact-card hint-card">
+        <SquareTerminal size={15} aria-hidden />
+        <div className="contact-text">
+          <p className="contact-title">A local .mcool file</p>
+          <p className="contact-body">{`Run gnome3d-ng extract --mcool sample.mcool --region ${span} --out region.bedpe on your computer and upload region.bedpe as a BEDPE of the region.`}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** The dialog for a job's own data: loops per factor, anchors, contacts and enhancers, each
  * checked by the server on arrival. "Use these loops" hands the checked uploads to the form. */
 export function OwnData({
@@ -118,6 +231,7 @@ export function OwnData({
   region,
   initial,
   tab = 'loops',
+  maxMb = 20,
   onClose,
   onUse,
 }: {
@@ -125,6 +239,7 @@ export function OwnData({
   region: Region | null
   initial: OwnChoice | null
   tab?: OwnTab
+  maxMb?: number
   onClose: () => void
   onUse: (own: OwnChoice) => void
 }) {
@@ -162,6 +277,31 @@ export function OwnData({
     const key = next.current++
     setSingle((s) => ({ ...s, [kind]: { key, factor: '', name: file.name, size: file.size } }))
     void send(kind, file, '', (patch) => setSingle((s) => (s[kind]?.key === key ? { ...s, [kind]: { ...s[kind]!, ...patch } } : s)))
+  }
+
+  const putContacts = (key: number) => (patch: Partial<Entry>) => setSingle((s) => (s.contacts?.key === key ? { ...s, contacts: { ...s.contacts, ...patch } } : s))
+  const addLink = (url: string) => {
+    const key = next.current++
+    const name = url.split('?')[0].split('/').pop() || url
+    setSingle((s) => ({ ...s, contacts: { key, factor: '', name, size: 0 } }))
+    const put = putContacts(key)
+    uploadLink(url, where)
+      .then((result) => put({ result }))
+      .catch((e: Error) => put({ failure: e.message, fix: e instanceof LinkRefused ? e.fix : '' }))
+  }
+  const addLocal = (file: File) => {
+    const key = next.current++
+    setSingle((s) => ({ ...s, contacts: { key, factor: '', name: file.name, size: file.size } }))
+    const put = putContacts(key)
+    if (!region) {
+      put({ failure: 'The region is not set', fix: 'Enter the region in step 1 first. The page reads only the bins of the region from the file.' })
+      return
+    }
+    const win = { chrom: region.chrom, start: region.start, end: region.end }
+    readHicWindow(file, win, CONTACT_RES)
+      .then((text) => uploadFile('contacts', new File([text], `${file.name.replace(/\.hic$/i, '')}.${region.chrom}_${region.start}_${region.end}.bedpe`), where))
+      .then((result) => put({ result }))
+      .catch((e: Error) => put({ failure: `${file.name} could not be read`, fix: e.message }))
   }
 
   const blocking = [...loops.map((l) => [l, `${l.factor} file`] as const), ...(['anchors', 'contacts', 'enhancers'] as const).map((k) => [single[k], `${k} file`] as const)].find(
@@ -249,10 +389,12 @@ export function OwnData({
             />
           )}
           {active === 'contacts' && (
-            <OneFile
-              kind="contacts"
-              rule="Contact pairs of the region in BEDPE, columns chr1 start1 end1 chr2 start2 end2 count. A job on your own cell type needs contacts."
+            <ContactsTab
+              region={region}
+              maxMb={maxMb}
               entry={single.contacts}
+              onLink={addLink}
+              onLocal={addLocal}
               onFile={(f) => addSingle('contacts', f)}
               onRemove={() => setSingle((s) => ({ ...s, contacts: null }))}
             />
@@ -268,12 +410,14 @@ export function OwnData({
           )}
         </div>
         <footer className="dialog-foot">
-          <p className="foot-note">{blocking ? `Fix or remove the ${blocking[1]} to continue.` : checking ? 'Checking the files.' : ''}</p>
+          <p className={`foot-note${blocking ? ' bad' : ''}`}>
+            {blocking ? `Fix or remove the ${blocking[1]} to continue.` : checking ? 'Checking the files.' : active === 'contacts' ? "The map replaces the cell type's map for this job." : ''}
+          </p>
           <button type="button" className="secondary" onClick={onClose}>
             Cancel
           </button>
           <button type="button" className="primary" disabled={!!blocking || checking || !anything} onClick={use}>
-            Use these loops
+            {USE_LABEL[active]}
           </button>
         </footer>
       </div>

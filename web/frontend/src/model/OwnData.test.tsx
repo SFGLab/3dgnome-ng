@@ -3,7 +3,10 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
+import { readHicWindow } from './hicLocal'
 import { OwnData } from './OwnData'
+
+vi.mock('./hicLocal', () => ({ readHicWindow: vi.fn(async () => 'chr1\t11600000\t11625000\tchr1\t11900000\t11925000\t12\n') }))
 
 const RESULTS: Record<string, object> = {
   'GM12878_CTCF_loops.bedpe': { ok: true, summary: '12,433 loops read. 118 are in the region.', error: null },
@@ -14,6 +17,13 @@ const RESULTS: Record<string, object> = {
   },
   'anchors.bed': { ok: true, summary: '1,204 anchors read, with orientations.', error: null },
   'enhancers.bed': { ok: true, summary: '71 enhancers read.', error: null },
+  'region.bedpe': { ok: true, summary: '5,500 contacts read.', error: null },
+  'sample.chr1_11500000_12600000.bedpe': { ok: true, summary: '1 contact read.', error: null },
+}
+
+const LINK_OK = {
+  id: 'linkupload1', kind: 'contacts', name: '4DNFI1UEG1HD.hic', size: 41_016_250_368, samples: [], ok: true, error: null,
+  summary: 'Resolutions from 5 kb to 2.5 Mb, 25 kb is used. 1,284,512 contacts in chr1:11,500,000-12,600,000 are read and 5,500 are kept.',
 }
 
 let n = 0
@@ -22,6 +32,12 @@ function mock() {
     [/^\/api\/uploads$/, (_u, init) => {
       const file = (init!.body as FormData).get('file') as File
       return [201, { id: `upload${++n}abcd`, kind: (init!.body as FormData).get('kind'), name: file.name, size: 2_100_000, samples: [], ...RESULTS[file.name] }]
+    }],
+    [/^\/api\/uploads\/link$/, (_u, init) => {
+      const url = String((init!.body as FormData).get('url'))
+      return url.includes('example.org')
+        ? [400, { error: 'example.org does not answer range requests', fix: 'The server would have to download the whole file. Host the file where range requests work, or choose Local .hic file and the page reads your region in the browser.' }]
+        : [201, LINK_OK]
     }],
     [/^\/api\/uploads\/[\w-]+\/preview$/, () => [200, [[11_600_000, 11_900_000, 7]]]],
   ])
@@ -87,6 +103,62 @@ describe('Your own data dialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Use these loops' }))
     await waitFor(() => expect(onUse).toHaveBeenCalled())
     expect(onUse.mock.calls[0][0].loops[0]).toMatchObject({ factor: 'CTCF', upload: { name: 'GM12878_CTCF_loops.bedpe', ok: true } })
+  })
+
+  it('offers three routes to a contact map and the .mcool hint', () => {
+    renderDialog()
+    fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
+    expect(screen.getAllByRole('radio').map((r) => r.querySelector('.route-title')?.textContent)).toEqual(['Link to a file', 'Local .hic file', 'BEDPE of the region'])
+    expect(screen.getByText(/The server must answer range requests/)).toBeInTheDocument()
+    expect(screen.getByText(/gnome3d-ng extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe/)).toBeInTheDocument()
+    expect(screen.getByText("The map replaces the cell type's map for this job.")).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Use this map' })).toBeInTheDocument()
+  })
+
+  it('reads a map by link and shows its summary', async () => {
+    renderDialog()
+    fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
+    fireEvent.change(screen.getByLabelText('Link to a .hic or .mcool file'), { target: { value: 'https://4dn-open-data-public.s3.amazonaws.com/x/4DNFI1UEG1HD.hic' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Read' }))
+    expect(await screen.findByText('4DNFI1UEG1HD.hic, 38.2 GB')).toBeInTheDocument()
+    expect(screen.getByText(/1,284,512 contacts/)).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /Contacts/ })).toHaveTextContent('1 file')
+  })
+
+  it('shows the refusal of a link with its fix', async () => {
+    renderDialog()
+    fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
+    fireEvent.change(screen.getByLabelText('Link to a .hic or .mcool file'), { target: { value: 'https://example.org/map.hic' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Read' }))
+    expect(await screen.findByText('example.org does not answer range requests')).toBeInTheDocument()
+    expect(screen.getByText(/Host the file where range requests work/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Use this map' })).toBeDisabled()
+  })
+
+  it('reads the region of a local .hic file in the browser and uploads it', async () => {
+    renderDialog()
+    fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /Local .hic file/ }))
+    fireEvent.change(screen.getByLabelText(/Choose a .hic file/), { target: { files: [new File(['x'], 'sample.hic')] } })
+    expect(await screen.findByText('1 contact read.')).toBeInTheDocument()
+    expect(vi.mocked(readHicWindow)).toHaveBeenCalledWith(expect.any(File), { chrom: 'chr1', start: 11_500_000, end: 12_600_000 }, 25_000)
+  })
+
+  it('takes a BEDPE of the region', async () => {
+    renderDialog()
+    fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /BEDPE of the region/ }))
+    fireEvent.change(screen.getByLabelText(/Choose a BEDPE file/), { target: { files: [new File(['x'], 'region.bedpe')] } })
+    expect(await screen.findByText('5,500 contacts read.')).toBeInTheDocument()
+  })
+
+  it('keeps to the writing rules on the contacts tab', async () => {
+    const { container } = renderDialog()
+    fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
+    fireEvent.change(screen.getByLabelText('Link to a .hic or .mcool file'), { target: { value: 'https://example.org/map.hic' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Read' }))
+    await screen.findByText('example.org does not answer range requests')
+    expect(checkCopy(container)).toEqual([])
   })
 
   it('keeps to the writing rules', async () => {

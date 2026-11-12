@@ -6,6 +6,7 @@ describe('upload helpers', () => {
     expect(megabytes(2_200_000)).toBe('2.1 MB')
     expect(megabytes(400)).toBe('1 kB')
     expect(megabytes(40_000)).toBe('39 kB')
+    expect(megabytes(41_016_250_368)).toBe('38.2 GB')
   })
 
   it('reads the factor from a file name, CTCF for an unnamed first file', () => {

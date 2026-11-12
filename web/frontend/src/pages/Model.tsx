@@ -156,19 +156,6 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           {schema.data && <SettingsTree schema={schema.data} values={form.settings} onChange={(settings) => set({ settings })} />}
           {stepError(5)}
         </Step>
-        {dialog && (
-          <OwnData
-            cell={lookup}
-            region={region.data ?? null}
-            initial={form.own}
-            tab={dialog.tab}
-            onClose={() => setDialog(null)}
-            onUse={(own) => {
-              set(dialog.cell ? { own, cell: 'own' } : { own })
-              setDialog(null)
-            }}
-          />
-        )}
         <div className="submit-row">
           <button type="button" className="submit" disabled={!form.region.trim() || submit.isPending} onClick={() => submit.mutate()}>
             {`Build ${form.structures} structure${form.structures === 1 ? '' : 's'}`} <ArrowRight size={16} aria-hidden />
@@ -176,6 +163,20 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           <span className="timing">The job page shows the progress of the job and its place in the queue.</span>
         </div>
       </div>
+      {dialog && (
+        <OwnData
+          cell={lookup}
+          region={region.data ?? null}
+          initial={form.own}
+          tab={dialog.tab}
+          maxMb={catalog.data?.max_region_mb ?? 20}
+          onClose={() => setDialog(null)}
+          onUse={(own) => {
+            set(dialog.cell ? { own, cell: 'own' } : { own })
+            setDialog(null)
+          }}
+        />
+      )}
     </div>
   )
 }
