@@ -6,8 +6,9 @@ stages, and keeps a kernel running the rest, with most of the card's cores unuse
 comes from several jobs on each card at once. Each job must stay inside its own memory, and a job must not
 stop another.
 
-The production server has two RTX 2080 cards, 8 GiB each if they are not the 11 GiB Ti, compute
-capability 7.5. Each worker is pinned to one card with `CUDA_VISIBLE_DEVICES`. A worker that sees
+The production server, team-aragorn, has two RTX 2080 SUPER cards of 8 GiB, compute capability
+7.5, driver 580 with CUDA 13.0, 36 cores and 125 GB of memory. The MPS control daemon is
+installed. Persistence mode is off. Each worker is pinned to one card with `CUDA_VISIBLE_DEVICES`. A worker that sees
 both cards would spread one job over both in the multi GPU groups mode, and every job would then
 compete for both cards.
 
