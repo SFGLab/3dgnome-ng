@@ -284,24 +284,33 @@ def combine_changes(by_factor: list[tuple[str, str]]) -> str:
     return "; ".join(dict.fromkeys(w for _, w in real))
 
 
-def variant_check(cell, region, factors: str, vcf: Path, sample: str, haplotype: int) -> dict[str, object]:  # noqa: ANN001
+def variant_check(cell, region, factors: str, vcf: Path, sample: str, haplotype: int, own_loops: list[tuple[str, Path]] | None = None, own_anchors: Path | None = None) -> dict[str, object]:  # noqa: ANN001, PLR0913
     """What a sample's variants on one haplotype do to the loops of a region, one variant at a
-    time, with the counts applied and skipped.
+    time, with the counts applied and skipped. Own loops replace the cell type's, with their
+    anchors file or their merged ends as anchors, as the job builds them.
 
     @raises KeyError when the sample is not in the VCF
     """
     from personal3d import motifs, rewrite
 
-    from .inputs import _clusters, _read
+    from .inputs import _clusters, _loop_end_anchors, _read
     from .svs import sample_variants
 
     records, skipped_all = sample_variants(vcf, sample, region)
     mine = [r for r in records if r["haps"][haplotype]]
     chrom = region.chrom
-    anchors = _read(cell.anchors_for(factors), chrom, 4).sort_values(1).reset_index(drop=True)
+    if own_loops:
+        anchors = _read(own_anchors, chrom, 4) if own_anchors else _loop_end_anchors([p for _, p in own_loops], chrom)
+        if anchors.shape[1] < 4:
+            anchors[3] = "N"
+        sources = own_loops
+    else:
+        anchors = _read(cell.anchors_for(factors), chrom, 4)
+        sources = cell.clusters_for(factors)
+    anchors = anchors.sort_values(1).reset_index(drop=True)
     length = int(anchors[2].max()) + 10_000_000 if len(anchors) else region.end + 10_000_000
     nets = []
-    for factor, path in cell.clusters_for(factors):
+    for factor, path in sources:
         clusters = _clusters(_read(path, chrom, 7), anchors)
         segs = rewrite.domains(clusters)
         base = rewrite.apply(clusters, segs, {chrom: length}, [], None, None, motifs.THRESHOLD)

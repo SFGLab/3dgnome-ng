@@ -25,6 +25,7 @@ function mock() {
   checks = []
   return mockApi([
     [/^\/api\/uploads$/, () => [201, { id: 'vcfupload1', kind: 'vcf', name: 'HG00733.sv.vcf.gz', size: 48_000_000, ok: true, summary: 'VCF with 2 samples.', error: null, samples: ['HG00733', 'HG00512'] }]],
+    [/^\/api\/uploads\/[\w-]+\/preview$/, () => [200, [[11_600_000, 11_900_000, 7]]]],
     [/^\/api\/variants\/check$/, (_u, init) => {
       checks.push(init!.body as FormData)
       return [200, CHECK]
@@ -90,6 +91,14 @@ describe('Structural variants dialog', () => {
     expect(checks[0].get('sv_set')).toBe('HGSVC')
     fireEvent.click(screen.getByRole('button', { name: 'Apply 6 variants' }))
     expect(onApply).toHaveBeenCalledWith({ svSet: 'HGSVC', sample: 'HG00733', haplotype: 0, vcf: null })
+  })
+
+  it('checks the variants against own loops and draws them', async () => {
+    const mine = { id: 'loopsupload1', kind: 'loops' as const, name: 'mine.bedpe', size: 10, ok: true, summary: '', error: null, samples: [] }
+    renderDialog({ own: { loops: [{ factor: 'H3K27ac', upload: mine }], anchors: null, contacts: null, enhancers: null } })
+    await screen.findByRole('table')
+    expect(JSON.parse(String(checks[0].get('own'))).loops).toEqual([{ factor: 'H3K27ac', upload: 'loopsupload1' }])
+    await waitFor(() => expect(screen.getByRole('img', { name: /Variants in chr1/ }).querySelectorAll('.arc.own')).toHaveLength(1))
   })
 
   it('keeps to the writing rules', async () => {

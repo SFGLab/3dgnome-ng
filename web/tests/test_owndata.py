@@ -118,6 +118,12 @@ def main() -> int:
         v = c.post("/api/variants/check", data={"cell": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "sample": "NOBODY", "haplotype": "0", "upload": vid})
         check("a sample not in the VCF is a 400 on the sample field", v.status_code == 400 and v.json()["field"] == "sample", v.text)
 
+        mine = up("loops", "mine.bedpe", b"chr1\t900000\t901000\tchr1\t1300000\t1301000\t5\n").json()["id"]
+        own = json.dumps({"loops": [{"factor": "H3K27ac", "upload": mine}]})
+        v = c.post("/api/variants/check", data={"cell": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "sample": "P1", "haplotype": "0", "sv_set": "DEMO", "own": own})
+        dele = next((x for x in v.json().get("variants", []) if x["type"] == "DEL"), {})
+        check("with own loops the check describes the change to those loops", "H3K27ac" in dele.get("change", "") and "CTCF" not in dele.get("change", ""), v.text[:300])
+
         from gnome3d_web.owndata import combine_changes
 
         check("one verb over two factors is summed with the split", combine_changes([("CTCF", "lengthens 9 loops"), ("RNAPII", "lengthens 2 loops")]) == "lengthens 11 loops, 9 CTCF and 2 RNAPII")

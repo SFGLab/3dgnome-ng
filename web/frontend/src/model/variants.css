@@ -106,8 +106,17 @@
   stroke: var(--ctcf);
 }
 
-.sv-track .arc.rnapii {
+.sv-track .arc.rnapii,
+.sv-track .arc.own.f1 {
   stroke: var(--rnapii);
+}
+
+.sv-track .arc.own.f0 {
+  stroke: var(--ctcf);
+}
+
+.sv-track .arc.own.f2 {
+  stroke: var(--original);
 }
 
 .sv-track .axis {

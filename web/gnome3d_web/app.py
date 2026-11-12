@@ -280,7 +280,7 @@ def create_app() -> FastAPI:
         return JSONResponse(owndata.preview(d, reg) if reg else [])
 
     @app.post("/api/variants/check")
-    def api_variants_check(cell: str = Form(...), region: str = Form(...), factors: str = Form("CTCF"), sample: str = Form(...), haplotype: int = Form(0), upload: str = Form(""), sv_set: str = Form("")) -> JSONResponse:
+    def api_variants_check(cell: str = Form(...), region: str = Form(...), factors: str = Form("CTCF"), sample: str = Form(...), haplotype: int = Form(0), upload: str = Form(""), sv_set: str = Form(""), own: str = Form("")) -> JSONResponse:  # noqa: PLR0913
         base = cell if cell in catalog.cell_types else next(iter(catalog.cell_types))
         try:
             r = parse_region(region, catalog.cell_types[base].genes(), s.max_span)
@@ -293,7 +293,13 @@ def create_app() -> FastAPI:
         else:
             return JSONResponse({"error": "Choose a hosted call set or upload a VCF.", "field": "sv_set"}, 400)
         try:
-            out = owndata.variant_check(catalog.cell_types[base], r, factors if factors in FACTOR_CHOICES else "CTCF", vcf, sample, 1 if haplotype == 1 else 0)
+            own_dirs = own_uploads(json.loads(own or "{}"))
+        except (JobError, json.JSONDecodeError) as e:
+            return JSONResponse({"error": str(e), "field": "own"}, 400)
+        own_loops = [(f, owndata.data_file(d)) for f, d in own_dirs.get("loops", [])]
+        own_anchors = owndata.data_file(own_dirs["anchors"]) if "anchors" in own_dirs else None
+        try:
+            out = owndata.variant_check(catalog.cell_types[base], r, factors if factors in FACTOR_CHOICES else "CTCF", vcf, sample, 1 if haplotype == 1 else 0, own_loops, own_anchors)
         except KeyError:
             return JSONResponse({"error": f"{sample!r} is not a sample of this VCF", "field": "sample"}, 400)
         return JSONResponse(out)
