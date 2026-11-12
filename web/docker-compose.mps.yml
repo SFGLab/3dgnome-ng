@@ -3,15 +3,20 @@
 #   docker compose -f docker-compose.yml -f docker-compose.mps.yml up -d
 # The workers share the host IPC namespace and the daemon's pipe directory, /tmp/nvidia-mps by
 # default, MPS_PIPE_DIRECTORY to change it. A daemon started without root serves only its own
-# user; MPS_USER=$(id -u):$(id -g) runs the workers as that user.
+# user; MPS_USER=$(id -u):$(id -g) runs the web process and the workers as that user, since both
+# write the job directories.
 x-mps: &mps
   ipc: host
   user: "${MPS_USER:-0:0}"
   environment:
     CUDA_MPS_PIPE_DIRECTORY: /tmp/nvidia-mps
+    # The image's source directory belongs to root. Numba keeps its cache next to the results.
+    NUMBA_CACHE_DIR: /results/.numba-cache
   volumes:
     - "${MPS_PIPE_DIRECTORY:-/tmp/nvidia-mps}:/tmp/nvidia-mps"
 
 services:
+  web:
+    user: "${MPS_USER:-0:0}"
   worker-gpu0: *mps
   worker-gpu1: *mps
