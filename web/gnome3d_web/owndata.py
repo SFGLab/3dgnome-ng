@@ -224,7 +224,9 @@ def clean_copy(d: Path, dst: Path) -> Path:
 
 def result(d: Path, c: Check) -> dict[str, object]:
     m = meta(d)
-    return {"id": m["id"], "kind": m["kind"], "name": m["name"], "size": m["size"], "ok": c.ok, "summary": c.summary, "error": asdict(c.error) if c.error else None, "samples": c.samples}
+    # A map read by link is shown by the remote file's name and size, not the window kept.
+    name, size = m.get("link_name", m["name"]), int(m.get("link_size", m["size"]))  # type: ignore[arg-type]
+    return {"id": m["id"], "kind": m["kind"], "name": name, "size": size, "ok": c.ok, "summary": c.summary, "error": asdict(c.error) if c.error else None, "samples": c.samples}
 
 
 def preview(d: Path, region: tuple[str, int, int]) -> list[list[int]]:

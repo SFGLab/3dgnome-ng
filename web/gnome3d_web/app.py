@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import io
 import json
 import re
 import secrets
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -13,7 +15,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTex
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import explore, owndata
+from . import explore, owndata, remote
 from .catalog import BACKGROUNDS, FACTOR_CHOICES, Catalog
 from .jobs import JobRequest, _member, request_key
 from .queue import enqueue, queue_position, sweep_private
@@ -239,6 +241,27 @@ def create_app() -> FastAPI:
         except owndata.UploadTooLarge as e:
             return JSONResponse({"error": str(e)}, 413)
         c = owndata.check(kind, owndata.data_file(d), reg)
+        owndata.record_check(d, c)
+        return JSONResponse(owndata.result(d, c), 201)
+
+    @app.post("/api/uploads/link")
+    def api_upload_link(url: str = Form(...), cell: str = Form(""), region: str = Form("")) -> JSONResponse:
+        try:
+            reg = region_of(cell, region)
+        except RegionError as e:
+            return JSONResponse({"error": str(e), "field": "region"}, 400)
+        if reg is None:
+            return JSONResponse({"error": "Enter the region first.", "fix": "The server reads only the bins of the region from the file.", "field": "region"}, 400)
+        base = catalog.cell_types[cell] if cell in catalog.cell_types else next(iter(catalog.cell_types.values()))
+        try:
+            per_mb = remote.hosted_density(base.path("singletons"), reg[0])
+            text, size, summary = remote.link_window(url, *reg, per_mb, base.name, s.link_allow_private)
+        except remote.RemoteError as e:
+            return JSONResponse({"error": str(e), "fix": e.fix, "field": "url"}, 400)
+        stem = urlparse(url).path.rsplit("/", 1)[-1]
+        extra = {"link": url, "link_name": stem, "link_size": str(size)}
+        d = owndata.store(io.BytesIO(text), f"{stem}.{reg[0]}_{reg[1]}_{reg[2]}.bedpe", "contacts", uploads, s.upload_max_mb << 20, extra)
+        c = owndata.Check(True, summary)
         owndata.record_check(d, c)
         return JSONResponse(owndata.result(d, c), 201)
 
