@@ -21,16 +21,36 @@ DATA_DIR=/srv/gnome3d/data RESULTS_DIR=/srv/gnome3d/results PORT=8000 docker com
 The image builds from the repository root, so the engine it runs is the checkout's. `GPU=0`
 builds a CPU image; then remove the worker's `deploy` block and see "CPU only" below.
 
-Several workers can share one GPU. Give each a share of the card's memory, for example two
-workers at 0.45 each:
+## Workers and GPUs
 
-```bash
-XLA_PYTHON_CLIENT_MEM_FRACTION=0.45 docker compose up -d --scale worker=2
-```
+docker-compose.yml has one worker group per GPU, `worker-gpu0` and `worker-gpu1`, each worker
+pinned to its card. `WORKERS_PER_GPU` sets the workers per card, 2 by default, and
+`GPU_POOL_GIB` the memory pool of each, 1.5 GiB by default. On a machine with one GPU, remove
+`worker-gpu1`.
 
-The shares add up to less than 1, and the rest of the card is for the CUDA context of each
-process. Without the variable the first job takes 75 percent of the card and a job that starts
-next to it takes what is free, at least 1 GiB, and logs the pool it got.
+A job of 20 Mb and 10 structures needs 0.65 GiB of GPU memory and runs at the same speed in any
+pool from 1 GiB up. The largest array is the bead distance matrix, which grows with the square
+of the window. The pools of the workers on a card and 0.5 GiB per worker for its CUDA context
+add up to less than the card. A worker whose pool does not fit the free memory refuses to start
+its job and says how much is free.
+
+Measured 2026-11-12 on an RTX 3090 with the same job:
+
+| Jobs at once on one card | Jobs per hour | With MPS |
+|---|---|---|
+| 1 | 39.3 | 42.8 |
+| 2 | 37.3 | 46.5 |
+| 3 | 39.4 | 47.3 |
+
+Without MPS the processes on a card take turns and a second worker gains nothing. With the
+NVIDIA MPS daemon running on the host, kernels of several processes run at once and two workers
+per card give 18 percent more than one. A third adds nothing. MPS in containers needs the host
+daemon's pipe directory mounted and `ipc: host` on the workers. Without MPS set
+`WORKERS_PER_GPU=1`.
+
+Without Docker, `QUEUE=thread` runs jobs in the web process on the slots of `GPU_SLOTS`, one GPU
+id per slot, `0,0,1,1` for two jobs at once on each of two cards. Waiting jobs are lost when the
+process stops.
 
 ## Populate the data directory
 
@@ -82,6 +102,8 @@ All by environment, see `gnome3d_web/settings.py`. The ones that matter:
 | `QUEUE` | `rq` | `rq` with `REDIS_URL`, `thread` or `inline` for development |
 | `RETENTION_DAYS` | 14 | a private job is deleted after this many days, as the form says |
 | `ENGINE_CMD` | `python -m gnome3d.cli` | how the worker starts the engine |
+| `GPU_SLOTS` | `0` | the slots of the `thread` queue, one GPU id per slot |
+| `GNOME3D_GPU_POOL_GIB` | unset | the GPU memory pool of each engine process in GiB |
 
 HiCDiffusion is offered only when `HICDIFFUSION_DIR`, `HICDIFFUSION_PYTHON`,
 `HICDIFFUSION_MODELS` and `REFERENCE_FASTA` are all set, the checkout, its own interpreter (its

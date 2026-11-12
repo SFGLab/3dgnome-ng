@@ -1,10 +1,12 @@
-"""Running jobs: rq workers in production, a thread of the web process for development."""
+"""Running jobs: rq workers, or a local pool of slots in the web process, one GPU per slot."""
 
 from __future__ import annotations
 
+import queue
 import shutil
 import threading
 import time
+import traceback
 from dataclasses import asdict
 from pathlib import Path
 
@@ -13,12 +15,57 @@ from .jobs import JobRequest, run_job
 from .settings import Settings
 
 
-def work(req_dict: dict[str, object], job_dir: str) -> str:
-    """The function a worker runs, with everything it needs read from the environment."""
+def work(req_dict: dict[str, object], job_dir: str, gpu: str | None = None, engine: list[str] | None = None) -> str:
+    """The function a worker runs, with everything it needs read from the environment. `gpu`
+    is the only GPU the engine sees, all of the worker's GPUs when None."""
     s = Settings.from_env()
     catalog = Catalog.load(s.data_dir)
-    run_job(JobRequest(**req_dict), catalog, Path(job_dir), engine=s.engine_cmd)  # type: ignore[arg-type]
+    extra = {"CUDA_VISIBLE_DEVICES": gpu} if gpu is not None else None
+    run_job(JobRequest(**req_dict), catalog, Path(job_dir), engine=engine or s.engine_cmd, env_extra=extra)  # type: ignore[arg-type]
     return job_dir
+
+
+class LocalPool:
+    """Runs jobs in the web process on a fixed set of slots, one GPU id per slot. A job waits
+    for a free slot, and its engine sees only the slot's GPU. Waiting jobs are lost when the
+    process stops."""
+
+    def __init__(self, slots: list[str], engine: list[str] | None = None) -> None:
+        self._jobs: queue.Queue[tuple[dict[str, object], str]] = queue.Queue()
+        self._engine = engine
+        for gpu in slots:
+            threading.Thread(target=self._serve, args=(gpu,), daemon=True).start()
+
+    def _serve(self, gpu: str) -> None:
+        while True:
+            req_dict, job_dir = self._jobs.get()
+            try:
+                work(req_dict, job_dir, gpu, self._engine)
+            except Exception:  # noqa: BLE001
+                # A job that raises before run_job records it must not end the slot.
+                traceback.print_exc()
+            finally:
+                self._jobs.task_done()
+
+    def submit(self, req_dict: dict[str, object], job_dir: str) -> None:
+        """Queues one job."""
+        self._jobs.put((req_dict, job_dir))
+
+    def join(self) -> None:
+        """Waits until every queued job has finished."""
+        self._jobs.join()
+
+
+_POOL: LocalPool | None = None
+_POOL_LOCK = threading.Lock()
+
+
+def _local_pool(s: Settings) -> LocalPool:
+    global _POOL
+    with _POOL_LOCK:
+        if _POOL is None:
+            _POOL = LocalPool(s.gpu_slots, s.engine_cmd)
+        return _POOL
 
 
 def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
@@ -27,7 +74,7 @@ def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
         work(asdict(req), str(job_dir))
         return
     if s.queue == "thread":
-        threading.Thread(target=work, args=(asdict(req), str(job_dir)), daemon=True).start()
+        _local_pool(s).submit(asdict(req), str(job_dir))
         return
     from redis import Redis
     from rq import Queue

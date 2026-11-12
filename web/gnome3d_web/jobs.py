@@ -109,9 +109,12 @@ def _lifted_marks(cell, chrom: str, svs: list):  # noqa: ANN001, ANN202
     return genes, enh[(enh[1] >= 0) & (enh[2] > 0)]
 
 
-def run_job(req: JobRequest, catalog: Catalog, job: Path, engine: list[str] | None = None) -> Path:
+def run_job(
+    req: JobRequest, catalog: Catalog, job: Path, engine: list[str] | None = None, env_extra: dict[str, str] | None = None
+) -> Path:
     """Run one job in `job` and return that directory. `engine` is the command that starts
-    the engine, `python -m gnome3d.cli` from `ENGINE_PYTHON` by default."""
+    the engine, `python -m gnome3d.cli` from `ENGINE_PYTHON` by default. `env_extra` is added to
+    the engine's environment, the GPU of a queue slot for example."""
     job.mkdir(parents=True, exist_ok=True)
     (job / "request.json").write_text(json.dumps(asdict(req), indent=2))
     _status(job, state="running", stage="inputs", started=time.time())
@@ -134,7 +137,7 @@ def run_job(req: JobRequest, catalog: Catalog, job: Path, engine: list[str] | No
 
         cmd = list(engine) if engine else [os.environ.get("ENGINE_PYTHON", "python"), "-m", "gnome3d.cli"]
         cmd += ["--config", str(inputs.config), "--region", inputs.region, "--members", f"0-{req.n_models - 1}", "--out", str(job / "models")]
-        env = dict(os.environ)
+        env = dict(os.environ) | (env_extra or {})
         if "ENGINE_ROOT" in env:
             env["PYTHONPATH"] = env["ENGINE_ROOT"] + (":" + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
         with log.open("w") as fh:

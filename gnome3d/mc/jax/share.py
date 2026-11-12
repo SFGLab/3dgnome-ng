@@ -57,6 +57,24 @@ def plan_gpu_pool(env: Mapping[str, str], gpus: Sequence[tuple[int, int]]) -> Po
         return PoolPlan(None, "")
     total, free = min(gpus, key=lambda g: g[1])
     asked = env.get("XLA_PYTHON_CLIENT_MEM_FRACTION")
+    gib = env.get("GNOME3D_GPU_POOL_GIB")
+    if gib is not None:
+        if asked is not None:
+            raise GpuShareError(
+                f"GNOME3D_GPU_POOL_GIB={gib} and XLA_PYTHON_CLIENT_MEM_FRACTION={asked} are both set. "
+                "Set one of them."
+            )
+        pool = float(gib) * GIB
+        if pool + RESERVE_BYTES > free:
+            raise GpuShareError(
+                f"GNOME3D_GPU_POOL_GIB={gib} asks for a pool of {pool / GIB:.1f} GiB and the GPU has "
+                f"{free / GIB:.1f} GiB free. Other processes hold the rest. Lower the pool so the "
+                "processes on this card fit, or wait for one to finish."
+            )
+        return PoolPlan(
+            int(pool / total * 10000) / 10000,
+            f"GPU memory pool {pool / GIB:.1f} GiB of {total / GIB:.1f} GiB",
+        )
     if asked is not None:
         pool = float(asked) * total
         if pool + RESERVE_BYTES > free:
@@ -123,6 +141,6 @@ def configure_gpu_pool(env: MutableMapping[str, str] | None = None) -> None:
         return
     plan = plan_gpu_pool(env, visible_gpu_memory(env))
     if plan.fraction is not None:
-        env["XLA_PYTHON_CLIENT_MEM_FRACTION"] = f"{plan.fraction:.3f}"
+        env["XLA_PYTHON_CLIENT_MEM_FRACTION"] = f"{plan.fraction:.4f}"
     if plan.line:
         log.status(LOG, "%s", plan.line)

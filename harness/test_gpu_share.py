@@ -82,6 +82,34 @@ def main() -> int:
         str(p),
     )
 
+    p = plan_gpu_pool({"GNOME3D_GPU_POOL_GIB": "1.5"}, [(CARD, int(15.4 * GIB))])
+    check(
+        "a pool in GiB becomes the fraction of the card",
+        p.fraction is not None and abs(p.fraction - 1.5 / 16) < 0.001 and "1.5 GiB" in p.line,
+        str(p),
+    )
+    p = plan_gpu_pool({"GNOME3D_GPU_POOL_GIB": "1.5"}, [(8 * GIB, int(7.6 * GIB))])
+    check(
+        "the same pool on an 8 GiB card is twice the fraction",
+        p.fraction is not None and abs(p.fraction - 1.5 / 8) < 0.001,
+        str(p),
+    )
+
+    msg = raises({"GNOME3D_GPU_POOL_GIB": "1.5"}, [(CARD, int(1.2 * GIB))])
+    check(
+        "a pool in GiB over the free memory is refused", "1.5 GiB" in msg and "1.2 GiB" in msg, msg
+    )
+
+    msg = raises(
+        {"GNOME3D_GPU_POOL_GIB": "1.5", "XLA_PYTHON_CLIENT_MEM_FRACTION": "0.2"},
+        [(CARD, int(15.4 * GIB))],
+    )
+    check(
+        "a pool in GiB and a fraction together are refused",
+        "GNOME3D_GPU_POOL_GIB" in msg and "XLA_PYTHON_CLIENT_MEM_FRACTION" in msg,
+        msg,
+    )
+
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     return 1 if FAIL else 0
 

@@ -2,7 +2,10 @@
 
 DATA_DIR      the hosted data, with catalog.json at its root
 RESULTS_DIR   jobs, shared ones under jobs/, private ones under private/
-QUEUE         "rq" with REDIS_URL, or "inline" to run each job in a thread of the web process
+QUEUE         "rq" with REDIS_URL, "thread" for a pool of slots in the web process, or "inline"
+              to run each job in the request, for tests
+GPU_SLOTS     the slots of the "thread" queue, one GPU id per slot, default "0"; "0,0,1,1" runs
+              two jobs at once on each of two GPUs
 ENGINE_CMD    the command that starts the engine, default ENGINE_PYTHON -m gnome3d.cli
 RETENTION_DAYS  how long a private job is kept, default 14
 HICDIFFUSION_DIR, HICDIFFUSION_PYTHON, HICDIFFUSION_MODELS, REFERENCE_FASTA  the optional
@@ -27,6 +30,7 @@ class Settings:
     redis_url: str
     engine_cmd: list[str] | None
     retention_days: int
+    gpu_slots: list[str]
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -38,6 +42,7 @@ class Settings:
             redis_url=os.environ.get("REDIS_URL", "redis://redis:6379/0"),
             engine_cmd=shlex.split(cmd) if cmd else None,
             retention_days=int(os.environ.get("RETENTION_DAYS", "14")),
+            gpu_slots=[g.strip() for g in os.environ.get("GPU_SLOTS", "0").split(",") if g.strip()],
         )
 
     @staticmethod
