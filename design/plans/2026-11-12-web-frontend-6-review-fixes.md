@@ -55,12 +55,13 @@ submitting an example's request returns the shared job, finished or running, so 
 - A queued or running job shows a bar over its stages, queued, inputs, HiCDiffusion when asked, modelling and marks, the modelling share filled by structures written out of those asked, its place in the queue, and below it a status log: each stage with its start time, then the last lines of engine.log, refreshed with the summary.
 - Tests: the summary carries the stages and the count of written structures; the page shows the bar at the right share, the stage lines and the log tail; a failed job keeps its log; checkCopy clean.
 
-### Task 5: Depth in the 3D structure
+### Task 5: Depth and hover in the 3D structure
 
 **Files:** `web/frontend/src/job/Scene.tsx`, `StructureView.tsx`. Test `src/job/StructureView.test.tsx` if one exists, else a render check.
 
 - The chain is drawn as a lit tube with a light from the camera, and fog from the middle of the structure to its far side, so near strands are dark and sharp and far strands fade toward the background, the way a molecular viewer shades depth.
-- Check: render the TNFRSF8 job on team-frodo before and after, light and dark.
+- The bead under the pointer is marked plainly: a ring and a larger sphere in a colour no mark uses, the stretch of chain around it brightened, and its position in a label beside the pointer.
+- Check: render the TNFRSF8 job on team-frodo before and after, light and dark, with a bead hovered.
 
 ### Task 6: On team-frodo
 
