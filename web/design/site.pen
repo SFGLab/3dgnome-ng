@@ -9119,7 +9119,7 @@
       "name": "Cite page",
       "clip": true,
       "width": 1440,
-      "height": 3600,
+      "height": 3720,
       "fill": "$bg",
       "layout": "vertical",
       "children": [
@@ -10977,6 +10977,80 @@
                               "name": "DOI",
                               "fill": "$accent",
                               "content": "doi:10.1371/journal.pcbi.1000153",
+                              "fontFamily": "$mono",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "MU0uV",
+                      "name": "Ref Mirny",
+                      "width": "fill_container",
+                      "stroke": "$line",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "layout": "vertical",
+                      "gap": 3,
+                      "padding": [
+                        12,
+                        0
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "DR1sc",
+                          "name": "Title",
+                          "fill": "$ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "The fractal globule as a model of chromatin architecture in the cell",
+                          "lineHeight": 1.4,
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "kPUaw",
+                          "name": "Authors",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Mirny LA",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "VdgFz",
+                          "name": "Venue",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "v1Ywe7",
+                              "name": "Journal",
+                              "fill": "$muted",
+                              "content": "Chromosome Research 19, 37-51 (2011)",
+                              "fontFamily": "$font",
+                              "fontSize": 13,
+                              "fontWeight": "normal",
+                              "fontStyle": "italic"
+                            },
+                            {
+                              "type": "text",
+                              "id": "JJ6lv",
+                              "name": "DOI",
+                              "fill": "$accent",
+                              "content": "doi:10.1007/s10577-010-9177-0",
                               "fontFamily": "$mono",
                               "fontSize": 12,
                               "fontWeight": "normal"
@@ -15849,11 +15923,11 @@
       "type": "frame",
       "id": "n6RrWu",
       "x": 0,
-      "y": 5020,
+      "y": 5140,
       "name": "Method page",
       "clip": true,
       "width": 1440,
-      "height": 5810,
+      "height": 5990,
       "fill": "$bg",
       "layout": "vertical",
       "children": [
@@ -16784,7 +16858,7 @@
                       "fill": "#3F3E3B",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "Overlapping loops form a block, and the region is split into blocks at points that no loop spans. Stretches without loops have no beads. Every pair of anchors then gets a target distance from one law in bead units, one bead being the distance at 1 kb. A pair without a loop has the target b(s), with s the genomic separation. A loop of strength q has the target d(s, q).",
+                      "content": "Overlapping loops form a block, the computational form of the chromatin contact domains of Tang and colleagues [16] used by 3D-GNOME [1]. The region is split into blocks at points that no loop spans, and stretches without loops have no beads. Every pair of anchors then gets a target distance from one law in bead units, one bead being the distance at 1 kb. A pair without a loop has the target b(s), with s the genomic separation, a power law as in polymer models of chromatin [3, 17]. A loop of strength q has the target d(s, q).",
                       "lineHeight": 1.6,
                       "fontFamily": "$font",
                       "fontSize": 14,
@@ -16839,7 +16913,7 @@
                       "fill": "#3F3E3B",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "The exponent nu is fitted at load to the contact probability of the cell type's Hi-C, which falls as s to the power of minus 3 nu [3]. If the fit fails, the run prints the reason and uses 0.285. The strength q of a loop is its PET count over the typical count of loops of the same span and factor. A strong loop pulls its anchors to one bead apart, figure 1.",
+                      "content": "The exponent nu is fitted at load to the contact probability P(s) of the cell type's Hi-C, which falls as s to the power of minus 3 nu [3, 17]. If the fit fails, the run prints the reason and uses 0.285. The strength q of a loop is its PET count n over the typical count of loops of the same span and factor f. The target shrinks as the PET count grows, as in 3D-GNOME [1] and MultiMM [5], and saturates at one bead for a strong loop, figure 1. A Hi-C cell converts to a distance the same way, b(s) times observed over expected contacts to the power of minus one third [3].",
                       "lineHeight": 1.6,
                       "fontFamily": "$font",
                       "fontSize": 14,
@@ -21054,6 +21128,74 @@
                           "fontWeight": "normal"
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "AsDFS",
+                      "name": "Ref 16",
+                      "width": "fill_container",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "PcpNS",
+                          "name": "N",
+                          "fill": "$faint",
+                          "textGrowth": "fixed-width",
+                          "width": 34,
+                          "content": "[16]",
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "C5dhyB",
+                          "name": "T",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Tang Z, Luo OJ, Li X, et al. CTCF-mediated human 3D genome architecture reveals chromatin topology for transcription. Cell 163, 1611-1627 (2015). doi:10.1016/j.cell.2015.11.024",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "dEwb9",
+                      "name": "Ref 17",
+                      "width": "fill_container",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "DIH9s",
+                          "name": "N",
+                          "fill": "$faint",
+                          "textGrowth": "fixed-width",
+                          "width": 34,
+                          "content": "[17]",
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Z9HQn",
+                          "name": "T",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Mirny LA. The fractal globule as a model of chromatin architecture in the cell. Chromosome Research 19, 37-51 (2011). doi:10.1007/s10577-010-9177-0",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -21145,7 +21287,7 @@
       "type": "frame",
       "id": "n7ivTu",
       "x": 1540,
-      "y": 5020,
+      "y": 5140,
       "name": "Help page",
       "clip": true,
       "width": 1440,
@@ -25523,7 +25665,7 @@
       "type": "frame",
       "id": "g7Kqf",
       "x": 3080,
-      "y": 5020,
+      "y": 5140,
       "name": "Results page",
       "clip": true,
       "width": 1440,
