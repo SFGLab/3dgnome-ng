@@ -8,6 +8,7 @@ import re
 import secrets
 import shutil
 import threading
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -177,7 +178,7 @@ def create_app() -> FastAPI:
         if st.is_file() and json.loads(st.read_text()).get("state") in ("running", "done", "queued"):
             return f"/jobs/{key}"
         job.mkdir(parents=True, exist_ok=True)
-        st.write_text(json.dumps({"state": "queued"}))
+        st.write_text(json.dumps({"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]}))
         enqueue(s, req, job)
         return f"/jobs/{key}"
 

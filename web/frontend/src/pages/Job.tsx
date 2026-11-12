@@ -4,6 +4,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { jobApi } from '../job/api'
 import { JobSidePanel } from '../job/SidePanel'
 import { Compare } from '../job/Compare'
+import { Progress } from '../job/Progress'
 import { ContactMapTab } from '../job/ContactMapTab'
 import { GenesPanel } from '../job/GenesPanel'
 import { LogTab } from '../job/LogTab'
@@ -104,7 +105,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
           </div>
         ) : (
           <div className="job-message">
-            <p>The job page refreshes itself and opens the structures when the job is done.</p>
+            <Progress summary={s} />
           </div>
         )}
       </div>

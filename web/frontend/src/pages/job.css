@@ -1061,3 +1061,63 @@
   color: var(--muted);
   font-size: 13px;
 }
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+}
+
+.progress-line {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.progress-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--line);
+}
+
+.progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+  transition: width 0.6s ease;
+}
+
+.status-log {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.status-log li {
+  display: flex;
+  justify-content: space-between;
+  max-width: 420px;
+  color: var(--muted);
+}
+
+.status-log li:last-child {
+  color: var(--ink);
+}
+
+.status-time {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.progress-note {
+  margin: 0;
+  color: var(--faint);
+  font-size: 13px;
+}

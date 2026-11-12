@@ -90,6 +90,28 @@ def main() -> int:
         token = priv.rsplit("/", 1)[1]
         check("a private job answers under /api/p", c.get(f"/api/p/{token}/summary").status_code == 200)
         check("a private job is not under /api/jobs", c.get(f"/api/jobs/{token}/summary").status_code == 404)
+        from gnome3d_web import explore as ex
+        from gnome3d_web.jobs import _status
+
+        run = root / "results" / "jobs" / "running0000000001"
+        (run / "models").mkdir(parents=True)
+        (run / "request.json").write_text(json.dumps({"cell_type": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "n_models": 5}))
+        _status(run, state="queued", stage="queued")
+        _status(run, state="running", stage="inputs")
+        _status(run, stage="modelling")
+        _status(run, stage="modelling")
+        for k in (1, 2):
+            (run / "models" / f"chr1_0_3000000_s{k}.cif").write_text("data_x\n")
+        (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(40)))
+        live = ex.summary(run, None)
+        check("a running job lists its stages once each, in order", [st["stage"] for st in live["stages"]] == ["queued", "inputs", "modelling"] and all("at" in st for st in live["stages"]), str(live.get("stages")))
+        check("a running job counts the structures written", live["structures_done"] == 2 and live["structures_asked"] == 5, str(live))
+        (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(39)) + f"wrote {run}/models/s3.cif\n")
+        tail = ex.summary(run, None)["log_recent"]
+        check("the log shows no server path", str(run) not in tail and "wrote models/s3.cif" in tail and str(run) not in ex.log_text(run), tail[-80:])
+        (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(40)))
+        live = ex.summary(run, None)
+        check("a running job carries the end of its engine log", live["log_recent"].splitlines()[-1] == "line 39" and len(live["log_recent"].splitlines()) == 12, str(live.get("log_recent"))[:100])
     return done()
 
 

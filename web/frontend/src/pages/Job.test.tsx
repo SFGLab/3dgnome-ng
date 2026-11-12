@@ -107,6 +107,42 @@ describe('Job explorer', () => {
     expect(await screen.findByRole('tablist', {}, { timeout: 3000 })).toBeInTheDocument()
   })
 
+  it('shows the progress of a running job and its status log', async () => {
+    const running = {
+      ...SUMMARY_DONE,
+      state: 'running',
+      stage: 'modelling',
+      models: [],
+      structures: 0,
+      structures_done: 2,
+      structures_asked: 5,
+      stages: [
+        { stage: 'queued', at: 1000 },
+        { stage: 'inputs', at: 1012 },
+        { stage: 'modelling', at: 1020 },
+      ],
+      log_recent: 'structure 1 written\nstructure 2 written',
+    }
+    mockApi([[/summary$/, () => [200, running]]])
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter initialEntries={[`/jobs/${KEY}`]}>
+          <Routes>
+            <Route path="/jobs/:key" element={<Job kind="jobs" pollMs={100000} />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    const bar = await screen.findByRole('progressbar', { name: 'Progress of the job' })
+    // inputs 5, then modelling's 85 by two fifths: 5 + 34 = 39
+    expect(bar).toHaveAttribute('aria-valuenow', '39')
+    expect(screen.getByText('Modelling the structures, 2 of 5 written')).toBeInTheDocument()
+    const log = screen.getByRole('list', { name: 'Status log' })
+    expect(within(log).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Queued0 s', 'Building the inputs12 s', 'Modelling the structures20 s'])
+    expect(screen.getByText(/structure 2 written/)).toBeInTheDocument()
+    expect(checkCopy(container)).toEqual([])
+  })
+
   it('shows a failed job with its error and log', async () => {
     mockApi([[/summary$/, () => [200, { ...SUMMARY_DONE, state: 'failed', error: 'RuntimeError: engine exploded', log_tail: 'line 1\nengine exploded', models: [] }]]])
     renderJob()

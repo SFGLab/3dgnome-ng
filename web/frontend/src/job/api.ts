@@ -25,6 +25,10 @@ export type Summary = {
   loops: Record<string, number>
   n_svs: number | null
   structures: number
+  stages?: { stage: string; at: number }[]
+  structures_done?: number
+  structures_asked?: number | null
+  log_recent?: string
   genes: number
   loop_count: number
   files: FileInfo[]

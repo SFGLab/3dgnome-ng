@@ -97,7 +97,14 @@ def _member(p: Path) -> tuple[int, str]:
 def _status(job: Path, **fields: object) -> None:
     path = job / "status.json"
     cur = json.loads(path.read_text()) if path.is_file() else {}
-    cur.update(fields, updated=time.time())
+    now = time.time()
+    # Each stage once, with the time it began, for the job page's status log.
+    stage = fields.get("stage")
+    stages = cur.get("stages", [])
+    if stage and (not stages or stages[-1]["stage"] != stage):
+        stages.append({"stage": stage, "at": now})
+        cur["stages"] = stages
+    cur.update(fields, updated=now)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(cur, indent=2))
     tmp.replace(path)

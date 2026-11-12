@@ -73,7 +73,7 @@ def summary(job: Path, ahead: int | None) -> dict[str, object]:
         "state": status.get("state"),
         "stage": status.get("stage"),
         "error": status.get("error"),
-        "log_tail": status.get("log_tail"),
+        "log_tail": _public_log(status["log_tail"], job) if status.get("log_tail") else None,
         "ahead": ahead,
         "started": status.get("started"),
         "finished": status.get("finished"),
@@ -86,7 +86,21 @@ def summary(job: Path, ahead: int | None) -> dict[str, object]:
         "loop_count": sum(status.get("loops", {}).values()),
         "files": files,
         "models": [{"name": m.name, "size": m.stat().st_size} for m in models(job) if m.is_file()],
+        "stages": status.get("stages", []),
+        "structures_done": len(list((job / "models").glob("*.cif"))) if (job / "models").is_dir() else 0,
+        "structures_asked": _json(job / "request.json").get("n_models"),
+        "log_recent": _public_log(_log_tail(job / "engine.log", 12), job) if status.get("state") in ("running", "failed") else "",
     }
+
+
+def _log_tail(path: Path, n: int) -> str:
+    """The last n lines of a log, read from its end so a long log costs little."""
+    if not path.is_file():
+        return ""
+    with path.open("rb") as f:
+        f.seek(0, 2)
+        f.seek(max(0, f.tell() - 16_384))
+        return "\n".join(f.read().decode(errors="replace").splitlines()[-n:])
 
 
 def _loop_files(job: Path) -> list[tuple[str, Path]]:
@@ -272,10 +286,18 @@ def genes(job: Path) -> list[dict[str, object]]:
     return _cached(job, "genes", make)
 
 
+def _public_log(text: str, job: Path) -> str:
+    """A log with the job's directory on the server cut from every path, so a private job's
+    location on disk is not shown."""
+    for p in {str(job.resolve()), str(job)}:
+        text = text.replace(p + "/", "").replace(p, ".")
+    return text
+
+
 def log_text(job: Path) -> str:
     """The engine log."""
     path = job / "engine.log"
-    return path.read_text(errors="replace") if path.is_file() else ""
+    return _public_log(path.read_text(errors="replace"), job) if path.is_file() else ""
 
 
 def zip_bytes(job: Path) -> bytes:
