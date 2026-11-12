@@ -1,10 +1,12 @@
-"""Render the structure shown in the viewer of the design mock, `web/design/site.pen`.
+"""Render the images shown in the design mock, `web/design/site.pen`.
 
     python web/design/render_mock.py design/figures/rnapii-2026-11-12/fig_inputs/maps_GM12878.npz \
-        web/design/images/structure.png
+        web/design/images
 
-Draws the medoid conformation of the TNFRSF8 locus with CTCF and RNAPII loops as a grey tube with
-the promoter beads in the site's promoter colour and the enhancer beads in its enhancer colour.
+Writes `structure.png`, the medoid conformation of the TNFRSF8 locus with CTCF and RNAPII loops as
+a grey tube with the promoter beads in the site's promoter colour and the enhancer beads in its
+enhancer colour, and `contacts.png`, the Hi-C map of chr1:20-25 Mb above the diagonal and the
+summed model map of the same arm below it, each on its own log scale.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+from matplotlib.colors import LinearSegmentedColormap  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -25,10 +28,10 @@ from playground.figures.tube import draw, tube_pieces  # noqa: E402
 TSS = 12_063_302
 ENHANCER = (12_448_194, 12_450_774)
 GREY, PROMOTER, ENH = "#a9a8a3", "#eb6834", "#1baf7a"
+CONTACTS = LinearSegmentedColormap.from_list("contacts", ["#ffffff", "#f6c9a8", "#d9542b", "#7a1f0c"])
 
 
-def main() -> None:
-    maps, out = np.load(sys.argv[1]), Path(sys.argv[2])
+def structure(maps: np.lib.npyio.NpzFile, out: Path) -> None:
     xyz, mid = maps["locus_R_xyz"], maps["locus_R_mid"]
     keep = (mid > 11_990_000) & (mid < 12_520_000)
     xyz, mid = xyz[keep][::2], mid[keep][::2]
@@ -41,8 +44,41 @@ def main() -> None:
     draw(ax, [tube_pieces(xyz, cols, vt, centre, 4.5)], background="white")
     ax.set_aspect("equal")
     ax.axis("off")
-    out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=0.15, facecolor="white")
+
+
+def _scaled(m: np.ndarray, held: np.ndarray | None = None) -> np.ndarray:
+    """log10 of a map scaled to the 2nd to 99.5th percentile of its nonzero cells off the
+    diagonal, NaN where a bin holds no bead. A model map is zero beyond contact range, so the
+    scale is set on the cells it fills."""
+    v = np.log10(m + np.nanmin(m[m > 0]))
+    off = m[np.triu_indices_from(m, 1)] > 0
+    lo, hi = np.nanpercentile(v[np.triu_indices_from(v, 1)][off], [2, 99.5])
+    v = np.clip((v - lo) / (hi - lo), 0, 1)
+    if held is not None:
+        v[~held, :] = np.nan
+        v[:, ~held] = np.nan
+    return v
+
+
+def contacts(maps: np.lib.npyio.NpzFile, out: Path) -> None:
+    hic, model = _scaled(maps["hic"]), _scaled(maps["R"], maps["R_held"])
+    upper = np.triu(np.ones_like(hic, bool), 1)
+    split = np.where(upper, hic, model)
+    cmap = CONTACTS.copy()
+    cmap.set_bad("#e9e8e4")
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.imshow(split, cmap=cmap, vmin=0, vmax=1, interpolation="nearest")
+    ax.plot([-0.5, len(hic) - 0.5], [-0.5, len(hic) - 0.5], color="#151514", lw=0.6)
+    ax.axis("off")
+    fig.savefig(out, dpi=200, bbox_inches="tight", pad_inches=0.02, facecolor="white")
+
+
+def main() -> None:
+    maps, out = np.load(sys.argv[1]), Path(sys.argv[2])
+    out.mkdir(parents=True, exist_ok=True)
+    structure(maps, out / "structure.png")
+    contacts(maps, out / "contacts.png")
     print(out)
 
 
