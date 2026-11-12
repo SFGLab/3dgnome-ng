@@ -38,12 +38,12 @@ INK, MUTED, GRID = "#0b0b0b", "#52514e", "#e4e3df"
 # +1 higher is better, -1 lower is better, 0 closest to one is better.
 DIRECTION = {
     "pearson": 1, "spearman": 1, "scc": 1, "multimm": 1, "exponent": 1, "eig_r": 1,
-    "saddle": 1, "apa_vs_map": 0, "wb_aa": -1, "wb_sa": -1, "xb": -1,
+    "apa_vs_map": 0, "wb_aa": -1, "wb_sa": -1, "xb": -1,
     "partial": -1, "rho_3d": -1, "e1": -1, "e2": 1, "e3": -1, "jump_rho": -1, "family_sep": 1,
     "r_total": -1, "r_set": -1, "r_conf": -1, "jump_r_conf": -1, "apa_microc_vs_map": 0, "r_fine": 1,
 }  # fmt: skip
-STRUCTURE = ("scc", "pearson", "multimm", "saddle", "eig_r", "apa_vs_map", "r_fine", "apa_microc_vs_map", "wb_aa", "xb")
-EXPRESSION = ("r_conf", "r_total", "jump_r_conf", "partial", "rho_3d", "e1", "e3", "jump_rho", "family_sep")
+STRUCTURE = ("scc", "pearson", "multimm", "saddle", "apa_vs_map", "r_fine", "apa_microc_vs_map")
+EXPRESSION = ("jump_r_conf", "r_total", "r_conf", "partial", "rho_3d", "e1", "e3", "jump_rho", "family_sep")
 NAMES = {"HFFC6": "HFFc6", "H1ESC": "H1"}
 
 
@@ -128,9 +128,8 @@ def figure_grid(df: pd.DataFrame, records: dict[str, dict[str, object]], out: Pa
     """Every dataset by every metric; each cell lists the arms' values and is tinted by the best."""
     datasets = _order(df)
     present = list(dict.fromkeys(df["metric"]))
-    metrics = [m for m in (*STRUCTURE, *EXPRESSION) if m in present] + [
-        m for m in present if m not in STRUCTURE + EXPRESSION
-    ]
+    # the side columns of the battery, overlaps, Rg and the band exponents, stay in the tables
+    metrics = [m for m in (*STRUCTURE, *EXPRESSION) if m in present]
     fig, ax = plt.subplots(figsize=(1.6 * len(metrics) + 2.5, 0.55 * len(datasets) + 1.2))
     ax.set_xlim(0, len(metrics))
     ax.set_ylim(len(datasets), 0)
@@ -177,10 +176,10 @@ def _paired(ax: plt.Axes, df: pd.DataFrame, metric: str, records: dict[str, dict
     arms = [a for a in ARMS if a in set(sub["arm"])]
     x = {a: i for i, a in enumerate(arms)}
     ends: list[tuple[str, float, float]] = []
-    datasets = sorted(_order(sub), key=lambda d: sub[sub["dataset"] == d]["kind"].iloc[0] == "line")
+    datasets = sorted(_order(sub), key=lambda d: sub[sub["dataset"] == d]["kind"].iloc[0] in ("line", "pair"))
     for ds in datasets:
         d = sub[sub["dataset"] == ds].set_index("arm")
-        line = d["kind"].iloc[0] == "line"
+        line = d["kind"].iloc[0] in ("line", "pair")
         xs = [x[a] for a in arms if a in d.index]
         ys = [float(d.loc[a, "value"]) for a in arms if a in d.index]
         ax.plot(xs, ys, color=MUTED if line else GRID, linewidth=2 if line else 1, zorder=2 if line else 1)
@@ -201,7 +200,7 @@ def _paired(ax: plt.Axes, df: pd.DataFrame, metric: str, records: dict[str, dict
     ax.set_xticks(range(len(arms)), arms)
     ax.set_xlim(-0.4, len(arms) - 1 + 1.6)
     ax.set_title(title, fontsize=9, color=INK, loc="left")
-    ax.text(0.0, -0.13, "thick: cell lines, thin: trio individuals", transform=ax.transAxes, fontsize=7, color=MUTED)
+    ax.text(0.0, -0.13, "thick: cell lines and line pairs, thin: trio individuals", transform=ax.transAxes, fontsize=7, color=MUTED)
     _style(ax)
 
 
@@ -218,19 +217,25 @@ def figure_main(
     ax_c.set_title("c  pile-up at RNAPII loops, observed over expected", fontsize=9, color=INK, loc="left")
     if piles:
         keys = list(piles)
-        vmax = max(float(np.nanmax(p)) for p in piles.values())
+        from pileup import apa_score
+
+        # one scale for every tile, twice the map's peak, so an arm that overshoots saturates
+        # rather than flattening the others
+        ref = next((p for k, p in piles.items() if k.endswith("/map")), next(iter(piles.values())))
+        vmax = 2.0 * float(np.nanmax(ref))
         for k, key in enumerate(keys):
-            inset = ax_c.inset_axes((k / len(keys) + 0.01, 0.0, 1 / len(keys) - 0.02, 0.85))
+            inset = ax_c.inset_axes((k / len(keys) + 0.01, 0.12, 1 / len(keys) - 0.02, 0.75))
             inset.imshow(piles[key], cmap="Blues", vmin=0, vmax=vmax)
             inset.set_xticks([])
             inset.set_yticks([])
             ds, arm = key.split("/")
             inset.set_title(f"{dataset_label(ds, records)} {arm}", fontsize=7, color=INK)
+            inset.text(0.5, -0.12, f"APA {apa_score(piles[key]):.2f}", transform=inset.transAxes, ha="center", va="top", fontsize=7, color=INK)
     else:
         ax_c.text(0.5, 0.5, "no pile-ups given", ha="center", color=MUTED, fontsize=8)
 
     _paired(ax_d, df, "scc", records, "d  structure, SCC against Hi-C")
-    expr = next((m for m in ("r_conf", "partial", "e3", "rho_3d") if m in set(df["metric"])), None)
+    expr = next((m for m in ("jump_r_conf", "r_total", "partial", "e3", "rho_3d") if m in set(df["metric"])), None)
     if expr is None:
         for ax, name in ((ax_e, "e  expression"), (ax_f, "f  trade-off")):
             ax.axis("off")
@@ -253,7 +258,7 @@ def figure_main(
                 p = piv.loc[(ds, arm)]
                 dx = float(p["scc"] - base["scc"])
                 dy = DIRECTION[expr] * float(p[expr] - base[expr])
-                line = df[df["dataset"] == ds]["kind"].iloc[0] == "line"
+                line = df[df["dataset"] == ds]["kind"].iloc[0] in ("line", "pair")
                 ax_f.scatter(dx, dy, s=40 if line else 14, color=COLOUR[arm], edgecolor="white",
                              linewidth=1.5 if line else 0.5, zorder=2 if line else 1)  # fmt: skip
                 if line:

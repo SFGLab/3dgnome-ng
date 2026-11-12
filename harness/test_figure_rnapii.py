@@ -186,6 +186,55 @@ def test_each_arm_marked(tmp: Path) -> None:
     check("a C arm of six models is marked in the paired panels", "n=6" in " ".join(texts(fig)))
 
 
+def test_figure_choices(tmp: Path) -> None:
+    df = table()
+    extra = pd.DataFrame(
+        [
+            {
+                "dataset": "GM12878",
+                "kind": "line",
+                "arm": a,
+                "metric": "wb_sa",
+                "value": 1.0,
+                "n": 10,
+            }
+            for a in "CRM"
+        ]
+        + [
+            {
+                "dataset": "GM12878 vs H1ESC",
+                "kind": "pair",
+                "arm": a,
+                "metric": m,
+                "value": v,
+                "n": 10,
+            }
+            for a, v in (("C", -0.26), ("R", -0.33))
+            for m in ("jump_r_conf", "r_conf", "scc")
+        ]
+    )
+    df = pd.concat([df, extra], ignore_index=True)
+    fig = figure_grid(df, {}, tmp / "g2.png")
+    ticks = [t.get_text() for ax in fig.axes for t in ax.get_xticklabels()]
+    check(
+        "the grid leaves out the side columns of the battery",
+        "wb_sa" not in ticks and "scc" in ticks,
+        str(ticks),
+    )
+    fig = figure_main(
+        df, {"GM12878/map": np.ones((21, 21)), "GM12878/C": np.ones((21, 21))}, {}, tmp / "m2.png"
+    )
+    axes = list(fig.axes) + [c for ax in fig.axes for c in ax.child_axes]
+    t = (
+        " ".join(x.get_text() for ax in axes for x in ax.texts)
+        + " "
+        + " ".join(ax.get_title(loc="left") for ax in axes)
+    )
+    check("panel e shows the jump statistic", "jump_r_conf" in t, t[:200])
+    check("a pair of lines is labelled in the paired panels", "GM12878 vs H1ESC" in t)
+    check("each pile-up tile carries its score", "APA" in t)
+
+
 def main() -> int:
     test_label_bj()
     test_loci()
@@ -196,6 +245,7 @@ def main() -> int:
         test_structure_only(Path(d))
         test_duplicate_rows_refused(Path(d))
         test_each_arm_marked(Path(d))
+        test_figure_choices(Path(d))
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     return 1 if FAIL else 0
 
