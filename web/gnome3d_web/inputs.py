@@ -12,6 +12,8 @@ coordinates before the region do not move.
 
 from __future__ import annotations
 
+import hashlib
+
 import re
 
 from dataclasses import dataclass, field
@@ -72,6 +74,20 @@ def _read(path: Path, chrom: str, ncol: int) -> pd.DataFrame:
     df = pd.read_csv(path, sep="\t", header=None, comment="#")
     df = df[df[0] == chrom]
     return df.iloc[:, :ncol].reset_index(drop=True) if df.shape[1] >= ncol else df.reset_index(drop=True)
+
+
+def _thin_to_hosted(sing: pd.DataFrame, cell: CellType, chrom: str) -> pd.DataFrame:
+    """Own contacts thinned to the contacts per Mb of the cell type's hosted map on the
+    chromosome, over the span the own contacts cover. Every route of own contacts meets here,
+    so a deep map and a shallow one give the engine the density its maps are read at."""
+    from .remote import hosted_density, thin
+
+    span = (int(sing[5].max()) - int(sing[1].min())) / 1e6
+    target = round(hosted_density(cell.path("singletons"), chrom) * span)
+    seed = int.from_bytes(hashlib.blake2b(f"{chrom} {len(sing)} {int(sing[6].sum())}".encode(), digest_size=8).digest(), "little")
+    out = sing.copy()
+    out[6] = thin(out[6].to_numpy(dtype=np.int64), target, seed)
+    return out[out[6] > 0].reset_index(drop=True)
 
 
 def _orientation(anchors: pd.DataFrame) -> dict[tuple[int, int], str]:
@@ -176,6 +192,8 @@ def build_inputs(
 
     sing = _read(own.contacts if own and own.contacts else cell.path("singletons"), chrom, 7)
     sing = sing[sing[3] == chrom]
+    if own and own.contacts and len(sing):
+        sing = _thin_to_hosted(sing, cell, chrom)
     if svs:
         sing = engine.lift_bedpe(sing, {chrom: L})
     if hic is not None:
