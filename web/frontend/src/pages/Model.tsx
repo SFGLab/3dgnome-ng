@@ -5,7 +5,8 @@ import { api } from '../api'
 import { CellTypes } from '../model/CellTypes'
 import { EXAMPLES, type Example } from '../model/examples'
 import { EMPTY_FORM, type FormState } from '../model/form'
-import { RegionField } from '../model/RegionField'
+import { LoopPreview } from '../model/LoopPreview'
+import { RegionField, useRegion } from '../model/RegionField'
 import { SidePanel } from '../model/SidePanel'
 import { Step } from '../model/Step'
 import '../styles/doc.css'
@@ -21,6 +22,7 @@ export function Model() {
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: api.catalog })
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }))
+  const region = useRegion(form.cell, form.region)
 
   useEffect(() => {
     const e = EXAMPLES.find((x) => x.id === params.get('example'))
@@ -40,6 +42,7 @@ export function Model() {
         <Step n={1} title="Cell type and region">
           {catalog.data && <CellTypes catalog={catalog.data} value={form.cell} onChange={(cell) => set({ cell })} />}
           <RegionField cell={form.cell} value={form.region} onChange={(region) => set({ region })} />
+          {region.data && <LoopPreview cell={form.cell} region={region.data} factors={form.factors} />}
         </Step>
         <Step n={2} title="Loops">
           <div />

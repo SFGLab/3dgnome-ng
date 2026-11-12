@@ -219,3 +219,86 @@
     grid-template-columns: 1fr;
   }
 }
+
+.loop-preview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--panel);
+  border-radius: 8px;
+}
+
+.loop-preview[aria-busy='true'] {
+  height: 150px;
+  background: var(--panel);
+  border-radius: 8px;
+}
+
+.arc {
+  fill: none;
+  stroke-width: 1.5;
+  opacity: 0.75;
+}
+
+.arc.ctcf {
+  stroke: var(--ctcf);
+}
+
+.arc.rnapii {
+  stroke: var(--rnapii);
+}
+
+.arc.faint {
+  opacity: 0.15;
+}
+
+.axis {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.gene-tick {
+  stroke: var(--faint);
+}
+
+.gene-tick.named {
+  stroke: var(--promoter);
+  stroke-width: 2;
+}
+
+.gene-label {
+  fill: var(--ink);
+  font: 600 10px var(--font);
+}
+
+.side-label {
+  fill: var(--muted);
+  font: 10px var(--font);
+}
+
+.preview-key {
+  display: flex;
+  gap: 16px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.key-line {
+  width: 14px;
+  height: 2px;
+}
+
+.key-line.ctcf {
+  background: var(--ctcf);
+}
+
+.key-line.rnapii {
+  background: var(--rnapii);
+}
