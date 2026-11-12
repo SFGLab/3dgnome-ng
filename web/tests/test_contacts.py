@@ -14,7 +14,7 @@ import numpy as np
 from _check import check, done
 from fixture import make_data
 
-from gnome3d_web.contacts import ice, median_bond, model_map, multimm_map, scc
+from gnome3d_web.contacts import ice, loop_enrichment, median_bond, model_map, multimm_map, scc
 
 
 def battery_scc(A: np.ndarray, B: np.ndarray, max_sep_bins: int) -> float:
@@ -71,6 +71,13 @@ def main() -> int:
     check("the MultiMM map is 1/(d+1)^3 of bin centroids in units of the median step", np.allclose(mm, [[1, 1 / 8, 1 / 27], [1 / 8, 1, 1 / 8], [1 / 27, 1 / 8, 1]]), str(mm))
     wide = multimm_map([rng.random((50, 3)) * 10 for _ in range(3)], np.arange(50) * 1000 + 500, 0, 50_000, 1000)
     check("the MultiMM map has no zero off the diagonal", bool((wide[~np.eye(50, dtype=bool)] > 0).all()))
+    flat = np.ones((30, 30))
+    loop_px = np.zeros((30, 30))
+    loop_px[5, 15] = loop_px[15, 5] = 4
+    raised = flat.copy()
+    raised[5, 15] = raised[15, 5] = 3
+    check("a map raised at the loop pixels has an enrichment above 1", abs(loop_enrichment(loop_px, raised) - 3) < 1e-9, str(loop_enrichment(loop_px, raised)))
+    check("a map flat at the loop pixels has an enrichment of 1", abs(loop_enrichment(loop_px, flat) - 1) < 1e-9)
     check("the median bond of a chain", abs(median_bond([np.array([[0.0, 0, 0], [1.0, 0, 0], [3.0, 0, 0], [4.0, 0, 0]])]) - 1.0) < 1e-12)
 
     with tempfile.TemporaryDirectory() as d:
@@ -90,10 +97,16 @@ def main() -> int:
         n = len(r["bins"])
         check("the endpoint returns two square maps on the bins of the resolution", n == 120 and len(r["upper"]) == n and len(r["lower"][0]) == n and r["bins"][1] - r["bins"][0] == 25000, str(n))
         check("the halves are labelled", r["upper_label"].startswith("Hi-C") and "2 structures" in r["lower_label"] and "1/(d+1)" in r["lower_label"], str((r["upper_label"], r["lower_label"])))
-        check("the agreement names the maps it compares", "median bond" in r["scc_about"] and "raw" in r["scc_about"], str(r.get("scc_about")))
+        check("the agreement names the two halves it compares", "Hi-C of GMX" in r["scc_about"] and "1/(d+1)" in r["scc_about"] and "raw" in r["scc_about"], str(r.get("scc_about")))
         counted = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "hic", "lower": "model_count", "norm": "raw"}).json()
         check("the counted model is still offered", "within" in counted["lower_label"], counted.get("lower_label", counted))
-        check("the agreement does not change with the halves shown", counted["scc"] == r["scc"], f"{counted['scc']} {r['scc']}")
+        battery = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "hic", "lower": "model_count", "norm": "ice"}).json()
+        check("the agreement follows the halves shown", counted["scc"] != r["scc"] or "1/(d+1)" in r["scc_about"], f"{counted['scc']} {r['scc']}")
+        check("Hi-C against the counted model is the battery's number, whatever the display", battery["scc"] == counted["scc"] and "validation battery" in battery["scc_about"], str(battery.get("scc_about")))
+        lp = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "loops_ctcf", "lower": "model", "norm": "raw"}).json()
+        up = np.array(lp["upper"])
+        check("a loop half bins each CTCF loop at its anchors", up.sum() > 0 and "CTCF loops" in lp["upper_label"], lp.get("upper_label", lp))
+        check("with loops on one side the card has the enrichment", isinstance(lp.get("loop_enrichment"), float), str(lp.get("loop_enrichment")))
 
         from gnome3d_web import explore as ex
 

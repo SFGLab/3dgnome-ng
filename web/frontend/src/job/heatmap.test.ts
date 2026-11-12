@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DARKEST, colour, emptyRows, transform } from './heatmap'
+import { DARKEST, colour, diverging, emptyRows, transform } from './heatmap'
 
 const M = [
   [4, 2, 1],
@@ -64,5 +64,15 @@ describe('colour', () => {
 describe('emptyRows', () => {
   it('marks the rows with no contact off the diagonal', () => {
     expect(emptyRows([[3, 0, 0], [0, 0, 2], [0, 2, 0]])).toEqual([true, false, false])
+  })
+})
+
+describe('diverging', () => {
+  it('is white at no change, blue below and red above', () => {
+    expect(diverging(0, 2)).toEqual([255, 255, 255])
+    const [r1, , b1] = diverging(-2, 2)
+    const [r2, , b2] = diverging(2, 2)
+    expect(b1).toBeGreaterThan(r1)
+    expect(r2).toBeGreaterThan(b2)
   })
 })

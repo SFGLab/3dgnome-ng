@@ -134,3 +134,36 @@ def scc(a: np.ndarray, b: np.ndarray, res: int, max_bp: int = 2_000_000) -> floa
 def coarsest_fit(start: int, end: int) -> int:
     """The finest resolution with no more than MAX_BINS bins over a window."""
     return next(r for r in RESOLUTIONS if len(bins_for(start, end, r)) <= MAX_BINS)
+
+
+def loop_map(rows: list[tuple[int, int, int]], start: int, end: int, res: int) -> np.ndarray:
+    """Loops as a map: each loop's PET count at the bins of its two anchor midpoints.
+
+    @param rows (midpoint of anchor a, midpoint of anchor b, PET count) of the loops on the chromosome
+    """
+    edges = bins_for(start, end, res)
+    n = len(edges)
+    m = np.zeros((n, n))
+    for a, b, pets in rows:
+        i, j = (a - edges[0]) // res, (b - edges[0]) // res
+        if 0 <= i < n and 0 <= j < n and i != j:
+            m[i, j] += pets
+            m[j, i] += pets
+    return m
+
+
+def loop_enrichment(loops: np.ndarray, other: np.ndarray) -> float | None:
+    """The mean observed over expected of a map at the loop pixels, the expected of each diagonal
+    taken from its pixels that hold no loop. Above 1 the map is raised where the loops are. None
+    without a loop pixel that has an expectation."""
+    ratios = []
+    n = len(loops)
+    for k in range(1, n):
+        lp, ot = np.diagonal(loops, k), np.diagonal(other, k)
+        hit = lp > 0
+        if not hit.any() or hit.all():
+            continue
+        e = ot[~hit].mean()
+        if e > 0:
+            ratios.extend(ot[hit] / e)
+    return float(np.mean(ratios)) if ratios else None

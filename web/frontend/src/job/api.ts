@@ -63,8 +63,18 @@ export type GeneRow = {
   sd: number
   n: number
   joined_by: string
+  promoter_loops?: number
 }
-export type Contacts = { bins: number[]; upper: number[][]; lower: number[][]; upper_label: string; lower_label: string; scc: number | null; scc_about?: string }
+export type Contacts = {
+  bins: number[]
+  upper: number[][]
+  lower: number[][]
+  upper_label: string
+  lower_label: string
+  scc: number | null
+  scc_about?: string
+  loop_enrichment?: number | null
+}
 export type Compare = { same_region: boolean; rows: { gene: string; linear_bp: number; a: { mean: number; sd: number }; b: { mean: number; sd: number }; ratio: number }[] }
 
 async function call<T>(path: string, text = false): Promise<T> {

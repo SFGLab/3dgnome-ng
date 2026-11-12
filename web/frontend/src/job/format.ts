@@ -3,6 +3,7 @@ export const bp = (n: number) => n.toLocaleString('en-US')
 
 export function kb(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} Mb`
+  if (n < 1000) return `${n} bp`
   return `${Math.round(n / 1000)} kb`
 }
 

@@ -60,6 +60,17 @@ export function transform(m: number[][], show: Show): number[][] {
   return m
 }
 
+const BLUE: [number, number, number] = [42, 110, 200]
+const RED: [number, number, number] = [192, 38, 27]
+
+/** A two sided ramp for a change: white at 0, blue below and red above, full at +-span. */
+export function diverging(v: number, span: number): [number, number, number] {
+  const t = Math.max(-1, Math.min(1, span > 0 ? v / span : 0))
+  const end = t < 0 ? BLUE : RED
+  const u = Math.abs(t)
+  return [0, 1, 2].map((k) => Math.round(255 + u * (end[k] - 255))) as [number, number, number]
+}
+
 /** The ramp colour of a value between lo and hi, on a log scale when asked. */
 export function colour(v: number, lo: number, hi: number, log: boolean): [number, number, number] {
   const f = (x: number) => (log ? Math.log1p(Math.max(0, x)) : x)
@@ -73,6 +84,9 @@ export function colour(v: number, lo: number, hi: number, log: boolean): [number
 
 /** A high percentile of the nonzero values, the default top of the colour range. */
 export function percentile(m: number[][], p: number): number {
-  const xs = m.flat().filter((v) => v > 0).sort((a, b) => a - b)
+  const xs = m
+    .flat()
+    .filter((v) => v > 0)
+    .sort((a, b) => a - b)
   return xs.length ? xs[Math.min(xs.length - 1, Math.floor(p * xs.length))] : 1
 }

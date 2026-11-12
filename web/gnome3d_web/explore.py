@@ -279,11 +279,13 @@ def genes(job: Path) -> list[dict[str, object]]:
                     "sd": float(d.std(ddof=1)) if len(d) > 1 else 0.0,
                     "n": len(d),
                     "joined_by": " and ".join(factors),
+                    # A promoter can anchor loops that reach elsewhere; the table says so.
+                    "promoter_loops": sum(1 for lp in loop_rows if holds(lp["a"], pb) or holds(lp["b"], pb)),  # type: ignore[arg-type]
                 }
             )
         return rows
 
-    return _cached(job, "genes", make)
+    return _cached(job, "genes_v2", make)
 
 
 def _public_log(text: str, job: Path) -> str:
@@ -388,17 +390,28 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         hic_label = f"Hi-C of {cell}, the contacts this job read" + (", the deep map could not be read" if hic_url else "")
     counted = cm.model_map(pos, mid, start, end, res, bond)
 
+    loop_sets = {f"loops_{factor.lower()}": (factor, path) for factor, path in _loop_files(job)}
+
     def one(kind: str) -> tuple[np.ndarray, str]:
         if kind == "hic":
             return hic, hic_label
+        if kind in loop_sets:
+            factor, path = loop_sets[kind]
+            rows = []
+            for ln in path.read_text().splitlines():
+                f = ln.split()
+                if len(f) >= 7 and f[0] == chrom and f[3] == chrom:
+                    rows.append(((int(f[1]) + int(f[2])) // 2, (int(f[4]) + int(f[5])) // 2, int(float(f[6]))))
+            return cm.loop_map(rows, start, end, res), f"{factor} loops, PETs at the anchors"
         if kind == "model":
             return cm.multimm_map(pos, mid, start, end, res), f"This job, 1/(d+1)³ between bins, mean of {n_models} structures"
         if kind == "model_count":
             return counted, f"This job, contacts within the median bond, sum of {n_models} structures"
-        raise ExploreError(f"{kind!r} is not hic, model or model_count")
+        raise ExploreError(f"{kind!r} is not one of hic, model, model_count, {', '.join(loop_sets)}")
 
     a, la = one(upper)
     b, lb = one(lower)
+    raw_a, raw_b = a, b
     if norm == "ice":
         a, b = cm.ice(a), cm.ice(b)
     elif norm != "raw":
@@ -409,9 +422,21 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         "lower": np.round(b, 6).tolist(),
         "upper_label": la,
         "lower_label": lb,
-        # The battery's number, whatever the halves shown: raw counts on both sides.
-        "scc": cm.scc(hic, counted, res),
-        "scc_about": f"{hic_label} against this job's contacts within the median bond, raw counts, diagonals up to 2 Mb, as the validation battery computes it",
+        # The agreement of the two halves shown, on raw values; Hi-C against the counted model is
+        # the validation battery's number.
+        "scc": cm.scc(raw_a, raw_b, res),
+        "scc_about": (
+            f"{hic_label} against this job's contacts within the median bond, raw counts, diagonals up to 2 Mb, as the validation battery computes it"
+            if {upper, lower} == {"hic", "model_count"}
+            else f"{la} against {lb}, raw values, diagonals up to 2 Mb"
+        ),
+        "loop_enrichment": (
+            cm.loop_enrichment(raw_a, raw_b)
+            if upper in loop_sets and lower not in loop_sets
+            else cm.loop_enrichment(raw_b, raw_a)
+            if lower in loop_sets and upper not in loop_sets
+            else None
+        ),
     }
 
 

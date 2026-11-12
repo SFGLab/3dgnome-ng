@@ -65,6 +65,7 @@ def main() -> int:
 
         g = c.get(three + "/genes").json()
         check("gene rows carry statistics over the structures and the loop joining them", g and {"min", "q1", "median", "q3", "max", "joined_by", "n"} <= set(g[0]), str(g[:1]))
+        check("gene rows count the loops the promoter bead anchors", all(isinstance(r.get("promoter_loops"), int) and r["promoter_loops"] >= 0 for r in g), str(g[:1]))
 
         loops = c.get(three + "/loops").json()
         check("the loops list factor, ends, span and PETs", len(loops) == 15 and {"factor", "a", "b", "span", "pets"} <= set(loops[0]), str(loops[:1]))

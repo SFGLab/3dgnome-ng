@@ -86,7 +86,7 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
               {header('linear_bp', 'Separation', true)}
               {header('distance', '3D distance', true)}
               <th>{`Over ${structures} structures`}</th>
-              <th>Joined by</th>
+              <th>Loop between them</th>
             </tr>
           </thead>
           <tbody>
@@ -109,7 +109,7 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
                   {r.joined_by ? (
                     <span className={`loop-badge ${r.joined_by === 'RNAPII' ? 'rnapii' : 'ctcf'}`}>{`${r.joined_by} loop`}</span>
                   ) : (
-                    <span className="no-loop">no loop</span>
+                    <span className="no-loop">{r.promoter_loops ? `none, the promoter anchors ${r.promoter_loops} loop${r.promoter_loops === 1 ? '' : 's'}` : 'none'}</span>
                   )}
                 </td>
               </tr>

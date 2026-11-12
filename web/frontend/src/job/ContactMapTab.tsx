@@ -3,7 +3,7 @@ import { RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Contacts, JobApi, Summary } from './api'
 import { bp } from './format'
-import { colour, emptyRows, percentile, transform, type Show } from './heatmap'
+import { colour, diverging, emptyRows, percentile, transform, type Show } from './heatmap'
 import { parseRegion } from './StructureTab'
 
 const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]
@@ -24,7 +24,6 @@ function clamp(l: Locus, job: Locus, res: number): Locus {
 const fitting = (l: Locus, res: number) => RESOLUTIONS.find((r) => r >= res && (l.end - l.start) / r <= MAX_BINS) ?? RESOLUTIONS[RESOLUTIONS.length - 1]
 const SHOWS: [Show, string][] = [
   ['observed', 'Observed'],
-  ['expected', 'Expected'],
   ['oe', 'O/E'],
   ['pearson', 'Pearson'],
 ]
@@ -36,14 +35,17 @@ const parse = (t: string): Locus | null => {
   return m && Number(m[3]) > Number(m[2]) ? { chrom: m[1], start: Number(m[2]), end: Number(m[3]) } : null
 }
 
-function draw(canvas: HTMLCanvasElement, upper: number[][], lower: number[][], range: [number, number], log: boolean) {
+function draw(canvas: HTMLCanvasElement, upper: number[][], lower: number[][], range: [number, number], log: boolean, show: Show) {
   const ctx = canvas.getContext('2d')
   const n = upper.length
   if (!ctx || !n) return
   canvas.width = n
   canvas.height = n
   // Each half on its own scale: the lower half's values are brought to the upper half's range.
-  const ratio = percentile(upper, 0.99) / (percentile(lower, 0.99) || 1)
+  // Observed counts of the two halves differ in scale, so the lower half is brought to the upper
+  // half's range; O/E and Pearson are already on one scale.
+  const ratio = show === 'observed' ? percentile(upper, 0.99) / (percentile(lower, 0.99) || 1) : 1
+  const span = Math.max(Math.abs(range[0]), Math.abs(range[1]))
   const [emptyUp, emptyLow] = [emptyRows(upper), emptyRows(lower)]
   const img = ctx.createImageData(n, n)
   for (let i = 0; i < n; i++)
@@ -51,7 +53,8 @@ function draw(canvas: HTMLCanvasElement, upper: number[][], lower: number[][], r
       const v = j >= i ? upper[i][j] : lower[i][j] * ratio
       // The maps hold no pair within one bin, so the main diagonal is drawn as no data.
       const empty = j >= i ? emptyUp[i] || emptyUp[j] : emptyLow[i] || emptyLow[j]
-      const [r, g, b] = i === j || empty ? NO_DATA : colour(v, range[0], range[1], log)
+      const [r, g, b] =
+        i === j || empty ? NO_DATA : show === 'oe' ? diverging(v > 0 ? Math.log2(v) : -span, span) : show === 'pearson' ? diverging(v, span) : colour(v, range[0], range[1], log)
       const k = (i * n + j) * 4
       img.data.set([r, g, b, 255], k)
     }
@@ -73,6 +76,12 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
   const [hover, setHover] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const canvas = useRef<HTMLCanvasElement>(null)
+  const halves: [string, string][] = [
+    ['hic', `Hi-C, ${summary.request.cell_type}`],
+    ['model', 'This job, 1/(d+1)³ between bins'],
+    ['model_count', 'This job, contacts within the median bond'],
+    ...Object.keys(summary.loops).map((f): [string, string] => [`loops_${f.toLowerCase()}`, `${f} loops`]),
+  ]
   // The map follows the window once a burst of wheel steps settles, not at every step.
   const [settled, setSettled] = useState<Locus>(job)
   useEffect(() => {
@@ -93,9 +102,22 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
   // of the nonzero values spreads it over the colours.
   const bottom = maps.data && log && show === 'observed' ? percentile(upper, 0.05) : 0
   const round = (v: number) => Math.round(v * 100) / 100
-  const shownRange: [number, number] = range ?? [round(bottom), round(top)]
+  // O/E is drawn as log2 and Pearson as itself, both symmetric about no change.
+  const oeSpan =
+    maps.data && show === 'oe'
+      ? Math.max(
+          0.5,
+          round(
+            percentile(
+              upper.map((r) => r.map((v) => (v > 0 ? Math.abs(Math.log2(v)) : 0))),
+              0.95,
+            ),
+          ),
+        )
+      : 1
+  const shownRange: [number, number] = range ?? (show === 'oe' ? [-oeSpan, oeSpan] : show === 'pearson' ? [-1, 1] : [round(bottom), round(top)])
   useEffect(() => {
-    if (canvas.current && maps.data) draw(canvas.current, upper, lower, shownRange, log)
+    if (canvas.current && maps.data) draw(canvas.current, upper, lower, shownRange, log, show)
   })
   const moveTo = (want: Locus) => {
     const next = clamp(want, job, res)
@@ -255,32 +277,40 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
         </section>
         <label className="field">
           <span>Upper half</span>
-          <select value={upperKind} onChange={(e) => setUpper(e.target.value)}>
-            <option value="hic">{`Hi-C, ${summary.request.cell_type}`}</option>
-            <option value="model">This job, 1/(d+1)³ between bins</option>
-            <option value="model_count">This job, contacts within the median bond</option>
+          <select aria-label="Upper half" value={upperKind} onChange={(e) => setUpper(e.target.value)}>
+            {halves.map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
           </select>
         </label>
         <label className="field">
           <span>Lower half</span>
           <select aria-label="Lower half" value={lowerKind} onChange={(e) => setLower(e.target.value)}>
-            <option value="model">This job, 1/(d+1)³ between bins</option>
-            <option value="model_count">This job, contacts within the median bond</option>
-            <option value="hic">{`Hi-C, ${summary.request.cell_type}`}</option>
+            {[...halves.slice(1, 3), halves[0], ...halves.slice(3)].map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
           </select>
         </label>
         {maps.data && (
-          <section className="side-card" aria-label="Agreement with Hi-C">
-            <p className="card-label">Agreement with Hi-C</p>
+          <section className="side-card" aria-label="Agreement of the two halves">
+            <p className="card-label">Agreement of the two halves</p>
             <p className="big">
               <span className="big-value">{maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}</span> <span className="unit">stratum adjusted correlation</span>
             </p>
-            <p className="card-text">{`Stratum adjusted correlation at ${res / 1000} kb of ${maps.data.scc_about ?? 'the two maps'}. The halves shown do not change it.`}</p>
+            <p className="card-text">{`Stratum adjusted correlation at ${res / 1000} kb of ${maps.data.scc_about ?? 'the two maps'}.`}</p>
+            {typeof maps.data.loop_enrichment === 'number' && (
+              <p className="card-text">{`At the loops the other half is ${maps.data.loop_enrichment.toFixed(1)} times its expected contact at the same distance.`}</p>
+            )}
           </section>
         )}
         <p className="card-text">Scroll to zoom and double click to centre. Grey bins contain no bead.</p>
         <p className="card-text">
-          Expected is the average contact at each distance in this view, the decay with distance alone. O/E divides the observed map by it, and Pearson correlates the rows of O/E.
+          O/E divides each contact by the average contact at its distance, blue below and red above it. Pearson correlates the rows of O/E, red for rows that rise and fall
+          together.
         </p>
       </div>
     </div>

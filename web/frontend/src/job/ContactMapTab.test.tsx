@@ -43,7 +43,7 @@ describe('ContactMapTab', () => {
   it('shows the agreement with Hi-C and how it was computed', async () => {
     mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
-    const card = await screen.findByRole('region', { name: 'Agreement with Hi-C' })
+    const card = await screen.findByRole('region', { name: 'Agreement of the two halves' })
     expect(within(card).getByText('0.37')).toBeInTheDocument()
     expect(within(card).getByText(/4DN 4DNFIXP4QG5B against this job's contacts within the median bond/)).toBeInTheDocument()
     expect(document.querySelector('.map-labels')?.textContent).toBe('This job, 1/(d+1)³ between bins, mean of 100 structuresHi-C of GM12878')
@@ -93,7 +93,7 @@ describe('ContactMapTab', () => {
     renderTab()
     await screen.findByText('0.37')
     const lower = screen.getByLabelText('Lower half')
-    expect(within(lower).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['model', 'model_count', 'hic'])
+    expect(within(lower).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['model', 'model_count', 'hic', 'loops_ctcf', 'loops_rnapii'])
     fireEvent.change(lower, { target: { value: 'model_count' } })
     await new Promise((r) => setTimeout(r, 50))
     expect(f.mock.calls.some(([u]) => String(u).includes('lower=model_count'))).toBe(true)
@@ -104,6 +104,24 @@ describe('ContactMapTab', () => {
     renderTab()
     await screen.findByText('0.37')
     expect(Number((screen.getByLabelText(/min/) as HTMLInputElement).value)).toBeGreaterThan(0)
+  })
+
+  it('offers Observed, O/E and Pearson', async () => {
+    mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    renderTab()
+    await screen.findByText('0.37')
+    expect(within(screen.getByRole('group', { name: 'Show' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['Observed', 'O/E', 'Pearson'])
+  })
+
+  it('offers the loops of each factor in either half and shows their enrichment', async () => {
+    const f = mockApi([[/contacts$/, (u) => [200, u.searchParams.get('upper') === 'loops_ctcf' ? { ...MAP, upper_label: 'CTCF loops, PETs at the anchors', loop_enrichment: 2.4 } : MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    renderTab()
+    await screen.findByText('0.37')
+    const upper = screen.getByLabelText('Upper half')
+    expect(within(upper).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['hic', 'model', 'model_count', 'loops_ctcf', 'loops_rnapii'])
+    fireEvent.change(upper, { target: { value: 'loops_ctcf' } })
+    expect(await screen.findByText('At the loops the other half is 2.4 times its expected contact at the same distance.')).toBeInTheDocument()
+    expect(f.mock.calls.some(([u]) => String(u).includes('upper=loops_ctcf'))).toBe(true)
   })
 
   it('shows the server message for a resolution it refuses', async () => {

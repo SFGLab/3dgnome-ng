@@ -18,8 +18,8 @@ export function GeneCard({ row, chrom, onOpenGenes }: { row: GeneRow; chrom: str
         <dd>{kb(row.linear_bp)}</dd>
         <dt>Range over structures</dt>
         <dd>{`${row.min.toFixed(1)} to ${row.max.toFixed(1)}`}</dd>
-        <dt>Joined by</dt>
-        <dd>{row.joined_by ? `${row.joined_by} loop` : 'no loop'}</dd>
+        <dt>Loop between them</dt>
+        <dd>{row.joined_by ? `${row.joined_by} loop` : row.promoter_loops ? `none, the promoter anchors ${row.promoter_loops} loops` : 'none'}</dd>
       </dl>
       <button type="button" className="link-button" onClick={() => onOpenGenes(row.gene)}>
         All enhancers of this gene <ArrowRight size={13} aria-hidden />
