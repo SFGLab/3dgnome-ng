@@ -1,12 +1,38 @@
 import { Html, Line, OrbitControls } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import type { ThreeEvent } from '@react-three/fiber'
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+import type { CameraLink } from './cameraLink'
 
 export type Marker = { label: string; at: [number, number, number] }
 export type SceneHandle = { reset: () => void; png: () => string | null }
+
+
+function CameraSync({ link, id }: { link: CameraLink; id: string }) {
+  const { camera, controls } = useThree() as unknown as { camera: THREE.PerspectiveCamera; controls: OrbitControlsImpl | null }
+  useEffect(() => {
+    if (!controls) return
+    let applying = false
+    const onChange = () => {
+      if (!applying) link.publish(id, { position: camera.position.toArray(), target: controls.target.toArray(), zoom: camera.zoom })
+    }
+    controls.addEventListener('change', onChange)
+    const off = link.subscribe(id, (s) => {
+      applying = true
+      camera.position.fromArray(s.position)
+      controls.target.fromArray(s.target)
+      controls.update()
+      applying = false
+    })
+    return () => {
+      controls.removeEventListener('change', onChange)
+      off()
+    }
+  }, [camera, controls, link, id])
+  return null
+}
 
 type Props = {
   points: [number, number, number][]
@@ -15,11 +41,12 @@ type Props = {
   highlight?: [number, number, number][][]
   onHover?: (index: number | null, x: number, y: number) => void
   onPick?: (index: number) => void
-  camera?: { position: [number, number, number]; onChange?: (p: [number, number, number]) => void }
+  link?: CameraLink
+  linkId?: string
 }
 
 /** The chain as a coloured line in a WebGL canvas with orbit controls, markers and highlights. */
-export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, colors, markers = [], highlight = [], onHover, onPick }, ref) {
+export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, colors, markers = [], highlight = [], onHover, onPick, link, linkId = 'scene' }, ref) {
   const controls = useRef<OrbitControlsImpl>(null)
   const gl = useRef<THREE.WebGLRenderer | null>(null)
   const { center, radius } = useMemo(() => {
@@ -69,6 +96,7 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
         </Html>
       ))}
       <OrbitControls ref={controls} makeDefault enableDamping={false} />
+      {link && <CameraSync link={link} id={linkId} />}
     </Canvas>
   )
 })

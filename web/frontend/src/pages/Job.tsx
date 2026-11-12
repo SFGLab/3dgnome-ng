@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { jobApi } from '../job/api'
 import { JobSidePanel } from '../job/SidePanel'
+import { Compare } from '../job/Compare'
 import { ContactMapTab } from '../job/ContactMapTab'
 import { GenesPanel } from '../job/GenesPanel'
 import { LogTab } from '../job/LogTab'
@@ -45,7 +46,8 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
               onCompare={() => setComparing((c) => !c)}
             />
             <div className="tab-body" role="tabpanel">
-              {tab === 'structure' && (
+              {comparing && <Compare api={api} summary={s} selected={selected} gene={gene} onClose={() => setComparing(false)} />}
+              {!comparing && tab === 'structure' && (
                 <StructureTab
                   api={api}
                   summary={s}
@@ -58,7 +60,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
                   }}
                 />
               )}
-              {tab === 'genes' && (
+              {!comparing && tab === 'genes' && (
                 <GenesPanel
                   api={api}
                   summary={s}
@@ -70,9 +72,9 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
                   }}
                 />
               )}
-              {tab === 'contacts' && <ContactMapTab api={api} summary={s} />}
-              {tab === 'loops' && <LoopsTab api={api} />}
-              {tab === 'log' && <LogTab api={api} />}
+              {!comparing && tab === 'contacts' && <ContactMapTab api={api} summary={s} />}
+              {!comparing && tab === 'loops' && <LoopsTab api={api} />}
+              {!comparing && tab === 'log' && <LogTab api={api} />}
             </div>
           </>
         ) : s.state === 'failed' ? (

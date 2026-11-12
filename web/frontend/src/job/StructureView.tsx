@@ -7,6 +7,19 @@ import { Scene, type Marker, type SceneHandle } from './Scene'
 
 export type HoverInfo = { lines: string[]; x: number; y: number }
 
+/** The colour of every chain point of a structure under a colour mode. */
+export function chainColors(structure: Structure, annotations: Annotations, region: [number, number], mode: Mode, palette = readPalette()): string[] {
+  const ctx = {
+    palette,
+    start: region[0],
+    end: region[1],
+    promoters: annotations.genes.map((g) => [g.tss - 1000, g.tss + 1000] as [number, number]),
+    enhancers: annotations.enhancers,
+    anchors: structure.anchors.map((a) => ({ start: a.start, end: a.end, factors: a.loops.map((l) => l.factor) })),
+  }
+  return structure.chain.map((p) => colorAt(mode, p[3], ctx))
+}
+
 type Props = {
   structure: Structure
   annotations: Annotations
@@ -48,17 +61,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
   const [hover, setHover] = useState<HoverInfo | null>(null)
   const palette = useMemo(readPalette, [])
   const points = useMemo(() => structure.chain.map(([x, y, z]) => [x, y, z] as [number, number, number]), [structure])
-  const colors = useMemo(() => {
-    const ctx = {
-      palette,
-      start: region[0],
-      end: region[1],
-      promoters: annotations.genes.map((g) => [g.tss - 1000, g.tss + 1000] as [number, number]),
-      enhancers: annotations.enhancers,
-      anchors: structure.anchors.map((a) => ({ start: a.start, end: a.end, factors: a.loops.map((l) => l.factor) })),
-    }
-    return structure.chain.map((p) => colorAt(mode, p[3], ctx))
-  }, [structure, annotations, region, mode, palette])
+  const colors = useMemo(() => chainColors(structure, annotations, region, mode, palette), [structure, annotations, region, mode, palette])
 
   const describe = (i: number): string[] => {
     const k = beadAt(structure.beads, structure.chain[i][3])
