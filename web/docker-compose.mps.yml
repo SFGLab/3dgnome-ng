@@ -2,9 +2,11 @@
 #   nvidia-cuda-mps-control -d          # on the host, once, as root or the GPU owner
 #   docker compose -f docker-compose.yml -f docker-compose.mps.yml up -d
 # The workers share the host IPC namespace and the daemon's pipe directory, /tmp/nvidia-mps by
-# default, MPS_PIPE_DIRECTORY to change it.
+# default, MPS_PIPE_DIRECTORY to change it. A daemon started without root serves only its own
+# user; MPS_USER=$(id -u):$(id -g) runs the workers as that user.
 x-mps: &mps
   ipc: host
+  user: "${MPS_USER:-0:0}"
   environment:
     CUDA_MPS_PIPE_DIRECTORY: /tmp/nvidia-mps
   volumes:
