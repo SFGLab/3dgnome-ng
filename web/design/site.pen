@@ -13132,7 +13132,7 @@
                                   "fill": "$muted",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "Loops in BEDPE, contacts in .hic, .mcool or BEDPE, enhancers in BED",
+                                  "content": "Loops and anchors in BEDPE and BED, contacts as .mcool or BEDPE, enhancers in BED",
                                   "lineHeight": 1.45,
                                   "fontFamily": "$font",
                                   "fontSize": 12,
@@ -13203,7 +13203,7 @@
                           "fill": "$faint",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "Cell types come from the server catalog. Help shows the command that adds a cell type.",
+                          "content": "For a cell type that is not listed, upload its loops and contacts as your own data.",
                           "lineHeight": 1.45,
                           "fontFamily": "$font",
                           "fontSize": 12,
@@ -15828,7 +15828,7 @@
                       "id": "Npv4h",
                       "name": "Timing",
                       "fill": "$faint",
-                      "content": "A 1 Mb region took a median of 6 minutes on this server this month.",
+                      "content": "The job page shows the progress of the job and its place in the queue.",
                       "fontFamily": "$font",
                       "fontSize": 12,
                       "fontWeight": "normal"
@@ -21291,7 +21291,7 @@
       "name": "Help page",
       "clip": true,
       "width": 1440,
-      "height": 2500,
+      "height": 2672,
       "fill": "$bg",
       "layout": "vertical",
       "children": [
@@ -21463,8 +21463,8 @@
                 },
                 {
                   "type": "frame",
-                  "id": "IWkK4",
-                  "name": "Link Your own variants",
+                  "id": "xZmx7",
+                  "name": "Link Input formats",
                   "width": "fill_container",
                   "fill": "$accent-soft",
                   "cornerRadius": 6,
@@ -21475,10 +21475,10 @@
                   "children": [
                     {
                       "type": "text",
-                      "id": "F744q",
+                      "id": "QaI2x",
                       "name": "Label",
                       "fill": "$accent",
-                      "content": "Your own variants",
+                      "content": "Input formats",
                       "fontFamily": "$font",
                       "fontSize": 13,
                       "fontWeight": "600"
@@ -21487,7 +21487,30 @@
                 },
                 {
                   "type": "frame",
-                  "id": "HV5pR",
+                  "id": "y4JaT",
+                  "name": "Link Structural variants",
+                  "width": "fill_container",
+                  "fill": "#00000000",
+                  "cornerRadius": 6,
+                  "padding": [
+                    7,
+                    10
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "iIh7Q",
+                      "name": "Label",
+                      "fill": "$ink",
+                      "content": "Structural variants",
+                      "fontFamily": "$font",
+                      "fontSize": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "LyMVF",
                   "name": "Link Reading the results",
                   "width": "fill_container",
                   "fill": "#00000000",
@@ -21499,7 +21522,7 @@
                   "children": [
                     {
                       "type": "text",
-                      "id": "TUGZs",
+                      "id": "mWdkl",
                       "name": "Label",
                       "fill": "$ink",
                       "content": "Reading the results",
@@ -21510,7 +21533,7 @@
                 },
                 {
                   "type": "frame",
-                  "id": "Nu8rR",
+                  "id": "s8sE1",
                   "name": "Link Questions",
                   "width": "fill_container",
                   "fill": "#00000000",
@@ -21522,7 +21545,7 @@
                   "children": [
                     {
                       "type": "text",
-                      "id": "FC2tF",
+                      "id": "IUrnC",
                       "name": "Label",
                       "fill": "$ink",
                       "content": "Questions",
@@ -21533,8 +21556,8 @@
                 },
                 {
                   "type": "frame",
-                  "id": "ENfzW",
-                  "name": "Link Running gnome3d yourself",
+                  "id": "gw7f4",
+                  "name": "Link Running gnome3d-ng yourself",
                   "width": "fill_container",
                   "fill": "#00000000",
                   "cornerRadius": 6,
@@ -21545,7 +21568,7 @@
                   "children": [
                     {
                       "type": "text",
-                      "id": "q6W4p",
+                      "id": "GTnDZ",
                       "name": "Label",
                       "fill": "$ink",
                       "content": "Running gnome3d-ng yourself",
@@ -21561,7 +21584,6 @@
               "id": "az3mo",
               "name": "Reading column",
               "width": "fill_container",
-              "height": "fill_container",
               "layout": "vertical",
               "gap": 34,
               "padding": [
@@ -21606,6 +21628,967 @@
                 },
                 {
                   "type": "frame",
+                  "id": "GWZpt",
+                  "name": "Input formats",
+                  "width": 760,
+                  "layout": "vertical",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "vyvGn",
+                      "name": "Heading",
+                      "fill": "$ink",
+                      "content": "Input formats",
+                      "fontFamily": "$font",
+                      "fontSize": 18,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "GQgDS",
+                      "name": "Intro",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Input files are plain text with one record per line, separated by tabs or spaces, with positions in base pairs on GRCh38. Each cell type on the server has a full set, and an upload replaces one file of the set.",
+                      "lineHeight": 1.55,
+                      "fontFamily": "$font",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "BIVb4",
+                      "name": "Formats table",
+                      "clip": true,
+                      "width": "fill_container",
+                      "fill": "$surface",
+                      "cornerRadius": 10,
+                      "stroke": "$line",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "zU3TJ",
+                          "name": "Header",
+                          "width": "fill_container",
+                          "fill": "$panel",
+                          "stroke": "$line",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 14,
+                          "padding": [
+                            8,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "i8kvV",
+                              "name": "Cell",
+                              "width": 150,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Hz0qs",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "File",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "F9ymT",
+                              "name": "Cell",
+                              "width": 230,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Xjttv",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Columns",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "J2vRI",
+                              "name": "Cell",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "FqGNJ",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Notes",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "FpZGk",
+                          "name": "Row Loop anchors, BED",
+                          "width": "fill_container",
+                          "fill": "#00000000",
+                          "stroke": "$line",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 14,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "NHqrl",
+                              "name": "Cell",
+                              "width": 150,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Ds1Uq",
+                                  "name": "T",
+                                  "fill": "$ink",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Loop anchors, BED",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "iK0Io",
+                              "name": "Cell",
+                              "width": 230,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "EmX64",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "chr  start  end  orientation",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$mono",
+                                  "fontSize": 11
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "LhD0j",
+                              "name": "Cell",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "wJE0M",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Orientation of the CTCF motif, L, R or N. Use N when it is unknown and for RNAPII anchors. Give the orientation on every line or on none. The engine reads the first line to decide whether the file has it.",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "l0neeZ",
+                          "name": "Row Loops, BEDPE",
+                          "width": "fill_container",
+                          "fill": "#00000000",
+                          "stroke": "$line",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 14,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "Or6BU",
+                              "name": "Cell",
+                              "width": 150,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "OMztU",
+                                  "name": "T",
+                                  "fill": "$ink",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Loops, BEDPE",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "YLI6F",
+                              "name": "Cell",
+                              "width": 230,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Xdq8Y",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "chr1  start1  end1  chr2  start2  end2  count",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$mono",
+                                  "fontSize": 11
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "FQoom",
+                              "name": "Cell",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "M0MK3",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "One file per factor, CTCF first. The count is the number of PETs. Loops between chromosomes are skipped, and a loop longer than 1 Mb goes to the coarse contact map.",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "P7hel",
+                          "name": "Row Contacts, BEDPE",
+                          "width": "fill_container",
+                          "fill": "#00000000",
+                          "stroke": "$line",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 14,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "z2C42",
+                              "name": "Cell",
+                              "width": 150,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "tc7qo",
+                                  "name": "T",
+                                  "fill": "$ink",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Contacts, BEDPE",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "CJ8bc",
+                              "name": "Cell",
+                              "width": 230,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "a3U77",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "chr1  start1  end1  chr2  start2  end2  count",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$mono",
+                                  "fontSize": 11
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "Z9Qt1",
+                              "name": "Cell",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "ZlFTq",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Hi-C bin pairs or ChIA-PET singletons, with an integer count. The start column gives the position of each end. A .mcool map is converted to this format first.",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "vO7fz",
+                          "name": "Row Genes, GTF",
+                          "width": "fill_container",
+                          "fill": "#00000000",
+                          "stroke": "$line",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 14,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "K20xl6",
+                              "name": "Cell",
+                              "width": 150,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "gm0i0",
+                                  "name": "T",
+                                  "fill": "$ink",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Genes, GTF",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "f5EJE",
+                              "name": "Cell",
+                              "width": 230,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "yidCq",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "standard GTF",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$mono",
+                                  "fontSize": 11
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "KpImv",
+                              "name": "Cell",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "MHkz1",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Gene records give the gene name and the TSS, taken from the strand.",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "V3QY4",
+                          "name": "Row Enhancers, BED",
+                          "width": "fill_container",
+                          "fill": "#00000000",
+                          "stroke": "$line",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 14,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "phmyw",
+                              "name": "Cell",
+                              "width": 150,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Qr1v2",
+                                  "name": "T",
+                                  "fill": "$ink",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Enhancers, BED",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "BXikN",
+                              "name": "Cell",
+                              "width": 230,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "bC7cf",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "chr  start  end",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$mono",
+                                  "fontSize": 11
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "kEVut",
+                              "name": "Cell",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "dX5d0",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "One enhancer per line, for example from EnhancerAtlas.",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Wdtqb",
+                          "name": "Row Segment split, BED",
+                          "width": "fill_container",
+                          "fill": "#00000000",
+                          "stroke": "$line",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 14,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "ZQZmK",
+                              "name": "Cell",
+                              "width": 150,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "s7JrH",
+                                  "name": "T",
+                                  "fill": "$ink",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Segment split, BED",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "k9RALF",
+                              "name": "Cell",
+                              "width": 230,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "f3HlZP",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "chr  position  position",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$mono",
+                                  "fontSize": 11
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "D7fOE",
+                              "name": "Cell",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "sSw9N",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Optional. Positions where the coarse segments split.",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "p5pFl",
+                          "name": "Row Centromeres, BED",
+                          "width": "fill_container",
+                          "fill": "#00000000",
+                          "stroke": "$line",
+                          "strokeWidth": {
+                            "bottom": 1
+                          },
+                          "gap": 14,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "HQBZz",
+                              "name": "Cell",
+                              "width": 150,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n8M61g",
+                                  "name": "T",
+                                  "fill": "$ink",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Centromeres, BED",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "oOpW9",
+                              "name": "Cell",
+                              "width": 230,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Zn6ie",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "chr  start  end",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$mono",
+                                  "fontSize": 11
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "ExVVY",
+                              "name": "Cell",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "synjF",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "One line per chromosome.",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "bQ8iO",
+                          "name": "Row Structural variants, VCF",
+                          "width": "fill_container",
+                          "fill": "#00000000",
+                          "stroke": "$line",
+                          "gap": 14,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "GMWeJ",
+                              "name": "Cell",
+                              "width": 150,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "CpDpV",
+                                  "name": "T",
+                                  "fill": "$ink",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Structural variants, VCF",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "QnmVR",
+                              "name": "Cell",
+                              "width": 230,
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "G2pMsG",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "standard VCF, bgzip",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$mono",
+                                  "fontSize": 11
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "K02Qf",
+                              "name": "Cell",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "IZBBq",
+                                  "name": "T",
+                                  "fill": "$muted",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "See the next section.",
+                                  "lineHeight": 1.4,
+                                  "fontFamily": "$font",
+                                  "fontSize": 13
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "zCxmE",
+                      "name": "Ex head",
+                      "fill": "$ink",
+                      "content": "Example, one CTCF loop and its anchors",
+                      "fontFamily": "$font",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "CsWl7",
+                      "name": "Example anchors.bed",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "M1DAj",
+                          "name": "Label",
+                          "fill": "$muted",
+                          "content": "anchors.bed",
+                          "fontFamily": "$mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "EBwpT",
+                          "name": "Code",
+                          "width": "fill_container",
+                          "fill": "#1E1E1C",
+                          "cornerRadius": 8,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "l7kPCU",
+                              "name": "T",
+                              "fill": "#E9E8E3",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "chr1  12062800  12064300  R\nchr1  12447900  12451100  L",
+                              "lineHeight": 1.6,
+                              "fontFamily": "$mono",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "TLUDo",
+                      "name": "Example ctcf_loops.bedpe",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "h81IT",
+                          "name": "Label",
+                          "fill": "$muted",
+                          "content": "ctcf_loops.bedpe",
+                          "fontFamily": "$mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Hpt3v",
+                          "name": "Code",
+                          "width": "fill_container",
+                          "fill": "#1E1E1C",
+                          "cornerRadius": 8,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "VpplT",
+                              "name": "T",
+                              "fill": "#E9E8E3",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "chr1  12062800  12064300  chr1  12447900  12451100  7",
+                              "lineHeight": 1.6,
+                              "fontFamily": "$mono",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "f939O",
+                      "name": "Example contacts.bedpe",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "jKwBY",
+                          "name": "Label",
+                          "fill": "$muted",
+                          "content": "contacts.bedpe",
+                          "fontFamily": "$mono",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "YkOLr",
+                          "name": "Code",
+                          "width": "fill_container",
+                          "fill": "#1E1E1C",
+                          "cornerRadius": 8,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "h597R",
+                              "name": "T",
+                              "fill": "#E9E8E3",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "chr1  12050000  12075000  chr1  12425000  12450000  41",
+                              "lineHeight": 1.6,
+                              "fontFamily": "$mono",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "FY4tM",
+                      "name": "Old format",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "The 10 column loop files of 3D-GNOME 2.0 and 3.0, with motif orientations and the factor in the loop file, are not read. Move the orientations to the anchors file and write one loop file per factor.",
+                      "lineHeight": 1.55,
+                      "fontFamily": "$font",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "LpyW3",
+                      "name": "Mcool",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "The server converts an uploaded .mcool map. To convert one yourself, run prep_singletons.py from the gnome3d-ng repository, which writes intra chromosomal bin pairs at a chosen bin size and can thin a deep map.",
+                      "lineHeight": 1.55,
+                      "fontFamily": "$font",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
                   "id": "O8GHR9",
                   "name": "Your own variants",
                   "width": 760,
@@ -21617,7 +22600,7 @@
                       "id": "Qjx3R",
                       "name": "Heading",
                       "fill": "$ink",
-                      "content": "Your own variants",
+                      "content": "Structural variants",
                       "fontFamily": "$font",
                       "fontSize": 18,
                       "fontWeight": "700"
@@ -21953,7 +22936,7 @@
                           "fill": "$muted",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "A 1 Mb region with 100 structures took a median of 6 minutes on this server this month. A job waits in the queue while the GPUs are busy, and the job page shows its place in the queue.",
+                          "content": "Run time grows with the size of the region and the number of structures. A job waits in the queue while the GPUs are busy, and the job page shows its place in the queue.",
                           "lineHeight": 1.55,
                           "fontFamily": "$font",
                           "fontSize": 14,
@@ -22458,72 +23441,6 @@
                               "fill": "$accent",
                               "content": "All 161 settings, from SETTINGS.md",
                               "fontFamily": "$font",
-                              "fontSize": 12,
-                              "fontWeight": "normal"
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "PCnLe",
-                      "name": "Add a cell type",
-                      "width": "fill_container",
-                      "layout": "vertical",
-                      "gap": 8,
-                      "padding": [
-                        8,
-                        0,
-                        0,
-                        0
-                      ],
-                      "children": [
-                        {
-                          "type": "text",
-                          "id": "kbqB7",
-                          "name": "H",
-                          "fill": "$ink",
-                          "content": "New cell types",
-                          "fontFamily": "$font",
-                          "fontSize": 15,
-                          "fontWeight": "600"
-                        },
-                        {
-                          "type": "text",
-                          "id": "Y2fwm3",
-                          "name": "T",
-                          "fill": "$muted",
-                          "textGrowth": "fixed-width",
-                          "width": "fill_container",
-                          "content": "A server reads its cell types from a catalog file. One command copies a cell type's loops, contacts, genes and enhancers into the data directory and adds its entry.",
-                          "lineHeight": 1.55,
-                          "fontFamily": "$font",
-                          "fontSize": 14,
-                          "fontWeight": "normal"
-                        },
-                        {
-                          "type": "frame",
-                          "id": "P2hzAC",
-                          "name": "Code",
-                          "width": "fill_container",
-                          "fill": "#1E1E1C",
-                          "cornerRadius": 8,
-                          "padding": [
-                            12,
-                            14
-                          ],
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "aoYUc",
-                              "name": "T",
-                              "fill": "#E9E8E3",
-                              "textGrowth": "fixed-width",
-                              "width": "fill_container",
-                              "content": "python web/scripts/make_dataset.py data $DATA_DIR K562 --label \"K562, myelogenous leukaemia\" \\\n  --gtf gencode.v40.basic.annotation.gtf --enhancers K562_enhancers_hg38.bed",
-                              "lineHeight": 1.6,
-                              "fontFamily": "$mono",
                               "fontSize": 12,
                               "fontWeight": "normal"
                             }
