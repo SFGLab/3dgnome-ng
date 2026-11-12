@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 from .catalog import Catalog
-from .inputs import build_inputs
+from .inputs import Own, build_inputs
 from .marks import ep_table, mark_beads, read_cif
 from .regions import parse_region
 from .settings import Settings
@@ -33,6 +33,10 @@ ENGINE_VERSION = "gnome3d-ng"
 
 
 def _no_overrides() -> dict[str, str]:
+    return {}
+
+
+def _no_own() -> dict[str, object]:
     return {}
 
 
@@ -49,6 +53,7 @@ class JobRequest:
     upload_vcf: str = ""
     overrides: dict[str, str] = field(default_factory=_no_overrides)
     background: str = "hic"
+    own: dict[str, object] = field(default_factory=_no_own)
 
     def __post_init__(self) -> None:
         # The old form sent HiCDiffusion as a flag; request.json files of that form still read.
@@ -112,7 +117,7 @@ def _hicdiffusion(region_start: int, chrom: str, svs: list, fasta: Path) -> tupl
     return cond[0], region_start
 
 
-def _lifted_marks(cell, chrom: str, svs: list):  # noqa: ANN001, ANN202
+def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None):  # noqa: ANN001, ANN202
     """The cell type's genes and enhancers on `chrom` in the haplotype's coordinates, the beads'
     coordinates, those inside a deletion dropped."""
     import pandas as pd
@@ -123,7 +128,7 @@ def _lifted_marks(cell, chrom: str, svs: list):  # noqa: ANN001, ANN202
     genes = genes[genes["chrom"] == chrom].copy()
     genes["tss"] = L.many(genes["tss"].to_numpy())
     genes = genes[genes["tss"] >= 0]
-    enh = pd.read_csv(cell.path("enhancers"), sep="\t", header=None, usecols=[0, 1, 2])
+    enh = pd.read_csv(enhancers or cell.path("enhancers"), sep="\t", header=None, usecols=[0, 1, 2])
     enh = enh[enh[0] == chrom].copy()
     enh[1], enh[2] = L.many(enh[1].to_numpy()), L.many(enh[2].to_numpy() - 1) + 1
     return genes, enh[(enh[1] >= 0) & (enh[2] > 0)]
@@ -140,7 +145,14 @@ def run_job(
     _status(job, state="running", stage="inputs", started=time.time())
     log = job / "engine.log"
     try:
-        cell = catalog.cell_types[req.cell_type]
+        cell = catalog.cell_types[req.cell_type] if req.cell_type != "own" else next(iter(catalog.cell_types.values()))
+        o = req.own
+        own = Own(
+            loops=[(str(f), Path(p)) for f, p in o.get("loops", [])],  # type: ignore[union-attr]
+            anchors=Path(str(o["anchors"])) if o.get("anchors") else None,
+            contacts=Path(str(o["contacts"])) if o.get("contacts") else None,
+            enhancers=Path(str(o["enhancers"])) if o.get("enhancers") else None,
+        ) if o else None
         region = parse_region(req.region, cell.genes(), Settings.from_env().max_span)
         svs: list = []
         skipped = 0
@@ -152,7 +164,7 @@ def run_job(
         if req.background == "hicdiffusion":
             _status(job, stage="hicdiffusion")
             hic = _hicdiffusion(region.start, region.chrom, svs, Path(os.environ["REFERENCE_FASTA"]))
-        inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background)
+        inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background, own)
         apply_overrides(inputs.config, validate_overrides(req.overrides))
         _status(job, stage="modelling", region=inputs.region, n_svs=inputs.n_svs, skipped_svs=skipped, loops=inputs.loops)
 
@@ -170,7 +182,7 @@ def run_job(
         cifs = sorted((job / "models").glob("*.cif"), key=_member)
         models = [read_cif(c) for c in cifs]
         pos0, starts, ends, _ = models[0]
-        genes, enh = _lifted_marks(cell, region.chrom, svs)
+        genes, enh = _lifted_marks(cell, region.chrom, svs, own.enhancers if own else None)
         inputs_lo, inputs_hi = (int(x) for x in inputs.region.split(":")[1].split("-"))
         marks = mark_beads(region.chrom, starts, ends, genes, enh)
         # read_cif sorts beads by start; the viewer selects atoms in file order

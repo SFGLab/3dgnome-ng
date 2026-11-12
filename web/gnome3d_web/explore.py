@@ -51,6 +51,15 @@ def models(job: Path) -> list[Path]:
     return [job / "models" / n for n in names]
 
 
+def _public_request(req: dict) -> dict:
+    """The request without the server's paths of uploaded files."""
+    out = {k: v for k, v in req.items() if k not in ("upload_vcf", "own")}
+    own = req.get("own") or {}
+    if own:
+        out["own"] = {"loops": [f for f, _ in own.get("loops", [])], **{k: bool(own.get(k)) for k in ("anchors", "contacts", "enhancers")}}
+    return out
+
+
 def summary(job: Path, ahead: int | None) -> dict[str, object]:
     """The state, the request, the counts and the files of a job."""
     status = _json(job / "status.json") or {"state": "queued"}
@@ -65,7 +74,7 @@ def summary(job: Path, ahead: int | None) -> dict[str, object]:
         "started": status.get("started"),
         "finished": status.get("finished"),
         "region": status.get("region"),
-        "request": {k: v for k, v in _json(job / "request.json").items() if k != "upload_vcf"},
+        "request": _public_request(_json(job / "request.json")),
         "loops": status.get("loops", {}),
         "n_svs": status.get("n_svs"),
         "structures": len(models(job)),

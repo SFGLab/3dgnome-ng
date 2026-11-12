@@ -15,7 +15,7 @@ from fixture import make_data
 from personal3d.variants import SV
 
 from gnome3d_web.catalog import Catalog
-from gnome3d_web.inputs import build_inputs
+from gnome3d_web.inputs import Own, build_inputs
 from gnome3d_web.regions import Region
 
 
@@ -66,6 +66,27 @@ def main() -> int:
         cfg = configparser.ConfigParser()
         cfg.read(inp.config)
         check("background hic leaves the config as the cell type has it", not cfg.has_section("springs") and not cfg.has_section("anchor_heatmap"))
+
+        own_dir = Path(d) / "own_files"
+        own_dir.mkdir()
+        (own_dir / "a.bedpe").write_text("chr1\t100000\t101000\tchr1\t300000\t301000\t5\nchr1\t100500\t101500\tchr1\t500000\t501000\t3\n")
+        (own_dir / "b.bedpe").write_text("chr1\t700000\t701000\tchr1\t900000\t901000\t4\n")
+        (own_dir / "c.bedpe").write_text("chr1\t100000\t125000\tchr1\t300000\t325000\t9\n")
+        own = Own(loops=[("CTCF", own_dir / "a.bedpe"), ("H3K27ac", own_dir / "b.bedpe")], contacts=own_dir / "c.bedpe")
+        inp = build_inputs(ct, region, "own", [], Path(d) / "own", own=own)
+        cfg = configparser.ConfigParser()
+        cfg.read(inp.config)
+        data = cfg["data"]
+        check("own loops of two factors write two files with the factors named", len(data["clusters"].split(",")) == 2 and data["factors"] == "CTCF,H3K27AC", dict(data).__repr__())
+        anchors = rows(Path(data["data_dir"]) / data["anchors"])
+        check("without an anchors upload the anchors are the merged loop ends with N", [(a[1], a[2], a[3]) for a in anchors] == [("100000", "101500", "N"), ("300000", "301000", "N"), ("500000", "501000", "N"), ("700000", "701000", "N"), ("900000", "901000", "N")], str(anchors))
+        sing = rows(Path(data["data_dir"]) / "singletons.bedpe")
+        check("own contacts replace the singletons", len(sing) == 1 and sing[0][6] == "9", str(sing))
+        own2 = Own(loops=[("H3K27ac", own_dir / "b.bedpe")])
+        inp = build_inputs(ct, region, "own", [], Path(d) / "own2", own=own2)
+        cfg = configparser.ConfigParser()
+        cfg.read(inp.config)
+        check("a first factor that is not CTCF turns the orientation term off", cfg["motif_orientation"]["use_motif_orientation"] == "no")
 
         dele = SV("chr1", 900_001, 960_001, "DEL")
         inp = build_inputs(ct, region, "CTCF", [dele], Path(d) / "del")

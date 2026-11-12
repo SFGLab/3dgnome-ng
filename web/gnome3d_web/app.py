@@ -80,16 +80,29 @@ def create_app() -> FastAPI:
         """
         cell_type = fields.get("cell_type", "")
         factors = fields.get("factors", "CTCF")
+        try:
+            own_raw = json.loads(fields.get("own") or "{}")
+        except json.JSONDecodeError as e:
+            raise JobError(f"own is not JSON: {e}", "own") from e
+        own_dirs = own_uploads(own_raw)
+        if cell_type == "own":
+            if not own_dirs.get("loops"):
+                raise JobError("Your own data needs loops.", "loops")
+            if "contacts" not in own_dirs:
+                raise JobError("Your own data needs contacts, as .hic, .mcool or BEDPE.", "contacts")
+            base = next(iter(catalog.cell_types))
+        else:
+            base = cell_type
         background = fields.get("background", "hic")
         sv_set, sample = fields.get("sv_set", ""), fields.get("sample", "")
-        if cell_type not in catalog.cell_types:
+        if base not in catalog.cell_types:
             raise JobError(f"unknown cell type {cell_type!r}", "cell_type")
-        if factors not in FACTOR_CHOICES:
+        if factors not in FACTOR_CHOICES and not own_dirs.get("loops"):
             raise JobError(f"unknown factor choice {factors!r}", "factors")
         if background not in BACKGROUNDS:
             raise JobError(f"unknown contact background {background!r}", "background")
         try:
-            r = parse_region(fields.get("region", ""), catalog.cell_types[cell_type].genes(), s.max_span)
+            r = parse_region(fields.get("region", ""), catalog.cell_types[base].genes(), s.max_span)
         except RegionError as e:
             raise JobError(str(e), "region") from e
         if background == "hicdiffusion" and r.end - r.start > HICDIFFUSION_SPAN:
@@ -117,6 +130,24 @@ def create_app() -> FastAPI:
             haplotype=1 if str(fields.get("haplotype", "0")) == "1" else 0, n_models=n_models,
             background=background, overrides=overrides,
         )  # fmt: skip
+        if own_dirs:
+            token = secrets.token_urlsafe(18)
+            job = private / token
+            (job / "own").mkdir(parents=True)
+            own: dict[str, object] = {"loops": []}
+            for i, (factor, d) in enumerate(own_dirs.get("loops", [])):
+                own["loops"].append([factor, str(owndata.clean_copy(d, job / "own" / f"loops_{i}.bedpe"))])  # type: ignore[union-attr]
+            for kind in ("anchors", "contacts", "enhancers"):
+                if kind in own_dirs:
+                    own[kind] = str(owndata.clean_copy(own_dirs[kind], job / "own" / f"{kind}.txt"))
+            req.own = own
+            if vcf is not None:
+                up = job / "upload.vcf.gz"
+                up.write_bytes(vcf)
+                req.upload_vcf = str(up)
+                req.sv_set = ""
+            enqueue(s, req, job)
+            return f"/p/{token}"
         if vcf is not None:
             token = secrets.token_urlsafe(18)
             job = private / token
@@ -136,6 +167,32 @@ def create_app() -> FastAPI:
         st.write_text(json.dumps({"state": "queued"}))
         enqueue(s, req, job)
         return f"/jobs/{key}"
+
+    def own_uploads(raw: object) -> dict:
+        """The upload directories a job request names, each checked to exist, to be of its kind
+        and to have passed its check."""
+        if not isinstance(raw, dict):
+            raise JobError("own is not an object of uploads", "own")
+        out: dict = {}
+
+        def one(uid: object, kind: str) -> Path:
+            d = uploads / str(uid)
+            if not re.fullmatch(r"[A-Za-z0-9_-]{8,64}", str(uid)) or not (d / "meta.json").is_file():
+                raise JobError(f"upload {uid!r} does not exist", "own")
+            m = owndata.meta(d)
+            if m["kind"] != kind:
+                raise JobError(f"upload {uid!r} holds {m['kind']}, not {kind}", "own")
+            if not m.get("ok"):
+                raise JobError(f"{m['name']} did not pass its check. Fix the file and upload it again.", "own")
+            return d
+
+        loops = raw.get("loops") or []
+        if loops:
+            out["loops"] = [(str(x.get("factor") or "loops"), one(x.get("upload"), "loops")) for x in loops]
+        for kind in ("anchors", "contacts", "enhancers"):
+            if raw.get(kind):
+                out[kind] = one(raw[kind], kind)
+        return out
 
     @app.post("/jobs")
     async def submit(request: Request, vcf: UploadFile | None = File(None)):  # noqa: ANN202, B008
@@ -181,7 +238,9 @@ def create_app() -> FastAPI:
             d = owndata.store(file.file, file.filename or kind, kind, uploads, cap, {"factor": factor} if factor else None)
         except owndata.UploadTooLarge as e:
             return JSONResponse({"error": str(e)}, 413)
-        return JSONResponse(owndata.result(d, owndata.check(kind, owndata.data_file(d), reg)), 201)
+        c = owndata.check(kind, owndata.data_file(d), reg)
+        owndata.record_check(d, c)
+        return JSONResponse(owndata.result(d, c), 201)
 
     def upload_dir(uid: str) -> Path:
         if not re.fullmatch(r"[A-Za-z0-9_-]{8,64}", uid) or not (uploads / uid / "meta.json").is_file():

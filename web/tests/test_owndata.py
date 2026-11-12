@@ -79,6 +79,31 @@ def main() -> int:
         check("the preview lists the loops in the region", len(prev) >= 1 and all(len(x) == 3 for x in prev), str(prev[:2]))
         check("an unknown upload is a 404", c.get("/api/uploads/nothing12345/preview", params={"region": "chr1:0-1000"}).status_code == 404)
 
+        loops_a = up("loops", "ctcf.bedpe", (ct / "ctcf.bedpe").read_bytes()).json()["id"]
+        loops_b = up("loops", "rnapii.bedpe", (ct / "rnapii.bedpe").read_bytes()).json()["id"]
+        contacts = up("contacts", "c.bedpe", (ct / "singletons.bedpe").read_bytes()).json()["id"]
+        enh = up("enhancers", "e.bed", b"chr1\t1300000\t1302000\n").json()["id"]
+        own = {"loops": [{"factor": "CTCF", "upload": loops_a}, {"factor": "RNAPII", "upload": loops_b}], "contacts": contacts, "enhancers": enh}
+        form = {"cell_type": "own", "region": "chr1:0-3000000", "n_models": "2", "own": json.dumps(own)}
+        r = c.post("/api/jobs", data=form)
+        url = r.json().get("url", "")
+        check("an own data job is private", r.status_code == 201 and url.startswith("/p/"), r.text)
+        s = c.get(f"/api{url}/summary").json()
+        check("an own data job runs to done", s["state"] == "done" and s["loops"] == {"CTCF": 14, "RNAPII": 1}, str(s)[:300])
+        check("the summary names the own files without server paths", s["request"]["own"] == {"loops": ["CTCF", "RNAPII"], "anchors": False, "contacts": True, "enhancers": True}, str(s["request"].get("own")))
+        marks = json.loads((root / "results" / "private" / url.split("/")[-1] / "marks.json").read_text())
+        enh_marks = [e for e in marks["elements"] if e["kind"] == "enhancer"]
+        check("own enhancers replace the cell type's", [(e["start"], e["end"]) for e in enh_marks] == [(1300000, 1302000)], str(enh_marks))
+        r = c.post("/api/jobs", data=form | {"own": json.dumps({"loops": own["loops"]})})
+        check("an own data job without contacts on cell type own is a 400 on contacts", r.status_code == 400 and r.json()["field"] == "contacts", r.text)
+        r = c.post("/api/jobs", data=form | {"own": json.dumps({"loops": [{"factor": "CTCF", "upload": "nothing12345"}], "contacts": contacts})})
+        check("an unknown upload is a 400 on own", r.status_code == 400 and r.json()["field"] == "own", r.text)
+        bad = up("loops", "old.txt", old.encode()).json()["id"]
+        r = c.post("/api/jobs", data=form | {"own": json.dumps({"loops": [{"factor": "CTCF", "upload": bad}], "contacts": contacts})})
+        check("an upload that failed its check is a 400", r.status_code == 400 and "check" in r.json()["error"], r.text)
+        r = c.post("/api/jobs", data={"cell_type": "GMX", "region": "chr1:0-3000000", "n_models": "2", "own": json.dumps({"loops": [{"factor": "CTCF", "upload": loops_a}]})})
+        check("a hosted cell type with own loops keeps its contacts and runs", r.status_code == 201 and c.get(f"/api{r.json()['url']}/summary").json()["state"] == "done", r.text)
+
         from gnome3d_web.queue import sweep_private
 
         stale = uploads / lid

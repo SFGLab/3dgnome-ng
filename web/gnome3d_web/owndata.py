@@ -208,6 +208,20 @@ def check(kind: str, path: Path, region: tuple[str, int, int] | None) -> Check:
     return check_vcf(path)
 
 
+def record_check(d: Path, c: Check) -> None:
+    """Writes the outcome of the check into the upload's meta.json."""
+    m = meta(d) | {"ok": c.ok}
+    (d / "meta.json").write_text(json.dumps(m))
+
+
+def clean_copy(d: Path, dst: Path) -> Path:
+    """Writes the upload's records tab separated, without header lines or Windows line ends."""
+    with dst.open("w") as out:
+        for _, cols in records(data_file(d)):
+            out.write("\t".join(cols) + "\n")
+    return dst
+
+
 def result(d: Path, c: Check) -> dict[str, object]:
     m = meta(d)
     return {"id": m["id"], "kind": m["kind"], "name": m["name"], "size": m["size"], "ok": c.ok, "summary": c.summary, "error": asdict(c.error) if c.error else None, "samples": c.samples}

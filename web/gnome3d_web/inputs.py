@@ -12,7 +12,9 @@ coordinates before the region do not move.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import re
+
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -26,6 +28,36 @@ from .regions import Region
 from .settings_schema import apply_overrides
 
 ENGINE_FACTOR = {"CTCF": "CTCF", "RNAPII": "RNAPOL2"}
+
+
+def _no_loops() -> list[tuple[str, Path]]:
+    return []
+
+
+@dataclass
+class Own:
+    """A job's own files: loops per factor, and anchors, contacts and enhancers in place of the
+    cell type's. Without anchors the loop ends are the anchors."""
+
+    loops: list[tuple[str, Path]] = field(default_factory=_no_loops)
+    anchors: Path | None = None
+    contacts: Path | None = None
+    enhancers: Path | None = None
+
+
+def _loop_end_anchors(paths: list[Path], chrom: str) -> pd.DataFrame:
+    """The ends of the loops on a chromosome, overlapping ends merged, orientation N."""
+    spans = []
+    for p in paths:
+        t = _read(p, chrom, 7)
+        spans += list(zip(t[1], t[2], strict=True)) + list(zip(t[4], t[5], strict=True))
+    merged: list[list[int]] = []
+    for a, b in sorted(spans):
+        if merged and a <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], int(b))
+        else:
+            merged.append([int(a), int(b)])
+    return pd.DataFrame([(chrom, a, b, "N") for a, b in merged], columns=range(4))
 
 
 @dataclass
@@ -60,6 +92,20 @@ def _clusters(loops: pd.DataFrame, anchors: pd.DataFrame) -> list[list]:
     return [[r[0], int(r[1]), int(r[2]), r[3], int(r[4]), int(r[5]), o(int(r[1]), int(r[2])), o(int(r[4]), int(r[5])), int(r[6])] for r in loops.itertuples(index=False)]
 
 
+def _snap(loops: pd.DataFrame, anchors: pd.DataFrame) -> pd.DataFrame:
+    """Own loops with each end replaced by the anchor holding its midpoint, when one does."""
+    starts = anchors[1].to_numpy()
+    ends = anchors[2].to_numpy()
+    out = loops.copy()
+    for s_col, e_col in ((1, 2), (4, 5)):
+        mids = ((out[s_col] + out[e_col]) // 2).to_numpy()
+        k = np.searchsorted(starts, mids, side="right") - 1
+        hit = (k >= 0) & (ends[np.clip(k, 0, None)] >= mids)
+        out.loc[hit, s_col] = starts[k[hit]]
+        out.loc[hit, e_col] = ends[k[hit]]
+    return out
+
+
 def build_inputs(
     cell: CellType,
     region: Region,
@@ -68,6 +114,7 @@ def build_inputs(
     out: Path,
     hic: tuple[np.ndarray, int] | None = None,
     background: str = "hic",
+    own: Own | None = None,
 ) -> Inputs:
     """Write the inputs for one haplotype under `out` and return the config and the region in
     the haplotype's coordinates. `hic` is a predicted HiCDiffusion window and its reference start.
@@ -76,7 +123,14 @@ def build_inputs(
     out.mkdir(parents=True, exist_ok=True)
     chrom = region.chrom
     L = Lift(svs)
-    anchors = _read(cell.anchors_for(factors), chrom, 4).sort_values(1).reset_index(drop=True)
+    sources = own.loops if own and own.loops else cell.clusters_for(factors)
+    if own and own.loops:
+        anchors = _read(own.anchors, chrom, 4) if own.anchors else _loop_end_anchors([p for _, p in own.loops], chrom)
+        if anchors.shape[1] < 4:
+            anchors[3] = "N"
+        anchors = anchors.sort_values(1).reset_index(drop=True)
+    else:
+        anchors = _read(cell.anchors_for(factors), chrom, 4).sort_values(1).reset_index(drop=True)
     if factors == "RNAPII":
         ends = _read(cell.clusters_for("RNAPII")[0][1], chrom, 7)
         spans = list(zip(ends[1], ends[2], strict=True)) + list(zip(ends[4], ends[5], strict=True))
@@ -91,8 +145,9 @@ def build_inputs(
     names: list[str] = []
     counts: dict[str, int] = {}
     extra: dict[tuple[int, int], str] = {}
-    for fac, path in cell.clusters_for(factors):
-        clusters = _clusters(_read(path, chrom, 7), anchors)
+    for fac, path in sources:
+        raw = _read(path, chrom, 7)
+        clusters = _clusters(_snap(raw, anchors) if own and own.loops else raw, anchors)
         if svs:
             # An inserted motif becomes an anchor only above triosformer's score cutoff. At the
             # rules' own 0, repeats inside insertions made dozens of 19 bp anchors per region.
@@ -101,10 +156,10 @@ def build_inputs(
             got = [rewrite.Loop(c[0], (c[1], c[2]), (c[4], c[5]), (c[6], c[7]), float(c[8]), (c[1], c[2]), (c[4], c[5])) for c in clusters]
         kept = [lp for lp in got if region.start <= (lp.ref_a or lp.a)[0] and (lp.ref_b or lp.b)[1] <= region.end]
         rows = sorted((lp.chrom, *lp.a, lp.chrom, *lp.b, max(1, int(round(lp.weight)))) for lp in kept)
-        name = f"{fac.lower()}_clusters.bedpe"
+        name = f"{re.sub(r'[^a-z0-9]', '', fac.lower()) or 'loops'}_clusters.bedpe"
         pd.DataFrame(rows, columns=range(7)).to_csv(out / name, sep="\t", header=False, index=False)
         files.append(name)
-        names.append(ENGINE_FACTOR[fac])
+        names.append(ENGINE_FACTOR.get(fac, fac.upper()))
         counts[fac] = len(rows)
         for lp in kept:
             extra[lp.a] = lp.orient[0]
@@ -119,7 +174,7 @@ def build_inputs(
         lifted.setdefault((int(iv[0]), int(iv[1])), o)
     pd.DataFrame([(chrom, a, b, o) for (a, b), o in sorted(lifted.items())]).to_csv(out / "anchors.bed", sep="\t", header=False, index=False)
 
-    sing = _read(cell.path("singletons"), chrom, 7)
+    sing = _read(own.contacts if own and own.contacts else cell.path("singletons"), chrom, 7)
     sing = sing[sing[3] == chrom]
     if svs:
         sing = engine.lift_bedpe(sing, {chrom: L})
@@ -144,11 +199,11 @@ def build_inputs(
         "segment_split": "segments.bed",
         "centromeres": "centromeres.bed",
     }
-    if len(names) > 1 or factors == "RNAPII":
+    if len(names) > 1 or factors == "RNAPII" or (own and own.loops):
         data["factors"] = ",".join(names)
     config = engine.write_config(cell.path("config"), data, out / "config.ini", header=f"{cell.name} {region} {factors}")
     fixed = {}
-    if factors == "RNAPII":
+    if factors == "RNAPII" or (own and own.loops and own.loops[0][0].upper() != "CTCF"):
         fixed["motif_orientation.use_motif_orientation"] = "no"
     if background == "none":
         fixed |= {"springs.use_contact_background": "no", "anchor_heatmap.use_anchor_heatmap": "no"}
