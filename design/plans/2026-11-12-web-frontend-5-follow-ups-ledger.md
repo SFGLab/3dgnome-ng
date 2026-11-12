@@ -18,3 +18,4 @@ Task 6: verified on team-frodo through the page: your own cell type with H1ESC C
 Final review: self-review (native execution by the user's rule); no Critical or Important finding
 Final: minor (deferred): the link summary's density names the cell type the dialog was opened on; on your own cell type with Loops of changed afterwards the job thins again at build to the chosen cell type's density, so the kept count in the summary can differ from what the job reads
 Final: minor (deferred): a 4DN file has no md5 to check after download, only the size in the key table
+Task 6: complete (commits f1b10ac..36ddcf1, tests: bash .superpowers/sdd/2026-11-12-web-frontend-5-follow-ups/alltests.sh → all pass)
