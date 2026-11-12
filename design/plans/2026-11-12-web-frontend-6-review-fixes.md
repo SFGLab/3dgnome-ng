@@ -4,7 +4,7 @@
 
 **Goal:** The user's review of 2026-11-12: the own data dialog as a wizard with a side panel and
 consistent step subtitles, examples that open finished jobs, the comparison link dropped, a
-My jobs page with an empty state, a progress bar with a status log, and depth in the 3D view.
+My jobs page with an empty state, a progress bar with a status log, depth and hover in the 3D view, and every table paginated.
 
 **Architecture:** Mostly `web/frontend/src`; the progress task adds stages to the job's status. Examples reuse the server's request cache:
 submitting an example's request returns the shared job, finished or running, so no server change.
@@ -63,6 +63,13 @@ submitting an example's request returns the shared job, finished or running, so 
 - The bead under the pointer is marked plainly: a ring and a larger sphere in a colour no mark uses, the stretch of chain around it brightened, and its position in a label beside the pointer.
 - Check: render the TNFRSF8 job on team-frodo before and after, light and dark, with a bead hovered.
 
-### Task 6: On team-frodo
+### Task 6: Every table paginated
+
+**Files:** create `web/frontend/src/components/Pager.tsx` and a `usePage` hook beside it; modify every table of the site: `src/job/LoopsTab.tsx`, `GenesTab.tsx`, `Compare.tsx`, `src/model/VariantsDialog.tsx`, `src/pages/MyJobs.tsx`, and any other `<table>` found by search. Test `src/components/Pager.test.tsx` and one case per table.
+
+- 50 rows a page by default, a pager under the table with the row range, Previous and Next, and the page reset when a filter or sort changes. A table of 50 rows or fewer shows no pager.
+- The loops endpoint, if it returns every loop, gains `offset` and `limit` so a page is fetched, not the whole list.
+
+### Task 7: On team-frodo
 
 - Deploy; open each example through the title page and the Examples page; the wizard at 1440 and 390 px in both themes; My jobs empty and filled. Ledger copied to design/plans.

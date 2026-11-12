@@ -66,10 +66,6 @@ export function Title() {
         </div>
       </section>
 
-      <Link className="results-link" to={ROUTES.results}>
-        Comparison with Hi-C and expression data <ArrowRight size={14} aria-hidden />
-      </Link>
-
       <section className="examples">
         <div className="examples-head">
           <h2>Examples</h2>

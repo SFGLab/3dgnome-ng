@@ -2,7 +2,8 @@
 export type RecentJob = { url: string; label: string; name: string; at: number }
 
 const KEY = 'gnome3d.recentJobs'
-const MAX = 10
+// Enough for a working session; older jobs stay reachable by their links.
+const MAX = 50
 
 export function recentJobs(): RecentJob[] {
   try {

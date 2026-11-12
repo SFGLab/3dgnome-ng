@@ -15,10 +15,10 @@ describe('recent jobs', () => {
     expect(recentJobs().map((j) => j.url)).toEqual(['/jobs/2', '/jobs/1'])
   })
 
-  it('keeps ten jobs', () => {
-    for (let i = 0; i < 12; i++) rememberJob(job(i))
-    expect(recentJobs()).toHaveLength(10)
-    expect(recentJobs()[0].url).toBe('/jobs/11')
+  it('keeps fifty jobs', () => {
+    for (let i = 0; i < 52; i++) rememberJob(job(i))
+    expect(recentJobs()).toHaveLength(50)
+    expect(recentJobs()[0].url).toBe('/jobs/51')
   })
 
   it('lists a job once', () => {

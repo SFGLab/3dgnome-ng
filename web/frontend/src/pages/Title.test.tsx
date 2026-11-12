@@ -27,7 +27,7 @@ describe('Title page', () => {
     renderTitle()
     const model = screen.getAllByRole('link', { name: /Model a region/ }).map((a) => a.getAttribute('href'))
     expect(model).toContain(ROUTES.model)
-    expect(screen.getByRole('link', { name: /Comparison with Hi-C and expression data/ })).toHaveAttribute('href', ROUTES.results)
+    expect(screen.queryByRole('link', { name: /Comparison with Hi-C and expression data/ })).toBeNull()
   })
 
   it('links to the previous services', () => {
