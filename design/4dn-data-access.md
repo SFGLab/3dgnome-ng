@@ -33,6 +33,8 @@ Found on 2026-11-12:
 Both read through the website's link route, `web/gnome3d_web/remote.py`: a 1.1 Mb window of
 chr1 in 6.2 s from the .hic and 9.6 s from the .mcool.
 
-Needed for the RNAPII and Micro-C inputs. The fix for fetch is to resolve a 4DN accession to
-its bucket key by the listing above, cached in a small table beside the manifests, in place of
-the portal's metadata call.
+Needed for the RNAPII and Micro-C inputs. `validation/studies/fetch.py` now resolves a 4DN
+accession through `validation/manifests/4dn_keys.tsv`, and an accession missing from the table
+is found by the listing and added to it, so a new RNAPII or Micro-C manifest needs nothing more
+than its accessions. The portal's md5 and assay metadata are gone with it; fetch checks no md5
+for 4DN files. Unit checks in `harness/test_fetch_4dn.py`.
