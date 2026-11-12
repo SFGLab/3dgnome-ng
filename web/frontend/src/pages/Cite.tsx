@@ -1,6 +1,7 @@
 import { Copy, ExternalLink, Github, Type } from 'lucide-react'
 import { ReferenceEntry } from '../components/ReferenceEntry'
 import { DATA_SOURCES, REFERENCES, referenceLink } from '../content/references'
+import '../styles/doc.css'
 import './cite.css'
 
 const PRIMARY =
