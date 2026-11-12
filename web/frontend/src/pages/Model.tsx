@@ -2,13 +2,16 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../api'
+import { Background } from '../model/Background'
 import { CellTypes } from '../model/CellTypes'
 import { EXAMPLES, type Example } from '../model/examples'
 import { EMPTY_FORM, type FormState } from '../model/form'
+import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
 import { RegionField, useRegion } from '../model/RegionField'
 import { SidePanel } from '../model/SidePanel'
 import { Step } from '../model/Step'
+import { Variants } from '../model/Variants'
 import '../styles/doc.css'
 import './model.css'
 
@@ -29,6 +32,12 @@ export function Model() {
     if (e) setForm(fromExample(e))
   }, [params])
 
+  const cellType = catalog.data?.cell_types[form.cell]
+  const hicdiffusionOk = !!catalog.data?.hicdiffusion && !(region.data && region.data.end - region.data.start > 2_000_000)
+  useEffect(() => {
+    if (form.background === 'hicdiffusion' && catalog.data && !hicdiffusionOk) setForm((f) => ({ ...f, background: 'hic' }))
+  }, [form.background, hicdiffusionOk, catalog.data])
+
   return (
     <div className="doc-page model-page">
       <SidePanel onExample={(e) => setForm(fromExample(e))} />
@@ -45,13 +54,19 @@ export function Model() {
           {region.data && <LoopPreview cell={form.cell} region={region.data} factors={form.factors} />}
         </Step>
         <Step n={2} title="Loops">
-          <div />
+          <LoopOptions value={form.factors} onChange={(factors) => set({ factors })} />
         </Step>
         <Step n={3} title="Structural variants" note="optional">
-          <div />
+          {catalog.data && <Variants catalog={catalog.data} svSet={form.svSet} sample={form.sample} haplotype={form.haplotype} vcf={form.vcf} onChange={set} />}
         </Step>
         <Step n={4} title="Contact background">
-          <div />
+          <Background
+            value={form.background}
+            region={region.data}
+            available={!!catalog.data?.hicdiffusion}
+            lymphoblastoid={cellType?.lymphoblastoid ?? true}
+            onChange={(background) => set({ background })}
+          />
         </Step>
         <Step n={5} title="Ensemble and simulation settings">
           <div />

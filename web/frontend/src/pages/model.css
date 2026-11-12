@@ -302,3 +302,159 @@
 .key-line.rnapii {
   background: var(--rnapii);
 }
+
+.options {
+  display: grid;
+  gap: 10px;
+}
+
+.options.two {
+  grid-template-columns: 1fr 1fr;
+}
+
+.options.three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.option[aria-checked='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.option:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.radio-dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border: 1.5px solid var(--faint);
+  border-radius: 50%;
+  background: #FFFFFF;
+}
+
+.option[aria-checked='true'] .radio-dot {
+  border: 4px solid var(--accent);
+}
+
+.option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.option-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.option.card .option-title {
+  font-size: 13px;
+}
+
+.option-desc,
+.option-reason {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.option-reason {
+  color: #B45309;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.field select,
+.field input {
+  padding: 9px 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font: 13px var(--font);
+}
+
+.upload {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.upload input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.upload.chosen {
+  border-style: solid;
+  color: var(--ink);
+  cursor: default;
+}
+
+.icon-button {
+  margin-left: auto;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #FFF4DC;
+  color: #6B4A00;
+  font-size: 12px;
+}
+
+@media (max-width: 960px) {
+  .options.two,
+  .options.three,
+  .fields {
+    grid-template-columns: 1fr;
+  }
+}
