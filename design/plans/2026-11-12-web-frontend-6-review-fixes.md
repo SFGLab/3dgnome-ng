@@ -38,7 +38,8 @@ submitting an example's request returns the shared job, finished or running, so 
 
 - Every example is a request plus where its job opens: a tab, or a second request to compare with. Opening one submits its request, ten structures, which the server's cache turns into the shared job, and goes to its page.
 - The title page cards and an Examples page at /examples, linked as All examples, open examples. The Model page's side panel keeps filling the form.
-- Tests: a card posts its request and opens the job url with its tab; the compare example posts both and opens the first with `compare`; the Job page opens the comparison from the query; checkCopy clean.
+- The job page keeps its tab and its comparison in the URL as history entries, so Back returns to the previous tab or closes the comparison instead of leaving the job.
+- Tests: a card posts its request and opens the job url with its tab; Back after two tab clicks returns to the first tab; the compare example posts both and opens the first with `compare`; the Job page opens the comparison from the query; checkCopy clean.
 
 ### Task 3: The comparison link dropped, My jobs with an empty state
 
@@ -70,6 +71,13 @@ submitting an example's request returns the shared job, finished or running, so 
 - 50 rows a page by default, a pager under the table with the row range, Previous and Next, and the page reset when a filter or sort changes. A table of 50 rows or fewer shows no pager.
 - The loops endpoint, if it returns every loop, gains `offset` and `limit` so a page is fetched, not the whole list.
 
-### Task 7: On team-frodo
+### Task 7: The contact map at the width of its panel
+
+**Files:** `web/frontend/src/job/ContactMapTab.tsx`, `heatmap.ts`, the job css. Test `src/pages/Job.test.tsx`.
+
+- The maps scale to the panel's width, two side by side on a wide screen and one above the other on a narrow one, the canvas drawn at the device pixel ratio so a bin stays sharp; hover and the axis follow the drawn size.
+- Check: 1440, 1024 and 390 px screenshots.
+
+### Task 8: On team-frodo
 
 - Deploy; open each example through the title page and the Examples page; the wizard at 1440 and 390 px in both themes; My jobs empty and filled. Ledger copied to design/plans.
