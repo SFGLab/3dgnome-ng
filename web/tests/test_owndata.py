@@ -115,6 +115,18 @@ def main() -> int:
         vid = up("vcf", "demo.vcf.gz", (data / "svs" / "demo.vcf.gz").read_bytes()).json()["id"]
         v = c.post("/api/variants/check", data={"cell": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "sample": "P1", "haplotype": "0", "upload": vid})
         check("an uploaded VCF is checked the same way", v.status_code == 200 and v.json()["applied"] == {"DEL": 1}, v.text[:200])
+        job = {"cell_type": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "n_models": "2", "sample": "P1", "haplotype": "0"}
+        r = c.post("/api/jobs", data=job | {"vcf_upload": vid})
+        url = r.json().get("url", "")
+        s = c.get(f"/api{url}/summary").json() if url else {}
+        check("a job takes its VCF by upload id and is private", r.status_code == 201 and url.startswith("/p/") and s.get("state") == "done" and s.get("n_svs") == 1, r.text + str(s)[:200])
+        for bad_id in ("nosuchupload1", loops_a):
+            r = c.post("/api/jobs", data=job | {"vcf_upload": bad_id})
+            check(f"a VCF upload id that is unknown or of another kind is a 400 ({bad_id[:6]})", r.status_code == 400 and r.json()["field"] == "vcf_upload", r.text)
+        notvcf = up("vcf", "plain.vcf", b"#CHROM\tPOS\n").json()["id"]
+        r = c.post("/api/jobs", data=job | {"vcf_upload": notvcf})
+        check("a VCF upload that failed its check is a 400", r.status_code == 400 and r.json()["field"] == "vcf_upload", r.text)
+
         v = c.post("/api/variants/check", data={"cell": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "sample": "NOBODY", "haplotype": "0", "upload": vid})
         check("a sample not in the VCF is a 400 on the sample field", v.status_code == 400 and v.json()["field"] == "sample", v.text)
 

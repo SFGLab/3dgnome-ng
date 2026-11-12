@@ -1,20 +1,21 @@
 import { Upload, X } from 'lucide-react'
 import type { Catalog } from '../api'
 import type { FormState } from './form'
+import type { UploadResult } from './upload'
 
 type Props = {
   catalog: Catalog
   svSet: string
   sample: string
   haplotype: 0 | 1
-  vcf: File | null
+  vcfUpload: UploadResult | null
   onChange: (patch: Partial<FormState>) => void
   onOpen: (mode: 'hosted' | 'upload', file: File | null) => void
 }
 
 /** Step 3, a hosted call set with its sample and haplotype, or an uploaded VCF. A VCF and the
  * variants of a chosen sample open the dialog that shows their change to the loops. */
-export function Variants({ catalog, svSet, sample, haplotype, vcf, onChange, onOpen }: Props) {
+export function Variants({ catalog, svSet, sample, haplotype, vcfUpload: vcf, onChange, onOpen }: Props) {
   const samples = svSet ? (catalog.sv_sets[svSet]?.samples ?? []) : []
   return (
     <div className="variants">
@@ -53,7 +54,7 @@ export function Variants({ catalog, svSet, sample, haplotype, vcf, onChange, onO
         <div className="upload chosen">
           <Upload size={14} aria-hidden />
           <span>{vcf.name}</span>
-          <button type="button" className="icon-button" aria-label="Remove the VCF" onClick={() => onChange({ vcf: null })}>
+          <button type="button" className="icon-button" aria-label="Remove the VCF" onClick={() => onChange({ vcfUpload: null })}>
             <X size={14} aria-hidden />
           </button>
         </div>
@@ -65,7 +66,7 @@ export function Variants({ catalog, svSet, sample, haplotype, vcf, onChange, onO
         </label>
       )}
       {((svSet && sample) || vcf) && (
-        <button type="button" className="link-button" onClick={() => onOpen(vcf ? 'upload' : 'hosted', vcf)}>
+        <button type="button" className="link-button" onClick={() => onOpen(vcf ? 'upload' : 'hosted', null)}>
           Show the variants in the region
         </button>
       )}

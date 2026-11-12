@@ -32,7 +32,7 @@ describe('LoopOptions', () => {
 describe('Variants', () => {
   it('lists the samples of the chosen call set and the haplotypes', () => {
     const onChange = vi.fn()
-    render(<Variants catalog={CATALOG} svSet="HGSVC" sample="" haplotype={0} vcf={null} onChange={onChange} onOpen={vi.fn()} />)
+    render(<Variants catalog={CATALOG} svSet="HGSVC" sample="" haplotype={0} vcfUpload={null} onChange={onChange} onOpen={vi.fn()} />)
     expect(screen.getByLabelText('Sample')).toHaveTextContent('HG00512')
     fireEvent.change(screen.getByLabelText('Sample'), { target: { value: 'HG00733' } })
     expect(onChange).toHaveBeenCalledWith({ sample: 'HG00733' })
@@ -42,7 +42,7 @@ describe('Variants', () => {
 
   it('opens the dialog with a VCF file', () => {
     const onOpen = vi.fn()
-    render(<Variants catalog={CATALOG} svSet="" sample="" haplotype={0} vcf={null} onChange={vi.fn()} onOpen={onOpen} />)
+    render(<Variants catalog={CATALOG} svSet="" sample="" haplotype={0} vcfUpload={null} onChange={vi.fn()} onOpen={onOpen} />)
     const file = new File(['x'], 'mine.vcf.gz')
     fireEvent.change(screen.getByLabelText(/Or drop your own VCF here/), { target: { files: [file] } })
     expect(onOpen).toHaveBeenCalledWith('upload', file)
@@ -50,7 +50,7 @@ describe('Variants', () => {
 
   it('opens the dialog for a chosen sample of a call set', () => {
     const onOpen = vi.fn()
-    render(<Variants catalog={CATALOG} svSet="HGSVC" sample="HG00733" haplotype={0} vcf={null} onChange={vi.fn()} onOpen={onOpen} />)
+    render(<Variants catalog={CATALOG} svSet="HGSVC" sample="HG00733" haplotype={0} vcfUpload={null} onChange={vi.fn()} onOpen={onOpen} />)
     fireEvent.click(screen.getByRole('button', { name: 'Show the variants in the region' }))
     expect(onOpen).toHaveBeenCalledWith('hosted', null)
   })
@@ -85,7 +85,7 @@ describe('Background', () => {
     const { container } = render(
       <>
         <LoopOptions value="CTCF" ownCell={false} onChange={() => {}} onOwn={() => {}} />
-        <Variants catalog={CATALOG} svSet="" sample="" haplotype={0} vcf={null} onChange={() => {}} onOpen={() => {}} />
+        <Variants catalog={CATALOG} svSet="" sample="" haplotype={0} vcfUpload={null} onChange={() => {}} onOpen={() => {}} />
         <Background value="hic" region={REGION_3MB} available={false} lymphoblastoid={false} onChange={() => {}} />
       </>,
     )

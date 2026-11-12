@@ -80,6 +80,7 @@ export function VariantsDialog(props: {
   factors: string
   mode: VariantsMode
   file: File | null
+  upload?: UploadResult | null
   svSet: string
   sample: string
   haplotype: 0 | 1
@@ -90,7 +91,7 @@ export function VariantsDialog(props: {
   const { catalog, cell, region, factors, onClose, onApply } = props
   const [mode, setMode] = useState<VariantsMode>(props.mode)
   const [file, setFile] = useState<File | null>(props.file)
-  const [upload, setUpload] = useState<UploadResult | null>(null)
+  const [upload, setUpload] = useState<UploadResult | null>(props.upload ?? null)
   const [failure, setFailure] = useState('')
   const [svSet, setSvSet] = useState(props.svSet || Object.keys(catalog.sv_sets)[0] || '')
   const [sample, setSample] = useState(props.sample)
@@ -143,7 +144,7 @@ export function VariantsDialog(props: {
   const samples = mode === 'upload' ? (upload?.samples ?? []) : (catalog.sv_sets[svSet]?.samples ?? [])
   const n = check.data?.variants.length
   const ready = !!sample && !!source
-  const apply = () => onApply(mode === 'upload' ? { vcf: file, svSet: '', sample, haplotype } : { svSet, sample, haplotype, vcf: null })
+  const apply = () => onApply(mode === 'upload' ? { vcfUpload: upload, svSet: '', sample, haplotype } : { svSet, sample, haplotype, vcfUpload: null })
 
   const haplotypeField = (
     <label className="field">
@@ -205,11 +206,11 @@ export function VariantsDialog(props: {
           </div>
           <div className="sv-fields" role="tabpanel">
             {mode === 'upload' ? (
-              file ? (
+              file || upload ? (
                 <span className="file-chip">
                   <FileArchive size={14} aria-hidden />
-                  <span className="file-name">{file.name}</span>
-                  <span className="file-size">{megabytes(file.size)}</span>
+                  <span className="file-name">{file?.name ?? upload?.name}</span>
+                  <span className="file-size">{megabytes(file?.size ?? upload?.size ?? 0)}</span>
                 </span>
               ) : (
                 <label className="add-file">

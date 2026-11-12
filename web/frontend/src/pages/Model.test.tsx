@@ -159,7 +159,8 @@ describe('Model a region page', () => {
     fireEvent.click(screen.getByRole('button', { name: /Build 100 structures/ }))
     await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u) === '/api/jobs')).toBe(true))
     const body = fetchMock.mock.calls.find(([u]) => String(u) === '/api/jobs')![1]!.body as FormData
-    expect((body.get('vcf') as File).name).toBe('mine.vcf.gz')
+    expect(body.get('vcf_upload')).toBe('vcfupload1')
+    expect(body.get('vcf')).toBeNull()
     expect(body.get('sample')).toBe('HG00733')
     expect(body.get('sv_set')).toBe('')
   })

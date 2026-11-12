@@ -6,6 +6,7 @@ import io
 import json
 import re
 import secrets
+import shutil
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -73,11 +74,12 @@ def create_app() -> FastAPI:
             super().__init__(message)
             self.field = field
 
-    def create_job(fields: dict[str, str], vcf: bytes | None) -> str:
+    def create_job(fields: dict[str, str], vcf: bytes | Path | None) -> str:
         """Checks a job request, queues the job unless the same one exists, and returns its url.
 
         @param fields the form fields of a job request, overrides as JSON text
-        @param vcf an uploaded VCF, which makes the job private
+        @param vcf an uploaded VCF, which makes the job private. The field vcf_upload names an
+            upload in its place.
         @raises JobError naming the field the request fails on
         """
         cell_type = fields.get("cell_type", "")
@@ -87,6 +89,8 @@ def create_app() -> FastAPI:
         except json.JSONDecodeError as e:
             raise JobError(f"own is not JSON: {e}", "own") from e
         own_dirs = own_uploads(own_raw)
+        if fields.get("vcf_upload"):
+            vcf = owndata.data_file(checked_upload(fields["vcf_upload"], "vcf", "vcf_upload"))
         if cell_type == "own":
             if not own_dirs.get("loops"):
                 raise JobError("Your own data needs loops.", "loops")
@@ -144,9 +148,7 @@ def create_app() -> FastAPI:
                     own[kind] = str(owndata.clean_copy(own_dirs[kind], job / "own" / f"{kind}.txt"))
             req.own = own
             if vcf is not None:
-                up = job / "upload.vcf.gz"
-                up.write_bytes(vcf)
-                req.upload_vcf = str(up)
+                req.upload_vcf = str(put_vcf(vcf, job))
                 req.sv_set = ""
             enqueue(s, req, job)
             return f"/p/{token}"
@@ -154,9 +156,7 @@ def create_app() -> FastAPI:
             token = secrets.token_urlsafe(18)
             job = private / token
             job.mkdir(parents=True)
-            up = job / "upload.vcf.gz"
-            up.write_bytes(vcf)
-            req.upload_vcf = str(up)
+            req.upload_vcf = str(put_vcf(vcf, job))
             req.sv_set = ""
             enqueue(s, req, job)
             return f"/p/{token}"
@@ -170,6 +170,29 @@ def create_app() -> FastAPI:
         enqueue(s, req, job)
         return f"/jobs/{key}"
 
+    def put_vcf(vcf: bytes | Path, job: Path) -> Path:
+        up = job / "upload.vcf.gz"
+        if isinstance(vcf, Path):
+            shutil.copyfile(vcf, up)
+        else:
+            up.write_bytes(vcf)
+        return up
+
+    def checked_upload(uid: object, kind: str, field: str) -> Path:
+        """The directory of an upload that exists, holds `kind` and passed its check.
+
+        @raises JobError on `field` otherwise
+        """
+        d = uploads / str(uid)
+        if not re.fullmatch(r"[A-Za-z0-9_-]{8,64}", str(uid)) or not (d / "meta.json").is_file():
+            raise JobError(f"upload {uid!r} does not exist", field)
+        m = owndata.meta(d)
+        if m["kind"] != kind:
+            raise JobError(f"upload {uid!r} holds {m['kind']}, not {kind}", field)
+        if not m.get("ok"):
+            raise JobError(f"{m['name']} did not pass its check. Fix the file and upload it again.", field)
+        return d
+
     def own_uploads(raw: object) -> dict:
         """The upload directories a job request names, each checked to exist, to be of its kind
         and to have passed its check."""
@@ -178,15 +201,7 @@ def create_app() -> FastAPI:
         out: dict = {}
 
         def one(uid: object, kind: str) -> Path:
-            d = uploads / str(uid)
-            if not re.fullmatch(r"[A-Za-z0-9_-]{8,64}", str(uid)) or not (d / "meta.json").is_file():
-                raise JobError(f"upload {uid!r} does not exist", "own")
-            m = owndata.meta(d)
-            if m["kind"] != kind:
-                raise JobError(f"upload {uid!r} holds {m['kind']}, not {kind}", "own")
-            if not m.get("ok"):
-                raise JobError(f"{m['name']} did not pass its check. Fix the file and upload it again.", "own")
-            return d
+            return checked_upload(uid, kind, "own")
 
         loops = raw.get("loops") or []
         if loops:

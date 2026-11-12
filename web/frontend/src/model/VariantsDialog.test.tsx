@@ -69,6 +69,16 @@ describe('Structural variants dialog', () => {
     expect(screen.getByRole('img', { name: /Variants in chr1/ }).querySelectorAll('.sv-mark')).toHaveLength(6)
   })
 
+  it('reuses an upload it was given rather than uploading again', async () => {
+    const fetchMock = mock()
+    const upload = { id: 'vcfupload9', kind: 'vcf' as const, name: 'kept.vcf.gz', size: 1000, ok: true, summary: '', error: null, samples: ['HG00733'] }
+    renderDialog({ file: null, upload, sample: 'HG00733' })
+    await screen.findByRole('table')
+    expect(fetchMock.mock.calls.some(([u]) => String(u) === '/api/uploads')).toBe(false)
+    expect(checks[0].get('upload')).toBe('vcfupload9')
+    expect(screen.getByText('kept.vcf.gz')).toBeInTheDocument()
+  })
+
   it('checks again for the second haplotype', async () => {
     renderDialog()
     await screen.findByRole('table')
@@ -81,7 +91,7 @@ describe('Structural variants dialog', () => {
     await screen.findByRole('table')
     fireEvent.click(screen.getByRole('button', { name: 'Apply 6 variants' }))
     expect(onApply).toHaveBeenCalledWith(expect.objectContaining({ svSet: '', sample: 'HG00733', haplotype: 0 }))
-    expect(onApply.mock.calls[0][0].vcf.name).toBe('HG00733.sv.vcf.gz')
+    expect(onApply.mock.calls[0][0].vcfUpload.id).toBe('vcfupload1')
   })
 
   it('checks a sample of a hosted call set', async () => {
@@ -90,7 +100,7 @@ describe('Structural variants dialog', () => {
     await screen.findByRole('table')
     expect(checks[0].get('sv_set')).toBe('HGSVC')
     fireEvent.click(screen.getByRole('button', { name: 'Apply 6 variants' }))
-    expect(onApply).toHaveBeenCalledWith({ svSet: 'HGSVC', sample: 'HG00733', haplotype: 0, vcf: null })
+    expect(onApply).toHaveBeenCalledWith({ svSet: 'HGSVC', sample: 'HG00733', haplotype: 0, vcfUpload: null })
   })
 
   it('checks the variants against own loops and draws them', async () => {

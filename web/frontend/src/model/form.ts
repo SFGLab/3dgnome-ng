@@ -1,4 +1,4 @@
-import { NO_OWN, type OwnChoice } from './upload'
+import { NO_OWN, type OwnChoice, type UploadResult } from './upload'
 
 /** The state of the Model a region form. The cell type own means the job reads only uploads. */
 export type Factors = 'CTCF' | 'RNAPII' | 'CTCF+RNAPII'
@@ -11,7 +11,7 @@ export type FormState = {
   svSet: string
   sample: string
   haplotype: 0 | 1
-  vcf: File | null
+  vcfUpload: UploadResult | null
   background: Background
   structures: number
   name: string
@@ -26,7 +26,7 @@ export const EMPTY_FORM: FormState = {
   svSet: '',
   sample: '',
   haplotype: 0,
-  vcf: null,
+  vcfUpload: null,
   background: 'hic',
   structures: 100,
   name: '',

@@ -31,6 +31,7 @@ const FIELD_STEP: Record<string, number> = {
   loops: 2,
   sv_set: 3,
   sample: 3,
+  vcf_upload: 3,
   background: 4,
   n_models: 5,
   overrides: 5,
@@ -48,7 +49,7 @@ function toFormData(form: FormState, overrides: Record<string, string>): FormDat
   d.append('haplotype', String(form.haplotype))
   d.append('n_models', String(form.structures))
   d.append('overrides', JSON.stringify(overrides))
-  if (form.vcf) d.append('vcf', form.vcf)
+  if (form.vcfUpload) d.append('vcf_upload', form.vcfUpload.id)
   const own = form.own
   if (own.loops.length || own.anchors || own.contacts || own.enhancers) d.append('own', ownField(own))
   return d
@@ -157,7 +158,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
               svSet={form.svSet}
               sample={form.sample}
               haplotype={form.haplotype}
-              vcf={form.vcf}
+              vcfUpload={form.vcfUpload}
               onChange={set}
               onOpen={(mode, file) => setSvDialog({ mode, file })}
             />
@@ -194,6 +195,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           factors={form.factors}
           mode={svDialog.mode}
           file={svDialog.file}
+          upload={form.vcfUpload}
           svSet={form.svSet}
           sample={form.sample}
           haplotype={form.haplotype}
