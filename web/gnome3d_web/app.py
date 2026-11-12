@@ -1,4 +1,4 @@
-"""The web app: the form, job pages, files and a small JSON API."""
+"""The web app: the frontend build, the form, job pages, files and a small JSON API."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .catalog import FACTOR_CHOICES, Catalog
@@ -56,7 +57,7 @@ def create_app() -> FastAPI:
             status_code=status,
         )
 
-    @app.get("/", response_class=HTMLResponse)
+    @app.get("/model", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:
         return form_page(request)
 
@@ -219,5 +220,18 @@ def create_app() -> FastAPI:
             "cell_types": {k: {"label": c.label, "lymphoblastoid": c.lymphoblastoid, "note": c.note} for k, c in catalog.cell_types.items()},
             "sv_sets": {k: {"label": v.label, "samples": v.samples} for k, v in catalog.sv_sets.items()},
         }
+
+    index_html = s.frontend_dist / "index.html"
+    if (s.frontend_dist / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=s.frontend_dist / "assets"), name="assets")
+
+    # Registered last: every path no route above answers is a client route of the frontend.
+    @app.get("/{path:path}", response_class=HTMLResponse, include_in_schema=False)
+    def frontend(path: str) -> HTMLResponse:
+        if path.startswith(("api/", "jobs/", "p/", "assets/")):
+            raise HTTPException(404)
+        if not index_html.is_file():
+            return HTMLResponse(f"The frontend is not built. Run npm run build in web/frontend, or set FRONTEND_DIST. Expected {index_html}.", 503)
+        return HTMLResponse(index_html.read_text())
 
     return app
