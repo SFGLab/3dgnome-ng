@@ -32,6 +32,8 @@ class CellType:
     anchors: dict[str, str] = field(default_factory=_no_strings)
     clusters: dict[str, str] = field(default_factory=_no_strings)
     note: str = ""
+    description: str = ""
+    data: list[str] = field(default_factory=list)
 
     def path(self, key: str) -> Path:
         """The absolute path of one of the cell type's single files, by catalog key."""
@@ -82,6 +84,8 @@ class Catalog:
                 anchors=dict(c["anchors"]),
                 clusters=dict(c["clusters"]),
                 note=c.get("note", ""),
+                description=c.get("description", c.get("label", name).partition(", ")[2]),
+                data=list(c.get("data", [*c["clusters"], "Hi-C", *(["enhancers"] if c.get("enhancers") else [])])),
             )
         svs = {
             name: SVSet(name=name, label=s.get("label", name), vcf=root / s["vcf"], samples=list(s["samples"]))

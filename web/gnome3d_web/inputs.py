@@ -21,9 +21,9 @@ from personal3d import engine, hicdiffusion, motifs, rewrite
 from personal3d.lift import Lift
 from personal3d.variants import SV
 
-from .settings_schema import apply_overrides
 from .catalog import CellType
 from .regions import Region
+from .settings_schema import apply_overrides
 
 ENGINE_FACTOR = {"CTCF": "CTCF", "RNAPII": "RNAPOL2"}
 
