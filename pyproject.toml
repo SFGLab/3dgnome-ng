@@ -30,6 +30,11 @@ jax = [
     "jax>=0.4.30",
 ]
 
+# gnome3d-ng extract reads .mcool files with cooler.
+extract = [
+    "cooler>=0.9",
+]
+
 # Validation harness (validation/): structure-quality metrics, Hi-C correlation,
 # and the EV/confinement hyperparameter sweep. Needs SciPy for stats, cooler to
 # read 4DN Hi-C .mcool matrices, and hicrep for the stratum-adjusted SCC.

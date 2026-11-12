@@ -28,12 +28,9 @@ describe('readHicWindow', () => {
     calls.length = 0
   })
 
-  it('writes the window as BEDPE lines with whole counts', async () => {
+  it('writes the off diagonal pairs as BEDPE lines with whole counts, as the hosted maps hold them', async () => {
     const text = await readHicWindow(new File(['x'], 'mine.hic'), REGION, 25_000)
-    expect(text.trim().split('\n')).toEqual([
-      'chr1\t11500000\t11525000\tchr1\t11500000\t11525000\t61',
-      'chr1\t11500000\t11525000\tchr1\t11525000\t11550000\t13',
-    ])
+    expect(text.trim().split('\n')).toEqual(['chr1\t11500000\t11525000\tchr1\t11525000\t11550000\t13'])
   })
 
   it('asks for the chromosome by the name the file uses', async () => {

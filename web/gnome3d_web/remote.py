@@ -247,6 +247,9 @@ def link_window(url: str, chrom: str, start: int, end: int, per_mb: float, densi
     kind = check_link(url, allow_private)
     size, final = probe(url, allow_private, first_hop_checked=True)
     w = read_window(final, kind, chrom, start, end)
+    # The hosted maps hold no pair within one bin, and the engine reads every map alike.
+    off = w.bin1 != w.bin2
+    w = Window(w.bin1[off], w.bin2[off], w.counts[off], w.resolutions)
     span = f"{chrom}:{start:,}-{end:,}"
     read = int(w.counts.sum())
     if read == 0:

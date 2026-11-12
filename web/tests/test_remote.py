@@ -88,8 +88,10 @@ def write_mcool(singletons: Path, out: Path) -> None:
     for res in (5_000, 25_000):
         bins = pd.DataFrame({"chrom": "chr1", "start": np.arange(0, 4_000_000, res)})
         bins["end"] = bins["start"] + res
-        b1, b2 = t[1].to_numpy() // res, t[4].to_numpy() // res
-        pixels = pd.DataFrame({"bin1_id": np.minimum(b1, b2), "bin2_id": np.maximum(b1, b2), "count": t[6].to_numpy()})
+        diag = pd.DataFrame([["chr1", 600_000, 600_000 + res, "chr1", 600_000, 600_000 + res, 40]])
+        both = pd.concat([t, diag], ignore_index=True)
+        b1, b2 = both[1].to_numpy() // res, both[4].to_numpy() // res
+        pixels = pd.DataFrame({"bin1_id": np.minimum(b1, b2), "bin2_id": np.maximum(b1, b2), "count": both[6].to_numpy()})
         pixels = pixels.groupby(["bin1_id", "bin2_id"], as_index=False)["count"].sum().sort_values(["bin1_id", "bin2_id"])
         cooler.create_cooler(f"{out}::resolutions/{res}", bins, pixels, ordered=True, mode="a")
 
@@ -152,7 +154,7 @@ def main() -> int:
         from gnome3d_web import owndata
 
         pairs = pd.read_csv(owndata.data_file(stored), sep="\t", header=None)
-        check("the window's bin pairs are stored at 25 kb", len(pairs) == 10 and set(pairs[2] - pairs[1]) == {25_000} and int(pairs[6].sum()) == 30, pairs.to_string())
+        check("the window's off diagonal bin pairs are stored at 25 kb", len(pairs) == 10 and set(pairs[2] - pairs[1]) == {25_000} and int(pairs[6].sum()) == 30, pairs.to_string())
 
         r = link(f"{url_whole}/test.mcool")
         check("a link without range requests is a 400 naming it", r.status_code == 400 and "does not answer range requests" in r.json()["error"] and r.json()["fix"], r.text)

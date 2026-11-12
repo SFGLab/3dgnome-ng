@@ -96,6 +96,10 @@ def _run_structure(
 
 
 def main() -> None:
+    if sys.argv[1:2] == ["extract"]:
+        from gnome3d.extract import main as extract_main
+
+        sys.exit(extract_main(sys.argv[2:]))
     parser = argparse.ArgumentParser(description="3dgnome-ng structure prediction")
     parser.add_argument("--config", required=True, help="Path to config.ini")
     parser.add_argument(
