@@ -47,6 +47,7 @@
 
 .top-bar nav {
   display: flex;
+  margin-left: auto;
   gap: 24px;
   flex-wrap: wrap;
 }
@@ -60,6 +61,36 @@
 .top-bar nav a.active {
   color: var(--accent);
   font-weight: 600;
+}
+
+.theme-switch {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.theme-switch button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.theme-switch button[aria-checked='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
 }
 
 .cite-strip {

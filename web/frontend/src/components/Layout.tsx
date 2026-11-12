@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { ROUTES } from '../routes'
 import { CiteStrip } from './CiteStrip'
+import { ThemeSwitch } from './ThemeSwitch'
 import { Wordmark } from './Wordmark'
 import './layout.css'
 
@@ -30,6 +31,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </NavLink>
           ))}
         </nav>
+        <ThemeSwitch />
       </header>
       <main>{children}</main>
       <CiteStrip />
