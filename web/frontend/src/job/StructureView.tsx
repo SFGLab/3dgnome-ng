@@ -5,7 +5,7 @@ import { colorAt, readPalette, type Mode } from './colors'
 import { bp as fmt } from './format'
 import { Scene, type Marker, type SceneHandle } from './Scene'
 
-export type HoverInfo = { lines: string[]; x: number; y: number }
+export type HoverInfo = { lines: string[]; x: number; y: number; index: number }
 
 /** The colour of every chain point of a structure under a colour mode. */
 export function chainColors(structure: Structure, annotations: Annotations, region: [number, number], mode: Mode, palette = readPalette()): string[] {
@@ -136,11 +136,12 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
           colors={colors}
           markers={markers}
           highlight={highlight}
-          onHover={(i, x, y) => setHover(i === null ? null : { lines: describe(i), x, y })}
+          hovered={hover?.index ?? null}
+          onHover={(i, x, y) => setHover(i === null ? null : { lines: describe(i), x, y, index: i })}
           onPick={(i) => onPickBead?.(beadAt(structure.beads, structure.chain[i][3]))}
         />
         {hover && (
-          <div className="hover-box" style={{ left: hover.x + 14, top: hover.y + 14 }}>
+          <div className="hover-box" style={{ left: hover.x + 22, top: hover.y + 22 }}>
             {hover.lines.map((l, i) => (
               <span key={i} className={i === 0 ? 'mono' : undefined}>
                 {l}

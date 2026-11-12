@@ -1121,3 +1121,18 @@
   color: var(--faint);
   font-size: 13px;
 }
+
+/* The hovered bead: a ring in the hover colour around the bead, above the chain. */
+.hover-ring {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border: 2.5px solid #2A78D6;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #FFFFFF;
+  pointer-events: none;
+}
+
+.hover-box {
+  border-left: 3px solid #2A78D6;
+}
