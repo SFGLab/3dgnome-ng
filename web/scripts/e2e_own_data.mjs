@@ -54,7 +54,7 @@ if (which === 'own') {
   await click('.route', 'Local .hic')
   await (await p.$('.add-file input')).uploadFile(`${FILES}/ENCFF011KAF.hic`)
   await p.waitForSelector('.contact-card.good', { timeout: 120000 })
-  await click('.dialog-foot button', 'Use this map')
+  await click('.dialog-foot button', 'Use this data')
   await structures(5)
 } else if (which === 'vcf') {
   await region('chr1:109,200,000-110,200,000')
@@ -79,7 +79,7 @@ if (which === 'own') {
   await p.select('.own-select select', 'GM12878')
   await wait(300)
   await p.screenshot({ path: `${SHOTS}/e2e_owncell_enhancers.png` })
-  await click('.dialog-foot button', 'Use these files')
+  await click('.dialog-foot button', 'Use this data')
   await click('button[role=radio]', 'CTCF ChIA-PET')
   await p.select('.loops-of select', 'H1ESC')
   await structures(5)
@@ -93,7 +93,7 @@ if (which === 'own') {
   await wait(500)
   await p.screenshot({ path: `${SHOTS}/e2e_contacts_link.png` })
   console.log(await p.$eval('.contact-card:not(.hint-card)', (n) => n.textContent))
-  await click('.dialog-foot button', 'Use this map')
+  await click('.dialog-foot button', 'Use this data')
   await structures(5)
 }
 console.log('job', await submit())

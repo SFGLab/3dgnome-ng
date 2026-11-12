@@ -3,10 +3,10 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** The user's review of 2026-11-12: the own data dialog as a wizard with a side panel and
-consistent step subtitles, examples that open finished jobs, the comparison link dropped, and a
-My jobs page with an empty state.
+consistent step subtitles, examples that open finished jobs, the comparison link dropped, a
+My jobs page with an empty state, a progress bar with a status log, and depth in the 3D view.
 
-**Architecture:** Frontend only, `web/frontend/src`. Examples reuse the server's request cache:
+**Architecture:** Mostly `web/frontend/src`; the progress task adds stages to the job's status. Examples reuse the server's request cache:
 submitting an example's request returns the shared job, finished or running, so no server change.
 
 **Spec:** the user's review of part 5, 2026-11-12, with a screenshot of the dialog.
@@ -48,6 +48,20 @@ submitting an example's request returns the shared job, finished or running, so 
 - /jobs lists this browser's jobs with their state, name and date, and with none shows "You have no jobs in this browser yet." and a link to Model a region; a note says jobs are kept per browser.
 - Tests: the empty state; a list of two jobs; storage that throws gives the empty state; checkCopy clean.
 
-### Task 4: On team-frodo
+### Task 4: A progress bar and status log for a running job
+
+**Files:** `web/gnome3d_web/jobs.py` (`_status` keeps a list of stages with their start times), `explore.py` (`summary` adds `stages` and, while modelling, `structures_done` from the written .cif files); `web/frontend/src/pages/Job.tsx`, create `src/job/Progress.tsx`. Tests `web/tests/test_explore.py`, `src/pages/Job.test.tsx`.
+
+- A queued or running job shows a bar over its stages, queued, inputs, HiCDiffusion when asked, modelling and marks, the modelling share filled by structures written out of those asked, its place in the queue, and below it a status log: each stage with its start time, then the last lines of engine.log, refreshed with the summary.
+- Tests: the summary carries the stages and the count of written structures; the page shows the bar at the right share, the stage lines and the log tail; a failed job keeps its log; checkCopy clean.
+
+### Task 5: Depth in the 3D structure
+
+**Files:** `web/frontend/src/job/Scene.tsx`, `StructureView.tsx`. Test `src/job/StructureView.test.tsx` if one exists, else a render check.
+
+- The chain is drawn as a lit tube with a light from the camera, and fog from the middle of the structure to its far side, so near strands are dark and sharp and far strands fade toward the background, the way a molecular viewer shades depth.
+- Check: render the TNFRSF8 job on team-frodo before and after, light and dark.
+
+### Task 6: On team-frodo
 
 - Deploy; open each example through the title page and the Examples page; the wizard at 1440 and 390 px in both themes; My jobs empty and filled. Ledger copied to design/plans.

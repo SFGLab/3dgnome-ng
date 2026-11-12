@@ -120,7 +120,8 @@ const ENH_SOURCES: [EnhSource, string, string][] = [
 ]
 
 const CONTACT_RES = 25_000
-const USE_LABEL: Record<OwnTab, string> = { loops: 'Use these loops', anchors: 'Use these files', contacts: 'Use this map', enhancers: 'Use these files' }
+const STEPS: OwnTab[] = ['loops', 'anchors', 'contacts', 'enhancers']
+const STEP_TITLE: Record<OwnTab, string> = { loops: 'Loops', anchors: 'Anchors', contacts: 'Contacts', enhancers: 'Enhancers' }
 type Route = 'link' | 'local' | 'bedpe'
 const ROUTES: [Route, string, string, typeof Link2][] = [
   ['link', 'Link to a file', '.hic or .mcool', Link2],
@@ -340,17 +341,15 @@ export function OwnData({
       enhancersFrom: ownCell ? (enhSource === 'listed' ? enhFrom : enhSource === 'none' ? 'none' : undefined) : undefined,
     })
 
-  const count = (n: number) => `${n} file${n === 1 ? '' : 's'}`
-  const tabs: [OwnTab, string, string][] = [
-    ['loops', 'Loops', count(loops.length)],
-    ['anchors', 'Anchors', single.anchors ? '1 file' : 'loop ends'],
-    ['contacts', 'Contacts', single.contacts ? '1 file' : '.hic, .mcool or BEDPE'],
-    [
-      'enhancers',
-      'Enhancers',
-      !ownCell ? (single.enhancers ? '1 file' : 'cell type') : enhSource === 'upload' ? (single.enhancers ? '1 file' : 'upload') : enhSource === 'listed' ? enhFrom : 'none',
-    ],
-  ]
+  // Each step's subtitle names what the job will use from it, in one form for all four.
+  const named = (e: Entry | null) => (e ? (e.result?.name ?? e.name) : null)
+  const uses: Record<OwnTab, string> = {
+    loops: loops.length ? `${loops.length} file${loops.length === 1 ? '' : 's'}` : 'the listed sets',
+    anchors: named(single.anchors) ?? 'the loop ends',
+    contacts: named(single.contacts) ?? (ownCell ? 'needed' : "the cell type's Hi-C"),
+    enhancers: !ownCell ? (named(single.enhancers) ?? "the cell type's") : enhSource === 'upload' ? (named(single.enhancers) ?? 'none') : enhSource === 'listed' ? enhFrom : 'none',
+  }
+  const at = STEPS.indexOf(active)
 
   return (
     <div className="dialog-backdrop">
@@ -364,104 +363,112 @@ export function OwnData({
             <X size={18} aria-hidden />
           </button>
         </header>
-        <div className="dialog-tabs" role="tablist">
-          {tabs.map(([id, title, meta]) => (
-            <button key={id} type="button" role="tab" aria-selected={active === id} onClick={() => setActive(id)}>
-              {title} <span className="tab-meta">{meta}</span>
-            </button>
-          ))}
-        </div>
-        <div className="dialog-body" role="tabpanel">
-          {active === 'loops' && (
-            <div className="own-tab">
-              <p className="rule">
-                One BEDPE file per factor, columns chr1 start1 end1 chr2 start2 end2 count. The first factor is read as CTCF and its loops get the motif orientation term.
-              </p>
-              {loops.map((l, i) => (
-                <div key={l.key} className={`factor-row${l.failure || l.result?.ok === false ? ' bad' : ''}`} role="group" aria-label={`Loops of factor ${i + 1}`}>
-                  <div className="row-head">
-                    <span className={`factor-name f${Math.min(i, 2)}`}>
-                      <span className="key-line" aria-hidden />
-                      <input aria-label="Factor" value={l.factor} onChange={(e) => setLoops((ls) => ls.map((x) => (x.key === l.key ? { ...x, factor: e.target.value } : x)))} />
-                    </span>
-                    <FileChip entry={l} />
-                    <button type="button" className="icon-button" aria-label={`Remove ${l.name}`} onClick={() => setLoops((ls) => ls.filter((x) => x.key !== l.key))}>
-                      <Trash2 size={15} aria-hidden />
-                    </button>
+        <div className="wizard">
+          <div className="wizard-steps" role="tablist" aria-orientation="vertical" aria-label="Steps">
+            {STEPS.map((id, i) => (
+              <button key={id} type="button" role="tab" aria-selected={active === id} onClick={() => setActive(id)}>
+                <span className="step-number" aria-hidden>
+                  {i + 1}
+                </span>
+                <span className="step-text">
+                  <span className="step-title">{STEP_TITLE[id]}</span>
+                  <span className="step-uses">{uses[id]}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="dialog-body" role="tabpanel">
+            {active === 'loops' && (
+              <div className="own-tab">
+                <p className="rule">
+                  One BEDPE file per factor, columns chr1 start1 end1 chr2 start2 end2 count. The first factor is read as CTCF and its loops get the motif orientation term.
+                </p>
+                {loops.map((l, i) => (
+                  <div key={l.key} className={`factor-row${l.failure || l.result?.ok === false ? ' bad' : ''}`} role="group" aria-label={`Loops of factor ${i + 1}`}>
+                    <div className="row-head">
+                      <span className={`factor-name f${Math.min(i, 2)}`}>
+                        <span className="key-line" aria-hidden />
+                        <input aria-label="Factor" value={l.factor} onChange={(e) => setLoops((ls) => ls.map((x) => (x.key === l.key ? { ...x, factor: e.target.value } : x)))} />
+                      </span>
+                      <FileChip entry={l} />
+                      <button type="button" className="icon-button" aria-label={`Remove ${l.name}`} onClick={() => setLoops((ls) => ls.filter((x) => x.key !== l.key))}>
+                        <Trash2 size={15} aria-hidden />
+                      </button>
+                    </div>
+                    <CheckLine entry={l} />
                   </div>
-                  <CheckLine entry={l} />
-                </div>
-              ))}
-              <label
-                className="add-file"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  addLoops(e.dataTransfer.files)
-                }}
-              >
-                <Plus size={15} aria-hidden /> Add a factor, or drop a BEDPE file here
-                <input type="file" multiple className="visually-hidden" onChange={(e) => addLoops(e.target.files)} />
-              </label>
-              {region && loops.some((l) => l.result?.ok) && <OwnPreview cell={cell} region={region} loops={loops} />}
-            </div>
-          )}
-          {active === 'anchors' && (
-            <OneFile
-              kind="anchors"
-              rule="One BED file, columns chr start end and an optional fourth column with the motif orientation L, R or N. Without a file the anchors are the loop ends, merged where they overlap."
-              entry={single.anchors}
-              onFile={(f) => addSingle('anchors', f)}
-              onRemove={() => setSingle((s) => ({ ...s, anchors: null }))}
-            />
-          )}
-          {active === 'contacts' && (
-            <ContactsTab
-              region={region}
-              maxMb={maxMb}
-              entry={single.contacts}
-              onLink={addLink}
-              onLocal={addLocal}
-              onFile={(f) => addSingle('contacts', f)}
-              onRemove={() => setSingle((s) => ({ ...s, contacts: null }))}
-            />
-          )}
-          {active === 'enhancers' && ownCell && (
-            <div className="own-tab">
-              <div className="routes" role="radiogroup" aria-label="Enhancers from">
-                {ENH_SOURCES.map(([id, title, sub]) => (
-                  <button key={id} type="button" role="radio" aria-checked={enhSource === id} className="route" onClick={() => setEnhSource(id)}>
-                    <span>
-                      <span className="route-title">{title}</span>
-                      <span className="route-sub">{sub}</span>
-                    </span>
-                  </button>
                 ))}
-              </div>
-              {enhSource === 'listed' && (
-                <label className="own-select">
-                  <span>Enhancers of</span>
-                  <select value={enhFrom} onChange={(e) => setEnhFrom(e.target.value)}>
-                    {cells.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                <label
+                  className="add-file"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    addLoops(e.dataTransfer.files)
+                  }}
+                >
+                  <Plus size={15} aria-hidden /> Add a factor, or drop a BEDPE file here
+                  <input type="file" multiple className="visually-hidden" onChange={(e) => addLoops(e.target.files)} />
                 </label>
-              )}
-              {enhSource === 'none' && <p className="rule">The job marks promoters only.</p>}
-            </div>
-          )}
-          {active === 'enhancers' && (!ownCell || enhSource === 'upload') && (
-            <OneFile
-              kind="enhancers"
-              rule={ownCell ? 'One BED file, columns chr start end.' : 'One BED file, columns chr start end. Without a file the job marks the enhancers of the cell type.'}
-              entry={single.enhancers}
-              onFile={(f) => addSingle('enhancers', f)}
-              onRemove={() => setSingle((s) => ({ ...s, enhancers: null }))}
-            />
-          )}
+                {region && loops.some((l) => l.result?.ok) && <OwnPreview cell={cell} region={region} loops={loops} />}
+              </div>
+            )}
+            {active === 'anchors' && (
+              <OneFile
+                kind="anchors"
+                rule="One BED file, columns chr start end and an optional fourth column with the motif orientation L, R or N. Without a file the anchors are the loop ends, merged where they overlap."
+                entry={single.anchors}
+                onFile={(f) => addSingle('anchors', f)}
+                onRemove={() => setSingle((s) => ({ ...s, anchors: null }))}
+              />
+            )}
+            {active === 'contacts' && (
+              <ContactsTab
+                region={region}
+                maxMb={maxMb}
+                entry={single.contacts}
+                onLink={addLink}
+                onLocal={addLocal}
+                onFile={(f) => addSingle('contacts', f)}
+                onRemove={() => setSingle((s) => ({ ...s, contacts: null }))}
+              />
+            )}
+            {active === 'enhancers' && ownCell && (
+              <div className="own-tab">
+                <div className="routes" role="radiogroup" aria-label="Enhancers from">
+                  {ENH_SOURCES.map(([id, title, sub]) => (
+                    <button key={id} type="button" role="radio" aria-checked={enhSource === id} className="route" onClick={() => setEnhSource(id)}>
+                      <span>
+                        <span className="route-title">{title}</span>
+                        <span className="route-sub">{sub}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {enhSource === 'listed' && (
+                  <label className="own-select">
+                    <span>Enhancers of</span>
+                    <select value={enhFrom} onChange={(e) => setEnhFrom(e.target.value)}>
+                      {cells.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {enhSource === 'none' && <p className="rule">The job marks promoters only.</p>}
+              </div>
+            )}
+            {active === 'enhancers' && (!ownCell || enhSource === 'upload') && (
+              <OneFile
+                kind="enhancers"
+                rule={ownCell ? 'One BED file, columns chr start end.' : 'One BED file, columns chr start end. Without a file the job marks the enhancers of the cell type.'}
+                entry={single.enhancers}
+                onFile={(f) => addSingle('enhancers', f)}
+                onRemove={() => setSingle((s) => ({ ...s, enhancers: null }))}
+              />
+            )}
+          </div>
         </div>
         <footer className="dialog-foot">
           <p className={`foot-note${blocking ? ' bad' : ''}`}>
@@ -469,15 +476,21 @@ export function OwnData({
               ? `Fix or remove the ${blocking[1]} to continue.`
               : checking
                 ? 'Checking the files.'
-                : active === 'contacts'
+                : active === 'contacts' && !ownCell
                   ? "The map replaces the cell type's map for this job."
                   : ''}
           </p>
           <button type="button" className="secondary" onClick={onClose}>
             Cancel
           </button>
+          <button type="button" className="secondary" disabled={at === 0} onClick={() => setActive(STEPS[at - 1])}>
+            Back
+          </button>
+          <button type="button" className="secondary" disabled={at === STEPS.length - 1} onClick={() => setActive(STEPS[at + 1])}>
+            Next
+          </button>
           <button type="button" className="primary" disabled={!!blocking || checking || !anything} onClick={use}>
-            {USE_LABEL[active]}
+            Use this data
           </button>
         </footer>
       </div>

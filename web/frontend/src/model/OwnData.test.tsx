@@ -80,9 +80,9 @@ describe('Your own data dialog', () => {
     const row = screen.getAllByRole('group', { name: /Loops of factor/ })[1]
     fireEvent.change(within(row).getByLabelText('Factor'), { target: { value: 'H3K27ac' } })
     expect(screen.getByText('Fix or remove the H3K27ac file to continue.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Use these loops' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Use this data' })).toBeDisabled()
     fireEvent.click(within(row).getByRole('button', { name: /Remove/ }))
-    expect(screen.getByRole('button', { name: 'Use these loops' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Use this data' })).toBeEnabled()
   })
 
   it('takes one anchors file and one enhancers file', async () => {
@@ -106,14 +106,58 @@ describe('Your own data dialog', () => {
     expect(screen.getByRole('radio', { name: /None/ })).toBeChecked()
     fireEvent.click(screen.getByRole('radio', { name: /Enhancers of a listed cell type/ }))
     fireEvent.change(screen.getByLabelText('Enhancers of'), { target: { value: 'H1ESC' } })
-    expect(screen.getByRole('tab', { name: /Enhancers/ })).toHaveTextContent('H1ESC')
+    expect(screen.getByRole('tab', { name: /Enhancers/ }).querySelector('.step-uses')?.textContent).toBe('H1ESC')
     fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
     fireEvent.click(screen.getByRole('radio', { name: /BEDPE of the region/ }))
     fireEvent.change(screen.getByLabelText(/Choose a BEDPE file/), { target: { files: [new File(['x'], 'region.bedpe')] } })
     await screen.findByText('5,500 contacts read.')
-    fireEvent.click(screen.getByRole('button', { name: 'Use this map' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Use this data' }))
     expect(onUse.mock.calls[0][0]).toMatchObject({ enhancersFrom: 'H1ESC', enhancers: null })
     expect(checkCopy(document.body)).toEqual([])
+  })
+
+  it('lists four steps in a side panel, each naming what the job will use', () => {
+    renderDialog()
+    const steps = screen.getAllByRole('tab')
+    expect(steps.map((t) => t.querySelector('.step-title')?.textContent)).toEqual(['Loops', 'Anchors', 'Contacts', 'Enhancers'])
+    expect(steps.map((t) => t.querySelector('.step-uses')?.textContent)).toEqual(['the listed sets', 'the loop ends', "the cell type's Hi-C", "the cell type's"])
+    expect(screen.getByRole('tablist')).toHaveAttribute('aria-orientation', 'vertical')
+  })
+
+  it('says contacts are needed on your own cell type', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <OwnData cell="GM12878" region={null} initial={null} ownCell cells={['GM12878']} onClose={vi.fn()} onUse={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    expect(screen.getByRole('tab', { name: /Contacts/ }).querySelector('.step-uses')?.textContent).toBe('needed')
+    expect(screen.getByRole('tab', { name: /Enhancers/ }).querySelector('.step-uses')?.textContent).toBe('none')
+  })
+
+  it('moves between steps with Next and Back and keeps one action', () => {
+    renderDialog()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByRole('tab', { name: /Anchors/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: 'Use this data' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByRole('tab', { name: /Enhancers/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(screen.getByRole('tab', { name: /Contacts/ })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('names an uploaded file as what the job will use', async () => {
+    renderDialog()
+    addLoops('GM12878_CTCF_loops.bedpe', 'GM12878_RNAPII_loops.bedpe')
+    await screen.findByText(/31,902 loops read/)
+    expect(screen.getByRole('tab', { name: /Loops/ }).querySelector('.step-uses')?.textContent).toBe('2 files')
+    fireEvent.click(screen.getByRole('tab', { name: /Anchors/ }))
+    fireEvent.change(screen.getByLabelText(/anchors file/), { target: { files: [new File(['x'], 'anchors.bed')] } })
+    await screen.findByText(/1,204 anchors read/)
+    expect(screen.getByRole('tab', { name: /Anchors/ }).querySelector('.step-uses')?.textContent).toBe('anchors.bed')
   })
 
   it('hands the uploads to the form', async () => {
@@ -121,7 +165,7 @@ describe('Your own data dialog', () => {
     renderDialog(onUse)
     addLoops('GM12878_CTCF_loops.bedpe')
     await screen.findByText(/12,433 loops read/)
-    fireEvent.click(screen.getByRole('button', { name: 'Use these loops' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Use this data' }))
     await waitFor(() => expect(onUse).toHaveBeenCalled())
     expect(onUse.mock.calls[0][0].loops[0]).toMatchObject({ factor: 'CTCF', upload: { name: 'GM12878_CTCF_loops.bedpe', ok: true } })
   })
@@ -133,7 +177,7 @@ describe('Your own data dialog', () => {
     expect(screen.getByText(/The server must answer range requests/)).toBeInTheDocument()
     expect(screen.getByText(/gnome3d-ng extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe/)).toBeInTheDocument()
     expect(screen.getByText("The map replaces the cell type's map for this job.")).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Use this map' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Use this data' })).toBeInTheDocument()
   })
 
   it('reads a map by link and shows its summary', async () => {
@@ -143,7 +187,7 @@ describe('Your own data dialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Read' }))
     expect(await screen.findByText('4DNFI1UEG1HD.hic, 38.2 GB')).toBeInTheDocument()
     expect(screen.getByText(/1,284,512 contacts/)).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /Contacts/ })).toHaveTextContent('1 file')
+    expect(screen.getByRole('tab', { name: /Contacts/ }).querySelector('.step-uses')?.textContent).toBe('4DNFI1UEG1HD.hic')
   })
 
   it('shows the refusal of a link with its fix', async () => {
@@ -153,7 +197,7 @@ describe('Your own data dialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Read' }))
     expect(await screen.findByText('example.org does not answer range requests')).toBeInTheDocument()
     expect(screen.getByText(/Host the file where range requests work/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Use this map' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Use this data' })).toBeDisabled()
   })
 
   it('reads the region of a local .hic file in the browser and uploads it', async () => {
