@@ -359,8 +359,12 @@ same maps, which favours the gnome3d arms over E.
 1,578 genes covered in all twelve ensembles; more negative is a stronger link). jump statistic
 E C R M: GM12878 vs H1 −0.172, −0.260, −0.326, −0.298; H1 vs HFFc6 −0.126, −0.131, −0.242,
 −0.217; GM12878 vs HFFc6 −0.289, −0.285, −0.337, −0.293. RNAPII strengthens the link on every
-pair and statistic; M keeps most of it. Bootstrap intervals are in `readouts/e3d_*/summary.tsv`
-and have not been read against each other yet.
+pair and statistic; M keeps most of it. The gain is consistent in sign but small against the
+bootstrap intervals: total correlation C against R, GM12878 vs H1 −0.260 [−0.334, −0.179] against
+−0.292 [−0.362, −0.219], H1 vs HFFc6 −0.189 [−0.264, −0.112] against −0.199 [−0.276, −0.118],
+GM12878 vs HFFc6 −0.292 [−0.369, −0.213] against −0.327 [−0.397, −0.249]. No pair separates on
+its own; the case rests on the same direction in all three pairs, in both statistics, and in the
+earlier trio and GM12878 runs. The whole genome would give the power one chromosome lacks.
 
 **Trios, each person against their own HGSVC Hi-C** (`playground/rnapii/trio_summary.py`):
 R minus C, median over nine and in how many R is higher: SCC −0.007 (2 of 9), Pearson −0.027
@@ -372,5 +376,5 @@ nine at a small cost to global agreement.
 where its loops are; it does not make them agree better with contact maps globally, at 25 kb or
 at 5 kb. The claim that holds is "RNAPII loops carry functional information the CTCF model
 lacks, and can be added at a small structural cost, which merged anchors reduce", not
-"closer to Hi-C". Open: the bootstrap intervals of C against R, the trio expression statistics
+"closer to Hi-C". Open: the trio expression statistics
 on the new models, chromosomes beyond chr1.
