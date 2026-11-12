@@ -1,0 +1,3 @@
+  map                          models   0  loops    367  APA 4.295
+  HG00514_C_60mb               models  10  loops    367  APA 1.323
+  HG00514_R_60mb               models  10  loops    367  APA 1.883

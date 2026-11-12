@@ -1,0 +1,5 @@
+  HFFC6_E_60mb             n 10  APA 12.840  r_fine 0.109
+  HFFC6_C_60mb             n 10  APA 1.549  r_fine 0.142
+  HFFC6_R_60mb             n 10  APA 1.526  r_fine 0.083
+  HFFC6_M_60mb             n 10  APA 2.296  r_fine 0.122
+  map APA 2.675 over 2842 loops

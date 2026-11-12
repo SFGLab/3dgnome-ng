@@ -331,3 +331,46 @@ Each expression table is reduced to a CSV of arm, metric, value and n, metric on
 `rho_3d`, `e1`, `e3`, `jump_rho`, `family_sep`, and listed in a manifest with the JSON files
 above; then `python playground/rnapii/figure_rnapii.py manifest.json out/xc/figures`. The
 manifest format is in that script's docstring.
+
+## Results, 2026-11-12
+
+chr1, the battery and pile-ups on chr1:1-60 Mb, ten conformations per arm. Figures and every
+readout table in `design/figures/rnapii-2026-11-12/` (`figures/rnapii_main`, `figures/rnapii_grid`,
+`readouts/`). Each claim names its yardstick.
+
+**Large scale structure, bulk Hi-C at 25 kb.** SCC, E C R M:
+
+| line | E | C | R | M | APA at RNAPII loops, map / E / C / R / M |
+|---|---|---|---|---|---|
+| GM12878 | 0.219 | 0.373 | 0.288 | 0.373 | 1.46 / 7.06 / 1.18 / 1.29 / 1.37 |
+| H1 | 0.145 | 0.269 | 0.194 | 0.221 | 1.32 / 3.22 / 1.43 / 1.24 / 1.59 |
+| HFFc6, RNAPII from BJ | 0.146 | 0.331 | 0.232 | 0.295 | 1.56 / 6.22 / 1.41 / 1.75 / 2.94 |
+
+The new engine agrees with Hi-C better than the original on every line. RNAPII as is costs
+SCC on every line; merging its ends into CTCF anchors within 25 kb recovers all of it on
+GM12878 and part on the others. The singletons the arms are built from are thinned from the
+same maps, which favours the gnome3d arms over E.
+
+**Fine scale, Micro-C at 5 kb.** `r_fine` E C R M: H1 0.111, 0.121, 0.101, 0.111; HFFc6 0.109,
+0.142, 0.083, 0.122. APA at RNAPII loops, map 1.79 and 2.68: H1 3.35, 1.31, 0.96, 1.18; HFFc6
+12.84, 1.55, 1.53, 2.30. RNAPII does not improve fine scale agreement; every model's is weak.
+
+**Function, cross line enhancer to promoter distance against expression** (enhancer3d CLI,
+1,578 genes covered in all twelve ensembles; more negative is a stronger link). jump statistic
+E C R M: GM12878 vs H1 −0.172, −0.260, −0.326, −0.298; H1 vs HFFc6 −0.126, −0.131, −0.242,
+−0.217; GM12878 vs HFFc6 −0.289, −0.285, −0.337, −0.293. RNAPII strengthens the link on every
+pair and statistic; M keeps most of it. Bootstrap intervals are in `readouts/e3d_*/summary.tsv`
+and have not been read against each other yet.
+
+**Trios, each person against their own HGSVC Hi-C** (`playground/rnapii/trio_summary.py`):
+R minus C, median over nine and in how many R is higher: SCC −0.007 (2 of 9), Pearson −0.027
+(0 of 9), MultiMM −0.026 (0 of 9), saddle −0.096 (2 of 9), APA at RNAPII loops over the map's
++0.169 (9 of 9). RNAPII brings the contacts at its loops closer to the person's own Hi-C in all
+nine at a small cost to global agreement.
+
+**Reading.** RNAPII makes the models more predictive of expression and puts more contacts
+where its loops are; it does not make them agree better with contact maps globally, at 25 kb or
+at 5 kb. The claim that holds is "RNAPII loops carry functional information the CTCF model
+lacks, and can be added at a small structural cost, which merged anchors reduce", not
+"closer to Hi-C". Open: the bootstrap intervals of C against R, the trio expression statistics
+on the new models, chromosomes beyond chr1.

@@ -1,0 +1,5 @@
+  map                          models   0  loops   1594  APA 1.461
+  GM12878_E_60mb               models  10  loops   1594  APA 7.061
+  GM12878_C_60mb               models  10  loops   1594  APA 1.178
+  GM12878_R_60mb               models  10  loops   1594  APA 1.285
+  GM12878_M_60mb               models  10  loops   1594  APA 1.370
