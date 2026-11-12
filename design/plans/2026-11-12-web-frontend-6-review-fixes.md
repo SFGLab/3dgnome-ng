@@ -78,6 +78,19 @@ submitting an example's request returns the shared job, finished or running, so 
 - The maps scale to the panel's width, two side by side on a wide screen and one above the other on a narrow one, the canvas drawn at the device pixel ratio so a bin stays sharp; hover and the axis follow the drawn size.
 - Check: 1440, 1024 and 390 px screenshots.
 
+### Task 9: The contact map's Hi-C and model halves, and its agreement, as the battery has them
+
+**Files:** `web/gnome3d_web/contacts.py`, `explore.py`, `catalog.py` (an optional deep map link per cell type), `web/frontend/src/job/ContactMapTab.tsx`. Tests `web/tests/test_contacts.py`, `src/job/ContactMapTab.test.tsx`.
+
+User report 2026-11-13: the model half is mostly white and the agreement reads -0.17 on a job where the two maps agree by eye. Measured on frodo's TNFRSF8 job of 10 structures: per diagonal Pearson 0.43 at one bin and Spearman 0.51 over the map, while the site's score was -0.11. Four differences from the validation battery (`validation/metrics/hic.py`):
+
+- The model half counts pairs within a fixed 1.5 bead units, so with few structures most far cells are 0. It becomes the battery's MultiMM map: per structure the distance between bin centroids scaled by the median step between neighbouring bins, 1/(d+1)^3, averaged over the structures. The counted map stays as a second choice.
+- The agreement drops pairs that are zero in both maps before each diagonal's Pearson and weights by rank spread. It becomes the battery's `_scc`: whole diagonals weighted by their length and the two standard deviations, on raw counts, the model counted within the median bond of the structures, diagonals up to 2 Mb.
+- The Hi-C half is the job's input, thinned to the hosted density. A cell type whose catalog entry names a deep map in the 4DN bucket gets its window read through `remote.read_window` once per job and resolution and cached in the job; the job's input stays the fallback, and the card names which map it used.
+- ICE stays a display choice; the agreement never reads it.
+
+- Tests: the MultiMM map has no zero cell off the diagonal and equals a hand computed value on a three bead chain; the agreement equals the battery's `_scc` on the same pair of maps; a deep map link is read once and cached; the card names the map.
+
 ### Task 8: On team-frodo
 
 - Deploy; open each example through the title page and the Examples page; the wizard at 1440 and 390 px in both themes; My jobs empty and filled. Ledger copied to design/plans.
