@@ -28,3 +28,5 @@ Final review: self-review (native execution by the user's rule)
 Final: fixed every zoom of the contact map re-read the remote deep map — test_contacts 'a deep map is read once per resolution over the job's region' RED→GREEN, suite green
 Final: minor (deferred): a failed deep map read is caught broadly and falls back to the job's contacts with a label; the cause is not logged
 Final: minor (deferred): the deep map read is not counted against LINK_READS; the first view of each resolution of each job starts one read
+Task 10: complete — test_contacts 26/26, test_explore 28/28, frontend 205/205; the old check that the agreement does not follow the halves was the earlier contract, replaced at the user's request
+Task 10: user question on CYB561D1 'no loop' and 0 kb: the promoter is a hub of 21 loop ends and none reaches the enhancer 352 bp away; the column now reads none, the promoter anchors N loops, and spans under 1 kb show in bp
