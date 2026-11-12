@@ -1,0 +1,221 @@
+.model-page .reading.model-form {
+  max-width: 860px;
+  gap: 18px;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.reading .step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.step-number {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.step-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.cell-types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cell-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.cell-card[aria-checked='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.cell-card.own {
+  border-style: dashed;
+  border-color: var(--faint);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.cell-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cell-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.chip {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.catalog-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.region-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.region-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+
+.region-input.error {
+  border-color: #C2410C;
+}
+
+.region-input input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 14px var(--font);
+  outline: none;
+}
+
+.resolved {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.field-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #C2410C;
+}
+
+.model-side .eyebrow {
+  margin-top: 10px;
+}
+
+.example-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.example-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.example-gene {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.example-cell {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.example-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.side-panel a.recent-job {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+}
+
+.recent-region {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.recent-state {
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.retention {
+  margin: 12px 10px 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+@media (max-width: 960px) {
+  .cell-types {
+    grid-template-columns: 1fr;
+  }
+}

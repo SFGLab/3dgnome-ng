@@ -59,7 +59,7 @@ def create_app() -> FastAPI:
             status_code=status,
         )
 
-    @app.get("/model", response_class=HTMLResponse)
+    @app.get("/model/classic", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:
         return form_page(request)
 

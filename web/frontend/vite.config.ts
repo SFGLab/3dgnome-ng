@@ -10,7 +10,7 @@ export default defineConfig({
       '/api': 'http://127.0.0.1:8000',
       '^/jobs($|/)': 'http://127.0.0.1:8000',
       '/p/': 'http://127.0.0.1:8000',
-      '/model': 'http://127.0.0.1:8000',
+      '/model/classic': 'http://127.0.0.1:8000',
     },
   },
   test: {

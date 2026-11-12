@@ -39,8 +39,9 @@ def main() -> int:
             check(f"{path} returns the app", r.status_code == 200 and "FRONTEND-OK" in r.text, str(r.status_code))
         r = c.get("/assets/app.js")
         check("an asset is served", r.status_code == 200 and "console.log" in r.text, str(r.status_code))
-        r = c.get("/model")
-        check("/model returns the old form", r.status_code == 200 and "GMX, lymphoblastoid" in r.text and "FRONTEND-OK" not in r.text)
+        r = c.get("/model/classic")
+        check("/model/classic returns the old form", r.status_code == 200 and "GMX, lymphoblastoid" in r.text and "FRONTEND-OK" not in r.text)
+        check("/model returns the app", "FRONTEND-OK" in c.get("/model").text)
         r = c.get("/api/catalog")
         check("the catalog API stays JSON", r.status_code == 200 and r.headers["content-type"].startswith("application/json"))
         form = {"cell_type": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "n_models": "2"}
@@ -56,7 +57,7 @@ def main() -> int:
         bare = TestClient(create_app())
         r = bare.get("/")
         check("without a build the app says so", r.status_code == 503 and "The frontend is not built" in r.text, str(r.status_code))
-        check("without a build /model still works", bare.get("/model").status_code == 200)
+        check("without a build /model/classic still works", bare.get("/model/classic").status_code == 200)
     return done()
 
 
