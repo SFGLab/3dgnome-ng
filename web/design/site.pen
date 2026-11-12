@@ -11582,7 +11582,7 @@
                       "fill": "$muted",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "Pick a cell type and a region of up to 3 Mb, choose the loops, and get an ensemble of 3D structures with promoters and enhancers marked.",
+                      "content": "Pick a cell type and a region of up to 20 Mb, choose the loops, and get an ensemble of 3D structures with promoters and enhancers marked.",
                       "lineHeight": 1.45,
                       "fontFamily": "$font",
                       "fontSize": 15,
@@ -16915,7 +16915,7 @@
                       "id": "q6W4p",
                       "name": "Label",
                       "fill": "$ink",
-                      "content": "Running 3dgnome-ng yourself",
+                      "content": "Running gnome3d-ng yourself",
                       "fontFamily": "$font",
                       "fontSize": 13
                     }
@@ -17343,7 +17343,7 @@
                       "id": "H0Rua",
                       "name": "Heading",
                       "fill": "$ink",
-                      "content": "Running 3dgnome-ng yourself",
+                      "content": "Running gnome3d-ng yourself",
                       "fontFamily": "$font",
                       "fontSize": 18,
                       "fontWeight": "700"
@@ -17380,7 +17380,7 @@
                           "fill": "#E9E8E3",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "pip install 3dgnome-ng\n3dgnome-ng --config config.ini --region chr1:11500000-12600000 -n 10 --out models/",
+                          "content": "pip install gnome3d-ng\ngnome3d-ng --config config.ini --region chr1:11500000-12600000 -n 10 --out models/",
                           "lineHeight": 1.6,
                           "fontFamily": "$mono",
                           "fontSize": 12,
@@ -20168,11 +20168,11 @@
       "type": "frame",
       "id": "RjlvI",
       "x": 0,
-      "y": -1350,
+      "y": -1700,
       "name": "Title page",
       "clip": true,
       "width": 1440,
-      "height": 1250,
+      "height": 1600,
       "fill": "$bg",
       "layout": "vertical",
       "children": [
@@ -20364,7 +20364,7 @@
                       "fill": "$muted",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "3D structures of genomic regions up to 3 Mb, computed from CTCF and RNAPII loops, Hi-C contacts and structural variants. Each job returns an ensemble of structures with promoters and enhancers marked and their 3D distances.",
+                      "content": "3D structures of genomic regions up to 20 Mb, computed from CTCF and RNAPII loops, Hi-C contacts and structural variants. Each job returns an ensemble of structures with promoters and enhancers marked and their 3D distances.",
                       "lineHeight": 1.5,
                       "fontFamily": "$font",
                       "fontSize": 18,
@@ -20455,7 +20455,7 @@
                       "id": "cx97b",
                       "name": "Note",
                       "fill": "$faint",
-                      "content": "Free, no account. Jobs with uploaded data stay private.",
+                      "content": "Jobs with uploaded data stay private.",
                       "fontFamily": "$font",
                       "fontSize": 13,
                       "fontWeight": "normal"
@@ -20560,53 +20560,106 @@
             },
             {
               "type": "frame",
-              "id": "H2Flzr",
-              "name": "Facts",
+              "id": "LMbYX",
+              "name": "Previous server",
               "width": "fill_container",
-              "gap": 16,
+              "fill": "$panel",
+              "cornerRadius": 10,
+              "gap": 10,
+              "padding": [
+                12,
+                16
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "FnKFS",
+                  "name": "I",
+                  "width": 16,
+                  "height": 16,
+                  "icon": "history",
+                  "library": "lucide",
+                  "fill": "$muted"
+                },
+                {
+                  "type": "text",
+                  "id": "KxcYR",
+                  "name": "T",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "3D-GNOME 3.0, the previous server with its 1000 Genomes structures, keeps running at 3dgnome.mini.pw.edu.pl.",
+                  "lineHeight": 1.45,
+                  "fontFamily": "$font",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "vAtg2",
+                  "name": "Link",
+                  "gap": 5,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "kWMwA",
+                      "name": "T",
+                      "fill": "$accent",
+                      "content": "Open 3D-GNOME 3.0",
+                      "fontFamily": "$font",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "NtSbb",
+                      "name": "I",
+                      "width": 13,
+                      "height": 13,
+                      "icon": "external-link",
+                      "library": "lucide",
+                      "fill": "$accent"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "bJvra",
+              "name": "Results",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 14,
               "children": [
                 {
                   "type": "frame",
-                  "id": "WzDcQ",
-                  "name": "Fact Closer to Hi-C",
+                  "id": "z90bcx",
+                  "name": "Head",
                   "width": "fill_container",
-                  "height": 158,
-                  "fill": "$surface",
-                  "cornerRadius": 12,
-                  "stroke": "$line",
-                  "strokeWidth": 1,
                   "layout": "vertical",
-                  "gap": 6,
-                  "padding": 18,
+                  "gap": 4,
                   "children": [
                     {
                       "type": "text",
-                      "id": "u9d9G9",
-                      "name": "Big",
+                      "id": "vQRh2",
+                      "name": "T",
                       "fill": "$ink",
-                      "content": "0.37",
+                      "content": "Results",
                       "fontFamily": "$font",
-                      "fontSize": 30,
-                      "fontWeight": "800"
+                      "fontSize": 20,
+                      "fontWeight": "700"
                     },
                     {
                       "type": "text",
-                      "id": "Edczl",
-                      "name": "Head",
-                      "fill": "$ink",
-                      "content": "Closer to Hi-C",
-                      "fontFamily": "$font",
-                      "fontSize": 14,
-                      "fontWeight": "600"
-                    },
-                    {
-                      "type": "text",
-                      "id": "FdfpO",
-                      "name": "Text",
+                      "id": "sp1u7",
+                      "name": "D",
                       "fill": "$muted",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "Stratum adjusted correlation with GM12878 Hi-C, against 0.22 for the original 3D-GNOME models.",
+                      "content": "GM12878, H1ESC and HFFc6, chr1:1-60 Mb, ten structures per model. Original models are the cudaMMC models of 3D-GNOME 3.0.",
                       "lineHeight": 1.45,
                       "fontFamily": "$font",
                       "fontSize": 13,
@@ -20616,150 +20669,1224 @@
                 },
                 {
                   "type": "frame",
-                  "id": "x8WIzs",
-                  "name": "Fact Enhancers closer to promoters",
-                  "width": "fill_container",
-                  "height": 158,
-                  "fill": "$surface",
-                  "cornerRadius": 12,
-                  "stroke": "$line",
-                  "strokeWidth": 1,
-                  "layout": "vertical",
-                  "gap": 6,
-                  "padding": 18,
+                  "id": "N2NvoX",
+                  "name": "Key",
+                  "gap": 18,
                   "children": [
                     {
-                      "type": "text",
-                      "id": "mklbH",
-                      "name": "Big",
-                      "fill": "$ink",
-                      "content": "11 to 24%",
-                      "fontFamily": "$font",
-                      "fontSize": 30,
-                      "fontWeight": "800"
+                      "type": "frame",
+                      "id": "T8tG7H",
+                      "name": "K original models, cudaMMC",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 2,
+                          "id": "yZz8X",
+                          "name": "S",
+                          "fill": "#A9A8A3",
+                          "width": 12,
+                          "height": 8
+                        },
+                        {
+                          "type": "text",
+                          "id": "E3I4Vd",
+                          "name": "L",
+                          "fill": "$muted",
+                          "content": "original models, cudaMMC",
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     },
                     {
-                      "type": "text",
-                      "id": "Urvt4",
-                      "name": "Head",
-                      "fill": "$ink",
-                      "content": "Enhancers closer to promoters",
-                      "fontFamily": "$font",
-                      "fontSize": 14,
-                      "fontWeight": "600"
+                      "type": "frame",
+                      "id": "lEMC9",
+                      "name": "K 3D-GNOMEᴺᴳ, CTCF loops",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 2,
+                          "id": "LITdp",
+                          "name": "S",
+                          "fill": "$ctcf",
+                          "width": 12,
+                          "height": 8
+                        },
+                        {
+                          "type": "text",
+                          "id": "YBFyy",
+                          "name": "L",
+                          "fill": "$muted",
+                          "content": "3D-GNOMEᴺᴳ, CTCF loops",
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     },
                     {
-                      "type": "text",
-                      "id": "kSrPO",
-                      "name": "Text",
-                      "fill": "$muted",
-                      "textGrowth": "fixed-width",
-                      "width": "fill_container",
-                      "content": "With RNAPII loops, enhancer to promoter pairs that only RNAPII joins come closer on three cell lines.",
-                      "lineHeight": 1.45,
-                      "fontFamily": "$font",
-                      "fontSize": 13,
-                      "fontWeight": "normal"
+                      "type": "frame",
+                      "id": "wDZbu",
+                      "name": "K 3D-GNOMEᴺᴳ, CTCF and RNAPII loops",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 2,
+                          "id": "ohS8h",
+                          "name": "S",
+                          "fill": "$rnapii",
+                          "width": 12,
+                          "height": 8
+                        },
+                        {
+                          "type": "text",
+                          "id": "fxBiO",
+                          "name": "L",
+                          "fill": "$muted",
+                          "content": "3D-GNOMEᴺᴳ, CTCF and RNAPII loops",
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
                     }
                   ]
                 },
                 {
                   "type": "frame",
-                  "id": "MNxSi",
-                  "name": "Fact Inputs",
+                  "id": "g042Z",
+                  "name": "Charts",
                   "width": "fill_container",
-                  "height": 158,
-                  "fill": "$surface",
-                  "cornerRadius": 12,
-                  "stroke": "$line",
-                  "strokeWidth": 1,
-                  "layout": "vertical",
-                  "gap": 6,
-                  "padding": 18,
+                  "gap": 16,
                   "children": [
                     {
-                      "type": "text",
-                      "id": "ugmSs",
-                      "name": "Big",
-                      "fill": "$ink",
-                      "content": "4",
-                      "fontFamily": "$font",
-                      "fontSize": 30,
-                      "fontWeight": "800"
-                    },
-                    {
-                      "type": "text",
-                      "id": "rKwIo",
-                      "name": "Head",
-                      "fill": "$ink",
-                      "content": "Inputs",
-                      "fontFamily": "$font",
-                      "fontSize": 14,
-                      "fontWeight": "600"
-                    },
-                    {
-                      "type": "text",
-                      "id": "vfMlI",
-                      "name": "Text",
-                      "fill": "$muted",
-                      "textGrowth": "fixed-width",
+                      "type": "frame",
+                      "id": "KkkWe",
+                      "name": "Chart Agreement with Hi-C",
                       "width": "fill_container",
-                      "content": "CTCF loops, RNAPII loops, Hi-C or HiCDiffusion contacts, and structural variants from a VCF.",
-                      "lineHeight": 1.45,
-                      "fontFamily": "$font",
-                      "fontSize": 13,
-                      "fontWeight": "normal"
+                      "height": 326,
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$line",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 10,
+                      "padding": 16,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "hVKRG",
+                          "name": "Title",
+                          "fill": "$ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Agreement with Hi-C",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "KQpMk",
+                          "name": "Sub",
+                          "fill": "$faint",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Stratum adjusted correlation at 25 kb, higher is better.",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "TGqxn",
+                          "name": "Group GM12878",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "g8CSAA",
+                              "name": "L",
+                              "fill": "$muted",
+                              "content": "GM12878",
+                              "fontFamily": "$font",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "MNTK2",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "SZ98i",
+                                  "name": "R",
+                                  "fill": "#A9A8A3",
+                                  "width": 110,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "tDO5F",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.22",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "Ed91L",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "d3YF1",
+                                  "name": "R",
+                                  "fill": "$ctcf",
+                                  "width": 185,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "KQK3m",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.37",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "gLZJ9",
+                          "name": "Group H1ESC",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "p4APFn",
+                              "name": "L",
+                              "fill": "$muted",
+                              "content": "H1ESC",
+                              "fontFamily": "$font",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "sSd2J",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "f1bwh",
+                                  "name": "R",
+                                  "fill": "#A9A8A3",
+                                  "width": 75,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "ZJUCv",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.15",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "GZAgs",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "YiFNJ",
+                                  "name": "R",
+                                  "fill": "$ctcf",
+                                  "width": 135,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "Zf0Qj",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.27",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "UR65m",
+                          "name": "Group HFFc6",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "b3kzva",
+                              "name": "L",
+                              "fill": "$muted",
+                              "content": "HFFc6",
+                              "fontFamily": "$font",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "bapGn",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "M6S7Dz",
+                                  "name": "R",
+                                  "fill": "#A9A8A3",
+                                  "width": 75,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "YrDxr",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.15",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "kIxPJ",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "TOvyA",
+                                  "name": "R",
+                                  "fill": "$ctcf",
+                                  "width": 165,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "M9c9es",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.33",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "V8xNy",
+                      "name": "Chart Enhancer to promoter distance",
+                      "width": "fill_container",
+                      "height": 326,
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$line",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 10,
+                      "padding": 16,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "XhlnB",
+                          "name": "Title",
+                          "fill": "$ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Enhancer to promoter distance",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "mFDGO",
+                          "name": "Sub",
+                          "fill": "$faint",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Pairs joined by an RNAPII loop only, median over pairs, bead units.",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Aci9w",
+                          "name": "Group GM12878, 13% closer",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "I9XGq9",
+                              "name": "L",
+                              "fill": "$muted",
+                              "content": "GM12878, 13% closer",
+                              "fontFamily": "$font",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "lrPWg",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "BCuT5",
+                                  "name": "R",
+                                  "fill": "$ctcf",
+                                  "width": 169,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "efDRu",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "4.2",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "OAWoN",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "u5QZs",
+                                  "name": "R",
+                                  "fill": "$rnapii",
+                                  "width": 147,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "k1v0aP",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "3.7",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Q5rh90",
+                          "name": "Group H1ESC, 24% closer",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "k39cOs",
+                              "name": "L",
+                              "fill": "$muted",
+                              "content": "H1ESC, 24% closer",
+                              "fontFamily": "$font",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "oHouA",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "XqDuA",
+                                  "name": "R",
+                                  "fill": "$ctcf",
+                                  "width": 159,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "WSiNj",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "4.0",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "Yws7k",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "vv3ED",
+                                  "name": "R",
+                                  "fill": "$rnapii",
+                                  "width": 120,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "m0Mwd",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "3.0",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "lrIbf",
+                          "name": "Group HFFc6, 11% closer",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "p3nUgI",
+                              "name": "L",
+                              "fill": "$muted",
+                              "content": "HFFc6, 11% closer",
+                              "fontFamily": "$font",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "IJL1s",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "kshBF",
+                                  "name": "R",
+                                  "fill": "$ctcf",
+                                  "width": 180,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "Gpr9R",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "4.5",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "Hy99o",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "t6LxoT",
+                                  "name": "R",
+                                  "fill": "$rnapii",
+                                  "width": 160,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "uNfAN",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "4.0",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "jpwaS",
+                      "name": "Chart Link to expression",
+                      "width": "fill_container",
+                      "height": 326,
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$line",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 10,
+                      "padding": 16,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "o5k0CA",
+                          "name": "Title",
+                          "fill": "$ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Link to expression",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "ygiDv",
+                          "name": "Sub",
+                          "fill": "$faint",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Spearman between change in 3D distance and change in expression across cell lines, sign flipped, higher is stronger.",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "l1CAH",
+                          "name": "Group GM12878 and H1ESC",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "eU0YN",
+                              "name": "L",
+                              "fill": "$muted",
+                              "content": "GM12878 and H1ESC",
+                              "fontFamily": "$font",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "J1tLD6",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "c7m2gX",
+                                  "name": "R",
+                                  "fill": "#A9A8A3",
+                                  "width": 109,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "aTSVo",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.19",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "nxgMu",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "wOknn",
+                                  "name": "R",
+                                  "fill": "$ctcf",
+                                  "width": 149,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "A3cJ3n",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.26",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "N5ieXv",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "C1kHRe",
+                                  "name": "R",
+                                  "fill": "$rnapii",
+                                  "width": 166,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "LYdP7",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.29",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "eG6VD",
+                          "name": "Group H1ESC and HFFc6",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "fQp4c",
+                              "name": "L",
+                              "fill": "$muted",
+                              "content": "H1ESC and HFFc6",
+                              "fontFamily": "$font",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "veKj1",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "mRFF9",
+                                  "name": "R",
+                                  "fill": "#A9A8A3",
+                                  "width": 69,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "m01vc",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.12",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "P6Fcwm",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "ozLTY",
+                                  "name": "R",
+                                  "fill": "$ctcf",
+                                  "width": 109,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "l2oxw",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.19",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "Z5AjpX",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "fqeA9",
+                                  "name": "R",
+                                  "fill": "$rnapii",
+                                  "width": 114,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "XyFrV",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.20",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "iRJBt",
+                          "name": "Group GM12878 and HFFc6",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ent4w",
+                              "name": "L",
+                              "fill": "$muted",
+                              "content": "GM12878 and HFFc6",
+                              "fontFamily": "$font",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "vi60j",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "YVFA0",
+                                  "name": "R",
+                                  "fill": "#A9A8A3",
+                                  "width": 143,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "gQjzx",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.25",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "TgKJN",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "Oohj4",
+                                  "name": "R",
+                                  "fill": "$ctcf",
+                                  "width": 166,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "bDk18",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.29",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "C5dNU",
+                              "name": "Bar",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": [
+                                    0,
+                                    3,
+                                    3,
+                                    0
+                                  ],
+                                  "id": "jeXAQ",
+                                  "name": "R",
+                                  "fill": "$rnapii",
+                                  "width": 189,
+                                  "height": 9
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "BrnEI",
+                                  "name": "V",
+                                  "fill": "$ink",
+                                  "content": "0.33",
+                                  "fontFamily": "$font",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "I5AWv",
+                      "name": "Chart Nine people, three trios",
+                      "width": "fill_container",
+                      "height": 326,
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$line",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 10,
+                      "padding": 16,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "DDXTX",
+                          "name": "Title",
+                          "fill": "$ink",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Nine people, three trios",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "NRIos",
+                          "name": "Sub",
+                          "fill": "$faint",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Change with RNAPII loops against each person's own Hi-C.",
+                          "lineHeight": 1.45,
+                          "fontFamily": "$font",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "azuBh",
+                          "name": "Stat contact enrichment at RNAPII loops rises, from 39 to 98%, median 57%",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 1,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "OXXKT",
+                              "name": "V",
+                              "fill": "$ink",
+                              "content": "9 of 9",
+                              "fontFamily": "$font",
+                              "fontSize": 24,
+                              "fontWeight": "800"
+                            },
+                            {
+                              "type": "text",
+                              "id": "ejsZY",
+                              "name": "L",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "contact enrichment at RNAPII loops rises, from 39 to 98%, median 57%",
+                              "lineHeight": 1.45,
+                              "fontFamily": "$font",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ZDOO2",
+                          "name": "Stat correlation with the whole Hi-C map rises, from -17 to +29%, median -2%",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 1,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "n3yru",
+                              "name": "V",
+                              "fill": "$ink",
+                              "content": "2 of 9",
+                              "fontFamily": "$font",
+                              "fontSize": 24,
+                              "fontWeight": "800"
+                            },
+                            {
+                              "type": "text",
+                              "id": "B6YikH",
+                              "name": "L",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "correlation with the whole Hi-C map rises, from -17 to +29%, median -2%",
+                              "lineHeight": 1.45,
+                              "fontFamily": "$font",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
                     }
                   ]
                 },
                 {
-                  "type": "frame",
-                  "id": "wNI3n",
-                  "name": "Fact Resolution",
+                  "type": "text",
+                  "id": "kbS4k",
+                  "name": "Reading",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
                   "width": "fill_container",
-                  "height": 158,
-                  "fill": "$surface",
-                  "cornerRadius": 12,
-                  "stroke": "$line",
-                  "strokeWidth": 1,
-                  "layout": "vertical",
-                  "gap": 6,
-                  "padding": 18,
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "DbGIH",
-                      "name": "Big",
-                      "fill": "$ink",
-                      "content": "1 kb",
-                      "fontFamily": "$font",
-                      "fontSize": 30,
-                      "fontWeight": "800"
-                    },
-                    {
-                      "type": "text",
-                      "id": "exhpb",
-                      "name": "Head",
-                      "fill": "$ink",
-                      "content": "Resolution",
-                      "fontFamily": "$font",
-                      "fontSize": 14,
-                      "fontWeight": "600"
-                    },
-                    {
-                      "type": "text",
-                      "id": "easpR",
-                      "name": "Text",
-                      "fill": "$muted",
-                      "textGrowth": "fixed-width",
-                      "width": "fill_container",
-                      "content": "About one bead per kilobase, on the GPU, ensembles of up to 100 structures.",
-                      "lineHeight": 1.45,
-                      "fontFamily": "$font",
-                      "fontSize": 13,
-                      "fontWeight": "normal"
-                    }
-                  ]
+                  "content": "With RNAPII loops, enhancers sit closer to their genes and the link to expression is stronger, while agreement with the whole Hi-C map is lower.",
+                  "lineHeight": 1.45,
+                  "fontFamily": "$font",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
                 }
               ]
             },
