@@ -2,21 +2,29 @@
 
 The website runs user jobs on the queue. One job leaves the GPU mostly idle: the kernels are bound
 by launch latency, and 32 chains in one launch cost 1.24 times one chain. Throughput comes from
-several jobs on the card at once. Each job must stay inside its own memory, and a job must not
+several jobs on each card at once. Each job must stay inside its own memory, and a job must not
 stop another.
+
+The production server has two RTX 2080 cards, 8 GiB each if they are not the 11 GiB Ti, compute
+capability 7.5. Each worker is pinned to one card with `CUDA_VISIBLE_DEVICES`. A worker that sees
+both cards would spread one job over both in the multi GPU groups mode, and every job would then
+compete for both cards.
 
 ## Stability
 
 Each worker gets a fixed share of the card in `XLA_PYTHON_CLIENT_MEM_FRACTION`, taken from the
 peak memory of the largest job the form allows: 20 Mb, 10 structures, CTCF and RNAPII loops. The
-window limit bounds every job, so no job exceeds its share. The guard of `gnome3d/mc/jax/share.py`
+window limit bounds every job, and no job exceeds its share. The guard of `gnome3d/mc/jax/share.py`
 refuses a share that does not fit the free memory, with the numbers. The shares add up to less
 than 1 with 0.5 GiB per process for the CUDA context.
 
-## Measurements on the workstation
+## Measurements
 
-RTX 4060 Ti, 16 GiB, with the production config, on the workstation in a directory apart from
-~/3dgnome-ng.
+First on the workstation, RTX 4060 Ti, 16 GiB, in a directory apart from ~/3dgnome-ng, with the
+production config. The peak memory of a job carries over to the 2080. The worker count and the MPS
+result do not: the 2080 has 46 SMs of an older generation against 34 on the 4060 Ti. The
+throughput step runs again on the production server before the defaults are set, and the server's
+JAX build is checked for compute capability 7.5.
 
 | Step | Measure |
 |---|---|
@@ -30,5 +38,5 @@ and gave the structures of a job on a free card bit for bit; the job peaked near
 
 ## Output
 
-The worker count, the share per worker, whether MPS is used and the thread cap become the
-defaults in web/docker-compose.yml and are written in web/README.md with the numbers.
+The worker count per card, the share per worker, whether MPS is used and the thread cap become
+the defaults in web/docker-compose.yml, with one worker service per card pinned to its device, and are written in web/README.md with the numbers.
