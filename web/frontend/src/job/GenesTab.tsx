@@ -1,5 +1,7 @@
 import { ArrowDown, ArrowUp, Download, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { Pager } from '../components/Pager'
+import { usePage } from '../components/usePage'
 import type { GeneRow } from './api'
 import { bp, kb } from './format'
 
@@ -32,12 +34,11 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
   useEffect(() => setText(filter), [filter])
   const shown = useMemo(() => {
     const t = text.trim().toUpperCase()
-    const kept = rows.filter(
-      (r) => r.gene.toUpperCase().includes(t) && (chip === 'all' || (chip === 'loop' ? r.joined_by !== '' : r.joined_by === 'RNAPII')),
-    )
+    const kept = rows.filter((r) => r.gene.toUpperCase().includes(t) && (chip === 'all' || (chip === 'loop' ? r.joined_by !== '' : r.joined_by === 'RNAPII')))
     const dir = sort.up ? 1 : -1
     return [...kept].sort((a, b) => (sort.key === 'gene' ? a.gene.localeCompare(b.gene) : a[sort.key] - b[sort.key]) * dir)
   }, [rows, text, chip, sort])
+  const page = usePage(shown, `${text}|${chip}|${sort.key}|${sort.up}`)
   const max = Math.max(...rows.map((r) => r.max), 1)
   const header = (key: Key, label: string, num = false) => (
     <th className={num ? 'num' : undefined} onClick={() => setSort((s) => ({ key, up: s.key === key ? !s.up : true }))}>
@@ -89,7 +90,7 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
             </tr>
           </thead>
           <tbody>
-            {shown.map((r) => (
+            {page.rows.map((r) => (
               <tr key={r.gene} className={r.gene === selected ? 'selected' : undefined} onClick={() => onSelect(r.gene)}>
                 <td className="gene">{r.gene}</td>
                 <td className="mono" title={`${chrom}:${bp(r.enhancer)}`}>
@@ -115,6 +116,7 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
             ))}
           </tbody>
         </table>
+        <Pager page={page} noun="genes" />
       </div>
       <section className="side-card hist-card" aria-label="3D distance, all genes">
         <p className="card-label">3D distance, all genes</p>
@@ -130,7 +132,9 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
         </p>
         <p className="card-text">
           {`The median is ${median(rows.map((r) => r.distance)).toFixed(1)}.`}
-          {looped.length > 0 && other.length > 0 && ` It is ${median(looped).toFixed(1)} for genes joined to their enhancer by a loop and ${median(other).toFixed(1)} for the other genes.`}
+          {looped.length > 0 &&
+            other.length > 0 &&
+            ` It is ${median(looped).toFixed(1)} for genes joined to their enhancer by a loop and ${median(other).toFixed(1)} for the other genes.`}
         </p>
       </section>
     </div>

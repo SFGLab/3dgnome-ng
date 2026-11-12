@@ -79,6 +79,18 @@ describe('Structural variants dialog', () => {
     expect(screen.getByText('kept.vcf.gz')).toBeInTheDocument()
   })
 
+  it('pages a long list of variants', async () => {
+    const many = { ...CHECK, variants: Array.from({ length: 60 }, (_, i) => ({ ...CHECK.variants[0], pos: 11_600_000 + i * 1000 })) }
+    mockApi([
+      [/^\/api\/uploads$/, () => [201, { id: 'vcfupload1', kind: 'vcf', name: 'HG00733.sv.vcf.gz', size: 48_000_000, ok: true, summary: '', error: null, samples: ['HG00733'] }]],
+      [/^\/api\/variants\/check$/, () => [200, many]],
+    ])
+    renderDialog()
+    const table = await screen.findByRole('table')
+    expect(within(table).getAllByRole('row').slice(1)).toHaveLength(50)
+    expect(screen.getByText('variants 1 to 50 of 60')).toBeInTheDocument()
+  })
+
   it('checks again for the second haplotype', async () => {
     renderDialog()
     await screen.findByRole('table')

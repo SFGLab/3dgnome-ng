@@ -34,6 +34,16 @@ describe('GenesTab', () => {
     expect(names()[0]).toBe('DHRS3')
   })
 
+  it('pages a long gene list and starts again at the first page when filtered', () => {
+    const many: GeneRow[] = Array.from({ length: 75 }, (_, i) => ({ ...GENES[0], gene: `G${String(i).padStart(3, '0')}`, distance: i }))
+    renderTab({ rows: many })
+    expect(names()).toHaveLength(50)
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    expect(screen.getByText('genes 51 to 75 of 75')).toBeInTheDocument()
+    fireEvent.change(screen.getByPlaceholderText('Filter genes'), { target: { value: 'G0' } })
+    expect(screen.getByText('genes 1 to 50 of 75')).toBeInTheDocument()
+  })
+
   it('filters by name and by the loop joining the pair', () => {
     renderTab()
     fireEvent.change(screen.getByPlaceholderText('Filter genes'), { target: { value: 'pl' } })

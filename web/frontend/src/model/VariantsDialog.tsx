@@ -1,6 +1,8 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { CircleAlert, CircleCheck, FileArchive, LoaderCircle, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Pager } from '../components/Pager'
+import { usePage } from '../components/usePage'
 import { api, type Catalog, type Region, type VariantRow } from '../api'
 import type { FormState } from './form'
 import { megabytes, type OwnChoice, ownField, type UploadResult, uploadFile, uploadPreview } from './upload'
@@ -141,6 +143,7 @@ export function VariantsDialog(props: {
     retry: false,
   })
 
+  const variantPage = usePage(check.data?.variants ?? [], fields)
   const samples = mode === 'upload' ? (upload?.samples ?? []) : (catalog.sv_sets[svSet]?.samples ?? [])
   const n = check.data?.variants.length
   const ready = !!sample && !!source
@@ -267,33 +270,36 @@ export function VariantsDialog(props: {
               </p>
               <Track cell={cell} region={region} factors={factors} own={own} rows={check.data.variants} />
               {check.data.variants.length > 0 && (
-                <div className="sv-table-wrap">
-                  <table className="sv-table">
-                    <thead>
-                      <tr>
-                        <th>Type</th>
-                        <th>Position</th>
-                        <th>Length</th>
-                        <th>Genotype</th>
-                        <th>Change to the loops</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {check.data.variants.map((v, i) => (
-                        <tr key={i}>
-                          <td>
-                            <span className={`sv-dot sv-${v.type.toLowerCase()}`} aria-hidden />
-                            {NAMES[v.type] ?? v.type}
-                          </td>
-                          <td className="mono">{`${region.chrom}:${v.pos.toLocaleString('en-US')}`}</td>
-                          <td>{basePairs(v.length)}</td>
-                          <td className="mono">{v.genotype}</td>
-                          <td>{v.change}</td>
+                <>
+                  <div className="sv-table-wrap">
+                    <table className="sv-table">
+                      <thead>
+                        <tr>
+                          <th>Type</th>
+                          <th>Position</th>
+                          <th>Length</th>
+                          <th>Genotype</th>
+                          <th>Change to the loops</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {variantPage.rows.map((v, i) => (
+                          <tr key={i}>
+                            <td>
+                              <span className={`sv-dot sv-${v.type.toLowerCase()}`} aria-hidden />
+                              {NAMES[v.type] ?? v.type}
+                            </td>
+                            <td className="mono">{`${region.chrom}:${v.pos.toLocaleString('en-US')}`}</td>
+                            <td>{basePairs(v.length)}</td>
+                            <td className="mono">{v.genotype}</td>
+                            <td>{v.change}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <Pager page={variantPage} noun="variants" />
+                </>
               )}
             </>
           )}
