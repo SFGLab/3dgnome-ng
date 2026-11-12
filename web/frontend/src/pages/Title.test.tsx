@@ -71,6 +71,11 @@ describe('Title page', () => {
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444'))
     const posted = fetchMock.mock.calls.filter(([u]) => String(u) === '/api/jobs').map(([, i]) => (i!.body as FormData).get('factors'))
     expect(posted).toEqual(['CTCF+RNAPII', 'CTCF'])
+    expect(JSON.parse(localStorage.getItem('gnome3d.recentJobs') ?? '[]').map((j: { label: string }) => j.label)).toEqual([
+      'GM12878 TNFRSF8, CTCF loops',
+      'GM12878 TNFRSF8, CTCF and RNAPII loops',
+    ])
+    localStorage.clear()
     vi.unstubAllGlobals()
   })
 
