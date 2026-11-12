@@ -121,7 +121,8 @@ def _style(ax: plt.Axes) -> None:
 
 def _order(df: pd.DataFrame) -> list[str]:
     kinds = df.drop_duplicates("dataset").set_index("dataset")["kind"]
-    return sorted(kinds.index, key=lambda d: (kinds[d] != "line", d))
+    rank = {"line": 0, "pair": 1, "person": 2}
+    return sorted(kinds.index, key=lambda d: (rank.get(str(kinds[d]), 3), d))
 
 
 def figure_grid(df: pd.DataFrame, records: dict[str, dict[str, object]], out: Path) -> Figure:

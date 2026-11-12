@@ -213,9 +213,38 @@ def test_figure_choices(tmp: Path) -> None:
             for m in ("jump_r_conf", "r_conf", "scc")
         ]
     )
-    df = pd.concat([df, extra], ignore_index=True)
+    order_rows = pd.DataFrame(
+        [
+            {
+                "dataset": "H1ESC vs HFFC6",
+                "kind": "pair",
+                "arm": "C",
+                "metric": "scc",
+                "value": 0.3,
+                "n": 10,
+            },
+            {
+                "dataset": "GM19238",
+                "kind": "person",
+                "arm": "C",
+                "metric": "scc",
+                "value": 0.3,
+                "n": 10,
+            },
+        ]
+    )
+    df = pd.concat([df, extra, order_rows], ignore_index=True)
     fig = figure_grid(df, {}, tmp / "g2.png")
     ticks = [t.get_text() for ax in fig.axes for t in ax.get_xticklabels()]
+    rows = [t.get_text() for ax in fig.axes for t in ax.get_yticklabels()]
+    check(
+        "grid rows run lines, then pairs, then people",
+        rows.index("GM12878")
+        < rows.index("GM12878 vs H1ESC")
+        < rows.index("H1ESC vs HFFC6")
+        < rows.index("GM19238"),
+        str(rows),
+    )
     check(
         "the grid leaves out the side columns of the battery",
         "wb_sa" not in ticks and "scc" in ticks,
