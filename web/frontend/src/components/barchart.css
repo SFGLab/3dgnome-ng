@@ -1,0 +1,105 @@
+.bar-chart {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bar-chart figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.chart-sub {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.bar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.group-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bar {
+  height: 14px;
+  border-radius: 0 4px 4px 0;
+}
+
+.bar.original,
+.swatch.original {
+  background: var(--original);
+}
+
+.bar.ctcf,
+.swatch.ctcf {
+  background: var(--ctcf);
+}
+
+.bar.rnapii,
+.swatch.rnapii {
+  background: var(--rnapii);
+}
+
+.bar.placeholder {
+  opacity: 0.33;
+}
+
+.bar-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.bar-value.muted {
+  font-weight: 400;
+  color: var(--faint);
+}
+
+.chart-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chart-key li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
