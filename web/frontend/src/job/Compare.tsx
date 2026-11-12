@@ -18,7 +18,23 @@ function parseJobUrl(text: string): { kind: 'jobs' | 'p'; key: string } | null {
   return m ? { kind: m[1] as 'jobs' | 'p', key: m[2] } : null
 }
 
-function Panel({ api, label, structure: index, gene, link, linkId, onChange }: { api: JobApi; label: string; structure: number; gene: string | null; link?: CameraLink; linkId: string; onChange: () => void }) {
+function Panel({
+  api,
+  label,
+  structure: index,
+  gene,
+  link,
+  linkId,
+  onChange,
+}: {
+  api: JobApi
+  label: string
+  structure: number
+  gene: string | null
+  link?: CameraLink
+  linkId: string
+  onChange: () => void
+}) {
   const summary = useQuery({ queryKey: ['summary', api.base], queryFn: api.summary })
   const structure = useQuery({ queryKey: ['structure', api.base, index], queryFn: () => api.structure(index) })
   const annotations = useQuery({ queryKey: ['annotations', api.base], queryFn: api.annotations })
@@ -55,8 +71,28 @@ function Panel({ api, label, structure: index, gene, link, linkId, onChange }: {
 
 /** The compare view: this job and another side by side, with the largest changes in enhancer to
  * promoter distance between them. */
-export function Compare({ api, summary, selected, gene, onClose }: { api: JobApi; summary: Summary; selected: number; gene: string | null; onClose: () => void }) {
-  const [other, setOther] = useState<{ kind: 'jobs' | 'p'; key: string } | null>(null)
+export function Compare({
+  api,
+  summary,
+  selected,
+  gene,
+  initial = null,
+  onOther,
+  onClose,
+}: {
+  api: JobApi
+  summary: Summary
+  selected: number
+  gene: string | null
+  initial?: string | null
+  onOther?: (url: string | null) => void
+  onClose: () => void
+}) {
+  const [other, setOtherState] = useState<{ kind: 'jobs' | 'p'; key: string } | null>(initial ? parseJobUrl(initial) : null)
+  const setOther = (o: { kind: 'jobs' | 'p'; key: string } | null) => {
+    setOtherState(o)
+    onOther?.(o ? `/${o.kind}/${o.key}` : null)
+  }
   const [pasted, setPasted] = useState('')
   const [linked, setLinked] = useState(true)
   const link = useMemo(makeCameraLink, [])
@@ -102,7 +138,15 @@ export function Compare({ api, summary, selected, gene, onClose }: { api: JobApi
       </div>
       <div className="compare-panels">
         <Panel api={api} label="this job" structure={selected} gene={gene} link={linked ? link : undefined} linkId="a" onChange={() => setOther(null)} />
-        <Panel api={otherApi} label={`job ${otherName ?? otherApi.url.split('/').pop()}`} structure={1} gene={gene} link={linked ? link : undefined} linkId="b" onChange={() => setOther(null)} />
+        <Panel
+          api={otherApi}
+          label={`job ${otherName ?? otherApi.url.split('/').pop()}`}
+          structure={1}
+          gene={gene}
+          link={linked ? link : undefined}
+          linkId="b"
+          onChange={() => setOther(null)}
+        />
       </div>
       {cmp.data && cmp.data.rows.length > 0 && (
         <table className="genes-table compare-table" aria-label="Largest changes in enhancer to promoter distance">

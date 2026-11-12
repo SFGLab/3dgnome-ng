@@ -198,6 +198,11 @@
 .example {
   display: flex;
   flex-direction: column;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;

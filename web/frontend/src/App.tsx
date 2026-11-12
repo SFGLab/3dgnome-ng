@@ -5,6 +5,7 @@ import { Cite } from './pages/Cite'
 import { Help } from './pages/Help'
 import { Method } from './pages/Method'
 import { Model } from './pages/Model'
+import { Examples } from './pages/Examples'
 import { MyJobs } from './pages/MyJobs'
 import { Results } from './pages/Results'
 import { Title } from './pages/Title'
@@ -27,6 +28,7 @@ export function App() {
           <Route path={ROUTES.help} element={<Help />} />
           <Route path={ROUTES.model} element={<Model />} />
           <Route path={ROUTES.jobs} element={<MyJobs />} />
+          <Route path={ROUTES.examples} element={<Examples />} />
           <Route path="/jobs/:key" element={<Job kind="jobs" />} />
           <Route path="/p/:key" element={<Job kind="p" />} />
           <Route path="*" element={null} />

@@ -68,3 +68,15 @@
     display: none;
   }
 }
+
+/* These pages have no side panel, so the reading column takes the left gutter itself. */
+.doc-page.my-jobs {
+  padding-left: 48px;
+}
+
+@media (max-width: 900px) {
+  .doc-page.my-jobs {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

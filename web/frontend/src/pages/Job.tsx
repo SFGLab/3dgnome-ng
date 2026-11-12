@@ -19,7 +19,11 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   const [params, setParams] = useSearchParams()
   const tab = (params.get('tab') as Tab) ?? 'structure'
   const [selected, setSelected] = useState(1)
-  const [comparing, setComparing] = useState(false)
+  // The tab and the comparison live in the URL as history entries, so Back returns to the
+  // previous tab or closes the comparison.
+  const compareTo = params.get('compare')
+  const comparing = compareTo !== null
+  const go = (next: Record<string, string>) => setParams(next)
   const [gene, setGene] = useState<string | null>(null)
   const [geneFilter, setGeneFilter] = useState('')
   const summary = useQuery({
@@ -27,7 +31,12 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
     queryFn: api.summary,
     refetchInterval: (q) => (q.state.data && ['done', 'failed'].includes(q.state.data.state) ? false : pollMs),
   })
-  if (summary.isError) return <div className="job-page"><p className="job-message">{summary.error.message}</p></div>
+  if (summary.isError)
+    return (
+      <div className="job-page">
+        <p className="job-message">{summary.error.message}</p>
+      </div>
+    )
   if (!summary.data) return <div className="job-page" aria-busy="true" />
   const s = summary.data
   const pick = async (which: 'medoid' | 'compact' | 'random') => setSelected((await api.picks())[which])
@@ -42,11 +51,22 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
               counts={{ genes: s.genes, loops: s.loop_count }}
               comparing={comparing}
               zipUrl={api.zipUrl}
-              onTab={(t) => setParams({ tab: t }, { replace: true })}
-              onCompare={() => setComparing((c) => !c)}
+              onTab={(t) => go({ tab: t })}
+              onCompare={() => go(comparing ? { tab } : { tab, compare: '' })}
             />
             <div className="tab-body" role="tabpanel">
-              {comparing && <Compare api={api} summary={s} selected={selected} gene={gene} onClose={() => setComparing(false)} />}
+              {comparing && (
+                <Compare
+                  key={compareTo}
+                  api={api}
+                  summary={s}
+                  selected={selected}
+                  gene={gene}
+                  initial={compareTo || null}
+                  onOther={(url) => go({ tab, compare: url ?? '' })}
+                  onClose={() => go({ tab })}
+                />
+              )}
               {!comparing && tab === 'structure' && (
                 <StructureTab
                   api={api}
@@ -56,7 +76,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
                   onGene={setGene}
                   onOpenGenes={(g) => {
                     setGeneFilter(g)
-                    setParams({ tab: 'genes' }, { replace: true })
+                    go({ tab: 'genes' })
                   }}
                 />
               )}
@@ -68,7 +88,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
                   selected={gene}
                   onSelect={(g) => {
                     setGene(g)
-                    setParams({ tab: 'structure' }, { replace: true })
+                    go({ tab: 'structure' })
                   }}
                 />
               )}

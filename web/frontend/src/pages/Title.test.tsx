@@ -1,16 +1,25 @@
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { describe, expect, it, vi } from 'vitest'
+import { mockApi } from '../test/api'
 import { Layout } from '../components/Layout'
 import { ROUTES } from '../routes'
 import { checkCopy } from '../test/copy'
 import { Title } from './Title'
 
+function Where() {
+  const l = useLocation()
+  return <p data-testid="where">{l.pathname + l.search}</p>
+}
+
 function renderTitle() {
   return render(
     <MemoryRouter>
       <Layout>
-        <Title />
+        <Routes>
+          <Route path="/" element={<Title />} />
+          <Route path="*" element={<Where />} />
+        </Routes>
       </Layout>
     </MemoryRouter>,
   )
@@ -41,6 +50,33 @@ describe('Title page', () => {
     for (const t of ['TNFRSF8, CTCF and RNAPII loops', 'The same locus, CTCF loops alone', 'Contacts against Hi-C']) {
       expect(screen.getByText(t)).toBeInTheDocument()
     }
+  })
+
+  it('opens an example as its finished job, on its tab', async () => {
+    const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: '/jobs/aaaa1111bbbb2222' }]]])
+    renderTitle()
+    fireEvent.click(screen.getByRole('button', { name: /Contacts against Hi-C/ }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?tab=contacts'))
+    const body = fetchMock.mock.calls.find(([u]) => String(u) === '/api/jobs')![1]!.body as FormData
+    expect(body.get('region')).toBe('chr1:20,000,000-25,000,000')
+    expect(body.get('n_models')).toBe('10')
+    vi.unstubAllGlobals()
+  })
+
+  it('opens the compare example with both jobs', async () => {
+    let n = 0
+    const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: n++ === 0 ? '/jobs/aaaa1111bbbb2222' : '/jobs/cccc3333dddd4444' }]]])
+    renderTitle()
+    fireEvent.click(screen.getByRole('button', { name: /The same locus, CTCF loops alone/ }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444'))
+    const posted = fetchMock.mock.calls.filter(([u]) => String(u) === '/api/jobs').map(([, i]) => (i!.body as FormData).get('factors'))
+    expect(posted).toEqual(['CTCF+RNAPII', 'CTCF'])
+    vi.unstubAllGlobals()
+  })
+
+  it('links All examples to the examples page', () => {
+    renderTitle()
+    expect(screen.getByRole('link', { name: 'All examples' })).toHaveAttribute('href', ROUTES.examples)
   })
 
   it('keeps to the writing rules', () => {

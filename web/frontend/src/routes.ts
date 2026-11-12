@@ -3,6 +3,7 @@ export const ROUTES = {
   title: '/',
   model: '/model',
   jobs: '/jobs',
+  examples: '/examples',
   method: '/method',
   results: '/results',
   help: '/help',

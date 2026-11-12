@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
@@ -8,7 +8,16 @@ import { KEY, PICKS, SUMMARY_DONE } from '../test/job'
 import { recentJobs } from '../model/recent'
 import { Job } from './Job'
 
-function renderJob(path = `/jobs/${KEY}`) {
+function Back() {
+  const navigate = useNavigate()
+  return (
+    <button type="button" onClick={() => navigate(-1)}>
+      history back
+    </button>
+  )
+}
+
+function renderJob(path = `/jobs/${KEY}`, back = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
@@ -17,6 +26,7 @@ function renderJob(path = `/jobs/${KEY}`) {
           <Route path="/jobs/:key" element={<Job kind="jobs" pollMs={50} />} />
           <Route path="/p/:key" element={<Job kind="p" pollMs={50} />} />
         </Routes>
+        {back && <Back />}
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -59,6 +69,21 @@ describe('Job explorer', () => {
     mockApi([[/summary$/, () => [200, own]]])
     renderJob()
     expect(await screen.findByText('CTCF of H1ESC')).toBeInTheDocument()
+  })
+
+  it('goes back to the previous tab with the browser', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+    renderJob(`/jobs/${KEY}`, true)
+    fireEvent.click(await screen.findByRole('tab', { name: /Genes/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /Loops/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'history back' }))
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Genes/ })).toHaveAttribute('aria-selected', 'true'))
+  })
+
+  it('opens the comparison named in the link', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+    renderJob(`/jobs/${KEY}?compare=${encodeURIComponent('/jobs/cccc3333dddd4444')}`)
+    expect(await screen.findByText('Link rotation and zoom')).toBeInTheDocument()
   })
 
   it('moves between structures and to the picks', async () => {
