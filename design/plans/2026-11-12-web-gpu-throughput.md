@@ -81,6 +81,9 @@ pool of 1.5 GiB and MPS, took six jobs posted at once, GM12878, CTCF and RNAPII,
 3 Mb windows, `web/scripts/load_test.py`: all six done in 251 s, two at a time, 46 to 96 s each,
 86 jobs per hour, every engine at its 1.5 GiB pool.
 
+The same in Docker with docker-compose.mps.yml, two workers on GPU 0, `web/scripts/docker_mps_check.sh`:
+both engines on one MPS server, all six done in 226 s, 95.6 jobs per hour.
+
 Decision for the production server, to confirm there: two workers per card with MPS, each at a
 pool of 1.5 GiB, each worker pinned to its card. One worker per card without MPS is the fallback
 at about 85 percent of the throughput.

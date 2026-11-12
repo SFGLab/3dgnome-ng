@@ -52,7 +52,13 @@ IPC namespace and the daemon's pipe directory:
 docker compose -f docker-compose.yml -f docker-compose.mps.yml up -d
 ```
 
-Without MPS set `WORKERS_PER_GPU=1`. MPS in containers has not been run on a GPU yet.
+Without MPS set `WORKERS_PER_GPU=1`. The host needs the NVIDIA container toolkit; Docker's
+`nvidia` runtime entry alone does not give the containers a GPU.
+
+Measured 2026-11-12 on team-frodo, RTX 3090, with `web/scripts/docker_mps_check.sh`: Redis, the
+web container and two workers on GPU 0 with this overlay took six jobs posted at once, GM12878,
+CTCF and RNAPII, 10 structures, 3 Mb windows. Both engines ran on the one MPS server, 1.7 GiB
+each on the card, all six done in 226 s, 95.6 jobs per hour.
 
 Without Docker, `QUEUE=thread` runs jobs in the web process on the slots of `GPU_SLOTS`, one GPU
 id per slot, `0,0,1,1` for two jobs at once on each of two cards. Waiting jobs are lost when the
