@@ -314,3 +314,27 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         "lower_label": lb,
         "scc": cm.scc(a, b, res),
     }
+
+
+def compare(a: Path, b: Path) -> dict[str, object]:
+    """The genes both jobs have, with each job's mean and SD of the enhancer to promoter distance
+    and the ratio b over a, the largest changes first, at most 20."""
+    ra, rb = _json(a / "status.json").get("region"), _json(b / "status.json").get("region")
+    ga = {r["gene"]: r for r in genes(a)}
+    gb = {r["gene"]: r for r in genes(b)}
+    rows = []
+    for name in ga.keys() & gb.keys():
+        x, y = ga[name], gb[name]
+        if x["distance"] <= 0:
+            continue
+        rows.append(
+            {
+                "gene": name,
+                "linear_bp": x["linear_bp"],
+                "a": {"mean": x["distance"], "sd": x["sd"]},
+                "b": {"mean": y["distance"], "sd": y["sd"]},
+                "ratio": y["distance"] / x["distance"],
+            }
+        )
+    rows.sort(key=lambda r: max(r["ratio"], 1 / r["ratio"]), reverse=True)
+    return {"same_region": ra is not None and ra == rb, "rows": rows[:20]}

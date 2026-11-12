@@ -379,6 +379,16 @@ def create_app() -> FastAPI:
     explore_routes("jobs")
     explore_routes("p")
 
+    @app.get("/api/compare")
+    def api_compare(a: str, b: str) -> JSONResponse:
+        dirs = []
+        for url in (a, b):
+            m = re.fullmatch(r"/(jobs|p)/([A-Za-z0-9_-]{8,64})", url)
+            if not m:
+                raise HTTPException(404)
+            dirs.append(job_dir(m[1], m[2]))
+        return JSONResponse(explore.compare(dirs[0], dirs[1]))
+
     index_html = s.frontend_dist / "index.html"
     if (s.frontend_dist / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=s.frontend_dist / "assets"), name="assets")

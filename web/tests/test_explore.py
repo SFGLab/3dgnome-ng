@@ -72,6 +72,19 @@ def main() -> int:
         z = zipfile.ZipFile(io.BytesIO(c.get(three + "/files.zip").content))
         check("the zip holds the job's files", "ep.tsv" in z.namelist() and any(n.endswith(".cif") for n in z.namelist()), str(z.namelist()[:5]))
 
+        ctcf = c.post("/api/jobs", data=form | {"factors": "CTCF"}).json()["url"]
+        both = three.removeprefix("/api")
+        cmp = c.get("/api/compare", params={"a": both, "b": ctcf}).json()
+        check("two jobs on one region compare on the same region", cmp["same_region"] is True, str(cmp)[:200])
+        check("compare rows carry both means and a ratio", cmp["rows"] and {"gene", "linear_bp", "a", "b", "ratio"} <= set(cmp["rows"][0]), str(cmp["rows"][:1]))
+        fold = [max(r["ratio"], 1 / r["ratio"]) for r in cmp["rows"]]
+        check("compare rows are sorted by the size of the change", fold == sorted(fold, reverse=True), str(fold))
+        other = c.post("/api/jobs", data=form | {"region": "chr1:500000-3000000"}).json()["url"]
+        cmp2 = c.get("/api/compare", params={"a": both, "b": other}).json()
+        shared = {r["gene"] for r in c.get(three + "/genes").json()} & {r["gene"] for r in c.get("/api" + other + "/genes").json()}
+        check("jobs on different regions say so and list the shared genes only", cmp2["same_region"] is False and {r["gene"] for r in cmp2["rows"]} <= shared, str(cmp2)[:200])
+        check("a url that is not a job is a 404", c.get("/api/compare", params={"a": both, "b": "/jobs/nothing123"}).status_code == 404)
+
         vcf = (root / "data" / "svs" / "demo.vcf.gz").read_bytes()
         priv = c.post("/api/jobs", data=form | {"n_models": "1"}, files={"vcf": ("mine.vcf.gz", vcf)}).json()["url"]
         token = priv.rsplit("/", 1)[1]
