@@ -1,0 +1,61 @@
+/* Design tokens from web/design/site.pen, one custom property per Pencil variable. The design
+   defines light values; the dark values are derived here, the factor colours checked with the
+   palette validator against the dark surface. */
+:root {
+  --bg: #FCFCFB;
+  --surface: #FFFFFF;
+  --panel: #F5F4F1;
+  --ink: #151514;
+  --muted: #5B5A56;
+  --faint: #8A8984;
+  --line: #E4E3DF;
+  --accent: #2A78D6;
+  --accent-soft: #E8F1FC;
+  --ctcf: #2A78D6;
+  --rnapii: #7A3FB0;
+  --promoter: #EB6834;
+  --enhancer: #1BAF7A;
+  --font: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141413;
+    --surface: #1C1C1A;
+    --panel: #232321;
+    --ink: #F1F0EC;
+    --muted: #B4B2AC;
+    --faint: #858380;
+    --line: #33322F;
+    --accent: #4A96E6;
+    --accent-soft: #1E2A3A;
+    --ctcf: #4A96E6;
+    --rnapii: #8A44C4;
+    --promoter: #E0622E;
+    --enhancer: #1FA673;
+    --font: "Inter", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #141413;
+  --surface: #1C1C1A;
+  --panel: #232321;
+  --ink: #F1F0EC;
+  --muted: #B4B2AC;
+  --faint: #858380;
+  --line: #33322F;
+  --accent: #4A96E6;
+  --accent-soft: #1E2A3A;
+  --ctcf: #4A96E6;
+  --rnapii: #8A44C4;
+  --promoter: #E0622E;
+  --enhancer: #1FA673;
+  --font: "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
