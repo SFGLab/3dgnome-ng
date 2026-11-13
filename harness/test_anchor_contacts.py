@@ -126,6 +126,12 @@ def test_two_sided() -> None:
         "a pair with no contact sits at a finite distance",
         np.isfinite(out[20, 24]) and -out[20, 24] <= hi + 1e-9,
     )
+    thin = add_contact_background(mat, mids, heat * 0.05, s, lens)
+    check(
+        "a pair whose expectation is under z squared is never tested, even when enriched",
+        thin[10, 14] == -0.5 and thin[20, 24] == -0.5,
+        f"expected 5 counts, {thin[10, 14]:.3f}",
+    )
     old = add_contact_background(mat, mids, heat, settings(0.0), lens)
     check(
         "at z zero only enriched pairs are held, the old rule",

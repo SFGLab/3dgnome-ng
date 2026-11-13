@@ -11,7 +11,8 @@
 #   table_z3    the anchor map from TABLE, pairs beyond three Poisson deviations held in or out
 # Phase 1, chr1:20-25, 10-15 and 35-40 Mb at five structures. Phase 2, whole chr1 at three
 # structures, scored on the 1-60 Mb slice. Every phase ends with the law readout and the
-# battery, raw and balanced. A finished arm is not rerun.
+# battery, raw and balanced. A finished arm is not rerun. ARMS picks a subset; COMPARE names
+# an earlier OUT whose prod arms are scored beside this run's.
 set -u
 cd "$(dirname "$0")/../.."
 C=GM12878
@@ -64,11 +65,13 @@ score() {  # region tag dirs...
   echo "[$T] scored $(date +%H:%M)"
 }
 
-ARMS="prod table_old table_z3"
+ARMS="${ARMS:-prod table_old table_z3}"
+COMPARE="${COMPARE:-}"
+extra() { [ -n "$COMPARE" ] && echo "$COMPARE/${1}_prod"; }
 for R in chr1:20000000-25000000 chr1:10000000-15000000 chr1:35000000-40000000; do
   T=$(echo "$R" | tr ':-' '__')
   run "$R" "$T" 5 $ARMS
-  score "$R" "$T" $(for A in $ARMS; do echo "$OUT/${T}_$A"; done)
+  score "$R" "$T" $(extra "$T") $(for A in $ARMS; do echo "$OUT/${T}_$A"; done)
 done
 echo "PHASE 1 DONE $(date)"
 
@@ -77,5 +80,5 @@ for A in $ARMS; do
   .venv/bin/python playground/slice_arm.py "$OUT/chr1_$A" "$OUT/chr1_60mb_$A" chr1:1-60000000 > /dev/null
   cp "$OUT/chr1_$A.log" "$OUT/chr1_60mb_$A.log"
 done
-score chr1:1-60000000 chr1_60mb $(for A in $ARMS; do echo "$OUT/chr1_60mb_$A"; done)
+score chr1:1-60000000 chr1_60mb $(extra chr1_60mb) $(for A in $ARMS; do echo "$OUT/chr1_60mb_$A"; done)
 echo "ANCHOR CONTACTS TRIAL DONE $(date)"

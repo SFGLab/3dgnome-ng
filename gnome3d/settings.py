@@ -462,7 +462,8 @@ class Settings:
         self.use_contact_background = False
         # Above zero, the contact background holds an arcless pair whose count is this many
         # Poisson deviations above or below its expectation, in or out, the expectation taken
-        # over every pair at its separation, zeros included. Zero keeps the rule above.
+        # over every pair at its separation, zeros included, and tests only pairs whose
+        # expectation is above this value squared. Zero keeps the rule above.
         self.contact_background_z = 0.0
 
         # ---- simulation steps ----

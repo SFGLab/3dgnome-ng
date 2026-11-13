@@ -493,8 +493,8 @@ def _contact_z_background(
 ) -> F64Array:
     """`add_contact_background` under `contact_background_z`.
 
-    Every arcless pair, a repulsion or a short range entry, whose count lies more than z
-    Poisson deviations from its expectation is held at the background times observed over
+    Every arcless pair, a repulsion or a short range entry, whose expectation is above z squared
+    and whose count lies more than z Poisson deviations from it is held at the background times observed over
     expected to the minus third, in when above and out when below. The count is the map times
     the two anchors' lengths over 1e6, undoing its normalisation, and the expectation the
     pair's area times the count per unit area over every pair in its log separation bin, eight a
@@ -534,7 +534,11 @@ def _contact_z_background(
         obs = heat[ii, jj] * area
         exp = density[key] * area
         z = (obs - exp) / np.sqrt(np.maximum(exp, 1e-300))
-        sel = (mat[ii, jj] < 0.0) & (exp > 0.0) & (sep > 0.0) & (np.abs(z) > z_cut)
+        # A pair is tested only where its expectation is above z squared, where a count of
+        # zero lies z deviations under it, so the test can fire either way. Beyond that a far
+        # pair can only come out enriched, and holding those alone shrank a chromosome by a
+        # fifth.
+        sel = (mat[ii, jj] < 0.0) & (exp > z_cut * z_cut) & (sep > 0.0) & (np.abs(z) > z_cut)
         if not sel.any():
             continue
         bg = np.maximum(1.0, (np.maximum(sep[sel], 1.0) / s0) ** law.nu)
