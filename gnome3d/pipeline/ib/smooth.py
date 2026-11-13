@@ -17,6 +17,7 @@ terminal here, the beads ARE the output.  Serial runner = numba `mc_smooth_numba
 
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -127,6 +128,49 @@ def _start_positions(prob: Problem) -> F32Array:
     return coil_start(pos, prob["fixed"], dtn, r, np.random.default_rng(int(prob["seed"])))
 
 
+def law_target(st: Densified) -> F32Array | None:
+    """The polymer law's distance for every bead pair closer than `smooth_law_range_bp`, and 0
+    for every other pair, which the heat term reads as no target. Pairs of two fixed beads are
+    0 too, since no move changes them. None when `smooth_law_weight` is zero.
+
+    The heat term scores `weight ((d - target) / target)^2` over the pairs with a target, so
+    with this matrix it is a spring holding each pair at the law, the same distance the arcs
+    stage holds an arcless anchor pair at. See [[project_microc_loop_comparison]].
+    """
+    s = st.settings
+    if float(s.smooth_law_weight) <= 0.0:
+        return None
+    law = s.polymer_law()
+    mid = (np.asarray(st.bead_starts, dtype=np.float64) + np.asarray(st.bead_ends)) / 2.0
+    sep = np.abs(mid[:, None] - mid[None, :]).astype(np.float32)
+    held = (sep > 0.0) & (sep < float(s.smooth_law_range_bp))
+    fixed = np.asarray(st.fixed, dtype=bool)
+    held &= ~(fixed[:, None] & fixed[None, :])
+    np.divide(sep, np.float32(max(int(law.s0_bp), 1)), out=sep)
+    np.power(sep, np.float32(law.nu), out=sep)
+    np.maximum(sep, np.float32(1.0), out=sep)
+    sep[~held] = 0.0
+    return sep
+
+
+def _heat_and_settings(st: Densified) -> tuple[F32Array | None, Settings]:
+    """The heat target and the settings the kernel reads its weight from. With the law spring
+    on, the target is `law_target` and the heat weight is `smooth_law_weight` on a copy of the
+    settings."""
+    heat = getattr(st, "heat_dist", None)
+    law = law_target(st)
+    if law is None:
+        return heat, st.settings
+    if heat is not None:
+        raise ValueError(
+            "[simulation_arcs_smooth] law_weight and use_subanchor_heatmap both act through "
+            "the subanchor heat term; set one of them"
+        )
+    s = copy.copy(st.settings)
+    s.subanchor_heatmap_dist_weight = float(st.settings.smooth_law_weight)
+    return law, s
+
+
 def _run(problem: Problem) -> Result:
     """Serial runner: steps_smooth restarts from the running best; returns
     ``(best_score, best_pos)``.  Mirrors `Solver._run_smooth_serial`."""
@@ -176,7 +220,9 @@ class SmoothStage:
         no-heat IB could land in a heat batch and get the wrong kernel)."""
         st = inputs[0]
         assert isinstance(st, Densified)
-        heat = getattr(st, "heat_dist", None) is not None
+        heat = (
+            getattr(st, "heat_dist", None) is not None or float(st.settings.smooth_law_weight) > 0.0
+        )
         orn = (
             st.orientations is not None
             and st.anchor_neighbors is not None
@@ -209,17 +255,18 @@ class SmoothStage:
             if st.orientations is not None
             else None
         )
+        heat, settings = _heat_and_settings(st)
         return {
             "pos": st.pos,
             "dtn": st.dtn,
             "fixed": st.fixed,
             "step_size": st.step_size_smooth,
-            "settings": st.settings,
+            "settings": settings,
             "seed": (st.seed + _SEED_SALT) & 0x7FFFFFFF,
             "char_orientations": char_orn,
             "anchor_neighbors": st.anchor_neighbors,
             "anchor_neighbor_weights": st.anchor_neighbor_weights,
-            "heat_dist": getattr(st, "heat_dist", None),
+            "heat_dist": heat,
             "compartment": st.bead_compartment,
         }
 
