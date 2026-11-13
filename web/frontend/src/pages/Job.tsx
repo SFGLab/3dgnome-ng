@@ -25,7 +25,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   const compareTo = params.get('compare')
   const comparing = compareTo !== null
   const go = (next: Record<string, string>) => setParams(next)
-  const [gene, setGene] = useState<string | null>(null)
+  const [gene, setGene] = useState<string | null>(params.get('gene'))
   const [geneFilter, setGeneFilter] = useState('')
   const summary = useQuery({
     queryKey: ['summary', api.base],

@@ -140,7 +140,7 @@ export function Compare({
         <Panel api={api} label="this job" structure={selected} gene={gene} link={linked ? link : undefined} linkId="a" onChange={() => setOther(null)} />
         <Panel
           api={otherApi}
-          label={`job ${otherName ?? otherApi.url.split('/').pop()}`}
+          label={otherName || recentJobs().find((j) => j.url === otherApi.url)?.label || 'the other job'}
           structure={1}
           gene={gene}
           link={linked ? link : undefined}
@@ -155,16 +155,17 @@ export function Compare({
               <th>Largest changes in enhancer to promoter distance</th>
               <th>{thisLabel}</th>
               <th>{otherSummary.data ? (FACTORS[otherSummary.data.request.factors] ?? otherSummary.data.request.factors) : ''}</th>
-              <th>Change</th>
+              <th>{otherSummary.data ? `${FACTORS[otherSummary.data.request.factors] ?? otherSummary.data.request.factors} against ${thisLabel}` : 'Change'}</th>
             </tr>
           </thead>
           <tbody>
-            {cmp.data.rows.slice(0, 10).map((r) => (
-              <tr key={r.gene}>
+            {[...cmp.data.rows.filter((r) => r.gene === gene), ...cmp.data.rows.filter((r) => r.gene !== gene).slice(0, 10)].map((r) => (
+              <tr key={r.gene} className={r.gene === gene ? 'selected' : undefined}>
                 <td>{`${r.gene}, enhancer ${kb(r.linear_bp)} away`}</td>
                 <td>{`${r.a.mean.toFixed(1)} ± ${r.a.sd.toFixed(1)}`}</td>
                 <td>{`${r.b.mean.toFixed(1)} ± ${r.b.sd.toFixed(1)}`}</td>
-                <td>{r.ratio >= 1 ? `${r.ratio.toFixed(1)} times closer` : `${(1 / r.ratio).toFixed(1)} times farther`}</td>
+                {/* The ratio is the other job's distance over this job's. Above 1 the other is farther. */}
+                <td>{r.ratio >= 1 ? `${r.ratio.toFixed(1)} times farther` : `${(1 / r.ratio).toFixed(1)} times closer`}</td>
               </tr>
             ))}
           </tbody>

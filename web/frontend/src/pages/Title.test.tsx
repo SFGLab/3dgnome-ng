@@ -63,18 +63,28 @@ describe('Title page', () => {
     vi.unstubAllGlobals()
   })
 
-  it('opens the compare example with both jobs', async () => {
+  it('opens the TNFRSF8 example compared with CTCF loops alone', async () => {
     let n = 0
     const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: n++ === 0 ? '/jobs/aaaa1111bbbb2222' : '/jobs/cccc3333dddd4444' }]]])
     renderTitle()
-    fireEvent.click(screen.getByRole('button', { name: /The same locus, CTCF loops alone/ }))
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444'))
+    fireEvent.click(screen.getByRole('button', { name: /TNFRSF8, CTCF and RNAPII loops/ }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444&gene=TNFRSF8'))
     const posted = fetchMock.mock.calls.filter(([u]) => String(u) === '/api/jobs').map(([, i]) => (i!.body as FormData).get('factors'))
     expect(posted).toEqual(['CTCF+RNAPII', 'CTCF'])
     expect(JSON.parse(localStorage.getItem('gnome3d.recentJobs') ?? '[]').map((j: { label: string }) => j.label)).toEqual([
       'GM12878 TNFRSF8, CTCF loops',
       'GM12878 TNFRSF8, CTCF and RNAPII loops',
     ])
+    localStorage.clear()
+    vi.unstubAllGlobals()
+  })
+
+  it('opens the CTCF loops example as its own job', async () => {
+    const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: '/jobs/cccc3333dddd4444' }]]])
+    renderTitle()
+    fireEvent.click(screen.getByRole('button', { name: /The same locus, CTCF loops alone/ }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/jobs\/cccc3333dddd4444$/))
+    expect(fetchMock.mock.calls.filter(([u]) => String(u) === '/api/jobs').map(([, i]) => (i!.body as FormData).get('factors'))).toEqual(['CTCF'])
     localStorage.clear()
     vi.unstubAllGlobals()
   })

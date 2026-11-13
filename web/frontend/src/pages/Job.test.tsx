@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
-import { KEY, PICKS, SUMMARY_DONE } from '../test/job'
+import { GENES, KEY, PICKS, SUMMARY_DONE } from '../test/job'
 import { recentJobs } from '../model/recent'
 import { Job } from './Job'
 
@@ -78,6 +78,13 @@ describe('Job explorer', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Loops/ }))
     fireEvent.click(screen.getByRole('button', { name: 'history back' }))
     await waitFor(() => expect(screen.getByRole('tab', { name: /Genes/ })).toHaveAttribute('aria-selected', 'true'))
+  })
+
+  it('opens with the gene named in the link selected', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]], [/genes$/, () => [200, GENES]]])
+    renderJob(`/jobs/${KEY}?tab=genes&gene=DHRS3`)
+    const row = await screen.findByRole('row', { name: /DHRS3/ })
+    expect(row).toHaveClass('selected')
   })
 
   it('opens the comparison named in the link', async () => {

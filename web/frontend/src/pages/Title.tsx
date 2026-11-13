@@ -9,8 +9,8 @@ import { useOpenExample } from '../model/useOpenExample'
 import './title.css'
 
 const EXAMPLES = [
-  { name: 'TNFRSF8', title: 'TNFRSF8, CTCF and RNAPII loops', detail: 'GM12878, chr1:11.5-12.6 Mb', image: structure, fit: 'contain' },
-  { name: 'TNFRSF8-CTCF', title: 'The same locus, CTCF loops alone', detail: 'GM12878, compare screen', image: structureCtcf, fit: 'contain' },
+  { name: 'TNFRSF8', title: 'TNFRSF8, CTCF and RNAPII loops', detail: 'GM12878, compared with CTCF loops alone', image: structure, fit: 'contain' },
+  { name: 'TNFRSF8-CTCF', title: 'The same locus, CTCF loops alone', detail: 'GM12878, chr1:11.5-12.6 Mb', image: structureCtcf, fit: 'contain' },
   { name: 'contacts', title: 'Contacts against Hi-C', detail: 'GM12878, chr1:20-25 Mb', image: contacts, fit: 'cover' },
 ] as const
 

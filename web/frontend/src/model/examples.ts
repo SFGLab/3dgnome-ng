@@ -14,6 +14,8 @@ export type Example = {
   sample?: string
   tab?: 'structure' | 'genes' | 'contacts' | 'loops'
   compareFactors?: Factors
+  /** A gene the job opens with selected, its promoter and enhancer marked in each structure. */
+  gene?: string
 }
 
 export const EXAMPLES: Example[] = [
@@ -22,9 +24,11 @@ export const EXAMPLES: Example[] = [
     title: 'TNFRSF8',
     cell: 'GM12878',
     cellLabel: 'GM12878',
-    description: 'An enhancer 385 kb away joined by an RNAPII loop',
+    description: 'An enhancer 385 kb away joined by an RNAPII loop, compared with CTCF loops alone',
     region: 'TNFRSF8',
     factors: 'CTCF+RNAPII',
+    compareFactors: 'CTCF',
+    gene: 'TNFRSF8',
   },
   {
     id: 'MYC',
@@ -52,10 +56,9 @@ export const EXAMPLES: Example[] = [
     title: 'TNFRSF8, CTCF loops alone',
     cell: 'GM12878',
     cellLabel: 'GM12878',
-    description: 'The two loop sets side by side in the compare view',
+    description: 'The same locus without the RNAPII loop that joins the enhancer',
     region: 'TNFRSF8',
-    factors: 'CTCF+RNAPII',
-    compareFactors: 'CTCF',
+    factors: 'CTCF',
   },
   {
     id: 'contacts',

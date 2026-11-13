@@ -68,7 +68,8 @@ describe('Compare', () => {
     expect([...document.querySelectorAll('.ab-label')].map((e) => e.textContent)).toEqual(['A to B 6.7 ± 1.9', 'A to B 15.8 ± 3.4'])
     const table = await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
     expect(within(table).getByText('TNFRSF8, enhancer 385 kb away')).toBeInTheDocument()
-    expect(within(table).getByText('2.4 times closer')).toBeInTheDocument()
+    expect(within(table).getByText('2.4 times farther')).toBeInTheDocument()
+    expect(within(table).getAllByRole('columnheader').at(-1)!.textContent).toBe('CTCF against CTCF and RNAPII')
   })
 
   it('keeps to the writing rules', async () => {

@@ -31,7 +31,8 @@ export async function openExample(e: Example): Promise<string> {
   if (e.compareFactors) {
     const other = await api.submit(request(e, e.compareFactors))
     rememberJob({ url: other.url, label: named(e.compareFactors), name: '', at: Date.now() })
-    return `${url}?${new URLSearchParams({ compare: other.url })}`
+    return `${url}?${new URLSearchParams({ compare: other.url, ...(e.gene ? { gene: e.gene } : {}) })}`
   }
-  return e.tab ? `${url}?${new URLSearchParams({ tab: e.tab })}` : url
+  const q = new URLSearchParams({ ...(e.tab ? { tab: e.tab } : {}), ...(e.gene ? { gene: e.gene } : {}) }).toString()
+  return q ? `${url}?${q}` : url
 }
