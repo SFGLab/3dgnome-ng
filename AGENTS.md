@@ -1294,6 +1294,18 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: the reference has no excluded volume at all.
 
+  **Tried and dropped, 2026-11-13: a law spring on bead pairs in the smooth stage.** Traced on a
+  web job, GM12878 chr1:20-25 Mb with CTCF and RNAPII loops, the squares in the contact map are
+  anchorless gaps: anchor pairs sit at 1.0 to 1.2 of the law, subanchor pairs inside a gap at
+  0.76 to 0.87 of it at 50 to 200 kb. Holding every bead pair under a range at the law through
+  the subanchor heat term fixed the gaps, 1.02 at a 200 kb range, and cut overlaps tenfold, and
+  lost the battery on chr1:20-25 and 10-15 Mb at five structures: Pearson 0.504 to 0.330 and
+  0.366 to 0.243, MultiMM 0.671 to 0.630 and 0.613 to 0.545, the 20 to 100 kb contact exponent
+  0.31 to 0.47. A spring at the mean distance removes the fluctuations contacts come from. A
+  wider range was worse and 2 Mb compressed the block, as the all pairs springs did. The smooth
+  wall tripled. Removed the same day; `playground/trace_square_blocks.py`,
+  `playground/law_spring_readout.py` and `slurm/ensemble/law_spring_trial.sh` are the record.
+
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
   `[simulation_backend] neighbour_grid`, default yes)
   The excluded volume term sums over pairs closer than `r0` and was implemented as a scan over

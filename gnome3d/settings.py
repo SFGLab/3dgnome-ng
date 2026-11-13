@@ -115,8 +115,6 @@ class Settings:
     smooth_hard_wall: bool
     smooth_anchor_cap: float
     smooth_start: str
-    smooth_law_weight: float
-    smooth_law_range_bp: int
     smooth_prefetch: int
     smooth_jax_grid: bool
     smooth_jax_grid_min_beads: int
@@ -471,8 +469,6 @@ class Settings:
         self.smooth_hard_wall = False  # reject a move that adds or deepens a pair under the radius
         self.smooth_anchor_cap = 0.0  # anchors may move this many mean bonds from the arcs position
         self.smooth_start = "line"  # line | coil, where a gap's subanchors start
-        self.smooth_law_weight = 0.0  # law spring on bead pairs under smooth_law_range_bp
-        self.smooth_law_range_bp = 100_000
         self.smooth_prefetch = 1  # proposals one JAX step evaluates at once, first accepted kept
         self.smooth_jax_grid = False  # excluded volume on a cell grid in the JAX kernel
         self.smooth_jax_grid_min_beads = 4096  # the grid only pays above this many beads
@@ -1158,12 +1154,6 @@ class Settings:
             "simulation_arcs_smooth", "anchor_cap", self.smooth_anchor_cap
         )
         self.smooth_start = gets("simulation_arcs_smooth", "start", self.smooth_start)
-        self.smooth_law_weight = getf(
-            "simulation_arcs_smooth", "law_weight", self.smooth_law_weight
-        )
-        self.smooth_law_range_bp = geti(
-            "simulation_arcs_smooth", "law_range_bp", self.smooth_law_range_bp
-        )
         self.smooth_prefetch = geti("simulation_arcs_smooth", "prefetch", self.smooth_prefetch)
         if self.smooth_prefetch < 1:
             raise ValueError("[simulation_arcs_smooth] prefetch must be at least 1")

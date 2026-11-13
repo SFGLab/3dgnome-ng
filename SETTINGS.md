@@ -183,8 +183,6 @@ least `stop_condition_successes_threshold` moves.
 | `jax_grid` | bool | no | yes | Put the excluded volume and the wall on a cell grid in the JAX kernel, so a proposal visits the 27 cells around it instead of every bead. Exact, rebuilt every round and relinked on every accepted move. |
 | `jax_grid_min_beads` | int | 4096 | 4096 | The grid is used only on launches whose padded bead count reaches this, since below it the full scan is already cheap. |
 | `start` | str | line | coil | Where a gap's subanchors start. `line` is the densified straight line between its anchors, `coil` a compact random bridge at the bond targets. |
-| `law_weight` | float | 0.0 | 0.0 | Weight of a spring holding every bead pair closer than `law_range_bp` at the polymer law's distance for its separation, scored by the subanchor heat term with this as its weight. Under measurement. Cannot be combined with `use_subanchor_heatmap`. |
-| `law_range_bp` | int | 100000 | 100000 | The genomic separation below which `law_weight` holds a pair. |
 
 ### [simulation_ib] only
 
