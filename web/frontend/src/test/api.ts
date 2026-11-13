@@ -32,7 +32,7 @@ export const SCHEMA = [
   },
 ]
 
-type Route = [RegExp, (url: URL, init?: RequestInit) => [number, unknown]]
+type Route = [RegExp, (url: URL, init?: RequestInit) => [number, unknown] | Promise<[number, unknown]>]
 
 /** Replaces fetch with fixed answers for the site's API. Returns the mock to inspect calls. */
 export function mockApi(extra: Route[] = []) {
@@ -52,7 +52,7 @@ export function mockApi(extra: Route[] = []) {
   const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), 'http://site')
     const hit = routes.find(([re]) => re.test(url.pathname))
-    const [status, body] = hit ? hit[1](url, init) : [404, { error: 'not found' }]
+    const [status, body] = hit ? await hit[1](url, init) : [404, { error: 'not found' }]
     return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
   })
   vi.stubGlobal('fetch', fn)

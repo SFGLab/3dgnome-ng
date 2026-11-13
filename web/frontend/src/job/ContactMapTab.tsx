@@ -202,9 +202,14 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           <label className="field">
             <span>Resolution</span>
             <select aria-label="Resolution" value={res} onChange={(e) => setRes(fitting(locus, Number(e.target.value)))}>
-              {RESOLUTIONS.map((r) => (
-                <option key={r} value={r}>{`${r / 1000} kb`}</option>
-              ))}
+              {RESOLUTIONS.map((r) => {
+                const tooFine = (locus.end - locus.start) / r > MAX_BINS
+                return (
+                  <option key={r} value={r} disabled={tooFine}>
+                    {`${r / 1000} kb${tooFine ? ', zoom in to use' : ''}`}
+                  </option>
+                )
+              })}
             </select>
           </label>
           <div className="zoom-buttons">
@@ -244,6 +249,12 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           </p>
         )}
         {note && <p className="map-note">{note}</p>}
+        {maps.isFetching && (
+          <p className="map-note" role="status">
+            {`Reading the map at ${res / 1000} kb.`}
+            {upperKind === 'hic' || lowerKind === 'hic' ? ' The first view of a resolution reads the deep Hi-C map, about ten seconds.' : ''}
+          </p>
+        )}
         {maps.isError && <p className="field-error">{maps.error.message}</p>}
         <canvas
           ref={canvas}

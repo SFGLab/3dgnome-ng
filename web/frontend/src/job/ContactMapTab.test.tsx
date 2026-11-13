@@ -124,6 +124,32 @@ describe('ContactMapTab', () => {
     expect(f.mock.calls.some(([u]) => String(u).includes('upper=loops_ctcf'))).toBe(true)
   })
 
+  it('disables a resolution too fine for the window and says why', async () => {
+    mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ContactMapTab api={jobApi('jobs', KEY)} summary={{ ...SUMMARY_DONE, region: 'chr1:10000000-15000000' }} />
+      </QueryClientProvider>,
+    )
+    await screen.findByText('0.37')
+    const five = within(screen.getByLabelText('Resolution')).getByRole('option', { name: /^5 kb/ }) as HTMLOptionElement
+    expect(five.disabled).toBe(true)
+    expect(five.textContent).toBe('5 kb, zoom in to use')
+  })
+
+  it('says it is reading while a new resolution loads', async () => {
+    let release = () => {}
+    mockApi([
+      [/contacts$/, (u) => (u.searchParams.get('res') === '50000' ? new Promise<[number, unknown]>((r) => (release = () => r([200, MAP]))) : [200, MAP])],
+      [/annotations$/, () => [200, ANNOTATIONS]],
+    ])
+    renderTab()
+    await screen.findByText('0.37')
+    fireEvent.change(screen.getByLabelText('Resolution'), { target: { value: '50000' } })
+    expect(await screen.findByText(/Reading the map at 50 kb\./)).toBeInTheDocument()
+    release()
+  })
+
   it('shows the server message for a resolution it refuses', async () => {
     mockApi([
       [/contacts$/, (u) => (u.searchParams.get('res') === '5000' ? [400, { error: 'chr1:1-20000000 at 5 kb is more than 800 bins on a side. Use 25 kb or a shorter window.' }] : [200, MAP])],

@@ -1062,6 +1062,10 @@
   font-size: 13px;
 }
 
+.map-note[role='status'] {
+  color: var(--accent);
+}
+
 .progress {
   display: flex;
   flex-direction: column;
