@@ -1,6 +1,6 @@
 """How many anchor pairs a full depth map says sit closer and how many farther than expected.
 
-    python playground/pair_balance.py MCOOL REGION ARM_DIR [RES]
+    python playground/pair_balance.py MCOOL REGION ARM_DIR [RES] [KIND]
 
 Anchor pair counts come from the map at RES, 1 kb by default, each pixel shared between the
 anchors it overlaps in proportion to the overlap, C = W^T M W with W the bins by anchors
@@ -28,13 +28,15 @@ BANDS = (
 )
 
 
-def anchors(arm: Path) -> tuple[np.ndarray, np.ndarray]:
+def anchors(arm: Path, kind: str = "anchor") -> tuple[np.ndarray, np.ndarray]:
+    """Bead intervals of the first structure, anchors by default, subanchors with KIND
+    subanchor."""
     f = sorted(arm.glob("*.cif"))[0]
     st, en = [], []
     for line in f.read_text().splitlines():
         if line.startswith("ATOM"):
             x = line.split()
-            if x[18] == "anchor":
+            if x[18] == kind:
                 st.append(int(x[16]))
                 en.append(int(x[17]))
     o = np.argsort(st)
@@ -59,9 +61,10 @@ def overlap_weights(starts: np.ndarray, res: int, a_st: np.ndarray, a_en: np.nda
 def main() -> None:
     mcool, region, arm = sys.argv[1], sys.argv[2], Path(sys.argv[3])
     res = int(sys.argv[4]) if len(sys.argv) > 4 else 1000
+    kind = sys.argv[5] if len(sys.argv) > 5 else "anchor"
     chrom, rest = region.split(":")
     lo, hi = (int(x) for x in rest.split("-"))
-    a_st, a_en = anchors(arm)
+    a_st, a_en = anchors(arm, kind)
     sel = (a_st >= lo) & (a_en <= hi)
     a_st, a_en = a_st[sel], a_en[sel]
     c = cooler.Cooler(f"{mcool}::/resolutions/{res}")
@@ -85,7 +88,7 @@ def main() -> None:
     dens = np.bincount(b, obs, minlength=len(edges)) / np.maximum(np.bincount(b, area, minlength=len(edges)), 1)
     exp = dens[b] * area
     z = (obs - exp) / np.sqrt(np.maximum(exp, 1e-12))
-    print(f"{region} at {res // 1000} kb: {n} anchors, {obs.sum():,.0f} contacts between anchors")
+    print(f"{region} at {res // 1000} kb: {n} {kind} beads, {obs.sum():,.0f} contacts between anchors")
     for b0, b1 in BANDS:
         band = (sep >= b0) & (sep < b1)
         q = np.percentile(exp[band], [25, 50, 75])
