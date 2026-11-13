@@ -1,0 +1,33 @@
+chr1:1000000-31000000: 3134 anchors, median width 1.1 kb, thinning 1/230
+   1 kb full    contacts       770,762  anchors receiving any 0.62
+      0.1-0.5 Mb: held 0.191  enriched in truth 0.064  precision 0.33  recall 1.00
+      0.5-2 Mb: held 0.074  enriched in truth 0.033  precision 0.45  recall 1.00
+      2-10 Mb: held 0.021  enriched in truth 0.016  precision 0.76  recall 1.00
+   1 kb thinned contacts         3,367  anchors receiving any 0.51
+      0.1-0.5 Mb: held 0.004  enriched in truth 0.064  precision 0.50  recall 0.03
+      0.5-2 Mb: held 0.000  enriched in truth 0.033  precision 0.52  recall 0.01
+      2-10 Mb: held 0.000  enriched in truth 0.016  precision 0.73  recall 0.00
+   5 kb full    contacts       672,535  anchors receiving any 0.18
+      0.1-0.5 Mb: held 0.029  enriched in truth 0.064  precision 0.21  recall 0.10
+      0.5-2 Mb: held 0.025  enriched in truth 0.033  precision 0.12  recall 0.09
+      2-10 Mb: held 0.014  enriched in truth 0.016  precision 0.11  recall 0.10
+   5 kb thinned contacts         2,912  anchors receiving any 0.17
+      0.1-0.5 Mb: held 0.004  enriched in truth 0.064  precision 0.33  recall 0.02
+      0.5-2 Mb: held 0.000  enriched in truth 0.033  precision 0.19  recall 0.00
+      2-10 Mb: held 0.000  enriched in truth 0.016  precision 0.16  recall 0.00
+  10 kb full    contacts       632,858  anchors receiving any 0.09
+      0.1-0.5 Mb: held 0.008  enriched in truth 0.064  precision 0.20  recall 0.02
+      0.5-2 Mb: held 0.008  enriched in truth 0.033  precision 0.11  recall 0.02
+      2-10 Mb: held 0.007  enriched in truth 0.016  precision 0.07  recall 0.03
+  10 kb thinned contacts         2,802  anchors receiving any 0.09
+      0.1-0.5 Mb: held 0.003  enriched in truth 0.064  precision 0.27  recall 0.01
+      0.5-2 Mb: held 0.001  enriched in truth 0.033  precision 0.18  recall 0.00
+      2-10 Mb: held 0.000  enriched in truth 0.016  precision 0.09  recall 0.00
+  25 kb full    contacts       607,703  anchors receiving any 0.04
+      0.1-0.5 Mb: held 0.002  enriched in truth 0.064  precision 0.18  recall 0.00
+      0.5-2 Mb: held 0.002  enriched in truth 0.033  precision 0.08  recall 0.00
+      2-10 Mb: held 0.002  enriched in truth 0.016  precision 0.05  recall 0.01
+  25 kb thinned contacts         2,656  anchors receiving any 0.04
+      0.1-0.5 Mb: held 0.001  enriched in truth 0.064  precision 0.21  recall 0.00
+      0.5-2 Mb: held 0.001  enriched in truth 0.033  precision 0.11  recall 0.00
+      2-10 Mb: held 0.000  enriched in truth 0.016  precision 0.10  recall 0.00
