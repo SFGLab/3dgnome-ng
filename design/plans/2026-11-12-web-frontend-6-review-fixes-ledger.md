@@ -30,3 +30,7 @@ Final: minor (deferred): a failed deep map read is caught broadly and falls back
 Final: minor (deferred): the deep map read is not counted against LINK_READS; the first view of each resolution of each job starts one read
 Task 10: complete — test_contacts 26/26, test_explore 28/28, frontend 205/205; the old check that the agreement does not follow the halves was the earlier contract, replaced at the user's request
 Task 10: user question on CYB561D1 'no loop' and 0 kb: the promoter is a hub of 21 loop ends and none reaches the enhancer 352 bp away; the column now reads none, the promoter anchors N loops, and spans under 1 kb show in bp
+Task 8: verified on team-frodo through the page: every example opened its job from the Examples page, two from the cache; My jobs listed them; the wizard, progress view, 3D hover, contact map views, loop halves and resolution switch checked with screenshots; no console errors
+Final: Ruling: the agreement stays on raw values for now; on TNFRSF8 raw 0.47 against 0.18 with both halves balanced, shared coverage inflating the raw number — the user parked the choice with the methodology work — cost if wrong: raw agreements read high where bead density follows coverage
+Final: minor (deferred): the deep map read of a new resolution shows a note but cannot be cancelled
+Task 8: complete (commits ab94a44..6e02171, tests: bash .superpowers/sdd/2026-11-12-web-frontend-6-review-fixes/alltests.sh → all pass)
