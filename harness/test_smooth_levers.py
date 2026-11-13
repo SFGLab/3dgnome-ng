@@ -156,6 +156,57 @@ def test_coil_start() -> None:
     check("and not the line", np.linalg.norm(out - pos) > 1.0)
 
 
+def _law_gap_ratio(pos: np.ndarray, lo: int, hi: int, nu: float) -> float:
+    """Median distance over the law, `max(1, k^nu)` at one bead per kilobase, for interior
+    pairs `lo` to `hi` beads apart."""
+    n = len(pos)
+    r = []
+    for k in range(lo, min(hi, n - 1)):
+        i = np.arange(1, n - 1 - k)
+        if i.size:
+            r.append(np.linalg.norm(pos[i + k] - pos[i], axis=1) / max(1.0, k**nu))
+    return float(np.median(np.concatenate(r)))
+
+
+def test_law_start() -> None:
+    nu, n = 0.344, 301
+    fixed = np.zeros(n, dtype=np.bool_)
+    fixed[[0, n - 1]] = True
+    pos = np.zeros((n, 3), dtype=np.float32)
+    pos[-1] = [(n - 1) ** nu, 0.0, 0.0]
+    dtn = np.ones(n - 1, dtype=np.float32)
+    mids = np.arange(n, dtype=np.float64) * 1000.0
+    law_r, compact_r, law_u, compact_u = [], [], [], []
+    for seed in range(5):
+        law = coil_start(pos, fixed, dtn, 0.7, np.random.default_rng(seed), "law", mids, nu, 1000)
+        compact = coil_start(pos, fixed, dtn, 0.7, np.random.default_rng(seed))
+        law_r.append([_law_gap_ratio(law, 50, 100, nu), _law_gap_ratio(law, 100, 200, nu)])
+        compact_r.append(
+            [_law_gap_ratio(compact, 50, 100, nu), _law_gap_ratio(compact, 100, 200, nu)]
+        )
+        law_u.append(under(law, 0.7))
+        compact_u.append(under(compact, 0.7))
+    lr, cr = np.mean(law_r, axis=0), np.mean(compact_r, axis=0)
+    check(
+        "the law start puts a 300 kb gap's interior within a fifth of the law at 50 to 200 kb",
+        bool(np.all(np.abs(np.log(lr)) < np.log(1.2))),
+        f"law {lr.round(2)}, compact {cr.round(2)}",
+    )
+    check(
+        "with no more pairs under the radius than the compact start",
+        np.mean(law_u) <= np.mean(compact_u),
+        f"law {np.mean(law_u):.0f}, compact {np.mean(compact_u):.0f}",
+    )
+    again = coil_start(pos, fixed, dtn, 0.7, np.random.default_rng(4), "law", mids, nu, 1000)
+    check("the law start is a function of its seed", np.array_equal(again, law))
+    try:
+        coil_start(pos, fixed, dtn, 0.7, np.random.default_rng(0), "law")
+        refused = False
+    except ValueError:
+        refused = True
+    check("and refuses to run without the beads' midpoints", refused)
+
+
 def _jax_available() -> bool:
     try:
         from gnome3d.mc.jax.util import jax_is_available
@@ -304,6 +355,7 @@ def main() -> int:
     test_wall_holds_once_clear()
     test_anchor_cap()
     test_coil_start()
+    test_law_start()
     test_jax_wall_and_cap()
     test_jax_prefetch()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")

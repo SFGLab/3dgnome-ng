@@ -182,7 +182,7 @@ least `stop_condition_successes_threshold` moves.
 | `prefetch` | int | 1 | 32 | How many proposals one step of the JAX kernel evaluates against the current state at once, keeping the first accepted in draw order. The chain keeps its law and, where acceptance is rare, advances close to this many steps per step. Numba ignores it. |
 | `jax_grid` | bool | no | yes | Put the excluded volume and the wall on a cell grid in the JAX kernel, so a proposal visits the 27 cells around it instead of every bead. Exact, rebuilt every round and relinked on every accepted move. |
 | `jax_grid_min_beads` | int | 4096 | 4096 | The grid is used only on launches whose padded bead count reaches this, since below it the full scan is already cheap. |
-| `start` | str | line | coil | Where a gap's subanchors start. `line` is the densified straight line between its anchors, `coil` a compact random bridge at the bond targets. |
+| `start` | str | line | coil | Where a gap's subanchors start. `line` is the densified straight line between its anchors, `coil` a compact random bridge at the bond targets, `law` a random bridge whose beads are placed so their distances to the beads behind them follow the polymer law. |
 
 ### [simulation_ib] only
 
