@@ -25,6 +25,7 @@ from __future__ import annotations
 from dataclasses import field
 from typing import TYPE_CHECKING, Any
 
+from gnome3d import anchor_contacts as ac
 from gnome3d import log
 from gnome3d.io import (
     compartment_from_label,
@@ -50,6 +51,35 @@ if TYPE_CHECKING:
     from gnome3d.settings import Settings
 
 LOG = log.get("data")
+
+
+def _empty_anchor_contacts() -> ac.AnchorContactMap:
+    return {}
+
+
+def _load_anchor_contacts(path: str, anchors: AnchorMap) -> ac.AnchorContactMap:
+    """The anchor contact tables of the run's chromosomes, with one always visible line giving
+    how many of the run's anchors the tables hold. A run anchor a table lacks gets no contacts,
+    which the line makes visible rather than silent."""
+    tables = ac.load(path, set(anchors))
+    found = total = 0
+    for chrom, lst in anchors.items():
+        total += len(lst)
+        t = tables.get(chrom)
+        if t is None or not lst:
+            continue
+        st = np.array([a.start for a in lst], dtype=np.int64)
+        en = np.array([a.end for a in lst], dtype=np.int64)
+        found += int((ac.match(t, st, en) >= 0).sum())
+    log.status(
+        LOG,
+        "anchor contacts: %s of %s run anchors found in %s, %d chromosomes",
+        f"{found:,}",
+        f"{total:,}",
+        path,
+        len(tables),
+    )
+    return tables
 
 
 @dataclass
@@ -81,6 +111,8 @@ class ContactData:
     compartments: CompartmentMap = field(default_factory=empty_compartment_map)
     # The anchor activity track for the factory term, empty when none is configured.
     activity: SignalMap = field(default_factory=empty_signal_map)
+    # Counts between anchor pairs from a full depth map, empty when none is configured.
+    anchor_contacts: ac.AnchorContactMap = field(default_factory=_empty_anchor_contacts)
 
     @classmethod
     def from_files(
@@ -165,6 +197,10 @@ class ContactData:
 
         compartments = _finalize_tracks(compartments, phasing, anchors)
 
+        anchor_contacts: ac.AnchorContactMap = {}
+        if s.data_anchor_contacts:
+            anchor_contacts = _load_anchor_contacts(s.data_path(s.data_anchor_contacts), anchors)
+
         return cls(
             anchors=anchors,
             arcs=arcs,
@@ -176,6 +212,7 @@ class ContactData:
             long_arcs=long_arcs,
             compartments=compartments,
             activity=activity,
+            anchor_contacts=anchor_contacts,
         )
 
     @classmethod

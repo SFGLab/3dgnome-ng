@@ -32,6 +32,7 @@ from gnome3d import log
 
 if TYPE_CHECKING:
     from gnome3d.polymer import PolymerLaw
+from gnome3d.anchor_contacts import AnchorContactMap, dense_counts
 from gnome3d.data import ContactData
 from gnome3d.hierarchy import Cluster, Level, build_cluster_tree, set_level
 from gnome3d.io import create_singleton_heatmap
@@ -98,6 +99,9 @@ class CoarseState:
     compartments: CompartmentMap = field(default_factory=empty_compartment_map)
     # Anchor activity track for the factory term, empty when none is configured.
     activity: SignalMap = field(default_factory=empty_signal_map)
+    # Counts between anchor pairs from a full depth map; empty builds the anchor contact map
+    # from the singletons.
+    anchor_contacts: AnchorContactMap = field(default_factory=dict)
 
 
 def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
@@ -176,6 +180,7 @@ def build_state(
         selected_region=region,
         compartments=data.compartments,
         activity=data.activity,
+        anchor_contacts=data.anchor_contacts,
     )
 
 
@@ -420,7 +425,11 @@ def arc_expected_matrix(
 
 
 def add_contact_background(
-    mat: F64Array, mids: list[int], anchor_heatmap: F64Array | None, s: Settings
+    mat: F64Array,
+    mids: list[int],
+    anchor_heatmap: F64Array | None,
+    s: Settings,
+    lens: F64Array | None = None,
 ) -> F64Array:
     """Hold an arcless anchor pair beyond the short range at the law's contact distance when
     its contact cell says it sits closer than the background. Returns a new matrix, or the
@@ -444,6 +453,9 @@ def add_contact_background(
         Contact counts between anchor pairs, or None.
     s
         The run's settings.
+    lens
+        Each anchor's length in bp, floored at one, as the map was normalised by. Required
+        with `contact_background_z` above zero, which reads the map as counts.
     """
     if (
         not bool(s.use_contact_background)
@@ -456,6 +468,10 @@ def add_contact_background(
     if n < 2 or float(heat.max()) <= 0.0:
         return mat
     pos = np.asarray(mids, dtype=np.float64)
+    if float(s.contact_background_z) > 0.0:
+        if lens is None:
+            raise ValueError("contact_background_z needs the anchor lengths")
+        return _contact_z_background(mat, pos, heat, np.asarray(lens, dtype=np.float64), s)
     dist, _avg = create_distance_heatmap(s, heat, n, separations_bp=pos)
     dist = np.asarray(dist, dtype=np.float64)
     law = s.polymer_law()
@@ -466,6 +482,74 @@ def add_contact_background(
         return mat
     out = np.array(mat, dtype=np.float64, copy=True)
     out[eligible] = -np.maximum(1.0, dist[eligible])
+    return out
+
+
+_Z_ROWS = 512
+
+
+def _contact_z_background(
+    mat: F64Array, pos: F64Array, heat: F64Array, lens: F64Array, s: Settings
+) -> F64Array:
+    """`add_contact_background` under `contact_background_z`.
+
+    Every arcless pair, a repulsion or a short range entry, whose count lies more than z
+    Poisson deviations from its expectation is held at the background times observed over
+    expected to the minus third, in when above and out when below. The count is the map times
+    the two anchors' lengths over 1e6, undoing its normalisation, and the expectation the
+    pair's area times the count per unit area over every pair in its log separation bin, eight a
+    decade, zeros included. The ratio carries half a count on each side, so a pair with no
+    contact sits at a finite distance, and the target is clipped to one bead and to
+    `heatmap_distance_stretching` backgrounds. The pass runs in blocks of rows, so nothing
+    beyond the matrices it is given is held at n by n.
+    """
+    n = len(pos)
+    law = s.polymer_law()
+    z_cut = float(s.contact_background_z)
+    s0 = max(int(law.s0_bp), 1)
+    stretch = float(s.heatmap_distance_stretching)
+    n_key = 80
+
+    def rows(r0: int) -> tuple[I64Array, I64Array, F64Array, F64Array, I64Array]:
+        r1 = min(n, r0 + _Z_ROWS)
+        ii, jj = np.nonzero(np.arange(n)[None, :] > np.arange(r0, r1)[:, None])
+        ii = ii + r0
+        sep = np.abs(pos[jj] - pos[ii])
+        area = lens[ii] * lens[jj] / 1e6
+        key = np.clip(np.floor(np.log10(np.maximum(sep, 1.0)) * 8.0), 0, n_key - 1)
+        return ii, jj, sep, area, key.astype(np.int64)
+
+    num = np.zeros(n_key)
+    den = np.zeros(n_key)
+    for r0 in range(0, n, _Z_ROWS):
+        ii, jj, _sep, area, key = rows(r0)
+        num += np.bincount(key, heat[ii, jj] * area, minlength=n_key)
+        den += np.bincount(key, area, minlength=n_key)
+    density = np.where(den > 0, num / np.maximum(den, 1e-300), 0.0)
+
+    out = np.array(mat, dtype=np.float64, copy=True)
+    held_in = held_out = 0
+    for r0 in range(0, n, _Z_ROWS):
+        ii, jj, sep, area, key = rows(r0)
+        obs = heat[ii, jj] * area
+        exp = density[key] * area
+        z = (obs - exp) / np.sqrt(np.maximum(exp, 1e-300))
+        sel = (mat[ii, jj] < 0.0) & (exp > 0.0) & (sep > 0.0) & (np.abs(z) > z_cut)
+        if not sel.any():
+            continue
+        bg = np.maximum(1.0, (np.maximum(sep[sel], 1.0) / s0) ** law.nu)
+        ratio = (obs[sel] + 0.5) / (exp[sel] + 0.5)
+        target = np.clip(bg * ratio ** (-1.0 / 3.0), 1.0, stretch * bg)
+        out[ii[sel], jj[sel]] = -target
+        out[jj[sel], ii[sel]] = -target
+        held_in += int((z[sel] > 0).sum())
+        held_out += int((z[sel] < 0).sum())
+    LOG.info(
+        "contact background: %d pairs held in, %d held out, of %d",
+        held_in,
+        held_out,
+        n * (n - 1) // 2,
+    )
     return out
 
 
@@ -623,7 +707,14 @@ def calc_anchor_expected_distances(
                     mat[i, j] *= 1.0 - s_val
                     mat[j, i] = mat[i, j]
 
-    return add_contact_background(mat, mids, anchor_heatmap, s)
+    lens = np.maximum(
+        np.array(
+            [state.clusters[a].end - state.clusters[a].start for a in active_region],
+            dtype=np.float64,
+        ),
+        1.0,
+    )
+    return add_contact_background(mat, mids, anchor_heatmap, s, lens)
 
 
 def subanchor_counts_per_arc(state: CoarseState, active_region: list[int]) -> list[int]:
@@ -760,6 +851,17 @@ def build_contact_heatmaps(
     anchor_off = np.asarray(anchor_offsets[:n_anchors], dtype=np.intp)
     al = np.maximum(np.asarray(anchor_lens, dtype=np.float64), 1.0)  # (n_anchors,)
 
+    # A full depth anchor contact table, when configured, is the anchor map, normalised the
+    # same way. The singletons then feed the subanchor map alone.
+    table = state.anchor_contacts.get(chr_)
+    h_table: F64Array | None = None
+    if table is not None:
+        st = np.array([clusters[a].start for a in active_region], dtype=np.int64)
+        en = np.array([clusters[a].end for a in active_region], dtype=np.int64)
+        h_table = dense_counts(table, st, en) / (np.outer(al, al) / 1e6)
+        if not with_subanchor:
+            return h_table, None
+
     if not with_subanchor:
         # The anchor bins alone. A contact whose either end falls in a subanchor bin is
         # not an anchor pair and is dropped, as cutting the anchor bins out of the full
@@ -804,6 +906,8 @@ def build_contact_heatmaps(
     # the anchor bins (diagonal stays 0, off-diagonal symmetric).
     h_anchor: F64Array = h_sub[np.ix_(anchor_off, anchor_off)] / (np.outer(al, al) / 1e6)
     np.fill_diagonal(h_anchor, 0.0)
+    if h_table is not None:
+        h_anchor = h_table
 
     # Which arc each subanchor bin belongs to (-1 at anchor bins).
     bin_arc_idx: list[int] = [-1] * N

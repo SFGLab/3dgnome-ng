@@ -162,7 +162,7 @@ def joint_arcs_solve(
         mids_all = np.array([clusters[a].genomic_pos for a in active_all], dtype=np.int64)
         pos0 = hilbert_start(pos0, mids_all, law)
     anchor_heat: F64Array | None = None
-    if s.use_anchor_heatmap and state.singletons:
+    if s.use_anchor_heatmap and (state.singletons or state.anchor_contacts):
         anchor_heat, _ = cb.build_contact_heatmaps(state, active_all, chr_, with_subanchor=False)
     exp_dist = cb.calc_anchor_expected_distances(state, active_all, chr_, anchor_heat, seed)
     arc_w = cb.calc_anchor_arc_weights(state, active_all, chr_, seed)
@@ -264,7 +264,9 @@ def seed_for_ib(
     # Contact heatmaps (anchor-level scales exp_dist; subanchor feeds ESTIMATE_DIST).
     anchor_heat: F64Array | None = None
     subanchor_heat_raw: F32Array | None = None
-    if (state.s.use_anchor_heatmap or state.s.use_subanchor_heatmap) and state.singletons:
+    if (state.s.use_anchor_heatmap or state.s.use_subanchor_heatmap) and (
+        state.singletons or state.anchor_contacts
+    ):
         anchor_heat, subanchor_heat_raw = cb.build_contact_heatmaps(
             state, active_region, chr_, with_subanchor=bool(state.s.use_subanchor_heatmap)
         )

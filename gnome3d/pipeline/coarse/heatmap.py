@@ -108,13 +108,24 @@ def _polymer_distances(
             out[i, j] = law.heatmap_distance(float(ha[i, j]), expected, sep_bp)
         return out
     sep = np.abs(separations_bp[:, None] - separations_bp[None, :])
-    ls = np.log10(np.maximum(sep, 1.0))
-    key = np.floor(ls * 8.0).astype(np.int64)
-    for k in np.unique(key[use]):
-        m = use & (key == k)
-        expected = float(ha[m].mean())
-        for i, j in zip(*np.nonzero(m), strict=True):
-            out[i, j] = law.heatmap_distance(float(ha[i, j]), expected, int(sep[i, j]))
+    ii, jj = np.nonzero(use)
+    s_ij = sep[ii, jj]
+    key = np.floor(np.log10(np.maximum(s_ij, 1.0)) * 8.0).astype(np.int64)
+    f_ij = ha[ii, jj]
+    # `law.heatmap_distance` over every cell of a bin at once. The cells are taken in the order
+    # np.nonzero gives, so each bin's mean sums the same values in the same order.
+    s0 = max(int(law.s0_bp), 1)
+    for k in np.unique(key):
+        sel = key == k
+        f = f_ij[sel]
+        expected = float(f.mean())
+        if expected <= 1e-12:
+            continue
+        sp_bp = np.maximum(np.abs(np.trunc(s_ij[sel])), 1.0)
+        bg = np.maximum(1.0, (sp_bp / s0) ** law.nu)
+        val = bg * (f / expected) ** (-1.0 / 3.0)
+        val[f <= 1e-12] = 0.0
+        out[ii[sel], jj[sel]] = val
     return out
 
 

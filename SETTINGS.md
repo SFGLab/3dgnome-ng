@@ -56,6 +56,7 @@ Filenames are relative to `data_dir` unless absolute. The region string is `chr:
 | `compartments` | str |  | bedGraph of a signed compartment eigenvector or a CALDER BED, for `[compartments]`. |
 | `phasing_track` | str |  | Track used to fix the eigenvector's arbitrary sign. Required with `compartments`. |
 | `anchor_activity` | str |  | A BED with a signal column giving each anchor an activity for `[factories]`: the seventh column when a line has seven or more, a broadPeak's signal, else the fourth, a bedGraph. An anchor takes the largest value of the intervals overlapping it, zero where none does. |
+| `anchor_contacts` | str |  | Counts between anchor pairs from a full depth map, an npz written by `slurm/ensemble/prep_anchor_contacts.py` from an mcool and the run's anchor file, each pixel shared between the anchors it overlaps. The anchor contact map is built from it instead of the singletons, which keep the exponent fit and the coarse heatmaps. A STATUS line gives the share of the run's anchors found in it. |
 
 ## [distance]
 
@@ -94,6 +95,7 @@ is too far and the squeeze constant when too close.
 | `background_range_bp` | int | 100000 | 100000 | The separation under which an arcless pair is held at the background. Beyond it the pair keeps the repulsion, since a power law distance matrix cannot be embedded in three dimensions over every pair, only over a band. |
 | `factor_strength` | str |  |  | A multiplier on loop strength per cluster file, comma separated in file order, 1 each when empty. A factor whose contacts are more transient than CTCF's pulls less at the same PET count; 0 holds its loops at the background, which keeps its anchors as beads with no pull. |
 | `use_contact_background` | bool | no | yes | Beyond that range, hold an arcless pair whose contact cell puts it closer than the background at the law's contact distance, with the same spring. A pair at or below its expected contact keeps the repulsion, so the held set stays sparse, and on a thin map it holds next to nothing, which is allowed. Needs `use_anchor_heatmap`. |
+| `contact_background_z` | float | 0.0 | 0.0 | Above zero, the contact background holds every arcless pair whose count is this many Poisson deviations above or below its expectation, at `background * ((count + 0.5) / (expected + 0.5)) ^ (-1/3)`, so a depleted pair is held out as an enriched one is held in; the expectation is the count per unit anchor area over every pair at that separation, zeros included, and the target is clipped to one bead and to `distance_heatmap_stretching` backgrounds. Zero keeps the rule above. Under measurement since 2026-11-13. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 

@@ -52,6 +52,7 @@ class Settings:
     data_compartments: str
     data_phasing_track: str
     data_anchor_activity: str
+    data_anchor_contacts: str
 
     # ---- template ----
 
@@ -105,6 +106,7 @@ class Settings:
     background_range_bp: int
     spring_squeeze_arcs: float
     use_contact_background: bool
+    contact_background_z: float
 
     # ---- simulation steps ----
     steps_lvl1: int
@@ -384,6 +386,9 @@ class Settings:
         # A BED with a signal column, a broadPeak or a bedGraph, giving each anchor the
         # activity the factory term of [factories] reads; empty leaves the term inert.
         self.data_anchor_activity = ""
+        # Counts between anchor pairs from a full depth map, `gnome3d.anchor_contacts`; empty
+        # builds the anchor contact map from the singletons.
+        self.data_anchor_contacts = ""
 
         # ---- motif orientation ----
         self.use_ctcf_motif = False
@@ -455,6 +460,10 @@ class Settings:
         # Multiplies the chain bond target. At 1 the bonds pull the short range below the
         # parity values and the distance curve steepens past the Hi-C exponent.
         self.use_contact_background = False
+        # Above zero, the contact background holds an arcless pair whose count is this many
+        # Poisson deviations above or below its expectation, in or out, the expectation taken
+        # over every pair at its separation, zeros included. Zero keeps the rule above.
+        self.contact_background_z = 0.0
 
         # ---- simulation steps ----
         self.steps_lvl1 = 2
@@ -814,6 +823,7 @@ class Settings:
         self.data_compartments = gets("data", "compartments", self.data_compartments)
         self.data_phasing_track = gets("data", "phasing_track", self.data_phasing_track)
         self.data_anchor_activity = gets("data", "anchor_activity", self.data_anchor_activity)
+        self.data_anchor_contacts = gets("data", "anchor_contacts", self.data_anchor_contacts)
 
         # [template]
 
@@ -845,6 +855,9 @@ class Settings:
         )
         self.use_contact_background = getb(
             "springs", "use_contact_background", self.use_contact_background
+        )
+        self.contact_background_z = getf(
+            "springs", "contact_background_z", self.contact_background_z
         )
         self.spring_stretch_ib = getf("springs", "stretch_constant_ib", self.spring_stretch_ib)
         self.spring_squeeze_ib = getf("springs", "squeeze_constant_ib", self.spring_squeeze_ib)
