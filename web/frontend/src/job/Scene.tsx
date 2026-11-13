@@ -12,6 +12,11 @@ const HOVER = '#2A78D6'
 /** Marks drawn over the chain take no pointer events, or the pointer would hit the mark instead
  * of the bead under it and the hover would flicker between the two. */
 const noRaycast = () => null
+/** The labels over the canvas take no pointer events either. drei's `Html` applies its own
+ * `pointerEvents` prop only to transformed labels, so the style goes on the wrapper and the
+ * inner div by hand. A label that took the pointer would leave the canvas the moment it appeared
+ * under a still cursor, clear the hover, vanish and bring the hover back, over and over. */
+const MARK_STYLE = { pointerEvents: 'none' } as const
 /** Hover and pick by the screen: every bond is projected as the tube it is drawn as, and the
  * front tube under the cursor gives the bead. Casting rays into the meshes flickered between the
  * tubes and the joints, and testing bead centres alone missed a zoomed tube between two beads
@@ -98,7 +103,6 @@ function Picker({
 
 export type Marker = { label: string; at: [number, number, number] }
 export type SceneHandle = { reset: () => void; png: () => string | null }
-
 
 function CameraSync({ link, id }: { link: CameraLink; id: string }) {
   const { camera, controls } = useThree() as unknown as { camera: THREE.PerspectiveCamera; controls: OrbitControlsImpl | null }
@@ -254,7 +258,7 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
             <sphereGeometry args={[tube * 2.6, 20, 16]} />
             <meshBasicMaterial color={HOVER} depthTest={false} transparent opacity={0.9} fog={false} />
           </mesh>
-          <Html position={shifted[hovered!]} center pointerEvents="none">
+          <Html position={shifted[hovered!]} center wrapperClass="scene-mark" style={MARK_STYLE}>
             <span className="hover-ring" />
           </Html>
         </>
@@ -264,7 +268,7 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
       ))}
       {markers.length === 2 && <Line points={[shift(markers[0].at), shift(markers[1].at)]} color="#151514" lineWidth={1.5} raycast={noRaycast} />}
       {markers.map((m) => (
-        <Html key={m.label} position={shift(m.at)} center pointerEvents="none">
+        <Html key={m.label} position={shift(m.at)} center wrapperClass="scene-mark" style={MARK_STYLE}>
           <span className="marker">{m.label}</span>
         </Html>
       ))}
