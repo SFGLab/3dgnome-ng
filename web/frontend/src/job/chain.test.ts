@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bondRadius, fogRange, pickNearest, stretch } from './chain'
+import { bondRadius, fogRange, pickOnChain, stretch } from './chain'
 
 describe('chain geometry', () => {
   it('makes the tube a fixed share of the median bond', () => {
@@ -22,22 +22,36 @@ describe('chain geometry', () => {
   })
 })
 
-describe('pickNearest', () => {
-  // Screen x, y in pixels and depth, smaller nearer.
-  const screen: [number, number, number][] = [
-    [100, 100, 0.5],
-    [104, 100, 0.2],
-    [300, 300, 0.1],
-  ]
-  it('takes the front bead among those within the radius of the cursor', () => {
-    expect(pickNearest(screen, 101, 100, 8)).toBe(1)
+describe('pickOnChain', () => {
+  // Screen x, y in pixels, distance from the camera, and the tube's drawn radius in pixels there.
+  it('takes the tube under the cursor between two beads far apart on screen', () => {
+    const chain: [number, number, number, number][] = [
+      [0, 100, 10, 6],
+      [100, 100, 10, 6],
+    ]
+    expect(pickOnChain(chain, 30, 103)).toBe(0)
+    expect(pickOnChain(chain, 70, 98)).toBe(1)
   })
 
-  it('takes nothing when no bead is that close', () => {
-    expect(pickNearest(screen, 200, 200, 8)).toBe(null)
+  it('takes the front tube where two cross', () => {
+    const chain: [number, number, number, number][] = [
+      [0, 100, 20, 6],
+      [100, 100, 20, 6],
+      [50, 0, 5, 6],
+      [50, 200, 5, 6],
+    ]
+    expect(pickOnChain(chain, 50, 100)).toBe(2)
   })
 
-  it('ignores a bead behind the camera', () => {
-    expect(pickNearest([[100, 100, 1.5]], 100, 100, 8)).toBe(null)
+  it('takes nothing off every tube', () => {
+    const chain: [number, number, number, number][] = [
+      [0, 100, 10, 6],
+      [100, 100, 10, 6],
+    ]
+    expect(pickOnChain(chain, 50, 130)).toBe(null)
+  })
+
+  it('takes a lone bead under the cursor', () => {
+    expect(pickOnChain([[10, 10, 5, 6]], 12, 12)).toBe(0)
   })
 })

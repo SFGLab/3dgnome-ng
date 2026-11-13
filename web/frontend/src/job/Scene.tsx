@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, u
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CameraLink } from './cameraLink'
-import { bondRadius, fogRange, pickNearest, stretch } from './chain'
+import { bondRadius, fogRange, pickOnChain, stretch } from './chain'
 
 const BACKGROUND = '#FFFFFF'
 /** The hovered bead's colour, one no mark uses. */
@@ -12,14 +12,22 @@ const HOVER = '#2A78D6'
 /** Marks drawn over the chain take no pointer events, or the pointer would hit the mark instead
  * of the bead under it and the hover would flicker between the two. */
 const noRaycast = () => null
-/** How near the cursor, in pixels, a bead must be drawn to be hovered or picked. */
-const PICK_RADIUS = 10
-
-/** Hover and pick by the screen: each bead is projected and the bead drawn nearest the cursor,
- * the front one when several are that near, is the one under it. Casting rays into the tube
- * meshes flickered between the tubes and the joints and could land on a strand behind. No hover
- * while a drag rotates the view, and a click is a press and release that hardly moved. */
-function Picker({ points, onHover, onPick }: { points: [number, number, number][]; onHover?: (index: number | null, x: number, y: number) => void; onPick?: (index: number) => void }) {
+/** Hover and pick by the screen: every bond is projected as the tube it is drawn as, and the
+ * front tube under the cursor gives the bead. Casting rays into the meshes flickered between the
+ * tubes and the joints, and testing bead centres alone missed a zoomed tube between two beads
+ * and caught a strand behind. No hover while a drag rotates the view, and a click is a press and
+ * release that hardly moved. */
+function Picker({
+  points,
+  tube,
+  onHover,
+  onPick,
+}: {
+  points: [number, number, number][]
+  tube: number
+  onHover?: (index: number | null, x: number, y: number) => void
+  onPick?: (index: number) => void
+}) {
   const { camera, gl } = useThree()
   const handlers = useRef({ onHover, onPick })
   handlers.current = { onHover, onPick }
@@ -35,11 +43,15 @@ function Picker({ points, onHover, onPick }: { points: [number, number, number][
     }
     const pick = (x: number, y: number) => {
       const r = el.getBoundingClientRect()
-      const screen = points.map(([px, py, pz]): [number, number, number] => {
-        v.set(px, py, pz).project(camera)
-        return [((v.x + 1) / 2) * r.width, ((1 - v.y) / 2) * r.height, v.z]
+      const cam = camera as THREE.PerspectiveCamera
+      const focal = r.height / 2 / Math.tan((cam.fov * Math.PI) / 360)
+      const chain = points.map(([px, py, pz]): [number, number, number, number] => {
+        v.set(px, py, pz).applyMatrix4(cam.matrixWorldInverse)
+        const dist = -v.z
+        v.set(px, py, pz).project(cam)
+        return [((v.x + 1) / 2) * r.width, ((1 - v.y) / 2) * r.height, dist, dist > 0 ? (tube * focal) / dist : 0]
       })
-      return pickNearest(screen, x, y, PICK_RADIUS)
+      return pickOnChain(chain, x, y)
     }
     const move = (e: PointerEvent) => {
       if (e.buttons) return
@@ -80,7 +92,7 @@ function Picker({ points, onHover, onPick }: { points: [number, number, number][
       el.removeEventListener('pointerdown', press)
       el.removeEventListener('pointerup', release)
     }
-  }, [points, camera, gl])
+  }, [points, tube, camera, gl])
   return null
 }
 
@@ -234,7 +246,7 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
       <CameraLight />
       <DepthFog radius={radius} />
       <Chain points={shifted} colors={colors} radius={tube} />
-      <Picker points={shifted} onHover={onHover} onPick={onPick} />
+      <Picker points={shifted} tube={tube} onHover={onHover} onPick={onPick} />
       {near && (
         <>
           <Line points={shifted.slice(near[0], near[1] + 1)} color={HOVER} lineWidth={5} transparent opacity={0.85} depthTest={false} raycast={noRaycast} />
