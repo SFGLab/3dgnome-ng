@@ -17,11 +17,12 @@ terminal here, the beads ARE the output.  Serial runner = numba `mc_smooth_numba
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from gnome3d.pipeline.ib.buckets import batch_bucket
+from gnome3d.pipeline.ib.maxent import maxent_start
 from gnome3d.pipeline.ib.start import coil_start
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import AnchorMapEntry, Densified, Orientation, Smoothed, State
@@ -112,19 +113,35 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
 
 
 def _start_positions(prob: Problem) -> F32Array:
-    """The chain the stage starts from. The densified line by default, or under
-    `smooth_start = coil` each gap's subanchors on a compact bridge between its anchors, drawn
-    from a generator seeded by the problem so the start is reproducible and the kernel's own
-    stream is untouched."""
+    """The chain the stage starts from. The densified line by default, under
+    `smooth_start = coil` each gap's subanchors on a compact bridge between its anchors, and
+    under `maxent` on a bridge drawn from the maximum entropy chain for the law and the contact
+    map. Both bridges draw from a generator seeded by the problem, so the start is reproducible
+    and the kernel's own stream is untouched."""
     pos: F32Array = prob["pos"]
     s = prob["settings"]
-    if str(getattr(s, "smooth_start", "line")) != "coil":
+    start = str(getattr(s, "smooth_start", "line"))
+    if start not in ("coil", "maxent"):
         return pos
     dtn = prob["dtn"]
     r = float(s.exclusion_radius_smooth)
     if r <= 0.0:
         r = float(s.exclusion_auto_factor_smooth) * float(np.mean(dtn))
-    return coil_start(pos, prob["fixed"], dtn, r, np.random.default_rng(int(prob["seed"])))
+    rng = np.random.default_rng(int(prob["seed"]))
+    if start == "coil":
+        return coil_start(pos, prob["fixed"], dtn, r, rng)
+    return maxent_start(
+        pos,
+        prob["fixed"],
+        prob["bead_starts"],
+        prob["bead_ends"],
+        s.polymer_law(),
+        float(s.heatmap_distance_stretching),
+        r,
+        rng,
+        str(s.data_contact_map),
+        str(prob["chrom"]),
+    )
 
 
 def _run(problem: Problem) -> Result:
@@ -221,6 +238,9 @@ class SmoothStage:
             "anchor_neighbor_weights": st.anchor_neighbor_weights,
             "heat_dist": getattr(st, "heat_dist", None),
             "compartment": st.bead_compartment,
+            "bead_starts": st.bead_starts,
+            "bead_ends": st.bead_ends,
+            "chrom": st.chrom,
         }
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
@@ -228,5 +248,5 @@ class SmoothStage:
         assert isinstance(st, Densified)
         _score, final_pos = result
         beads = _assemble_beads(final_pos, st.fixed, st.bead_starts, st.bead_ends, st.settings)
-        base = {**vars(st), "heat_dist": getattr(st, "heat_dist", None)}
+        base: dict[str, Any] = {**vars(st), "heat_dist": getattr(st, "heat_dist", None)}
         return Smoothed(**base, final_pos=final_pos, beads=beads)

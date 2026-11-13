@@ -53,6 +53,7 @@ class Settings:
     data_phasing_track: str
     data_anchor_activity: str
     data_anchor_contacts: str
+    data_contact_map: str
 
     # ---- template ----
 
@@ -389,6 +390,7 @@ class Settings:
         # Counts between anchor pairs from a full depth map, `gnome3d.anchor_contacts`; empty
         # builds the anchor contact map from the singletons.
         self.data_anchor_contacts = ""
+        self.data_contact_map = ""  # cooler URI the maxent start reads window counts from
 
         # ---- motif orientation ----
         self.use_ctcf_motif = False
@@ -478,7 +480,7 @@ class Settings:
         self.noise_smooth = 0.5
         self.smooth_hard_wall = False  # reject a move that adds or deepens a pair under the radius
         self.smooth_anchor_cap = 0.0  # anchors may move this many mean bonds from the arcs position
-        self.smooth_start = "line"  # line | coil, where a gap's subanchors start
+        self.smooth_start = "line"  # line | coil | maxent, where a gap's subanchors start
         self.smooth_prefetch = 1  # proposals one JAX step evaluates at once, first accepted kept
         self.smooth_jax_grid = False  # excluded volume on a cell grid in the JAX kernel
         self.smooth_jax_grid_min_beads = 4096  # the grid only pays above this many beads
@@ -825,6 +827,7 @@ class Settings:
         self.data_phasing_track = gets("data", "phasing_track", self.data_phasing_track)
         self.data_anchor_activity = gets("data", "anchor_activity", self.data_anchor_activity)
         self.data_anchor_contacts = gets("data", "anchor_contacts", self.data_anchor_contacts)
+        self.data_contact_map = gets("data", "contact_map", self.data_contact_map)
 
         # [template]
 
@@ -1175,9 +1178,10 @@ class Settings:
         self.smooth_jax_grid_min_beads = geti(
             "simulation_arcs_smooth", "jax_grid_min_beads", self.smooth_jax_grid_min_beads
         )
-        if self.smooth_start not in ("line", "coil"):
+        if self.smooth_start not in ("line", "coil", "maxent"):
             raise ValueError(
-                f"[simulation_arcs_smooth] start must be line or coil, got {self.smooth_start!r}"
+                "[simulation_arcs_smooth] start must be line, coil or maxent,"
+                f" got {self.smooth_start!r}"
             )
         self.smooth_dist_weight = getf(
             "simulation_arcs_smooth", "dist_weight", self.smooth_dist_weight

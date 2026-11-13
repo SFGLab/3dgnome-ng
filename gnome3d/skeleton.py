@@ -351,5 +351,6 @@ def seed_for_ib(
         anchor_genomic=anchor_genomic,
         step_size_arcs=_ARCS_NOISE,
         track_compartments=track_compartments,
+        chrom=chr_,
     )
     return seed, wants_heat

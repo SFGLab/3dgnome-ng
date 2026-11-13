@@ -1318,6 +1318,18 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   went negative. Removed the same day; `slurm/ensemble/law_start_trial.sh`,
   `slurm/ensemble/gap_start_overnight.sh` and `playground/square_blocks/gapnight/` are the record.
 
+  **A maximum entropy gap start: `start = maxent` with `[data] contact_map`, under measurement
+  since 2026-11-14.** ([pipeline/ib/maxent.py](gnome3d/pipeline/ib/maxent.py)) Both dropped
+  trials gave every conformation the mean, and a contact map comes from the spread between
+  conformations. Each gap's subanchors are drawn from the Gaussian chain whose mean pair distances
+  are the law's, conditioned on the two anchors, after HIPPS and DIMES (Shi and Thirumalai). With
+  a contact map, a cooler URI at 1 kb, each target is scaled by the count between the 10 kb
+  windows of the pair against a power law fitted on the block's windows, observed over expected
+  to the minus third. One set of springs cannot hold every pair at the law below an exponent of a
+  third, and a distribution can, since the law's mean squared distance is a fractional Brownian
+  motion variogram. The draw comes from the problem's seed. `line` and `coil` are unchanged.
+  Unit checks in `harness/test_maxent_start.py`, options and trial in `design/gap-fill.md`.
+
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
   `[simulation_backend] neighbour_grid`, default yes)
   The excluded volume term sums over pairs closer than `r0` and was implemented as a scan over

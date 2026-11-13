@@ -57,6 +57,7 @@ Filenames are relative to `data_dir` unless absolute. The region string is `chr:
 | `phasing_track` | str |  | Track used to fix the eigenvector's arbitrary sign. Required with `compartments`. |
 | `anchor_activity` | str |  | A BED with a signal column giving each anchor an activity for `[factories]`: the seventh column when a line has seven or more, a broadPeak's signal, else the fourth, a bedGraph. An anchor takes the largest value of the intervals overlapping it, zero where none does. |
 | `anchor_contacts` | str |  | Counts between anchor pairs from a full depth map, an npz written by `slurm/ensemble/prep_anchor_contacts.py` from an mcool and the run's anchor file, each pixel shared between the anchors it overlaps. The anchor contact map is built from it instead of the singletons, which keep the exponent fit and the coarse heatmaps. A STATUS line gives the share of the run's anchors found in it. |
+| `contact_map` | str |  | A cooler URI at fine resolution, such as an mcool at 1 kb, that `start = maxent` reads raw counts between windows of about 10 kb inside each gap from. Empty draws gaps from the law alone. |
 
 ## [distance]
 
@@ -184,7 +185,7 @@ least `stop_condition_successes_threshold` moves.
 | `prefetch` | int | 1 | 32 | How many proposals one step of the JAX kernel evaluates against the current state at once, keeping the first accepted in draw order. The chain keeps its law and, where acceptance is rare, advances close to this many steps per step. Numba ignores it. |
 | `jax_grid` | bool | no | yes | Put the excluded volume and the wall on a cell grid in the JAX kernel, so a proposal visits the 27 cells around it instead of every bead. Exact, rebuilt every round and relinked on every accepted move. |
 | `jax_grid_min_beads` | int | 4096 | 4096 | The grid is used only on launches whose padded bead count reaches this, since below it the full scan is already cheap. |
-| `start` | str | line | coil | Where a gap's subanchors start. `line` is the densified straight line between its anchors, `coil` a compact random bridge at the bond targets. |
+| `start` | str | line | coil | Where a gap's subanchors start. `line` is the densified straight line between its anchors, `coil` a compact random bridge at the bond targets, `maxent` a draw from the maximum entropy Gaussian bridge whose mean pair distances are the law's, scaled by window contacts from `[data] contact_map` when one is given. `maxent` is under measurement since 2026-11-14, `design/gap-fill.md`. |
 
 ### [simulation_ib] only
 
