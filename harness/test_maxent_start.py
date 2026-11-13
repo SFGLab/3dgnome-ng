@@ -96,9 +96,9 @@ def test_start() -> None:
     pos = np.zeros((n, 3), dtype=np.float32)
     pos[12] = [2.0, 0.0, 0.0]
     pos[29] = [2.0, 3.0, 0.0]
-    a = me.maxent_start(pos, fixed, starts, ends, LAW, 2.0, 0.5, np.random.default_rng(7))
-    b = me.maxent_start(pos, fixed, starts, ends, LAW, 2.0, 0.5, np.random.default_rng(7))
-    c = me.maxent_start(pos, fixed, starts, ends, LAW, 2.0, 0.5, np.random.default_rng(8))
+    a = me.maxent_start(pos, fixed, starts, ends, LAW, 2.0, np.random.default_rng(7))
+    b = me.maxent_start(pos, fixed, starts, ends, LAW, 2.0, np.random.default_rng(7))
+    c = me.maxent_start(pos, fixed, starts, ends, LAW, 2.0, np.random.default_rng(8))
     check("anchors untouched", np.array_equal(a[fixed], pos[fixed]))
     check("same seed same start", np.array_equal(a, b))
     check("another seed another start", not np.array_equal(a, c))

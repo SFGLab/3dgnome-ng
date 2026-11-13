@@ -48,8 +48,9 @@ Built 2026-11-14 as `[simulation_arcs_smooth] start = maxent` with `[data] conta
 written beside the code. Windows of up to 10 kb. A pseudocount of 9 on observed and expected,
 the count at which a zero is three Poisson deviations under its expectation. The expectation is a
 power law in separation fitted on the block's own windows. The variance per coordinate is pi d^2
-over 8 for a mean distance d. Twenty draws per gap, the clearest kept, as the coil start keeps the
-clearest of twenty draws per bead.
+over 8 for a mean distance d. One draw per gap and conformation. Keeping the clearest of twenty
+draws, as the coil start does per bead, put the start at 1.14 to 1.24 of the law on GM12878
+chr1:20-25 Mb against 0.92 to 1.08 for one draw, and is no longer the maximum entropy ensemble.
 
 ### 2. Loop extrusion per conformation
 

@@ -137,7 +137,6 @@ def _start_positions(prob: Problem) -> F32Array:
         prob["bead_ends"],
         s.polymer_law(),
         float(s.heatmap_distance_stretching),
-        r,
         rng,
         str(s.data_contact_map),
         str(prob["chrom"]),

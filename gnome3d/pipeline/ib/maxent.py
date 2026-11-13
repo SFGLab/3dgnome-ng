@@ -4,8 +4,7 @@ Under `start = maxent` each gap's subanchors are drawn from the Gaussian chain w
 distances are the targets, conditioned on the two anchors the arcs stage placed. A pair's target
 is the law's background. With `[data] contact_map` it is scaled by the count between the windows
 of about 10 kb the two beads are in, against the count a power law fitted on the block's own
-windows expects at that separation. Of twenty bridges drawn per gap the one with the fewest pairs
-under the clearance radius is kept. See `design/gap-fill.md`.
+windows expects at that separation. See `design/gap-fill.md`.
 """
 
 from __future__ import annotations
@@ -26,7 +25,6 @@ if TYPE_CHECKING:
 LOG = log.get("maxent")
 
 _WINDOW_BP = 10_000
-_DRAWS = 20
 # The count under which a pair's ratio is shrunk toward its expectation, the count at which a
 # pair with no contact sits three Poisson deviations under it.
 _PSEUDO = 9.0
@@ -154,7 +152,6 @@ def maxent_start(
     ends: list[int],
     law: PolymerLaw,
     stretch: float,
-    r_avoid: float,
     rng: np.random.Generator,
     contact_map: str = "",
     chrom: str = "",
@@ -173,8 +170,6 @@ def maxent_start(
         The run's distance law.
     stretch
         The largest multiple of the background a contact scaled target may reach.
-    r_avoid
-        A pair of non neighbouring beads closer than this counts against a draw.
     rng
         The generator every draw comes from, so the start is a function of its seed.
     contact_map
@@ -238,20 +233,5 @@ def maxent_start(
             np.fill_diagonal(d, 0.0)
         coef, root = bridge(d)
         pa, pb = out[a], out[b]
-        mean = pa + coef[:, None] * (pb - pa)
-        k = b - a + 1
-        far = np.triu(np.ones((k, k), dtype=bool), 2)
-        best: F64Array | None = None
-        best_n = -1
-        for _ in range(_DRAWS):
-            interior = mean + root @ rng.normal(size=(k - 2, 3))
-            chain = np.vstack([pa, interior, pb])
-            dd = np.linalg.norm(chain[:, None, :] - chain[None, :, :], axis=2)
-            n_close = int((dd[far] < r_avoid).sum())
-            if best is None or n_close < best_n:
-                best, best_n = interior, n_close
-                if n_close == 0:
-                    break
-        assert best is not None
-        out[a + 1 : b] = best
+        out[a + 1 : b] = pa + coef[:, None] * (pb - pa) + root @ rng.normal(size=(b - a - 1, 3))
     return out.astype(np.float32)
