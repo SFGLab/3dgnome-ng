@@ -1306,6 +1306,18 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   wall tripled. Removed the same day; `playground/trace_square_blocks.py`,
   `playground/law_spring_readout.py` and `slurm/ensemble/law_spring_trial.sh` are the record.
 
+  **Tried and dropped, 2026-11-13: a gap start that follows the law.** Under `start = law` each
+  subanchor took the clear candidate whose distances to the beads 2 to 128 places behind it best
+  matched the law in log, so a gap began at the law's size instead of packed into a ball. No
+  energy term. On chr1:20-25, 10-15 and 35-40 Mb at five structures and chr1 at three, scored
+  on 1-60 Mb, against the coil: Pearson down 0.03 to 0.07 on all four, the distance exponent
+  1.06 to 1.17 times Hi-C down to 0.96 to 1.05, overlaps within blocks down two to twenty
+  times, across blocks on chr1 11.7 to 20.5 per thousand. Gaps ended at about 1.2 of the law,
+  since the smooth stage holds bonds and nothing holds a gap's interior, so its size is the
+  start's. Without the hard wall overlaps rose tenfold, and with the subanchor heat term SCC
+  went negative. Removed the same day; `slurm/ensemble/law_start_trial.sh`,
+  `slurm/ensemble/gap_start_overnight.sh` and `playground/square_blocks/gapnight/` are the record.
+
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
   `[simulation_backend] neighbour_grid`, default yes)
   The excluded volume term sums over pairs closer than `r0` and was implemented as a scan over

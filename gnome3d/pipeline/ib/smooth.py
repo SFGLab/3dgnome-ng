@@ -112,27 +112,19 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
 
 
 def _start_positions(prob: Problem) -> F32Array:
-    """The chain the stage starts from. The densified line by default, under
-    `smooth_start = coil` each gap's subanchors on a compact bridge between its anchors, and
-    under `law` on a bridge whose distances follow the polymer law. Both bridges draw from a
-    generator seeded by the problem, so the start is reproducible and the kernel's own stream
-    is untouched."""
+    """The chain the stage starts from. The densified line by default, or under
+    `smooth_start = coil` each gap's subanchors on a compact bridge between its anchors, drawn
+    from a generator seeded by the problem so the start is reproducible and the kernel's own
+    stream is untouched."""
     pos: F32Array = prob["pos"]
     s = prob["settings"]
-    start = str(getattr(s, "smooth_start", "line"))
-    if start not in ("coil", "law"):
+    if str(getattr(s, "smooth_start", "line")) != "coil":
         return pos
     dtn = prob["dtn"]
     r = float(s.exclusion_radius_smooth)
     if r <= 0.0:
         r = float(s.exclusion_auto_factor_smooth) * float(np.mean(dtn))
-    rng = np.random.default_rng(int(prob["seed"]))
-    if start == "coil":
-        return coil_start(pos, prob["fixed"], dtn, r, rng)
-    law = s.polymer_law()
-    return coil_start(
-        pos, prob["fixed"], dtn, r, rng, "law", prob["bead_mid"], float(law.nu), int(law.s0_bp)
-    )
+    return coil_start(pos, prob["fixed"], dtn, r, np.random.default_rng(int(prob["seed"])))
 
 
 def _run(problem: Problem) -> Result:
@@ -229,8 +221,6 @@ class SmoothStage:
             "anchor_neighbor_weights": st.anchor_neighbor_weights,
             "heat_dist": getattr(st, "heat_dist", None),
             "compartment": st.bead_compartment,
-            "bead_mid": (np.asarray(st.bead_starts, dtype=np.float64) + np.asarray(st.bead_ends))
-            / 2.0,
         }
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:

@@ -468,7 +468,7 @@ class Settings:
         self.noise_smooth = 0.5
         self.smooth_hard_wall = False  # reject a move that adds or deepens a pair under the radius
         self.smooth_anchor_cap = 0.0  # anchors may move this many mean bonds from the arcs position
-        self.smooth_start = "line"  # line | coil | law, where a gap's subanchors start
+        self.smooth_start = "line"  # line | coil, where a gap's subanchors start
         self.smooth_prefetch = 1  # proposals one JAX step evaluates at once, first accepted kept
         self.smooth_jax_grid = False  # excluded volume on a cell grid in the JAX kernel
         self.smooth_jax_grid_min_beads = 4096  # the grid only pays above this many beads
@@ -1161,9 +1161,9 @@ class Settings:
         self.smooth_jax_grid_min_beads = geti(
             "simulation_arcs_smooth", "jax_grid_min_beads", self.smooth_jax_grid_min_beads
         )
-        if self.smooth_start not in ("line", "coil", "law"):
+        if self.smooth_start not in ("line", "coil"):
             raise ValueError(
-                f"[simulation_arcs_smooth] start must be line, coil or law, got {self.smooth_start!r}"
+                f"[simulation_arcs_smooth] start must be line or coil, got {self.smooth_start!r}"
             )
         self.smooth_dist_weight = getf(
             "simulation_arcs_smooth", "dist_weight", self.smooth_dist_weight

@@ -8,10 +8,6 @@ a clear candidate when one of twenty draws is clear of the beads already placed 
 Under the compact rule the clear candidate nearest the gap's midpoint is taken, which keeps
 the coil as small as the clearance allows rather than as open as it can be.
 
-Under the law rule the clear candidate is the one whose distances to the beads 2, 4, 8 up to
-128 places behind it best match the polymer law in log, so a gap's interior starts at the
-law's size instead of packed into a ball, whose interior distances stop growing at its radius.
-
 Only beads of the same gap and its two anchors count for clearance. Pairs across gaps are left
 to the smooth stage, whose hard wall only ever lowers their number.
 """
@@ -21,10 +17,9 @@ from __future__ import annotations
 import numpy as np
 
 from gnome3d.mc.numba.terms import njit
-from gnome3d.types import BoolArray, F32Array, F64Array, I64Array
+from gnome3d.types import BoolArray, F32Array, F64Array
 
 _DRAWS = 20
-_LAW_OFFSETS = np.array([2, 4, 8, 16, 32, 64, 128], dtype=np.int64)
 
 
 @njit(cache=True)
@@ -104,105 +99,6 @@ def _bridge_compact_nb(
     return out
 
 
-@njit(cache=True)
-def _bridge_law_nb(
-    a: F64Array,
-    b: F64Array,
-    targets: F64Array,
-    r_avoid: float,
-    normals: F64Array,
-    mids: F64Array,
-    nu: float,
-    s0: float,
-    offsets: I64Array,
-) -> F64Array:
-    """The walk of `_bridge_compact_nb` keyed on the law instead of the gap's midpoint.
-
-    `mids` holds the genomic midpoints of the gap's m + 2 beads, its two anchors at the ends,
-    and a bead's law distance to the bead k places behind it is `max(1, (sep / s0)^nu)`.
-    """
-    m = targets.shape[0] - 1
-    out = np.zeros((m, 3), dtype=np.float64)
-    pts = np.zeros((m + 2, 3), dtype=np.float64)
-    chain = np.zeros((m + 1, 3), dtype=np.float64)
-    pts[0] = a
-    pts[1] = b
-    chain[0] = a
-    n_pts = 2
-    cur = a.copy()
-    step = np.zeros(3, dtype=np.float64)
-    cand = np.zeros(3, dtype=np.float64)
-    best = np.zeros(3, dtype=np.float64)
-    for j in range(m):
-        idx = j + 1
-        remaining = m + 1 - j
-        length = targets[j]
-        best_gap = -1.0
-        best_key = np.inf
-        for k in range(normals.shape[1]):
-            u0, u1, u2 = normals[j, k, 0], normals[j, k, 1], normals[j, k, 2]
-            un = np.sqrt(u0 * u0 + u1 * u1 + u2 * u2)
-            u0, u1, u2 = u0 / un, u1 / un, u2 / un
-            step[0] = u0 * length + 0.7 * ((b[0] - cur[0]) / remaining)
-            step[1] = u1 * length + 0.7 * ((b[1] - cur[1]) / remaining)
-            step[2] = u2 * length + 0.7 * ((b[2] - cur[2]) / remaining)
-            sn = np.sqrt(step[0] * step[0] + step[1] * step[1] + step[2] * step[2])
-            f = length / sn
-            cand[0] = cur[0] + step[0] * f
-            cand[1] = cur[1] + step[1] * f
-            cand[2] = cur[2] + step[2] * f
-            gap = np.inf
-            for q in range(n_pts):
-                dx = pts[q, 0] - cand[0]
-                dy = pts[q, 1] - cand[1]
-                dz = pts[q, 2] - cand[2]
-                g = np.sqrt(dx * dx + dy * dy + dz * dz)
-                if g < gap:
-                    gap = g
-            if gap >= r_avoid:
-                key = 0.0
-                for o in range(offsets.shape[0]):
-                    back = offsets[o]
-                    if back > idx:
-                        break
-                    dx = chain[idx - back, 0] - cand[0]
-                    dy = chain[idx - back, 1] - cand[1]
-                    dz = chain[idx - back, 2] - cand[2]
-                    d = np.sqrt(dx * dx + dy * dy + dz * dz)
-                    sep = abs(mids[idx] - mids[idx - back])
-                    want = (sep / s0) ** nu
-                    if want < 1.0:
-                        want = 1.0
-                    lr = np.log(max(d, 1e-9) / want)
-                    key += lr * lr
-                if key < best_key:
-                    best_key = key
-                    best[:] = cand
-            elif best_key == np.inf and gap > best_gap:
-                best_gap = gap
-                best[:] = cand
-        cur[:] = best
-        out[j] = cur
-        chain[idx] = cur
-        pts[n_pts] = cur
-        n_pts += 1
-    if m > 0:
-        dx = b[0] - cur[0]
-        dy = b[1] - cur[1]
-        dz = b[2] - cur[2]
-        dn = np.sqrt(dx * dx + dy * dy + dz * dz)
-        t = targets[m]
-        rx = b[0] - (cur[0] + dx / dn * t)
-        ry = b[1] - (cur[1] + dy / dn * t)
-        rz = b[2] - (cur[2] + dz / dn * t)
-        for j in range(m):
-            f = (j + 1) / (m + 1)
-            out[j, 0] += rx * f
-            out[j, 1] += ry * f
-            out[j, 2] += rz * f
-    return out
-
-
 def _bridge(
     a: F64Array, b: F64Array, targets: F64Array, r_avoid: float, rng: np.random.Generator, rule: str
 ) -> F64Array:
@@ -257,9 +153,6 @@ def coil_start(
     r_avoid: float,
     rng: np.random.Generator,
     rule: str = "compact",
-    mids: F64Array | None = None,
-    nu: float = 0.0,
-    s0_bp: int = 1,
 ) -> F32Array:
     """The chain with every gap's subanchors on a bridge between its anchors.
 
@@ -277,13 +170,7 @@ def coil_start(
         The generator every draw comes from, so the start is a function of its seed.
     rule
         `compact` takes the clear candidate nearest the gap's midpoint, `first` the first clear
-        one, `law` the clear one whose distances to the beads behind it best match the law.
-    mids
-        Genomic midpoint in bp of every bead, required under `law`.
-    nu
-        The law's exponent, under `law`.
-    s0_bp
-        The separation that is one bead, under `law`.
+        one.
     """
     out = pos.astype(np.float64).copy()
     anchors = np.flatnonzero(fixed)
@@ -291,22 +178,7 @@ def coil_start(
     for a, b in zip(anchors[:-1], anchors[1:], strict=True):
         if b - a < 2:
             continue
-        if rule == "law":
-            if mids is None:
-                raise ValueError("the law start needs the beads' genomic midpoints")
-            normals = rng.normal(size=(b - a - 1, _DRAWS, 3))
-            out[a + 1 : b] = _bridge_law_nb(
-                out[a],
-                out[b],
-                d[a:b],
-                float(r_avoid),
-                normals,
-                np.ascontiguousarray(mids[a : b + 1], dtype=np.float64),
-                float(nu),
-                float(max(s0_bp, 1)),
-                _LAW_OFFSETS,
-            )
-        elif rule == "compact":
+        if rule == "compact":
             # Every bead takes all of its draws under this rule, so they can be drawn at once
             # in the order the loop would have drawn them, and the walk runs compiled.
             normals = rng.normal(size=(b - a - 1, _DRAWS, 3))
