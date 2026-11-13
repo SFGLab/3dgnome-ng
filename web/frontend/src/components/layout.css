@@ -132,3 +132,13 @@
     padding-right: 16px;
   }
 }
+
+@media (max-width: 560px) {
+  .cite-strip {
+    flex-wrap: wrap;
+  }
+
+  .cite-strip p {
+    flex: 1 1 calc(100% - 30px);
+  }
+}

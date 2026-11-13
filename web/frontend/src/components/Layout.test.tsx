@@ -31,6 +31,11 @@ describe('Layout', () => {
     expect(links.map((a) => a.getAttribute('href'))).toEqual([ROUTES.model, ROUTES.jobs, ROUTES.method, ROUTES.results, ROUTES.help, ROUTES.cite])
   })
 
+  it('links the source code on every page', () => {
+    renderLayout()
+    expect(screen.getByRole('link', { name: /Source code/ })).toHaveAttribute('href', 'https://github.com/SFGLab/3dgnome-ng')
+  })
+
   it('has the cite strip with a link to the cite page', () => {
     renderLayout()
     expect(screen.getByText(/If you use these models, please cite 3D-GNOMEᴺᴳ/)).toBeInTheDocument()
