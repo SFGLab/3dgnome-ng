@@ -544,11 +544,13 @@ def _contact_z_background(
         out[jj[sel], ii[sel]] = -target
         held_in += int((z[sel] > 0).sum())
         held_out += int((z[sel] < 0).sum())
-    LOG.info(
-        "contact background: %d pairs held in, %d held out, of %d",
-        held_in,
-        held_out,
-        n * (n - 1) // 2,
+    log.status(
+        LOG,
+        "contact background: %s pairs held in, %s held out, of %s at z %.1f",
+        f"{held_in:,}",
+        f"{held_out:,}",
+        f"{n * (n - 1) // 2:,}",
+        z_cut,
     )
     return out
 
