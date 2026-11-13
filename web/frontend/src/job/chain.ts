@@ -22,3 +22,23 @@ export function stretch(i: number, n: number, k = 6): [number, number] {
 export function fogRange(radius: number, cameraDistance: number): [number, number] {
   return [cameraDistance, cameraDistance + radius]
 }
+
+/** The bead under the cursor: among the beads within `radius` pixels of it, the one nearest the
+ * camera, so a strand in front wins over one behind it. Null when none is that close.
+ *
+ * @param screen each bead's screen x and y in pixels and its depth in clip space, -1 to 1
+ */
+export function pickNearest(screen: [number, number, number][], x: number, y: number, radius: number): number | null {
+  const r2 = radius * radius
+  let best: number | null = null
+  let depth = Infinity
+  for (let i = 0; i < screen.length; i++) {
+    const [sx, sy, z] = screen[i]
+    if (z < -1 || z > 1) continue
+    if ((sx - x) ** 2 + (sy - y) ** 2 <= r2 && z < depth) {
+      best = i
+      depth = z
+    }
+  }
+  return best
+}

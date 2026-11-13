@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bondRadius, fogRange, stretch } from './chain'
+import { bondRadius, fogRange, pickNearest, stretch } from './chain'
 
 describe('chain geometry', () => {
   it('makes the tube a fixed share of the median bond', () => {
@@ -19,5 +19,25 @@ describe('chain geometry', () => {
 
   it('fogs from the middle of the structure to its far side', () => {
     expect(fogRange(10, 24)).toEqual([24, 34])
+  })
+})
+
+describe('pickNearest', () => {
+  // Screen x, y in pixels and depth, smaller nearer.
+  const screen: [number, number, number][] = [
+    [100, 100, 0.5],
+    [104, 100, 0.2],
+    [300, 300, 0.1],
+  ]
+  it('takes the front bead among those within the radius of the cursor', () => {
+    expect(pickNearest(screen, 101, 100, 8)).toBe(1)
+  })
+
+  it('takes nothing when no bead is that close', () => {
+    expect(pickNearest(screen, 200, 200, 8)).toBe(null)
+  })
+
+  it('ignores a bead behind the camera', () => {
+    expect(pickNearest([[100, 100, 1.5]], 100, 100, 8)).toBe(null)
   })
 })

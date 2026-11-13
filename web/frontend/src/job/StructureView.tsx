@@ -61,7 +61,12 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
   const [hover, setHover] = useState<HoverInfo | null>(null)
   const palette = useMemo(readPalette, [])
   const points = useMemo(() => structure.chain.map(([x, y, z]) => [x, y, z] as [number, number, number]), [structure])
-  const colors = useMemo(() => chainColors(structure, annotations, region, mode, palette), [structure, annotations, region, mode, palette])
+  // Keyed on the region's numbers: a parent passes a new array each render, and a new colour
+  // array would rebuild every tube of the chain on every hover.
+  const colors = useMemo(
+    () => chainColors(structure, annotations, region, mode, palette),
+    [structure, annotations, region[0], region[1], mode, palette], // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
   const describe = (i: number): string[] => {
     const k = beadAt(structure.beads, structure.chain[i][3])

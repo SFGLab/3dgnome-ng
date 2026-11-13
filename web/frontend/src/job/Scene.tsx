@@ -1,11 +1,10 @@
 import { Html, Line, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import type { ThreeEvent } from '@react-three/fiber'
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CameraLink } from './cameraLink'
-import { bondRadius, fogRange, stretch } from './chain'
+import { bondRadius, fogRange, pickNearest, stretch } from './chain'
 
 const BACKGROUND = '#FFFFFF'
 /** The hovered bead's colour, one no mark uses. */
@@ -13,6 +12,77 @@ const HOVER = '#2A78D6'
 /** Marks drawn over the chain take no pointer events, or the pointer would hit the mark instead
  * of the bead under it and the hover would flicker between the two. */
 const noRaycast = () => null
+/** How near the cursor, in pixels, a bead must be drawn to be hovered or picked. */
+const PICK_RADIUS = 10
+
+/** Hover and pick by the screen: each bead is projected and the bead drawn nearest the cursor,
+ * the front one when several are that near, is the one under it. Casting rays into the tube
+ * meshes flickered between the tubes and the joints and could land on a strand behind. No hover
+ * while a drag rotates the view, and a click is a press and release that hardly moved. */
+function Picker({ points, onHover, onPick }: { points: [number, number, number][]; onHover?: (index: number | null, x: number, y: number) => void; onPick?: (index: number) => void }) {
+  const { camera, gl } = useThree()
+  const handlers = useRef({ onHover, onPick })
+  handlers.current = { onHover, onPick }
+  useEffect(() => {
+    const el = gl.domElement
+    const v = new THREE.Vector3()
+    let frame = 0
+    let last: number | null = null
+    let down: [number, number] | null = null
+    const at = (e: PointerEvent): [number, number] => {
+      const r = el.getBoundingClientRect()
+      return [e.clientX - r.left, e.clientY - r.top]
+    }
+    const pick = (x: number, y: number) => {
+      const r = el.getBoundingClientRect()
+      const screen = points.map(([px, py, pz]): [number, number, number] => {
+        v.set(px, py, pz).project(camera)
+        return [((v.x + 1) / 2) * r.width, ((1 - v.y) / 2) * r.height, v.z]
+      })
+      return pickNearest(screen, x, y, PICK_RADIUS)
+    }
+    const move = (e: PointerEvent) => {
+      if (e.buttons) return
+      const [x, y] = at(e)
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const i = pick(x, y)
+        if (i === null && last === null) return
+        last = i
+        handlers.current.onHover?.(i, x, y)
+      })
+    }
+    const leave = () => {
+      cancelAnimationFrame(frame)
+      if (last !== null) handlers.current.onHover?.(null, 0, 0)
+      last = null
+    }
+    const press = (e: PointerEvent) => {
+      down = at(e)
+    }
+    const release = (e: PointerEvent) => {
+      if (!down) return
+      const [x, y] = at(e)
+      const still = Math.hypot(x - down[0], y - down[1]) < 5
+      down = null
+      if (!still) return
+      const i = pick(x, y)
+      if (i !== null) handlers.current.onPick?.(i)
+    }
+    el.addEventListener('pointermove', move)
+    el.addEventListener('pointerleave', leave)
+    el.addEventListener('pointerdown', press)
+    el.addEventListener('pointerup', release)
+    return () => {
+      cancelAnimationFrame(frame)
+      el.removeEventListener('pointermove', move)
+      el.removeEventListener('pointerleave', leave)
+      el.removeEventListener('pointerdown', press)
+      el.removeEventListener('pointerup', release)
+    }
+  }, [points, camera, gl])
+  return null
+}
 
 export type Marker = { label: string; at: [number, number, number] }
 export type SceneHandle = { reset: () => void; png: () => string | null }
@@ -72,12 +142,10 @@ type ChainProps = {
   points: [number, number, number][]
   colors: string[]
   radius: number
-  onHover?: (index: number | null, x: number, y: number) => void
-  onPick?: (index: number) => void
 }
 
 /** The chain as lit tubes between beads and spheres at the beads, one instanced mesh each. */
-function Chain({ points, colors, radius, onHover, onPick }: ChainProps) {
+function Chain({ points, colors, radius }: ChainProps) {
   const tubes = useRef<THREE.InstancedMesh>(null)
   const joints = useRef<THREE.InstancedMesh>(null)
   const n = points.length
@@ -107,26 +175,15 @@ function Chain({ points, colors, radius, onHover, onPick }: ChainProps) {
       mesh.computeBoundingSphere()
     }
   }, [points, colors, n])
-  const handlers = (bead: (id: number) => number) => ({
-    onPointerMove: (e: ThreeEvent<PointerEvent>) => {
-      e.stopPropagation()
-      if (e.instanceId !== undefined) onHover?.(bead(e.instanceId), e.nativeEvent.offsetX, e.nativeEvent.offsetY)
-    },
-    onPointerOut: () => onHover?.(null, 0, 0),
-    onClick: (e: ThreeEvent<MouseEvent>) => {
-      e.stopPropagation()
-      if (e.instanceId !== undefined) onPick?.(bead(e.instanceId))
-    },
-  })
   return (
     <>
       {n > 1 && (
-        <instancedMesh ref={tubes} args={[undefined, undefined, n - 1]} {...handlers((id) => id)}>
+        <instancedMesh ref={tubes} args={[undefined, undefined, n - 1]} raycast={noRaycast}>
           <cylinderGeometry args={[radius, radius, 1, 10, 1, true]} />
           <meshStandardMaterial roughness={0.5} metalness={0.05} />
         </instancedMesh>
       )}
-      <instancedMesh ref={joints} args={[undefined, undefined, n]} {...handlers((id) => id)}>
+      <instancedMesh ref={joints} args={[undefined, undefined, n]} raycast={noRaycast}>
         <sphereGeometry args={[radius, 12, 10]} />
         <meshStandardMaterial roughness={0.5} metalness={0.05} />
       </instancedMesh>
@@ -171,13 +228,13 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
       onCreated={(s) => {
         gl.current = s.gl
       }}
-      onPointerMissed={() => onHover?.(null, 0, 0)}
     >
       <color attach="background" args={[BACKGROUND]} />
       <ambientLight intensity={0.55} />
       <CameraLight />
       <DepthFog radius={radius} />
-      <Chain points={shifted} colors={colors} radius={tube} onHover={onHover} onPick={onPick} />
+      <Chain points={shifted} colors={colors} radius={tube} />
+      <Picker points={shifted} onHover={onHover} onPick={onPick} />
       {near && (
         <>
           <Line points={shifted.slice(near[0], near[1] + 1)} color={HOVER} lineWidth={5} transparent opacity={0.85} depthTest={false} raycast={noRaycast} />
