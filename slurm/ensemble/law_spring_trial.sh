@@ -11,10 +11,11 @@
 set -u
 cd "$(dirname "$0")/../.."
 C=GM12878
+DATA="${DATA:-data}"
 OUT="${OUT:-out/lawspring}"
 ARMS="${ARMS:-0 0.01 0.1}"
 MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
-SING=data/$C/${C}_hic_25kb_singletons.bedpe
+SING=$DATA/$C/${C}_hic_25kb_singletons.bedpe
 mkdir -p "$OUT"
 git log --format="law spring trial on %h %s" -1
 
@@ -40,7 +41,7 @@ run() {  # region tag n
     mkdir -p "$D"
     if [ "$(ls "$D"/*.cif 2>/dev/null | wc -l)" -ge "$3" ]; then continue; fi
     echo "[$2 law $W] start $(date +%H:%M)"
-    .venv/bin/python -m gnome3d.cli --config "$OUT/law_$W.ini" --data-dir data/$C --region "$1" -n "$3" --out "$D" > "$D.log" 2>&1
+    .venv/bin/python -m gnome3d.cli --config "$OUT/law_$W.ini" --data-dir "$DATA/$C" --region "$1" -n "$3" --out "$D" > "$D.log" 2>&1
     echo "[$2 law $W] exit $? $(date +%H:%M) structures $(ls "$D"/*.cif 2>/dev/null | wc -l)"
   done
 }
