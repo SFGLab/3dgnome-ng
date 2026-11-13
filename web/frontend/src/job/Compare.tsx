@@ -47,6 +47,13 @@ function Panel({
     [structure.data, annotations.data, region?.start, region?.end, palette], // eslint-disable-line react-hooks/exhaustive-deps
   )
   const row = genes.data?.find((r) => r.gene === gene)
+  // The selected gene's promoter and enhancer, marked A and B as on the Structure tab.
+  const markers =
+    row && structure.data
+      ? [row.promoter_bead, row.enhancer_bead]
+          .filter((k) => structure.data!.beads[k])
+          .map((k, i) => ({ label: 'AB'[i], at: [structure.data!.beads[k][2], structure.data!.beads[k][3], structure.data!.beads[k][4]] as [number, number, number] }))
+      : []
   return (
     <div className="compare-panel">
       <button type="button" className="panel-head" onClick={onChange}>
@@ -58,7 +65,9 @@ function Panel({
         <ChevronDown size={14} aria-hidden />
       </button>
       <div className="view-box compare-box">
-        {structure.data && <Scene points={structure.data.chain.map(([x, y, z]) => [x, y, z] as [number, number, number])} colors={colors} link={link} linkId={linkId} />}
+        {structure.data && (
+          <Scene points={structure.data.chain.map(([x, y, z]) => [x, y, z] as [number, number, number])} colors={colors} markers={markers} link={link} linkId={linkId} />
+        )}
         {row && (
           <span className="ab-label">
             A to B <strong>{`${row.distance.toFixed(1)} ± ${row.sd.toFixed(1)}`}</strong>

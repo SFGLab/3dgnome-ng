@@ -8,7 +8,7 @@ import { ANNOTATIONS, GENES, KEY, STRUCTURE, SUMMARY_DONE } from '../test/job'
 import { jobApi } from './api'
 import { Compare } from './Compare'
 
-vi.mock('./Scene', () => ({ Scene: () => <div data-testid="scene" /> }))
+vi.mock('./Scene', () => ({ Scene: (p: { markers?: { label: string }[] }) => <div data-testid="scene">{(p.markers ?? []).map((m) => m.label).join('')}</div> }))
 
 const OTHER = 'fedcba9876543210'
 const CTCF_SUMMARY = { ...SUMMARY_DONE, request: { ...SUMMARY_DONE.request, factors: 'CTCF' } }
@@ -66,6 +66,7 @@ describe('Compare', () => {
     expect(await screen.findByRole('checkbox', { name: 'Same region' })).toBeChecked()
     await screen.findAllByText('15.8 ± 3.4')
     expect([...document.querySelectorAll('.ab-label')].map((e) => e.textContent)).toEqual(['A to B 6.7 ± 1.9', 'A to B 15.8 ± 3.4'])
+    expect(screen.getAllByTestId('scene').map((s) => s.textContent)).toEqual(['AB', 'AB'])
     const table = await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
     expect(within(table).getByText('TNFRSF8, enhancer 385 kb away')).toBeInTheDocument()
     expect(within(table).getByText('2.4 times farther')).toBeInTheDocument()
