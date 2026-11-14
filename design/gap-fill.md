@@ -116,4 +116,37 @@ GM12878, H1ESC and HFFC6, chr1:20-25, 10-15 and 35-40 Mb at five structures, who
 scored on 1-60 Mb. The gap readout is realised over law for subanchor pairs at 20 kb to 1 Mb,
 where `start = law` and the coil differed. The battery is the decision.
 
-Results to follow.
+The gate rerun was byte identical. Battery on raw counts, region columns the mean over the three
+5 Mb regions, chr1 the 1-60 Mb slice of whole chr1.
+
+| Cell | Arm | Pearson regions | SCC regions | MultiMM regions | Pearson chr1 | SCC chr1 | MultiMM chr1 | exponent over Hi-C chr1 |
+|---|---|---|---|---|---|---|---|---|
+| GM12878 | prod | 0.443 | 0.220 | 0.673 | 0.262 | 0.282 | 0.587 | 1.18 |
+| GM12878 | fbm | 0.404 | 0.195 | 0.687 | 0.237 | 0.255 | 0.590 | 1.10 |
+| GM12878 | maxent | 0.399 | 0.220 | 0.686 | 0.234 | 0.281 | 0.585 | 1.09 |
+| H1ESC | prod | 0.431 | 0.176 | 0.658 | 0.292 | 0.190 | 0.590 | 1.18 |
+| H1ESC | fbm | 0.397 | 0.137 | 0.635 | 0.265 | 0.166 | 0.580 | 1.11 |
+| H1ESC | maxent | 0.390 | 0.178 | 0.631 | 0.262 | 0.200 | 0.578 | 1.11 |
+| HFFC6 | prod | 0.408 | 0.234 | 0.605 | 0.268 | 0.234 | 0.557 | 1.15 |
+| HFFC6 | fbm | 0.379 | 0.202 | 0.626 | 0.255 | 0.200 | 0.597 | 1.09 |
+| HFFC6 | maxent | 0.379 | 0.211 | 0.617 | 0.251 | 0.239 | 0.577 | 1.09 |
+
+On chr1 the z3 arms read Pearson 0.259, 0.293 and 0.268 for production and 0.235, 0.263 and 0.251
+for maxent_z3, SCC 0.297, 0.212 and 0.241 against 0.298, 0.219 and 0.243.
+
+The start loses Pearson on every cell and region, 0.01 to 0.05 raw and 0.03 to 0.06 balanced.
+SCC is level with production once the window contacts scale the targets and 0.02 to 0.04 under
+it on the law alone, so the window contacts carry signal, maxent over fbm on SCC in eleven of
+twelve cell and region pairs. MultiMM is up 0.01 to 0.04 on GM12878 and HFFC6 regions and down on
+H1ESC. The distance exponent moves toward Hi-C, 1.15 to 1.18 times its fit to 1.09 to 1.11.
+Cross block overlaps rise on GM12878 chr1, 18 to 29 per thousand, and on HFFC6 chr1, 1.4 to 3.3.
+
+The gap readout names the mechanism. On GM12878 chr1 the start draws gaps at 0.92 to 1.08 of the
+law and they end at 1.24, 1.21 and 1.13 at 25-50, 50-100 and 100-200 kb, where the coil ends at
+1.03, 0.87 and 0.77. The smooth stage widens the drawn bridge by about a fifth and the gaps then
+hold fewer short range contacts than the coil's, which raw Pearson weighs most. Anchorless bins
+stay at a model observed over expected of 0.4 to 0.6 in every arm against 0.85 to 0.92 in Hi-C,
+so none of the arms reaches the contact deficit those bins carry, holes included.
+
+Not adopted. The start stays opt in as the source of a hole's beads if holes get them, and as the
+place a denser map enters.

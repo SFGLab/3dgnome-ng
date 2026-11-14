@@ -1318,8 +1318,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   went negative. Removed the same day; `slurm/ensemble/law_start_trial.sh`,
   `slurm/ensemble/gap_start_overnight.sh` and `playground/square_blocks/gapnight/` are the record.
 
-  **A maximum entropy gap start: `start = maxent` with `[data] contact_map`, under measurement
-  since 2026-11-14.** ([pipeline/ib/maxent.py](gnome3d/pipeline/ib/maxent.py)) Both dropped
+  **A maximum entropy gap start: `start = maxent` with `[data] contact_map`, measured 2026-11-14
+  and left opt in.** ([pipeline/ib/maxent.py](gnome3d/pipeline/ib/maxent.py)) Both dropped
   trials gave every conformation the mean, and a contact map comes from the spread between
   conformations. Each gap's subanchors are drawn from the Gaussian chain whose mean pair distances
   are the law's, conditioned on the two anchors, after HIPPS and DIMES (Shi and Thirumalai). With
@@ -1328,6 +1328,10 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   to the minus third. One set of springs cannot hold every pair at the law below an exponent of a
   third, and a distribution can, since the law's mean squared distance is a fractional Brownian
   motion variogram. The draw comes from the problem's seed. `line` and `coil` are unchanged.
+  On three cells, three 5 Mb regions and chr1 it lost Pearson by 0.01 to 0.05 against the coil
+  with SCC level and the distance exponent nearer Hi-C. The smooth stage widens the drawn gaps to
+  1.2 of the law, where the coil ends under it. `slurm/ensemble/gap_maxent_trial.sh` and
+  `playground/square_blocks/gapme/` are the record.
   Unit checks in `harness/test_maxent_start.py`, options and trial in `design/gap-fill.md`.
 
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
