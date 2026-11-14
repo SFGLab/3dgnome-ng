@@ -185,3 +185,38 @@ coil starts compact there and nothing in the stage moves a gap's far pairs.
 The restart noise moves every subanchor by up to one bond per coordinate before the stage starts,
 bonds 1.58 times their target, and the stage recovers the bonds. It is a cost of the start, not of
 the end state.
+
+## Bend term and hole beads, 2026-11-14, regions
+
+`slurm/ensemble/gap_angle_holes_trial.sh`, results in `out/gapah` and
+`playground/square_blocks/gapah/`. Gate rerun byte identical. Battery on raw counts, Pearson and
+SCC.
+
+| Cell, region | prod | noangle | maxent | maxent_noangle | maxent_bare | holes |
+|---|---|---|---|---|---|---|
+| GM12878 10-15 | 0.367, 0.377 | 0.356, 0.360 | 0.330, 0.350 | 0.319, 0.349 | 0.317, 0.308 | 0.346, -0.038 |
+| GM12878 20-25 | 0.492, 0.081 | 0.477, 0.081 | 0.445, 0.110 | 0.433, 0.103 | 0.417, 0.066 | no hole |
+| GM12878 35-40 | 0.471, 0.203 | 0.460, 0.189 | 0.423, 0.201 | 0.411, 0.188 | 0.396, 0.147 | 0.475, 0.171 |
+| H1ESC 10-15 | 0.357, 0.281 | 0.349, 0.273 | 0.316, 0.238 | 0.309, 0.237 | 0.308, 0.234 | 0.298, 0.012 |
+| H1ESC 20-25 | 0.488, 0.145 | 0.475, 0.155 | 0.440, 0.155 | 0.427, 0.155 | 0.412, 0.165 | no hole |
+| H1ESC 35-40 | 0.448, 0.102 | 0.433, 0.087 | 0.415, 0.141 | 0.401, 0.141 | 0.387, 0.152 | no hole |
+| HFFC6 10-15 | 0.372, 0.378 | 0.366, 0.365 | 0.335, 0.348 | 0.325, 0.340 | 0.321, 0.282 | 0.372, 0.267 |
+| HFFC6 20-25 | 0.430, 0.108 | 0.415, 0.092 | 0.420, 0.104 | 0.404, 0.086 | 0.387, 0.107 | no hole |
+| HFFC6 35-40 | 0.421, 0.217 | 0.423, 0.206 | 0.381, 0.181 | 0.374, 0.182 | 0.357, 0.150 | no hole |
+
+Without the bend term Pearson falls 0.01 to 0.015 on every arm, and gaps held on the law with no
+wall and no excluded volume score lowest of all with 540 to 850 overlapping pairs per thousand
+beads. A gap at the law is not what the contact map rewards, so option 1 is not recovered by the
+smooth stage.
+
+Hole beads bring the anchorless bins' observed over expected to the Hi-C level, 0.75 to 0.93
+against 0.90 to 0.93 on GM12878 chr1:10-15 Mb, and cost SCC everywhere a hole lies, to below the
+null without structure on GM12878 and H1ESC. The holes there, 12.66 to 13.64 and 13.85 to
+14.52 Mb, hold fewer contacts than the blocks around them at every separation, a ratio of 0.30 to
+0.52 per diagonal in raw counts and 0.47 to 0.80 balanced, with 12 of 66 bins unmappable. The
+bridges give them 1.2 to 2.2 times the blocks' contacts. A bridge on the law is denser at short
+range than a block, which the smooth stage leaves at 1.45 of the law, and the window
+expectation is fitted on each hole's own windows, so it cannot read a hole as depleted against the
+chromosome. Two changes follow: the expectation taken over the chromosome from the map's 10 kb
+resolution, and the hole chains run through the smooth stage's terms so their short range matches
+the blocks'.
