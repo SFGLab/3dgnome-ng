@@ -283,3 +283,20 @@ Inside a hole the drawn chain follows Hi-C from 50 to 400 kb. The blocks hold 1.
 few contacts from 100 to 400 kb and ten times too few beyond. Against blocks that sparse at long
 range a hole at the right density reads as hot, and the stratified correlation counts it against
 the model. The defect the holes expose is the blocks' long range contact deficit.
+
+The deficit is spread, not distance. `playground/contact_spread.py` prints, per separation, the
+root mean square distance of pairs inside one block, their contact share and the share a Gaussian
+chain at that mean square would have. GM12878 production, chr1:10-15 Mb, five structures:
+
+| | 25-50 kb | 100-200 kb | 200-400 kb | 400-1000 kb |
+|---|---|---|---|---|
+| rms in bonds | 4.0 | 6.0 | 7.4 | 10.9 |
+| contact share | 0.033 | 0.0072 | 0.0029 | 0.0002 |
+| Gaussian share at that rms | 0.048 | 0.015 | 0.0077 | 0.0025 |
+
+The Gaussian shares fall 19 fold from the first band to the last and Hi-C 21 fold, the blocks 170
+fold. Anchor pairs inside a block never touch beyond 50 kb on GM12878 or H1ESC. Their distance over
+the law has a floor: the 0.1 and 1 percent quantiles sit at 0.27 to 0.32 and 0.42 to 0.46 at every
+separation from 25 kb to 3 Mb, the median at 0.88 to 1.01, where a contact at 400 kb needs 0.17.
+Every conformation holds every pair near its target, and contacts come from the pairs that are not
+near it. The holes are drawn from a distribution and carry the Gaussian share.
