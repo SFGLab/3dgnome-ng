@@ -53,8 +53,7 @@ def block(lo: int, n: int, x0: float) -> list[BeadOut]:
 
 def test_slots() -> None:
     print("\n[slots] a hole is tiled at the gap rule's count")
-    s = settings(True)
-    sl = hole_slots(10_000, 30_000, s)
+    sl = hole_slots(10_000, 30_000, 1000)
     check("count follows the rule", len(sl) == 19, f"{len(sl)}")
     check(
         "slots inside the hole and ascending",
@@ -62,10 +61,10 @@ def test_slots() -> None:
         and sl[-1][1] <= 30_000
         and all(a[1] <= b[0] for a, b in zip(sl, sl[1:], strict=False)),
     )
-    check("capped", len(hole_slots(0, 5_000_000, s)) == 100)
+    check("no cap", len(hole_slots(0, 5_000_000, 1000)) == 4999)
     check(
         "no hole no slots",
-        hole_slots(10_000, 10_000, s) == [] and hole_slots(10_000, 11_000, s) == [],
+        hole_slots(10_000, 10_000, 1000) == [] and hole_slots(10_000, 11_000, 1000) == [],
     )
 
 
@@ -100,9 +99,26 @@ def test_fill() -> None:
     )
 
 
+def test_long() -> None:
+    print("\n[long] a hole over 500 beads is drawn in two levels")
+    blocks = [block(0, 10, 0.0), block(1_210_000, 10, 30.0)]
+    a = fill_holes(blocks, settings(True), "chr1", 3)
+    hole = a[2]
+    xs = np.array([[x.x, x.y, x.z] for x in hole])
+    bonds = np.linalg.norm(np.diff(xs, axis=0), axis=1)
+    check("one bead per kilobase", len(hole) == 1199, f"{len(hole)}")
+    check("finite", bool(np.isfinite(xs).all()))
+    check(
+        "bonds at the segment joins like the rest",
+        float(bonds[[499, 500, 999, 1000]].max()) < 4 * float(np.median(bonds)),
+        f"median {np.median(bonds):.2f} joins {bonds[[499, 500, 999, 1000]].round(2)}",
+    )
+
+
 def main() -> int:
     test_slots()
     test_fill()
+    test_long()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

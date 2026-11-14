@@ -150,3 +150,38 @@ so none of the arms reaches the contact deficit those bins carry, holes included
 
 Not adopted. The start stays opt in as the source of a hole's beads if holes get them, and as the
 place a denser map enters.
+
+## Smooth stage trace, 2026-11-14
+
+`playground/smooth_widening_trace.py` keeps each block's start, its start after the restart noise
+and its final chain, `slurm/ensemble/smooth_widening_trace.sh`, GM12878 chr1:20-25 Mb, one
+structure per arm, logs in `playground/square_blocks/widen/`. Pairs inside one gap, realised over
+law.
+
+| Arm | State | 1-5 kb | 5-25 kb | 25-50 kb | 50-100 kb | 100-200 kb | mean bend | close pairs per thousand |
+|---|---|---|---|---|---|---|---|---|
+| maxent | start | 0.98 | 0.99 | 1.05 | 1.01 | 1.03 | 0.587 | 1170 |
+| maxent | after noise | 1.40 | 1.15 | 1.12 | 1.07 | 1.07 | 0.670 | 858 |
+| maxent | final | 1.42 | 1.33 | 1.24 | 1.17 | 1.13 | 0.269 | 8 |
+| no bend term | final | 1.22 | 1.27 | 1.21 | 1.13 | 1.06 | 0.423 | 11 |
+| no wall | final | 1.40 | 1.30 | 1.23 | 1.13 | 1.11 | 0.259 | 250 |
+| no wall, no excluded volume | final | 1.41 | 1.23 | 1.16 | 1.05 | 1.11 | 0.247 | 695 |
+| none of the three, no sphere | final | 1.01 | 1.04 | 1.07 | 1.01 | 1.05 | 0.531 | 1084 |
+| coil | start | 1.08 | 0.99 | 0.79 | 0.67 | 0.55 | 0.497 | 918 |
+| coil | final | 1.45 | 1.34 | 1.03 | 0.84 | 0.70 | 0.273 | 12 |
+
+Mean bend is one minus the cosine between consecutive bonds over two, the quantity the bend term
+scores as its cube, a half for a random walk. Close pairs are non neighbour pairs under the
+excluded volume radius of 0.7 bonds.
+
+The bonds and the springs keep a drawn gap on the law. The bend term straightens the chain, mean
+bend 0.59 to 0.27, and the excluded volume swells it, and either alone widens a gap by a fifth to
+two fifths under 50 kb. The law itself is not reachable under both. A chain on the law at nu 0.34
+folds back more often than a random walk and holds 1,170 pairs per thousand beads under 0.7 bonds,
+which the overlap count of the battery reads as defects. The coil ends at the same 1.45 and 1.34
+under 25 kb, so production is as stiff at short range, and below the law beyond 50 kb because the
+coil starts compact there and nothing in the stage moves a gap's far pairs.
+
+The restart noise moves every subanchor by up to one bond per coordinate before the stage starts,
+bonds 1.58 times their target, and the stage recovers the bonds. It is a cost of the start, not of
+the end state.

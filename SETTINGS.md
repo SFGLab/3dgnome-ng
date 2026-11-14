@@ -295,10 +295,10 @@ other while the arcs and the stitch are kept.
 
 ## [holes]
 
-Runs before the stitch. The stretch between two blocks has no beads. With the key on it gets beads
-at the count the dynamic loop density gives a gap of that span, drawn from the maximum entropy
-bridge between the two anchors that bound it and scaled by `[data] contact_map` when one is given.
-The stretches before the first block and after the last stay empty.
+Runs before the stitch. The stretch between two blocks has no beads. With the key on it gets one
+bead per `target_bp_per_subanchor` with no cap, drawn from the maximum entropy bridge between the
+two anchors that bound it and scaled by `[data] contact_map` when one is given. The stretches
+before the first block and after the last stay empty.
 
 | key | type | default | production | what it does |
 | --- | --- | --- | --- | --- |
