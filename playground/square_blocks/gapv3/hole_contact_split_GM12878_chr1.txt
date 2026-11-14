@@ -1,0 +1,18 @@
+chr1:1-60000000: 76 holes, 300 mapped hole bins, 2054 mapped block bins, 12 unmapped hole bins
+  mean count over block with block at the same separation; one hole / two holes / hole with block
+                                            25-50 kb             50-100 kb            100-200 kb            200-400 kb           400-1000 kb
+                      Hi-C raw      0.54     -  0.74      0.50     -  0.61      0.50     -  0.56      0.58  0.98  0.58      0.98  0.96  0.75
+                 Hi-C balanced      0.84     -  0.82      0.79     -  0.70      0.80     -  0.67      0.96  1.15  0.71      1.68  1.23  0.94
+             GM12878_chr1_prod      0.00     -  0.27      0.00     -  0.12      0.00     -  0.07      0.00  0.00  0.05      0.00  0.00  0.03
+           GM12878_chr1_holes2      0.53     -  0.87      0.73     -  0.98      1.53     -  1.48      3.05  2.75  2.39      5.51 11.94  7.80
+           GM12878_chr1_holes3      0.59     -  0.84      0.81     -  0.87      1.65     -  1.33      3.09  2.40  2.02      5.82  8.37  6.14
+  decay, mean count over the block with block mean at 25-50 kb; block with block / one hole
+                      Hi-C raw          1.000  0.539          0.435  0.218          0.240  0.119          0.127  0.073          0.045  0.044
+                 Hi-C balanced          1.000  0.840          0.435  0.344          0.240  0.191          0.127  0.122          0.045  0.076
+             GM12878_chr1_prod          1.000  0.000          0.381  0.000          0.116  0.000          0.034  0.000          0.006  0.000
+           GM12878_chr1_holes2          1.000  0.531          0.379  0.275          0.115  0.177          0.034  0.103          0.006  0.031
+           GM12878_chr1_holes3          1.000  0.590          0.381  0.309          0.116  0.191          0.034  0.105          0.006  0.033
+  SCC on raw counts, share of stratum covariance from pairs touching a hole bin / block pairs, and SCC with the model zeroed on the bins Hi-C cannot map
+             GM12878_chr1_prod  SCC  0.341   hole +0.36  block +0.64   mapped only  0.343
+           GM12878_chr1_holes2  SCC  0.228   hole +0.18  block +0.82   mapped only  0.235
+           GM12878_chr1_holes3  SCC  0.231   hole +0.17  block +0.83   mapped only  0.238

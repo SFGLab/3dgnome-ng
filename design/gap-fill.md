@@ -300,3 +300,37 @@ the law has a floor: the 0.1 and 1 percent quantiles sit at 0.27 to 0.32 and 0.4
 separation from 25 kb to 3 Mb, the median at 0.88 to 1.01, where a contact at 400 kb needs 0.17.
 Every conformation holds every pair near its target, and contacts come from the pairs that are not
 near it. The holes are drawn from a distribution and carry the Gaussian share.
+
+GM12878 whole chr1, three structures, scored on 1 to 60 Mb: holes3 raw Pearson 0.270 and SCC
+0.179 against production's 0.262 and 0.282 and holes2's 0.266 and 0.176. Cross block overlaps 45
+per thousand against holes2's 98, the hole with block contacts under 0.7 bond 8 percent against
+15. Block pairs hold 0.116, 0.034 and 0.006 of their 25 to 50 kb count at 100 to 200 kb, 200 to
+400 kb and 400 kb to 1 Mb, Hi-C 0.240, 0.127 and 0.045. Pairs inside a hole hold 0.191, 0.105 and
+0.033, Hi-C 0.191, 0.122 and 0.076.
+
+## Anchors drawn from a distribution, 2026-11-15
+
+`[simulation_arcs] start = maxent` draws a chromosome's anchors once per conformation from a
+Gaussian whose pair variances meet every pair's target: a loop's target, the background where it
+holds a pair, the law's distance elsewhere. With `solver_iters = 0` the draw is kept. Two forms
+failed first on GM12878 chr1:20-25 Mb, 434 anchors and 486 loops. The law's Gaussian conditioned
+on loop springs at their targets collapsed the region to an rms of 1.3 to 2.2 bonds at every
+separation, since springs in parallel pull each other's pairs closer. Fitting the loop springs to
+meet their targets left 2 to 3.7 bonds, nothing holding the arcless pairs out. A DIMES iteration
+over every pair diverged, every spring moving at once. A set of targets holding loops is not the
+distance matrix of any Gaussian, so the form kept is a least squares one: the covariance is taken
+as `y y^T`, a pair's variance per coordinate is the squared distance between its rows, and the
+rows are fitted by L-BFGS to the squared relative misfit, loops and the rest weighted equally in
+total. On the same region it meets loops at 1.006 and the rest at 1.000 of target in 200
+iterations. Two structures, against production:
+
+| Within one block | 25-50 kb | 100-200 kb | 200-400 kb | 400-1000 kb |
+|---|---|---|---|---|
+| production rms, contact share | 3.8, 0.036 | 6.0, 0.0057 | 7.5, 0.0020 | 10.8, 0.0002 |
+| draw rms, contact share | 3.8, 0.045 | 5.5, 0.013 | 6.9, 0.0067 | 9.7, 0.0019 |
+
+The draw's block contacts fall 24 fold from the first band to the last, Hi-C's 21 fold and
+production's 170 fold. Anchor pairs touch at every separation. Trial `slurm/ensemble/spread_trial.sh`,
+arms against production on three regions and three cells and on whole chr1 for two cells: the
+draw kept, the draw and 30 solver iterations, the draw and the full solve, the repulsion's reach
+at 1.0 and 0.75, loop dropout, and the kept draw with hole beads.
