@@ -56,19 +56,87 @@ def law_distances(mids: F64Array, law: PolymerLaw) -> F64Array:
     return d
 
 
+_FIT_ITERS = 500
+_FIT_RANK = 256
+_FIT: dict[tuple[int, bytes], F64Array] = {}
+
+
+def _targets(exp_dist: F64Array, mids: F64Array, law: PolymerLaw) -> F64Array:
+    """Every anchor pair's target mean distance. A loop's target, the background where it holds
+    a pair, the law's distance elsewhere."""
+    d = law_distances(mids, law)
+    d = np.where(exp_dist > 1e-6, exp_dist, np.where(exp_dist <= -1.0, -exp_dist, d))
+    d = 0.5 * (d + d.T)
+    np.fill_diagonal(d, 0.0)
+    return d
+
+
+def _fit_root(target: F64Array, loop: BoolArray) -> F64Array:
+    """A root `y` of the covariance per coordinate whose pair variances best meet `target`.
+
+    A pair's variance per coordinate under covariance `y y^T` is the squared distance between
+    its two rows of `y`, so the fit is a stress minimisation on those rows, of the squared
+    relative misfit to `pi / 8` times the squared target, the loops and every other pair
+    weighted equally in total. A set of targets holding loops is not the distance matrix of any
+    Gaussian, so the fit is the nearest one rather than an exact one. It starts from the root of
+    the double centred squared targets with its negative modes dropped, at up to 256 columns.
+    """
+    from scipy.optimize import minimize
+
+    n = target.shape[0]
+    vt = _MAXWELL * target * target
+    off = ~np.eye(n, dtype=bool)
+    nl = max(int(loop.sum()), 1)
+    w = np.where(loop, (off.sum() - nl) / nl, 1.0)
+    w[~off] = 0.0
+    w = w / np.where(off, vt * vt, 1.0)
+    w /= float(w.sum())
+    row = vt.mean(axis=1)
+    g = -0.5 * (vt - row[:, None] - row[None, :] + float(row.mean()))
+    lam, u = np.linalg.eigh(g)
+    m = min(n, _FIT_RANK)
+    y0 = u[:, -m:] * np.sqrt(np.clip(lam[-m:], 0.0, None))
+
+    def fun(flat: F64Array) -> tuple[float, F64Array]:
+        y = flat.reshape(n, m)
+        sq = (y * y).sum(axis=1)
+        v = sq[:, None] + sq[None, :] - 2.0 * (y @ y.T)
+        r = w * (v - vt)
+        # d/dy_i of sum_jk r_jk (v_jk - vt_jk) is 4 sum_j r_ij (y_i - y_j) over both orders.
+        grad = 4.0 * (r.sum(axis=1)[:, None] * y - r @ y)
+        return float((r * (v - vt)).sum()), grad.reshape(-1)
+
+    res = minimize(
+        fun, y0.reshape(-1), jac=True, method="L-BFGS-B", options={"maxiter": _FIT_ITERS}
+    )
+    y = res.x.reshape(n, m)
+    sq = (y * y).sum(axis=1)
+    v = np.maximum(sq[:, None] + sq[None, :] - 2.0 * (y @ y.T), 0.0)
+    ratio = np.sqrt(v[off] / vt[off])
+    lr = np.abs(np.log(np.maximum(ratio, 1e-12)))
+    lo = loop[off]
+    log.status(
+        LOG,
+        "maxent anchors: fitted in %d iterations, realised over target median %.3f on loops and %.3f elsewhere, absolute log deviation %.3f and %.3f",
+        int(res.nit),
+        float(np.median(ratio[lo])) if lo.any() else float("nan"),
+        float(np.median(ratio[~lo])),
+        float(np.median(lr[lo])) if lo.any() else float("nan"),
+        float(np.median(lr[~lo])),
+    )
+    return y
+
+
 def anchor_draw(
     exp_dist: F64Array, mids: F64Array, law: PolymerLaw, rng: np.random.Generator
 ) -> F32Array:
     """One draw of a chromosome's anchors from the maximum entropy Gaussian for the arcs
     targets, centred on the origin.
 
-    The prior is the Gaussian whose mean pair distances are the law's at each separation, a
-    pair the background holds taking the background instead. Its squared distances are taken per
-    coordinate as for a gap and double centred into a covariance, whose negative eigenvalues, the
-    part no set of points realises, are dropped. Each loop then enters as an observation that its
-    two anchors differ by a centred Gaussian whose mean length is the loop's target, which adds
-    the loops' weighted Laplacian to the precision. The draw keeps the fluctuations a minimised
-    structure has none of.
+    Every pair has a target mean distance, a loop's target, the background where it holds the
+    pair, the law's distance elsewhere, and the Gaussian is the one whose mean pair distances
+    meet them as nearly as a Gaussian can. The fit depends on the targets alone and is kept for the run's
+    later conformations. The draw keeps the fluctuations a minimised structure has none of.
 
     Parameters
     ----------
@@ -83,40 +151,21 @@ def anchor_draw(
         The draw's generator.
     """
     n = len(mids)
-    d = law_distances(mids, law)
-    held = exp_dist <= -1.0
-    d = np.where(held, -exp_dist, d)
-    d = 0.5 * (d + d.T)
-    np.fill_diagonal(d, 0.0)
-    v = _MAXWELL * d * d
-    row = v.mean(axis=1)
-    g = -0.5 * (v - row[:, None] - row[None, :] + float(row.mean()))
-    lam, u = np.linalg.eigh(g)
-    keep = lam > 1e-9 * float(lam.max())
-    neg = float(-lam[lam < 0.0].sum())
-    lam, u = lam[keep], u[:, keep]
-    loop = np.triu(exp_dist > 1e-6, 1)
-    li, lj = np.nonzero(loop)
-    w = 1.0 / (_MAXWELL * exp_dist[li, lj] ** 2)
-    lap = sp.coo_matrix(
-        (
-            np.concatenate([-w, -w, w, w]),
-            (np.concatenate([li, lj, li, lj]), np.concatenate([lj, li, li, lj])),
-        ),
-        shape=(n, n),
-    ).tocsr()
-    prec = u.T @ np.asarray(lap @ u)
-    prec[np.diag_indices_from(prec)] += 1.0 / lam
-    chol = np.linalg.cholesky(0.5 * (prec + prec.T))
-    y = np.linalg.solve(chol.T, rng.standard_normal((len(lam), 3)))
-    log.status(
-        LOG,
-        "maxent anchors: %d anchors, %d loops, %.1f percent of the prior's spectrum negative and dropped",
-        n,
-        len(li),
-        100.0 * neg / max(float(np.abs(np.linalg.eigvalsh(g)).sum()), 1e-300),
-    )
-    return np.ascontiguousarray(u @ y, dtype=np.float32)
+    key = (n, exp_dist.tobytes() + mids.tobytes())
+    root = _FIT.get(key)
+    if root is None:
+        log.status(
+            LOG,
+            "maxent anchors: %d anchors, %d loops",
+            n,
+            int(np.triu(exp_dist > 1e-6, 1).sum()),
+        )
+        loop = exp_dist > 1e-6
+        root = _fit_root(_targets(exp_dist, mids, law), loop | loop.T)
+        _FIT[key] = root
+    x = root @ rng.standard_normal((root.shape[1], 3))
+    x -= x.mean(axis=0)
+    return np.ascontiguousarray(x, dtype=np.float32)
 
 
 def windows(starts: I64Array, ends: I64Array) -> I64Array:
