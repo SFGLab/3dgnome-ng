@@ -3,8 +3,11 @@
 Under `start = maxent` each gap's subanchors are drawn from the Gaussian chain whose mean pair
 distances are the targets, conditioned on the two anchors the arcs stage placed. A pair's target
 is the law's background. With `[data] contact_map` it is scaled by the count between the windows
-of about 10 kb the two beads are in, against the count a power law fitted on the block's own
-windows expects at that separation. See `design/gap-fill.md`.
+of about 10 kb the two beads are in, against the count a power law in separation expects. The
+power law is fitted over the chromosome on the map's 10 kb resolution, so a stretch holding fewer
+contacts than the chromosome at large reads as depleted. A map with no 10 kb resolution falls
+back to a fit on the call's own windows, which reads every stretch against itself, and says so.
+See `design/gap-fill.md`.
 """
 
 from __future__ import annotations
@@ -32,7 +35,14 @@ _PSEUDO = 9.0
 # whose mean distance is d has a variance per coordinate of pi d^2 / 8.
 _MAXWELL = np.pi / 8.0
 
+# The chromosome expectation is read from 20 windows of 5 Mb spread along the chromosome at the
+# map's 10 kb resolution, enough for separations to 5 Mb without reading the whole band.
+_EXP_RES = 10_000
+_EXP_WINDOWS = 20
+_EXP_SPAN = 5_000_000
+
 _COUNTS: dict[tuple[str, str, int, int], tuple[F64Array, F64Array]] = {}
+_EXPECTED: dict[tuple[str, str], tuple[float, float] | None] = {}
 _ANNOUNCED: set[str] = set()
 _COOLERS: dict[str, Any] = {}
 _LOCK = threading.Lock()
@@ -133,6 +143,45 @@ def _expectation(sep: F64Array, area: F64Array, obs: F64Array) -> tuple[float, f
     return float(icpt), float(slope)
 
 
+def chromosome_expectation(uri: str, chrom: str) -> tuple[float, float] | None:
+    """The power law for the raw count per unit area against separation over a chromosome, read
+    at 10 kb from the same file as `uri`. None when the file has no 10 kb resolution.
+
+    Returns
+    -------
+    intercept, slope
+        Of log10 count per bp squared against log10 separation in bp.
+    """
+    key = (uri, chrom)
+    if key in _EXPECTED:
+        return _EXPECTED[key]
+    path, _, _ = uri.partition("::")
+    coarse = f"{path}::/resolutions/{_EXP_RES}"
+    try:
+        clr = _cooler(coarse)
+    except (KeyError, OSError, ValueError):
+        _EXPECTED[key] = None
+        return None
+    length = int(clr.chromsizes[chrom])
+    nd = _EXP_SPAN // _EXP_RES
+    sums = np.zeros(nd, dtype=np.float64)
+    pairs = np.zeros(nd, dtype=np.float64)
+    span = min(_EXP_SPAN, length)
+    for lo in np.linspace(0, max(length - span, 0), _EXP_WINDOWS).astype(np.int64):
+        with _LOCK:
+            m = clr.matrix(balance=False, sparse=True).fetch(f"{chrom}:{lo}-{lo + span}").tocoo()
+        n = m.shape[0]
+        d = m.col - m.row
+        keep = (d >= 1) & (d < nd)
+        sums += np.bincount(d[keep], m.data[keep].astype(np.float64), minlength=nd)
+        pairs[1 : min(n, nd)] += n - np.arange(1, min(n, nd))
+    sep = np.arange(nd, dtype=np.float64) * _EXP_RES
+    area = pairs * float(_EXP_RES) ** 2
+    ok = pairs > 0
+    _EXPECTED[key] = _expectation(sep[ok], area[ok], sums[ok])
+    return _EXPECTED[key]
+
+
 def _gap_factor(
     counts: F64Array, mids: F64Array, lens: F64Array, fit: tuple[float, float]
 ) -> F64Array:
@@ -208,7 +257,8 @@ def maxent_start(
             pool_s.append(np.abs(w_mid[j] - w_mid[i]))
             pool_a.append(w_len[i] * w_len[j])
             pool_o.append(cnt[i, j])
-        if pool_s:
+        fit = chromosome_expectation(contact_map, chrom)
+        if fit is None and pool_s:
             fit = _expectation(
                 np.concatenate(pool_s), np.concatenate(pool_a), np.concatenate(pool_o)
             )
@@ -217,11 +267,16 @@ def maxent_start(
     source = contact_map if contact_map and chrom else ""
     if source not in _ANNOUNCED:
         _ANNOUNCED.add(source)
-        log.status(
-            LOG,
-            "maxent start: gaps drawn from the law%s",
-            f" scaled by window contacts from {source}" if source else " alone, no contact map",
-        )
+        if not source:
+            how = " alone, no contact map"
+        elif _EXPECTED.get((contact_map, chrom)) is not None:
+            how = f" scaled by window contacts from {source} against the chromosome at 10 kb"
+        else:
+            how = (
+                f" scaled by window contacts from {source} against each call's own windows,"
+                " the map has no 10 kb resolution"
+            )
+        log.status(LOG, "maxent start: gaps drawn from the law%s", how)
 
     for (a, b), extra in zip(gaps, per_gap, strict=True):
         bg = law_distances(mids[a : b + 1], law)

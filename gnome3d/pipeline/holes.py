@@ -8,7 +8,9 @@ a gap. A hole of more than 500 beads is drawn in two levels, a bridge over every
 then a bridge between each two of those, so the cost stays linear in the hole's length. A segment
 is conditioned on its two ends alone, which leaves out its correlation with the rest of the hole.
 The contact map scales the segments and not the coarse level, where beads 500 kb apart share
-almost no counts at 1 kb.
+almost no counts at 1 kb. The drawn chain then runs through the smooth stage's kernel with its
+two ends fixed, the terms a gap inside a block runs through, so a hole's short range matches the
+blocks'. Excluded volume acts within a hole and not against the blocks.
 The stretches before the first block and after the last are left empty, since a bridge needs two
 ends. See `design/gap-fill.md`.
 """
@@ -23,6 +25,7 @@ from gnome3d import log
 from gnome3d.pipeline.ib.maxent import maxent_start
 from gnome3d.settings import Settings
 from gnome3d.types import BeadOut, F32Array
+from gnome3d.util import add_movable_noise_inplace, seed_rng
 
 LOG = log.get("holes")
 
@@ -89,6 +92,25 @@ def _draw(
     return pos
 
 
+def _smooth(pos: F32Array, starts: list[int], ends: list[int], s: Settings, seed: int) -> None:
+    """Run the smooth stage's kernel over a hole chain in place, its two ends fixed, with bond
+    targets and step set as densification sets a block's."""
+    from gnome3d.mc import numba as mc_numba
+
+    mids = (np.asarray(starts, dtype=np.int64) + np.asarray(ends, dtype=np.int64)) // 2
+    dtn = np.array(
+        [float(s.genomic_length_to_distance(int(g))) for g in np.maximum(np.diff(mids), 0)],
+        dtype=np.float32,
+    )
+    fixed = np.zeros(len(pos), dtype=np.bool_)
+    fixed[[0, -1]] = True
+    step = float(dtn.mean()) * float(s.noise_smooth)
+    seed_rng(seed)
+    mc_numba.seed_numba(seed)
+    add_movable_noise_inplace(pos, fixed, step)
+    mc_numba.mc_smooth_numba(pos, dtn, fixed, step, s)
+
+
 def fill_holes(
     blocks: list[list[BeadOut]], s: Settings, chrom: str, seed: int
 ) -> list[list[BeadOut]]:
@@ -125,6 +147,7 @@ def fill_holes(
         rng = np.random.default_rng([seed & 0x7FFFFFFF, zlib.crc32(chrom.encode()), k])
         ends_pos = np.array([(a.x, a.y, a.z), (b.x, b.y, b.z)], dtype=np.float32)
         drawn = _draw(starts, ends, ends_pos, s, rng, chrom)
+        _smooth(drawn, starts, ends, s, int(rng.integers(0, 0x7FFFFFFF)))
         out.append(
             [
                 BeadOut(lo, hi, float(p[0]), float(p[1]), float(p[2]), "subanchor")
