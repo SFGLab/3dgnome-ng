@@ -236,8 +236,8 @@ beads add 7,708 beads over the 60 Mb on GM12878.
 
 Smooth stage overlaps per thousand beads, prod against holes: 12.1 to 215, 10.4 to 127, 3.5 to
 62, and across blocks 18 to 90, 16 to 51, 1.4 to 17. The bridges carry no smoothing and no
-excluded volume against the blocks, so they sit at the law's 1,170 close pairs per thousand of
+excluded volume against the blocks and sit at the law's 1,170 close pairs per thousand of
 the trace. Raw Pearson holds with the holes, balanced Pearson falls 0.02 to 0.04 and SCC falls
 by a factor of 1.6 to 4.5. The anchorless bins' observed over expected rises from 0.43 to 0.57
-to 0.69 to 0.91 against Hi-C's 0.85 to 0.92, so the first version fills the bins and overfills
+to 0.69 to 0.91 against Hi-C's 0.85 to 0.92. The first version fills the bins and overfills
 them. The second version, chromosome expectation and smoothed holes, is in `out/gapv2`.

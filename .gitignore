@@ -218,6 +218,7 @@ __marimo__/
 
 # Claude
 .claude/
+.mcp.json
 
 # 3dgnome
 cudaMMC/
