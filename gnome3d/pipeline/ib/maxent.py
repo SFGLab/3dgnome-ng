@@ -56,6 +56,69 @@ def law_distances(mids: F64Array, law: PolymerLaw) -> F64Array:
     return d
 
 
+def anchor_draw(
+    exp_dist: F64Array, mids: F64Array, law: PolymerLaw, rng: np.random.Generator
+) -> F32Array:
+    """One draw of a chromosome's anchors from the maximum entropy Gaussian for the arcs
+    targets, centred on the origin.
+
+    The prior is the Gaussian whose mean pair distances are the law's at each separation, a
+    pair the background holds taking the background instead. Its squared distances are taken per
+    coordinate as for a gap and double centred into a covariance, whose negative eigenvalues, the
+    part no set of points realises, are dropped. Each loop then enters as an observation that its
+    two anchors differ by a centred Gaussian whose mean length is the loop's target, which adds
+    the loops' weighted Laplacian to the precision. The draw keeps the fluctuations a minimised
+    structure has none of.
+
+    Parameters
+    ----------
+    exp_dist
+        The arcs target matrix. Positive is a loop's target, at most minus one a background
+        distance, anything else an arcless pair.
+    mids
+        The anchors' genomic midpoints.
+    law
+        The run's polymer law.
+    rng
+        The draw's generator.
+    """
+    n = len(mids)
+    d = law_distances(mids, law)
+    held = exp_dist <= -1.0
+    d = np.where(held, -exp_dist, d)
+    d = 0.5 * (d + d.T)
+    np.fill_diagonal(d, 0.0)
+    v = _MAXWELL * d * d
+    row = v.mean(axis=1)
+    g = -0.5 * (v - row[:, None] - row[None, :] + float(row.mean()))
+    lam, u = np.linalg.eigh(g)
+    keep = lam > 1e-9 * float(lam.max())
+    neg = float(-lam[lam < 0.0].sum())
+    lam, u = lam[keep], u[:, keep]
+    loop = np.triu(exp_dist > 1e-6, 1)
+    li, lj = np.nonzero(loop)
+    w = 1.0 / (_MAXWELL * exp_dist[li, lj] ** 2)
+    lap = sp.coo_matrix(
+        (
+            np.concatenate([-w, -w, w, w]),
+            (np.concatenate([li, lj, li, lj]), np.concatenate([lj, li, li, lj])),
+        ),
+        shape=(n, n),
+    ).tocsr()
+    prec = u.T @ np.asarray(lap @ u)
+    prec[np.diag_indices_from(prec)] += 1.0 / lam
+    chol = np.linalg.cholesky(0.5 * (prec + prec.T))
+    y = np.linalg.solve(chol.T, rng.standard_normal((len(lam), 3)))
+    log.status(
+        LOG,
+        "maxent anchors: %d anchors, %d loops, %.1f percent of the prior's spectrum negative and dropped",
+        n,
+        len(li),
+        100.0 * neg / max(float(np.abs(np.linalg.eigvalsh(g)).sum()), 1e-300),
+    )
+    return np.ascontiguousarray(u @ y, dtype=np.float32)
+
+
 def windows(starts: I64Array, ends: I64Array) -> I64Array:
     """Each bead's window, consecutive beads grouped while a window spans at most 10 kb."""
     lab = np.zeros(len(starts), dtype=np.int64)

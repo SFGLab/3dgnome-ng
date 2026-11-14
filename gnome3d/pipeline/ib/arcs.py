@@ -68,7 +68,10 @@ def _run_one(problem: Problem, backend: str) -> Result:
     elif s.arcs_start == "hilbert":
         pos0 = hilbert_start(pos0, problem["anchor_genomic"], s.polymer_law())
     elif s.arcs_start != "centroid":
-        raise ValueError(f"unknown arcs start {s.arcs_start!r}, expected centroid, walk or hilbert")
+        raise ValueError(
+            f"arcs start {s.arcs_start!r} at block scope, expected centroid, walk or hilbert;"
+            " maxent is drawn at chromosome scope only"
+        )
 
     best_score = -1.0
     best: F32Array = pos0.copy()

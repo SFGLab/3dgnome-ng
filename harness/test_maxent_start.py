@@ -117,12 +117,49 @@ def test_settings() -> None:
     check("default off", Settings().data_contact_map == "" and Settings().smooth_start == "line")
 
 
+def test_anchor_draw() -> None:
+    print("\n[anchors] a draw's mean pair distances are the targets")
+    rng = np.random.default_rng(0)
+    mids = np.sort(rng.choice(np.arange(0, 2_000_000, 1000), 60, replace=False)).astype(np.float64)
+    exp = -0.5 * np.ones((60, 60))
+    exp[5, 40] = exp[40, 5] = 2.0
+    law = me.law_distances(mids, LAW)
+    acc = np.zeros((60, 60))
+    n = 400
+    for k in range(n):
+        x = me.anchor_draw(exp, mids, LAW, np.random.default_rng(k)).astype(np.float64)
+        acc += np.linalg.norm(x[:, None] - x[None, :], axis=2)
+    mean = acc / n
+    iu = np.triu_indices(60, 1)
+    r = (mean / np.where(law > 0, law, 1.0))[iu]
+    free = np.ones_like(r, dtype=bool)
+    free[np.flatnonzero((iu[0] == 5) & (iu[1] == 40))] = False
+    check(
+        "arcless pairs at the law within ten percent",
+        bool(np.abs(np.median(r[free]) - 1.0) < 0.1),
+        f"median {np.median(r[free]):.3f}",
+    )
+    check(
+        "the loop pulled in toward its target",
+        bool(mean[5, 40] < 0.6 * law[5, 40]),
+        f"{mean[5, 40]:.2f} against law {law[5, 40]:.2f}",
+    )
+    one = me.anchor_draw(exp, mids, LAW, np.random.default_rng(1))
+    d1 = np.linalg.norm(one[:, None] - one[None, :], axis=2)[iu] / law[iu]
+    check(
+        "one draw spreads",
+        bool(np.quantile(d1, 0.01) < 0.3),
+        f"1 percent quantile of distance over law {np.quantile(d1, 0.01):.3f}",
+    )
+
+
 def main() -> int:
     test_bridge()
     test_windows()
     test_factor()
     test_start()
     test_settings()
+    test_anchor_draw()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

@@ -31,6 +31,7 @@ from gnome3d.pipeline import Orientation, Seeded
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
 from gnome3d.pipeline.ib.arcs import hilbert_start, run_arcs_problem, walk_start
+from gnome3d.pipeline.ib.maxent import anchor_draw
 from gnome3d.settings import Settings
 from gnome3d.tracks import slice_intervals
 from gnome3d.types import (
@@ -136,7 +137,9 @@ def joint_arcs_solve(
     into the cluster graph, so each block's seed carries final anchors.
 
     Each block's anchors start where the block placement stage put the block, at its centroid,
-    or on a walk around it under `arcs_start = walk`. The target matrix is the one a block
+    or on a walk around it under `arcs_start = walk`. Under `arcs_start = maxent` they start
+    from one draw of the Gaussian whose mean pair distances are the targets, and with
+    `solver_iters` at zero they stay there. The target matrix is the one a block
     would get, built over the whole chromosome, so the contact background and the loops act
     across blocks, and the confinement sphere is the law's for the chromosome's span.
     """
@@ -165,6 +168,12 @@ def joint_arcs_solve(
     if s.use_anchor_heatmap and (state.singletons or state.anchor_contacts):
         anchor_heat, _ = cb.build_contact_heatmaps(state, active_all, chr_, with_subanchor=False)
     exp_dist = cb.calc_anchor_expected_distances(state, active_all, chr_, anchor_heat, seed)
+    if s.arcs_start == "maxent":
+        # One draw per conformation from the distribution whose mean distances are the
+        # targets, placed where the block layout's centroid is.
+        mids_all = np.array([clusters[a].genomic_pos for a in active_all], dtype=np.float64)
+        draw = anchor_draw(exp_dist, mids_all, law, np.random.default_rng([seed, 7]))
+        pos0 = np.ascontiguousarray(draw + pos0.mean(axis=0), dtype=np.float32)
     arc_w = cb.calc_anchor_arc_weights(state, active_all, chr_, seed)
     activity = cb.calc_anchor_activity(state, active_all, chr_)
     anchor_genomic = [

@@ -306,6 +306,10 @@ def solve_arcs(
 
             fun = with_factories_cpu
             fun_args = ()
+    if n_it <= 0:
+        # No descent. The start is kept, which is how a drawn start reaches the chains as drawn.
+        e0, _ = fun(pw.reshape(-1), *fun_args)
+        return float(e0), np.ascontiguousarray(pw, dtype=np.float32)
     # The stop rule. With a tolerance the solve ends when an iteration improves the energy by
     # less than that fraction of it, L-BFGS-B's own `ftol`, and the iteration count is a safety
     # cap; without one the cap is the only stop, which on a chromosome it always is.
