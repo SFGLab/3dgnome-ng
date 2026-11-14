@@ -220,3 +220,24 @@ expectation is fitted on each hole's own windows, so it cannot read a hole as de
 chromosome. Two changes follow: the expectation taken over the chromosome from the map's 10 kb
 resolution, and the hole chains run through the smooth stage's terms so their short range matches
 the blocks'.
+
+## Bend term and hole beads, 2026-11-14, chr1
+
+Chromosome 1 at three structures, scored on 1 to 60 Mb, raw counts then balanced Pearson. Hole
+beads add 7,708 beads over the 60 Mb on GM12878.
+
+| Arm | GM12878 raw P, SCC | bal P | H1ESC raw P, SCC | bal P | HFFC6 raw P, SCC | bal P |
+|---|---|---|---|---|---|---|
+| prod | 0.262, 0.282 | 0.675 | 0.292, 0.190 | 0.649 | 0.268, 0.234 | 0.720 |
+| maxent | 0.234, 0.281 | 0.622 | 0.262, 0.200 | 0.593 | 0.251, 0.239 | 0.689 |
+| maxent_noangle | 0.226, 0.268 | 0.631 | 0.254, 0.200 | 0.599 | 0.243, 0.230 | 0.697 |
+| holes | 0.269, 0.062 | 0.634 | 0.292, 0.084 | 0.629 | 0.272, 0.146 | 0.700 |
+| holes_maxent_noangle | 0.236, 0.049 | 0.587 | 0.253, 0.086 | 0.575 | 0.246, 0.134 | 0.672 |
+
+Smooth stage overlaps per thousand beads, prod against holes: 12.1 to 215, 10.4 to 127, 3.5 to
+62, and across blocks 18 to 90, 16 to 51, 1.4 to 17. The bridges carry no smoothing and no
+excluded volume against the blocks, so they sit at the law's 1,170 close pairs per thousand of
+the trace. Raw Pearson holds with the holes, balanced Pearson falls 0.02 to 0.04 and SCC falls
+by a factor of 1.6 to 4.5. The anchorless bins' observed over expected rises from 0.43 to 0.57
+to 0.69 to 0.91 against Hi-C's 0.85 to 0.92, so the first version fills the bins and overfills
+them. The second version, chromosome expectation and smoothed holes, is in `out/gapv2`.
