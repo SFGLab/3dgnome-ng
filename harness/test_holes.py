@@ -29,9 +29,14 @@ def check(name: str, cond: bool, detail: str = "") -> None:
     print(f"  {mark}  {name}" + (f"   {detail}" if detail else ""))
 
 
-def settings(on: bool) -> Settings:
+def settings(on: bool, ev: bool = False) -> Settings:
     return Settings.from_dict(
         {
+            "excluded_volume": {
+                "use_excluded_volume": "yes" if ev else "no",
+                "apply_to_smooth": "yes",
+            },
+            "simulation_arcs_smooth": {"hard_wall": "yes" if ev else "no"},
             "main": {
                 "use_dynamic_loop_density": "yes",
                 "target_bp_per_subanchor": "1000",
@@ -115,10 +120,37 @@ def test_long() -> None:
     )
 
 
+def test_blocks_repel() -> None:
+    print("\n[repel] a hole does not pass through a block")
+    a = block(0, 10, 0.0)
+    b = block(60_000, 10, 13.0)
+    g = np.stack(np.meshgrid(*[np.arange(-2.0, 2.01, 1.0)] * 3), -1).reshape(-1, 3)
+    kinds = ["anchor"] + ["subanchor"] * (len(g) - 2) + ["anchor"]
+    c = [
+        BeadOut(200_000 + i * 1000, 201_000 + i * 1000, 11.0 + x, y, z, k)  # type: ignore[arg-type]
+        for i, ((x, y, z), k) in enumerate(zip(g, kinds, strict=True))
+    ]
+    cp = np.array([[x.x, x.y, x.z] for x in c])
+    for ev, want in ((False, "some"), (True, "none")):
+        out = fill_holes([a, b, c], settings(True, ev=ev), "chr1", 0)
+        hole = sorted(out[3:], key=lambda h: h[0].start)[0]
+        hp = np.array([[x.x, x.y, x.z] for x in hole])
+        d = np.linalg.norm(hp[:, None] - cp[None, :], axis=2)
+        close = int((d < 0.5).sum())
+        ok = close == 0 if ev else close > 0
+        check(
+            f"excluded volume {'on' if ev else 'off'}, {want} inside the block",
+            ok,
+            f"{close} pairs under 0.5",
+        )
+        check(f"excluded volume {'on' if ev else 'off'}, block beads unmoved", out[2] == c)
+
+
 def main() -> int:
     test_slots()
     test_fill()
     test_long()
+    test_blocks_repel()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

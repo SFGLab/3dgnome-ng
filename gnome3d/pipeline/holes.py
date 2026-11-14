@@ -10,13 +10,16 @@ is conditioned on its two ends alone, which leaves out its correlation with the 
 The contact map scales the segments and not the coarse level, where beads 500 kb apart share
 almost no counts at 1 kb. The drawn chain then runs through the smooth stage's kernel with its
 two ends fixed, the terms a gap inside a block runs through, so a hole's short range matches the
-blocks'. Excluded volume acts within a hole and not against the blocks.
-The stretches before the first block and after the last are left empty, since a bridge needs two
-ends. See `design/gap-fill.md`.
+blocks'. That pass runs once over the whole chromosome in genomic order with every block bead
+fixed, so the excluded volume and the hard wall act between hole beads and block beads as well as
+within a hole. Confinement is left out, since a sphere about the chromosome's centroid has no
+meaning for one hole. The stretches before the first block and after the last are left empty,
+since a bridge needs two ends. See `design/gap-fill.md`.
 """
 
 from __future__ import annotations
 
+import copy
 import zlib
 
 import numpy as np
@@ -92,23 +95,49 @@ def _draw(
     return pos
 
 
-def _smooth(pos: F32Array, starts: list[int], ends: list[int], s: Settings, seed: int) -> None:
-    """Run the smooth stage's kernel over a hole chain in place, its two ends fixed, with bond
-    targets and step set as densification sets a block's."""
+def _smooth(chain: list[BeadOut], hole: list[bool], s: Settings, seed: int) -> F32Array:
+    """Positions of `chain` after the smooth stage's kernel has run over it with only the beads
+    marked in `hole` free to move.
+
+    Parameters
+    ----------
+    chain
+        One chromosome's beads in genomic order, blocks and holes together.
+    hole
+        Per bead of `chain`, whether it is a hole bead.
+    s
+        Settings. The smooth stage's terms are used as they are, confinement and the compartment
+        term excepted.
+    seed
+        Seed of the restart noise and of the kernel.
+    """
     from gnome3d.mc import numba as mc_numba
 
-    mids = (np.asarray(starts, dtype=np.int64) + np.asarray(ends, dtype=np.int64)) // 2
+    pos = np.array([[b.x, b.y, b.z] for b in chain], dtype=np.float32)
+    fixed = ~np.asarray(hole, dtype=np.bool_)
+    mids = np.array([(b.start + b.end) // 2 for b in chain], dtype=np.int64)
     dtn = np.array(
         [float(s.genomic_length_to_distance(int(g))) for g in np.maximum(np.diff(mids), 0)],
         dtype=np.float32,
     )
-    fixed = np.zeros(len(pos), dtype=np.bool_)
-    fixed[[0, -1]] = True
-    step = float(dtn.mean()) * float(s.noise_smooth)
+    # A bond between two block beads is constant under the pass. Its target is its own length,
+    # so the block's score is the one it already has.
+    both = fixed[:-1] & fixed[1:]
+    dtn[both] = np.linalg.norm(np.diff(pos, axis=0), axis=1)[both]
+    free = ~(fixed[:-1] & fixed[1:])
+    mean_hole = float(dtn[free].mean())
+    r = copy.copy(s)
+    r.use_confinement = False
+    r.use_compartments = False
+    r.mc_smooth_chains = 1
+    if float(s.exclusion_radius_smooth) <= 0.0:
+        r.exclusion_radius_smooth = float(s.exclusion_auto_factor_smooth) * mean_hole
+    step = mean_hole * float(s.noise_smooth)
     seed_rng(seed)
     mc_numba.seed_numba(seed)
     add_movable_noise_inplace(pos, fixed, step)
-    mc_numba.mc_smooth_numba(pos, dtn, fixed, step, s)
+    mc_numba.mc_smooth_numba(pos, dtn, fixed, step, r)
+    return pos
 
 
 def fill_holes(
@@ -134,6 +163,7 @@ def fill_holes(
     order = sorted(nonempty, key=lambda b: min(x.start for x in b))
     target = int(s.target_bp_per_subanchor)
     out = list(blocks)
+    drawn_holes: list[list[BeadOut]] = []
     n_holes = n_beads = 0
     span_bp = 0
     for k in range(len(order) - 1):
@@ -147,8 +177,7 @@ def fill_holes(
         rng = np.random.default_rng([seed & 0x7FFFFFFF, zlib.crc32(chrom.encode()), k])
         ends_pos = np.array([(a.x, a.y, a.z), (b.x, b.y, b.z)], dtype=np.float32)
         drawn = _draw(starts, ends, ends_pos, s, rng, chrom)
-        _smooth(drawn, starts, ends, s, int(rng.integers(0, 0x7FFFFFFF)))
-        out.append(
+        drawn_holes.append(
             [
                 BeadOut(lo, hi, float(p[0]), float(p[1]), float(p[2]), "subanchor")
                 for (lo, hi), p in zip(slots, drawn[1:-1], strict=True)
@@ -157,6 +186,39 @@ def fill_holes(
         n_holes += 1
         n_beads += len(slots)
         span_bp += b.start - a.end
+    if drawn_holes:
+        lists = nonempty + drawn_holes
+        tag = [False] * len(nonempty) + [True] * len(drawn_holes)
+        keyed = sorted(
+            ((x, t) for blk, t in zip(lists, tag, strict=True) for x in blk),
+            key=lambda xt: xt[0].start,
+        )
+        chain = [x for x, _ in keyed]
+        moved = _smooth(
+            chain,
+            [t for _, t in keyed],
+            s,
+            int(
+                np.random.default_rng([seed & 0x7FFFFFFF, zlib.crc32(chrom.encode())]).integers(
+                    0, 0x7FFFFFFF
+                )
+            ),
+        )
+        where = {x.start: p for x, p in zip(chain, moved, strict=True)}
+        for h in drawn_holes:
+            out.append(
+                [
+                    BeadOut(
+                        x.start,
+                        x.end,
+                        float(where[x.start][0]),
+                        float(where[x.start][1]),
+                        float(where[x.start][2]),
+                        x.kind,
+                    )
+                    for x in h
+                ]
+            )
     log.status(
         LOG,
         "hole beads %s: %d holes, %d beads over %.1f Mb",
