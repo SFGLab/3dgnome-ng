@@ -25,6 +25,7 @@ from gnome3d.pipeline.executor import (
     MixedExecutor,
     SerialExecutor,
 )
+from gnome3d.pipeline.holes import fill_holes
 from gnome3d.pipeline.ib import ib_chain_nodes, ib_node_id
 from gnome3d.pipeline.relax import relax_blocks
 from gnome3d.pipeline.stage import StageKind
@@ -121,12 +122,15 @@ def _beads(output: State) -> list[BeadOut]:
 
 
 def _assemble(
-    per_chr: dict[str, list[list[BeadOut]]], settings: Settings
+    per_chr: dict[str, list[list[BeadOut]]], settings: Settings, seed: int = 0
 ) -> dict[str, list[BeadOut]]:
     """Flatten each chromosome's per block beads into one list in genomic order. With
-    `use_boundary_stitch` set, the blocks are stitched at their edges first."""
+    `use_hole_beads` the holes between blocks get beads first, drawn from generators seeded by
+    `seed`, the structure's seed offset. With `use_boundary_stitch` set, the blocks are stitched
+    at their edges."""
     out: dict[str, list[BeadOut]] = {}
     for chr_, blocks in per_chr.items():
+        blocks = fill_holes(blocks, settings, chr_, seed)
         if settings.use_boundary_stitch:
             blocks = stitch_blocks(blocks, settings)
         if settings.use_cross_block_relax:
@@ -162,7 +166,7 @@ def reconstruct(
     for ibs in ib_sink:
         per_chr[ibs.chr_].append(_beads(outputs[ib_node_id(ibs.ib_id, StageKind.SMOOTH)]))
 
-    return _assemble(per_chr, settings)
+    return _assemble(per_chr, settings, seed_offset)
 
 
 def reconstruct_ensemble(
@@ -222,6 +226,6 @@ def reconstruct_ensemble(
             nid = ib_node_id(f"m{m} :: {ibs.ib_id}", StageKind.SMOOTH)
             per_chr[ibs.chr_].append(_beads(outputs[nid]))
 
-        results.append(_assemble(per_chr, settings))
+        results.append(_assemble(per_chr, settings, base_seed_offset + m * MEMBER_SEED_STRIDE))
 
     return results

@@ -1,0 +1,113 @@
+"""Unit checks for the hole beads between blocks.
+
+    python harness/test_holes.py
+
+A hole's slots tile the stretch between two blocks at the gap rule's count, the blocks are left
+as they were, the draw follows the seed, and with the key off nothing changes.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from gnome3d.pipeline.holes import fill_holes, hole_slots  # noqa: E402
+from gnome3d.settings import Settings  # noqa: E402
+from gnome3d.types import BeadOut  # noqa: E402
+
+PASS: list[str] = []
+FAIL: list[str] = []
+
+
+def check(name: str, cond: bool, detail: str = "") -> None:
+    (PASS if cond else FAIL).append(name)
+    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
+    print(f"  {mark}  {name}" + (f"   {detail}" if detail else ""))
+
+
+def settings(on: bool) -> Settings:
+    return Settings.from_dict(
+        {
+            "main": {
+                "use_dynamic_loop_density": "yes",
+                "target_bp_per_subanchor": "1000",
+                "max_subanchors_per_arc": "100",
+            },
+            "distance": {"polymer_exponent": "0.34"},
+            "holes": {"use_hole_beads": "yes" if on else "no"},
+        }
+    )
+
+
+def block(lo: int, n: int, x0: float) -> list[BeadOut]:
+    kinds = ["anchor"] + ["subanchor"] * (n - 2) + ["anchor"]
+    return [
+        BeadOut(lo + i * 1000, lo + (i + 1) * 1000, x0 + i, 0.0, 0.0, k)  # type: ignore[arg-type]
+        for i, k in enumerate(kinds)
+    ]
+
+
+def test_slots() -> None:
+    print("\n[slots] a hole is tiled at the gap rule's count")
+    s = settings(True)
+    sl = hole_slots(10_000, 30_000, s)
+    check("count follows the rule", len(sl) == 19, f"{len(sl)}")
+    check(
+        "slots inside the hole and ascending",
+        sl[0][0] >= 10_000
+        and sl[-1][1] <= 30_000
+        and all(a[1] <= b[0] for a, b in zip(sl, sl[1:], strict=False)),
+    )
+    check("capped", len(hole_slots(0, 5_000_000, s)) == 100)
+    check(
+        "no hole no slots",
+        hole_slots(10_000, 10_000, s) == [] and hole_slots(10_000, 11_000, s) == [],
+    )
+
+
+def test_fill() -> None:
+    print("\n[fill] blocks untouched, holes filled, seeded")
+    blocks = [block(0, 10, 0.0), block(60_000, 10, 30.0), block(20_000, 5, 12.0)]
+    off = fill_holes(blocks, settings(False), "chr1", 0)
+    check("off returns the blocks", off is blocks)
+    a = fill_holes(blocks, settings(True), "chr1", 0)
+    b = fill_holes(blocks, settings(True), "chr1", 0)
+    c = fill_holes(blocks, settings(True), "chr1", 7)
+    check("blocks first and unchanged", a[:3] == blocks)
+    check("one list per hole", len(a) == 5, f"{len(a)}")
+    holes = sorted(a[3:], key=lambda h: h[0].start)
+    check(
+        "first hole between 10 kb and 20 kb",
+        holes[0][0].start >= 10_000 and holes[0][-1].end <= 20_000,
+    )
+    check(
+        "second hole between 25 kb and 60 kb",
+        holes[1][0].start >= 25_000 and holes[1][-1].end <= 60_000,
+    )
+    flat = sorted((x for blk in a for x in blk), key=lambda x: x.start)
+    check("bead starts unique", len({x.start for x in flat}) == len(flat))
+    check("same seed same beads", a == b)
+    check("another seed other beads", a[3:] != c[3:])
+    xs = np.array([[x.x, x.y, x.z] for x in holes[1]])
+    check(
+        "bridge runs from one block to the next",
+        14 < float(xs[:, 0].mean()) < 30,
+        f"{xs[:, 0].mean():.1f}",
+    )
+
+
+def main() -> int:
+    test_slots()
+    test_fill()
+    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
+    for f in FAIL:
+        print(f"  failed: {f}")
+    return 1 if FAIL else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

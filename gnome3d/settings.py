@@ -285,6 +285,9 @@ class Settings:
     relax_noise: float
     relax_bond_weight: float
 
+    # ---- holes between blocks ----
+    use_hole_beads: bool
+
     # ---- A/B compartments ----
     use_compartments: bool
     compartment_weight: float
@@ -631,6 +634,11 @@ class Settings:
         # 691 for 11,766 on a real chromosome, so restricting it to the beads that need moving is
         # where the pass's cost actually goes.
         self.relax_local_window = -1
+
+        # ---- holes between blocks ----
+        # Beads for the stretch between two blocks, drawn from the maximum entropy bridge between
+        # the anchors that bound it. See gnome3d/pipeline/holes.py.
+        self.use_hole_beads = False
 
         # ---- A/B compartments ----
         # Block-copolymer segregation over a per-bead compartment call, ported
@@ -1111,6 +1119,9 @@ class Settings:
         self.relax_noise = getf("relax", "noise", self.relax_noise)
         self.relax_bond_weight = getf("relax", "bond_weight", self.relax_bond_weight)
         self.relax_local_window = geti("relax", "local_window", self.relax_local_window)
+
+        # [holes]
+        self.use_hole_beads = getb("holes", "use_hole_beads", self.use_hole_beads)
 
         # [compartments]
         self.use_compartments = getb("compartments", "use_compartments", self.use_compartments)

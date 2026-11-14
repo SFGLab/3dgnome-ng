@@ -293,6 +293,17 @@ other while the arcs and the stitch are kept.
 | `bond_weight` | float | 10.0 | 10.0 | Chain spring weight for the pass. At the smooth stage's 0.1 the excluded volume tears the coil. |
 | `local_window` | int | -1 | 1 | Let only the beads touching another block move, plus this many chain neighbours either side. -1 lets every subanchor move, which on a chromosome is hours. A window of 1 is minutes. |
 
+## [holes]
+
+Runs before the stitch. The stretch between two blocks has no beads. With the key on it gets beads
+at the count the dynamic loop density gives a gap of that span, drawn from the maximum entropy
+bridge between the two anchors that bound it and scaled by `[data] contact_map` when one is given.
+The stretches before the first block and after the last stay empty.
+
+| key | type | default | production | what it does |
+| --- | --- | --- | --- | --- |
+| `use_hole_beads` | bool | no | no | Master switch. Under measurement since 2026-11-14, `design/gap-fill.md`. |
+
 ## [compartments]
 
 A/B compartment terms ported from MultiMM [7], written shifted and non negative so the Metropolis
