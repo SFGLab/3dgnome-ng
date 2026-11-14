@@ -241,3 +241,45 @@ the trace. Raw Pearson holds with the holes, balanced Pearson falls 0.02 to 0.04
 by a factor of 1.6 to 4.5. The anchorless bins' observed over expected rises from 0.43 to 0.57
 to 0.69 to 0.91 against Hi-C's 0.85 to 0.92. The first version fills the bins and overfills
 them. The second version, chromosome expectation and smoothed holes, is in `out/gapv2`.
+
+## Hole beads against the blocks, 2026-11-14
+
+Two diagnostics on the second version, `playground/hole_contact_split.py` and
+`playground/hole_contact_overlap.py`. Hole with block and two hole contacts sat under 0.7 bond in
+15 percent of cases at every separation, the share for beads uniform within the contact radius,
+against 2 to 5 percent inside one hole. The holes passed through the blocks. The third version
+smooths every hole in one pass over the chromosome with the block beads fixed, so the excluded
+volume and the wall act between them. `slurm/ensemble/gap_holes_v3_trial.sh`, results in
+`playground/square_blocks/gapv3/`. Raw Pearson, SCC and cross block overlaps per thousand beads.
+
+| Region | prod | holes2 | holes3 |
+|---|---|---|---|
+| GM12878 10-15 | 0.367, 0.377, 2.8 | 0.348, 0.194, 97.8 | 0.358, 0.190, 28.6 |
+| H1ESC 10-15 | 0.357, 0.281, 13.4 | 0.311, 0.153, 78.9 | 0.317, 0.159, 19.7 |
+| HFFC6 10-15 | 0.372, 0.378, 5.3 | 0.362, 0.322, 24.2 | 0.364, 0.329, 7.6 |
+| GM12878 35-40 | 0.471, 0.203, 1.3 | 0.475, 0.187, 10.6 | 0.475, 0.192, 3.2 |
+
+The overlaps fall three to four times and SCC stays where the second version had it. Part of the
+loss is the instrument. Hi-C reads the unmappable bins as zero, production leaves them empty and
+hole beads fill them. With the model zeroed there the SCC of the averaged map moves from 0.272 to
+0.315 on GM12878 against 0.458 for production, 0.216 to 0.300 on H1ESC against 0.344 and 0.429 to
+0.455 on HFFC6 against 0.481.
+
+The rest is the blocks. Mean count per separation over the block with block mean at 25 to 50 kb,
+balanced Hi-C against the model, chr1:10-15 Mb:
+
+| | 25-50 kb | 50-100 | 100-200 | 200-400 | 400-1000 |
+|---|---|---|---|---|---|
+| GM12878 Hi-C, block pairs | 1 | 0.44 | 0.24 | 0.13 | 0.048 |
+| GM12878 model, block pairs | 1 | 0.41 | 0.17 | 0.066 | 0.004 |
+| GM12878 Hi-C, one hole | 0.82 | 0.33 | 0.18 | 0.11 | 0.068 |
+| GM12878 holes3, one hole | 0.66 | 0.32 | 0.18 | 0.10 | 0.004 |
+| H1ESC Hi-C, block pairs | 1 | 0.50 | 0.29 | 0.16 | 0.051 |
+| H1ESC model, block pairs | 1 | 0.42 | 0.11 | 0.03 | 0.005 |
+| H1ESC Hi-C, one hole | 1.14 | 0.51 | 0.29 | 0.26 | 0.14 |
+| H1ESC holes3, one hole | 0.85 | 0.51 | 0.31 | 0.22 | 0.04 |
+
+Inside a hole the drawn chain follows Hi-C from 50 to 400 kb. The blocks hold 1.4 to 5 times too
+few contacts from 100 to 400 kb and ten times too few beyond. Against blocks that sparse at long
+range a hole at the right density reads as hot, and the stratified correlation counts it against
+the model. The defect the holes expose is the blocks' long range contact deficit.

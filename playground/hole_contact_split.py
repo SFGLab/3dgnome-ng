@@ -63,6 +63,26 @@ def ratios(m: np.ndarray, hole_id: np.ndarray, mapped: np.ndarray) -> list[tuple
     return out
 
 
+def decay(m: np.ndarray, hole_id: np.ndarray, mapped: np.ndarray) -> tuple[list[float], list[float]]:
+    """Per band, the mean count of block with block pairs and of pairs inside one hole, each over
+    the block with block mean of the first band."""
+    n = len(hole_id)
+    i, j = np.triu_indices(n, 1)
+    ok = mapped[i] & mapped[j]
+    hi, hj = hole_id[i] >= 0, hole_id[j] >= 0
+    same = hi & hj & (hole_id[i] == hole_id[j])
+    bb = ~hi & ~hj
+    first = ok & bb & (j - i >= BANDS[0][0]) & (j - i < BANDS[0][1])
+    base = float(m[i[first], j[first]].mean())
+    out_b, out_h = [], []
+    for lo, up in BANDS:
+        band = ok & (j - i >= lo) & (j - i < up)
+        sb, sh = band & bb, band & same
+        out_b.append(float(m[i[sb], j[sb]].mean()) / base if sb.any() else np.nan)
+        out_h.append(float(m[i[sh], j[sh]].mean()) / base if sh.any() else np.nan)
+    return out_b, out_h
+
+
 def scc_share(a: np.ndarray, b: np.ndarray, hole: np.ndarray) -> tuple[float, float, float]:
     """The battery's SCC, and the share of the stratum covariance carried by pairs touching a hole
     bin and by block pairs alone."""
@@ -115,10 +135,22 @@ def main() -> None:
             for row in ratios(m, hole_id, mapped)
         )
         print(f"  {name:>28s}  {cells}")
-    print("  SCC on raw counts, share of stratum covariance from pairs touching a hole bin / block pairs")
+    print("  decay, mean count over the block with block mean at 25-50 kb; block with block / one hole")
+    for name, m in maps.items():
+        db, dh = decay(m, hole_id, mapped)
+        cells = "  ".join(
+            f"{x:6.3f} {y:6.3f}".replace("nan", "  - ").rjust(20) for x, y in zip(db, dh, strict=True)
+        )
+        print(f"  {name:>28s}  {cells}")
+    print(
+        "  SCC on raw counts, share of stratum covariance from pairs touching a hole bin / block"
+        " pairs, and SCC with the model zeroed on the bins Hi-C cannot map"
+    )
     for a in arms:
         s, ch, cb = scc_share(maps[a.name], raw, hole)
-        print(f"  {a.name:>28s}  SCC {s:6.3f}   hole {ch:+.2f}  block {cb:+.2f}")
+        masked = maps[a.name] * np.outer(mapped, mapped)
+        sm, _, _ = scc_share(masked, raw, hole)
+        print(f"  {a.name:>28s}  SCC {s:6.3f}   hole {ch:+.2f}  block {cb:+.2f}   mapped only {sm:6.3f}")
 
 
 if __name__ == "__main__":
