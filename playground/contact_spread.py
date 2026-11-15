@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "playground"))
 
 from hole_readout import holes, read_spans  # noqa: E402
-from law_spring_readout import read_models  # noqa: E402
+from law_spring_readout import nu_from_log, read_models  # noqa: E402
 from validation_battery import CONTACT_BEADS  # noqa: E402
 
 BANDS = ((25_000, 50_000), (50_000, 100_000), (100_000, 200_000), (200_000, 400_000), (400_000, 1_000_000))
@@ -85,6 +85,40 @@ def main() -> None:
             gauss = float(gammainc(1.5, CONTACT_BEADS**2 / (2.0 * msd / 3.0)))
             cells.append(f"{msd**0.5:6.1f} {share:7.4f} {gauss:7.4f}".rjust(22))
         print(f"  {name:>12s}  {'  '.join(cells)}")
+    floor_line(structs, mids, anc, same_block, i, j, sep, arm)
+
+
+def floor_line(
+    structs: list[np.ndarray],
+    mids: np.ndarray,
+    anc: np.ndarray,
+    same_block: np.ndarray,
+    i: np.ndarray,
+    j: np.ndarray,
+    sep: np.ndarray,
+    arm: Path,
+) -> None:
+    """The 1 percent and median quantiles of anchor pair distance over the law, per band, the
+    law read from the arm's log at one bead per target spacing of 1 kb."""
+    logf = arm.with_suffix(".log")
+    if not logf.exists():
+        return
+    nu = nu_from_log(logf)
+    cells = []
+    for lo, up in BANDS:
+        sel = same_block & anc[i] & anc[j] & (sep >= lo) & (sep < up)
+        ii, jj, ss = i[sel][:MAX_PAIRS], j[sel][:MAX_PAIRS], sep[sel][:MAX_PAIRS]
+        if ii.size < 50:
+            cells.append("-".rjust(22))
+            continue
+        law = np.maximum(1.0, (ss / 1000.0) ** nu)
+        r = []
+        for p in structs:
+            bond = float(np.median(np.linalg.norm(np.diff(p, axis=0), axis=1)))
+            r.append(np.linalg.norm(p[ii] - p[jj], axis=1) / bond / law)
+        q = np.concatenate(r)
+        cells.append(f"{np.quantile(q, 0.01):6.2f} {np.median(q):6.2f}".rjust(22))
+    print(f"  {'anchor floor':>12s}  {'  '.join(cells)}   1% and median of distance over law, nu {nu:.3f}")
 
 
 if __name__ == "__main__":
