@@ -365,3 +365,26 @@ The arm that keeps the spread and removes the overlaps, `slurm/ensemble/spread_e
 draws and then solves with every target spring at zero, so only the excluded volume and the
 arcless repulsion act. On GM12878 20-25 Mb, two structures, block contacts at 400 kb to 1 Mb
 hold 0.0021 of pairs against production's 0.0002 and 25 to 50 kb 0.035 against 0.036.
+
+### Drawn anchors with only the overlaps relaxed, 2026-11-15
+
+`slurm/ensemble/spread_ev_trial.sh`, results in `playground/square_blocks/spreadev/`. The draw, then
+up to 200 solver iterations with every target spring at zero, the arcless repulsion's reach at 0.5
+or 1.0 of the mean arc target. Mean over the nine region runs, raw Pearson, balanced Pearson,
+balanced SCC, MultiMM:
+
+| Arm | raw P | bal P | bal SCC | MultiMM |
+|---|---|---|---|---|
+| prod | 0.427 | 0.707 | 0.186 | 0.678 |
+| mx0 | 0.464 | 0.598 | 0.165 | 0.685 |
+| mxev05 | 0.439 | 0.570 | 0.143 | 0.665 |
+| mxev10 | 0.382 | 0.557 | 0.149 | 0.633 |
+
+Both lose more than the kept draw. At reach 0.5 the anchor overlaps go, 34.7 to 0.5 per thousand on
+GM12878 20-25 Mb, the long range spread stays, 0.0017 of block pairs in contact at 400 kb to 1 Mb,
+and the subanchor coils between the drawn anchors still overlap, 150 per thousand within blocks and
+103 across. At 1.0 the repulsion swells every anchor pair to an rms of 7 to 12 bonds and the
+short range contacts fall under production's. The 20 to 100 kb exponent stays at 0.24 to 0.26
+against Hi-C's 0.33 in every drawn arm. The raw gains of the kept draw came with its overlaps, and
+the spread the draw adds at long range does not reach balanced Pearson or SCC. The whole chr1 run
+was stopped. The drawn start with the full solve stays the one arm with a gain, MultiMM.

@@ -1,0 +1,53 @@
+chr1:35000000-40000000 at 25 kb, 200 bins, Hi-C /mnt/storagelinux/_hic/H1ESC/hic.4DNFI6HDY7WZ.mcool
+
+H1ESC_chr1_35000000_40000000_prod: 5 structures, 4205 beads, nu 0.353, 136 of 200 bins hold an anchor
+  SCC raw 0.183  balanced 0.243   no structure null raw 0.006  balanced 0.353
+  SCC balanced on anchored bins only 0.369
+  realised over law
+    25-50 kb: inside a gap 0.98 (n=16333), five or more anchors between 1.09 (n=26361)
+    50-100 kb: inside a gap 0.84 (n=9348), five or more anchors between 1.09 (n=108313)
+    100-200 kb: inside a gap 0.71 (n=2594), five or more anchors between 1.12 (n=300309)
+  observed over expected, median, Hi-C / model
+    25-50 kb  anchored 1.01 / 0.86   anchorless 0.98 / 0.89
+    50-100 kb  anchored 0.98 / 0.82   anchorless 0.99 / 1.09
+    100-200 kb  anchored 0.91 / 0.77   anchorless 1.00 / 1.16
+    200-400 kb  anchored 0.88 / 0.74   anchorless 1.05 / 1.14
+
+H1ESC_chr1_35000000_40000000_mx0: 5 structures, 4205 beads, nu 0.353, 136 of 200 bins hold an anchor
+  SCC raw 0.178  balanced 0.229   no structure null raw 0.006  balanced 0.353
+  SCC balanced on anchored bins only 0.294
+  realised over law
+    25-50 kb: inside a gap 1.01 (n=16333), five or more anchors between 1.12 (n=26361)
+    50-100 kb: inside a gap 0.85 (n=9348), five or more anchors between 1.04 (n=108313)
+    100-200 kb: inside a gap 0.69 (n=2594), five or more anchors between 1.00 (n=300309)
+  observed over expected, median, Hi-C / model
+    25-50 kb  anchored 1.01 / 0.90   anchorless 0.98 / 0.87
+    50-100 kb  anchored 0.98 / 0.87   anchorless 0.99 / 1.02
+    100-200 kb  anchored 0.91 / 0.82   anchorless 1.00 / 0.89
+    200-400 kb  anchored 0.88 / 0.82   anchorless 1.05 / 0.87
+
+H1ESC_chr1_35000000_40000000_mxev05: 5 structures, 4205 beads, nu 0.353, 136 of 200 bins hold an anchor
+  SCC raw 0.122  balanced 0.193   no structure null raw 0.006  balanced 0.353
+  SCC balanced on anchored bins only 0.296
+  realised over law
+    25-50 kb: inside a gap 1.00 (n=16333), five or more anchors between 1.21 (n=26361)
+    50-100 kb: inside a gap 0.85 (n=9348), five or more anchors between 1.09 (n=108313)
+    100-200 kb: inside a gap 0.69 (n=2594), five or more anchors between 1.06 (n=300309)
+  observed over expected, median, Hi-C / model
+    25-50 kb  anchored 1.01 / 0.86   anchorless 0.98 / 1.00
+    50-100 kb  anchored 0.98 / 0.80   anchorless 0.99 / 1.17
+    100-200 kb  anchored 0.91 / 0.82   anchorless 1.00 / 0.81
+    200-400 kb  anchored 0.88 / 0.84   anchorless 1.05 / 0.77
+
+H1ESC_chr1_35000000_40000000_mxev10: 5 structures, 4205 beads, nu 0.353, 136 of 200 bins hold an anchor
+  SCC raw 0.147  balanced 0.179   no structure null raw 0.006  balanced 0.353
+  SCC balanced on anchored bins only 0.285
+  realised over law
+    25-50 kb: inside a gap 1.01 (n=16333), five or more anchors between 1.61 (n=26361)
+    50-100 kb: inside a gap 0.84 (n=9348), five or more anchors between 1.41 (n=108313)
+    100-200 kb: inside a gap 0.70 (n=2594), five or more anchors between 1.34 (n=300309)
+  observed over expected, median, Hi-C / model
+    25-50 kb  anchored 1.01 / 0.79   anchorless 0.98 / 1.35
+    50-100 kb  anchored 0.98 / 0.78   anchorless 0.99 / 1.39
+    100-200 kb  anchored 0.91 / 0.83   anchorless 1.00 / 0.87
+    200-400 kb  anchored 0.88 / 0.85   anchorless 1.05 / 0.80
