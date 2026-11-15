@@ -540,3 +540,24 @@ three structures, pooled: raw SCC 0.379 against 0.361 and production's 0.343, ba
 against 0.292 and 0.276, Spearman 0.169 against 0.164 and 0.141, MultiMM 0.681 against 0.637 and
 0.588, cross block overlaps 19.7. The fit of the draw over 11,913 anchors takes 159 iterations and
 the chromosome 25 minutes on frodo.
+
+### Hole beads on top, 2026-11-15
+
+Holes v3 with the contact map on the drawn start and gyration arm, `playground/square_blocks/mxholes/`.
+Pooled balanced SCC over the bins Hi-C maps, `playground/ensemble_score.py` now printing it
+beside the full map, raw in brackets:
+
+| | prod | mxgyr | mxgyr and holes |
+|---|---|---|---|
+| GM12878 10-15 Mb, two holes | 0.378 (0.429) | 0.405 (0.460) | 0.326 (0.322) |
+| H1ESC 10-15 Mb, three holes | 0.096 (0.248) | 0.134 (0.260) | 0.158 (0.233) |
+| HFFC6 10-15 Mb, two small holes | 0.249 (0.354) | 0.302 (0.400) | 0.313 (0.398) |
+| GM12878 chr1, 1 to 60 Mb | 0.250 (0.323) | 0.292 (0.364) | 0.266 (0.324) |
+
+Holes still cost GM12878 and chr1 and gain a little on H1ESC and HFFC6. On GM12878 10-15 Mb the
+blocks now hold Hi-C's decay to 200 kb, 0.213 of the 25 to 50 kb count at 100 to 200 kb against
+0.243, and inside a hole the drawn chain sits under Hi-C by a quarter at short range. The pairs a
+hole forms with its blocks are what is left: 0.24 and 0.25 of block with block at 50 to 200 kb
+against Hi-C's 0.69 and 0.70, and 0.41 against 0.78 at 200 to 400 kb, with no hole with block
+contact under 0.7 bond. The excluded volume and the wall in the chromosome pass keep a hole beside
+its blocks rather than against them.
