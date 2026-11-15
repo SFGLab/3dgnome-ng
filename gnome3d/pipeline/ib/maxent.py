@@ -13,7 +13,6 @@ See `design/gap-fill.md`.
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -72,44 +71,6 @@ def _targets(exp_dist: F64Array, mids: F64Array, law: PolymerLaw) -> F64Array:
     return d
 
 
-def _device_objective(
-    w: F64Array, vt: F64Array, n: int, m: int
-) -> Callable[[F64Array], tuple[float, F64Array]] | None:
-    """The fit's objective and gradient evaluated on a GPU in float32, or None without one.
-
-    Above a thousand anchors the host objective is most of a chromosome's fit, an `n` by `n`
-    by `m` product per evaluation. L-BFGS-B stays on the host and gets the energy and gradient
-    back in float64.
-    """
-    if n < 1024:
-        return None
-    from gnome3d.mc.jax.util import jax_is_available
-
-    if not jax_is_available():
-        return None
-    import jax
-    import jax.numpy as jnp
-
-    if jax.default_backend() != "gpu":
-        return None
-    w_d = jnp.asarray(w, dtype=jnp.float32)
-    vt_d = jnp.asarray(vt, dtype=jnp.float32)
-
-    @jax.jit
-    def energy_grad(y: Any) -> tuple[Any, Any]:
-        sq = (y * y).sum(axis=1)
-        dv = sq[:, None] + sq[None, :] - 2.0 * (y @ y.T) - vt_d
-        r = w_d * dv
-        return (r * dv).sum(), 4.0 * (r.sum(axis=1)[:, None] * y - r @ y)
-
-    def call(flat: F64Array) -> tuple[float, F64Array]:
-        e, g = energy_grad(jnp.asarray(flat.reshape(n, m), dtype=jnp.float32))
-        return float(e), np.asarray(g, dtype=np.float64).reshape(-1)
-
-    log.status(LOG, "maxent anchors: the fit's objective runs on the GPU in float32")
-    return call
-
-
 def _fit_root(target: F64Array, loop: BoolArray) -> F64Array:
     """A root `y` of the covariance per coordinate whose pair variances best meet `target`.
 
@@ -145,13 +106,8 @@ def _fit_root(target: F64Array, loop: BoolArray) -> F64Array:
         grad = 4.0 * (r.sum(axis=1)[:, None] * y - r @ y)
         return float((r * (v - vt)).sum()), grad.reshape(-1)
 
-    objective: Any = fun
-    device = _device_objective(w, vt, n, m)
-    if device is not None:
-        objective = device
-
     res = minimize(
-        objective, y0.reshape(-1), jac=True, method="L-BFGS-B", options={"maxiter": _FIT_ITERS}
+        fun, y0.reshape(-1), jac=True, method="L-BFGS-B", options={"maxiter": _FIT_ITERS}
     )
     y = res.x.reshape(n, m)
     sq = (y * y).sum(axis=1)
