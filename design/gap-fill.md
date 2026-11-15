@@ -458,3 +458,24 @@ production's and loses more balanced Pearson and MultiMM, so the flatter short b
 explain the balanced Pearson loss. With five structures a far bin holds a handful of contacts,
 and production holds none there, so an arm that opens the long range fills those bins with
 sampling noise. The check is the same two arms at twenty structures.
+
+### Per structure against pooled scoring, 2026-11-15
+
+`playground/validation_battery.py` scores every structure against Hi-C and averages, so twenty
+structures score as five do: chr1:20-25 Mb, `gyr01` against production, balanced Pearson 0.704
+against 0.730 on GM12878 and 0.719 against 0.785 on HFFC6 at twenty, the same gaps at five. Hi-C is
+a population average, and a production structure resembles it because every conformation is
+nearly the same one. `playground/ensemble_score.py` pools each arm's contacts first. Twenty
+structures, results in `playground/square_blocks/n20/`:
+
+| | raw P | raw Spearman | raw SCC | bal P | bal Spearman | bal SCC |
+|---|---|---|---|---|---|---|
+| GM12878 prod | 0.658 | 0.533 | 0.130 | 0.779 | 0.534 | 0.106 |
+| GM12878 gyr01 | 0.703 | 0.570 | 0.187 | 0.735 | 0.575 | 0.180 |
+| HFFC6 prod | 0.565 | 0.422 | 0.154 | 0.823 | 0.422 | 0.180 |
+| HFFC6 gyr01 | 0.636 | 0.502 | 0.214 | 0.737 | 0.502 | 0.240 |
+
+Pooled, the arm gains 0.04 to 0.08 in Spearman and 0.06 to 0.07 in SCC on both cells and loses
+balanced Pearson by 0.04 to 0.09. Balanced counts are well under one, so Pearson on their log plus
+one is nearly linear and follows the largest values, the first diagonals, which production's
+steeper decay next to the diagonal matches better.
