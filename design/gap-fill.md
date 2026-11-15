@@ -506,3 +506,20 @@ Overlaps at chromosome scale, GM12878 whole chr1, three structures, scored on 1 
 The relaxation with a window of one moves 27,800 of 134,823 beads and takes cross block contacts
 within a bond from 26,565 to 2,286, at about five minutes a structure set. Far block contacts stay
 at four times production's.
+
+The same arm on whole chr1 of all three cells, three structures, scored on 1 to 60 Mb, pooled:
+
+| Cell | raw Sp | raw SCC | bal SCC | bal P | MultiMM | cross block overlaps | exponent over Hi-C |
+|---|---|---|---|---|---|---|---|
+| GM12878 prod | 0.141 | 0.343 | 0.276 | 0.710 | 0.588 | 19 | 1.16 |
+| GM12878 gyr01relax | 0.164 | 0.361 | 0.292 | 0.674 | 0.637 | 14 | 1.02 |
+| H1ESC prod | 0.141 | 0.232 | 0.149 | 0.706 | 0.605 | 14.7 | 1.18 |
+| H1ESC gyr01relax | 0.156 | 0.248 | 0.165 | 0.679 | 0.649 | 4.9 | 1.07 |
+| HFFC6 prod | 0.118 | 0.281 | 0.221 | 0.756 | 0.556 | 1.4 | 1.15 |
+| HFFC6 gyr01relax | 0.143 | 0.289 | 0.242 | 0.714 | 0.630 | 1.2 | 1.03 |
+
+Pooled SCC up 0.008 to 0.021 and Spearman 0.015 to 0.025 on every cell, MultiMM 0.04 to 0.07,
+balanced Pearson down 0.03 to 0.04. The arm is no repulsion, `[excluded_volume]
+arcs_repulsion_cutoff_factor` 0.05, the arcs excluded volume at the mean arc target,
+`auto_factor_arcs` 1.0, `[springs] gyration_weight` 0.1, and `[relax] use_cross_block_relax` with
+`local_window` 1.
