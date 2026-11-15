@@ -1,0 +1,22 @@
+observed Hi-C chr1:10000000-15000000 at 25,000 bp: 200 bins
+exponent yardstick: nu 0.333 fitted on H1ESC_hic_25kb_singletons.bedpe
+
+         arm   n   pearson  spearman      SCC   multimm  exponent  vs Hi-C  e20-100k  e100k-1M       Rg   wb-aa   wb-sa      xb
+  H1ESC_chr1_10000000_15000000_prod   5     0.602     0.277    0.201     0.616     0.362    1.09x     0.278     0.368     9.49     0.2     3.3    14.5
+  H1ESC_chr1_10000000_15000000_mxgyr   5     0.584     0.298    0.200     0.721     0.340    1.02x     0.245     0.363    10.07     0.1     4.5     0.6
+  H1ESC_chr1_10000000_15000000_mxholes   5     0.557     0.228    0.148     0.631     0.278    0.83x     0.242     0.288    10.48     0.1    11.9     1.0
+  H1ESC_chr1_10000000_15000000_hnowall   5     0.554     0.228    0.149     0.622     0.279    0.84x     0.239     0.290    10.47     0.1    18.4     0.9
+  H1ESC_chr1_10000000_15000000_hflank   5     0.558     0.231    0.151     0.626     0.276    0.83x     0.235     0.287    10.43     0.1    11.3     1.1
+  H1ESC_chr1_10000000_15000000_hboth   5     0.555     0.226    0.150     0.623     0.277    0.83x     0.240     0.287    10.43     0.1    17.8     1.0
+
+  exponent target is 0.333, the fit a run makes on the same file;
+  the project's structures have measured flatter than that, so higher is better here.
+  e20-100k and e100k-1M are the exponent fitted on each band alone; the two should agree
+  with each other and with the cell's measured nu, and a flat short band under a steep
+  long one is loops pulling pairs in with nothing holding the rest at the background.
+  the overlap columns count pairs closer than 0.7 of the structure's own subanchor
+  bond, per thousand beads. wb-aa is
+  anchors inside one block, which only the arcs
+  stage can move; wb-sa is the smooth stage's own excluded volume; xb is across two
+  blocks, which the boundary stitch and the cross block relaxation own. an arm whose
+  beads carry no anchors and no blocks, such as MultiMM, has all its overlaps in wb-sa.

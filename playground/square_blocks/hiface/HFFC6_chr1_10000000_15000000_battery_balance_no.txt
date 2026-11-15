@@ -1,0 +1,22 @@
+observed Hi-C chr1:10000000-15000000 at 25,000 bp: 200 bins, raw counts, not comparable with a balanced run
+exponent yardstick: nu 0.352 fitted on HFFC6_hic_25kb_singletons.bedpe
+
+         arm   n   pearson  spearman      SCC   multimm  exponent  vs Hi-C  e20-100k  e100k-1M       Rg   wb-aa   wb-sa      xb
+  HFFC6_chr1_10000000_15000000_prod   5     0.369     0.282    0.366     0.509     0.399    1.13x     0.350     0.410    11.01     0.0     1.7     3.6
+  HFFC6_chr1_10000000_15000000_mxgyr   5     0.394     0.312    0.366     0.588     0.359    1.02x     0.316     0.403    11.06     0.0     3.5     0.5
+  HFFC6_chr1_10000000_15000000_mxholes   5     0.395     0.314    0.358     0.587     0.325    0.92x     0.296     0.353    11.18     0.0     3.0     0.4
+  HFFC6_chr1_10000000_15000000_hnowall   5     0.394     0.313    0.359     0.588     0.324    0.92x     0.296     0.352    11.18     0.0     7.4     1.3
+  HFFC6_chr1_10000000_15000000_hflank   5     0.397     0.316    0.372     0.594     0.329    0.93x     0.293     0.358    11.50     0.0    11.6     2.8
+  HFFC6_chr1_10000000_15000000_hboth   5     0.396     0.314    0.372     0.598     0.329    0.93x     0.293     0.358    11.51     0.0    11.9     2.7
+
+  exponent target is 0.352, the fit a run makes on the same file;
+  the project's structures have measured flatter than that, so higher is better here.
+  e20-100k and e100k-1M are the exponent fitted on each band alone; the two should agree
+  with each other and with the cell's measured nu, and a flat short band under a steep
+  long one is loops pulling pairs in with nothing holding the rest at the background.
+  the overlap columns count pairs closer than 0.7 of the structure's own subanchor
+  bond, per thousand beads. wb-aa is
+  anchors inside one block, which only the arcs
+  stage can move; wb-sa is the smooth stage's own excluded volume; xb is across two
+  blocks, which the boundary stitch and the cross block relaxation own. an arm whose
+  beads carry no anchors and no blocks, such as MultiMM, has all its overlaps in wb-sa.

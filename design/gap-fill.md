@@ -561,3 +561,29 @@ hole forms with its blocks are what is left: 0.24 and 0.25 of block with block a
 against Hi-C's 0.69 and 0.70, and 0.41 against 0.78 at 200 to 400 kb, with no hole with block
 contact under 0.7 bond. The excluded volume and the wall in the chromosome pass keep a hole beside
 its blocks rather than against them.
+
+### The hole interface, and what SCC can say about holes, 2026-11-16
+
+`[holes] hard_wall = no` takes the wall out of the hole pass and `[holes] flank_beads` conditions
+the draw on block beads beside the anchors, `conditioned_draw` in `maxent.py`, the bridge when only
+the ends are fixed. Unit checks in `harness/test_maxent_start.py` and `harness/test_holes.py`.
+chr1:10-15 Mb, pooled balanced SCC over mapped bins, raw in brackets, `playground/square_blocks/hiface/`:
+
+| | mxgyr | holes | no wall | flank 5 | both |
+|---|---|---|---|---|---|
+| GM12878 | 0.405 (0.460) | 0.326 (0.322) | 0.326 (0.325) | 0.327 (0.337) | 0.321 (0.312) |
+| H1ESC | 0.134 (0.260) | 0.158 (0.233) | 0.160 (0.229) | 0.160 (0.232) | 0.158 (0.221) |
+| HFFC6 | 0.302 (0.400) | 0.313 (0.398) | 0.312 (0.406) | 0.329 (0.421) | 0.329 (0.423) |
+
+The wall changes nothing and the flank conditioning adds up to 0.016. `playground/hole_mask_scc.py`
+leaves each hole's bins out in turn: with every hole bin out the arms score alike, GM12878 0.279 and
+0.316 with holes against 0.266 and 0.318 without, so the cost lies in the hole bins themselves, and
+on GM12878 in both holes, the PRAMEF hole at 0.70 mapped and 0.52 of the median raw coverage and
+the fully mapped one at 0.77. `playground/hole_scale_scc.py` multiplies every count touching a hole
+bin: on GM12878 the pooled SCC falls steadily from a factor of 0, 0.468 and 0.406 raw and
+balanced, through 0.25, 0.5 and 1 to 0.156 and 0.204 at 2; on H1ESC balanced SCC rises with it,
+0.142 to 0.163, and HFFC6 is flat. Over pairs touching a hole bin the model's counts follow Hi-C's
+from pair to pair, Spearman +0.03 to +0.36 by separation band on GM12878 and HFFC6 and +0.09 to
++0.37 balanced on H1ESC. An empty hole puts zeros where Hi-C is depleted, and a correlation scores
+that extreme against any filled level whose pattern is only partly right, so SCC cannot decide
+whether holes are filled; their contents carry Hi-C's pattern.
