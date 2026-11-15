@@ -479,3 +479,11 @@ Pooled, the arm gains 0.04 to 0.08 in Spearman and 0.06 to 0.07 in SCC on both c
 balanced Pearson by 0.04 to 0.09. Balanced counts are well under one, so Pearson on their log plus
 one is nearly linear and follows the largest values, the first diagonals, which production's
 steeper decay next to the diagonal matches better.
+
+GM12878 whole chr1, three structures, scored on 1 to 60 Mb, `playground/square_blocks/gyrchr/`:
+per structure raw Pearson 0.281 against 0.261, MultiMM 0.628 against 0.588, balanced Pearson
+0.626 against 0.672, balanced SCC 0.233 against 0.228; pooled raw Spearman 0.165 against 0.141,
+balanced SCC 0.290 against 0.276. Far block contacts at 400 kb to 1 Mb four and a half times
+production's, the floor beyond 100 kb 0.25 to 0.32 against 0.40 to 0.51. Rg 21.4 against 24.3 and
+cross block overlaps 62 against 19 per thousand: at chromosome scale the gyration weight of 0.1
+does not hold the size.
