@@ -243,6 +243,7 @@ one as the stage's auto factor times the stage's mean bond scale.
 | `auto_factor_heatmap` | float | 0.5 | 0.5 | Times the mean active heatmap target. |
 | `auto_factor_ib` | float | 0.5 | 0.5 | Times the mean block chain bond. |
 | `arcs_repulsion_cutoff_factor` | float | 0.0 | 1.5 | Truncate the arcless pair repulsion `1 / d` beyond this times the mean arc target. 0 leaves it unbounded, which is the reference's behaviour and lets a sparse block explode. At 3 every pair beyond 100 kb ran away; 1.5 with the contact background sits on the law to 2 Mb, and 1.0 compacts past it. |
+| `arcs_repulsion_range_bp` | int | 0 | 0 | Arcless anchor pairs farther apart than this carry no repulsion, only the excluded volume, so the repulsion acts at short and middle range and leaves the long range free. Zero keeps it on every arcless pair. The marker is cleared after the contact background, so a pair that background holds keeps its spring. Under measurement since 2026-11-15, with `[springs] gyration_weight` to hold the size, `design/gap-fill.md`. |
 
 ## [confinement]
 

@@ -104,6 +104,7 @@ class Settings:
     loop_contact: bool
     factory_weight: float
     gyration_weight: float
+    arcs_repulsion_range_bp: int
     factory_radius: float
     background_range_bp: int
     spring_squeeze_arcs: float
@@ -451,6 +452,7 @@ class Settings:
         # energy, weight zero off, radius in beads.
         self.factory_weight = 0.0
         self.gyration_weight = 0.0
+        self.arcs_repulsion_range_bp = 0
         self.factory_radius = 2.0
         # A weak spring holding an arcless anchor pair inside `background_range_bp` at the
         # background for its separation, in the arcs stage, beside the repulsion that every
@@ -1024,6 +1026,9 @@ class Settings:
         )
         self.arcs_repulsion_cutoff_factor = getf(
             "excluded_volume", "arcs_repulsion_cutoff_factor", self.arcs_repulsion_cutoff_factor
+        )
+        self.arcs_repulsion_range_bp = geti(
+            "excluded_volume", "arcs_repulsion_range_bp", self.arcs_repulsion_range_bp
         )
         self.exclusion_radius_smooth = getf(
             "excluded_volume", "radius_smooth", self.exclusion_radius_smooth

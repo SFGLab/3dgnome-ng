@@ -720,7 +720,22 @@ def calc_anchor_expected_distances(
         ),
         1.0,
     )
-    return add_contact_background(mat, mids, anchor_heatmap, s, lens)
+    mat = add_contact_background(mat, mids, anchor_heatmap, s, lens)
+    return repulsion_range(mat, mids, s)
+
+
+def repulsion_range(mat: F64Array, mids: list[int], s: Settings) -> F64Array:
+    """Clear the repulsion marker on arcless pairs farther apart than `arcs_repulsion_range_bp`,
+    so the kernels score nothing on them but the excluded volume. Zero leaves every marker,
+    and the input is returned as is."""
+    rng = int(s.arcs_repulsion_range_bp)
+    if rng <= 0:
+        return mat
+    m = np.asarray(mids, dtype=np.float64)
+    far = (np.abs(m[:, None] - m[None, :]) > rng) & (mat == -0.5)
+    out = mat.copy()
+    out[far] = 0.0
+    return out
 
 
 def subanchor_counts_per_arc(state: CoarseState, active_region: list[int]) -> list[int]:

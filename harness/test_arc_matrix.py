@@ -28,6 +28,7 @@ from gnome3d.pipeline.coarse.build import (  # noqa: E402
     _active_arcs,
     add_contact_background,
     arc_expected_matrix,
+    repulsion_range,
 )
 from gnome3d.polymer import PolymerLaw  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
@@ -313,11 +314,34 @@ def test_jax_batched_driver_runs() -> None:
     )
 
 
+def test_repulsion_range() -> None:
+    print("\n[repulsion range] far arcless pairs lose the repulsion marker, nothing else moves")
+    s = settings()
+    s.background_weight = 0.1
+    mids = [0, 50_000, 150_000, 600_000, 2_000_000]
+    arcs = [(0, 4, 5, 0)]
+    mat = arc_expected_matrix(s, mids, arcs)
+    same = repulsion_range(mat, mids, s)
+    check("off returns the matrix", same is mat)
+    s.arcs_repulsion_range_bp = 500_000
+    out = repulsion_range(mat, mids, s)
+    sep = np.abs(np.subtract.outer(mids, mids))
+    cleared = (mat == -0.5) & (sep > 500_000)
+    check(
+        "far arcless pairs cleared",
+        bool((out[cleared] == 0.0).all()) and bool(cleared.any()),
+        f"{int(cleared.sum())}",
+    )
+    check("every other entry unchanged", bool(np.array_equal(out[~cleared], mat[~cleared])))
+    check("the far loop kept", out[0, 4] == mat[0, 4] and out[0, 4] > 0.0)
+
+
 def main() -> int:
     print("arc matrix checks")
     test_matrix()
     test_two_factors()
     test_loop_contact()
+    test_repulsion_range()
     test_short_range_background()
     test_contact_background()
     test_jax_matches_numba()
