@@ -81,10 +81,22 @@ def _run_one(problem: Problem, backend: str) -> Result:
         if solver == "lbfgs":
             from gnome3d.mc.numba.arcs_solver import solve_arcs  # noqa: PLC0415
 
+            g = np.asarray(problem["anchor_genomic"], dtype=np.int64)
             score, pos = solve_arcs(
-                pos, exp_dist, s, backend=backend, arc_w=arc_w, activity=activity
+                pos,
+                exp_dist,
+                s,
+                backend=backend,
+                arc_w=arc_w,
+                activity=activity,
+                mids=g[:, 2] if g.ndim == 2 else g,
             )
         else:
+            if float(s.gyration_weight) > 0.0:
+                raise NotImplementedError(
+                    "the gyration term is in the solver's energy, not the annealer's; set "
+                    "[simulation_arcs] solver = lbfgs or [springs] gyration_weight = 0"
+                )
             if activity is not None:
                 raise NotImplementedError(
                     "the factory term is in the solver's energy, not the annealer's; set "

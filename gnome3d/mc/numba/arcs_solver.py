@@ -27,9 +27,10 @@ from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
 from gnome3d.mc.numba.terms import NO_W, njit
-from gnome3d.types import F32Array, F64Array
+from gnome3d.types import F32Array, F64Array, I64Array
 
 if TYPE_CHECKING:
+    from gnome3d.polymer import PolymerLaw
     from gnome3d.settings import Settings
 
 LOG = log.get("arcs.solver")
@@ -204,6 +205,64 @@ def factory_energy_grad(x: F64Array, act: F64Array, w: float, r: float) -> tuple
     return ener.sum(), g.reshape(-1)
 
 
+def gyration_windows(
+    mids: I64Array, law: PolymerLaw, smallest_bp: int
+) -> tuple[Any, F64Array, F64Array]:
+    """The windows the gyration term holds and their target radii.
+
+    Windows tile the anchors' span at every scale from `smallest_bp` doubling up to the span,
+    twice at each scale, the second tiling shifted by half a window. A window holding fewer than
+    four anchors is left out. Its target is the law's radius of gyration for the span its anchors
+    cover.
+
+    Returns
+    -------
+    member, count, target
+        A sparse window by anchor matrix of ones, each window's anchor count, and its target.
+    """
+    import scipy.sparse as sp  # noqa: PLC0415
+
+    m = np.asarray(mids, dtype=np.int64)
+    lo, hi = int(m.min()), int(m.max())
+    rows: list[I64Array] = []
+    targets: list[float] = []
+    w = max(int(smallest_bp), 1)
+    while w <= max(hi - lo, 1):
+        for off in (0, w // 2):
+            lab = (m - lo + off) // w
+            order = np.argsort(lab, kind="stable")
+            cuts = np.flatnonzero(np.diff(lab[order])) + 1
+            for grp in np.split(order, cuts):
+                if grp.size < 4:
+                    continue
+                rows.append(grp)
+                targets.append(law.radius_of_gyration(int(m[grp].max() - m[grp].min())))
+        w *= 2
+    if not rows:
+        return sp.csr_matrix((0, len(m))), np.zeros(0), np.zeros(0)
+    ri = np.concatenate([np.full(len(g), k) for k, g in enumerate(rows)])
+    ci = np.concatenate(rows)
+    member = sp.csr_matrix((np.ones(len(ci)), (ri, ci)), shape=(len(rows), len(m)))
+    return member, np.array([len(g) for g in rows], dtype=np.float64), np.array(targets)
+
+
+def gyration_energy_grad(
+    x: F64Array, member: Any, count: F64Array, target: F64Array, weight: float
+) -> tuple[float, F64Array]:
+    """`weight` times the sum over windows of the anchor count times the squared relative misfit
+    of the window's radius of gyration to its target, and the gradient."""
+    n = member.shape[1]
+    pos = x.reshape(n, 3)
+    cen = (member @ pos) / count[:, None]
+    msq = (member @ (pos * pos).sum(axis=1)) / count
+    rg = np.sqrt(np.maximum(msq - (cen * cen).sum(axis=1), 1e-12))
+    rel = rg / target - 1.0
+    e = weight * float((count * rel * rel).sum())
+    coef = 2.0 * weight * rel / (target * rg)
+    g = (member.T @ coef)[:, None] * pos - member.T @ (coef[:, None] * cen)
+    return e, g.reshape(-1)
+
+
 def solve_arcs(
     pos: F32Array,
     exp_dist: F64Array,
@@ -212,6 +271,7 @@ def solve_arcs(
     backend: str = "numba",
     arc_w: F32Array | None = None,
     activity: F32Array | None = None,
+    mids: I64Array | None = None,
 ) -> tuple[float, F32Array]:
     """Minimise the arcs energy from `pos`. Returns `(energy, positions)`.
 
@@ -220,6 +280,8 @@ def solve_arcs(
     minimiser itself always runs on the host. The arcs stage passes the executor's choice.
     `arc_w` is each arc pair's spring weight, or None for every pair at one. `activity` is
     each anchor's activity for the factory term at `factory_weight`, or None for no term.
+    `mids` are the anchors' genomic midpoints, which the gyration term at `gyration_weight`
+    needs to tile its windows.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -306,6 +368,22 @@ def solve_arcs(
 
             fun = with_factories_cpu
             fun_args = ()
+    gyr_w = float(s.gyration_weight)
+    if gyr_w > 0.0:
+        if mids is None:
+            raise ValueError("[springs] gyration_weight needs the anchors' genomic midpoints")
+        member, count, target = gyration_windows(mids, s.polymer_law(), int(s.background_range_bp))
+        base_g, base_g_args = fun, fun_args
+
+        def with_gyration(x: Any) -> tuple[float, F64Array]:
+            e1, g1 = base_g(x, *base_g_args)
+            e2, g2 = gyration_energy_grad(
+                np.asarray(x, dtype=np.float64), member, count, target, gyr_w
+            )
+            return float(e1) + e2, np.asarray(g1, dtype=np.float64) + g2
+
+        fun = with_gyration
+        fun_args = ()
     if n_it <= 0:
         # No descent. The start is kept, which is how a drawn start reaches the chains as drawn.
         e0, _ = fun(pw.reshape(-1), *fun_args)

@@ -103,6 +103,7 @@ class Settings:
     loop_dropout_scale: float
     loop_contact: bool
     factory_weight: float
+    gyration_weight: float
     factory_radius: float
     background_range_bp: int
     spring_squeeze_arcs: float
@@ -449,6 +450,7 @@ class Settings:
         # The factory term: active anchors attract as a group with a saturating collective
         # energy, weight zero off, radius in beads.
         self.factory_weight = 0.0
+        self.gyration_weight = 0.0
         self.factory_radius = 2.0
         # A weak spring holding an arcless anchor pair inside `background_range_bp` at the
         # background for its separation, in the arcs stage, beside the repulsion that every
@@ -861,6 +863,7 @@ class Settings:
             "springs", "stretch_constant_arcs", self.spring_stretch_arcs
         )
         self.background_weight = getf("springs", "background_weight", self.background_weight)
+        self.gyration_weight = getf("springs", "gyration_weight", self.gyration_weight)
         self.background_range_bp = geti("springs", "background_range_bp", self.background_range_bp)
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs
