@@ -523,3 +523,20 @@ balanced Pearson down 0.03 to 0.04. The arm is no repulsion, `[excluded_volume]
 arcs_repulsion_cutoff_factor` 0.05, the arcs excluded volume at the mean arc target,
 `auto_factor_arcs` 1.0, `[springs] gyration_weight` 0.1, and `[relax] use_cross_block_relax` with
 `local_window` 1.
+
+### The drawn start on top, 2026-11-15
+
+`start = maxent` added to the arm above, results in `playground/square_blocks/mxgyr/` and
+`gyrchr/`. Pooled, mean over three regions and three cells, five structures:
+
+| Arm | raw P | raw Sp | raw SCC | bal P | bal Sp | bal SCC |
+|---|---|---|---|---|---|---|
+| prod | 0.527 | 0.411 | 0.266 | 0.761 | 0.410 | 0.241 |
+| gyr01relax | 0.572 | 0.458 | 0.289 | 0.732 | 0.458 | 0.268 |
+| mxgyr | 0.586 | 0.471 | 0.305 | 0.727 | 0.470 | 0.288 |
+
+Balanced SCC up over gyr01relax on eight of nine runs and level on the ninth. GM12878 whole chr1,
+three structures, pooled: raw SCC 0.379 against 0.361 and production's 0.343, balanced SCC 0.308
+against 0.292 and 0.276, Spearman 0.169 against 0.164 and 0.141, MultiMM 0.681 against 0.637 and
+0.588, cross block overlaps 19.7. The fit of the draw over 11,913 anchors takes 159 iterations and
+the chromosome 25 minutes on frodo.
