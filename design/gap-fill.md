@@ -487,3 +487,22 @@ balanced SCC 0.290 against 0.276. Far block contacts at 400 kb to 1 Mb four and 
 production's, the floor beyond 100 kb 0.25 to 0.32 against 0.40 to 0.51. Rg 21.4 against 24.3 and
 cross block overlaps 62 against 19 per thousand: at chromosome scale the gyration weight of 0.1
 does not hold the size.
+
+Scoring decision, 2026-11-15: arms are judged by the pooled ensemble map's SCC and Spearman,
+`playground/ensemble_score.py`, written per region by `slurm/ensemble/arms_trial.sh`; the
+battery per structure and balanced Pearson are kept as secondary columns. The 12 percent smaller
+Rg of the gyration arm is the law's: 20.7 for 60 Mb, the arm 21.4, production 24.3, its distance
+exponent 1.16 times Hi-C's against the arm's 1.04.
+
+Overlaps at chromosome scale, GM12878 whole chr1, three structures, scored on 1 to 60 Mb, pooled:
+
+| Arm | raw Sp | raw SCC | bal SCC | bal P | MultiMM | Rg | cross block overlaps |
+|---|---|---|---|---|---|---|---|
+| prod | 0.141 | 0.343 | 0.276 | 0.710 | 0.588 | 24.3 | 19 |
+| gyr01 | 0.165 | 0.351 | 0.290 | 0.659 | 0.628 | 21.4 | 62 |
+| gyr01 and the cross block relaxation, window 1 | 0.164 | 0.361 | 0.292 | 0.674 | 0.637 | 21.5 | 14 |
+| gyr01, arcs excluded volume 1.25 | 0.164 | 0.346 | 0.284 | 0.670 | 0.640 | 21.5 | 49 |
+
+The relaxation with a window of one moves 27,800 of 134,823 beads and takes cross block contacts
+within a bond from 26,565 to 2,286, at about five minutes a structure set. Far block contacts stay
+at four times production's.
