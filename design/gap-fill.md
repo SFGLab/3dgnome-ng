@@ -438,3 +438,23 @@ Far block contacts stay two to two and a half times production's with the floor 
 0.29 to 0.38. Gyration at 1 or 10 adds nothing, and beside the repulsion it changes little.
 Balanced Pearson stays 0.02 under production on every region, with the 20 to 100 kb exponent at
 0.25 to 0.28 against 0.27 to 0.30 and smooth stage overlaps up, 16 to 46 per thousand on 20-25 Mb.
+
+Three cells, three regions, mean, results in `playground/square_blocks/gyr3c/` and `rrange/`:
+
+| Arm | raw P | raw SCC | bal P | bal SCC | MultiMM | e20-100k |
+|---|---|---|---|---|---|---|
+| prod | 0.427 | 0.211 | 0.707 | 0.190 | 0.677 | 0.327 |
+| no repulsion, excluded volume 1.0, gyration 0.1 | 0.455 | 0.224 | 0.676 | 0.207 | 0.712 | 0.291 |
+| the same, gyration 0.3 | 0.451 | 0.225 | 0.681 | 0.209 | 0.702 | 0.297 |
+| the same, excluded volume 1.25 | 0.448 | 0.219 | 0.682 | 0.205 | 0.708 | 0.292 |
+| repulsion kept to 200 kb, gyration 0.1 | 0.437 | 0.213 | 0.661 | 0.193 | 0.637 | 0.324 |
+| repulsion kept to 500 kb, gyration 0.1 | 0.417 | 0.216 | 0.674 | 0.195 | 0.604 | 0.319 |
+| repulsion kept to 200 kb, no gyration | 0.437 | 0.206 | 0.640 | 0.188 | 0.619 | 0.326 |
+
+With no repulsion and gyration 0.1, raw Pearson is up on nine of nine runs and balanced SCC and
+MultiMM on seven, balanced Pearson down on nine, by 0.015 to 0.066. Keeping the repulsion to 200
+or 500 kb, `[excluded_volume] arcs_repulsion_range_bp`, brings the 20 to 100 kb exponent back to
+production's and loses more balanced Pearson and MultiMM, so the flatter short band does not
+explain the balanced Pearson loss. With five structures a far bin holds a handful of contacts,
+and production holds none there, so an arm that opens the long range fills those bins with
+sampling noise. The check is the same two arms at twenty structures.
