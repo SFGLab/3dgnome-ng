@@ -1,0 +1,22 @@
+observed Hi-C chr1:10000000-15000000 at 25,000 bp: 200 bins
+exponent yardstick: nu 0.329 fitted on GM12878_hic_25kb_singletons.bedpe
+
+         arm   n   pearson  spearman      SCC   multimm  exponent  vs Hi-C  e20-100k  e100k-1M       Rg   wb-aa   wb-sa      xb
+  GM12878_chr1_10000000_15000000_prod   5     0.646     0.295    0.325     0.760     0.403    1.22x     0.268     0.457     9.08     0.1     5.5     4.2
+  GM12878_chr1_10000000_15000000_norep   5     0.541     0.328    0.283     0.685     0.274    0.83x     0.233     0.332     7.01     0.6   156.8   133.3
+  GM12878_chr1_10000000_15000000_nocb   5     0.645     0.296    0.333     0.743     0.404    1.23x     0.264     0.457     9.05     0.1     7.6     3.7
+  GM12878_chr1_10000000_15000000_nobg   5     0.592     0.278    0.294     0.683     0.375    1.14x     0.203     0.443    10.31     0.0     1.2     4.4
+  GM12878_chr1_10000000_15000000_noarcsev   5     0.645     0.296    0.328     0.727     0.406    1.23x     0.256     0.463     9.10     0.6     4.7     1.2
+  GM12878_chr1_10000000_15000000_weakloop   5     0.644     0.279    0.303     0.727     0.416    1.26x     0.298     0.462     9.13     0.0     4.2     1.2
+
+  exponent target is 0.329, the fit a run makes on the same file;
+  the project's structures have measured flatter than that, so higher is better here.
+  e20-100k and e100k-1M are the exponent fitted on each band alone; the two should agree
+  with each other and with the cell's measured nu, and a flat short band under a steep
+  long one is loops pulling pairs in with nothing holding the rest at the background.
+  the overlap columns count pairs closer than 0.7 of the structure's own subanchor
+  bond, per thousand beads. wb-aa is
+  anchors inside one block, which only the arcs
+  stage can move; wb-sa is the smooth stage's own excluded volume; xb is across two
+  blocks, which the boundary stitch and the cross block relaxation own. an arm whose
+  beads carry no anchors and no blocks, such as MultiMM, has all its overlaps in wb-sa.

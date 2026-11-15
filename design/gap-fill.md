@@ -388,3 +388,28 @@ short range contacts fall under production's. The 20 to 100 kb exponent stays at
 against Hi-C's 0.33 in every drawn arm. The raw gains of the kept draw came with its overlaps, and
 the spread the draw adds at long range does not reach balanced Pearson or SCC. The whole chr1 run
 was stopped. The drawn start with the full solve stays the one arm with a gain, MultiMM.
+
+## What sets the anchor floor, 2026-11-15
+
+`slurm/ensemble/arms_trial.sh` on frodo, GM12878 chr1:10-15, 20-25 and 35-40 Mb, five structures,
+one arcs term removed per arm, production rerun beside them. Results in
+`playground/square_blocks/ablate/`. `playground/contact_spread.py` now prints the anchor floor,
+the 1 percent and median quantiles of anchor pair distance over the law.
+
+| Arm | floor beyond 100 kb, 1% and median | block contacts 400 kb to 1 Mb | bal Pearson | Rg | cross block overlaps |
+|---|---|---|---|---|---|
+| prod | 0.42 to 0.53, 0.95 to 1.07 | 0.0002 to 0.0003 | 0.646 to 0.729 | 9 to 10 | 1 to 4 |
+| no arcless repulsion | 0.17 to 0.22, 0.62 to 0.66 | 0.0022 to 0.0036 | 0.541 to 0.622 | 7.0 to 7.5 | 133 to 285 |
+| no contact background | unchanged | unchanged | unchanged | | |
+| no arcs excluded volume | unchanged | unchanged | unchanged | | |
+| no background springs | 0.43 to 0.54, 1.3 to 2.0 | unchanged | down 0.05 to 0.10 | 10 to 12 | |
+| loop springs at 0.1 | 0.45 to 0.65, 0.97 to 1.14 | lower | level | | |
+
+Beyond 100 kb the arcless repulsion sets the floor. Without it the long range contacts rise ten
+fold and the 100 kb to 1 Mb exponent falls from 0.39 to 0.46 to 0.28 to 0.33 against Hi-C's 0.33,
+and the blocks compact a third and pass through each other, since nothing else holds the long
+range size. The repulsion stands in for the volume of the chain between anchors, which the arcs
+stage does not carry, and holds every far pair of every conformation at the same distance. Under
+100 kb the background springs hold the pairs at the law, and without them the blocks swell. The
+next arms take the long range arrangement and its spread from the draw and solve without the
+repulsion, with the arcs excluded volume at its default radius and at a full mean arc target.
