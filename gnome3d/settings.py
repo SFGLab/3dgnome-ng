@@ -289,6 +289,8 @@ class Settings:
 
     # ---- holes between blocks ----
     use_hole_beads: bool
+    holes_hard_wall: bool
+    holes_flank_beads: int
 
     # ---- A/B compartments ----
     use_compartments: bool
@@ -643,6 +645,8 @@ class Settings:
         # Beads for the stretch between two blocks, drawn from the maximum entropy bridge between
         # the anchors that bound it. See gnome3d/pipeline/holes.py.
         self.use_hole_beads = False
+        self.holes_hard_wall = True
+        self.holes_flank_beads = 0
 
         # ---- A/B compartments ----
         # Block-copolymer segregation over a per-bead compartment call, ported
@@ -1130,6 +1134,8 @@ class Settings:
 
         # [holes]
         self.use_hole_beads = getb("holes", "use_hole_beads", self.use_hole_beads)
+        self.holes_hard_wall = getb("holes", "hard_wall", self.holes_hard_wall)
+        self.holes_flank_beads = geti("holes", "flank_beads", self.holes_flank_beads)
 
         # [compartments]
         self.use_compartments = getb("compartments", "use_compartments", self.use_compartments)

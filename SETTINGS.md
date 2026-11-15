@@ -305,6 +305,8 @@ before the first block and after the last stay empty.
 | key | type | default | production | what it does |
 | --- | --- | --- | --- | --- |
 | `use_hole_beads` | bool | no | no | Master switch. Under measurement since 2026-11-14, `design/gap-fill.md`. |
+| `hard_wall` | bool | yes | yes | Whether the chromosome pass over the hole beads keeps the smooth stage's hard wall. `no` leaves the soft excluded volume alone, so a hole can rest against its blocks instead of beside them. Under measurement since 2026-11-15, `design/gap-fill.md`. |
+| `flank_beads` | int | 0 | 0 | Block beads on each side of a hole, besides the two anchors, that its draw is conditioned on, so the hole starts in contact with its blocks as the law has it. Zero draws a bridge between the anchors alone. Under measurement since 2026-11-15. |
 
 ## [compartments]
 

@@ -146,11 +146,32 @@ def test_blocks_repel() -> None:
         check(f"excluded volume {'on' if ev else 'off'}, block beads unmoved", out[2] == c)
 
 
+def test_keys() -> None:
+    print("\n[keys] flank beads and the hole wall")
+    blocks = [block(0, 10, 0.0), block(60_000, 10, 30.0), block(20_000, 5, 12.0)]
+    s = settings(True, ev=True)
+    s.holes_flank_beads = 3
+    a = fill_holes(blocks, s, "chr1", 0)
+    b = fill_holes(blocks, s, "chr1", 0)
+    check("flank draw seeded", a == b)
+    flat = sorted((x for blk in a for x in blk), key=lambda x: x.start)
+    check("flank draw keeps starts unique", len({x.start for x in flat}) == len(flat))
+    check(
+        "flank draw changes the holes",
+        a[3:] != fill_holes(blocks, settings(True, ev=True), "chr1", 0)[3:],
+    )
+    s2 = settings(True, ev=True)
+    s2.holes_hard_wall = False
+    c = fill_holes(blocks, s2, "chr1", 0)
+    check("blocks untouched without the wall", c[:3] == blocks)
+
+
 def main() -> int:
     test_slots()
     test_fill()
     test_long()
     test_blocks_repel()
+    test_keys()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

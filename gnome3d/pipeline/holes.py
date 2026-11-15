@@ -12,7 +12,9 @@ almost no counts at 1 kb. The drawn chain then runs through the smooth stage's k
 two ends fixed, the terms a gap inside a block runs through, so a hole's short range matches the
 blocks'. That pass runs once over the whole chromosome in genomic order with every block bead
 fixed, so the excluded volume and the hard wall act between hole beads and block beads as well as
-within a hole. Confinement is left out, since a sphere about the chromosome's centroid has no
+within a hole. `[holes] hard_wall = no` leaves the wall out of the pass and keeps the soft excluded
+volume, and `[holes] flank_beads` conditions the draw on that many beads of each flanking block
+besides the two anchors. Confinement is left out, since a sphere about the chromosome's centroid has no
 meaning for one hole. The stretches before the first block and after the last are left empty,
 since a bridge needs two ends. See `design/gap-fill.md`.
 """
@@ -25,7 +27,7 @@ import zlib
 import numpy as np
 
 from gnome3d import log
-from gnome3d.pipeline.ib.maxent import maxent_start
+from gnome3d.pipeline.ib.maxent import chain_targets, conditioned_draw, maxent_start
 from gnome3d.settings import Settings
 from gnome3d.types import BeadOut, F32Array
 from gnome3d.util import add_movable_noise_inplace, seed_rng
@@ -56,8 +58,12 @@ def _draw(
     s: Settings,
     rng: np.random.Generator,
     chrom: str,
+    flank: tuple[list[BeadOut], list[BeadOut]] = ([], []),
 ) -> F32Array:
-    """Positions of a chain whose first and last beads are fixed at `ends_pos`."""
+    """Positions of a chain whose first and last beads are fixed at `ends_pos`.
+
+    `flank` holds block beads before the first bead and after the last, in genomic order. With
+    any, the hole's top level is drawn conditioned on them as well as on the two anchors."""
     law = s.polymer_law()
     stretch = float(s.heatmap_distance_stretching)
     uri = str(s.data_contact_map)
@@ -65,7 +71,29 @@ def _draw(
     knots = list(range(0, n - 1, _SEGMENT)) + [n - 1]
     pos = np.zeros((n, 3), dtype=np.float32)
     pos[0], pos[-1] = ends_pos[0], ends_pos[1]
-    if len(knots) > 2:
+    left, right = flank
+    if left or right:
+        # The top level, every bead of a short hole or the knots of a long one, drawn with the
+        # flanking block beads fixed beside the anchors.
+        top = knots if len(knots) > 2 else list(range(n))
+        f_st = [x.start for x in left] + [starts[k] for k in top] + [x.start for x in right]
+        f_en = [x.end for x in left] + [ends[k] for k in top] + [x.end for x in right]
+        f_pos = np.concatenate(
+            [
+                np.array([[x.x, x.y, x.z] for x in left], dtype=np.float64).reshape(-1, 3),
+                pos[top].astype(np.float64),
+                np.array([[x.x, x.y, x.z] for x in right], dtype=np.float64).reshape(-1, 3),
+            ]
+        )
+        fixed = np.zeros(len(f_st), dtype=np.bool_)
+        fixed[: len(left) + 1] = True
+        fixed[len(left) + len(top) - 1 :] = True
+        d = chain_targets(f_st, f_en, law, stretch, "" if len(knots) > 2 else uri, chrom)
+        drawn = conditioned_draw(f_pos, fixed, d, rng)
+        pos[top] = drawn[len(left) : len(left) + len(top)].astype(np.float32)
+        if len(knots) <= 2:
+            return pos
+    elif len(knots) > 2:
         fixed = np.zeros(len(knots), dtype=np.bool_)
         fixed[[0, -1]] = True
         coarse = maxent_start(
@@ -130,6 +158,7 @@ def _smooth(chain: list[BeadOut], hole: list[bool], s: Settings, seed: int) -> F
     r.use_confinement = False
     r.use_compartments = False
     r.mc_smooth_chains = 1
+    r.smooth_hard_wall = bool(s.smooth_hard_wall) and bool(s.holes_hard_wall)
     if float(s.exclusion_radius_smooth) <= 0.0:
         r.exclusion_radius_smooth = float(s.exclusion_auto_factor_smooth) * mean_hole
     step = mean_hole * float(s.noise_smooth)
@@ -150,7 +179,8 @@ def fill_holes(
     blocks
         One chromosome's per block bead lists, in any order.
     s
-        Settings. Reads `use_hole_beads`, `target_bp_per_subanchor` and `[data] contact_map`.
+        Settings. Reads `use_hole_beads`, `flank_beads`, `hard_wall`,
+        `target_bp_per_subanchor` and `[data] contact_map`.
     chrom
         The chromosome, for the contact map and the draw's seed.
     seed
@@ -176,7 +206,16 @@ def fill_holes(
         ends = [a.end] + [hi for _, hi in slots] + [b.end]
         rng = np.random.default_rng([seed & 0x7FFFFFFF, zlib.crc32(chrom.encode()), k])
         ends_pos = np.array([(a.x, a.y, a.z), (b.x, b.y, b.z)], dtype=np.float32)
-        drawn = _draw(starts, ends, ends_pos, s, rng, chrom)
+        nf = int(s.holes_flank_beads)
+        flank: tuple[list[BeadOut], list[BeadOut]] = ([], [])
+        if nf > 0:
+            lb = sorted(order[k], key=lambda x: x.start)
+            rb = sorted(order[k + 1], key=lambda x: x.start)
+            flank = (
+                [x for x in lb if x is not a][-nf:],
+                [x for x in rb if x is not b][:nf],
+            )
+        drawn = _draw(starts, ends, ends_pos, s, rng, chrom, flank)
         drawn_holes.append(
             [
                 BeadOut(lo, hi, float(p[0]), float(p[1]), float(p[2]), "subanchor")

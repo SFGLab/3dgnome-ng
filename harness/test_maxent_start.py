@@ -153,6 +153,45 @@ def test_anchor_draw() -> None:
     )
 
 
+def test_conditioned() -> None:
+    print("\n[conditioned] two fixed ends give the bridge, flanks pull the free beads")
+    mids = np.arange(0, 40_000, 1000, dtype=np.float64)
+    d = me.law_distances(mids, LAW)
+    pos = np.zeros((40, 3))
+    pos[-1] = [6.0, 0.0, 0.0]
+    fixed = np.zeros(40, dtype=bool)
+    fixed[[0, -1]] = True
+    coef, root = me.bridge(d)
+    draws = np.array(
+        [me.conditioned_draw(pos, fixed, d, np.random.default_rng(k)) for k in range(400)]
+    )
+    mean = draws.mean(axis=0)[1:-1, 0]
+    check(
+        "mean matches the bridge",
+        bool(np.abs(mean - coef * 6.0).max() < 0.4),
+        f"{np.abs(mean - coef * 6.0).max():.3f}",
+    )
+    spread = draws[:, 1:-1, 1].std(axis=0)
+    expect = np.sqrt((root**2).sum(axis=1))
+    check(
+        "spread matches the bridge",
+        bool(np.abs(spread / expect - 1).max() < 0.2),
+        f"{np.abs(spread / expect - 1).max():.3f}",
+    )
+    fixed2 = fixed.copy()
+    fixed2[:4] = True
+    pos2 = pos.copy()
+    pos2[1:4] = [[0.0, 3.0, 0.0], [0.0, 4.0, 0.0], [0.0, 5.0, 0.0]]
+    near = np.array(
+        [me.conditioned_draw(pos2, fixed2, d, np.random.default_rng(k)) for k in range(200)]
+    ).mean(axis=0)
+    check(
+        "a free bead beside fixed flank beads follows them",
+        bool(near[4, 1] > 2.0),
+        f"y {near[4, 1]:.2f}",
+    )
+
+
 def main() -> int:
     test_bridge()
     test_windows()
@@ -160,6 +199,7 @@ def main() -> int:
     test_start()
     test_settings()
     test_anchor_draw()
+    test_conditioned()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
         print(f"  failed: {f}")

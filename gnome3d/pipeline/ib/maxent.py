@@ -306,6 +306,73 @@ def _gap_factor(
     return f
 
 
+def chain_targets(
+    starts: list[int],
+    ends: list[int],
+    law: PolymerLaw,
+    stretch: float,
+    contact_map: str = "",
+    chrom: str = "",
+) -> F64Array:
+    """Target mean distances between every two beads of one chain, the law's background scaled
+    by the window contacts of `contact_map` as a gap's are, or the law alone without one."""
+    st = np.asarray(starts, dtype=np.int64)
+    en = np.asarray(ends, dtype=np.int64)
+    mids = (st + en) / 2.0
+    d = law_distances(mids, law)
+    if not (contact_map and chrom):
+        return d
+    order = np.argsort(st, kind="stable")
+    lab_sorted = windows(st[order], en[order])
+    lab = np.empty_like(lab_sorted)
+    lab[order] = lab_sorted
+    k = int(lab_sorted[-1]) + 1
+    fit = chromosome_expectation(contact_map, chrom)
+    if k < 3 or fit is None:
+        return d
+    w_st = np.array([st[lab == q].min() for q in range(k)], dtype=np.int64)
+    w_en = np.array([en[lab == q].max() for q in range(k)], dtype=np.int64)
+    cnt = window_counts(contact_map, chrom, w_st, w_en)
+    f = _gap_factor(cnt, (w_st + w_en) / 2.0, np.maximum(w_en - w_st, 1).astype(np.float64), fit)
+    out = np.clip(d * f[lab[:, None], lab[None, :]], 1.0, stretch * np.maximum(d, 1.0))
+    np.fill_diagonal(out, 0.0)
+    return out
+
+
+def conditioned_draw(
+    pos: F64Array, fixed: BoolArray, d: F64Array, rng: np.random.Generator
+) -> F64Array:
+    """The free beads of a chain drawn from the Gaussian whose mean pair distances are `d`,
+    conditioned on every fixed bead where `pos` puts it.
+
+    The covariance per coordinate is taken against the first fixed bead as origin, from the
+    squared targets as for a bridge, and the free beads' law given the fixed ones is the usual
+    Gaussian conditional. A bridge is the case of two fixed beads at the chain's ends.
+    """
+    v = _MAXWELL * d * d
+    o = int(np.flatnonzero(fixed)[0])
+    c = 0.5 * (v[o][:, None] + v[o][None, :] - v)
+    fx = np.flatnonzero(fixed)
+    fx = fx[fx != o]
+    fr = np.flatnonzero(~fixed)
+    out = pos.copy()
+    if fr.size == 0:
+        return out
+    cff = c[np.ix_(fx, fx)]
+    cuf = c[np.ix_(fr, fx)]
+    sol = (
+        np.linalg.solve(cff + 1e-9 * np.eye(len(fx)), cuf.T).T
+        if fx.size
+        else np.zeros((fr.size, 0))
+    )
+    mean = pos[o] + sol @ (pos[fx] - pos[o]) if fx.size else np.tile(pos[o], (fr.size, 1))
+    cov = c[np.ix_(fr, fr)] - sol @ cuf.T
+    lam, u = np.linalg.eigh(0.5 * (cov + cov.T))
+    root = u * np.sqrt(np.clip(lam, 0.0, None))
+    out[fr] = mean + root @ rng.normal(size=(fr.size, 3))
+    return out
+
+
 def maxent_start(
     pos: F32Array,
     fixed: BoolArray,
