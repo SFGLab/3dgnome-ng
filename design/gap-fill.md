@@ -413,3 +413,28 @@ stage does not carry, and holds every far pair of every conformation at the same
 100 kb the background springs hold the pairs at the law, and without them the blocks swell. The
 next arms take the long range arrangement and its spread from the draw and solve without the
 repulsion, with the arcs excluded volume at its default radius and at a full mean arc target.
+
+### Excluded volume radius and a gyration term, 2026-11-15
+
+Without the repulsion the arcs excluded volume radius sets the long range size, and it sets a
+floor with it. GM12878, three regions, `playground/square_blocks/ablate2/` and `ablate3/`: at 1.0
+of the mean arc target the floor beyond 100 kb is 0.29 to 0.35 of the law and far block contacts
+four times production's, at Rg down 15 percent and balanced Pearson down 0.03 to 0.06; at 1.5 the
+floor is 0.34 to 0.44 and the contacts 1.3 times production's; at 2.0 the floor is back at 0.38 to
+0.53. Any pairwise term that holds the size holds every far pair at one distance.
+
+`[springs] gyration_weight` holds the radius of gyration of every genomic window of anchors at the
+law's, windows at every scale from 100 kb doubling up and tiled twice, in the arcs solver's energy.
+It sets size without holding a pair. Unit checks in `harness/test_gyration.py`. GM12878, three
+regions, mean, results in `playground/square_blocks/gyr/`:
+
+| Arm | raw P | raw SCC | bal P | bal SCC | MultiMM | Rg |
+|---|---|---|---|---|---|---|
+| prod | 0.443 | 0.224 | 0.697 | 0.185 | 0.697 | 9.7 |
+| no repulsion, excluded volume at 1.0 | 0.478 | 0.240 | 0.656 | 0.204 | 0.727 | 8.3 |
+| the same and gyration at 0.1 | 0.466 | 0.243 | 0.676 | 0.208 | 0.734 | 9.1 |
+
+Far block contacts stay two to two and a half times production's with the floor beyond 100 kb at
+0.29 to 0.38. Gyration at 1 or 10 adds nothing, and beside the repulsion it changes little.
+Balanced Pearson stays 0.02 under production on every region, with the 20 to 100 kb exponent at
+0.25 to 0.28 against 0.27 to 0.30 and smooth stage overlaps up, 16 to 46 per thousand on 20-25 Mb.
