@@ -334,3 +334,34 @@ production's 170 fold. Anchor pairs touch at every separation. Trial `slurm/ense
 arms against production on three regions and three cells and on whole chr1 for two cells: the
 draw kept, the draw and 30 solver iterations, the draw and the full solve, the repulsion's reach
 at 1.0 and 0.75, loop dropout, and the kept draw with hole beads.
+
+### Spread trial, regions, 2026-11-15
+
+`slurm/ensemble/spread_trial.sh`, results in `playground/square_blocks/spread/`. Gate rerun
+byte identical. Mean over chr1:10-15, 20-25 and 35-40 Mb on GM12878, H1ESC and HFFC6, five
+structures each: raw Pearson, balanced Pearson, balanced SCC, MultiMM.
+
+| Arm | raw P | bal P | bal SCC | MultiMM |
+|---|---|---|---|---|
+| prod | 0.427 | 0.707 | 0.186 | 0.678 |
+| mx0, the draw kept | 0.464 | 0.598 | 0.165 | 0.685 |
+| mx30, the draw and 30 solver iterations | 0.421 | 0.674 | 0.182 | 0.710 |
+| mxfull, the draw and the full solve | 0.426 | 0.697 | 0.193 | 0.717 |
+| reach10 | 0.450 | 0.671 | 0.189 | 0.659 |
+| reach075 | 0.462 | 0.642 | 0.189 | 0.630 |
+| dropout | 0.416 | 0.693 | 0.183 | 0.669 |
+| mx0holes | 0.460 | 0.596 | 0.149 | 0.674 |
+
+The kept draw raises raw Pearson, Spearman and MultiMM and costs balanced Pearson 0.11. It has no
+excluded volume: anchor overlaps inside a block rise from 4.4 to 34.7 per thousand on GM12878
+20-25 Mb and cross block overlaps to 40 to 220, and the 20 to 100 kb exponent falls to 0.23 against
+Hi-C's 0.33. The draw followed by the full solve keeps balanced Pearson within 0.01, raises SCC
+0.007 and MultiMM 0.039, up on seven of nine runs: the solve undoes the spread and keeps the
+long range arrangement the draw set, where production's comes from the Hilbert curve. A shorter
+repulsion reach raises raw Pearson and costs balanced Pearson and MultiMM, compacting the blocks
+to an Rg 15 to 20 percent under production. Dropout loses on every column.
+
+The arm that keeps the spread and removes the overlaps, `slurm/ensemble/spread_ev_trial.sh`,
+draws and then solves with every target spring at zero, so only the excluded volume and the
+arcless repulsion act. On GM12878 20-25 Mb, two structures, block contacts at 400 kb to 1 Mb
+hold 0.0021 of pairs against production's 0.0002 and 25 to 50 kb 0.035 against 0.036.
