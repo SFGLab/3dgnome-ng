@@ -9,8 +9,9 @@
 # file as it is, runs beside them on the same machine, since another card or pool size does not
 # reproduce a structure bit for bit. A value CONTACT_MAP in an override is replaced by the cell's
 # deepest mcool at 1 kb. A region written chr1 runs the whole chromosome and is scored on
-# chr1:1-60000000. Each region is scored by the battery on raw and balanced counts, the readout
-# and the contact spread, and the log of the whole trial is OUT/TAG.log.
+# chr1:1-60000000. Each region is scored on the pooled ensemble map, the headline, and by the
+# battery per structure on raw and balanced counts, the readout and the contact spread, and the
+# log of the whole trial is OUT/TAG.log.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
@@ -83,6 +84,7 @@ for C in $CELLS; do
         --singletons "$DATA/$C/${C}_hic_25kb_singletons.bedpe" "$M" "$SCORE_R" 25000 $dirs 2>&1 \
         | grep -vE "INFO|WARN" > "$OUT/${C}_${SCORE_T}_battery_balance_$B.txt"
     done
+    .venv/bin/python playground/ensemble_score.py "$M" "$SCORE_R" $dirs 2>&1 | grep -vE "INFO|WARN" > "$OUT/${C}_${SCORE_T}_pooled.txt"
     for d in $dirs; do
       .venv/bin/python playground/contact_spread.py "$OUT/${C}_${SCORE_T}_prod" "$d" 2>&1 | grep -vE "INFO|WARN"
     done > "$OUT/${C}_${SCORE_T}_spread.txt"
