@@ -29,6 +29,9 @@ CUDAMMC="${CUDAMMC:-$HOME/tools/cudaMMC/build/cudaMMC}"
 CUDAMMC_TEMPLATE="${CUDAMMC_TEMPLATE:-$HOME/tools/cudaMMC/config.ini}"
 MULTIMM="${MULTIMM:-$HOME/tools/mmenv/bin/MultiMM}"
 PLATFORM="${PLATFORM:-CUDA}"
+# The tools to run. A tool left out is scored where its output exists.
+TOOLS_RUN="${TOOLS_RUN:-ours cudammc multimm}"
+want() { case " $TOOLS_RUN " in *" $1 "*) return 0 ;; esac; return 1; }
 mkdir -p "$OUT"
 LOG="$OUT/tools.log"
 TIMING="$OUT/timing.tsv"
@@ -97,13 +100,13 @@ for C in $CELLS; do
     NN=$N; SR=$R; ST=$T
     [ "$R" = chr1 ] && NN=$N_CHR && SR=chr1:1-60000000 && ST=chr1_60mb
     O=$OUT/${C}_${T}_ours
-    if [ "$(ls "$O"/*.cif 2>/dev/null | wc -l)" -lt "$NN" ]; then
+    if want ours && [ "$(ls "$O"/*.cif 2>/dev/null | wc -l)" -lt "$NN" ]; then
       echo "[$C $R ours] start $(date +%H:%M)" >> "$LOG"
       timed "$C" "$R" ours "$NN" "$O" .venv/bin/python -m gnome3d.cli --config "$INI" --data-dir "$DATA/$C" \
         --region "$R" -n "$NN" --out "$O" > "$O.log" 2>&1
     fi
     K=$OUT/${C}_${T}_cudammc
-    if [ "$(ls "$K"/*.cif 2>/dev/null | wc -l)" -lt "$NN" ]; then
+    if want cudammc && [ "$(ls "$K"/*.cif 2>/dev/null | wc -l)" -lt "$NN" ]; then
       echo "[$C $R cudammc] start $(date +%H:%M)" >> "$LOG"
       timed "$C" "$R" cudammc "$NN" "$K" run_cudammc "$C" "$R" "$NN" "${K}_hcm" "$K"
     fi
@@ -118,7 +121,7 @@ st, en = read_spans(Path('$O'))
 print(f'chr1:{st.min()}-{en.max()}')")
     fi
     MM=$OUT/${C}_${T}_multimm
-    if [ "$(ls "${MM}_md"/*.cif 2>/dev/null | wc -l)" -lt "$NN" ]; then
+    if want multimm && [ "$(ls "${MM}_md"/*.cif 2>/dev/null | wc -l)" -lt "$NN" ]; then
       echo "[$C $R multimm] start $(date +%H:%M)" >> "$LOG"
       timed "$C" "$R" multimm "$NN" "${MM}_md" .venv/bin/python playground/multimm_arm.py "$LOOPS" "$MR" "$O" "$MM" \
         --platform "$PLATFORM" --multimm "$MULTIMM" --n "$NN" > "$MM.log" 2>&1
