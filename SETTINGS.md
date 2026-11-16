@@ -211,7 +211,7 @@ resolves from the older backend keys.
 | `mc_executor_arcs` | str | auto | batch | Executor for the arcs stage. With the annealer, `batch` is the vmapped JAX kernel, which cannot retire a converged block, so one straggler holds every other block in the launch. With the solver, `batch` evaluates the energy on the JAX device block by block, which is where a chromosome solve is cheap; `serial` and `threaded` evaluate it on the CPU. |
 | `mc_executor_densify` | str | auto | threaded | Executor for densification. |
 | `mc_executor_estimate_dist` | str | auto | batch | Executor for the subanchor distance estimate. |
-| `mc_executor_smooth` | str | auto | batch | Executor for the smooth stage. The cross block relaxation also picks its kernel from this, and one chain on the batch kernel is that kernel's worst case. |
+| `mc_executor_smooth` | str | auto | threaded | Executor for the smooth stage. `auto` is `threaded` from 4 workers and `batch` below that when JAX is installed. Threaded numba is ahead of an RTX 3090 from 8 workers on a chromosome and at any size of region, measured 2026-11-16. The cross block relaxation also picks its kernel from this, and one chain on the batch kernel is that kernel's worst case. |
 | `mc_executor_jax_bucket_shapes` | bool | no | no | Pad each block to a shape ladder so a stage is a few wide launches rather than one compile per size. |
 | `merge_smooth_launches` | bool | yes | yes | Pack every smooth block that agrees on its energy terms into as few launches as device memory allows, regardless of size. |
 | `mc_executor_jax_batch_width_smooth` | int or auto | auto | auto | Blocks per smooth launch. `auto` solves the largest count that fits the device. |

@@ -742,6 +742,14 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     than 1. A process with a smaller pool packs its launches differently, so its structures are
     not bit identical to a run on a free card; at a fixed pool it reproduces. Unit checks in
     `harness/test_gpu_share.py`, two instances on one card in `playground/gpu_share_run.py`.
+  - **The smooth stage is threaded numba in production since 2026-11-16, and `auto` picks it
+    from four workers.** Measured on 36 cores against an RTX 3090 on GM12878 chr1: the stage of
+    52 blocks takes 53 to 80 s threaded, 92 s on 8 workers, and 122 to 146 s on the device, and
+    a 10 Mb region of two structures 35 s against 60 s. The relaxation pass follows it onto
+    numba. The arcs solve stays on the device, 20 s against 106 s. Matched seeds are level on
+    the pooled and battery numbers. The L-BFGS-B calls hold BLAS at up to eight threads,
+    `util.blas_threads`, since OpenBLAS on every core spent a 5 Mb region's fit waking them.
+    `design/kernel-performance.md`, section 14. Unit checks in `harness/test_executor_auto.py`.
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
 
   **Kernel seeding is process-stable.** Every JAX kernel takes its PRNG offset from

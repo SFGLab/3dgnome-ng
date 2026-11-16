@@ -45,8 +45,19 @@ LOG = log.get("reconstruct")
 MEMBER_SEED_STRIDE = 2_000_003
 
 
+# Workers from which the threaded smooth stage beats the device. Measured 2026-11-16 on GM12878
+# chr1, 52 blocks and 124,657 beads, against an RTX 3090 at 122 to 146 s: 147 s on 4 workers, 92
+# on 8, 71 on 16. The relaxation pass follows the stage onto numba and wins there at any count,
+# so a whole structure is ahead from 4.
+_SMOOTH_THREADED_MIN_WORKERS = 4
+
+
 def _auto_strategy(kind: StageKind, settings: Settings) -> ExecutorStrategy:
-    """Resolve ``mc_executor_<stage> = auto``."""
+    """Resolve ``mc_executor_<stage> = auto``. The smooth stage runs threaded on numba from
+    `_SMOOTH_THREADED_MIN_WORKERS` workers and on the device below that when JAX is there."""
+    workers = int(settings.mc_executor_threaded_workers)
+    if kind is StageKind.SMOOTH and workers >= _SMOOTH_THREADED_MIN_WORKERS:
+        return ExecutorStrategy.THREADED
     prefer_jax = jax_is_available()
     if prefer_jax and kind in (StageKind.SMOOTH, StageKind.ESTIMATE_DIST):
         return ExecutorStrategy.BATCH

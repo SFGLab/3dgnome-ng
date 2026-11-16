@@ -514,6 +514,55 @@ this morning. Production from 2026-09-20: `mc_executor_arcs = batch`, the solver
 the device, and `solver_iters` 800. The setting is the executor's, not a new key: `batch`
 already means JAX for every stage, and the solver follows it.
 
+### 14. Which stage runs where, 2026-11-16. Smooth threaded, arcs on the device
+
+Measured on frodo, 36 cores and an RTX 3090, GM12878 chr1 from 10 Mb, two structures per arm,
+wall clock from the command to the last structure. `slurm/ensemble/executor_crossover.sh`,
+tables in `playground/square_blocks/crossover/`.
+
+Two costs came first. The maxent fit, the arcs solver and the stitch call scipy's L-BFGS-B,
+which does its vector arithmetic through BLAS between evaluations, and OpenBLAS ran each call
+on all 36 cores. A dot product and an update on 89,600 numbers cost 6.3 ms at 36 threads, 0.03
+ms at 4 and 0.08 ms at 1. On chr1 20 to 25 Mb 22.6 s of a 27 s fit sat in the optimiser's own
+routine. The calls now hold BLAS at up to eight threads, `util.blas_threads`. The first
+structure's coarse stage went from 30 s to 5 s on the region and from 274 s to 252 s on chr1,
+where the objective on 9,195 anchors is the cost and one thread takes 468 s.
+
+| Span | Beads | serial | threaded | batch | arcs batch, smooth threaded |
+|---|---|---|---|---|---|
+| 5 Mb | 2,590 | 33.6 s | 23.8 s | 35.9 s | |
+| 10 Mb | 6,953 | 40.2 s | 33.9 s | 60.3 s | 35.3 s |
+| 20 Mb | 15,643 | 80.9 s | 76.5 s | 118.4 s | |
+| 40 Mb | 30,902 | 181.7 s | 133.4 s | 176.9 s | 134.8 s |
+| chr1 | 124,657 | | 764.5 s | 807.4 s | 630.9 s |
+
+By stage on chr1, the second structure, with no fit in it. The arcs solve of 9,195 anchors
+takes 106 s on numba and 20 s on the device. The smooth stage of 52 blocks takes 53 to 80 s
+threaded and 122 to 146 s on the device. The relaxation pass follows the smooth stage's
+executor and is faster on numba, about 80 s against 110 s by subtraction.
+
+The threaded smooth stage against the worker count, chr1, one structure, arcs on the device.
+
+| Workers | smooth stage | whole run |
+|---|---|---|
+| 4 | 146.8 s | 495 s |
+| 8 | 92.1 s | 441 s |
+| 16 | 71.0 s | 420 s |
+| 36 | 68.9 s | |
+| device | 122 to 146 s | 544 s |
+
+A structure is the same at every worker count, bit for bit.
+
+Four structures per smooth kernel on chr1 1 to 60 Mb, seeds 1 and 2 from two runs each, are
+level. Pooled balanced SCC over mapped bins 0.351 on numba and 0.353 on the device, raw SCC
+0.450 and 0.450, MultiMM 0.709 and 0.711, Rg 21.22 and 21.20, subanchor overlaps 37.6 and
+35.3 per thousand. A first comparison at seven structures a side read 0.04 apart on pooled SCC.
+Four of the seven numba structures were one structure, the same seed at four worker counts.
+
+Production from 2026-11-16 is `mc_executor_smooth = threaded` with `mc_executor_arcs = batch`.
+`auto` resolves the smooth stage to threaded from four workers. The fit on a chromosome is
+about 215 s of the first structure and is the largest single cost left.
+
 ## Outcomes
 
 ### The numba excluded volume cell grid. Done

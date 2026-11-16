@@ -103,7 +103,13 @@ CANONICAL: dict[str, dict[str, object]] = {
         "mc_executor_arcs": "batch",
         "mc_executor_densify": "threaded",
         "mc_executor_estimate_dist": "batch",
-        "mc_executor_smooth": "batch",
+        # Threaded on numba since 2026-11-16. On frodo, 36 cores and an RTX 3090, GM12878 chr1 at
+        # two structures takes 631 s against 807 s with this stage on the device, and a 10 Mb
+        # region 35 s against 60 s; the stage alone on chr1 is 53 to 80 s against 122 to 146 s,
+        # and 92 s on 8 workers. The cross block relaxation follows it onto numba. Four
+        # structures per kernel on matched seeds are level on every pooled and battery number.
+        # design/kernel-performance.md.
+        "mc_executor_smooth": "threaded",
         # Cell grid for the excluded volume term. Identical results, so this is only about
         # speed, and it is written out rather than left to the default so a config records it.
         "neighbour_grid": "yes",
