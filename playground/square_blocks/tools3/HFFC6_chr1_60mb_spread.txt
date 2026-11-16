@@ -1,0 +1,8 @@
+HFFC6_chr1_60mb_ours: 3 structures, 36783 beads, 10 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     3.9  0.0319  0.0483     4.5  0.0203  0.0336     5.3  0.0119  0.0202     6.8  0.0044  0.0098    10.1  0.0006  0.0031
+  anchor pairs                       -                       -                       -                       -     9.7  0.0000  0.0035
+    subanchors     4.0  0.0306  0.0464     4.5  0.0203  0.0329     5.4  0.0124  0.0199     6.9  0.0044  0.0096    10.1  0.0006  0.0031
+      one hole                       -                       -                       -                       -                       -
+  anchor floor                       -                       -                       -                       -             0.37   0.82   1% and median of distance over law, nu 0.370
