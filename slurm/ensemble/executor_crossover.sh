@@ -6,7 +6,8 @@
 #     bash slurm/ensemble/executor_crossover.sh
 #
 # Each span runs N structures under production's executors, `batch`, and with the arcs, estimate
-# and smooth stages on `serial` or `threaded`. A span written chr1 is the whole chromosome. Wall
+# and smooth stages on `serial` or `threaded`, or as `hybrid` with the arcs solve on the device and
+# the smooth stage threaded. A span written chr1 is the whole chromosome. Wall
 # clock, bead count and the stage lines of each log go to OUT/crossover.tsv and OUT/stages.txt.
 set -u
 cd "$(dirname "$0")/../.."
@@ -26,7 +27,9 @@ c.write(open(sys.argv[1] + '/batch.ini', 'w'))
 for e in ('serial', 'threaded'):
     for k in ('mc_executor_arcs', 'mc_executor_estimate_dist', 'mc_executor_smooth'):
         c['simulation_backend'][k] = e
-    c.write(open(sys.argv[1] + '/' + e + '.ini', 'w'))" "$OUT"
+    c.write(open(sys.argv[1] + '/' + e + '.ini', 'w'))
+c['simulation_backend']['mc_executor_arcs'] = 'batch'
+c.write(open(sys.argv[1] + '/hybrid.ini', 'w'))" "$OUT"
 for S in $SPANS; do
   if [ "$S" = chr1 ]; then R=chr1; else R="chr1:10000000-$((10000000 + S * 1000000))"; fi
   for E in $EXECS; do
