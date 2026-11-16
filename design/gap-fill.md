@@ -610,3 +610,28 @@ and 0.222, on H1ESC balanced SCC is flat at 0.133 to 0.135. With the hole counts
 hole arm's blocks score as the arm without holes does, so the holes do not harm the blocks.
 Spearman over pairs touching a hole bin is positive in every band on GM12878 and HFFC6, +0.09 to
 +0.21 balanced, and in all but one on H1ESC.
+
+## Overlaps on CTCF only inputs, 2026-11-16
+
+Every long range arm was measured on the cross line CTCF and RNAPII inputs. On the CTCF only inputs,
+`<cell>_hic_arcs.ini` and the C arm, the new production against the old on GM12878 and HFFC6 at
+10-15 and 20-25 Mb, five structures: pooled raw SCC up on eight of eight, by 0.006 to 0.041,
+balanced SCC on seven, MultiMM on eight, and smooth stage overlaps 22 to 294 per thousand against
+5 to 103, cross block 1 to 90 against 5 to 23. `playground/overlap_classes.py` puts them between
+the coils of two gaps at 50 kb to 1 Mb, whose anchors sit at 0.59 to 0.65 of the law against 0.66
+to 0.74: on GM12878 20-25 Mb 379 such pairs per thousand beads against 119, inside one gap 134
+against 68. The long range fix brings far anchors close and the coils laid down around them meet.
+
+`[relax] within_blocks` lets the relaxation move non neighbour pairs of one block closer than 0.7
+of a bond as well as beads touching another block, and with it the pass runs on a lone block.
+Unit checks in `harness/test_relax.py`. At the pass's radius of 1.5 bonds it costs Pearson and
+MultiMM; at `ev_radius` 1.0, results in `playground/square_blocks/within/`:
+
+| | overlaps within and across blocks, production then 1.0 | pooled balanced SCC |
+|---|---|---|
+| GM12878 10-15 CTCF only | 240 and 40, 8 and 1.4 | 0.477, 0.484 |
+| GM12878 20-25 CTCF only | 294 and 90, 18 and 4.4 | 0.212, 0.221 |
+| GM12878 35-40 CTCF only | 226 and 51, 9 and 2.8 | 0.297, 0.299 |
+| HFFC6 10-15 CTCF only | 53 and 4.6, 1.9 and 0.1 | 0.332, 0.332 |
+| HFFC6 20-25 CTCF only | 126 and 32, 11 and 1.6 | 0.174, 0.174 |
+| CTCF and RNAPII, six runs | 4 to 76, 1 to 22 | within 0.007 |
