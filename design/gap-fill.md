@@ -587,3 +587,26 @@ from pair to pair, Spearman +0.03 to +0.36 by separation band on GM12878 and HFF
 +0.37 balanced on H1ESC. An empty hole puts zeros where Hi-C is depleted, and a correlation scores
 that extreme against any filled level whose pattern is only partly right, so SCC cannot decide
 whether holes are filled; their contents carry Hi-C's pattern.
+
+Whole chr1 on three cells, three structures, scored on 1 to 60 Mb, pooled; the flank conditioned
+holes against the arm without them:
+
+| Cell | arm | raw Sp | raw SCC | bal SCC | bal SCC mapped | MultiMM | cross block overlaps |
+|---|---|---|---|---|---|---|---|
+| GM12878 | prod | 0.141 | 0.343 | 0.276 | 0.250 | 0.588 | 19 |
+| GM12878 | mxgyr | 0.169 | 0.379 | 0.308 | 0.292 | 0.681 | 20 |
+| GM12878 | hflank | 0.183 | 0.342 | 0.288 | 0.270 | 0.663 | 8 |
+| H1ESC | prod | 0.141 | 0.232 | 0.149 | 0.109 | 0.605 | 15 |
+| H1ESC | mxgyr | 0.159 | 0.249 | 0.166 | 0.131 | 0.664 | 7 |
+| H1ESC | hflank | 0.161 | 0.238 | 0.165 | 0.135 | 0.647 | 6 |
+| HFFC6 | prod | 0.118 | 0.281 | 0.221 | 0.180 | 0.556 | 1.4 |
+| HFFC6 | mxgyr | 0.146 | 0.314 | 0.265 | 0.238 | 0.653 | 1.3 |
+| HFFC6 | hflank | 0.149 | 0.292 | 0.254 | 0.222 | 0.656 | 1.3 |
+
+The wall and flank variants on GM12878 chr1 sit within 0.006 of each other. Scaling the hole
+counts at chromosome scale gives the same picture as the regions: on GM12878 SCC falls from
+0.370 and 0.295 at a factor of 0 to 0.325 and 0.270 at 1, on HFFC6 from 0.284 and 0.230 to 0.263
+and 0.222, on H1ESC balanced SCC is flat at 0.133 to 0.135. With the hole counts at zero the
+hole arm's blocks score as the arm without holes does, so the holes do not harm the blocks.
+Spearman over pairs touching a hole bin is positive in every band on GM12878 and HFFC6, +0.09 to
++0.21 balanced, and in all but one on H1ESC.

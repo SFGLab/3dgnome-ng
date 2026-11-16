@@ -1,0 +1,13 @@
+chr1:1-60000000 HFFC6_chr1_60mb_hflank: 133 mapped hole bins
+  hole counts scaled by   SCC raw / balanced over mapped bins
+                    0.00   0.284 / 0.230
+                    0.25   0.280 / 0.228
+                    0.50   0.275 / 0.227
+                    1.00   0.263 / 0.222
+                    2.00   0.234 / 0.207
+  Spearman over pairs touching a hole bin, raw / balanced, by separation
+     25 to    50 kb  n   137   +0.181 / +0.113
+     50 to   100 kb  n   283   +0.276 / +0.210
+    100 to   200 kb  n   601   +0.133 / +0.132
+    200 to   400 kb  n  1283   +0.131 / +0.166
+    400 to  1000 kb  n  4644   +0.100 / +0.109

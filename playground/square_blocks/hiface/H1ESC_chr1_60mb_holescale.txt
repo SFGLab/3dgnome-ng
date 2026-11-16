@@ -1,0 +1,13 @@
+chr1:1-60000000 H1ESC_chr1_60mb_hflank: 138 mapped hole bins
+  hole counts scaled by   SCC raw / balanced over mapped bins
+                    0.00   0.234 / 0.133
+                    0.25   0.230 / 0.134
+                    0.50   0.227 / 0.135
+                    1.00   0.219 / 0.135
+                    2.00   0.198 / 0.134
+  Spearman over pairs touching a hole bin, raw / balanced, by separation
+     25 to    50 kb  n   147   +0.317 / +0.121
+     50 to   100 kb  n   322   +0.074 / +0.090
+    100 to   200 kb  n   711   +0.054 / +0.120
+    200 to   400 kb  n  1586   -0.049 / +0.030
+    400 to  1000 kb  n  5393   +0.034 / +0.091

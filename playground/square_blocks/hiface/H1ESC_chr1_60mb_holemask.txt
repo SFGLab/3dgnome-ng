@@ -1,0 +1,16 @@
+chr1:1-60000000: 12 holes, 11 spanning two bins or more
+  hole 0: 4.35 to 4.66 Mb, 12 bins, 1.00 mapped, raw coverage 1.20 of the median
+  hole 1: 12.66 to 13.54 Mb, 36 bins, 0.53 mapped, raw coverage 0.30 of the median
+  hole 3: 48.87 to 50.33 Mb, 58 bins, 1.00 mapped, raw coverage 0.61 of the median
+  hole 4: 51.30 to 51.34 Mb, 2 bins, 1.00 mapped, raw coverage 0.96 of the median
+  hole 5: 51.45 to 51.52 Mb, 3 bins, 1.00 mapped, raw coverage 0.59 of the median
+  hole 6: 52.92 to 53.07 Mb, 6 bins, 1.00 mapped, raw coverage 0.77 of the median
+  hole 7: 53.76 to 53.86 Mb, 4 bins, 1.00 mapped, raw coverage 0.88 of the median
+  hole 8: 53.95 to 53.99 Mb, 2 bins, 1.00 mapped, raw coverage 0.93 of the median
+  hole 9: 56.97 to 57.42 Mb, 18 bins, 1.00 mapped, raw coverage 0.91 of the median
+  hole 10: 57.83 to 58.04 Mb, 8 bins, 1.00 mapped, raw coverage 0.86 of the median
+  hole 11: 59.76 to 59.88 Mb, 5 bins, 1.00 mapped, raw coverage 0.60 of the median
+  SCC raw / balanced, mapped, no hole 0, no hole 1, no hole 3, no hole 4, no hole 5, no hole 6, no hole 7, no hole 8, no hole 9, no hole 10, no hole 11, no holes
+                          H1ESC_chr1_60mb_prod    0.208/0.109    0.210/0.114    0.205/0.112    0.190/0.118    0.209/0.109    0.208/0.109    0.208/0.110    0.209/0.110    0.209/0.110    0.206/0.110    0.207/0.110    0.207/0.109    0.180/0.128
+                         H1ESC_chr1_60mb_mxgyr    0.228/0.131    0.230/0.137    0.225/0.133    0.212/0.141    0.228/0.131    0.227/0.132    0.228/0.132    0.228/0.132    0.228/0.132    0.226/0.132    0.227/0.132    0.227/0.131    0.205/0.154
+                        H1ESC_chr1_60mb_hflank    0.219/0.135    0.220/0.139    0.217/0.137    0.212/0.142    0.219/0.136    0.219/0.136    0.219/0.136    0.219/0.136    0.219/0.136    0.217/0.136    0.218/0.136    0.219/0.136    0.211/0.154
