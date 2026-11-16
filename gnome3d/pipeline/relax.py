@@ -61,6 +61,19 @@ def _cross_pairs(pos: np.ndarray, owner: np.ndarray, radius: float) -> np.ndarra
     return pairs[owner[pairs[:, 0]] != owner[pairs[:, 1]]]
 
 
+def _within_overlaps(pos: np.ndarray, owner: np.ndarray, radius: float) -> np.ndarray:
+    """Index pairs, into `pos` in chain order, of non neighbour beads of one block closer than
+    `radius`."""
+    if pos.shape[0] < 3:
+        return np.zeros((0, 2), dtype=np.int64)
+    pairs = KDTree(pos).query_pairs(radius, output_type="ndarray")
+    if pairs.size == 0:
+        return np.zeros((0, 2), dtype=np.int64)
+    same = owner[pairs[:, 0]] == owner[pairs[:, 1]]
+    far = np.abs(pairs[:, 0] - pairs[:, 1]) > 1
+    return pairs[same & far]
+
+
 def _relax_settings(s: Settings, bond: float) -> Settings:
     """A copy of the settings with only chain bonds and excluded volume active."""
     r = copy.copy(s)
@@ -123,6 +136,13 @@ def relax_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]
             np.concatenate([np.full(len(blocks[k]), k) for k in order]) if blocks else np.zeros(0)
         )
         touching = np.unique(_cross_pairs(pos, owner_chain, radius).ravel())
+        if bool(getattr(s, "relax_within_blocks", False)):
+            # Non neighbour pairs of one block closer than the battery's overlap distance, 0.7
+            # of a bond, move as well, which takes the coils of two gaps whose anchors the arcs
+            # stage put close apart again.
+            inner = _within_overlaps(pos, owner_chain, 0.7 * bond)
+            LOG.info("cross block relax: %d overlapping pairs inside blocks", inner.shape[0])
+            touching = np.unique(np.concatenate([touching, inner.ravel()]))
         movable = np.zeros(len(chain), dtype=np.bool_)
         for off in range(-window, window + 1):
             idx = touching + off

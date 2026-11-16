@@ -294,6 +294,7 @@ other while the arcs and the stitch are kept.
 | `noise` | float | 0.5 | 0.5 | Step size in chain bonds. |
 | `bond_weight` | float | 10.0 | 10.0 | Chain spring weight for the pass. At the smooth stage's 0.1 the excluded volume tears the coil. |
 | `local_window` | int | -1 | 1 | Let only the beads touching another block move, plus this many chain neighbours either side. -1 lets every subanchor move, which on a chromosome is hours. A window of 1 is minutes. |
+| `within_blocks` | bool | no | no | With `local_window` set, non neighbour bead pairs of one block closer than 0.7 of a bond move in the pass as well as beads touching another block. They are the coils of two gaps whose anchors the arcs stage put close, which the smooth stage's soft excluded volume leaves. Under measurement since 2026-11-16, `design/gap-fill.md`. |
 
 ## [holes]
 

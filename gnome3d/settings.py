@@ -286,6 +286,7 @@ class Settings:
     relax_temp: float
     relax_noise: float
     relax_bond_weight: float
+    relax_within_blocks: bool
 
     # ---- holes between blocks ----
     use_hole_beads: bool
@@ -629,6 +630,7 @@ class Settings:
         self.relax_temp = 0.1  # fraction of max_temp_smooth; a little heat lets coils cross
         self.relax_noise = 0.5  # step size as a fraction of the median bond length
         self.relax_bond_weight = 10.0  # chain spring constants during the pass
+        self.relax_within_blocks = False
         # Skip the pass when fewer than this fraction of beads are touching another block.
         # It anneals the whole chromosome until its own convergence test fires, so it costs the
         # same however little there is to fix: measured on a trio run at an hour and fifty five
@@ -1129,6 +1131,7 @@ class Settings:
         self.relax_noise = getf("relax", "noise", self.relax_noise)
         self.relax_bond_weight = getf("relax", "bond_weight", self.relax_bond_weight)
         self.relax_local_window = geti("relax", "local_window", self.relax_local_window)
+        self.relax_within_blocks = getb("relax", "within_blocks", self.relax_within_blocks)
 
         # [holes]
         self.use_hole_beads = getb("holes", "use_hole_beads", self.use_hole_beads)
