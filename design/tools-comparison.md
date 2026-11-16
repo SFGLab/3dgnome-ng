@@ -118,3 +118,25 @@ is the fastest on the regions and on two of the three chromosomes.
 
 3dgnome's smooth stage and relaxation pass run on the CPU cores and its arcs solve on the GPU,
 `design/kernel-performance.md` section 14. cudaMMC and MultiMM run as their defaults place them.
+
+## Run time against bead count
+
+GM12878 chr1, three structures, each tool at several bead counts. `slurm/ensemble/tools_scaling.sh`,
+table in `playground/square_blocks/toolscale/timing.tsv`. 3dgnome's count is set by
+`target_bp_per_subanchor`, 1,000, 2,000 and 4,000 bp. cudaMMC's is set by `loop_density`, 5, 10,
+14 and 20, where 14 is the density nearest 3dgnome's production count. MultiMM takes the count
+directly.
+
+| Beads | 3dgnome | cudaMMC | MultiMM |
+|---|---|---|---|
+| about 50,000 | 386 s at 49,387 | 521 s at 50,631 | 487 s at 49,387 |
+| about 87,000 | 528 s at 81,665 | 572 s at 92,686 | 1,181 s at 81,665 |
+| about 125,000 | 673 s at 124,657 | 641 s at 126,330 | 2,528 s at 124,657 |
+| 176,796 | | 713 s | |
+
+At matched beads 3dgnome and cudaMMC are within a third of each other over the whole range.
+3dgnome is the faster below about 100,000 beads and cudaMMC above. cudaMMC's time grows as the
+bead count to the power 0.25, 3dgnome's to 0.6 and MultiMM's to 1.8, fitted between each tool's
+smallest and largest count. cudaMMC's default on this chromosome is 50,631 beads and 3dgnome's
+is 124,657, and the first table gives each at its own default.
+

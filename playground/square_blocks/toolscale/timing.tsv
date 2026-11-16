@@ -1,0 +1,8 @@
+tool	setting	structures	beads	seconds
+ours	2000	3	81665	527.9
+ours	4000	3	49387	386.3
+cudammc	10	3	92686	572.2
+cudammc	20	3	176796	713.4
+cudammc	14	3	126330	640.6
+multimm	2000	3	81665	1180.6
+multimm	4000	3	49387	486.5
