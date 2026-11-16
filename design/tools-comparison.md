@@ -45,6 +45,34 @@ everywhere.
 On MultiMM's own metric, the battery's per structure number, 3dgnome reads 0.71 to 0.82,
 MultiMM 0.24 to 0.44 and cudaMMC 0.30 to 0.56.
 
+### Intervals
+
+A paired block bootstrap, `playground/ensemble_bootstrap.py`, table in
+`playground/square_blocks/tools3/bootstrap.txt`. Each region's 25 kb bins are resampled in
+blocks of ten, a thousand times, every tool scored on the same resamples, and a difference
+counts as a lead or a loss with its 95 percent interval clear of zero.
+
+| Score | against | 3dgnome leads | tie | 3dgnome loses |
+|---|---|---|---|---|
+| raw Pearson | MultiMM | 12 | 0 | 0 |
+| raw Pearson | cudaMMC | 12 | 0 | 0 |
+| raw Spearman | MultiMM | 12 | 0 | 0 |
+| raw Spearman | cudaMMC | 12 | 0 | 0 |
+| raw SCC | MultiMM | 5 | 7 | 0 |
+| raw SCC | cudaMMC | 6 | 6 | 0 |
+| balanced SCC, mapped bins | MultiMM | 3 | 9 | 0 |
+| balanced SCC, mapped bins | cudaMMC | 5 | 7 | 0 |
+
+The two runs 3dgnome loses on SCC by the point value are ties, GM12878 chr1 20 to 25 Mb at
+-0.006 with an interval of -0.133 to +0.132 and HFFC6 at -0.048 with -0.248 to +0.108. A 5 Mb
+region is 200 bins and its SCC interval is 0.3 to 0.4 wide, so SCC does not separate the tools
+at that scale. On chr1 1 to 60 Mb 3dgnome leads on raw SCC on all three cells against both
+tools, and on balanced SCC on GM12878 and HFFC6.
+
+The bootstrap keeps every pair's true separation, where the pooled table closes the gaps left
+by unmapped bins, so its balanced SCC differs from the table's by up to 0.03 on a region with
+unmapped bins.
+
 ## Physics
 
 The validation battery per structure, means over the same runs. Overlaps are non neighbour
