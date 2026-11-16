@@ -1403,9 +1403,18 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Measured on the real structure, same seed, positions and scores identical: 5.3 times faster
   at 8,000 beads, 11.2 at 20,000, 22.8 at 42,480. It applies to every reconstruction, since the
   per block smooth stage runs the same term on blocks of up to 16,384 beads, and smooth is most
-  of the pipeline's wall time. Below 2,048 beads the full scan is already cheap and the grid is
-  skipped. The JAX kernels are untouched and keep the full scan. Unit checks in
-  `harness/test_cells.py`.
+  of the pipeline's wall time. The grid is used from 128 beads, where it starts to win: on a
+  block of 1,831 beads with the hard wall the stage takes 4.7 s against 45.9 s on the full
+  scan. Unit checks in `harness/test_cells.py`.
+
+  A query clamps its cell index as the insertion does, since 2026-11-16. The box is the
+  extent the structure had when the grid was built, a bead beyond it is filed in an edge cell,
+  and a query from more than a cell beyond it searched no cell at all, so two beads out there
+  did not see each other, neither the soft term nor the wall. A coil that swells past its
+  starting extent ran without excluded volume in the swollen part. Found on a block the grid
+  and the full scan solved differently. With the clamp the two agree bit for bit at every
+  chain length from 32 to 1,831 beads, wall on and off. The JAX grid clamps both sides and
+  was not affected.
 
 ---
 

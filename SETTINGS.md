@@ -217,7 +217,7 @@ resolves from the older backend keys.
 | `mc_executor_jax_batch_width_smooth` | int or auto | auto | auto | Blocks per smooth launch. `auto` solves the largest count that fits the device. |
 | `mc_executor_jax_batch_width_arcs` | int or auto | auto | auto | The same for the JAX arcs kernel. |
 | `multigpu_mode` | str | groups | groups | `groups` runs whole batch groups on different devices and is byte exact in the device count. `within` splits one group across devices. `off` uses one device. |
-| `neighbour_grid` | bool | yes | yes | Cell grid for the excluded volume term in the numba kernels. Identical results, faster above 2048 beads. |
+| `neighbour_grid` | bool | yes | yes | Cell grid for the excluded volume term in the numba kernels. Identical results. Used from 128 beads, where it starts to win. |
 
 ## [excluded_volume]
 

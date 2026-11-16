@@ -29,7 +29,11 @@ from gnome3d.mc.numba.cells import (  # noqa: E402
     local_excl_cells,
     relink,
 )
-from gnome3d.mc.numba.terms import _local_excl_nb  # noqa: E402
+from gnome3d.mc.numba.terms import (  # noqa: E402
+    _local_excl_nb,
+    _wall_local_cells_nb,
+    _wall_local_nb,
+)
 
 PASS: list[str] = []
 FAIL: list[str] = []
@@ -171,12 +175,45 @@ def test_moves_keep_it_exact() -> None:
     )
 
 
+def test_beads_outside_the_box() -> None:
+    """The grid's box is the extent the structure had when it was built. A coil that swells
+    carries beads beyond it, where they are filed in the edge cells, and a query from out there
+    has to look in the edge cells too."""
+    print("\n[outside] beads beyond the box the grid was built on")
+    rng = np.random.default_rng(5)
+    n = 1200
+    pos = np.ascontiguousarray(rng.normal(0, 3, (n, 3)))
+    r0, weight, skip = 2.0, 10.0, 1
+    lo, dim, c = grid_shape(pos, r0)
+    head, nxt, where = build_grid(pos, lo, dim, c)
+    buf = np.empty(BUF, dtype=np.int32)
+    pos *= 3.0
+    for i in range(n):
+        relink(head, nxt, where, i, cell_of(pos[i, 0], pos[i, 1], pos[i, 2], lo, dim, c))
+    outside = int(((pos < lo - c) | (pos > lo + dim * c + c)).any(axis=1).sum())
+    bad = wall_bad = 0
+    depth_worst = 0.0
+    for p in range(n):
+        want = _local_excl_nb(pos, p, r0, weight, skip)
+        got = local_excl_cells(pos, p, r0, weight, skip, lo, dim, c, head, nxt, buf)
+        bad += int(got != want)
+        cnt0, dep0 = _wall_local_nb(pos, p, r0, skip)
+        cnt1, dep1 = _wall_local_cells_nb(pos, p, r0, skip, lo, dim, c, head, nxt)
+        wall_bad += int(cnt0 != cnt1)
+        depth_worst = max(depth_worst, abs(dep0 - dep1))
+    check("the test has beads well outside the box", outside > n // 4, f"{outside} of {n}")
+    check("the excluded volume is identical out there", bad == 0, f"{bad} of {n} beads differ")
+    check("the wall counts the same pairs out there", wall_bad == 0, f"{wall_bad} of {n} differ")
+    check("the wall depth agrees to rounding", depth_worst < 1e-9, f"worst {depth_worst:.2e}")
+
+
 def main() -> int:
     print("excluded volume cell grid checks")
     test_random()
     test_edges()
     test_overflow_is_safe()
     test_moves_keep_it_exact()
+    test_beads_outside_the_box()
     test_real_structure()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
     for f in FAIL:
