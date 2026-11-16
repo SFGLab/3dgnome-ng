@@ -134,7 +134,7 @@ directly.
 | about 125,000 | 673 s at 124,657 | 641 s at 126,330 | 2,528 s at 124,657 |
 | 176,796 | | 713 s | |
 
-At matched beads 3dgnome and cudaMMC are within a third of each other over the whole range.
+At matched beads 3dgnome and cudaMMC are within 35 percent of each other over the whole range.
 3dgnome is the faster below about 100,000 beads and cudaMMC above. cudaMMC's time grows as the
 bead count to the power 0.25, 3dgnome's to 0.6 and MultiMM's to 1.8, fitted between each tool's
 smallest and largest count. cudaMMC's default on this chromosome is 50,631 beads and 3dgnome's
