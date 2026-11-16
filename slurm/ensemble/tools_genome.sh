@@ -7,7 +7,7 @@
 # 3dgnome runs the production config. cudaMMC runs its template config from the tools trial with
 # its own loop density. MultiMM runs the clusters of every chromosome at 3dgnome's total bead
 # count, minimisation and the dynamics the region runs use, and on failure at half and then a
-# quarter of that count. Each row of OUT/timing.tsv is a tool, its setting, its bead count and
+# quarter of that count. A MultiMM run is stopped after MM_TIMEOUT seconds and its row says so. Each row of OUT/timing.tsv is a tool, its setting, its bead count and
 # its seconds, a failed run with its exit code in place of the beads. Nothing is scored.
 set -u
 cd "$(dirname "$0")/../.."
@@ -19,6 +19,7 @@ CHROMS="${CHROMS:-chr1-chr22}"
 CUDAMMC="${CUDAMMC:-$HOME/tools/cudaMMC/build/cudaMMC}"
 MULTIMM="${MULTIMM:-$HOME/tools/mmenv/bin/MultiMM}"
 WAIT="${WAIT:-}"
+MM_TIMEOUT="${MM_TIMEOUT:-5400}"
 mkdir -p "$OUT"
 LOG="$OUT/genome.log"
 TIMING="$OUT/timing.tsv"
@@ -66,10 +67,10 @@ for DIV in 1 2 4; do
   printf "[Main]\nPLATFORM = CUDA\nLOOPS_PATH = %s\nOUT_PATH = %s\nN_BEADS = %s\nSIM_RUN_MD = True\nSIM_N_STEPS = 10000\nSAVE_PLOTS = False\nCOB_USE_COMPARTMENT_BLOCKS = False\n" \
     "$LOOPS" "$(realpath -m "$MM")" "$N" > "$MM.ini"
   t0=$(date +%s.%N)
-  "$MULTIMM" -c "$MM.ini" > "$MM.log" 2>&1
+  timeout "$MM_TIMEOUT" "$MULTIMM" -c "$MM.ini" > "$MM.log" 2>&1
   rc=$?; el=$(since "$t0")
   if [ $rc = 0 ] && [ -n "$(find "$MM" -name "*.cif" 2>/dev/null | head -1)" ]; then row multimm "$N beads" "$N" "$el"; break; fi
-  row multimm "$N beads" "exit $rc" "$el"
+  if [ $rc = 124 ]; then row multimm "$N beads" "stopped at ${MM_TIMEOUT} s" "$el"; else row multimm "$N beads" "exit $rc" "$el"; fi
 done
 echo "genome DONE $(date)" >> "$LOG"
 echo EXIT >> "$LOG"
