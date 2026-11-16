@@ -7,6 +7,7 @@ redis==5.2.1
 pandas==3.0.3
 sortedcontainers==2.4.0
 scipy==1.17.1
+threadpoolctl==3.6.0
 h5py==3.16.0
 fsspec==2026.9.0
 aiohttp==3.14.5
