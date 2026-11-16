@@ -6,6 +6,9 @@ from __future__ import annotations
 
 import random
 import threading
+from collections.abc import Generator
+from contextlib import contextmanager
+from typing import Any
 
 import numpy as np
 
@@ -13,6 +16,31 @@ from gnome3d import log
 from gnome3d.types import BoolArray, F32Array, F64Array
 
 LOG = log.get("util")
+
+# Measured on a 36 core machine with OpenBLAS: the vector routines L-BFGS-B calls between
+# evaluations cost 6 ms at 36 threads and 0.03 ms at 4 on 90,000 variables, and the maxent fit's
+# objective is fastest at 8 from 350 to 9,195 anchors.
+_OPTIMISER_BLAS_THREADS = 8
+
+
+@contextmanager
+def blas_threads() -> Generator[None]:
+    """Hold the linear algebra library at up to eight threads for the block.
+
+    scipy's L-BFGS-B does its own vector arithmetic through BLAS, and a library that wakes
+    every core for a vector of some ten thousand numbers spends the call waking them. The
+    limit is process wide while the block runs and never raises a lower count set by the
+    environment.
+    """
+    from threadpoolctl import ThreadpoolController
+
+    ctl: Any = ThreadpoolController()
+    now = max(
+        (int(lib.num_threads) for lib in ctl.lib_controllers if lib.user_api == "blas"), default=1
+    )
+    with ctl.limit(limits=min(_OPTIMISER_BLAS_THREADS, now), user_api="blas"):
+        yield
+
 
 # Thread-local RNG for the positioning noise.  The global `random` module is a
 # single `random.Random` instance shared across threads, so a `ThreadedExecutor`

@@ -28,6 +28,7 @@ from numba import prange  # type: ignore[reportMissingTypeStubs]
 from gnome3d import log
 from gnome3d.mc.numba.terms import NO_W, njit
 from gnome3d.types import F32Array, F64Array, I64Array
+from gnome3d.util import blas_threads
 
 if TYPE_CHECKING:
     from gnome3d.polymer import PolymerLaw
@@ -409,14 +410,15 @@ def solve_arcs(
 
         objective = traced
 
-    res: Any = minimize(
-        objective,
-        pw.reshape(-1),
-        args=fun_args,
-        jac=True,
-        method="L-BFGS-B",
-        options=options,
-    )
+    with blas_threads():
+        res: Any = minimize(
+            objective,
+            pw.reshape(-1),
+            args=fun_args,
+            jac=True,
+            method="L-BFGS-B",
+            options=options,
+        )
     if trace_path:
         with open(trace_path, "a") as fh:
             fh.write(f"# {n} anchors, {int(res.nit)} iterations, {res.message}\n")

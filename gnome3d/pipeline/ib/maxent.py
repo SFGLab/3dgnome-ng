@@ -20,6 +20,7 @@ import scipy.sparse as sp
 
 from gnome3d import log
 from gnome3d.anchor_contacts import overlap_weights
+from gnome3d.util import blas_threads
 
 if TYPE_CHECKING:
     from gnome3d.polymer import PolymerLaw
@@ -106,9 +107,10 @@ def _fit_root(target: F64Array, loop: BoolArray) -> F64Array:
         grad = 4.0 * (r.sum(axis=1)[:, None] * y - r @ y)
         return float((r * (v - vt)).sum()), grad.reshape(-1)
 
-    res = minimize(
-        fun, y0.reshape(-1), jac=True, method="L-BFGS-B", options={"maxiter": _FIT_ITERS}
-    )
+    with blas_threads():
+        res = minimize(
+            fun, y0.reshape(-1), jac=True, method="L-BFGS-B", options={"maxiter": _FIT_ITERS}
+        )
     y = res.x.reshape(n, m)
     sq = (y * y).sum(axis=1)
     v = np.maximum(sq[:, None] + sq[None, :] - 2.0 * (y @ y.T), 0.0)
