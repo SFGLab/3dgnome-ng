@@ -79,9 +79,9 @@ PY
 
 run_cudammc() {  # cell region n hcmdir cif dir
   C=$1; R=$2; NN=$3; H=$4; D=$5
+  # cudaMMC parses a region as chr:start-end, whatever its README says.
   local cfg="$OUT/${C}_cudammc.ini" spec="$R"
   [ -f "$cfg" ] || cudammc_config "$C" "slurm/ensemble/$(echo "$C" | tr 'A-Z' 'a-z')_hic_arcs.ini" "$cfg"
-  case "$R" in *:*-*) spec="$(echo "$R" | sed 's/-/:/')";; esac
   mkdir -p "$H" "$D"
   "$CUDAMMC" -s "$cfg" -c "$spec" -o "$H/" -n cudammc -m "$NN" > "$H.log" 2>&1 || return $?
   .venv/bin/python playground/reference_arm.py "$DATA/$C/$(key "$cfg" anchors)" "$H" "$D" "${R%%:*}" >> "$H.log" 2>&1

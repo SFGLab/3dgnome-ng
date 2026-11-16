@@ -166,28 +166,26 @@ def collect_ensemble(
 ) -> int:
     """Relabel each member's minimised and after dynamics cif into the two arm directories.
 
-    MultiMM writes member i to `<out_root>_i`. Returns how many members had a model directory.
-    A member's trajectory frames and DCD are removed once its models are collected. They are
-    about 1.4 GB per member at our bead count and nothing reads them; thirty of them filled a
-    150 GB disk.
+    MultiMM 2 writes member i to `<out_root>/run_<i>` counting from zero, and earlier versions
+    to `<out_root>_<i>` counting from one; both are read. Returns how many members had a model
+    directory. Trajectory frames are left where MultiMM wrote them.
     """
     arm_min.mkdir(parents=True, exist_ok=True)
     arm_md.mkdir(parents=True, exist_ok=True)
     found = 0
-    for i in range(1, n_ensemble + 1):
-        model = Path(f"{out_root}_{i}") / "model"
+    for i in range(n_ensemble):
+        model = out_root / f"run_{i}" / "model"
+        if not model.is_dir():
+            model = Path(f"{out_root}_{i + 1}") / "model"
         if not model.is_dir():
             continue
         found += 1
         for src, dst in (
-            (model / "MultiMM_minimized.cif", arm_min / f"member_{i}.cif"),
-            (model / "MultiMM_afterMD.cif", arm_md / f"member_{i}.cif"),
+            (model / "MultiMM_minimized.cif", arm_min / f"member_{i + 1}.cif"),
+            (model / "MultiMM_afterMD.cif", arm_md / f"member_{i + 1}.cif"),
         ):
             if src.is_file():
                 write_cif(str(dst), uniform_beads(read_multimm_cif(src), lo, hi))
-        shutil.rmtree(model.parent / "md_frames", ignore_errors=True)
-        for big in (model.parent / "metadata").glob("*.dcd"):
-            big.unlink()
     return found
 
 
