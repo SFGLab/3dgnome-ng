@@ -31,10 +31,14 @@ A="chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 ch
 T=/mnt/evafs/groups/sfglab/nkozlov/triosformer
 ROOT=$PWD OUT=$PWD/out/lr SPLIT=1 CHROMS="$A" sbatch --array=0-197%10 slurm/ensemble/crosscell_arms.sh
 ROOT=$PWD TRIOS_ROOT=$T PYTHONPATH=$PWD CONFIG_TAG=_trio_hgsvc_genome_lr2 OUT=$PWD/out/lr_trio_ctcf \
-  CHROMS="${A// /,}" sbatch --array=0-197%8 $T/slurm/trio_ensemble.sh
+  CHROMS="${A// /,}" sbatch -A sfglab -p long --array=0-197%8 $T/slurm/trio_ensemble.sh
 ROOT=$PWD TRIOS_ROOT=$T PYTHONPATH=$PWD CONFIG_TAG=_trio_rnapol2_hgsvc_genome_lr2 OUT=$PWD/out/lr_trio_rnapol2 \
-  CHROMS="${A// /,}" sbatch --array=0-197%8 $T/slurm/trio_ensemble.sh
+  CHROMS="${A// /,}" sbatch -A sfglab -p long --array=0-197%8 $T/slurm/trio_ensemble.sh
 ```
+
+The trio script sets no account and the user's default association on eden, `null`, has a submit
+limit of zero, so the trio arrays need `-A sfglab`; without it sbatch refuses them with
+`AssocMaxSubmitJobLimit`. The cell array was submitted on 2026-11-16 as job 1943267.
 
 Cell array task i runs line and arm i % 9 on chromosome i / 9; trio task i runs one chromosome of
 one sample, the chromosome slowest. A member whose cif exists is skipped, so resubmitting fills
