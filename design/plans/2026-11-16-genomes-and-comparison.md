@@ -10,26 +10,29 @@ Ten conformations per genome, autosomes chr1 to chr22, the same arms as the cros
 2026-11-12: cell lines GM12878, H1ESC and HFFC6 on arms C, R and M, and the nine trio samples on
 CTCF and on CTCF with RNAPOL2, HGSVC singletons.
 
-Staged on eden at `/mnt/evafs/groups/sfglab/nkozlov/3dgnome-lr-run`, a copy of commit ac98231
-(`STAGED_COMMIT`) without `data/`, with `data` and `.venv` linked to `../3dgnome-ng`. Trio
-configs were generated in the eden triosformer checkout with the staged engine,
-`TRIOS_GNOME3D=<run dir> pipeline/trio_configs.py --factor {CTCF,RNAPOL2} --singletons hgsvc
---scope genome --out-dir slurm/configs_lrc`, and copied into `slurm/configs/` as
-`<sample>_trio{,_rnapol2}_hgsvc_genome_lrc.ini`. A first attempt that set `GNOME3D` instead of
-`TRIOS_GNOME3D` read the old production config; its files, `slurm/configs_lr/` and
-`slurm/configs/*_genome_lr.ini`, are wrong and are left for the user to delete.
+Staged on eden at `/mnt/evafs/groups/sfglab/nkozlov/3dgnome-lr2-run`, a copy of commit 860a847
+(`STAGED_COMMIT`), production with the within block relaxation, without `data/`, with `data` and
+`.venv` linked to `../3dgnome-ng`. Trio configs were generated in the eden triosformer checkout
+with the staged engine, `TRIOS_GNOME3D=<run dir> pipeline/trio_configs.py --factor
+{CTCF,RNAPOL2} --singletons hgsvc --scope genome --out-dir slurm/configs_lr2`, and copied into
+`slurm/configs/` as `<sample>_trio{,_rnapol2}_hgsvc_genome_lr2.ini`.
 
-Dry runs of tasks 0, 4, 8 and 197 of the cell array and 0, 100 and 197 of the trio array map and
-pass their guards. Submit from the run directory:
+Superseded and left for the user to delete: `3dgnome-lr-run` (commit ac98231, before the within
+block relaxation), and in the triosformer checkout `slurm/configs_lr/`, `slurm/configs_lrc/`,
+`slurm/configs/*_genome_lr.ini` (read the old production config, `GNOME3D` set instead of
+`TRIOS_GNOME3D`) and `slurm/configs/*_genome_lrc.ini`.
+
+Dry runs of tasks 0 and 197 of the cell array and 197 of both trio arrays map and pass their
+guards. Submit from the run directory:
 
 ```bash
-cd /mnt/evafs/groups/sfglab/nkozlov/3dgnome-lr-run
+cd /mnt/evafs/groups/sfglab/nkozlov/3dgnome-lr2-run
 A="chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22"
 T=/mnt/evafs/groups/sfglab/nkozlov/triosformer
 ROOT=$PWD OUT=$PWD/out/lr SPLIT=1 CHROMS="$A" sbatch --array=0-197%10 slurm/ensemble/crosscell_arms.sh
-ROOT=$PWD TRIOS_ROOT=$T PYTHONPATH=$PWD CONFIG_TAG=_trio_hgsvc_genome_lrc OUT=$PWD/out/lr_trio_ctcf \
+ROOT=$PWD TRIOS_ROOT=$T PYTHONPATH=$PWD CONFIG_TAG=_trio_hgsvc_genome_lr2 OUT=$PWD/out/lr_trio_ctcf \
   CHROMS="${A// /,}" sbatch --array=0-197%8 $T/slurm/trio_ensemble.sh
-ROOT=$PWD TRIOS_ROOT=$T PYTHONPATH=$PWD CONFIG_TAG=_trio_rnapol2_hgsvc_genome_lrc OUT=$PWD/out/lr_trio_rnapol2 \
+ROOT=$PWD TRIOS_ROOT=$T PYTHONPATH=$PWD CONFIG_TAG=_trio_rnapol2_hgsvc_genome_lr2 OUT=$PWD/out/lr_trio_rnapol2 \
   CHROMS="${A// /,}" sbatch --array=0-197%8 $T/slurm/trio_ensemble.sh
 ```
 
