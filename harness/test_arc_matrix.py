@@ -315,25 +315,24 @@ def test_jax_batched_driver_runs() -> None:
 
 
 def test_repulsion_range() -> None:
-    print("\n[repulsion range] far arcless pairs lose the repulsion marker, nothing else moves")
+    print("\n[repulsion off] every repulsion marker cleared, nothing else moves")
     s = settings()
     s.background_weight = 0.1
     mids = [0, 50_000, 150_000, 600_000, 2_000_000]
     arcs = [(0, 4, 5, 0)]
     mat = arc_expected_matrix(s, mids, arcs)
     same = repulsion_range(mat, mids, s)
-    check("off returns the matrix", same is mat)
-    s.arcs_repulsion_range_bp = 500_000
+    check("on returns the matrix", same is mat)
+    s.arcs_repulsion = False
     out = repulsion_range(mat, mids, s)
-    sep = np.abs(np.subtract.outer(mids, mids))
-    cleared = (mat == -0.5) & (sep > 500_000)
+    marker = mat == -0.5
     check(
-        "far arcless pairs cleared",
-        bool((out[cleared] == 0.0).all()) and bool(cleared.any()),
-        f"{int(cleared.sum())}",
+        "markers cleared",
+        bool((out[marker] == 0.0).all()) and bool(marker.any()),
+        f"{int(marker.sum())}",
     )
-    check("every other entry unchanged", bool(np.array_equal(out[~cleared], mat[~cleared])))
-    check("the far loop kept", out[0, 4] == mat[0, 4] and out[0, 4] > 0.0)
+    check("every other entry unchanged", bool(np.array_equal(out[~marker], mat[~marker])))
+    check("the loop kept", out[0, 4] == mat[0, 4] and out[0, 4] > 0.0)
 
 
 def main() -> int:

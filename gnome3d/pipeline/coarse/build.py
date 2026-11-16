@@ -725,16 +725,18 @@ def calc_anchor_expected_distances(
 
 
 def repulsion_range(mat: F64Array, mids: list[int], s: Settings) -> F64Array:
-    """Clear the repulsion marker on arcless pairs farther apart than `arcs_repulsion_range_bp`,
-    so the kernels score nothing on them but the excluded volume. Zero leaves every marker,
-    and the input is returned as is."""
-    rng = int(s.arcs_repulsion_range_bp)
-    if rng <= 0:
+    """Clear every repulsion marker when `arcs_repulsion` is off, so the kernels score nothing on
+    an arcless pair beyond the short range background but the excluded volume. With it on the
+    input is returned as is.
+
+    The repulsion holds every far arcless pair of every conformation at one distance, which
+    leaves no far pair in contact; with it off `[springs] gyration_weight` holds the size. See
+    `design/gap-fill.md`."""
+    del mids
+    if bool(s.arcs_repulsion):
         return mat
-    m = np.asarray(mids, dtype=np.float64)
-    far = (np.abs(m[:, None] - m[None, :]) > rng) & (mat == -0.5)
     out = mat.copy()
-    out[far] = 0.0
+    out[out == -0.5] = 0.0
     return out
 
 
