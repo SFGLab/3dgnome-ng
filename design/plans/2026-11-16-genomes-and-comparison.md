@@ -38,7 +38,8 @@ ROOT=$PWD TRIOS_ROOT=$T PYTHONPATH=$PWD CONFIG_TAG=_trio_rnapol2_hgsvc_genome_lr
 
 The trio script sets no account and the user's default association on eden, `null`, has a submit
 limit of zero, so the trio arrays need `-A sfglab`; without it sbatch refuses them with
-`AssocMaxSubmitJobLimit`. The cell array was submitted on 2026-11-16 as job 1943267.
+`AssocMaxSubmitJobLimit`. Submitted on 2026-11-16: cell array 1943267, trio CTCF 1943269, trio
+CTCF and RNAPOL2 1943270.
 
 Cell array task i runs line and arm i % 9 on chromosome i / 9; trio task i runs one chromosome of
 one sample, the chromosome slowest. A member whose cif exists is skipped, so resubmitting fills
