@@ -14,7 +14,7 @@ import numpy as np
 from _check import check, done
 from fixture import make_data
 
-from gnome3d_web.contacts import ice, loop_enrichment, median_bond, model_map, multimm_map, rank_agreement, scc
+from gnome3d_web.contacts import ice, loop_enrichment, median_bond, model_map, multimm_map, rank_agreement, rank_reach, scc
 
 
 def battery_scc(A: np.ndarray, B: np.ndarray, max_sep_bins: int) -> float:
@@ -66,6 +66,13 @@ def main() -> int:
     kept = np.ones(60, dtype=bool)
     kept[20:30] = False
     check("bins left out do not count", abs(rank_agreement(x, holed, 25000, kept) - 1) < 1e-9 and rank_agreement(x, holed, 25000) < 1 - 1e-6)
+    thin = x.copy()
+    for k in range(9, 60):
+        idx = np.arange(60 - k)
+        thin[idx, idx + k] = thin[idx + k, idx] = 0
+        thin[0, k] = thin[k, 0] = 1
+    check("the rank agreement stops at the first distance under half filled", rank_reach(x, thin, 25000) == 8 * 25000 and abs(rank_agreement(x, thin, 25000) - 1) < 1e-9, str(rank_reach(x, thin, 25000)))
+    check("a full map is read to its end", rank_reach(x, x, 25000) == 57 * 25000, str(rank_reach(x, x, 25000)))
     sparse = np.zeros((40, 40))
     other = np.zeros((40, 40))
     for k in range(1, 40):

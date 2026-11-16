@@ -348,6 +348,11 @@ def _deep_map(job: Path, url: str, chrom: str, start: int, end: int, res: int, a
     return m
 
 
+def _span(bp: int) -> str:
+    """A separation in words, megabases from one up."""
+    return f"{bp / 1e6:g} Mb" if bp >= 1_000_000 else f"{bp // 1000} kb"
+
+
 def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str, hic_url: str = "", hic_name: str = "", allow_private: bool = False) -> dict[str, object]:
     """Two contact maps of a window on one grid, each the Hi-C, the model's MultiMM map or its
     counted contacts, raw or ICE balanced, with two agreements of the halves: the rank agreement
@@ -444,7 +449,8 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
             else f"{la} against {lb}, raw values, diagonals up to 2 Mb"
         ),
         "rank": cm.rank_agreement(rk_a, rk_b, res, keep),
-        "rank_about": f"{la} against {lb}, each distance up to 2 Mb ranked on its own" + (", Hi-C balanced, over the bins Hi-C maps" if "hic" in (upper, lower) else ""),
+        "rank_about": f"{la} against {lb}, each distance up to {_span(cm.rank_reach(rk_a, rk_b, res, keep))} ranked on its own, the distances at which half of the pairs hold a contact in both maps"
+        + (", Hi-C balanced, over the bins Hi-C maps" if "hic" in (upper, lower) else ""),
         "loop_enrichment": (
             cm.loop_enrichment(raw_a, raw_b)
             if upper in loop_sets and lower not in loop_sets

@@ -131,12 +131,11 @@ def scc(a: np.ndarray, b: np.ndarray, res: int, max_bp: int = 2_000_000) -> floa
     return num / den if den > 0 else None
 
 
-def rank_agreement(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None = None, max_bp: int = 2_000_000) -> float | None:
-    """The Spearman correlation of each diagonal up to max_bp over the kept bins, averaged with
-    the diagonal's length as weight. Ranks within one separation carry no distance decay and no
-    scale, so a stretch is judged by its pattern and not by its level; the stratum adjusted
-    correlation scores an empty stretch above any filled one where Hi-C is depleted. None when
-    no diagonal has two maps with variance.
+def rank_strata(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None = None, max_bp: int = 2_000_000, min_filled: float = 0.5) -> list[tuple[int, int, float]]:
+    """The Spearman correlation of each diagonal over the kept bins, as (separation in bins,
+    pairs, correlation), from the first diagonal up to max_bp or to the last one before a
+    diagonal with under min_filled of its pairs above zero in either map. A small ensemble
+    holds no contact at most far pairs, and the ranks of a diagonal of zeros are ties.
 
     @param keep the bins compared, every bin when None
     """
@@ -144,17 +143,34 @@ def rank_agreement(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | No
 
     if keep is not None:
         a, b = a[np.ix_(keep, keep)], b[np.ix_(keep, keep)]
-    n = len(a)
-    num = den = 0.0
-    for k in range(1, min(n - 2, max_bp // res) + 1):
+    out: list[tuple[int, int, float]] = []
+    for k in range(1, min(len(a) - 2, max_bp // res) + 1):
         x, y = np.diagonal(a, k), np.diagonal(b, k)
-        if x.size < 3 or x.std() < 1e-12 or y.std() < 1e-12:
+        if x.size < 3 or min((x > 0).mean(), (y > 0).mean()) < min_filled:
+            break
+        if x.std() < 1e-12 or y.std() < 1e-12:
             continue
         r = float(spearmanr(x, y).statistic)
         if np.isfinite(r):
-            num += x.size * r
-            den += x.size
-    return num / den if den > 0 else None
+            out.append((k, x.size, r))
+    return out
+
+
+def rank_agreement(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None = None, max_bp: int = 2_000_000, min_filled: float = 0.5) -> float | None:
+    """The diagonals of rank_strata averaged with the diagonal's length as weight. Ranks within
+    one separation carry no distance decay and no scale, so a stretch is judged by its pattern
+    and not by its level; the stratum adjusted correlation scores an empty stretch above any
+    filled one where Hi-C is depleted. None when no diagonal counts.
+    """
+    strata = rank_strata(a, b, res, keep, max_bp, min_filled)
+    den = sum(n for _, n, _ in strata)
+    return sum(n * r for _, n, r in strata) / den if den > 0 else None
+
+
+def rank_reach(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None = None, max_bp: int = 2_000_000, min_filled: float = 0.5) -> int:
+    """The largest separation in bp that rank_agreement counted, 0 when none."""
+    strata = rank_strata(a, b, res, keep, max_bp, min_filled)
+    return strata[-1][0] * res if strata else 0
 
 
 def coarsest_fit(start: int, end: int) -> int:
