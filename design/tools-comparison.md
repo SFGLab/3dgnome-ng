@@ -36,8 +36,8 @@ bins.
 | chr1 | cudaMMC | 0.214 | 0.113 | 0.171 | 0.272 | 0.101 | 0.052 to 0.151 |
 
 3dgnome leads on every statistic at both scales. Per run it leads on raw Pearson and raw
-Spearman in all twelve. On SCC it loses two of the twelve to MultiMM, both on chr1 20 to 25 Mb:
-GM12878 at raw SCC 0.305 against 0.318, and HFFC6 at 0.168 against 0.222, where cudaMMC's 0.178
+Spearman in all twelve. On SCC it loses two of the twelve to MultiMM, both on chr1 20 to 25 Mb.
+GM12878 reads raw SCC 0.305 against 0.318 and HFFC6 0.168 against 0.222, where cudaMMC's 0.178
 is ahead of it too. MultiMM's minimised ensemble is within 0.01 of its dynamics ensemble
 everywhere.
 
