@@ -226,6 +226,12 @@ def test_within_blocks_clears_inner_overlaps() -> None:
         "off leaves a lone dense block as it was", inner(off) == before, f"{inner(off)} of {before}"
     )
     check("on clears most inner overlaps", inner(on) < 0.3 * before, f"{inner(on)} of {before}")
+    alone = positions(relax_blocks([a], s)[0])
+    check(
+        "on clears them in a lone block too",
+        inner(alone) < 0.3 * before,
+        f"{inner(alone)} of {before}",
+    )
 
 
 def main() -> int:
