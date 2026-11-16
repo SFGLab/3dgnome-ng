@@ -1098,7 +1098,10 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: the reference has no block layout pass at all.
 
-- **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no, production no since 2026-09-19.**
+- **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no, production yes since 2026-11-16.**
+  Production with the arcless repulsion off, which tripled cross block overlaps on a chromosome;
+  the pass with `local_window` 1 takes GM12878 chr1 from 62 to 14 per thousand. The paragraph
+  below is the measurement that kept it off from 2026-09-19 with the repulsion on.
   Both end passes were measured at chromosome scope on GM12878 chr1:1-60 Mb, three structures
   per arm: Hi-C level on all four arms, the joint solve already holding boundary pairs at a
   median of 1.03 times the curve and none over 2.34, the stitch adding a tenth of Rg through its
@@ -1233,7 +1236,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   far pairs. Block scope, centroid start and weight zero are byte exact by the parity gate.
   Unit checks in `harness/test_arcs_scope.py` and `harness/test_arcs_start.py`.
 
-  Production since 2026-09-11 at chromosome scope with the Hilbert start and no arcs sphere.
+  Production since 2026-09-11 at chromosome scope with no arcs sphere, the start the Hilbert
+  curve until 2026-11-16 and the maxent draw since, see the long range entry below.
   The joint solve holds no arc across blocks and the contact background 80 of 3.5 million
   cross block pairs on chr1:1-60 Mb, so the start is the long range arrangement, and a
   Hilbert curve scaled to the law's bond gives it the cube root size growth the maps show
@@ -1333,6 +1337,36 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   1.2 of the law, where the coil ends under it. `slurm/ensemble/gap_maxent_trial.sh` and
   `playground/square_blocks/gapme/` are the record.
   Unit checks in `harness/test_maxent_start.py`, options and trial in `design/gap-fill.md`.
+
+- **Long range in the arcs stage: `[excluded_volume] arcs_repulsion = no`, `[springs]
+  gyration_weight` 0.1, the arcs excluded volume at `auto_factor_arcs` 1.0 and `[simulation_arcs]
+  start = maxent`, production since 2026-11-16.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
+  `repulsion_range`, [mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py) `gyration_windows`,
+  [pipeline/ib/maxent.py](gnome3d/pipeline/ib/maxent.py) `anchor_draw`)
+  Blocks held two to ten times too few contacts from 100 kb to 1 Mb against Hi-C at the right
+  mean size. The arcless repulsion held every far anchor pair of every conformation at one
+  distance, the 1 percent quantile beyond 100 kb at 0.40 to 0.53 of the law, so far pairs never
+  met; an ablation of the arcs terms, one per arm, moved that floor only with the repulsion. Off,
+  the blocks compact a third, so the gyration term holds the radius of gyration of every genomic
+  window of anchors, 100 kb doubling up and tiled twice, at the law's in the solver's energy,
+  which sets the size without holding a pair. The maxent start draws the anchors per
+  conformation from the Gaussian whose pair variances best meet every pair's target, fitted by
+  L-BFGS on a root of the covariance, and the solve descends from it. The cross block
+  relaxation is on with it. Pooled ensemble scores on chr1 1 to 60 Mb, three cells: SCC up 0.017
+  to 0.044, Spearman 0.018 to 0.028, MultiMM 0.06 to 0.10, the distance exponent 1.02 to 1.07
+  of Hi-C's against 1.15 to 1.18, Rg at the law's where production sat 15 percent over it;
+  balanced Pearson down 0.03 to 0.04, which follows the first diagonals. Arms are judged by the
+  pooled map, `playground/ensemble_score.py`, since a per structure score rewards ensembles of one
+  conformation. Unit checks in `harness/test_gyration.py`, `harness/test_maxent_start.py` and
+  `harness/test_arc_matrix.py`.
+
+  Hole beads between blocks, `[holes] use_hole_beads` with `flank_beads`, stay opt in: on this
+  arm they raise Spearman and lower pooled SCC 0.01 to 0.04 on three cells, since a correlation
+  scores an empty hole's zeros against any filled level, while their contacts follow Hi-C's from
+  pair to pair. `design/gap-fill.md` has every arm.
+
+  Why not in the reference: the reference has the `1 / d` repulsion on every arcless pair and
+  solves no size term.
 
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
   `[simulation_backend] neighbour_grid`, default yes)
