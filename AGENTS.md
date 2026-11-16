@@ -1101,7 +1101,10 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 - **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no, production yes since 2026-11-16.**
   Production with the arcless repulsion off, which tripled cross block overlaps on a chromosome;
   the pass with `local_window` 1 takes GM12878 chr1 from 62 to 14 per thousand. The paragraph
-  below is the measurement that kept it off from 2026-09-19 with the repulsion on.
+  below is the measurement that kept it off from 2026-09-19 with the repulsion on. With
+  `within_blocks` and `ev_radius` 1.0, production since 2026-11-16, overlapping pairs inside a block
+  move too: on CTCF only inputs the coils of two gaps whose anchors sit close met 240 to 300 times
+  per thousand beads, and GM12878 chr1 goes from 246 to 37 within blocks at level balanced SCC.
   Both end passes were measured at chromosome scope on GM12878 chr1:1-60 Mb, three structures
   per arm: Hi-C level on all four arms, the joint solve already holding boundary pairs at a
   median of 1.03 times the curve and none over 2.34, the stitch adding a tenth of Rg through its

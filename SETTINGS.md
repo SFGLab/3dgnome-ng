@@ -289,12 +289,12 @@ other while the arcs and the stitch are kept.
 | --- | --- | --- | --- | --- |
 | `use_cross_block_relax` | bool | no | yes | Master switch. On at block scope with the stitch, whose rigid moves it cleans up after. At chromosome scope it was null with the arcless repulsion on, 23 to 21 cross block pairs per thousand, and is production since 2026-11-16 with the repulsion off, which tripled them: 62 to 14 on GM12878 chr1. |
 | `ev_weight` | float | 10.0 | 10.0 | Excluded volume weight for the pass. |
-| `ev_radius` | float | 0.0 | 0.0 | Excluded volume radius. 0 uses 1.5 chain bonds, so nothing is left under one bond where contacts are counted. |
+| `ev_radius` | float | 0.0 | 1.0 | Excluded volume radius. 0 uses 1.5 chain bonds, so nothing is left under one bond where contacts are counted. 1.0 in production since 2026-11-16, about one bond; 1.5 bonds with `within_blocks` cost Pearson and MultiMM. |
 | `temp` | float | 0.1 | 0.1 | Starting temperature as a fraction of the smooth stage's `max_temp`. Untangling needs a bead to cross a neighbour's shell, and a greedy pass stalls. |
 | `noise` | float | 0.5 | 0.5 | Step size in chain bonds. |
 | `bond_weight` | float | 10.0 | 10.0 | Chain spring weight for the pass. At the smooth stage's 0.1 the excluded volume tears the coil. |
 | `local_window` | int | -1 | 1 | Let only the beads touching another block move, plus this many chain neighbours either side. -1 lets every subanchor move, which on a chromosome is hours. A window of 1 is minutes. |
-| `within_blocks` | bool | no | no | With `local_window` set, non neighbour bead pairs of one block closer than 0.7 of a bond move in the pass as well as beads touching another block. They are the coils of two gaps whose anchors the arcs stage put close, which the smooth stage's soft excluded volume leaves. Under measurement since 2026-11-16, `design/gap-fill.md`. |
+| `within_blocks` | bool | no | yes | With `local_window` set, non neighbour bead pairs of one block closer than 0.7 of a bond move in the pass as well as beads touching another block. They are the coils of two gaps whose anchors the arcs stage put close, which the smooth stage's soft excluded volume leaves. Under measurement since 2026-11-16, `design/gap-fill.md`. Production yes since 2026-11-16 with `ev_radius` 1.0. |
 
 ## [holes]
 

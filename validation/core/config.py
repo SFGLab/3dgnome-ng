@@ -262,6 +262,12 @@ CANONICAL: dict[str, dict[str, object]] = {
         # 24 hours on it. Replayed on the same chromosome a window of one took 129 seconds and
         # cut cross block contacts 31,637 to 362; a wider window only adds rounds.
         "local_window": 1,
+        # Overlaps inside a block move too, at a radius of one model unit, about a bond. With
+        # the repulsion off the coils of two gaps whose anchors sit close meet, 240 to 300 per
+        # thousand beads on CTCF only inputs; this takes GM12878 chr1 from 246 to 37 within
+        # blocks and 82 to 16 across at balanced SCC 0.355 to 0.359. 2026-11-16.
+        "within_blocks": "yes",
+        "ev_radius": 1.0,
     },
 }
 
