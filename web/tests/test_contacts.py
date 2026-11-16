@@ -14,7 +14,7 @@ import numpy as np
 from _check import check, done
 from fixture import make_data
 
-from gnome3d_web.contacts import ice, loop_enrichment, median_bond, model_map, multimm_map, scc
+from gnome3d_web.contacts import ice, loop_enrichment, median_bond, model_map, multimm_map, rank_agreement, scc
 
 
 def battery_scc(A: np.ndarray, B: np.ndarray, max_sep_bins: int) -> float:
@@ -56,6 +56,16 @@ def main() -> int:
         shuffled[idx + k, idx] = d
     check("a map with each diagonal shuffled agrees poorly", scc(x, shuffled, 25000) < 0.5, str(scc(x, shuffled, 25000)))
     check("an empty map has no agreement", scc(x, np.zeros_like(x), 25000) is None)
+    check("a map ranks as itself", abs(rank_agreement(x, x, 25000) - 1) < 1e-9)
+    check("the rank agreement ignores scale and any rising curve", abs(rank_agreement(x, 7 * x**3, 25000) - 1) < 1e-9)
+    check("a map with each diagonal shuffled ranks poorly", abs(rank_agreement(x, shuffled, 25000)) < 0.3, str(rank_agreement(x, shuffled, 25000)))
+    check("an empty map has no rank agreement", rank_agreement(x, np.zeros_like(x), 25000) is None)
+    holed = x.copy()
+    holed[20:30, :] = 0
+    holed[:, 20:30] = 0
+    kept = np.ones(60, dtype=bool)
+    kept[20:30] = False
+    check("bins left out do not count", abs(rank_agreement(x, holed, 25000, kept) - 1) < 1e-9 and rank_agreement(x, holed, 25000) < 1 - 1e-6)
     sparse = np.zeros((40, 40))
     other = np.zeros((40, 40))
     for k in range(1, 40):
@@ -98,6 +108,7 @@ def main() -> int:
         check("the endpoint returns two square maps on the bins of the resolution", n == 120 and len(r["upper"]) == n and len(r["lower"][0]) == n and r["bins"][1] - r["bins"][0] == 25000, str(n))
         check("the halves are labelled", r["upper_label"].startswith("Hi-C") and "2 structures" in r["lower_label"] and "1/(d+1)" in r["lower_label"], str((r["upper_label"], r["lower_label"])))
         check("the agreement names the two halves it compares", "Hi-C of GMX" in r["scc_about"] and "1/(d+1)" in r["scc_about"] and "raw" in r["scc_about"], str(r.get("scc_about")))
+        check("the rank agreement comes with what it compares", "rank" in r and (r["rank"] is None or -1 <= r["rank"] <= 1) and "ranked" in r["rank_about"] and "balanced" in r["rank_about"], str(r.get("rank_about")))
         counted = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "hic", "lower": "model_count", "norm": "raw"}).json()
         check("the counted model is still offered", "within" in counted["lower_label"], counted.get("lower_label", counted))
         battery = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "hic", "lower": "model_count", "norm": "ice"}).json()

@@ -43,6 +43,11 @@ def genes_from_gtf(gtf: Path, out: Path) -> int:
     return n
 
 
+# The site fills the stretches no loop covers with beads, which the production config leaves
+# empty: its maps are read by eye and by the rank agreement, design/gap-fill.md.
+HOLES = "\n[holes]\nuse_hole_beads = yes\nflank_beads = 5\n"
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("repo_data")
@@ -54,6 +59,7 @@ def main() -> None:
     ap.add_argument("--lymphoblastoid", action="store_true")
     ap.add_argument("--note", default="")
     ap.add_argument("--singletons", default="", help="the Hi-C singletons, when not under the repo data dir")
+    ap.add_argument("--contact-map", default="", help="a cooler URI at 1 kb on the server, for the stretches without loops")
     a = ap.parse_args()
     c = a.cell
     src = Path(a.repo_data) / c
@@ -77,6 +83,8 @@ def main() -> None:
         if not p.is_file():
             raise SystemExit(f"missing {p}")
         shutil.copyfile(p, dest / name)
+    with (dest / "config.ini").open("a") as fh:
+        fh.write(HOLES)
     n = genes_from_gtf(Path(a.gtf), dest / "genes.tsv")
     cat_path = site / "catalog.json"
     cat = json.loads(cat_path.read_text()) if cat_path.is_file() else {"cell_types": {}, "sv_sets": {}}
@@ -94,6 +102,8 @@ def main() -> None:
         "enhancers": "enhancers.bed",
         "note": a.note,
     }
+    if a.contact_map:
+        cat["cell_types"][c]["contact_map"] = a.contact_map
     cat_path.write_text(json.dumps(cat, indent=2) + "\n")
     print(f"wrote {dest}, {n} genes, and the catalog entry")
 

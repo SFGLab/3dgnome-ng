@@ -317,9 +317,10 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           <section className="side-card" aria-label="Agreement of the two halves">
             <p className="card-label">Agreement of the two halves</p>
             <p className="big">
-              <span className="big-value">{maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}</span> <span className="unit">stratum adjusted correlation</span>
+              <span className="big-value">{typeof maps.data.rank === 'number' ? maps.data.rank.toFixed(2) : 'none'}</span> <span className="unit">rank agreement</span>
             </p>
-            <p className="card-text">{`Stratum adjusted correlation at ${res / 1000} kb of ${maps.data.scc_about ?? 'the two maps'}.`}</p>
+            <p className="card-text">{`Rank correlation at ${res / 1000} kb of ${maps.data.rank_about ?? 'the two maps'}. It compares the pattern at each distance and not the level.`}</p>
+            <p className="card-text">{`Stratum adjusted correlation ${maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}, of ${maps.data.scc_about ?? 'the two maps'}. It also compares the level, and a stretch without beads scores well where Hi-C is depleted.`}</p>
             {typeof maps.data.loop_enrichment === 'number' && (
               <p className="card-text">{`At the loops the other half is ${maps.data.loop_enrichment.toFixed(1)} times its expected contact at the same distance.`}</p>
             )}

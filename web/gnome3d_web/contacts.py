@@ -131,6 +131,32 @@ def scc(a: np.ndarray, b: np.ndarray, res: int, max_bp: int = 2_000_000) -> floa
     return num / den if den > 0 else None
 
 
+def rank_agreement(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None = None, max_bp: int = 2_000_000) -> float | None:
+    """The Spearman correlation of each diagonal up to max_bp over the kept bins, averaged with
+    the diagonal's length as weight. Ranks within one separation carry no distance decay and no
+    scale, so a stretch is judged by its pattern and not by its level; the stratum adjusted
+    correlation scores an empty stretch above any filled one where Hi-C is depleted. None when
+    no diagonal has two maps with variance.
+
+    @param keep the bins compared, every bin when None
+    """
+    from scipy.stats import spearmanr
+
+    if keep is not None:
+        a, b = a[np.ix_(keep, keep)], b[np.ix_(keep, keep)]
+    n = len(a)
+    num = den = 0.0
+    for k in range(1, min(n - 2, max_bp // res) + 1):
+        x, y = np.diagonal(a, k), np.diagonal(b, k)
+        if x.size < 3 or x.std() < 1e-12 or y.std() < 1e-12:
+            continue
+        r = float(spearmanr(x, y).statistic)
+        if np.isfinite(r):
+            num += x.size * r
+            den += x.size
+    return num / den if den > 0 else None
+
+
 def coarsest_fit(start: int, end: int) -> int:
     """The finest resolution with no more than MAX_BINS bins over a window."""
     return next(r for r in RESOLUTIONS if len(bins_for(start, end, r)) <= MAX_BINS)

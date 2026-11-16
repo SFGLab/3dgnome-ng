@@ -66,12 +66,18 @@ EDITABLE: dict[str, list[Editable]] = {
         _n("springs", "background_weight", 0, 1, 0.01),
         _n("springs", "background_range_bp", 0, 1_000_000, 10_000),
         _c("springs", "use_contact_background"),
+        _c("excluded_volume", "arcs_repulsion"),
         _n("excluded_volume", "arcs_repulsion_cutoff_factor", 0, 3, 0.1),
+        _n("springs", "gyration_weight", 0, 10, 0.1),
+    ],
+    "Stretches without loops": [
+        _c("holes", "use_hole_beads"),
+        _n("holes", "flank_beads", 0, 20, 1),
     ],
     "Anchor fit": [
         _c("simulation_arcs", "solver", "mc", "lbfgs"),
         _n("simulation_arcs", "solver_tol", 0, 1e-3, 1e-6),
-        _c("simulation_arcs", "start", "centroid", "walk", "hilbert"),
+        _c("simulation_arcs", "start", "centroid", "walk", "hilbert", "maxent"),
     ],
     "Chains": [
         _n("main", "noise_smooth", 0.1, 5, 0.1),
@@ -82,6 +88,9 @@ EDITABLE: dict[str, list[Editable]] = {
         _c("excluded_volume", "use_excluded_volume"),
         _n("excluded_volume", "weight", 0, 10, 0.1),
         _n("excluded_volume", "skip_neighbors", 0, 5, 1),
+        _n("excluded_volume", "auto_factor_arcs", 0.1, 2, 0.1),
+        _c("relax", "use_cross_block_relax"),
+        _c("relax", "within_blocks"),
     ],
     "Confinement": [
         _c("confinement", "use_confinement"),

@@ -220,6 +220,10 @@ def build_inputs(
     }
     if len(names) > 1 or factors == "RNAPII" or (own and own.loops):
         data["factors"] = ",".join(names)
+    # The beads of a stretch without loops are drawn against the cell type's map, which is in
+    # reference coordinates and is this cell's, so not with variants applied or own contacts.
+    if cell.contact_map and not svs and not (own and own.contacts):
+        data["contact_map"] = cell.contact_map
     config = engine.write_config(cell.path("config"), data, out / "config.ini", header=f"{cell.name} {region} {factors}")
     fixed = {}
     if factors == "RNAPII" or (own and own.loops and own.loops[0][0].upper() != "CTCF"):

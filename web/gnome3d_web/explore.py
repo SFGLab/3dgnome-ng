@@ -350,8 +350,9 @@ def _deep_map(job: Path, url: str, chrom: str, start: int, end: int, res: int, a
 
 def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str, hic_url: str = "", hic_name: str = "", allow_private: bool = False) -> dict[str, object]:
     """Two contact maps of a window on one grid, each the Hi-C, the model's MultiMM map or its
-    counted contacts, raw or ICE balanced, and the agreement the battery reports: the stratum
-    adjusted correlation of raw Hi-C against contacts within the structures' median bond.
+    counted contacts, raw or ICE balanced, with two agreements of the halves: the rank agreement
+    per distance, and the stratum adjusted correlation the battery reports, raw Hi-C against
+    contacts within the structures' median bond.
 
     @param hic_url a deep map of the cell type in place of the job's own input contacts
     @param hic_name the deep map's name for the labels
@@ -418,6 +419,16 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         b = b if lower in loop_sets else cm.ice(b)
     elif norm != "raw":
         raise ExploreError(f"{norm!r} is not ice or raw")
+    # The rank agreement reads a Hi-C half balanced and over the bins Hi-C maps, since an
+    # unmapped bin reads as zero and a bead there would count against the model.
+    keep = np.ones(len(raw_a), dtype=bool)
+    rk_a, rk_b = raw_a, raw_b
+    if upper == "hic":
+        keep &= raw_a.sum(axis=1) > 0
+        rk_a = cm.ice(raw_a)
+    if lower == "hic":
+        keep &= raw_b.sum(axis=1) > 0
+        rk_b = cm.ice(raw_b)
     return {
         "bins": cm.bins_for(start, end, res).tolist(),
         "upper": np.round(a, 6).tolist(),
@@ -432,6 +443,8 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
             if {upper, lower} == {"hic", "model_count"}
             else f"{la} against {lb}, raw values, diagonals up to 2 Mb"
         ),
+        "rank": cm.rank_agreement(rk_a, rk_b, res, keep),
+        "rank_about": f"{la} against {lb}, each distance up to 2 Mb ranked on its own" + (", Hi-C balanced, over the bins Hi-C maps" if "hic" in (upper, lower) else ""),
         "loop_enrichment": (
             cm.loop_enrichment(raw_a, raw_b)
             if upper in loop_sets and lower not in loop_sets

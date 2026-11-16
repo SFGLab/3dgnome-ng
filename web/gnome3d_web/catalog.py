@@ -2,7 +2,8 @@
 
 A cell type is a directory of the files one modelling run reads, the base loops per factor,
 the anchors per factor choice, the base contact map as singletons, segments, centromeres and a
-production config, plus the genes and enhancers the result pages mark. An SV set is one
+production config, plus the genes and enhancers the result pages mark. `contact_map`, when
+given, is a cooler URI at 1 kb on the server that the stretches without loops are drawn against. An SV set is one
 bgzipped VCF and the samples it holds. Paths in the catalog are relative to the data directory.
 """
 
@@ -35,6 +36,7 @@ class CellType:
     description: str = ""
     hic_url: str = ""
     hic_name: str = ""
+    contact_map: str = ""
     data: list[str] = field(default_factory=list)
 
     def path(self, key: str) -> Path:
@@ -88,6 +90,7 @@ class Catalog:
                 note=c.get("note", ""),
                 hic_url=c.get("hic_url", ""),
                 hic_name=c.get("hic_name", ""),
+                contact_map=c.get("contact_map", ""),
                 description=c.get("description", c.get("label", name).partition(", ")[2]),
                 data=list(c.get("data", [*c["clusters"], "Hi-C", *(["enhancers"] if c.get("enhancers") else [])])),
             )

@@ -14,6 +14,8 @@ const MAP = {
   upper_label: 'Hi-C of GM12878',
   lower_label: 'This job, 1/(d+1)³ between bins, mean of 100 structures',
   scc: 0.37,
+  rank: 0.21,
+  rank_about: 'Hi-C of GM12878 against This job, each distance up to 2 Mb ranked on its own, Hi-C balanced, over the bins Hi-C maps',
   scc_about: 'Hi-C of GM12878, 4DN 4DNFIXP4QG5B against this job\'s contacts within the median bond, raw counts, diagonals up to 2 Mb, as the validation battery computes it',
 }
 
@@ -32,7 +34,7 @@ describe('ContactMapTab', () => {
   it('asks for the job region at 25 kb with Hi-C above and the model below', async () => {
     const f = mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     const url = String(f.mock.calls.find(([u]) => String(u).includes('/contacts'))![0])
     expect(url).toContain('region=chr1%3A11500000-11575000')
     expect(url).toContain('res=25000')
@@ -44,7 +46,9 @@ describe('ContactMapTab', () => {
     mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
     const card = await screen.findByRole('region', { name: 'Agreement of the two halves' })
-    expect(within(card).getByText('0.37')).toBeInTheDocument()
+    expect(within(card).getByText('0.21')).toBeInTheDocument()
+    expect(within(card).getByText(/Stratum adjusted correlation 0.37/)).toBeInTheDocument()
+    expect(within(card).getByText(/each distance up to 2 Mb ranked on its own/)).toBeInTheDocument()
     expect(within(card).getByText(/4DN 4DNFIXP4QG5B against this job's contacts within the median bond/)).toBeInTheDocument()
     expect(document.querySelector('.map-labels')?.textContent).toBe('This job, 1/(d+1)³ between bins, mean of 100 structuresHi-C of GM12878')
   })
@@ -52,7 +56,7 @@ describe('ContactMapTab', () => {
   it('keeps zooming out inside the job region', async () => {
     const f = mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     const canvas = document.querySelector('canvas')!
     for (let i = 0; i < 6; i++) fireEvent.wheel(canvas, { deltaY: 100 })
     await new Promise((r) => setTimeout(r, 400))
@@ -71,7 +75,7 @@ describe('ContactMapTab', () => {
         <ContactMapTab api={jobApi('jobs', KEY)} summary={{ ...SUMMARY_DONE, region: 'chr1:10000000-14000000' }} />
       </QueryClientProvider>,
     )
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     const before = f.mock.calls.filter(([u]) => String(u).includes('/contacts')).length
     const canvas = document.querySelector('canvas')!
     for (let i = 0; i < 5; i++) fireEvent.wheel(canvas, { deltaY: -100 })
@@ -82,7 +86,7 @@ describe('ContactMapTab', () => {
   it('keeps a typed locus inside the job region and says so', async () => {
     mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     fireEvent.change(screen.getByLabelText('Locus'), { target: { value: 'chr1:13,781,651-14,281,651' } })
     fireEvent.click(screen.getByRole('button', { name: 'Go' }))
     expect(screen.getByText('The job covers chr1:11,500,000-11,575,000. The map shows only that region.')).toBeInTheDocument()
@@ -91,7 +95,7 @@ describe('ContactMapTab', () => {
   it('offers the model as the MultiMM map or as counted contacts', async () => {
     const f = mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     const lower = screen.getByLabelText('Lower half')
     expect(within(lower).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['model', 'model_count', 'hic', 'loops_ctcf', 'loops_rnapii'])
     fireEvent.change(lower, { target: { value: 'model_count' } })
@@ -102,21 +106,21 @@ describe('ContactMapTab', () => {
   it('starts the log colour range at a low percentile, not at zero', async () => {
     mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     expect(Number((screen.getByLabelText(/min/) as HTMLInputElement).value)).toBeGreaterThan(0)
   })
 
   it('offers Observed, O/E and Pearson', async () => {
     mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     expect(within(screen.getByRole('group', { name: 'Show' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['Observed', 'O/E', 'Pearson'])
   })
 
   it('offers the loops of each factor in either half and shows their enrichment', async () => {
     const f = mockApi([[/contacts$/, (u) => [200, u.searchParams.get('upper') === 'loops_ctcf' ? { ...MAP, upper_label: 'CTCF loops, PETs at the anchors', loop_enrichment: 2.4 } : MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     const upper = screen.getByLabelText('Upper half')
     expect(within(upper).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['hic', 'model', 'model_count', 'loops_ctcf', 'loops_rnapii'])
     fireEvent.change(upper, { target: { value: 'loops_ctcf' } })
@@ -131,7 +135,7 @@ describe('ContactMapTab', () => {
         <ContactMapTab api={jobApi('jobs', KEY)} summary={{ ...SUMMARY_DONE, region: 'chr1:10000000-15000000' }} />
       </QueryClientProvider>,
     )
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     const five = within(screen.getByLabelText('Resolution')).getByRole('option', { name: /^5 kb/ }) as HTMLOptionElement
     expect(five.disabled).toBe(true)
     expect(five.textContent).toBe('5 kb, zoom in to use')
@@ -144,7 +148,7 @@ describe('ContactMapTab', () => {
       [/annotations$/, () => [200, ANNOTATIONS]],
     ])
     renderTab()
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     fireEvent.change(screen.getByLabelText('Resolution'), { target: { value: '50000' } })
     expect(await screen.findByText(/Reading the map at 50 kb\./)).toBeInTheDocument()
     release()
@@ -156,7 +160,7 @@ describe('ContactMapTab', () => {
       [/annotations$/, () => [200, ANNOTATIONS]],
     ])
     renderTab()
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     fireEvent.change(screen.getByLabelText('Resolution'), { target: { value: '5000' } })
     expect(await screen.findByText(/more than 800 bins on a side/)).toBeInTheDocument()
   })
@@ -164,7 +168,7 @@ describe('ContactMapTab', () => {
   it('keeps to the writing rules', async () => {
     mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     const { container } = renderTab()
-    await screen.findByText('0.37')
+    await screen.findByText('0.21')
     expect(checkCopy(container)).toEqual([])
   })
 })
