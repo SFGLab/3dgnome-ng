@@ -1,0 +1,6 @@
+chr1:1-60000000 @ 100 kb: experimental saddle 6.823
+  arm                           saddle  eig |r|   kappa   n
+  HFFC6_E_60mb                   1.994    0.002   0.001  10
+  HFFC6_C_60mb                   1.035    0.025  -0.026  10
+  HFFC6_R_60mb                   0.702    0.080   0.073  10
+  HFFC6_M_60mb                   0.698    0.104   0.121  10
