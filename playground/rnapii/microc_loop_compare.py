@@ -21,7 +21,10 @@ only place a loop its input holds. The class without support measures the rest o
 
 The last class is a check of the instrument. Every loop is moved 30 bins along the diagonal,
 where no loop was called, and scored the same way. Its ratio should be one and its placed share
-is the rate a pair with no loop passes the threshold.
+is the rate a pair with no loop passes the threshold. That rate differs between tools, since an
+ensemble whose structures differ more has noisier mean distances. Two numbers allow for it. The
+placed share above the moved loops' share, and the chance that a loop's ratio is under a moved
+loop's, one half when the model does not tell them apart.
 
 Prints one row per arm and class and writes the rows and the per loop table to the JSON.
 """
@@ -91,6 +94,15 @@ def supported(loops: list[tuple[int, int]], anchors: list[tuple[int, int, int, i
         hit = (c[:, 1] >= s1 - b) & (c[:, 0] <= s1 + 2 * b) & (c[:, 3] >= s2 - b) & (c[:, 2] <= s2 + 2 * b)
         out[n] = bool(hit.any())
     return out
+
+
+def chance_under(r: np.ndarray, null: np.ndarray) -> float:
+    """The chance that a value of `r` is under a value of `null`, ties counted as half."""
+    from scipy.stats import mannwhitneyu
+
+    if r.size == 0 or null.size == 0:
+        return float("nan")
+    return float(mannwhitneyu(null, r).statistic / (len(null) * len(r)))
 
 
 def spearman(x: np.ndarray, y: np.ndarray) -> float:
@@ -200,6 +212,9 @@ def main() -> None:
         ratio = np.where(seen > 0, dist / np.maximum(dctl, 1e-12), np.nan)
         name = Path(d).name
         per_loop[name] = ratio[:real].tolist()
+        null = ratio[~is_real]
+        null_placed = float((null <= CLOSER).sum() / max(len(null), 1))
+        null = null[np.isfinite(null)]
         for c, m in classes.items():
             ok = m & np.isfinite(ratio)
             okc = ok & np.isfinite(sctl) & (sctl > 0)
@@ -215,13 +230,16 @@ def main() -> None:
                 "closer_than_controls": float((r < 1.0).mean()) if r.size else float("nan"),
                 "closer_by_a_fifth": float((r <= CLOSER).mean()) if r.size else float("nan"),
                 "placed": float((r <= CLOSER).sum() / max(int(m.sum()), 1)),
+                "placed_above_moved": float((r <= CLOSER).sum() / max(int(m.sum()), 1)) - null_placed,
+                "under_a_moved_loop": chance_under(r, null),
                 "rank_with_map": spearman(map_enr[ok], -np.log(r)) if r.size else float("nan"),
             }
             rows.append(row)
             print(
                 f"  {name:<32} {c:<15} loops {row['loops']:>5} scored {row['scored']:>5}  contact {row['contact_enrichment']:6.2f}"
                 f"  ratio {row['distance_ratio_median']:.3f}  closer {row['closer_than_controls']:.2f}"
-                f"  placed {row['placed']:.2f}  rank {row['rank_with_map']:+.2f}",
+                f"  placed {row['placed']:.2f}  above moved {row['placed_above_moved']:+.2f}"
+                f"  under {row['under_a_moved_loop']:.2f}  rank {row['rank_with_map']:+.2f}",
                 flush=True,
             )
     for r in rows[: len(classes)]:
