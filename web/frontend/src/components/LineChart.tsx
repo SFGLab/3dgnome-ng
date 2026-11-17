@@ -17,7 +17,7 @@ const TIME_TICKS: [number, string][] = [
 ]
 
 /** Seconds as the reader says them, seconds under a minute and minutes above. */
-export function duration(seconds: number): string {
+function duration(seconds: number): string {
   return seconds < 60 ? `${seconds.toFixed(seconds < 10 ? 1 : 0)} s` : `${(seconds / 60).toFixed(1)} min`
 }
 
