@@ -13,6 +13,10 @@
   grid-template-columns: repeat(3, 1fr);
 }
 
+.chart-row.one {
+  grid-template-columns: 1fr;
+}
+
 .chart-row > div {
   display: flex;
 }

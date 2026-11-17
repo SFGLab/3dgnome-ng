@@ -26,21 +26,21 @@ describe('Results page', () => {
     expect(values(screen.getByRole('figure', { name: 'Link to expression' }))).toEqual(['0.19', '0.26', '0.28', '0.12', '0.18', '0.22', '0.25', '0.29', '0.31'])
   })
 
-  it('shows the run time of the three tools with the bead count of each model', () => {
+  it('shows the beads, the run time and the run time per 1,000 beads of each tool', () => {
     renderResults()
+    const cells = (figure: HTMLElement, id: string) => within(figure).getAllByTestId(id).map((el) => el.textContent)
     const one = screen.getByRole('figure', { name: 'One structure, 1 Mb' })
     expect(values(one)).toEqual(['6.4', '7.4', '9.0'])
-    expect(within(one).getByText('cudaMMC, 350 beads')).toBeInTheDocument()
-    expect(within(one).getByText('3D-GNOMEᴺᴳ, 760 beads')).toBeInTheDocument()
+    expect(cells(one, 'beads-value')).toEqual(['350', '760', '760'])
+    expect(cells(one, 'rate-value')).toEqual(['18.3', '9.7', '11.8'])
+    expect(within(one).getByRole('columnheader', { name: 'run time, seconds' })).toBeInTheDocument()
     expect(values(screen.getByRole('figure', { name: 'One structure, whole chromosome' }))).toEqual(['3.2', '14.2', '6.4'])
     expect(values(screen.getByRole('figure', { name: 'Ten structures, 60 Mb' }))).toEqual(['9.3', '20.1', '10.6'])
     expect(values(screen.getByRole('figure', { name: 'Three structures at equal bead counts' }))).toEqual(['10.7', '42.1', '11.2'])
     const genome = screen.getByRole('figure', { name: 'One structure, whole genome' })
-    expect(values(genome)).toEqual(['31.4', '46.4'])
-    expect(within(genome).getByText('3D-GNOMEᴺᴳ, 1,312,597 beads')).toBeInTheDocument()
-    for (const name of ['One structure, 1 Mb', 'Ten structures, 60 Mb', 'One structure, whole chromosome', 'Three structures at equal bead counts']) {
-      expect(values(screen.getByRole('figure', { name }))).not.toContain('placeholder')
-    }
+    expect(values(genome)).toEqual(['31.4', 'did not complete', '46.4'])
+    expect(cells(genome, 'beads-value')).toEqual(['458,445', '1,312,597', '1,312,597'])
+    expect(cells(genome, 'rate-value')).toEqual(['4.1', '', '2.1'])
   })
 
   it('charts one structure by region size and by bead count, with a table of every value', () => {

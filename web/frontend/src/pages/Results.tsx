@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { BarChart, ChartKey, type Bar, type Group } from '../components/BarChart'
 import { LineChart, type Line, type Point } from '../components/LineChart'
+import { ToolRuns, type ToolRun } from '../components/ToolRuns'
 import { ROUTES } from '../routes'
 import '../styles/doc.css'
 import './results.css'
@@ -29,11 +30,11 @@ const EXPRESSION: Group[] = [
   { name: 'GM12878 and HFFc6', bars: [bar('original', 0.25), bar('ctcf', 0.29), bar('rnapii', 0.31)] },
 ]
 
-/** One bar per tool, the group named by the tool and the bead count of its model. */
-const tools = (cudammc: [number, number], multimm: [number, number], ours: [number, number], digits = 1): Group[] => [
-  { name: `cudaMMC, ${cudammc[1].toLocaleString('en-US')} beads`, bars: [bar('cudammc', cudammc[0], digits)] },
-  { name: `MultiMM, ${multimm[1].toLocaleString('en-US')} beads`, bars: [bar('multimm', multimm[0], digits)] },
-  { name: `3D-GNOMEᴺᴳ, ${ours[1].toLocaleString('en-US')} beads`, bars: [bar('ctcf', ours[0], digits)] },
+/** The runs of the three tools on one task, each as beads and seconds. A null time is a run that did not finish. */
+const runs = (cudammc: [number, number], multimm: [number, number | null], ours: [number, number], note?: string): ToolRun[] => [
+  { series: 'cudammc', name: 'cudaMMC', beads: cudammc[0], seconds: cudammc[1] },
+  { series: 'multimm', name: 'MultiMM', beads: multimm[0], seconds: multimm[1], note },
+  { series: 'ctcf', name: '3D-GNOMEᴺᴳ', beads: ours[0], seconds: ours[1] },
 ]
 
 const TOOLS_SCC: Group[] = [
@@ -42,19 +43,12 @@ const TOOLS_SCC: Group[] = [
   { name: 'HFFc6', bars: [bar('cudammc', 0.15), bar('multimm', 0.18), bar('ctcf', 0.44)] },
 ]
 
-const RUN_TIME: [string, string, Group[]][] = [
-  ['One structure, 1 Mb', 'chr1:11.5-12.6 Mb, seconds, lower is better.', tools([6.4, 350], [7.4, 760], [9.0, 760])],
-  ['Ten structures, 60 Mb', 'chr1:1-60 Mb, minutes, lower is better.', tools([9.3, 17321], [20.1, 42480], [10.6, 42480])],
-  ['One structure, whole chromosome', 'chr1, 248 Mb, minutes, lower is better.', tools([3.2, 50631], [14.2, 124657], [6.4, 124657])],
-  ['Three structures at equal bead counts', 'chr1, 248 Mb, minutes, lower is better.', tools([10.7, 126330], [42.1, 124657], [11.2, 124657])],
-  [
-    'One structure, whole genome',
-    'chr1 to chr22, minutes, lower is better. MultiMM did not complete.',
-    [
-      { name: 'cudaMMC, 458,445 beads', bars: [bar('cudammc', 31.4, 1)] },
-      { name: '3D-GNOMEᴺᴳ, 1,312,597 beads', bars: [bar('ctcf', 46.4, 1)] },
-    ],
-  ],
+const RUN_TIME: [string, string, 'seconds' | 'minutes', ToolRun[]][] = [
+  ['One structure, 1 Mb', 'chr1:11.5-12.6 Mb.', 'seconds', runs([350, 6.4], [760, 7.4], [760, 9.0])],
+  ['Ten structures, 60 Mb', 'chr1:1-60 Mb.', 'minutes', runs([17321, 560.9], [42480, 1207.5], [42480, 634.4])],
+  ['One structure, whole chromosome', 'chr1, 248 Mb.', 'minutes', runs([50631, 194.8], [124657, 853.1], [124657, 384.2])],
+  ['Three structures at equal bead counts', 'chr1, 248 Mb. cudaMMC is set to as many beads as the other two.', 'minutes', runs([126330, 641], [124657, 2528], [124657, 673])],
+  ['One structure, whole genome', 'chr1 to chr22.', 'minutes', runs([458445, 1882.1], [1312597, null], [1312597, 2784.0], 'did not complete')],
 ]
 
 /** One structure of GM12878 chr1 from 10 Mb per tool: megabases, beads, seconds. The last is the whole chromosome. */
@@ -178,7 +172,7 @@ export function Results() {
         <section id="run-time">
           <h2>Run time</h2>
           <p className="intro">
-            The three tools on the same GM12878 inputs and one machine, an RTX 3090 with 36 CPU cores. Each tool is named with the bead count of its model. At its default settings cudaMMC models a region with fewer beads, and the last chart gives it as many as the other two.
+            The three tools on the same GM12878 inputs and one machine, an RTX 3090 with 36 CPU cores. At its default settings cudaMMC models a region with a third to a half of the beads of the other two. The charts under the two curves therefore give three numbers per tool. They are the beads in its model, its run time and its run time per 1,000 beads.
           </p>
           <div className="chart-row">
             <LineChart
@@ -199,11 +193,14 @@ export function Results() {
           <p className="reading-note">
             For one structure cudaMMC is the fastest from 10 Mb, and under that it and MultiMM are level. 3D-GNOMEᴺᴳ is faster than MultiMM from about 50 Mb. At equal bead counts the three are close up to 20,000 beads. A further structure of the same region costs 3D-GNOMEᴺᴳ less than the first, and the ensemble charts below show it.
           </p>
-          <div className="chart-row">
-            {RUN_TIME.map(([title, sub, groups]) => (
-              <BarChart key={title} title={title} subtitle={sub} groups={groups} />
+          <div className="chart-row one">
+            {RUN_TIME.map(([title, sub, unit, toolRuns]) => (
+              <ToolRuns key={title} title={title} subtitle={sub} unit={unit} runs={toolRuns} />
             ))}
           </div>
+          <p className="reading-note">
+            Per 1,000 beads 3D-GNOMEᴺᴳ is the fastest on ten structures of 60 Mb, on one structure of the chromosome and on the genome. MultiMM is the fastest at 1 Mb, and at equal bead counts cudaMMC and 3D-GNOMEᴺᴳ are level.
+          </p>
           <p className="reading-note">
             On the whole genome 3D-GNOMEᴺᴳ runs as one job. cudaMMC ran one chromosome at a time and its 22 runs are added up. MultiMM ran out of memory on the 24 GB card at 1,312,597 beads and at half of that, and at a quarter it was stopped after 90 minutes.
           </p>
