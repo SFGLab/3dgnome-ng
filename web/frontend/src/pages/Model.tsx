@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api'
+import { served } from '../base'
 import { Background } from '../model/Background'
 import { CellTypes } from '../model/CellTypes'
 import { EXAMPLES, type Example } from '../model/examples'
@@ -56,7 +57,7 @@ function toFormData(form: FormState, overrides: Record<string, string>): FormDat
 }
 
 function goTo(url: string) {
-  window.location.assign(url)
+  window.location.assign(served(url))
 }
 
 function fromExample(e: Example): FormState {

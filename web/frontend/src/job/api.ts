@@ -1,4 +1,5 @@
 import { ApiError } from '../api'
+import { served } from '../base'
 
 export type FileInfo = { name: string; size: number }
 export type Summary = {
@@ -80,7 +81,7 @@ export type Contacts = {
 export type Compare = { same_region: boolean; rows: { gene: string; linear_bp: number; a: { mean: number; sd: number }; b: { mean: number; sd: number }; ratio: number }[] }
 
 async function call<T>(path: string, text = false): Promise<T> {
-  const r = await fetch(path)
+  const r = await fetch(served(path))
   if (!r.ok) {
     const body = await r.json().catch(() => ({}))
     throw new ApiError(body.error ?? `${r.status} from ${path}`, r.status)
@@ -104,8 +105,8 @@ export function jobApi(kind: 'jobs' | 'p', key: string) {
     loops: () => call<Loop[]>(`${base}/loops`),
     log: () => call<string>(`${base}/log`, true),
     contacts: (p: { region: string; res: number; upper: string; lower: string; norm: string }) => call<Contacts>(`${base}/contacts?${q(p)}`),
-    fileUrl: (name: string) => `/${kind}/${key}/files/${name}`,
-    zipUrl: `${base}/files.zip`,
+    fileUrl: (name: string) => served(`/${kind}/${key}/files/${name}`),
+    zipUrl: served(`${base}/files.zip`),
   }
 }
 

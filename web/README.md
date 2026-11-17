@@ -82,6 +82,20 @@ npm run dev         # Vite on port 5173, passing /api, /jobs, /p and /model to F
 npm run build       # writes dist/ for FastAPI
 ```
 
+A site under a path of a host, `https://host/new/`, needs `BASE_PATH=/new` twice, at the build
+and on the server:
+
+```bash
+BASE_PATH=/new npm run build                 # in web/frontend
+BASE_PATH=/new uvicorn gnome3d_web.app:create_app --factory
+```
+
+The build writes the path into its asset links, its router and its API requests. The server
+answers every route under the path and at the root, and the proxy in front may strip the path or
+pass it on. The server answers 503 with both paths named when the build and the server disagree.
+With Docker Compose, `BASE_PATH=/new` in the environment sets both. A proxy rule for `/new/`
+does not match `/new`, and a second rule redirects `/new` to `/new/`.
+
 The page text, the colours and the figures come from the approved design in web/design/site.pen.
 A change of wording goes into the design first.
 
@@ -155,6 +169,7 @@ All by environment, see `gnome3d_web/settings.py`. The ones that matter:
 | `GNOME3D_GPU_POOL_GIB` | unset | the GPU memory pool of each engine process in GiB |
 | `MAX_STRUCTURES` | 100 | the most structures a job may ask for |
 | `UPLOAD_MAX_MB` | 200 | the largest upload; set the proxy's body limit to match |
+| `BASE_PATH` | unset | the path the site is served under, `/new` for a site at `/new/`; the frontend is built with the same value |
 | `LINK_ALLOW_PRIVATE` | off | `1` lets a contact map link point at a private address, for tests only |
 | `LINK_READS` | 4 | contact map links read at once |
 

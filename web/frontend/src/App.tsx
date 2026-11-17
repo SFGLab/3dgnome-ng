@@ -9,6 +9,7 @@ import { Examples } from './pages/Examples'
 import { MyJobs } from './pages/MyJobs'
 import { Results } from './pages/Results'
 import { Title } from './pages/Title'
+import { BASE } from './base'
 import { ROUTES } from './routes'
 
 // The explorer carries three.js and loads only on a job page.
@@ -17,7 +18,7 @@ const Job = lazy(() => import('./pages/Job').then((m) => ({ default: m.Job })))
 /** The site's routes. */
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={BASE || '/'}>
       <Layout>
         <Suspense fallback={null}>
         <Routes>

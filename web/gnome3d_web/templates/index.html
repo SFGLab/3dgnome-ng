@@ -3,7 +3,7 @@
 <h1>Model a region</h1>
 <p class="lead">Pick a cell type and a region, choose the loops, optionally apply structural variants, and get an ensemble of 3D structures with promoters and enhancers marked.</p>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
-<form method="post" action="/jobs" enctype="multipart/form-data">
+<form method="post" action="{{ root }}/jobs" enctype="multipart/form-data">
 <fieldset><legend>Cell type and region</legend>
   <div class="row">
     <div><label for="cell_type">Cell type</label>

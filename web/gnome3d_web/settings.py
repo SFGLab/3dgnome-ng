@@ -10,6 +10,8 @@ ENGINE_CMD    the command that starts the engine, default ENGINE_PYTHON -m gnome
 RETENTION_DAYS  how long a private job is kept, default 14
 MAX_REGION_MB   the longest region the form accepts, in Mb, default 20
 FRONTEND_DIST   the frontend build, default web/frontend/dist
+BASE_PATH     the path the site is served under, /new for a site at /new/, default the root.
+              The frontend is built with the same value
 MAX_STRUCTURES  the most structures a job may ask for, default 100
 UPLOAD_MAX_MB   the largest upload, in MB, default 200
 LINK_READS    how many contact map links the server reads at once, default 4
@@ -29,6 +31,12 @@ from pathlib import Path
 HICDIFFUSION_KEYS = ("HICDIFFUSION_DIR", "HICDIFFUSION_PYTHON", "HICDIFFUSION_MODELS", "REFERENCE_FASTA")
 
 
+def base_path(text: str) -> str:
+    """A base path as a prefix with a leading slash and no trailing one. The root is empty."""
+    inner = text.strip().strip("/")
+    return f"/{inner}" if inner else ""
+
+
 @dataclass
 class Settings:
     data_dir: Path
@@ -44,6 +52,7 @@ class Settings:
     upload_max_mb: int
     link_allow_private: bool = False
     link_reads: int = 4
+    base_path: str = ""
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -61,6 +70,7 @@ class Settings:
             upload_max_mb=int(os.environ.get("UPLOAD_MAX_MB", "200")),
             link_allow_private=os.environ.get("LINK_ALLOW_PRIVATE", "") == "1",
             link_reads=int(os.environ.get("LINK_READS", "4")),
+            base_path=base_path(os.environ.get("BASE_PATH", "")),
             frontend_dist=Path(os.environ.get("FRONTEND_DIST", Path(__file__).resolve().parents[1] / "frontend" / "dist")),
         )
 

@@ -1,5 +1,7 @@
 /** The site's JSON API. */
 
+import { served } from './base'
+
 export type CellType = { label: string; description: string; data: string[]; lymphoblastoid: boolean; note: string }
 export type Catalog = {
   cell_types: Record<string, CellType>
@@ -40,7 +42,7 @@ export class ApiError extends Error {
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(path, init)
+  const r = await fetch(served(path), init)
   const body = await r.json().catch(() => ({}))
   if (!r.ok) throw new ApiError(body.error ?? `${r.status} from ${path}`, r.status, body.field)
   return body as T

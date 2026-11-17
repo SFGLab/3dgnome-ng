@@ -8,12 +8,13 @@ services:
     restart: unless-stopped
 
   web:
-    build: { context: .., dockerfile: web/Dockerfile, args: { GPU: "${GPU:-1}" } }
+    build: { context: .., dockerfile: web/Dockerfile, args: { GPU: "${GPU:-1}", BASE_PATH: "${BASE_PATH:-}" } }
     image: gnome3d-web
     restart: unless-stopped
     ports: ["${PORT:-8000}:8000"]
     environment:
       QUEUE: rq
+      BASE_PATH: "${BASE_PATH:-}"
       REDIS_URL: redis://redis:6379/0
       RETENTION_DAYS: "${RETENTION_DAYS:-14}"
     volumes:

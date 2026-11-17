@@ -10,6 +10,7 @@ import shutil
 import threading
 import time
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 import pandas as pd
@@ -38,6 +39,25 @@ HERE = Path(__file__).resolve().parent
 FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|[A-Za-z0-9_.:-]+\.cif)$")
 
 
+class StripBase:
+    """Removes the site's base path from a request path that carries it.
+
+    The routes are written for the root. The proxy in front may strip the base path or pass it
+    on, and both reach the same route.
+    """
+
+    def __init__(self, app: Any, base: str) -> None:
+        self.app = app
+        self.base = base
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        path = scope.get("path", "")
+        if scope["type"] in ("http", "websocket") and (path == self.base or path.startswith(self.base + "/")):
+            raw = scope.get("raw_path") or path.encode()
+            scope = {**scope, "path": path[len(self.base) :] or "/", "raw_path": raw[len(self.base.encode()) :] or b"/"}
+        await self.app(scope, receive, send)
+
+
 def create_app() -> FastAPI:
     s = Settings.from_env()
     catalog = Catalog.load(s.data_dir)
@@ -49,7 +69,10 @@ def create_app() -> FastAPI:
         return f"{m[1]}:{int(m[2]):,}-{int(m[3]):,}" if m else str(text)
 
     templates.env.filters["region"] = pretty_region
+    templates.env.globals["root"] = s.base_path
     app = FastAPI(title="3D-GNOME")
+    if s.base_path:
+        app.add_middleware(StripBase, base=s.base_path)
     shared = s.results_dir / "jobs"
     private = s.results_dir / "private"
     shared.mkdir(parents=True, exist_ok=True)
@@ -241,7 +264,7 @@ def create_app() -> FastAPI:
             url = create_job(fields, await vcf.read() if vcf is not None and vcf.filename else None)
         except JobError as e:
             return form_page(request, str(e), 400, values)
-        return RedirectResponse(url, status_code=303)
+        return RedirectResponse(s.base_path + url, status_code=303)
 
     @app.post("/api/jobs")
     async def api_submit(request: Request, vcf: UploadFile | None = File(None)) -> JSONResponse:  # noqa: B008
@@ -421,7 +444,7 @@ def create_app() -> FastAPI:
             request,
             "job.html",
             {
-                "base": f"/{kind}/{key}" if kind == "jobs" else f"/p/{key}",
+                "base": s.base_path + (f"/{kind}/{key}" if kind == "jobs" else f"/p/{key}"),
                 "status": status,
                 "req": req,
                 "cell": cell,
@@ -606,6 +629,14 @@ def create_app() -> FastAPI:
             raise HTTPException(404)
         if not index_html.is_file():
             return HTMLResponse(f"The frontend is not built. Run npm run build in web/frontend, or set FRONTEND_DIST. Expected {index_html}.", 503)
-        return HTMLResponse(index_html.read_text())
+        html = index_html.read_text()
+        built = re.search(r'(?:src|href)="([^"]*)/assets/', html)
+        if built and built[1] != s.base_path:
+            return HTMLResponse(
+                f"The frontend is built for the path {built[1] or '/'} and the server has BASE_PATH {s.base_path or '/'}. "
+                f"Build with BASE_PATH={s.base_path or '/'} npm run build in web/frontend, or set BASE_PATH to match.",
+                503,
+            )
+        return HTMLResponse(html)
 
     return app

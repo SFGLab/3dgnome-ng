@@ -9,7 +9,9 @@ WORKDIR /web/frontend
 COPY web/frontend/package.json web/frontend/package-lock.json ./
 RUN npm ci
 COPY web/frontend ./
-RUN npm run build
+# The path the site is served under, /new for a site at /new/. Empty is the root.
+ARG BASE_PATH=
+RUN BASE_PATH=$BASE_PATH npm run build
 
 FROM python:3.12-slim
 
