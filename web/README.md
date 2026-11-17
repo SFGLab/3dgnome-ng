@@ -21,6 +21,60 @@ DATA_DIR=/srv/gnome3d/data RESULTS_DIR=/srv/gnome3d/results PORT=8000 docker com
 The image builds from the repository root, so the engine it runs is the checkout's. `GPU=0`
 builds a CPU image; then remove the worker's `deploy` block and see "CPU only" below.
 
+## One container
+
+docker-compose.single.yml runs the site and the engine in one container of the same image. The
+jobs run in the web process on the slots of `GPU_SLOTS`, one GPU id per slot.
+
+```bash
+cd web
+SITE_ROOT=/mnt/raid/3dgnome-new BASE_PATH=/new PORT=8770 GPU_SLOTS=0,1 \
+  SITE_USER=$(id -u):$(id -g) docker compose -f docker-compose.single.yml up -d --build
+```
+
+`SITE_ROOT` holds two directories. The container reads `data/` and never writes it. It writes
+`results/` as `SITE_USER`, and the JAX and Numba caches go there too. The port is bound to the
+loopback of the host, for a proxy on the host. A job that waits in the queue is lost when the
+container stops; docker-compose.yml keeps its queue in Redis.
+
+A path in `catalog.json` must exist inside the container. `data/` is mounted at `/data`, and a
+`contact_map` is written as `/data/maps/...`. A link that leaves `data/` does not resolve in the
+container. A large set kept elsewhere is mounted below `/data` in an override file, passed with
+a second `-f`:
+
+```yaml
+services:
+  site:
+    volumes: ["/mnt/raid/tbooo/release:/data/svs/tbooo:ro"]
+```
+
+## A registry on the host
+
+docker-compose.registry.yml runs an image registry on the deployment host, with its storage in
+`REGISTRY_ROOT`. The image is then built on any machine, pushed under a tag, and the host pulls
+the tag it should run. An earlier tag stays in the registry for a way back.
+
+```bash
+# on the host, once
+REGISTRY_ROOT=/mnt/raid/registry REGISTRY_USER=$(id -u):$(id -g) \
+  docker compose -f docker-compose.registry.yml up -d
+
+# on the machine that builds, from web/, with a tunnel to the host's registry
+ssh -N -L 5000:localhost:5000 HOST &
+TAG=$(git rev-parse --short HEAD)
+SITE_ROOT=. IMAGE=localhost:5000/gnome3d-web:$TAG BASE_PATH=/new \
+  docker compose -f docker-compose.single.yml build
+docker push localhost:5000/gnome3d-web:$TAG
+
+# on the host, with the variables of "One container" and the same IMAGE
+docker compose -f docker-compose.single.yml pull
+docker compose -f docker-compose.single.yml up -d --no-build
+```
+
+The registry listens on the loopback of the host and has no login. Docker accepts a registry
+on localhost without TLS, on the host directly and on the building machine through the tunnel.
+`BASE_PATH` is fixed at the build, so an image serves the path it was built for.
+
 ## Workers and GPUs
 
 docker-compose.yml has one worker group per GPU, `worker-gpu0` and `worker-gpu1`, each worker
@@ -196,6 +250,24 @@ finds the finished job instead of running again. A request with an uploaded VCF 
 own data gets a random link under `/p/`, never enters the shared cache, and is removed by the
 retention sweep the app runs at start. Uploads waiting for a job sit under `RESULTS_DIR/uploads`
 and are swept after the same retention period. Shared jobs are never removed by the site.
+
+## Sync codes
+
+The My jobs page keeps its list in the browser. A sync code puts one list on several browsers
+without an account. `POST /api/lists` stores the browser's jobs and answers a code of 16
+characters, 80 random bits, shown as `K7M2-9QXD-4THP-W3RZ`. `GET /api/lists/{code}` reads the
+list and `PUT /api/lists/{code}` merges a browser's jobs into it and answers the merged list. A
+job on both sides keeps the entry edited last, and a write never removes a job. A browser with
+a code sends its jobs on every page load, every 30 seconds, on return to the tab and after each
+job it starts or renames.
+
+The person chooses on making the code whether the list takes private jobs. A list made without
+them refuses a `/p/` link from any browser, and those jobs stay in the browser that started
+them. A list made with them gives every holder of the code the private links on it.
+
+The lists are files under `RESULTS_DIR/lists`, named by a digest of the code, so the directory
+does not hold the codes. A list holds at most 50 jobs, the newest. The site never removes a
+list.
 
 ## Uploads
 

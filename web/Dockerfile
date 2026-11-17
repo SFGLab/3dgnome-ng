@@ -5,6 +5,12 @@
 #   docker build -f web/Dockerfile -t gnome3d-web .
 #   docker build -f web/Dockerfile --build-arg GPU=1 -t gnome3d-web:gpu .
 FROM node:22-slim AS frontend
+# One dependency of the lockfile is a GitHub repository named by its ssh address. npm needs git
+# for it, and the image has no ssh key, so git reads GitHub over https.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
 WORKDIR /web/frontend
 COPY web/frontend/package.json web/frontend/package-lock.json ./
 RUN npm ci
@@ -15,8 +21,9 @@ RUN BASE_PATH=$BASE_PATH npm run build
 
 FROM python:3.12-slim
 
+# hic-straw has no wheel for this Python and is compiled here, against libcurl and zlib.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tabix \
+ && apt-get install -y --no-install-recommends tabix g++ libcurl4-openssl-dev zlib1g-dev \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
