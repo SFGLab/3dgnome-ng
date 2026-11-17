@@ -11,31 +11,39 @@ const bar = (series: Bar['series'], value: number | null, digits = 2): Bar => ({
 })
 
 const SCC: Group[] = [
-  { name: 'GM12878', bars: [bar('original', 0.22), bar('ctcf', 0.37)] },
-  { name: 'H1ESC', bars: [bar('original', 0.15), bar('ctcf', 0.27)] },
-  { name: 'HFFc6', bars: [bar('original', 0.15), bar('ctcf', 0.33)] },
+  { name: 'GM12878', bars: [bar('original', 0.22), bar('ctcf', 0.5)] },
+  { name: 'H1ESC', bars: [bar('original', 0.15), bar('ctcf', 0.36)] },
+  { name: 'HFFc6', bars: [bar('original', 0.15), bar('ctcf', 0.43)] },
 ]
 
 const DISTANCE: Group[] = [
-  { name: 'GM12878, 13% closer', bars: [bar('ctcf', 4.2, 1), bar('rnapii', 3.7, 1)] },
+  { name: 'GM12878, 16% closer', bars: [bar('ctcf', 4.3, 1), bar('rnapii', 3.6, 1)] },
   { name: 'H1ESC, 24% closer', bars: [bar('ctcf', 4.0, 1), bar('rnapii', 3.0, 1)] },
-  { name: 'HFFc6, 11% closer', bars: [bar('ctcf', 4.5, 1), bar('rnapii', 4.0, 1)] },
+  { name: 'HFFc6, 17% closer', bars: [bar('ctcf', 4.6, 1), bar('rnapii', 3.8, 1)] },
 ]
 
 const EXPRESSION: Group[] = [
-  { name: 'GM12878 and H1ESC', bars: [bar('original', 0.19), bar('ctcf', 0.26), bar('rnapii', 0.29)] },
-  { name: 'H1ESC and HFFc6', bars: [bar('original', 0.12), bar('ctcf', 0.19), bar('rnapii', 0.2)] },
-  { name: 'GM12878 and HFFc6', bars: [bar('original', 0.25), bar('ctcf', 0.29), bar('rnapii', 0.33)] },
+  { name: 'GM12878 and H1ESC', bars: [bar('original', 0.19), bar('ctcf', 0.26), bar('rnapii', 0.28)] },
+  { name: 'H1ESC and HFFc6', bars: [bar('original', 0.12), bar('ctcf', 0.18), bar('rnapii', 0.22)] },
+  { name: 'GM12878 and HFFc6', bars: [bar('original', 0.25), bar('ctcf', 0.29), bar('rnapii', 0.31)] },
 ]
 
-const RUN_TIME = [
-  ['One structure, 1 Mb', 'chr1:11.5-12.6 Mb, minutes, lower is better.'],
-  ['Ten structures, 60 Mb', 'chr1:1-60 Mb, hours, lower is better.'],
-  ['One structure, whole chromosome', 'chr1, 248 Mb, hours, lower is better.'],
+/** One bar per tool, the group named by the tool and the bead count of its model. */
+const tools = (cudammc: [number, number], multimm: [number, number], ours: [number, number], digits = 1): Group[] => [
+  { name: `cudaMMC, ${cudammc[1].toLocaleString('en-US')} beads`, bars: [bar('cudammc', cudammc[0], digits)] },
+  { name: `MultiMM, ${multimm[1].toLocaleString('en-US')} beads`, bars: [bar('multimm', multimm[0], digits)] },
+  { name: `3D-GNOMEᴺᴳ, ${ours[1].toLocaleString('en-US')} beads`, bars: [bar('ctcf', ours[0], digits)] },
 ]
-const RUN_TIME_GROUPS: Group[] = [
-  { name: 'cudaMMC', bars: [bar('original', null)] },
-  { name: '3D-GNOMEᴺᴳ, CTCF loops', bars: [bar('ctcf', null)] },
+
+const TOOLS_SCC: Group[] = [
+  { name: 'GM12878', bars: [bar('cudammc', 0.22), bar('multimm', 0.3), bar('ctcf', 0.51)] },
+]
+
+const RUN_TIME: [string, string, Group[]][] = [
+  ['One structure, 1 Mb', 'chr1:11.5-12.6 Mb, seconds, lower is better.', tools([6.4, 350], [7.4, 760], [9.0, 760])],
+  ['Ten structures, 60 Mb', 'chr1:1-60 Mb, minutes, lower is better.', tools([9.3, 17321], [20.1, 42480], [10.6, 42480])],
+  ['One structure, whole chromosome', 'chr1, 248 Mb, minutes, lower is better.', tools([3.2, 50631], [14.2, 124657], [6.4, 124657])],
+  ['Three structures at equal bead counts', 'chr1, 248 Mb, minutes, lower is better.', tools([10.7, 126330], [42.1, 124657], [11.2, 124657])],
 ]
 
 const SECTIONS = [
@@ -43,11 +51,12 @@ const SECTIONS = [
   ['#distance', 'Enhancer to promoter distance'],
   ['#expression', 'Link to expression'],
   ['#trios', 'Nine people, three trios'],
+  ['#tools', 'Other tools'],
   [`${ROUTES.method}#limitations`, 'Limitations'],
   ['#run-time', 'Run time'],
 ]
 
-/** The models against measured data, and the run time against cudaMMC. */
+/** The models against measured data and against cudaMMC and MultiMM, and the run time of the three. */
 export function Results() {
   return (
     <div className="doc-page">
@@ -69,13 +78,13 @@ export function Results() {
         <header className="page-head">
           <h1>Results</h1>
           <p className="lead">
-            This page compares the models with measured data and shows the effect of RNAPII loops. The data are GM12878, H1ESC and HFFc6, chr1:1-60 Mb, ten structures per model. The original models are the cudaMMC models of 3D-GNOME 3.0.
+            This page compares the models with measured data and with two other tools, and shows the effect of RNAPII loops. The data are GM12878, H1ESC and HFFc6, chr1:1-60 Mb, ten structures per model. The original models are the cudaMMC models of 3D-GNOME 3.0.
           </p>
         </header>
         <ChartKey />
         <div className="chart-row">
           <div id="agreement">
-            <BarChart title="Agreement with Hi-C" subtitle="Stratum adjusted correlation at 25 kb, higher is better." groups={SCC} />
+            <BarChart title="Agreement with Hi-C" subtitle="Stratum adjusted correlation at 25 kb. The contacts of ten structures are summed before the comparison. Higher is better." groups={SCC} />
           </div>
           <div id="distance">
             <BarChart title="Enhancer to promoter distance" subtitle="Pairs joined by an RNAPII loop only, median over pairs, bead units." groups={DISTANCE} />
@@ -107,14 +116,46 @@ export function Results() {
         <p className="reading-note">
           With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower.
         </p>
+        <section id="tools">
+          <h2>Other tools</h2>
+          <p className="intro">
+            cudaMMC, MultiMM and 3D-GNOMEᴺᴳ on the same CTCF loops and the same Hi-C contacts. cudaMMC and MultiMM run at their default settings, and MultiMM models as many beads as 3D-GNOMEᴺᴳ.
+          </p>
+          <div className="chart-row">
+            <div>
+              <BarChart
+                title="Agreement with Hi-C, three tools"
+                subtitle="chr1:1-60 Mb, stratum adjusted correlation at 25 kb. The contacts of ten structures are summed before the comparison. Higher is better."
+                groups={TOOLS_SCC}
+              />
+            </div>
+            <figure className="bar-chart" aria-label="Twelve runs with intervals">
+              <figcaption>
+                <span className="chart-title">Twelve runs with intervals</span>
+                <span className="chart-sub">Three cell lines, three regions of 5 Mb and chr1:1-60 Mb. A lead has a 95% bootstrap interval clear of zero.</span>
+              </figcaption>
+              <div className="stat">
+                <span className="stat-value">12 of 12</span>
+                <span className="stat-label">3D-GNOMEᴺᴳ leads both tools on the Pearson and on the rank correlation with Hi-C</span>
+              </div>
+              <div className="stat">
+                <span className="stat-value">5 of 12</span>
+                <span className="stat-label">3D-GNOMEᴺᴳ leads MultiMM on the stratum adjusted correlation, 6 of 12 for cudaMMC, and neither tool leads it in any run</span>
+              </div>
+            </figure>
+          </div>
+          <p className="reading-note">
+            A region of 5 Mb is too short for the stratum adjusted correlation to separate the tools. On chr1:1-60 Mb 3D-GNOMEᴺᴳ leads both on every cell line.
+          </p>
+        </section>
         <section id="run-time">
           <h2>Run time</h2>
           <p className="intro">
-            cudaMMC and 3D-GNOMEᴺᴳ on the same GM12878 inputs and the same RTX 4060 Ti. The values are placeholders until the timing run is done.
+            The three tools on the same GM12878 inputs and one machine, an RTX 3090 with 36 CPU cores. Each tool is named with the bead count of its model. At its default settings cudaMMC models a region with fewer beads, and the last chart gives it as many as the other two.
           </p>
-          <div className="chart-row three">
-            {RUN_TIME.map(([title, sub]) => (
-              <BarChart key={title} title={title} subtitle={sub} groups={RUN_TIME_GROUPS} />
+          <div className="chart-row">
+            {RUN_TIME.map(([title, sub, groups]) => (
+              <BarChart key={title} title={title} subtitle={sub} groups={groups} />
             ))}
           </div>
         </section>

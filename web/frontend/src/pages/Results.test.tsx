@@ -17,20 +17,35 @@ const values = (chart: HTMLElement) => within(chart).getAllByTestId('bar-value')
 describe('Results page', () => {
   it('shows the agreement with Hi-C of the original and the new models', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C' }))).toEqual(['0.22', '0.37', '0.15', '0.27', '0.15', '0.33'])
+    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C' }))).toEqual(['0.22', '0.50', '0.15', '0.36', '0.15', '0.43'])
   })
 
   it('shows the enhancer to promoter distances and the link to expression', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Enhancer to promoter distance' }))).toEqual(['4.2', '3.7', '4.0', '3.0', '4.5', '4.0'])
-    expect(values(screen.getByRole('figure', { name: 'Link to expression' }))).toEqual(['0.19', '0.26', '0.29', '0.12', '0.19', '0.20', '0.25', '0.29', '0.33'])
+    expect(values(screen.getByRole('figure', { name: 'Enhancer to promoter distance' }))).toEqual(['4.3', '3.6', '4.0', '3.0', '4.6', '3.8'])
+    expect(values(screen.getByRole('figure', { name: 'Link to expression' }))).toEqual(['0.19', '0.26', '0.28', '0.12', '0.18', '0.22', '0.25', '0.29', '0.31'])
   })
 
-  it('marks every run time value as a placeholder', () => {
+  it('shows the run time of the three tools with the bead count of each model', () => {
     renderResults()
-    for (const name of ['One structure, 1 Mb', 'Ten structures, 60 Mb', 'One structure, whole chromosome']) {
-      expect(values(screen.getByRole('figure', { name }))).toEqual(['placeholder', 'placeholder'])
+    const one = screen.getByRole('figure', { name: 'One structure, 1 Mb' })
+    expect(values(one)).toEqual(['6.4', '7.4', '9.0'])
+    expect(within(one).getByText('cudaMMC, 350 beads')).toBeInTheDocument()
+    expect(within(one).getByText('3D-GNOMEᴺᴳ, 760 beads')).toBeInTheDocument()
+    expect(values(screen.getByRole('figure', { name: 'One structure, whole chromosome' }))).toEqual(['3.2', '14.2', '6.4'])
+    expect(values(screen.getByRole('figure', { name: 'Ten structures, 60 Mb' }))).toEqual(['9.3', '20.1', '10.6'])
+    expect(values(screen.getByRole('figure', { name: 'Three structures at equal bead counts' }))).toEqual(['10.7', '42.1', '11.2'])
+    for (const name of ['One structure, 1 Mb', 'Ten structures, 60 Mb', 'One structure, whole chromosome', 'Three structures at equal bead counts']) {
+      expect(values(screen.getByRole('figure', { name }))).not.toContain('placeholder')
     }
+  })
+
+  it('compares the three tools on Hi-C and counts the runs with intervals', () => {
+    renderResults()
+    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C, three tools' })).slice(0, 3)).toEqual(['0.22', '0.30', '0.51'])
+    const runs = screen.getByRole('figure', { name: 'Twelve runs with intervals' })
+    expect(within(runs).getByText('12 of 12')).toBeInTheDocument()
+    expect(within(runs).getByText('5 of 12')).toBeInTheDocument()
   })
 
   it('shows the trio counts', () => {

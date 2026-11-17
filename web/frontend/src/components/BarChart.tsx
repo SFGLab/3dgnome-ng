@@ -1,6 +1,6 @@
 import './barchart.css'
 
-export type Series = 'original' | 'ctcf' | 'rnapii'
+export type Series = 'original' | 'ctcf' | 'rnapii' | 'cudammc' | 'multimm'
 export type Bar = { series: Series; value: number | null; label: string }
 export type Group = { name: string; bars: Bar[] }
 
@@ -8,6 +8,8 @@ const SERIES_NAME: Record<Series, string> = {
   original: 'original models, cudaMMC',
   ctcf: '3D-GNOMEᴺᴳ, CTCF loops',
   rnapii: '3D-GNOMEᴺᴳ, CTCF and RNAPII loops',
+  cudammc: 'cudaMMC',
+  multimm: 'MultiMM',
 }
 
 /** Horizontal bars in groups, each bar labelled with its value. A bar without a value is a placeholder. */
@@ -39,11 +41,13 @@ export function BarChart({ title, subtitle, groups }: { title: string; subtitle:
   )
 }
 
-/** The key of the three kinds of model. */
-export function ChartKey() {
+const MODEL_SERIES: Series[] = ['original', 'ctcf', 'rnapii']
+
+/** The key of the three kinds of model, or of the series given. */
+export function ChartKey({ series = MODEL_SERIES, label = 'Key' }: { series?: Series[]; label?: string }) {
   return (
-    <ul className="chart-key" aria-label="Key">
-      {(Object.keys(SERIES_NAME) as Series[]).map((s) => (
+    <ul className="chart-key" aria-label={label}>
+      {series.map((s) => (
         <li key={s}>
           <span className={`swatch ${s}`} />
           {SERIES_NAME[s]}

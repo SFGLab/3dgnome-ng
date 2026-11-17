@@ -16,6 +16,7 @@
   --promoter: #EB6834;
   --enhancer: #1BAF7A;
   --original: #A9A8A3;
+  --multimm: #B8860B;
   --font: "Inter", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
   color-scheme: light;
@@ -37,6 +38,7 @@
     --promoter: #E0622E;
     --enhancer: #1FA673;
     --original: #8E8D88;
+    --multimm: #D2A036;
     --font: "Inter", system-ui, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, monospace;
     color-scheme: dark;
@@ -58,6 +60,7 @@
   --promoter: #E0622E;
   --enhancer: #1FA673;
   --original: #8E8D88;
+  --multimm: #D2A036;
   --font: "Inter", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, monospace;
   color-scheme: dark;
