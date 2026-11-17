@@ -35,6 +35,9 @@ describe('Results page', () => {
     expect(values(screen.getByRole('figure', { name: 'One structure, whole chromosome' }))).toEqual(['3.2', '14.2', '6.4'])
     expect(values(screen.getByRole('figure', { name: 'Ten structures, 60 Mb' }))).toEqual(['9.3', '20.1', '10.6'])
     expect(values(screen.getByRole('figure', { name: 'Three structures at equal bead counts' }))).toEqual(['10.7', '42.1', '11.2'])
+    const genome = screen.getByRole('figure', { name: 'One structure, whole genome' })
+    expect(values(genome)).toEqual(['31.4', '46.4'])
+    expect(within(genome).getByText('3D-GNOMEᴺᴳ, 1,312,597 beads')).toBeInTheDocument()
     for (const name of ['One structure, 1 Mb', 'Ten structures, 60 Mb', 'One structure, whole chromosome', 'Three structures at equal bead counts']) {
       expect(values(screen.getByRole('figure', { name }))).not.toContain('placeholder')
     }

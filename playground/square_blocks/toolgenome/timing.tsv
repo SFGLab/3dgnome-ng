@@ -1,0 +1,6 @@
+tool	setting	beads	seconds
+ours	production	1312597	2784.0
+cudammc	loop_density 5	0	35.3
+multimm	1312597 beads	exit 1	137.6
+multimm	656298 beads	exit 1	70.2
+multimm	328149 beads	stopped at 5400 s	5400.2

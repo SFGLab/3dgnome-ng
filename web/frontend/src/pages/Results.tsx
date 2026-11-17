@@ -47,6 +47,14 @@ const RUN_TIME: [string, string, Group[]][] = [
   ['Ten structures, 60 Mb', 'chr1:1-60 Mb, minutes, lower is better.', tools([9.3, 17321], [20.1, 42480], [10.6, 42480])],
   ['One structure, whole chromosome', 'chr1, 248 Mb, minutes, lower is better.', tools([3.2, 50631], [14.2, 124657], [6.4, 124657])],
   ['Three structures at equal bead counts', 'chr1, 248 Mb, minutes, lower is better.', tools([10.7, 126330], [42.1, 124657], [11.2, 124657])],
+  [
+    'One structure, whole genome',
+    'chr1 to chr22, minutes, lower is better. MultiMM did not complete.',
+    [
+      { name: 'cudaMMC, 458,445 beads', bars: [bar('cudammc', 31.4, 1)] },
+      { name: '3D-GNOMEᴺᴳ, 1,312,597 beads', bars: [bar('ctcf', 46.4, 1)] },
+    ],
+  ],
 ]
 
 /** One structure of GM12878 chr1 from 10 Mb per tool: megabases, beads, seconds. The last is the whole chromosome. */
@@ -196,6 +204,9 @@ export function Results() {
               <BarChart key={title} title={title} subtitle={sub} groups={groups} />
             ))}
           </div>
+          <p className="reading-note">
+            On the whole genome 3D-GNOMEᴺᴳ runs as one job. cudaMMC ran one chromosome at a time and its 22 runs are added up. MultiMM ran out of memory on the 24 GB card at 1,312,597 beads and at half of that, and at a quarter it was stopped after 90 minutes.
+          </p>
         </section>
       </div>
     </div>

@@ -194,3 +194,27 @@ bead count to the power 0.25, 3dgnome's to 0.6 and MultiMM's to 1.8, fitted betw
 smallest and largest count. cudaMMC's default on this chromosome is 50,631 beads and 3dgnome's
 is 124,657, and the first table gives each at its own default.
 
+
+
+## Whole genome
+
+GM12878, chr1 to chr22, one structure. `slurm/ensemble/tools_genome.sh` and
+`slurm/ensemble/tools_genome_perchr.sh`, tables in `playground/square_blocks/toolgenome/`.
+
+| Tool | Setting | Beads | Seconds |
+|---|---|---|---|
+| 3dgnome | production, one job | 1,312,597 | 2,784 |
+| cudaMMC | its defaults, 22 runs added up | 458,445 | 1,882 |
+| MultiMM | 1,312,597 beads | | out of memory on the 24 GB card |
+| MultiMM | 656,298 beads | | out of memory |
+| MultiMM | 328,149 beads | | stopped at 5,400, in dynamics after a minimisation of 1,672 |
+
+cudaMMC's genome mode builds a chromosome level heatmap from contacts between chromosomes and
+stops when it finds none, `LooperSolver.cpp:1113`. The singletons every tool reads here hold
+contacts within a chromosome only, and 3dgnome's genome run places its chromosomes without them
+too. cudaMMC was therefore run one chromosome at a time. Its chromosomes take 18 to 192 seconds
+at 2,380 to 50,631 beads.
+
+cudaMMC's count is 0.35 of 3dgnome's and its time 0.68. Per bead 3dgnome takes 2.1 ms and
+cudaMMC 4.1 ms. MultiMM ran without compartments, as on every other run here, and its own log
+says a genome run wants them.
