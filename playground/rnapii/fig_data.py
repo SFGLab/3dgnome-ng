@@ -39,19 +39,55 @@ def agreement(readouts: Path) -> pd.DataFrame:
     """Agreement with contact maps per line and arm.
 
     Returns columns line, arm, measure and value. `hic` is the stratum adjusted correlation of
-    `<LINE>_battery.json`, `microc` the 5 kb correlation of `<LINE>_microc.json`. A line with no
-    Micro-C file has no microc rows.
+    the summed map in `<LINE>_pooled.txt`, or of `<LINE>_battery.json` for a line without that
+    file. `microc` is the 5 kb correlation of `<LINE>_microc.json`. `microc_loops` is the share
+    of Micro-C loops placed above the moved loops, from `<LINE>_microc_loops.json`. A line
+    without a Micro-C file has no rows of that measure.
     """
     rows = []
+    pooled = {p.name.removesuffix("_pooled.txt") for p in readouts.glob("*_pooled.txt")}
+    for path in sorted(readouts.glob("*_pooled.txt")):
+        for ln in path.read_text().splitlines():
+            f = ln.split()
+            m = _ARM.match(f[0]) if f else None
+            if m:
+                rows.append({"line": m["name"], "arm": m["arm"], "measure": "hic", "value": float(f[4])})
     for path in sorted(readouts.glob("*_battery.json")):
         for r in _rows(path):
-            rows.append({"line": r["name"], "arm": r["letter"], "measure": "hic", "value": float(r["scc"])})
+            if r["name"] not in pooled:
+                rows.append({"line": r["name"], "arm": r["letter"], "measure": "hic", "value": float(r["scc"])})
+    for r in microc_classes(readouts).itertuples():
+        if r.loop_class == "all":
+            rows.append({"line": r.line, "arm": r.arm, "measure": "microc_loops", "value": r.value})
     for path in sorted(readouts.glob("*_microc.json")):
         for r in _rows(path):
             rows.append(
                 {"line": r["name"], "arm": r["letter"], "measure": "microc", "value": float(r["r_fine"])}
             )
     return pd.DataFrame(rows, columns=["line", "arm", "measure", "value"])
+
+
+def microc_classes(readouts: Path) -> pd.DataFrame:
+    """The share of Micro-C loops placed above the moved loops, per line, arm and loop class.
+
+    Reads `<LINE>_microc_loops.json`, the output of `microc_loop_compare.py`. Returns columns
+    line, arm, loop_class, loops and value. The class of the moved loops is left out.
+    """
+    rows = []
+    for path in sorted(readouts.glob("*_microc_loops.json")):
+        for r in json.loads(path.read_text())["rows"]:
+            m = _ARM.match(str(r["arm"]))
+            if m and "placed_above_moved" in r and not str(r["class"]).startswith("moved"):
+                rows.append(
+                    {
+                        "line": m["name"],
+                        "arm": m["arm"],
+                        "loop_class": r["class"],
+                        "loops": int(r["loops"]),
+                        "value": float(r["placed_above_moved"]),
+                    }
+                )
+    return pd.DataFrame(rows, columns=["line", "arm", "loop_class", "loops", "value"])
 
 
 def trio_paired(trio_dir: Path) -> pd.DataFrame:

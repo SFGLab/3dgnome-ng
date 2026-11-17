@@ -6,8 +6,8 @@
 
 The first region is the map window, the second the locus. Reads `<models_root>/<LINE>_<A>_60mb/*.cif`
 for arms E, C and R. Saves the Hi-C map and each arm's summed simulated map at 25 kb, the
-window's bin starts, and for C and R the locus beads of the medoid conformation and of the
-first three conformations.
+window's bin starts, and for C and R the locus beads of the medoid conformation and of every
+conformation.
 """
 
 from __future__ import annotations
@@ -88,7 +88,7 @@ def main() -> None:
         p, st, m, anc = loaded[k]
         save[f"locus_{arm}_xyz"], save[f"locus_{arm}_mid"] = p[sel[k]], m[sel[k]]
         save[f"locus_{arm}_anchor"] = anc[sel[k]]
-        for j in range(min(3, len(loaded))):
+        for j in range(len(loaded)):
             save[f"ensemble_{arm}_{j}_xyz"] = loaded[j][0][sel[j]]
             save[f"ensemble_{arm}_{j}_mid"] = loaded[j][2][sel[j]]
         print(f"{line} {arm}: medoid {cifs[k].name}, {int(sel[k].sum())} locus beads")

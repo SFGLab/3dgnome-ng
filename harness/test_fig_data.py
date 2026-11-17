@@ -19,7 +19,7 @@ from scipy.stats import spearmanr
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "playground" / "rnapii"))
 
-from fig_data import agreement, boot_draws, link_draws, trio_paired  # noqa: E402
+from fig_data import agreement, boot_draws, link_draws, microc_classes, trio_paired  # noqa: E402
 
 PASS: list[str] = []
 FAIL: list[str] = []
@@ -60,6 +60,36 @@ def test_agreement_no_microc_line(d: Path) -> None:
     t = agreement(d)
     gm = t[t.line == "GM12878"]
     check("agreement_no_microc_line", set(gm.measure) == {"hic"} and len(gm) == 2)
+
+
+def test_pooled_and_microc_loops(d: Path) -> None:
+    _battery(d / "H1ESC_battery.json", "H1ESC", {"E": 0.1, "C": 0.3})
+    _battery(d / "GM12878_battery.json", "GM12878", {"C": 0.37})
+    (d / "H1ESC_pooled.txt").write_text(
+        "chr1:1-60000000, pooled ensemble against Hi-C at 25000 bp, 58 unmapped bins\n"
+        "   arm   n   raw P  raw Sp  raw SCC   bal P\n"
+        "   H1ESC_E_60mb  10   0.258   0.146   0.145   0.273\n"
+        "   H1ESC_C_60mb  10   0.450   0.207   0.363   0.640\n"
+    )
+    rows = [
+        {"arm": "map", "class": "all", "loops": 605, "scored": 604, "contact_enrichment": 6.9},
+        {"arm": "H1ESC_C_60mb", "class": "all", "loops": 605, "placed_above_moved": 0.34},
+        {"arm": "H1ESC_C_60mb", "class": "RNAPII alone", "loops": 40, "placed_above_moved": 0.22},
+        {"arm": "H1ESC_C_60mb", "class": "moved, no loop", "loops": 603, "placed_above_moved": 0.0},
+    ]
+    (d / "H1ESC_microc_loops.json").write_text(json.dumps({"binsize": 5000, "rows": rows, "loops": {}}))
+    got = agreement(d).set_index(["line", "arm", "measure"]).value
+    cls = microc_classes(d).set_index(["line", "arm", "loop_class"])
+    check(
+        "pooled_and_microc_loops",
+        got[("H1ESC", "C", "hic")] == 0.363
+        and got[("GM12878", "C", "hic")] == 0.37
+        and got[("H1ESC", "C", "microc_loops")] == 0.34
+        and ("H1ESC", "E", "microc_loops") not in got
+        and len(cls) == 2
+        and cls.loops[("H1ESC", "C", "RNAPII alone")] == 40,
+        str(got.to_dict()),
+    )
 
 
 def test_trio_relative_pileup(d: Path) -> None:
@@ -141,6 +171,7 @@ def main() -> int:
     for fn in (
         test_agreement_reads_lines,
         test_agreement_no_microc_line,
+        test_pooled_and_microc_loops,
         test_trio_relative_pileup,
         test_boot_reproduces_point,
         test_link_draws_refuses_mismatch,

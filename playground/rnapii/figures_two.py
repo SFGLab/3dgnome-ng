@@ -3,10 +3,12 @@
 Figure 1: gnome3d matches chromatin structure better than cudaMMC and reads data cudaMMC cannot.
 Figure 2: RNAPII loops help the functional reading of the models, not the structure itself.
 
-    python playground/rnapii/figures_two.py <fig_inputs> <readouts> <out_dir>
+    python playground/rnapii/figures_two.py <fig_inputs> <readouts> <out_dir> [<trio readouts>]
 
 `fig_inputs` holds `ep_<LINE>.tsv` from `ep_pairs.py`, `maps_GM12878.npz` from `model_maps.py`
 and `atlas_GM12878_locus.bed`; `readouts` is the readout directory of the RNAPII comparison.
+The trio readouts are `<readouts>/trio` unless given. Micro-C is read as the share of its loops
+the models place when `<LINE>_microc_loops.json` is there, and as a map correlation otherwise.
 """
 
 from __future__ import annotations
@@ -28,7 +30,7 @@ from scipy.stats import gaussian_kde  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from fig_data import ARM_COLOUR, ARM_NAME, agreement, link_draws, trio_paired  # noqa: E402
+from fig_data import ARM_COLOUR, ARM_NAME, agreement, link_draws, microc_classes, trio_paired  # noqa: E402
 
 from playground.figures.tube import draw, tube_pieces  # noqa: E402
 
@@ -42,7 +44,9 @@ PAIR_LABEL = {
 MEASURE_LABEL = {
     "hic": "stratum adjusted correlation\nwith Hi-C at 25 kb",
     "microc": "correlation with\nMicro-C at 5 kb",
+    "microc_loops": "share of Micro-C loops placed,\nabove moved loops",
 }
+CLASS_LABEL = {"CTCF": "a CTCF loop", "RNAPII alone": "an RNAPII loop\nand no CTCF loop", "none": "no ChIA-PET loop"}
 INK, MUTED, GRID, CONTROL = "#1a1a1a", "#5a5955", "#e4e3df", "#b5b3ad"
 LOCUS = {"gene": "TNFRSF8", "tss": 12_063_302, "enhancer": (12_448_194, 12_450_774)}
 
@@ -115,7 +119,7 @@ def dumbbells(ax: plt.Axes, df: pd.DataFrame, a: str, b: str, measure: str, xlim
     sub = df[df.measure == measure].set_index(["line", "arm"]).value
     for row, line in enumerate(LINES[::-1]):
         if (line, a) not in sub or (line, b) not in sub:
-            ax.text(np.mean(xlim), row, "no Micro-C" if measure == "microc" else "no map",
+            ax.text(np.mean(xlim), row, "no Micro-C" if measure.startswith("microc") else "no map",
                     ha="center", va="center", color=MUTED, fontsize=7, style="italic")
             continue
         va, vb = sub[(line, a)], sub[(line, b)]
@@ -203,10 +207,19 @@ def _tube(ax: plt.Axes, xyz: np.ndarray, colours: np.ndarray, width: float) -> t
     return rot, centre
 
 
-def _render(ax: plt.Axes, xyz: np.ndarray, mid: np.ndarray, colour: str, title: str) -> None:
+def _ep_gap(xyz: np.ndarray, mid: np.ndarray) -> float:
+    """The 3D distance between the beads nearest the promoter and the enhancer of the locus."""
+    a = xyz[int(np.argmin(np.abs(mid - LOCUS["tss"])))]
+    b = xyz[int(np.argmin(np.abs(mid - sum(LOCUS["enhancer"]) / 2)))]
+    return float(np.linalg.norm(a - b))
+
+
+def _render(ax: plt.Axes, xyz: np.ndarray, mid: np.ndarray, colour: str, title: str,
+            ensemble: list[tuple[np.ndarray, np.ndarray]]) -> None:
     """One conformation of chr1:11.99-12.52 Mb, every third bead, as a tube. The promoter and
     the enhancer are drawn dark and boxed by the bead stretch covering each element, the
-    website viewer's rule, and their 3D distance is given in the caption."""
+    website viewer's rule. The caption gives their 3D distance in this conformation and its
+    mean over the conformations of `ensemble`."""
     keep = (mid > 11_990_000) & (mid < 12_520_000)
     full_xyz, full_mid = xyz[keep], mid[keep]
     xyz, mid = full_xyz[::3], full_mid[::3]
@@ -231,7 +244,10 @@ def _render(ax: plt.Axes, xyz: np.ndarray, mid: np.ndarray, colour: str, title: 
         ax.add_patch(Rectangle(lo, *(hi - lo), fill=False, edgecolor=c, lw=1.3, zorder=5))
         ax.text(lo[0], hi[1] + 0.3, name, fontsize=7, color=c, va="bottom", zorder=6)
     gap = float(np.linalg.norm(centres[0] - centres[1]))
-    ax.text(0.5, -0.02, f"{textwrap.fill(title, 24)}\nenhancer to promoter {gap:.1f} bead units",
+    mean = float(np.mean([_ep_gap(x, m) for x, m in ensemble]))
+    ax.text(0.5, -0.02,
+            f"{textwrap.fill(title, 24)}\nenhancer to promoter\n{gap:.1f} bead units here,\n"
+            f"{mean:.1f} on average over\n{len(ensemble)} structures",
             transform=ax.transAxes, ha="center", va="top", fontsize=7, color=INK)
 
 
@@ -255,9 +271,20 @@ def _joy_groups(draws: pd.DataFrame, arms: tuple[str, ...]) -> list[tuple[str, l
     ]
 
 
+def _microc_measure(ag: pd.DataFrame) -> str:
+    """The Micro-C measure the readouts hold, the loops when they are there."""
+    return "microc_loops" if (ag.measure == "microc_loops").any() else "microc"
+
+
+def _agreement_title(ag: pd.DataFrame, who: str) -> str:
+    if _microc_measure(ag) == "microc_loops":
+        return f"Correlation of simulated contact maps with Hi-C, and the share of Micro-C loops the models place, {who}"
+    return f"Correlation of simulated contact maps with Hi-C and Micro-C, {who}"
+
+
 def _agreement_row(sub: SubFigure, ag: pd.DataFrame, a: str, b: str) -> None:
     axes = sub.subplots(1, 2, sharey=True)
-    for ax, measure in zip(axes, ("hic", "microc"), strict=True):
+    for ax, measure in zip(axes, ("hic", _microc_measure(ag)), strict=True):
         vals = ag[ag.measure == measure].value
         dumbbells(ax, ag, a, b, measure, (min(0.0, vals.min() - 0.03), vals.max() + 0.05))
     sub.legend(handles=_handles((a, b)), loc="outside lower center", ncol=2, fontsize=7)
@@ -295,7 +322,7 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
         _triangle(ax, maps[key], held, start, binsize, 60, vmin, vmax, label)
     axes[-1].set_xlabel("position on chr1, Mb. Grey bins hold no model beads")
 
-    _row_title(rows[2], "c", "Correlation of simulated contact maps with Hi-C and Micro-C, cudaMMC and gnome3d with CTCF loops")
+    _row_title(rows[2], "c", _agreement_title(ag, "cudaMMC and gnome3d with CTCF loops"))
     _agreement_row(rows[2], ag, "E", "C")
 
     _row_title(
@@ -328,12 +355,12 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
     return fig
 
 
-def figure_two(inputs: Path, readouts: Path, out: Path) -> Figure:
+def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = None) -> Figure:
     """The link to expression, agreement with contact maps, the trio individuals and one locus,
     gnome3d with and without RNAPII loops."""
     ag = agreement(readouts)
     draws = link_draws(readouts, ("C", "R"))
-    trio = trio_paired(readouts / "trio")
+    trio = trio_paired(trio_dir or readouts / "trio")
     maps = np.load(inputs / "maps_GM12878.npz")
 
     fig = plt.figure(figsize=(7.2, 10.0), layout="constrained")
@@ -349,7 +376,7 @@ def figure_two(inputs: Path, readouts: Path, out: Path) -> Figure:
         "minus Spearman correlation over genes, 2,000 block bootstrap draws, larger is a stronger link")
     rows[0].legend(handles=_handles(("C", "R")), loc="outside lower center", ncol=2, fontsize=7)
 
-    _row_title(rows[1], "f", "Correlation of simulated contact maps with Hi-C and Micro-C, gnome3d with and without RNAPII loops")
+    _row_title(rows[1], "f", _agreement_title(ag, "gnome3d with and without RNAPII loops"))
     _agreement_row(rows[1], ag, "C", "R")
 
     bottom = rows[2].subfigures(1, 2, width_ratios=[0.85, 1.15], wspace=0.03)
@@ -383,7 +410,9 @@ def figure_two(inputs: Path, readouts: Path, out: Path) -> Figure:
 
     _row_title(bottom[1], "h", f"The {LOCUS['gene']} locus in GM12878, medoid of ten structures per model set", 52)
     for ax, arm in zip(bottom[1].subplots(1, 2), ("C", "R"), strict=True):
-        _render(ax, maps[f"locus_{arm}_xyz"], maps[f"locus_{arm}_mid"], ARM_COLOUR[arm], ARM_NAME[arm])
+        n = sum(1 for k in maps.files if k.startswith(f"ensemble_{arm}_") and k.endswith("_xyz"))
+        ens = [(maps[f"ensemble_{arm}_{j}_xyz"], maps[f"ensemble_{arm}_{j}_mid"]) for j in range(n)]
+        _render(ax, maps[f"locus_{arm}_xyz"], maps[f"locus_{arm}_mid"], ARM_COLOUR[arm], ARM_NAME[arm], ens)
     _save(fig, out / "rnapii_figure2")
     return fig
 
@@ -420,13 +449,18 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
     ag = agreement(readouts)
     arms = ("E", "C", "R", "M")
     draws = link_draws(readouts, arms, n=1000)
-    fig = plt.figure(figsize=(7.2, 8.4), layout="constrained")
-    rows = fig.subfigures(3, 1, hspace=0.05)
+    classes = microc_classes(readouts)
+    by_class = not classes.empty
+    fig = plt.figure(figsize=(7.2, 11.0 if by_class else 8.4), layout="constrained")
+    rows = fig.subfigures(4 if by_class else 3, 1, hspace=0.05)
+    microc = _microc_measure(ag)
     specs = (
         ("a", "Stratum adjusted correlation of simulated contact maps with Hi-C at 25 kb, per cell line, "
               "higher is better", "hic"),
-        ("b", "Correlation of simulated contact maps with Micro-C at 5 kb, per cell line, higher is better",
-         "microc"),
+        ("b", "Share of the loops called on Micro-C that the models place, above the share for the same loops "
+              "moved away, per cell line, higher is better" if microc == "microc_loops" else
+              "Correlation of simulated contact maps with Micro-C at 5 kb, per cell line, higher is better",
+         microc),
     )
     for sub, (letter, title, measure) in zip(rows[:2], specs, strict=True):
         _row_title(sub, letter, title)
@@ -453,6 +487,33 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
         _forest(ax, vals, arms)
         ax.set_title(PAIR_LABEL[pair], fontsize=8, color=INK)
     axes[0].set_yticklabels([textwrap.fill(ARM_NAME[a], 26) for a in arms[::-1]], fontsize=7)
+    if by_class:
+        _row_title(
+            rows[3], "d",
+            "Share of Micro-C loops placed, above moved loops, by the ChIA-PET loop at the Micro-C loop, "
+            "gnome3d with and without RNAPII loops",
+        )
+        lines = [x for x in LINES if (classes.line == x).any()]
+        axes = rows[3].subplots(1, len(lines), sharey=True, sharex=True, squeeze=False)[0]
+        for ax, line in zip(axes, lines, strict=True):
+            c = classes[classes.line == line].set_index(["loop_class", "arm"])
+            for row, cls in enumerate(list(CLASS_LABEL)[::-1]):
+                va, vb = float(c.value[(cls, "C")]), float(c.value[(cls, "R")])
+                ax.plot([va, vb], [row, row], color="#9a9893", lw=1.6, zorder=2)
+                ax.plot(va, row, "o", color=ARM_COLOUR["C"], ms=7, zorder=3)
+                ax.plot(vb, row, "o", color=ARM_COLOUR["R"], ms=7, zorder=3)
+                ax.text(vb, row + 0.28, f"{vb:.2f}", ha="center", fontsize=7, color=INK)
+                ax.text(va, row - 0.42, f"{va:.2f}", ha="center", fontsize=7, color=MUTED)
+                ax.text(1.0, row + 0.28, f"{int(c.loops[(cls, 'C')])} loops", transform=ax.get_yaxis_transform(),
+                        ha="right", fontsize=7, color=MUTED)
+            ax.set_title(LINE_LABEL[line].replace("\n", " "), fontsize=8, color=INK)
+            ax.set_ylim(-0.6, len(CLASS_LABEL) - 0.3)
+            ax.set_xlim(0, 0.95)
+            ax.set_yticks(range(len(CLASS_LABEL)))
+            ax.grid(axis="x", color=GRID, lw=0.6)
+            ax.set_axisbelow(True)
+        axes[0].set_yticklabels([CLASS_LABEL[k] for k in list(CLASS_LABEL)[::-1]], fontsize=7)
+        rows[3].legend(handles=_handles(("C", "R")), loc="outside lower center", ncol=2, fontsize=7)
     _save(fig, out / "rnapii_supplement")
     return fig
 
@@ -465,8 +526,9 @@ def _save(fig: Figure, stem: Path) -> None:
 
 def main() -> None:
     inputs, readouts, out = (Path(x) for x in sys.argv[1:4])
+    trio_dir = Path(sys.argv[4]) if len(sys.argv) > 4 else None
     figure_one(inputs, readouts, out)
-    figure_two(inputs, readouts, out)
+    figure_two(inputs, readouts, out, trio_dir)
     figure_supplement(inputs, readouts, out)
     print(f"wrote {out}")
 
