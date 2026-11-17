@@ -70,6 +70,14 @@ describe('Results page', () => {
     expect(within(runs).getByText('12 of 21')).toBeInTheDocument()
   })
 
+  it('shows the share of Micro-C loops placed, for the model sets and for the three tools', () => {
+    renderResults()
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed' }))).toEqual(['0.18', '0.34', '0.37', '0.12', '0.34', '0.41'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with an RNAPII loop only' }))).toEqual(['0.22', '0.51', '0.26', '0.64'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed, three tools' }))).toEqual(['0.18', '0.15', '0.34', '0.13', '0.11', '0.34'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with beads at both ends' }))).toEqual(['0.22', '1.00', '0.94', '0.19', '1.00', '0.94'])
+  })
+
   it('shows the trio counts', () => {
     renderResults()
     expect(screen.getByText('9 of 9')).toBeInTheDocument()

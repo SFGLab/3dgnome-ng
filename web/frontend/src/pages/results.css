@@ -64,3 +64,12 @@ section > .reading-note {
 .sub-head + .reading-note {
   margin: 8px 0 16px;
 }
+
+section > .chart-row + .chart-row,
+section > .chart-key + .chart-row {
+  margin-top: 16px;
+}
+
+section > .chart-key {
+  margin-top: 12px;
+}

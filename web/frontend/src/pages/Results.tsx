@@ -37,6 +37,26 @@ const runs = (cudammc: [number, number], multimm: [number, number | null], ours:
   { series: 'ctcf', name: '3D-GNOMEᴺᴳ', beads: ours[0], seconds: ours[1] },
 ]
 
+const MICROC: Group[] = [
+  { name: 'H1ESC, 605 loops', bars: [bar('original', 0.18), bar('ctcf', 0.34), bar('rnapii', 0.37)] },
+  { name: 'HFFc6, 969 loops', bars: [bar('original', 0.12), bar('ctcf', 0.34), bar('rnapii', 0.41)] },
+]
+
+const MICROC_RNAPII: Group[] = [
+  { name: 'H1ESC, 40 loops', bars: [bar('ctcf', 0.22), bar('rnapii', 0.51)] },
+  { name: 'HFFc6, 62 loops', bars: [bar('ctcf', 0.26), bar('rnapii', 0.64)] },
+]
+
+const TOOLS_MICROC: Group[] = [
+  { name: 'H1ESC, 605 loops', bars: [bar('cudammc', 0.18), bar('multimm', 0.15), bar('ctcf', 0.34)] },
+  { name: 'HFFc6, 969 loops', bars: [bar('cudammc', 0.13), bar('multimm', 0.11), bar('ctcf', 0.34)] },
+]
+
+const TOOLS_MICROC_BEADS: Group[] = [
+  { name: 'H1ESC', bars: [bar('cudammc', 0.22), bar('multimm', 1.0), bar('ctcf', 0.94)] },
+  { name: 'HFFc6', bars: [bar('cudammc', 0.19), bar('multimm', 1.0), bar('ctcf', 0.94)] },
+]
+
 const TOOLS_SCC: Group[] = [
   { name: 'GM12878', bars: [bar('cudammc', 0.22), bar('multimm', 0.3), bar('ctcf', 0.51)] },
   { name: 'H1ESC', bars: [bar('cudammc', 0.15), bar('multimm', 0.17), bar('ctcf', 0.34)] },
@@ -72,6 +92,7 @@ const SECTIONS = [
   ['#distance', 'Enhancer to promoter distance'],
   ['#expression', 'Link to expression'],
   ['#trios', 'Nine people, three trios'],
+  ['#microc', 'Micro-C loops'],
   ['#tools', 'Other tools'],
   [`${ROUTES.method}#limitations`, 'Limitations'],
   ['#runtime', 'Runtime'],
@@ -138,11 +159,35 @@ export function Results() {
         <p className="reading-note">
           With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower.
         </p>
+        <section id="microc">
+          <h2>Micro-C loops</h2>
+          <p className="intro">
+            Micro-C resolves loops that Hi-C at 25 kb does not. Loops were called on the Micro-C maps of H1ESC and HFFc6 on chr1:0-60 Mb, at 5 kb. GM12878 has no Micro-C map. A model places a loop if the two ends of the loop are at least a fifth closer in 3D than pairs at the same genomic separation. Each chart shows the share of loops that a model places, minus the share it places after the same loops are moved away from their position. A model that cannot tell a loop from another pair scores zero.
+          </p>
+          <div className="chart-row">
+            <BarChart
+              title="Micro-C loops placed"
+              subtitle="All loops called on the Micro-C map. The share placed, minus the share placed for moved loops."
+              better="higher"
+              groups={MICROC}
+            />
+            <BarChart
+              title="Micro-C loops with an RNAPII loop only"
+              subtitle="The Micro-C loops that match an RNAPII ChIA-PET loop and no CTCF loop. The share placed, minus the share placed for moved loops."
+              better="higher"
+              groups={MICROC_RNAPII}
+            />
+          </div>
+          <p className="reading-note">
+            About half of the Micro-C loops have no ChIA-PET loop near them, and the models place few of those. With RNAPII loops added, the models place about twice as many of the loops that only RNAPII supports. They also place more of the loops that CTCF supports.
+          </p>
+        </section>
         <section id="tools">
           <h2>Other tools</h2>
           <p className="intro">
             cudaMMC, MultiMM and 3D-GNOMEᴺᴳ were run on the same CTCF loops and the same Hi-C contacts. cudaMMC and MultiMM used their default settings, and MultiMM was set to the same number of beads as 3D-GNOMEᴺᴳ.
           </p>
+          <ChartKey series={['cudammc', 'multimm', 'ctcf']} label="Key of the tools" />
           <div className="chart-row">
             <div>
               <BarChart
@@ -167,6 +212,23 @@ export function Results() {
               </div>
             </figure>
           </div>
+          <div className="chart-row">
+            <BarChart
+              title="Micro-C loops placed, three tools"
+              subtitle="All loops called on the Micro-C map, chr1:0-60 Mb. The share placed, minus the share placed for moved loops."
+              better="higher"
+              groups={TOOLS_MICROC}
+            />
+            <BarChart
+              title="Micro-C loops with beads at both ends"
+              subtitle="The share of Micro-C loops with model beads in both 5 kb bins of the loop. A model cannot place a loop without them."
+              better="higher"
+              groups={TOOLS_MICROC_BEADS}
+            />
+          </div>
+          <p className="reading-note">
+            cudaMMC has beads at both ends of about a fifth of the Micro-C loops, and this limits the share it places. MultiMM has beads at every loop, and it places a loop little more often than a moved loop.
+          </p>
           <p className="reading-note">
             A region of 5 Mb has too few bins for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb, 3D-GNOMEᴺᴳ is better than cudaMMC in all nine and better than MultiMM in seven. On chr1:1-60 Mb it is better than both tools in every cell line.
           </p>
