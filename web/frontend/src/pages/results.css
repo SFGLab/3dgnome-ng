@@ -53,3 +53,14 @@
 section > .reading-note {
   margin-top: 16px;
 }
+
+.sub-head {
+  margin: 28px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sub-head + .reading-note {
+  margin: 8px 0 16px;
+}

@@ -12,13 +12,27 @@ const SERIES_NAME: Record<Series, string> = {
   multimm: 'MultiMM',
 }
 
+export type Direction = 'higher' | 'lower'
+
+/** The direction that counts as better on a measure, as an arrow and a few words. */
+export function Better({ dir, text }: { dir: Direction; text?: string }) {
+  return (
+    <span className="better" data-testid="better">
+      <span aria-hidden="true">{dir === 'higher' ? '↑' : '↓'}</span> {text ?? `${dir} is better`}
+    </span>
+  )
+}
+
 /** Horizontal bars in groups, each bar labelled with its value. A bar without a value is a placeholder. */
-export function BarChart({ title, subtitle, groups }: { title: string; subtitle: string; groups: Group[] }) {
+export function BarChart({ title, subtitle, groups, better }: { title: string; subtitle: string; groups: Group[]; better?: Direction }) {
   const max = Math.max(...groups.flatMap((g) => g.bars.map((b) => b.value ?? 0)), 1e-9)
   return (
     <figure className="bar-chart" aria-label={title}>
       <figcaption>
-        <span className="chart-title">{title}</span>
+        <span className="chart-head">
+          <span className="chart-title">{title}</span>
+          {better && <Better dir={better} />}
+        </span>
         <span className="chart-sub">{subtitle}</span>
       </figcaption>
       {groups.map((g) => (

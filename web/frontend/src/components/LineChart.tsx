@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChartKey, type Series } from './BarChart'
+import { Better, ChartKey, type Direction, type Series } from './BarChart'
 import './barchart.css'
 import './linechart.css'
 
@@ -37,9 +37,11 @@ export function LineChart({
   xLabel,
   xTick,
   lines,
+  better,
 }: {
   title: string
   subtitle: string
+  better?: Direction
   xLabel: string
   xTick: (x: number) => string
   lines: Line[]
@@ -60,7 +62,10 @@ export function LineChart({
   return (
     <figure className="bar-chart line-chart" aria-label={title}>
       <figcaption>
-        <span className="chart-title">{title}</span>
+        <span className="chart-head">
+          <span className="chart-title">{title}</span>
+          {better && <Better dir={better} />}
+        </span>
         <span className="chart-sub">{subtitle}</span>
       </figcaption>
       <ChartKey series={lines.map((l) => l.series)} label={`Key of ${title}`} />
