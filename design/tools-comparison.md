@@ -73,6 +73,30 @@ The bootstrap keeps every pair's true separation, where the pooled table closes 
 by unmapped bins, so its balanced SCC differs from the table's by up to 0.03 on a region with
 unmapped bins.
 
+### Regions of 20 Mb
+
+A 5 Mb region cannot separate the tools on SCC, so three regions of 20 Mb were added, the
+windows with the most CTCF loops in all three cells at once and on three chromosomes,
+chr12 40 to 60 Mb, chr11 60 to 80 Mb and chr17 35 to 55 Mb, with 1,232 to 2,972 loops against a
+median of 328 to 622 for a 20 Mb window. Five structures per tool and cell, the same bootstrap.
+Tables in `playground/square_blocks/tools20/`.
+
+| Score | against | 3dgnome leads | tie | 3dgnome loses |
+|---|---|---|---|---|
+| raw Pearson | MultiMM | 9 | 0 | 0 |
+| raw Pearson | cudaMMC | 9 | 0 | 0 |
+| raw Spearman | MultiMM | 9 | 0 | 0 |
+| raw Spearman | cudaMMC | 9 | 0 | 0 |
+| raw SCC | MultiMM | 7 | 2 | 0 |
+| raw SCC | cudaMMC | 9 | 0 | 0 |
+| balanced SCC, mapped bins | MultiMM | 5 | 4 | 0 |
+| balanced SCC, mapped bins | cudaMMC | 9 | 0 | 0 |
+
+Raw SCC reads 0.39 to 0.61 for 3dgnome, 0.25 to 0.47 for MultiMM and 0.18 to 0.38 for cudaMMC,
+and the point difference favours 3dgnome on all nine runs against both, by 0.09 to 0.22 over
+MultiMM and 0.16 to 0.30 over cudaMMC. The two ties with MultiMM are GM12878 chr11 at +0.089
+with an interval from -0.010 and HFFC6 chr12 at +0.086 with one from -0.042.
+
 ## Physics
 
 The validation battery per structure, means over the same runs. Overlaps are non neighbour

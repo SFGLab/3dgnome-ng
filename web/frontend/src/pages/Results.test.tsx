@@ -55,9 +55,9 @@ describe('Results page', () => {
   it('compares the three tools on Hi-C and counts the runs with intervals', () => {
     renderResults()
     expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C, three tools' })).slice(0, 3)).toEqual(['0.22', '0.30', '0.51'])
-    const runs = screen.getByRole('figure', { name: 'Twelve runs with intervals' })
-    expect(within(runs).getByText('12 of 12')).toBeInTheDocument()
-    expect(within(runs).getByText('5 of 12')).toBeInTheDocument()
+    const runs = screen.getByRole('figure', { name: 'Twenty one runs with intervals' })
+    expect(within(runs).getByText('21 of 21')).toBeInTheDocument()
+    expect(within(runs).getByText('12 of 21')).toBeInTheDocument()
   })
 
   it('shows the trio counts', () => {

@@ -146,23 +146,23 @@ export function Results() {
                 groups={TOOLS_SCC}
               />
             </div>
-            <figure className="bar-chart" aria-label="Twelve runs with intervals">
+            <figure className="bar-chart" aria-label="Twenty one runs with intervals">
               <figcaption>
-                <span className="chart-title">Twelve runs with intervals</span>
-                <span className="chart-sub">Three cell lines, three regions of 5 Mb and chr1:1-60 Mb. A lead has a 95% bootstrap interval clear of zero.</span>
+                <span className="chart-title">Twenty one runs with intervals</span>
+                <span className="chart-sub">Three cell lines, three regions of 5 Mb, three of 20 Mb and chr1:1-60 Mb. A lead has a 95% bootstrap interval clear of zero.</span>
               </figcaption>
               <div className="stat">
-                <span className="stat-value">12 of 12</span>
+                <span className="stat-value">21 of 21</span>
                 <span className="stat-label">3D-GNOMEᴺᴳ leads both tools on the Pearson and on the rank correlation with Hi-C</span>
               </div>
               <div className="stat">
-                <span className="stat-value">5 of 12</span>
-                <span className="stat-label">3D-GNOMEᴺᴳ leads MultiMM on the stratum adjusted correlation, 6 of 12 for cudaMMC, and neither tool leads it in any run</span>
+                <span className="stat-value">12 of 21</span>
+                <span className="stat-label">3D-GNOMEᴺᴳ leads MultiMM on the stratum adjusted correlation, 15 of 21 for cudaMMC, and neither tool leads it in any run</span>
               </div>
             </figure>
           </div>
           <p className="reading-note">
-            A region of 5 Mb is too short for the stratum adjusted correlation to separate the tools. On chr1:1-60 Mb 3D-GNOMEᴺᴳ leads both on every cell line.
+            A region of 5 Mb is too short for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb 3D-GNOMEᴺᴳ leads cudaMMC on all and MultiMM on seven. On chr1:1-60 Mb it leads both on every cell line.
           </p>
         </section>
         <section id="run-time">

@@ -1,0 +1,29 @@
+HFFC6_chr17_35000000_55000000_ours: 5 structures, 13460 beads, 3 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     4.2  0.0317  0.0414     5.0  0.0165  0.0246     6.2  0.0070  0.0129     8.4  0.0017  0.0053    13.3  0.0003  0.0014
+  anchor pairs                       -     4.7  0.0000  0.0291     5.8  0.0000  0.0161     8.4  0.0000  0.0054    12.9  0.0000  0.0015
+    subanchors     4.2  0.0324  0.0407     5.0  0.0168  0.0242     6.3  0.0072  0.0128     8.4  0.0017  0.0053    13.4  0.0003  0.0013
+      one hole                       -                       -                       -                       -                       -
+  anchor floor                       -             0.22   0.78             0.30   0.68             0.27   0.74             0.27   0.81   1% and median of distance over law, nu 0.416
+HFFC6_chr17_35000000_55000000_cudammc: 5 structures, 5132 beads, 3 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     3.0  0.2952  0.0972     3.5  0.3022  0.0673     5.8  0.2773  0.0161     9.8  0.2048  0.0034    15.8  0.0715  0.0008
+  anchor pairs     2.6  0.4726  0.1467     3.1  0.4521  0.0968     5.7  0.4115  0.0170     9.7  0.3124  0.0035    15.6  0.1133  0.0008
+    subanchors     3.5  0.1410  0.0674     3.7  0.1243  0.0590     6.0  0.1090  0.0146    10.0  0.0778  0.0032    15.9  0.0277  0.0008
+      one hole                       -                       -                       -                       -                       -
+HFFC6_chr17_35000000_55000000_multimm_min: 5 structures, 13460 beads, 3 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block    13.2  0.0020  0.0014    14.9  0.0022  0.0010    16.6  0.0010  0.0007    17.9  0.0004  0.0006    21.1  0.0001  0.0003
+  anchor pairs                       -                       -                       -                       -                       -
+    subanchors    13.2  0.0020  0.0014    14.9  0.0022  0.0010    16.6  0.0010  0.0007    17.9  0.0004  0.0006    21.1  0.0001  0.0003
+      one hole    16.1  0.0000  0.0008    16.5  0.0000  0.0007    18.1  0.0000  0.0005    22.5  0.0000  0.0003                       -
+HFFC6_chr17_35000000_55000000_multimm_md: 5 structures, 13460 beads, 3 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block    13.0  0.0022  0.0015    14.7  0.0026  0.0010    16.5  0.0011  0.0007    17.8  0.0004  0.0006    21.0  0.0001  0.0004
+  anchor pairs                       -                       -                       -                       -                       -
+    subanchors    13.0  0.0022  0.0015    14.7  0.0026  0.0010    16.5  0.0011  0.0007    17.8  0.0004  0.0006    21.0  0.0001  0.0004
+      one hole    15.9  0.0000  0.0008    16.3  0.0000  0.0007    17.9  0.0000  0.0006    22.3  0.0000  0.0003                       -
