@@ -526,11 +526,12 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
                 ax.plot(vb, row, "o", color=ARM_COLOUR["R"], ms=7, zorder=3)
                 ax.text(vb, row + 0.28, f"{vb:.2f}", ha="center", fontsize=7, color=INK)
                 ax.text(va, row - 0.42, f"{va:.2f}", ha="center", fontsize=7, color=MUTED)
-                ax.text(1.0, row + 0.28, f"{int(c.loops[(cls, 'C')])} loops", transform=ax.get_yaxis_transform(),
-                        ha="right", fontsize=7, color=MUTED)
+                ax.text(1.0, row, f"{int(c.loops[(cls, 'C')])} loops", transform=ax.get_yaxis_transform(),
+                        ha="right", va="center", fontsize=7, color=MUTED)
             ax.set_title(LINE_LABEL[line].replace("\n", " "), fontsize=8, color=INK)
             ax.set_ylim(-0.6, len(CLASS_LABEL) - 0.3)
-            ax.set_xlim(0, 0.95)
+            ax.set_xlim(0, 1.25)
+            ax.set_xticks([0, 0.2, 0.4, 0.6, 0.8])
             ax.set_yticks(range(len(CLASS_LABEL)))
             ax.grid(axis="x", color=GRID, lw=0.6)
             ax.set_axisbelow(True)

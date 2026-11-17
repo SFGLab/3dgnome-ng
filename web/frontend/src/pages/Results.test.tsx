@@ -72,10 +72,10 @@ describe('Results page', () => {
 
   it('shows the share of Micro-C loops placed, for the model sets and for the three tools', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed' }))).toEqual(['0.18', '0.34', '0.37', '0.12', '0.34', '0.41'])
-    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with an RNAPII loop only' }))).toEqual(['0.22', '0.51', '0.26', '0.64'])
-    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed, three tools' }))).toEqual(['0.18', '0.15', '0.34', '0.13', '0.11', '0.34'])
-    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with beads at both ends' }))).toEqual(['0.22', '1.00', '0.94', '0.19', '1.00', '0.94'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed' }))).toEqual(['0.14', '0.21', '0.30', '0.21', '0.39', '0.42', '0.15', '0.44', '0.50'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with an RNAPII loop only' }))).toEqual(['0.08', '0.67', '0.32', '0.48', '0.41', '0.72'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed, three tools' }))).toEqual(['0.14', '0.25', '0.26', '0.21', '0.16', '0.38', '0.16', '0.15', '0.45'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with beads at both ends' }))).toEqual(['0.25', '1.00', '0.97', '0.26', '1.00', '0.94', '0.22', '1.00', '0.96'])
   })
 
   it('shows the trio counts', () => {

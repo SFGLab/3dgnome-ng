@@ -38,23 +38,27 @@ const runs = (cudammc: [number, number], multimm: [number, number | null], ours:
 ]
 
 const MICROC: Group[] = [
-  { name: 'H1ESC, 605 loops', bars: [bar('original', 0.18), bar('ctcf', 0.34), bar('rnapii', 0.37)] },
-  { name: 'HFFc6, 969 loops', bars: [bar('original', 0.12), bar('ctcf', 0.34), bar('rnapii', 0.41)] },
+  { name: 'GM12878, 902 loops', bars: [bar('original', 0.14), bar('ctcf', 0.21), bar('rnapii', 0.3)] },
+  { name: 'H1ESC, 385 loops', bars: [bar('original', 0.21), bar('ctcf', 0.39), bar('rnapii', 0.42)] },
+  { name: 'HFFc6, 639 loops', bars: [bar('original', 0.15), bar('ctcf', 0.44), bar('rnapii', 0.5)] },
 ]
 
 const MICROC_RNAPII: Group[] = [
-  { name: 'H1ESC, 40 loops', bars: [bar('ctcf', 0.22), bar('rnapii', 0.51)] },
-  { name: 'HFFc6, 62 loops', bars: [bar('ctcf', 0.26), bar('rnapii', 0.64)] },
+  { name: 'GM12878, 65 loops', bars: [bar('ctcf', 0.08), bar('rnapii', 0.67)] },
+  { name: 'H1ESC, 21 loops', bars: [bar('ctcf', 0.32), bar('rnapii', 0.48)] },
+  { name: 'HFFc6, 38 loops', bars: [bar('ctcf', 0.41), bar('rnapii', 0.72)] },
 ]
 
 const TOOLS_MICROC: Group[] = [
-  { name: 'H1ESC, 605 loops', bars: [bar('cudammc', 0.18), bar('multimm', 0.15), bar('ctcf', 0.34)] },
-  { name: 'HFFc6, 969 loops', bars: [bar('cudammc', 0.13), bar('multimm', 0.11), bar('ctcf', 0.34)] },
+  { name: 'GM12878, 902 loops', bars: [bar('cudammc', 0.14), bar('multimm', 0.25), bar('ctcf', 0.26)] },
+  { name: 'H1ESC, 385 loops', bars: [bar('cudammc', 0.21), bar('multimm', 0.16), bar('ctcf', 0.38)] },
+  { name: 'HFFc6, 639 loops', bars: [bar('cudammc', 0.16), bar('multimm', 0.15), bar('ctcf', 0.45)] },
 ]
 
 const TOOLS_MICROC_BEADS: Group[] = [
-  { name: 'H1ESC', bars: [bar('cudammc', 0.22), bar('multimm', 1.0), bar('ctcf', 0.94)] },
-  { name: 'HFFc6', bars: [bar('cudammc', 0.19), bar('multimm', 1.0), bar('ctcf', 0.94)] },
+  { name: 'GM12878', bars: [bar('cudammc', 0.25), bar('multimm', 1.0), bar('ctcf', 0.97)] },
+  { name: 'H1ESC', bars: [bar('cudammc', 0.26), bar('multimm', 1.0), bar('ctcf', 0.94)] },
+  { name: 'HFFc6', bars: [bar('cudammc', 0.22), bar('multimm', 1.0), bar('ctcf', 0.96)] },
 ]
 
 const TOOLS_SCC: Group[] = [
@@ -162,7 +166,7 @@ export function Results() {
         <section id="microc">
           <h2>Micro-C loops</h2>
           <p className="intro">
-            Micro-C resolves loops that Hi-C at 25 kb does not. Loops were called on the Micro-C maps of H1ESC and HFFc6 on chr1:0-60 Mb, at 5 kb. GM12878 has no Micro-C map. A model places a loop if the two ends of the loop are at least a fifth closer in 3D than pairs at the same genomic separation. Each chart shows the share of loops that a model places, minus the share it places after the same loops are moved away from their position. A model that cannot tell a loop from another pair scores zero.
+            Micro-C resolves loops that Hi-C at 25 kb does not. Loops were called at 5 kb on chr1:0-60 Mb, on the 4DN Micro-C maps of H1ESC and HFFc6 and on the GM12878 Micro-C map of Hong and colleagues, Zenodo record 15303879. A loop is kept only if its signal is strong against its local background, and the kept loops also appear in the Hi-C map of the same cell line. A model places a loop if the two ends of the loop are at least a fifth closer in 3D than pairs at the same genomic separation. Each chart shows the share of loops that a model places, minus the share it places after the same loops are moved away from their position. A model that cannot tell a loop from another pair scores zero.
           </p>
           <div className="chart-row">
             <BarChart
@@ -179,7 +183,7 @@ export function Results() {
             />
           </div>
           <p className="reading-note">
-            About half of the Micro-C loops have no ChIA-PET loop near them, and the models place few of those. With RNAPII loops added, the models place about twice as many of the loops that only RNAPII supports. They also place more of the loops that CTCF supports.
+            Between 38 and 62 percent of the Micro-C loops have no ChIA-PET loop near them, and the models place few of those. With RNAPII loops added, the models place more of the loops that only RNAPII supports, on every cell line. They also place more of the loops that CTCF supports.
           </p>
         </section>
         <section id="tools">
@@ -227,7 +231,7 @@ export function Results() {
             />
           </div>
           <p className="reading-note">
-            cudaMMC has beads at both ends of about a fifth of the Micro-C loops, and this limits the share it places. MultiMM has beads at every loop, and it places a loop little more often than a moved loop.
+            cudaMMC has beads at both ends of about a quarter of the Micro-C loops, and this limits the share it places. MultiMM has beads at every loop. It places as many loops as 3D-GNOMEᴺᴳ on GM12878 and fewer on the other two cell lines.
           </p>
           <p className="reading-note">
             A region of 5 Mb has too few bins for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb, 3D-GNOMEᴺᴳ is better than cudaMMC in all nine and better than MultiMM in seven. On chr1:1-60 Mb it is better than both tools in every cell line.
