@@ -87,4 +87,24 @@ describe('Layout', () => {
       expect(document.documentElement.dataset.theme).toBe('dark')
     })
   })
+
+  it('shows the privacy notice on a first visit and not after it was closed', () => {
+    localStorage.clear()
+    const first = renderLayout()
+    const notice = screen.getByRole('complementary', { name: 'Privacy' })
+    expect(within(notice).getByText(/sets no cookies and does no tracking/)).toBeInTheDocument()
+    expect(within(notice).getByRole('link', { name: 'Privacy notice' })).toHaveAttribute('href', ROUTES.privacy)
+    expect(checkCopy(first.container)).toEqual([])
+    fireEvent.click(within(notice).getByRole('button', { name: 'OK' }))
+    expect(screen.queryByRole('complementary', { name: 'Privacy' })).toBeNull()
+    first.unmount()
+    renderLayout()
+    expect(screen.queryByRole('complementary', { name: 'Privacy' })).toBeNull()
+    localStorage.clear()
+  })
+
+  it('links the privacy notice from the foot of every page', () => {
+    renderLayout()
+    expect(within(screen.getByRole('contentinfo')).getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', ROUTES.privacy)
+  })
 })

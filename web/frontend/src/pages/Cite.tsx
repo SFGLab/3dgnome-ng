@@ -86,29 +86,38 @@ export function Cite() {
 
         <section id="data">
           <h2>Data on this server</h2>
+          <p className="intro">
+            Every data set behind the models and the Results page, with the accession of its archive. A row lists the experiment or the set first and its files after it. An entry that says to confirm is not recorded yet.
+          </p>
           <table className="data-table">
             <thead>
               <tr>
                 <th>Data</th>
+                <th>Accession</th>
                 <th>Used for</th>
                 <th>Cite</th>
               </tr>
             </thead>
             <tbody>
               {DATA_SOURCES.map((d) => {
-                const r = REFERENCES.find((x) => x.key === d.ref)!
-                const link = referenceLink(r)
+                const r = REFERENCES.find((x) => x.key === d.ref)
                 return (
                   <tr key={d.data}>
-                    <td className="data-name">{d.data}</td>
-                    <td>{d.usedFor}</td>
-                    <td>
-                      {r.unconfirmed ? (
-                        <span className="unconfirmed">{d.label}</span>
-                      ) : (
-                        <a href={link}>{d.label}</a>
-                      )}
+                    <td className="data-name">
+                      {d.data}
+                      {d.note && <span className="data-note">{d.note}</span>}
                     </td>
+                    <td className="accessions">
+                      {d.accessions.map((a) => (
+                        <a key={a.id} href={a.url}>
+                          {a.id}
+                        </a>
+                      ))}
+                      {d.pending && <span className="unconfirmed">{d.pending}</span>}
+                      {d.accessions.length === 0 && !d.pending && <span className="no-accession">none</span>}
+                    </td>
+                    <td>{d.usedFor}</td>
+                    <td>{r && !r.unconfirmed ? <a href={referenceLink(r)}>{d.label}</a> : <span className="unconfirmed">{d.label}</span>}</td>
                   </tr>
                 )
               })}

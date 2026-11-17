@@ -123,6 +123,26 @@ export const REFERENCES: Reference[] = [
     authors: 'Dekker J, Belmont AS, Guttman M, et al.', venue: 'Nature 549, 219-226',
   },
   {
+    key: 'encode2020', group: 'data', year: 2020, doi: '10.1038/s41586-020-2493-4',
+    title: 'Expanded encyclopaedias of DNA elements in the human and mouse genomes',
+    authors: 'The ENCODE Project Consortium', venue: 'Nature 583, 699-710',
+  },
+  {
+    key: 'hong2025', group: 'data', year: 2025, doi: '10.5281/zenodo.15303879',
+    title: 'Comprehensive mapping of genome structure with ultra-high-resolution 3D genomics and deep learning (experimental data)',
+    authors: 'Hong CKY', venue: 'Zenodo',
+  },
+  {
+    key: 'gencode2021', group: 'data', year: 2021, doi: '10.1093/nar/gkaa1087',
+    title: 'GENCODE 2021',
+    authors: 'Frankish A, Diekhans M, Jungreis I, et al.', venue: 'Nucleic Acids Research 49, D916-D923',
+  },
+  {
+    key: 'grch38', group: 'data', year: 2017, doi: '10.1101/gr.213611.116',
+    title: 'Evaluation of GRCh38 and de novo haploid genome assemblies demonstrates the enduring quality of the reference assembly',
+    authors: 'Schneider VA, Graves-Lindsay T, Howe K, et al.', venue: 'Genome Research 27, 849-864',
+  },
+  {
     key: 'enhanceratlas2020', group: 'data', year: 2020, doi: '10.1093/nar/gkz980',
     title: 'EnhancerAtlas 2.0: an updated resource with enhancer annotation in 586 tissue/cell types across nine species',
     authors: 'Gao T, Qian J', venue: 'Nucleic Acids Research 48, D58-D64',
@@ -139,15 +159,63 @@ export const REFERENCES: Reference[] = [
   },
 ]
 
-/** The rows of the Cite page's data table. */
-export type DataSource = { data: string; usedFor: string; label: string; ref: string }
+/** An accession with the page of its archive. */
+export type Accession = { id: string; url: string }
+
+/**
+ * A row of the Cite page's data table.
+ * `accessions` are the records the data came from, the experiment or set first and its files
+ * after it. `pending` says what is still to be recorded, and stands in the accession column.
+ * A row without `ref` has no confirmed source to cite yet.
+ */
+export type DataSource = { data: string; usedFor: string; accessions: Accession[]; note?: string; pending?: string; label: string; ref?: string }
+
+const encode = (id: string): Accession => ({ id, url: `https://www.encodeproject.org/${id.startsWith('ENCSR') ? 'experiments' : 'files'}/${id}/` })
+const fourDn = (id: string): Accession => ({ id, url: `https://data.4dnucleome.org/${id.startsWith('4DNES') ? 'experiment-set-replicates' : 'files-processed'}/${id}/` })
+const geo = (id: string): Accession => ({ id, url: `https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=${id}` })
 
 export const DATA_SOURCES: DataSource[] = [
-  { data: 'CTCF and RNAPII ChIA-PET, GM12878', usedFor: 'loops', label: 'Tang et al., Cell 2015', ref: 'tang2015' },
-  { data: 'Hi-C, 4DN data portal', usedFor: 'contact background, agreement', label: '4DN Network, Nature 2017', ref: '4dn2017' },
-  { data: 'Enhancers, EnhancerAtlas 2.0', usedFor: 'enhancer marks and distances', label: 'Gao and Qian, NAR 2020', ref: 'enhanceratlas2020' },
-  { data: 'Structural variants, HGSVC freeze 4', usedFor: 'variant structures', label: 'HGSVC, reference to confirm', ref: 'hgsvc4' },
-  { data: 'HiCDiffusion', usedFor: 'contact background from sequence', label: 'Chiliński and Plewczynski, BMC Genomics 2024', ref: 'hicdiffusion2024' },
+  { data: 'CTCF ChIA-PET loops, GM12878', usedFor: 'loops', accessions: [geo('GSE72816')], label: 'Tang et al., Cell 2015', ref: 'tang2015' },
+  { data: 'CTCF ChIA-PET loops, H1ESC', usedFor: 'loops', accessions: [], pending: 'accession to confirm', label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'CTCF ChIA-PET loops, HFFc6', usedFor: 'loops', accessions: [], pending: 'accession to confirm', label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  {
+    data: 'RNAPII ChIA-PET loops and peaks, GM12878', usedFor: 'loops',
+    accessions: ['ENCSR905HWW', 'ENCFF040KUS', 'ENCFF913VWM', 'ENCFF109HCZ', 'ENCFF578JKO'].map(encode),
+    label: 'ENCODE, Nature 2020', ref: 'encode2020',
+  },
+  {
+    data: 'RNAPII ChIA-PET loops and peaks, H1ESC', usedFor: 'loops',
+    accessions: ['ENCSR782EKZ', 'ENCFF324UIT', 'ENCFF753NSM', 'ENCFF665IXY', 'ENCFF116RLS'].map(encode),
+    label: 'ENCODE, Nature 2020', ref: 'encode2020',
+  },
+  {
+    data: 'RNAPII ChIA-PET loops and peaks, BJ', usedFor: 'loops of HFFc6', note: 'BJ is another foreskin fibroblast line. It stands in for HFFc6.',
+    accessions: ['ENCSR956IXE', 'ENCFF601NEC', 'ENCFF808QOQ', 'ENCFF775SCY', 'ENCFF428VXI', 'ENCFF084CXY', 'ENCFF953MBK'].map(encode),
+    label: 'ENCODE, Nature 2020', ref: 'encode2020',
+  },
+  { data: 'CTCF ChIP-seq peaks, GM12878', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR000DZN', 'ENCFF796WRU'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'CTCF ChIP-seq peaks, H1ESC', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR000BNH', 'ENCFF497ZGV'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'CTCF ChIP-seq peaks, HFFc6', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR163ULN', 'ENCFF414XTM'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'Hi-C, GM12878', usedFor: 'contact background, agreement', accessions: ['4DNES3JX38V5', '4DNFIXP4QG5B'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'Hi-C, H1ESC', usedFor: 'contact background, agreement', accessions: ['4DNES2M5JIGV', '4DNFI6HDY7WZ'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'Hi-C, HFFc6', usedFor: 'contact background, agreement', accessions: ['4DNES2R6PUEK', '4DNFIB59T7NN'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  {
+    data: 'Micro-C, GM12878', usedFor: 'loops the models are checked against',
+    accessions: [{ id: '10.5281/zenodo.15303879', url: 'https://doi.org/10.5281/zenodo.15303879' }],
+    label: 'Hong, Zenodo 2025', ref: 'hong2025',
+  },
+  { data: 'Micro-C, H1ESC', usedFor: 'loops the models are checked against', accessions: [fourDn('4DNFI2TK7L2F')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'Micro-C, HFFc6', usedFor: 'loops the models are checked against', accessions: [fourDn('4DNFI18Q799K')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'Gene expression of the three cell lines', usedFor: 'link to expression', accessions: [], pending: 'accession to confirm', label: 'source to confirm' },
+  { data: 'Enhancers, EnhancerAtlas 2.0', usedFor: 'enhancer marks and distances', accessions: [], note: 'One file per cell line. The atlas gives no accession.', label: 'Gao and Qian, NAR 2020', ref: 'enhanceratlas2020' },
+  { data: 'Genes, GENCODE release 40, basic annotation', usedFor: 'promoter marks and gene names', accessions: [{ id: 'GENCODE v40', url: 'https://www.gencodegenes.org/human/release_40.html' }], label: 'Frankish et al., NAR 2021', ref: 'gencode2021' },
+  { data: 'Structural variants, HGSVC freeze 4', usedFor: 'variant structures', accessions: [], pending: 'accession to confirm', label: 'HGSVC, reference to confirm', ref: 'hgsvc4' },
+  {
+    data: 'Reference genome, hg38', usedFor: 'sequence for HiCDiffusion',
+    accessions: [{ id: 'GCA_000001405.15', url: 'https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_000001405.15/' }],
+    note: 'GRCh38, the UCSC hg38 FASTA.', label: 'Schneider et al., Genome Research 2017', ref: 'grch38',
+  },
+  { data: 'HiCDiffusion model', usedFor: 'contact background from sequence', accessions: [], note: 'The checkpoints of the authors. They have no accession.', label: 'Chiliński and Plewczynski, BMC Genomics 2024', ref: 'hicdiffusion2024' },
 ]
 
 /** The link of a reference, its DOI or its URL. */

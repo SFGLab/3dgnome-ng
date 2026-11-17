@@ -142,3 +142,62 @@
     flex: 1 1 calc(100% - 30px);
   }
 }
+
+.cite-link {
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.privacy-notice {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 380px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
+  font-size: 13px;
+}
+
+.privacy-notice p {
+  margin: 0;
+}
+
+.privacy-notice-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.privacy-notice-actions a {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.privacy-notice-actions button {
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #FFFFFF;
+  font: 600 13px var(--font);
+  cursor: pointer;
+}
+
+@media (max-width: 560px) {
+  .privacy-notice {
+    right: 8px;
+    left: 8px;
+    bottom: 8px;
+    max-width: none;
+  }
+}

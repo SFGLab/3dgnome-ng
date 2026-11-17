@@ -7,6 +7,7 @@ import { Method } from './pages/Method'
 import { Model } from './pages/Model'
 import { Examples } from './pages/Examples'
 import { MyJobs } from './pages/MyJobs'
+import { Privacy } from './pages/Privacy'
 import { Results } from './pages/Results'
 import { Title } from './pages/Title'
 import { BASE } from './base'
@@ -33,6 +34,7 @@ export function App() {
           <Route path={ROUTES.model} element={<Model />} />
           <Route path={ROUTES.jobs} element={<MyJobs />} />
           <Route path={ROUTES.examples} element={<Examples />} />
+          <Route path={ROUTES.privacy} element={<Privacy />} />
           <Route path="/jobs/:key" element={<Job kind="jobs" />} />
           <Route path="/p/:key" element={<Job kind="p" />} />
           <Route path="*" element={null} />

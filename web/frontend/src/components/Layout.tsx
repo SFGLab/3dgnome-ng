@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { ROUTES } from '../routes'
 import { CiteStrip } from './CiteStrip'
+import { PrivacyNotice } from './PrivacyNotice'
 import { ThemeSwitch } from './ThemeSwitch'
 import { Wordmark } from './Wordmark'
 import './layout.css'
@@ -15,7 +16,7 @@ const NAV: [string, string][] = [
   ['Cite', ROUTES.cite],
 ]
 
-/** The top bar, the page and the cite strip. */
+/** The top bar, the page, the cite strip and the privacy notice of a first visit. */
 export function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="layout">
@@ -35,6 +36,7 @@ export function Layout({ children }: { children: ReactNode }) {
       </header>
       <main>{children}</main>
       <CiteStrip />
+      <PrivacyNotice />
     </div>
   )
 }

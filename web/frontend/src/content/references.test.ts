@@ -30,8 +30,11 @@ describe('references', () => {
     expect(REFERENCES.find((r) => r.key === 'hgsvc4')?.unconfirmed).toBe(true)
   })
 
-  it('points every data row at a reference', () => {
+  it('points every data row at a reference, or says the source is to confirm', () => {
     const keys = new Set(REFERENCES.map((r) => r.key))
-    for (const d of DATA_SOURCES) expect(keys, d.data).toContain(d.ref)
+    for (const d of DATA_SOURCES) {
+      if (d.ref) expect(keys, d.data).toContain(d.ref)
+      else expect(d.pending, d.data).toBeDefined()
+    }
   })
 })
