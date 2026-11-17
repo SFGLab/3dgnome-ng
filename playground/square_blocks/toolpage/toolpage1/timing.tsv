@@ -1,0 +1,4 @@
+cell	region	tool	structures	beads	seconds
+GM12878	chr1:11500000-12600000	ours	1	760	9.0
+GM12878	chr1:11500000-12600000	cudammc	1	350	6.4
+GM12878	chr1:11500000-12600000	multimm	1	760	7.4

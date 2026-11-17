@@ -40,6 +40,18 @@ describe('Results page', () => {
     }
   })
 
+  it('charts one structure by region size and by bead count, with a table of every value', () => {
+    renderResults()
+    for (const name of ['One structure by region size', 'One structure by bead count']) {
+      const chart = screen.getByRole('figure', { name })
+      expect(within(chart).getAllByRole('row')).toHaveLength(9)
+      expect(within(chart).getByText('9.1 s, 662 beads')).toBeInTheDocument()
+      expect(within(chart).getByText('6.4 min, 124,657 beads')).toBeInTheDocument()
+      expect(within(chart).getByText('3.2 min, 50,631 beads')).toBeInTheDocument()
+      expect(within(chart).getByLabelText('MultiMM, 100 Mb, 56,458 beads, 3.2 min')).toBeInTheDocument()
+    }
+  })
+
   it('compares the three tools on Hi-C and counts the runs with intervals', () => {
     renderResults()
     expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C, three tools' })).slice(0, 3)).toEqual(['0.22', '0.30', '0.51'])

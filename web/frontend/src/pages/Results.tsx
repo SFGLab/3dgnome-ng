@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { BarChart, ChartKey, type Bar, type Group } from '../components/BarChart'
+import { LineChart, type Line, type Point } from '../components/LineChart'
 import { ROUTES } from '../routes'
 import '../styles/doc.css'
 import './results.css'
@@ -45,6 +46,22 @@ const RUN_TIME: [string, string, Group[]][] = [
   ['One structure, whole chromosome', 'chr1, 248 Mb, minutes, lower is better.', tools([3.2, 50631], [14.2, 124657], [6.4, 124657])],
   ['Three structures at equal bead counts', 'chr1, 248 Mb, minutes, lower is better.', tools([10.7, 126330], [42.1, 124657], [11.2, 124657])],
 ]
+
+/** One structure of GM12878 chr1 from 10 Mb per tool: megabases, beads, seconds. The last is the whole chromosome. */
+const ONE_STRUCTURE: [Line['series'], string, [number, number, number][]][] = [
+  ['cudammc', 'cudaMMC', [[1, 129, 6.5], [2, 448, 7.2], [5, 762, 8.9], [10, 2170, 13.7], [20, 7128, 25.5], [50, 14936, 53.3], [100, 20401, 79.4], [248, 50631, 194.8]]],
+  ['multimm', 'MultiMM', [[1, 662, 7.3], [2, 1598, 8.2], [5, 2590, 8.5], [10, 6953, 15.8], [20, 15643, 33.9], [50, 36255, 97.6], [100, 56458, 189.7], [248, 124657, 853.1]]],
+  ['ctcf', '3D-GNOMEᴺᴳ', [[1, 662, 9.1], [2, 1598, 13.0], [5, 2590, 15.4], [10, 6953, 22.0], [20, 15643, 45.1], [50, 36255, 88.2], [100, 56458, 124.4], [248, 124657, 384.2]]],
+]
+
+const sized = (x: (mb: number, beads: number) => number): Line[] =>
+  ONE_STRUCTURE.map(([series, name, rows]) => ({
+    series,
+    name,
+    points: rows.map(([mb, beads, seconds]): Point => ({ x: x(mb, beads), seconds, beads, region: mb === 248 ? 'chr1, 248 Mb' : `${mb} Mb` })),
+  }))
+const BY_REGION = sized((mb) => mb)
+const BY_BEADS = sized((_, beads) => beads)
 
 const SECTIONS = [
   ['#agreement', 'Agreement with Hi-C'],
@@ -152,6 +169,25 @@ export function Results() {
           <h2>Run time</h2>
           <p className="intro">
             The three tools on the same GM12878 inputs and one machine, an RTX 3090 with 36 CPU cores. Each tool is named with the bead count of its model. At its default settings cudaMMC models a region with fewer beads, and the last chart gives it as many as the other two.
+          </p>
+          <div className="chart-row">
+            <LineChart
+              title="One structure by region size"
+              subtitle="chr1 from 10 Mb, and the whole chromosome. Both axes are logarithmic. Lower is better."
+              xLabel="region, Mb"
+              xTick={(x) => `${x}`}
+              lines={BY_REGION}
+            />
+            <LineChart
+              title="One structure by bead count"
+              subtitle="The same runs against the bead count of each model. Both axes are logarithmic. Lower is better."
+              xLabel="beads"
+              xTick={(x) => x.toLocaleString('en-US')}
+              lines={BY_BEADS}
+            />
+          </div>
+          <p className="reading-note">
+            For one structure cudaMMC is the fastest from 10 Mb, and under that it and MultiMM are level. 3D-GNOMEᴺᴳ is faster than MultiMM from about 50 Mb. At equal bead counts the three are close up to 20,000 beads. A further structure of the same region costs 3D-GNOMEᴺᴳ less than the first, and the ensemble charts below show it.
           </p>
           <div className="chart-row">
             {RUN_TIME.map(([title, sub, groups]) => (
