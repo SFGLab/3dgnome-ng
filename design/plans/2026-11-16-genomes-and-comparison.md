@@ -45,6 +45,17 @@ Cell array task i runs line and arm i % 9 on chromosome i / 9; trio task i runs 
 one sample, the chromosome slowest. A member whose cif exists is skipped, so resubmitting fills
 gaps. `PYTHONPATH` puts the staged engine before the shared venv's editable install.
 
+Host memory, read on 2026-11-17. The maxent anchor fit holds dense anchor by anchor arrays, and
+a chr1 task of array 1943270 peaked at 53.7 GB at 23,080 anchors. Tasks 5 and 6, HG00733 and
+GM19239 on chr1 at 25,660 and 25,409 anchors, were stopped by the out of memory killer at the
+script's 64 GB. Every other chr1 task of both arrays is at 23,080 anchors or fewer. The two
+tasks resubmit with more memory from the same directory, with `A` and `T` as above:
+
+```bash
+ROOT=$PWD TRIOS_ROOT=$T PYTHONPATH=$PWD CONFIG_TAG=_trio_rnapol2_hgsvc_genome_lr2 OUT=$PWD/out/lr_trio_rnapol2 \
+  CHROMS="${A// /,}" sbatch -A sfglab -p long --mem=96G --array=5,6 $T/slurm/trio_ensemble.sh
+```
+
 ## 3dgnome against MultiMM and cudaMMC, on frodo
 
 Same inputs for the three tools, MultiMM at our bead count, cudaMMC with its own defaults.
