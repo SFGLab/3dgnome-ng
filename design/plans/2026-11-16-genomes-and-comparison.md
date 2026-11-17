@@ -56,6 +56,8 @@ ROOT=$PWD TRIOS_ROOT=$T PYTHONPATH=$PWD CONFIG_TAG=_trio_rnapol2_hgsvc_genome_lr
   CHROMS="${A// /,}" sbatch -A sfglab -p long --mem=96G --array=5,6 $T/slurm/trio_ensemble.sh
 ```
 
+Submitted on 2026-11-17 as array 1943697.
+
 ## 3dgnome against MultiMM and cudaMMC, on frodo
 
 Same inputs for the three tools, MultiMM at our bead count, cudaMMC with its own defaults.
