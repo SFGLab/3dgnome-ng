@@ -73,11 +73,13 @@ def joy(
     xlabel: str,
     min_n: int = 15,
     clip: tuple[float, float] | None = None,
+    medians: dict[str, str] | None = None,
 ) -> None:
     """Stacked ridges, one row per group, one filled density per series.
 
     Each series is a label, a colour and its values. A series with fewer than `min_n` values is
-    drawn as points with its count.
+    drawn as points with its count. With `medians`, a map from series label to a short name,
+    every row lists the median of each series beside its ridges.
     """
     vals = np.concatenate([v[np.isfinite(v)] for _, ser in groups for _, _, v in ser])
     lo, hi = clip or (np.percentile(vals, 0.5), np.percentile(vals, 99.5))
@@ -107,6 +109,13 @@ def joy(
             ax.plot([med, med], [base, base + height * float(np.interp(med, xs, d)) / top], color=colour, lw=1)
         ax.axhline(base, color=GRID, lw=0.8, zorder=0)
         ax.text(lo - pad - 0.01 * (hi - lo), base + 0.45, name, ha="right", va="center", color=INK, fontsize=8)
+        if medians:
+            x0 = lo + 0.7 * (hi - lo)
+            for k, (label, colour, v) in enumerate(series):
+                y = base + 0.82 - 0.2 * k
+                ax.plot(x0, y, "s", color=colour, ms=4, zorder=4)
+                ax.text(x0 + 0.015 * (hi - lo), y, f"median {np.nanmedian(v):.1f}, {medians[label]}",
+                        va="center", ha="left", fontsize=6.5, color=INK, zorder=4)
     ax.set_yticks([])
     ax.spines["left"].set_visible(False)
     ax.set_xlim(lo - pad, hi + pad)
@@ -297,8 +306,8 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
     maps = np.load(inputs / "maps_GM12878.npz")
     ep = pd.concat(pd.read_csv(inputs / f"ep_{line}.tsv", sep="\t") for line in LINES)
 
-    fig = plt.figure(figsize=(7.2, 10.0), layout="constrained")
-    rows = fig.subfigures(4, 1, height_ratios=[0.8, 1.55, 1.05, 1.45], hspace=0.04)
+    fig = plt.figure(figsize=(7.2, 10.8), layout="constrained")
+    rows = fig.subfigures(4, 1, height_ratios=[0.8, 1.55, 1.05, 1.9], hspace=0.04)
 
     _row_title(rows[0], "a", "Input data read by cudaMMC and by gnome3d")
     panel_inputs(rows[0].subplots(), [(maps[f"ensemble_R_{j}_xyz"], maps[f"ensemble_R_{j}_mid"]) for j in range(3)])
@@ -327,8 +336,9 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
 
     _row_title(
         rows[3], "d",
-        "3D distance between enhancers and promoters joined by an RNAPII loop and by no CTCF loop, chr1, "
-        "against pairs at the same genomic separation joined by no loop",
+        "3D distance between enhancers and promoters on chr1. Pairs joined by an RNAPII loop and by no CTCF "
+        "loop, in models with and without the RNAPII loops, and reference pairs at the same genomic separation "
+        "joined by no loop",
     )
     ax = rows[3].subplots()
     groups = []
@@ -346,10 +356,22 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
                 ],
             )
         )
-    joy(ax, groups, "enhancer to promoter distance in the models, bead units, mean of ten structures", clip=(0, 14))
+    joy(
+        ax, groups,
+        "enhancer to promoter distance in the models, bead units, mean of ten structures.\nA smaller distance is closer",
+        clip=(0, 14),
+        medians={"control": "reference", "C": "CTCF loops", "R": "CTCF and RNAPII loops"},
+    )
     rows[3].legend(
-        handles=_handles(("C", "R"), [("no loop, matched separation, CTCF and RNAPII loops", CONTROL)]),
-        loc="outside lower center", ncol=3, fontsize=7,
+        handles=[
+            plt.Line2D([], [], color=CONTROL, lw=1.5,
+                       label="reference: enhancer and promoter pairs joined by no loop, same genomic separation"),
+            plt.Line2D([], [], marker="o", ls="", color=ARM_COLOUR["C"], ms=6,
+                       label="pairs joined by an RNAPII loop, in the models built from CTCF loops"),
+            plt.Line2D([], [], marker="o", ls="", color=ARM_COLOUR["R"], ms=6,
+                       label="the same pairs, in the models built from CTCF and RNAPII loops"),
+        ],
+        loc="outside lower center", ncol=1, fontsize=7,
     )
     _save(fig, out / "rnapii_figure1")
     return fig
