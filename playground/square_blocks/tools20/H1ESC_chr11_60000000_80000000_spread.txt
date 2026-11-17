@@ -1,0 +1,29 @@
+H1ESC_chr11_60000000_80000000_ours: 5 structures, 15722 beads, 1 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     3.8  0.0384  0.0535     4.3  0.0259  0.0377     5.0  0.0143  0.0243     6.2  0.0060  0.0133     8.4  0.0010  0.0053
+  anchor pairs     2.9  0.0000  0.1081     3.6  0.0205  0.0626     4.0  0.0071  0.0474     5.3  0.0018  0.0205     7.8  0.0000  0.0067
+    subanchors     3.9  0.0376  0.0510     4.4  0.0255  0.0361     5.1  0.0140  0.0233     6.2  0.0059  0.0129     8.5  0.0011  0.0052
+      one hole                       -                       -                       -                       -                       -
+  anchor floor             0.48   0.79             0.30   0.80             0.25   0.63             0.22   0.67             0.31   0.74   1% and median of distance over law, nu 0.351
+H1ESC_chr11_60000000_80000000_cudammc: 5 structures, 6486 beads, 1 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     2.4  0.3428  0.1870     2.5  0.3498  0.1608     3.7  0.3274  0.0579     5.9  0.2607  0.0148    10.8  0.1281  0.0026
+  anchor pairs     2.1  0.4792  0.2403     1.9  0.4852  0.2938     3.5  0.4416  0.0680     5.6  0.3760  0.0174    10.3  0.1902  0.0029
+    subanchors     2.9  0.1354  0.1118     3.3  0.1325  0.0771     4.2  0.1240  0.0403     6.7  0.0981  0.0106    11.5  0.0465  0.0021
+      one hole                       -                       -                       -                       -                       -
+H1ESC_chr11_60000000_80000000_multimm_min: 5 structures, 15722 beads, 1 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block    13.7  0.0028  0.0013    15.4  0.0026  0.0009    17.1  0.0017  0.0006    18.1  0.0008  0.0005    21.0  0.0003  0.0004
+  anchor pairs                       -                       -                       -                       -                       -
+    subanchors    13.7  0.0028  0.0013    15.4  0.0026  0.0009    17.1  0.0017  0.0006    18.1  0.0008  0.0005    21.0  0.0003  0.0004
+      one hole    16.9  0.0000  0.0007    16.7  0.0000  0.0007    18.5  0.0000  0.0005                       -                       -
+H1ESC_chr11_60000000_80000000_multimm_md: 5 structures, 15722 beads, 1 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block    13.5  0.0030  0.0013    15.3  0.0027  0.0009    17.0  0.0017  0.0007    17.9  0.0007  0.0006    20.8  0.0003  0.0004
+  anchor pairs                       -                       -                       -                       -                       -
+    subanchors    13.5  0.0030  0.0013    15.3  0.0027  0.0009    17.0  0.0017  0.0007    17.9  0.0007  0.0006    20.8  0.0003  0.0004
+      one hole    16.7  0.0000  0.0007    16.5  0.0000  0.0007    18.3  0.0000  0.0005                       -                       -

@@ -30,7 +30,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import ssl
 import sys
 import time
@@ -42,7 +41,6 @@ from urllib.error import HTTPError, URLError
 from validation.studies import Context, Study, register
 
 ENCODE_BASE = "https://www.encodeproject.org"
-DN_BASE = "https://data.4dnucleome.org"
 
 
 @dataclass
@@ -139,42 +137,78 @@ def resolve_encode(spec: AssaySpec, ctx: ssl.SSLContext) -> FileRef:
     )
 
 
-def resolve_4dn(spec: AssaySpec, ctx: ssl.SSLContext) -> FileRef:
-    """Resolve a 4DN accession, 4DNFI..., to a concrete file. Honors DN_KEY/DN_SECRET."""
-    auth = None
-    key, secret = os.environ.get("DN_KEY"), os.environ.get("DN_SECRET")
-    if key and secret:
-        auth = (key, secret)
-    meta = _get_json(f"{DN_BASE}/{spec.accession}/?format=json", ctx, auth=auth)
-    # Prefer open_data_url, the public 4dn-open-data S3 mirror with a valid cert and no auth. The
-    # gated @@download href 403s for open files and the portal cert is expired. open_data_url avoids both.
-    url = meta.get("open_data_url")
-    if not url:
-        href = meta.get("href")
-        if not href:
-            raise ValueError(f"4DN {spec.accession}: no open_data_url or href in metadata")
-        url = href if href.startswith("http") else DN_BASE + href
-    # 3dgnome models CTCF-mediated architecture, so the validation contact target must be
-    # CTCF-relevant, plain Hi-C or CTCF ChIA-PET, not RNA Pol II ChIA-PET or HiChIP, whose
-    # transcription-driven loops are the wrong ground truth. Flag a bad pick loudly.
-    assay = (
-        (meta.get("track_and_facet_info") or {}).get("assay_info") or meta.get("file_type") or ""
-    )
-    if any(t in assay for t in ("Pol II", "RNA Pol", "POLR2")):
-        print(
-            f"  [WARN ] {spec.name} ({spec.accession}) assay='{assay}' is RNA Pol II. "
-            "wrong contact type for a CTCF-driven model. pick plain Hi-C or CTCF ChIA-PET."
-        )
+DN_BUCKET = "https://4dn-open-data-public.s3.amazonaws.com"
+DN_PREFIX = "fourfront-webprod/wfoutput/"
+DN_KEYS = Path(__file__).resolve().parents[1] / "manifests" / "4dn_keys.tsv"
+
+
+def list_dn_bucket(ctx: ssl.SSLContext, want: set[str]) -> dict[str, tuple[str, int]]:
+    """The bucket key and size of each wanted accession, found by listing the 4DN prefix page by
+    page until every one is seen or the listing ends."""
+    import re
+    import urllib.parse
+
+    found: dict[str, tuple[str, int]] = {}
+    token = None
+    while len(found) < len(want):
+        q = {"list-type": "2", "prefix": DN_PREFIX, "max-keys": "1000"}
+        if token:
+            q["continuation-token"] = token
+        with urllib.request.urlopen(
+            f"{DN_BUCKET}/?{urllib.parse.urlencode(q)}", timeout=60, context=ctx
+        ) as r:
+            page = r.read().decode()
+        for key, size in re.findall(r"<Key>([^<]+)</Key>.*?<Size>(\d+)</Size>", page):
+            acc = key.rsplit("/", 1)[-1].split(".")[0]
+            if acc in want:
+                found[acc] = (key, int(size))
+        m = re.search(r"<NextContinuationToken>([^<]+)</NextContinuationToken>", page)
+        if not m:
+            break
+        token = m.group(1)
+    return found
+
+
+def dn_key(
+    accession: str, ctx: ssl.SSLContext, table: Path = DN_KEYS, lister=list_dn_bucket
+) -> tuple[str, int]:  # noqa: ANN001
+    """The bucket key and size of a 4DN accession, from the table beside the manifests, or found
+    by listing the bucket and added to the table.
+
+    @raises ValueError naming an accession the bucket does not hold
+    """
+    rows = {}
+    if table.exists():
+        for line in table.read_text().splitlines()[1:]:
+            acc, key, size = line.split("\t")
+            rows[acc] = (key, int(size))
+    if accession not in rows:
+        hit = lister(ctx, {accession})
+        if accession not in hit:
+            raise ValueError(f"4DN {accession} is not in the bucket {DN_BUCKET}/{DN_PREFIX}")
+        if not table.exists():
+            table.write_text("accession\tkey\tsize\n")
+        with table.open("a") as f:
+            f.write(f"{accession}\t{hit[accession][0]}\t{hit[accession][1]}\n")
+        rows[accession] = hit[accession]
+    return rows[accession]
+
+
+def resolve_4dn(
+    spec: AssaySpec, ctx: ssl.SSLContext, table: Path = DN_KEYS, lister=list_dn_bucket
+) -> FileRef:  # noqa: ANN001
+    """Resolve a 4DN accession, 4DNFI..., to its file in the public bucket. The 4DN portal that
+    gave the file's metadata is gone, see design/4dn-data-access.md, so there is no md5 and no
+    assay to check; the manifest's note says what each file holds."""
+    key, _ = dn_key(spec.accession, ctx, table, lister)
     return FileRef(
         assay=spec.name,
         source="4dn",
         accession=spec.accession,
-        url=url,
-        md5=meta.get("md5sum") or meta.get("content_md5sum"),
-        file_format=(meta.get("file_format") or {}).get("display_title")
-        if isinstance(meta.get("file_format"), dict)
-        else meta.get("file_format"),
-        output_type=assay or meta.get("file_type"),
+        url=f"{DN_BUCKET}/{key}",
+        md5=None,
+        file_format=key.rsplit(".", 1)[-1],
+        output_type=spec.output_type,
     )
 
 
@@ -280,19 +314,10 @@ class Fetch(Study):
         insecure.verify_mode = ssl.CERT_NONE
         if args.insecure:
             print("[fetch] WARNING: TLS verification disabled for ALL sources (--insecure)")
-        _warned_4dn = [False]
 
         def ctx_for(source: str) -> ssl.SSLContext:
-            # 4DN's portal cert is expired server-side and verify would always fail, so we skip
-            # verify for 4DN. ENCODE stays verified unless --insecure.
+            # 4DN files come from their S3 bucket, whose certificate verifies like ENCODE's.
             if args.insecure:
-                return insecure
-            if source == "4dn":
-                if not _warned_4dn[0]:
-                    print(
-                        "[fetch] NOTE: 4DN TLS cert is expired server-side; skipping verify for 4DN"
-                    )
-                    _warned_4dn[0] = True
                 return insecure
             return secure
 

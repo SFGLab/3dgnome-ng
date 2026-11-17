@@ -25,6 +25,7 @@ from gnome3d.pipeline.executor import (
     MixedExecutor,
     SerialExecutor,
 )
+from gnome3d.pipeline.holes import fill_holes
 from gnome3d.pipeline.ib import ib_chain_nodes, ib_node_id
 from gnome3d.pipeline.relax import relax_blocks
 from gnome3d.pipeline.stage import StageKind
@@ -44,8 +45,19 @@ LOG = log.get("reconstruct")
 MEMBER_SEED_STRIDE = 2_000_003
 
 
+# Workers from which the threaded smooth stage beats the device. Measured 2026-11-16 on GM12878
+# chr1, 52 blocks and 124,657 beads, against an RTX 3090 at 122 to 146 s: 147 s on 4 workers, 92
+# on 8, 71 on 16. The relaxation pass follows the stage onto numba and wins there at any count,
+# so a whole structure is ahead from 4.
+_SMOOTH_THREADED_MIN_WORKERS = 4
+
+
 def _auto_strategy(kind: StageKind, settings: Settings) -> ExecutorStrategy:
-    """Resolve ``mc_executor_<stage> = auto``."""
+    """Resolve ``mc_executor_<stage> = auto``. The smooth stage runs threaded on numba from
+    `_SMOOTH_THREADED_MIN_WORKERS` workers and on the device below that when JAX is there."""
+    workers = int(settings.mc_executor_threaded_workers)
+    if kind is StageKind.SMOOTH and workers >= _SMOOTH_THREADED_MIN_WORKERS:
+        return ExecutorStrategy.THREADED
     prefer_jax = jax_is_available()
     if prefer_jax and kind in (StageKind.SMOOTH, StageKind.ESTIMATE_DIST):
         return ExecutorStrategy.BATCH
@@ -121,12 +133,15 @@ def _beads(output: State) -> list[BeadOut]:
 
 
 def _assemble(
-    per_chr: dict[str, list[list[BeadOut]]], settings: Settings
+    per_chr: dict[str, list[list[BeadOut]]], settings: Settings, seed: int = 0
 ) -> dict[str, list[BeadOut]]:
     """Flatten each chromosome's per block beads into one list in genomic order. With
-    `use_boundary_stitch` set, the blocks are stitched at their edges first."""
+    `use_hole_beads` the holes between blocks get beads first, drawn from generators seeded by
+    `seed`, the structure's seed offset. With `use_boundary_stitch` set, the blocks are stitched
+    at their edges."""
     out: dict[str, list[BeadOut]] = {}
     for chr_, blocks in per_chr.items():
+        blocks = fill_holes(blocks, settings, chr_, seed)
         if settings.use_boundary_stitch:
             blocks = stitch_blocks(blocks, settings)
         if settings.use_cross_block_relax:
@@ -162,7 +177,7 @@ def reconstruct(
     for ibs in ib_sink:
         per_chr[ibs.chr_].append(_beads(outputs[ib_node_id(ibs.ib_id, StageKind.SMOOTH)]))
 
-    return _assemble(per_chr, settings)
+    return _assemble(per_chr, settings, seed_offset)
 
 
 def reconstruct_ensemble(
@@ -222,6 +237,6 @@ def reconstruct_ensemble(
             nid = ib_node_id(f"m{m} :: {ibs.ib_id}", StageKind.SMOOTH)
             per_chr[ibs.chr_].append(_beads(outputs[nid]))
 
-        results.append(_assemble(per_chr, settings))
+        results.append(_assemble(per_chr, settings, base_seed_offset + m * MEMBER_SEED_STRIDE))
 
     return results

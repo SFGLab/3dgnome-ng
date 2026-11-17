@@ -1,0 +1,6 @@
+chr1:10000000-110000000, pooled ensemble against Hi-C at 25000 bp, 29 unmapped bins
+                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
+          GM12878_chr1_10000000_110000000_ours   1   0.282   0.116   0.452   0.577   0.114   0.244                     0.452    0.245    0.103
+       GM12878_chr1_10000000_110000000_cudammc   1   0.155   0.072   0.238   0.236   0.071   0.138                     0.239    0.142    0.054
+   GM12878_chr1_10000000_110000000_multimm_min   1   0.150   0.065   0.278   0.373   0.063   0.166                     0.278    0.169    0.042
+    GM12878_chr1_10000000_110000000_multimm_md   1   0.152   0.066   0.278   0.374   0.064   0.165                     0.278    0.169    0.043

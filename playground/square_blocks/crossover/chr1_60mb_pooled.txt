@@ -1,0 +1,4 @@
+chr1:1-60000000, pooled ensemble against Hi-C at 25000 bp, 46 unmapped bins
+                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
+                            chr1_60mb_threaded   2   0.365   0.168   0.426   0.667   0.168   0.332                     0.414    0.318    0.139
+                               chr1_60mb_batch   2   0.370   0.172   0.429   0.674   0.171   0.336                     0.416    0.322    0.144

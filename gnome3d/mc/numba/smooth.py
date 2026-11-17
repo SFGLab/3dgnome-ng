@@ -52,6 +52,12 @@ if TYPE_CHECKING:
 
 LOG = log.get("mc.numba")
 
+# The chain length from which the excluded volume term runs on the cell grid. The grid gives
+# the same sum, so this is speed alone. Measured 2026-11-16 on prefixes of a real block with
+# the hard wall on, full scan against grid: 0.35 s and 0.36 s at 64 beads, 1.29 s and 0.88 s at
+# 128, 8.2 s and 2.8 s at 512, 45.9 s and 4.7 s at 1,831.
+GRID_MIN_BEADS = 128
+
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _batch_smooth_chain_nb(
@@ -411,11 +417,12 @@ def mc_smooth_numba(
 
     score_struct = float(init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
     # Cell grid for the excluded volume term. It sums the same pairs in the same order, so this
-    # changes only how long the term takes, both here and in the step loop. Below a couple of
-    # thousand beads the full scan is already cheap and the bookkeeping is not worth it.
+    # changes only how long the term takes, both here and in the step loop.
     excl_w = float(settings.exclusion_weight)
     excl_skip_n = int(settings.exclusion_skip_neighbors)
-    use_cells = use_excl and bool(getattr(settings, "mc_neighbour_grid", True)) and n >= 2048
+    use_cells = (
+        use_excl and bool(getattr(settings, "mc_neighbour_grid", True)) and n >= GRID_MIN_BEADS
+    )
     cell_lo = NO_F64_3
     cell_dim = NO_I64_3
     cell_size = 1.0

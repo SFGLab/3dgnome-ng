@@ -1,0 +1,5 @@
+  map                          models   0  loops   1793  APA 1.318
+  H1ESC_E_60mb                 models  10  loops   1793  APA 3.216
+  H1ESC_C_60mb                 models  10  loops   1793  APA 1.425
+  H1ESC_R_60mb                 models  10  loops   1793  APA 1.239
+  H1ESC_M_60mb                 models  10  loops   1793  APA 1.591

@@ -1,0 +1,17 @@
+chr1:20000000-25000000: 604 anchors in 1 blocks, 524 arcs, nu 0.344
+  mean arc target 2.62 beads, repulsion reach 3.93; factor 0 alone mean 3.18, reach 4.78
+  law background at 37 kb: 3.48 beads
+  law background at 75 kb: 4.42 beads
+  law background at 150 kb: 5.62 beads
+  law background at 300 kb: 7.13 beads
+  10 models matched on all 604 anchors
+  anchors per 25 kb bin: tercile edges 2 and 5, max 25
+         band    bins  pairs   arc spring  repel  d/law in reach    F arc F spring  F repel    F net
+    25-50  kb   dense   3309  0.02   0.98   0.00   0.98     0.00    0.005   -0.011    0.000   -0.006
+    25-50  kb  sparse     43  0.02   0.98   0.00   0.95     0.00   -0.000   -0.014    0.000   -0.014
+    50-100 kb   dense   5498  0.01   0.99   0.00   1.05     0.00    0.005   -0.003    0.000    0.002
+    50-100 kb  sparse     79  0.04   0.96   0.00   1.05     0.00   -0.000    0.002    0.000    0.002
+   100-200 kb   dense   9665  0.01   0.00   0.99   1.18     0.03    0.002    0.000   -0.003   -0.000
+   100-200 kb  sparse    120  0.03   0.00   0.97   1.11     0.02    0.001    0.000   -0.002   -0.001
+   200-400 kb   dense  12900  0.00   0.00   1.00   1.19     0.00    0.001    0.000   -0.000    0.000
+   200-400 kb  sparse    259  0.02   0.00   0.98   1.14     0.02    0.001    0.000   -0.002   -0.000

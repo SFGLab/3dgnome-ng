@@ -71,6 +71,9 @@ def jax_is_available() -> bool:
     with _init_lock:
         if _JAX_AVAILABLE is not None:
             return _JAX_AVAILABLE
+        from gnome3d.mc.jax.share import configure_gpu_pool
+
+        configure_gpu_pool()
         try:
             import jax  # type: ignore[import-not-found]
             import jax.numpy as jnp  # type: ignore[import-not-found]
@@ -168,6 +171,10 @@ def jax_device_budget_bytes(fraction: float = 0.95) -> int | None:
     alloc = os.environ.get("XLA_PYTHON_CLIENT_ALLOCATOR", "").lower()
     if alloc in ("vmm", "platform"):
         total = stats.get("bytes_reservable_limit") or _physical_device_total_bytes()
+        share = os.environ.get("XLA_PYTHON_CLIENT_MEM_FRACTION")
+        if total and share:
+            # These allocators do not cap a process, so its share of the card is the budget.
+            total = int(int(total) * float(share))
     else:
         total = stats.get("bytes_limit")
     if not total:

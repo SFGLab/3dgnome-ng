@@ -1,0 +1,119 @@
+3D-GNOME
+NG
+3D chromatin models from loops, contacts and structural variants
+Model a region
+My jobs
+Method
+Results
+Help
+Cite
+Done in 6 min 12 s
+TNFRSF8 with RNAPII loops
+GM12878, chr1:11,500,000-12,600,000
+Rename job
+Loops
+CTCF and RNAPII
+Loops in region
+118 CTCF, 64 RNAPII
+Structural variants
+none
+Contact background
+Hi-C, 4DN
+Structures
+100
+Structure
+3 of 100
+Medoid
+Most compact
+Random
+Files
+structures
+100 files
+model_003.cif
+412 KB
+97 more
+ep.tsv
+38 KB
+marks.json
+6 KB
+engine.log
+22 KB
+all files, zip
+4.1 MB
+Structure
+Genes
+312
+Contact map
+Loops
+182
+Log
+Copy link
+Download all
+Filter genes
+All genes
+Joined by a loop
+Joined by RNAPII only
+ep.tsv
+Gene
+Nearest enhancer
+Separation
+3D distance
+Over 10 structures
+Joined by
+DHRS3
+12,540,102
+28 kb
+2.1
+CTCF loop
+MFN2
+11,958,744
+21 kb
+2.4
+CTCF loop
+PLOD1
+11,902,310
+32 kb
+2.9
+no loop
+MIIP
+12,047,610
+28 kb
+3.3
+RNAPII loop
+TNFRSF1B
+12,201,885
+35 kb
+3.8
+CTCF loop
+VPS13D
+12,198,402
+32 kb
+4.4
+no loop
+NPPA
+11,822,155
+26 kb
+5.0
+RNAPII loop
+TNFRSF8
+12,448,194
+385 kb
+6.7
+RNAPII loop
+CLCN6
+11,893,620
+88 kb
+7.2
+no loop
+MTHFR
+11,712,340
+95 kb
+8.1
+no loop
+3d distance, all genes
+0
+bead units
+13
+The median is 5.2. It is 3.4 for genes joined to their enhancer by a loop and 6.1 for the other genes.
+If you use these models, please cite 3D-GNOMEᴺᴳ and the method and data papers on the Cite page.
+All citations

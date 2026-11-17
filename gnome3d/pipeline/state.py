@@ -71,6 +71,8 @@ class Seeded:
     arc_w: F32Array | None = field(default=None, kw_only=True)
     # Each anchor's activity for the factory term, None when the term is off.
     activity: F32Array | None = field(default=None, kw_only=True)
+    # The block's chromosome, which the maximum entropy start reads its contact map by.
+    chrom: str = field(default="", kw_only=True)
 
 
 @dataclass(frozen=True)

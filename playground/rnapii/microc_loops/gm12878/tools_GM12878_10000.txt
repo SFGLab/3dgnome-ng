@@ -1,0 +1,23 @@
+ctcf: 4530 input loops in the region, 695 at a Micro-C loop
+rnapii: 3264 input loops in the region, 212 at a Micro-C loop
+6102 Micro-C loops at 10000 bp, all 6102, CTCF 285, RNAPII alone 34, none 5783, moved, no loop 6005
+  GM12878_chr1_1_60000000_cudammc  all             loops  6102 scored  1965  contact  23.49  ratio 0.996  closer 0.56  placed 0.04  above moved +0.03  under 0.57  rank -0.02
+  GM12878_chr1_1_60000000_cudammc  CTCF            loops   285 scored   197  contact  32.44  ratio 0.230  closer 0.95  placed 0.62  above moved +0.61  under 0.94  rank +0.02
+  GM12878_chr1_1_60000000_cudammc  RNAPII alone    loops    34 scored    14  contact  27.73  ratio 0.942  closer 0.71  placed 0.15  above moved +0.14  under 0.73  rank +0.07
+  GM12878_chr1_1_60000000_cudammc  none            loops  5783 scored  1754  contact   2.58  ratio 0.999  closer 0.52  placed 0.01  above moved -0.00  under 0.53  rank -0.01
+  GM12878_chr1_1_60000000_cudammc  moved, no loop  loops  6005 scored  1581  contact   0.90  ratio 1.002  closer 0.47  placed 0.01  above moved +0.00  under 0.50  rank +0.03
+  GM12878_chr1_1_60000000_multimm_md all             loops  6102 scored  6102  contact   4.26  ratio 0.979  closer 0.52  placed 0.33  above moved +0.06  under 0.53  rank +0.07
+  GM12878_chr1_1_60000000_multimm_md CTCF            loops   285 scored   285  contact   8.97  ratio 0.341  closer 0.97  placed 0.94  above moved +0.66  under 0.93  rank +0.18
+  GM12878_chr1_1_60000000_multimm_md RNAPII alone    loops    34 scored    34  contact   0.00  ratio 0.709  closer 0.62  placed 0.56  above moved +0.29  under 0.61  rank +0.17
+  GM12878_chr1_1_60000000_multimm_md none            loops  5783 scored  5783  contact   0.43  ratio 1.002  closer 0.50  placed 0.30  above moved +0.03  under 0.51  rank +0.08
+  GM12878_chr1_1_60000000_multimm_md moved, no loop  loops  6005 scored  6005  contact   0.90  ratio 1.015  closer 0.48  placed 0.27  above moved +0.00  under 0.50  rank +0.04
+  GM12878_chr1_1_60000000_ours     all             loops  6102 scored  5679  contact   2.78  ratio 0.997  closer 0.52  placed 0.04  above moved +0.03  under 0.52  rank -0.00
+  GM12878_chr1_1_60000000_ours     CTCF            loops   285 scored   285  contact   3.55  ratio 0.698  closer 0.91  placed 0.71  above moved +0.70  under 0.90  rank +0.09
+  GM12878_chr1_1_60000000_ours     RNAPII alone    loops    34 scored    34  contact   1.35  ratio 0.921  closer 0.62  placed 0.38  above moved +0.37  under 0.60  rank +0.42
+  GM12878_chr1_1_60000000_ours     none            loops  5783 scored  5360  contact   1.01  ratio 1.000  closer 0.50  placed 0.01  above moved -0.00  under 0.50  rank +0.00
+  GM12878_chr1_1_60000000_ours     moved, no loop  loops  6005 scored  5549  contact   1.00  ratio 1.000  closer 0.50  placed 0.01  above moved +0.00  under 0.50  rank +0.02
+  map all             loops  6102 scored  6102  contact   5.83
+  map CTCF            loops   285 scored   285  contact   6.89
+  map RNAPII alone    loops    34 scored    34  contact   3.85
+  map none            loops  5783 scored  5783  contact   4.72
+  map moved, no loop  loops  6005 scored  5989  contact   0.93

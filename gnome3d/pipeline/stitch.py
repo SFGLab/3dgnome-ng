@@ -31,6 +31,7 @@ from scipy.spatial.transform import Rotation
 
 from gnome3d.settings import Settings
 from gnome3d.types import BeadOut, BoolArray, F64Array, I64Array
+from gnome3d.util import blas_threads
 
 _MIN_BIN_COUNT = 5
 
@@ -272,21 +273,22 @@ def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut
     iu0 = iu[0][ev_pairs]
     iu1 = iu[1][ev_pairs]
     r0 = r0[ev_pairs]
-    res = minimize(
-        _energy_grad,
-        np.zeros(6 * n),
-        args=(cen, first, last, target, w_spring, iu0, iu1, r0, w_ev),
-        jac=True,
-        method="L-BFGS-B",
-        options={
-            "maxiter": int(s.boundary_stitch_max_iter),
-            # The evaluation budget must not bind before the iteration count does, which is what
-            # scipy's own default of 15000 did once a chromosome brought thousands of variables.
-            "maxfun": 100 * int(s.boundary_stitch_max_iter) + 1000,
-            "ftol": 1e-14,
-            "gtol": 1e-10,
-        },
-    )
+    with blas_threads():
+        res = minimize(
+            _energy_grad,
+            np.zeros(6 * n),
+            args=(cen, first, last, target, w_spring, iu0, iu1, r0, w_ev),
+            jac=True,
+            method="L-BFGS-B",
+            options={
+                "maxiter": int(s.boundary_stitch_max_iter),
+                # The evaluation budget must not bind before the iteration count does, which is what
+                # scipy's own default of 15000 did once a chromosome brought thousands of variables.
+                "maxfun": 100 * int(s.boundary_stitch_max_iter) + 1000,
+                "ftol": 1e-14,
+                "gtol": 1e-10,
+            },
+        )
     rv = res.x[: 3 * n].reshape(n, 3)
     t = res.x[3 * n :].reshape(n, 3)
 

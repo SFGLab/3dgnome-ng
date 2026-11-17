@@ -1,0 +1,7 @@
+GM12878_chr1_holes3 structure 1: 202178 beads, 63732 in 76 holes, median bond 1.063
+  contacts per thousand beads of the class, share closer than 0.7 bond
+                               0-25 kb         25-100 kb        100-400 kb       400-2000 kb       2000-inf kb
+            one hole     1468.2   0.03      434.4   0.06      629.3   0.06      653.3   0.06      483.3   0.06
+           two holes        0.2   0.00        1.6   0.06       16.3   0.06      231.6   0.07      218.6   0.06
+     hole with block       22.2   0.06       69.9   0.08      251.4   0.08      905.5   0.08     1462.5   0.08
+    block with block     2082.3   0.01     1230.5   0.01      816.4   0.01      300.7   0.03      220.1   0.11

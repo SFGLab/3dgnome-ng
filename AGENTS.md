@@ -466,6 +466,13 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   byte identical by the parity gate. Built 2026-09-19 for RNAPII ChIA-PET as a second factor,
   `design/rnapii-loops.md`. Unit checks in `harness/test_factors.py`.
 
+  The summary arc the reader writes for a pair two factors join scores 0 with factor -1. The
+  arcs stage leaves it out, since as an arc it gave the pair the background as its target, and
+  a pair two factors join takes the closer of its factors' targets instead of the one written
+  last. Found 2026-10-27 by the trio study: on a trio chr1 406 pairs, strong ones with a median
+  of 14 CTCF and 6 RNAPII PETs, had been held at the background in every run without loop
+  dropout, which drops the summary arc by its score. Unit checks in `harness/test_arc_matrix.py`.
+
   Why not in the reference: the reference declares `[data] factors` and, for an anchor pair
   carried by more than one factor, writes a summary arc with `eff_score` zero
   (`InteractionArcs.cpp:98-141`); it fits no strength per factor and its orientation term
@@ -722,6 +729,27 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     to 1 s on the RTX 4060 Ti. Numbers and the per batch composition in
     `design/kernel-performance.md`.
   - **`cli.py` auto-forces `ib_workers=1` when `mc_backend=jax`** — multiple Python threads contending for a single GPU is net-negative; restarts go inside JAX via `mc_smooth_chains` (vmap), not via thread pools.
+  - **Several processes on one card: `XLA_PYTHON_CLIENT_MEM_FRACTION`, JAX's own variable, no
+    setting.** ([mc/jax/share.py](gnome3d/mc/jax/share.py)) JAX preallocates 75 percent of the
+    card when its backend starts. Measured 2026-11-12 on the RTX 4060 Ti with JAX 0.11: a second
+    process on a held card gets a smaller pool than it asked for, `memory_stats()` still reports
+    the full 11.7 GiB, the kernels size their launches from that and XLA aborts the process with
+    a failed check in the allocator. Before the backend starts, `configure_gpu_pool` reads the
+    free memory with nvidia-smi. On a free card it changes nothing. On a held card it sets the
+    pool to the free memory less 0.5 GiB for the CUDA context and logs it, and refuses under
+    1 GiB. A fraction set by hand that does not fit the free memory is refused with the numbers.
+    Several instances that share a card on purpose set the variable in each, adding up to less
+    than 1. A process with a smaller pool packs its launches differently, so its structures are
+    not bit identical to a run on a free card; at a fixed pool it reproduces. Unit checks in
+    `harness/test_gpu_share.py`, two instances on one card in `playground/gpu_share_run.py`.
+  - **The smooth stage is threaded numba in production since 2026-11-16, and `auto` picks it
+    from four workers.** Measured on 36 cores against an RTX 3090 on GM12878 chr1: the stage of
+    52 blocks takes 53 to 80 s threaded, 92 s on 8 workers, and 122 to 146 s on the device, and
+    a 10 Mb region of two structures 35 s against 60 s. The relaxation pass follows it onto
+    numba. The arcs solve stays on the device, 20 s against 106 s. Matched seeds are level on
+    the pooled and battery numbers. The L-BFGS-B calls hold BLAS at up to eight threads,
+    `util.blas_threads`, since OpenBLAS on every core spent a 5 Mb region's fit waking them.
+    `design/kernel-performance.md`, section 14. Unit checks in `harness/test_executor_auto.py`.
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
 
   **Kernel seeding is process-stable.** Every JAX kernel takes its PRNG offset from
@@ -951,6 +979,16 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   strength at +0.03 to +0.06 of the loops' +0.10 person specific part, which bounds what it
   can carry. Unit checks in `harness/test_arcs_solver.py`.
 
+  **Kept loops at contact: `[springs] loop_contact`, default no, under measurement since
+  2026-10-27.** With it a loop a conformation keeps is held at one bead, touching, instead of
+  the law's part way target, so with the dropout a loop's strength sets how often its anchors
+  are in contact rather than how far they are pulled. Measured by triosformer's loop bench
+  before it was built: a CTCF loop of 3 to 4 PETs asked for two thirds of the background in
+  every conformation sits closer than a control pair on the mean and meets its anchors 0.60
+  times as often within 1.5 beads, since the spring holds it at four to five beads and the
+  control reaches contact by its spread. Off is byte exact. Unit checks in
+  `harness/test_arc_matrix.py`.
+
   Why not in the reference: the reference solves every arc in every structure.
 
 - **Transcription factories: `[factories] weight`, default 0, with `radius` and
@@ -1068,7 +1106,13 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: the reference has no block layout pass at all.
 
-- **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no, production no since 2026-09-19.**
+- **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no, production yes since 2026-11-16.**
+  Production with the arcless repulsion off, which tripled cross block overlaps on a chromosome;
+  the pass with `local_window` 1 takes GM12878 chr1 from 62 to 14 per thousand. The paragraph
+  below is the measurement that kept it off from 2026-09-19 with the repulsion on. With
+  `within_blocks` and `ev_radius` 1.0, production since 2026-11-16, overlapping pairs inside a block
+  move too: on CTCF only inputs the coils of two gaps whose anchors sit close met 240 to 300 times
+  per thousand beads, and GM12878 chr1 goes from 246 to 37 within blocks at level balanced SCC.
   Both end passes were measured at chromosome scope on GM12878 chr1:1-60 Mb, three structures
   per arm: Hi-C level on all four arms, the joint solve already holding boundary pairs at a
   median of 1.03 times the curve and none over 2.34, the stitch adding a tenth of Rg through its
@@ -1203,7 +1247,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   far pairs. Block scope, centroid start and weight zero are byte exact by the parity gate.
   Unit checks in `harness/test_arcs_scope.py` and `harness/test_arcs_start.py`.
 
-  Production since 2026-09-11 at chromosome scope with the Hilbert start and no arcs sphere.
+  Production since 2026-09-11 at chromosome scope with no arcs sphere, the start the Hilbert
+  curve until 2026-11-16 and the maxent draw since, see the long range entry below.
   The joint solve holds no arc across blocks and the contact background 80 of 3.5 million
   cross block pairs on chr1:1-60 Mb, so the start is the long range arrangement, and a
   Hilbert curve scaled to the law's bond gives it the cube root size growth the maps show
@@ -1264,6 +1309,76 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   Why not in the reference: the reference has no excluded volume at all.
 
+  **Tried and dropped, 2026-11-13: a law spring on bead pairs in the smooth stage.** Traced on a
+  web job, GM12878 chr1:20-25 Mb with CTCF and RNAPII loops, the squares in the contact map are
+  anchorless gaps: anchor pairs sit at 1.0 to 1.2 of the law, subanchor pairs inside a gap at
+  0.76 to 0.87 of it at 50 to 200 kb. Holding every bead pair under a range at the law through
+  the subanchor heat term fixed the gaps, 1.02 at a 200 kb range, and cut overlaps tenfold, and
+  lost the battery on chr1:20-25 and 10-15 Mb at five structures: Pearson 0.504 to 0.330 and
+  0.366 to 0.243, MultiMM 0.671 to 0.630 and 0.613 to 0.545, the 20 to 100 kb contact exponent
+  0.31 to 0.47. A spring at the mean distance removes the fluctuations contacts come from. A
+  wider range was worse and 2 Mb compressed the block, as the all pairs springs did. The smooth
+  wall tripled. Removed the same day; `playground/trace_square_blocks.py`,
+  `playground/law_spring_readout.py` and `slurm/ensemble/law_spring_trial.sh` are the record.
+
+  **Tried and dropped, 2026-11-13: a gap start that follows the law.** Under `start = law` each
+  subanchor took the clear candidate whose distances to the beads 2 to 128 places behind it best
+  matched the law in log, so a gap began at the law's size instead of packed into a ball. No
+  energy term. On chr1:20-25, 10-15 and 35-40 Mb at five structures and chr1 at three, scored
+  on 1-60 Mb, against the coil: Pearson down 0.03 to 0.07 on all four, the distance exponent
+  1.06 to 1.17 times Hi-C down to 0.96 to 1.05, overlaps within blocks down two to twenty
+  times, across blocks on chr1 11.7 to 20.5 per thousand. Gaps ended at about 1.2 of the law,
+  since the smooth stage holds bonds and nothing holds a gap's interior, so its size is the
+  start's. Without the hard wall overlaps rose tenfold, and with the subanchor heat term SCC
+  went negative. Removed the same day; `slurm/ensemble/law_start_trial.sh`,
+  `slurm/ensemble/gap_start_overnight.sh` and `playground/square_blocks/gapnight/` are the record.
+
+  **A maximum entropy gap start: `start = maxent` with `[data] contact_map`, measured 2026-11-14
+  and left opt in.** ([pipeline/ib/maxent.py](gnome3d/pipeline/ib/maxent.py)) Both dropped
+  trials gave every conformation the mean, and a contact map comes from the spread between
+  conformations. Each gap's subanchors are drawn from the Gaussian chain whose mean pair distances
+  are the law's, conditioned on the two anchors, after HIPPS and DIMES (Shi and Thirumalai). With
+  a contact map, a cooler URI at 1 kb, each target is scaled by the count between the 10 kb
+  windows of the pair against a power law fitted on the block's windows, observed over expected
+  to the minus third. One set of springs cannot hold every pair at the law below an exponent of a
+  third, and a distribution can, since the law's mean squared distance is a fractional Brownian
+  motion variogram. The draw comes from the problem's seed. `line` and `coil` are unchanged.
+  On three cells, three 5 Mb regions and chr1 it lost Pearson by 0.01 to 0.05 against the coil
+  with SCC level and the distance exponent nearer Hi-C. The smooth stage widens the drawn gaps to
+  1.2 of the law, where the coil ends under it. `slurm/ensemble/gap_maxent_trial.sh` and
+  `playground/square_blocks/gapme/` are the record.
+  Unit checks in `harness/test_maxent_start.py`, options and trial in `design/gap-fill.md`.
+
+- **Long range in the arcs stage: `[excluded_volume] arcs_repulsion = no`, `[springs]
+  gyration_weight` 0.1, the arcs excluded volume at `auto_factor_arcs` 1.0 and `[simulation_arcs]
+  start = maxent`, production since 2026-11-16.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
+  `repulsion_range`, [mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py) `gyration_windows`,
+  [pipeline/ib/maxent.py](gnome3d/pipeline/ib/maxent.py) `anchor_draw`)
+  Blocks held two to ten times too few contacts from 100 kb to 1 Mb against Hi-C at the right
+  mean size. The arcless repulsion held every far anchor pair of every conformation at one
+  distance, the 1 percent quantile beyond 100 kb at 0.40 to 0.53 of the law, so far pairs never
+  met; an ablation of the arcs terms, one per arm, moved that floor only with the repulsion. Off,
+  the blocks compact a third, so the gyration term holds the radius of gyration of every genomic
+  window of anchors, 100 kb doubling up and tiled twice, at the law's in the solver's energy,
+  which sets the size without holding a pair. The maxent start draws the anchors per
+  conformation from the Gaussian whose pair variances best meet every pair's target, fitted by
+  L-BFGS on a root of the covariance, and the solve descends from it. The cross block
+  relaxation is on with it. Pooled ensemble scores on chr1 1 to 60 Mb, three cells: SCC up 0.017
+  to 0.044, Spearman 0.018 to 0.028, MultiMM 0.06 to 0.10, the distance exponent 1.02 to 1.07
+  of Hi-C's against 1.15 to 1.18, Rg at the law's where production sat 15 percent over it;
+  balanced Pearson down 0.03 to 0.04, which follows the first diagonals. Arms are judged by the
+  pooled map, `playground/ensemble_score.py`, since a per structure score rewards ensembles of one
+  conformation. Unit checks in `harness/test_gyration.py`, `harness/test_maxent_start.py` and
+  `harness/test_arc_matrix.py`.
+
+  Hole beads between blocks, `[holes] use_hole_beads` with `flank_beads`, stay opt in: on this
+  arm they raise Spearman and lower pooled SCC 0.01 to 0.04 on three cells, since a correlation
+  scores an empty hole's zeros against any filled level, while their contacts follow Hi-C's from
+  pair to pair. `design/gap-fill.md` has every arm.
+
+  Why not in the reference: the reference has the `1 / d` repulsion on every arcless pair and
+  solves no size term.
+
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
   `[simulation_backend] neighbour_grid`, default yes)
   The excluded volume term sums over pairs closer than `r0` and was implemented as a scan over
@@ -1288,9 +1403,18 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   Measured on the real structure, same seed, positions and scores identical: 5.3 times faster
   at 8,000 beads, 11.2 at 20,000, 22.8 at 42,480. It applies to every reconstruction, since the
   per block smooth stage runs the same term on blocks of up to 16,384 beads, and smooth is most
-  of the pipeline's wall time. Below 2,048 beads the full scan is already cheap and the grid is
-  skipped. The JAX kernels are untouched and keep the full scan. Unit checks in
-  `harness/test_cells.py`.
+  of the pipeline's wall time. The grid is used from 128 beads, where it starts to win: on a
+  block of 1,831 beads with the hard wall the stage takes 4.7 s against 45.9 s on the full
+  scan. Unit checks in `harness/test_cells.py`.
+
+  A query clamps its cell index as the insertion does, since 2026-11-16. The box is the
+  extent the structure had when the grid was built, a bead beyond it is filed in an edge cell,
+  and a query from more than a cell beyond it searched no cell at all, so two beads out there
+  did not see each other, neither the soft term nor the wall. A coil that swells past its
+  starting extent ran without excluded volume in the swollen part. Found on a block the grid
+  and the full scan solved differently. With the clamp the two agree bit for bit at every
+  chain length from 32 to 1,831 beads, wall on and off. The JAX grid clamps both sides and
+  was not affected.
 
 ---
 

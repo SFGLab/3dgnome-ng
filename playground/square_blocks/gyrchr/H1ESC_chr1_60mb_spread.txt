@@ -1,0 +1,16 @@
+H1ESC_chr1_60mb_prod: 3 structures, 43923 beads, 12 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     3.9  0.0268  0.0487     4.9  0.0133  0.0265     6.3  0.0054  0.0124     7.9  0.0013  0.0063    11.3  0.0003  0.0022
+  anchor pairs                       -                       -     6.2  0.0000  0.0134     7.7  0.0000  0.0069    11.4  0.0000  0.0022
+    subanchors     4.0  0.0268  0.0463     4.9  0.0139  0.0256     6.3  0.0059  0.0123     8.0  0.0015  0.0063    11.4  0.0003  0.0022
+      one hole                       -                       -                       -                       -                       -
+  anchor floor                       -                       -             0.53   0.98             0.46   0.98             0.50   1.07   1% and median of distance over law, nu 0.353
+H1ESC_chr1_60mb_gyr01relax: 3 structures, 43923 beads, 12 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     4.0  0.0284  0.0475     4.8  0.0123  0.0280     5.9  0.0079  0.0153     7.3  0.0026  0.0081    10.2  0.0005  0.0030
+  anchor pairs                       -                       -     5.2  0.0000  0.0217     6.3  0.0000  0.0124     9.5  0.0000  0.0038
+    subanchors     4.0  0.0297  0.0449     4.8  0.0135  0.0270     5.9  0.0082  0.0149     7.4  0.0027  0.0078    10.3  0.0005  0.0030
+      one hole                       -                       -                       -                       -                       -
+  anchor floor                       -                       -             0.39   0.82             0.30   0.81             0.35   0.91   1% and median of distance over law, nu 0.353

@@ -56,6 +56,8 @@ Filenames are relative to `data_dir` unless absolute. The region string is `chr:
 | `compartments` | str |  | bedGraph of a signed compartment eigenvector or a CALDER BED, for `[compartments]`. |
 | `phasing_track` | str |  | Track used to fix the eigenvector's arbitrary sign. Required with `compartments`. |
 | `anchor_activity` | str |  | A BED with a signal column giving each anchor an activity for `[factories]`: the seventh column when a line has seven or more, a broadPeak's signal, else the fourth, a bedGraph. An anchor takes the largest value of the intervals overlapping it, zero where none does. |
+| `anchor_contacts` | str |  | Counts between anchor pairs from a full depth map, an npz written by `slurm/ensemble/prep_anchor_contacts.py` from an mcool and the run's anchor file, each pixel shared between the anchors it overlaps. The anchor contact map is built from it instead of the singletons, which keep the exponent fit and the coarse heatmaps. A STATUS line gives the share of the run's anchors found in it. |
+| `contact_map` | str |  | A cooler URI at fine resolution, such as an mcool at 1 kb, that `start = maxent` reads raw counts between windows of about 10 kb inside each gap from. Empty draws gaps from the law alone. |
 
 ## [distance]
 
@@ -89,10 +91,13 @@ is too far and the squeeze constant when too close.
 | `arc_weight_exponent` | float | 0.0 | 0.0 | Each loop's spring constant scaled by its strength, the PET count over the typical count at its span, to this power; zero is every loop at one spring, byte exact. Measured at 1 on the trio chromosomes, 2026-09-22, null on the strong loops and on expression, so it stays at 0, design/expression-from-structure.md idea 37. |
 | `loop_dropout` | bool | no | no | Each conformation keeps a loop with probability `q / (q + loop_dropout_scale)`, `q` the law's strength, and drops it otherwise, its pair arcless for that conformation, so the ensemble mean carries the loop's frequency; the draw is seeded by the conformation. Off keeps every loop, byte exact. Design/expression-from-structure.md idea 33, under measurement since 2026-09-23. |
 | `loop_dropout_scale` | float | 1.0 | 1.0 | The strength at which a loop is kept in half the conformations; a typical loop at 1. |
+| `loop_contact` | bool | no | no | A loop a conformation keeps is held at contact, one bead, instead of the law's part way target, so with `loop_dropout` a loop's strength sets how often its anchors are in contact rather than how far they are pulled. Off keeps the law's target, byte exact. Under measurement since 2026-10-27, triosformer's tracker idea 120. |
 | `background_weight` | float | 0.0 | 0.1 | A weak spring holding an arcless anchor pair inside `background_range_bp` at the background for its separation, in the arcs stage. Zero is off and every other arcless pair keeps the repulsion. |
 | `background_range_bp` | int | 100000 | 100000 | The separation under which an arcless pair is held at the background. Beyond it the pair keeps the repulsion, since a power law distance matrix cannot be embedded in three dimensions over every pair, only over a band. |
+| `gyration_weight` | float | 0.0 | 0.1 | Holds the radius of gyration of every genomic window of anchors at the law's, in the arcs solver's energy, as the weight on the squared relative misfit times the window's anchor count. Windows tile the span at every scale from `background_range_bp` doubling up, twice per scale with the second shifted by half a window, a window of fewer than four anchors left out. It sets size without holding any pair at a distance, so far pairs keep their spread. Solver only, the annealer refuses it. Under measurement since 2026-11-15, `design/gap-fill.md`. Production 0.1 since 2026-11-16. |
 | `factor_strength` | str |  |  | A multiplier on loop strength per cluster file, comma separated in file order, 1 each when empty. A factor whose contacts are more transient than CTCF's pulls less at the same PET count; 0 holds its loops at the background, which keeps its anchors as beads with no pull. |
 | `use_contact_background` | bool | no | yes | Beyond that range, hold an arcless pair whose contact cell puts it closer than the background at the law's contact distance, with the same spring. A pair at or below its expected contact keeps the repulsion, so the held set stays sparse, and on a thin map it holds next to nothing, which is allowed. Needs `use_anchor_heatmap`. |
+| `contact_background_z` | float | 0.0 | 0.0 | Above zero, the contact background holds every arcless pair whose expectation is above this value squared, where a count of zero would lie this many deviations under it, and whose count is this many Poisson deviations above or below its expectation, at `background * ((count + 0.5) / (expected + 0.5)) ^ (-1/3)`, so a depleted pair is held out as an enriched one is held in and only pairs that could come out either way are tested; the expectation is the count per unit anchor area over every pair at that separation, zeros included, and the target is clipped to one bead and to `distance_heatmap_stretching` backgrounds. Zero keeps the rule above. Under measurement since 2026-11-13. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Block placement chain bond. |
 
@@ -165,9 +170,9 @@ least `stop_condition_successes_threshold` moves.
 | --- | --- | --- | --- | --- |
 | `stop_condition_ratio` | float | 0.9999 | 0.9999 | Also stop when the score over the previous round's is at or above this, a plateau guard. |
 | `solver` | str | mc | lbfgs | `mc` anneals, `lbfgs` minimises the same energy with L-BFGS-B. Same minimum, same overlaps, the stage's calls fell from minutes to seconds. Where its energy is evaluated follows `mc_executor_arcs`: `serial` and `threaded` are the numba kernel over every pair on the CPU, `batch` is the same energy on the JAX device in float32, row chunked, one read of the target matrix per evaluation, agreeing to about 1e-6 relative and not to the bit. |
-| `solver_iters` | int | 200 | 5000 | The iteration cap. With `solver_tol` set it is a safety the tolerance stops before; at tolerance zero it is the only stop and binds on every chromosome solve. |
+| `solver_iters` | int | 200 | 5000 | The iteration cap. Zero keeps the start as it is, which leaves a `maxent` draw undescended. With `solver_tol` set it is a safety the tolerance stops before; at tolerance zero it is the only stop and binds on every chromosome solve. |
 | `solver_tol` | float | 0.0 | 1e-6 | The solve's stop rule. Positive stops it when an iteration improves the energy by less than this fraction of it, L-BFGS-B's own test; zero leaves the cap as the only stop. Production 1e-6 leaves a chromosome solve's long tail near 2,400 iterations, within one percent of the energy at 8,000, since the improvement per iteration sits flat near 1e-6 from there with no plateau. |
-| `start` | str | centroid | hilbert | Where a block's anchors start. `centroid` puts every anchor at the block centroid, from which the solver descends to a compact minimum. `walk` places consecutive anchors at the law's distance for their gap along random directions, so pairs no term acts on begin near the law. `hilbert` places them along a 3D Hilbert curve scaled to the law's bond, at chromosome scope one curve over the chromosome, so genomic neighbours are spatial neighbours at every scale and the size grows as the cube root of the count. Any executor with the solver; the batch executor's annealer refuses it. |
+| `start` | str | centroid | maxent | Where a block's anchors start. `centroid` puts every anchor at the block centroid, from which the solver descends to a compact minimum. `walk` places consecutive anchors at the law's distance for their gap along random directions, so pairs no term acts on begin near the law. `hilbert` places them along a 3D Hilbert curve scaled to the law's bond, at chromosome scope one curve over the chromosome, so genomic neighbours are spatial neighbours at every scale and the size grows as the cube root of the count. `maxent`, at chromosome scope only, draws the anchors once per conformation from the Gaussian whose pair variances best meet every pair's target, a loop's, the background's where it holds a pair and the law's elsewhere, and the solve then descends from the draw. Production since 2026-11-16 with the arcless repulsion off, `design/gap-fill.md`. Any executor with the solver; the batch executor's annealer refuses it. |
 | `scope` | str | block | chromosome | `block` solves each block's anchors alone. `chromosome` solves every anchor of a chromosome as one problem, each block's anchors starting at its placed centroid, so loops, the contact background and the compartment term act across blocks; the per block stage then passes its anchors through. Solver and annealer only. |
 
 ### [simulation_arcs_smooth] only
@@ -181,7 +186,7 @@ least `stop_condition_successes_threshold` moves.
 | `prefetch` | int | 1 | 32 | How many proposals one step of the JAX kernel evaluates against the current state at once, keeping the first accepted in draw order. The chain keeps its law and, where acceptance is rare, advances close to this many steps per step. Numba ignores it. |
 | `jax_grid` | bool | no | yes | Put the excluded volume and the wall on a cell grid in the JAX kernel, so a proposal visits the 27 cells around it instead of every bead. Exact, rebuilt every round and relinked on every accepted move. |
 | `jax_grid_min_beads` | int | 4096 | 4096 | The grid is used only on launches whose padded bead count reaches this, since below it the full scan is already cheap. |
-| `start` | str | line | coil | Where a gap's subanchors start. `line` is the densified straight line between its anchors, `coil` a compact random bridge at the bond targets. |
+| `start` | str | line | coil | Where a gap's subanchors start. `line` is the densified straight line between its anchors, `coil` a compact random bridge at the bond targets, `maxent` a draw from the maximum entropy Gaussian bridge whose mean pair distances are the law's, scaled by window contacts from `[data] contact_map` when one is given. `maxent` measured 2026-11-14, Pearson down 0.01 to 0.05 on three cells, left opt in, `design/gap-fill.md`. |
 
 ### [simulation_ib] only
 
@@ -206,13 +211,13 @@ resolves from the older backend keys.
 | `mc_executor_arcs` | str | auto | batch | Executor for the arcs stage. With the annealer, `batch` is the vmapped JAX kernel, which cannot retire a converged block, so one straggler holds every other block in the launch. With the solver, `batch` evaluates the energy on the JAX device block by block, which is where a chromosome solve is cheap; `serial` and `threaded` evaluate it on the CPU. |
 | `mc_executor_densify` | str | auto | threaded | Executor for densification. |
 | `mc_executor_estimate_dist` | str | auto | batch | Executor for the subanchor distance estimate. |
-| `mc_executor_smooth` | str | auto | batch | Executor for the smooth stage. The cross block relaxation also picks its kernel from this, and one chain on the batch kernel is that kernel's worst case. |
+| `mc_executor_smooth` | str | auto | threaded | Executor for the smooth stage. `auto` is `threaded` from 4 workers and `batch` below that when JAX is installed. Threaded numba is ahead of an RTX 3090 from 8 workers on a chromosome and at any size of region, measured 2026-11-16. The cross block relaxation also picks its kernel from this, and one chain on the batch kernel is that kernel's worst case. |
 | `mc_executor_jax_bucket_shapes` | bool | no | no | Pad each block to a shape ladder so a stage is a few wide launches rather than one compile per size. |
 | `merge_smooth_launches` | bool | yes | yes | Pack every smooth block that agrees on its energy terms into as few launches as device memory allows, regardless of size. |
 | `mc_executor_jax_batch_width_smooth` | int or auto | auto | auto | Blocks per smooth launch. `auto` solves the largest count that fits the device. |
 | `mc_executor_jax_batch_width_arcs` | int or auto | auto | auto | The same for the JAX arcs kernel. |
 | `multigpu_mode` | str | groups | groups | `groups` runs whole batch groups on different devices and is byte exact in the device count. `within` splits one group across devices. `off` uses one device. |
-| `neighbour_grid` | bool | yes | yes | Cell grid for the excluded volume term in the numba kernels. Identical results, faster above 2048 beads. |
+| `neighbour_grid` | bool | yes | yes | Cell grid for the excluded volume term in the numba kernels. Identical results. Used from 128 beads, where it starts to win. |
 
 ## [excluded_volume]
 
@@ -233,11 +238,12 @@ one as the stage's auto factor times the stage's mean bond scale.
 | `radius_smooth` | float | 0.0 | 0.0 | Smooth stage radius. |
 | `radius_heatmap` | float | 0.0 | 0.0 | Heatmap stage radius. |
 | `radius_ib` | float | 0.0 | 0.0 | Block placement radius. Also the constant centroid radius of the boundary stitch when positive. |
-| `auto_factor_arcs` | float | 0.5 | 0.5 | Times the mean positive arc target. |
+| `auto_factor_arcs` | float | 0.5 | 1.0 | Times the mean positive arc target. 1.0 in production since 2026-11-16, with the arcless repulsion off. |
 | `auto_factor_smooth` | float | 0.5 | 0.7 | Times the mean chain bond target of the block. |
 | `auto_factor_heatmap` | float | 0.5 | 0.5 | Times the mean active heatmap target. |
 | `auto_factor_ib` | float | 0.5 | 0.5 | Times the mean block chain bond. |
 | `arcs_repulsion_cutoff_factor` | float | 0.0 | 1.5 | Truncate the arcless pair repulsion `1 / d` beyond this times the mean arc target. 0 leaves it unbounded, which is the reference's behaviour and lets a sparse block explode. At 3 every pair beyond 100 kb ran away; 1.5 with the contact background sits on the law to 2 Mb, and 1.0 compacts past it. |
+| `arcs_repulsion` | bool | yes | no | The repulsion between arcless anchor pairs in the arcs stage. Off, every arcless pair beyond the short range background carries nothing but the excluded volume, and `[springs] gyration_weight` holds the size. The repulsion holds every far pair of every conformation at one distance and leaves no far pair in contact: on three cells, chr1 1 to 60 Mb, off with the gyration term, the arcs excluded volume at 1.0, the maxent start and the cross block relaxation raised pooled SCC 0.017 to 0.044 and MultiMM 0.06 to 0.10. Production since 2026-11-16, `design/gap-fill.md`. |
 
 ## [confinement]
 
@@ -281,13 +287,27 @@ other while the arcs and the stitch are kept.
 
 | key | type | default | production | what it does |
 | --- | --- | --- | --- | --- |
-| `use_cross_block_relax` | bool | no | no | Master switch. On at block scope with the stitch, whose rigid moves it cleans up after. Off at chromosome scope, where it moves the cross block count from 23 to 21 per thousand. |
+| `use_cross_block_relax` | bool | no | yes | Master switch. On at block scope with the stitch, whose rigid moves it cleans up after. At chromosome scope it was null with the arcless repulsion on, 23 to 21 cross block pairs per thousand, and is production since 2026-11-16 with the repulsion off, which tripled them: 62 to 14 on GM12878 chr1. |
 | `ev_weight` | float | 10.0 | 10.0 | Excluded volume weight for the pass. |
-| `ev_radius` | float | 0.0 | 0.0 | Excluded volume radius. 0 uses 1.5 chain bonds, so nothing is left under one bond where contacts are counted. |
+| `ev_radius` | float | 0.0 | 1.0 | Excluded volume radius. 0 uses 1.5 chain bonds, so nothing is left under one bond where contacts are counted. 1.0 in production since 2026-11-16, about one bond; 1.5 bonds with `within_blocks` cost Pearson and MultiMM. |
 | `temp` | float | 0.1 | 0.1 | Starting temperature as a fraction of the smooth stage's `max_temp`. Untangling needs a bead to cross a neighbour's shell, and a greedy pass stalls. |
 | `noise` | float | 0.5 | 0.5 | Step size in chain bonds. |
 | `bond_weight` | float | 10.0 | 10.0 | Chain spring weight for the pass. At the smooth stage's 0.1 the excluded volume tears the coil. |
 | `local_window` | int | -1 | 1 | Let only the beads touching another block move, plus this many chain neighbours either side. -1 lets every subanchor move, which on a chromosome is hours. A window of 1 is minutes. |
+| `within_blocks` | bool | no | yes | With `local_window` set, non neighbour bead pairs of one block closer than 0.7 of a bond move in the pass as well as beads touching another block. They are the coils of two gaps whose anchors the arcs stage put close, which the smooth stage's soft excluded volume leaves. Under measurement since 2026-11-16, `design/gap-fill.md`. Production yes since 2026-11-16 with `ev_radius` 1.0. |
+
+## [holes]
+
+Runs before the stitch. The stretch between two blocks has no beads. With the key on it gets one
+bead per `target_bp_per_subanchor` with no cap, drawn from the maximum entropy bridge between the
+two anchors that bound it and scaled by `[data] contact_map` when one is given. The stretches
+before the first block and after the last stay empty.
+
+| key | type | default | production | what it does |
+| --- | --- | --- | --- | --- |
+| `use_hole_beads` | bool | no | no | Master switch. Under measurement since 2026-11-14, `design/gap-fill.md`. |
+| `hard_wall` | bool | yes | yes | Whether the chromosome pass over the hole beads keeps the smooth stage's hard wall. `no` leaves the soft excluded volume alone, so a hole can rest against its blocks instead of beside them. Under measurement since 2026-11-15, `design/gap-fill.md`. |
+| `flank_beads` | int | 0 | 0 | Block beads on each side of a hole, besides the two anchors, that its draw is conditioned on, so the hole starts in contact with its blocks as the law has it. Zero draws a bridge between the anchors alone. Under measurement since 2026-11-15. |
 
 ## [compartments]
 

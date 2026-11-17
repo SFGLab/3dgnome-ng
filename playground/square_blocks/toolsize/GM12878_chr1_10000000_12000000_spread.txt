@@ -1,0 +1,29 @@
+GM12878_chr1_10000000_12000000_ours: 1 structures, 1598 beads, 0 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     3.9  0.0355  0.0501     4.4  0.0222  0.0359     5.3  0.0118  0.0203     6.6  0.0050  0.0110     8.0  0.0014  0.0061
+  anchor pairs     3.3  0.0103  0.0753     3.8  0.0098  0.0531     4.6  0.0038  0.0316     5.3  0.0012  0.0212     6.6  0.0004  0.0109
+    subanchors     3.9  0.0339  0.0481     4.4  0.0215  0.0346     5.4  0.0114  0.0199     6.7  0.0049  0.0105     8.1  0.0014  0.0059
+      one hole                       -                       -                       -                       -                       -
+  anchor floor             0.50   0.92             0.41   0.85             0.27   0.77             0.31   0.70             0.27   0.66   1% and median of distance over law, nu 0.344
+GM12878_chr1_10000000_12000000_cudammc: 1 structures, 448 beads, 0 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     2.8  0.1916  0.1270     3.9  0.2556  0.0501     4.0  0.2373  0.0464     5.5  0.1989  0.0183    10.8  0.1642  0.0026
+  anchor pairs     1.7  0.4388  0.3927     2.5  0.4950  0.1566     3.1  0.4403  0.0953     4.7  0.4002  0.0298     9.6  0.3213  0.0036
+    subanchors     3.4  0.0293  0.0744     5.4  0.0825  0.0198     5.4  0.0556  0.0198     6.6  0.0376  0.0111    12.2  0.0426  0.0018
+      one hole                       -                       -                       -                       -                       -
+GM12878_chr1_10000000_12000000_multimm_min: 1 structures, 1598 beads, 0 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block    13.8  0.0009  0.0012    15.0  0.0009  0.0010    17.5  0.0006  0.0006    19.2  0.0003  0.0005    21.9  0.0002  0.0003
+  anchor pairs                       -                       -                       -                       -                       -
+    subanchors    13.8  0.0009  0.0012    15.0  0.0009  0.0010    17.5  0.0006  0.0006    19.2  0.0003  0.0005    21.9  0.0002  0.0003
+      one hole                       -                       -                       -                       -                       -
+GM12878_chr1_10000000_12000000_multimm_md: 1 structures, 1598 beads, 0 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block    13.6  0.0010  0.0013    14.9  0.0010  0.0010    17.4  0.0007  0.0006    19.1  0.0003  0.0005    21.8  0.0002  0.0003
+  anchor pairs                       -                       -                       -                       -                       -
+    subanchors    13.6  0.0010  0.0013    14.9  0.0010  0.0010    17.4  0.0007  0.0006    19.1  0.0003  0.0005    21.8  0.0002  0.0003
+      one hole                       -                       -                       -                       -                       -

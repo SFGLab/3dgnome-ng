@@ -10,6 +10,10 @@ requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24.0",
     "numba>=0.59.0",
+    # the production arcs solver is scipy's L-BFGS-B, and the stitch and relax passes use it too
+    "scipy>=1.10",
+    # holds the BLAS thread count around the L-BFGS-B calls, gnome3d/util.py blas_threads
+    "threadpoolctl>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +30,11 @@ dev = [
 #     pip install gnome3d-ng[jax] "jax[rocm6]"    # AMD
 jax = [
     "jax>=0.4.30",
+]
+
+# gnome3d-ng extract reads .mcool files with cooler.
+extract = [
+    "cooler>=0.9",
 ]
 
 # Validation harness (validation/): structure-quality metrics, Hi-C correlation,

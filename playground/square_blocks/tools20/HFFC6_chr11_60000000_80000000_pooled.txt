@@ -1,0 +1,6 @@
+chr11:60000000-80000000, pooled ensemble against Hi-C at 25000 bp, 18 unmapped bins
+                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
+            HFFC6_chr11_60000000_80000000_ours   5   0.550   0.280   0.420   0.675   0.275   0.327                     0.423    0.333    0.177
+         HFFC6_chr11_60000000_80000000_cudammc   5   0.307   0.192   0.179   0.306   0.186   0.130                     0.175    0.126    0.065
+     HFFC6_chr11_60000000_80000000_multimm_min   5   0.302   0.142   0.243   0.580   0.137   0.186                     0.242    0.189    0.071
+      HFFC6_chr11_60000000_80000000_multimm_md   5   0.307   0.146   0.247   0.580   0.140   0.190                     0.247    0.192    0.073

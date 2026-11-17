@@ -1,0 +1,5 @@
+chr1:10000000-15000000, pooled ensemble against Hi-C at 25000 bp
+                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC
+           GM12878_chr1_10000000_15000000_prod   5   0.446   0.368   0.464   0.691   0.364   0.402
+          GM12878_chr1_10000000_15000000_mxgyr   5   0.473   0.391   0.487   0.678   0.383   0.417
+     GM12878_chr1_10000000_15000000_mxgyrholes   5   0.466   0.351   0.364   0.675   0.323   0.356

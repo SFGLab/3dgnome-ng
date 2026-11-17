@@ -25,6 +25,10 @@ def visible_devices(limit: int = 0) -> list[Any]:
     multi-device simulation used for local tests).  ``limit`` > 0 caps the count."""
     import jax
 
+    from gnome3d.mc.jax.util import jax_is_available
+
+    jax_is_available()
+
     devs = list(jax.devices())
     gpus = [d for d in devs if getattr(d, "platform", "") in ("gpu", "cuda", "rocm")]
     devs = gpus or devs

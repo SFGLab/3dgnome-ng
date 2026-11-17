@@ -1,0 +1,18 @@
+chr1:1-60000000: 17 holes, 13 spanning two bins or more
+  hole 1: 3.97 to 5.51 Mb, 61 bins, 1.00 mapped, raw coverage 0.74 of the median
+  hole 2: 5.92 to 5.99 Mb, 3 bins, 1.00 mapped, raw coverage 1.10 of the median
+  hole 4: 12.66 to 13.64 Mb, 40 bins, 0.70 mapped, raw coverage 0.58 of the median
+  hole 5: 13.85 to 14.52 Mb, 27 bins, 1.00 mapped, raw coverage 0.81 of the median
+  hole 6: 29.23 to 29.79 Mb, 23 bins, 1.00 mapped, raw coverage 1.05 of the median
+  hole 7: 30.38 to 30.71 Mb, 13 bins, 1.00 mapped, raw coverage 1.01 of the median
+  hole 8: 46.73 to 47.18 Mb, 18 bins, 1.00 mapped, raw coverage 0.59 of the median
+  hole 10: 48.53 to 48.57 Mb, 2 bins, 1.00 mapped, raw coverage 0.62 of the median
+  hole 11: 48.87 to 50.33 Mb, 58 bins, 1.00 mapped, raw coverage 0.43 of the median
+  hole 12: 50.71 to 50.77 Mb, 3 bins, 1.00 mapped, raw coverage 0.66 of the median
+  hole 14: 53.24 to 53.28 Mb, 2 bins, 1.00 mapped, raw coverage 0.94 of the median
+  hole 15: 55.38 to 55.64 Mb, 11 bins, 1.00 mapped, raw coverage 0.67 of the median
+  hole 16: 56.83 to 58.01 Mb, 48 bins, 1.00 mapped, raw coverage 0.60 of the median
+  SCC raw / balanced, mapped, no hole 1, no hole 2, no hole 4, no hole 5, no hole 6, no hole 7, no hole 8, no hole 10, no hole 11, no hole 12, no hole 14, no hole 15, no hole 16, no holes
+                        GM12878_chr1_60mb_prod    0.323/0.250    0.307/0.240    0.324/0.250    0.316/0.244    0.318/0.247    0.324/0.247    0.323/0.248    0.318/0.247    0.323/0.250    0.301/0.245    0.323/0.250    0.324/0.251    0.321/0.249    0.310/0.243    0.231/0.205
+                       GM12878_chr1_60mb_mxgyr    0.364/0.292    0.351/0.285    0.365/0.292    0.359/0.287    0.360/0.290    0.365/0.290    0.365/0.291    0.360/0.290    0.364/0.292    0.346/0.289    0.364/0.292    0.365/0.293    0.363/0.292    0.353/0.287    0.294/0.263
+                      GM12878_chr1_60mb_hflank    0.325/0.270    0.321/0.268    0.326/0.271    0.322/0.268    0.324/0.271    0.327/0.271    0.325/0.269    0.324/0.271    0.326/0.271    0.319/0.270    0.325/0.271    0.326/0.271    0.324/0.271    0.321/0.269    0.300/0.265

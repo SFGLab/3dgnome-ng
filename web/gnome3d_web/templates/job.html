@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Job {{ status.state }}{% endblock %}
+{% block head %}
+{% if status.state not in ("done", "failed") %}<meta http-equiv="refresh" content="10">{% endif %}
+{% if status.state == "done" %}<script src="https://cdn.jsdelivr.net/npm/ngl@2.3.1/dist/ngl.js"></script>{% endif %}
+{% endblock %}
+{% block body %}
+<h1>{{ cell.label if cell else req.cell_type }}, {{ (status.region or req.region)|region }}</h1>
+<p class="lead">{{ req.factors.replace('+', ' and ') if req.factors else '' }} loops{% if req.sample %}, {{ req.sample }} haplotype {{ req.haplotype + 1 }}{% endif %}, {{ req.n_models }} structures. State: <strong>{{ status.state }}</strong>{% if status.stage and status.state != "done" %}, {{ status.stage }}{% endif %}.</p>
+{% if private %}<div class="notice">This job is private. Keep the link; it is deleted after {{ retention }} days.</div>{% endif %}
+{% if cell and cell.note %}<div class="notice">{{ cell.note }}</div>{% endif %}
+{% if req.hicdiffusion %}<div class="notice">The contact background was predicted from sequence by HiCDiffusion, trained on GM12878. It is not an individual specific map{% if cell and not cell.lymphoblastoid %}, and for this cell type it is outside what the model was trained on{% endif %}.</div>{% endif %}
+{% if status.n_svs is defined %}<p class="muted">{{ status.n_svs }} structural variants applied{% if status.skipped_svs %}, {{ status.skipped_svs }} skipped for an unsupported type{% endif %}. Loops modelled: {% for k, n in (status.loops or {}).items() %}{{ k }} {{ n }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+{% if status.state == "failed" %}
+  <div class="error">{{ status.error }}</div>
+  <pre style="white-space:pre-wrap;font-size:12px">{{ status.log_tail }}</pre>
+{% elif status.state == "done" %}
+  <h2>Structures</h2>
+  <div class="row" style="align-items:end">
+    <div><label for="model">Structure</label><select id="model">{% for m in marks.models %}<option value="{{ m }}">{{ loop.index }}</option>{% endfor %}</select></div>
+    <div><span class="key"><span class="dot" style="background:var(--promoter)"></span>promoters</span><span class="key"><span class="dot" style="background:var(--enhancer)"></span>enhancers</span></div>
+  </div>
+  <div id="viewer" style="margin-top:8px"></div>
+  <h2>Nearest enhancer per gene</h2>
+  <p class="muted">Ensemble mean 3D distance, model units, to the nearest enhancer within 1 Mb. A TSS or enhancer more than 5 kb from any bead is left out.</p>
+  <div class="table-wrap"><table>
+    <tr><th>Gene</th><th class="num">TSS</th><th class="num">Nearest enhancer</th><th class="num">Linear, kb</th><th class="num">3D distance</th></tr>
+    {% for row in ep %}<tr><td>{{ row[0] }}</td>{% for x in row[1:] %}<td class="num">{{ x }}</td>{% endfor %}</tr>{% endfor %}
+  </table></div>
+  <p class="muted">The first 25 genes; ep.tsv has them all.</p>
+  <h2>Downloads</h2>
+  <p><a href="{{ base }}/files/ep.tsv">ep.tsv</a> · <a href="{{ base }}/files/marks.json">marks.json</a> · <a href="{{ base }}/files/engine.log">engine.log</a> · {% for m in marks.models %}<a href="{{ base }}/files/{{ m }}">{{ m }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  <script>
+  const stage = new NGL.Stage('viewer', {backgroundColor: getComputedStyle(document.body).backgroundColor});
+  const css = getComputedStyle(document.documentElement);
+  const rgb = v => { const c = new NGL.Color(css.getPropertyValue(v).trim()); return [c.r, c.g, c.b]; };
+  function show(name) {
+    fetch('{{ base }}/view/' + name.replace(/\.cif$/, '.json')).then(r => r.json()).then(p => {
+      stage.removeAllComponents();
+      // the chain, smoothed with the figures' Catmull-Rom spline, as a tube of short cylinders
+      const chain = new NGL.Shape('chain');
+      const grey = [0.62, 0.62, 0.6];
+      for (let i = 0; i + 1 < p.chain.length; i++) chain.addCylinder(p.chain[i], p.chain[i + 1], grey, 0.07);
+      stage.addComponentFromObject(chain).addRepresentation('buffer');
+      // promoters and enhancers as translucent boxes around their stretch of the chain
+      const boxes = new NGL.Shape('elements');
+      const col = {promoter: rgb('--promoter'), enhancer: rgb('--enhancer')};
+      for (const b of p.boxes) {
+        const c = [0, 1, 2].map(k => (b.min[k] + b.max[k]) / 2), s = [0, 1, 2].map(k => b.max[k] - b.min[k]);
+        boxes.addBox(c, col[b.kind], s[0], [0, s[1], 0], [0, 0, s[2]], b.name || b.kind);
+      }
+      stage.addComponentFromObject(boxes).addRepresentation('buffer', {opacity: 0.35, depthWrite: false});
+      stage.autoView();
+    });
+  }
+  document.getElementById('model').addEventListener('change', e => show(e.target.value));
+  show(document.getElementById('model').value);
+  window.addEventListener('resize', () => stage.handleResize());
+  </script>
+{% else %}
+  <p class="muted">This page refreshes every 10 seconds.</p>
+{% endif %}
+{% endblock %}

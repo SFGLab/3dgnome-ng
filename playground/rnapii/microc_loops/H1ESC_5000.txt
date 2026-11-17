@@ -1,0 +1,28 @@
+ctcf: 2088 input loops in the region, 353 at a Micro-C loop
+rnapii: 4387 input loops in the region, 141 at a Micro-C loop
+605 Micro-C loops at 5000 bp, all 605, CTCF 263, RNAPII alone 40, none 302, moved, no loop 603
+  H1ESC_E_60mb                     all             loops   605 scored   132  contact  31.78  ratio 0.251  closer 0.95  placed 0.19  rank +0.09
+  H1ESC_E_60mb                     CTCF            loops   263 scored   109  contact  33.67  ratio 0.244  closer 0.98  placed 0.39  rank +0.11
+  H1ESC_E_60mb                     RNAPII alone    loops    40 scored     1  contact   0.61  ratio 1.282  closer 0.00  placed 0.00  rank +nan
+  H1ESC_E_60mb                     none            loops   302 scored    22  contact   8.58  ratio 0.584  closer 0.82  placed 0.04  rank -0.37
+  H1ESC_E_60mb                     moved, no loop  loops   603 scored    46  contact   0.43  ratio 1.063  closer 0.46  placed 0.01  rank +0.23
+  H1ESC_C_60mb                     all             loops   605 scored   540  contact   2.55  ratio 0.831  closer 0.81  placed 0.40  rank +0.18
+  H1ESC_C_60mb                     CTCF            loops   263 scored   258  contact   3.10  ratio 0.710  closer 0.93  placed 0.67  rank +0.29
+  H1ESC_C_60mb                     RNAPII alone    loops    40 scored    36  contact   1.48  ratio 0.902  closer 0.67  placed 0.28  rank +0.37
+  H1ESC_C_60mb                     none            loops   302 scored   246  contact   1.59  ratio 0.911  closer 0.70  placed 0.17  rank -0.12
+  H1ESC_C_60mb                     moved, no loop  loops   603 scored   522  contact   1.03  ratio 1.002  closer 0.50  placed 0.06  rank +0.09
+  H1ESC_R_60mb                     all             loops   605 scored   567  contact   4.34  ratio 0.807  closer 0.81  placed 0.45  rank +0.15
+  H1ESC_R_60mb                     CTCF            loops   263 scored   261  contact   6.00  ratio 0.688  closer 0.95  placed 0.73  rank +0.32
+  H1ESC_R_60mb                     RNAPII alone    loops    40 scored    32  contact   1.03  ratio 0.704  closer 0.97  placed 0.60  rank +0.05
+  H1ESC_R_60mb                     none            loops   302 scored   274  contact   1.89  ratio 0.930  closer 0.66  placed 0.19  rank -0.11
+  H1ESC_R_60mb                     moved, no loop  loops   603 scored   552  contact   1.02  ratio 1.007  closer 0.48  placed 0.09  rank +0.01
+  H1ESC_M_60mb                     all             loops   605 scored   571  contact   2.82  ratio 0.820  closer 0.81  placed 0.43  rank +0.11
+  H1ESC_M_60mb                     CTCF            loops   263 scored   261  contact   3.56  ratio 0.708  closer 0.95  placed 0.69  rank +0.22
+  H1ESC_M_60mb                     RNAPII alone    loops    40 scored    36  contact   1.06  ratio 0.757  closer 0.89  placed 0.47  rank +0.11
+  H1ESC_M_60mb                     none            loops   302 scored   274  contact   1.68  ratio 0.931  closer 0.68  placed 0.20  rank -0.09
+  H1ESC_M_60mb                     moved, no loop  loops   603 scored   564  contact   1.03  ratio 1.008  closer 0.48  placed 0.08  rank +0.07
+  map all             loops   605 scored   604  contact   6.96
+  map CTCF            loops   263 scored   263  contact   7.99
+  map RNAPII alone    loops    40 scored    40  contact   6.42
+  map none            loops   302 scored   301  contact   5.77
+  map moved, no loop  loops   603 scored   603  contact   0.99

@@ -61,6 +61,9 @@ from validation.metrics.hic import (  # noqa: E402
     multimm_faithful_pearson,
     observed_hic,
 )
+METRIC_KEYS = (
+    "pearson", "spearman", "scc", "multimm", "exponent", "e_short", "e_long", "rg", "wb_aa", "wb_sa", "xb",
+)  # fmt: skip
 CONTACT_BEADS = 1.33  # a contact is two beads within this many chain bonds; 2.0 units at the old 1.5 unit bead
 
 
@@ -249,6 +252,7 @@ def main() -> None:
     ev_factor = _flag("--ev-factor", 0.7)  # the run's exclusion_auto_factor_smooth
     balance = "--balance" not in sys.argv or _str_flag("--balance") != "no"
     singletons = _str_flag("--singletons")  # the run's own singletons file, for the exponent yardstick
+    json_out = _str_flag("--json")  # one row per arm, for readers that should not parse the table
     mcool, region, binsize = sys.argv[1], sys.argv[2], int(sys.argv[3])
     if singletons:
         fit = cell_nu(Path(singletons))
@@ -273,10 +277,12 @@ def main() -> None:
         f"{'multimm':>9s} {'exponent':>9s} {'vs Hi-C':>8s} {'e20-100k':>9s} {'e100k-1M':>9s} "
         f"{'Rg':>8s} {'wb-aa':>7s} {'wb-sa':>7s} {'xb':>7s}"
     )
+    rows: list[dict[str, object]] = []
     for d in sys.argv[4:]:
         cifs = sorted(Path(d).glob("*.cif"))
         if not cifs:
             print(f"  {Path(d).name:>10s}  no cif files")
+            rows.append({"arm": Path(d).name, "n": 0, **{k: float("nan") for k in METRIC_KEYS}})
             continue
         coords, mids = [], None
         pear, spear, scc, expo, rgs = [], [], [], [], []
@@ -312,6 +318,27 @@ def main() -> None:
             f"{np.mean(waa):>7.1f} {np.mean(wsa):>7.1f} {np.mean(xb):>7.1f}",
             flush=True,
         )
+        rows.append(
+            {
+                "arm": Path(d).name,
+                "n": len(cifs),
+                "pearson": float(np.nanmean(pear)),
+                "spearman": float(np.nanmean(spear)),
+                "scc": float(np.nanmean(scc)),
+                "multimm": float(mm),
+                "exponent": e,
+                "e_short": float(np.nanmean(elo)),
+                "e_long": float(np.nanmean(ehi)),
+                "rg": float(np.mean(rgs)),
+                "wb_aa": float(np.mean(waa)),
+                "wb_sa": float(np.mean(wsa)),
+                "xb": float(np.mean(xb)),
+            }
+        )
+    if json_out:
+        import json
+
+        Path(json_out).write_text(json.dumps(rows, indent=2) + "\n")
     print(f"\n  exponent target is {nu:.3f}, {yardstick.split(', ', 1)[-1] if not singletons else 'the fit a run makes on the same file'};")
     print("  the project's structures have measured flatter than that, so higher is better here.")
     print("  e20-100k and e100k-1M are the exponent fitted on each band alone; the two should agree")

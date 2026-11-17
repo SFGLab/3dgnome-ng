@@ -1,2 +1,4 @@
 numpy>=1.24.0
 numba>=0.59.0
+scipy>=1.10
+threadpoolctl>=3.1

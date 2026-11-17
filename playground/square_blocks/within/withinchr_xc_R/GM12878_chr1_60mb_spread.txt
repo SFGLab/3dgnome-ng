@@ -1,0 +1,16 @@
+GM12878_chr1_60mb_prod: 3 structures, 43204 beads, 17 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     4.1  0.0279  0.0443     4.8  0.0146  0.0272     5.7  0.0087  0.0164     7.1  0.0038  0.0089     9.5  0.0005  0.0038
+  anchor pairs                       -                       -     4.8  0.0032  0.0279     6.0  0.0026  0.0142     8.6  0.0000  0.0049
+    subanchors     4.1  0.0286  0.0417     4.9  0.0159  0.0261     5.8  0.0084  0.0158     7.1  0.0037  0.0086     9.5  0.0005  0.0037
+      one hole                       -                       -                       -                       -                       -
+  anchor floor                       -                       -             0.29   0.79             0.25   0.77             0.36   0.87   1% and median of distance over law, nu 0.344
+GM12878_chr1_60mb_rw10: 3 structures, 43204 beads, 17 holes
+  rms distance in bonds, contact share, Gaussian share at that rms
+                              25-50 kb               50-100 kb              100-200 kb              200-400 kb             400-1000 kb
+     one block     3.9  0.0327  0.0504     4.6  0.0149  0.0304     5.5  0.0094  0.0181     6.9  0.0039  0.0098     9.2  0.0006  0.0040
+  anchor pairs                       -                       -     4.7  0.0032  0.0290     5.9  0.0026  0.0148     8.5  0.0000  0.0051
+    subanchors     3.9  0.0325  0.0481     4.7  0.0171  0.0295     5.6  0.0092  0.0177     6.9  0.0040  0.0095     9.3  0.0006  0.0040
+      one hole                       -                       -                       -                       -                       -
+  anchor floor                       -                       -             0.29   0.78             0.25   0.76             0.35   0.86   1% and median of distance over law, nu 0.344

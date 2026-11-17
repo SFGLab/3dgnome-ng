@@ -1,0 +1,13 @@
+chr1:1-60000000 GM12878_chr1_60mb_hflank: 300 mapped hole bins
+  hole counts scaled by   SCC raw / balanced over mapped bins
+                    0.00   0.370 / 0.295
+                    0.25   0.361 / 0.291
+                    0.50   0.351 / 0.285
+                    1.00   0.325 / 0.270
+                    2.00   0.264 / 0.231
+  Spearman over pairs touching a hole bin, raw / balanced, by separation
+     25 to    50 kb  n   313   +0.124 / +0.094
+     50 to   100 kb  n   661   +0.088 / +0.180
+    100 to   200 kb  n  1426   +0.089 / +0.212
+    200 to   400 kb  n  3207   +0.017 / +0.129
+    400 to  1000 kb  n 11174   +0.142 / +0.147

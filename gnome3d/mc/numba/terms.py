@@ -253,8 +253,8 @@ def _wall_local_cells_nb(
     head: I32Array,
     nxt: I32Array,
 ) -> tuple[int, float]:
-    """`_wall_local_nb` over the grid's twenty seven cell neighbourhood. Exact, since a count
-    and a sum of depths do not depend on the order beads are visited in."""
+    """`_wall_local_nb` over the grid's twenty seven cell neighbourhood. The count is the same
+    and the depth agrees to rounding, its sum running in cell order."""
     px = pos[p, 0]
     py = pos[p, 1]
     pz = pos[p, 2]
@@ -262,9 +262,11 @@ def _wall_local_cells_nb(
     nx = int(dim[0])
     ny = int(dim[1])
     nz = int(dim[2])
-    ix = int((px - lo[0]) / c)
-    iy = int((py - lo[1]) / c)
-    iz = int((pz - lo[2]) / c)
+    # Clamped as `cell_of_nb` clamps, so a bead beyond the box searches the edge cells, where
+    # every other bead beyond it is filed.
+    ix = min(max(int((px - lo[0]) / c), 0), nx - 1)
+    iy = min(max(int((py - lo[1]) / c), 0), ny - 1)
+    iz = min(max(int((pz - lo[2]) / c), 0), nz - 1)
     cnt = 0
     depth = 0.0
     for jz in range(max(iz - 1, 0), min(iz + 2, nz)):
@@ -770,9 +772,11 @@ def local_excl_cells_nb(
     nx = int(dim[0])
     ny = int(dim[1])
     nz = int(dim[2])
-    ix = int((px - lo[0]) / c)
-    iy = int((py - lo[1]) / c)
-    iz = int((pz - lo[2]) / c)
+    # Clamped as `cell_of_nb` clamps, so a bead beyond the box searches the edge cells, where
+    # every other bead beyond it is filed.
+    ix = min(max(int((px - lo[0]) / c), 0), nx - 1)
+    iy = min(max(int((py - lo[1]) / c), 0), ny - 1)
+    iz = min(max(int((pz - lo[2]) / c), 0), nz - 1)
     m = 0
     for jz in range(max(iz - 1, 0), min(iz + 2, nz)):
         for jy in range(max(iy - 1, 0), min(iy + 2, ny)):

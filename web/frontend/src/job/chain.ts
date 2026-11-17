@@ -1,0 +1,58 @@
+/** Geometry of the chain as the 3D view draws it. */
+type P = [number, number, number]
+
+/** The tube radius, a fixed share of the median bond. A chain then looks the same at any scale. */
+export function bondRadius(points: P[]): number {
+  const bonds: number[] = []
+  for (let i = 1; i < points.length; i++) {
+    const [a, b] = [points[i - 1], points[i]]
+    bonds.push(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]))
+  }
+  if (!bonds.length) return 0.3
+  bonds.sort((x, y) => x - y)
+  return 0.28 * bonds[Math.floor(bonds.length / 2)]
+}
+
+/** The beads either side of a hovered bead that are brightened with it, cut at the chain's ends. */
+export function stretch(i: number, n: number, k = 6): [number, number] {
+  return [Math.max(0, i - k), Math.min(n - 1, i + k)]
+}
+
+/** Fog from the structure's middle to its far side, seen from the camera's distance. */
+export function fogRange(radius: number, cameraDistance: number): [number, number] {
+  return [cameraDistance, cameraDistance + radius]
+}
+
+/** The bead whose tube is drawn under the cursor. Each bond is a tube from one bead to the next;
+ * the cursor is on a bond when it lies within that bond's drawn radius, plus two pixels, of the
+ * bond's line on the screen. Of the bonds under the cursor the one nearest the camera wins, and
+ * of its two beads the one nearer the cursor along it. Null off every tube.
+ *
+ * @param chain each bead's screen x and y in pixels, its distance from the camera and the tube's
+ *   drawn radius in pixels at that bead
+ */
+export function pickOnChain(chain: [number, number, number, number][], x: number, y: number): number | null {
+  if (chain.length === 1) {
+    const [sx, sy, , r] = chain[0]
+    return Math.hypot(sx - x, sy - y) <= r + 2 ? 0 : null
+  }
+  let best: number | null = null
+  let depth = Infinity
+  for (let i = 0; i + 1 < chain.length; i++) {
+    const [ax, ay, ad, ar] = chain[i]
+    const [bx, by, bd, br] = chain[i + 1]
+    if (ad <= 0 || bd <= 0) continue
+    const dx = bx - ax
+    const dy = by - ay
+    const len2 = dx * dx + dy * dy
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / len2)) : 0
+    const off = Math.hypot(ax + t * dx - x, ay + t * dy - y)
+    const radius = ar + t * (br - ar)
+    const d = ad + t * (bd - ad)
+    if (off <= radius + 2 && d < depth) {
+      depth = d
+      best = t <= 0.5 ? i : i + 1
+    }
+  }
+  return best
+}

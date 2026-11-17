@@ -1,0 +1,32 @@
+{
+  "_note": "RNAPII ChIA-PET loops and peaks per replicate from ENCODE ENCSR782EKZ, and CTCF ChIP-seq conservative IDR peaks from ENCSR000BNH, the inputs of playground/rnapii/crosscell_prep.py. Fetch with: python -m validation fetch --manifest validation/manifests/H1ESC_rnapii.json --out data/_rnapii",
+  "cell_line": "H1ESC",
+  "assembly": "GRCh38",
+  "assays": [
+    {
+      "name": "RNAPII_loops_r1",
+      "source": "encode",
+      "accession": "ENCFF324UIT"
+    },
+    {
+      "name": "RNAPII_loops_r2",
+      "source": "encode",
+      "accession": "ENCFF753NSM"
+    },
+    {
+      "name": "RNAPII_peaks_r1",
+      "source": "encode",
+      "accession": "ENCFF665IXY"
+    },
+    {
+      "name": "RNAPII_peaks_r2",
+      "source": "encode",
+      "accession": "ENCFF116RLS"
+    },
+    {
+      "name": "CTCF_peaks",
+      "source": "encode",
+      "accession": "ENCFF497ZGV"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+workers 4 seconds 495.381517023 [executor]   smooth[threaded]: 52 nodes in 146.8s
+workers 8 seconds 440.974000014 [executor]   smooth[threaded]: 52 nodes in 92.1s
+workers 16 seconds 420.404494551 [executor]   smooth[threaded]: 52 nodes in 71.0s
+EXIT

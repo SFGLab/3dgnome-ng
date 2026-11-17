@@ -52,6 +52,8 @@ class Settings:
     data_compartments: str
     data_phasing_track: str
     data_anchor_activity: str
+    data_anchor_contacts: str
+    data_contact_map: str
 
     # ---- template ----
 
@@ -99,11 +101,15 @@ class Settings:
     background_weight: float
     loop_dropout: bool
     loop_dropout_scale: float
+    loop_contact: bool
     factory_weight: float
+    gyration_weight: float
+    arcs_repulsion: bool
     factory_radius: float
     background_range_bp: int
     spring_squeeze_arcs: float
     use_contact_background: bool
+    contact_background_z: float
 
     # ---- simulation steps ----
     steps_lvl1: int
@@ -280,6 +286,12 @@ class Settings:
     relax_temp: float
     relax_noise: float
     relax_bond_weight: float
+    relax_within_blocks: bool
+
+    # ---- holes between blocks ----
+    use_hole_beads: bool
+    holes_hard_wall: bool
+    holes_flank_beads: int
 
     # ---- A/B compartments ----
     use_compartments: bool
@@ -383,6 +395,10 @@ class Settings:
         # A BED with a signal column, a broadPeak or a bedGraph, giving each anchor the
         # activity the factory term of [factories] reads; empty leaves the term inert.
         self.data_anchor_activity = ""
+        # Counts between anchor pairs from a full depth map, `gnome3d.anchor_contacts`; empty
+        # builds the anchor contact map from the singletons.
+        self.data_anchor_contacts = ""
+        self.data_contact_map = ""  # cooler URI the maxent start reads window counts from
 
         # ---- motif orientation ----
         self.use_ctcf_motif = False
@@ -432,9 +448,14 @@ class Settings:
         # strength, so the ensemble mean carries the loop's frequency. Off keeps every loop.
         self.loop_dropout = False
         self.loop_dropout_scale = 1.0
+        # A loop a conformation keeps is held at contact, one bead, and not at the law's part
+        # way target, so with the dropout a loop's strength sets how often it is in contact.
+        self.loop_contact = False
         # The factory term: active anchors attract as a group with a saturating collective
         # energy, weight zero off, radius in beads.
         self.factory_weight = 0.0
+        self.gyration_weight = 0.0
+        self.arcs_repulsion = True
         self.factory_radius = 2.0
         # A weak spring holding an arcless anchor pair inside `background_range_bp` at the
         # background for its separation, in the arcs stage, beside the repulsion that every
@@ -451,6 +472,11 @@ class Settings:
         # Multiplies the chain bond target. At 1 the bonds pull the short range below the
         # parity values and the distance curve steepens past the Hi-C exponent.
         self.use_contact_background = False
+        # Above zero, the contact background holds an arcless pair whose count is this many
+        # Poisson deviations above or below its expectation, in or out, the expectation taken
+        # over every pair at its separation, zeros included, and tests only pairs whose
+        # expectation is above this value squared. Zero keeps the rule above.
+        self.contact_background_z = 0.0
 
         # ---- simulation steps ----
         self.steps_lvl1 = 2
@@ -464,7 +490,7 @@ class Settings:
         self.noise_smooth = 0.5
         self.smooth_hard_wall = False  # reject a move that adds or deepens a pair under the radius
         self.smooth_anchor_cap = 0.0  # anchors may move this many mean bonds from the arcs position
-        self.smooth_start = "line"  # line | coil, where a gap's subanchors start
+        self.smooth_start = "line"  # line | coil | maxent, where a gap's subanchors start
         self.smooth_prefetch = 1  # proposals one JAX step evaluates at once, first accepted kept
         self.smooth_jax_grid = False  # excluded volume on a cell grid in the JAX kernel
         self.smooth_jax_grid_min_beads = 4096  # the grid only pays above this many beads
@@ -604,6 +630,7 @@ class Settings:
         self.relax_temp = 0.1  # fraction of max_temp_smooth; a little heat lets coils cross
         self.relax_noise = 0.5  # step size as a fraction of the median bond length
         self.relax_bond_weight = 10.0  # chain spring constants during the pass
+        self.relax_within_blocks = False
         # Skip the pass when fewer than this fraction of beads are touching another block.
         # It anneals the whole chromosome until its own convergence test fires, so it costs the
         # same however little there is to fix: measured on a trio run at an hour and fifty five
@@ -615,6 +642,13 @@ class Settings:
         # 691 for 11,766 on a real chromosome, so restricting it to the beads that need moving is
         # where the pass's cost actually goes.
         self.relax_local_window = -1
+
+        # ---- holes between blocks ----
+        # Beads for the stretch between two blocks, drawn from the maximum entropy bridge between
+        # the anchors that bound it. See gnome3d/pipeline/holes.py.
+        self.use_hole_beads = False
+        self.holes_hard_wall = True
+        self.holes_flank_beads = 0
 
         # ---- A/B compartments ----
         # Block-copolymer segregation over a per-bead compartment call, ported
@@ -810,6 +844,8 @@ class Settings:
         self.data_compartments = gets("data", "compartments", self.data_compartments)
         self.data_phasing_track = gets("data", "phasing_track", self.data_phasing_track)
         self.data_anchor_activity = gets("data", "anchor_activity", self.data_anchor_activity)
+        self.data_anchor_contacts = gets("data", "anchor_contacts", self.data_anchor_contacts)
+        self.data_contact_map = gets("data", "contact_map", self.data_contact_map)
 
         # [template]
 
@@ -826,6 +862,7 @@ class Settings:
         self.arc_weight_exponent = getf("springs", "arc_weight_exponent", self.arc_weight_exponent)
         self.loop_dropout = getb("springs", "loop_dropout", self.loop_dropout)
         self.loop_dropout_scale = getf("springs", "loop_dropout_scale", self.loop_dropout_scale)
+        self.loop_contact = getb("springs", "loop_contact", self.loop_contact)
         self.factory_weight = getf("factories", "weight", self.factory_weight)
         self.factory_radius = getf("factories", "radius", self.factory_radius)
         self.spring_squeeze = getf("springs", "squeeze_constant", self.spring_squeeze)
@@ -834,12 +871,16 @@ class Settings:
             "springs", "stretch_constant_arcs", self.spring_stretch_arcs
         )
         self.background_weight = getf("springs", "background_weight", self.background_weight)
+        self.gyration_weight = getf("springs", "gyration_weight", self.gyration_weight)
         self.background_range_bp = geti("springs", "background_range_bp", self.background_range_bp)
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs
         )
         self.use_contact_background = getb(
             "springs", "use_contact_background", self.use_contact_background
+        )
+        self.contact_background_z = getf(
+            "springs", "contact_background_z", self.contact_background_z
         )
         self.spring_stretch_ib = getf("springs", "stretch_constant_ib", self.spring_stretch_ib)
         self.spring_squeeze_ib = getf("springs", "squeeze_constant_ib", self.spring_squeeze_ib)
@@ -992,6 +1033,7 @@ class Settings:
         self.arcs_repulsion_cutoff_factor = getf(
             "excluded_volume", "arcs_repulsion_cutoff_factor", self.arcs_repulsion_cutoff_factor
         )
+        self.arcs_repulsion = getb("excluded_volume", "arcs_repulsion", self.arcs_repulsion)
         self.exclusion_radius_smooth = getf(
             "excluded_volume", "radius_smooth", self.exclusion_radius_smooth
         )
@@ -1089,6 +1131,12 @@ class Settings:
         self.relax_noise = getf("relax", "noise", self.relax_noise)
         self.relax_bond_weight = getf("relax", "bond_weight", self.relax_bond_weight)
         self.relax_local_window = geti("relax", "local_window", self.relax_local_window)
+        self.relax_within_blocks = getb("relax", "within_blocks", self.relax_within_blocks)
+
+        # [holes]
+        self.use_hole_beads = getb("holes", "use_hole_beads", self.use_hole_beads)
+        self.holes_hard_wall = getb("holes", "hard_wall", self.holes_hard_wall)
+        self.holes_flank_beads = geti("holes", "flank_beads", self.holes_flank_beads)
 
         # [compartments]
         self.use_compartments = getb("compartments", "use_compartments", self.use_compartments)
@@ -1156,9 +1204,10 @@ class Settings:
         self.smooth_jax_grid_min_beads = geti(
             "simulation_arcs_smooth", "jax_grid_min_beads", self.smooth_jax_grid_min_beads
         )
-        if self.smooth_start not in ("line", "coil"):
+        if self.smooth_start not in ("line", "coil", "maxent"):
             raise ValueError(
-                f"[simulation_arcs_smooth] start must be line or coil, got {self.smooth_start!r}"
+                "[simulation_arcs_smooth] start must be line, coil or maxent,"
+                f" got {self.smooth_start!r}"
             )
         self.smooth_dist_weight = getf(
             "simulation_arcs_smooth", "dist_weight", self.smooth_dist_weight

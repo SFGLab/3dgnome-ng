@@ -204,12 +204,43 @@ def test_it_is_reproducible_from_a_given_rng_state() -> None:
     check("from the same RNG state it gives the same structure", same)
 
 
+def test_within_blocks_clears_inner_overlaps() -> None:
+    """Overlaps inside a block move only with `within_blocks`."""
+    rng = np.random.default_rng(5)
+    a = coil(0, 80, np.zeros(3), rng, 1.0)
+    far = coil(500_000, 20, np.array([100.0, 0.0, 0.0]), rng, 1.0)
+    pa = positions(a)
+    d = np.linalg.norm(pa[:, None] - pa[None, :], axis=2)
+    iu = np.triu_indices(len(a), 2)
+    before = int((d[iu] < 0.7).sum())
+    s = settings(relax_local_window=1)
+    off = positions(relax_blocks([a, far], s)[0])
+    s.relax_within_blocks = True
+    on = positions(relax_blocks([a, far], s)[0])
+
+    def inner(q: np.ndarray) -> int:
+        dd = np.linalg.norm(q[:, None] - q[None, :], axis=2)
+        return int((dd[iu] < 0.7).sum())
+
+    check(
+        "off leaves a lone dense block as it was", inner(off) == before, f"{inner(off)} of {before}"
+    )
+    check("on clears most inner overlaps", inner(on) < 0.3 * before, f"{inner(on)} of {before}")
+    alone = positions(relax_blocks([a], s)[0])
+    check(
+        "on clears them in a lone block too",
+        inner(alone) < 0.3 * before,
+        f"{inner(alone)} of {before}",
+    )
+
+
 def main() -> int:
     print("cross block relaxation checks")
     test_gate_function()
     test_relax_separates()
     test_flag_off()
     test_local_window_restricts_who_may_move()
+    test_within_blocks_clears_inner_overlaps()
     test_local_window_is_off_by_default()
     test_it_is_reproducible_from_a_given_rng_state()
     print(f"\n{len(PASS)} passed, {len(FAIL)} failed")

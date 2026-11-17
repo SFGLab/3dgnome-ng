@@ -67,6 +67,10 @@ CANONICAL: dict[str, dict[str, object]] = {
         # the input curve on all three cells; 0.3 and 1.0 pull the closest pairs closer at a
         # steady cost in Hi-C. Measured 2026-09-07.
         "background_weight": 0.1,
+        # Every genomic window of anchors, 100 kb doubling up to the span, held at the law's
+        # radius of gyration in the arcs solve. It sets the size the repulsion set without
+        # holding any pair at a distance. Weights 1 and 10 added nothing on 2026-11-15.
+        "gyration_weight": 0.1,
         "background_range_bp": 100000,
         # Beyond that range, an arcless pair whose contact cell puts it under the background is
         # held at the law's contact distance. Sparse by construction, and on a thin map it
@@ -99,7 +103,13 @@ CANONICAL: dict[str, dict[str, object]] = {
         "mc_executor_arcs": "batch",
         "mc_executor_densify": "threaded",
         "mc_executor_estimate_dist": "batch",
-        "mc_executor_smooth": "batch",
+        # Threaded on numba since 2026-11-16. On frodo, 36 cores and an RTX 3090, GM12878 chr1 at
+        # two structures takes 631 s against 807 s with this stage on the device, and a 10 Mb
+        # region 35 s against 60 s; the stage alone on chr1 is 53 to 80 s against 122 to 146 s,
+        # and 92 s on 8 workers. The cross block relaxation follows it onto numba. Four
+        # structures per kernel on matched seeds are level on every pooled and battery number.
+        # design/kernel-performance.md.
+        "mc_executor_smooth": "threaded",
         # Cell grid for the excluded volume term. Identical results, so this is only about
         # speed, and it is written out rather than left to the default so a config records it.
         "neighbour_grid": "yes",
@@ -155,7 +165,12 @@ CANONICAL: dict[str, dict[str, object]] = {
         # against the walk with the sphere: Pearson up on all, SCC level, MultiMM level on
         # H1ESC and 0.01 to 0.04 down on the others, cross block overlaps 176/173/143 to
         # 163/126/100 per thousand, Rg 28/27/30 to 24/25/26.
-        "start": "hilbert",
+        # Since 2026-11-16 the anchors start from one draw per conformation of the maximum
+        # entropy Gaussian whose pair distances meet the arcs targets, the law's elsewhere.
+        # The solve takes them to its minimum and keeps the long range arrangement the draw
+        # set; with the repulsion off and the gyration term below, pooled SCC rose a further
+        # 0.016 to 0.020 over the Hilbert start on nine region runs and GM12878 chr1.
+        "start": "maxent",
         "max_temp": 5.0,
         "jump_temp_scale": 50.0,
         "jump_temp_coef": 20.0,
@@ -214,6 +229,14 @@ CANONICAL: dict[str, dict[str, object]] = {
         # 1.3 to 1.8 times. At 1.5, with the contact background holding the far pairs that
         # carry data, the curve sits on the law to 2 Mb on three cells; 1.0 compacts past it.
         "arcs_repulsion_cutoff_factor": 1.5,
+        # Off since 2026-11-16. The repulsion held every far arcless pair of every conformation
+        # at one distance, the 1 percent quantile beyond 100 kb at 0.40 to 0.53 of the law, so
+        # far pairs never met and block contacts at 400 kb to 1 Mb sat ten times under Hi-C's.
+        # The size it held is held by the gyration term in [springs], and anchor overlaps by
+        # the arcs excluded volume at a full mean arc target. The cutoff above is read only
+        # while the repulsion is on.
+        "arcs_repulsion": "no",
+        "auto_factor_arcs": 1.0,
     },
     "confinement": {
         "use_confinement": "yes",
@@ -235,13 +258,22 @@ CANONICAL: dict[str, dict[str, object]] = {
     # Excluded volume across blocks, so the stitched globules cannot interpenetrate. Without it
     # nothing acts between the beads of two blocks once the stitch has moved them together.
     "relax": {
-        "use_cross_block_relax": "no",
+        # On since 2026-11-16 with the repulsion off, which tripled cross block overlaps on a
+        # chromosome, 19 to 62 per thousand on GM12878 chr1; the pass takes them to 14 and
+        # adds about five minutes to a chr1 structure set.
+        "use_cross_block_relax": "yes",
         # Only the beads touching another block move, plus one chain neighbour either side.
         # With every subanchor movable the pass took an hour and fifty five minutes per
         # structure on a trio chr1 whatever the workload, and the last trio array timed out at
         # 24 hours on it. Replayed on the same chromosome a window of one took 129 seconds and
         # cut cross block contacts 31,637 to 362; a wider window only adds rounds.
         "local_window": 1,
+        # Overlaps inside a block move too, at a radius of one model unit, about a bond. With
+        # the repulsion off the coils of two gaps whose anchors sit close meet, 240 to 300 per
+        # thousand beads on CTCF only inputs; this takes GM12878 chr1 from 246 to 37 within
+        # blocks and 82 to 16 across at balanced SCC 0.355 to 0.359. 2026-11-16.
+        "within_blocks": "yes",
+        "ev_radius": 1.0,
     },
 }
 

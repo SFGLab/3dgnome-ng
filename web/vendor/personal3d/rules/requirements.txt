@@ -1,0 +1,5 @@
+PyVCF==0.6.8
+numpy==1.16.4
+pandas==0.24.2
+sortedcontainers==2.1.0
+

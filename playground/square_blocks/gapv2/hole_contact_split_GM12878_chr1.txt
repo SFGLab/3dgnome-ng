@@ -1,0 +1,12 @@
+chr1:1-60000000: 76 holes, 300 mapped hole bins, 2054 mapped block bins, 12 unmapped hole bins
+  mean count over block with block at the same separation; one hole / two holes / hole with block
+                                            25-50 kb             50-100 kb            100-200 kb            200-400 kb           400-1000 kb
+                      Hi-C raw      0.54     -  0.74      0.50     -  0.61      0.50     -  0.56      0.58  0.98  0.58      0.98  0.96  0.75
+                 Hi-C balanced      0.84     -  0.82      0.79     -  0.70      0.80     -  0.67      0.96  1.15  0.71      1.68  1.23  0.94
+             GM12878_chr1_prod      0.00     -  0.27      0.00     -  0.12      0.00     -  0.07      0.00  0.00  0.05      0.00  0.00  0.03
+            GM12878_chr1_holes      1.58     -  1.43      1.74     -  1.42      2.93     -  2.06      4.67  2.63  3.35     16.37 13.23  8.76
+           GM12878_chr1_holes2      0.53     -  0.87      0.73     -  0.98      1.53     -  1.48      3.05  2.75  2.39      5.51 11.94  7.80
+  SCC on raw counts, share of stratum covariance from pairs touching a hole bin / block pairs
+             GM12878_chr1_prod  SCC  0.341   hole +0.36  block +0.64
+            GM12878_chr1_holes  SCC  0.087   hole -0.67  block +1.67
+           GM12878_chr1_holes2  SCC  0.228   hole +0.18  block +0.82

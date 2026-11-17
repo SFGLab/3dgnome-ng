@@ -1,0 +1,85 @@
+3D-GNOME
+NG
+3D chromatin models from loops, contacts and structural variants
+Model a region
+My jobs
+Method
+Results
+Help
+Cite
+On this page
+Agreement with Hi-C
+Enhancer to promoter distance
+Link to expression
+Nine people, three trios
+Run time
+Results
+This page compares the models with measured data and shows the effect of RNAPII loops. The data are GM12878, H1ESC and HFFc6, chr1:1-60 Mb, ten structures per model. The original models are the cudaMMC models of 3D-GNOME 3.0.
+original models, cudaMMC
+3D-GNOMEᴺᴳ, CTCF loops
+3D-GNOMEᴺᴳ, CTCF and RNAPII loops
+Agreement with Hi-C
+Stratum adjusted correlation at 25 kb, higher is better.
+GM12878
+0.22
+0.37
+H1ESC
+0.15
+0.27
+HFFc6
+0.15
+0.33
+Enhancer to promoter distance
+Pairs joined by an RNAPII loop only, median over pairs, bead units.
+GM12878, 13% closer
+4.2
+3.7
+H1ESC, 24% closer
+4.0
+3.0
+HFFc6, 11% closer
+4.5
+4.0
+Link to expression
+Spearman correlation between the change in 3D distance and the change in expression across cell lines, with the sign flipped. Higher means a stronger link.
+GM12878 and H1ESC
+0.19
+0.26
+0.29
+H1ESC and HFFc6
+0.12
+0.19
+0.20
+GM12878 and HFFc6
+0.25
+0.29
+0.33
+Nine people, three trios
+Change with RNAPII loops, measured against the Hi-C of each person.
+9 of 9
+contact enrichment at RNAPII loops rises, from 39 to 98%, median 57%
+2 of 9
+correlation with the whole Hi-C map rises, from -17 to +29%, median -2%
+With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower.
+Run time
+cudaMMC and 3D-GNOMEᴺᴳ on the same GM12878 inputs and the same RTX 4060 Ti. The values are placeholders until the timing run is done.
+One structure, 1 Mb
+chr1:11.5-12.6 Mb, minutes, lower is better.
+cudaMMC
+placeholder
+3D-GNOMEᴺᴳ, CTCF loops
+placeholder
+Ten structures, 60 Mb
+chr1:1-60 Mb, hours, lower is better.
+cudaMMC
+placeholder
+3D-GNOMEᴺᴳ, CTCF loops
+placeholder
+One structure, whole chromosome
+chr1, 248 Mb, hours, lower is better.
+cudaMMC
+placeholder
+3D-GNOMEᴺᴳ, CTCF loops
+placeholder
+If you use these models, please cite 3D-GNOMEᴺᴳ and the method and data papers on the Cite page.
+All citations

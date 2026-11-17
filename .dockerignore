@@ -1,0 +1,12 @@
+# The image needs the engine and the web app only. Everything else, data/ above all, stays out
+# of the build context.
+*
+!pyproject.toml
+!README.md
+!SETTINGS.md
+!gnome3d
+!web
+web/frontend/node_modules
+web/frontend/dist
+web/design
+**/__pycache__
