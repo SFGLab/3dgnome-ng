@@ -6,6 +6,7 @@
 #   out/toolpage1    GM12878 chr1:11.5-12.6 Mb, one structure per tool, the site's first run time chart
 #   out/toolpagechr  GM12878 whole chr1, one structure per tool, its third
 #   out/toolpage60   chr1:1-60 Mb, ten structures per tool, GM12878 first, its second chart and its Hi-C chart
+#   out/toolsize     GM12878 chr1 from 10 Mb, one structure per tool at 1, 2, 5, 10, 20, 50 and 100 Mb
 #   out/tools20      three 20 Mb regions dense in loops, five structures, three cells, with the bootstrap
 #   out/toolpage60   the same for H1ESC and HFFC6
 #   out/toolgenome   one whole genome per tool
@@ -29,6 +30,8 @@ boot() {  # out cells regions
 CELLS=GM12878 N=1 REGIONS="chr1:11500000-12600000" trial out/toolpage1; echo EXIT >> out/toolpage1/night.done
 CELLS=GM12878 N_CHR=1 REGIONS=chr1 trial out/toolpagechr; echo EXIT >> out/toolpagechr/night.done
 CELLS=GM12878 N=10 REGIONS="chr1:1-60000000" trial out/toolpage60; echo EXIT >> out/toolpage60/night.done
+RSIZE="chr1:10000000-11000000 chr1:10000000-12000000 chr1:10000000-15000000 chr1:10000000-20000000 chr1:10000000-30000000 chr1:10000000-60000000 chr1:10000000-110000000"
+CELLS=GM12878 N=1 REGIONS="$RSIZE" trial out/toolsize; echo EXIT >> out/toolsize/night.done
 N=5 REGIONS="$R20" trial out/tools20
 boot out/tools20 "GM12878 H1ESC HFFC6" "$R20"; echo EXIT >> out/tools20/night.done
 CELLS="H1ESC HFFC6" N=10 REGIONS="chr1:1-60000000" trial out/toolpage60
