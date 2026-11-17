@@ -2,7 +2,7 @@ import { useQueries } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api, type JobStatus } from '../api'
 import { EXAMPLES, type Example } from './examples'
-import { recentJobs } from './recent'
+import { useRecentJobs } from './useRecentJobs'
 
 function stateText(s: JobStatus | undefined): string {
   if (!s) return ''
@@ -12,7 +12,7 @@ function stateText(s: JobStatus | undefined): string {
 
 /** The examples and the recent jobs of this browser. */
 export function SidePanel({ onExample }: { onExample: (e: Example) => void }) {
-  const jobs = recentJobs()
+  const jobs = useRecentJobs()
   const statuses = useQueries({
     queries: jobs.map((j) => ({ queryKey: ['status', j.url], queryFn: () => api.status(j.url), refetchInterval: 15000, retry: false })),
   })

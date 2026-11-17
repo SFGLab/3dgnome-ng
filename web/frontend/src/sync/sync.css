@@ -1,0 +1,169 @@
+.sync-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.reading .sync-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+}
+
+.reading .sync-panel p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.sync-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.sync-when {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.sync-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--good);
+}
+
+.sync-dot.bad {
+  background: var(--promoter);
+}
+
+.sync-actions,
+.sync-code-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 500 13px var(--font);
+  cursor: pointer;
+}
+
+.sync-button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.sync-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.sync-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: 500 13px var(--font);
+  cursor: pointer;
+}
+
+.sync-code {
+  padding: 8px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  font: 600 20px var(--mono);
+  letter-spacing: 0.06em;
+  user-select: all;
+}
+
+.sync-form,
+.sync-stop {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.sync-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.sync-check input {
+  margin-top: 3px;
+}
+
+.sync-check strong {
+  display: block;
+  font-weight: 600;
+}
+
+.sync-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.sync-input {
+  max-width: 320px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 600 18px var(--mono);
+  letter-spacing: 0.06em;
+}
+
+.sync-input:focus {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent-soft);
+}
+
+.reading .sync-panel .sync-hint,
+.sync-hint {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.reading .sync-panel .sync-error {
+  color: var(--promoter);
+  font-size: 13px;
+}
+
+@media (max-width: 560px) {
+  .sync-code {
+    font-size: 16px;
+  }
+}

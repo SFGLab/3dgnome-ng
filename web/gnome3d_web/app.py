@@ -26,7 +26,7 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import explore, owndata, remote
+from . import explore, lists, owndata, remote
 from .catalog import BACKGROUNDS, FACTOR_CHOICES, Catalog
 from .jobs import JobRequest, _member, request_key
 from .queue import enqueue, queue_position, sweep_private
@@ -616,6 +616,45 @@ def create_app() -> FastAPI:
                 raise HTTPException(404)
             dirs.append(job_dir(m[1], m[2]))
         return JSONResponse(explore.compare(dirs[0], dirs[1]))
+
+    shared_lists = lists.Lists(s.results_dir / "lists")
+    BAD_CODE = "A sync code has 16 letters and digits, like K7M2-9QXD-4THP-W3RZ."
+    NO_LIST = "No list has this code. Compare it with the computer that shows it."
+
+    async def list_body(request: Request) -> dict[str, Any]:
+        raw = await request.body()
+        if len(raw) > lists.MAX_BODY:
+            raise HTTPException(413)
+        try:
+            body = json.loads(raw or b"{}")
+        except ValueError:
+            raise HTTPException(400) from None
+        return body if isinstance(body, dict) else {}
+
+    def list_answer(code: str, record: dict[str, Any], status: int = 200) -> JSONResponse:
+        return JSONResponse({"code": code, "private": record["private"], "jobs": record["jobs"]}, status)
+
+    @app.post("/api/lists")
+    async def list_create(request: Request) -> JSONResponse:
+        body = await list_body(request)
+        code, record = shared_lists.create(body.get("jobs"), body.get("private") is True)
+        return list_answer(code, record, 201)
+
+    @app.get("/api/lists/{code}")
+    def list_read(code: str) -> JSONResponse:
+        shown = lists.normalise(code)
+        if shown is None:
+            return JSONResponse({"error": BAD_CODE}, 400)
+        record = shared_lists.read(shown)
+        return list_answer(shown, record) if record else JSONResponse({"error": NO_LIST}, 404)
+
+    @app.put("/api/lists/{code}")
+    async def list_update(code: str, request: Request) -> JSONResponse:
+        shown = lists.normalise(code)
+        if shown is None:
+            return JSONResponse({"error": BAD_CODE}, 400)
+        record = shared_lists.update(shown, (await list_body(request)).get("jobs"))
+        return list_answer(shown, record) if record else JSONResponse({"error": NO_LIST}, 404)
 
     index_html = s.frontend_dist / "index.html"
     if (s.frontend_dist / "assets").is_dir():

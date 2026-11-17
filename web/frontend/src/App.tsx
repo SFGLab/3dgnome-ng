@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Cite } from './pages/Cite'
@@ -11,12 +11,15 @@ import { Results } from './pages/Results'
 import { Title } from './pages/Title'
 import { BASE } from './base'
 import { ROUTES } from './routes'
+import { startSync } from './sync/sync'
 
 // The explorer carries three.js and loads only on a job page.
 const Job = lazy(() => import('./pages/Job').then((m) => ({ default: m.Job })))
 
 /** The site's routes. */
 export function App() {
+  // A browser with a sync code sends each job it starts or renames, on every page.
+  useEffect(() => startSync(), [])
   return (
     <BrowserRouter basename={BASE || '/'}>
       <Layout>

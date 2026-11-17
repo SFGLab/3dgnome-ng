@@ -127,6 +127,7 @@ export function Help() {
           <h2>Questions</h2>
           <QA q="Hi-C instead of ChIA-PET" a="You can call loops from Hi-C and upload them as your own loops, with the Hi-C as the contact background. Loops called from Hi-C are noisier than ChIA-PET loops, and structures built from them are noisier too." />
           <QA q="HiCDiffusion warning" a="HiCDiffusion was trained on GM12878. For other cell types its predicted map is outside its training data." />
+          <QA q="My jobs on another computer" a="The list on the My jobs page is kept in the browser. A sync code from that page links the list with your other computers, and each of them then shows the same jobs. Type the code on the other computer, or open the link the page gives. Private jobs join the shared list only if you choose so on making the code." />
           <QA q="Job runtime" a="The runtime grows with the size of the region and the number of structures. A job waits in the queue while the GPUs are busy, and the job page shows its place in the queue." />
         </section>
 
