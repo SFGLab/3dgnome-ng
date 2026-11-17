@@ -97,6 +97,33 @@ and the point difference favours 3dgnome on all nine runs against both, by 0.09 
 MultiMM and 0.16 to 0.30 over cudaMMC. The two ties with MultiMM are GM12878 chr11 at +0.089
 with an interval from -0.010 and HFFC6 chr12 at +0.086 with one from -0.042.
 
+### Ten structures on chr1 1 to 60 Mb
+
+The region reconstructed on its own, ten structures per tool and cell, the same bootstrap.
+Script `slurm/ensemble/night_queue.sh`, tables in `playground/square_blocks/toolpage/toolpage60/`.
+
+| Cell | Score | 3dgnome | MultiMM | cudaMMC |
+|---|---|---|---|---|
+| GM12878 | raw SCC | 0.509 | 0.299 | 0.220 |
+| H1ESC | raw SCC | 0.340 | 0.165 | 0.145 |
+| HFFC6 | raw SCC | 0.436 | 0.181 | 0.146 |
+| GM12878 | raw Pearson | 0.458 | 0.244 | 0.247 |
+| H1ESC | raw Pearson | 0.494 | 0.252 | 0.258 |
+| HFFC6 | raw Pearson | 0.450 | 0.237 | 0.210 |
+| GM12878 | raw Spearman | 0.224 | 0.125 | 0.148 |
+| H1ESC | raw Spearman | 0.216 | 0.122 | 0.146 |
+| HFFC6 | raw Spearman | 0.182 | 0.099 | 0.102 |
+| GM12878 | MultiMM's own metric | 0.784 | 0.354 | 0.513 |
+| H1ESC | MultiMM's own metric | 0.765 | 0.286 | 0.484 |
+| HFFC6 | MultiMM's own metric | 0.775 | 0.310 | 0.535 |
+
+3dgnome leads both tools on raw Pearson, raw Spearman and raw SCC on all three cells, every
+interval clear of zero. The raw SCC difference is +0.175 to +0.254 over MultiMM and +0.195 to
++0.290 over cudaMMC. On balanced SCC over mapped bins it leads both on GM12878 and HFFC6 and
+ties both on H1ESC, +0.094 with an interval from -0.013 against MultiMM and +0.093 with one
+from -0.031 against cudaMMC. The distance exponent over Hi-C's is 0.97, 1.02 and 1.11 for
+3dgnome, 0.48 to 0.51 for MultiMM and 1.66 to 2.31 for cudaMMC.
+
 ## Physics
 
 The validation battery per structure, means over the same runs. Overlaps are non neighbour
@@ -134,6 +161,9 @@ Wall clock for the whole ensemble, from the command to the last structure, in se
 | GM12878 chr1, three structures | 673 at 124,657 beads | 521 at 50,631 beads | 2,528 at 124,657 beads |
 | H1ESC chr1, three structures | 526 at 114,276 beads | 412 at 35,881 beads | 2,083 at 114,276 beads |
 | HFFC6 chr1, three structures | 385 at 109,082 beads | 436 at 28,616 beads | 1,842 at 109,082 beads |
+| GM12878 chr1 1 to 60 Mb, ten structures | 634 at 42,480 beads | 561 at 17,321 beads | 1,208 at 42,480 beads |
+| H1ESC chr1 1 to 60 Mb, ten structures | 687 at 40,570 beads | 494 at 14,229 beads | 1,118 at 40,570 beads |
+| HFFC6 chr1 1 to 60 Mb, ten structures | 374 at 36,765 beads | 503 at 10,050 beads | 978 at 36,765 beads |
 
 On a 5 Mb region 3dgnome takes 1.0 to 1.5 times MultiMM's time at the same bead count. On a
 chromosome it is 3.8 to 4.8 times faster than MultiMM at the same bead count. cudaMMC runs at

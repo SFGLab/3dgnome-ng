@@ -38,6 +38,8 @@ const tools = (cudammc: [number, number], multimm: [number, number], ours: [numb
 
 const TOOLS_SCC: Group[] = [
   { name: 'GM12878', bars: [bar('cudammc', 0.22), bar('multimm', 0.3), bar('ctcf', 0.51)] },
+  { name: 'H1ESC', bars: [bar('cudammc', 0.15), bar('multimm', 0.17), bar('ctcf', 0.34)] },
+  { name: 'HFFc6', bars: [bar('cudammc', 0.15), bar('multimm', 0.18), bar('ctcf', 0.44)] },
 ]
 
 const RUN_TIME: [string, string, Group[]][] = [
