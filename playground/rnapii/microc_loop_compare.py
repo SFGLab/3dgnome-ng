@@ -1,7 +1,7 @@
 """Score model ensembles at the loops called on a Micro-C map, loop by loop.
 
     python playground/rnapii/microc_loop_compare.py --json out.json <slice.npz> <microc loops.bedpe> \
-        ctcf=<loops.bedpe> rnapii=<loops.bedpe> <arm_dir> ...
+        ctcf=<loops.bedpe> rnapii=<loops.bedpe> [min_z=15] <arm_dir> ...
 
 The loops are the pixels `microc_call_loops.py` wrote. Each loop is compared with control pairs
 at the same genomic separation, the loop's two bins shifted together by 3 to 10 bins either way
@@ -25,6 +25,11 @@ is the rate a pair with no loop passes the threshold. That rate differs between 
 ensemble whose structures differ more has noisier mean distances. Two numbers allow for it. The
 placed share above the moved loops' share, and the chance that a loop's ratio is under a moved
 loop's, one half when the model does not tell them apart.
+
+With `min_z` a loop is kept only when its count on the map is that many standard deviations
+over its controls, the excess over the square root of the control mean. The caller's defaults
+pass thousands of pixels of about ten reads on a deep map, and those do not show in the Hi-C
+map of the same cells. `loops_in_map.py` is the check, numbers in `design/microc-loops.md`.
 
 Prints one row per arm and class and writes the rows and the per loop table to the JSON.
 """
@@ -128,6 +133,8 @@ def main() -> None:
     out = Path(args[k + 1])
     del args[k : k + 2]
     slice_path, loops_path, *rest = args
+    min_z = next((float(a.split("=", 1)[1]) for a in rest if a.startswith("min_z=")), 0.0)
+    rest = [a for a in rest if not a.startswith("min_z=")]
     inputs = {a.split("=", 1)[0]: Path(a.split("=", 1)[1]) for a in rest if "=" in a}
     arms = [a for a in rest if "=" not in a]
 
@@ -143,6 +150,14 @@ def main() -> None:
     keep = (j < n) & (j - i >= 4)
     i, j = i[keep], j[keep]
     called = [lp for lp, kk in zip(called, keep, strict=True) if kk]
+    if min_z > 0:
+        c0, ctl0 = count_enrichment(obs, i, j, obs.sum(axis=0) > 0)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            z = (c0 - ctl0) / np.sqrt(ctl0)
+        strong = np.isfinite(z) & (z >= min_z)
+        print(f"min_z {min_z:g}: {int(strong.sum())} of {len(called)} loops kept", flush=True)
+        i, j = i[strong], j[strong]
+        called = [lp for lp, kk in zip(called, strong, strict=True) if kk]
     ends = [(lp[1], lp[4]) for lp in called]
 
     chrom = called[0][0]
