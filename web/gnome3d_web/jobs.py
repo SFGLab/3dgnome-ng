@@ -21,6 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
+from . import hicdiffusion
 from .catalog import Catalog
 from .inputs import Own, build_inputs
 from .marks import ep_table, mark_beads, read_cif
@@ -114,16 +115,6 @@ def _tail(path: Path, n: int = 30) -> str:
     return "\n".join(path.read_text(errors="replace").splitlines()[-n:]) if path.is_file() else ""
 
 
-def _hicdiffusion(region_start: int, chrom: str, svs: list, fasta: Path) -> tuple[np.ndarray, int]:
-    """HiCDiffusion's deterministic map of the 2 Mb window from the region's start."""
-    from personal3d import hicdiffusion
-
-    ref = hicdiffusion.Reference(fasta)
-    w = hicdiffusion.haplotype_window(ref, chrom, region_start, svs)
-    cond, _ = hicdiffusion.predict([w])
-    return cond[0], region_start
-
-
 def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, cell_enhancers: bool = True):  # noqa: ANN001, ANN202
     """The cell type's genes and enhancers on `chrom` in the haplotype's coordinates, the beads'
     coordinates, those inside a deletion dropped. An enhancers upload replaces the cell type's;
@@ -176,7 +167,7 @@ def run_job(
         hic = None
         if req.background == "hicdiffusion":
             _status(job, stage="hicdiffusion")
-            hic = _hicdiffusion(region.start, region.chrom, svs, Path(os.environ["REFERENCE_FASTA"]))
+            hic = hicdiffusion.predict(region.chrom, region.start, svs, log, env_extra), region.start
         inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background, own)
         apply_overrides(inputs.config, validate_overrides(req.overrides))
         _status(job, stage="modelling", region=inputs.region, n_svs=inputs.n_svs, skipped_svs=skipped, loops=inputs.loops)
@@ -186,7 +177,8 @@ def run_job(
         env = dict(os.environ) | (env_extra or {})
         if "ENGINE_ROOT" in env:
             env["PYTHONPATH"] = env["ENGINE_ROOT"] + (":" + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
-        with log.open("w") as fh:
+        # The log of a job begins with the HiCDiffusion step when it ran, and the engine follows.
+        with log.open("a" if hic is not None else "w") as fh:
             rc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, cwd=env.get("ENGINE_ROOT"), env=env).returncode
         if rc != 0:
             raise RuntimeError(f"the engine exited with {rc}")

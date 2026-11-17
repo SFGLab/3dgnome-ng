@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
 
   web:
-    build: { context: .., dockerfile: web/Dockerfile, args: { GPU: "${GPU:-1}", BASE_PATH: "${BASE_PATH:-}" } }
+    build: { context: .., dockerfile: web/Dockerfile, args: { GPU: "${GPU:-1}", BASE_PATH: "${BASE_PATH:-}", HICDIFFUSION: "${HICDIFFUSION:-1}" } }
     image: gnome3d-web
     restart: unless-stopped
     ports: ["${PORT:-8000}:8000"]

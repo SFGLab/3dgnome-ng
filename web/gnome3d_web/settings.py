@@ -17,8 +17,8 @@ UPLOAD_MAX_MB   the largest upload, in MB, default 200
 LINK_READS    how many contact map links the server reads at once, default 4
 LINK_ALLOW_PRIVATE  1 lets a contact map link point at a private or loopback address, for tests;
               off by default
-HICDIFFUSION_DIR, HICDIFFUSION_PYTHON, HICDIFFUSION_MODELS, REFERENCE_FASTA  the optional
-              HiCDiffusion step; it is offered only when all four are set
+HICDIFFUSION_DIR, HICDIFFUSION_PYTHON, HICDIFFUSION_MODELS, REFERENCE_FASTA  the parts of the
+              HiCDiffusion step, see hicdiffusion.py; it is offered when every part is in place
 """
 
 from __future__ import annotations
@@ -27,8 +27,6 @@ import os
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
-
-HICDIFFUSION_KEYS = ("HICDIFFUSION_DIR", "HICDIFFUSION_PYTHON", "HICDIFFUSION_MODELS", "REFERENCE_FASTA")
 
 
 def base_path(text: str) -> str:
@@ -73,8 +71,3 @@ class Settings:
             base_path=base_path(os.environ.get("BASE_PATH", "")),
             frontend_dist=Path(os.environ.get("FRONTEND_DIST", Path(__file__).resolve().parents[1] / "frontend" / "dist")),
         )
-
-    @staticmethod
-    def hicdiffusion_missing() -> list[str]:
-        """The HiCDiffusion settings that are not set, empty when the step can run."""
-        return [k for k in HICDIFFUSION_KEYS if not os.environ.get(k)]

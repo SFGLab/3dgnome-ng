@@ -227,13 +227,29 @@ All by environment, see `gnome3d_web/settings.py`. The ones that matter:
 | `LINK_ALLOW_PRIVATE` | off | `1` lets a contact map link point at a private address, for tests only |
 | `LINK_READS` | 4 | contact map links read at once |
 
-HiCDiffusion is offered only when `HICDIFFUSION_DIR`, `HICDIFFUSION_PYTHON`,
-`HICDIFFUSION_MODELS` and `REFERENCE_FASTA` are all set, the checkout, its own interpreter (its
-package pins clash with the engine's), the directory with `hicdiffusion.ckpt` and
-`hicdiffusion_encoder_decoder.ckpt` (triosformer's `models/manifest.tsv` lists the archive), and
-the hg38 FASTA with its `.fai`. Mount them into the worker and set the variables. Its map is
-a contact background from sequence spliced into the cell type's map over a 2 Mb window from the
-region's start; the site never presents it as individual specific.
+HiCDiffusion is a step of a job that asks for it. It predicts the contact background of a 2 Mb
+window from the haplotype's sequence, and the map is spliced into the cell type's map from the
+region's start. The step runs HiCDiffusion's encoder decoder, which is deterministic, on the GPU
+of the job's queue slot before the engine starts, and its output opens the job's log. Measured
+2026-11-17 on an RTX 3090 the prediction takes 2 s and 1.1 GiB of GPU memory, 5 s on the CPU,
+and the step takes 12 s of a job with the start of its interpreter and the load of the model.
+The site never presents the map as individual specific.
+
+HiCDiffusion runs in its own interpreter, since its package pins clash with the engine's. The
+Docker image holds its checkout at a fixed commit and that interpreter, and sets the four
+variables of the step. Two parts are data and go below `DATA_DIR`:
+
+| variable | value in the image | part |
+|---|---|---|
+| `HICDIFFUSION_DIR` | `/opt/hicdiffusion` | the checkout, in the image |
+| `HICDIFFUSION_PYTHON` | `/opt/hicdiffusion-venv/bin/python` | its interpreter, in the image |
+| `HICDIFFUSION_MODELS` | `/data/hicdiffusion` | `hicdiffusion.ckpt` and `hicdiffusion_encoder_decoder.ckpt`; triosformer's `models/manifest.tsv` lists the archive |
+| `REFERENCE_FASTA` | `/data/reference/hg38.fa` | the hg38 FASTA with its `.fai` beside it |
+
+The site offers the step once every part is in place, and the form names it as not set up
+until then. A job that asks for it on such a server is refused with the missing part named.
+`HICDIFFUSION=0` at the build leaves the step out of the image, which is then about 5 GB
+smaller.
 
 ## How long a job takes
 

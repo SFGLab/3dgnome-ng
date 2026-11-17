@@ -26,7 +26,7 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import explore, lists, owndata, remote
+from . import explore, hicdiffusion, lists, owndata, remote
 from .catalog import BACKGROUNDS, FACTOR_CHOICES, Catalog
 from .jobs import JobRequest, _member, request_key
 from .queue import enqueue, queue_position, sweep_private
@@ -88,7 +88,7 @@ def create_app() -> FastAPI:
                 "factors": FACTOR_CHOICES,
                 "retention": s.retention_days,
                 "max_region_mb": f"{s.max_span / 1e6:g}",
-                "hicdiffusion_missing": Settings.hicdiffusion_missing(),
+                "hicdiffusion_missing": hicdiffusion.missing(),
                 "error": error,
                 "v": values or {},
             },
@@ -149,8 +149,8 @@ def create_app() -> FastAPI:
                 "Pick a region of up to 2 Mb, or the Hi-C of the cell type as the contact background.",
                 "background",
             )
-        if background == "hicdiffusion" and Settings.hicdiffusion_missing():
-            raise JobError("HiCDiffusion is not set up on this server: " + ", ".join(Settings.hicdiffusion_missing()), "background")
+        if background == "hicdiffusion" and hicdiffusion.missing():
+            raise JobError("HiCDiffusion is not set up on this server: " + ", ".join(hicdiffusion.missing()), "background")
         if sv_set and sv_set not in catalog.sv_sets:
             raise JobError(f"unknown SV set {sv_set!r}", "sv_set")
         if sv_set and sample not in catalog.sv_sets[sv_set].samples:
@@ -525,7 +525,7 @@ def create_app() -> FastAPI:
             "factors": list(FACTOR_CHOICES),
             "max_region_mb": s.max_span / 1e6,
             "max_structures": s.max_structures,
-            "hicdiffusion": not Settings.hicdiffusion_missing(),
+            "hicdiffusion": not hicdiffusion.missing(),
         }
 
     @app.get("/api/settings")
