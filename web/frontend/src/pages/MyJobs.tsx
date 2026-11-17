@@ -26,7 +26,7 @@ export function MyJobs() {
       <div className="reading">
         <header className="page-head">
           <h1>My jobs</h1>
-          <p className="lead">The jobs started in this browser, newest first. The list lives in this browser only. A job opened from its link on another computer is not on it.</p>
+          <p className="lead">The jobs started in this browser, newest first. The list is stored in this browser only. A job opened from its link on another computer is not on it.</p>
         </header>
         {jobs.length === 0 ? (
           <div className="no-jobs">

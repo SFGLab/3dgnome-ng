@@ -1,7 +1,7 @@
 /** Geometry of the chain as the 3D view draws it. */
 type P = [number, number, number]
 
-/** The tube radius, a fixed share of the median bond, so a chain reads the same at any scale. */
+/** The tube radius, a fixed share of the median bond. A chain then looks the same at any scale. */
 export function bondRadius(points: P[]): number {
   const bonds: number[] = []
   for (let i = 1; i < points.length; i++) {

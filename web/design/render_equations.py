@@ -30,7 +30,7 @@ EQUATIONS: dict[str, tuple[str, int]] = {
     "anchor_energy": (
         r"$E_{\mathrm{anchor}} = \sum_{(i,j) \in L} k \left(\frac{d_{ij} - t_{ij}}{t_{ij}}\right)^2"
         r" + w_b \sum_{(i,j) \in B} \left(\frac{d_{ij} - b_{ij}}{\min(d_{ij}, b_{ij})}\right)^2"
-        r"$" "\n" r"$\qquad + \sum_{(i,j) \in R} \max\left(0,\ \frac{1}{d_{ij}} - \frac{1}{r_c}\right)"
+        r"$" "\n" r"$\qquad + w_g \sum_{w \in W} n_w \left(\frac{R_g(w)}{R_w} - 1\right)^2"
         r" + w_{ev} \sum_{|i - j| > 1} \left(\frac{r_0 - d_{ij}}{r_0}\right)_{+}^{2}$",
         DISPLAY,
     ),
@@ -46,6 +46,7 @@ EQUATIONS: dict[str, tuple[str, int]] = {
     "t_loop_simple": (r"$k \left(\frac{d_{ij} - t_{ij}}{t_{ij}}\right)^2$", CELL),
     "t_background": (r"$w_b \left(\frac{d_{ij} - b_{ij}}{\min(d_{ij}, b_{ij})}\right)^2$", CELL),
     "t_repulsion": (r"$\max\left(0,\ \frac{1}{d_{ij}} - \frac{1}{r_c}\right)$", CELL),
+    "t_gyration": (r"$w_g\, n_w \left(\frac{R_g(w)}{R_w} - 1\right)^2$", CELL),
     "t_ev": (r"$w_{ev} \left(\frac{r_0 - d_{ij}}{r_0}\right)^2,\ d_{ij} < r_0$", CELL),
     "t_bond": (r"$w_d k \left(\frac{d_{i,i+1} - t_i}{t_i}\right)^2$", CELL),
     "t_bending": (r"$w_a \left(\frac{1 - \cos\theta_i}{2}\right)^3$", CELL),

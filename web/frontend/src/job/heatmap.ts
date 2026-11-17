@@ -4,10 +4,10 @@ export type Show = 'observed' | 'expected' | 'oe' | 'pearson'
 export const DARKEST: [number, number, number] = [110, 18, 8]
 const STOPS: [number, number, number][] = [[255, 255, 255], [241, 120, 60], DARKEST]
 
-/** The expected contact at each separation: the mean over pairs whose rows both hold contacts,
- * and from three bins apart the median of the neighbouring separations, so one sparse stratum
- * does not stand out as a stripe. The main diagonal is left empty; the maps hold no pair within
- * one bin. */
+/** The expected contact at each separation. It is the mean over pairs whose rows both hold
+ * contacts, and from three bins apart the median of the neighbouring separations. The median
+ * stops one sparse stratum from showing as a stripe. The main diagonal is left empty. The maps
+ * hold no pair within one bin. */
 function expected(m: number[][]): number[][] {
   const n = m.length
   const live = m.map((row, i) => row.some((v, j) => j !== i && v > 0))
@@ -73,8 +73,8 @@ export function diverging(v: number, span: number): [number, number, number] {
 
 /** The ramp colour of a value between lo and hi, on a log scale when asked. */
 export function colour(v: number, lo: number, hi: number, log: boolean): [number, number, number] {
-  // A true log, so a map of values below one spreads as one of counts does; a lower end of zero
-  // takes a floor a thousandth of the upper end.
+  // A true log spreads a map of values below one as it spreads a map of counts. A lower end of
+  // zero takes a floor of a thousandth of the upper end.
   const floor = lo > 0 ? lo : hi / 1000
   const f = (x: number) => (log ? Math.log(Math.max(x, floor)) : x)
   const span = f(hi) - f(lo)

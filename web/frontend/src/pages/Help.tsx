@@ -127,7 +127,7 @@ export function Help() {
           <h2>Questions</h2>
           <QA q="Hi-C instead of ChIA-PET" a="You can call loops from Hi-C and upload them as your own loops, with the Hi-C as the contact background. Loops called from Hi-C are noisier than ChIA-PET loops, and structures built from them are noisier too." />
           <QA q="HiCDiffusion warning" a="HiCDiffusion was trained on GM12878. For other cell types its predicted map is outside its training data." />
-          <QA q="Job run time" a="Run time grows with the size of the region and the number of structures. A job waits in the queue while the GPUs are busy, and the job page shows its place in the queue." />
+          <QA q="Job runtime" a="The runtime grows with the size of the region and the number of structures. A job waits in the queue while the GPUs are busy, and the job page shows its place in the queue." />
         </section>
 
         <section id="running">
@@ -163,7 +163,7 @@ export function Help() {
             </tbody>
           </table>
           <a className="settings-link" href="https://github.com/SFGLab/3dgnome-ng/blob/main/SETTINGS.md">
-            <BookOpen size={13} aria-hidden /> All 177 settings, from SETTINGS.md
+            <BookOpen size={13} aria-hidden /> All 186 settings, from SETTINGS.md
           </a>
         </section>
       </div>

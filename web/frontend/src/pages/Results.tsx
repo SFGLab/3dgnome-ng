@@ -47,7 +47,7 @@ const RUN_TIME: [string, string, 'seconds' | 'minutes', ToolRun[]][] = [
   ['One structure, 1 Mb', 'chr1:11.5-12.6 Mb.', 'seconds', runs([350, 6.4], [760, 7.4], [760, 9.0])],
   ['Ten structures, 60 Mb', 'chr1:1-60 Mb.', 'minutes', runs([17321, 560.9], [42480, 1207.5], [42480, 634.4])],
   ['One structure, whole chromosome', 'chr1, 248 Mb.', 'minutes', runs([50631, 194.8], [124657, 853.1], [124657, 384.2])],
-  ['Three structures at equal bead counts', 'chr1, 248 Mb. cudaMMC is set to as many beads as the other two.', 'minutes', runs([126330, 641], [124657, 2528], [124657, 673])],
+  ['Three structures at equal bead counts', 'chr1, 248 Mb. cudaMMC was set to about the same number of beads as the other two tools.', 'minutes', runs([126330, 641], [124657, 2528], [124657, 673])],
   ['One structure, whole genome', 'chr1 to chr22.', 'minutes', runs([458445, 1882.1], [1312597, null], [1312597, 2784.0], 'did not complete')],
 ]
 
@@ -74,10 +74,10 @@ const SECTIONS = [
   ['#trios', 'Nine people, three trios'],
   ['#tools', 'Other tools'],
   [`${ROUTES.method}#limitations`, 'Limitations'],
-  ['#run-time', 'Run time'],
+  ['#runtime', 'Runtime'],
 ]
 
-/** The models against measured data and against cudaMMC and MultiMM, and the run time of the three. */
+/** The models against measured data and against cudaMMC and MultiMM, and the runtime of the three. */
 export function Results() {
   return (
     <div className="doc-page">
@@ -99,16 +99,16 @@ export function Results() {
         <header className="page-head">
           <h1>Results</h1>
           <p className="lead">
-            This page compares the models with measured data and with two other tools, and shows the effect of RNAPII loops. The data are GM12878, H1ESC and HFFc6, chr1:1-60 Mb, ten structures per model. The original models are the cudaMMC models of 3D-GNOME 3.0.
+            This page compares 3D-GNOMEᴺᴳ models with measured data and with two other tools. It also shows the change in the models when RNAPII loops are added to the CTCF loops. Unless a chart states another region, the models cover chr1:1-60 Mb in the cell lines GM12878, H1ESC and HFFc6, with ten structures per model. The original models are the cudaMMC models of 3D-GNOME 3.0.
           </p>
         </header>
         <ChartKey />
         <div className="chart-row">
           <div id="agreement">
-            <BarChart title="Agreement with Hi-C" subtitle="Stratum adjusted correlation at 25 kb. The contacts of ten structures are summed before the comparison." better="higher" groups={SCC} />
+            <BarChart title="Agreement with Hi-C" subtitle="The stratum adjusted correlation between the contact map of a model and the Hi-C map, at 25 kb. The contact map of a model is the sum of the contacts of its ten structures." better="higher" groups={SCC} />
           </div>
           <div id="distance">
-            <BarChart title="Enhancer to promoter distance" subtitle="Pairs joined by an RNAPII loop only, median over pairs, bead units." groups={DISTANCE} />
+            <BarChart title="Enhancer to promoter distance" subtitle="The median 3D distance between an enhancer and its promoter, in bead units. Only the pairs joined by an RNAPII loop are counted." groups={DISTANCE} />
           </div>
         </div>
         <div className="chart-row">
@@ -116,22 +116,22 @@ export function Results() {
             <BarChart
               title="Link to expression"
               better="higher"
-              subtitle="Spearman correlation between the change in 3D distance and the change in expression across cell lines, with the sign flipped. Higher means a stronger link."
+              subtitle="The Spearman correlation between the change in enhancer to promoter distance and the change in gene expression between two cell lines. The sign is flipped, and a higher value means a stronger link."
               groups={EXPRESSION}
             />
           </div>
           <figure id="trios" className="bar-chart" aria-label="Nine people, three trios">
             <figcaption>
               <span className="chart-title">Nine people, three trios</span>
-              <span className="chart-sub">Change with RNAPII loops, measured against the Hi-C of each person.</span>
+              <span className="chart-sub">The change in the model of each person when RNAPII loops are added, measured against the Hi-C map of that person.</span>
             </figcaption>
             <div className="stat">
               <span className="stat-value">9 of 9</span>
-              <span className="stat-label">contact enrichment at RNAPII loops rises, from 39 to 98%, median 57%</span>
+              <span className="stat-label">people with more contact enrichment at RNAPII loops. The rise is 39 to 98%, and the median is 57%.</span>
             </div>
             <div className="stat">
               <span className="stat-value">2 of 9</span>
-              <span className="stat-label">correlation with the whole Hi-C map rises, from -17 to +29%, median -2%</span>
+              <span className="stat-label">people with a higher correlation with the whole Hi-C map. The change is -17 to +29%, and the median is -2%.</span>
             </div>
           </figure>
         </div>
@@ -141,40 +141,40 @@ export function Results() {
         <section id="tools">
           <h2>Other tools</h2>
           <p className="intro">
-            cudaMMC, MultiMM and 3D-GNOMEᴺᴳ on the same CTCF loops and the same Hi-C contacts. cudaMMC and MultiMM run at their default settings, and MultiMM models as many beads as 3D-GNOMEᴺᴳ.
+            cudaMMC, MultiMM and 3D-GNOMEᴺᴳ were run on the same CTCF loops and the same Hi-C contacts. cudaMMC and MultiMM used their default settings, and MultiMM was set to the same number of beads as 3D-GNOMEᴺᴳ.
           </p>
           <div className="chart-row">
             <div>
               <BarChart
                 title="Agreement with Hi-C, three tools"
-                subtitle="chr1:1-60 Mb, stratum adjusted correlation at 25 kb. The contacts of ten structures are summed before the comparison."
+                subtitle="The stratum adjusted correlation with the Hi-C map at 25 kb, on chr1:1-60 Mb. The contact map of a model is the sum of the contacts of its ten structures."
                 better="higher"
                 groups={TOOLS_SCC}
               />
             </div>
-            <figure className="bar-chart" aria-label="Twenty one runs with intervals">
+            <figure className="bar-chart" aria-label="Comparison over 21 runs">
               <figcaption>
-                <span className="chart-title">Twenty one runs with intervals</span>
-                <span className="chart-sub">Three cell lines, three regions of 5 Mb, three of 20 Mb and chr1:1-60 Mb. A lead has a 95% bootstrap interval clear of zero.</span>
+                <span className="chart-title">Comparison over 21 runs</span>
+                <span className="chart-sub">Each of the three cell lines was modelled on three regions of 5 Mb, three regions of 20 Mb and chr1:1-60 Mb. A tool counts as better in a run when the 95% bootstrap interval of the difference does not include zero.</span>
               </figcaption>
               <div className="stat">
                 <span className="stat-value">21 of 21</span>
-                <span className="stat-label">3D-GNOMEᴺᴳ leads both tools on the Pearson and on the rank correlation with Hi-C</span>
+                <span className="stat-label">runs with a higher Pearson correlation and a higher rank correlation with Hi-C for 3D-GNOMEᴺᴳ than for both other tools</span>
               </div>
               <div className="stat">
                 <span className="stat-value">12 of 21</span>
-                <span className="stat-label">3D-GNOMEᴺᴳ leads MultiMM on the stratum adjusted correlation, 15 of 21 for cudaMMC, and neither tool leads it in any run</span>
+                <span className="stat-label">runs with a higher stratum adjusted correlation for 3D-GNOMEᴺᴳ than for MultiMM. The count against cudaMMC is 15 of 21. Neither tool is better than 3D-GNOMEᴺᴳ in any run.</span>
               </div>
             </figure>
           </div>
           <p className="reading-note">
-            A region of 5 Mb is too short for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb 3D-GNOMEᴺᴳ leads cudaMMC on all and MultiMM on seven. On chr1:1-60 Mb it leads both on every cell line.
+            A region of 5 Mb has too few bins for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb, 3D-GNOMEᴺᴳ is better than cudaMMC in all nine and better than MultiMM in seven. On chr1:1-60 Mb it is better than both tools in every cell line.
           </p>
         </section>
-        <section id="run-time">
-          <h2>Run time</h2>
+        <section id="runtime">
+          <h2>Runtime</h2>
           <p className="intro">
-            The three tools on the same GM12878 inputs and one machine, an RTX 3090 with 36 CPU cores. At its default settings cudaMMC models a region with a third to a half of the beads of the other two. Each chart therefore gives three numbers per tool. They are the beads in its model, its run time and its run time per 1,000 beads. A tick marks the lowest time in a column.
+            The three tools were timed on the same GM12878 inputs and on one computer with an RTX 3090 and 36 CPU cores. At its default settings cudaMMC uses a third to a half of the beads of the other two tools for the same region. Each chart therefore shows three numbers per tool, the number of beads in its model, its runtime and its runtime per 1,000 beads. A tick marks the lowest time in a column.
           </p>
           <div className="chart-row one">
             {RUN_TIME.map(([title, sub, unit, toolRuns]) => (
@@ -182,19 +182,19 @@ export function Results() {
             ))}
           </div>
           <p className="reading-note">
-            Per 1,000 beads 3D-GNOMEᴺᴳ is the fastest on ten structures of 60 Mb, on one structure of the chromosome and on the genome. MultiMM is the fastest at 1 Mb, and at equal bead counts cudaMMC is 5 percent ahead of 3D-GNOMEᴺᴳ.
+            Per 1,000 beads, 3D-GNOMEᴺᴳ is the fastest tool for ten structures of 60 Mb, for one structure of the chromosome and for the genome. MultiMM is the fastest tool at 1 Mb. At equal bead counts cudaMMC is 5 percent faster than 3D-GNOMEᴺᴳ.
           </p>
           <p className="reading-note">
-            On the whole genome 3D-GNOMEᴺᴳ runs as one job. cudaMMC ran one chromosome at a time and its 22 runs are added up. MultiMM ran out of memory on the 24 GB card at 1,312,597 beads and at half of that, and at a quarter it was stopped after 90 minutes.
+            3D-GNOMEᴺᴳ models the whole genome in one job. cudaMMC was run on one chromosome at a time, and the chart shows the sum of its 22 runs. MultiMM ran out of memory on the 24 GB card at 1,312,597 beads and at half that number. At a quarter of that number it was stopped after 90 minutes.
           </p>
-          <h3 className="sub-head">Run time against the size of the task</h3>
+          <h3 className="sub-head">Runtime and the size of the region</h3>
           <p className="reading-note">
-            Each tool built one structure of eight regions of chr1, from 1 Mb to the whole chromosome of 248 Mb, and each point is one of those runs. The two charts hold the same runs. The left chart places a run by the size of its region, and it reads as the wait for a region of that size. The right chart places the same run by the number of beads in its model, and it reads as the cost of a model of that size. A tool with fewer beads per megabase sits lower on the left only.
+            The two charts below show the growth of the runtime of one structure with the size of the task. Each tool modelled eight regions of chr1, from 1 Mb to the whole chromosome of 248 Mb, and each point is one run. Both charts show the same runs. In the left chart the horizontal axis is the size of the region, and the chart shows the time you wait for a region of that size. In the right chart the horizontal axis is the number of beads in the model, and the chart compares the tools at the same number of beads. cudaMMC uses fewer beads than the other two tools for the same region. This lowers its line in the left chart and does not change the right chart.
           </p>
           <div className="chart-row">
             <LineChart
               title="One structure by region size"
-              subtitle="Regions of 1 to 100 Mb starting at chr1:10 Mb, and the whole chromosome. Both axes are logarithmic."
+              subtitle="Regions of 1 to 100 Mb that start at chr1:10 Mb, and the whole chromosome. Both axes are logarithmic."
               better="lower"
               xLabel="region, Mb"
               xTick={(x) => `${x}`}
@@ -202,7 +202,7 @@ export function Results() {
             />
             <LineChart
               title="One structure by bead count"
-              subtitle="The same runs placed by the bead count of each model. Both axes are logarithmic."
+              subtitle="The same runs, with the number of beads in each model on the horizontal axis. Both axes are logarithmic."
               better="lower"
               xLabel="beads"
               xTick={(x) => x.toLocaleString('en-US')}
@@ -210,7 +210,7 @@ export function Results() {
             />
           </div>
           <p className="reading-note">
-            By region size cudaMMC is the fastest from 10 Mb, and under that it and MultiMM are level. 3D-GNOMEᴺᴳ is faster than MultiMM from about 50 Mb. By bead count MultiMM is the fastest up to about 30,000 beads and 3D-GNOMEᴺᴳ above that, and cudaMMC is level with 3D-GNOMEᴺᴳ up to about 7,000 beads and slower above. A further structure of the same region costs 3D-GNOMEᴺᴳ less than the first. One structure of chr1 takes 6.4 minutes and three take 11.2.
+            By region size, cudaMMC is the fastest tool from 10 Mb, and below 10 Mb cudaMMC and MultiMM take about the same time. 3D-GNOMEᴺᴳ is faster than MultiMM from about 50 Mb. By bead count, MultiMM is the fastest tool up to about 30,000 beads and 3D-GNOMEᴺᴳ is the fastest above that. cudaMMC takes about the same time as 3D-GNOMEᴺᴳ up to about 7,000 beads and more time above that. Each further structure of the same region costs 3D-GNOMEᴺᴳ less time than the first. One structure of chr1 takes 6.4 minutes and three structures take 11.2 minutes.
           </p>
         </section>
       </div>

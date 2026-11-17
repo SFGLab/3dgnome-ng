@@ -26,14 +26,14 @@ describe('Results page', () => {
     expect(values(screen.getByRole('figure', { name: 'Link to expression' }))).toEqual(['0.19', '0.26', '0.28', '0.12', '0.18', '0.22', '0.25', '0.29', '0.31'])
   })
 
-  it('shows the beads, the run time and the run time per 1,000 beads of each tool', () => {
+  it('shows the beads, the runtime and the runtime per 1,000 beads of each tool', () => {
     renderResults()
     const cells = (figure: HTMLElement, id: string) => within(figure).getAllByTestId(id).map((el) => el.textContent)
     const one = screen.getByRole('figure', { name: 'One structure, 1 Mb' })
     expect(values(one)).toEqual(['6.4', '7.4', '9.0'])
     expect(cells(one, 'beads-value')).toEqual(['350', '760', '760'])
     expect(cells(one, 'rate-value')).toEqual(['18.3', '9.7', '11.8'])
-    expect(within(one).getByRole('columnheader', { name: /^run time, seconds/ })).toBeInTheDocument()
+    expect(within(one).getByRole('columnheader', { name: /^runtime, seconds/ })).toBeInTheDocument()
     expect(cells(one, 'better')).toEqual(['↑ more is finer', '↓ lower is better', '↓ lower is better'])
     expect(within(one).getByTestId('bar-best').closest('tr')).toHaveTextContent('cudaMMC')
     expect(within(one).getByTestId('rate-best').closest('tr')).toHaveTextContent('MultiMM')
@@ -65,7 +65,7 @@ describe('Results page', () => {
   it('compares the three tools on Hi-C and counts the runs with intervals', () => {
     renderResults()
     expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C, three tools' }))).toEqual(['0.22', '0.30', '0.51', '0.15', '0.17', '0.34', '0.15', '0.18', '0.44'])
-    const runs = screen.getByRole('figure', { name: 'Twenty one runs with intervals' })
+    const runs = screen.getByRole('figure', { name: 'Comparison over 21 runs' })
     expect(within(runs).getByText('21 of 21')).toBeInTheDocument()
     expect(within(runs).getByText('12 of 21')).toBeInTheDocument()
   })

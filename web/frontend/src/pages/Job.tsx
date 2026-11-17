@@ -20,8 +20,8 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   const [params, setParams] = useSearchParams()
   const tab = (params.get('tab') as Tab) ?? 'structure'
   const [selected, setSelected] = useState(1)
-  // The tab and the comparison live in the URL as history entries, so Back returns to the
-  // previous tab or closes the comparison.
+  // The tab and the comparison are history entries in the URL. Back returns to the previous tab
+  // or closes the comparison.
   const compareTo = params.get('compare')
   const comparing = compareTo !== null
   const go = (next: Record<string, string>) => setParams(next)

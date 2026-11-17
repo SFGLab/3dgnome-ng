@@ -13,7 +13,7 @@ const HOVER = '#2A78D6'
  * of the bead under it and the hover would flicker between the two. */
 const noRaycast = () => null
 /** The labels over the canvas take no pointer events either. drei's `Html` applies its own
- * `pointerEvents` prop only to transformed labels, so the style goes on the wrapper and the
+ * `pointerEvents` prop only to transformed labels. The style is set on the wrapper and the
  * inner div by hand. A label that took the pointer would leave the canvas the moment it appeared
  * under a still cursor, clear the hover, vanish and bring the hover back, over and over. */
 const MARK_STYLE = { pointerEvents: 'none' } as const
@@ -128,7 +128,7 @@ function CameraSync({ link, id }: { link: CameraLink; id: string }) {
   return null
 }
 
-/** A light at the camera, so the side of a strand facing the viewer is lit wherever it turns. */
+/** A light at the camera. It lights the side of a strand that faces the viewer in every direction. */
 function CameraLight() {
   const light = useRef<THREE.DirectionalLight>(null)
   useFrame(({ camera }) => light.current?.position.copy(camera.position))

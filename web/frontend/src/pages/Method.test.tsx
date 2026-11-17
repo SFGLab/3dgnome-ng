@@ -37,7 +37,7 @@ describe('Method page', () => {
 
   it('numbers the references as the design does', () => {
     expect(METHOD_REFERENCES).toEqual([
-      'szalaj2016', 'cudammc', 'lieberman2009', 'hilbert1891', 'multimm', 'byrd1995', 'zhu1997', 'kirkpatrick1983',
+      'szalaj2016', 'cudammc', 'lieberman2009', 'shi2023', 'multimm', 'byrd1995', 'zhu1997', 'kirkpatrick1983',
       'metropolis1953', 'enhancer3d', 'jax2018', 'sadowski2019', 'hicrep2017', 'kremer1990', 'rosa2008', 'tang2015', 'mirny2011',
     ])
     renderMethod()
@@ -51,7 +51,7 @@ describe('Method page', () => {
     const chainTerms = screen.getByRole('table', { name: 'Chain energy terms' })
     const source = (table: HTMLElement, term: string) =>
       within(within(table).getByRole('row', { name: new RegExp(term) })).getAllByRole('cell').at(-1)?.textContent
-    expect(source(anchorTerms, 'Repulsion')).toBe('[1, 5]')
+    expect(source(anchorTerms, 'Window size')).toBe('this work')
     expect(source(anchorTerms, 'Excluded volume')).toBe('[5, 14]')
     expect(source(chainTerms, 'Excluded volume')).toBe('[5, 14]')
     expect(source(chainTerms, 'Confinement')).toBe('[5, 15]')

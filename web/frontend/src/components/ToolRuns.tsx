@@ -12,14 +12,14 @@ const TIE = 0.02
 
 /**
  * The runs of several tools on one task as a table of bars. Each tool has three bars, the beads
- * in its model, its run time and its run time per 1,000 beads. Every column has its own scale
+ * in its model, its runtime and its runtime per 1,000 beads. Every column has its own scale
  * and names the direction that is better. The two time columns mark their lowest value.
  */
 export function ToolRuns({ title, subtitle, unit, runs }: { title: string; subtitle: string; unit: 'seconds' | 'minutes'; runs: ToolRun[] }) {
   const measures: Measure[] = [
     { key: 'beads', label: 'beads in the model', dir: 'higher', dirText: 'more is finer', ranks: false, value: (r) => r.beads, text: (v) => v.toLocaleString('en-US') },
-    { key: 'bar', label: `run time, ${unit}`, dir: 'lower', ranks: true, value: (r) => (r.seconds === null ? null : unit === 'minutes' ? r.seconds / 60 : r.seconds), text: (v) => v.toFixed(1) },
-    { key: 'rate', label: 'seconds per 1,000 beads', dir: 'lower', ranks: true, value: (r) => (r.seconds === null ? null : (r.seconds / r.beads) * 1000), text: (v) => v.toFixed(1) },
+    { key: 'bar', label: `runtime, ${unit}`, dir: 'lower', ranks: true, value: (r) => (r.seconds === null ? null : unit === 'minutes' ? r.seconds / 60 : r.seconds), text: (v) => v.toFixed(1) },
+    { key: 'rate', label: 'runtime per 1,000 beads, seconds', dir: 'lower', ranks: true, value: (r) => (r.seconds === null ? null : (r.seconds / r.beads) * 1000), text: (v) => v.toFixed(1) },
   ]
   const max = measures.map((m) => Math.max(...runs.map((r) => m.value(r) ?? 0), 1e-9))
   const min = measures.map((m) => Math.min(...runs.map((r) => m.value(r) ?? Infinity)))

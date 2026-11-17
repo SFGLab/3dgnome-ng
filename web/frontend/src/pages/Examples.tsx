@@ -13,7 +13,7 @@ export function Examples() {
       <div className="reading">
         <header className="page-head">
           <h1>Examples</h1>
-          <p className="lead">{`Each example opens its finished job of ${EXAMPLE_STRUCTURES} structures. The first visitor waits about a minute while it runs, and everyone after opens it at once.`}</p>
+          <p className="lead">{`Each example opens its finished job of ${EXAMPLE_STRUCTURES} structures. If nobody has opened an example before, its job runs first and takes about a minute.`}</p>
         </header>
         {error && (
           <p className="field-error" role="alert">

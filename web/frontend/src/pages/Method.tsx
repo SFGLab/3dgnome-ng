@@ -12,7 +12,7 @@ import '../styles/doc.css'
 
 /** The Method page's references in the order of their numbers [1] to [17]. */
 export const METHOD_REFERENCES = [
-  'szalaj2016', 'cudammc', 'lieberman2009', 'hilbert1891', 'multimm', 'byrd1995', 'zhu1997', 'kirkpatrick1983',
+  'szalaj2016', 'cudammc', 'lieberman2009', 'shi2023', 'multimm', 'byrd1995', 'zhu1997', 'kirkpatrick1983',
   'metropolis1953', 'enhancer3d', 'jax2018', 'sadowski2019', 'hicrep2017', 'kremer1990', 'rosa2008', 'tang2015', 'mirny2011',
 ]
 
@@ -41,7 +41,7 @@ type Term = [string, EquationName, string, string]
 const ANCHOR_TERMS: Term[] = [
   ['Loop spring', 't_loop_simple', 'anchor pairs joined by a loop, t = d(s, q)', '[1]'],
   ['Background spring', 't_background', 'pairs without a loop under 100 kb apart, and far pairs with more Hi-C contacts than expected', 'this work'],
-  ['Repulsion', 't_repulsion', 'all other pairs, r_c is 1.5 times the mean target', '[1, 5]'],
+  ['Window size', 't_gyration', 'genomic windows with at least four anchors, n_w the number of anchors, R_g their radius of gyration and R_w the radius from the distance law', 'this work'],
   ['Excluded volume', 't_ev', 'anchors not next to each other', '[5, 14]'],
 ]
 
@@ -59,7 +59,7 @@ function Terms({ label, terms }: { label: string; terms: Term[] }) {
       <thead>
         <tr>
           <th>Term</th>
-          <th>Energy of one pair</th>
+          <th>Energy of one pair or window</th>
           <th>Applies to</th>
           <th>Source</th>
         </tr>
@@ -163,7 +163,7 @@ export function Method() {
         </Section>
 
         <Section id="anchors">
-          <P>{'All anchors of a chromosome are placed in one fit. The start is a Hilbert curve [4] scaled to b(s), as in MultiMM [5]. L-BFGS-B [6, 7] then minimises the anchor energy below, with L the anchor pairs joined by a loop, B the pairs held at the background and R all other pairs. A loop spring uses k_s when the pair is further apart than its target t and k_q otherwise. Ten annealing runs from perturbed starts end within one percent of the same energy, and L-BFGS-B reaches that minimum. The GPU evaluates the energy and its gradient, the optimiser runs on the CPU, and the fit stops when the relative improvement per iteration drops below 1e-6.'}</P>
+          <P>{'All anchors of a chromosome are placed in one fit. Each structure starts from a random draw of the anchor positions. The draw comes from a Gaussian model that is fitted once per run, and its mean pair distances are as close to the target distances as a Gaussian model allows, as in the maximum entropy models of Shi and Thirumalai [4]. L-BFGS-B [6, 7] then minimises the anchor energy below, with L the anchor pairs joined by a loop, B the pairs held at the background and W a set of genomic windows. A loop spring uses k_s when the pair is further apart than its target t and k_q otherwise. The window term keeps each part of the chromosome at the size the distance law gives for its length. The windows start at 100 kb and double in size up to the whole chromosome, and each size is placed twice, the second time shifted by half a window. The GPU evaluates the pair terms and their gradient, the optimiser runs on the CPU, and the fit stops when the relative improvement per iteration drops below 1e-6.'}</P>
           <div className="equations">
             <Equation name="anchor_energy" />
           </div>
@@ -171,7 +171,7 @@ export function Method() {
         </Section>
 
         <Section id="chain">
-          <P>{"The beads between two anchors start on a compact random coil at the bond targets, and the anchors stay where the anchor phase put them. Simulated annealing [8] moves one bead at a time and scores the chain energy below, with C the anchor pairs joined by a CTCF loop and o the direction of the CTCF motif at an anchor. A move that lowers the energy is accepted, and a move that raises it is accepted with the probability below, where E' is the energy after the move. The temperature T falls by a constant factor each step [1, 9]. A wall rejects any move that brings two beads closer than the excluded volume radius."}</P>
+          <P>{"The beads between two anchors start on a compact random coil at the bond targets, and the anchors stay where the anchor phase put them. Simulated annealing [8] moves one bead at a time and scores the chain energy below, with C the anchor pairs joined by a CTCF loop and o the direction of the CTCF motif at an anchor. A move that lowers the energy is accepted, and a move that raises it is accepted with the probability below, where E' is the energy after the move. The temperature T falls by a constant factor each step [1, 9]. A wall rejects any move that brings two beads closer than the excluded volume radius. After the chains of all blocks are finished, a last pass moves the beads that still overlap, within a block or between two blocks, and keeps the anchors fixed."}</P>
           <div className="equations">
             <Equation name="chain_energy" />
             <Equation name="acceptance_plain" />
@@ -203,7 +203,8 @@ export function Method() {
 
         <Section id="engine">
           <P>A run is a graph of tasks that grows while it runs, figure 3a. The region task adds one task per chromosome, a chromosome task adds its blocks, and each chromosome gets one anchor fit and one chain task per block. Each stage has its own executor, serial, threaded or batched on the GPU. Results are applied in a fixed order, and a run with the same settings and seed gives the same structures.</P>
-          <P>{'The chain tasks of many blocks run together in JAX [11] launches on the GPU, figure 3b. Each block is padded to the next size on a fixed ladder, and blocks with the same energy terms are packed into as few launches as GPU memory allows. Each chain has its own random stream, and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. Excluded volume uses a grid of cells rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU, and the output does not depend on the number of GPUs.'}</P>
+          <P>On the server the anchor fit uses the GPU and the chain tasks run on the CPU cores, one chain per thread. Excluded volume uses a grid of cells, and the cost of a step does not grow with the size of the block.</P>
+          <P>{'The chain tasks of many blocks can also run together in JAX [11] launches on the GPU, figure 3b. This is faster on a computer with few CPU cores. Each block is padded to the next size on a fixed ladder, and blocks with the same energy terms are packed into as few launches as GPU memory allows. Each chain has its own random stream, and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. The grid of cells is rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU, and the output does not depend on the number of GPUs.'}</P>
           <figure className="figure">
             <img src={engineGraph} alt="Task graph of a run on two chromosomes: a region task, one task per chromosome, its blocks, one anchor fit per chromosome on the CPU with the energy on the GPU, the chains of seven blocks in one batched launch, and the assembly" />
             <figcaption>
@@ -235,7 +236,7 @@ export function Method() {
         </Section>
 
         <Section id="validation">
-          <P>{'A change to the engine becomes the default only after it is measured on GM12878, H1ESC and HFFc6. The measurements are the stratum adjusted correlation with Hi-C [13] at 25 kb, the correlation with Micro-C at 5 kb where a map exists, the exponent of distance against separation, and the number of overlapping beads. A change meant to leave results unchanged is checked by comparing bead coordinates with the previous version. A test against the original 3D-GNOME program compares the distance distributions of both ensembles on a 2 Mb region. The Results page lists the measurements.'}</P>
+          <P>{'A change to the engine becomes the default only after it is measured on GM12878, H1ESC and HFFc6. The contacts of the structures of an ensemble are summed into one map, and the measurements are the stratum adjusted correlation [13] and the rank correlation of that map with Hi-C at 25 kb, the correlation with Micro-C at 5 kb where a map exists, the exponent of distance against separation, and the number of overlapping beads. A change meant to leave results unchanged is checked by comparing bead coordinates with the previous version. A test against the original 3D-GNOME program compares the distance distributions of both ensembles on a 2 Mb region. The Results page lists the measurements.'}</P>
         </Section>
 
         <Section id="limitations">

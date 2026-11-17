@@ -12,8 +12,8 @@
   30
  ],
  "anchor_energy": [
-  453,
-  116
+  445,
+  117
  ],
  "chain_energy": [
   570,
@@ -54,5 +54,9 @@
  "t_confinement": [
   135,
   31
+ ],
+ "t_gyration": [
+  128,
+  35
  ]
 }

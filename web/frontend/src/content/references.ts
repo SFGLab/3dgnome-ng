@@ -73,9 +73,9 @@ export const REFERENCES: Reference[] = [
     authors: 'Metropolis N, Rosenbluth AW, Rosenbluth MN, Teller AH, Teller E', venue: 'Journal of Chemical Physics 21, 1087-1092',
   },
   {
-    key: 'hilbert1891', group: 'algorithms', year: 1891, doi: '10.1007/BF01199431',
-    title: 'Über die stetige Abbildung einer Linie auf ein Flächenstück',
-    authors: 'Hilbert D', venue: 'Mathematische Annalen 38, 459-460',
+    key: 'shi2023', group: 'algorithms', year: 2023, doi: '10.1038/s41467-023-36412-4',
+    title: 'A maximum-entropy model to predict 3D structural ensembles of chromatin from pairwise distances with applications to interphase chromosomes and structural variants',
+    authors: 'Shi G, Thirumalai D', venue: 'Nature Communications 14, 1150',
   },
   {
     key: 'hicrep2017', group: 'algorithms', year: 2017, doi: '10.1101/gr.220640.117',
