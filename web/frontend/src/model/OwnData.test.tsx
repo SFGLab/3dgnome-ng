@@ -13,7 +13,7 @@ const RESULTS: Record<string, object> = {
   'GM12878_RNAPII_loops.bedpe': { ok: true, summary: '31,902 loops read. 64 are in the region.', error: null },
   'hichip_loops.txt': {
     ok: false, summary: '',
-    error: { line: 1, found: 'Line 1 has 10 columns, and column 7 is the letter R where a count is expected.', fix: 'This is the loop format of 3D-GNOME 3.0. Move the orientations to the anchors file and keep one file per factor with seven columns.' },
+    error: { line: 1, found: 'Line 1 has 10 columns and column 7 is the letter R where a count is expected.', fix: 'This is the loop format of 3D-GNOME 3.0. Move the orientations to the anchors file and keep one file per factor with seven columns.' },
   },
   'anchors.bed': { ok: true, summary: '1,204 anchors read, with orientations.', error: null },
   'enhancers.bed': { ok: true, summary: '71 enhancers read.', error: null },

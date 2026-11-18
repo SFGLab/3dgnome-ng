@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { guessFactor, megabytes, ownField } from './upload'
 
 describe('upload helpers', () => {
-  it('writes a file size in MB, and in kB under a tenth of a MB', () => {
+  it('writes a file size in MB and in kB under a tenth of a MB', () => {
     expect(megabytes(2_200_000)).toBe('2.1 MB')
     expect(megabytes(400)).toBe('1 kB')
     expect(megabytes(40_000)).toBe('39 kB')

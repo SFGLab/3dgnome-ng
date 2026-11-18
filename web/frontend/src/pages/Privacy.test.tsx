@@ -16,7 +16,7 @@ describe('Privacy page', () => {
   it('says what the site does not do', () => {
     renderPage()
     expect(screen.getByText('The site sets no cookies and does no tracking or analytics.')).toBeInTheDocument()
-    expect(screen.getByText('It asks for no name and no e-mail address, and it has no accounts.')).toBeInTheDocument()
+    expect(screen.getByText('It asks for no name and no e-mail address and it has no accounts.')).toBeInTheDocument()
   })
 
   it('lists what the server keeps and for how long', () => {

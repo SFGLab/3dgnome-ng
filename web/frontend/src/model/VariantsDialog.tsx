@@ -31,7 +31,7 @@ const W = 780
 const H = 110
 const AXIS = 62
 
-/** The loops of the region above the axis, own loops in place of the cell type's, and the
+/** The loops of the region above the axis, own loops in place of the cell type's and the
  * variants below it. */
 function Track({ cell, region, factors, own, rows }: { cell: string; region: Region; factors: string; own: OwnChoice | null; rows: VariantRow[] }) {
   const span = `${region.chrom}:${region.start}-${region.end}`
@@ -74,7 +74,7 @@ function Track({ cell, region, factors, own, rows }: { cell: string; region: Reg
 }
 
 /** The structural variants dialog: a hosted call set or an uploaded VCF, its sample and
- * haplotype, and the change each variant makes to the loops of the region. */
+ * haplotype and the change each variant makes to the loops of the region. */
 export function VariantsDialog(props: {
   catalog: Catalog
   cell: string

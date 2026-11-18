@@ -122,7 +122,7 @@ function JoinForm({ initial, onDone, onCancel }: { initial: string; onDone: () =
           ? `This list has ${jobsText(found.jobs.length)}. ${found.private ? 'It includes private jobs.' : 'Private jobs are not on it.'}${added ? ` ${jobsText(added)} of this computer will be added to it.` : ''}`
           : error
             ? ''
-            : 'Capital and small letters are the same, and the dashes are optional.'}
+            : 'Capital and small letters are the same and the dashes are optional.'}
       </p>
       {error && (
         <p className="sync-error" role="alert">
@@ -232,7 +232,7 @@ export function SyncPanel({ initialCode = '', onCodeUsed }: { initialCode?: stri
       )}
       {mode === 'stop' ? (
         <div className="sync-stop">
-          <p>The jobs stay on this computer, and the code keeps working on the others. Keep a copy of the code if no other computer has it.</p>
+          <p>The jobs stay on this computer and the code keeps working on the others. Keep a copy of the code if no other computer has it.</p>
           <div className="sync-actions">
             <button
               type="button"

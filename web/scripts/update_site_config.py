@@ -3,9 +3,9 @@
     python web/scripts/update_site_config.py SITE_DATA TAG [CELL=COOLER_URI ...]
 
 For each cell type of the catalog that has `slurm/ensemble/<cell>_xc_C.ini`, that file with the
-site's hole settings appended is written beside the old config as `config_<TAG>.ini`, and the
+site's hole settings appended is written beside the old config as `config_<TAG>.ini` and the
 catalog entry is pointed at it. A `CELL=URI` argument sets the cell type's `contact_map`. The old
-config stays, and the catalog as it was is kept as `catalog.json.before-<TAG>`. Nothing is
+config stays and the catalog as it was is kept as `catalog.json.before-<TAG>`. Nothing is
 overwritten: an existing target stops the run.
 """
 

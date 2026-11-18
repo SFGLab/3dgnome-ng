@@ -42,7 +42,7 @@ export function replaceJobs(jobs: RecentJob[]): boolean {
   return true
 }
 
-/** Adds a job to the list, or replaces its entry, and marks the entry as edited now. */
+/** Adds a job to the list, or replaces its entry and marks the entry as edited now. */
 export function rememberJob(job: RecentJob): void {
   const rest = recentJobs().filter((j) => j.url !== job.url)
   if (replaceJobs(mergeJobs([{ ...job, edited: Date.now() }], rest))) window.dispatchEvent(new Event(JOBS_EDITED))

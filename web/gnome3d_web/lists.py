@@ -41,7 +41,7 @@ def new_code() -> str:
 def normalise(text: str) -> str | None:
     """A typed code in its shown form, or None when it cannot be a code.
 
-    Case, spaces and dashes do not matter, and O, I and L read as the digits they resemble.
+    Case, spaces and dashes do not matter and O, I and L read as the digits they resemble.
     """
     bare = re.sub(r"[\s-]", "", text).upper().translate(_LOOKALIKE)
     if len(bare) != GROUPS * GROUP or any(ch not in ALPHABET for ch in bare):

@@ -1,4 +1,4 @@
-"""The settings users may change: the schema from SETTINGS.md, validation, and the config they
+"""The settings users may change: the schema from SETTINGS.md, validation and the config they
 are written into.
 
     python web/tests/test_settings_schema.py
@@ -66,12 +66,12 @@ def main() -> int:
         from gnome3d_web import settings_schema as _schema
 
         keys = {f"{e.section}.{e.key}" for group in _schema.EDITABLE.values() for e in group}
-        check("every editable setting has its own text, and no text is left over", keys == set(_schema.HELP), str(keys ^ set(_schema.HELP)))
+        check("every editable setting has its own text and no text is left over", keys == set(_schema.HELP), str(keys ^ set(_schema.HELP)))
         shown = [x["meaning"] for g in groups for x in g["settings"]]
         check("a text is one to three short sentences", all(20 <= len(t) <= 240 and t.endswith(".") for t in shown), str([t for t in shown if not (20 <= len(t) <= 240)]))
         history = _re.compile(r"\b20\d\d\b|production|byte exact|measured|under measurement|design/|since|idea \d|null|Master switch", _re.I)
         check("a text states what the setting does, without history", not [t for t in shown if history.search(t)], str([t for t in shown if history.search(t)]))
-        rules = _re.compile(r", so |because|\bwhich\b.*\bwhich\b|^(When|Where|What|Why|How|Which)\b|[;:]|—| - ")
+        rules = _re.compile(r", so |, and |because|\bwhich\b.*\bwhich\b|^(When|Where|What|Why|How|Which)\b|[;:]|—| - ")
         check("a text keeps to the writing rules", not [t for t in shown if rules.search(t)], str([t for t in shown if rules.search(t)]))
 
         ok, bad = parse_ini("[distance]\npolymer_exponent = 0.2\n[data]\nanchors = x.bed\n")

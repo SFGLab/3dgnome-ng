@@ -174,7 +174,7 @@ function ContactsTab({
   return (
     <div className="own-tab">
       <p className="rule">
-        {`A contact map at 25 kb is used for the contacts between loops. The server reads only the bins of your region, up to ${maxMb} Mb, and thins a deep map to the density the cell type maps use.`}
+        {`A contact map at 25 kb is used for the contacts between loops. The server reads only the bins of your region, up to ${maxMb} Mb and thins a deep map to the density the cell type maps use.`}
       </p>
       <div className="routes" role="radiogroup" aria-label="Contact map from">
         {ROUTES.map(([id, title, sub, Icon]) => (
@@ -212,7 +212,7 @@ function ContactsTab({
             </button>
           </div>
           <p className="hint">
-            The server must answer range requests. 4DN, ENCODE, GEO and S3 links do. The file is not copied, and the server keeps only the bins of your region.
+            The server must answer range requests. 4DN, ENCODE, GEO and S3 links do. The file is not copied and the server keeps only the bins of your region.
           </p>
         </form>
       )}

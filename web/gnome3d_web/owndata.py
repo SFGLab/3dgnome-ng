@@ -93,7 +93,7 @@ def _pair(i: int, cols: list[str], what: str) -> Problem | None:
     if len(cols) == 10 and not cols[6].isdigit():
         return Problem(
             i,
-            f"Line {i} has 10 columns, and column 7 is the letter {cols[6]} where a count is expected.",
+            f"Line {i} has 10 columns and column 7 is the letter {cols[6]} where a count is expected.",
             "This is the loop format of 3D-GNOME 3.0. Move the orientations to the anchors file and keep one file per factor with seven columns.",
         )
     if len(cols) < 7:
@@ -130,7 +130,7 @@ def check_loops(path: Path, region: tuple[str, int, int] | None) -> Check:
     if long:
         tail.append(f"{_n(long, 'loop', 'loops')} longer than 1 Mb {'goes' if long == 1 else 'go'} to the coarse contact map")
     if tail:
-        parts.append(", and ".join(tail) + ".")
+        parts.append(" and ".join(tail) + ".")
     return Check(True, " ".join(parts))
 
 
@@ -143,7 +143,7 @@ def check_anchors(path: Path) -> Check:
         if first is None:
             first = has
         elif has != first:
-            found = f"Line {i} has {'an' if has else 'no'} orientation, and the first line has {'none' if has else 'one'}."
+            found = f"Line {i} has {'an' if has else 'no'} orientation and the first line has {'none' if has else 'one'}."
             return Check(False, error=Problem(i, found, "Give the orientation on every line or on none."))
         if has and cols[3] not in ("L", "R", "N"):
             return Check(False, error=Problem(i, f"Line {i} has orientation {cols[3]!r}.", "Use L, R or N."))
@@ -183,7 +183,7 @@ def check_vcf(path: Path) -> Check:
     with path.open("rb") as f:
         magic = f.read(2)
     if magic != b"\x1f\x8b":
-        return Check(False, error=Problem(0, "The file is not compressed.", "Compress it with bgzip, and index it with tabix for large files."))
+        return Check(False, error=Problem(0, "The file is not compressed.", "Compress it with bgzip and index it with tabix for large files."))
     with gzip.open(path, "rt", errors="replace") as f:
         for line in f:
             if line.startswith("#CHROM"):
@@ -279,7 +279,7 @@ def _change(kind: str, before: dict, after_loops: list, factor: str) -> str:
 
 def combine_changes(by_factor: list[tuple[str, str]]) -> str:
     """One sentence for the changes of several loop factors: one verb is summed with the split
-    by factor, different changes are listed, and a factor without change is left out."""
+    by factor, different changes are listed and a factor without change is left out."""
     real = [(f, w) for f, w in by_factor if not w.startswith("no ")]
     if not real:
         return by_factor[0][1] if by_factor else "no anchor inside"

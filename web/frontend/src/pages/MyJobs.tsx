@@ -17,7 +17,7 @@ function stateText(s: JobStatus | undefined): string {
 
 const when = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
-/** The jobs of this browser, newest first, with their state, and the sync of the list. */
+/** The jobs of this browser, newest first, with their state and the sync of the list. */
 export function MyJobs() {
   const jobs = useRecentJobs()
   const [params, setParams] = useSearchParams()

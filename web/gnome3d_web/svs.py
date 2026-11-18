@@ -89,7 +89,7 @@ def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV]
 
 def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[dict[str, object]], dict[str, int]]:
     """The records of one sample inside the region with their genotype and the haplotypes that
-    carry them, and the count of records of other types the sample carries, by type.
+    carry them and the count of records of other types the sample carries, by type.
 
     @raises KeyError when the sample is not a column of the VCF
     """

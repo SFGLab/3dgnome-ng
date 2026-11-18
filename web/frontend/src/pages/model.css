@@ -418,7 +418,7 @@
 }
 
 /* The browser's own arrow sits at a distance from the text that differs by platform. This one
-   keeps its place, and a long option is cut with an ellipsis before it. */
+   keeps its place and a long option is cut with an ellipsis before it. */
 .field select {
   appearance: none;
   padding-right: 30px;

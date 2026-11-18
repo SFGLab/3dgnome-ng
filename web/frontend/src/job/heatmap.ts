@@ -5,7 +5,7 @@ export const DARKEST: [number, number, number] = [110, 18, 8]
 const STOPS: [number, number, number][] = [[255, 255, 255], [241, 120, 60], DARKEST]
 
 /** The expected contact at each separation. It is the mean over pairs whose rows both hold
- * contacts, and from three bins apart the median of the neighbouring separations. The median
+ * contacts and from three bins apart the median of the neighbouring separations. The median
  * stops one sparse stratum from showing as a stripe. The main diagonal is left empty. The maps
  * hold no pair within one bin. */
 function expected(m: number[][]): number[][] {

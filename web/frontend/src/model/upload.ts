@@ -60,7 +60,7 @@ export function ownField(own: OwnChoice): string {
   })
 }
 
-/** The factor a loops file most likely holds, read from its name, and CTCF for the first file. */
+/** The factor a loops file most likely holds, read from its name and CTCF for the first file. */
 export function guessFactor(name: string, index: number): string {
   const n = name.toUpperCase()
   if (/RNAP|POL2|POLII/.test(n)) return 'RNAPII'

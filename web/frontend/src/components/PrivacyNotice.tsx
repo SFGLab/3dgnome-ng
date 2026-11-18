@@ -8,7 +8,7 @@ function seen(): boolean {
   try {
     return localStorage.getItem(KEY) === '1'
   } catch {
-    // A browser without storage cannot remember the answer, and the notice would return on
+    // A browser without storage cannot remember the answer and the notice would return on
     // every page.
     return true
   }
@@ -28,7 +28,7 @@ export function PrivacyNotice() {
   }
   return (
     <aside className="privacy-notice" aria-label="Privacy">
-      <p>This site sets no cookies and does no tracking. It keeps your job list in your browser, and files that you upload are private and deleted after 14 days.</p>
+      <p>This site sets no cookies and does no tracking. It keeps your job list in your browser. Files that you upload are private and deleted after 14 days.</p>
       <div className="privacy-notice-actions">
         <Link to={ROUTES.privacy} onClick={close}>
           Privacy notice

@@ -33,7 +33,7 @@ def main() -> int:
     check("a code with a letter outside the alphabet is no code", lists.normalise("U7M2-9QXD-4TLP-W3RZ") is None)
 
     rows = lists.clean([job("a", 1), job("b", 3), job("x", 2, kind="p"), {"url": "/api/catalog", "at": 9}, {"url": "/jobs/c"}, "text", job("d", True)], private=False)  # type: ignore[arg-type]
-    check("clean keeps job routes with a time, newest first, and no private job", [r["url"] for r in rows] == ["/jobs/b", "/jobs/a"], str(rows))
+    check("clean keeps job routes with a time, newest first and no private job", [r["url"] for r in rows] == ["/jobs/b", "/jobs/a"], str(rows))
     rows = lists.clean([job("a", 1), job("x", 2, kind="p")], private=True)
     check("a private list keeps private jobs", [r["url"] for r in rows] == ["/p/x", "/jobs/a"])
     check("clean cuts long text", len(lists.clean([{"url": "/jobs/a", "at": 1, "name": "n" * 500}], False)[0]["name"]) == lists.MAX_TEXT)

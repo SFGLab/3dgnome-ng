@@ -13,7 +13,7 @@ import { StructureTab } from '../job/StructureTab'
 import { JobTabs, type Tab } from '../job/Tabs'
 import './job.css'
 
-/** The explorer of one job: its side panel, its tabs, and its state while it is not done. */
+/** The explorer of one job: its side panel, its tabs and its state while it is not done. */
 export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: number }) {
   const { key = '' } = useParams()
   const api = useMemo(() => jobApi(kind, key), [kind, key])

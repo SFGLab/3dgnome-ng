@@ -11,7 +11,7 @@ export type Catalog = {
   max_structures: number
   hicdiffusion: boolean
 }
-/** A sample of a call set. An unknown field is an empty string, and so is a parent the set does not hold. */
+/** A sample of a call set. An unknown field is an empty string and so is a parent the set does not hold. */
 export type SampleRow = { sample: string; sex: string; population: string; superpopulation: string; father: string; mother: string }
 export type Region = { chrom: string; start: number; end: number; label: string; gene?: string }
 export type Preview = { loops: Record<string, [number, number, number][]>; counts: Record<string, number>; genes: { name: string; tss: number }[] }

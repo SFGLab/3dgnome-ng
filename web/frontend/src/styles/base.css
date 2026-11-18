@@ -30,7 +30,7 @@ pre {
   font-family: var(--mono);
 }
 
-/* A button that reads as a link. Several pages use it, and a page's own stylesheet loads with
+/* A button that reads as a link. Several pages use it and a page's own stylesheet loads with
    that page alone. */
 .link-button {
   display: inline-flex;

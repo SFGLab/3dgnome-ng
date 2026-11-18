@@ -40,7 +40,7 @@ type Term = [string, EquationName, string, string]
 
 const ANCHOR_TERMS: Term[] = [
   ['Loop spring', 't_loop_simple', 'anchor pairs joined by a loop, t = d(s, q)', '[1]'],
-  ['Background spring', 't_background', 'pairs without a loop under 100 kb apart, and far pairs with more Hi-C contacts than expected', 'this work'],
+  ['Background spring', 't_background', 'pairs without a loop under 100 kb apart and far pairs with more Hi-C contacts than expected', 'this work'],
   ['Window size', 't_gyration', 'genomic windows with at least four anchors, n_w the number of anchors, R_g their radius of gyration and R_w the radius from the distance law', 'this work'],
   ['Excluded volume', 't_ev', 'anchors not next to each other', '[5, 14]'],
 ]
@@ -123,7 +123,7 @@ export function Method() {
         </header>
 
         <Section id="inputs">
-          <P>A job reads loops, a contact map, gene and enhancer positions, and optionally structural variants. The loops hold the structure together at their anchors. The contact map sets how distance grows with genomic separation and adds contacts between pairs without a loop.</P>
+          <P>A job reads loops, a contact map and the positions of genes and enhancers. Structural variants are optional. The loops hold the structure together at their anchors. The contact map sets how distance grows with genomic separation and adds contacts between pairs without a loop.</P>
           <table className="doc-table" aria-label="Inputs">
             <thead>
               <tr>
@@ -145,12 +145,12 @@ export function Method() {
         </Section>
 
         <Section id="targets">
-          <P>{"Overlapping loops form a block, the computational form of the chromatin contact domains of Tang and colleagues [16] used by 3D-GNOME [1]. The region is split into blocks at points that no loop spans, and stretches without loops have no beads. Every pair of anchors then gets a target distance from one law in bead units, one bead being the distance at 1 kb. A pair without a loop has the target b(s), with s the genomic separation, a power law as in polymer models of chromatin [3, 17]. A loop of strength q has the target d(s, q)."}</P>
+          <P>{"Overlapping loops form a block, the computational form of the chromatin contact domains of Tang and colleagues [16] used by 3D-GNOME [1]. The region is split into blocks at points that no loop spans and stretches without loops have no beads. Every pair of anchors then gets a target distance from one law in bead units, one bead being the distance at 1 kb. A pair without a loop has the target b(s), with s the genomic separation, a power law as in polymer models of chromatin [3, 17]. A loop of strength q has the target d(s, q)."}</P>
           <div className="equations">
             <Equation name="background" />
             <Equation name="loop_target" />
           </div>
-          <P>{"The exponent nu is fitted at load to the contact probability P(s) of the cell type's Hi-C, which falls as s to the power of minus 3 nu [3, 17]. If the fit fails, the run prints the reason and uses 0.285. The strength q of a loop is its PET count n over the typical count of loops of the same span and factor f. The target shrinks as the PET count grows, as in 3D-GNOME [1] and MultiMM [5], and saturates at one bead for a strong loop, figure 1. A Hi-C cell converts to a distance the same way, b(s) times observed over expected contacts to the power of minus one third [3]."}</P>
+          <P>{"The exponent nu is fitted at load to the contact probability P(s) of the cell type's Hi-C, which falls as s to the power of minus 3 nu [3, 17]. If the fit fails, the run prints the reason and uses 0.285. The strength q of a loop is its PET count n over the typical count of loops of the same span and factor f. The target shrinks as the PET count grows, as in 3D-GNOME [1] and MultiMM [5]. It saturates at one bead for a strong loop, figure 1. A Hi-C cell converts to a distance the same way, b(s) times observed over expected contacts to the power of minus one third [3]."}</P>
           <div className="equations">
             <Equation name="contact_prob" />
           </div>
@@ -163,7 +163,7 @@ export function Method() {
         </Section>
 
         <Section id="anchors">
-          <P>{'All anchors of a chromosome are placed in one fit. Each structure starts from a random draw of the anchor positions. The draw comes from a Gaussian model that is fitted once per run, and its mean pair distances are as close to the target distances as a Gaussian model allows, as in the maximum entropy models of Shi and Thirumalai [4]. L-BFGS-B [6, 7] then minimises the anchor energy below, with L the anchor pairs joined by a loop, B the pairs held at the background and W a set of genomic windows. A loop spring uses k_s when the pair is further apart than its target t and k_q otherwise. The window term keeps each part of the chromosome at the size the distance law gives for its length. The windows start at 100 kb and double in size up to the whole chromosome, and each size is placed twice, the second time shifted by half a window. The GPU evaluates the pair terms and their gradient, the optimiser runs on the CPU, and the fit stops when the relative improvement per iteration drops below 1e-6.'}</P>
+          <P>{'All anchors of a chromosome are placed in one fit. Each structure starts from a random draw of the anchor positions. The draw comes from a Gaussian model that is fitted once per run and its mean pair distances are as close to the target distances as a Gaussian model allows, as in the maximum entropy models of Shi and Thirumalai [4]. L-BFGS-B [6, 7] then minimises the anchor energy below, with L the anchor pairs joined by a loop, B the pairs held at the background and W a set of genomic windows. A loop spring uses k_s when the pair is further apart than its target t and k_q otherwise. The window term keeps each part of the chromosome at the size the distance law gives for its length. The windows start at 100 kb and double in size up to the whole chromosome and each size is placed twice, the second time shifted by half a window. The GPU evaluates the pair terms and their gradient, the optimiser runs on the CPU and the fit stops when the relative improvement per iteration drops below 1e-6.'}</P>
           <div className="equations">
             <Equation name="anchor_energy" />
           </div>
@@ -171,7 +171,7 @@ export function Method() {
         </Section>
 
         <Section id="chain">
-          <P>{"The beads between two anchors start on a compact random coil at the bond targets, and the anchors stay where the anchor phase put them. Simulated annealing [8] moves one bead at a time and scores the chain energy below, with C the anchor pairs joined by a CTCF loop and o the direction of the CTCF motif at an anchor. A move that lowers the energy is accepted, and a move that raises it is accepted with the probability below, where E' is the energy after the move. The temperature T falls by a constant factor each step [1, 9]. A wall rejects any move that brings two beads closer than the excluded volume radius. After the chains of all blocks are finished, a last pass moves the beads that still overlap, within a block or between two blocks, and keeps the anchors fixed."}</P>
+          <P>{"The beads between two anchors start on a compact random coil at the bond targets and the anchors stay where the anchor phase put them. Simulated annealing [8] moves one bead at a time and scores the chain energy below, with C the anchor pairs joined by a CTCF loop and o the direction of the CTCF motif at an anchor. A move that lowers the energy is accepted and a move that raises it is accepted with the probability below, where E' is the energy after the move. The temperature T falls by a constant factor each step [1, 9]. A wall rejects any move that brings two beads closer than the excluded volume radius. After the chains of all blocks are finished, a last pass moves the beads that still overlap, within a block or between two blocks. The pass keeps the anchors fixed."}</P>
           <div className="equations">
             <Equation name="chain_energy" />
             <Equation name="acceptance_plain" />
@@ -198,15 +198,15 @@ export function Method() {
         </Section>
 
         <Section id="ensemble">
-          <P>{'The anchor and chain phases repeat from new random starts, one structure per start. Parts of the region with many loops are similar across structures, and parts with few loops vary more. Each structure is saved as an mmCIF file. The job then computes, for every gene, the 3D distance from its promoter to its nearest enhancer within 1 Mb over all structures, as in enhancer3D [10].'}</P>
+          <P>{'The anchor and chain phases repeat from new random starts, one structure per start. Parts of the region with many loops are similar across structures and parts with few loops vary more. Each structure is saved as an mmCIF file. The job then computes, for every gene, the 3D distance from its promoter to its nearest enhancer within 1 Mb over all structures, as in enhancer3D [10].'}</P>
         </Section>
 
         <Section id="engine">
-          <P>A run is a graph of tasks that grows while it runs, figure 3a. The region task adds one task per chromosome, a chromosome task adds its blocks, and each chromosome gets one anchor fit and one chain task per block. Each stage has its own executor, serial, threaded or batched on the GPU. Results are applied in a fixed order, and a run with the same settings and seed gives the same structures.</P>
-          <P>{'The chain tasks of many blocks run together in JAX [11] launches on the GPU, figure 3b. Each block is padded to the next size on a fixed ladder, and blocks with the same energy terms are packed into as few launches as GPU memory allows. Each chain has its own random stream, and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. Excluded volume uses a grid of cells rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU, and the output does not depend on the number of GPUs.'}</P>
-          <P>The chain tasks can also run on the CPU cores, one chain per thread, while the anchor fit stays on the GPU. This is faster on a computer with many CPU cores, and the server runs its jobs this way.</P>
+          <P>A run is a graph of tasks that grows while it runs, figure 3a. The region task adds one task per chromosome, a chromosome task adds its blocks and each chromosome gets one anchor fit and one chain task per block. Each stage has its own executor, serial, threaded or batched on the GPU. Results are applied in a fixed order and a run with the same settings and seed gives the same structures.</P>
+          <P>{'The chain tasks of many blocks run together in JAX [11] launches on the GPU, figure 3b. Each block is padded to the next size on a fixed ladder and blocks with the same energy terms are packed into as few launches as GPU memory allows. Each chain has its own random stream and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. Excluded volume uses a grid of cells rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU and the output does not depend on the number of GPUs.'}</P>
+          <P>The chain tasks can also run on the CPU cores, one chain per thread, while the anchor fit stays on the GPU. This is faster on a computer with many CPU cores and the server runs its jobs this way.</P>
           <figure className="figure">
-            <img src={engineGraph} alt="Task graph of a run on two chromosomes: a region task, one task per chromosome, its blocks, one anchor fit per chromosome on the CPU with the energy on the GPU, the chains of seven blocks in one batched launch, and the assembly" />
+            <img src={engineGraph} alt="Task graph of a run on two chromosomes: a region task, one task per chromosome, its blocks, one anchor fit per chromosome on the CPU with the energy on the GPU, the chains of seven blocks in one batched launch and the assembly" />
             <figcaption>
               <b>Figure 3a</b>Task graph of a run on two chromosomes.
             </figcaption>
@@ -214,13 +214,13 @@ export function Method() {
           <figure className="figure">
             <img src={engineBatching} alt="Nine blocks of 300 to 3600 beads, each padded to a ladder size of 512 to 4096, sorted largest first and packed into two launches padded to 4096 and 1024" />
             <figcaption>
-              <b>Figure 3b</b>Bucketing and batching of chain tasks. Each block is padded up to the next size on a fixed ladder, which limits how many shapes the GPU compiles. Blocks with the same energy terms are sorted largest first and packed into as few launches as GPU memory allows, and a launch pads its members to the size of the first.
+              <b>Figure 3b</b>Bucketing and batching of chain tasks. Each block is padded up to the next size on a fixed ladder, which limits how many shapes the GPU compiles. Blocks with the same energy terms are sorted largest first and packed into as few launches as GPU memory allows and a launch pads its members to the size of the first.
             </figcaption>
           </figure>
         </Section>
 
         <Section id="variants">
-          <P>{'Structural variants change the loops before the anchor phase. The approach comes from Sadowski and colleagues [12], and the rules below extend theirs.'}</P>
+          <P>{'Structural variants change the loops before the anchor phase. The approach comes from Sadowski and colleagues [12] and the rules below extend theirs.'}</P>
           <div className="cards">
             {[
               ['Deletion', 'Anchors inside the deletion are removed with their loops. Positions after it shift by its length.'],
@@ -236,7 +236,7 @@ export function Method() {
         </Section>
 
         <Section id="validation">
-          <P>{'A change to the engine becomes the default only after it is measured on GM12878, H1ESC and HFFc6. The contacts of the structures of an ensemble are summed into one map, and the measurements are the stratum adjusted correlation [13] and the rank correlation of that map with Hi-C at 25 kb, the exponent of distance against separation, and the number of overlapping beads. For a cell line with a Micro-C map, loops are called on that map and each loop is checked in the models. The check compares the 3D distance between the two ends of the loop with the distance of pairs at the same genomic separation. A change meant to leave results unchanged is checked by comparing bead coordinates with the previous version. A test against the original 3D-GNOME program compares the distance distributions of both ensembles on a 2 Mb region. The Results page lists the measurements.'}</P>
+          <P>{'A change to the engine becomes the default only after it is measured on GM12878, H1ESC and HFFc6. The contacts of the structures of an ensemble are summed into one map and the measurements are the stratum adjusted correlation [13] and the rank correlation of that map with Hi-C at 25 kb, the exponent of distance against separation and the number of overlapping beads. For a cell line with a Micro-C map, loops are called on that map and each loop is checked in the models. The check compares the 3D distance between the two ends of the loop with the distance of pairs at the same genomic separation. A change meant to leave results unchanged is checked by comparing bead coordinates with the previous version. A test against the original 3D-GNOME program compares the distance distributions of both ensembles on a 2 Mb region. The Results page lists the measurements.'}</P>
         </Section>
 
         <Section id="limitations">

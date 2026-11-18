@@ -12,6 +12,7 @@ export function checkCopy(root: HTMLElement): string[] {
     }
     if (text.includes(', so ')) found.add(`has a ", so" clause: "${text}"`)
     if (/\bbecause\b/i.test(text)) found.add(`has a "because" clause: "${text}"`)
+    if (text.includes(', and ')) found.add(`has a comma before "and": "${text}"`)
   }
   return [...found]
 }

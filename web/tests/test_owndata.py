@@ -40,7 +40,7 @@ def main() -> int:
 
         mixed = "chr1\t100000\t101000\tchr1\t300000\t301000\t5\nchr1\t1000000\t1001000\tchr2\t300000\t301000\t3\nchr1\t100000\t101000\tchr1\t1500000\t1501000\t4\n"
         j = up("loops", "mixed.bedpe", mixed.encode()).json()
-        check("the summary counts loops between chromosomes and over 1 Mb", j["summary"] == "3 loops read. 1 loop between chromosomes is skipped, and 1 loop longer than 1 Mb goes to the coarse contact map.", j["summary"])
+        check("the summary counts loops between chromosomes and over 1 Mb", j["summary"] == "3 loops read. 1 loop between chromosomes is skipped and 1 loop longer than 1 Mb goes to the coarse contact map.", j["summary"])
 
         old = "chr1\t100000\t101000\tchr1\t300000\t301000\tR\tL\tCTCF\t5\n"
         j = up("loops", "hichip_loops.txt", old.encode()).json()

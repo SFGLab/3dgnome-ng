@@ -356,7 +356,7 @@ def _span(bp: int) -> str:
 def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str, hic_url: str = "", hic_name: str = "", allow_private: bool = False) -> dict[str, object]:
     """Two contact maps of a window on one grid, each the Hi-C, the model's MultiMM map or its
     counted contacts, raw or ICE balanced, with two agreements of the halves: the rank agreement
-    per distance, and the stratum adjusted correlation the battery reports, raw Hi-C against
+    per distance and the stratum adjusted correlation the battery reports, raw Hi-C against
     contacts within the structures' median bond.
 
     @param hic_url a deep map of the cell type in place of the job's own input contacts
@@ -388,7 +388,7 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         try:
             hic, hic_label = _deep_map(job, hic_url, chrom, start, end, res, allow_private), f"Hi-C of {cell}, {hic_name or 'deep map'}"
         except Exception:  # noqa: BLE001
-            # A deep map that cannot be read leaves the contacts the job read, and the label says so.
+            # A deep map that cannot be read leaves the contacts the job read and the label says so.
             hic = None
     if hic is None:
         sing = pd.read_csv(job / "inputs" / "singletons.bedpe", sep="\t", header=None, usecols=range(7))
@@ -419,7 +419,7 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
     b, lb = one(lower)
     raw_a, raw_b = a, b
     if norm == "ice":
-        # A loop half is a list of loops, not a contact map, and is never balanced.
+        # A loop half is a list of loops, not a contact map and is never balanced.
         a = a if upper in loop_sets else cm.ice(a)
         b = b if lower in loop_sets else cm.ice(b)
     elif norm != "raw":

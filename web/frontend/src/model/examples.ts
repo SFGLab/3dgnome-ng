@@ -1,11 +1,11 @@
 import type { Factors } from './form'
 
-/** The examples: each a request the form can be filled with, and the tab or second loop set its
- * finished job opens on. Each description is read from the hosted data, and a change of the data
+/** The examples: each a request the form can be filled with and the tab or second loop set its
+ * finished job opens on. Each description is read from the hosted data and a change of the data
  * needs them read again. TNFRSF8: one RNAPII loop of 3 PETs from 3 kb inside the gene to the
- * enhancer at chr1:12,448,194-12,450,774, and no CTCF loop between the two. MYC: loops from the
+ * enhancer at chr1:12,448,194-12,450,774 and no CTCF loop between the two. MYC: loops from the
  * promoter to anchors with enhancers 428 to 557 kb upstream. HOXA: the loop count of the preview.
- * GSTM1: the variants check of HG00512, and 48 of 69 alleles of the call set carry the deletion. */
+ * GSTM1: the variants check of HG00512 and 48 of 69 alleles of the call set carry the deletion. */
 export type Example = {
   id: string
   title: string

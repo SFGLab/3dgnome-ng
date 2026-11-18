@@ -5,7 +5,7 @@ export const PAGE = 50
 
 export type Page<T> = { rows: T[]; at: number; total: number; size: number; go: (at: number) => void }
 
-/** One page of rows. `reset` changes when a filter or sort does, and sends the table back to
+/** One page of rows. `reset` changes when a filter or sort does and sends the table back to
  * its first page. */
 export function usePage<T>(all: T[], reset: unknown = null, size = PAGE): Page<T> {
   const [at, setAt] = useState(0)

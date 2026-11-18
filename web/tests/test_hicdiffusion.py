@@ -1,4 +1,4 @@
-"""The HiCDiffusion step: what the server lacks, and one job through it with a stand in model.
+"""The HiCDiffusion step: what the server lacks and one job through it with a stand in model.
 
     python web/tests/test_hicdiffusion.py
 """

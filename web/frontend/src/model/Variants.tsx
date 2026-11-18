@@ -26,7 +26,7 @@ const describe = (r: SampleRow) => [r.population, r.superpopulation, r.sex].filt
 const LISTED = 12
 
 /** The sample of a large call set, typed with the browser's own suggestions. The form takes the
- * sample once the text names one of the set's samples, and has none while it does not. */
+ * sample once the text names one of the set's samples and has none while it does not. */
 function SampleSearch({ samples, sample, table, onChange, onText }: { samples: string[]; sample: string; table: Map<string, SampleRow>; onChange: (sample: string) => void; onText: (text: string) => void }) {
   const [text, setText] = useState(sample)
   useEffect(() => {

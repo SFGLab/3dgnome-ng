@@ -135,7 +135,7 @@ export function Cite() {
         <section id="contact">
           <h2>Contact</h2>
           <p className="intro">
-            Laboratory of Functional and Structural Genomics, led by Dariusz Plewczynski, at the Faculty of Mathematics and Information Science, Warsaw University of Technology, and the Centre of New Technologies, University of Warsaw.
+            Laboratory of Functional and Structural Genomics, led by Dariusz Plewczynski, at the Faculty of Mathematics and Information Science, Warsaw University of Technology and the Centre of New Technologies, University of Warsaw.
           </p>
           <a className="lab-link" href="https://sfglab.mini.pw.edu.pl">
             <ExternalLink size={13} aria-hidden /> sfglab.mini.pw.edu.pl

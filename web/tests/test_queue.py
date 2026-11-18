@@ -74,7 +74,7 @@ def main() -> int:
         check("a slot keeps serving after a job that raises", after == "done", after)
 
         # A restart: one job was running, one waited with its request on disk, one waited without
-        # it, and one had finished.
+        # it and one had finished.
         results = root / "restart"
         def left(name: str, state: str, request: bool) -> Path:
             job = results / "jobs" / name

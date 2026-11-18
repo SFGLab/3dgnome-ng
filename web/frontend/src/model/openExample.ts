@@ -22,7 +22,7 @@ function request(e: Example, factors: Factors): FormData {
 }
 
 /** Submits an example's request, which the server answers with the shared job, finished or
- * running, and returns the page to open: the job on its tab, or with the comparison. */
+ * running and returns the page to open: the job on its tab, or with the comparison. */
 export async function openExample(e: Example): Promise<string> {
   // A compare example's two jobs are named by their loop sets, not by the example's title.
   const named = (f: Factors) => `${e.cellLabel} ${e.region}, ${f === 'CTCF+RNAPII' ? 'CTCF and RNAPII' : f} loops`

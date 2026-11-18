@@ -39,7 +39,7 @@ export function Background({ value, region, available, lymphoblastoid, onChange 
       </div>
       {!lymphoblastoid && (
         <p className="notice">
-          <Info size={14} aria-hidden /> HiCDiffusion was trained on GM12878. Its predictions for H1ESC and HFFc6 are outside its training data, and the job page shows a warning.
+          <Info size={14} aria-hidden /> HiCDiffusion was trained on GM12878. Its predictions for H1ESC and HFFc6 are outside its training data and the job page shows a warning.
         </p>
       )}
     </>

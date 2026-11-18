@@ -1,12 +1,12 @@
 #!/bin/bash
-# The site without Docker or Redis: uvicorn with the thread queue on fixed GPU slots, and the
+# The site without Docker or Redis: uvicorn with the thread queue on fixed GPU slots and the
 # NVIDIA MPS daemon for the engines when MPS=1. Run from the repository root.
 #
 #   SITE=~/site-data RESULTS=~/results VENV=~/venv PORT=8766 GPU_SLOTS=0,0 POOL_GIB=1.5 MPS=1 \
 #     bash web/scripts/serve_local.sh
 #
 # With MPS=1 the daemon runs as this user in a pipe directory under RESULTS, which only these
-# engines use, and stops when the site stops.
+# engines use and stops when the site stops.
 set -euo pipefail
 SITE="${SITE:?set SITE to the site data directory}"
 RESULTS="${RESULTS:?set RESULTS to the results directory}"

@@ -1,5 +1,5 @@
 """The engine settings a user may change on the form. Types and defaults are read from
-SETTINGS.md, and the text shown under a setting is `HELP`.
+SETTINGS.md and the text shown under a setting is `HELP`.
 
 Every other setting keeps the value of the cell type's config. A change is validated against
 its range here and written into the job's config.ini before the engine starts.
@@ -120,7 +120,7 @@ HELP: dict[str, str] = {
     "springs.background_weight": "Strength of a weak spring that holds two nearby anchors without a loop at the distance the law gives for their separation. 0 turns it off.",
     "springs.background_range_bp": "Largest genomic separation, in bp, of an anchor pair that the background_weight spring holds.",
     "springs.use_contact_background": "Beyond background_range_bp, pulls an anchor pair without a loop closer if the contact map has more contacts than expected at its separation.",
-    "excluded_volume.arcs_repulsion": "Pushes apart every pair of anchors that has no loop. Off, distant anchors are free to meet, and gyration_weight keeps the size of the model.",
+    "excluded_volume.arcs_repulsion": "Pushes apart every pair of anchors that has no loop. Off, distant anchors are free to meet and gyration_weight keeps the size of the model.",
     "excluded_volume.arcs_repulsion_cutoff_factor": "Reach of arcs_repulsion, as a multiple of the mean loop distance. Anchors farther apart are not pushed. 0 sets no limit.",
     "springs.gyration_weight": "Holds every stretch of the region at the size the distance law gives for its length. It sets how compact the model is and fixes no pair of anchors at a distance. 0 turns it off.",
     "holes.use_hole_beads": "Fills a stretch that no loop covers with beads. Off, such a stretch is left out of the structure.",
@@ -139,7 +139,7 @@ HELP: dict[str, str] = {
     "relax.within_blocks": "The last pass also moves apart overlapping beads inside one loop block.",
     "confinement.use_confinement": "Keeps the structure inside a sphere, as a nucleus would.",
     "confinement.weight": "Strength of the pull back into the sphere.",
-    "compartments.use_compartments": "Draws beads of the same compartment, A or B, toward each other. It needs a compartment track, and the hosted cell types have none.",
+    "compartments.use_compartments": "Draws beads of the same compartment, A or B, toward each other. It needs a compartment track and the hosted cell types have none.",
     "compartments.weight": "Strength of the attraction between beads of one compartment.",
 }
 
@@ -217,7 +217,7 @@ def validate_overrides(raw: dict[str, str]) -> dict[str, str]:
 
 
 def apply_overrides(config: Path, overrides: dict[str, str]) -> None:
-    """Writes the changes into an ini file, replacing a key in its section or adding it there,
+    """Writes the changes into an ini file, replacing a key in its section or adding it there
     and keeps every other line."""
     lines = config.read_text().splitlines()
     for name, value in sorted(overrides.items()):

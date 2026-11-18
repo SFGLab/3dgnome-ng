@@ -1,5 +1,5 @@
 """Contact maps of a job on one grid: the Hi-C, the model as MultiMM's 1/(d+1)^3 map or as
-counted contacts, ICE balancing, and the stratum adjusted correlation of the validation battery
+counted contacts, ICE balancing and the stratum adjusted correlation of the validation battery
 (validation/metrics/hic.py), so the site and the battery report one number.
 """
 
@@ -135,7 +135,7 @@ def rank_strata(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None 
     """The Spearman correlation of each diagonal over the kept bins, as (separation in bins,
     pairs, correlation), from the first diagonal up to max_bp or to the last one before a
     diagonal with under min_filled of its pairs above zero in either map. A small ensemble
-    holds no contact at most far pairs, and the ranks of a diagonal of zeros are ties.
+    holds no contact at most far pairs and the ranks of a diagonal of zeros are ties.
 
     @param keep the bins compared, every bin when None
     """

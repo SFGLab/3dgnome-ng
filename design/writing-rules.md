@@ -26,6 +26,9 @@ how something looks.
 Do not use ", so" consequence clauses or "because" clauses. The exception is a clause that carries a rule the next
 editor would otherwise break.
 
+Do not put a comma before "and". Join the two parts without it. Where the sentence then reads badly, write two
+sentences. The maintainer added this rule on 2026-11-18.
+
 Do not use capitals for emphasis. Use few backticks and few parentheses. Leave out facts nobody needs, and do not argue
 against a misreading nobody would have. Use the common term, for example "map", not "one output per element".
 
@@ -54,4 +57,4 @@ case that happened, the step, and the fix, in one or two sentences.
 ## Check before handing over
 
 Reread new text against these rules while writing it. Search the added text for the wh-openers, endings in "by",
-"under", "in", "on", "for", "with" or "to", the verbs "names", "write" and "hands", ", so " and "because".
+"under", "in", "on", "for", "with" or "to", the verbs "names", "write" and "hands", ", so ", ", and " and "because".

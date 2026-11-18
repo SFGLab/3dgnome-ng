@@ -8,7 +8,7 @@ const AXIS = 75
 
 const plural = (n: number, word: string) => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`
 
-/** The loops of a region as arcs over an axis, CTCF above and RNAPII below, and the genes as ticks. */
+/** The loops of a region as arcs over an axis, CTCF above and RNAPII below and the genes as ticks. */
 export function LoopPreview({ cell, region, factors }: { cell: string; region: Region; factors: Factors }) {
   const span = `${region.chrom}:${region.start}-${region.end}`
   const preview = useQuery({ queryKey: ['preview', cell, span], queryFn: () => api.preview(cell, span) })

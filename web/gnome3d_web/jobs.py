@@ -2,7 +2,7 @@
 
 A job directory holds `request.json`, `status.json`, the engine inputs under `inputs/`, the
 structures under `models/`, `marks.json`, `ep.tsv` and `engine.log`. `status.json` is rewritten
-at every stage, so a page can show where a job is, and a failure records the stage and the last
+at every stage, so a page can show where a job is and a failure records the stage and the last
 lines of the log. A job on hosted inputs is keyed by a hash of the normalised request, so the
 same request finds the same directory. A job with an upload is private and keyed by a random
 token instead.
@@ -110,7 +110,7 @@ def _status(job: Path, **fields: object) -> None:
 
 
 def write_json(path: Path, value: object) -> None:
-    """Write a JSON file whole. A job page reads a job's files while the job runs, and a file
+    """Write a JSON file whole. A job page reads a job's files while the job runs and a file
     written in place is empty for a moment."""
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(value, indent=2))
@@ -128,7 +128,7 @@ def _tail(path: Path, n: int = 30) -> str:
 def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, cell_enhancers: bool = True):  # noqa: ANN001, ANN202
     """The cell type's genes and enhancers on `chrom` in the haplotype's coordinates, the beads'
     coordinates, those inside a deletion dropped. A gene or an enhancer inside a duplication is
-    there twice, and the gene's second copy carries `COPY` after its name. An enhancers upload
+    there twice and the gene's second copy carries `COPY` after its name. An enhancers upload
     replaces the cell type's; with `cell_enhancers` off and no upload there are none, as on your
     own cell type."""
     import pandas as pd
@@ -198,7 +198,7 @@ def run_job(
         env = dict(os.environ) | (env_extra or {})
         if "ENGINE_ROOT" in env:
             env["PYTHONPATH"] = env["ENGINE_ROOT"] + (":" + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
-        # The log of a job begins with the HiCDiffusion step when it ran, and the engine follows.
+        # The log of a job begins with the HiCDiffusion step when it ran and the engine follows.
         with log.open("a" if hic is not None else "w") as fh:
             rc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, cwd=env.get("ENGINE_ROOT"), env=env).returncode
         if rc != 0:

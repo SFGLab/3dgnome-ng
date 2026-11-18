@@ -844,7 +844,7 @@
 .contact-frame {
   position: relative;
   box-sizing: border-box;
-  /* As wide as the panel, and short enough that the whole square fits on the screen. */
+  /* As wide as the panel and short enough that the whole square fits on the screen. */
   width: min(100%, max(320px, calc(100vh - 360px)));
   aspect-ratio: 1;
   overflow: hidden;

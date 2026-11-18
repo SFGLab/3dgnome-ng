@@ -329,7 +329,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
               <span className="big-value">{typeof maps.data.rank === 'number' ? maps.data.rank.toFixed(2) : 'none'}</span> <span className="unit">rank agreement</span>
             </p>
             <p className="card-text">{`Rank correlation at ${res / 1000} kb of ${maps.data.rank_about ?? 'the two maps'}. It compares the pattern at each distance and not the level.`}</p>
-            <p className="card-text">{`Stratum adjusted correlation ${maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}, of ${maps.data.scc_about ?? 'the two maps'}. It also compares the level, and a stretch without beads scores well where Hi-C is depleted.`}</p>
+            <p className="card-text">{`Stratum adjusted correlation ${maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}, of ${maps.data.scc_about ?? 'the two maps'}. It also compares the level and a stretch without beads scores well where Hi-C is depleted.`}</p>
             {typeof maps.data.loop_enrichment === 'number' && (
               <p className="card-text">{`At the loops the other half is ${maps.data.loop_enrichment.toFixed(1)} times its expected contact at the same distance.`}</p>
             )}

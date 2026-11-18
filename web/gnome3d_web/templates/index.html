@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block body %}
 <h1>Model a region</h1>
-<p class="lead">Pick a cell type and a region, choose the loops, optionally apply structural variants, and get an ensemble of 3D structures with promoters and enhancers marked.</p>
+<p class="lead">Pick a cell type and a region, choose the loops, optionally apply structural variants and get an ensemble of 3D structures with promoters and enhancers marked.</p>
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 <form method="post" action="{{ root }}/jobs" enctype="multipart/form-data">
 <fieldset><legend>Cell type and region</legend>
@@ -31,7 +31,7 @@
   </div>
   <label for="vcf">Or upload your own VCF, bgzipped, with SVTYPE of DEL, INS, INV or DUP</label>
   <input id="vcf" name="vcf" type="file" accept=".vcf,.gz">
-  <p class="muted">An uploaded VCF and everything built from it are private, reachable only through the job's link, and deleted after {{ retention }} days.</p>
+  <p class="muted">An uploaded VCF and everything built from it are private, reachable only through the job's link and deleted after {{ retention }} days.</p>
 </fieldset>
 <fieldset><legend>Contacts and ensemble</legend>
   <div class="row">

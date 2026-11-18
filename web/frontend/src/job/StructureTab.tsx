@@ -34,7 +34,7 @@ type Props = {
 }
 
 /** The Structure tab: the selected structure in 3D, measurement between two beads over the
- * ensemble, and the card of a selected gene. */
+ * ensemble and the card of a selected gene. */
 export function StructureTab({ api, summary, selected, gene: geneProp, onGene, onOpenGenes = () => {} }: Props) {
   const [mode, setMode] = useState<Mode>('elements')
   const [measure, setMeasure] = useState(false)

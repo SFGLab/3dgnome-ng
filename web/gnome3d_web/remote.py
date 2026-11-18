@@ -2,7 +2,7 @@
 range requests and keeps only its bin pairs at 25 kb, thinned to the density of the hosted maps.
 The whole file never comes to the server.
 
-A link must be http or https, end in .hic, .mcool or .cool, and resolve to a public address.
+A link must be http or https, end in .hic, .mcool or .cool and resolve to a public address.
 Every connection to the link's server resolves its host once and connects to the address it
 checked, so a name that turns private between the check and the read is refused. The readers
 reach the file through a local range proxy that makes those connections.
@@ -154,7 +154,7 @@ def check_link(url: str, allow_private: bool) -> str:
 
 
 def probe(url: str, allow_private: bool, timeout: float = HEAD_SECONDS) -> tuple[int, str]:
-    """The size of a remote file whose server answers range requests, and the address it is served
+    """The size of a remote file whose server answers range requests and the address it is served
     from after redirects. Every connection, redirects included, goes to an address checked when it
     is made.
 
@@ -351,7 +351,7 @@ class _Proxy:
             self.idle.setdefault(self._key(url, getattr(conn, "allow_private", False)), []).append(conn)
 
     def add(self, url: str, allow_private: bool) -> tuple[str, str]:
-        """A local address that serves `url`, and its token."""
+        """A local address that serves `url` and its token."""
         token = secrets.token_urlsafe(16)
         self.routes[token] = (url, allow_private)
         name = urlparse(url).path.rsplit("/", 1)[-1] or "file"
@@ -448,7 +448,7 @@ def link_window(url: str, chrom: str, start: int, end: int, per_mb: float, densi
     kind = check_link(url, allow_private)
     size, final = probe(url, allow_private)
     w = read_window(final, kind, chrom, start, end, size, allow_private)
-    # The hosted maps hold no pair within one bin, and the engine reads every map alike.
+    # The hosted maps hold no pair within one bin and the engine reads every map alike.
     off = w.bin1 != w.bin2
     w = Window(w.bin1[off], w.bin2[off], w.counts[off], w.resolutions)
     span = f"{chrom}:{start:,}-{end:,}"

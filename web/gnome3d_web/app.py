@@ -43,7 +43,7 @@ class StripBase:
     """Removes the site's base path from a request path that carries it.
 
     The routes are written for the root. The proxy in front may strip the base path or pass it
-    on, and both reach the same route.
+    on and both reach the same route.
     """
 
     def __init__(self, app: Any, base: str) -> None:
@@ -124,7 +124,7 @@ def create_app() -> FastAPI:
             self.field = field
 
     def create_job(fields: dict[str, str], vcf: bytes | Path | None) -> str:
-        """Checks a job request, queues the job unless the same one exists, and returns its url.
+        """Checks a job request, queues the job unless the same one exists and returns its url.
 
         @param fields the form fields of a job request, overrides as JSON text
         @param vcf an uploaded VCF, which makes the job private. The field vcf_upload names an

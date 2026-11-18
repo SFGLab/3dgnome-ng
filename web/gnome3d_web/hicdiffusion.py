@@ -27,7 +27,7 @@ from personal3d.hicdiffusion import Reference, encode, haplotype_window
 
 VARIABLES = ("HICDIFFUSION_DIR", "HICDIFFUSION_PYTHON", "HICDIFFUSION_MODELS", "REFERENCE_FASTA")
 CHECKPOINTS = ("hicdiffusion.ckpt", "hicdiffusion_encoder_decoder.ckpt")
-# The runner has a directory of its own. Python puts a script's directory first on its path,
+# The runner has a directory of its own. Python puts a script's directory first on its path
 # and beside the site's modules `import queue` inside torch would find the site's queue.py.
 RUNNER = Path(__file__).resolve().parent / "hicdiffusion_env" / "runner.py"
 

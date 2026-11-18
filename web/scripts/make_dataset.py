@@ -9,7 +9,7 @@ add it to the catalog.
 same for every cell type of one annotation.
 
 Reads, from `<repo data dir>/<CELL>/`, the production CTCF anchors and the cross line inputs of
-playground/rnapii/crosscell_prep.py, the Hi-C singletons, segments and centromeres, and takes
+playground/rnapii/crosscell_prep.py, the Hi-C singletons, segments and centromeres and takes
 the arm C config from slurm/ensemble as the template. Files are copied, never linked, so the
 site's data directory stands on its own. An existing cell type directory is refused.
 """
@@ -116,7 +116,7 @@ def main() -> None:
     if a.contact_map:
         cat["cell_types"][c]["contact_map"] = a.contact_map
     cat_path.write_text(json.dumps(cat, indent=2) + "\n")
-    print(f"wrote {dest}, {n} genes, and the catalog entry")
+    print(f"wrote {dest}, {n} genes and the catalog entry")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """The engine's inputs for one request, written to the job's directory.
 
 The cell type's loops of the region's chromosome are rewired by the sample's variants with the
-2019 rules of personal3d, CTCF and RNAPII separately, and the loops wholly inside the region
+2019 rules of personal3d, CTCF and RNAPII separately and the loops wholly inside the region
 are kept. The anchors are the cell type's own, lifted to the haplotype's coordinates, plus any
 loop end the rules made. The singletons of the whole chromosome are kept, since the engine fits
 the contact decay on the file, lifted end by end, with a HiCDiffusion window spliced in when
@@ -38,7 +38,7 @@ def _no_loops() -> list[tuple[str, Path]]:
 
 @dataclass
 class Own:
-    """A job's own files: loops per factor, and anchors, contacts and enhancers in place of the
+    """A job's own files: loops per factor and anchors, contacts and enhancers in place of the
     cell type's. Without anchors the loop ends are the anchors."""
 
     loops: list[tuple[str, Path]] = field(default_factory=_no_loops)
@@ -136,7 +136,7 @@ def build_inputs(
     """Write the inputs for one haplotype under `out` and return the config and the region in
     the haplotype's coordinates. `hic` is a predicted HiCDiffusion window and its reference start.
     `background` none turns off the contact terms and keeps the singletons for the exponent fit.
-    RNAPII alone has its loop ends as anchors, orientation N, and no CTCF orientation term."""
+    RNAPII alone has its loop ends as anchors, orientation N and no CTCF orientation term."""
     out.mkdir(parents=True, exist_ok=True)
     chrom = region.chrom
     L = Lift(svs)

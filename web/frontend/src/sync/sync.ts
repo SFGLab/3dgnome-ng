@@ -2,7 +2,7 @@
  * One list of jobs on several browsers, joined by a sync code.
  *
  * The server keeps the list. A browser that has the code sends its jobs, takes back the merged
- * list and stores it as its own. A list made without private jobs never receives one, and the
+ * list and stores it as its own. A list made without private jobs never receives one and the
  * private jobs of a browser then stay in that browser.
  */
 import { useSyncExternalStore } from 'react'

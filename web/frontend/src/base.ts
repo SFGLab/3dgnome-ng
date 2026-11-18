@@ -8,6 +8,6 @@ export const BASE = prefixOf(import.meta.env.BASE_URL)
 
 /**
  * A path of the server as the browser requests it.
- * The router adds the prefix to its own links, and every other request and link goes through here.
+ * The router adds the prefix to its own links and every other request and link goes through here.
  */
 export const served = (path: string, base = BASE) => base + path

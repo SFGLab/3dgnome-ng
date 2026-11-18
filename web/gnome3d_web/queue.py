@@ -28,7 +28,7 @@ def work(req_dict: dict[str, object], job_dir: str, gpu: str | None = None, engi
 
 class LocalPool:
     """Runs jobs in the web process on a fixed set of slots, one GPU id per slot. A job waits
-    for a free slot, and its engine sees only the slot's GPU. Waiting jobs are lost when the
+    for a free slot and its engine sees only the slot's GPU. Waiting jobs are lost when the
     process stops."""
 
     def __init__(self, slots: list[str], engine: list[str] | None = None) -> None:
@@ -112,11 +112,11 @@ def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
 
 
 def resume_interrupted(results_dir: Path, pool: LocalPool) -> list[str]:
-    """Queue again the jobs a stop of the web process left running or waiting, oldest first,
+    """Queue again the jobs a stop of the web process left running or waiting, oldest first
     and return their names.
 
     The local pool holds its jobs in the process, so a restart ends a running engine and
-    forgets the waiting jobs, and their pages would wait without end. A job without its
+    forgets the waiting jobs and their pages would wait without end. A job without its
     request on disk cannot be run again and is marked failed, so its page says so and the
     form accepts the request anew.
     """
@@ -150,7 +150,7 @@ def resume_after_restart(s: Settings) -> list[str]:
 
 def sweep_private(results_dir: Path, retention_days: int) -> list[str]:
     """Remove private jobs and uploads older than the retention period, as the form promises
-    users, and return their names. Shared jobs are never removed here."""
+    users and return their names. Shared jobs are never removed here."""
     gone = []
     cutoff = time.time() - retention_days * 86400
     for root in (results_dir / "private", results_dir / "uploads"):

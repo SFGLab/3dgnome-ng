@@ -44,7 +44,7 @@ describe('GenesTab', () => {
     expect(screen.getByText('genes 1 to 50 of 75')).toBeInTheDocument()
   })
 
-  it('says when a promoter anchors loops that do not reach its enhancer, and gives short separations in bp', () => {
+  it('says when a promoter anchors loops that do not reach its enhancer and gives short separations in bp', () => {
     renderTab({ rows: [{ ...GENES[1], gene: 'CYB561D1', linear_bp: 352, joined_by: '', promoter_loops: 21 }] })
     const cells = within(screen.getAllByRole('row')[1]).getAllByRole('cell')
     expect(cells[2].textContent).toBe('352 bp')

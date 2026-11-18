@@ -9,7 +9,7 @@
 <p class="lead">{{ req.factors.replace('+', ' and ') if req.factors else '' }} loops{% if req.sample %}, {{ req.sample }} haplotype {{ req.haplotype + 1 }}{% endif %}, {{ req.n_models }} structures. State: <strong>{{ status.state }}</strong>{% if status.stage and status.state != "done" %}, {{ status.stage }}{% endif %}.</p>
 {% if private %}<div class="notice">This job is private. Keep the link; it is deleted after {{ retention }} days.</div>{% endif %}
 {% if cell and cell.note %}<div class="notice">{{ cell.note }}</div>{% endif %}
-{% if req.hicdiffusion %}<div class="notice">The contact background was predicted from sequence by HiCDiffusion, trained on GM12878. It is not an individual specific map{% if cell and not cell.lymphoblastoid %}, and for this cell type it is outside what the model was trained on{% endif %}.</div>{% endif %}
+{% if req.hicdiffusion %}<div class="notice">The contact background was predicted from sequence by HiCDiffusion, trained on GM12878. It is not an individual specific map{% if cell and not cell.lymphoblastoid %} and for this cell type it is outside what the model was trained on{% endif %}.</div>{% endif %}
 {% if status.n_svs is defined %}<p class="muted">{{ status.n_svs }} structural variants applied{% if status.skipped_svs %}, {{ status.skipped_svs }} skipped for an unsupported type{% endif %}. Loops modelled: {% for k, n in (status.loops or {}).items() %}{{ k }} {{ n }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
 {% if status.state == "failed" %}
   <div class="error">{{ status.error }}</div>

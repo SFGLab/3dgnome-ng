@@ -17,10 +17,10 @@ const noRaycast = () => null
  * inner div by hand. A label that took the pointer would leave the canvas the moment it appeared
  * under a still cursor, clear the hover, vanish and bring the hover back, over and over. */
 const MARK_STYLE = { pointerEvents: 'none' } as const
-/** Hover and pick by the screen: every bond is projected as the tube it is drawn as, and the
+/** Hover and pick by the screen: every bond is projected as the tube it is drawn as and the
  * front tube under the cursor gives the bead. Casting rays into the meshes flickered between the
- * tubes and the joints, and testing bead centres alone missed a zoomed tube between two beads
- * and caught a strand behind. No hover while a drag rotates the view, and a click is a press and
+ * tubes and the joints and testing bead centres alone missed a zoomed tube between two beads
+ * and caught a strand behind. No hover while a drag rotates the view and a click is a press and
  * release that hardly moved. */
 function Picker({
   points,

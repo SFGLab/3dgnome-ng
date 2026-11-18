@@ -175,7 +175,7 @@ export type Accession = { id: string; url: string }
 /**
  * A row of the Cite page's data table.
  * `accessions` are the records the data came from, the experiment or set first and its files
- * after it. `pending` says what is still to be recorded, and stands in the accession column.
+ * after it. `pending` says what is still to be recorded and stands in the accession column.
  * A row without `ref` has no confirmed source to cite yet.
  */
 export type DataSource = { data: string; usedFor: string; accessions: Accession[]; note?: string; pending?: string; label: string; ref?: string }

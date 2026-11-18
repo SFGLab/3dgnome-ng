@@ -26,7 +26,7 @@ export function Title() {
           </h1>
           <p className="lead">
             3D-GNOMEᴺᴳ computes 3D structures of genomic regions up to 20 Mb from CTCF and RNAPII loops, Hi-C contacts and structural variants. Each job returns an ensemble of
-            structures with promoters and enhancers marked, and the 3D distances between them.
+            structures with promoters and enhancers marked and the 3D distances between them.
           </p>
           <div className="buttons">
             <Link className="button primary" to={ROUTES.model}>

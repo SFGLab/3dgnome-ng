@@ -4,7 +4,7 @@
 
 The directory holds `<sample>/<sample>.vcf`, each with the records that sample carries, the
 layout the 3D-GNOME 3.0 server keeps the 1000 Genomes structural variants in. A record is the
-same site in two files when its chromosome, position, ID, REF and ALT agree, and its QUAL,
+same site in two files when its chromosome, position, ID, REF and ALT agree and its QUAL,
 FILTER and INFO are taken from the file read first. A sample that does not list a site gets
 0|0 there. The output is sorted in the header's contig order, compressed with bgzip and indexed
 with tabix, both of which must be on the path.

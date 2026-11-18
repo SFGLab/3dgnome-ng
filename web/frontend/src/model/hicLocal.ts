@@ -28,7 +28,7 @@ export async function readHicWindow(file: File, region: Window, res: number): Pr
   const c = region.chrom
   return records
     .map((r) => [Math.min(r.bin1, r.bin2) * res, Math.max(r.bin1, r.bin2) * res, Math.round(r.counts)] as const)
-    // The hosted maps hold no pair within one bin, and the engine reads every map alike.
+    // The hosted maps hold no pair within one bin and the engine reads every map alike.
     .filter(([a, b, n]) => n > 0 && a !== b)
     .map(([a, b, n]) => `${c}\t${a}\t${a + res}\t${c}\t${b}\t${b + res}\t${n}\n`)
     .join('')
