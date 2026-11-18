@@ -8,7 +8,7 @@ State words: done, open, waiting, held. A waiting item states the person or the 
 ## Website, 3D-GNOME NG on team-aragorn
 
 The site is at `https://3dgnome.mini.pw.edu.pl/new/` and outside access works since 2026-11-18. It runs
-the image at `729afe3`. Record: `web/deploy/aragorn.md`.
+the image at `aa464ad`. Record: `web/deploy/aragorn.md`.
 
 | Request | State | Notes |
 |---|---|---|
@@ -25,6 +25,7 @@ the image at `729afe3`. Record: `web/deploy/aragorn.md`.
 | Loading state of the contact map | done | Commit `72c821d`. A card with a spinner inside the map frame. |
 | Layout of the model page: example tags, the own data card | done | Commit `71a8239`, live. A long tag goes below its title. The own data card takes a whole row where it would start one. |
 | Accessions of the CTCF loops, checked against enhancer3D | done | Commit `71a8239`, live. The files are enhancer3D's, the 4DN in situ ChIA-PET sets 4DNES7IB5LY9, 4DNESR9S8R38 and 4DNESCQ7ZD21, read from the portal's records. The GM12878 row had named Tang 2015. |
+| Example descriptions checked against the data | done | Commit `aa464ad`, live. HOXA has 8 CTCF loops and no longer says dense. The MYC window moved to chr8:127.0-128.5 Mb to hold the enhancers its loops reach. GSTM1 states the deletion's change. TNFRSF8 was true and stays. |
 | HFFc6 as a hosted cell type | waiting, download of its map | The build of 2026-11-11 made two cell types. `data/cell_types/HFFC6` is on aragorn. The catalog entry follows the map, `web/deploy/maps_hffc6.sh`. |
 | HFFc6's own RNAPII ChIA-PET in place of BJ | open | The 4DN portal answers again since 2026-11-18, and the set 4DNESI1WZ5HT was out of reach on 2026-11-11. A new loop set means the cross line prep is run again. |
 | Sample table for the picker: population, sex, trios | done | Commit `729afe3`, live. `data/svs/1KGP.samples.tsv` from the panel's pedigree file: 3,202 samples, 602 with both parents in the set, 2 with one. A typed population code lists its samples, and a chosen sample states its parents and children as buttons. |
