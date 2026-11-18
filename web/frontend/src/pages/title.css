@@ -77,32 +77,30 @@
   color: var(--faint);
 }
 
+/* The drawing with its caption under it. */
 .hero-image {
+  display: flex;
   flex: 1;
-  height: 440px;
+  flex-direction: column;
+  height: 480px;
   margin: 0;
-  position: relative;
   background: #FFFFFF;
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
 }
 
-.hero-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+.hero-image .structure-preview {
+  flex: 1;
+  min-height: 0;
 }
 
 .hero-image figcaption {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
   display: flex;
-  gap: 14px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  background: #FFFFFFE6;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid #E4E3DF;
   font-size: 12px;
   color: #5B5A56;
 }
@@ -210,9 +208,11 @@
   text-decoration: none;
 }
 
-.example img {
+.example img,
+.example-drawing {
+  display: block;
   width: 100%;
-  height: 170px;
+  height: 230px;
   background: #FFFFFF;
 }
 
