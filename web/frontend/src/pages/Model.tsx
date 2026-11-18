@@ -174,6 +174,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
               haplotype={form.haplotype}
               vcfUpload={form.vcfUpload}
               sampleTable={hasSampleTable ? sampleTable.data : undefined}
+              hasRegion={!!region.data}
               onChange={set}
               onOpen={(mode, file) => setSvDialog({ mode, file })}
             />

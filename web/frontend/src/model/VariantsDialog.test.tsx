@@ -115,6 +115,17 @@ describe('Structural variants dialog', () => {
     expect(onApply).toHaveBeenCalledWith({ svSet: 'HGSVC', sample: 'HG00733', haplotype: 0, vcfUpload: null })
   })
 
+  it('keeps the hosted call set and sample over a look at the upload', async () => {
+    renderDialog({ mode: 'hosted', file: null, svSet: 'HGSVC', sample: 'HG00733' })
+    await screen.findByRole('table')
+    fireEvent.click(screen.getByRole('tab', { name: 'Upload a VCF' }))
+    expect(screen.getByLabelText('Sample, from the VCF header')).toHaveValue('')
+    fireEvent.click(screen.getByRole('tab', { name: 'Hosted call set' }))
+    expect(screen.getByLabelText('Call set')).toHaveValue('HGSVC')
+    expect(screen.getByLabelText('Sample')).toHaveValue('HG00733')
+    expect(await screen.findByRole('button', { name: 'Apply 6 variants' })).toBeInTheDocument()
+  })
+
   it('checks the variants against own loops and draws them', async () => {
     const mine = { id: 'loopsupload1', kind: 'loops' as const, name: 'mine.bedpe', size: 10, ok: true, summary: '', error: null, samples: [] }
     renderDialog({ own: { loops: [{ factor: 'H3K27ac', upload: mine }], anchors: null, contacts: null, enhancers: null } })

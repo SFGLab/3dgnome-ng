@@ -136,6 +136,14 @@ describe('Variants', () => {
 })
 
 describe('Background', () => {
+  it('offers the variants once step 1 has a region and says so before', () => {
+    const { rerender } = render(<Variants catalog={CATALOG} svSet="HGSVC" sample="HG00733" haplotype={0} vcfUpload={null} hasRegion={false} onChange={vi.fn()} onOpen={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /Show the variants/ })).toBeNull()
+    expect(screen.getByText('Enter the region in step 1 to see the variants inside it.')).toBeInTheDocument()
+    rerender(<Variants catalog={CATALOG} svSet="HGSVC" sample="HG00733" haplotype={0} vcfUpload={null} hasRegion onChange={vi.fn()} onOpen={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /Show the variants/ })).toBeInTheDocument()
+  })
+
   it('starts on the Hi-C of the cell type', () => {
     render(<Background value="hic" region={REGION_1MB} available lymphoblastoid onChange={() => {}} />)
     expect(screen.getByRole('radio', { name: /Hi-C of this cell type/ })).toBeChecked()

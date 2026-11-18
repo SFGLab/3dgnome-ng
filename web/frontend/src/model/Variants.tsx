@@ -12,6 +12,8 @@ type Props = {
   vcfUpload: UploadResult | null
   /** Sex, population and parents of the call set's samples, for a call set that has them. */
   sampleTable?: SampleRow[]
+  /** False until step 1 has a region. The variants are shown for a region, so the button waits for one. */
+  hasRegion?: boolean
   onChange: (patch: Partial<FormState>) => void
   onOpen: (mode: 'hosted' | 'upload', file: File | null) => void
 }
@@ -104,7 +106,7 @@ function SampleFacts({ rows, table, sample, text, onPick }: { rows: SampleRow[];
 
 /** Step 3, a hosted call set with its sample and haplotype, or an uploaded VCF. A VCF and the
  * variants of a chosen sample open the dialog that shows their change to the loops. */
-export function Variants({ catalog, svSet, sample, haplotype, vcfUpload: vcf, sampleTable, onChange, onOpen }: Props) {
+export function Variants({ catalog, svSet, sample, haplotype, vcfUpload: vcf, sampleTable, hasRegion = true, onChange, onOpen }: Props) {
   const samples = svSet ? (catalog.sv_sets[svSet]?.samples ?? []) : []
   const [typed, setTyped] = useState('')
   const rows = sampleTable ?? []
@@ -162,7 +164,8 @@ export function Variants({ catalog, svSet, sample, haplotype, vcfUpload: vcf, sa
           <input type="file" accept=".gz,.bgz" onChange={(e) => e.target.files?.[0] && onOpen('upload', e.target.files[0])} />
         </label>
       )}
-      {((svSet && sample) || vcf) && (
+      {((svSet && sample) || vcf) && !hasRegion && <p className="sample-facts">Enter the region in step 1 to see the variants inside it.</p>}
+      {((svSet && sample) || vcf) && hasRegion && (
         <button type="button" className="preview-button" onClick={() => onOpen(vcf ? 'upload' : 'hosted', null)}>
           <Dna size={15} aria-hidden />
           <span>Show the variants in the region</span>

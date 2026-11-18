@@ -96,7 +96,11 @@ export function VariantsDialog(props: {
   const [upload, setUpload] = useState<UploadResult | null>(props.upload ?? null)
   const [failure, setFailure] = useState('')
   const [svSet, setSvSet] = useState(props.svSet || Object.keys(catalog.sv_sets)[0] || '')
-  const [sample, setSample] = useState(props.sample)
+  // One sample for each source, so a look at the other source does not lose the choice.
+  const [chosen, setChosen] = useState<Record<VariantsMode, string>>({ hosted: props.mode === 'hosted' ? props.sample : '', upload: props.mode === 'upload' ? props.sample : '' })
+  const sample = chosen[mode]
+  const setSampleOf = (of: VariantsMode, value: string | ((s: string) => string)) => setChosen((all) => ({ ...all, [of]: typeof value === 'function' ? value(all[of]) : value }))
+  const setSample = (value: string) => setSampleOf(mode, value)
   const [haplotype, setHaplotype] = useState<0 | 1>(props.haplotype)
   const span = region ? `${region.chrom}:${region.start}-${region.end}` : ''
 
@@ -109,7 +113,7 @@ export function VariantsDialog(props: {
       .then((u) => {
         if (!live) return
         setUpload(u)
-        setSample((s) => (u.samples.includes(s) ? s : (u.samples[0] ?? '')))
+        setSampleOf('upload', (s) => (u.samples.includes(s) ? s : (u.samples[0] ?? '')))
       })
       .catch((e: Error) => live && setFailure(e.message))
     return () => {
@@ -198,10 +202,7 @@ export function VariantsDialog(props: {
                 role="tab"
                 aria-selected={mode === id}
                 disabled={id === 'hosted' && !Object.keys(catalog.sv_sets).length}
-                onClick={() => {
-                  setMode(id)
-                  setSample('')
-                }}
+                onClick={() => setMode(id)}
               >
                 {title}
               </button>
