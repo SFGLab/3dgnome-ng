@@ -106,8 +106,14 @@ def _status(job: Path, **fields: object) -> None:
         stages.append({"stage": stage, "at": now})
         cur["stages"] = stages
     cur.update(fields, updated=now)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(cur, indent=2))
+    write_json(path, cur)
+
+
+def write_json(path: Path, value: object) -> None:
+    """Write a JSON file whole. A job page reads a job's files while the job runs, and a file
+    written in place is empty for a moment."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(value, indent=2))
     tmp.replace(path)
 
 
@@ -157,7 +163,7 @@ def run_job(
     the engine, `python -m gnome3d.cli` from `ENGINE_PYTHON` by default. `env_extra` is added to
     the engine's environment, the GPU of a queue slot for example."""
     job.mkdir(parents=True, exist_ok=True)
-    (job / "request.json").write_text(json.dumps(asdict(req), indent=2))
+    write_json(job / "request.json", asdict(req))
     _status(job, state="running", stage="inputs", started=time.time())
     log = job / "engine.log"
     try:

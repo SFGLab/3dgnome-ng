@@ -12,7 +12,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .catalog import Catalog
-from .jobs import JobRequest, run_job
+from .jobs import JobRequest, run_job, write_json
 from .settings import Settings
 
 
@@ -95,7 +95,7 @@ def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
     # The request is on disk from the moment the job waits, so a waiting job can be queued
     # again after a restart.
     job_dir.mkdir(parents=True, exist_ok=True)
-    (job_dir / "request.json").write_text(json.dumps(asdict(req), indent=2))
+    write_json(job_dir / "request.json", asdict(req))
     if s.queue == "inline":
         # Synchronous, so a request returns after its job; for development and tests.
         work(asdict(req), str(job_dir))
@@ -135,9 +135,9 @@ def resume_interrupted(results_dir: Path, pool: LocalPool) -> list[str]:
         try:
             req = json.loads((job / "request.json").read_text())
         except (OSError, ValueError):
-            st.write_text(json.dumps({"state": "failed", "error": "The site restarted before this job started. Submit it again.", "finished": time.time()}))
+            write_json(st, {"state": "failed", "error": "The site restarted before this job started. Submit it again.", "finished": time.time()})
             continue
-        st.write_text(json.dumps({"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]}))
+        write_json(st, {"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]})
         pool.submit(req, str(job))
         again.append(job.name)
     return again
