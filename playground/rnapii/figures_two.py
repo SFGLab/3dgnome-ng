@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from fig_data import ARM_COLOUR, ARM_NAME, agreement, link_draws, microc_classes, trio_paired  # noqa: E402
+from fig_stats import LEGEND, ep_tests, link_difference, mark, paired, stars, unpaired  # noqa: E402
 
 from playground.figures.tube import draw, tube_pieces  # noqa: E402
 
@@ -74,12 +75,15 @@ def joy(
     min_n: int = 15,
     clip: tuple[float, float] | None = None,
     medians: dict[str, str] | None = None,
+    notes: dict[str, list[str]] | None = None,
 ) -> None:
     """Stacked ridges, one row per group, one filled density per series.
 
     Each series is a label, a colour and its values. A series with fewer than `min_n` values is
     drawn as points with its count. With `medians`, a map from series label to a short name,
-    every row lists the median of each series beside its ridges.
+    every row lists the median of each series beside its ridges. With `notes`, a map from group
+    name to lines of text, a row carries its lines, under the medians when there are medians and
+    under the name of the row otherwise. They hold the results of the tests.
     """
     vals = np.concatenate([v[np.isfinite(v)] for _, ser in groups for _, _, v in ser])
     lo, hi = clip or (np.percentile(vals, 0.5), np.percentile(vals, 99.5))
@@ -116,6 +120,13 @@ def joy(
                 ax.plot(x0, y, "s", color=colour, ms=4, zorder=4)
                 ax.text(x0 + 0.015 * (hi - lo), y, f"median {np.nanmedian(v):.1f}, {medians[label]}",
                         va="center", ha="left", fontsize=6.5, color=INK, zorder=4)
+        for k, text in enumerate((notes or {}).get(name, [])):
+            if medians:
+                ax.text(lo + 0.7 * (hi - lo) + 0.015 * (hi - lo), base + 0.82 - 0.2 * len(series) - 0.15 * k, text,
+                        va="center", ha="left", fontsize=6.5, color=MUTED, zorder=4)
+            else:
+                ax.text(lo - pad - 0.01 * (hi - lo), base + 0.2 - 0.3 * k, text.replace(", ", "\n", 1), ha="right", va="center",
+                        color=MUTED, fontsize=6.5, linespacing=1.15)
     ax.set_yticks([])
     ax.spines["left"].set_visible(False)
     ax.set_xlim(lo - pad, hi + pad)
@@ -356,11 +367,17 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
                 ],
             )
         )
+    notes = {}
+    for line in LINES:
+        t = ep_tests(ep, line)
+        # The marks belong to the last median listed, the models with RNAPII loops.
+        notes[LINE_LABEL[line]] = [f"against CTCF loops {stars(t['models'])}, reference {stars(t['reference'])}"]
     joy(
         ax, groups,
         "enhancer to promoter distance in the models, bead units, mean of ten structures.\nA smaller distance is closer",
         clip=(0, 14),
         medians={"control": "reference", "C": "CTCF loops", "R": "CTCF and RNAPII loops"},
+        notes=notes,
     )
     rows[3].legend(
         handles=[
@@ -372,6 +389,12 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
                        label="the same pairs, in the models built from CTCF and RNAPII loops"),
         ],
         loc="outside lower center", ncol=1, fontsize=7,
+    )
+    fig.supxlabel(
+        textwrap.fill(
+            f"{LEGEND}. d: Wilcoxon signed rank test over the pairs of both model sets, "
+            "Mann-Whitney U test against the reference pairs. The marks stand beside the models with RNAPII loops.", 150),
+        fontsize=6.5, color=MUTED,
     )
     _save(fig, out / "rnapii_figure1")
     return fig
@@ -394,8 +417,10 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
         "across pairs of cell lines, bootstrap distribution over genes",
     )
     ax = rows[0].subplots()
+    link = link_difference(readouts, "C", "R")
     joy(ax, _joy_groups(draws, ("C", "R")),
-        "minus Spearman correlation over genes, 2,000 block bootstrap draws, larger is a stronger link")
+        "minus Spearman correlation over genes, 2,000 block bootstrap draws, larger is a stronger link",
+        notes={PAIR_LABEL[k]: [f"difference {d:+.3f}, {mark(pv)}"] for k, (d, pv, _) in link.items()})
     rows[0].legend(handles=_handles(("C", "R")), loc="outside lower center", ncol=2, fontsize=7)
 
     _row_title(rows[1], "f", _agreement_title(ag, "gnome3d with and without RNAPII loops"))
@@ -418,7 +443,8 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
         jitter = np.linspace(-0.12, 0.12, len(change))
         ax.scatter(change, row + jitter, color=ARM_COLOUR["R"], s=16, zorder=3)
         up = int((change > 0).sum())
-        ax.text(1.0, row + 0.32, f"higher in {up} of {len(change)}", transform=ax.get_yaxis_transform(),
+        pv, _ = paired(w.C.to_numpy(), w.R.to_numpy())
+        ax.text(1.0, row + 0.32, f"higher in {up} of {len(change)}, {mark(pv)}", transform=ax.get_yaxis_transform(),
                 ha="right", va="center", fontsize=7, color=INK)
         ax.text(-0.02, row, label, transform=ax.get_yaxis_transform(), ha="right", va="center", fontsize=7.5,
                 color=INK)
@@ -436,6 +462,23 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
         n = sum(1 for k in maps.files if k.startswith(f"ensemble_{arm}_") and k.endswith("_xyz"))
         ens = [(maps[f"ensemble_{arm}_{j}_xyz"], maps[f"ensemble_{arm}_{j}_mid"]) for j in range(n)]
         _render(ax, maps[f"locus_{arm}_xyz"], maps[f"locus_{arm}_mid"], ARM_COLOUR[arm], ARM_NAME[arm], ens)
+    gaps = {
+        arm: np.array([_ep_gap(maps[f"ensemble_{arm}_{j}_xyz"], maps[f"ensemble_{arm}_{j}_mid"])
+                       for j in range(sum(1 for k in maps.files if k.startswith(f"ensemble_{arm}_") and k.endswith("_xyz")))])
+        for arm in ("C", "R")
+    }
+    bottom[1].supxlabel(
+        textwrap.fill(
+            "enhancer to promoter distance over the ten structures, with against without RNAPII loops: "
+            f"{mark(unpaired(gaps['C'], gaps['R']))}", 70),
+        fontsize=7, color=INK,
+    )
+    fig.supxlabel(
+        textwrap.fill(
+            f"{LEGEND}. e: block bootstrap of the difference between the two model sets on the genes of both. "
+            "g: Wilcoxon signed rank test over the nine individuals, exact. h: Mann-Whitney U test.", 150),
+        fontsize=6.5, color=MUTED,
+    )
     _save(fig, out / "rnapii_figure2")
     return fig
 
