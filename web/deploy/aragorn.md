@@ -14,7 +14,7 @@ the site's container on the loopback, port 8770, and everything else to the old 
   app/maps_hffc6_v3.sh, app/maps_hffc6_parallel.sh  the same for HFFc6, `web/deploy/maps_hffc6.sh` and `maps_hffc6_parallel.sh` here
   data/             DATA_DIR, read only in the container
     catalog.json
-    cell_types/     GM12878, H1ESC, HFFC6
+    cell_types/     GM12878, H1ESC, HFFC6, each with compartments.bed
     maps/<CELL>/    the deep map of each cell type, the catalog's contact_map
     svs/            HGSVC and 1KGP, one indexed VCF each, and 1KGP.samples.tsv
     hicdiffusion/   the two checkpoints
@@ -26,6 +26,26 @@ the site's container on the loopback, port 8770, and everything else to the old 
 
 The raid is XFS on `/dev/md0`, RAID6 over eight disks, mounted at `/mnt/raid`. `/mnt/raid`
 belongs to root, so the registry is inside the site's directory.
+
+## Compartments
+
+Each cell type has `compartments.bed`, A and B labels at 100 kb from its deep map, the catalog's
+`compartments` key. `web/scripts/make_compartments.py` writes it inside the site's container,
+which has cooler and the maps:
+
+```
+docker exec -i gnome3d-site-site-1 python - /data/maps/GM12878/4DNFIXP4QG5B.mcool::/resolutions/100000 \
+    /data/cell_types/GM12878/genes.tsv /data/cell_types/GM12878/centromeres.bed \
+    < make_compartments.py > GM12878.bed 2> GM12878.stats.jsonl
+```
+
+Each arm is taken alone and the side with more gene starts is A. The reports of the build of
+2026-11-18 are in `web/deploy/compartments/`. GM12878 has 43 arms, H1ESC 40 and HFFC6 41. The
+arms left out are the short arms of the acrocentric chromosomes, chrY, and in H1ESC chr18p and
+chr19q, where the signal does not follow gene density. On the autosomes of GM12878 the labels
+agree with the validation study's 100 kb track at 86 to 94 percent of bins. A job writes its
+chromosome's rows into its inputs and the term stays off unless the request turns it on. The
+catalog before the key is `data/catalog.json.before-compartments`.
 
 ## The 1000 Genomes call set
 

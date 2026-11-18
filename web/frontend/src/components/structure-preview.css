@@ -13,20 +13,32 @@
   stroke-linejoin: round;
 }
 
-.structure-preview .chain.far {
-  stroke: #D5D7DB;
-  stroke-width: 5;
+.structure-preview .edge {
+  stroke: #FFFFFF;
+  stroke-width: 13;
 }
 
-.structure-preview .chain.mid {
-  stroke: #A9ADB4;
-  stroke-width: 6;
+.structure-preview .edge.mark {
+  stroke-width: 22;
 }
 
-.structure-preview .chain.near {
-  stroke: #6F747D;
+.structure-preview .chain {
   stroke-width: 7;
 }
+
+.structure-preview .chain.step0 { stroke: #E6E7EA; }
+.structure-preview .chain.step1 { stroke: #DDDFE3; }
+.structure-preview .chain.step2 { stroke: #D3D6DB; }
+.structure-preview .chain.step3 { stroke: #C9CCD2; }
+.structure-preview .chain.step4 { stroke: #BFC3CA; }
+.structure-preview .chain.step5 { stroke: #B4B8C0; }
+
+.structure-preview .chain.between.step0 { stroke: #A9ADB5; }
+.structure-preview .chain.between.step1 { stroke: #979BA4; }
+.structure-preview .chain.between.step2 { stroke: #858A93; }
+.structure-preview .chain.between.step3 { stroke: #737882; }
+.structure-preview .chain.between.step4 { stroke: #616670; }
+.structure-preview .chain.between.step5 { stroke: #4F545E; }
 
 .structure-preview .mark {
   stroke-width: 16;

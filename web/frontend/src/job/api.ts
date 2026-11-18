@@ -78,6 +78,8 @@ export type Contacts = {
   scc_about?: string
   rank?: number | null
   rank_about?: string
+  /** The largest separation in bp the rank correlation counted. */
+  rank_reach?: number
   loop_enrichment?: number | null
 }
 export type Compare = { same_region: boolean; rows: { gene: string; linear_bp: number; a: { mean: number; sd: number }; b: { mean: number; sd: number }; ratio: number }[] }

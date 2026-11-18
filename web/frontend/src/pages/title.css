@@ -77,30 +77,65 @@
   color: var(--faint);
 }
 
-/* The drawing with its caption under it. */
+/* The rendered structure with its marks, and the key over its lower left corner. */
 .hero-image {
-  display: flex;
   flex: 1;
-  flex-direction: column;
-  height: 480px;
+  height: 440px;
   margin: 0;
+  position: relative;
   background: #FFFFFF;
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
 }
 
-.hero-image .structure-preview {
-  flex: 1;
-  min-height: 0;
+.hero-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-ab {
+  stroke: #151514;
+  stroke-width: 3;
+  stroke-dasharray: 3 9;
+  stroke-linecap: round;
+}
+
+.hero-box {
+  fill: #FFFFFF;
+  stroke: #E4E3DF;
+  stroke-width: 1.5;
+}
+
+.hero-distance {
+  fill: #151514;
+  font: 600 24px var(--font);
+  text-anchor: middle;
+}
+
+.hero-end,
+.hero-point {
+  fill: #151514;
+  stroke: #FFFFFF;
+  stroke-width: 3;
+}
+
+.hero-end-text {
+  fill: #FFFFFF;
+  font: 700 24px var(--font);
+  text-anchor: middle;
 }
 
 .hero-image figcaption {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  padding: 10px 14px 12px;
-  border-top: 1px solid #E4E3DF;
+  gap: 14px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #FFFFFFE6;
   font-size: 12px;
   color: #5B5A56;
 }
@@ -209,11 +244,48 @@
 }
 
 .example img,
-.example-drawing {
-  display: block;
+.story-panels {
   width: 100%;
-  height: 230px;
+  height: 330px;
   background: #FFFFFF;
+}
+
+.example img {
+  display: block;
+  object-fit: cover;
+}
+
+/* The first example: two drawings of one locus side by side, on one scale. */
+.example.story {
+  grid-column: span 2;
+}
+
+.story-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 330px;
+}
+
+.story-panel {
+  position: relative;
+  min-width: 0;
+  height: 330px;
+}
+
+.story-panel + .story-panel {
+  border-left: 1px solid #E4E3DF;
+}
+
+.story-tag {
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #FFFFFFE6;
+  font-size: 12px;
+  font-weight: 600;
+  color: #151514;
 }
 
 .example-title {
@@ -251,5 +323,8 @@
   }
   .example-row {
     grid-template-columns: 1fr;
+  }
+  .example.story {
+    grid-column: auto;
   }
 }

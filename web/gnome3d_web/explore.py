@@ -449,6 +449,7 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
             else f"{la} against {lb}, raw values, diagonals up to 2 Mb"
         ),
         "rank": cm.rank_agreement(rk_a, rk_b, res, keep),
+        "rank_reach": cm.rank_reach(rk_a, rk_b, res, keep),
         "rank_about": f"{la} against {lb}, each distance up to {_span(cm.rank_reach(rk_a, rk_b, res, keep))} ranked on its own, the distances at which half of the pairs hold a contact in both maps"
         + (", Hi-C balanced, over the bins Hi-C maps" if "hic" in (upper, lower) else ""),
         "loop_enrichment": (

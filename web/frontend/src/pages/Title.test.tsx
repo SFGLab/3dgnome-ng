@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
@@ -45,11 +45,27 @@ describe('Title page', () => {
     expect(screen.getByRole('link', { name: /Open enhancer3D/ })).toHaveAttribute('href', 'https://3dgnome.mini.pw.edu.pl/old/enhancer3D/')
   })
 
-  it('shows three examples', () => {
+  it('shows the TNFRSF8 comparison and the contact map as examples', () => {
     renderTitle()
-    for (const t of ['TNFRSF8, CTCF and RNAPII loops', 'The same locus, CTCF loops alone', 'Contacts against Hi-C']) {
+    for (const t of ['TNFRSF8 with and without its RNAPII loop', 'Contacts against Hi-C']) {
       expect(screen.getByText(t)).toBeInTheDocument()
     }
+  })
+
+  it('draws the locus with and without the RNAPII loop in one card, each with its distance', () => {
+    renderTitle()
+    const card = screen.getByRole('button', { name: /TNFRSF8 with and without its RNAPII loop/ })
+    expect(within(card).getByRole('img', { name: /CTCF and RNAPII loops.*6\.0 ± 1\.6 bead units apart/ })).toBeInTheDocument()
+    expect(within(card).getByRole('img', { name: /CTCF loops alone.*9\.9 ± 2\.9 bead units apart/ })).toBeInTheDocument()
+    expect(card).toHaveTextContent('6.0 ± 1.6 bead units with the loop and 9.9 ± 2.9 with CTCF loops alone')
+  })
+
+  it('marks A, B and the distance on the picture at the top', () => {
+    renderTitle()
+    const art = screen.getByRole('img', { name: /A 3D structure of the TNFRSF8 locus/ })
+    expect(art).toHaveTextContent('6.0 ± 1.6')
+    expect(screen.getByText('A to B 6.0 ± 1.6 bead units')).toBeInTheDocument()
+    expect(screen.queryByText(/stay private/)).toBeNull()
   })
 
   it('opens an example as its finished job, on its tab', async () => {
@@ -67,7 +83,7 @@ describe('Title page', () => {
     let n = 0
     const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: n++ === 0 ? '/jobs/aaaa1111bbbb2222' : '/jobs/cccc3333dddd4444' }]]])
     renderTitle()
-    fireEvent.click(screen.getByRole('button', { name: /TNFRSF8, CTCF and RNAPII loops/ }))
+    fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 with and without its RNAPII loop/ }))
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444&gene=TNFRSF8'))
     const posted = fetchMock.mock.calls.filter(([u]) => String(u) === '/api/jobs').map(([, i]) => (i!.body as FormData).get('factors'))
     expect(posted).toEqual(['CTCF+RNAPII', 'CTCF'])
@@ -75,16 +91,6 @@ describe('Title page', () => {
       'GM12878 TNFRSF8, CTCF loops',
       'GM12878 TNFRSF8, CTCF and RNAPII loops',
     ])
-    localStorage.clear()
-    vi.unstubAllGlobals()
-  })
-
-  it('opens the CTCF loops example as its own job', async () => {
-    const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: '/jobs/cccc3333dddd4444' }]]])
-    renderTitle()
-    fireEvent.click(screen.getByRole('button', { name: /The same locus, CTCF loops alone/ }))
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(/^\/jobs\/cccc3333dddd4444$/))
-    expect(fetchMock.mock.calls.filter(([u]) => String(u) === '/api/jobs').map(([, i]) => (i!.body as FormData).get('factors'))).toEqual(['CTCF'])
     localStorage.clear()
     vi.unstubAllGlobals()
   })

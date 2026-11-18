@@ -1,0 +1,48 @@
+{"chrom": "chr1", "arm": "p", "bins": 1174, "kept": true, "genes": 0.433, "lag1": 0.946, "share_a": 0.553}
+{"chrom": "chr1", "arm": "q", "bins": 992, "kept": true, "genes": 0.234, "lag1": 0.932, "share_a": 0.507}
+{"chrom": "chr2", "arm": "p", "bins": 879, "kept": true, "genes": 0.383, "lag1": 0.963, "share_a": 0.513}
+{"chrom": "chr2", "arm": "q", "bins": 1431, "kept": true, "genes": 0.314, "lag1": 0.944, "share_a": 0.528}
+{"chrom": "chr3", "arm": "p", "bins": 902, "kept": true, "genes": 0.437, "lag1": 0.939, "share_a": 0.449}
+{"chrom": "chr3", "arm": "q", "bins": 1041, "kept": true, "genes": 0.346, "lag1": 0.942, "share_a": 0.532}
+{"chrom": "chr4", "arm": "p", "bins": 485, "kept": true, "genes": 0.336, "lag1": 0.952, "share_a": 0.466}
+{"chrom": "chr4", "arm": "q", "bins": 1377, "kept": true, "genes": 0.274, "lag1": 0.938, "share_a": 0.455}
+{"chrom": "chr5", "arm": "p", "bins": 450, "kept": true, "genes": 0.372, "lag1": 0.959, "share_a": 0.373}
+{"chrom": "chr5", "arm": "q", "bins": 1284, "kept": true, "genes": 0.289, "lag1": 0.928, "share_a": 0.492}
+{"chrom": "chr6", "arm": "p", "bins": 569, "kept": true, "genes": 0.279, "lag1": 0.928, "share_a": 0.513}
+{"chrom": "chr6", "arm": "q", "bins": 1089, "kept": true, "genes": 0.282, "lag1": 0.937, "share_a": 0.461}
+{"chrom": "chr7", "arm": "p", "bins": 569, "kept": true, "genes": 0.183, "lag1": 0.943, "share_a": 0.469}
+{"chrom": "chr7", "arm": "q", "bins": 920, "kept": true, "genes": 0.278, "lag1": 0.948, "share_a": 0.472}
+{"chrom": "chr8", "arm": "p", "bins": 414, "kept": true, "genes": 0.374, "lag1": 0.934, "share_a": 0.483}
+{"chrom": "chr8", "arm": "q", "bins": 984, "kept": true, "genes": 0.318, "lag1": 0.929, "share_a": 0.452}
+{"chrom": "chr9", "arm": "p", "bins": 387, "kept": true, "genes": 0.405, "lag1": 0.936, "share_a": 0.416}
+{"chrom": "chr9", "arm": "q", "bins": 696, "kept": true, "genes": 0.282, "lag1": 0.936, "share_a": 0.546}
+{"chrom": "chr10", "arm": "p", "bins": 380, "kept": true, "genes": 0.247, "lag1": 0.933, "share_a": 0.479}
+{"chrom": "chr10", "arm": "q", "bins": 886, "kept": true, "genes": 0.398, "lag1": 0.943, "share_a": 0.5}
+{"chrom": "chr11", "arm": "p", "bins": 485, "kept": true, "genes": 0.259, "lag1": 0.938, "share_a": 0.493}
+{"chrom": "chr11", "arm": "q", "bins": 786, "kept": true, "genes": 0.339, "lag1": 0.94, "share_a": 0.485}
+{"chrom": "chr12", "arm": "p", "bins": 338, "kept": true, "genes": 0.329, "lag1": 0.917, "share_a": 0.459}
+{"chrom": "chr12", "arm": "q", "bins": 952, "kept": true, "genes": 0.428, "lag1": 0.943, "share_a": 0.484}
+{"chrom": "chr13", "arm": "p", "bins": 0, "kept": false}
+{"chrom": "chr13", "arm": "q", "bins": 946, "kept": true, "genes": 0.3, "lag1": 0.955, "share_a": 0.5}
+{"chrom": "chr14", "arm": "p", "bins": 0, "kept": false}
+{"chrom": "chr14", "arm": "q", "bins": 863, "kept": true, "genes": 0.164, "lag1": 0.935, "share_a": 0.472}
+{"chrom": "chr15", "arm": "p", "bins": 0, "kept": false}
+{"chrom": "chr15", "arm": "q", "bins": 761, "kept": true, "genes": 0.252, "lag1": 0.947, "share_a": 0.539}
+{"chrom": "chr16", "arm": "p", "bins": 288, "kept": true, "genes": 0.502, "lag1": 0.929, "share_a": 0.507}
+{"chrom": "chr16", "arm": "q", "bins": 434, "kept": true, "genes": 0.482, "lag1": 0.949, "share_a": 0.463}
+{"chrom": "chr17", "arm": "p", "bins": 204, "kept": true, "genes": 0.372, "lag1": 0.935, "share_a": 0.461}
+{"chrom": "chr17", "arm": "q", "bins": 542, "kept": true, "genes": 0.479, "lag1": 0.964, "share_a": 0.607}
+{"chrom": "chr18", "arm": "p", "bins": 143, "kept": true, "genes": 0.194, "lag1": 0.923, "share_a": 0.455}
+{"chrom": "chr18", "arm": "q", "bins": 593, "kept": true, "genes": 0.316, "lag1": 0.949, "share_a": 0.476}
+{"chrom": "chr19", "arm": "p", "bins": 237, "kept": true, "genes": 0.15, "lag1": 0.956, "share_a": 0.591}
+{"chrom": "chr19", "arm": "q", "bins": 306, "kept": true, "genes": 0.238, "lag1": 0.897, "share_a": 0.471}
+{"chrom": "chr20", "arm": "p", "bins": 257, "kept": true, "genes": 0.323, "lag1": 0.903, "share_a": 0.447}
+{"chrom": "chr20", "arm": "q", "bins": 331, "kept": true, "genes": 0.383, "lag1": 0.941, "share_a": 0.55}
+{"chrom": "chr21", "arm": "p", "bins": 0, "kept": false}
+{"chrom": "chr21", "arm": "q", "bins": 319, "kept": true, "genes": 0.237, "lag1": 0.962, "share_a": 0.451}
+{"chrom": "chr22", "arm": "p", "bins": 0, "kept": false}
+{"chrom": "chr22", "arm": "q", "bins": 326, "kept": true, "genes": 0.276, "lag1": 0.952, "share_a": 0.653}
+{"chrom": "chrX", "arm": "p", "bins": 570, "kept": true, "genes": 0.322, "lag1": 0.936, "share_a": 0.437}
+{"chrom": "chrX", "arm": "q", "bins": 874, "kept": true, "genes": 0.418, "lag1": 0.923, "share_a": 0.365}
+{"chrom": "chrY", "arm": "p", "bins": 65, "kept": false, "genes": 0.068, "lag1": 0.901, "share_a": 0.154}
+{"chrom": "chrY", "arm": "q", "bins": 0, "kept": false}

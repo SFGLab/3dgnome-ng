@@ -29,6 +29,8 @@ const SHOWS: [Show, string][] = [
 ]
 
 type Locus = { chrom: string; start: number; end: number }
+/** The separation the rank correlation reached, as the end of a sentence. Nothing when unknown. */
+const reach = (bp?: number) => (bp ? `, up to ${bp >= 1e6 ? `${bp / 1e6} Mb` : `${bp / 1000} kb`}` : '')
 const fmt = (l: Locus) => `${l.chrom}:${bp(l.start)}-${bp(l.end)}`
 const parse = (t: string): Locus | null => {
   const m = t.replace(/,/g, '').match(/^(\w+):(\d+)-(\d+)$/)
@@ -324,11 +326,12 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
         {maps.data && (
           <section className="side-card" aria-label="Agreement of the two halves">
             <p className="card-label">Agreement of the two halves</p>
-            <p className="big">
-              <span className="big-value">{typeof maps.data.rank === 'number' ? maps.data.rank.toFixed(2) : 'none'}</span> <span className="unit">rank agreement</span>
+            {/* The full account of each number is its tooltip. */}
+            <p className="big" title={maps.data.rank_about}>
+              <span className="big-value">{typeof maps.data.rank === 'number' ? maps.data.rank.toFixed(2) : 'none'}</span> <span className="unit">Spearman correlation</span>
             </p>
-            <p className="card-text">{`Rank correlation at ${res / 1000} kb of ${maps.data.rank_about ?? 'the two maps'}. It compares the pattern at each distance and not the level.`}</p>
-            <p className="card-text">{`Stratum adjusted correlation ${maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}, of ${maps.data.scc_about ?? 'the two maps'}. It also compares the level and a stretch without beads scores well where Hi-C is depleted.`}</p>
+            <p className="card-text">{`Pairs of bins the same distance apart are compared${reach(maps.data.rank_reach)}. The fall of contacts with distance adds nothing to this number.`}</p>
+            <p className="card-text" title={maps.data.scc_about}>{`SCC ${maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}, the same comparison on the values and not their ranks.`}</p>
             {typeof maps.data.loop_enrichment === 'number' && (
               <p className="card-text">{`At the loops the other half is ${maps.data.loop_enrichment.toFixed(1)} times its expected contact at the same distance.`}</p>
             )}

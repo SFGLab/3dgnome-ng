@@ -102,6 +102,9 @@ class Catalog:
         cts: dict[str, CellType] = {}
         for name, c in raw.get("cell_types", {}).items():
             singles = {k: c[k] for k in ("singletons", "segments", "centromeres", "config", "genes", "enhancers")}
+            # A and B compartments as chr, start, end and label, for the compartment term.
+            if c.get("compartments"):
+                singles["compartments"] = c["compartments"]
             cts[name] = CellType(
                 name=name,
                 label=c.get("label", name),

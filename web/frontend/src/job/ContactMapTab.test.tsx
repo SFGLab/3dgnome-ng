@@ -15,6 +15,7 @@ const MAP = {
   lower_label: 'This job, 1/(d+1)³ between bins, mean of 100 structures',
   scc: 0.37,
   rank: 0.21,
+  rank_reach: 2000000,
   rank_about: 'Hi-C of GM12878 against This job, each distance up to 2 Mb ranked on its own, Hi-C balanced, over the bins Hi-C maps',
   scc_about: 'Hi-C of GM12878, 4DN 4DNFIXP4QG5B against this job\'s contacts within the median bond, raw counts, diagonals up to 2 Mb, as the validation battery computes it',
 }
@@ -47,9 +48,11 @@ describe('ContactMapTab', () => {
     renderTab()
     const card = await screen.findByRole('region', { name: 'Agreement of the two halves' })
     expect(within(card).getByText('0.21')).toBeInTheDocument()
-    expect(within(card).getByText(/Stratum adjusted correlation 0.37/)).toBeInTheDocument()
-    expect(within(card).getByText(/each distance up to 2 Mb ranked on its own/)).toBeInTheDocument()
-    expect(within(card).getByText(/4DN 4DNFIXP4QG5B against this job's contacts within the median bond/)).toBeInTheDocument()
+    expect(within(card).getByText('Spearman correlation')).toBeInTheDocument()
+    expect(within(card).getByText('Pairs of bins the same distance apart are compared, up to 2 Mb. The fall of contacts with distance adds nothing to this number.')).toBeInTheDocument()
+    expect(within(card).getByText('SCC 0.37, the same comparison on the values and not their ranks.')).toHaveAttribute('title', expect.stringContaining('within the median bond'))
+    expect(within(card).getByText('0.21').parentElement).toHaveAttribute('title', expect.stringContaining('ranked on its own'))
+    expect(card.textContent!.length).toBeLessThan(260)
     expect(document.querySelector('.map-labels')?.textContent).toBe('This job, 1/(d+1)³ between bins, mean of 100 structuresHi-C of GM12878')
   })
 

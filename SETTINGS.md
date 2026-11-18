@@ -53,8 +53,8 @@ Filenames are relative to `data_dir` unless absolute. The region string is `chr:
 | `singletons_inter` | str |  | A second singletons file appended for multi chromosome runs only. |
 | `centromeres` | str |  | BED of centromere positions. |
 | `segment_split` | str |  | BED of segment boundary breakpoints. |
-| `compartments` | str |  | bedGraph of a signed compartment eigenvector or a CALDER BED, for `[compartments]`. |
-| `phasing_track` | str |  | Track used to fix the eigenvector's arbitrary sign. Required with `compartments`. |
+| `compartments` | str |  | For `[compartments]`. A bedGraph of a signed compartment eigenvector, or a BED whose fourth column is a label, `A`, `B` or a CALDER rank. |
+| `phasing_track` | str |  | Track used to fix the arbitrary sign of an eigenvector in `compartments`. Without it the side with more loop anchors is A. A labelled file needs none. |
 | `anchor_activity` | str |  | A BED with a signal column giving each anchor an activity for `[factories]`: the seventh column when a line has seven or more, a broadPeak's signal, else the fourth, a bedGraph. An anchor takes the largest value of the intervals overlapping it, zero where none does. |
 | `anchor_contacts` | str |  | Counts between anchor pairs from a full depth map, an npz written by `slurm/ensemble/prep_anchor_contacts.py` from an mcool and the run's anchor file, each pixel shared between the anchors it overlaps. The anchor contact map is built from it instead of the singletons, which keep the exponent fit and the coarse heatmaps. A STATUS line gives the share of the run's anchors found in it. |
 | `contact_map` | str |  | A cooler URI at fine resolution, such as an mcool at 1 kb, that `start = maxent` reads raw counts between windows of about 10 kb inside each gap from. Empty draws gaps from the law alone. |
@@ -313,8 +313,8 @@ before the first block and after the last stay empty.
 
 A/B compartment terms ported from MultiMM [7], written shifted and non negative so the Metropolis
 ratio stays defined, and divided by `N - 1` so a weight tuned on a small region holds on a large
-one. Needs `[data] compartments` and `phasing_track`, and excluded volume or confinement
-alongside since the terms are attractive.
+one. Needs `[data] compartments`, with `phasing_track` for a signed track, and excluded volume
+or confinement alongside since the terms are attractive.
 
 | key | type | default | production | what it does |
 | --- | --- | --- | --- | --- |

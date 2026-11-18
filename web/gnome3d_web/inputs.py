@@ -5,7 +5,7 @@ The cell type's loops of the region's chromosome are rewired by the sample's var
 are kept. The anchors are the cell type's own, lifted to the haplotype's coordinates, plus any
 loop end the rules made. The singletons of the whole chromosome are kept, since the engine fits
 the contact decay on the file, lifted end by end, with a HiCDiffusion window spliced in when
-one is given. Segments and centromeres are lifted the same way. The config is the cell type's
+one is given. Segments, centromeres and compartments are lifted the same way. The config is the cell type's
 with only its data section replaced. Only variants inside the region are applied, so
 coordinates before the region do not move.
 """
@@ -208,6 +208,14 @@ def build_inputs(
     cen = _read(cell.path("centromeres"), chrom, 3)
     cen[1], cen[2] = L.many(cen[1].to_numpy()), L.many(cen[2].to_numpy())
     cen.to_csv(out / "centromeres.bed", sep="\t", header=False, index=False)
+    # The compartments are the cell type's own, so not read with own contacts. An edge inside a
+    # deletion goes where the deletion joins its two sides, so neighbours stay joined.
+    compartments = "compartments" in cell.files and not (own and own.contacts)
+    if compartments:
+        comp = _read(cell.path("compartments"), chrom, 4)
+        ends = [(L.edge(int(a)), L.edge(int(b))) for a, b in zip(comp[1], comp[2], strict=True)]
+        comp[1], comp[2] = [min(e) for e in ends], [max(e) for e in ends]
+        comp[comp[2] > comp[1]].to_csv(out / "compartments.bed", sep="\t", header=False, index=False)
 
     data = {
         "data_dir": str(out.resolve()),
@@ -218,6 +226,8 @@ def build_inputs(
         "segment_split": "segments.bed",
         "centromeres": "centromeres.bed",
     }
+    if compartments:
+        data["compartments"] = "compartments.bed"
     if len(names) > 1 or factors == "RNAPII" or (own and own.loops):
         data["factors"] = ",".join(names)
     # The beads of a stretch without loops are drawn against the cell type's map, which is in
