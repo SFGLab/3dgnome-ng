@@ -1,5 +1,5 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { CircleAlert, CircleCheck, FileArchive, LoaderCircle, X } from 'lucide-react'
+import { CircleAlert, CircleCheck, FileArchive, LoaderCircle, Upload, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
@@ -217,7 +217,7 @@ export function VariantsDialog(props: {
                 </span>
               ) : (
                 <label className="add-file">
-                  Choose a VCF compressed with bgzip
+                  <Upload size={14} aria-hidden /> Choose a VCF compressed with bgzip
                   <input type="file" accept=".gz,.bgz" className="visually-hidden" onChange={(e) => e.target.files?.[0] && setFile(e.target.files[0])} />
                 </label>
               )

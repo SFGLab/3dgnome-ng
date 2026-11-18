@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query'
-import { CircleAlert, CircleCheck, FileText, HardDrive, Link2, LoaderCircle, Plus, SquareTerminal, Trash2, Upload, X } from 'lucide-react'
+import { CircleAlert, CircleCheck, FileText, HardDrive, Link2, LoaderCircle, SquareTerminal, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Region } from '../api'
 import { readHicWindow } from './hicLocal'
@@ -104,7 +104,7 @@ function OneFile({ kind, rule, entry, onFile, onRemove }: { kind: string; rule: 
         </div>
       ) : (
         <label className="add-file">
-          <Plus size={15} aria-hidden /> {`Choose an ${kind} file`}
+          <Upload size={14} aria-hidden /> {`Choose an ${kind} file`}
           <input type="file" className="visually-hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
         </label>
       )}
@@ -218,13 +218,13 @@ function ContactsTab({
       )}
       {route === 'local' && (
         <label className="add-file">
-          <Plus size={15} aria-hidden /> Choose a .hic file. The page reads only your region and uploads it.
+          <Upload size={14} aria-hidden /> Choose a .hic file. The page reads only your region and uploads it.
           <input type="file" accept=".hic" className="visually-hidden" onChange={(e) => e.target.files?.[0] && onLocal(e.target.files[0])} />
         </label>
       )}
       {route === 'bedpe' && (
         <label className="add-file">
-          <Plus size={15} aria-hidden /> Choose a BEDPE file, columns chr1 start1 end1 chr2 start2 end2 count
+          <Upload size={14} aria-hidden /> Choose a BEDPE file, columns chr1 start1 end1 chr2 start2 end2 count
           <input type="file" className="visually-hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
         </label>
       )}
@@ -406,7 +406,7 @@ export function OwnData({
                     addLoops(e.dataTransfer.files)
                   }}
                 >
-                  <Plus size={15} aria-hidden /> Add a factor, or drop a BEDPE file here
+                  <Upload size={14} aria-hidden /> Add a factor, or drop a BEDPE file here
                   <input type="file" multiple className="visually-hidden" onChange={(e) => addLoops(e.target.files)} />
                 </label>
                 {region && loops.some((l) => l.result?.ok) && <OwnPreview cell={cell} region={region} loops={loops} />}

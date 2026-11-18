@@ -45,8 +45,10 @@ pre {
   cursor: pointer;
 }
 
-.link-button:hover {
+/* A button drawn as a link is underlined under the pointer, as a link is. */
+:is(.link-button, .sync-link, .reset):hover {
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* A labelled control and the message under one. The form and the job page both use them and a

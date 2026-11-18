@@ -78,6 +78,8 @@
   cursor: default;
 }
 
+/* A link of the panel has the size and weight of the panel's text and differs by its colour
+   alone, so a block of the panel holds two text styles at most. */
 .sync-link {
   display: inline-flex;
   align-items: center;
@@ -87,16 +89,24 @@
   border: 0;
   background: none;
   color: var(--accent);
-  font: 500 13px var(--font);
+  font: 400 14px var(--font);
   cursor: pointer;
 }
 
+/* The code and the buttons beside it are one height. */
+.sync-code-row > * {
+  box-sizing: border-box;
+  height: 40px;
+}
+
 .sync-code {
-  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
   border: 1px dashed var(--line);
   border-radius: 8px;
   background: var(--panel);
-  font: 600 20px var(--mono);
+  font: 600 18px var(--mono);
   letter-spacing: 0.06em;
   user-select: all;
 }

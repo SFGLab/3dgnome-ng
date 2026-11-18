@@ -219,9 +219,7 @@ export function SyncPanel({ initialCode = '', onCodeUsed }: { initialCode?: stri
         <CopyButton text={joinLink(sync.code)} label="Copy link" />
       </div>
       <p>On another computer, open My jobs, choose Enter a code and type this code. Opening the link there does the same.</p>
-      <p className="sync-hint">
-        {sync.private ? 'Private jobs are on the shared list. Anyone who has the code can open them.' : 'Private jobs stay on this computer. They are not on the shared list.'}
-      </p>
+      <p>{sync.private ? 'Private jobs are on the shared list. Anyone who has the code can open them.' : 'Private jobs stay on this computer. They are not on the shared list.'}</p>
       {other && (
         <p className="sync-error" role="alert">
           The link you opened has another code. This computer keeps its own code. To use the other one, stop syncing here first.{' '}

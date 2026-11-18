@@ -1,6 +1,12 @@
 /** Formats shared by the explorer. */
 export const bp = (n: number) => n.toLocaleString('en-US')
 
+/** A region in megabases with no more digits than its positions need, chr8:127-128.5 Mb. */
+export function shortRegion(chrom: string, start: number, end: number): string {
+  const mb = (n: number) => String(Number((n / 1_000_000).toFixed(3)))
+  return `${chrom}:${mb(start)}-${mb(end)} Mb`
+}
+
 export function kb(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} Mb`
   if (n < 1000) return `${n} bp`

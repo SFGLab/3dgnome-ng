@@ -69,26 +69,33 @@
   cursor: pointer;
 }
 
+/* The chosen step is marked as a chosen option is everywhere on the form. */
 .wizard-steps [role='tab'][aria-selected='true'] {
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
+  background: var(--accent-soft);
 }
 
-.step-number {
+.wizard-steps [role='tab'][aria-selected='true'] .step-title {
+  color: var(--accent);
+}
+
+.wizard-steps .step-number {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: center;
   width: 20px;
   height: 20px;
+  margin-top: 1px;
+  border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--line);
-  color: var(--ink);
+  background: var(--surface);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
 }
 
-[aria-selected='true'] .step-number {
+.wizard-steps [aria-selected='true'] .step-number {
+  border-color: var(--accent);
   background: var(--accent);
   color: #FFFFFF;
 }
@@ -278,16 +285,17 @@
   }
 }
 
+/* A place to choose or drop a file, drawn as the VCF field of the form is. */
 .add-file {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--muted);
-  border-radius: 10px;
-  color: var(--accent);
-  font-size: 14px;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 12px;
   cursor: pointer;
 }
 

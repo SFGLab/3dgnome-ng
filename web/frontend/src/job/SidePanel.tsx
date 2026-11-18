@@ -2,7 +2,7 @@ import { Archive, Braces, ChevronLeft, ChevronRight, FileText, Folder, Pencil } 
 import { useState } from 'react'
 import { recentJobs, rememberJob } from '../model/recent'
 import type { JobApi, Summary } from './api'
-import { bp, duration, FACTORS, size } from './format'
+import { bp, duration, FACTORS, size, shortRegion } from './format'
 
 type Props = {
   api: JobApi
@@ -44,13 +44,14 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
   const [editing, setEditing] = useState(false)
   const m = summary.region?.match(/^(\w+):(\d+)-(\d+)$/)
   const region = m ? `${m[1]}:${bp(Number(m[2]))}-${bp(Number(m[3]))}` : summary.request.region
-  const title = name || `${summary.request.cell_type} ${region}`
+  // The heading has the region in megabases, which fits the panel. The line under it has the exact positions.
+  const short = m ? shortRegion(m[1], Number(m[2]), Number(m[3])) : summary.request.region
   const n = summary.structures
   const model = summary.models[selected - 1]
   const save = (value: string) => {
     setName(value.trim())
     setEditing(false)
-    rememberJob({ url: api.url, label: remembered?.label ?? `${summary.request.cell_type} ${region}`, name: value.trim(), at: remembered?.at ?? Date.now() })
+    rememberJob({ url: api.url, label: remembered?.label ?? `${summary.request.cell_type} ${short}`, name: value.trim(), at: remembered?.at ?? Date.now() })
   }
   const state =
     summary.state === 'done' && summary.started && summary.finished
@@ -82,7 +83,13 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
           onBlur={(e) => save(e.target.value)}
         />
       ) : (
-        <h1 className="job-title">{title}</h1>
+        <h1 className="job-title">
+          {name || (
+            <>
+              {summary.request.cell_type} <span className="nowrap">{short}</span>
+            </>
+          )}
+        </h1>
       )}
       <p className="job-locus">
         {summary.request.cell_type}, {region}

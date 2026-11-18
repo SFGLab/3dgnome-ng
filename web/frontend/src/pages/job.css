@@ -46,6 +46,13 @@
   font-size: 20px;
   font-weight: 700;
   line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+/* The region of the heading stays on one line. */
+.job-title .nowrap {
+  white-space: nowrap;
 }
 
 .rename {
