@@ -159,8 +159,12 @@
 
 .sv-dup rect,
 .sv-dot.sv-dup {
-  fill: var(--muted);
-  background: var(--muted);
+  fill: #1B7F8C;
+  background: #1B7F8C;
+}
+
+.sv-dup text {
+  fill: #1B7F8C;
 }
 
 .sv-table-wrap {

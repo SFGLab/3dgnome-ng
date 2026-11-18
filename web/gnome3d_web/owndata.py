@@ -265,6 +265,13 @@ def _change(kind: str, before: dict, after_loops: list, factor: str) -> str:
         if new_anchors:
             return f"adds {_plural(len(new_anchors), f'{factor} anchor')}, {_plural(len(new_loops), 'new loop')}"
         return f"lengthens {_plural(len(changed), 'loop')}" if changed else f"no {factor} motif above the cutoff"
+    if kind == "DUP":
+        # A copy keeps the reference interval of its original, so a copied loop has the key of a
+        # loop that is there already and shows as one more loop than the keys count.
+        copied = len(after_loops) - len(keyed) - len(new_loops)
+        if copied > 0 or new_loops:
+            return f"copies {_plural(max(copied, 0), 'loop')}, adds {_plural(len(new_loops), 'new loop')}" if new_loops else f"copies {_plural(copied, 'loop')}"
+        return f"lengthens {_plural(len(changed), 'loop')}" if changed else "no anchor inside"
     if flipped or removed:
         return f"flips {_plural(len(flipped), 'anchor')}, replaces {_plural(len(removed) + len(new_loops), 'loop')}"
     return "no anchor inside"

@@ -4,7 +4,7 @@ The rules of personal3d/rules/threeDgenome.py take a reference interaction netwo
 loops with each anchor's CTCF motif orientation and the contact domains they make, and
 rewrite it by a list of variants. A deletion removes the anchors it touches with their loops,
 an inversion flips and mirrors the anchors it holds, an insertion with a CTCF motif adds
-anchors, and every anchor left without a loop is linked to the nearest convergent partner at
+anchors, a tandem duplication copies the anchors it holds with the loops among them, and every anchor left without a loop is linked to the nearest convergent partner at
 a distance between the 10th and 90th percentile of the loop lengths, at the median strength.
 
 Here the reference is a panel, `panel.Panel`, and each anchor is tagged with its reference
@@ -97,6 +97,20 @@ def _get_duplicate(self):
 
 
 _tdg.Anchor.get_duplicate = _get_duplicate
+_duplicate_segment = _tdg.Segment.get_duplicate
+
+
+def _get_duplicate_segment(self):
+    """The rules' copy of a whole segment inside a duplication builds its anchors anew, in the
+    segment's order. Each keeps the reference interval of the anchor it copies."""
+    d = _duplicate_segment(self)
+    for mine, copy in zip(self.get_anchor_list(), d.get_anchor_list()):
+        if hasattr(mine, "ref"):
+            copy.ref = mine.ref
+    return d
+
+
+_tdg.Segment.get_duplicate = _get_duplicate_segment
 
 
 @dataclass

@@ -201,7 +201,7 @@ python web/scripts/add_sv_set.py $DATA_DIR HGSVC variants_freeze4_sv_insdel_alt.
   --label "HGSVC freeze 4 insertions and deletions"
 ```
 
-Records need SVTYPE of DEL, INS or INV, with END or SVLEN; an insertion's ALT sequence is used
+Records need SVTYPE of DEL, INS, INV or DUP, with END or SVLEN; an insertion's ALT sequence is used
 when it has one. Other types are skipped and counted on the result page. Many large call sets
 are fine: a job reads only its region through tabix.
 

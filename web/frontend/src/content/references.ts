@@ -220,7 +220,7 @@ export const DATA_SOURCES: DataSource[] = [
       { id: 'PRJEB31736', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB31736' },
       { id: 'PRJEB36890', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB36890' },
     ],
-    note: 'The phased panel of the 2,504 unrelated samples and the 698 that complete the trios. Deletions, insertions and inversions on the autosomes are applied.',
+    note: 'The phased panel of the 2,504 unrelated samples and the 698 that complete the trios. Deletions, insertions, inversions and duplications on the autosomes are applied.',
     label: 'Byrska-Bishop et al., Cell 2022', ref: 'kgp30x',
   },
   { data: 'Structural variants, HGSVC freeze 4', usedFor: 'variant structures', accessions: [], pending: 'accession to confirm', label: 'HGSVC, reference to confirm', ref: 'hgsvc4' },

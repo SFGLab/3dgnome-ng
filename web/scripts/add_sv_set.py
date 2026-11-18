@@ -3,7 +3,7 @@
     python web/scripts/add_sv_set.py <site data dir> <NAME> <calls.vcf.gz> [--label "..."]
 
 The VCF is copied under `svs/`, indexed with tabix when tabix is installed, and its samples are
-read from the header. Records need SVTYPE of DEL, INS or INV; others are skipped at run time.
+read from the header. Records need SVTYPE of DEL, INS, INV or DUP; others are skipped at run time.
 """
 
 from __future__ import annotations

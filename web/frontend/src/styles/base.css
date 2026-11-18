@@ -29,3 +29,22 @@ code,
 pre {
   font-family: var(--mono);
 }
+
+/* A button that reads as a link. Several pages use it, and a page's own stylesheet loads with
+   that page alone. */
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: 12px var(--font);
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}

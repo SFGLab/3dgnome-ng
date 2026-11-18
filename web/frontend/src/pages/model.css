@@ -342,16 +342,18 @@
 
 .radio-dot {
   flex: none;
-  width: 14px;
-  height: 14px;
-  margin-top: 2px;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
   border: 1.5px solid var(--faint);
   border-radius: 50%;
-  background: #FFFFFF;
+  background: var(--bg);
 }
 
 .option[aria-checked='true'] .radio-dot {
-  border: 4px solid var(--accent);
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 4px, var(--bg) 4.5px);
 }
 
 .option-text {
@@ -395,12 +397,38 @@
 
 .field select,
 .field input {
+  min-width: 0;
   padding: 9px 10px;
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
   font: 13px var(--font);
+}
+
+/* The browser's own arrow sits at a distance from the text that differs by platform. This one
+   keeps its place, and a long option is cut with an ellipsis before it. */
+.field select {
+  appearance: none;
+  padding-right: 30px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 55%,
+    calc(100% - 11px) 55%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  text-overflow: ellipsis;
+}
+
+.field select:disabled,
+.field input:disabled {
+  opacity: 0.6;
+}
+
+/* The call set's label is long and the haplotype is one word. */
+.variants .fields {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(7.5rem, 0.8fr);
 }
 
 .upload {
@@ -454,7 +482,8 @@
 @media (max-width: 960px) {
   .options.two,
   .options.three,
-  .fields {
+  .fields,
+  .variants .fields {
     grid-template-columns: 1fr;
   }
 }

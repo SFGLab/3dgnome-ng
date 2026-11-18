@@ -111,28 +111,43 @@ def _status(job: Path, **fields: object) -> None:
     tmp.replace(path)
 
 
+# After the name of a gene's second copy in a tandem duplication.
+COPY = ", second copy"
+
+
 def _tail(path: Path, n: int = 30) -> str:
     return "\n".join(path.read_text(errors="replace").splitlines()[-n:]) if path.is_file() else ""
 
 
 def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, cell_enhancers: bool = True):  # noqa: ANN001, ANN202
     """The cell type's genes and enhancers on `chrom` in the haplotype's coordinates, the beads'
-    coordinates, those inside a deletion dropped. An enhancers upload replaces the cell type's;
-    with `cell_enhancers` off and no upload there are none, as on your own cell type."""
+    coordinates, those inside a deletion dropped. A gene or an enhancer inside a duplication is
+    there twice, and the gene's second copy carries `COPY` after its name. An enhancers upload
+    replaces the cell type's; with `cell_enhancers` off and no upload there are none, as on your
+    own cell type."""
     import pandas as pd
     from personal3d.lift import Lift
 
     L = Lift(svs)
     genes = cell.genes()
     genes = genes[genes["chrom"] == chrom].copy()
+    twin = genes.copy()
+    twin["tss"] = L.copies(genes["tss"].to_numpy())
+    twin = twin[twin["tss"] >= 0]
+    twin["name"] = twin["name"] + COPY
+    twin["gene_id"] = twin["gene_id"].astype(str) + ".copy2"
     genes["tss"] = L.many(genes["tss"].to_numpy())
-    genes = genes[genes["tss"] >= 0]
+    genes = pd.concat([genes[genes["tss"] >= 0], twin], ignore_index=True)
     if enhancers is None and not cell_enhancers:
         return genes, pd.DataFrame({0: pd.Series(dtype=str), 1: pd.Series(dtype=int), 2: pd.Series(dtype=int)})
     enh = pd.read_csv(enhancers or cell.path("enhancers"), sep="\t", header=None, usecols=[0, 1, 2])
     enh = enh[enh[0] == chrom].copy()
-    enh[1], enh[2] = L.many(enh[1].to_numpy()), L.many(enh[2].to_numpy() - 1) + 1
-    return genes, enh[(enh[1] >= 0) & (enh[2] > 0)]
+    start, end = enh[1].to_numpy(), enh[2].to_numpy()
+    second = enh.copy()
+    second[1], second[2] = L.copies(start), L.copies(end - 1) + 1
+    second = second[(second[1] >= 0) & (second[2] > 0)]
+    enh[1], enh[2] = L.many(start), L.many(end - 1) + 1
+    return genes, pd.concat([enh[(enh[1] >= 0) & (enh[2] > 0)], second], ignore_index=True)
 
 
 def run_job(

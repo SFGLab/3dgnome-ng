@@ -64,19 +64,6 @@
   color: var(--muted);
 }
 
-.link-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  align-self: flex-start;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--accent);
-  font: 12px var(--font);
-  cursor: pointer;
-}
-
 .facts {
   display: grid;
   grid-template-columns: auto 1fr;

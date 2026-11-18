@@ -101,7 +101,7 @@ export function Variants({ catalog, svSet, sample, haplotype, vcfUpload: vcf, on
       ) : (
         <label className="upload">
           <Upload size={14} aria-hidden />
-          <span>Or drop your own VCF here. The file must be compressed with bgzip and have SVTYPE of DEL, INS or INV.</span>
+          <span>Or drop your own VCF here. The file must be compressed with bgzip and have SVTYPE of DEL, INS, INV or DUP.</span>
           <input type="file" accept=".gz,.bgz" onChange={(e) => e.target.files?.[0] && onOpen('upload', e.target.files[0])} />
         </label>
       )}

@@ -110,10 +110,10 @@ export function Help() {
         <section id="variants">
           <h2>Structural variants</h2>
           <p>
-            Two hosted call sets need no upload. The 1000 Genomes set holds the 3,202 samples of the 30x phased panel, and the HGSVC set holds 35 samples of freeze 4. Choose the set, type a sample name such as HG00096, and pick a haplotype. The 1000 Genomes set covers chromosomes 1 to 22, and its duplications are skipped.
+            Two hosted call sets need no upload. The 1000 Genomes set holds the 3,202 samples of the 30x phased panel, and the HGSVC set holds 35 samples of freeze 4. Choose the set, type a sample name such as HG00096, and pick a haplotype. The 1000 Genomes set covers chromosomes 1 to 22.
           </p>
           <p>
-            Or upload a VCF compressed with bgzip. A record needs SVTYPE of DEL, INS or INV in its INFO field, and END or SVLEN. An insertion uses its ALT sequence when it has one. CTCF motifs in that sequence can become new anchors. The result page counts the skipped records of other types. A phased genotype puts each allele on its own haplotype.
+            Or upload a VCF compressed with bgzip. A record needs SVTYPE of DEL, INS, INV or DUP in its INFO field, and END or SVLEN. An insertion uses its ALT sequence when it has one. A duplication is read as tandem, with the copy right after the original. A gene inside it is listed twice, the second time as its second copy. CTCF motifs in that sequence can become new anchors. The result page counts the skipped records of other types. A phased genotype puts each allele on its own haplotype.
           </p>
           <pre className="code">{VCF}</pre>
           <p className="small">An uploaded file and everything built from it are private, reachable only through the job's link, and deleted after 14 days.</p>
