@@ -33,8 +33,8 @@ Genomes 30x panel, 97,862 sites on chromosomes 1 to 22. The 3D-GNOME 3.0 server 
 VCF per sample in `/home/gnome/3dgnome_data/data_vcf_modified/data`, each with the records that
 sample carries. `web/scripts/merge_sample_vcfs.py` made the one file from those, run in a
 container of the site's image with that directory mounted read only. Two samples were compared
-record for record with their source files. The site applies the 51,380 deletions, 31,538
-insertions and 572 inversions and skips the 14,372 duplications. The catalog before the set was
+record for record with their source files. The site applies its 51,380 deletions, 31,538
+insertions, 572 inversions and 14,372 duplications, the last read as tandem. The catalog before the set was
 added is `data/catalog.json.before-1kgp`.
 
 ## Run
