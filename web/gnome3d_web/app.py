@@ -395,6 +395,27 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": f"{sample!r} is not a sample of this VCF", "field": "sample"}, 400)
         return JSONResponse(out)
 
+    gene_names: dict[str, list[tuple[str, str, str, int]]] = {}
+
+    @app.get("/api/genes")
+    def api_genes(cell: str, q: str, limit: int = 8) -> JSONResponse:
+        """Genes of a cell type whose name starts with the text, then those that hold it, for the
+        suggestions of the region field. Each has its name, chromosome and TSS."""
+        if cell not in catalog.cell_types:
+            return JSONResponse({"error": f"unknown cell type {cell!r}"}, 404)
+        text = q.strip().upper()
+        if len(text) < 2:
+            return JSONResponse([])
+        if cell not in gene_names:
+            genes = catalog.cell_types[cell].genes().drop_duplicates("name")
+            gene_names[cell] = sorted((str(n).upper(), str(n), str(c), int(t)) for n, c, t in zip(genes["name"], genes["chrom"], genes["tss"], strict=True))
+        limit = max(1, min(limit, 25))
+        starts = [g for g in gene_names[cell] if g[0].startswith(text)]
+        # The shortest names first, so that MYC comes before MYCBP.
+        starts.sort(key=lambda g: (len(g[0]), g[0]))
+        holds = [g for g in gene_names[cell] if text in g[0] and not g[0].startswith(text)] if len(starts) < limit else []
+        return JSONResponse([{"name": n, "chrom": c, "tss": t} for _, n, c, t in (starts + holds)[:limit]])
+
     @app.get("/api/region")
     def api_region(cell: str, q: str) -> JSONResponse:
         if cell not in catalog.cell_types:

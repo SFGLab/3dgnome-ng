@@ -18,6 +18,12 @@ export const PREVIEW = {
   genes: [{ name: 'TNFRSF8', tss: 12063303 }],
 }
 
+export const GENES = [
+  { name: 'MYC', chrom: 'chr8', tss: 127735433 },
+  { name: 'MYCBP', chrom: 'chr1', tss: 38873368 },
+  { name: 'TNFRSF8', chrom: 'chr1', tss: 12063302 },
+]
+
 export const SCHEMA = [
   {
     name: 'Distance law',
@@ -44,6 +50,10 @@ export function mockApi(extra: Route[] = []) {
       if (q === 'TNFRSF8') return [200, { chrom: 'chr1', start: 11500000, end: 12600000, label: 'chr1:11,500,000-12,600,000, 1.1 Mb', gene: 'TNFRSF8' }]
       if (q.startsWith('CHR8')) return [200, { chrom: 'chr8', start: 127500000, end: 129000000, label: 'chr8:127,500,000-129,000,000, 1.5 Mb' }]
       return [400, { error: `'${q}' is neither chr:start-end nor a known gene name` }]
+    }],
+    [/^\/api\/genes$/, (u) => {
+      const q = (u.searchParams.get('q') ?? '').toUpperCase()
+      return [200, GENES.filter((g) => g.name.startsWith(q))]
     }],
     [/^\/api\/preview$/, () => [200, PREVIEW]],
     [/^\/api\/settings$/, () => [200, SCHEMA]],

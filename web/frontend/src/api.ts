@@ -13,6 +13,8 @@ export type Catalog = {
 }
 /** A sample of a call set. An unknown field is an empty string and so is a parent the set does not hold. */
 export type SampleRow = { sample: string; sex: string; population: string; superpopulation: string; father: string; mother: string }
+/** A gene the region field suggests. */
+export type GeneHit = { name: string; chrom: string; tss: number }
 export type Region = { chrom: string; start: number; end: number; label: string; gene?: string }
 export type Preview = { loops: Record<string, [number, number, number][]>; counts: Record<string, number>; genes: { name: string; tss: number }[] }
 export type Setting = {
@@ -55,6 +57,7 @@ const q = (params: Record<string, string>) => new URLSearchParams(params).toStri
 export const api = {
   catalog: () => call<Catalog>('/api/catalog'),
   region: (cell: string, text: string) => call<Region>(`/api/region?${q({ cell, q: text })}`),
+  genes: (cell: string, text: string) => call<GeneHit[]>(`/api/genes?${q({ cell, q: text })}`),
   preview: (cell: string, region: string) => call<Preview>(`/api/preview?${q({ cell, region })}`),
   sampleTable: (set: string) =>
     call<{ columns: string[]; rows: string[][] }>(`/api/sv_sets/${encodeURIComponent(set)}/samples`).then((t) =>

@@ -45,6 +45,11 @@ def main() -> int:
         r = c.get("/api/region", params={"cell": "GMX", "q": "alpha"}).json()
         check("a gene name in lower case resolves to its window", r["gene"] == "ALPHA" and r["chrom"] == "chr1" and r["end"] - r["start"] == 2_000_000, str(r))
         check("a region gets a label with its length", r["label"].endswith("2.0 Mb"), str(r))
+        g = c.get("/api/genes", params={"cell": "GMX", "q": "al"}).json()
+        check("typed letters give the genes that start with them", g == [{"name": "ALPHA", "chrom": "chr1", "tss": 1310000}], str(g))
+        g = c.get("/api/genes", params={"cell": "GMX", "q": "ta"}).json()
+        check("a gene that holds the text comes after those that start with it", [x["name"] for x in g] == ["BETA"], str(g))
+        check("one letter gives no genes and an unknown cell type is a 404", c.get("/api/genes", params={"cell": "GMX", "q": "a"}).json() == [] and c.get("/api/genes", params={"cell": "NOPE", "q": "al"}).status_code == 404)
         r = c.get("/api/region", params={"cell": "GMX", "q": "chr1:0-25000000"})
         check("a region over the limit is a 400 naming it", r.status_code == 400 and "20,000,000" in r.json()["error"], r.text)
 

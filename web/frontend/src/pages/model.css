@@ -146,6 +146,48 @@
   outline: none;
 }
 
+.region-field {
+  position: relative;
+}
+
+/* The genes that match the typed text, over the content below the field. */
+.gene-options {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+
+.gene-options li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.gene-options li.active {
+  background: var(--accent-soft);
+}
+
+.gene-name {
+  font-weight: 600;
+}
+
+.gene-place {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .resolved {
   font-size: 12px;
   color: var(--muted);
