@@ -3,6 +3,8 @@
    palette validator against the dark surface. */
 :root {
   --bg: #FCFCFB;
+  /* A clickable element under the pointer: darker on a light page, lighter on a dark one. */
+  --hover: brightness(0.96);
   --surface: #FFFFFF;
   --panel: #F5F4F1;
   --ink: #151514;
@@ -26,6 +28,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #141413;
+  --hover: brightness(1.2);
     --surface: #1C1C1A;
     --panel: #232321;
     --ink: #F1F0EC;
@@ -49,6 +52,7 @@
 
 :root[data-theme="dark"] {
   --bg: #141413;
+  --hover: brightness(1.2);
   --surface: #1C1C1A;
   --panel: #232321;
   --ink: #F1F0EC;

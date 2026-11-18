@@ -158,9 +158,9 @@ export const REFERENCES: Reference[] = [
     authors: 'SFGLab', venue: 'GitHub repository',
   },
   {
-    key: 'hgsvc4', group: 'data', year: 2025, unconfirmed: true,
-    title: 'Human Genome Structural Variation Consortium, freeze 4',
-    authors: 'HGSVC', venue: 'reference to confirm',
+    key: 'hgsvc4', group: 'data', year: 2021, doi: '10.1126/science.abf7117',
+    title: 'Haplotype-resolved diverse human genomes and integrated analysis of structural variation',
+    authors: 'Ebert P, Audano PA, Zhu Q, et al.', venue: 'Science 372, eabf7117',
   },
   {
     key: 'hicdiffusion2024', group: 'data', year: 2024, doi: '10.1186/s12864-024-10885-z',
@@ -216,7 +216,7 @@ export const DATA_SOURCES: DataSource[] = [
   },
   { data: 'Micro-C, H1ESC', usedFor: 'loops the models are checked against', accessions: [fourDn('4DNFI2TK7L2F')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
   { data: 'Micro-C, HFFc6', usedFor: 'loops the models are checked against', accessions: [fourDn('4DNFI18Q799K')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
-  { data: 'Gene expression of the three cell lines', usedFor: 'link to expression', accessions: [], pending: 'accession to confirm', label: 'source to confirm' },
+  { data: 'Gene expression, total RNA-seq of GM12878, H1 and HFFc6', usedFor: 'link to expression', accessions: ['ENCSR820PHH', 'ENCSR895ZTB', 'ENCSR420ZKB'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
   { data: 'Enhancers, EnhancerAtlas 2.0', usedFor: 'enhancer marks and distances', accessions: [], note: 'One file per cell line. The atlas gives no accession.', label: 'Gao and Qian, NAR 2020', ref: 'enhanceratlas2020' },
   { data: 'Genes, GENCODE release 40, basic annotation', usedFor: 'promoter marks and gene names', accessions: [{ id: 'GENCODE v40', url: 'https://www.gencodegenes.org/human/release_40.html' }], label: 'Frankish et al., NAR 2021', ref: 'gencode2021' },
   {
@@ -228,7 +228,11 @@ export const DATA_SOURCES: DataSource[] = [
     note: 'The phased panel of the 2,504 unrelated samples and the 698 that complete the trios. Deletions, insertions, inversions and duplications on the autosomes are applied.',
     label: 'Byrska-Bishop et al., Cell 2022', ref: 'kgp30x',
   },
-  { data: 'Structural variants, HGSVC freeze 4', usedFor: 'variant structures', accessions: [], pending: 'accession to confirm', label: 'HGSVC, reference to confirm', ref: 'hgsvc4' },
+  {
+    data: 'Structural variants, HGSVC freeze 4', usedFor: 'variant structures', note: 'The phased insertions and deletions of 35 samples, variants_freeze4_sv_insdel_alt.vcf.gz.',
+    accessions: [{ id: 'HGSVC2 release v2.0', url: 'https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/HGSVC2/release/v2.0/integrated_callset/' }],
+    label: 'Ebert et al., Science 2021', ref: 'hgsvc4',
+  },
   {
     data: 'Reference genome, hg38', usedFor: 'sequence for HiCDiffusion',
     accessions: [{ id: 'GCA_000001405.15', url: 'https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_000001405.15/' }],

@@ -194,12 +194,6 @@
   white-space: nowrap;
 }
 
-.field-error {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: #C2410C;
-}
-
 .model-side .eyebrow {
   margin-top: 10px;
 }
@@ -438,45 +432,6 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.field select,
-.field input {
-  min-width: 0;
-  padding: 9px 10px;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--ink);
-  font: 13px var(--font);
-}
-
-/* The browser's own arrow sits at a distance from the text that differs by platform. This one
-   keeps its place and a long option is cut with an ellipsis before it. */
-.field select {
-  appearance: none;
-  padding-right: 30px;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position:
-    calc(100% - 16px) 55%,
-    calc(100% - 11px) 55%;
-  background-size: 5px 5px;
-  background-repeat: no-repeat;
-  text-overflow: ellipsis;
-}
-
-.field select:disabled,
-.field input:disabled {
-  opacity: 0.6;
 }
 
 /* Opens the dialog with the sample's variants and what each does to the loops. */
@@ -783,24 +738,13 @@
   font: 12px var(--mono);
 }
 
-/* A choice gets the arrow of the form's other selects in place of the browser's, which is
-   drawn past the edge of a box this narrow. The box grows with its longest option. */
+/* A choice grows with its longest option. */
 select.value-box {
-  appearance: none;
   flex: none;
   width: auto;
   min-width: 90px;
   max-width: 100%;
   margin-left: auto;
-  padding-right: 26px;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position:
-    calc(100% - 14px) 55%,
-    calc(100% - 9px) 55%;
-  background-size: 5px 5px;
-  background-repeat: no-repeat;
-  text-overflow: ellipsis;
 }
 
 .setting.changed .value-box {

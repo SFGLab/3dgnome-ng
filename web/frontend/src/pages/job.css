@@ -784,19 +784,41 @@
   margin-bottom: 10px;
 }
 
+/* The controls of the toolbar share one height, so their boxes and their labels line up. */
+.map-toolbar .field select,
+.map-toolbar .segmented,
+.locus-input {
+  box-sizing: border-box;
+  height: 36px;
+}
+
+.map-toolbar .field select {
+  padding-top: 0;
+  padding-bottom: 0;
+  background-color: var(--surface);
+}
+
+.map-toolbar .segmented {
+  align-items: stretch;
+}
+
 .locus-input {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px 4px 4px 10px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 8px;
   background: var(--surface);
 }
 
-.locus-input input {
-  width: 200px;
+/* Wide enough for chr10:100,000,000-120,000,000 in the mono face. */
+.field .locus-input input {
+  width: 30ch;
+  min-width: 0;
+  padding: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--ink);
   font: 12px var(--mono);
@@ -804,7 +826,7 @@
 }
 
 .locus-input button {
-  padding: 3px 8px;
+  padding: 4px 9px;
   border: 0;
   border-radius: 5px;
   background: var(--ink);

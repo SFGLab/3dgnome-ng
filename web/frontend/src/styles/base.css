@@ -48,3 +48,89 @@ pre {
 .link-button:hover {
   text-decoration: underline;
 }
+
+/* A labelled control and the message under one. The form and the job page both use them and a
+   page's own stylesheet loads with that page alone. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.field select,
+.field input {
+  min-width: 0;
+  padding: 9px 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font: 13px var(--font);
+}
+
+.field select:disabled,
+.field input:disabled {
+  opacity: 0.6;
+}
+
+.field-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #C2410C;
+}
+
+/* Every select draws this arrow in place of the browser's own. The browser's arrow differs by
+   platform and Safari draws it at the very edge of the box. These properties are marked
+   important since a component sets its padding and its background with the shorthands, which
+   would clear the arrow and its room. A long option is cut with an ellipsis before the arrow. */
+select {
+  appearance: none;
+  padding-right: 30px !important;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%) !important;
+  background-position:
+    calc(100% - 16px) 55%,
+    calc(100% - 11px) 55% !important;
+  background-size: 5px 5px !important;
+  background-repeat: no-repeat !important;
+  text-overflow: ellipsis;
+}
+
+/* Everything that takes a click answers the pointer: a slight change of brightness under it
+   and a slight press while the button is down. The selectors have no weight of their own, so a
+   component's rule for its own hover wins. A label around a file field is a drop area, and a
+   label around a tick box is clicked as the box is. */
+:where(button, select, summary, a, [role='button'], [role='tab'], [role='option'], label:has(input[type='file']), label:has(input[type='checkbox']), input[type='checkbox'], input[type='radio']) {
+  cursor: pointer;
+  transition:
+    filter 120ms ease,
+    transform 80ms ease;
+}
+
+:where(button, select, summary, a, [role='button'], [role='tab'], [role='option'], label:has(input[type='file']), label:has(input[type='checkbox']), input[type='checkbox'], input[type='radio']):where(:not(:disabled, [aria-disabled='true'])):hover {
+  filter: var(--hover);
+}
+
+:where(button, select, summary, [role='button'], [role='tab'], [role='option'], label:has(input[type='file']), a.button, a.button-link):where(:not(:disabled, [aria-disabled='true'])):active {
+  transform: translateY(1px) scale(0.985);
+}
+
+:where(a, input[type='checkbox'], input[type='radio'], label:has(input[type='checkbox'])):where(:not(:disabled)):active {
+  filter: var(--hover) opacity(0.75);
+}
+
+:where(button, select, input):disabled {
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, select, summary, a, [role='button'], [role='tab'], [role='option'], label, input) {
+    transition: none;
+  }
+
+  :where(button, select, summary, [role='button'], [role='tab'], [role='option'], label, a):active {
+    transform: none;
+  }
+}

@@ -53,9 +53,11 @@ describe('Cite page', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('marks the unconfirmed reference', () => {
+  it('links the HGSVC call set to its release and its paper', () => {
     renderCite()
-    expect(screen.getByText('HGSVC, reference to confirm')).toHaveClass('unconfirmed')
+    expect(screen.getByRole('link', { name: 'HGSVC2 release v2.0' })).toHaveAttribute('href', expect.stringContaining('data_collections/HGSVC2/release/v2.0'))
+    expect(screen.getByRole('link', { name: 'Ebert et al., Science 2021' })).toHaveAttribute('href', 'https://doi.org/10.1126/science.abf7117')
+    expect(document.querySelector('.unconfirmed')).toBeNull()
   })
 
   it('offers the primary citation with copy buttons and the source code', () => {
