@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { checkCopy } from '../test/copy'
-import { StructureView } from './StructureView'
+import { chainAt, StructureView } from './StructureView'
 
 vi.mock('./Scene', () => ({ Scene: () => <div data-testid="scene" /> }))
 
@@ -54,5 +54,10 @@ describe('StructureView', () => {
   it('keeps to the writing rules', () => {
     const { container } = renderView()
     expect(checkCopy(container)).toEqual([])
+  })
+
+  it('finds the chain point nearest a genomic position', () => {
+    const chain = [1000, 2000, 3000, 4500].map((bp, i) => [i, 0, 0, bp] as [number, number, number, number])
+    expect([500, 1400, 1600, 3000, 3900, 9000].map((bp) => chainAt(chain, bp))).toEqual([0, 0, 1, 2, 3, 3])
   })
 })

@@ -119,6 +119,30 @@ select {
   transform: translateY(1px) scale(0.985);
 }
 
+/* A tab, a choice of a segmented control, a node of a tree and a step have no background of their
+   own, so the change of brightness shows nothing on them. They get a tint and the ink colour
+   under the pointer. The chosen one keeps its own mark. */
+:is(.job-tab, .segmented button, .node, .wizard-steps [role='tab'], .dialog-tabs [role='tab']):not([aria-selected='true'], [aria-pressed='true'], .open):hover {
+  background-color: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+}
+
+/* A row of a table is tinted under the pointer. A row marked as chosen keeps its mark. A column
+   header that sorts the table is tinted too and shows the pointer of a button. */
+tbody tr:hover > :is(td, th) {
+  background-color: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+th[aria-sort] {
+  cursor: pointer;
+  user-select: none;
+}
+
+thead th[aria-sort]:hover {
+  background-color: color-mix(in srgb, var(--ink) 10%, var(--panel));
+  color: var(--ink);
+}
+
 /* A link is underlined under the pointer. Many components draw their links without the line,
    so the rule is marked important. A link drawn as a button, a card or the site's name keeps the
    brightness change alone. */

@@ -18,9 +18,20 @@ export function stretch(i: number, n: number, k = 6): [number, number] {
   return [Math.max(0, i - k), Math.min(n - 1, i + k)]
 }
 
-/** Fog from the structure's middle to its far side, seen from the camera's distance. */
+/** Fog that starts at the structure's middle and would be full at 2.5 radii behind it, seen from
+ * the camera's distance. The far side of the structure is at one radius, so it fades by two
+ * fifths and stays readable against the background. */
 export function fogRange(radius: number, cameraDistance: number): [number, number] {
-  return [cameraDistance, cameraDistance + radius]
+  return [cameraDistance, cameraDistance + 2.5 * radius]
+}
+
+/** The points of the chain inside any of the ranges, as a mask. Null for no ranges, which marks
+ * no part of the chain over the rest. */
+export function focusMask(n: number, ranges: [number, number][]): Uint8Array | null {
+  if (!ranges.length) return null
+  const mask = new Uint8Array(n)
+  for (const [a, b] of ranges) mask.fill(1, Math.max(0, Math.min(a, b)), Math.min(n, Math.max(a, b) + 1))
+  return mask
 }
 
 /** The bead whose tube is drawn under the cursor. Each bond is a tube from one bead to the next;

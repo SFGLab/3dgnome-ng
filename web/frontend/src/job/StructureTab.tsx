@@ -73,6 +73,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
         mode={mode}
         onMode={setMode}
         markers={markers}
+        focusBeads={pair}
         onPickBead={pick}
         toolbarStart={<FindGene names={(genes.data ?? []).map((r) => r.gene)} onFind={(g) => setGene(g)} />}
         toolbarEnd={

@@ -4,9 +4,11 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, u
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CameraLink } from './cameraLink'
-import { bondRadius, fogRange, pickOnChain, stretch } from './chain'
+import { bondRadius, focusMask, fogRange, pickOnChain, stretch } from './chain'
 
 const BACKGROUND = '#FFFFFF'
+/** The share of the background mixed into the chain outside the part in focus. */
+const DIM = 0.82
 /** The hovered bead's colour, one no mark uses. */
 const HOVER = '#2A78D6'
 /** Marks drawn over the chain take no pointer events, or the pointer would hit the mark instead
@@ -102,6 +104,7 @@ function Picker({
 }
 
 export type Marker = { label: string; at: [number, number, number] }
+const NO_FOCUS: [number, number][] = []
 export type SceneHandle = { reset: () => void; png: () => string | null }
 
 function CameraSync({ link, id }: { link: CameraLink; id: string }) {
@@ -158,10 +161,12 @@ type ChainProps = {
   points: [number, number, number][]
   colors: string[]
   radius: number
+  focus: Uint8Array | null
 }
 
-/** The chain as lit tubes between beads and spheres at the beads, one instanced mesh each. */
-function Chain({ points, colors, radius }: ChainProps) {
+/** The chain as lit tubes between beads and spheres at the beads, one instanced mesh each. With
+ * a part in focus the rest of the chain is faded toward the background. */
+function Chain({ points, colors, radius, focus }: ChainProps) {
   const tubes = useRef<THREE.InstancedMesh>(null)
   const joints = useRef<THREE.InstancedMesh>(null)
   const n = points.length
@@ -170,27 +175,35 @@ function Chain({ points, colors, radius }: ChainProps) {
     const q = new THREE.Quaternion()
     const up = new THREE.Vector3(0, 1, 0)
     const one = new THREE.Vector3(1, 1, 1)
-    const c = new THREE.Color()
     for (let i = 0; i < n; i++) {
       const a = new THREE.Vector3(...points[i])
       joints.current?.setMatrixAt(i, m.compose(a, q.identity(), one))
-      joints.current?.setColorAt(i, c.set(colors[i]))
       if (i + 1 < n && tubes.current) {
         const b = new THREE.Vector3(...points[i + 1])
         const dir = b.clone().sub(a)
         const len = dir.length()
         q.setFromUnitVectors(up, len > 0 ? dir.normalize() : up)
         tubes.current.setMatrixAt(i, m.compose(a.clone().add(b).multiplyScalar(0.5), q, new THREE.Vector3(1, len, 1)))
-        tubes.current.setColorAt(i, c.set(colors[i]))
       }
     }
     for (const mesh of [tubes.current, joints.current]) {
       if (!mesh) continue
       mesh.instanceMatrix.needsUpdate = true
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
       mesh.computeBoundingSphere()
     }
-  }, [points, colors, n])
+  }, [points, n])
+  // The colours are set apart from the positions: a hover changes the focus alone.
+  useLayoutEffect(() => {
+    const c = new THREE.Color()
+    const back = new THREE.Color(BACKGROUND)
+    const tone = (i: number) => (focus && !focus[i] ? c.set(colors[i]).lerp(back, DIM) : c.set(colors[i]))
+    for (let i = 0; i < n; i++) {
+      joints.current?.setColorAt(i, tone(i))
+      // A bond is in focus when both of its beads are.
+      if (i + 1 < n) tubes.current?.setColorAt(i, focus && !(focus[i] && focus[i + 1]) ? c.set(colors[i]).lerp(back, DIM) : c.set(colors[i]))
+    }
+    for (const mesh of [tubes.current, joints.current]) if (mesh?.instanceColor) mesh.instanceColor.needsUpdate = true
+  }, [colors, focus, n])
   return (
     <>
       {n > 1 && (
@@ -217,11 +230,13 @@ type Props = {
   link?: CameraLink
   linkId?: string
   hovered?: number | null
+  /** Ranges of chain points drawn at full strength while the rest is faded. None fades nothing. */
+  focus?: [number, number][]
 }
 
 /** The chain as lit tubes in a WebGL canvas with depth fog, orbit controls, markers, highlights
  * and the hovered bead marked. */
-export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, colors, markers = [], highlight = [], onHover, onPick, link, linkId = 'scene', hovered = null }, ref) {
+export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, colors, markers = [], highlight = [], onHover, onPick, link, linkId = 'scene', hovered = null, focus = NO_FOCUS }, ref) {
   const controls = useRef<OrbitControlsImpl>(null)
   const gl = useRef<THREE.WebGLRenderer | null>(null)
   const { center, radius } = useMemo(() => {
@@ -231,6 +246,7 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
   }, [points])
   const shifted = useMemo(() => points.map(([x, y, z]) => [x - center.x, y - center.y, z - center.z] as [number, number, number]), [points, center])
   const tube = useMemo(() => bondRadius(shifted), [shifted])
+  const mask = useMemo(() => focusMask(shifted.length, focus), [shifted.length, focus])
   const near = hovered === null || hovered >= shifted.length ? null : stretch(hovered, shifted.length)
   useImperativeHandle(ref, () => ({
     reset: () => controls.current?.reset(),
@@ -246,10 +262,10 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
       }}
     >
       <color attach="background" args={[BACKGROUND]} />
-      <ambientLight intensity={0.55} />
+      <ambientLight intensity={0.45} />
       <CameraLight />
       <DepthFog radius={radius} />
-      <Chain points={shifted} colors={colors} radius={tube} />
+      <Chain points={shifted} colors={colors} radius={tube} focus={mask} />
       <Picker points={shifted} tube={tube} onHover={onHover} onPick={onPick} />
       {near && (
         <>

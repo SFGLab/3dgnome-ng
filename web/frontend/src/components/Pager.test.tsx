@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { checkCopy } from '../test/copy'
 import { Pager } from './Pager'
-import { PAGE, usePage } from './usePage'
+import { PAGE, PAGE_SIZES, usePage } from './usePage'
 
 function List({ n, reset = 0 }: { n: number; reset?: number }) {
   const rows = Array.from({ length: n }, (_, i) => `row ${i + 1}`)
@@ -20,10 +20,31 @@ function List({ n, reset = 0 }: { n: number; reset?: number }) {
 }
 
 describe('Pager', () => {
-  it('shows no pager for a page or less', () => {
-    render(<List n={PAGE} />)
-    expect(screen.getAllByRole('listitem')).toHaveLength(PAGE)
+  beforeEach(() => localStorage.clear())
+
+  it('shows no pager for a table that fits the smallest page', () => {
+    render(<List n={PAGE_SIZES[0]} />)
+    expect(screen.getAllByRole('listitem')).toHaveLength(PAGE_SIZES[0])
     expect(screen.queryByRole('navigation', { name: 'Pages' })).toBeNull()
+  })
+
+  it('offers the rows per page and starts again from the first row', () => {
+    render(<List n={120} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.change(screen.getByLabelText('Rows per page'), { target: { value: '100' } })
+    expect(screen.getAllByRole('listitem')).toHaveLength(100)
+    expect(screen.getByText('rows 1 to 100 of 120')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Rows per page'), { target: { value: '250' } })
+    expect(screen.getAllByRole('listitem')).toHaveLength(120)
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+  })
+
+  it('keeps the chosen rows per page for the next table', () => {
+    const first = render(<List n={120} />)
+    fireEvent.change(screen.getByLabelText('Rows per page'), { target: { value: '25' } })
+    first.unmount()
+    render(<List n={120} />)
+    expect(screen.getAllByRole('listitem')).toHaveLength(25)
   })
 
   it('pages through more rows with the range shown', () => {

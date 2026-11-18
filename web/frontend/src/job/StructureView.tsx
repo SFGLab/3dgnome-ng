@@ -1,6 +1,7 @@
 import { Expand, Camera, RotateCcw } from 'lucide-react'
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Annotations, Structure } from './api'
+import { stretch } from './chain'
 import { colorAt, readPalette, type Mode } from './colors'
 import { bp as fmt } from './format'
 import { Scene, type Marker, type SceneHandle } from './Scene'
@@ -31,6 +32,9 @@ type Props = {
   onMode: (m: Mode) => void
   markers?: Marker[]
   highlight?: [number, number, number][][]
+  /** The beads of a selection, a gene's promoter and enhancer or a measured pair. The chain
+   * between two of them, or around one, stays at full strength and the rest fades. */
+  focusBeads?: number[]
   onPickBead?: (bead: number) => void
   toolbarStart?: ReactNode
   toolbarEnd?: ReactNode
@@ -54,11 +58,45 @@ export function beadAt(beads: Structure['beads'], bp: number): number {
   return lo
 }
 
+/** Index of the chain point nearest a genomic position, by binary search over the positions. */
+export function chainAt(chain: Structure['chain'], bp: number): number {
+  let lo = 0
+  let hi = chain.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (chain[mid][3] < bp) lo = mid + 1
+    else hi = mid
+  }
+  return lo > 0 && Math.abs(chain[lo - 1][3] - bp) <= Math.abs(chain[lo][3] - bp) ? lo - 1 : lo
+}
+
+/** Chain points either side of a hovered or a single selected point that stay at full strength. */
+const FOCUS_REACH = 15
+const NO_BEADS: number[] = []
+
 /** The Structure tab's 3D view: toolbar, coloured chain, hover box, legend and caption. */
-export function StructureView({ structure, annotations, region, chrom = '', index, total, mode, onMode, markers, highlight, onPickBead, toolbarStart, toolbarEnd }: Props) {
+export function StructureView({ structure, annotations, region, chrom = '', index, total, mode, onMode, markers, highlight, focusBeads = NO_BEADS, onPickBead, toolbarStart, toolbarEnd }: Props) {
   const scene = useRef<SceneHandle>(null)
   const box = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<HoverInfo | null>(null)
+  // The fade follows the pointer with a short delay and leaves with a longer one, so a pointer
+  // that crosses the model does not flash the whole chain.
+  const [held, setHeld] = useState<number | null>(null)
+  const over = hover?.index ?? null
+  useEffect(() => {
+    const t = setTimeout(() => setHeld(over), over === null ? 250 : 120)
+    return () => clearTimeout(t)
+  }, [over])
+  // Keyed on the beads' numbers: a parent passes a new array each render and a new focus would
+  // recolour the whole chain on every pointer move.
+  const beadsKey = focusBeads.join(',')
+  const focus = useMemo(() => {
+    const n = structure.chain.length
+    const at = focusBeads.map((k) => chainAt(structure.chain, (structure.beads[k][0] + structure.beads[k][1]) / 2))
+    const ranges: [number, number][] = at.length === 2 ? [[at[0], at[1]]] : at.map((i) => stretch(i, n, FOCUS_REACH))
+    if (held !== null && held < n) ranges.push(stretch(held, n, FOCUS_REACH))
+    return ranges
+  }, [structure, beadsKey, held]) // eslint-disable-line react-hooks/exhaustive-deps
   const palette = useMemo(readPalette, [])
   const points = useMemo(() => structure.chain.map(([x, y, z]) => [x, y, z] as [number, number, number]), [structure])
   // Keyed on the region's numbers: a parent passes a new array each render and a new colour
@@ -141,6 +179,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
           colors={colors}
           markers={markers}
           highlight={highlight}
+          focus={focus}
           hovered={hover?.index ?? null}
           onHover={(i, x, y) => setHover(i === null ? null : { lines: describe(i), x, y, index: i })}
           onPick={(i) => onPickBead?.(beadAt(structure.beads, structure.chain[i][3]))}
@@ -164,7 +203,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
         </ul>
       </div>
       <p className="view-caption">
-        Structure {index} of {total}, about one bead per kb. Drag to rotate and scroll to zoom. Hover over a bead to see its position. Click two beads to measure the distance between them.
+        Structure {index} of {total}, about one bead per kb. Drag to rotate and scroll to zoom. Hover over a bead to see its position. The chain near the pointer, or between two selected beads, keeps its colour and the rest fades. Click two beads to measure the distance between them.
       </p>
     </div>
   )

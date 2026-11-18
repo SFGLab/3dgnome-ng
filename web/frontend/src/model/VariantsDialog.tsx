@@ -271,6 +271,7 @@ export function VariantsDialog(props: {
               <Track cell={cell} region={region} factors={factors} own={own} rows={check.data.variants} />
               {check.data.variants.length > 0 && (
                 <>
+                  <Pager page={variantPage} noun="variants" />
                   <div className="sv-table-wrap">
                     <table className="sv-table">
                       <thead>
@@ -298,7 +299,6 @@ export function VariantsDialog(props: {
                       </tbody>
                     </table>
                   </div>
-                  <Pager page={variantPage} noun="variants" />
                 </>
               )}
             </>

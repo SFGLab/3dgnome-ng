@@ -13,6 +13,7 @@ export function LoopsTab({ api }: { api: JobApi }) {
   if (!loops.data) return <div aria-busy="true" />
   return (
     <>
+      <Pager page={page} noun="loops" />
       <table className="genes-table loops-table">
         <thead>
           <tr>
@@ -37,7 +38,6 @@ export function LoopsTab({ api }: { api: JobApi }) {
           ))}
         </tbody>
       </table>
-      <Pager page={page} noun="loops" />
     </>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bondRadius, fogRange, pickOnChain, stretch } from './chain'
+import { bondRadius, focusMask, fogRange, pickOnChain, stretch } from './chain'
 
 describe('chain geometry', () => {
   it('makes the tube a fixed share of the median bond', () => {
@@ -17,8 +17,14 @@ describe('chain geometry', () => {
     expect(stretch(98, 100)).toEqual([92, 99])
   })
 
-  it('fogs from the middle of the structure to its far side', () => {
-    expect(fogRange(10, 24)).toEqual([24, 34])
+  it('fogs from the middle of the structure and leaves its far side readable', () => {
+    expect(fogRange(10, 24)).toEqual([24, 49])
+  })
+
+  it('masks the points inside the focus ranges, either order, cut at the ends', () => {
+    expect(focusMask(8, [])).toBeNull()
+    expect([...focusMask(8, [[5, 2]])!]).toEqual([0, 0, 1, 1, 1, 1, 0, 0])
+    expect([...focusMask(6, [[-3, 1], [4, 99]])!]).toEqual([1, 1, 0, 0, 1, 1])
   })
 })
 
