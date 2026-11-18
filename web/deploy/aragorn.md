@@ -83,7 +83,7 @@ are read with `dpkg-query` or `apk list` and scored by the CVSS 3 base score of 
 The Python packages of both interpreters come from `pip freeze`. The frontend is checked with
 `npm audit --omit=dev`. No scanner runs on the host.
 
-On 2026-11-18 the image at `5891e3b` has one record at 9.0 or over, CVE-2019-1010022 in glibc,
+On 2026-11-18 the image at `5891e3b`, and the one at `2ee8c6b` built from it, has one record at 9.0 or over, CVE-2019-1010022 in glibc,
 which its authors dispute and which every Debian image carries. Both Python environments are
 clear but for one record of moderate severity on biopython 1.81, which HiCDiffusion's
 requirements pin and which has no fixed release. The shipped frontend is clear. The image holds
