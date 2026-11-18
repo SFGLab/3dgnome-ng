@@ -28,12 +28,14 @@ RUN apt-get update \
 
 WORKDIR /app
 ARG GPU=0
-RUN pip install --no-cache-dir numpy==2.4.4 numba==0.65.1 scipy==1.17.1 threadpoolctl==3.6.0 \
+RUN pip install --no-cache-dir pip==26.3 \
+ && pip install --no-cache-dir numpy==2.4.4 numba==0.65.1 scipy==1.17.1 threadpoolctl==3.6.0 \
  && if [ "$GPU" = "1" ]; then pip install --no-cache-dir "jax[cuda12]==0.10.1"; else pip install --no-cache-dir jax==0.10.1; fi
 
 # HiCDiffusion at a fixed commit with its own interpreter, Python 3.11 and the packages its
-# requirements pin, which clash with the engine's. lightning 2.3 imports pkg_resources, which a
-# new environment lacks, so setuptools is installed at the version the model was run with.
+# requirements pin, which clash with the engine's. Five of those pins carry published
+# advisories and are raised by an override file. On the raised set the model predicts the map it
+# predicts on its own pins, within 3e-4 of a largest value of 4.5.
 # HICDIFFUSION=0 leaves the step out of the image, and the site then does not offer it.
 ARG HICDIFFUSION=1
 ARG HICDIFFUSION_COMMIT=f892fb4df826158f0d398fbccc62832d7534f6db
@@ -46,7 +48,9 @@ RUN if [ "$HICDIFFUSION" = "1" ]; then \
    && git clone -q https://github.com/SFGLab/HiCDiffusion /opt/hicdiffusion \
    && git -C /opt/hicdiffusion checkout -q "$HICDIFFUSION_COMMIT" \
    && uv venv -q --python 3.11 /opt/hicdiffusion-venv \
-   && uv pip install -q --no-cache --python /opt/hicdiffusion-venv/bin/python -r /opt/hicdiffusion/requirements.txt setuptools==69.5.1 ; \
+   && printf '%s\n' torch==2.15.0 torchvision==0.29.2 lightning==2.6.6 fsspec==2026.9.0 tqdm==4.66.3 > /opt/hicdiffusion-raised.txt \
+   && uv pip install -q --no-cache --python /opt/hicdiffusion-venv/bin/python -r /opt/hicdiffusion/requirements.txt \
+        --override /opt/hicdiffusion-raised.txt ; \
     fi
 
 COPY pyproject.toml README.md SETTINGS.md ./

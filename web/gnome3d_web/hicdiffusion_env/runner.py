@@ -27,6 +27,8 @@ def main() -> None:
     sys.path.insert(0, os.getcwd())
     # The model builds its training metrics on load, and each warns about its memory.
     warnings.filterwarnings("ignore", category=UserWarning, module="torchmetrics")
+    # The diffusion package decorates with a torch call that newer torch names differently.
+    warnings.filterwarnings("ignore", category=FutureWarning, module="denoising_diffusion_pytorch")
     from hicdiffusion_model import HiCDiffusion
 
     src, dst, model_ckpt, ed_ckpt = sys.argv[1:5]
