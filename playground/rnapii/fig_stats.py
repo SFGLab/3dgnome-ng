@@ -27,7 +27,11 @@ def stars(p: float) -> str:
 
 def mark(p: float) -> str:
     """The star mark with the p value written out, as it stands in a figure."""
-    return f"{stars(p)}, p < 0.001" if p < 0.001 else f"{stars(p)}, p = {p:.3f}" if p < 0.1 else f"{stars(p)}, p = {p:.2f}"
+    if p < 0.001:
+        return f"{stars(p)}, p < 0.001"
+    if p > 0.99:
+        return f"{stars(p)}, p > 0.99"
+    return f"{stars(p)}, p = {p:.3f}" if p < 0.1 else f"{stars(p)}, p = {p:.2f}"
 
 
 def paired(a: np.ndarray, b: np.ndarray) -> tuple[float, int]:
