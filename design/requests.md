@@ -8,7 +8,7 @@ State words: done, open, waiting, held. A waiting item states the person or the 
 ## Website, 3D-GNOME NG on team-aragorn
 
 The site is at `https://3dgnome.mini.pw.edu.pl/new/` and outside access works since 2026-11-18. It runs
-the image at `e8417b6`. Record: `web/deploy/aragorn.md`.
+the image at `72c821d`. Record: `web/deploy/aragorn.md`.
 
 | Request | State | Notes |
 |---|---|---|
@@ -21,7 +21,8 @@ the image at `e8417b6`. Record: `web/deploy/aragorn.md`.
 | 1000 Genomes call set, 3,202 samples | done | `data/svs/1KGP.vcf.gz`, typed sample field |
 | Duplications applied | done | In the vendored `personal3d`, not yet in triosformer |
 | Three faults of the model page's look, nicer variants button | done | |
-| TBOOO on the Cite page | open | Commit `a01b0ed`. Not in the running image. It goes out with the next build. |
+| TBOOO on the Cite page | done | Commit `a01b0ed`, live since `72c821d` |
+| Loading state of the contact map | done | Commit `72c821d`. A card with a spinner inside the map frame. |
 | Sample table for the picker: population, sex, trios | open | `design/tbooo-data.md`, step 1. Agreed 2026-11-18. |
 | Small variants in CTCF motifs | open | `design/tbooo-data.md`, step 2. Needs the 2022 panel on aragorn. |
 | Measured expression beside a structure | open | `design/tbooo-data.md`, step 3. MAGE first, then GEUVADIS. |
