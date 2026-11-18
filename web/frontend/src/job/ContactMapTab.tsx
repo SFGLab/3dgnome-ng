@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Contacts, JobApi, Summary } from './api'
@@ -97,6 +97,8 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     queryKey: ['contacts', api.base, region, res, upperKind, lowerKind, norm],
     queryFn: () => api.contacts({ region, res, upper: upperKind, lower: lowerKind, norm }),
     retry: false,
+    // The map on screen stays, dimmed, while the next view is read.
+    placeholderData: keepPreviousData,
   })
   const annotations = useQuery({ queryKey: ['annotations', api.base], queryFn: api.annotations })
   const upper = maps.data ? transform(maps.data.upper, show) : []
@@ -249,13 +251,17 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           </p>
         )}
         {note && <p className="map-note">{note}</p>}
-        {maps.isFetching && (
-          <p className="map-note" role="status">
-            {`Reading the map at ${res / 1000} kb.`}
-            {upperKind === 'hic' || lowerKind === 'hic' ? ' The first view of a resolution reads the deep Hi-C map, about ten seconds.' : ''}
-          </p>
-        )}
         {maps.isError && <p className="field-error">{maps.error.message}</p>}
+        <div className={`contact-frame${maps.data ? '' : ' empty'}${maps.isFetching ? ' loading' : ''}`}>
+          {maps.isFetching && (
+            <div className="map-loading" role="status">
+              <div className="map-loading-card">
+                <span className="map-spinner" aria-hidden />
+                <strong>{`Reading the map at ${res / 1000} kb.`}</strong>
+                {(upperKind === 'hic' || lowerKind === 'hic') && <span>The first view of a resolution reads the deep Hi-C map, about ten seconds.</span>}
+              </div>
+            </div>
+          )}
         <canvas
           ref={canvas}
           className="contact-canvas"
@@ -276,7 +282,10 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             zoom(1, maps.data.bins[Math.max(0, Math.min(j, maps.data.bins.length - 1))])
           }}
         />
-        <p className="hover-bar mono">{hover ?? ' '}</p>
+        </div>
+        {maps.data && (
+          <p className={`hover-bar mono${hover ? '' : ' idle'}`}>{hover ?? 'Move over the map to read a pair of positions. Double click to zoom in.'}</p>
+        )}
       </div>
       <div className="side-cards">
         <section className="side-card" aria-label="Colour range">
