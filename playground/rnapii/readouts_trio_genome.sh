@@ -3,6 +3,11 @@
 # array task per person and chromosome, CPU only.
 #
 #   sbatch -A sfglab --array=0-197%24 playground/rnapii/readouts_trio_genome.sh
+#   ROOT=~/trio_lr REPO=~/trio_lr/repo PY=~/3dgnome-ng/.venv/bin/python bash readouts_trio_genome.sh 7
+#
+# Under Slurm the task is the array index. On a workstation it is the first argument, ROOT
+# holds out/ and data/, REPO the code and PY the interpreter. A task whose two outputs are there
+# does nothing, so a list of tasks can be run again.
 #
 # Task k is person k mod 9 on chromosome k div 9 plus one, so the first nine tasks are chr1 of
 # everyone and tasks 189 to 197 are chr22. The arms are out/lr_trio_ctcf and
@@ -25,17 +30,20 @@
 
 set -euo pipefail
 ROOT="${ROOT:-$SLURM_SUBMIT_DIR}"
+REPO="${REPO:-$ROOT}"
 cd "$ROOT"
-source .venv/bin/activate
-export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+if [ -z "${PY:-}" ]; then source .venv/bin/activate; PY=python; fi
+export PYTHONPATH="$REPO${PYTHONPATH:+:$PYTHONPATH}"
 
 PEOPLE=(HG00512 HG00513 HG00514 HG00731 HG00732 HG00733 GM19238 GM19239 GM19240)
-K="${SLURM_ARRAY_TASK_ID:-0}"
+K="${SLURM_ARRAY_TASK_ID:-${1:-0}}"
 S="${PEOPLE[$((K % 9))]}"
 CHR="chr$((K / 9 + 1))"
 OUT="$ROOT/out/readouts/trio_lr"
 LINKS="$ROOT/out/xc/trio_lr"
 mkdir -p "$OUT" "$LINKS"
+
+if [ -s "$OUT/${S}_${CHR}_pooled.txt" ] && [ -s "$OUT/${S}_${CHR}_pileup.npz" ]; then echo "[$S $CHR] already read"; exit 0; fi
 
 ARMS=()
 for pair in "C:out/lr_trio_ctcf" "R:out/lr_trio_rnapol2"; do
@@ -48,10 +56,10 @@ done
 echo "[$S $CHR] arms: ${ARMS[*]##*/}"
 M="data/_hic/$S/$S.mcool"
 date +"%H:%M:%S pooled score"
-python playground/ensemble_score.py "$M" "$CHR" "${ARMS[@]}" 2>&1 | grep -vE "INFO|WARN" > "$OUT/${S}_${CHR}_pooled.txt.part"
+"$PY" "$REPO/playground/ensemble_score.py" "$M" "$CHR" "${ARMS[@]}" 2>&1 | grep -vE "INFO|WARN" > "$OUT/${S}_${CHR}_pooled.txt.part"
 mv "$OUT/${S}_${CHR}_pooled.txt.part" "$OUT/${S}_${CHR}_pooled.txt"
 cat "$OUT/${S}_${CHR}_pooled.txt"
 date +"%H:%M:%S pile-up"
-python playground/rnapii/pileup.py --json "$OUT/${S}_${CHR}_pileup.json" "$M" "$CHR" 10000 \
+"$PY" "$REPO/playground/rnapii/pileup.py" --json "$OUT/${S}_${CHR}_pileup.json" "$M" "$CHR" 10000 \
   "data/$S/${S}_rnapol2_clusters_3+.bedpe" "${ARMS[@]}" 2>&1 | grep -vE "INFO|WARN"
 date +"%H:%M:%S done"
