@@ -8,7 +8,7 @@ State words: done, open, waiting, held. A waiting item states the person or the 
 ## Website, 3D-GNOME NG on team-aragorn
 
 The site is at `https://3dgnome.mini.pw.edu.pl/new/` and outside access works since 2026-11-18. It runs
-the image at `0fb2ee2`. Record: `web/deploy/aragorn.md`.
+the image at `dfc6e74`. Record: `web/deploy/aragorn.md`.
 
 | Request | State | Notes |
 |---|---|---|
@@ -38,7 +38,7 @@ the image at `0fb2ee2`. Record: `web/deploy/aragorn.md`.
 | Light theme by default, compare rows that select a gene, every structure file listed, no header tagline | done | Commits `18eafd6` and `299a34f`, live. |
 | Crash of the job page on any structure button | done | Shipped in `299a34f`, fixed in `575dad6`. An effect returned the promise recent Chrome gives from scrollIntoView. A test covers it. |
 | See through part without speckle, clearing of a compare selection | done | Commit `575dad6`, live. |
-| Own data dialog: readable rules, one choice height, three text styles | done | Commit `0fb2ee2`, live. |
+| Own data dialog: readable rules, one choice height, three text styles, one vertical gap | done | Commits `0fb2ee2` and `dfc6e74`, live. |
 | Gene picker in the region field | done | Commit `cc7cb74`, live. Typed letters list up to eight matching genes with their positions. A click or the arrow keys and Enter take one. |
 | No comma before "and" | done | The maintainer's rule of 2026-11-18, in `design/writing-rules.md`. Commit `0fc99d9`, live. Gone from the text under `web`, and the page tests refuse it. The other documents of the repository are not swept. |
 | A restart of the site stranded a running job | done | Commits `ce6425b` and `2e30505`, live. The site queues again every job a restart left running or waiting, and job files are written whole. Before a deployment the host is still checked for a running engine. |
