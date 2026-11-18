@@ -870,13 +870,17 @@
   visibility: hidden;
 }
 
+/* A band of light crosses the frame. The band is a layer of the frame's own size that moves
+   from wholly left of it to wholly right, so nothing of it is in view at either end of a pass
+   and the repeat has no jump. The frame clips it. */
 .contact-frame.empty.loading::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(110deg, transparent 35%, color-mix(in srgb, var(--ink) 7%, transparent) 50%, transparent 65%);
-  background-size: 220% 100%;
+  background: linear-gradient(110deg, transparent 30%, color-mix(in srgb, var(--ink) 7%, transparent) 50%, transparent 70%);
+  transform: translateX(-100%);
   animation: map-sheen 1.8s linear infinite;
+  pointer-events: none;
 }
 
 /* A map already shown stays under the message, dimmed, while the next one is read. */
@@ -941,11 +945,11 @@
 
 @keyframes map-sheen {
   from {
-    background-position: 110% 0;
+    transform: translateX(-100%);
   }
 
   to {
-    background-position: -110% 0;
+    transform: translateX(100%);
   }
 }
 
