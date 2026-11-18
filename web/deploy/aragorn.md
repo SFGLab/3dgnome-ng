@@ -66,20 +66,42 @@ location /new/ {
 
 ## Versions and advisories
 
-The faculty asks each hosted site for its stack with exact versions. The image's packages are
-checked against osv.dev by name and version, both interpreters, and the frontend with
-`npm audit --omit=dev`. On 2026-11-18 the image at `4a106e9` has no advisory in either Python
-environment but one of moderate severity on biopython 1.81, which HiCDiffusion's requirements
-pin and which has no fixed release, and none in the shipped frontend. `site.env.<tag>` beside
-`site.env` keeps the variables of each deployed tag.
+The faculty asks each hosted site for its container stack with exact versions. An image is
+checked against osv.dev by name and version at three levels. The operating system's packages
+are read with `dpkg-query` or `apk list` and scored by the CVSS 3 base score of each record.
+The Python packages of both interpreters come from `pip freeze`. The frontend is checked with
+`npm audit --omit=dev`. No scanner runs on the host.
+
+On 2026-11-18 the image at `5891e3b` has one record at 9.0 or over, CVE-2019-1010022 in glibc,
+which its authors dispute and which every Debian image carries. Both Python environments are
+clear but for one record of moderate severity on biopython 1.81, which HiCDiffusion's
+requirements pin and which has no fixed release. The shipped frontend is clear. The image holds
+no compiler, and its libcurl 8.23.0 and htslib 1.25 are built from their releases in the build
+stage. `site.env.<tag>` beside `site.env` keeps the variables of each deployed tag.
 
 ## The other sites on the host
 
 team-aragorn serves six more names from other people's containers, each behind the host nginx
-at an address its compose file fixes. `hosted/spring-model/` holds a rebuild of spring-model on
-a current base, tried on 2026-11-18 beside the running site: `Dockerfile.bump` and
-`requirements.bump.txt` build `sm_webservice-django:2026-11-18` from a copy of the source,
-`compose.stage.yml` runs the trial copy on the loopback at port 8772 with an empty database,
-and `compose.bump.yml` is the overlay that moves the running site onto the new images. The
-trial copy applied its migrations and finished two modelling tasks. The copy of the source and
-the build log are in `/mnt/raid/3dgnome-new/stage/spring-model/`.
+at an address its compose file fixes. `hosted/` holds what was built for them on 2026-11-18,
+and `/mnt/raid/hosted-sites/` on the host holds the same files with a copy of each site's
+source, the build logs and the package lists. Each site runs through its own compose file with
+`compose.bump.yml` laid over it, and the step back is the same command without the overlay.
+The commands name both files by their full path, since the sites' directories are closed to
+other users and a failed `cd` leaves the shell in the last site's directory.
+
+```bash
+sudo docker compose -f <the site's compose file> -f /mnt/raid/hosted-sites/<site>/compose.bump.yml up -d --no-build
+```
+
+| Site | Compose file | What the overlay runs |
+|---|---|---|
+| spring-model | `/home/mkadlof/sm_webservice/compose.yaml` | a rebuild on python:3.12-slim with Django 5.2.19 and OpenMM 8.6.1, nginx 1.30.6, Redis 7.2.17, PostgreSQL 16.16 |
+| lab page | `/var/www/labwebpage/compose.yaml` | nginx 1.30.6, and the Python environment on python:3.11-alpine with each package at the patch release of its own series, Django 4.2.30 |
+| Bertrand | `/home/vyatsenko/bertrand-interface/docker-compose.yml` | the documentation on nginx 1.30.6, and the server compiled again with Go 1.27.4 on Alpine 3.24, PocketBase kept at 0.18.2 |
+
+spring-model's database took three migrations of django_celery_results at the switch, which
+the old code ignores. The lab page stays on Django 4.2, which left support in April 2026, and
+its move to 5.2 needs new major releases of its admin plugins. The old 3D-GNOME site in
+`/home/gnome/3dgnome_webserver` runs Flask 1.1 on Python 3.8 and Ubuntu 20.04 and cannot be
+cleared in place. Image backups of 2026-11-18 and the dumps taken before each switch are in
+`/mnt/raid/aragorn-backup-2026-11-18/`.

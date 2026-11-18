@@ -3,4 +3,4 @@
 # The step back is the same command without this file.
 services:
   bertrand-docs: { image: "bertrand-docs:2026-11-18" }
-  bertrand-server: { image: "bertrand-server:2026-11-18" }
+  bertrand-server: { image: "bertrand-server:2026-11-18.2" }

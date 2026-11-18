@@ -1,0 +1,24 @@
+# Bertrand's server compiled again from its source with a current Go, PocketBase kept at
+# 0.18.2 so the data needs no migration. The Docker client library and three libraries of the
+# standard toolchain's neighbourhood are raised to releases that clear their advisories. The
+# frontend is the one the running image already holds, so Node is not needed.
+# Build from the directory that holds src/, the copy of the site's repository:
+#   docker build -f Dockerfile.rebuild -t bertrand-server:2026-11-18.2 .
+FROM golang:1.27.4-alpine AS backend
+WORKDIR /app/backend
+COPY src/app/pocketbase .
+RUN go get github.com/docker/docker@v25.0.13+incompatible github.com/docker/cli@v25.0.7+incompatible \
+      github.com/golang-jwt/jwt/v4@v4.5.2 \
+      golang.org/x/crypto@v0.59.0 golang.org/x/net@v0.63.0 \
+ && go mod tidy \
+ && go build -o server \
+ && go version -m server > /buildinfo.txt
+
+FROM bertrand-server:latest AS old
+FROM alpine:3.24
+WORKDIR /app
+COPY --from=backend /app/backend/server ./server
+COPY --from=backend /buildinfo.txt /app/buildinfo.txt
+COPY --from=old /app/pb_public ./pb_public
+EXPOSE 80
+CMD ["./server", "serve", "--http", "0.0.0.0:80"]
