@@ -8,7 +8,7 @@ State words: done, open, waiting, held. A waiting item states the person or the 
 ## Website, 3D-GNOME NG on team-aragorn
 
 The site is at `https://3dgnome.mini.pw.edu.pl/new/` and outside access works since 2026-11-18. It runs
-the image at `4f8247e`. Record: `web/deploy/aragorn.md`.
+the image at `89412be`. Record: `web/deploy/aragorn.md`.
 
 | Request | State | Notes |
 |---|---|---|
@@ -64,7 +64,7 @@ the image at `4f8247e`. Record: `web/deploy/aragorn.md`.
 | Front page line on the old server's 1000 Genomes structures | open | True of the old site, and no longer a difference between the two |
 | Duplication patch in triosformer | open | `web/vendor/VENDORED.md` lists the changes |
 | New site at `/`, old site at `/old` | open | The front page already links to `/old`. The old site has not been served under a prefix. |
-| Trio card on the Results page and figure 2g | done | Whole genome, 2026-11-18. Both arms are 198 of 198 blocks on eden, `out/lr_trio_ctcf` and `out/lr_trio_rnapol2`, after the six blocks that failed on a filesystem fault and on dgx-1's `CUDA_ERROR_LAUNCH_FAILED` were sent again. The structures, maps and loop files, 42 GB, were pulled to `~/trio_lr` on team-frodo and read there, 198 tasks of person by chromosome, `playground/rnapii/readouts_trio_genome.sh` and `trio_genome_summary.py`. Against each person's own Hi-C on chromosomes 1 to 22, with RNAPII loops: pile-up at RNAPII loops relative to the map's higher in 9 of 9, +44 to +67 percent, median +53. Stratum adjusted correlation of the summed map higher in 5 of 9, -4.3 to +6.8 percent, median +0.1. The chr1:1-60 Mb card had 2 of 9 and a median of -2 percent, on the earlier arms and the per structure score. Readouts and the redrawn figures are in `design/figures/rnapii-2026-11-18/`. The trio expression statistics are not redone on the whole genome. |
+| Trio card on the Results page and figure 2g | done | Commit `89412be`, live. Whole genome, 2026-11-18. Both arms are 198 of 198 blocks on eden, `out/lr_trio_ctcf` and `out/lr_trio_rnapol2`, after the six blocks that failed on a filesystem fault and on dgx-1's `CUDA_ERROR_LAUNCH_FAILED` were sent again. The structures, maps and loop files, 42 GB, were pulled to `~/trio_lr` on team-frodo and read there, 198 tasks of person by chromosome, `playground/rnapii/readouts_trio_genome.sh` and `trio_genome_summary.py`. Against each person's own Hi-C on chromosomes 1 to 22, with RNAPII loops: pile-up at RNAPII loops relative to the map's higher in 9 of 9, +44 to +67 percent, median +53. Stratum adjusted correlation of the summed map higher in 5 of 9, -4.3 to +6.8 percent, median +0.1. The chr1:1-60 Mb card had 2 of 9 and a median of -2 percent, on the earlier arms and the per structure score. Readouts and the redrawn figures are in `design/figures/rnapii-2026-11-18/`. The trio expression statistics are not redone on the whole genome. |
 
 ## Other sites on team-aragorn
 
