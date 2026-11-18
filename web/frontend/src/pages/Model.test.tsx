@@ -63,7 +63,7 @@ describe('Model a region page', () => {
   it('fills the form from an example', async () => {
     renderModel()
     fireEvent.click(await screen.findByRole('button', { name: /MYC/ }))
-    expect(screen.getByLabelText('Region, chr:start-end or a gene name')).toHaveValue('chr8:127,500,000-129,000,000')
+    expect(screen.getByLabelText('Region, chr:start-end or a gene name')).toHaveValue('chr8:127,000,000-128,500,000')
     expect(screen.getByRole('radio', { name: /GM12878/ })).toBeChecked()
   })
 
