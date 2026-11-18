@@ -153,10 +153,10 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
               <ul className="files" aria-label="Structure files">
                 {summary.models.map((f, i) => (
                   <li key={f.name} className={i === selected - 1 ? 'file selected' : 'file'} ref={i === selected - 1 ? shown : undefined}>
-                    <a href={api.fileUrl(f.name)}>
+                    {/* The sizes of the structures are alike. The size is in the tooltip and the name has the row. */}
+                    <a href={api.fileUrl(f.name)} title={`${f.name}, ${size(f.size)}`}>
                       <FileText size={14} aria-hidden /> {f.name}
                     </a>
-                    <span className="size">{size(f.size)}</span>
                   </li>
                 ))}
               </ul>

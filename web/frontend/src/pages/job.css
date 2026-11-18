@@ -173,7 +173,11 @@
 .files .models > ul {
   max-height: 190px;
   overflow-y: auto;
-  padding-left: 14px;
+}
+
+/* A long file name is cut, not its icon. */
+.files a svg {
+  flex: none;
 }
 
 .files .size {
