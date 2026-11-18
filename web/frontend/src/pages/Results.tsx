@@ -148,20 +148,20 @@ export function Results() {
           <figure id="trios" className="bar-chart" aria-label="Nine people, three trios">
             <figcaption>
               <span className="chart-title">Nine people, three trios</span>
-              <span className="chart-sub">The change in the model of each person when RNAPII loops are added, measured against the Hi-C map of that person.</span>
+              <span className="chart-sub">The change in the model of each person when RNAPII loops are added, measured against the Hi-C map of that person on chromosomes 1 to 22.</span>
             </figcaption>
             <div className="stat">
               <span className="stat-value">9 of 9</span>
-              <span className="stat-label">people with more contact enrichment at RNAPII loops. The rise is 39 to 98% and the median is 57%.</span>
+              <span className="stat-label">people with more contact enrichment at RNAPII loops. The rise is 44 to 67% and the median is 53%.</span>
             </div>
             <div className="stat">
-              <span className="stat-value">2 of 9</span>
-              <span className="stat-label">people with a higher correlation with the whole Hi-C map. The change is -17 to +29% and the median is -2%.</span>
+              <span className="stat-value">5 of 9</span>
+              <span className="stat-label">people with a higher correlation with the whole Hi-C map. The change is -4 to +7% and the median is 0%.</span>
             </div>
           </figure>
         </div>
         <p className="reading-note">
-          With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower.
+          With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower for the three cell lines and unchanged for the nine people.
         </p>
         <section id="microc">
           <h2>Micro-C loops</h2>

@@ -402,9 +402,10 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
     _agreement_row(rows[1], ag, "C", "R")
 
     bottom = rows[2].subfigures(1, 2, width_ratios=[0.85, 1.15], wspace=0.03)
+    scope = ", chromosomes 1 to 22" if ((trio_dir or readouts / "trio") / "trio_genome.json").is_file() else ""
     _row_title(
         bottom[0], "g",
-        "Nine trio individuals, change from adding RNAPII loops, each against the individual's own Hi-C", 40,
+        f"Nine trio individuals, change from adding RNAPII loops, each against the individual's own Hi-C{scope}", 40,
     )
     ax = bottom[0].subplots()
     rows_g = (

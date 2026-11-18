@@ -80,8 +80,12 @@ describe('Results page', () => {
 
   it('shows the trio counts', () => {
     renderResults()
+    // The whole genome readouts of design/figures/rnapii-2026-11-18/readouts/trio_lr/trio_genome.json.
     expect(screen.getByText('9 of 9')).toBeInTheDocument()
-    expect(screen.getByText('2 of 9')).toBeInTheDocument()
+    expect(screen.getByText('5 of 9')).toBeInTheDocument()
+    expect(screen.getByText(/The rise is 44 to 67% and the median is 53%/)).toBeInTheDocument()
+    expect(screen.getByText(/The change is -4 to \+7% and the median is 0%/)).toBeInTheDocument()
+    expect(screen.getByText(/on chromosomes 1 to 22/)).toBeInTheDocument()
   })
 
   it('has a key for the three kinds of model', () => {

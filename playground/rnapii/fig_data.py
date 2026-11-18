@@ -94,9 +94,18 @@ def trio_paired(trio_dir: Path) -> pd.DataFrame:
     """Per person readouts against the person's own Hi-C.
 
     Returns columns person, arm, measure and value. `loop_pileup` is the model's pile-up at
-    RNAPII loops over the map's, `hic` the stratum adjusted correlation.
+    RNAPII loops over the map's, `hic` the stratum adjusted correlation. A directory holding
+    `trio_genome.json` of `trio_genome_summary.py` is read from that file, the chromosomes
+    already added up. Any other is read per person from the files of `readouts_trio.sh`.
     """
     rows = []
+    genome = trio_dir / "trio_genome.json"
+    if genome.is_file():
+        for r in json.loads(genome.read_text())["people"]:
+            for arm in ("C", "R"):
+                rows.append({"person": r["person"], "arm": arm, "measure": "loop_pileup", "value": float(r[f"pileup_{arm}"])})
+                rows.append({"person": r["person"], "arm": arm, "measure": "hic", "value": float(r[f"scc_{arm}"])})
+        return pd.DataFrame(rows, columns=["person", "arm", "measure", "value"])
     for path in sorted(trio_dir.glob("*_pileup.json")):
         rec = json.loads(path.read_text())
         ref = [float(r["apa"]) for r in rec if r["arm"] == "map"]
