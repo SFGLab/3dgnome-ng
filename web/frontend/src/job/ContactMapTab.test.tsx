@@ -53,7 +53,7 @@ describe('ContactMapTab', () => {
     expect(within(card).getByText('SCC 0.37, the same comparison on the values and not their ranks.')).toHaveAttribute('title', expect.stringContaining('within the median bond'))
     expect(within(card).getByText('0.21').parentElement).toHaveAttribute('title', expect.stringContaining('ranked on its own'))
     expect(card.textContent!.length).toBeLessThan(260)
-    expect(document.querySelector('.map-labels')?.textContent).toBe('This job, 1/(d+1)³ between bins, mean of 100 structuresHi-C of GM12878')
+    expect(document.querySelector('.map-labels')).toBeNull()
   })
 
   it('keeps zooming out inside the job region', async () => {
@@ -69,6 +69,26 @@ describe('ContactMapTab', () => {
       expect(a).toBeGreaterThanOrEqual(11_500_000)
       expect(b).toBeLessThanOrEqual(11_575_000)
     }
+  })
+
+  it('marks the part of the map a zoom in will show and no part on a zoom out', async () => {
+    const wide = { ...MAP, bins: [10_000_000, 15_000_000] }
+    mockApi([[/contacts$/, () => [200, wide]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <ContactMapTab api={jobApi('jobs', KEY)} summary={{ ...SUMMARY_DONE, region: 'chr1:10000000-20000000' }} />
+      </QueryClientProvider>,
+    )
+    await screen.findByRole('region', { name: 'Agreement of the two halves' })
+    expect(document.querySelector('.zoom-box')).toBeNull()
+    const canvas = document.querySelector('canvas')!
+    fireEvent.wheel(canvas, { deltaY: -100 })
+    const box = document.querySelector<HTMLElement>('.zoom-box')!
+    expect([box.style.left, box.style.top, box.style.width, box.style.height].map(parseFloat).map(Math.round)).toEqual([10, 10, 80, 80])
+    fireEvent.wheel(canvas, { deltaY: 100 })
+    fireEvent.wheel(canvas, { deltaY: 100 })
+    expect(document.querySelector('.zoom-box')).toBeNull()
   })
 
   it('asks once for a burst of wheel steps', async () => {

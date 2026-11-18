@@ -130,6 +130,12 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     if (canvas.current && maps.data)
       draw(canvas.current, { m: upper, range: shownRange, loops: upperKind.startsWith('loops_') }, { m: lower, range: lowRange, loops: lowerKind.startsWith('loops_') }, log, show)
   })
+  // The window asked for as a part of the map on screen, its start and its width, while the map
+  // on screen is still the wider one. It is the square the next map will fill.
+  const bins = maps.data?.bins ?? []
+  const shown = bins.length > 1 ? { start: bins[0], width: bins.length * (bins[1] - bins[0]) } : null
+  const part = shown ? [(locus.start - shown.start) / shown.width, (locus.end - locus.start) / shown.width] : null
+  const target = part && part[1] < 0.97 && part[0] > -0.02 && part[0] + part[1] < 1.02 ? [Math.max(0, part[0]), Math.min(part[1], 1 - Math.max(0, part[0]))] : null
   const moveTo = (want: Locus) => {
     const next = clamp(want, job, res)
     const r = fitting(next, res)
@@ -246,12 +252,6 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             return <path key={i} className={`arc ${l.factor.toLowerCase()}`} d={`M ${a} 34 A ${(b - a) / 2} 30 0 0 1 ${b} 34`} />
           })}
         </svg>
-        {maps.data && (
-          <p className="map-labels">
-            <span>{maps.data.lower_label}</span>
-            <span>{maps.data.upper_label}</span>
-          </p>
-        )}
         {note && <p className="map-note">{note}</p>}
         {maps.isError && <p className="field-error">{maps.error.message}</p>}
         <div className={`contact-frame${maps.data ? '' : ' empty'}${maps.isFetching ? ' loading' : ''}`}>
@@ -263,6 +263,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
               </div>
             </div>
           )}
+          {target && <div className="zoom-box" aria-hidden style={{ left: `${target[0] * 100}%`, top: `${target[0] * 100}%`, width: `${target[1] * 100}%`, height: `${target[1] * 100}%` }} />}
         <canvas
           ref={canvas}
           className="contact-canvas"

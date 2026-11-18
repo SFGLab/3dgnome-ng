@@ -8,7 +8,7 @@ State words: done, open, waiting, held. A waiting item states the person or the 
 ## Website, 3D-GNOME NG on team-aragorn
 
 The site is at `https://3dgnome.mini.pw.edu.pl/new/` and outside access works since 2026-11-18. It runs
-the image at `65f688a`. Record: `web/deploy/aragorn.md`.
+the image at `a736297`. Record: `web/deploy/aragorn.md`.
 
 | Request | State | Notes |
 |---|---|---|
@@ -43,9 +43,10 @@ the image at `65f688a`. Record: `web/deploy/aragorn.md`.
 | Gene name sent to the form on choice, plain background choices, the job name label | done | Commit `380e6d0`, live. |
 | Running job: the log over the whole screen under a header with the bar | done | Commit `5e79213`, live. The log holds the last 200 lines and follows its end. |
 | Front page previews that tell the examples apart, A, B and the distance in the hero | done | Commit `65f688a`, live. Drawn from the jobs by `web/scripts/make_previews.py`. With RNAPII loops 6.0 +- 1.6 bead units over 10 structures, with CTCF loops alone 9.9 +- 2.9. |
-| Front page: the first picture back with A, B and the distance, one card for TNFRSF8 with and without its RNAPII loop, no line on private jobs | done | The rendered picture is the hero again with its marks drawn over it. The two TNFRSF8 cards are one card of two drawings on one scale, A at one place in both. The chain is smooth, nearer strands cross over farther ones, the stretch between A and B is darker, and the view is the turn about the line from A to B that leaves the fewest beads in front of the two. |
-| Agreement card of the contact map in two short lines | done | The number is a Spearman correlation among pairs of bins the same distance apart. The full account of each number is its tooltip. The value itself is the model's and is not changed. |
-| Compartment tracks for the hosted cell types | done | `web/scripts/make_compartments.py`, `web/deploy/aragorn.md`. A and B at 100 kb from each deep map, per arm, the gene rich side A. The term stays off by default and a request can turn it on. The setting's text no longer says what the site lacks. |
+| Front page: the first picture back with A, B and the distance, one card for TNFRSF8 with and without its RNAPII loop, no line on private jobs | done | Commit `a736297`, live. The rendered picture is the hero again with its marks drawn over it. The two TNFRSF8 cards are one card of two drawings on one scale, A at one place in both. The chain is smooth, nearer strands cross over farther ones, the stretch between A and B is darker, and the view is the turn about the line from A to B that leaves the fewest beads in front of the two. |
+| Agreement card of the contact map in two short lines | done | Commit `a736297`, live. The number is a Spearman correlation among pairs of bins the same distance apart. The full account of each number is its tooltip. The value itself is the model's and is not changed. |
+| Compartment tracks for the hosted cell types | done | Commit `a736297`, live. `web/scripts/make_compartments.py`, `web/deploy/aragorn.md`. A and B at 100 kb from each deep map, per arm, the gene rich side A. The term stays off by default and a request can turn it on. The setting's text no longer says what the site lacks. |
+| Contact map: no line of the two halves over the map, a box for the part a zoom in will show | done | The halves are in the two choices beside the map. The box is the square of the map on screen that the next map fills, drawn until that map arrives. A zoom out draws none. |
 | Gene picker in the region field | done | Commit `cc7cb74`, live. Typed letters list up to eight matching genes with their positions. A click or the arrow keys and Enter take one. |
 | No comma before "and" | done | The maintainer's rule of 2026-11-18, in `design/writing-rules.md`. Commit `0fc99d9`, live. Gone from the text under `web`, and the page tests refuse it. The other documents of the repository are not swept. |
 | A restart of the site stranded a running job | done | Commits `ce6425b` and `2e30505`, live. The site queues again every job a restart left running or waiting, and job files are written whole. Before a deployment the host is still checked for a running engine. |

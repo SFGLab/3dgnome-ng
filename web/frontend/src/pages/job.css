@@ -874,15 +874,6 @@
   font: 8px var(--font);
 }
 
-.map-labels {
-  display: flex;
-  justify-content: space-between;
-  margin: 6px 0 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-}
-
 .contact-frame {
   position: relative;
   box-sizing: border-box;
@@ -893,6 +884,16 @@
   border: 1px solid var(--line);
   border-radius: 6px 6px 0 0;
   background: #FFFFFF;
+}
+
+/* The part of the map on screen that the next map will show, while zooming in. */
+.zoom-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  pointer-events: none;
 }
 
 .contact-canvas {
@@ -1259,10 +1260,6 @@
   .compare-panels {
     grid-template-columns: 1fr;
   }
-}
-
-.map-labels {
-  max-width: min(100%, max(320px, calc(100vh - 360px)));
 }
 
 .map-note {
