@@ -73,9 +73,22 @@ Held by the maintainer on 2026-11-18 while the trial and the download run. Plan 
 | 2022 panel on aragorn | held | After tbooo is consistent |
 | Sweep of the code for mistakes | open | Fixed so far: SGDP sample table and ids `1cc0ff0`, genetic positions of the array files `c9e3f7a`, sample files of the imputed and exome outputs `fe74093`, size of the per sample files `897ea07`. Not read yet: the rest of QC, phenotypes, expression, restricted cohorts. |
 | The 100 TB | done | Cause found and fixed in `897ea07`. The fixed stage is not run yet. |
-| SGDP on GRCh38, phased | waiting, job 1945118 | The trial on chromosome 22 decides the tools. The stage itself is not written. |
+| SGDP on GRCh38, phased | held | The trial on chromosome 22 ran, see below. The stage itself is not written. |
 | Structural variants for SGDP | held | Imputation, long indels, or HGDP in its place. HGDP is unverified. |
 | Full run on eden | waiting, maintainer | After the branch is complete. Then its data goes to the site. |
+
+Trial on chromosome 22, job 1945118, 17 minutes on 16 cores in all.
+
+- The read of the 13.8 GB file of every base took under 7 minutes and left 388,268 variant records.
+- The lift to GRCh38 lost 575 of 392,261 records.
+- 23 SGDP samples are also in the panel. For one of them the two call sets agree at 99.98 percent of
+  236,870 shared sites, and at 99.88 percent of the sites where either carries the variant.
+- Beagle phased in 6 minutes. Its output holds the panel's 1,066,557 sites alone. The 125,931 SGDP
+  records the panel does not have, a third of them, are dropped. The stage needs a phasing step that
+  keeps them.
+- Of the panel's 1,462 structural variants on the chromosome, 696 are imputed into one SGDP sample or
+  more. The quality is spread wide: the median dosage r squared is 0.3, and four in ten are at 0.73
+  or over.
 
 On eden the tools are in `tbooo/tools/`: bcftools 1.25, Picard 3.5.0, Beagle 5.5. The batch scripts are in
 `playground/sgdp_grch38/`. On frodo the raid is full, and `data/tmp/nygc_split_chr1` to `chr3`, 6.7 TB,
