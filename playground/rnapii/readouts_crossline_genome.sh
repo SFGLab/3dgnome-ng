@@ -1,14 +1,15 @@
 #!/bin/bash
 # Whole genome readouts of the cross line RNAPII comparison, one chromosome a call, on a
 # workstation. The models are eden's out/lr, arms C, R and M of the three lines, ten
-# conformations a chromosome. Arm E, the cudaMMC models, exists on chr1 alone and is not read.
+# conformations a chromosome, and arm E, a seeded ten of the hundred cudaMMC models a chromosome
+# from team-faramir's models_ccd, written as cifs by `e3d_export.py --hcm-to-cif`.
 #
 #   ROOT=~/xc_lr bash playground/rnapii/readouts_crossline_genome.sh expression chr7
 #   ROOT=~/xc_lr bash playground/rnapii/readouts_crossline_genome.sh structure chr7
 #   ROOT=~/xc_lr bash playground/rnapii/readouts_crossline_genome.sh pairs chr7
 #
 # expression: every arm of every line exported to the enhancer3d layout, the genes covered in
-#   all nine ensembles, then the cross line command once per arm, under out/readouts/e3d_<arm>/<chr>.
+#   all twelve ensembles, then the cross line command once per arm, under out/readouts/e3d_<arm>/<chr>.
 # structure: the summed contact map of each arm against the line's deep map at 25 kb, and the
 #   pile-up at the line's RNAPII loops at 10 kb, under out/readouts/structure.
 # pairs: the enhancer to promoter pairs an RNAPII loop alone joins and their reference pairs,
@@ -28,7 +29,7 @@ E3DX="${E3DX:-$ROOT/e3dx}"
 OUT="$ROOT/out/readouts"
 STEP=$1; CHR=$2
 LINES=(GM12878 H1ESC HFFC6)
-ARMS=(C R M)
+ARMS=(E C R M)
 export PYTHONPATH="$REPO"
 cd "$ROOT"
 
