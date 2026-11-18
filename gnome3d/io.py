@@ -566,7 +566,10 @@ _atom_site.gnome_region_start
 _atom_site.gnome_region_end
 _atom_site.gnome_bead_kind
 """
-    with open(path, "w") as f:
+    # A run that is started again skips a member whose file exists. The file therefore takes
+    # its name only once it is whole.
+    part = path + ".part"
+    with open(part, "w") as f:
         f.write(header)
         for i, bead in enumerate(beads, start=1):
             comp = "ALA" if bead.kind == "anchor" else "GLY"
@@ -575,6 +578,7 @@ _atom_site.gnome_bead_kind
                 f"{bead.x} {bead.y} {bead.z} 1.00 99.99 C "
                 f"{bead.start} {bead.end} {bead.kind}\n"
             )
+    os.replace(part, path)
 
 
 def write_bead_table(path: str, chr_: str, beads: list[BeadOut]) -> None:

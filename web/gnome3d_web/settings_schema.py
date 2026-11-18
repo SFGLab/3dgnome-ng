@@ -139,7 +139,7 @@ HELP: dict[str, str] = {
     "relax.within_blocks": "The last pass also moves apart overlapping beads inside one loop block.",
     "confinement.use_confinement": "Keeps the structure inside a sphere, as a nucleus would.",
     "confinement.weight": "Strength of the pull back into the sphere.",
-    "compartments.use_compartments": "Draws beads of the same compartment, A or B, toward each other. The compartments come from the Hi-C map of the cell type.",
+    "compartments.use_compartments": "Draws beads of the same compartment, A or B, toward each other. The compartments come from the Hi-C map of the cell type. A job takes many times longer with it.",
     "compartments.weight": "Strength of the attraction between beads of one compartment.",
 }
 

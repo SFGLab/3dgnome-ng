@@ -84,8 +84,9 @@ def _run_structure(
 
             cif_path = out_dir / _cif_name(entry_base, chr_, i, multi_chr)
             entry_id = cif_path.stem
-            write_cif(str(cif_path), beads, entry_id=entry_id)
+            # The CIF is written last. Its presence marks the member as done for a later run.
             write_bead_table(str(cif_path.with_suffix(".beads.tsv")), chr_, beads)
+            write_cif(str(cif_path), beads, entry_id=entry_id)
             LOG.info("wrote %s  (%d beads)", cif_path, len(beads))
             total_beads += len(beads)
 

@@ -198,8 +198,14 @@ def run_job(
         env = dict(os.environ) | (env_extra or {})
         if "ENGINE_ROOT" in env:
             env["PYTHONPATH"] = env["ENGINE_ROOT"] + (":" + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
-        # The log of a job begins with the HiCDiffusion step when it ran and the engine follows.
-        with log.open("a" if hic is not None else "w") as fh:
+        # The engine skips a structure whose file exists, so a job run again after a restart of
+        # the site goes on where it stopped and its log is kept. Otherwise the log begins with
+        # the HiCDiffusion step when it ran and the engine follows.
+        kept = len(list((job / "models").glob("*.cif"))) if (job / "models").is_dir() else 0
+        with log.open("a" if hic is not None or kept else "w") as fh:
+            if kept:
+                fh.write(f"\nThe job was started again and goes on after {kept} of {req.n_models} structures.\n")
+                fh.flush()
             rc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, cwd=env.get("ENGINE_ROOT"), env=env).returncode
         if rc != 0:
             raise RuntimeError(f"the engine exited with {rc}")
