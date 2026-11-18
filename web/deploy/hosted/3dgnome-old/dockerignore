@@ -1,0 +1,13 @@
+**/__pycache__
+**/*.php
+gnu_log
+log_file
+tasks_file
+db_repository
+db_migrate.py
+db_scripts
+cudaMMC/build
+Dockerfile.port*
+requirements.port.txt.*
+tests
+test_config_file.py

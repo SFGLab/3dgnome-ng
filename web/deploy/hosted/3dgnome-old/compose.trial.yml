@@ -1,0 +1,23 @@
+# A trial copy of the old 3D-GNOME site on its new image, on the loopback. The reference data is
+# the running site's, read only. The request directory and the box plots are copies, and the
+# database is a dump of the running one in a volume of its own.
+#   docker compose -f compose.trial.yml up -d
+name: gnome3d-old-trial
+services:
+  web:
+    image: 3dgnome_webserver:2026-11-18
+    ports: ["127.0.0.1:8776:8000"]
+    volumes:
+      - /home/gnome/3dgnome_data/data_hg38/:/home/3dgnome_webserver/app/static/data_svs/data_hg38/:ro
+      - /home/gnome/3dgnome_data/browser_data/:/home/3dgnome_webserver/app/static/browser_data/:ro
+      - /home/gnome/3dgnome_data/data_vcf_modified/:/home/3dgnome_webserver/app/static/data_vcf_modified/:ro
+      - /home/gnome/3dgnome_data/data_enhancer3D/:/home/3dgnome_webserver/app/static/enhancer3D/:ro
+      - ./trial/data:/home/3dgnome_webserver/app/static/data
+      - ./trial/boxplots:/boxplots
+      - db:/var/lib/mysql
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
+volumes:
+  db:
