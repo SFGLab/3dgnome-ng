@@ -1,0 +1,46 @@
+# The old 3D-GNOME site on its new images, in place of the container its own compose.yaml runs.
+# It keeps that compose project's name and network, so the web container takes the address the
+# host nginx passes 3dgnome.mini.pw.edu.pl to, and it mounts the same data. The database is
+# MariaDB's own image with a volume, filled from a dump of the old container's.
+#
+#   docker exec webservice_container mysqldump -u root --single-transaction 3dgnome_webserver > old.sql
+#   docker stop webservice_container && docker update --restart=no webservice_container
+#   docker compose -f compose.port.yml up -d
+#   docker compose -f compose.port.yml exec -T db sh -c 'mariadb -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE"' < old.sql
+#
+# The step back stops these two containers and starts the old one:
+#   docker compose -f compose.port.yml stop
+#   docker update --restart=always webservice_container && docker start webservice_container
+name: 3dgnome_webserver
+services:
+  db:
+    image: mariadb:11.8.9
+    container_name: 3dgnome_db
+    restart: always
+    env_file: [db.env]
+    environment: { MARIADB_RANDOM_ROOT_PASSWORD: "1" }
+    volumes: ["dbdata:/var/lib/mysql"]
+    networks: { gnome_network: { ipv4_address: 172.22.0.3 } }
+  web:
+    image: 3dgnome_webserver:2026-11-18.2
+    container_name: 3dgnome_web
+    restart: always
+    depends_on: [db]
+    volumes:
+      - /home/gnome/3dgnome_data/data_hg38/:/home/3dgnome_webserver/app/static/data_svs/data_hg38/:ro
+      - /home/gnome/3dgnome_data/browser_data/:/home/3dgnome_webserver/app/static/browser_data/:ro
+      - /home/gnome/3dgnome_data/data_vcf_modified/:/home/3dgnome_webserver/app/static/data_vcf_modified/:ro
+      - /home/gnome/3dgnome_data/data/:/home/3dgnome_webserver/app/static/data/
+      - /home/gnome/3dgnome_data/db_boxplots:/boxplots:rw
+      - /home/gnome/3dgnome_data/data_enhancer3D/:/home/3dgnome_webserver/app/static/enhancer3D/:ro
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: 1, capabilities: [gpu] }]
+    networks: { gnome_network: { ipv4_address: 172.22.0.2 } }
+volumes:
+  dbdata:
+networks:
+  gnome_network:
+    ipam:
+      config: [{ subnet: 172.22.0.0/16 }]

@@ -37,20 +37,11 @@ edit("chromatin_pipeline.py", "from app import db\n", "from app import app, db\n
 edit("app/views.py", "from jinja2 import Markup", "from markupsafe import Markup", 1)
 # Flask 2 renamed send_file's argument.
 edit("app/views.py", "attachment_filename=", "download_name=", 2)
-# sqlalchemy-migrate does not support SQLAlchemy 2 and Python 3.12 has no imp module. The site
+# sqlalchemy-migrate does not support SQLAlchemy 2. The site
 # has two tables and create_all makes them where they are missing.
 (root / "db_create.py").write_text(
     "#!/usr/bin/env python\nfrom app import app, db\n\nwith app.app_context():\n    db.create_all()\n"
 )
 print("db_create.py: rewritten")
-s = (root / "start-container.sh").read_text()
-for old, new, n in (
-    ("service mysql start", "service mariadb start", 1),
-    ("python db_migrate.py\n", "", 1),
-    (" --log-level=debug --reload", "", 1),
-):
-    if s.count(old) != n:
-        raise SystemExit(f"start-container.sh: {old!r} occurs {s.count(old)} times, expected {n}")
-    s = s.replace(old, new)
-(root / "start-container.sh").write_text(s)
-print("start-container.sh: mariadb service, no migrate step, gunicorn without reload and debug")
+# The database is a container named db beside the site's.
+edit("config.py.dist_local", "@localhost/3dgnome_webserver", "@db/3dgnome_webserver", 1)

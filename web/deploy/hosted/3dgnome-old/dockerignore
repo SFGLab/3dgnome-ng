@@ -11,3 +11,4 @@ Dockerfile.port*
 requirements.port.txt.*
 tests
 test_config_file.py
+start-container.sh

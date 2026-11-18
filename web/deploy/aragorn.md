@@ -103,5 +103,9 @@ spring-model's database took three migrations of django_celery_results at the sw
 the old code ignores. The lab page stays on Django 4.2, which left support in April 2026, and
 its move to 5.2 needs new major releases of its admin plugins. The old 3D-GNOME site in
 `/home/gnome/3dgnome_webserver` runs Flask 1.1 on Python 3.8 and Ubuntu 20.04 and cannot be
-cleared in place. Image backups of 2026-11-18 and the dumps taken before each switch are in
+cleared in place. `hosted/3dgnome-old/` is its port, two containers in place of one, and
+`compose.port.yml` there carries the switch and the step back. Its analysis libraries stay at
+pandas 1.5.3 and numpy 1.26.4 on Python 3.11, since the site's code was written for pandas 0.25
+and later releases refuse or change calls it makes. The site's own tests are left out of the
+image. Run in a container they empty its database. Image backups of 2026-11-18 and the dumps taken before each switch are in
 `/mnt/raid/aragorn-backup-2026-11-18/`.
