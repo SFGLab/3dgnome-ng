@@ -27,6 +27,11 @@ HIC="${HIC:-$HOME/gapfill-data/_hic}"
 E3D="${E3D:-$HOME/enhancer3d/data}"
 E3DX="${E3DX:-$ROOT/e3dx}"
 OUT="$ROOT/out/readouts"
+# The least share of a chromosome's 1 kb positions within 5 kb of a bead for an ensemble to be
+# read. The chr1 readouts used 0.2, since the cudaMMC beads leave a third of chr1 covered. On
+# the gene poor chromosomes they leave less, 0.16 of chr21 and 0.19 of chr18 for HFFC6, so the
+# whole genome uses 0.1. The statistics read the genes covered in all twelve ensembles either way.
+MIN_COVERED="${MIN_COVERED:-0.1}"
 STEP=$1; CHR=$2
 LINES=(GM12878 H1ESC HFFC6)
 ARMS=(E C R M)
@@ -38,7 +43,7 @@ expression() {
   mkdir -p "$OUT/genes"
   for A in "${ARMS[@]}"; do for L in "${LINES[@]}"; do
     local SRC="$ROOT/out/lr/${L}_${A}/$CHR" DST="$ROOT/out/e3d/${L}_${A}/$CHR"
-    ls "$DST"/*.txt > /dev/null 2>&1 || "$PY" "$REPO/playground/rnapii/e3d_export.py" "$SRC" "$DST" "$CHR" --min-covered 0.2 | tail -n 1
+    ls "$DST"/*.txt > /dev/null 2>&1 || "$PY" "$REPO/playground/rnapii/e3d_export.py" "$SRC" "$DST" "$CHR" --min-covered "$MIN_COVERED" | tail -n 1
     DIRS+=("$DST")
   done; done
   [ -s "$COMMON" ] || "$PY" "$REPO/playground/rnapii/e3d_export.py" --common-genes "$GENES" "$COMMON" "${DIRS[@]}"
