@@ -1,0 +1,30 @@
+# A trial copy of spring-model beside the running one, on an empty database, on the loopback.
+#   docker compose -f compose.stage.yml up -d
+name: sm-stage
+services:
+  db:
+    image: postgres:16.16-alpine
+    environment: &pg { POSTGRES_DB: sm_db, POSTGRES_USER: sm_stage, POSTGRES_PASSWORD: stage-only }
+  redis:
+    image: redis:7.2.17-alpine
+  django:
+    image: sm_webservice-django:2026-11-18
+    environment: &dj { <<: *pg, DJANGO_SETTINGS_MODULE: sm_webservice.settings.prod }
+    command: ./wait-for-it.sh db:5432 -- uwsgi --ini /home/sm_webservice/sm_webservice/settings/uwsgi.ini --socket :9090 --chdir /home/sm_webservice
+    volumes: ["tasks:/home/sm_webservice/data/tasks_data"]
+    depends_on: [db, redis]
+  worker:
+    image: sm_webservice-django:2026-11-18
+    environment: *dj
+    command: celery -A sm_webservice worker --loglevel=INFO --concurrency=2
+    volumes: ["tasks:/home/sm_webservice/data/tasks_data"]
+    depends_on: [db, redis]
+  nginx:
+    image: nginx:1.30.6-alpine
+    ports: ["127.0.0.1:8772:80"]
+    volumes:
+      - ./src/sm_webservice/settings/nginx:/etc/nginx/templates:ro
+      - ./src:/home/sm_webservice:ro
+    depends_on: [django]
+volumes:
+  tasks:

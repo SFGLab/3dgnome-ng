@@ -63,3 +63,23 @@ location /new/ {
 
 `client_max_body_size` matches `UPLOAD_MAX_MB`. The server strips `/new` itself, so the
 `proxy_pass` has no path.
+
+## Versions and advisories
+
+The faculty asks each hosted site for its stack with exact versions. The image's packages are
+checked against osv.dev by name and version, both interpreters, and the frontend with
+`npm audit --omit=dev`. On 2026-11-18 the image at `4a106e9` has no advisory in either Python
+environment but one of moderate severity on biopython 1.81, which HiCDiffusion's requirements
+pin and which has no fixed release, and none in the shipped frontend. `site.env.<tag>` beside
+`site.env` keeps the variables of each deployed tag.
+
+## The other sites on the host
+
+team-aragorn serves six more names from other people's containers, each behind the host nginx
+at an address its compose file fixes. `hosted/spring-model/` holds a rebuild of spring-model on
+a current base, tried on 2026-11-18 beside the running site: `Dockerfile.bump` and
+`requirements.bump.txt` build `sm_webservice-django:2026-11-18` from a copy of the source,
+`compose.stage.yml` runs the trial copy on the loopback at port 8772 with an empty database,
+and `compose.bump.yml` is the overlay that moves the running site onto the new images. The
+trial copy applied its migrations and finished two modelling tasks. The copy of the source and
+the build log are in `/mnt/raid/3dgnome-new/stage/spring-model/`.
