@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Upload, X } from 'lucide-react'
+import { ChevronRight, Dna, Upload, X } from 'lucide-react'
 import type { Catalog } from '../api'
 import type { FormState } from './form'
 import type { UploadResult } from './upload'
@@ -106,8 +106,10 @@ export function Variants({ catalog, svSet, sample, haplotype, vcfUpload: vcf, on
         </label>
       )}
       {((svSet && sample) || vcf) && (
-        <button type="button" className="link-button" onClick={() => onOpen(vcf ? 'upload' : 'hosted', null)}>
-          Show the variants in the region
+        <button type="button" className="preview-button" onClick={() => onOpen(vcf ? 'upload' : 'hosted', null)}>
+          <Dna size={15} aria-hidden />
+          <span>Show the variants in the region</span>
+          <ChevronRight size={14} className="chevron" aria-hidden />
         </button>
       )}
     </div>

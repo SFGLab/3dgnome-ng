@@ -426,6 +426,43 @@
   opacity: 0.6;
 }
 
+/* Opens the dialog with the sample's variants and what each does to the loops. */
+.preview-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 10px 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font: 500 13px var(--font);
+  cursor: pointer;
+  transition:
+    border-color 120ms,
+    background 120ms;
+}
+
+.preview-button svg:first-child {
+  color: var(--accent);
+}
+
+.preview-button .chevron {
+  color: var(--muted);
+  transition: transform 120ms;
+}
+
+.preview-button:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.preview-button:hover .chevron {
+  color: var(--accent);
+  transform: translateX(2px);
+}
+
 /* The call set's label is long and the haplotype is one word. */
 .variants .fields {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(7.5rem, 0.8fr);
