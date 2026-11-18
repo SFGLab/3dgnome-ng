@@ -23,18 +23,36 @@ const Label = ({ at, children }: { at: Pt; children: string }) => (
     {children}
   </text>
 )
-/** A short arrow from a point along a direction, for the direction of a CTCF motif. */
-const Motif = ({ from, dx }: { from: Pt; dx: number }) => (
-  <g className="sk-motif">
-    <line x1={from[0]} y1={from[1]} x2={from[0] + dx} y2={from[1]} />
-    <path d={`M${from[0] + dx} ${from[1]}l${dx > 0 ? -5 : 5} -3.5v7z`} />
-  </g>
-)
+/** The direction of the CTCF motif at an anchor, an arrow beside the anchor. */
+function Motif({ from, to }: { from: Pt; to: Pt }) {
+  const turn = (Math.atan2(to[1] - from[1], to[0] - from[0]) * 180) / Math.PI
+  return (
+    <g className="sk-motif">
+      <line x1={from[0]} y1={from[1]} x2={to[0]} y2={to[1]} />
+      <path d="M2 0l-6.5 -3.8v7.6z" transform={`translate(${to[0]} ${to[1]}) rotate(${turn})`} />
+    </g>
+  )
+}
 
-const RING: Pt[] = [[26, 56], [14, 38], [26, 20], [45, 13], [64, 20], [76, 38], [64, 56]]
+/** A loop along the genome: the line, its two anchors, the loop over them and the direction of
+ * each motif under its anchor. The first motif points right. */
+function Genome({ second }: { second: 'left' | 'right' }) {
+  const chevron = (x: number, right: boolean) => <path className="sk-chevron" d={right ? `M${x - 3} 17l5 4l-5 4` : `M${x + 3} 17l-5 4l5 4`} />
+  return (
+    <g>
+      <line className="sk-genome" x1={12} y1={11} x2={88} y2={11} />
+      <path className="sk-mark" d="M30 11Q50 -7 70 11" />
+      <circle className="sk-bead anchor" cx={30} cy={11} r={3.4} />
+      <circle className="sk-bead anchor" cx={70} cy={11} r={3.4} />
+      {chevron(30, true)}
+      {chevron(70, second === 'right')}
+    </g>
+  )
+}
 
-/** Each sketch as the state before and the state after, both drawn in a box of 90 by 84. */
-const SKETCHES: Record<string, { text: string; before: ReactNode; after: ReactNode }> = {
+/** Each sketch as the state before and the state after, both drawn in a box of 90 by 84, or as
+ * one whole drawing of 220 by 108. */
+const SKETCHES: Record<string, { text: string; before?: ReactNode; after?: ReactNode; whole?: ReactNode }> = {
   'anchor:Loop spring': {
     text: 'Brings the two anchors of a loop to the target distance of the loop.',
     before: (
@@ -109,20 +127,29 @@ const SKETCHES: Record<string, { text: string; before: ReactNode; after: ReactNo
     before: <Chain anchors={[0, 5]} hot={[2, 3]} pts={[[6, 58], [22, 24], [38, 60], [54, 24], [70, 60], [86, 30]]} />,
     after: <Chain anchors={[0, 5]} hot={[2, 3]} pts={[[6, 58], [20, 42], [38, 32], [56, 32], [72, 42], [86, 58]]} />,
   },
+  // After the figure of 3D-GNOME. The term is least when the two motif directions are the same
+  // in space. A motif on the reverse strand points against the chain, so motifs that face each
+  // other along the genome are side by side in a hairpin and motifs of one direction in a loop
+  // of a full turn.
   'chain:CTCF orientation': {
-    text: 'Turns the two anchors of a CTCF loop until their motifs point in opposite directions.',
-    before: (
+    text: 'Turns the chain at the two anchors of a CTCF loop until their motifs point the same way in space. Motifs that face each other along the genome give a hairpin and motifs of one direction give a loop of a full turn.',
+    whole: (
       <>
-        <Chain anchors={[0, 6]} pts={RING} />
-        <Motif from={[26, 70]} dx={15} />
-        <Motif from={[64, 70]} dx={15} />
-      </>
-    ),
-    after: (
-      <>
-        <Chain anchors={[0, 6]} pts={RING} />
-        <Motif from={[26, 70]} dx={15} />
-        <Motif from={[64, 70]} dx={-15} />
+        <Genome second="left" />
+        <path className="sk-chain" d="M34 104C36 94 41 91 42 84C44 66 22 62 26 46C30 28 70 28 74 46C78 62 56 66 58 84C59 91 64 94 66 104" />
+        <Motif from={[42, 84]} to={[43, 66]} />
+        <Motif from={[58, 84]} to={[57, 66]} />
+        <circle className="sk-bead anchor" cx={42} cy={84} r={4.6} />
+        <circle className="sk-bead anchor" cx={58} cy={84} r={4.6} />
+        <line className="sk-split" x1={110} y1={6} x2={110} y2={100} />
+        <g transform="translate(122 0)">
+          <Genome second="right" />
+          <path className="sk-chain" d="M36 104C37 96 38 90 38 84C38 70 40 56 52 48C66 38 86 48 86 66C86 84 70 96 58 94C52 93 50 90 50 84C50 70 48 52 46 34" />
+          <Motif from={[38, 84]} to={[38, 66]} />
+          <Motif from={[50, 84]} to={[50, 66]} />
+          <circle className="sk-bead anchor" cx={38} cy={84} r={4.6} />
+          <circle className="sk-bead anchor" cx={50} cy={84} r={4.6} />
+        </g>
       </>
     ),
   },
@@ -163,14 +190,18 @@ const SKETCHES: Record<string, { text: string; before: ReactNode; after: ReactNo
 export function TermSketch({ phase, name }: { phase: 'anchor' | 'chain'; name: string }) {
   const s = SKETCHES[`${phase}:${name}`]
   return (
-    <svg className="term-sketch" viewBox="0 0 220 84" role="img" aria-label={s.text}>
+    <svg className="term-sketch" viewBox={s.whole ? '0 0 220 108' : '0 0 220 84'} role="img" aria-label={s.text}>
       <title>{s.text}</title>
-      {s.before}
-      <g className="sk-then">
-        <line x1={99} y1={42} x2={117} y2={42} />
-        <path d="M121 42l-6 -4v8z" />
-      </g>
-      <g transform="translate(130 0)">{s.after}</g>
+      {s.whole ?? (
+        <>
+          {s.before}
+          <g className="sk-then">
+            <line x1={99} y1={42} x2={117} y2={42} />
+            <path d="M121 42l-6 -4v8z" />
+          </g>
+          <g transform="translate(130 0)">{s.after}</g>
+        </>
+      )}
     </svg>
   )
 }

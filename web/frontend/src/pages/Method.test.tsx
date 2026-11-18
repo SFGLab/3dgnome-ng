@@ -65,6 +65,10 @@ describe('Method page', () => {
     expect(chainTerms.querySelectorAll('svg.term-sketch')).toHaveLength(5)
     expect(within(within(chainTerms).getByRole('row', { name: /Bending/ })).getByRole('img', { name: 'Straightens sharp turns of the chain.' })).toBeInTheDocument()
     expect(within(within(anchorTerms).getByRole('row', { name: /Loop spring/ })).getByRole('img', { name: /two anchors of a loop/ })).toBeInTheDocument()
+    // The orientation term is least for motifs that point the same way, as the engine scores it.
+    const orientation = within(chainTerms).getByRole('row', { name: /CTCF orientation/ })
+    expect(within(orientation).getByRole('img', { name: /point the same way in space.*face each other along the genome give a hairpin/ })).toBeInTheDocument()
+    expect(within(orientation).getByAltText(/1 - \\mathbf\{o\}_i \\cdot \\mathbf\{o\}_j/)).toBeInTheDocument()
   })
 
   it('gives the rule of each kind of variant, tandem duplications among them', () => {

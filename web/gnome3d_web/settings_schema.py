@@ -114,7 +114,7 @@ HELP: dict[str, str] = {
     "springs.stretch_constant": "Stiffness of the bond between neighbouring beads once it is stretched past its target length.",
     "springs.squeeze_constant": "Stiffness of the bond between neighbouring beads once it is shorter than its target length.",
     "springs.arc_weight_exponent": "Makes strong loops stiffer. The spring of a loop is multiplied by its strength to this power. 0 gives every loop the same spring.",
-    "motif_orientation.weight": "Weight of the term that turns the CTCF motifs at the two anchors of a loop toward each other. 0 turns it off.",
+    "motif_orientation.weight": "Weight of the term that folds a CTCF loop by the directions of its two motifs, a hairpin for motifs that face each other. 0 turns it off.",
     "springs.loop_dropout": "Each structure keeps a loop with a probability that grows with the strength of the loop. A strong loop is then present in more structures of the ensemble than a weak one. Off, every structure has every loop.",
     "springs.loop_contact": "A loop that a structure keeps brings its two anchors into contact, in place of a distance set by its strength. Meant for use with loop_dropout.",
     "springs.background_weight": "Strength of a weak spring that holds two nearby anchors without a loop at the distance the law gives for their separation. 0 turns it off.",

@@ -181,6 +181,12 @@
   border-radius: 8px;
 }
 
+/* A drawing whose marks reach its own edge gets room inside the frame. */
+.figure.padded img {
+  box-sizing: border-box;
+  padding: 16px 18px;
+}
+
 .figure figcaption,
 .panel-caption {
   margin-top: 8px;
@@ -296,6 +302,24 @@
 
 .sk-motif path {
   fill: var(--accent);
+}
+
+.sk-genome {
+  stroke: var(--faint);
+  stroke-width: 1.4;
+}
+
+.sk-chevron {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sk-split {
+  stroke: var(--line);
+  stroke-width: 1;
 }
 
 .sk-then line {

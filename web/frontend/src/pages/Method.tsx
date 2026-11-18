@@ -49,7 +49,7 @@ const ANCHOR_TERMS: Term[] = [
 const CHAIN_TERMS: Term[] = [
   ['Bond', 't_bond', 'consecutive beads, t is the bond target', '[1]'],
   ['Bending', 't_bending', 'each pair of consecutive bonds, θ the angle between them', '[1]'],
-  ['CTCF orientation', 't_orientation', 'anchors joined by a CTCF loop, o the direction of the motif', '[1]'],
+  ['CTCF orientation', 't_orientation', 'anchors joined by a CTCF loop, o the direction of the motif in space', '[1]'],
   ['Excluded volume', 't_ev', 'beads not next to each other', '[5, 14]'],
   ['Confinement', 't_confinement', 'beads outside a sphere around the block centre', '[5, 15]'],
 ]
@@ -183,7 +183,7 @@ export function Method() {
             <Equation name="acceptance_plain" />
           </div>
           <Terms label="Chain energy terms" terms={CHAIN_TERMS} phase="chain" />
-          <p className="panel-caption">Each drawing shows a short chain, before the term acts and after. Dark beads are anchors and the arrows of the orientation term are the directions of the CTCF motifs.</p>
+          <p className="panel-caption">Each drawing shows a short chain, before the term acts and after. Dark beads are anchors. The drawing of the orientation term follows 3D-GNOME [1] and shows two loops. On top are the directions of the two CTCF motifs along the genome and below is the loop that brings the two motifs side by side pointing the same way. Motifs that face each other give a hairpin and motifs of one direction give a loop of a full turn.</p>
           <div className="panels">
             {[
               [methodAnchors, 'a', 'Anchor positions after the fit. TNFRSF8 locus, GM12878, CTCF and RNAPII loops.'],
@@ -218,7 +218,7 @@ export function Method() {
               <b>Figure 3a</b>Task graph of a run on two chromosomes.
             </figcaption>
           </figure>
-          <figure className="figure">
+          <figure className="figure padded">
             <img src={engineBatching} alt="Nine blocks of 300 to 3600 beads, each padded to a ladder size of 512 to 4096, sorted largest first and packed into two launches padded to 4096 and 1024" />
             <figcaption>
               <b>Figure 3b</b>Bucketing and batching of chain tasks. Each block is padded up to the next size on a fixed ladder, which limits how many shapes the GPU compiles. Blocks with the same energy terms are sorted largest first and packed into as few launches as GPU memory allows and a launch pads its members to the size of the first.
