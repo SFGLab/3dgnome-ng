@@ -104,7 +104,7 @@ describe('Your own data dialog', () => {
       </QueryClientProvider>,
     )
     expect(screen.getByRole('radio', { name: /None/ })).toBeChecked()
-    fireEvent.click(screen.getByRole('radio', { name: /Enhancers of a listed cell type/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /A listed cell type/ }))
     fireEvent.change(screen.getByLabelText('Enhancers of'), { target: { value: 'H1ESC' } })
     expect(screen.getByRole('tab', { name: /Enhancers/ }).querySelector('.step-uses')?.textContent).toBe('H1ESC')
     fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
