@@ -153,6 +153,11 @@ export const REFERENCES: Reference[] = [
     authors: 'Byrska-Bishop M, Evani US, Zhao X, et al.', venue: 'Cell 185, 3426-3440',
   },
   {
+    key: 'tbooo', group: 'data', year: 2026, url: 'https://github.com/SFGLab/tbooo',
+    title: 'TBOOO, The Biobank Of Our Own: the data layout of a biobank rebuilt from the 1000 Genomes Project and the Simons Genome Diversity Project',
+    authors: 'SFGLab', venue: 'GitHub repository',
+  },
+  {
     key: 'hgsvc4', group: 'data', year: 2025, unconfirmed: true,
     title: 'Human Genome Structural Variation Consortium, freeze 4',
     authors: 'HGSVC', venue: 'reference to confirm',
