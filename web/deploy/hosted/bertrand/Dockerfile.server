@@ -1,0 +1,11 @@
+# Bertrand's server, the binary and the frontend taken from the running image and put on a
+# current Alpine. This clears the advisories of the operating system alone. The binary is
+# PocketBase 0.18.2 built with Go 1.20.12 and stays so until it is rebuilt from its source.
+#   docker build -f Dockerfile.server -t bertrand-server:2026-11-18 .
+FROM bertrand-server:latest AS old
+FROM alpine:3.24
+WORKDIR /app
+COPY --from=old /app/server ./server
+COPY --from=old /app/pb_public ./pb_public
+EXPOSE 80
+CMD ["./server", "serve", "--http", "0.0.0.0:80"]

@@ -8,13 +8,13 @@ services:
   redis:
     image: redis:7.2.17-alpine
   django:
-    image: sm_webservice-django:2026-11-18
+    image: sm_webservice-django:2026-11-18.2
     environment: &dj { <<: *pg, DJANGO_SETTINGS_MODULE: sm_webservice.settings.prod }
     command: ./wait-for-it.sh db:5432 -- uwsgi --ini /home/sm_webservice/sm_webservice/settings/uwsgi.ini --socket :9090 --chdir /home/sm_webservice
     volumes: ["tasks:/home/sm_webservice/data/tasks_data"]
     depends_on: [db, redis]
   worker:
-    image: sm_webservice-django:2026-11-18
+    image: sm_webservice-django:2026-11-18.2
     environment: *dj
     command: celery -A sm_webservice worker --loglevel=INFO --concurrency=2
     volumes: ["tasks:/home/sm_webservice/data/tasks_data"]

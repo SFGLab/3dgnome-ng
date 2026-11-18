@@ -1,0 +1,5 @@
+# The lab page's nginx on the current stable nginx image. Its own image is nginx 1.25.2 on
+# Alpine 3.18 with the www-data user added, and that user is all this adds too.
+#   docker build -f Dockerfile.nginx -t labwebpage-nginx:2026-11-18 .
+FROM nginx:1.30.6-alpine
+RUN set -x ; deluser xfs ; addgroup -g 33 -S www-data ; adduser -u 33 -D -S -G www-data www-data ; adduser www-data nginx && exit 0 ; exit 1

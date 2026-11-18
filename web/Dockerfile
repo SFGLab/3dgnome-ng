@@ -19,11 +19,20 @@ COPY web/frontend ./
 ARG BASE_PATH=
 RUN BASE_PATH=$BASE_PATH npm run build
 
+# hic-straw has no wheel for this Python and is compiled against libcurl and zlib. The compiler
+# and the headers stay in this stage, since a scanner reads the kernel headers they bring as a
+# kernel in the image.
+FROM python:3.12-slim AS wheels
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends g++ libcurl4-openssl-dev zlib1g-dev \
+ && rm -rf /var/lib/apt/lists/*
+RUN pip wheel --no-cache-dir --no-deps -w /wheels hic-straw==1.3.1
+
 FROM python:3.12-slim
 
-# hic-straw has no wheel for this Python and is compiled here, against libcurl and zlib.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tabix g++ libcurl4-openssl-dev zlib1g-dev \
+ && apt-get upgrade -y \
+ && apt-get install -y --no-install-recommends tabix libcurl4t64 \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -50,7 +59,8 @@ RUN if [ "$HICDIFFUSION" = "1" ]; then \
    && uv venv -q --python 3.11 /opt/hicdiffusion-venv \
    && printf '%s\n' torch==2.15.0 torchvision==0.29.2 lightning==2.6.6 fsspec==2026.9.0 tqdm==4.66.3 > /opt/hicdiffusion-raised.txt \
    && uv pip install -q --no-cache --python /opt/hicdiffusion-venv/bin/python -r /opt/hicdiffusion/requirements.txt \
-        --override /opt/hicdiffusion-raised.txt ; \
+        --override /opt/hicdiffusion-raised.txt \
+   && apt-get purge -y git && apt-get autoremove -y ; \
     fi
 
 COPY pyproject.toml README.md SETTINGS.md ./
@@ -58,7 +68,8 @@ COPY gnome3d ./gnome3d
 RUN pip install --no-cache-dir --no-deps .
 
 COPY web/requirements.txt ./web/requirements.txt
-RUN pip install --no-cache-dir -r web/requirements.txt
+COPY --from=wheels /wheels /wheels
+RUN pip install --no-cache-dir --find-links /wheels -r web/requirements.txt
 COPY web ./web
 COPY --from=frontend /web/frontend/dist ./web/frontend/dist
 

@@ -1,17 +1,25 @@
 # spring-model on a current base. The site's own Dockerfile builds on mkadlof/openmm:8.0, Ubuntu
 # 22.04 with Python 3.10, and Pillow's fixed release needs Python 3.11. OpenMM comes from its
-# wheel here, which carries the CPU platform, the one sm_engine/tasks.py asks for.
+# wheel here, which carries the CPU platform, the one sm_engine/tasks.py asks for. uWSGI is
+# compiled in a build stage, so the compiler and the kernel headers it brings are not in the
+# image.
 # Build from a copy of the site's source with requirements.bump.txt beside it and the file
 # dockerignore as its .dockerignore, which keeps the IDE's data source files out of the image:
-#   docker build -f Dockerfile.bump -t sm_webservice-django:2026-11-18 <copy of the source>
-FROM python:3.12-slim
+#   docker build -f Dockerfile.bump -t sm_webservice-django:2026-11-18.2 <copy of the source>
+FROM python:3.12-slim AS build
 RUN apt-get update \
  && apt-get install -y --no-install-recommends build-essential \
  && rm -rf /var/lib/apt/lists/*
-WORKDIR /home/sm_webservice
-ENV DJANGO_SETTINGS_MODULE=sm_webservice.settings
+RUN python -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
 COPY requirements.bump.txt requirements.bump.txt
 RUN pip install --no-cache-dir pip==26.3 && pip install --no-cache-dir -r requirements.bump.txt
+
+FROM python:3.12-slim
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+WORKDIR /home/sm_webservice
+ENV PATH=/opt/venv/bin:$PATH DJANGO_SETTINGS_MODULE=sm_webservice.settings
+COPY --from=build /opt/venv /opt/venv
 EXPOSE 5000
 COPY . .
 RUN mkdir -p data/tasks_data && chown -R 33:33 /home/sm_webservice/data/tasks_data
