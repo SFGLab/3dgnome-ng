@@ -36,6 +36,9 @@ def make_data(root: Path) -> Path:
         f.write("chr1\t900000\td1\tN\t<DEL>\t.\tPASS\tSVTYPE=DEL;END=960000;SVLEN=-60000\tGT\t1|0\t0|0\n")
         f.write("chr1\t1700000\ti1\tN\tNACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT\t.\tPASS\tSVTYPE=INS;SVLEN=56\tGT\t0|1\t0|0\n")
         f.write("chr1\t2500000\tb1\tN\t<CNV>\t.\tPASS\tSVTYPE=CNV;END=2600000\tGT\t1|1\t0|0\n")
+    # P1 is the child of P2 and of a father the call set does not hold.
+    (svs / "demo.samples.tsv").write_text(
+        "sample\tsex\tpopulation\tsuperpopulation\tfather\tmother\nP1\tfemale\tPUR\tAMR\tP0\tP2\nP2\tfemale\tPUR\tAMR\t\t\n")
     catalog = {
         "cell_types": {
             "GMX": {
@@ -46,7 +49,10 @@ def make_data(root: Path) -> Path:
                 "config": "config.ini", "genes": "genes.tsv", "enhancers": "enhancers.bed", "note": "",
             }
         },
-        "sv_sets": {"DEMO": {"label": "demo call set", "vcf": "svs/demo.vcf.gz", "samples": ["P1", "P2"]}},
+        "sv_sets": {
+            "DEMO": {"label": "demo call set", "vcf": "svs/demo.vcf.gz", "samples": ["P1", "P2"], "samples_table": "svs/demo.samples.tsv"},
+            "BARE": {"label": "a call set without a table", "vcf": "svs/demo.vcf.gz", "samples": ["P1", "P2"]},
+        },
     }  # fmt: skip
     (root / "catalog.json").write_text(json.dumps(catalog, indent=2))
     return root

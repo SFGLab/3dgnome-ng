@@ -42,6 +42,10 @@ def main() -> int:
         check("the summary has the state, structures and files", s["state"] == "done" and s["structures"] == 3 and {"ep.tsv", "marks.json", "engine.log"} <= names, str(s)[:200])
         check("the summary has the loop counts and the gene count", s["loops"] == {"CTCF": 14, "RNAPII": 1} and s["genes"] >= 1, str(s)[:300])
         check("a done job is not in the queue", s["ahead"] is None)
+        check("a job without a hosted sample has no sample note", s["sample_note"] == "", str(s.get("sample_note")))
+        hosted = "/api" + c.post("/api/jobs", data=form | {"n_models": "1", "sv_set": "DEMO", "sample": "P1"}).json()["url"]
+        note = c.get(hosted + "/summary").json()["sample_note"]
+        check("a hosted sample's job gives its population and sex", note == "PUR, AMR, female", note)
 
         st = c.get(three + "/structure/2").json()
         check("a structure has a chain with genomic positions", len(st["chain"]) > 100 and len(st["chain"][0]) == 4, str(st["chain"][:2]))

@@ -32,7 +32,8 @@ function listedLoops(s: Summary): string {
 
 function variants(s: Summary): string {
   if (!s.n_svs) return 'none'
-  const who = s.request.sample ? `${s.request.sample}, haplotype ${s.request.haplotype + 1}` : 'uploaded VCF'
+  const sample = s.sample_note ? `${s.request.sample} (${s.sample_note})` : s.request.sample
+  const who = s.request.sample ? `${sample}, haplotype ${s.request.haplotype + 1}` : 'uploaded VCF'
   return `${s.n_svs} from ${who}`
 }
 

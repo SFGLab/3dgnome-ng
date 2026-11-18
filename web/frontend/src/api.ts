@@ -5,12 +5,14 @@ import { served } from './base'
 export type CellType = { label: string; description: string; data: string[]; lymphoblastoid: boolean; note: string }
 export type Catalog = {
   cell_types: Record<string, CellType>
-  sv_sets: Record<string, { label: string; samples: string[] }>
+  sv_sets: Record<string, { label: string; samples: string[]; sample_table?: boolean }>
   factors: string[]
   max_region_mb: number
   max_structures: number
   hicdiffusion: boolean
 }
+/** A sample of a call set. An unknown field is an empty string, and so is a parent the set does not hold. */
+export type SampleRow = { sample: string; sex: string; population: string; superpopulation: string; father: string; mother: string }
 export type Region = { chrom: string; start: number; end: number; label: string; gene?: string }
 export type Preview = { loops: Record<string, [number, number, number][]>; counts: Record<string, number>; genes: { name: string; tss: number }[] }
 export type Setting = {
@@ -54,6 +56,10 @@ export const api = {
   catalog: () => call<Catalog>('/api/catalog'),
   region: (cell: string, text: string) => call<Region>(`/api/region?${q({ cell, q: text })}`),
   preview: (cell: string, region: string) => call<Preview>(`/api/preview?${q({ cell, region })}`),
+  sampleTable: (set: string) =>
+    call<{ columns: string[]; rows: string[][] }>(`/api/sv_sets/${encodeURIComponent(set)}/samples`).then((t) =>
+      t.rows.map((r) => Object.fromEntries(t.columns.map((c, i) => [c, r[i] ?? ''])) as SampleRow),
+    ),
   settings: (cell: string) => call<SettingGroup[]>(`/api/settings?${q({ cell })}`),
   parseIni: (file: File) => {
     const form = new FormData()

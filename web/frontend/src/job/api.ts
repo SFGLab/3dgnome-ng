@@ -23,6 +23,8 @@ export type Summary = {
     n_models: number
     own?: { loops: string[]; anchors: boolean; contacts: boolean; enhancers: boolean; loops_from?: string; enhancers_from?: string }
   }
+  /** Population, superpopulation and sex of a hosted sample, where its call set has them. */
+  sample_note?: string
   loops: Record<string, number>
   n_svs: number | null
   structures: number

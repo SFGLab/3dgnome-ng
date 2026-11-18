@@ -869,3 +869,14 @@
   color: var(--ink);
   font: inherit;
 }
+
+.sample-facts {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sample-facts .link-button {
+  display: inline;
+  font: inherit;
+}

@@ -37,6 +37,10 @@ def main() -> int:
         check("the catalog lists the cell type with its data", gmx["data"] == ["CTCF", "RNAPII", "Hi-C", "enhancers"], str(gmx))
         check("the catalog gives the limits and the factor choices", cat["max_structures"] == 100 and cat["max_region_mb"] == 20 and cat["factors"] == ["CTCF", "RNAPII", "CTCF+RNAPII"], str(cat)[:200])
         check("the catalog says HiCDiffusion is not set up", cat["hicdiffusion"] is False)
+        check("the catalog says which call sets have a sample table", cat["sv_sets"]["DEMO"]["sample_table"] is True and cat["sv_sets"]["BARE"]["sample_table"] is False, str(cat["sv_sets"]))
+        t = c.get("/api/sv_sets/DEMO/samples").json()
+        check("a call set's sample table lists each sample with its parents", t["columns"][0] == "sample" and t["rows"][0] == ["P1", "female", "PUR", "AMR", "", "P2"], str(t))
+        check("a call set without a table is a 404", c.get("/api/sv_sets/BARE/samples").status_code == 404 and c.get("/api/sv_sets/NOPE/samples").status_code == 404)
 
         r = c.get("/api/region", params={"cell": "GMX", "q": "alpha"}).json()
         check("a gene name in lower case resolves to its window", r["gene"] == "ALPHA" and r["chrom"] == "chr1" and r["end"] - r["start"] == 2_000_000, str(r))

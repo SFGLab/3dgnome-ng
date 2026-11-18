@@ -27,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import explore, hicdiffusion, lists, owndata, remote
-from .catalog import BACKGROUNDS, FACTOR_CHOICES, Catalog
+from .catalog import BACKGROUNDS, FACTOR_CHOICES, SAMPLE_COLUMNS, Catalog
 from .jobs import JobRequest, _member, request_key
 from .queue import enqueue, queue_position, sweep_private
 from .regions import HICDIFFUSION_SPAN, RegionError, parse_region
@@ -61,6 +61,22 @@ class StripBase:
 def create_app() -> FastAPI:
     s = Settings.from_env()
     catalog = Catalog.load(s.data_dir)
+    sample_tables: dict[str, list[list[str]]] = {}
+
+    def sample_rows(name: str) -> list[list[str]] | None:
+        """The sample table of a call set, read once, or None for a set without one."""
+        sv = catalog.sv_sets.get(name)
+        if sv is None or sv.samples_table is None:
+            return None
+        if name not in sample_tables:
+            sample_tables[name] = sv.sample_rows()
+        return sample_tables[name]
+
+    def sample_note(request: dict[str, object]) -> str:
+        """Population, superpopulation and sex of a job's hosted sample, or an empty string."""
+        rows = sample_rows(str(request.get("sv_set", ""))) or []
+        row = next((r for r in rows if r[0] == request.get("sample")), None)
+        return ", ".join(v for v in (row[2], row[3], row[1]) if v) if row else ""
     templates = Jinja2Templates(directory=str(HERE / "templates"))
 
     def pretty_region(text: str) -> str:
@@ -514,6 +530,14 @@ def create_app() -> FastAPI:
         d = job_dir("private", key)
         return JSONResponse(json.loads((d / "status.json").read_text()))
 
+    @app.get("/api/sv_sets/{name}/samples")
+    def api_sv_samples(name: str) -> JSONResponse:
+        """Sex, population and parents of each sample of a call set that has the table."""
+        rows = sample_rows(name)
+        if rows is None:
+            return JSONResponse({"error": f"no sample table for {name!r}"}, 404)
+        return JSONResponse({"columns": list(SAMPLE_COLUMNS), "rows": rows})
+
     @app.get("/api/catalog")
     def api_catalog() -> dict[str, object]:
         return {
@@ -521,7 +545,10 @@ def create_app() -> FastAPI:
                 k: {"label": c.label, "description": c.description, "data": c.data, "lymphoblastoid": c.lymphoblastoid, "note": c.note}
                 for k, c in catalog.cell_types.items()
             },
-            "sv_sets": {k: {"label": v.label, "samples": v.samples} for k, v in catalog.sv_sets.items()},
+            "sv_sets": {
+                k: {"label": v.label, "samples": v.samples, "sample_table": v.samples_table is not None}
+                for k, v in catalog.sv_sets.items()
+            },
             "factors": list(FACTOR_CHOICES),
             "max_region_mb": s.max_span / 1e6,
             "max_structures": s.max_structures,
@@ -548,7 +575,9 @@ def create_app() -> FastAPI:
         @app.get(base + "/summary", name=f"{kind}_summary")
         def ex_summary(key: str) -> JSONResponse:
             d = guard(key)
-            return JSONResponse(explore.summary(d, queue_position(s, d)))
+            summary = explore.summary(d, queue_position(s, d))
+            summary["sample_note"] = sample_note(summary["request"])
+            return JSONResponse(summary)
 
         @app.get(base + "/structure/{i}", name=f"{kind}_structure")
         def ex_structure(key: str, i: int) -> JSONResponse:

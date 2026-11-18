@@ -87,6 +87,8 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   const cells = Object.keys(catalog.data?.cell_types ?? {})
   const lookup = ownCell ? form.own.loopsFrom || cells[0] || 'GM12878' : form.cell
   const region = useRegion(lookup, form.region)
+  const hasSampleTable = Boolean(catalog.data?.sv_sets[form.svSet]?.sample_table)
+  const sampleTable = useQuery({ queryKey: ['sample-table', form.svSet], queryFn: () => api.sampleTable(form.svSet), enabled: hasSampleTable, staleTime: Infinity })
   const schema = useQuery({
     queryKey: ['settings', lookup],
     queryFn: () => api.settings(lookup),
@@ -171,6 +173,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
               sample={form.sample}
               haplotype={form.haplotype}
               vcfUpload={form.vcfUpload}
+              sampleTable={hasSampleTable ? sampleTable.data : undefined}
               onChange={set}
               onOpen={(mode, file) => setSvDialog({ mode, file })}
             />
