@@ -5,6 +5,9 @@ add it to the catalog.
         --gtf gencode.v40.basic.annotation.gtf --enhancers <CELL>_enhancers_hg38.bed \\
         [--label "GM12878, lymphoblastoid"] [--lymphoblastoid] [--note "..."]
 
+`--genes` takes the genes.tsv of a cell type already built in place of `--gtf`. The table is the
+same for every cell type of one annotation.
+
 Reads, from `<repo data dir>/<CELL>/`, the production CTCF anchors and the cross line inputs of
 playground/rnapii/crosscell_prep.py, the Hi-C singletons, segments and centromeres, and takes
 the arm C config from slurm/ensemble as the template. Files are copied, never linked, so the
@@ -53,7 +56,8 @@ def main() -> None:
     ap.add_argument("repo_data")
     ap.add_argument("site_data")
     ap.add_argument("cell")
-    ap.add_argument("--gtf", required=True)
+    ap.add_argument("--gtf", default="")
+    ap.add_argument("--genes", default="", help="a genes.tsv already built from the annotation, in place of --gtf")
     ap.add_argument("--enhancers", required=True)
     ap.add_argument("--label", default="")
     ap.add_argument("--lymphoblastoid", action="store_true")
@@ -61,6 +65,8 @@ def main() -> None:
     ap.add_argument("--singletons", default="", help="the Hi-C singletons, when not under the repo data dir")
     ap.add_argument("--contact-map", default="", help="a cooler URI at 1 kb on the server, for the stretches without loops")
     a = ap.parse_args()
+    if bool(a.gtf) == bool(a.genes):
+        raise SystemExit("give one of --gtf and --genes")
     c = a.cell
     src = Path(a.repo_data) / c
     site = Path(a.site_data)
@@ -85,7 +91,12 @@ def main() -> None:
         shutil.copyfile(p, dest / name)
     with (dest / "config.ini").open("a") as fh:
         fh.write(HOLES)
-    n = genes_from_gtf(Path(a.gtf), dest / "genes.tsv")
+    if a.genes:
+        shutil.copyfile(a.genes, dest / "genes.tsv")
+        with (dest / "genes.tsv").open() as fh:
+            n = sum(1 for _ in fh) - 1
+    else:
+        n = genes_from_gtf(Path(a.gtf), dest / "genes.tsv")
     cat_path = site / "catalog.json"
     cat = json.loads(cat_path.read_text()) if cat_path.is_file() else {"cell_types": {}, "sv_sets": {}}
     cat["cell_types"][c] = {

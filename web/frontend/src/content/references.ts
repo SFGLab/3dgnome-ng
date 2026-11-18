@@ -113,7 +113,7 @@ export const REFERENCES: Reference[] = [
     authors: 'Korsak S, Plewczynski D', venue: 'Methods 223, 106-117',
   },
   {
-    key: 'tang2015', group: 'data', year: 2015, doi: '10.1016/j.cell.2015.11.024',
+    key: 'tang2015', group: 'algorithms', year: 2015, doi: '10.1016/j.cell.2015.11.024',
     title: 'CTCF-mediated human 3D genome architecture reveals chromatin topology for transcription',
     authors: 'Tang Z, Luo OJ, Li X, et al.', venue: 'Cell 163, 1611-1627',
   },
@@ -185,9 +185,9 @@ const fourDn = (id: string): Accession => ({ id, url: `https://data.4dnucleome.o
 const geo = (id: string): Accession => ({ id, url: `https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=${id}` })
 
 export const DATA_SOURCES: DataSource[] = [
-  { data: 'CTCF ChIA-PET loops, GM12878', usedFor: 'loops', accessions: [geo('GSE72816')], label: 'Tang et al., Cell 2015', ref: 'tang2015' },
-  { data: 'CTCF ChIA-PET loops, H1ESC', usedFor: 'loops', accessions: [], pending: 'accession to confirm', label: '4DN Network, Nature 2017', ref: '4dn2017' },
-  { data: 'CTCF ChIA-PET loops, HFFc6', usedFor: 'loops', accessions: [], pending: 'accession to confirm', label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'CTCF in situ ChIA-PET loops, GM12878', usedFor: 'loops', accessions: [fourDn('4DNES7IB5LY9'), encode('ENCSR184YZV')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'CTCF in situ ChIA-PET loops, H1ESC', usedFor: 'loops', accessions: [fourDn('4DNESR9S8R38'), encode('ENCSR095SXC'), geo('GSE242609')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'CTCF in situ ChIA-PET loops, HFFc6', usedFor: 'loops', accessions: [fourDn('4DNESCQ7ZD21')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
   {
     data: 'RNAPII ChIA-PET loops and peaks, GM12878', usedFor: 'loops',
     accessions: ['ENCSR905HWW', 'ENCFF040KUS', 'ENCFF913VWM', 'ENCFF109HCZ', 'ENCFF578JKO'].map(encode),

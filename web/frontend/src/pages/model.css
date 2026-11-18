@@ -68,8 +68,15 @@
 .cell-card.own {
   border-style: dashed;
   border-color: var(--faint);
-  cursor: not-allowed;
-  opacity: 0.7;
+}
+
+.cell-card.own[aria-checked='true'] {
+  border-color: var(--accent);
+}
+
+/* The own data card is the last card. As the first card of a row it takes the whole row. */
+.cell-card.own:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .cell-name {
@@ -170,10 +177,13 @@
   cursor: pointer;
 }
 
+/* A tag too long to share the line with the title goes below it. */
 .example-top {
   display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 2px 8px;
 }
 
 .example-gene {
@@ -184,6 +194,7 @@
 .example-cell {
   font-size: 11px;
   color: var(--faint);
+  white-space: nowrap;
 }
 
 .example-desc {
