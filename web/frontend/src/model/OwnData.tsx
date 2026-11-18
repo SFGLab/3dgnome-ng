@@ -236,16 +236,16 @@ function ContactsTab({
         </label>
       )}
       {route === 'bedpe' && (
-        <label className="add-file">
-          <Upload size={14} aria-hidden /> Choose a BEDPE file of the region
-          <input type="file" className="visually-hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
-        </label>
-      )}
-      {route === 'bedpe' && (
         <p className="columns">
           <span>Columns</span>
           <code>chr1 start1 end1 chr2 start2 end2 count</code>
         </p>
+      )}
+      {route === 'bedpe' && (
+        <label className="add-file">
+          <Upload size={14} aria-hidden /> Choose a BEDPE file of the region
+          <input type="file" className="visually-hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+        </label>
       )}
       {entry && <ContactCard entry={entry} onRemove={onRemove} />}
       <div className="contact-card hint-card">

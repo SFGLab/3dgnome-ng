@@ -151,7 +151,12 @@
   font-weight: 400;
 }
 
+/* Every block of a step is 14px under the one before it, whichever part of the step it belongs
+   to. A step can hold two parts, the choice and the file. */
 .dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   padding: 18px 22px;
   overflow-y: auto;
 }
@@ -159,14 +164,14 @@
 .own-tab {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 /* The dialog's body has three text styles: plain text, a label and a line of code. */
 .own-tab .rule {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .own-tab .rule p,
@@ -460,7 +465,7 @@
 .own-select {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   color: var(--ink);
   font-size: 13px;
   font-weight: 600;
