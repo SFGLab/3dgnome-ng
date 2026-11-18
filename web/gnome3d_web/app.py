@@ -727,6 +727,8 @@ def create_app() -> FastAPI:
                 f"Build with BASE_PATH={s.base_path or '/'} npm run build in web/frontend, or set BASE_PATH to match.",
                 503,
             )
-        return HTMLResponse(html)
+        # The page names its scripts by their hash. A browser asks for the page anew each time, so a
+        # new deployment is seen on the next load.
+        return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
     return app
