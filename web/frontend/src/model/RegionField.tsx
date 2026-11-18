@@ -21,23 +21,34 @@ export function useRegion(cell: string, text: string) {
 const maybeGene = (text: string) => text.length >= 2 && !text.includes(':')
 
 /** The region field. Typed letters list the genes that match under the field, each with its
- * position. A click, or the arrow keys and Enter, puts a gene's name in the field. */
+ * position. A click, or the arrow keys and Enter, puts a gene's name in the field.
+ *
+ * The form gets coordinates as they are typed. It gets a gene name once the name is chosen from
+ * the list, Enter is pressed or the field is left. A name still being typed can pass through
+ * the names of other genes, and each would draw its loops under the field and move the form. */
 export function RegionField({ cell, value, onChange }: { cell: string; value: string; onChange: (v: string) => void }) {
+  const [draft, setDraft] = useState(value)
+  useEffect(() => setDraft(value), [value])
   const region = useRegion(cell, value)
-  const text = value.trim()
+  const text = draft.trim()
   const typed = useDebounced(text, 150)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
+  const settled = draft === value
   const genes = useQuery({ queryKey: ['genes', cell, typed], queryFn: () => api.genes(cell, typed), enabled: open && maybeGene(typed), staleTime: 60_000, retry: false })
   const found = open && maybeGene(text) && typed === text ? (genes.data ?? []) : []
   // A list of the one gene already in the field offers nothing.
   const options = found.length === 1 && found[0].name.toUpperCase() === text.toUpperCase() ? [] : found
+  const commit = (v: string) => {
+    setDraft(v)
+    if (v !== value) onChange(v)
+  }
   const pick = (name: string) => {
-    onChange(name)
+    commit(name)
     setOpen(false)
   }
-  // A part of a gene name is not an error while the list offers its genes.
-  const failed = region.isError && options.length === 0
+  // A name still being typed is not an error, nor is a part of a name the list offers genes for.
+  const failed = settled && region.isError && options.length === 0
   return (
     <div className="region-field">
       <label htmlFor="region">Region, chr:start-end or a gene name</label>
@@ -49,19 +60,28 @@ export function RegionField({ cell, value, onChange }: { cell: string; value: st
           aria-controls="region-genes"
           aria-autocomplete="list"
           aria-activedescendant={options[active] ? `region-gene-${active}` : undefined}
-          value={value}
+          value={draft}
           placeholder="TNFRSF8 or chr1:11,500,000-12,600,000"
           autoComplete="off"
           spellCheck={false}
           onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
+          onBlur={() => {
+            setOpen(false)
+            commit(draft)
+          }}
           onChange={(e) => {
-            onChange(e.target.value)
+            const v = e.target.value
+            setDraft(v)
+            // Coordinates, and an emptied field, reach the form at once.
+            if (v.includes(':') || v.trim() === '') onChange(v)
             setOpen(true)
             setActive(0)
           }}
           onKeyDown={(e) => {
-            if (!options.length) return
+            if (!options.length) {
+              if (e.key === 'Enter') commit(draft)
+              return
+            }
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
               e.preventDefault()
               setActive((active + (e.key === 'ArrowDown' ? 1 : options.length - 1)) % options.length)
@@ -73,7 +93,7 @@ export function RegionField({ cell, value, onChange }: { cell: string; value: st
             }
           }}
         />
-        {region.data && <span className="resolved">{region.data.label}</span>}
+        {settled && region.data && <span className="resolved">{region.data.label}</span>}
       </div>
       {options.length > 0 && (
         <ul id="region-genes" role="listbox" aria-label="Genes" className="gene-options">

@@ -50,13 +50,19 @@ describe('Model a region page', () => {
 
   it('resolves a gene name to its region', async () => {
     renderModel()
-    fireEvent.change(await screen.findByLabelText('Region, chr:start-end or a gene name'), { target: { value: 'TNFRSF8' } })
+    // A gene name reaches the form once the field is left.
+    const field = await screen.findByLabelText('Region, chr:start-end or a gene name')
+    fireEvent.change(field, { target: { value: 'TNFRSF8' } })
+    fireEvent.blur(field)
     expect(await screen.findByText('chr1:11,500,000-12,600,000, 1.1 Mb')).toBeInTheDocument()
   })
 
   it('shows the error of a region it cannot resolve', async () => {
     renderModel()
-    fireEvent.change(await screen.findByLabelText('Region, chr:start-end or a gene name'), { target: { value: 'nowhere' } })
+    const field = await screen.findByLabelText('Region, chr:start-end or a gene name')
+    fireEvent.change(field, { target: { value: 'nowhere' } })
+    expect(screen.queryByText(/is neither chr:start-end nor a known gene name/)).toBeNull()
+    fireEvent.keyDown(field, { key: 'Enter' })
     expect(await screen.findByText(/is neither chr:start-end nor a known gene name/)).toBeInTheDocument()
   })
 
@@ -89,7 +95,7 @@ describe('Model a region page', () => {
     const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: '/jobs/abcdef0123456789' }]]])
     const onSubmitted = vi.fn()
     renderModel('/model?example=TNFRSF8', onSubmitted)
-    fireEvent.change(await screen.findByLabelText('Job name, optional'), { target: { value: 'my run' } })
+    fireEvent.change(await screen.findByLabelText('Job name (optional)'), { target: { value: 'my run' } })
     fireEvent.change(screen.getByLabelText('polymer_exponent'), { target: { value: '0.3' } })
     fireEvent.click(screen.getByRole('button', { name: /Build 100 structures/ }))
     await waitFor(() => expect(onSubmitted).toHaveBeenCalledWith('/jobs/abcdef0123456789'))

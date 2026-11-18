@@ -69,6 +69,6 @@ describe('EnsembleFields', () => {
     fireEvent.change(n, { target: { value: '250' } })
     fireEvent.blur(n)
     expect(onChange).toHaveBeenLastCalledWith({ structures: 100 })
-    expect(screen.getByLabelText('Job name, optional')).toHaveAttribute('placeholder', 'e.g. TNFRSF8 with RNAPII loops')
+    expect(screen.getByLabelText('Job name (optional)')).toHaveAttribute('placeholder', 'e.g. TNFRSF8 with RNAPII loops')
   })
 })

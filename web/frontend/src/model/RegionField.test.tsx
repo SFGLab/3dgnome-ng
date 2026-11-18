@@ -71,8 +71,32 @@ describe('RegionField', () => {
     const field = renderField()
     fireEvent.focus(field)
     fireEvent.change(field, { target: { value: 'TNFRSF8' } })
-    await waitFor(() => expect(screen.getByText('chr1:11,500,000-12,600,000, 1.1 Mb')).toBeInTheDocument())
     await new Promise((r) => setTimeout(r, 250))
     expect(screen.queryByRole('listbox')).toBeNull()
+    fireEvent.keyDown(field, { key: 'Enter' })
+    await waitFor(() => expect(screen.getByText('chr1:11,500,000-12,600,000, 1.1 Mb')).toBeInTheDocument())
+  })
+
+  it('gives the form a gene name once it is chosen, entered or the field is left, and coordinates at once', async () => {
+    const seen: string[] = []
+    function Spy() {
+      const [value, setValue] = useState('')
+      return <RegionField cell="GM12878" value={value} onChange={(v) => { seen.push(v); setValue(v) }} />
+    }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <Spy />
+      </QueryClientProvider>,
+    )
+    const field = screen.getByLabelText('Region, chr:start-end or a gene name')
+    fireEvent.focus(field)
+    fireEvent.change(field, { target: { value: 'MY' } })
+    fireEvent.change(field, { target: { value: 'MYC' } })
+    expect(seen).toEqual([])
+    fireEvent.blur(field)
+    expect(seen).toEqual(['MYC'])
+    fireEvent.change(field, { target: { value: 'chr8:1-2' } })
+    expect(seen).toEqual(['MYC', 'chr8:1-2'])
   })
 })
