@@ -65,7 +65,7 @@ Left for the maintainer to delete. Nothing was removed.
 
 ## tbooo
 
-Held by the maintainer on 2026-11-18 while the trial and the download run. Plan and findings:
+Held by the maintainer on 2026-11-18 and taken up again the same day. Plan and findings:
 `design/tbooo-data.md`. Code: branch `sv-panel` in `~/Desktop/biobank/tbooo`, not pushed.
 
 | Request | State | Notes |
@@ -75,9 +75,9 @@ Held by the maintainer on 2026-11-18 while the trial and the download run. Plan 
 | Downloader on the 2022 panel with structural variants | done | Commit `0fe656c` |
 | 2022 panel on eden | waiting, job 1945120 | Into `data/raw/1kg/`, checked against the release's manifest |
 | 2022 panel on aragorn | held | After tbooo is consistent |
-| Sweep of the code for mistakes | open | Fixed so far: SGDP sample table and ids `1cc0ff0`, genetic positions of the array files `c9e3f7a`, sample files of the imputed and exome outputs `fe74093`, size of the per sample files `897ea07`. Not read yet: the rest of QC, phenotypes, expression, restricted cohorts. |
+| Sweep of the code for mistakes | open | Fixed so far: SGDP sample table and ids `1cc0ff0`, genetic positions of the array files `c9e3f7a`, sample files of the imputed and exome outputs `fe74093`, size of the per sample files `897ea07`, flags of the participant table and the QC file, and the run targets that did nothing `b24ae1c`. Not read yet: the expression stages and the restricted cohorts. |
 | The 100 TB | done | Cause found and fixed in `897ea07`. The fixed stage is not run yet. |
-| SGDP on GRCh38, phased | held | The trial on chromosome 22 ran, see below. The stage itself is not written. |
+| SGDP on GRCh38, phased | open | The first trial on chromosome 22 ran, see below. A second trial, job 1945205, compares three ways to phase and keep the records the panel lacks. The stage is written after it. |
 | Structural variants for SGDP | held | Imputation, long indels, or HGDP in its place. HGDP is unverified. |
 | Full run on eden | waiting, maintainer | After the branch is complete. Then its data goes to the site. |
 
