@@ -64,7 +64,7 @@ the image at `4f8247e`. Record: `web/deploy/aragorn.md`.
 | Front page line on the old server's 1000 Genomes structures | open | True of the old site, and no longer a difference between the two |
 | Duplication patch in triosformer | open | `web/vendor/VENDORED.md` lists the changes |
 | New site at `/`, old site at `/old` | open | The front page already links to `/old`. The old site has not been served under a prefix. |
-| Trio card on the Results page and figure 2g | waiting, eden jobs | Seven of 396 runs are missing. Poly arm tasks 194 and 195 were resubmitted on 2026-11-18. Tasks 11, 75, 84, 101 and 106 of array 1943270 failed, memory is the likely cause. |
+| Trio card on the Results page and figure 2g | waiting, eden jobs | Six of 396 blocks are missing, none from a fault of the code or of memory. CTCF arm `out/lr_trio_ctcf`, tasks 194 and 195, chr22 of HG00733 and GM19239: both got a bus error at 01:47 on 2026-11-18 on dgx-2 with input/output errors from the shared filesystem, and 195 stayed in the queue until it was cancelled. RNAPOL2 arm `out/lr_trio_rnapol2`, tasks 75, 84, 101 and 106, chr9 and chr10 of HG00731 and chr12 of HG00514 and GM19238: `CUDA_ERROR_LAUNCH_FAILED` on dgx-1, 5 of the 65 tasks the node ran, at 10 to 12 GB of the 64 GB asked. The resubmission 1945129 of 194 and 195 failed at once: it was sent from the tbooo directory without `TRIOS_ROOT` and the arm's `CONFIG_TAG` and `OUT`. The commands that send the six again are in the maintainer's hands. |
 
 ## Other sites on team-aragorn
 
