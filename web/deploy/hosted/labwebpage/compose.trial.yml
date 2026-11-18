@@ -1,0 +1,20 @@
+# A trial copy of the lab page on Django 5.2, on the loopback, on a copy of the site's files.
+# The copy belongs to another user than www-data, so uWSGI takes the site's options on its
+# command line with that user in place of the ini's, and the public directories are opened to
+# nginx:
+#   chmod o+x trial52 && chmod -R o+rX trial52/static_files trial52/uploads
+#   docker compose -f compose.trial.yml up -d
+name: labwebpage-trial
+services:
+  web:
+    image: labwebpage-web:2026-11-18-dj52
+    volumes: ["./trial52:/home/labwebpage"]
+    command: ["uwsgi", "--module", "labwebpage.wsgi:application", "--master", "--vacuum", "--socket", ":9090", "--chdir", "/home/labwebpage", "--uid", "1010", "--gid", "1011"]
+    environment: { DJANGO_SETTINGS_MODULE: "labwebpage.settings.prod" }
+  nginx:
+    image: labwebpage-nginx:2026-11-18
+    ports: ["127.0.0.1:8775:80"]
+    volumes:
+      - "./trial52/labwebpage/settings/nginx:/etc/nginx/templates:ro"
+      - "./trial52:/home/labwebpage:ro"
+    depends_on: [web]
