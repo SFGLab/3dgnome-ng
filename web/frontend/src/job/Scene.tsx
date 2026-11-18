@@ -8,7 +8,7 @@ import { bondRadius, focusMask, fogRange, pickOnChain, stretch } from './chain'
 
 const BACKGROUND = '#FFFFFF'
 /** How solid the chain outside the part in focus is drawn. */
-const GHOST = 0.13
+const GHOST = 0.2
 /** The hovered bead's colour, one no mark uses. */
 const HOVER = '#2A78D6'
 /** Marks drawn over the chain take no pointer events, or the pointer would hit the mark instead
@@ -189,12 +189,14 @@ type PartProps = {
   focus: Uint8Array | null
   /** The part outside the focus, drawn see through. Without it, the part inside, drawn solid. */
   ghost?: boolean
+  /** A pass of the ghost that writes its depth and no colour. */
+  depthOnly?: boolean
 }
 
 /** One part of the chain as lit tubes between beads and spheres at the beads, one instanced mesh
  * each. The solid part holds the beads in focus, or all of them with no focus. The ghost part
  * holds the rest. A bond is in focus when both of its beads are. */
-function ChainPart({ matrices, colors, radius, focus, ghost = false }: PartProps) {
+function ChainPart({ matrices, colors, radius, focus, ghost = false, depthOnly = false }: PartProps) {
   const tubes = useRef<THREE.InstancedMesh>(null)
   const joints = useRef<THREE.InstancedMesh>(null)
   const n = matrices.joints.length
@@ -215,21 +217,27 @@ function ChainPart({ matrices, colors, radius, focus, ghost = false }: PartProps
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     }
   }, [matrices, colors, focus, ghost, n])
-  // The ghost writes no depth, so the solid part shows through the strands in front of it.
-  const material = ghost ? (
+  // The ghost is drawn twice. The first pass writes the depth of its nearest surface and no
+  // colour. The second blends its colour where it is that nearest surface, so every pixel gets
+  // one layer of it. Blended in one pass, the spheres at the beads and the strands behind each
+  // other add up to dots and blotches.
+  const material = depthOnly ? (
+    <meshBasicMaterial colorWrite={false} />
+  ) : ghost ? (
     <meshStandardMaterial roughness={0.5} metalness={0.05} transparent opacity={GHOST} depthWrite={false} />
   ) : (
     <meshStandardMaterial roughness={0.5} metalness={0.05} />
   )
+  const order = depthOnly ? 1 : ghost ? 2 : 0
   return (
     <>
       {n > 1 && (
-        <instancedMesh ref={tubes} args={[undefined, undefined, n - 1]} raycast={noRaycast} frustumCulled={false} renderOrder={ghost ? 1 : 0}>
+        <instancedMesh ref={tubes} args={[undefined, undefined, n - 1]} raycast={noRaycast} frustumCulled={false} renderOrder={order}>
           <cylinderGeometry args={[radius, radius, 1, 10, 1, true]} />
           {material}
         </instancedMesh>
       )}
-      <instancedMesh ref={joints} args={[undefined, undefined, n]} raycast={noRaycast} frustumCulled={false} renderOrder={ghost ? 1 : 0}>
+      <instancedMesh ref={joints} args={[undefined, undefined, n]} raycast={noRaycast} frustumCulled={false} renderOrder={order}>
         <sphereGeometry args={[radius, 12, 10]} />
         {material}
       </instancedMesh>
@@ -243,6 +251,7 @@ function Chain({ points, colors, radius, focus }: { points: [number, number, num
   return (
     <>
       <ChainPart matrices={matrices} colors={colors} radius={radius} focus={focus} />
+      {focus && <ChainPart matrices={matrices} colors={colors} radius={radius} focus={focus} ghost depthOnly />}
       {focus && <ChainPart matrices={matrices} colors={colors} radius={radius} focus={focus} ghost />}
     </>
   )

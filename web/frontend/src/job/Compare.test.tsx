@@ -106,6 +106,24 @@ describe('Compare', () => {
     const table = await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
     fireEvent.click(within(table).getByText('TNFRSF8, enhancer 385 kb away'))
     expect(onGene).toHaveBeenCalledWith('TNFRSF8')
+    expect(screen.queryByRole('button', { name: /Clear the selection/ })).toBeNull()
+  })
+
+  it('clears the selection from the selected row and from the toolbar', async () => {
+    rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
+    const onGene = vi.fn()
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene="TNFRSF8" onGene={onGene} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
+    const table = await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
+    fireEvent.click(within(table).getByText('TNFRSF8, enhancer 385 kb away'))
+    expect(onGene).toHaveBeenLastCalledWith(null)
+    fireEvent.click(screen.getByRole('button', { name: 'Clear the selection of TNFRSF8' }))
+    expect(onGene).toHaveBeenCalledTimes(2)
   })
 
   it('keeps the ten largest changes in their order and puts a selected gene outside them first', () => {

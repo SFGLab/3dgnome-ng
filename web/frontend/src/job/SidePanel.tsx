@@ -49,7 +49,11 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
   const n = summary.structures
   // The file of the structure in view is kept in sight in the list of all of them.
   const shown = useRef<HTMLLIElement>(null)
-  useEffect(() => shown.current?.scrollIntoView?.({ block: 'nearest' }), [selected])
+  useEffect(() => {
+    // In braces: a browser may return a promise from the scroll and an effect must return nothing
+    // but its cleanup.
+    shown.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [selected])
   const save = (value: string) => {
     setName(value.trim())
     setEditing(false)

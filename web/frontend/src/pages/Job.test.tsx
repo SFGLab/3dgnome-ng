@@ -56,6 +56,23 @@ describe('Job explorer', () => {
     expect(screen.getByRole('link', { name: /all files, zip/ })).toHaveAttribute('href', `/api/jobs/${KEY}/files.zip`)
   })
 
+  it('survives a browser whose scroll returns a promise when the structure changes', async () => {
+    const scroll = vi.fn(() => Promise.resolve())
+    const before = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scroll as unknown as typeof before
+    try {
+      mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+      renderJob()
+      await screen.findByText('Done in 6 min 12 s')
+      fireEvent.click(screen.getByRole('button', { name: 'Next structure' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Next structure' }))
+      expect(scroll).toHaveBeenCalled()
+      expect(screen.getByLabelText('Structure')).toHaveValue('3')
+    } finally {
+      Element.prototype.scrollIntoView = before
+    }
+  })
+
   it('names own loops and an uploaded contact map in the side panel', async () => {
     const own = { ...SUMMARY_DONE, request: { ...SUMMARY_DONE.request, cell_type: 'own', own: { loops: ['CTCF', 'H3K27ac'], anchors: false, contacts: true, enhancers: false } } }
     mockApi([[/summary$/, () => [200, own]]])

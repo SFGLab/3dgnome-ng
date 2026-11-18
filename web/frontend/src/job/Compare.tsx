@@ -167,8 +167,9 @@ export function Compare({
   gene: string | null
   initial?: string | null
   onOther?: (url: string | null) => void
-  /** Called with the gene of a clicked row of the table. Both sides then mark its pair. */
-  onGene?: (gene: string) => void
+  /** Called with the gene of a clicked row of the table. Both sides then mark its pair. A click
+   * on the selected row, or on the link of the toolbar, calls it with null. */
+  onGene?: (gene: string | null) => void
   onClose: () => void
 }) {
   const [other, setOtherState] = useState<{ kind: 'jobs' | 'p'; key: string } | null>(initial ? parseJobUrl(initial) : null)
@@ -196,6 +197,11 @@ export function Compare({
           <label className="check">
             <input type="checkbox" checked={cmp.data?.same_region ?? false} readOnly disabled /> Same region
           </label>
+        )}
+        {gene && onGene && (
+          <button type="button" className="link-button" onClick={() => onGene(null)}>
+            {`Clear the selection of ${gene}`}
+          </button>
         )}
         <button type="button" className="link-button" onClick={onClose}>
           Close the comparison
@@ -236,7 +242,7 @@ export function Compare({
           </thead>
           <tbody>
             {shownRows(cmp.data.rows, gene).map((r) => (
-              <tr key={r.gene} className={r.gene === gene ? 'selected' : undefined} aria-selected={r.gene === gene} onClick={() => onGene?.(r.gene)}>
+              <tr key={r.gene} className={r.gene === gene ? 'selected' : undefined} aria-selected={r.gene === gene} onClick={() => onGene?.(r.gene === gene ? null : r.gene)}>
                 <td>{`${r.gene}, enhancer ${kb(r.linear_bp)} away`}</td>
                 <td>{`${r.a.mean.toFixed(1)} ± ${r.a.sd.toFixed(1)}`}</td>
                 <td>{`${r.b.mean.toFixed(1)} ± ${r.b.sd.toFixed(1)}`}</td>
