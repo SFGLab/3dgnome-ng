@@ -64,8 +64,12 @@ export function Progress({ summary }: { summary: Summary }) {
       el.scrollTop = el.scrollHeight
     }
     toEnd()
-    // Once more after the layout has settled, a late font changes the height of the lines.
+    // Once more after the layout has settled and once the log's font has loaded, which changes
+    // the height of its lines.
     const frame = requestAnimationFrame(toEnd)
+    void document.fonts?.ready.then(() => {
+      if (follow.current) toEnd()
+    })
     return () => cancelAnimationFrame(frame)
   }, [summary.log_recent])
   return (

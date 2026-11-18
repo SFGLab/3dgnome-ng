@@ -1,7 +1,8 @@
 .job-page {
   display: grid;
   grid-template-columns: 320px 1fr;
-  min-height: calc(100vh - 100px);
+  /* The screen less the header, 59px, and the footer, 55px. */
+  min-height: calc(100vh - 114px);
 }
 
 .job-side {
@@ -1276,10 +1277,12 @@
 
 /* A running job takes the whole of the page's main part: the stage, the bar and the stages over
    the log, which has the rest of the screen. */
+/* The height is the page's own, the screen less the header and the footer, so the log can take
+   all that the header of the progress leaves. */
 .job-message:has(> .progress) {
   display: flex;
-  flex: 1;
-  min-height: 0;
+  box-sizing: border-box;
+  height: max(calc(100vh - 114px), 420px);
   padding: 20px 24px;
 }
 
@@ -1289,6 +1292,7 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
 }
 
 .progress-head {
@@ -1310,11 +1314,10 @@
   font: 13px var(--mono);
 }
 
-/* The log has the screen under the header and scrolls inside itself, so the page does not. */
+/* The log has the screen under the header, down to the footer, and scrolls inside itself. */
 .log-tail.live {
-  flex: none;
-  height: calc(100vh - 280px);
-  min-height: 240px;
+  flex: 1;
+  min-height: 0;
   max-height: none;
   margin: 0;
   white-space: pre-wrap;
