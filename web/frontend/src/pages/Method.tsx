@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { CitedText } from '../components/CitedText'
 import { Equation, type EquationName } from '../components/Equation'
+import { TermSketch } from '../components/TermSketch'
 import { REFERENCES, referenceLink, referenceText } from '../content/references'
 import engineBatching from '../assets/engine/engine_batching.svg'
 import engineGraph from '../assets/engine/engine_graph.svg'
@@ -53,12 +54,13 @@ const CHAIN_TERMS: Term[] = [
   ['Confinement', 't_confinement', 'beads outside a sphere around the block centre', '[5, 15]'],
 ]
 
-function Terms({ label, terms }: { label: string; terms: Term[] }) {
+function Terms({ label, terms, phase }: { label: string; terms: Term[]; phase: 'anchor' | 'chain' }) {
   return (
     <table className="doc-table" aria-label={label}>
       <thead>
         <tr>
           <th>Term</th>
+          <th>Before and after</th>
           <th>Energy of one pair or window</th>
           <th>Applies to</th>
           <th>Source</th>
@@ -68,6 +70,9 @@ function Terms({ label, terms }: { label: string; terms: Term[] }) {
         {terms.map(([name, eq, applies, source]) => (
           <tr key={name}>
             <td>{name}</td>
+            <td className="sketch-cell">
+              <TermSketch phase={phase} name={name} />
+            </td>
             <td>
               <Equation name={eq} />
             </td>
@@ -167,7 +172,8 @@ export function Method() {
           <div className="equations">
             <Equation name="anchor_energy" />
           </div>
-          <Terms label="Anchor energy terms" terms={ANCHOR_TERMS} />
+          <Terms label="Anchor energy terms" terms={ANCHOR_TERMS} phase="anchor" />
+          <p className="panel-caption">Each drawing shows a few anchors in their order along the genome, before the term acts and after. Blue marks the anchors and the distance or radius the term reads.</p>
         </Section>
 
         <Section id="chain">
@@ -176,7 +182,8 @@ export function Method() {
             <Equation name="chain_energy" />
             <Equation name="acceptance_plain" />
           </div>
-          <Terms label="Chain energy terms" terms={CHAIN_TERMS} />
+          <Terms label="Chain energy terms" terms={CHAIN_TERMS} phase="chain" />
+          <p className="panel-caption">Each drawing shows a short chain, before the term acts and after. Dark beads are anchors and the arrows of the orientation term are the directions of the CTCF motifs.</p>
           <div className="panels">
             {[
               [methodAnchors, 'a', 'Anchor positions after the fit. TNFRSF8 locus, GM12878, CTCF and RNAPII loops.'],
@@ -220,12 +227,13 @@ export function Method() {
         </Section>
 
         <Section id="variants">
-          <P>{'Structural variants change the loops before the anchor phase. The approach comes from Sadowski and colleagues [12] and the rules below extend theirs.'}</P>
-          <div className="cards">
+          <P>{'Structural variants change the loops before the anchor phase. The approach comes from Sadowski and colleagues [12] and the rules below extend theirs. Deletions, insertions, inversions and tandem duplications are applied. An anchor that a variant leaves without a loop forms one with the nearest anchor in convergent orientation. The contacts of the Hi-C map move with the positions and both copies of a duplication get the contacts of the duplicated stretch.'}</P>
+          <div className="cards two">
             {[
               ['Deletion', 'Anchors inside the deletion are removed with their loops. Positions after it shift by its length.'],
               ['Insertion', 'The inserted sequence is scanned for CTCF motifs. A motif above the score cutoff becomes an anchor and forms a loop with the nearest anchor in convergent orientation.'],
               ['Inversion', 'Anchors inside the inversion flip orientation and lose their loops. Each then forms a loop with the nearest anchor in convergent orientation.'],
+              ['Duplication', 'The copy is placed right after the original. Anchors inside the duplication are copied with the loops among them. A loop to an anchor before it stays on the first copy and a loop to an anchor after it moves to the second. Positions after it shift by its length.'],
             ].map(([title, text]) => (
               <div key={title} className="card">
                 <h3>{title}</h3>
