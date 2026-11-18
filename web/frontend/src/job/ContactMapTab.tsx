@@ -258,7 +258,6 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
               <div className="map-loading-card">
                 <span className="map-spinner" aria-hidden />
                 <strong>{`Reading the map at ${res / 1000} kb.`}</strong>
-                {(upperKind === 'hic' || lowerKind === 'hic') && <span>The first view of a resolution reads the deep Hi-C map, about ten seconds.</span>}
               </div>
             </div>
           )}
