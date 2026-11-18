@@ -117,6 +117,14 @@ select {
   transform: translateY(1px) scale(0.985);
 }
 
+/* A link is underlined under the pointer. Many components draw their links without the line,
+   so the rule is marked important. A link drawn as a button, a card or the site's name keeps the
+   brightness change alone. */
+a:not(.button, .button-link, .cite-button, .chip-button, .action, .brand, .recent-job):hover {
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
+}
+
 :where(a, input[type='checkbox'], input[type='radio'], label:has(input[type='checkbox'])):where(:not(:disabled)):active {
   filter: var(--hover) opacity(0.75);
 }
