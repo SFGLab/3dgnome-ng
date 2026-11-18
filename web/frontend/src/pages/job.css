@@ -1132,6 +1132,70 @@
   cursor: pointer;
 }
 
+/* The head of the side that shows this job is not a button. */
+.panel-head.fixed {
+  cursor: default;
+}
+
+.panel-head > svg {
+  flex: none;
+  margin-left: auto;
+}
+
+.panel-pick {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The jobs a side can show, under its head and over the view. */
+.panel-menu {
+  position: absolute;
+  z-index: 5;
+  top: 100%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+
+.menu-item {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: 13px var(--font);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--accent-soft);
+}
+
+.panel-menu .paste {
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+/* The side with no job chosen yet. */
+.compare-box.empty-side {
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .factor-line {
   width: 12px;
   height: 3px;
@@ -1276,4 +1340,8 @@
 /* The wrapper drei puts around a label over the canvas. It must not take the pointer from the canvas. */
 .scene-mark {
   pointer-events: none;
+}
+
+.compare-toolbar .link-button {
+  align-self: center;
 }

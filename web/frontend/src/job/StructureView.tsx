@@ -32,8 +32,8 @@ type Props = {
   onMode: (m: Mode) => void
   markers?: Marker[]
   highlight?: [number, number, number][][]
-  /** The beads of a selection, a gene's promoter and enhancer or a measured pair. The chain
-   * between two of them, or around one, stays at full strength and the rest fades. */
+  /** The beads of a selection, a gene's promoter and enhancer or a measured pair. A short
+   * stretch of the chain at each stays solid and the rest is drawn see through. */
   focusBeads?: number[]
   onPickBead?: (bead: number) => void
   toolbarStart?: ReactNode
@@ -79,7 +79,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
   const scene = useRef<SceneHandle>(null)
   const box = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<HoverInfo | null>(null)
-  // The fade follows the pointer with a short delay and leaves with a longer one, so a pointer
+  // The focus follows the pointer with a short delay and leaves with a longer one, so a pointer
   // that crosses the model does not flash the whole chain.
   const [held, setHeld] = useState<number | null>(null)
   const over = hover?.index ?? null
@@ -93,7 +93,9 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
   const focus = useMemo(() => {
     const n = structure.chain.length
     const at = focusBeads.map((k) => chainAt(structure.chain, (structure.beads[k][0] + structure.beads[k][1]) / 2))
-    const ranges: [number, number][] = at.length === 2 ? [[at[0], at[1]]] : at.map((i) => stretch(i, n, FOCUS_REACH))
+    // A short stretch at each selected bead. The whole chain between two beads far apart on the
+    // genome is most of the model and would leave nothing faded.
+    const ranges: [number, number][] = at.map((i) => stretch(i, n, FOCUS_REACH))
     if (held !== null && held < n) ranges.push(stretch(held, n, FOCUS_REACH))
     return ranges
   }, [structure, beadsKey, held]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -203,7 +205,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
         </ul>
       </div>
       <p className="view-caption">
-        Structure {index} of {total}, about one bead per kb. Drag to rotate and scroll to zoom. Hover over a bead to see its position. The chain near the pointer, or between two selected beads, keeps its colour and the rest fades. Click two beads to measure the distance between them.
+        Structure {index} of {total}, about one bead per kb. Drag to rotate and scroll to zoom. Hover over a bead to see its position. The chain at the pointer and at each selected bead stays solid and the rest turns see through. Click two beads to measure the distance between them.
       </p>
     </div>
   )

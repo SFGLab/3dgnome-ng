@@ -47,12 +47,32 @@ describe('Compare', () => {
     rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
     rememberJob({ url: `/jobs/${KEY}`, label: 'GM12878 TNFRSF8', name: 'this one', at: 3 })
     renderCompare()
-    const choose = screen.getByRole('region', { name: 'Compare with another job' })
+    // Both sides are there from the start and the empty side has its list of jobs open.
+    expect(await screen.findByText('CTCF and RNAPII loops')).toBeInTheDocument()
+    expect(screen.getByText('Choose a job to compare')).toBeInTheDocument()
+    const choose = screen.getByRole('group', { name: 'Jobs to compare with' })
     expect(within(choose).getByRole('button', { name: /TNFRSF8 CTCF/ })).toBeInTheDocument()
     expect(within(choose).queryByRole('button', { name: /this one/ })).toBeNull()
     fireEvent.change(within(choose).getByPlaceholderText('Paste a job link'), { target: { value: `https://site/jobs/${OTHER}` } })
     fireEvent.click(within(choose).getByRole('button', { name: 'Compare' }))
     expect(await screen.findByText('CTCF loops')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Jobs to compare with' })).toBeNull()
+  })
+
+  it('opens the jobs under the head of the other side to change it', async () => {
+    rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
+    rememberJob({ url: '/jobs/cccc3333dddd4444', label: 'GM12878 MYC', name: '', at: 1 })
+    renderCompare()
+    fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
+    const head = (await screen.findByText('CTCF loops')).closest('button')!
+    expect(head).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(head)
+    const menu = screen.getByRole('group', { name: 'Jobs to compare with' })
+    expect(within(menu).getByRole('button', { name: 'GM12878 MYC' })).toBeInTheDocument()
+    expect(within(menu).queryByRole('button', { name: /TNFRSF8 CTCF/ })).toBeNull()
+    expect(screen.getAllByTestId('scene')).toHaveLength(2)
+    fireEvent.keyDown(head, { key: 'Escape' })
+    expect(screen.queryByRole('group', { name: 'Jobs to compare with' })).toBeNull()
   })
 
   it('shows two panels, the linked view and the table of changes', async () => {

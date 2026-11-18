@@ -7,8 +7,8 @@ import type { CameraLink } from './cameraLink'
 import { bondRadius, focusMask, fogRange, pickOnChain, stretch } from './chain'
 
 const BACKGROUND = '#FFFFFF'
-/** The share of the background mixed into the chain outside the part in focus. */
-const DIM = 0.82
+/** How solid the chain outside the part in focus is drawn. */
+const GHOST = 0.13
 /** The hovered bead's colour, one no mark uses. */
 const HOVER = '#2A78D6'
 /** Marks drawn over the chain take no pointer events, or the pointer would hit the mark instead
@@ -157,65 +157,93 @@ function DepthFog({ radius }: { radius: number }) {
   return null
 }
 
-type ChainProps = {
-  points: [number, number, number][]
+type Matrices = { joints: THREE.Matrix4[]; tubes: THREE.Matrix4[] }
+/** An instance drawn at no size is not drawn. */
+const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0)
+
+/** The place of every bead's sphere and every bond's tube. */
+function chainMatrices(points: [number, number, number][]): Matrices {
+  const q = new THREE.Quaternion()
+  const up = new THREE.Vector3(0, 1, 0)
+  const one = new THREE.Vector3(1, 1, 1)
+  const joints: THREE.Matrix4[] = []
+  const tubes: THREE.Matrix4[] = []
+  for (let i = 0; i < points.length; i++) {
+    const a = new THREE.Vector3(...points[i])
+    joints.push(new THREE.Matrix4().compose(a, q.identity(), one))
+    if (i + 1 < points.length) {
+      const b = new THREE.Vector3(...points[i + 1])
+      const dir = b.clone().sub(a)
+      const len = dir.length()
+      q.setFromUnitVectors(up, len > 0 ? dir.normalize() : up)
+      tubes.push(new THREE.Matrix4().compose(a.clone().add(b).multiplyScalar(0.5), q, new THREE.Vector3(1, len, 1)))
+    }
+  }
+  return { joints, tubes }
+}
+
+type PartProps = {
+  matrices: Matrices
   colors: string[]
   radius: number
   focus: Uint8Array | null
+  /** The part outside the focus, drawn see through. Without it, the part inside, drawn solid. */
+  ghost?: boolean
 }
 
-/** The chain as lit tubes between beads and spheres at the beads, one instanced mesh each. With
- * a part in focus the rest of the chain is faded toward the background. */
-function Chain({ points, colors, radius, focus }: ChainProps) {
+/** One part of the chain as lit tubes between beads and spheres at the beads, one instanced mesh
+ * each. The solid part holds the beads in focus, or all of them with no focus. The ghost part
+ * holds the rest. A bond is in focus when both of its beads are. */
+function ChainPart({ matrices, colors, radius, focus, ghost = false }: PartProps) {
   const tubes = useRef<THREE.InstancedMesh>(null)
   const joints = useRef<THREE.InstancedMesh>(null)
-  const n = points.length
+  const n = matrices.joints.length
   useLayoutEffect(() => {
-    const m = new THREE.Matrix4()
-    const q = new THREE.Quaternion()
-    const up = new THREE.Vector3(0, 1, 0)
-    const one = new THREE.Vector3(1, 1, 1)
+    const c = new THREE.Color()
+    const shown = (inFocus: boolean) => (focus ? inFocus !== ghost : !ghost)
     for (let i = 0; i < n; i++) {
-      const a = new THREE.Vector3(...points[i])
-      joints.current?.setMatrixAt(i, m.compose(a, q.identity(), one))
+      joints.current?.setMatrixAt(i, shown(!focus || focus[i] === 1) ? matrices.joints[i] : HIDDEN)
+      joints.current?.setColorAt(i, c.set(colors[i]))
       if (i + 1 < n && tubes.current) {
-        const b = new THREE.Vector3(...points[i + 1])
-        const dir = b.clone().sub(a)
-        const len = dir.length()
-        q.setFromUnitVectors(up, len > 0 ? dir.normalize() : up)
-        tubes.current.setMatrixAt(i, m.compose(a.clone().add(b).multiplyScalar(0.5), q, new THREE.Vector3(1, len, 1)))
+        tubes.current.setMatrixAt(i, shown(!focus || (focus[i] === 1 && focus[i + 1] === 1)) ? matrices.tubes[i] : HIDDEN)
+        tubes.current.setColorAt(i, c.set(colors[i]))
       }
     }
     for (const mesh of [tubes.current, joints.current]) {
       if (!mesh) continue
       mesh.instanceMatrix.needsUpdate = true
-      mesh.computeBoundingSphere()
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     }
-  }, [points, n])
-  // The colours are set apart from the positions: a hover changes the focus alone.
-  useLayoutEffect(() => {
-    const c = new THREE.Color()
-    const back = new THREE.Color(BACKGROUND)
-    const tone = (i: number) => (focus && !focus[i] ? c.set(colors[i]).lerp(back, DIM) : c.set(colors[i]))
-    for (let i = 0; i < n; i++) {
-      joints.current?.setColorAt(i, tone(i))
-      // A bond is in focus when both of its beads are.
-      if (i + 1 < n) tubes.current?.setColorAt(i, focus && !(focus[i] && focus[i + 1]) ? c.set(colors[i]).lerp(back, DIM) : c.set(colors[i]))
-    }
-    for (const mesh of [tubes.current, joints.current]) if (mesh?.instanceColor) mesh.instanceColor.needsUpdate = true
-  }, [colors, focus, n])
+  }, [matrices, colors, focus, ghost, n])
+  // The ghost writes no depth, so the solid part shows through the strands in front of it.
+  const material = ghost ? (
+    <meshStandardMaterial roughness={0.5} metalness={0.05} transparent opacity={GHOST} depthWrite={false} />
+  ) : (
+    <meshStandardMaterial roughness={0.5} metalness={0.05} />
+  )
   return (
     <>
       {n > 1 && (
-        <instancedMesh ref={tubes} args={[undefined, undefined, n - 1]} raycast={noRaycast}>
+        <instancedMesh ref={tubes} args={[undefined, undefined, n - 1]} raycast={noRaycast} frustumCulled={false} renderOrder={ghost ? 1 : 0}>
           <cylinderGeometry args={[radius, radius, 1, 10, 1, true]} />
-          <meshStandardMaterial roughness={0.5} metalness={0.05} />
+          {material}
         </instancedMesh>
       )}
-      <instancedMesh ref={joints} args={[undefined, undefined, n]} raycast={noRaycast}>
+      <instancedMesh ref={joints} args={[undefined, undefined, n]} raycast={noRaycast} frustumCulled={false} renderOrder={ghost ? 1 : 0}>
         <sphereGeometry args={[radius, 12, 10]} />
-        <meshStandardMaterial roughness={0.5} metalness={0.05} />
+        {material}
       </instancedMesh>
+    </>
+  )
+}
+
+/** The chain. With a part in focus that part is solid and the rest is see through. */
+function Chain({ points, colors, radius, focus }: { points: [number, number, number][]; colors: string[]; radius: number; focus: Uint8Array | null }) {
+  const matrices = useMemo(() => chainMatrices(points), [points])
+  return (
+    <>
+      <ChainPart matrices={matrices} colors={colors} radius={radius} focus={focus} />
+      {focus && <ChainPart matrices={matrices} colors={colors} radius={radius} focus={focus} ghost />}
     </>
   )
 }
