@@ -19,21 +19,49 @@ COPY web/frontend ./
 ARG BASE_PATH=
 RUN BASE_PATH=$BASE_PATH npm run build
 
-# hic-straw has no wheel for this Python and is compiled against libcurl and zlib. The compiler
-# and the headers stay in this stage, since a scanner reads the kernel headers they bring as a
-# kernel in the image.
-FROM python:3.12-slim AS wheels
+# libcurl and htslib are built here from their current releases. Debian 13 ships curl 8.14 and
+# htslib 1.21 and leaves their open advisories unfixed as minor, and the site opens a contact map
+# at an address a user gives through libcurl. This libcurl speaks http and https alone. tabix
+# reads local files alone. hic-straw has no wheel for this Python and is compiled against this
+# libcurl. The compiler and the headers stay in this stage, since a scanner reads the kernel
+# headers they bring as a kernel in the image.
+FROM python:3.12-slim AS native
 RUN apt-get update \
- && apt-get install -y --no-install-recommends g++ libcurl4-openssl-dev zlib1g-dev \
+ && apt-get install -y --no-install-recommends g++ make curl ca-certificates xz-utils bzip2 \
+      libssl-dev zlib1g-dev libbz2-dev liblzma-dev \
  && rm -rf /var/lib/apt/lists/*
-RUN pip wheel --no-cache-dir --no-deps -w /wheels hic-straw==1.3.1
+ARG CURL_VERSION=8.23.0
+ARG CURL_SHA256=8dadd7d2536a314f982ad05a651b713f426bf7d02cc2c76cffb9796f2218e6c5
+ARG HTSLIB_VERSION=1.25
+ARG HTSLIB_SHA256=158c271e4e2986bb2dd11283b640edc10c56695b293df77a109ce99480303730
+WORKDIR /build
+RUN curl -fsSLO https://curl.se/download/curl-$CURL_VERSION.tar.xz \
+ && echo "$CURL_SHA256  curl-$CURL_VERSION.tar.xz" | sha256sum -c - \
+ && tar xf curl-$CURL_VERSION.tar.xz && cd curl-$CURL_VERSION \
+ && ./configure --prefix=/opt/native --with-openssl --with-ca-bundle=/etc/ssl/certs/ca-certificates.crt \
+      --disable-static --disable-manual --disable-docs \
+      --disable-ldap --disable-ldaps --disable-ftp --disable-file --disable-dict --disable-telnet \
+      --disable-tftp --disable-pop3 --disable-imap --disable-smb --disable-smtp --disable-gopher \
+      --disable-mqtt --disable-rtsp --disable-ipfs --disable-websockets \
+      --without-libpsl --without-brotli --without-zstd --without-nghttp2 --without-libidn2 \
+      --without-librtmp --without-libssh2 \
+ && make -j"$(nproc)" >/dev/null && make install >/dev/null
+RUN curl -fsSLO https://github.com/samtools/htslib/releases/download/$HTSLIB_VERSION/htslib-$HTSLIB_VERSION.tar.bz2 \
+ && echo "$HTSLIB_SHA256  htslib-$HTSLIB_VERSION.tar.bz2" | sha256sum -c - \
+ && tar xf htslib-$HTSLIB_VERSION.tar.bz2 && cd htslib-$HTSLIB_VERSION \
+ && ./configure --prefix=/opt/native --disable-libcurl --disable-s3 --disable-gcs --disable-plugins \
+      LDFLAGS="-Wl,-rpath,/opt/native/lib" \
+ && make -j"$(nproc)" >/dev/null && make install >/dev/null
+RUN CPPFLAGS=-I/opt/native/include LDFLAGS="-L/opt/native/lib -Wl,-rpath,/opt/native/lib" \
+    pip wheel --no-cache-dir --no-deps -w /wheels hic-straw==1.3.1
 
 FROM python:3.12-slim
 
 RUN apt-get update \
  && apt-get upgrade -y \
- && apt-get install -y --no-install-recommends tabix libcurl4t64 \
  && rm -rf /var/lib/apt/lists/*
+COPY --from=native /opt/native/lib/libcurl.so* /opt/native/lib/libhts.so* /opt/native/lib/
+COPY --from=native /opt/native/bin/tabix /opt/native/bin/bgzip /usr/local/bin/
 
 WORKDIR /app
 ARG GPU=0
@@ -68,7 +96,7 @@ COPY gnome3d ./gnome3d
 RUN pip install --no-cache-dir --no-deps .
 
 COPY web/requirements.txt ./web/requirements.txt
-COPY --from=wheels /wheels /wheels
+COPY --from=native /wheels /wheels
 RUN pip install --no-cache-dir --find-links /wheels -r web/requirements.txt
 COPY web ./web
 COPY --from=frontend /web/frontend/dist ./web/frontend/dist
