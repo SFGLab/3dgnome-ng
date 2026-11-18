@@ -89,7 +89,7 @@ def summary(job: Path, ahead: int | None) -> dict[str, object]:
         "stages": status.get("stages", []),
         "structures_done": len(list((job / "models").glob("*.cif"))) if (job / "models").is_dir() else 0,
         "structures_asked": _json(job / "request.json").get("n_models"),
-        "log_recent": _public_log(_log_tail(job / "engine.log", 12), job) if status.get("state") in ("running", "failed") else "",
+        "log_recent": _public_log(_log_tail(job / "engine.log", 200), job) if status.get("state") in ("running", "failed") else "",
     }
 
 
@@ -99,7 +99,7 @@ def _log_tail(path: Path, n: int) -> str:
         return ""
     with path.open("rb") as f:
         f.seek(0, 2)
-        f.seek(max(0, f.tell() - 16_384))
+        f.seek(max(0, f.tell() - 32_768))
         return "\n".join(f.read().decode(errors="replace").splitlines()[-n:])
 
 

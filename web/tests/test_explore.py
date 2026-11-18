@@ -114,9 +114,9 @@ def main() -> int:
         (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(39)) + f"wrote {run}/models/s3.cif\n")
         tail = ex.summary(run, None)["log_recent"]
         check("the log shows no server path", str(run) not in tail and "wrote models/s3.cif" in tail and str(run) not in ex.log_text(run), tail[-80:])
-        (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(40)))
+        (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(450)))
         live = ex.summary(run, None)
-        check("a running job carries the end of its engine log", live["log_recent"].splitlines()[-1] == "line 39" and len(live["log_recent"].splitlines()) == 12, str(live.get("log_recent"))[:100])
+        check("a running job carries the end of its engine log", live["log_recent"].splitlines()[-1] == "line 449" and len(live["log_recent"].splitlines()) == 200, str(live.get("log_recent"))[-60:])
     return done()
 
 

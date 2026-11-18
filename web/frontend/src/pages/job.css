@@ -275,6 +275,7 @@
 
 .log-tail {
   max-height: 400px;
+  margin: 0;
   overflow: auto;
   padding: 12px;
   background: #1E1E1C;
@@ -1273,17 +1274,50 @@
   color: var(--accent);
 }
 
+/* A running job takes the whole of the page's main part: the stage, the bar and the stages over
+   the log, which has the rest of the screen. */
+.job-message:has(> .progress) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 20px 24px;
+}
+
 .progress {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 12px;
-  max-width: 720px;
+  min-width: 0;
+}
+
+.progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .progress-line {
   margin: 0;
+  color: var(--ink);
   font-size: 15px;
   font-weight: 600;
+}
+
+.progress-pct {
+  color: var(--muted);
+  font: 13px var(--mono);
+}
+
+/* The log has the screen under the header and scrolls inside itself, so the page does not. */
+.log-tail.live {
+  flex: none;
+  height: calc(100vh - 280px);
+  min-height: 240px;
+  max-height: none;
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 .progress-bar {
@@ -1301,10 +1335,11 @@
   transition: width 0.6s ease;
 }
 
+/* The stages in a row, each with the time it began. */
 .status-log {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 6px 22px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1313,8 +1348,8 @@
 
 .status-log li {
   display: flex;
-  justify-content: space-between;
-  max-width: 420px;
+  align-items: baseline;
+  gap: 8px;
   color: var(--muted);
 }
 
@@ -1325,12 +1360,6 @@
 .status-time {
   font-family: var(--mono);
   font-size: 12px;
-}
-
-.progress-note {
-  margin: 0;
-  color: var(--faint);
-  font-size: 13px;
 }
 
 /* The hovered bead: a ring in the hover colour around the bead, above the chain. */
