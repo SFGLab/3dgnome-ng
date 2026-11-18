@@ -10,10 +10,11 @@ the site's container on the loopback, port 8770, and everything else to the old 
 /mnt/raid/3dgnome-new/
   app/repo/         a checkout of the deploy branch, from a git bundle
   app/site.env      the variables below, a copy of aragorn.env
-  app/maps.sh       fetches the two deep contact maps from the public 4DN bucket
+  app/maps.sh       fetches the deep contact maps of GM12878 and H1ESC from the public 4DN bucket
+  app/maps_hffc6_v3.sh  the same for HFFc6, `web/deploy/maps_hffc6.sh` here
   data/             DATA_DIR, read only in the container
     catalog.json
-    cell_types/     GM12878, H1ESC
+    cell_types/     GM12878, H1ESC, HFFC6
     maps/<CELL>/    the deep map of each cell type, the catalog's contact_map
     svs/            HGSVC and 1KGP, one indexed VCF each
     hicdiffusion/   the two checkpoints

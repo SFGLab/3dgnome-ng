@@ -8,7 +8,7 @@ State words: done, open, waiting, held. A waiting item states the person or the 
 ## Website, 3D-GNOME NG on team-aragorn
 
 The site is at `https://3dgnome.mini.pw.edu.pl/new/` and outside access works since 2026-11-18. It runs
-the image at `72c821d`. Record: `web/deploy/aragorn.md`.
+the image at `71a8239`. Record: `web/deploy/aragorn.md`.
 
 | Request | State | Notes |
 |---|---|---|
@@ -16,17 +16,21 @@ the image at `72c821d`. Record: `web/deploy/aragorn.md`.
 | Share a job list between computers | done | Sync codes |
 | One container for site and engine, a registry on the raid | done | |
 | HiCDiffusion as a job step | done | |
-| Accessions for every data source, privacy notice | done | Four accessions are still marked to confirm, see below |
+| Accessions for every data source, privacy notice | done | Two accessions are still marked to confirm, see below |
 | Packages without published advisories | done | Checked against osv.dev |
 | 1000 Genomes call set, 3,202 samples | done | `data/svs/1KGP.vcf.gz`, typed sample field |
 | Duplications applied | done | In the vendored `personal3d`, not yet in triosformer |
 | Three faults of the model page's look, nicer variants button | done | |
 | TBOOO on the Cite page | done | Commit `a01b0ed`, live since `72c821d` |
 | Loading state of the contact map | done | Commit `72c821d`. A card with a spinner inside the map frame. |
+| Layout of the model page: example tags, the own data card | done | Commit `71a8239`, live. A long tag goes below its title. The own data card takes a whole row where it would start one. |
+| Accessions of the CTCF loops, checked against enhancer3D | done | Commit `71a8239`, live. The files are enhancer3D's, the 4DN in situ ChIA-PET sets 4DNES7IB5LY9, 4DNESR9S8R38 and 4DNESCQ7ZD21, read from the portal's records. The GM12878 row had named Tang 2015. |
+| HFFc6 as a hosted cell type | waiting, download of its map | The build of 2026-11-11 made two cell types. `data/cell_types/HFFC6` is on aragorn. The catalog entry follows the map, `web/deploy/maps_hffc6.sh`. |
+| HFFc6's own RNAPII ChIA-PET in place of BJ | open | The 4DN portal answers again since 2026-11-18, and the set 4DNESI1WZ5HT was out of reach on 2026-11-11. A new loop set means the cross line prep is run again. |
 | Sample table for the picker: population, sex, trios | open | `design/tbooo-data.md`, step 1. Agreed 2026-11-18. |
 | Small variants in CTCF motifs | open | `design/tbooo-data.md`, step 2. Needs the 2022 panel on aragorn. |
 | Measured expression beside a structure | open | `design/tbooo-data.md`, step 3. MAGE first, then GEUVADIS. |
-| Four accessions to confirm | waiting, maintainer | CTCF ChIA-PET of H1ESC and HFFc6, expression of the three lines, HGSVC freeze 4 |
+| Two accessions to confirm | waiting, maintainer | Expression of the three lines, HGSVC freeze 4. The enhancer3D paper states no source for the expression. |
 | Privacy notice: legal basis and log retention | waiting, data protection officer | |
 | Side panel text on 14 days against shared jobs kept without limit | open | Wording |
 | Removal of a job from a shared list | open | No way exists today |
