@@ -8,7 +8,7 @@ State words: done, open, waiting, held. A waiting item states the person or the 
 ## Website, 3D-GNOME NG on team-aragorn
 
 The site is at `https://3dgnome.mini.pw.edu.pl/new/` and outside access works since 2026-11-18. It runs
-the image at `aa464ad`. Record: `web/deploy/aragorn.md`.
+the image at `2e30505`. Record: `web/deploy/aragorn.md`.
 
 | Request | State | Notes |
 |---|---|---|
@@ -26,7 +26,10 @@ the image at `aa464ad`. Record: `web/deploy/aragorn.md`.
 | Layout of the model page: example tags, the own data card | done | Commit `71a8239`, live. A long tag goes below its title. The own data card takes a whole row where it would start one. |
 | Accessions of the CTCF loops, checked against enhancer3D | done | Commit `71a8239`, live. The files are enhancer3D's, the 4DN in situ ChIA-PET sets 4DNES7IB5LY9, 4DNESR9S8R38 and 4DNESCQ7ZD21, read from the portal's records. The GM12878 row had named Tang 2015. |
 | Example descriptions checked against the data | done | Commit `aa464ad`, live. HOXA has 8 CTCF loops and no longer says dense. The MYC window moved to chr8:127.0-128.5 Mb to hold the enhancers its loops reach. GSTM1 states the deletion's change. TNFRSF8 was true and stays. |
-| HFFc6 as a hosted cell type | waiting, download of its map | The build of 2026-11-11 made two cell types. `data/cell_types/HFFC6` is on aragorn. The catalog entry follows the map, `web/deploy/maps_hffc6.sh`. |
+| HFFc6 as a hosted cell type | done | Live since 2026-11-18. The build of 2026-11-11 had made two cell types. The deep map 4DNFIB59T7NN is on the host, its md5 equal to the copy on team-frodo. A test job of chr1:20.0-21.5 Mb finished with 68 CTCF and 112 RNAPII loops, and its contact map reads the deep map. |
+| Plain texts in the settings selector | done | Commit `f9d38aa`, live. Each of the 32 settings has its own short text in `settings_schema.HELP`. `SETTINGS.md` is unchanged. The hosted cell types have no compartment track, and the Compartments group does nothing on the site. |
+| Choice box of a setting past its pane, loading sheen of the map | done | Commit `6240daa`, live. |
+| A restart of the site stranded a running job | done | Commits `ce6425b` and `2e30505`, live. The site queues again every job a restart left running or waiting, and job files are written whole. Before a deployment the host is still checked for a running engine. |
 | HFFc6's own RNAPII ChIA-PET in place of BJ | open | The 4DN portal answers again since 2026-11-18, and the set 4DNESI1WZ5HT was out of reach on 2026-11-11. A new loop set means the cross line prep is run again. |
 | Sample table for the picker: population, sex, trios | done | Commit `729afe3`, live. `data/svs/1KGP.samples.tsv` from the panel's pedigree file: 3,202 samples, 602 with both parents in the set, 2 with one. A typed population code lists its samples, and a chosen sample states its parents and children as buttons. |
 | Small variants in CTCF motifs | open | `design/tbooo-data.md`, step 2. Needs the 2022 panel on aragorn. |

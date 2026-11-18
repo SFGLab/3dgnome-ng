@@ -11,7 +11,7 @@ the site's container on the loopback, port 8770, and everything else to the old 
   app/repo/         a checkout of the deploy branch, from a git bundle
   app/site.env      the variables below, a copy of aragorn.env
   app/maps.sh       fetches the deep contact maps of GM12878 and H1ESC from the public 4DN bucket
-  app/maps_hffc6_v3.sh  the same for HFFc6, `web/deploy/maps_hffc6.sh` here
+  app/maps_hffc6_v3.sh, app/maps_hffc6_parallel.sh  the same for HFFc6, `web/deploy/maps_hffc6.sh` and `maps_hffc6_parallel.sh` here
   data/             DATA_DIR, read only in the container
     catalog.json
     cell_types/     GM12878, H1ESC, HFFC6
