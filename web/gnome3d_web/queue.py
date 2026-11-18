@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import queue
 import shutil
 import threading
@@ -91,6 +92,10 @@ def queue_position(s: Settings, job_dir: Path) -> int | None:
 
 
 def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
+    # The request is on disk from the moment the job waits, so a waiting job can be queued
+    # again after a restart.
+    job_dir.mkdir(parents=True, exist_ok=True)
+    (job_dir / "request.json").write_text(json.dumps(asdict(req), indent=2))
     if s.queue == "inline":
         # Synchronous, so a request returns after its job; for development and tests.
         work(asdict(req), str(job_dir))
@@ -104,6 +109,43 @@ def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
     Queue("gnome3d", connection=Redis.from_url(s.redis_url), default_timeout=6 * 3600).enqueue(
         work, asdict(req), str(job_dir), job_timeout=6 * 3600
     )
+
+
+def resume_interrupted(results_dir: Path, pool: LocalPool) -> list[str]:
+    """Queue again the jobs a stop of the web process left running or waiting, oldest first,
+    and return their names.
+
+    The local pool holds its jobs in the process, so a restart ends a running engine and
+    forgets the waiting jobs, and their pages would wait without end. A job without its
+    request on disk cannot be run again and is marked failed, so its page says so and the
+    form accepts the request anew.
+    """
+    left = []
+    for root in (results_dir / "jobs", results_dir / "private"):
+        for st in root.glob("*/status.json"):
+            try:
+                status = json.loads(st.read_text())
+            except (OSError, ValueError):
+                continue
+            if status.get("state") in ("running", "queued"):
+                left.append((st.stat().st_mtime, st))
+    again = []
+    for _, st in sorted(left):
+        job = st.parent
+        try:
+            req = json.loads((job / "request.json").read_text())
+        except (OSError, ValueError):
+            st.write_text(json.dumps({"state": "failed", "error": "The site restarted before this job started. Submit it again.", "finished": time.time()}))
+            continue
+        st.write_text(json.dumps({"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]}))
+        pool.submit(req, str(job))
+        again.append(job.name)
+    return again
+
+
+def resume_after_restart(s: Settings) -> list[str]:
+    """`resume_interrupted` for the local pool. Other queues keep their jobs through a restart."""
+    return resume_interrupted(s.results_dir, _local_pool(s)) if s.queue == "thread" else []
 
 
 def sweep_private(results_dir: Path, retention_days: int) -> list[str]:

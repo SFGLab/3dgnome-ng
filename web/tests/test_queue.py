@@ -17,7 +17,7 @@ from _check import check, done
 from fixture import make_data
 
 from gnome3d_web.jobs import JobRequest
-from gnome3d_web.queue import LocalPool
+from gnome3d_web.queue import LocalPool, resume_interrupted
 
 FAKE = [str(Path(__file__).resolve().parents[2] / ".venv" / "bin" / "python"), str(Path(__file__).resolve().parent / "fake_engine.py")]
 
@@ -72,6 +72,26 @@ def main() -> int:
         one.join()
         after = json.loads((good / "status.json").read_text())["state"] if (good / "status.json").is_file() else "never ran"
         check("a slot keeps serving after a job that raises", after == "done", after)
+
+        # A restart: one job was running, one waited with its request on disk, one waited without
+        # it, and one had finished.
+        results = root / "restart"
+        def left(name: str, state: str, request: bool) -> Path:
+            job = results / "jobs" / name
+            job.mkdir(parents=True)
+            (job / "status.json").write_text(json.dumps({"state": state}))
+            if request:
+                (job / "request.json").write_text(json.dumps(asdict(JobRequest(cell_type="GMX", region="chr1:0-2000000", factors="CTCF", n_models=1))))
+            return job
+        running, waiting, lost, finished = left("running", "running", True), left("waiting", "queued", True), left("lost", "queued", False), left("finished", "done", True)
+        fresh = LocalPool(["0"], engine=FAKE)
+        again = resume_interrupted(results, fresh)
+        fresh.join()
+        state = lambda job: json.loads((job / "status.json").read_text())  # noqa: E731
+        check("a restart queues again the running and the waiting job", sorted(again) == ["running", "waiting"], str(again))
+        check("both then finish", state(running)["state"] == "done" and state(waiting)["state"] == "done", str((state(running)["state"], state(waiting)["state"])))
+        check("a waiting job without its request fails with the reason", state(lost)["state"] == "failed" and "Submit it again" in state(lost)["error"], str(state(lost)))
+        check("a finished job is left as it is", state(finished) == {"state": "done"}, str(state(finished)))
     return done()
 
 

@@ -29,7 +29,7 @@ from fastapi.templating import Jinja2Templates
 from . import explore, hicdiffusion, lists, owndata, remote
 from .catalog import BACKGROUNDS, FACTOR_CHOICES, SAMPLE_COLUMNS, Catalog
 from .jobs import JobRequest, _member, request_key
-from .queue import enqueue, queue_position, sweep_private
+from .queue import enqueue, queue_position, resume_after_restart, sweep_private
 from .regions import HICDIFFUSION_SPAN, RegionError, parse_region
 from .settings import Settings
 from .settings_schema import SettingError, parse_ini, schema, validate_overrides
@@ -94,6 +94,7 @@ def create_app() -> FastAPI:
     shared.mkdir(parents=True, exist_ok=True)
     private.mkdir(parents=True, exist_ok=True)
     sweep_private(s.results_dir, s.retention_days)
+    resume_after_restart(s)
 
     def form_page(request: Request, error: str = "", status: int = 200, values: dict | None = None) -> HTMLResponse:
         return templates.TemplateResponse(
