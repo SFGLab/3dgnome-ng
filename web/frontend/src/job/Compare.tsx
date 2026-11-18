@@ -20,6 +20,14 @@ function parseJobUrl(text: string): { kind: 'jobs' | 'p'; key: string } | null {
 
 type Choice = { url: string; name: string }
 
+/** The ten largest changes in their order. A selected gene outside them is put first. The order
+ * of the ten does not change with the selection, so a clicked row stays under the pointer. */
+export function shownRows<T extends { gene: string }>(rows: T[], gene: string | null): T[] {
+  const top = rows.slice(0, 10)
+  const chosen = rows.find((r) => r.gene === gene)
+  return chosen && !top.includes(chosen) ? [chosen, ...top] : top
+}
+
 /** The head of one side. With `onPick` it is a button that opens, under itself, the jobs that
  * side can show and a field for a job link. Without it the head is plain. */
 function PanelHead({ line, title, sub, choices = [], onPick, startOpen = false }: { line?: string; title: string; sub: string; choices?: Choice[]; onPick?: (url: string) => void; startOpen?: boolean }) {
@@ -150,6 +158,7 @@ export function Compare({
   gene,
   initial = null,
   onOther,
+  onGene,
   onClose,
 }: {
   api: JobApi
@@ -158,6 +167,8 @@ export function Compare({
   gene: string | null
   initial?: string | null
   onOther?: (url: string | null) => void
+  /** Called with the gene of a clicked row of the table. Both sides then mark its pair. */
+  onGene?: (gene: string) => void
   onClose: () => void
 }) {
   const [other, setOtherState] = useState<{ kind: 'jobs' | 'p'; key: string } | null>(initial ? parseJobUrl(initial) : null)
@@ -224,8 +235,8 @@ export function Compare({
             </tr>
           </thead>
           <tbody>
-            {[...cmp.data.rows.filter((r) => r.gene === gene), ...cmp.data.rows.filter((r) => r.gene !== gene).slice(0, 10)].map((r) => (
-              <tr key={r.gene} className={r.gene === gene ? 'selected' : undefined}>
+            {shownRows(cmp.data.rows, gene).map((r) => (
+              <tr key={r.gene} className={r.gene === gene ? 'selected' : undefined} aria-selected={r.gene === gene} onClick={() => onGene?.(r.gene)}>
                 <td>{`${r.gene}, enhancer ${kb(r.linear_bp)} away`}</td>
                 <td>{`${r.a.mean.toFixed(1)} ± ${r.a.sd.toFixed(1)}`}</td>
                 <td>{`${r.b.mean.toFixed(1)} ± ${r.b.sd.toFixed(1)}`}</td>

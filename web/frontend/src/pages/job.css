@@ -164,9 +164,16 @@
   color: var(--accent);
 }
 
-.files .more {
-  color: var(--muted);
-  padding-left: 30px;
+/* Every structure's file, in a box that scrolls once the list is long. */
+.files .models {
+  display: block;
+  padding: 0;
+}
+
+.files .models > ul {
+  max-height: 190px;
+  overflow-y: auto;
+  padding-left: 14px;
 }
 
 .files .size {

@@ -1,5 +1,5 @@
 import { Archive, Braces, ChevronLeft, ChevronRight, FileText, Folder, Pencil } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { recentJobs, rememberJob } from '../model/recent'
 import type { JobApi, Summary } from './api'
 import { bp, duration, FACTORS, size, shortRegion } from './format'
@@ -47,7 +47,9 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
   // The heading has the region in megabases, which fits the panel. The line under it has the exact positions.
   const short = m ? shortRegion(m[1], Number(m[2]), Number(m[3])) : summary.request.region
   const n = summary.structures
-  const model = summary.models[selected - 1]
+  // The file of the structure in view is kept in sight in the list of all of them.
+  const shown = useRef<HTMLLIElement>(null)
+  useEffect(() => shown.current?.scrollIntoView?.({ block: 'nearest' }), [selected])
   const save = (value: string) => {
     setName(value.trim())
     setEditing(false)
@@ -143,15 +145,18 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
             <li className="folder">
               <Folder size={14} aria-hidden /> structures <span className="size">{n} files</span>
             </li>
-            {model && (
-              <li className="file selected">
-                <a href={api.fileUrl(model.name)}>
-                  <FileText size={14} aria-hidden /> {model.name}
-                </a>
-                <span className="size">{size(model.size)}</span>
-              </li>
-            )}
-            {n > 1 && <li className="more">{n - 1} more</li>}
+            <li className="models">
+              <ul className="files" aria-label="Structure files">
+                {summary.models.map((f, i) => (
+                  <li key={f.name} className={i === selected - 1 ? 'file selected' : 'file'} ref={i === selected - 1 ? shown : undefined}>
+                    <a href={api.fileUrl(f.name)}>
+                      <FileText size={14} aria-hidden /> {f.name}
+                    </a>
+                    <span className="size">{size(f.size)}</span>
+                  </li>
+                ))}
+              </ul>
+            </li>
             {summary.files
               .filter((f) => ['ep.tsv', 'marks.json', 'engine.log'].includes(f.name))
               .map((f) => (

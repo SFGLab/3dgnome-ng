@@ -6,7 +6,7 @@ import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { ANNOTATIONS, GENES, KEY, STRUCTURE, SUMMARY_DONE } from '../test/job'
 import { jobApi } from './api'
-import { Compare } from './Compare'
+import { Compare, shownRows } from './Compare'
 
 vi.mock('./Scene', () => ({ Scene: (p: { markers?: { label: string }[] }) => <div data-testid="scene">{(p.markers ?? []).map((m) => m.label).join('')}</div> }))
 
@@ -91,6 +91,28 @@ describe('Compare', () => {
     expect(within(table).getByText('TNFRSF8, enhancer 385 kb away')).toBeInTheDocument()
     expect(within(table).getByText('2.4 times farther')).toBeInTheDocument()
     expect(within(table).getAllByRole('columnheader').at(-1)!.textContent).toBe('CTCF against CTCF and RNAPII')
+  })
+
+  it('selects the gene of a clicked row of the table', async () => {
+    rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
+    const onGene = vi.fn()
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene={null} onGene={onGene} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
+    const table = await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
+    fireEvent.click(within(table).getByText('TNFRSF8, enhancer 385 kb away'))
+    expect(onGene).toHaveBeenCalledWith('TNFRSF8')
+  })
+
+  it('keeps the ten largest changes in their order and puts a selected gene outside them first', () => {
+    const rows = Array.from({ length: 14 }, (_, i) => ({ gene: `G${i}` }))
+    expect(shownRows(rows, 'G3').map((r) => r.gene)).toEqual(rows.slice(0, 10).map((r) => r.gene))
+    expect(shownRows(rows, 'G12').map((r) => r.gene)).toEqual(['G12', ...rows.slice(0, 10).map((r) => r.gene)])
+    expect(shownRows(rows, null)).toHaveLength(10)
   })
 
   it('keeps to the writing rules', async () => {

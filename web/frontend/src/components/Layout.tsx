@@ -23,7 +23,6 @@ export function Layout({ children }: { children: ReactNode }) {
       <header className="top-bar">
         <Link className="brand" to={ROUTES.title}>
           <Wordmark />
-          <span className="tagline">3D chromatin models from loops, contacts and structural variants</span>
         </Link>
         <nav>
           {NAV.map(([label, to]) => (

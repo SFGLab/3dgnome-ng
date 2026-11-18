@@ -63,6 +63,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
                   summary={s}
                   selected={selected}
                   gene={gene}
+                  onGene={setGene}
                   initial={compareTo || null}
                   onOther={(url) => go({ tab, compare: url ?? '' })}
                   onClose={() => go({ tab })}
