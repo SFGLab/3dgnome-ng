@@ -8,7 +8,7 @@ State words: done, open, waiting, held. A waiting item states the person or the 
 ## Website, 3D-GNOME NG on team-aragorn
 
 The site is at `https://3dgnome.mini.pw.edu.pl/new/` and outside access works since 2026-11-18. It runs
-the image at `6ed7f40`. Record: `web/deploy/aragorn.md`.
+the image at `cf529f7`. Record: `web/deploy/aragorn.md`.
 
 | Request | State | Notes |
 |---|---|---|
@@ -30,6 +30,10 @@ the image at `6ed7f40`. Record: `web/deploy/aragorn.md`.
 | Plain texts in the settings selector | done | Commit `f9d38aa`, live. Each of the 32 settings has its own short text in `settings_schema.HELP`. `SETTINGS.md` is unchanged. The hosted cell types have no compartment track, and the Compartments group does nothing on the site. |
 | Choice box of a setting past its pane, loading sheen of the map | done | Commit `6240daa`, live. |
 | Hover and press on every clickable element, one arrow for every select, the contact map's toolbar | done | Commits `ae97841` and `6ed7f40`, live. Set once in `base.css`. A link is underlined under the pointer. |
+| Sync panel, own data dialog and job heading in the site's design | done | Commit `6719582`, live. Two text styles in the panel, the code as high as its buttons, link buttons underlined under the pointer, the dialog's steps and droppers as on the form, the heading with the region in megabases. |
+| Readable 3D model with a focus | done | Commit `cf529f7`, live. Chromatin toned along the region, weaker fog, the chain near the pointer or between two selected beads at full strength and the rest faded. |
+| Pager over tables with rows per page | done | Commit `cf529f7`, live. 25, 50, 100 or 250, kept in the browser. |
+| Hover for job tabs, table rows and sorting column headers | done | Commit `cf529f7`, live. |
 | Gene picker in the region field | done | Commit `cc7cb74`, live. Typed letters list up to eight matching genes with their positions. A click or the arrow keys and Enter take one. |
 | No comma before "and" | done | The maintainer's rule of 2026-11-18, in `design/writing-rules.md`. Commit `0fc99d9`, live. Gone from the text under `web`, and the page tests refuse it. The other documents of the repository are not swept. |
 | A restart of the site stranded a running job | done | Commits `ce6425b` and `2e30505`, live. The site queues again every job a restart left running or waiting, and job files are written whole. Before a deployment the host is still checked for a running engine. |
