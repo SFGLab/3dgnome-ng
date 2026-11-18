@@ -52,6 +52,31 @@ describe('Variants', () => {
     expect(onChange).toHaveBeenCalledWith({ haplotype: 1 })
   })
 
+  it('takes a typed sample of a large call set once it names one', () => {
+    const onChange = vi.fn()
+    const samples = Array.from({ length: 3202 }, (_, i) => `HG${String(i).padStart(5, '0')}`)
+    const big = { ...CATALOG, sv_sets: { ...CATALOG.sv_sets, KGP: { label: '1000 Genomes', samples } } }
+    render(<Variants catalog={big} svSet="KGP" sample="" haplotype={0} vcfUpload={null} onChange={onChange} onOpen={vi.fn()} />)
+    const field = screen.getByLabelText('Sample')
+    expect(field.tagName).toBe('INPUT')
+    expect(field).toHaveAttribute('placeholder', 'type one of 3,202, e.g. HG00000')
+    fireEvent.change(field, { target: { value: 'HG0009' } })
+    expect(onChange).not.toHaveBeenCalled()
+    expect(field).toHaveAttribute('aria-invalid', 'true')
+    fireEvent.change(field, { target: { value: 'HG00096' } })
+    expect(onChange).toHaveBeenCalledWith({ sample: 'HG00096' })
+  })
+
+  it('drops the sample of a large call set when the text no longer names one', () => {
+    const onChange = vi.fn()
+    const samples = Array.from({ length: 100 }, (_, i) => `NA${String(i).padStart(5, '0')}`)
+    const big = { ...CATALOG, sv_sets: { KGP: { label: '1000 Genomes', samples } } }
+    render(<Variants catalog={big} svSet="KGP" sample="NA00007" haplotype={0} vcfUpload={null} onChange={onChange} onOpen={vi.fn()} />)
+    expect(screen.getByLabelText('Sample')).toHaveValue('NA00007')
+    fireEvent.change(screen.getByLabelText('Sample'), { target: { value: 'NA0000' } })
+    expect(onChange).toHaveBeenCalledWith({ sample: '' })
+  })
+
   it('opens the dialog with a VCF file', () => {
     const onOpen = vi.fn()
     render(<Variants catalog={CATALOG} svSet="" sample="" haplotype={0} vcfUpload={null} onChange={vi.fn()} onOpen={onOpen} />)

@@ -30,8 +30,9 @@ def main() -> int:
         check("a CNV is skipped and counted", skipped == 1)
         h0, h1, _ = read_svs(vcf, "P1", Region("chr1", 1_000_000, 3_000_000))
         check("variants outside the region are left out", h0 == [] and len(h1) == 1)
-        h0, h1, _ = read_svs(vcf, "P2", Region("chr1", 0, 3_000_000))
+        h0, h1, skipped = read_svs(vcf, "P2", Region("chr1", 0, 3_000_000))
         check("a sample with no alternate alleles has none", h0 == [] and h1 == [])
+        check("a record of another type that the sample does not carry is not counted", skipped == 0, str(skipped))
     return done()
 
 

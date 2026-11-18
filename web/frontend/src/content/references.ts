@@ -148,6 +148,11 @@ export const REFERENCES: Reference[] = [
     authors: 'Gao T, Qian J', venue: 'Nucleic Acids Research 48, D58-D64',
   },
   {
+    key: 'kgp30x', group: 'data', year: 2022, doi: '10.1016/j.cell.2022.08.004',
+    title: 'High-coverage whole-genome sequencing of the expanded 1000 Genomes Project cohort including 602 trios',
+    authors: 'Byrska-Bishop M, Evani US, Zhao X, et al.', venue: 'Cell 185, 3426-3440',
+  },
+  {
     key: 'hgsvc4', group: 'data', year: 2025, unconfirmed: true,
     title: 'Human Genome Structural Variation Consortium, freeze 4',
     authors: 'HGSVC', venue: 'reference to confirm',
@@ -209,6 +214,15 @@ export const DATA_SOURCES: DataSource[] = [
   { data: 'Gene expression of the three cell lines', usedFor: 'link to expression', accessions: [], pending: 'accession to confirm', label: 'source to confirm' },
   { data: 'Enhancers, EnhancerAtlas 2.0', usedFor: 'enhancer marks and distances', accessions: [], note: 'One file per cell line. The atlas gives no accession.', label: 'Gao and Qian, NAR 2020', ref: 'enhanceratlas2020' },
   { data: 'Genes, GENCODE release 40, basic annotation', usedFor: 'promoter marks and gene names', accessions: [{ id: 'GENCODE v40', url: 'https://www.gencodegenes.org/human/release_40.html' }], label: 'Frankish et al., NAR 2021', ref: 'gencode2021' },
+  {
+    data: 'Structural variants, 1000 Genomes 30x, 3,202 samples', usedFor: 'variant structures',
+    accessions: [
+      { id: 'PRJEB31736', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB31736' },
+      { id: 'PRJEB36890', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB36890' },
+    ],
+    note: 'The phased panel of the 2,504 unrelated samples and the 698 that complete the trios. Deletions, insertions and inversions on the autosomes are applied.',
+    label: 'Byrska-Bishop et al., Cell 2022', ref: 'kgp30x',
+  },
   { data: 'Structural variants, HGSVC freeze 4', usedFor: 'variant structures', accessions: [], pending: 'accession to confirm', label: 'HGSVC, reference to confirm', ref: 'hgsvc4' },
   {
     data: 'Reference genome, hg38', usedFor: 'sequence for HiCDiffusion',

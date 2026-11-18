@@ -15,7 +15,7 @@ the site's container on the loopback, port 8770, and everything else to the old 
     catalog.json
     cell_types/     GM12878, H1ESC
     maps/<CELL>/    the deep map of each cell type, the catalog's contact_map
-    svs/            HGSVC
+    svs/            HGSVC and 1KGP, one indexed VCF each
     hicdiffusion/   the two checkpoints
     reference/      hg38.fa and its index
   results/          RESULTS_DIR, written by the container as nk2
@@ -25,6 +25,17 @@ the site's container on the loopback, port 8770, and everything else to the old 
 
 The raid is XFS on `/dev/md0`, RAID6 over eight disks, mounted at `/mnt/raid`. `/mnt/raid`
 belongs to root, so the registry is inside the site's directory.
+
+## The 1000 Genomes call set
+
+`data/svs/1KGP.vcf.gz` holds the phased structural variants of the 3,202 samples of the 1000
+Genomes 30x panel, 97,862 sites on chromosomes 1 to 22. The 3D-GNOME 3.0 server keeps them as one
+VCF per sample in `/home/gnome/3dgnome_data/data_vcf_modified/data`, each with the records that
+sample carries. `web/scripts/merge_sample_vcfs.py` made the one file from those, run in a
+container of the site's image with that directory mounted read only. Two samples were compared
+record for record with their source files. The site applies the 51,380 deletions, 31,538
+insertions and 572 inversions and skips the 14,372 duplications. The catalog before the set was
+added is `data/catalog.json.before-1kgp`.
 
 ## Run
 

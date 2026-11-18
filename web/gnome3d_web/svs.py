@@ -51,8 +51,8 @@ def _alleles(gt: str) -> tuple[bool, bool]:
 
 
 def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV], int]:
-    """The sample's two haplotypes' variants in the region and the number of records skipped
-    for an unsupported type."""
+    """The sample's two haplotypes' variants in the region and the number of records the sample
+    carries there that are skipped for an unsupported type."""
     hap: tuple[list[SV], list[SV]] = ([], [])
     skipped = 0
     col = -1
@@ -64,8 +64,12 @@ def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV]
         info = dict(kv.split("=", 1) if "=" in kv else (kv, "") for kv in x[7].split(";"))
         kind = info.get("SVTYPE", "")
         pos = int(x[1])
+        carried = _alleles(x[col].split(":", 1)[0])
+        if not any(carried):
+            continue
         if kind not in KINDS:
-            skipped += 1
+            if x[0] == region.chrom and region.start <= pos < region.end:
+                skipped += 1
             continue
         if kind == "INS":
             alt = x[4]
@@ -76,8 +80,7 @@ def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV]
             sv = SV(x[0], pos + 1, end + 1, kind)
         if not (sv.chrom == region.chrom and sv.start >= region.start and sv.end <= region.end):
             continue
-        gt = x[col].split(":", 1)[0]
-        for h, on in enumerate(_alleles(gt)):
+        for h, on in enumerate(carried):
             if on:
                 hap[h].append(sv)
     return sorted(hap[0], key=lambda s: s.start), sorted(hap[1], key=lambda s: s.start), skipped

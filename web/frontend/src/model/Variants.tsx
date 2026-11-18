@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Upload, X } from 'lucide-react'
 import type { Catalog } from '../api'
 import type { FormState } from './form'
@@ -11,6 +12,41 @@ type Props = {
   vcfUpload: UploadResult | null
   onChange: (patch: Partial<FormState>) => void
   onOpen: (mode: 'hosted' | 'upload', file: File | null) => void
+}
+
+/** A call set with more samples than this gets a field to type in. */
+const LONG_LIST = 60
+
+/** The sample of a large call set, typed with the browser's own suggestions. The form takes the
+ * sample once the text names one of the set's samples, and has none while it does not. */
+function SampleSearch({ samples, sample, onChange }: { samples: string[]; sample: string; onChange: (sample: string) => void }) {
+  const [text, setText] = useState(sample)
+  useEffect(() => setText(sample), [sample])
+  const known = new Set(samples)
+  return (
+    <>
+      <input
+        type="text"
+        list="sample-names"
+        value={text}
+        placeholder={`type one of ${samples.length.toLocaleString('en-US')}, e.g. ${samples[0]}`}
+        autoComplete="off"
+        spellCheck={false}
+        aria-invalid={text !== '' && !known.has(text.trim())}
+        onChange={(e) => {
+          setText(e.target.value)
+          const v = e.target.value.trim()
+          if (known.has(v)) onChange(v)
+          else if (sample) onChange('')
+        }}
+      />
+      <datalist id="sample-names">
+        {samples.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
+    </>
+  )
 }
 
 /** Step 3, a hosted call set with its sample and haplotype, or an uploaded VCF. A VCF and the
@@ -33,14 +69,18 @@ export function Variants({ catalog, svSet, sample, haplotype, vcfUpload: vcf, on
         </label>
         <label className="field">
           <span>Sample</span>
-          <select value={sample} disabled={!svSet} onChange={(e) => onChange({ sample: e.target.value })}>
-            <option value="">e.g. HG00733</option>
-            {samples.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          {samples.length > LONG_LIST ? (
+            <SampleSearch key={svSet} samples={samples} sample={sample} onChange={(v) => onChange({ sample: v })} />
+          ) : (
+            <select value={sample} disabled={!svSet} onChange={(e) => onChange({ sample: e.target.value })}>
+              <option value="">e.g. HG00733</option>
+              {samples.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          )}
         </label>
         <label className="field">
           <span>Haplotype</span>
