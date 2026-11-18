@@ -6,9 +6,12 @@
     <title>3D-GNOME</title>
     <script>
       try {
+        // Light unless this browser chose Dark or the system's theme.
         const t = localStorage.getItem('gnome3d-theme')
-        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t
-      } catch {}
+        if (t !== 'system') document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light'
+      } catch {
+        document.documentElement.dataset.theme = 'light'
+      }
     </script>
   </head>
   <body>

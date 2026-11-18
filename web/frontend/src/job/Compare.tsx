@@ -7,7 +7,7 @@ import { readPalette } from './colors'
 import { FACTORS, kb } from './format'
 import { makeCameraLink, type CameraLink } from './cameraLink'
 import { Scene } from './Scene'
-import { chainColors } from './StructureView'
+import { chainColors, focusRanges } from './StructureView'
 import { parseRegion } from './StructureTab'
 
 const factorColor = (f: string) => (f === 'CTCF' ? 'var(--ctcf)' : 'var(--rnapii)')
@@ -113,6 +113,11 @@ function Panel({
           .filter((k) => structure.data!.beads[k])
           .map((k, i) => ({ label: 'AB'[i], at: [structure.data!.beads[k][2], structure.data!.beads[k][3], structure.data!.beads[k][4]] as [number, number, number] }))
       : []
+  // The chain at the selected gene's promoter and enhancer is solid and the rest see through.
+  const focus = useMemo(
+    () => (row && structure.data ? focusRanges(structure.data, [row.promoter_bead, row.enhancer_bead]) : undefined),
+    [structure.data, row?.promoter_bead, row?.enhancer_bead], // eslint-disable-line react-hooks/exhaustive-deps
+  )
   return (
     <div className="compare-panel">
       <PanelHead
@@ -124,7 +129,7 @@ function Panel({
       />
       <div className="view-box compare-box">
         {structure.data && (
-          <Scene points={structure.data.chain.map(([x, y, z]) => [x, y, z] as [number, number, number])} colors={colors} markers={markers} link={link} linkId={linkId} />
+          <Scene points={structure.data.chain.map(([x, y, z]) => [x, y, z] as [number, number, number])} colors={colors} markers={markers} focus={focus} link={link} linkId={linkId} />
         )}
         {row && (
           <span className="ab-label">
