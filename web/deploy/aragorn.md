@@ -80,6 +80,13 @@ the panel lacks does worse. Table: `playground/sgdp_grch38/results/sv_eval/` in 
 panel, tbooo's phased SGDP files and the imputed files with dosage and genotype probability.
 The catalog before the set was added is `data/catalog.json.before-sgdp`.
 
+## Parts left out
+
+`HIDE` in `site.env` is a comma list of `results`, `method` and `trios`. `results` and `method`
+take that page out of the top bar and send its address to the front page. `trios` takes the nine
+people out of the Results page. The site runs with `HIDE=trios`. The server reads it at start, so
+a change needs `up -d` and no build. An unknown name stops the server with the names it takes.
+
 ## Run
 
 All commands run from `app/repo/web` as nk2, who is in the docker group.

@@ -437,15 +437,19 @@ def create_app() -> FastAPI:
         if cell not in catalog.cell_types:
             return JSONResponse({"error": f"unknown cell type {cell!r}"}, 404)
         ct = catalog.cell_types[cell]
+        # The form draws the loops around a region as well, its own length on either side, so the
+        # preview takes three times the longest region a job may have.
         try:
-            r = parse_region(region, ct.genes(), s.max_span)
+            r = parse_region(region, ct.genes(), 3 * s.max_span)
         except RegionError as e:
             return JSONResponse({"error": str(e)}, 400)
         loops: dict[str, list[list[int]]] = {}
         for factor, name in ct.clusters.items():
             t = pd.read_csv(ct.root / name, sep=r"\s+", header=None, usecols=range(7), comment="#")
             t = t[(t[0] == r.chrom) & (t[3] == r.chrom) & (t[1] >= r.start) & (t[5] <= r.end)]
-            loops[factor] = [[int((a + b) // 2), int((c + e) // 2), int(n)] for a, b, c, e, n in zip(t[1], t[2], t[4], t[5], t[6], strict=True)]
+            # The two anchor middles and the count, then the outer edges, which decide whether a
+            # region holds the loop.
+            loops[factor] = [[int((a + b) // 2), int((c + e) // 2), int(n), int(a), int(e)] for a, b, c, e, n in zip(t[1], t[2], t[4], t[5], t[6], strict=True)]
         g = ct.genes()
         g = g[(g["chrom"] == r.chrom) & (g["tss"] >= r.start) & (g["tss"] < r.end)]
         return JSONResponse(

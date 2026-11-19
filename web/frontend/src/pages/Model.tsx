@@ -1,8 +1,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api, ApiError } from '../api'
+import { api, ApiError, type Region } from '../api'
 import { served } from '../base'
 import { Background } from '../model/Background'
 import { CellTypes } from '../model/CellTypes'
@@ -87,6 +87,11 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   const cells = Object.keys(catalog.data?.cell_types ?? {})
   const lookup = ownCell ? form.own.loopsFrom || cells[0] || 'GM12878' : form.cell
   const region = useRegion(lookup, form.region)
+  // The loops stay drawn at the last region while new coordinates are read, so a drag of the
+  // region on them does not blank the picture. A region the server refuses takes them away.
+  const lastRegion = useRef<Region>()
+  if (region.data) lastRegion.current = region.data
+  const shownRegion = region.data ?? (region.isError || !form.region.trim() ? undefined : lastRegion.current)
   const hasSampleTable = Boolean(catalog.data?.sv_sets[form.svSet]?.sample_table)
   const sampleTable = useQuery({ queryKey: ['sample-table', form.svSet], queryFn: () => api.sampleTable(form.svSet), enabled: hasSampleTable, staleTime: Infinity })
   const schema = useQuery({
@@ -142,7 +147,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
             />
           )}
           <RegionField cell={lookup} value={form.region} onChange={(region) => set({ region })} />
-          {region.data && !form.own.loops.length && <LoopPreview cell={lookup} region={region.data} factors={form.factors} />}
+          {shownRegion && !form.own.loops.length && <LoopPreview cell={lookup} region={shownRegion} factors={form.factors} onRegion={(region) => set({ region })} />}
           {stepError(1)}
         </Step>
         <Step n={2} title="Loops">

@@ -163,6 +163,10 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  /* About seven genes are seen and the rest scroll. */
+  max-height: 252px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .gene-options li {
@@ -302,6 +306,51 @@
 .axis {
   stroke: var(--muted);
   stroke-width: 1;
+}
+
+/* The region as a box over the loops, its two edges sliders. */
+.region-box {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.region-box.movable {
+  cursor: grab;
+  touch-action: none;
+}
+
+.region-box.movable:active {
+  cursor: grabbing;
+}
+
+.region-edge {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.region-handle {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.region-handle:hover,
+.region-handle:focus-visible {
+  fill: var(--accent-soft);
+  outline: none;
+}
+
+.preview-span {
+  margin-left: auto;
+  font-family: var(--mono);
+}
+
+.preview-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--faint);
 }
 
 .gene-tick {

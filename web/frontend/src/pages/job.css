@@ -869,15 +869,6 @@
   gap: 6px;
 }
 
-.loop-track {
-  display: block;
-  width: min(100%, max(320px, calc(100vh - 360px)));
-  height: 34px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-
 /* The loop view of the whole region over the map, as wide as the map. */
 .loop-overview {
   width: min(100%, max(320px, calc(100vh - 360px)));
@@ -897,11 +888,6 @@
 
 .row-action:hover {
   background: var(--accent-soft);
-}
-
-.loop-track text {
-  fill: var(--faint);
-  font: 8px var(--font);
 }
 
 .contact-frame {

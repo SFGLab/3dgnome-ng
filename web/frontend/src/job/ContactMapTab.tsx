@@ -178,8 +178,6 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     const n = maps.data?.bins.length ?? 0
     return [Math.floor(((e.clientY - box.top) / box.height) * n), Math.floor(((e.clientX - box.left) / box.width) * n)]
   }
-  const loops = (annotations.data?.loops ?? []).filter((l) => l.a[0] >= settled.start && l.b[1] <= settled.end)
-  const x = (p: number) => ((p - settled.start) / (settled.end - settled.start)) * 600
   return (
     <div className="contacts-tab">
       <div className="contacts-main">
@@ -266,16 +264,6 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             />
           </div>
         )}
-        <svg className="loop-track" viewBox="0 0 600 34" preserveAspectRatio="none" aria-label="Loops">
-          <text x={4} y={10}>
-            loops in the map
-          </text>
-          {loops.map((l, i) => {
-            const a = x((l.a[0] + l.a[1]) / 2)
-            const b = x((l.b[0] + l.b[1]) / 2)
-            return <path key={i} className={`arc ${l.factor.toLowerCase()}`} d={`M ${a} 34 A ${(b - a) / 2} 30 0 0 1 ${b} 34`} />
-          })}
-        </svg>
         {note && <p className="map-note">{note}</p>}
         {maps.isError && <p className="field-error">{maps.error.message}</p>}
         <div className={`contact-frame${maps.data ? '' : ' empty'}${maps.isFetching ? ' loading' : ''}`}>

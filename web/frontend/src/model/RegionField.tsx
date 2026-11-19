@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, ApiError, type Region } from '../api'
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -34,6 +34,11 @@ export function RegionField({ cell, value, onChange }: { cell: string; value: st
   const typed = useDebounced(text, 150)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
+  // The list scrolls, and the arrow keys bring the gene they reach into view.
+  const list = useRef<HTMLUListElement>(null)
+  useEffect(() => {
+    list.current?.children[active]?.scrollIntoView?.({ block: 'nearest' })
+  }, [active])
   const settled = draft === value
   const genes = useQuery({ queryKey: ['genes', cell, typed], queryFn: () => api.genes(cell, typed), enabled: open && maybeGene(typed), staleTime: 60_000, retry: false })
   const found = open && maybeGene(text) && typed === text ? (genes.data ?? []) : []
@@ -96,7 +101,7 @@ export function RegionField({ cell, value, onChange }: { cell: string; value: st
         {settled && region.data && <span className="resolved">{region.data.label}</span>}
       </div>
       {options.length > 0 && (
-        <ul id="region-genes" role="listbox" aria-label="Genes" className="gene-options">
+        <ul id="region-genes" ref={list} role="listbox" aria-label="Genes" className="gene-options">
           {options.map((g, i) => (
             // The press is taken before the field loses the focus, which would close the list.
             <li key={g.name} id={`region-gene-${i}`} role="option" aria-selected={i === active} className={i === active ? 'active' : undefined} onMouseDown={(e) => { e.preventDefault(); pick(g.name) }} onMouseEnter={() => setActive(i)}>

@@ -55,7 +55,7 @@ def main() -> int:
 
         p = c.get("/api/preview", params={"cell": "GMX", "region": "chr1:0-3000000"}).json()
         check("the preview lists the CTCF and RNAPII loops", p["counts"] == {"CTCF": 14, "RNAPII": 1} and len(p["loops"]["CTCF"]) == 14, str(p["counts"]))
-        check("a preview loop is two anchor midpoints and a count", p["loops"]["RNAPII"] == [[1300500, 1500500, 4]], str(p["loops"]["RNAPII"]))
+        check("a preview loop is two anchor midpoints, a count and the outer edges of the anchors", p["loops"]["RNAPII"][0][:3] == [1300500, 1500500, 4] and len(p["loops"]["RNAPII"][0]) == 5 and p["loops"]["RNAPII"][0][3] < 1300500 < 1500500 < p["loops"]["RNAPII"][0][4], str(p["loops"]["RNAPII"]))
         check("the preview lists the genes", sorted(g["name"] for g in p["genes"]) == ["ALPHA", "BETA"], str(p["genes"]))
 
         sch = c.get("/api/settings", params={"cell": "GMX"}).json()
