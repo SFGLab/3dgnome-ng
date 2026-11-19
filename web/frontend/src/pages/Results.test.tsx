@@ -15,15 +15,16 @@ function renderResults() {
 const values = (chart: HTMLElement) => within(chart).getAllByTestId('bar-value').map((v) => v.textContent)
 
 describe('Results page', () => {
+  // The cell line charts hold the whole genome readouts of design/figures/rnapii-2026-11-19/genome.
   it('shows the agreement with Hi-C of the original and the new models', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C' }))).toEqual(['0.22', '0.50', '0.15', '0.36', '0.15', '0.43'])
+    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C' }))).toEqual(['0.10', '0.29', '0.13', '0.45', '0.15', '0.47'])
   })
 
   it('shows the enhancer to promoter distances and the link to expression', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Enhancer to promoter distance' }))).toEqual(['4.3', '3.6', '4.0', '3.0', '4.6', '3.8'])
-    expect(values(screen.getByRole('figure', { name: 'Link to expression' }))).toEqual(['0.19', '0.26', '0.28', '0.12', '0.18', '0.22', '0.25', '0.29', '0.31'])
+    expect(values(screen.getByRole('figure', { name: 'Enhancer to promoter distance' }))).toEqual(['4.3', '3.5', '4.0', '3.1', '4.6', '3.8'])
+    expect(values(screen.getByRole('figure', { name: 'Link to expression' }))).toEqual(['0.14', '0.19', '0.24', '0.14', '0.17', '0.21', '0.14', '0.23', '0.27'])
   })
 
   it('shows the beads, the runtime and the runtime per 1,000 beads of each tool', () => {
@@ -72,8 +73,8 @@ describe('Results page', () => {
 
   it('shows the share of Micro-C loops placed, for the model sets and for the three tools', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed' }))).toEqual(['0.14', '0.21', '0.30', '0.21', '0.39', '0.42', '0.15', '0.44', '0.50'])
-    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with an RNAPII loop only' }))).toEqual(['0.08', '0.67', '0.32', '0.48', '0.41', '0.72'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed' }))).toEqual(['0.12', '0.23', '0.31', '0.12', '0.35', '0.40', '0.10', '0.39', '0.47'])
+    expect(values(screen.getByRole('figure', { name: 'Micro-C loops with an RNAPII loop only' }))).toEqual(['0.13', '0.66', '0.18', '0.58', '0.23', '0.64'])
     expect(values(screen.getByRole('figure', { name: 'Micro-C loops placed, three tools' }))).toEqual(['0.14', '0.25', '0.26', '0.21', '0.16', '0.38', '0.16', '0.15', '0.45'])
     expect(values(screen.getByRole('figure', { name: 'Micro-C loops with beads at both ends' }))).toEqual(['0.25', '1.00', '0.97', '0.26', '1.00', '0.94', '0.22', '1.00', '0.96'])
   })
