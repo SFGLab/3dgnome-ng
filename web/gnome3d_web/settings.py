@@ -8,7 +8,8 @@ GPU_SLOTS     the slots of the "thread" queue, one GPU id per slot, default "0";
               two jobs at once on each of two GPUs
 ENGINE_CMD    the command that starts the engine, default ENGINE_PYTHON -m gnome3d.cli
 RETENTION_DAYS  how long a private job is kept, default 14
-MAX_REGION_MB   the longest region the form accepts, in Mb, default 20
+MAX_REGION_MB   the longest region the form accepts, in Mb, default 20. limits.region_mb of the
+                site's config.json stands over it
 FRONTEND_DIST   the frontend build, default web/frontend/dist
 BASE_PATH     the path the site is served under, /new for a site at /new/, default the root.
               The frontend is built with the same value
@@ -17,8 +18,9 @@ UPLOAD_MAX_MB   the largest upload, in MB, default 200
 LINK_READS    how many contact map links the server reads at once, default 4
 LINK_ALLOW_PRIVATE  1 lets a contact map link point at a private or loopback address, for tests;
               off by default
-SITE_CONFIG   the site's config.json, default DATA_DIR/config.json. It holds the feature flags,
-              see siteconfig.py. A site without the file shows everything
+SITE_CONFIG   the site's config.json, default DATA_DIR/config.json. It holds the feature flags
+              and the limits of a job, see siteconfig.py. A site without the file shows
+              everything and keeps the default limits
 HICDIFFUSION_DIR, HICDIFFUSION_PYTHON, HICDIFFUSION_MODELS, REFERENCE_FASTA  the parts of the
               HiCDiffusion step, see hicdiffusion.py; it is offered when every part is in place
 """

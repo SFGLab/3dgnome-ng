@@ -1,5 +1,7 @@
+import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Database, ExternalLink, History, Play } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { api } from '../api'
 import contacts from '../assets/contacts.png'
 import previews from '../assets/previews.json'
 import structure from '../assets/structure.png'
@@ -30,6 +32,9 @@ const STORY = [
 /** The landing page: what the site computes, the examples and the previous services. */
 export function Title() {
   const { open, busy, error } = useOpenExample()
+  // The longest region of a job is the server's to say. 20 Mb stands until the server answers.
+  const catalog = useQuery({ queryKey: ['catalog'], queryFn: api.catalog })
+  const maxMb = catalog.data?.max_region_mb ?? 20
   return (
     <div className="title-page">
       <section className="hero">
@@ -38,7 +43,7 @@ export function Title() {
             3D-GNOME<sup className="ng">NG</sup>
           </h1>
           <p className="lead">
-            3D-GNOMEᴺᴳ computes 3D structures of genomic regions up to 20 Mb from CTCF and RNAPII loops, Hi-C contacts and structural variants. Each job returns an ensemble of
+            {`3D-GNOMEᴺᴳ computes 3D structures of genomic regions up to ${maxMb} Mb from CTCF`} and RNAPII loops, Hi-C contacts and structural variants. Each job returns an ensemble of
             structures with promoters and enhancers marked and the 3D distances between them.
           </p>
           <div className="buttons">

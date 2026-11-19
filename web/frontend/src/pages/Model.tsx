@@ -129,7 +129,8 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
     ) : null
 
   const cellType = catalog.data?.cell_types[form.cell]
-  const hicdiffusionOk = !!catalog.data?.hicdiffusion && !(region.data && region.data.end - region.data.start > 2_000_000)
+  const hicdiffusionMb = catalog.data?.hicdiffusion_mb ?? 2
+  const hicdiffusionOk = !!catalog.data?.hicdiffusion && !(region.data && region.data.end - region.data.start > hicdiffusionMb * 1e6)
   useEffect(() => {
     if (form.background === 'hicdiffusion' && catalog.data && !hicdiffusionOk) setForm((f) => ({ ...f, background: 'hic' }))
   }, [form.background, hicdiffusionOk, catalog.data])
@@ -141,7 +142,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
         <header className="page-head">
           <h1>Model a region</h1>
           <p className="lead">
-            Pick a cell type and a region of up to 20 Mb, then choose the loops. A job returns an ensemble of 3D structures with promoters and enhancers marked.
+            {`Pick a cell type and a region of up to ${catalog.data?.max_region_mb ?? 20} Mb, then choose the loops.`} A job returns an ensemble of 3D structures with promoters and enhancers marked.
           </p>
         </header>
         <Step n={1} title="Cell type and region">
@@ -198,6 +199,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
             value={form.background}
             region={region.data}
             available={!!catalog.data?.hicdiffusion}
+            limitMb={hicdiffusionMb}
             lymphoblastoid={cellType?.lymphoblastoid ?? true}
             onChange={(background) => set({ background })}
           />

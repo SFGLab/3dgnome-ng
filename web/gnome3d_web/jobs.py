@@ -24,7 +24,7 @@ from . import hicdiffusion
 from .catalog import Catalog
 from .inputs import Own, build_inputs
 from .marks import ep_table, mark_beads, read_cif
-from .regions import parse_region
+from .regions import ANY_SPAN, parse_region
 from .settings import Settings
 from .settings_schema import apply_overrides, validate_overrides
 from .svs import read_svs
@@ -66,7 +66,7 @@ class JobRequest:
 
 def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
     """The request with its region resolved. Equivalent requests compare equal."""
-    region = parse_region(req.region, catalog.cell_types[req.cell_type].genes(), Settings.from_env().max_span)
+    region = parse_region(req.region, catalog.cell_types[req.cell_type].genes(), ANY_SPAN)
     d = asdict(req)
     d["region"] = str(region)
     # Keys of requests made before overrides and background existed stay the same.
@@ -179,7 +179,7 @@ def run_job(
             contacts=Path(str(o["contacts"])) if o.get("contacts") else None,
             enhancers=Path(str(o["enhancers"])) if o.get("enhancers") else None,
         ) if o else None
-        region = parse_region(req.region, cell.genes(), Settings.from_env().max_span)
+        region = parse_region(req.region, cell.genes(), ANY_SPAN)
         svs: list = []
         skipped = 0
         vcf = Path(req.upload_vcf) if req.upload_vcf else (catalog.sv_sets[req.sv_set].vcf if req.sv_set else None)

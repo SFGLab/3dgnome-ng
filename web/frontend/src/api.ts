@@ -8,6 +8,8 @@ export type Catalog = {
   sv_sets: Record<string, { label: string; samples: string[]; sample_table?: boolean }>
   factors: string[]
   max_region_mb: number
+  /** The longest region of a job with a HiCDiffusion background, in Mb. */
+  hicdiffusion_mb: number
   max_structures: number
   hicdiffusion: boolean
 }

@@ -8,6 +8,8 @@ from dataclasses import dataclass
 import pandas as pd
 
 MAX_SPAN = 20_000_000
+# For a request the site has accepted. The limit of the site may have changed since.
+ANY_SPAN = 1 << 62
 # HiCDiffusion predicts 2,097,152 bp of the haplotype. The margin leaves room for insertions.
 HICDIFFUSION_SPAN = 2_000_000
 GENE_WINDOW = 2_000_000

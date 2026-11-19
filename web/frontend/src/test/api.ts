@@ -8,6 +8,7 @@ export const CATALOG = {
   sv_sets: { HGSVC: { label: 'HGSVC freeze 4', samples: ['HG00512', 'HG00733'] } },
   factors: ['CTCF', 'RNAPII', 'CTCF+RNAPII'],
   max_region_mb: 20,
+  hicdiffusion_mb: 2,
   max_structures: 100,
   hicdiffusion: true,
 }

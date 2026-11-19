@@ -155,6 +155,13 @@ describe('Background', () => {
     expect(screen.getByText('HiCDiffusion predicts regions up to 2 Mb.')).toBeInTheDocument()
   })
 
+  it('takes the HiCDiffusion limit of the server', () => {
+    render(<Background value="hic" region={REGION_1MB} available limitMb={0.5} lymphoblastoid onChange={() => {}} />)
+    expect(screen.getByRole('radio', { name: /Predicted by HiCDiffusion/ })).toBeDisabled()
+    expect(screen.getByText('HiCDiffusion predicts regions up to 0.5 Mb.')).toBeInTheDocument()
+    expect(screen.getByText(/for regions up to 0\.5 Mb/)).toBeInTheDocument()
+  })
+
   it('disables HiCDiffusion when the server has no HiCDiffusion', () => {
     render(<Background value="hic" region={REGION_1MB} available={false} lymphoblastoid onChange={() => {}} />)
     expect(screen.getByRole('radio', { name: /Predicted by HiCDiffusion/ })).toBeDisabled()

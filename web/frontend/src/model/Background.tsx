@@ -2,23 +2,23 @@ import { Info } from 'lucide-react'
 import type { Region } from '../api'
 import type { Background as BackgroundId } from './form'
 
-const HICDIFFUSION_SPAN = 2_000_000
-
 type Props = {
   value: BackgroundId
   region: Region | undefined
   available: boolean
+  /** The longest region HiCDiffusion takes on this server, in Mb. */
+  limitMb?: number
   lymphoblastoid: boolean
   onChange: (b: BackgroundId) => void
 }
 
 /** Step 4, the contact background: the cell type's Hi-C, a HiCDiffusion prediction or none. */
-export function Background({ value, region, available, lymphoblastoid, onChange }: Props) {
-  const tooLong = region !== undefined && region.end - region.start > HICDIFFUSION_SPAN
-  const reason = !available ? 'HiCDiffusion is not set up on this server.' : tooLong ? 'HiCDiffusion predicts regions up to 2 Mb.' : ''
+export function Background({ value, region, available, limitMb = 2, lymphoblastoid, onChange }: Props) {
+  const tooLong = region !== undefined && region.end - region.start > limitMb * 1e6
+  const reason = !available ? 'HiCDiffusion is not set up on this server.' : tooLong ? `HiCDiffusion predicts regions up to ${limitMb} Mb.` : ''
   const options: [BackgroundId, string, string][] = [
     ['hic', 'Hi-C of this cell type', 'The Hi-C experiment on this cell line, from 4DN. The default.'],
-    ['hicdiffusion', 'Predicted by HiCDiffusion', 'A contact map predicted from the DNA sequence, for regions up to 2 Mb. Structural variants change the prediction.'],
+    ['hicdiffusion', 'Predicted by HiCDiffusion', `A contact map predicted from the DNA sequence, for regions up to ${limitMb} Mb. Structural variants change the prediction.`],
     ['none', 'None', 'No contact map. Two points that no loop joins are placed by their distance along the genome alone.'],
   ]
   return (

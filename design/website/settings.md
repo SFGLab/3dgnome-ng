@@ -9,7 +9,7 @@ All by environment, see `web/gnome3d_web/settings.py`. The ones that matter:
 | `QUEUE` | `rq` | `rq` with `REDIS_URL`, `thread` or `inline` for development |
 | `RETENTION_DAYS` | 14 | a private job is deleted after this many days, as the form says |
 | `ENGINE_CMD` | `python -m gnome3d.cli` | how the worker starts the engine |
-| `MAX_REGION_MB` | 20 | the longest region the form accepts |
+| `MAX_REGION_MB` | 20 | the longest region the form accepts, unless `config.json` sets `limits.region_mb` |
 | `GPU_SLOTS` | `0` | the slots of the `thread` queue, one GPU id per slot |
 | `GNOME3D_GPU_POOL_GIB` | unset | the GPU memory pool of each engine process in GiB |
 | `MAX_STRUCTURES` | 100 | the most structures a job may ask for |
@@ -17,6 +17,30 @@ All by environment, see `web/gnome3d_web/settings.py`. The ones that matter:
 | `BASE_PATH` | unset | the path the site is served under, `/new` for a site at `/new/`; the frontend is built with the same value |
 | `LINK_ALLOW_PRIVATE` | off | `1` lets a contact map link point at a private address, for tests only |
 | `LINK_READS` | 4 | contact map links read at once |
+
+## config.json
+
+`config.json` beside the catalog, or the file `SITE_CONFIG` names, holds the feature flags and
+the limits of a job. The server reads the file again when it changes. An edit needs no restart
+and no build.
+
+    {"features": {"results": true, "method": true, "trios": false},
+     "limits": {"region_mb": 20, "hicdiffusion_mb": 2}}
+
+| key | default | meaning |
+|---|---|---|
+| `features.results`, `features.method` | on | the two pages. Off, the page leaves the top bar and its address leads to the front page |
+| `features.trios` | on | the nine people on the Results page |
+| `limits.region_mb` | `MAX_REGION_MB`, 20 | the longest region of a job, in Mb |
+| `limits.hicdiffusion_mb` | 2 | the longest region of a job with a HiCDiffusion background, in Mb, 2.097152 at most |
+
+HiCDiffusion predicts one window of 2,097,152 bp of the haplotype. A longer region would get the
+prediction on its first part alone, and the file is refused with a higher limit. The default
+of 2 Mb leaves room for insertions. The form, the title page and the refusals of the server
+state the limits of the file.
+
+A site does not start on a file with an unknown key, feature or limit. A broken edit of a
+running site is logged and the configuration it had stays.
 
 HiCDiffusion is a step of a job that asks for it. It predicts the contact background of a 2 Mb
 window from the haplotype's sequence, and the map is spliced into the cell type's map from the

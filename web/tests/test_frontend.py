@@ -131,3 +131,58 @@ def test_a_build_for_another_path_is_refused_with_both_paths_named(site: SimpleN
     (dist / "index.html").write_text('<html><body>FRONTEND-OK<script src="/new/assets/app.js"></script></body></html>')
     r = TestClient(create_app()).get("/")
     assert r.status_code == 503 and "built for the path /new" in r.text, "a prefixed build at the root is refused: " + r.text[:120]
+
+
+def test_config_json_sets_the_longest_region_and_the_longest_hicdiffusion_region(site: SimpleNamespace) -> None:
+    TestClient, create_app, root = site.TestClient, site.create_app, site.root
+    config = root / "data" / "config.json"
+    plain = TestClient(create_app()).get("/api/catalog").json()
+    assert (plain["max_region_mb"], plain["hicdiffusion_mb"]) == (20, 2), "without the file the limits are 20 Mb and 2 Mb"
+
+    config.write_text('{"limits": {"region_mb": 3, "hicdiffusion_mb": 1}}')
+    limited = TestClient(create_app())
+    cat = limited.get("/api/catalog").json()
+    assert (cat["max_region_mb"], cat["hicdiffusion_mb"]) == (3, 1), "the catalog gives the limits of the file"
+    r = limited.get("/api/region", params={"cell": "GMX", "q": "chr1:0-3500000"})
+    assert r.status_code == 400 and "3,000,000" in r.json()["error"], "a region over the limit of the file is refused: " + r.text
+    form = {"cell_type": "GMX", "region": "chr1:0-1500000", "factors": "CTCF", "n_models": "2", "background": "hicdiffusion"}
+    r = limited.post("/api/jobs", data=form)
+    said = r.json().get("error", "")
+    assert r.status_code == 400 and r.json()["field"] == "background", "a HiCDiffusion job over the limit of the file is refused: " + r.text
+    assert "up to 1,000,000 bp" in said and "up to 1 Mb" in said, "the refusal names the limit of the file: " + said
+
+    config.write_text('{"limits": {"region_mb": 30}}')
+    os.utime(config, ns=(5, 5))
+    cat = limited.get("/api/catalog").json()
+    assert (cat["max_region_mb"], cat["hicdiffusion_mb"]) == (30, 2), "an edit of the limits is read without a restart"
+    assert limited.get("/api/region", params={"cell": "GMX", "q": "chr1:0-25000000"}).status_code == 200, "a region the new limit allows is taken"
+
+
+def test_a_job_the_file_allows_runs_past_the_limit_of_the_environment(site: SimpleNamespace) -> None:
+    TestClient, create_app, root = site.TestClient, site.create_app, site.root
+    os.environ["MAX_REGION_MB"] = "1"
+    (root / "data" / "config.json").write_text('{"limits": {"region_mb": 3}}')
+    c = TestClient(create_app())
+    r = c.post("/api/jobs", data={"cell_type": "GMX", "region": "chr1:0-2000000", "factors": "CTCF", "n_models": "2", "background": "hic"})
+    assert r.status_code == 201, "the limit of the file stands over MAX_REGION_MB: " + r.text
+    state = c.get("/api" + r.json()["url"]).json()
+    assert state["state"] == "done", "the job runs. An accepted request is not held to a limit again: " + str(state)[:300]
+    del os.environ["MAX_REGION_MB"]
+
+
+@pytest.mark.parametrize(
+    ("text", "said"),
+    [
+        ('{"limits": {"hicdiffusion_mb": 5}}', "one window of 2,097,152 bp"),
+        ('{"limits": {"region": 5}}', "names the limit region"),
+        ('{"limits": {"region_mb": 0}}', "above zero"),
+        ('{"limits": {"region_mb": true}}', "above zero"),
+        ('{"limits": 20}', "limits must be an object"),
+    ],
+)
+def test_a_site_does_not_start_on_a_limit_it_cannot_keep(site: SimpleNamespace, text: str, said: str) -> None:
+    config = site.root / "data" / "config.json"
+    config.write_text(text)
+    with pytest.raises(ValueError, match=said):
+        site.create_app()
+    config.unlink()

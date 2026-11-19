@@ -1,9 +1,14 @@
 """The configuration of the site, `config.json` beside the catalog.
 
-    {"features": {"results": true, "method": true, "trios": false}}
+    {"features": {"results": true, "method": true, "trios": false},
+     "limits": {"region_mb": 20, "hicdiffusion_mb": 2}}
 
 `results` and `method` are the two pages with their links and `trios` is the nine people on
-the Results page. A feature the file leaves out is on. The file is read again when it changes.
+the Results page. A feature the file leaves out is on.
+
+`region_mb` is the longest region a job may cover and `hicdiffusion_mb` the longest region a
+job with a HiCDiffusion background may cover, both in Mb. A limit the file leaves out keeps the
+site's default. The file is read again when it changes.
 """
 
 from __future__ import annotations
@@ -13,10 +18,14 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from personal3d.hicdiffusion import SIZE as HICDIFFUSION_WINDOW
+
 log = logging.getLogger(__name__)
 
 # The parts of the site a feature flag can turn off.
 FEATURES = ("results", "method", "trios")
+# The limits of a job the file can set, in Mb.
+LIMITS = ("region_mb", "hicdiffusion_mb")
 
 
 class ConfigError(ValueError):
@@ -30,6 +39,9 @@ def _all_on() -> dict[str, bool]:
 @dataclass(frozen=True)
 class SiteConfig:
     features: dict[str, bool] = field(default_factory=_all_on)
+    # None keeps the default of the site.
+    region_mb: float | None = None
+    hicdiffusion_mb: float | None = None
 
     @property
     def hidden(self) -> tuple[str, ...]:
@@ -46,9 +58,9 @@ def parse(text: str, where: str = "config.json") -> SiteConfig:
         raise ConfigError(f"{where} is not JSON: {e}") from e
     if not isinstance(raw, dict):
         raise ConfigError(f"{where} must hold an object")
-    unknown = sorted(set(raw) - {"features"})
+    unknown = sorted(set(raw) - {"features", "limits"})
     if unknown:
-        raise ConfigError(f"{where} has the unknown key {', '.join(unknown)}. It takes features.")
+        raise ConfigError(f"{where} has the unknown key {', '.join(unknown)}. It takes features and limits.")
     flags = raw.get("features", {})
     if not isinstance(flags, dict):
         raise ConfigError(f"{where}: features must be an object of true and false")
@@ -58,7 +70,22 @@ def parse(text: str, where: str = "config.json") -> SiteConfig:
     for name, on in flags.items():
         if not isinstance(on, bool):
             raise ConfigError(f"{where}: the feature {name} must be true or false")
-    return SiteConfig(features={**_all_on(), **flags})
+    limits = raw.get("limits", {})
+    if not isinstance(limits, dict):
+        raise ConfigError(f"{where}: limits must be an object of numbers in Mb")
+    unknown = sorted(set(limits) - set(LIMITS))
+    if unknown:
+        raise ConfigError(f"{where} names the limit {', '.join(unknown)}. It takes {' and '.join(LIMITS)}.")
+    for name, mb in limits.items():
+        if isinstance(mb, bool) or not isinstance(mb, (int, float)) or mb <= 0:
+            raise ConfigError(f"{where}: the limit {name} must be a number of Mb above zero")
+    window_mb = HICDIFFUSION_WINDOW / 1e6
+    if limits.get("hicdiffusion_mb", 0) > window_mb:
+        raise ConfigError(
+            f"{where}: the limit hicdiffusion_mb is {limits['hicdiffusion_mb']:g}. HiCDiffusion predicts one window of "
+            f"{HICDIFFUSION_WINDOW:,} bp, and a longer region would get the prediction on its first part alone. Give {window_mb:g} or less."
+        )
+    return SiteConfig(features={**_all_on(), **flags}, region_mb=limits.get("region_mb"), hicdiffusion_mb=limits.get("hicdiffusion_mb"))
 
 
 class ConfigFile:
