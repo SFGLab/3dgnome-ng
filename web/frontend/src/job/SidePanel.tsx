@@ -1,4 +1,4 @@
-import { Braces, ChevronLeft, ChevronRight, FileText, Folder, Pencil } from 'lucide-react'
+import { Braces, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Folder, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { recentJobs, rememberJob } from '../model/recent'
 import type { JobApi, Summary } from './api'
@@ -42,6 +42,7 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
   const remembered = recentJobs().find((j) => j.url === api.url)
   const [name, setName] = useState(remembered?.name ?? '')
   const [editing, setEditing] = useState(false)
+  const [unfolded, setUnfolded] = useState(false)
   const m = summary.region?.match(/^(\w+):(\d+)-(\d+)$/)
   const region = m ? `${m[1]}:${bp(Number(m[2]))}-${bp(Number(m[3]))}` : summary.request.region
   // The heading has the region in megabases, which fits the panel. The line under it has the exact positions.
@@ -75,7 +76,7 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
     .map(([f, c]) => `${bp(c)} ${f}`)
     .join(', ')
   return (
-    <aside className="job-side">
+    <aside className={unfolded ? 'job-side' : 'job-side folded'}>
       <p className={`job-state ${summary.state}`}>
         <span className="state-dot" /> {state}
       </p>
@@ -102,6 +103,11 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
       </p>
       <button type="button" className="link-button" onClick={() => setEditing(true)}>
         <Pencil size={12} aria-hidden /> Rename job
+      </button>
+      {/* On a narrow screen the panel is above the tabs. Its facts and files fold away there, so
+          the model is not a screen below. */}
+      <button type="button" className="side-fold-toggle" aria-expanded={unfolded} onClick={() => setUnfolded((u) => !u)}>
+        {unfolded ? <ChevronUp size={13} aria-hidden /> : <ChevronDown size={13} aria-hidden />} Details and files
       </button>
       <dl className="facts">
         <dt>Loops</dt>
@@ -144,6 +150,7 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
               Random
             </button>
           </div>
+          <div className="side-files">
           <p className="side-label">Files</p>
           <ul className="files">
             <li className="folder">
@@ -172,6 +179,7 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
                 </li>
               ))}
           </ul>
+          </div>
         </>
       )}
     </aside>

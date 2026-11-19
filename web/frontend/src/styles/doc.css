@@ -44,6 +44,7 @@
 
 .reading {
   flex: 1;
+  min-width: 0;
   max-width: 820px;
   display: flex;
   flex-direction: column;
@@ -131,6 +132,14 @@
   margin: 4px 0 8px;
 }
 
+/* On a narrow screen a table scrolls sideways inside the page. */
+@media (max-width: 720px) {
+  .doc-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
 .doc-table th {
   padding: 8px 12px;
   background: var(--panel);
@@ -162,6 +171,10 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
+  /* A formula longer than the page scrolls sideways inside its box and keeps its size. */
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto;
   margin: 8px 0 16px;
   padding: 14px 18px;
   background: #FFFFFF;

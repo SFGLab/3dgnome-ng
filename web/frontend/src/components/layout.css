@@ -126,6 +126,24 @@
   .tagline {
     display: none;
   }
+  /* The name and the theme switch share the first row. The links take a second row of their
+     own and scroll sideways where they do not fit. */
+  .top-bar nav {
+    order: 3;
+    flex: 1 1 100%;
+    margin-left: 0;
+    gap: 18px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .top-bar nav::-webkit-scrollbar {
+    display: none;
+  }
+  .top-bar nav a {
+    flex: none;
+    white-space: nowrap;
+  }
   .top-bar,
   .cite-strip {
     padding-left: 16px;

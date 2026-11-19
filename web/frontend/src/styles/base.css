@@ -61,9 +61,14 @@ pre {
   color: var(--muted);
 }
 
+.field {
+  min-width: 0;
+}
+
 .field select,
 .field input {
   min-width: 0;
+  max-width: 100%;
   padding: 9px 10px;
   background: var(--bg);
   border: 1px solid var(--line);

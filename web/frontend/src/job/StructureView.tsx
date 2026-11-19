@@ -163,6 +163,8 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
           ))}
         </div>
         {toolbarEnd}
+        {/* One group, so the three wrap together and none is left alone on a row. */}
+        <div className="tool-group">
         <button type="button" className="icon-tool" aria-label="Reset view" onClick={() => scene.current?.reset()}>
           <RotateCcw size={15} aria-hidden />
         </button>
@@ -184,6 +186,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
         <button type="button" className="icon-tool" aria-label="Full screen" onClick={() => void box.current?.requestFullscreen?.()}>
           <Expand size={15} aria-hidden />
         </button>
+        </div>
       </div>
       {above}
       <div className="view-box" ref={box}>

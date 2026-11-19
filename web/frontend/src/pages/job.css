@@ -208,10 +208,23 @@
   border-bottom: 1px solid var(--line);
 }
 
+/* The tabs stay on one row and scroll sideways where they do not fit. */
 .job-tabs [role='tablist'] {
   display: flex;
   gap: 4px;
-  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.job-tabs [role='tablist']::-webkit-scrollbar {
+  display: none;
+}
+
+.job-tab {
+  flex: none;
+  white-space: nowrap;
 }
 
 .job-tab {
@@ -244,6 +257,7 @@
 
 .job-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -297,6 +311,14 @@
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
+  /* Named with the panel, so it wins over the rule that hides the button on a wide screen. */
+  .job-side .side-fold-toggle {
+    display: inline-flex;
+  }
+  .job-side.folded .facts,
+  .job-side.folded .side-files {
+    display: none;
+  }
 }
 
 .structure-view {
@@ -304,6 +326,41 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  /* The toolbar lays itself out by the width of the view, not of the screen: the view is
+     narrow beside the cards on a wide screen too. */
+  container: view / inline-size;
+}
+
+.tool-group {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Where the toolbar does not fit one row, the colour choice takes a row of its own under the
+   rest and its three buttons share it. */
+@container view (max-width: 860px) {
+  .view-toolbar .segmented {
+    order: 9;
+    flex: 1 1 100%;
+  }
+  .view-toolbar .segmented button {
+    flex: 1;
+    min-width: 0;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  .view-toolbar .find-gene {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+/* On a phone the gene field has the first row and the tools share the second. */
+@container view (max-width: 420px) {
+  .view-toolbar .find-gene {
+    flex-basis: 100%;
+  }
 }
 
 .view-toolbar {
@@ -447,9 +504,36 @@
 
 .structure-tab {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 20px;
   align-items: start;
+}
+
+/* Shown on a narrow screen alone, where it folds the facts and the files of the side panel. */
+.side-fold-toggle {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 12px var(--font);
+  cursor: pointer;
+}
+
+.side-files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* A table wider than its place scrolls sideways inside it. */
+.table-scroll {
+  overflow-x: auto;
 }
 
 .side-cards {
@@ -616,15 +700,21 @@
 
 @media (max-width: 1200px) {
   .structure-tab {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 .genes-tab {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 20px;
   align-items: start;
+}
+
+/* The table scrolls sideways inside its column where the column is narrower than it. */
+.genes-main {
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .genes-toolbar {
@@ -804,7 +894,7 @@
 
 @media (max-width: 1200px) {
   .genes-tab {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1096,7 +1186,7 @@
 
 @media (max-width: 1100px) {
   .contacts-tab {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

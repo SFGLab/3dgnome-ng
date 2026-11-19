@@ -15,6 +15,7 @@ export function LoopsTab({ api, onShow }: { api: JobApi; onShow?: (loop: Loop) =
   return (
     <>
       <Pager page={page} noun="loops" />
+      <div className="table-scroll">
       <table className="genes-table loops-table">
         <thead>
           <tr>
@@ -47,6 +48,7 @@ export function LoopsTab({ api, onShow }: { api: JobApi; onShow?: (loop: Loop) =
           ))}
         </tbody>
       </table>
+      </div>
     </>
   )
 }

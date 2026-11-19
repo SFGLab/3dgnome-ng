@@ -57,6 +57,18 @@ describe('Job explorer', () => {
     expect(screen.queryByRole('link', { name: /all files, zip/ })).not.toBeInTheDocument()
   })
 
+  it('folds the facts and the files of the side panel behind a button, for a narrow screen', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+    const { container } = renderJob()
+    const toggle = await screen.findByRole('button', { name: 'Details and files' })
+    // The styles show the button and hide the folded parts on a narrow screen alone.
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(container.querySelector('.job-side')).toHaveClass('folded')
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(container.querySelector('.job-side')).not.toHaveClass('folded')
+  })
+
   it('survives a browser whose scroll returns a promise when the structure changes', async () => {
     const scroll = vi.fn(() => Promise.resolve())
     const before = Element.prototype.scrollIntoView
