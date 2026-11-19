@@ -37,7 +37,7 @@ const SECTIONS = [
   ['variants', 'Structural variants'],
   ['reading', 'Reading the results'],
   ['questions', 'Questions'],
-  ['running', 'Running gnome3d-ng yourself'],
+  ['running', 'Running gnome3d yourself'],
 ]
 
 function QA({ q, a }: { q: string; a: string }) {
@@ -103,7 +103,7 @@ export function Help() {
             The 10 column loop files of 3D-GNOME 2.0 and 3.0, with motif orientations and the factor in the loop file, are not read. Move the orientations to the anchors file and write one loop file per factor.
           </p>
           <p>
-            To convert a .mcool map yourself, run prep_singletons.py from the gnome3d-ng repository. It writes intra chromosomal bin pairs at a chosen bin size and can thin a deep map.
+            To convert a .mcool map yourself, run prep_singletons.py from the 3D-GNOMEᴺᴳ repository. It writes intra chromosomal bin pairs at a chosen bin size and can thin a deep map.
           </p>
         </section>
 
@@ -138,11 +138,11 @@ export function Help() {
         </section>
 
         <section id="running">
-          <h2>Running gnome3d-ng yourself</h2>
+          <h2>Running gnome3d yourself</h2>
           <p>
-            The server runs the gnome3d-ng Python package. The package runs on a CPU and uses a GPU when one is present. A run reads one config.ini. The settings reference lists every key with its default, the value on this server and its meaning.
+            The server runs the gnome3d Python package. The package runs on a CPU and uses a GPU when one is present. A run reads one config.ini. The settings reference lists every key with its default, the value on this server and its meaning.
           </p>
-          <pre className="code">{'pip install gnome3d-ng\ngnome3d-ng --config config.ini --region chr1:11500000-12600000 -n 10 --out models/'}</pre>
+          <pre className="code">{'pip install gnome3d\ngnome3d --config config.ini --region chr1:11500000-12600000 -n 10 --out models/'}</pre>
           <table className="doc-table settings" aria-label="Settings">
             <thead>
               <tr>

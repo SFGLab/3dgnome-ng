@@ -312,7 +312,7 @@ the diagonal, the way the hosted maps hold them.
 |---|---|
 | link to a .hic or .mcool | on the server, `POST /api/uploads/link`, over HTTP range requests: hic-straw for .hic, h5py on an fsspec file for .mcool, each in a child process that reads through a range proxy on the loopback interface. Every connection resolves the host once and goes only to the public address it checked, redirects included. A read is stopped after 2 minutes, and at most `LINK_READS` run at once; one more is refused at once. |
 | local .hic file | in the browser, with the hic-straw JavaScript reader, uploaded as a BEDPE |
-| BEDPE of the region | on the user's computer; `gnome3d-ng extract --mcool FILE --region chr:start-end --out region.bedpe` writes it from a local .mcool, with `pip install gnome3d-ng[extract]` for cooler |
+| BEDPE of the region | on the user's computer; `gnome3d extract --mcool FILE --region chr:start-end --out region.bedpe` writes it from a local .mcool, with `pip install gnome3d[extract]` for cooler |
 
 In production the worker's network should also refuse private ranges, as a second guard
 behind the address check: with Docker, a network whose egress rule drops 10.0.0.0/8,

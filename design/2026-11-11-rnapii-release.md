@@ -11,7 +11,7 @@ Work on the 3D engine closes with three deliverables.
    structural variants, theirs or a hosted set, generates a contact background with
    HiCDiffusion when one is needed, and gets an ensemble of 3D structures of a region with
    enhancers and promoters marked.
-3. `gnome3d-ng` on PyPI, the same library the website calls.
+3. `gnome3d` on PyPI, the same library the website calls.
 
 The reconciliation plan behind this names four claims to support: closing the engine,
 RNAPII improving the structure or the signal, HiCDiffusion for genomes with no measured
@@ -225,7 +225,7 @@ can come back only if retries or long workflows become a real problem.
 
 ## Part 4. The library
 
-`gnome3d-ng` published to PyPI with the JAX backend as the optional `[jax]` extra. The site
+`gnome3d` published to PyPI with the JAX backend as the optional `[jax]` extra. The site
 calls the same public entry point the package exposes, `simulate.run_region`, so the release
 and the site cannot drift. Builder's call on versioning and what else enters the public API.
 

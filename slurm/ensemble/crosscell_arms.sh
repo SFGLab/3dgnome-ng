@@ -57,7 +57,7 @@ echo "[map] task=$TASK line=$LINE arm=$ARM config=$CONFIG out=$DEST chroms=$CHRO
 if [ "$DRY" = "1" ]; then
   [ -f "$CONFIG" ] && echo "[dry] config present" || echo "[dry] config MISSING"
   for C in $CHROMS; do
-    echo "[dry] gnome3d-ng --config $CONFIG --region $C --members 0-$((N - 1)) --out $DEST/$C"
+    echo "[dry] python -m gnome3d.cli --config $CONFIG --region $C --members 0-$((N - 1)) --out $DEST/$C"
   done
   exit 0
 fi

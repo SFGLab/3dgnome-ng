@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gnome3d-ng"
+name = "gnome3d"
 version = "0.2.0"
 description = "3D chromatin structure from ChIA-PET loops and Hi-C contacts"
 requires-python = ">=3.10"
@@ -27,13 +27,13 @@ dev = [
 # Gives 5-30x speedup over numba at N>=2048 on NVIDIA hardware.
 # This extras installs jax with CPU-only support; for GPU performance install
 # hardware-specific wheels separately, e.g.:
-#     pip install gnome3d-ng[jax] "jax[cuda12]"   # NVIDIA
-#     pip install gnome3d-ng[jax] "jax[rocm6]"    # AMD
+#     pip install gnome3d[jax] "jax[cuda12]"   # NVIDIA
+#     pip install gnome3d[jax] "jax[rocm6]"    # AMD
 jax = [
     "jax>=0.4.30",
 ]
 
-# gnome3d-ng extract reads .mcool files with cooler.
+# gnome3d extract reads .mcool files with cooler.
 extract = [
     "cooler>=0.9",
 ]
@@ -51,7 +51,7 @@ validation = [
 ]
 
 [project.scripts]
-gnome3d-ng = "gnome3d.cli:main"
+gnome3d = "gnome3d.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

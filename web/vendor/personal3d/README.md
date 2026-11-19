@@ -21,7 +21,7 @@ shared loops and change only where the person's DNA changes them.
   inversions.
 - `engine.py` writes a haplotype's engine inputs in its own coordinates, the rewritten loops,
   the base contact map lifted with a predicted window spliced in on the base map's grid and
-  depth, and the arm's config with only `[data]` replaced, and runs gnome3d-ng on a region.
+  depth, and the arm's config with only `[data]` replaced, and runs gnome3d on a region.
 
 The command line:
 

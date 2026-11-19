@@ -1,11 +1,11 @@
 """
 Command-line interface for 3dgnome-ng.
 
-Single region:   gnome3d-ng --config X.ini --region chr1:18288319-20307135
-Single chr:      gnome3d-ng --config X.ini --region chr14
-Chromosome list: gnome3d-ng --config X.ini --region chr1,chr3,chrX
-Range:           gnome3d-ng --config X.ini --region chr1-chr22,chrX
-Whole genome:    gnome3d-ng --config X.ini      (defaults to chr1-chr22,chrX)
+Single region:   gnome3d --config X.ini --region chr1:18288319-20307135
+Single chr:      gnome3d --config X.ini --region chr14
+Chromosome list: gnome3d --config X.ini --region chr1,chr3,chrX
+Range:           gnome3d --config X.ini --region chr1-chr22,chrX
+Whole genome:    gnome3d --config X.ini      (defaults to chr1-chr22,chrX)
 """
 
 import argparse

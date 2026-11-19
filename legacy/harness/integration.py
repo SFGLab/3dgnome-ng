@@ -1003,7 +1003,7 @@ def run_backend_divergence(
     if not jax_ok:
         sys.exit(
             "[error] divergence mode requires JAX installed.\n"
-            "  pip install gnome3d-ng[jax]  (and a jax[cuda12]/jax[rocm6] for GPU)"
+            "  pip install gnome3d[jax]  (and a jax[cuda12]/jax[rocm6] for GPU)"
         )
 
     tag = "jax-divergence"

@@ -107,5 +107,5 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
 fi
 
 echo "[launch] node=$(hostname) cell=$CELL chrom=$CHROM members=$MEMBERS task=$TASK"
-srun gnome3d-ng --config "$CONFIG" --region "$CHROM" --members "$MEMBERS" --out "$OUT/$CHROM" \
+srun python -m gnome3d.cli --config "$CONFIG" --region "$CHROM" --members "$MEMBERS" --out "$OUT/$CHROM" \
   --log-file "$ROOT/slurm/ensemble/logs/ens_${CELL}_${CHROM}_${SLURM_ARRAY_JOB_ID:-0}_${TASK}.detail.log"

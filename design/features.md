@@ -246,7 +246,7 @@ last section are dated records and are not rewritten when production moves on. `
   (`serial` | `threaded` | `batch` | `auto`). `batch` selects JAX. The old
   `mc_backend_apply_to_*` flags no longer exist.
 
-  Install: `pip install gnome3d-ng[jax] "jax[cuda12]"` (NVIDIA) or `"jax[rocm6]"` (AMD). Without JAX installed, the dispatcher raises a clear error if `mc_backend="jax"` is set; otherwise it never imports JAX. The `[jax]` extras dep in `pyproject.toml` is **optional** — base install is numba-only.
+  Install: `pip install gnome3d[jax] "jax[cuda12]"` (NVIDIA) or `"jax[rocm6]"` (AMD). Without JAX installed, the dispatcher raises a clear error if `mc_backend="jax"` is set; otherwise it never imports JAX. The `[jax]` extras dep in `pyproject.toml` is **optional** — base install is numba-only.
 
   Implementation notes:
   - **Per-shape XLA compile cost** (~1–60s per (N, K, n_anchors) combo) is paid once per machine via the persistent compile cache at `~/.cache/gnome3d/jax` (override with `GNOME3D_JAX_CACHE`).

@@ -19,13 +19,13 @@ Three extras add optional parts.
 | Extra | Content |
 |-------|---------|
 | `jax` | The GPU kernels. This extra installs JAX for the CPU. Add the build for your hardware, as in `pip install -e ".[jax]" "jax[cuda12]"`. |
-| `extract` | cooler, for `gnome3d-ng extract`. |
+| `extract` | cooler, for `gnome3d extract`. |
 | `dev` | ruff, pyright and pytest. |
 
 ## Run
 
 ```bash
-gnome3d-ng --config slurm/ensemble/gm12878_hic_arcs.ini --region chr1:18288319-20307135 -n 10 --out out/
+gnome3d --config slurm/ensemble/gm12878_hic_arcs.ini --region chr1:18288319-20307135 -n 10 --out out/
 ```
 
 `--region` takes one region `chr1:18288319-20307135`, one chromosome `chr14`, a list `chr1,chr3,chrX` or a range
@@ -76,10 +76,10 @@ The `[data]` section of the config points to the input files. The repository doe
 | `singletons` | BEDPE | Contacts for the exponent fit and the coarse heatmaps. ChIA-PET singletons or Hi-C bin pairs. |
 | `segment_split` | BED | Segment breakpoints. |
 
-`gnome3d-ng extract` writes the bin pairs of one region of an mcool file in the format of `singletons`.
+`gnome3d extract` writes the bin pairs of one region of an mcool file in the format of `singletons`.
 
 ```bash
-gnome3d-ng extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe
+gnome3d extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe
 ```
 
 The optional inputs are a compartment track, an anchor activity track, an anchor contact table and a contact map for

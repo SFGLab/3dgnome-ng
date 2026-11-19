@@ -1,4 +1,4 @@
-"""Unit checks for `gnome3d-ng extract`."""
+"""Unit checks for `gnome3d extract`."""
 
 from __future__ import annotations
 
@@ -131,7 +131,7 @@ def main() -> int:
             cwd=ROOT, capture_output=True, text=True, check=False,
         )  # fmt: skip
         check(
-            "gnome3d-ng extract runs from the command line",
+            "gnome3d extract runs from the command line",
             r.returncode == 0 and cli.read_text() == out.read_text(),
             r.stderr[-400:],
         )

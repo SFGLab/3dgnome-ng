@@ -15,7 +15,7 @@ battery. The old code is under `legacy/` and is not developed.
 ```
 gnome3d/            the model
   simulate.py       entry points: simulate, run_region, run_genome
-  cli.py            the gnome3d-ng command
+  cli.py            the gnome3d command
   production.py     the production configuration, CANONICAL and settings_for_cell
   settings.py       the loader of every config key
   data.py io.py     input data and file formats

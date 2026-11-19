@@ -28,7 +28,7 @@ from .settings import Settings
 from .settings_schema import apply_overrides, validate_overrides
 from .svs import read_svs
 
-ENGINE_VERSION = "gnome3d-ng"
+ENGINE_VERSION = "gnome3d"
 
 
 def _no_overrides() -> dict[str, str]:

@@ -10,7 +10,7 @@ A haplotype's inputs are those of the conf arm, written in the haplotype's own c
   segments and centromeres, the base files lifted
 
 The config is the arm's own ini with only its [data] section replaced, so every engine setting
-is the arm's. `run` starts gnome3d-ng on a region in the haplotype's coordinates.
+is the arm's. `run` starts gnome3d on a region in the haplotype's coordinates.
 """
 from __future__ import annotations
 
@@ -150,6 +150,6 @@ def write_config(template: Path, data: dict[str, str], dst: Path, header: str = 
 
 
 def run(gnome3d: Path, config: Path, region: str, members: str, out: Path) -> None:
-    """gnome3d-ng on one region, from the engine checkout's venv."""
-    exe = Path(gnome3d) / ".venv" / "bin" / "gnome3d-ng"
-    subprocess.run([str(exe), "--config", str(config), "--region", region, "--members", members, "--out", str(out)], cwd=gnome3d, check=True)
+    """gnome3d on one region, from the engine checkout's venv."""
+    python = Path(gnome3d) / ".venv" / "bin" / "python"
+    subprocess.run([str(python), "-m", "gnome3d.cli", "--config", str(config), "--region", region, "--members", members, "--out", str(out)], cwd=gnome3d, check=True)

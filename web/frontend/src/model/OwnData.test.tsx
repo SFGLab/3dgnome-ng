@@ -175,7 +175,7 @@ describe('Your own data dialog', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
     expect(screen.getAllByRole('radio').map((r) => r.querySelector('.route-title')?.textContent)).toEqual(['Link to a file', 'Local .hic file', 'BEDPE of the region'])
     expect(screen.getByText(/The server must answer range requests/)).toBeInTheDocument()
-    expect(screen.getByText(/gnome3d-ng extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe/)).toBeInTheDocument()
+    expect(screen.getByText(/gnome3d extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe/)).toBeInTheDocument()
     expect(screen.getByText("The map replaces the cell type's map for this job.")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Use this data' })).toBeInTheDocument()
   })

@@ -643,7 +643,7 @@ def mc_arcs_jax(
     if not jax_is_available():
         raise RuntimeError(
             "settings.mc_backend='jax' but JAX is not installed.  "
-            "Install with `pip install gnome3d-ng[jax]` or set mc_backend='numba'."
+            "Install with `pip install gnome3d[jax]` or set mc_backend='numba'."
         )
     import jax
     import jax.numpy as jnp

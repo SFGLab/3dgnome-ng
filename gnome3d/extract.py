@@ -1,6 +1,6 @@
 """Writes the bin pairs of one region of a .mcool as a seven column BEDPE.
 
-    gnome3d-ng extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe
+    gnome3d extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe
 
 The pairs are intra chromosomal, at one resolution, raw counts, without the diagonal.
 `--contacts-per-mb` thins the counts to that density by drawing contacts without replacement.
@@ -119,7 +119,7 @@ def extract(
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
-        prog="gnome3d-ng extract",
+        prog="gnome3d extract",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -138,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         n = extract(a.mcool, a.region, Path(a.out), a.res, a.contacts_per_mb, a.seed)
     except ExtractError as e:
-        print(f"gnome3d-ng extract: {e}", file=sys.stderr)
+        print(f"gnome3d extract: {e}", file=sys.stderr)
         return 2
     print(f"{n:,} bin pairs written to {a.out}", file=sys.stderr)
     return 0

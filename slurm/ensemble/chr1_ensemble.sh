@@ -78,5 +78,5 @@ print(f"[guard] config ok: singletons={s.data_singletons}")
 PYCHECK
 
 echo "[launch] node=$(hostname) task=${TASK} members=${MEMBERS} gpus=${SLURM_GPUS_ON_NODE:-?}"
-srun gnome3d-ng --config "$CONFIG" --region chr1 --members "$MEMBERS" --out "$OUT" \
+srun python -m gnome3d.cli --config "$CONFIG" --region chr1 --members "$MEMBERS" --out "$OUT" \
   --log-file "$ROOT/slurm/ensemble/logs/chr1_${SLURM_ARRAY_JOB_ID:-0}_${TASK}.detail.log"

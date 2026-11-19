@@ -253,7 +253,7 @@ function ContactsTab({
         <div className="contact-text">
           <p className="contact-title">A local .mcool file</p>
           <p className="contact-body">Extract the region on your computer with this command and upload region.bedpe as a BEDPE of the region.</p>
-          <code className="command">{`gnome3d-ng extract --mcool sample.mcool --region ${span} --out region.bedpe`}</code>
+          <code className="command">{`gnome3d extract --mcool sample.mcool --region ${span} --out region.bedpe`}</code>
         </div>
       </div>
     </div>
