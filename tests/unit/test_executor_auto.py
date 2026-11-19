@@ -1,9 +1,9 @@
-"""Unit checks for the executor an `auto` stage resolves to.
+"""Unit checks for the executor that an `auto` stage resolves to.
 
     python tests/unit/test_executor_auto.py
 
 The smooth stage runs threaded on numba from four workers and on the JAX device below that.
-A stage named outright keeps its name.
+A stage with an explicit value keeps it.
 """
 
 from __future__ import annotations

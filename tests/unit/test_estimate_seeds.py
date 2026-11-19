@@ -1,15 +1,9 @@
-"""Unit checks that the estimate stage's replicates are seeded from their own identity.
+"""Unit checks for the seeds of the replicates of the estimate stage.
 
     python tests/unit/test_estimate_seeds.py
 
-The estimate stage expands each interaction block into a set of dry smooth replicates that
-start from differently perturbed copies of the same chain. Those replicates go into the same
-batched kernel as everything else in the group, and that kernel now seeds each chain from the
-seed its problem carries. A replicate that carries no seed falls back to its slot in the launch,
-which puts the grouping back into the draw for this stage alone.
-
-So each replicate has to carry a seed of its own, distinct from its siblings, fixed by its
-parent block and its replicate number, and unaffected by which other blocks share the batch.
+Each replicate must carry its own seed, set by its block and its replicate number and
+independent of the other blocks in the batch.
 """
 
 from __future__ import annotations
@@ -67,7 +61,7 @@ def test_every_replicate_carries_a_seed() -> None:
 
 
 def test_seeds_follow_the_parent_not_the_batch() -> None:
-    """A block's replicate seeds are the same whoever else is in the batch."""
+    """The replicate seeds of a block do not depend on the rest of the batch."""
     alone = seeds_of([problem(64, 7)])
     first = seeds_of([problem(64, 7), problem(64, 9)])[:4]
     second = seeds_of([problem(64, 9), problem(64, 7)])[4:]

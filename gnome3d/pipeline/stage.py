@@ -1,11 +1,5 @@
-"""
-Stages: pure state->state transforms that adapt to/from a kernel.
-
-A stage never holds a kernel.  It declares its `kind` (what an executor groups
-on to batch) and only knows how to turn its input state(s) into a kernel
-*problem* and fold the *result* into its output state.  The actual numba/JAX
-kernel comes from the per-kind runner registry (`registry.py`), so adding a
-batched backend for a kind is a registration, not a code change here.
+"""Stages turn states into kernel problems and kernel results into states. The kernel of a kind
+comes from the registry.
 """
 
 from __future__ import annotations
@@ -17,46 +11,37 @@ from gnome3d.pipeline.state import State
 
 
 class StageKind(StrEnum):
-    """What a stage does.  The executor groups *ready* nodes by `(kind, bucket)`
-    to batch them and dispatches to the runner registered for the kind."""
+    """The kind of a stage. The executor groups ready nodes by `(kind, bucket)`."""
 
-    # --- coarse positioning (the cluster-tree spine, upstream of IBs) ---
-    COARSE = "coarse"  # one cluster-graph level: build/position in place (serial)
+    COARSE = "coarse"  # one level of the cluster tree, positioned in place
 
-    # --- per-IB reconstruction ---
-    ARCS = "arcs"  # position anchors via arc-spring MC (anchor-shaped)
-    DENSIFY = "densify"  # insert subanchor beads (CPU, reshapes)
-    ESTIMATE_DIST = "estimate_dist"  # estimate subanchor distance target (bead-shaped)
-    SMOOTH = "smooth"  # final smooth MC (bead-shaped)
+    ARCS = "arcs"  # anchors by arc springs
+    DENSIFY = "densify"  # inserts subanchors
+    ESTIMATE_DIST = "estimate_dist"  # subanchor distance targets
+    SMOOTH = "smooth"  # final smooth MC
 
 
-# A stage's kernel input/output, opaque and kernel-shaped: a "problem" is the
-# self-contained dict the `mc_*_jax_batch` entries consume; a "result" is
-# whatever that kernel returns.  Stages own the interpretation.
+# A problem is the dict a kernel takes and a result is what the kernel returns.
 Problem = dict[str, Any]
 Result = Any
 
 
 @runtime_checkable
 class Stage(Protocol):
-    """One node's transform.  Consumes its dependency states, turns them into a
-    kernel `Problem`, and folds the `Result` into its output ``State``.
-
-    Linear IB stages read a single upstream state (``inputs[0]``); the tuple form
-    keeps the door open for fan-in (merge) nodes without reshaping this contract.
-    """
+    """The transform of one node, from the states of its dependencies to its output state."""
 
     kind: StageKind
 
     def bucket(self, inputs: tuple[State, ...]) -> int:
-        """Shape class for batch grouping (anchor count for ARCS, bead count for
-        ESTIMATE_DIST/SMOOTH) - computed from the input state(s)."""
+        """Returns the shape class for batch grouping, the anchor count for ARCS and the bead
+        count for ESTIMATE_DIST and SMOOTH.
+        """
         ...
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:
-        """Build this stage's self-contained kernel input."""
+        """Builds the kernel input."""
         ...
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
-        """Produce the output state by folding in the kernel result."""
+        """Returns the output state from the kernel result."""
         ...

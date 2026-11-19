@@ -1,14 +1,11 @@
-"""Unit checks for the three smooth stage levers against within block overlaps.
+"""Unit checks for the hard wall, the anchor cap and the coil start of the smooth stage.
 
     python tests/unit/test_smooth_levers.py
 
-The hard wall rejects any move that adds a non neighbour pair under the excluded volume radius
-or deepens one that is there, so the count never rises and, once zero, stays zero. The anchor
-cap lets an anchor move but rejects a move taking it further than the cap from where the arcs
-put it. The coil start places each gap's subanchors on a random bridge between its anchors at
-the bond targets instead of on a straight line. Each is checked on a small chain where the
-property can be read off the output, and all three off leave the kernel's draws untouched,
-which the parity gate confirms on a real region.
+The wall rejects a move that adds a non neighbour pair under the excluded volume radius or
+deepens one. The cap rejects a move that takes an anchor further than the cap from its place.
+The coil start puts the subanchors of each gap on a random bridge between its anchors. With
+all three off the draws of the kernel are unchanged.
 """
 
 from __future__ import annotations
@@ -38,14 +35,14 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 
 
 def under(pos: np.ndarray, r: float) -> int:
-    """Non neighbour pairs closer than r."""
+    """Returns the number of non neighbour pairs closer than r."""
     d = np.linalg.norm(pos[:, None, :] - pos[None, :, :], axis=2)
     i, j = np.triu_indices(len(pos), k=2)
     return int((d[i, j] < r).sum())
 
 
 def chain(n: int = 120, gap: int = 12, seed: int = 0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Anchors every `gap` beads on a loose random walk, subanchors on the line between them."""
+    """Anchors every `gap` beads on a loose random walk and subanchors on the line between them."""
     rng = np.random.default_rng(seed)
     fixed = np.zeros(n, dtype=np.bool_)
     fixed[::gap] = True
@@ -166,7 +163,7 @@ def _jax_available() -> bool:
 
 
 def test_jax_wall_and_cap() -> None:
-    """The JAX kernel carries the same two rules, on the single and the batched path."""
+    """The JAX kernel has the same two rules, for one problem and batched."""
     if not _jax_available():
         print("  skip  JAX not available")
         return
@@ -194,7 +191,7 @@ def test_jax_wall_and_cap() -> None:
         0.0 < drift.max() <= 0.5 + 1e-5,
         f"max drift {drift.max():.3f}",
     )
-    # the batched path, two problems in one launch
+    # The batched path, two problems in one launch.
     problems = []
     starts = []
     for seed in (1, 2):
@@ -225,7 +222,7 @@ def test_jax_wall_and_cap() -> None:
 
 
 def test_jax_prefetch() -> None:
-    """Prefetching keeps the hard rules, lands where the serial step lands, and runs batched."""
+    """Prefetching keeps the hard rules, ends where the serial step ends and runs batched."""
     if not _jax_available():
         print("  skip  JAX not available")
         return
@@ -242,8 +239,7 @@ def test_jax_prefetch() -> None:
         after <= before,
         f"{before} -> {after}",
     )
-    # The chain has the serial law, so over seeds the final energies agree in the mean; one
-    # seed's energy differs between the two by as much as it does between two seeds.
+    # The chain has the serial law. Over seeds the final energies agree in the mean.
     means = {}
     for k in (1, 8):
         sk = settings(smooth_hard_wall=True, smooth_prefetch=k)

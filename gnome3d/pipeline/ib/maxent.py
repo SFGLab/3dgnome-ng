@@ -1,13 +1,12 @@
-"""Maximum entropy start for a block's gaps.
+"""Maximum entropy start of the gaps of a block.
 
-Under `start = maxent` each gap's subanchors are drawn from the Gaussian chain whose mean pair
-distances are the targets, conditioned on the two anchors the arcs stage placed. A pair's target
-is the law's background. With `[data] contact_map` it is scaled by the count between the windows
-of about 10 kb the two beads are in, against the count a power law in separation expects. The
-power law is fitted over the chromosome on the map's 10 kb resolution, so a stretch holding fewer
-contacts than the chromosome at large reads as depleted. A map with no 10 kb resolution falls
-back to a fit on the call's own windows, which reads every stretch against itself, and says so.
-See `design/gap-fill.md`.
+Under `start = maxent` the subanchors of each gap are drawn from the Gaussian chain whose mean
+pair distances are the targets, conditioned on the two anchors. The target of a pair is the
+background of the law. With `[data] contact_map` it is scaled by the count between the 10 kb
+windows of the two beads over the count a power law in separation expects. The power law is
+fitted over the chromosome at the 10 kb resolution of the map. A map without that resolution
+falls back to a fit on the windows of the call and the run logs that. See
+`design/gap-fill.md`.
 """
 
 from __future__ import annotations
@@ -29,15 +28,13 @@ if TYPE_CHECKING:
 LOG = log.get("maxent")
 
 _WINDOW_BP = 10_000
-# The count under which a pair's ratio is shrunk toward its expectation, the count at which a
-# pair with no contact sits three Poisson deviations under it.
+# Below this count the ratio of a pair is shrunk toward its expectation.
 _PSEUDO = 9.0
-# A Gaussian vector's mean squared length over its squared mean length is 3 pi / 8, so a pair
-# whose mean distance is d has a variance per coordinate of pi d^2 / 8.
+# The mean squared length of a Gaussian vector over its squared mean length is 3 pi / 8. A pair
+# at mean distance d has a variance of pi d^2 / 8 per coordinate.
 _MAXWELL = np.pi / 8.0
 
-# The chromosome expectation is read from 20 windows of 5 Mb spread along the chromosome at the
-# map's 10 kb resolution, enough for separations to 5 Mb without reading the whole band.
+# The chromosome expectation is read from 20 windows of 5 Mb at 10 kb.
 _EXP_RES = 10_000
 _EXP_WINDOWS = 20
 _EXP_SPAN = 5_000_000
@@ -50,7 +47,7 @@ _LOCK = threading.Lock()
 
 
 def law_distances(mids: F64Array, law: PolymerLaw) -> F64Array:
-    """The law's background for every bead pair, zero on the diagonal."""
+    """Returns the background of the law for every bead pair, zero on the diagonal."""
     sep = np.maximum(np.abs(mids[:, None] - mids[None, :]), 1.0)
     d = np.maximum(1.0, (sep / max(int(law.s0_bp), 1)) ** float(law.nu))
     np.fill_diagonal(d, 0.0)
@@ -63,8 +60,9 @@ _FIT: dict[tuple[int, bytes], F64Array] = {}
 
 
 def _targets(exp_dist: F64Array, mids: F64Array, law: PolymerLaw) -> F64Array:
-    """Every anchor pair's target mean distance. A loop's target, the background where it holds
-    a pair, the law's distance elsewhere."""
+    """Returns the target mean distance of every anchor pair: the target of a loop, the
+    background where the matrix holds one and the distance of the law elsewhere.
+    """
     d = law_distances(mids, law)
     d = np.where(exp_dist > 1e-6, exp_dist, np.where(exp_dist <= -1.0, -exp_dist, d))
     d = 0.5 * (d + d.T)
@@ -73,14 +71,12 @@ def _targets(exp_dist: F64Array, mids: F64Array, law: PolymerLaw) -> F64Array:
 
 
 def _fit_root(target: F64Array, loop: BoolArray) -> F64Array:
-    """A root `y` of the covariance per coordinate whose pair variances best meet `target`.
+    """Returns a root `y` of the covariance per coordinate whose pair variances best meet `target`.
 
-    A pair's variance per coordinate under covariance `y y^T` is the squared distance between
-    its two rows of `y`, so the fit is a stress minimisation on those rows, of the squared
-    relative misfit to `pi / 8` times the squared target, the loops and every other pair
-    weighted equally in total. A set of targets holding loops is not the distance matrix of any
-    Gaussian, so the fit is the nearest one rather than an exact one. It starts from the root of
-    the double centred squared targets with its negative modes dropped, at up to 256 columns.
+    The variance of a pair under the covariance `y y^T` is the squared distance between its two
+    rows of `y`. The fit minimises the squared relative misfit to `pi / 8` times the squared
+    target, with the loops and the other pairs weighted equally in total. It starts from the root
+    of the double centred squared targets without its negative modes, at up to 256 columns.
     """
     from scipy.optimize import minimize
 
@@ -132,25 +128,22 @@ def _fit_root(target: F64Array, loop: BoolArray) -> F64Array:
 def anchor_draw(
     exp_dist: F64Array, mids: F64Array, law: PolymerLaw, rng: np.random.Generator
 ) -> F32Array:
-    """One draw of a chromosome's anchors from the maximum entropy Gaussian for the arcs
-    targets, centred on the origin.
+    """Returns one draw of the anchors of a chromosome from the maximum entropy Gaussian of the
+    arcs targets, centred on the origin.
 
-    Every pair has a target mean distance, a loop's target, the background where it holds the
-    pair, the law's distance elsewhere, and the Gaussian is the one whose mean pair distances
-    meet them as nearly as a Gaussian can. The fit depends on the targets alone and is kept for the run's
-    later conformations. The draw keeps the fluctuations a minimised structure has none of.
+    The fit depends on the targets alone and is kept for the later conformations of the run.
 
     Parameters
     ----------
     exp_dist
-        The arcs target matrix. Positive is a loop's target, at most minus one a background
-        distance, anything else an arcless pair.
+        The arcs target matrix. A positive value is the target of a loop, a value of at most
+        minus one a background distance and any other value an arcless pair.
     mids
-        The anchors' genomic midpoints.
+        The genomic midpoints of the anchors.
     law
-        The run's polymer law.
+        The polymer law of the run.
     rng
-        The draw's generator.
+        The generator of the draw.
     """
     n = len(mids)
     key = (n, exp_dist.tobytes() + mids.tobytes())
@@ -171,7 +164,9 @@ def anchor_draw(
 
 
 def windows(starts: I64Array, ends: I64Array) -> I64Array:
-    """Each bead's window, consecutive beads grouped while a window spans at most 10 kb."""
+    """Returns the window of each bead. Consecutive beads share a window while it spans at most
+    10 kb.
+    """
     lab = np.zeros(len(starts), dtype=np.int64)
     w0 = int(starts[0])
     k = 0
@@ -184,7 +179,7 @@ def windows(starts: I64Array, ends: I64Array) -> I64Array:
 
 
 def bridge(d: F64Array) -> tuple[F64Array, F64Array]:
-    """The conditional law of a chain's interior given its two ends.
+    """Returns the conditional law of the interior of a chain given its two ends.
 
     Parameters
     ----------
@@ -194,8 +189,8 @@ def bridge(d: F64Array) -> tuple[F64Array, F64Array]:
     Returns
     -------
     coef, root
-        An interior bead sits at `a + coef[i] (b - a) + root[i] @ z` with `z` standard normal of
-        shape (k - 2, 3), one column per coordinate.
+        Interior bead i is at `a + coef[i] (b - a) + root[i] @ z`, with `z` standard normal of
+        shape (k - 2, 3).
     """
     v = _MAXWELL * d * d
     c = 0.5 * (v[1:, :1] + v[:1, 1:] - v[1:, 1:])
@@ -218,7 +213,9 @@ def _cooler(uri: str) -> Any:
 
 
 def window_counts(uri: str, chrom: str, w_st: I64Array, w_en: I64Array) -> F64Array:
-    """Raw counts between windows, each pixel shared by overlap, the diagonal pixels left out."""
+    """Returns the raw counts between windows. A pixel is shared by overlap and diagonal pixels
+    are left out.
+    """
     lo, hi = int(w_st[0]), int(w_en[-1])
     key = (uri, chrom, lo, hi)
     hit = _COUNTS.get(key)
@@ -239,8 +236,9 @@ def window_counts(uri: str, chrom: str, w_st: I64Array, w_en: I64Array) -> F64Ar
 
 
 def _expectation(sep: F64Array, area: F64Array, obs: F64Array) -> tuple[float, float] | None:
-    """A power law in separation for the count per unit window area, fitted in log on eight bins a
-    decade weighted by area. None when fewer than two bins hold a count."""
+    """Fits a power law in separation to the count per unit window area, in log on eight bins a
+    decade weighted by area. Returns None with fewer than two bins with a count.
+    """
     keep = sep > 0
     if keep.sum() < 2:
         return None
@@ -258,8 +256,8 @@ def _expectation(sep: F64Array, area: F64Array, obs: F64Array) -> tuple[float, f
 
 
 def chromosome_expectation(uri: str, chrom: str) -> tuple[float, float] | None:
-    """The power law for the raw count per unit area against separation over a chromosome, read
-    at 10 kb from the same file as `uri`. None when the file has no 10 kb resolution.
+    """Fits the power law of the raw count per unit area against separation over a chromosome,
+    at the 10 kb resolution of the file of `uri`. Returns None without that resolution.
 
     Returns
     -------
@@ -299,7 +297,7 @@ def chromosome_expectation(uri: str, chrom: str) -> tuple[float, float] | None:
 def _gap_factor(
     counts: F64Array, mids: F64Array, lens: F64Array, fit: tuple[float, float]
 ) -> F64Array:
-    """The distance factor between windows, observed over expected to the minus third."""
+    """Returns the distance factor between windows, observed over expected to the minus third."""
     sep = np.abs(mids[:, None] - mids[None, :])
     area = np.outer(lens, lens)
     exp = 10.0 ** (fit[0] + fit[1] * np.log10(np.maximum(sep, 1.0))) * area
@@ -316,8 +314,9 @@ def chain_targets(
     contact_map: str = "",
     chrom: str = "",
 ) -> F64Array:
-    """Target mean distances between every two beads of one chain, the law's background scaled
-    by the window contacts of `contact_map` as a gap's are, or the law alone without one."""
+    """Returns the target mean distances between every two beads of one chain, the background of
+    the law scaled by the window contacts of `contact_map`, or the law alone without a map.
+    """
     st = np.asarray(starts, dtype=np.int64)
     en = np.asarray(ends, dtype=np.int64)
     mids = (st + en) / 2.0
@@ -344,12 +343,10 @@ def chain_targets(
 def conditioned_draw(
     pos: F64Array, fixed: BoolArray, d: F64Array, rng: np.random.Generator
 ) -> F64Array:
-    """The free beads of a chain drawn from the Gaussian whose mean pair distances are `d`,
-    conditioned on every fixed bead where `pos` puts it.
+    """Draws the free beads of a chain from the Gaussian whose mean pair distances are `d`,
+    conditioned on the fixed beads at their places in `pos`.
 
-    The covariance per coordinate is taken against the first fixed bead as origin, from the
-    squared targets as for a bridge, and the free beads' law given the fixed ones is the usual
-    Gaussian conditional. A bridge is the case of two fixed beads at the chain's ends.
+    The covariance per coordinate is taken with the first fixed bead as origin.
     """
     v = _MAXWELL * d * d
     o = int(np.flatnonzero(fixed)[0])
@@ -386,26 +383,26 @@ def maxent_start(
     contact_map: str = "",
     chrom: str = "",
 ) -> F32Array:
-    """The chain with every gap's subanchors drawn from its maximum entropy bridge.
+    """Returns the chain with the subanchors of every gap drawn from its maximum entropy bridge.
 
     Parameters
     ----------
     pos
-        Bead positions, anchors where the arcs put them. Not modified.
+        Bead positions with the anchors placed. Not modified.
     fixed
         True for anchors.
     starts, ends
-        Each bead's genomic interval.
+        The genomic interval of each bead.
     law
-        The run's distance law.
+        The distance law of the run.
     stretch
-        The largest multiple of the background a contact scaled target may reach.
+        The largest multiple of the background that a contact scaled target may reach.
     rng
-        The generator every draw comes from, so the start is a function of its seed.
+        The generator of every draw.
     contact_map
         A cooler URI at fine resolution, or empty for the law alone.
     chrom
-        The block's chromosome in the cooler.
+        The chromosome of the block in the cooler.
     """
     out = pos.astype(np.float64).copy()
     st = np.asarray(starts, dtype=np.int64)

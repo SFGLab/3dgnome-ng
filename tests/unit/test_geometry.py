@@ -1,7 +1,6 @@
-"""Unit checks for the chain smoothing shared by the figures and the website,
-`gnome3d/geometry.py`.
+"""Unit checks for the chain smoothing of `gnome3d/geometry.py`.
 
-    python tests/unit/test_geometry.py
+python tests/unit/test_geometry.py
 """
 
 from __future__ import annotations

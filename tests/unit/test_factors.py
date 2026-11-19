@@ -1,5 +1,5 @@
-"""Loops of more than one factor: two cluster files, a strength fit per factor, the factor
-carried into the target matrix, and the orientation graph reading CTCF's loops alone.
+"""Unit checks for loops of more than one factor: two cluster files, a strength fit per factor,
+the factor in the target matrix and an orientation graph of the CTCF loops alone.
 
     python tests/unit/test_factors.py
 """
@@ -86,7 +86,7 @@ def test_factor_through_marking_and_fit() -> None:
             "the loader tags each file's arcs",
             all(a.factor == 0 for a in raw0["chr1"]) and all(a.factor == 1 for a in raw1["chr1"]),
         )
-        # anchors at every loop end, orientation only for the CTCF set
+        # Anchors at every loop end, with an orientation for the CTCF set only.
         ends = sorted({p for a in raw0["chr1"] + raw1["chr1"] for p in (a.start, a.end)})
         anchors = {
             "chr1": [

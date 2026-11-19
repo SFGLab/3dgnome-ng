@@ -1,13 +1,9 @@
 """Contact counts between anchor pairs, read from a full depth map at fine resolution.
 
-A singleton file holds one point per pixel, and an anchor receives a contact only when that
-point falls inside it. With anchors near 1 kb wide and 25 kb pixels almost no anchor can, and a
-file thinned for memory holds a fraction of the map. The table here holds what the arcs stage
-uses instead: per chromosome, the anchors of the anchor file and the summed counts between each
-pair of them, each pixel shared between the anchors it overlaps in proportion to the overlap.
-
-`slurm/ensemble/prep_anchor_contacts.py` writes the table from an mcool. The run matches its own
-anchors to the table's by interval, so the table must come from the run's anchor file.
+The table holds, per chromosome, the anchors of the anchor file and the summed counts between
+each pair. A pixel is shared between the anchors it overlaps in proportion to the overlap.
+`slurm/ensemble/prep_anchor_contacts.py` writes the table from an mcool. A run matches its
+anchors to the table's by interval. The table must come from the run's anchor file.
 """
 
 from __future__ import annotations
@@ -24,8 +20,11 @@ from gnome3d.types import F32Array, F64Array, I32Array, I64Array
 
 @dataclass(frozen=True)
 class AnchorContacts:
-    """One chromosome's table. `starts` and `ends` are the table's anchors, sorted by start, and
-    `i < j`, `count` the pairs with a count, indices into those anchors."""
+    """The table of one chromosome.
+
+    `starts` and `ends` are its anchors, sorted by start. `i`, `j` and `count` are the pairs with
+    a count, `i < j`.
+    """
 
     starts: I64Array
     ends: I64Array
@@ -40,7 +39,7 @@ AnchorContactMap = dict[str, AnchorContacts]
 def overlap_weights(
     bin_starts: I64Array, res: int, starts: I64Array, ends: I64Array
 ) -> sp.csr_matrix:
-    """Bins by anchors, the share of each bin's length inside each anchor.
+    """Returns the bins by anchors matrix of the share of each bin inside each anchor.
 
     Parameters
     ----------
@@ -67,9 +66,11 @@ def overlap_weights(
 def aggregate_pixels(
     w: sp.csr_matrix, bin1: I64Array, bin2: I64Array, count: F64Array
 ) -> sp.coo_matrix:
-    """Anchor pair counts from the pixels `(bin1, bin2, count)` of an upper triangle map,
-    `w` from `overlap_weights`. Returns the strict upper triangle; a pixel inside one anchor
-    and a pixel on the map's diagonal count for no pair."""
+    """Sums the pixels `(bin1, bin2, count)` of an upper triangle map into anchor pair counts.
+
+    `w` is from `overlap_weights`. Returns the strict upper triangle. A pixel inside one anchor
+    and a pixel on the diagonal count for no pair.
+    """
     nb, na = int(w.shape[0]), int(w.shape[1])  # pyright: ignore[reportOptionalSubscript]
     off = bin1 != bin2
     m = sp.coo_matrix((count[off], (bin1[off], bin2[off])), shape=(nb, nb)).tocsr()
@@ -80,7 +81,7 @@ def aggregate_pixels(
 
 
 def save(path: Path, tables: AnchorContactMap, res: int, source: str) -> None:
-    """Write the tables as one npz, five arrays per chromosome."""
+    """Writes the tables as one npz, five arrays per chromosome."""
     out: dict[str, np.ndarray] = {"res": np.array(res), "source": np.array(source)}
     for chrom, t in tables.items():
         for key in ("starts", "ends", "i", "j", "count"):
@@ -89,7 +90,7 @@ def save(path: Path, tables: AnchorContactMap, res: int, source: str) -> None:
 
 
 def load(path: str, chr_set: set[str]) -> AnchorContactMap:
-    """The tables of the chromosomes in `chr_set`."""
+    """Loads the tables of the chromosomes in `chr_set`."""
     out: AnchorContactMap = {}
     with np.load(path) as z:
         for chrom in sorted({k.split("/")[0] for k in z.files if "/" in k} & chr_set):
@@ -104,7 +105,7 @@ def load(path: str, chr_set: set[str]) -> AnchorContactMap:
 
 
 def match(table: AnchorContacts, starts: I64Array, ends: I64Array) -> I64Array:
-    """The table index of each given anchor, -1 where the table has no anchor of that interval."""
+    """Returns the table index of each given anchor, -1 for an anchor the table lacks."""
     k = np.searchsorted(table.starts, starts, side="left")
     idx = np.full(len(starts), -1, dtype=np.int64)
     n = len(table.starts)
@@ -120,8 +121,10 @@ def match(table: AnchorContacts, starts: I64Array, ends: I64Array) -> I64Array:
 
 
 def dense_counts(table: AnchorContacts, starts: I64Array, ends: I64Array) -> F64Array:
-    """Symmetric counts between the given anchors, zero on the diagonal and for any anchor the
-    table lacks."""
+    """Returns the symmetric counts between the given anchors.
+
+    The diagonal and any anchor the table lacks are zero.
+    """
     idx = match(table, starts, ends)
     n = len(starts)
     pos = np.full(len(table.starts), -1, dtype=np.int64)

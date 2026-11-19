@@ -1,9 +1,6 @@
 """Unit checks for the per bead coordinate table written beside every CIF.
 
-    python tests/unit/test_bead_table.py
-
-The table is one row per bead, chromosome, genomic start and end, x, y, z and the bead kind,
-tab separated with one header line, so a reader that cannot parse mmCIF still gets the model.
+python tests/unit/test_bead_table.py
 """
 
 from __future__ import annotations

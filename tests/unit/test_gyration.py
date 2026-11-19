@@ -2,9 +2,8 @@
 
     python tests/unit/test_gyration.py
 
-The gradient matches finite differences, the windows tile every scale twice, and a solve from a
-compacted start with nothing else holding the size brings each window's radius of gyration to
-the law's.
+The gradient matches finite differences, the windows tile every scale twice and a solve from a
+compacted start brings the radius of gyration of each window to the law's.
 """
 
 from __future__ import annotations

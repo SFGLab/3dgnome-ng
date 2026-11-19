@@ -8,7 +8,9 @@ Do **not** modify anything inside `legacy/3dnome/`. That directory is the refere
 
 ### Terminology
 
-Refer to `legacy/3dnome/MC/` as **"the reference"** (or "the reference implementation"), never as "C++". The language it happens to be written in is irrelevant to the design; the relevant fact is that it is the algorithmic source-of-truth we port from. This applies in code comments, docstrings, agent-visible documentation, commit messages, and conversations. When you cite a specific file or line, write `LooperSolver.cpp:1069-1104` — not "the C++ code at...".
+In a design note `legacy/3dnome/MC/` is "the reference" or "the reference implementation", not "C++". Code, comments,
+docstrings and messages under `gnome3d/`, `tests/` and `web/` do not mention it. The model is its own code since
+2026-11-19 and a comment describes what the code does, not what it was ported from.
 
 ### Status: results parity, not settings parity
 
@@ -340,10 +342,13 @@ Wording, everywhere:
   of a value.
 - No ", so", "so that", "because" or "unlike X" to justify a design. The reason goes in the commit message. Such a
   clause stays only when it carries a constraint the next editor would break.
-- No comma before "and". No capitals for emphasis. Few backticks and few parentheses.
+- No comma before "and". No capitals for emphasis, a word in capitals is an acronym or an identifier. Few backticks and
+  few parentheses.
 
 Doc comments and inline comments:
 
+- Comments are few. A comment exists only for a fact that the code and the names do not show.
+- No mention of the reference implementation, its files or its functions under `gnome3d/`, `tests/` and `web/`.
 - No dashes, colons or semicolons as sentence punctuation.
 - A doc says what the thing is and how to use it, in one or two sentences, as the code is now. No design reasons, no
   comparisons to sibling code, no callers, no history and no comment left in place of removed code.

@@ -2,18 +2,14 @@
 
     python tests/unit/test_stitch.py
 
-The pass moves whole blocks rigidly so that the last anchor of one block and the first anchor
-of the next sit at the distance an interior pair of the same genomic separation realises. Six
-properties.
+  * the within block curve is read from the structure
+  * a boundary pair ends on that curve
+  * the geometry inside a block is unchanged
+  * the centroid excluded volume keeps non adjacent blocks apart
+  * the gradient is the gradient of the energy
+  * a chain of chromosome size converges
 
-  * the within block curve is read off the structure itself
-  * a boundary pair lands on that curve to a tight tolerance
-  * intra block geometry is untouched, which is what rigid means
-  * centroid excluded volume keeps non adjacent blocks apart
-  * the energy's gradient is the gradient of that energy
-  * a chromosome sized chain converges, which needs the gradient to be analytic
-
-Plus the pass through cases a chromosome with one block or no anchors must take unchanged.
+A chromosome with one block or no anchors passes through unchanged.
 """
 
 from __future__ import annotations
@@ -52,7 +48,7 @@ TET = np.array([[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]], dtype=np.floa
 def block(
     start_bp: int, offset: np.ndarray, kinds: tuple[str, ...] = ("anchor",) * 4
 ) -> list[BeadOut]:
-    """Four beads on a tetrahedron of edge D, 1 kb apart genomically, shifted by offset."""
+    """Four beads on a tetrahedron of edge D, 1 kb apart on the genome, shifted by `offset`."""
     out: list[BeadOut] = []
     for k, (p, kind) in enumerate(zip(TET + offset, kinds, strict=True)):
         s = start_bp + k * 1000
@@ -63,7 +59,7 @@ def block(
 def settings(**kw: object) -> Settings:
     s = Settings()
     s.use_boundary_stitch = True
-    s.exclusion_radius_ib = 0.5  # never binds in the tetrahedron tests unless set otherwise
+    s.exclusion_radius_ib = 0.5  # does not bind in the tetrahedron tests unless set
     for k, v in kw.items():
         setattr(s, k, v)
     return s
@@ -129,8 +125,8 @@ def test_rigid() -> None:
 
 def test_excluded_volume() -> None:
     print("\n[ev] centroid excluded volume keeps non adjacent blocks apart")
-    # a one anchor middle block: both springs want the outer blocks' edges at D from one point,
-    # so without excluded volume the outer blocks can fold onto each other
+    # A middle block of one anchor. Both springs want the edges of the outer blocks at D from one
+    # point. Without excluded volume the outer blocks can fold onto each other.
     mid = [BeadOut(100_000, 100_500, 0.0, 0.0, 0.0, "anchor")]
     blocks = [block(0, np.array([-600.0, 0, 0])), mid, block(200_000, np.array([600.0, 0, 0]))]
     free = stitch_blocks(blocks, settings(boundary_stitch_ev_weight=0.0))
@@ -151,8 +147,8 @@ def test_excluded_volume() -> None:
 
 def test_per_pair_radius() -> None:
     print("\n[radius] the excluded volume radius comes from the blocks' own size")
-    # outer tetrahedra have Rg D*sqrt(3/8) = 6.12 each, so two of them touch at 12.2 apart. The
-    # old radius came from gld of the centroid gap, 0.5 * gld(100 kb) = 8.4, below touching.
+    # Each outer tetrahedron has an Rg of D * sqrt(3 / 8) = 6.12 and two of them touch at 12.2
+    # apart.
     mid = [BeadOut(100_000, 100_500, 0.0, 0.0, 0.0, "anchor")]
     blocks = [block(0, np.array([-600.0, 0, 0])), mid, block(200_000, np.array([600.0, 0, 0]))]
     held = stitch_blocks(blocks, settings(exclusion_radius_ib=0.0, boundary_stitch_ev_weight=1.0))
@@ -184,7 +180,7 @@ def test_pass_through() -> None:
 
 
 def test_gradient() -> None:
-    """Against central differences, with the excluded volume active so its term is covered."""
+    """Against central differences, with the excluded volume active."""
     print("\n[gradient] the energy carries its own gradient")
     rng = np.random.default_rng(0)
     n = 7
@@ -209,13 +205,7 @@ def test_gradient() -> None:
 
 
 def test_many_blocks_converge() -> None:
-    """The property a chromosome needs and a handful of blocks cannot show.
-
-    Six variables per block puts a real chromosome in the thousands of dimensions. A finite
-    difference gradient costs one evaluation per variable, so scipy's own default evaluation
-    budget of 15000 buys about one step there and the pass stops having moved almost nothing.
-    A hundred and twenty blocks is already past the point where that shows.
-    """
+    """A chain of 120 blocks has 720 variables and converges only with an analytic gradient."""
     print("\n[scale] a long chain of blocks reaches its own minimum")
     rng = np.random.default_rng(4)
     n = 120

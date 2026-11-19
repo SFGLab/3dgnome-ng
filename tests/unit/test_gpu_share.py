@@ -1,10 +1,8 @@
-"""Unit checks for the GPU memory pool a process takes when it shares the card.
+"""Unit checks for the GPU memory pool of a process that shares the card.
 
     python tests/unit/test_gpu_share.py
 
-JAX takes 75 percent of the card at start. A second process on the same card gets a smaller
-pool than it asked for, still reports the full limit, sizes its launches from that limit and
-aborts. `plan_gpu_pool` decides the pool before JAX starts. On a free card it changes nothing.
+`plan_gpu_pool` decides the pool before JAX starts. On a free card it changes nothing.
 """
 
 from __future__ import annotations

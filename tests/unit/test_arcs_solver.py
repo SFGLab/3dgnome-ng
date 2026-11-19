@@ -1,21 +1,11 @@
-"""Unit checks for solving the arcs stage instead of annealing it.
+"""Unit checks for the arcs solver.
 
     python tests/unit/test_arcs_solver.py
 
-The arcs landscape is a funnel: ten Monte Carlo starts land within one percent of each other and
-temperature is inert. A quasi Newton solver reaches the same minimum on real blocks about thirty
-six times faster, with matching energy, ensemble spread and geometry, so the stage is offered as
-a solver as well as an annealer.
-
-The energy it minimises has to be the same one `mc_arcs_numba` scores, or the two are not
-comparable and nothing else here means anything. That is most of this file: the solver's energy
-against the two initialisers the MC builds its score from, and its gradient against finite
-differences of itself.
-
-The solver covers the terms production uses, springs, a truncated repulsion and confinement. It
-A misspelled solver name must not fall through to the annealer, checked here. Under the batch
-executor the solver's energy is evaluated on the JAX device, and that has to agree with the CPU
-kernel and reach the same minimum, also checked here.
+The energy of the solver must be the one `mc_arcs_numba` scores. Most checks compare it with
+the two init functions of the MC and its gradient with finite differences. An unknown solver
+name raises. Under the batch executor the energy is evaluated on the JAX device and must agree
+with the CPU kernel.
 """
 
 from __future__ import annotations
@@ -67,7 +57,7 @@ def block(n: int = 90, seed: int = 3) -> tuple[np.ndarray, np.ndarray, Settings]
 
 
 def terms(pos: np.ndarray, exp: np.ndarray, s: Settings):
-    """The same derivations `mc_arcs_numba` makes, so both sides score one thing."""
+    """The derivations `mc_arcs_numba` makes."""
     m = exp > 1e-6
     avg = float(exp[m].mean())
     rep_inv = 1.0 / (float(s.arcs_repulsion_cutoff_factor) * avg)
@@ -80,7 +70,7 @@ def terms(pos: np.ndarray, exp: np.ndarray, s: Settings):
 
 
 def test_energy_is_the_one_the_mc_scores() -> None:
-    """Both counting conventions at once: the arc term is unordered, the excluded volume is not."""
+    """The arc term sums unordered pairs and the excluded volume ordered pairs."""
     pos, exp, s = block()
     for label, ev in (("without an excluded volume", False), ("with one", True)):
         s.use_excluded_volume = ev
@@ -123,7 +113,7 @@ def test_energy_is_the_one_the_mc_scores() -> None:
 
 
 def test_gradient_matches_finite_differences() -> None:
-    """With the excluded volume on, so its doubled gradient is covered too."""
+    """With the excluded volume on, which covers its doubled gradient."""
     pos, exp, s = block(60, 11)
     s.use_excluded_volume = True
     s.exclusion_apply_to_arcs = True
@@ -170,8 +160,7 @@ def test_it_descends() -> None:
 
 
 def test_the_tolerance_stops_the_solve_and_zero_leaves_it_alone() -> None:
-    """A loose tolerance ends the solve before the cap; at zero the cap is the only stop and
-    the result is the one the cap alone gives."""
+    """A loose tolerance ends the solve before the cap. At zero the cap alone stops it."""
     pos, exp, s = block(n=120, seed=11)
     s.use_excluded_volume = True
     s.exclusion_apply_to_arcs = True
@@ -190,11 +179,10 @@ def test_the_tolerance_stops_the_solve_and_zero_leaves_it_alone() -> None:
 
 
 def test_loop_weights() -> None:
-    """Weights of one are the unweighted energy bit for bit; with weights the solver's energy
-    is still the annealer's, term for term, and the device carries the same weighted energy;
-    and where two loops compete for one anchor the weighted one wins: an anchor held by a
-    strong loop to one partner and a weak loop to another, the partners held apart, sits
-    midway without weights and nearer the strong partner with them."""
+    """Weights of one give the unweighted energy bit for bit. With weights the energy is the
+    annealer's and the device agrees. An anchor between a strong and a weak loop ends nearer
+    the strong partner.
+    """
     pos, exp, s = block(n=120, seed=11)
     s.use_excluded_volume = True
     s.exclusion_apply_to_arcs = True
@@ -280,8 +268,9 @@ def test_loop_weights() -> None:
 
 
 def test_the_weight_matrix_follows_the_strength() -> None:
-    """At exponent zero there is no matrix; above it an arc pair carries its strength to the
-    exponent and every other pair one."""
+    """At exponent zero there is no matrix. Above it an arc pair holds its strength to the
+    exponent and every other pair one.
+    """
     from gnome3d.pipeline.coarse.build import arc_weight_matrix  # noqa: PLC0415
 
     s = Settings()
@@ -300,8 +289,7 @@ def test_the_weight_matrix_follows_the_strength() -> None:
 
 
 def test_device_energy_matches_the_cpu_kernel() -> None:
-    """The device evaluation is the CPU kernel's energy term for term, on a block carrying every
-    kind of pair: springs, backgrounds, repulsion, excluded volume and confinement."""
+    """The device evaluation equals the CPU kernel on a block with every kind of pair."""
     try:
         import jax  # noqa: F401
     except ImportError:
@@ -363,11 +351,11 @@ def test_off_by_default() -> None:
 
 
 def test_an_unknown_name_is_refused() -> None:
-    """Falling through to the annealer would run the wrong stage and say nothing."""
+    """An unknown solver name raises."""
     from gnome3d.pipeline.ib.arcs import _run
 
     pos, exp, s = block(40, 5)
-    s.arcs_solver = "lbgfs"  # a plausible typo
+    s.arcs_solver = "lbgfs"  # a typo
     s.steps_arcs = 1
     try:
         _run(
@@ -387,8 +375,9 @@ def test_an_unknown_name_is_refused() -> None:
 
 
 def test_the_batched_runner_solves_on_the_device() -> None:
-    """Under the batch executor the solver evaluates its energy on the JAX device, block by
-    block on each block's own settings, and lands where the CPU solve lands."""
+    """Under the batch executor the solver evaluates its energy on the JAX device and ends
+    where the CPU solve ends.
+    """
     try:
         import jax  # noqa: F401
     except ImportError:
@@ -399,8 +388,7 @@ def test_the_batched_runner_solves_on_the_device() -> None:
     pos, exp, s = block(60, 6)
     s.arcs_solver = "lbfgs"
     s.arcs_solver_iters = 60
-    # Excluded volume and a short repulsion reach keep the minimum above zero, so the two
-    # energies are compared as numbers rather than as noise around zero.
+    # Excluded volume and a short repulsion reach keep the minimum above zero.
     s.use_excluded_volume = True
     s.exclusion_apply_to_arcs = True
     s.arcs_repulsion_cutoff_factor = 1.0
@@ -447,15 +435,16 @@ def main() -> int:
 
 
 def test_loop_dropout() -> None:
-    """Idea 33: with the setting off every arc is kept and no draw is made; on, a conformation
-    keeps each arc with probability q over q plus the scale, reproducibly by its seed."""
+    """With the setting off every arc is kept and no draw is made. On, a conformation keeps
+    each arc with probability q / (q + scale), set by its seed.
+    """
     from gnome3d.pipeline.coarse.build import dropout_keep  # noqa: PLC0415
 
     s = Settings()
     s.polymer_exponent = 0.3
     mids = [i * 20_000 for i in range(400)]
     rng = np.random.default_rng(5)
-    # scores 1, 3 and 9 PETs at a law with no arc fit, where the strength is the count itself
+    # Scores of 1, 3 and 9 PETs under a law with no arc fit, where the strength is the count.
     arcs = [
         (int(i), int(i + 1 + rng.integers(1, 5)), int(sc))
         for i, sc in zip(rng.integers(0, 390, 3000), rng.choice([1, 3, 9], 3000), strict=True)
@@ -482,9 +471,10 @@ def test_loop_dropout() -> None:
 
 
 def test_factories() -> None:
-    """Idea 35: the factory term on three anchors against its closed form, its gradient against
-    finite differences, never below zero, the device against the CPU, and a solve with it pulls
-    the active anchors together."""
+    """The factory term on three anchors against its closed form, its gradient against finite
+    differences, its sign, the device against the CPU and a solve that pulls the active anchors
+    together.
+    """
     from gnome3d.mc.numba.arcs_solver import factory_energy_grad  # noqa: PLC0415
 
     pos = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 3.0, 0.0], [5.0, 5.0, 5.0]])
@@ -543,7 +533,7 @@ def test_factories() -> None:
         )
     except ImportError:
         pass
-    # a solve: active anchors with no arcs among them end closer with the term than without
+    # Active anchors with no arcs among them end closer with the term than without.
     n = 60
     exp = np.full((n, n), -0.5)
     np.fill_diagonal(exp, 0.0)

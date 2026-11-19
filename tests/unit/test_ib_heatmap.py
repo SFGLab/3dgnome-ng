@@ -1,11 +1,9 @@
-"""Unit checks for the block layout's contact term.
+"""Unit checks for the contact term of the block layout.
 
     python tests/unit/test_ib_heatmap.py
 
-Blocks within a segment were laid out by chain bonds, excluded volume and a sphere, with no
-contact data at all, and their arrangement carried no Hi-C. The term bins the run's contacts by
-block, converts them to distances with the law as the segment level does, and the block kernel
-scores them as its heat term. Weight zero is byte exact.
+The term bins the contacts of the run by block and converts them to distances with the law.
+The block kernel scores them as its heat term. Weight zero is byte exact.
 """
 
 from __future__ import annotations
@@ -40,7 +38,7 @@ def base() -> Settings:
     s.polymer = PolymerLaw(nu=0.3, s0_bp=1000, q_half=1.0)
     s.use_excluded_volume = False
     s.use_confinement = False
-    s.max_temp_ib = 1.0  # cold, a descent; see test_hot_layout_never_settles
+    s.max_temp_ib = 1.0  # cold, a descent, see test_hot_layout_never_settles
     return s
 
 
@@ -110,9 +108,9 @@ def test_the_term_pulls() -> None:
 
 
 def test_hot_layout_never_settles() -> None:
-    """At the schedule production inherited, max_temp_ib 20 against jump_coef 20, the rule accepts
-    about a third of uphill moves whatever their size and the chain random walks hot until the
-    stop fires. Cold, the same run is a descent and settles."""
+    """At `max_temp_ib` 20 with `jump_coef` 20 the rule accepts about a third of uphill moves
+    and the chain does not settle. Cold, the same run settles.
+    """
     s = base()
     s.heatmap_weight_ib = 0.0
     dtn = np.full(5, 2.0)

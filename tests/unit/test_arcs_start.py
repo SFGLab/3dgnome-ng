@@ -1,12 +1,9 @@
-"""Unit checks for the arcs stage's random walk start.
+"""Unit checks for the walk start and the Hilbert start of the arcs stage.
 
     python tests/unit/test_arcs_start.py
 
-Every anchor of a block starts at the block's centroid, and the solver descends from that
-collapsed point to a compact minimum. A block of a few hundred anchors is bounded by its own
-size; a chromosome solved as one block of four thousand folds to half the size the data
-shows. The walk start places consecutive anchors at the law's distance for their gap along
-random directions, so pairs no term acts on begin, and stay, near the law.
+The walk start places consecutive anchors at the law's distance of their gap along random
+directions.
 """
 
 from __future__ import annotations
@@ -86,8 +83,8 @@ def main() -> int:
     keep = i != j
     sep = np.abs(mids[i[keep]] - mids[j[keep]]).astype(np.float64)
     dist = np.linalg.norm(h[i[keep]].astype(np.float64) - h[j[keep]], axis=1)
-    # A space filling curve is locality preserving, not monotone: far pairs saturate at the
-    # cube's size. The property is that the mean distance rises with separation up to it.
+    # A space filling curve preserves locality and is not monotone. The mean distance rises with
+    # separation up to the size of the cube.
     edges = np.array([0, 20e3, 100e3, 500e3, 2e6, 1e9])
     means = [
         dist[(sep >= a) & (sep < b)].mean() for a, b in zip(edges[:-1], edges[1:], strict=True)

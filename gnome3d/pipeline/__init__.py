@@ -1,35 +1,13 @@
-"""
-Task-DAG abstraction for IB reconstruction.
+"""The task DAG of the reconstruction.
 
-`solver.py` fuses three unrelated jobs: building the coupled *skeleton*
-(hierarchy + inter-chr heatmap + IB positioning), the *per-IB reconstruction*
-(arcs -> densify -> heat-dist -> smooth), and *write-back* into shared mutable
-cluster state.  The third tangles through the second, which is why the GPU path
-had to re-implement the pipeline instead of just swapping a strategy.
+Once the coarse stages place the IB seeds, the reconstruction of an IB is a pure function of
+its inputs. The work is a DAG of typed stages and an executor decides how to run it.
 
-The structural fact this package is built on: once the skeleton has placed the
-IB seeds, **an IB reconstruction is a pure, isolated computation** -
-``(anchors, arcs, singletons, orientations, seed_pos, settings, rng) -> beads``,
-with no cross-IB shared state (which is why it already threads safely).  So we
-model the work as a dataflow DAG of typed stages and let an executor decide
-*how* to run it:
-
-    skeleton  ->  Dag of Nodes  ->  Executor  ->  {node -> State}
-    (coupled,      (pure stages,     (serial | batched | ensemble)
-     sequential)    explicit deps)
-
-Layout:
-  * `state`    - sealed frozen state progression (Seeded..Smoothed) + Orientation
-  * `stage`    - StageKind, the Stage protocol, Problem/Result
-  * `dag`      - Node, Dag, NodeId (the dataflow graph + ready/inputs_for)
-  * `registry` - per-kind serial/batch runner wiring (no kernel imports)
-  * `executor` - the Executor protocol (+ Serial/Batch executors)
-  * `stages/`  - concrete stage implementations (added with the port)
-
-Authorized *structural* divergence from the reference's mutable ``LooperSolver``
-shape - NOT a numerical one: every stage calls the same validated kernel, so the
-math per stage is unchanged and the divergence is gated by fixed-seed exact bead
-comparison (see `[[feedback_no_made_up_solutions]]`).
+  state     the frozen states from Seeded to Smoothed
+  stage     StageKind and the Stage protocol
+  dag       Node and Dag
+  registry  the serial and the batch runner of each kind
+  executor  the executors
 """
 
 from __future__ import annotations

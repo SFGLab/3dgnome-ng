@@ -1,9 +1,9 @@
-"""Unit checks for gnome3d-ng extract, the bin pairs of one region of a .mcool as BEDPE.
+"""Unit checks for `gnome3d-ng extract`.
 
     python tests/unit/test_extract.py
 
-The output is what the website takes as a BEDPE of the region: intra chromosomal pairs at the
-asked resolution, one line per pair, without the diagonal, as the hosted maps are written.
+The output holds the intra chromosomal pairs at the asked resolution, one line per pair,
+without the diagonal.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 
 
 def write_mcool(out: Path) -> pd.DataFrame:
-    """A cooler at 5 and 25 kb on chr1 and chr2 with known pixels. Returns the 25 kb pixels."""
+    """Writes a cooler at 5 and 25 kb on chr1 and chr2 with known pixels. Returns the 25 kb pixels."""
     import cooler
 
     rng = np.random.default_rng(3)

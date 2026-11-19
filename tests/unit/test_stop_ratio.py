@@ -1,15 +1,9 @@
-"""Unit checks for making the arcs convergence ratio settable.
+"""Unit checks for the settable convergence ratio of the arcs MC.
 
     python tests/unit/test_stop_ratio.py
 
-The arcs MC stops when a round improves the score by less than a fixed relative amount. Measured
-on real blocks, that is the branch that ends every single run: the plateau branch never fires,
-because it also requires the accept count to fall below its threshold and acceptance sits at 15
-to 50 percent throughout. So this one number sets the round count, and round count is the arcs
-wall.
-
-Smooth and the interaction-block stage pass 2.0 for the same argument, which can never be
-reached, so the knob is deliberately arcs only.
+The arcs MC stops when a round improves the score by less than a relative amount. Smooth and
+the IB stage pass 2.0, which is not reached.
 """
 
 from __future__ import annotations
@@ -61,10 +55,7 @@ def run(ratio: float | None) -> tuple[float, np.ndarray]:
     s.max_temp = 5.0
     s.dt_temp = 0.9999
     s.mc_stop_improvement = 0.999
-    # Zero successes makes the plateau branch unreachable, since it needs the accept count below
-    # its threshold, so the ratio is the only thing that can end the run and the knob is tested
-    # on its own. That is also what happens in production: on real blocks acceptance stays at 15
-    # to 50 percent, the plateau branch never fires, and every run exits on the ratio.
+    # With zero successes the plateau branch cannot fire and the ratio alone ends the run.
     s.mc_stop_successes = 0
     s.mc_stop_steps = 20_000
     if ratio is not None:
@@ -86,14 +77,7 @@ def test_default_matches_the_hardcoded_value() -> None:
 
 
 def test_the_knob_reaches_the_kernel() -> None:
-    """A ratio the very first round already exceeds must stop the run there, and a tight one
-    must not.
-
-    The exchange rate between rounds and energy is measured on real blocks in
-    `playground/stop_ratio_sweep.py`, not here. On a cheap synthetic block the score's
-    improvement falls off a cliff rather than approaching the threshold, so every threshold ends
-    the run in the same round and a test asserting otherwise would be testing the fixture.
-    """
+    """A ratio that the first round exceeds stops the run there and a tight one does not."""
     import io
     import logging
 

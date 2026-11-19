@@ -2,8 +2,8 @@
 
     python tests/unit/test_holes.py
 
-A hole's slots tile the stretch between two blocks at the gap rule's count, the blocks are left
-as they were, the draw follows the seed, and with the key off nothing changes.
+The slots of a hole tile the stretch between two blocks, the blocks are unchanged, the draw
+follows the seed and with the key off nothing changes.
 """
 
 from __future__ import annotations

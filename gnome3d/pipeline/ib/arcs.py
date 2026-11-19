@@ -1,15 +1,6 @@
-"""
-ARCS stage: position anchors via arc-spring MC.
+"""The ARCS stage places the anchors of an IB by arc springs.
 
-Pure port of `Solver._reconstruct_cluster_arcs`: the same restart loop (noise the
-anchor seeds, run `mc_arcs`, keep the best of `steps_arcs`), but reading the
-`Seeded` state instead of the cluster graph and seeding the RNG deterministically
-from `Seeded.seed` (Python's `random` for the initial noise + numba's RNG for the
-kernel) so the result is reproducible and order-independent - the property the
-batched/ensemble paths need.
-
-Serial runner = the numba backend (`mc_arcs_numba`).  The batched JAX runner
-(`mc_arcs_jax_batch`) is registered separately later.
+The RNGs are seeded from `Seeded.seed`. A result does not depend on the order of execution.
 """
 
 from __future__ import annotations
@@ -32,15 +23,14 @@ if TYPE_CHECKING:
 
 
 def _run(problem: Problem) -> Result:
-    """Serial runner on the CPU. Returns `(best_score, best_pos)`."""
+    """Runs one problem on the CPU. Returns `(best_score, best_pos)`."""
     return _run_one(problem, "numba")
 
 
 def _run_one(problem: Problem, backend: str) -> Result:
-    """Anneal or solve one IB's anchors, the solver's energy on `backend`.
+    """Anneals or solves the anchors of one IB with the energy on `backend`.
 
-    Mirrors `Solver._reconstruct_cluster_arcs` exactly (initial per-anchor noise,
-    `steps_arcs` restarts, best-of), with deterministic seeding added.
+    Noises the anchor seeds, runs `steps_arcs` restarts and keeps the best.
     """
     from gnome3d.mc import numba as mc_numba
 
@@ -52,16 +42,12 @@ def _run_one(problem: Problem, backend: str) -> Result:
     s = settings_for_block(problem["settings"], problem["anchor_genomic"])
     seed = int(problem["seed"])
 
-    # Deterministic per-IB RNG: Python `random` (initial noise) + numba (kernel).
     seed_rng(seed)
     mc_numba.seed_numba(seed)
 
-    # Anneal or solve. The solver minimises the same energy directly and reaches the same
-    # minimum far faster, because the landscape is a funnel. Restarts, noise and best-of are
-    # the same either way, so an ensemble still comes from the perturbed starts.
     solver = arcs_solver(s)
     if s.arcs_scope == "chromosome":
-        # The chromosome's anchors were solved together at seed time; the block's are final.
+        # At chromosome scope the anchors were solved together when the seed was built.
         return 0.0, np.asarray(pos0, dtype=np.float32)
     if s.arcs_start == "walk":
         pos0 = walk_start(pos0, problem["anchor_genomic"], s.polymer_law())
@@ -77,7 +63,7 @@ def _run_one(problem: Problem, backend: str) -> Result:
     best: F32Array = pos0.copy()
     for _run_i in range(max(1, int(s.steps_arcs))):
         pos: F32Array = pos0.copy()
-        add_movable_noise_inplace(pos, None, step)  # arcs noises ALL anchors
+        add_movable_noise_inplace(pos, None, step)  # every anchor moves
         if solver == "lbfgs":
             from gnome3d.mc.numba.arcs_solver import solve_arcs  # noqa: PLC0415
 
@@ -111,13 +97,9 @@ def _run_one(problem: Problem, backend: str) -> Result:
 
 
 def walk_start(pos0: F32Array, anchor_genomic: object, law: PolymerLaw) -> F32Array:
-    """Anchor starting positions on a random walk whose steps are the law's distance for each
-    consecutive gap, centred where the block's centroid was.
-
-    Every anchor otherwise starts at the block's centroid and the solver descends from that
-    collapsed point to a compact minimum, bounded only by the block's size. On the walk a pair
-    no term acts on begins near the law and the solver leaves it there. Directions come from
-    the seeded Python RNG, so a block's walk is reproducible.
+    """Returns anchor starts on a random walk whose steps are the law's distance of each
+    consecutive gap, centred on the centroid of the block. Directions come from the seeded
+    Python RNG.
     """
     g = np.asarray(anchor_genomic, dtype=np.int64)
     mids = g[:, 2] if g.ndim == 2 else g
@@ -133,10 +115,8 @@ def walk_start(pos0: F32Array, anchor_genomic: object, law: PolymerLaw) -> F32Ar
 
 
 def _hilbert_points(index: I64Array, bits: int) -> F64Array:
-    """Coordinates on the 3D Hilbert curve of `bits` bits per axis for each curve index.
-
-    Skilling's transpose to axes, vectorised. The index's bits are dealt round robin to the
-    three axes, most significant first, then Gray decoded and unwound axis by axis.
+    """Returns the coordinates on the 3D Hilbert curve of `bits` bits per axis for each curve
+    index, by Skilling's transpose to axes.
     """
     n = 3
     x = np.zeros((index.shape[0], n), dtype=np.int64)
@@ -164,14 +144,11 @@ def _hilbert_points(index: I64Array, bits: int) -> F64Array:
 
 
 def hilbert_start(pos0: F32Array, anchor_genomic: object, law: PolymerLaw) -> F32Array:
-    """Anchor starting positions along a 3D Hilbert curve, each anchor at the curve point of
-    its genomic fraction, scaled so consecutive anchors sit at the law's bond on average and
-    centred where the block's centroid was.
+    """Returns anchor starts along a 3D Hilbert curve, each anchor at the curve point of its
+    genomic fraction.
 
-    A space filling curve keeps genomic neighbours spatial neighbours at every scale and its
-    size grows as the cube root of the count, the exponent the maps show beyond a megabase.
-    A walk has the wrong exponent and a collapsed start none. No RNG; the start is a
-    function of the genomic positions alone.
+    The curve is scaled to the law's bond between consecutive anchors on average and centred
+    on the centroid of the block. Uses no RNG.
     """
     g = np.asarray(anchor_genomic, dtype=np.int64)
     mids = g[:, 2] if g.ndim == 2 else g
@@ -192,8 +169,9 @@ def hilbert_start(pos0: F32Array, anchor_genomic: object, law: PolymerLaw) -> F3
 
 
 def arcs_backend(s: Settings) -> str:
-    """Where the arcs stage's solver evaluates its energy, from `mc_executor_arcs`: the batch
-    executor is the JAX device, serial and threaded are the CPU."""
+    """Returns the place where the arcs solver evaluates its energy. The batch executor is the
+    JAX device, serial and threaded are the CPU.
+    """
     from gnome3d.pipeline.executor import ExecutorStrategy  # noqa: PLC0415
     from gnome3d.pipeline.stage import StageKind  # noqa: PLC0415
     from gnome3d.reconstruct import stage_strategy  # noqa: PLC0415
@@ -202,9 +180,9 @@ def arcs_backend(s: Settings) -> str:
 
 
 def run_arcs_problem(problem: Problem) -> Result:
-    """Solve or anneal one arcs problem on the calling thread. The joint chromosome solve in
-    the skeleton uses it directly, outside the executor, so it reads the executor's choice of
-    backend itself."""
+    """Solves or anneals one arcs problem on the calling thread, on the backend of
+    `mc_executor_arcs`.
+    """
     if arcs_backend(problem["settings"]) == "jax":
         return _run_one(problem, "jax")
     return _run(problem)
@@ -213,21 +191,20 @@ def run_arcs_problem(problem: Problem) -> Result:
 def settings_for_block(
     s: Settings, anchor_genomic: Sequence[int] | Sequence[tuple[int, int, int]] | I64Array
 ) -> Settings:
-    """The settings one block's kernels run with.
+    """Returns the settings that the kernels of one block run with.
 
-    With `confinement_packing_factor_arcs` at zero the block's confinement radius is the sphere
-    the law says a chain of its genomic span fills, and it reaches the kernels as an explicit
-    `confinement_radius_arcs` on a shallow copy, so the numba annealer, the solver and the JAX
-    kernel all read one value. The input is returned as is when the factor is positive, when
-    confinement is off at this level, or when a radius is set by hand.
+    With `confinement_packing_factor_arcs` at zero the confinement radius is the sphere of the law
+    for the genomic span of the block, set as `confinement_radius_arcs` on a shallow copy. The
+    input is returned when the factor is positive, when confinement is off at this level or when
+    a radius is set.
 
     Parameters
     ----------
     s
-        The run's settings.
+        The settings of the run.
     anchor_genomic
-        The block's anchors as the state carries them, (start, end, midpoint) triples, or a
-        flat sequence of positions. The span runs from the first start to the last end.
+        The anchors of the block as (start, end, midpoint) triples or a flat sequence of
+        positions. The span is from the first start to the last end.
     """
     derive = (
         bool(s.use_confinement)
@@ -257,8 +234,7 @@ def settings_for_block(
 
 
 def arcs_solver(s: Settings) -> str:
-    """The stage's solver name, validated. An unrecognised name is refused rather than falling
-    through to the annealer, which would run the wrong stage and report nothing."""
+    """Returns the validated solver name of the stage. An unknown name raises."""
     name = str(s.arcs_solver).strip().lower()
     if name not in ("mc", "lbfgs"):
         raise ValueError(f"[simulation_arcs] solver must be mc or lbfgs, got {s.arcs_solver!r}")
@@ -266,11 +242,11 @@ def arcs_solver(s: Settings) -> str:
 
 
 def _batch_run(problems: list[Problem]) -> list[Result]:
-    """Batched (JAX) runner. With the solver, each block is solved in turn with its energy on
-    the device, on its own settings and from its own start. With the annealer, a whole bucket
-    of IBs' arcs anneal in one vmapped kernel, each IB fanned out to `steps_arcs` noised
-    restarts (best kept), mirroring the serial loop. Returns one `(score, pos)` per input
-    problem. Lazy `mc_jax` import so the numba path never requires JAX."""
+    """Runs a group of problems on JAX and returns one `(score, pos)` per problem.
+
+    With the solver each block is solved in turn with its energy on the device. With the annealer
+    the IBs of a bucket anneal in one vmapped kernel, each with `steps_arcs` noised restarts.
+    """
     s = problems[0]["settings"]
     if s.arcs_scope == "chromosome":
         return [(0.0, np.asarray(p["anchor_pos"], dtype=np.float32)) for p in problems]
@@ -300,12 +276,12 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
             raise NotImplementedError(
                 "the factory term is not in the JAX annealer; the solver carries it on the device"
             )
-        seed_rng(int(prob["seed"]))  # deterministic restart noise for this IB
+        seed_rng(int(prob["seed"]))
         pos = prob["anchor_pos"]
         step = float(prob["step_size"])
         for _ in range(n_restarts):
             start = pos.copy()
-            add_movable_noise_inplace(start, None, step)  # arcs noises ALL anchors
+            add_movable_noise_inplace(start, None, step)  # every anchor moves
             expanded.append({"pos": start, "exp_dist": prob["exp_dist"], "step_size": step})
             owner.append(gi)
 
@@ -328,8 +304,9 @@ class ArcsStage:
         return int(inputs[0].anchor_seed_pos.shape[0])  # type: ignore[attr-defined]
 
     def batch_key(self, inputs: tuple[State, ...]) -> tuple[object, ...]:
-        """Arcs has uniform energy terms, so the batch key is just the anchor
-        shape-ladder bucket - all IBs in a bucket share one compiled kernel."""
+        """The batch key is the anchor shape bucket. Every arcs problem has the same energy
+        terms.
+        """
         st = inputs[0]
         assert isinstance(st, Seeded)
         return (batch_bucket(int(st.anchor_seed_pos.shape[0]), st.settings),)

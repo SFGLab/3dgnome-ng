@@ -1,10 +1,9 @@
-"""The smooth driver can hand each milestone's positions to a caller.
+"""Unit checks for the `on_round` callback of `mc_smooth_numba`.
 
     python tests/unit/test_smooth_trace.py
 
-`mc_smooth_numba` takes an optional `on_round` callback. The outer loop calls it once after
-every milestone with the chain's positions at that point, so a caller can record the annealing
-as a trajectory. With no callback nothing changes, which the parity gate holds.
+The outer loop calls it after every milestone with the positions of the chain. Without a
+callback nothing changes.
 """
 
 from __future__ import annotations

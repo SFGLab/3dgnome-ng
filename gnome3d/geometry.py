@@ -1,4 +1,4 @@
-"""Geometry for drawing a structure, shared by the figure scripts and the website."""
+"""Geometry for drawing a structure."""
 
 from __future__ import annotations
 
@@ -8,11 +8,9 @@ from gnome3d.types import F64Array
 
 
 def smooth_chain(pos: F64Array, per_bond: int = 4) -> F64Array:
-    """A Catmull-Rom spline through the beads, `per_bond` points per bond, ends included.
+    """Returns a Catmull-Rom spline through the beads with `per_bond` points per bond.
 
-    The curve passes through every bead, at every `per_bond`-th point. The end tangents come
-    from beads mirrored past each end. Fewer than three beads, or `per_bond` of one, return the
-    beads as they are.
+    Fewer than three beads or a `per_bond` of one return the beads unchanged.
     """
     p = np.asarray(pos, dtype=np.float64)
     if len(p) < 3 or per_bond <= 1:

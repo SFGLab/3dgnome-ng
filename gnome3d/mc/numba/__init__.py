@@ -1,20 +1,14 @@
-"""Numba backend for the Monte-Carlo loops, split one file per kernel.
+"""The numba kernels.
 
-The four public entry points - `mc_heatmap_numba`, `mc_arcs_numba`,
-`mc_smooth_numba`, `mc_ib_numba` - are the production CPU kernels.  They all
-drive one unified inner kernel (`terms._batch_mc_nb`) via the shared driver
-(`common._run_outer_loop`); they differ only in which structure-energy variant
-and which optional terms (heat / orientation / EV / confinement) they wire up.
+`mc_heatmap_numba`, `mc_arcs_numba`, `mc_smooth_numba` and `mc_ib_numba` are the CPU entry
+points. They share one inner kernel, `terms.batch_mc_nb` and one driver,
+`common.run_outer_loop`.
 
-Layout:
-  * `terms`   - all `_local_*_nb` / `_init_*_nb` term math + `_batch_mc_nb`
-  * `common`  - the `_run_outer_loop` driver, orientation prep, array helpers
-  * `arcs` / `smooth` / `heatmap` / `ib` - one public entry per kernel
+  terms   the energy terms and the inner kernel
+  common  the driver, the orientation arrays and array helpers
+  arcs, smooth, heatmap, ib  one entry point each
 
-This `__init__` re-exports the flat API so `from gnome3d.mc import numba as
-mc_numba; mc_numba.mc_arcs_numba(...)` keeps working after the split.  On first
-import the JIT functions compile (~10-30 s); subsequent runs load from numba's
-disk cache.
+The first import compiles the kernels, 10 to 30 s. Later runs load the numba disk cache.
 """
 
 from __future__ import annotations

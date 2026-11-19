@@ -1,12 +1,10 @@
-"""Unit checks for the polymer law and the contact decay fit it rests on.
+"""Unit checks for the polymer law and the contact decay fit.
 
     python tests/unit/test_polymer.py
 
-The fit reads the exponent distance grows with, `nu`, off the run's own singletons: contact
-probability falls as separation to the power `-3 nu`, so a log log slope of the contact count
-against separation gives it. It must recover a known slope from clean data, refuse data that is
-not a decay at all, which is what a ChIA-PET singletons file is since it is enrichment filtered
-around CTCF, and choose its band from the data's own resolution.
+Contact probability falls as separation to the power `-3 nu`. The fit recovers a known slope
+from clean data, refuses data that is not a decay, such as ChIA-PET singletons and chooses its
+band from the resolution of the data.
 """
 
 from __future__ import annotations
@@ -40,11 +38,12 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 def contacts(
     slope: float, n: int, seed: int, binsize: int = 0
 ) -> list[tuple[str, int, str, int, int]]:
-    """Intra chromosomal contacts whose separation density falls as `s ^ slope`, drawn by
-    inverse transform over 10 kb to 5 Mb, snapped to `binsize` when given."""
+    """Returns intra chromosomal contacts whose separation density falls as `s ^ slope`, drawn
+    by inverse transform over 10 kb to 5 Mb and snapped to `binsize` when given.
+    """
     rng = np.random.default_rng(seed)
     lo, hi = 1e4, 5e6
-    a = slope + 1.0  # density s^slope integrates to s^(slope+1)
+    a = slope + 1.0  # the density s^slope integrates to s^(slope+1)
     u = rng.random(n)
     s = (lo**a + u * (hi**a - lo**a)) ** (1.0 / a)
     p1 = rng.integers(1_000_000, 200_000_000, n)
@@ -102,8 +101,7 @@ def test_reports_what_it_used() -> None:
 
 
 def test_the_law() -> None:
-    """One law for every distance. Its unit is the bead, which is the distance at the
-    resolution the run declared, so the background at that separation is one by definition."""
+    """One bead is the distance at the resolution of the run and the background there is one."""
     print("\n[law] background, contact and heatmap distances in bead units")
     law = PolymerLaw(nu=0.3, s0_bp=1000, q_half=1.0)
     check("the background at the resolution is one bead", abs(law.background(1000) - 1.0) < 1e-12)
@@ -145,7 +143,7 @@ def test_the_law() -> None:
 
 
 def arcs(seed: int, n: int, slope: float = -0.5) -> list[InteractionArc]:
-    """Arcs whose typical PET count falls as span to `slope`, with scatter."""
+    """Returns arcs whose typical PET count falls as span to `slope`, with scatter."""
     rng = np.random.default_rng(seed)
     span = 10 ** rng.uniform(4.0, 6.0, n)
     typical = 20.0 * (span / 1e4) ** slope
@@ -160,9 +158,7 @@ def arcs(seed: int, n: int, slope: float = -0.5) -> list[InteractionArc]:
 
 
 def test_arc_strength() -> None:
-    """A loop's strength is its PET count over what a loop of its span typically has, which is
-    observed over expected read off the run's own arcs rather than a curve from another
-    dataset."""
+    """The strength of a loop is its PET count over the typical count of a loop of its span."""
     print("\n[arcs] typical strength against span, from the run's own arcs")
     f = fit_arc_strength(arcs(1, 5000))
     check("the fit is accepted on enough arcs", f.ok, f.reason)
@@ -186,9 +182,9 @@ def test_arc_strength() -> None:
 
 
 def test_settings_route_through_the_law() -> None:
-    """Every distance call on Settings answers from the attached law, and a Settings with no law
-    attached builds a default from the named fallback and says so, so nothing answers from a
-    constant silently."""
+    """Every distance call on Settings uses the attached law. A Settings without one builds a
+    default from the fallback and warns.
+    """
     print("\n[settings] every distance call answers from the law")
     s = Settings()
     check("no law is attached until data is loaded", s.polymer is None)
@@ -223,9 +219,9 @@ def test_settings_route_through_the_law() -> None:
 
 
 def test_block_size() -> None:
-    """A chain of span S under the law has a radius of gyration with no free constant, and the
-    sphere that holds it follows from that. At nu one half the chain is Gaussian and the
-    textbook result is Rg squared equal to N over 6 bonds."""
+    """The radius of gyration of a chain under the law has no free constant. At nu one half Rg
+    squared is N over 6 bonds.
+    """
     law = PolymerLaw(nu=0.5, s0_bp=1000, q_half=1.0)
     rg = law.radius_of_gyration(6_000)
     check("Gaussian chain of six bonds has Rg 1", abs(rg - 1.0) < 1e-9, f"{rg:.6f}")
@@ -250,9 +246,9 @@ def test_block_size() -> None:
 
 
 def test_counts_not_rows() -> None:
-    """A deep map has every pixel present, so the number of rows per separation says nothing
-    and the decay lives in the counts. The fit must weight rows by their count. On a thin map
-    the two agree, which is how counting rows passed."""
+    """The fit weights rows by their count. A deep map has every pixel and its row count per
+    separation carries no decay.
+    """
     rng = np.random.default_rng(3)
     rows: list[tuple[str, int, str, int, int]] = []
     n_bins = 400
@@ -272,9 +268,9 @@ def test_counts_not_rows() -> None:
 
 
 def test_grid_step_survives_a_truncated_end_bin() -> None:
-    """A binned file's last bin is shorter than the grid, so one midpoint per chromosome sits
-    off the grid and the smallest separation in the file is not the grid step. The step must
-    be read from where the separations pile up, not from the single smallest one."""
+    """The grid step is the separation most pairs share. The last bin of a chromosome is short
+    and gives a smaller separation.
+    """
     rng = np.random.default_rng(4)
     rows: list[tuple[str, int, str, int, int]] = []
     n_bins = 300

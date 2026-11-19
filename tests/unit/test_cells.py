@@ -2,11 +2,9 @@
 
     python tests/unit/test_cells.py
 
-The grid exists to make the excluded volume term visit the beads that are near instead of all
-of them. It is a pure optimisation, so the one property that matters is that it returns exactly
-what the full scan returns, bit for bit, on every bead of a real structure and on the awkward
-cases: a bead alone in its cell, a bead at the corner of the grid, everything piled at one
-point, and a candidate list too long for the buffer.
+The grid must return what the full scan returns, bit for bit: on every bead of a real
+structure, for a bead alone in its cell, for a bead at the corner of the grid, for every bead
+at one point and for a candidate list longer than the buffer.
 """
 
 from __future__ import annotations
@@ -48,7 +46,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 def compare(
     pos: np.ndarray, r0: float, weight: float, skip: int, buf_size: int = BUF
 ) -> tuple[int, float, int]:
-    """Every bead through both paths. Returns (mismatches, worst difference, overflows)."""
+    """Runs every bead through both paths. Returns (mismatches, worst difference, overflows)."""
     lo, dim, c = grid_shape(pos, r0)
     head, nxt, where = build_grid(pos, lo, dim, c)
     buf = np.empty(buf_size, dtype=np.int32)
@@ -140,8 +138,7 @@ def test_real_structure() -> None:
 
 
 def test_moves_keep_it_exact() -> None:
-    """The grid is updated in place as beads move, which is the whole point of the linked list,
-    so it has to stay exact over a long run of moves rather than only when freshly built."""
+    """The grid stays exact over a long run of moves."""
     print("\n[moves] the grid stays exact while beads move")
     rng = np.random.default_rng(11)
     n = 1500
@@ -176,9 +173,9 @@ def test_moves_keep_it_exact() -> None:
 
 
 def test_beads_outside_the_box() -> None:
-    """The grid's box is the extent the structure had when it was built. A coil that swells
-    carries beads beyond it, where they are filed in the edge cells, and a query from out there
-    has to look in the edge cells too."""
+    """A bead beyond the box of the grid is in an edge cell and a query from beyond the box
+    searches the edge cells.
+    """
     print("\n[outside] beads beyond the box the grid was built on")
     rng = np.random.default_rng(5)
     n = 1200

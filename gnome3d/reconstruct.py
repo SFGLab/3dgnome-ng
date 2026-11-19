@@ -1,12 +1,5 @@
-"""
-Pipeline driver: a single self-expanding DAG -> executor -> beads.
-
-The top-level orchestration.  `simulate` / `cli` call `reconstruct`; it builds the
-coarse `CoarseState`, assembles the unified coarse DAG (`build_coarse_dag`) whose
-IB-positioning node `expand`s into the per-IB `arcs -> densify -> [heat] -> smooth`
-chains, runs it under an executor, and returns ``dict[chr -> list[BeadOut]]``.
-
-It is a leaf consumer - nothing imports it back, so there is no cycle.
+"""The pipeline driver. Builds the coarse DAG, runs it under an executor and returns the beads
+per chromosome.
 """
 
 from __future__ import annotations
@@ -40,21 +33,19 @@ if TYPE_CHECKING:
 
 LOG = log.get("reconstruct")
 
-# Well-separated RNG offset per ensemble member, so structure i's per-IB seeds
-# (and coarse seed) are distinct from structure j's.  See coarse.seed_global_rng.
+# The seed offset between two ensemble members.
 MEMBER_SEED_STRIDE = 2_000_003
 
 
-# Workers from which the threaded smooth stage beats the device. Measured 2026-11-16 on GM12878
-# chr1, 52 blocks and 124,657 beads, against an RTX 3090 at 122 to 146 s: 147 s on 4 workers, 92
-# on 8, 71 on 16. The relaxation pass follows the stage onto numba and wins there at any count,
-# so a whole structure is ahead from 4.
+# The worker count from which the threaded smooth stage is faster than the device, design/kernel-
+# performance.md section 14.
 _SMOOTH_THREADED_MIN_WORKERS = 4
 
 
 def _auto_strategy(kind: StageKind, settings: Settings) -> ExecutorStrategy:
-    """Resolve ``mc_executor_<stage> = auto``. The smooth stage runs threaded on numba from
-    `_SMOOTH_THREADED_MIN_WORKERS` workers and on the device below that when JAX is there."""
+    """Resolves `mc_executor_<stage> = auto`. The smooth stage runs threaded on numba from
+    `_SMOOTH_THREADED_MIN_WORKERS` workers and on the device below that when JAX is installed.
+    """
     workers = int(settings.mc_executor_threaded_workers)
     if kind is StageKind.SMOOTH and workers >= _SMOOTH_THREADED_MIN_WORKERS:
         return ExecutorStrategy.THREADED
@@ -70,9 +61,11 @@ def _auto_strategy(kind: StageKind, settings: Settings) -> ExecutorStrategy:
 
 
 def _resolve_strategy(value: str, kind: StageKind, settings: Settings) -> ExecutorStrategy:
-    """One ``mc_executor_<stage>`` value (serial|threaded|batch|auto) -> strategy.
-    A batch choice that can't run (small-IB-boost's per-IB springs aren't in the
-    batched kernels; DENSIFY has no batch kernel) downgrades to threaded/serial."""
+    """Maps one `mc_executor_<stage>` value to a strategy.
+
+    A batch choice that cannot run becomes threaded or serial. The small IB boost has per IB
+    springs and DENSIFY has no batch kernel.
+    """
     v = str(value).strip().lower()
     chosen = (
         ExecutorStrategy(v)
@@ -91,7 +84,7 @@ def _resolve_strategy(value: str, kind: StageKind, settings: Settings) -> Execut
 
 
 def stage_strategy(settings: Settings, kind: StageKind) -> ExecutorStrategy:
-    """The strategy one stage runs under, from its `mc_executor_<stage>` value."""
+    """Returns the strategy of one stage from its `mc_executor_<stage>` value."""
     value = {
         StageKind.ARCS: settings.mc_executor_arcs,
         StageKind.DENSIFY: settings.mc_executor_densify,
@@ -102,10 +95,7 @@ def stage_strategy(settings: Settings, kind: StageKind) -> ExecutorStrategy:
 
 
 def pick_executor(settings: Settings) -> Executor:
-    """Build the executor from the per-stage ``mc_executor_*`` settings.
-
-    Each IB stage names its executor (serial | threaded | batch | auto); this maps
-    them to a per-kind strategy and returns one `MixedExecutor`."""
+    """Builds the executor from the `mc_executor_*` settings."""
     strategy = {
         StageKind.ARCS: _resolve_strategy(settings.mc_executor_arcs, StageKind.ARCS, settings),
         StageKind.DENSIFY: _resolve_strategy(
@@ -127,7 +117,7 @@ def pick_executor(settings: Settings) -> Executor:
 
 
 def _beads(output: State) -> list[BeadOut]:
-    """The beads of a terminal smooth node, narrowed from the opaque output."""
+    """Returns the beads of a terminal smooth node."""
     assert isinstance(output, Smoothed)
     return output.beads
 
@@ -135,10 +125,11 @@ def _beads(output: State) -> list[BeadOut]:
 def _assemble(
     per_chr: dict[str, list[list[BeadOut]]], settings: Settings, seed: int = 0
 ) -> dict[str, list[BeadOut]]:
-    """Flatten each chromosome's per block beads into one list in genomic order. With
-    `use_hole_beads` the holes between blocks get beads first, drawn from generators seeded by
-    `seed`, the structure's seed offset. With `use_boundary_stitch` set, the blocks are stitched
-    at their edges."""
+    """Joins the beads of each chromosome's blocks into one list in genomic order.
+
+    With `use_hole_beads` the holes between blocks get beads first, drawn from generators seeded
+    by `seed`. With `use_boundary_stitch` the blocks are stitched at their edges.
+    """
     out: dict[str, list[BeadOut]] = {}
     for chr_, blocks in per_chr.items():
         blocks = fill_holes(blocks, settings, chr_, seed)
@@ -158,15 +149,11 @@ def reconstruct(
     executor: Executor | None = None,
     seed_offset: int = 0,
 ) -> dict[str, list[BeadOut]]:
-    """Reconstruct via the single self-expanding DAG: the coarse spine
-    (hierarchy -> chr -> segment -> ib) and the per-IB chains are one graph, with
-    the IB-positioning node's `expand` fanning out the chains at run time.
+    """Reconstructs one structure and returns a bead list per chromosome, sorted by genomic start.
 
-    Returns one bead list per chr, sorted by genomic start.  `seed_offset`
-    selects the ensemble member (distinct structures from the same inputs); 0 is
-    the canonical single structure.  The coarse spine's root stage seeds the
-    global RNG from the seed it carries (`build_state` / `build_coarse_dag` use no
-    RNG), so no external seeding is needed."""
+    `seed_offset` selects the ensemble member. The root stage of the coarse DAG seeds the global
+    RNG from it.
+    """
     state = cb.build_state(settings, data, chrs, region)
     dag, ib_sink = build_coarse_dag(state, seed_offset)
 
@@ -189,24 +176,15 @@ def reconstruct_ensemble(
     executor: Executor | None = None,
     base_seed_offset: int = 0,
 ) -> list[dict[str, list[BeadOut]]]:
-    """Reconstruct an ensemble of `n` structures, batching the per-IB chains
-    *across members* so same-shaped IBs from different members fill one kernel
-    launch.
+    """Reconstructs `n` structures and batches the IB chains across members.
 
-    Two phases:
-      1. Run each member's coarse spine *sequentially* and gather its IB seeds.
-         The spine seeds + flows the global RNG, so members cannot interleave;
-         the gather is RNG-free.
-      2. Merge all members' IB chains into one DAG (node ids namespaced per member)
-         and run it under `executor` - a `BatchExecutor` then groups same-(kind,
-         bucket) chains across members into wide launches.
-
-    Member m uses ``base_seed_offset + m * MEMBER_SEED_STRIDE``, so member m is
-    byte-identical to ``reconstruct(seed_offset=that)`` (the coarse spine + IB
-    seeds match; the IB chains re-seed per node, independent of batching)."""
+    The coarse stages of each member run one after another. They use the global RNG. The
+    IB chains of all members then run as one DAG. Member m uses
+    `base_seed_offset + m * MEMBER_SEED_STRIDE` and is byte identical to `reconstruct` at that
+    offset.
+    """
     executor = executor or SerialExecutor()
 
-    # Phase 1: per-member coarse spine (sequential, RNG-safe) + seed gather.
     member_seeds: list[list[IBSeed]] = []
     for m in range(n):
         off = base_seed_offset + m * MEMBER_SEED_STRIDE
@@ -218,7 +196,6 @@ def reconstruct_ensemble(
     n_ib = sum(len(s) for s in member_seeds)
     LOG.info(f"ensemble: {n} members, {n_ib} IB chains total")
 
-    # Phase 2: one DAG over all members' IB chains, namespaced by member.
     nodes: dict[str, Node] = {}
     seeds: dict[str, Seeded] = {}
     for m, ibseeds in enumerate(member_seeds):
@@ -229,7 +206,6 @@ def reconstruct_ensemble(
     LOG.info(f"running ensemble DAG with {len(nodes)} nodes and {len(seeds)} seeds...")
     outputs = executor.run(Dag(nodes=nodes, seeds=seeds))
 
-    # Phase 3: collect each member's beads, sorted per chr.
     results: list[dict[str, list[BeadOut]]] = []
     for m, ibseeds in enumerate(member_seeds):
         per_chr: dict[str, list[list[BeadOut]]] = defaultdict(list)

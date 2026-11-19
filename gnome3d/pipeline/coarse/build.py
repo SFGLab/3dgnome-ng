@@ -1,26 +1,8 @@
-"""
-Coarse substrate: the cluster-graph state + its pure build helpers.
+"""`CoarseState` and the functions that build heatmaps, distance targets and positions from it.
 
-`CoarseState` is the immutable carrier for the coarse half of reconstruction -
-the cluster hierarchy plus the contact data needed to position it.  The free
-functions here are the *build* helpers that read that state to produce heatmaps,
-expected-distance matrices, bin layouts and child interpolation - everything the
-coarse positioning stages consume but that holds no MC orchestration of its own.
-
-Splitting these out of the old `CoarseModel` god-object lets the coarse
-positioning levels become small pipeline stages (in `pipeline.coarse.stages`)
-that call these helpers, instead of methods on one big class.  Two of them touch
-RNG and so must be called in a fixed order to keep the layout byte-exact:
-
-* `interpolate_children_linear` - its single-parent branch adds
-  `random_vector_np(100.0)` noise per child (and recurses), so it consumes the
-  global stream; the coarse stages call it in the same order the old engine did.
-
-Everything else here is pure (no RNG): bin layout, heatmap binning/normalization,
-expected-distance and contact-heatmap construction, and the small-IB settings
-boost.  `clusters` is shared and its `.pos` mutates in place across the coarse
-stages - natural for a graph algorithm; the immutability is of the *state's*
-field set, not of the positioned graph.
+`clusters` is shared and the coarse stages write `.pos` into it in place. The positioning
+functions and `interpolate_children_linear` draw from the global RNG and must run in a fixed
+order.
 """
 
 from __future__ import annotations
@@ -50,22 +32,14 @@ from gnome3d.util import random_vector_np, seed_rng
 
 LOG = log.get("coarse")
 
-# Fixed base seed for the coarse engine.  The coarse spine consumes a single
-# global RNG stream in dependency order, so seeding once makes the whole layout
-# deterministic; `seed_offset` shifts it per ensemble member.
+# The base seed of the coarse stages. `seed_offset` shifts it per ensemble member.
 COARSE_SEED: int = 0xC0FFEE
 
 
 def seed_global_rng(seed_offset: int = 0) -> int:
-    """Seed the global RNG (Python `random` for positioning noise, numba for the
-    heatmap/IB kernels) for the coarse spine, and return the resolved seed.
+    """Seeds the global RNGs, Python `random` and numba, for the coarse stages and returns the seed.
 
-    The coarse spine seeds *once* here and then flows the stream in dependency
-    order - it does NOT re-seed per stage.  That's the opposite of the per-IB
-    stages (which re-seed from `Seeded.seed` per node to be order-independent for
-    batching): the coarse levels are a coupled linear sequence that is never
-    reordered, so one seed is both deterministic and matches the reference
-    engine's single-stream order (keeping the layout byte-exact).
+    The coarse stages seed once here and draw from the one stream in order.
     """
     from gnome3d.mc import numba as mc_numba
 
@@ -77,11 +51,9 @@ def seed_global_rng(seed_offset: int = 0) -> int:
 
 @dataclass(frozen=True)
 class CoarseState:
-    """The cluster hierarchy + the contact data needed to position it.
+    """The cluster tree and the contact data that position it.
 
-    Immutable field set; the cluster objects it points at mutate in place (their
-    `.pos` is written by the coarse positioning stages - natural for a graph
-    algorithm).  Built once by `build_state`; threaded through the coarse stages.
+    The fields are fixed. The clusters mutate in place as the coarse stages write `.pos`.
     """
 
     s: Settings
@@ -94,23 +66,18 @@ class CoarseState:
     singletons: list[SingletonContact]
     long_arcs: RawArcMap
     selected_region: BedRegion | None = None
-    # Compartment track for the opt-in compartment term.  Empty when no track
-    # is configured, which leaves the term inert.
     compartments: CompartmentMap = field(default_factory=empty_compartment_map)
-    # Anchor activity track for the factory term, empty when none is configured.
     activity: SignalMap = field(default_factory=empty_signal_map)
-    # Counts between anchor pairs from a full depth map; empty builds the anchor contact map
-    # from the singletons.
+    # Empty builds the anchor contact map from the singletons.
     anchor_contacts: AnchorContactMap = field(default_factory=dict)
 
 
 def attach_polymer_law(settings: Settings, data: ContactData) -> PolymerLaw:
-    """The run's polymer law, from its own fits, with one always visible line saying what it
-    measured or why it could not. A repeat attach with the same exponent, which the ensemble
-    path makes once per member, logs at debug so the line is not printed per structure.
+    """Returns the polymer law of the run and logs what was measured or why not.
 
-    The exponent is `polymer_exponent` when pinned, otherwise the contact fit's, otherwise the
-    named fallback. The bead is the subanchor spacing the run declared.
+    The exponent is `polymer_exponent` when pinned, else the contact fit, else the fallback. One
+    bead is the subanchor spacing of the run. A repeated attach with the same exponent logs at
+    debug.
     """
     from gnome3d.polymer import FALLBACK_NU, PolymerLaw
 
@@ -152,10 +119,7 @@ def build_state(
     chrs_list: list[str],
     region: BedRegion | None = None,
 ) -> CoarseState:
-    """Build the cluster hierarchy from pre-loaded contact data.
-
-    Mirrors the old `CoarseModel.load` / Reference LooperSolver::setContactData().
-    """
+    """Builds the cluster tree from loaded contact data."""
     with log.step(LOG, "build cluster hierarchy"):
         clusters, chr_root, chr_first_cluster = build_cluster_tree(
             data.anchors,
@@ -184,18 +148,10 @@ def build_state(
     )
 
 
-# --- epigenomic track lookup ------------------------------------------------
-
-
 def compartment_for_clusters(
     state: CoarseState, indices: list[ClusterIndex], chr_: str
 ) -> I8Array | None:
-    """
-    Compartment call per cluster, or None when no track covers this chromosome.
-
-    Clusters carry inclusive genomic ranges, which is what `bin_compartments`
-    expects.
-    """
+    """Returns the compartment call per cluster, or None when no track covers the chromosome."""
     ivs = state.compartments.get(chr_, [])
     if not ivs or not indices:
         return None
@@ -209,10 +165,9 @@ def compartment_for_clusters(
 def coarse_track_arrays(
     state: CoarseState, active_region: list[ClusterIndex], chr_of: list[str]
 ) -> I8Array | None:
-    """Per-cluster compartment array for a multi-chromosome active region.
+    """Returns the compartment per cluster of an active region of several chromosomes.
 
-    `active_region` and `chr_of` are parallel, so each cluster is binned against
-    its own chromosome's track.  Returns None when the compartment term is off or
+    `active_region` and `chr_of` are parallel. Returns None when the compartment term is off or
     no chromosome has a track.
     """
     s = state.s
@@ -241,18 +196,11 @@ def coarse_track_arrays(
     return comp if got_comp else None
 
 
-# --- RNG-ordered shared subroutine ------------------------------------------
-
-
 def interpolate_children_linear(state: CoarseState, parent_indices: list[int]) -> None:
-    """
-    Set child cluster positions by linear interpolation between parents.
-    Used for IBs between segments, and anchors within IBs.
-    Simplified version of Reference interpolateChildrenPositionSpline().
+    """Sets child cluster positions by linear interpolation between parents.
 
-    RNG: the single-parent branch adds `random_vector_np(100.0)` per child and
-    recurses, so this consumes the global stream - call order matters for the
-    byte-exact layout.
+    A single parent adds `random_vector_np(100.0)` per child and recurses, which draws from the
+    global RNG. The call order must not change.
     """
     clusters = state.clusters
     n = len(parent_indices)
@@ -260,11 +208,9 @@ def interpolate_children_linear(state: CoarseState, parent_indices: list[int]) -
         return
 
     if n == 1:
-        # All children at parent position with small noise
         par = clusters[parent_indices[0]]
         for child_idx in par.children:
             clusters[child_idx].pos = par.pos + random_vector_np(100.0)
-            # Recurse into grandchildren
             if clusters[child_idx].children:
                 interpolate_children_linear(state, [child_idx])
         return
@@ -275,34 +221,24 @@ def interpolate_children_linear(state: CoarseState, parent_indices: list[int]) -
         if n_children == 0:
             continue
 
-        # Interpolation endpoints in 3D
         p_start = par.pos
         p_end = clusters[parent_indices[min(i + 1, n - 1)]].pos
 
         for j, child_idx in enumerate(par.children):
             t = (j + 0.5) / n_children
             clusters[child_idx].pos = ((1 - t) * p_start + t * p_end).astype(np.float32)
-            # Recurse
             if clusters[child_idx].children:
                 interpolate_children_linear(state, [child_idx])
-
-
-# --- pure (no-RNG) build helpers --------------------------------------------
 
 
 def compute_segment_bins(
     state: CoarseState, current_level: ChrLevel
 ) -> tuple[dict[str, list[int]], dict[str, int], int, list[float]]:
-    """
-    Compute heatmap bin boundaries for segment-level clusters.
-    Mirrors bin calculation in createSingletonHeatmap().
-    Returns (bins, start_ind, total_size, bin_lengths_mb).
+    """Computes the heatmap bin boundaries of the segment clusters.
 
-    bin_lengths_mb is a flat list aligned to global bin indices giving
-    the genomic span of each bin in Mb.  The first and last bins of each
-    chromosome use the actual cluster start/end (not the 0/1e9 sentinels)
-    so their lengths are not artificially inflated - mirrors the Reference min/max
-    position update done after reading contacts.
+    Returns `(bins, start_ind, total_size, bin_lengths_mb)`. `bin_lengths_mb` is the genomic span
+    of each global bin in Mb. The first and the last bin of a chromosome use the cluster start
+    and end, not the 0 and 1e9 sentinels.
     """
     clusters = state.clusters
     bins: dict[str, list[int]] = {}
@@ -344,15 +280,9 @@ def add_long_pet_to_segment_heatmap(
     start_ind: dict[str, int],
     total_size: int,
 ) -> None:
-    """
-    Bin long-range PET arcs (gap > max_pet_length) into the segment heatmap.
-    Each arc contributes long_pet_scale * arc.score ** long_pet_power to the
-    (st, end) bin pair. Mirrors Reference LooperSolver.cpp:1069-1104.
+    """Bins the arcs longer than `max_pet_length` into the segment heatmap.
 
-    Note: the Reference reference does h[st][end] += val twice (to the same cell),
-    not symmetrically.  The downstream normalize_heatmap symmetrize step
-    averages [st][end] and [end][st] so the net effect is val on each side
-    after normalization. We preserve the same pattern for parity.
+    Each arc adds `long_pet_scale * score ** long_pet_power` twice to the cell `[st][end]`. `normalize_heatmap` then symmetrises.
     """
     if not state.long_arcs:
         return
@@ -385,21 +315,20 @@ def add_long_pet_to_segment_heatmap(
 def arc_expected_matrix(
     s: Settings, mids: list[int], arcs: list[tuple[int, int, int] | tuple[int, int, int, int]]
 ) -> F64Array:
-    """The arc target matrix for one active region.
+    """Returns the arc target matrix of one active region.
 
-    An arc pair carries `Settings.arc_expected_distance` of its PET count and span, positive.
-    An arcless pair closer than `background_range_bp` carries minus the background for its
-    separation when `background_weight` is on, which the kernels score as a weak spring
-    symmetric in log distance. Every other arcless pair carries -0.5, which the kernels score
-    as the truncated repulsion. A background is never under one bead, so the sign and the
-    magnitude tell the two arcless kinds apart without a second matrix. The diagonal is 0.
+    An arc pair holds the positive target of its PET count and span. An arcless pair closer than
+    `background_range_bp` holds minus the background of its separation when `background_weight`
+    is on, which the kernels score as a spring symmetric in log distance. Any other arcless pair
+    holds -0.5, which the kernels score as the truncated repulsion. A background is at least one
+    bead. Sign and magnitude separate the two arcless kinds. The diagonal is 0.
 
     Parameters
     ----------
     mids
         Genomic midpoint in bp per anchor, in active region order.
     arcs
-        (i, j, score) or (i, j, score, factor) per arc in active region indices.
+        (i, j, score) or (i, j, score, factor) per arc, in active region indices.
     """
     n = len(mids)
     mat: F64Array = np.full((n, n), -0.5, dtype=np.float64)
@@ -415,8 +344,7 @@ def arc_expected_matrix(
         i, j, score = arc[0], arc[1], arc[2]
         factor = arc[3] if len(arc) > 3 else 0
         exp_d = 1.0 if s.loop_contact else s.arc_expected_distance(score, mids[j] - mids[i], factor)
-        # Two factors' arcs on one pair are two loops for one contact, so the pair takes the
-        # closer of their targets and not the one written last.
+        # A pair with arcs of two factors takes the closer of the targets.
         if mat[i, j] > 0.0:
             exp_d = min(exp_d, float(mat[i, j]))
         mat[i, j] = exp_d
@@ -431,31 +359,27 @@ def add_contact_background(
     s: Settings,
     lens: F64Array | None = None,
 ) -> F64Array:
-    """Hold an arcless anchor pair beyond the short range at the law's contact distance when
-    its contact cell says it sits closer than the background. Returns a new matrix, or the
-    input as is when the term is off, the spring weight is zero or there is no contact map.
+    """Holds an arcless anchor pair beyond the short range at the contact distance of the law
+    when its contact cell puts it under the background.
 
-    The contact map is converted with the law the way every heatmap is, observed over the
-    expectation at that separation within the map itself. Only a pair whose distance comes out
-    under the background is entered, as minus that distance and never under one bead, so the
-    kernels score it with the background spring. A pair at or below its expected contact keeps
-    the repulsion marker, which keeps the held set sparse; holding every pair at a power law
-    could not be embedded and was rejected. Inside the range the short range entry stands, and
-    arc pairs are untouched.
+    Returns a new matrix, or the input when the term is off, the spring weight is zero or there
+    is no contact map. The pair is entered as minus its distance, at least one bead and the
+    kernels score it with the background spring. A pair at or under its expected contact keeps the
+    repulsion marker. Arc pairs and pairs inside the range are unchanged.
 
     Parameters
     ----------
     mat
-        The target matrix from `arc_expected_matrix`.
+        The target matrix of `arc_expected_matrix`.
     mids
         Genomic midpoint of each anchor.
     anchor_heatmap
         Contact counts between anchor pairs, or None.
     s
-        The run's settings.
+        The settings of the run.
     lens
-        Each anchor's length in bp, floored at one, as the map was normalised by. Required
-        with `contact_background_z` above zero, which reads the map as counts.
+        The length of each anchor in bp, at least one, as the map was normalised by. Required
+        with `contact_background_z` above zero.
     """
     if (
         not bool(s.use_contact_background)
@@ -476,7 +400,7 @@ def add_contact_background(
     dist = np.asarray(dist, dtype=np.float64)
     law = s.polymer_law()
     sep = np.abs(pos[:, None] - pos[None, :])
-    bg = np.maximum(1.0, (sep / max(int(law.s0_bp), 1)) ** law.nu)  # law.background, arrayed
+    bg = np.maximum(1.0, (sep / max(int(law.s0_bp), 1)) ** law.nu)  # law.background as an array
     eligible = (mat == -0.5) & (sep > float(s.background_range_bp)) & (dist > 0.0) & (dist < bg)
     if not eligible.any():
         return mat
@@ -493,15 +417,12 @@ def _contact_z_background(
 ) -> F64Array:
     """`add_contact_background` under `contact_background_z`.
 
-    Every arcless pair, a repulsion or a short range entry, whose expectation is above z squared
-    and whose count lies more than z Poisson deviations from it is held at the background times observed over
-    expected to the minus third, in when above and out when below. The count is the map times
-    the two anchors' lengths over 1e6, undoing its normalisation, and the expectation the
-    pair's area times the count per unit area over every pair in its log separation bin, eight a
-    decade, zeros included. The ratio carries half a count on each side, so a pair with no
-    contact sits at a finite distance, and the target is clipped to one bead and to
-    `heatmap_distance_stretching` backgrounds. The pass runs in blocks of rows, so nothing
-    beyond the matrices it is given is held at n by n.
+    Every arcless pair whose expectation is above z squared and whose count is more than z Poisson
+    deviations from it is held at the background times observed over expected to the minus third.
+    The count is the map times the two anchor lengths over 1e6. The expectation is the area of the
+    pair times the count per unit area over every pair in its log separation bin, eight a decade.
+    The ratio has half a count on each side and the target is clipped to one bead and to
+    `heatmap_distance_stretching` backgrounds. The pass runs in blocks of rows.
     """
     n = len(pos)
     law = s.polymer_law()
@@ -534,10 +455,8 @@ def _contact_z_background(
         obs = heat[ii, jj] * area
         exp = density[key] * area
         z = (obs - exp) / np.sqrt(np.maximum(exp, 1e-300))
-        # A pair is tested only where its expectation is above z squared, where a count of
-        # zero lies z deviations under it, so the test can fire either way. Beyond that a far
-        # pair can only come out enriched, and holding those alone shrank a chromosome by a
-        # fifth.
+        # A pair is tested only where its expectation is above z squared. There a count of zero is z
+        # deviations under it and the test can fire both ways.
         sel = (mat[ii, jj] < 0.0) & (exp > z_cut * z_cut) & (sep > 0.0) & (np.abs(z) > z_cut)
         if not sel.any():
             continue
@@ -565,11 +484,9 @@ def dropout_keep(
     arcs: list[tuple[int, int, int] | tuple[int, int, int, int]],
     seed: int,
 ) -> list[bool]:
-    """Which arcs one conformation keeps under `loop_dropout`: each with probability
-    `q / (q + loop_dropout_scale)`, `q` the law's strength, so a typical loop is in half the
-    conformations at scale one and a strong one in nearly all. The draw comes from a generator
-    seeded by the conformation, apart from every other stream, so a run reproduces and the
-    parity gate holds with the setting off.
+    """Returns which arcs one conformation keeps under `loop_dropout`, each with probability
+    `q / (q + loop_dropout_scale)`, `q` the strength of the law. The draw comes from a generator
+    seeded by the conformation.
     """
     law = s.polymer_law()
     scale = max(float(s.loop_dropout_scale), 1e-9)
@@ -586,9 +503,11 @@ def dropout_keep(
 def _active_arcs(
     state: CoarseState, active_region: list[int], chr_: str, seed: int | None = None
 ) -> tuple[list[int], list[tuple[int, int, int] | tuple[int, int, int, int]]]:
-    """The anchors' genomic midpoints and the arcs among them, in active region indices, each
-    arc once from its lower cluster. With `loop_dropout` on and a conformation `seed`, the arcs
-    that conformation drops are left out, so its pairs are arcless for it."""
+    """Returns the genomic midpoints of the anchors and the arcs among them in active region
+    indices, each arc once.
+
+    With `loop_dropout` on and a `seed`, the arcs that the conformation drops are left out.
+    """
     clusters = state.clusters
     cluster_to_active = {ci: ai for ai, ci in enumerate(active_region)}
     chr_arcs = state.arcs.get(chr_, [])
@@ -598,8 +517,8 @@ def _active_arcs(
             if arc_local >= len(chr_arcs):
                 continue
             arc = chr_arcs[arc_local]
-            # A pair two factors join also carries a summary arc of score 0, which as an arc
-            # would hold the pair at the background. The pair's own arcs carry it.
+            # A pair that two factors join also has a summary arc of score 0. It is skipped.
+            # The arcs of the pair carry it.
             if arc.factor < 0:
                 continue
             other = arc.end if arc.start == ci else arc.start
@@ -616,8 +535,9 @@ def _active_arcs(
 def arc_weight_matrix(
     s: Settings, mids: list[int], arcs: list[tuple[int, int, int] | tuple[int, int, int, int]]
 ) -> F32Array | None:
-    """Each arc pair's spring weight, its strength to `arc_weight_exponent`, one everywhere
-    else; None at exponent zero, which the kernels take as every pair at one."""
+    """Returns the spring weight of each arc pair, its strength to `arc_weight_exponent` and
+    one elsewhere. Returns None at exponent zero.
+    """
     alpha = float(s.arc_weight_exponent)
     if alpha <= 0.0:
         return None
@@ -635,7 +555,7 @@ def arc_weight_matrix(
 def calc_anchor_arc_weights(
     state: CoarseState, active_region: list[int], chr_: str, seed: int | None = None
 ) -> F32Array | None:
-    """The spring weight matrix beside `calc_anchor_expected_distances`, on the same arcs."""
+    """Returns the spring weight matrix of the arcs of `calc_anchor_expected_distances`."""
     mids, arcs = _active_arcs(state, active_region, chr_, seed)
     return arc_weight_matrix(state.s, mids, arcs)
 
@@ -643,11 +563,12 @@ def calc_anchor_arc_weights(
 def calc_anchor_activity(
     state: CoarseState, active_region: list[int], chr_: str
 ) -> F32Array | None:
-    """Each anchor's activity for the factory term, the largest value of the track's intervals
-    overlapping the anchor and zero where none does, in active region order, scaled so the
-    active anchors average one, which gives `factory_weight` a scale a peak caller's signal
-    does not; None when the term is off or the chromosome has no track, which the kernels
-    take as no term."""
+    """Returns the activity of each anchor for the factory term, in active region order.
+
+    The activity is the largest value of the track intervals that overlap the anchor, zero without
+    one, scaled to a mean of one over the active anchors. Returns None when the term is off or the
+    chromosome has no track.
+    """
     s = state.s
     track = state.activity.get(chr_)
     if float(s.factory_weight) <= 0.0 or not track:
@@ -678,27 +599,17 @@ def calc_anchor_expected_distances(
     anchor_heatmap: F64Array | None = None,
     seed: int | None = None,
 ) -> F64Array:
-    """
-    Build expected distance matrix for anchor-level active region. `seed` names the
-    conformation for `loop_dropout`; without one every arc is kept.
-    Mirrors Reference calcAnchorExpectedDistancesHeatmap().
+    """Builds the expected distance matrix of an anchor level active region.
 
-    If anchor_heatmap (n x n) is provided and use_anchor_heatmap is True,
-    scales down expected distances for high-contact anchor pairs, mirroring
-    Reference calcAnchorExpectedDistancesHeatmap() post-processing.
-
-    Returns mat where:
-      mat[i,j] = -1  -> repulsion (no arc)
-      mat[i,j] =  0  -> diagonal (self)
-      mat[i,j] > 0   -> expected distance from freqToDistance(score)
+    `seed` selects the conformation for `loop_dropout`. Without one every arc is kept. With
+    `anchor_heatmap` and `use_anchor_heatmap` the expected distances of pairs with many contacts
+    are scaled down.
     """
     s = state.s
     n = len(active_region)
     mids, arcs = _active_arcs(state, active_region, chr_, seed)
     mat = arc_expected_matrix(s, mids, arcs)
 
-    # Apply anchor heatmap: scale down expected distances for high-contact pairs.
-    # Mirrors Reference post-processing in calcAnchorExpectedDistancesHeatmap().
     if anchor_heatmap is not None and s.use_anchor_heatmap:
         max_val = float(anchor_heatmap.max())
         influence = float(s.anchor_heatmap_influence)
@@ -725,13 +636,9 @@ def calc_anchor_expected_distances(
 
 
 def repulsion_range(mat: F64Array, mids: list[int], s: Settings) -> F64Array:
-    """Clear every repulsion marker when `arcs_repulsion` is off, so the kernels score nothing on
-    an arcless pair beyond the short range background but the excluded volume. With it on the
-    input is returned as is.
-
-    The repulsion holds every far arcless pair of every conformation at one distance, which
-    leaves no far pair in contact; with it off `[springs] gyration_weight` holds the size. See
-    `design/gap-fill.md`."""
+    """Clears every repulsion marker when `arcs_repulsion` is off and returns the input
+    otherwise. See `design/gap-fill.md`.
+    """
     del mids
     if bool(s.arcs_repulsion):
         return mat
@@ -741,27 +648,12 @@ def repulsion_range(mat: F64Array, mids: list[int], s: Settings) -> F64Array:
 
 
 def subanchor_counts_per_arc(state: CoarseState, active_region: list[int]) -> list[int]:
-    """
-    Number of subanchors to insert between each consecutive anchor pair.
+    """Returns the number of subanchors between each consecutive anchor pair.
 
-    Default mode (`use_dynamic_loop_density = False`): uniform
-    `s.loop_density` for every arc - matches the historical behavior
-    and the reference.
-
-    Dynamic mode (`use_dynamic_loop_density = True`): for each arc with
-    in-between span `span_bp`, pick the subanchor count so that the chain
-    segments connecting beads are roughly `target_bp_per_subanchor` long.
-    With `n` subanchors there are `n + 1` segments in the gap, so
-    `n = round(span_bp / target) - 1` (clamped to `[min, max]`).
-
-    Examples (target = 5kb): a 3 kb arc rounds to 1 segment → 0 subanchors;
-    a 5 kb arc → 1 segment → 0 subanchors (consecutive anchors are linked
-    directly); a 10 kb arc → 2 segments → 1 subanchor; a 50 kb arc → 10
-    segments → 9 subanchors.  Set `min_subanchors_per_arc = 1` to force
-    at least one subanchor between every pair regardless of span.
-
-    Both densification and `build_contact_heatmaps` consume this so the
-    densified bead chain and the subanchor heatmap binning stay in sync.
+    Without `use_dynamic_loop_density` the count is `loop_density`. With it,
+    `n = round(span_bp / target_bp_per_subanchor) - 1`, clamped to the minimum and the maximum.
+    That the chain segments are about the target long. Densification and
+    `build_contact_heatmaps` both use this.
     """
     s = state.s
     clusters = state.clusters
@@ -777,7 +669,6 @@ def subanchor_counts_per_arc(state: CoarseState, active_region: list[int]) -> li
         ca = clusters[active_region[i]]
         cb = clusters[active_region[i + 1]]
         span = abs(cb.start - ca.end)
-        # n_segments = round(span / target); subanchors = segments - 1.
         n = round(span / target) - 1
         counts.append(max(mn, min(mx, n)))
     return counts
@@ -789,34 +680,20 @@ def build_contact_heatmaps(
     chr_: str,
     with_subanchor: bool = True,
 ) -> tuple[F64Array, F32Array | None]:
-    """
-    Build anchor-level and subanchor-level singleton contact heatmaps.
-    Mirrors Reference createSingletonSubanchorHeatmap().
+    """Builds the anchor and the subanchor singleton contact heatmaps.
 
-    With `with_subanchor` false the anchor heatmap is binned directly at anchor resolution
-    and the subanchor matrix is None. The anchor matrix is the same to the byte, since it is
-    the anchor bins of the subanchor matrix and the same contacts land in them in the same
-    order, and nothing N by N is allocated, which on a 43,000 bead block is 15 GB.
-
-    Returns (anchor_heatmap, subanchor_heatmap_raw) where:
-      anchor_heatmap:      (n_anchors, n_anchors) float64 - normalized contact
-                           density between anchor pairs; used for expected-distance
-                           scaling in arc MC.
-      subanchor_heatmap_raw: (N, N) float32 where N = n_anchors + (n_anchors-1)*ld
-                           - normalized contact density at densified-bead resolution;
-                           used for heat energy in smooth MC.  Built in float64 (the
-                           binning/normalization stay byte-exact) then stored float32:
-                           it's a dense (N,N) matrix held per-IB, ~8.6 GB at N=32768
-                           in f64, and the reference Heatmap is `float` anyway.
+    Returns `(anchor_heatmap, subanchor_heatmap_raw)`. The anchor heatmap is (n_anchors,
+    n_anchors) float64, the contact density between anchor pairs. The subanchor heatmap is (N, N)
+    float32 at bead resolution. With `with_subanchor` false the anchor heatmap is binned at anchor
+    resolution, byte identical and the subanchor matrix is None.
     """
     clusters = state.clusters
     n_anchors = len(active_region)
-    counts = subanchor_counts_per_arc(state, active_region)  # length n_anchors-1
-    # Total bins = anchors + subanchors. Each arc i contributes counts[i] bins.
+    counts = subanchor_counts_per_arc(state, active_region)  # length n_anchors - 1
     N = n_anchors + sum(counts)
 
-    # anchor_offsets[k] is the flat-bin index of anchor k.
-    # Subanchor j of arc i lives at bin offsets[i] + 1 + j  (j = 0..counts[i]-1).
+    # `anchor_offsets[k]` is the bin of anchor k. Subanchor j of arc i is at bin `offsets[i] + 1 +
+    # j`.
     anchor_offsets: list[int] = [0]
     for c in counts:
         anchor_offsets.append(anchor_offsets[-1] + 1 + c)
@@ -827,13 +704,8 @@ def build_contact_heatmaps(
     region_start = clusters[active_region[0]].start
     region_end = clusters[active_region[-1]].end
 
-    # Build break boundaries.  breaks[k] = left edge of bin k.
-    # For each arc i: anchor i ends at ca.end, then counts[i] subanchor bins
-    # tile [ca.end, cb.start], then anchor (i+1) begins at cb.start.  If
-    # counts[i] == 0 there's no subanchor bin for that arc - we still need
-    # a single break separating the two anchor bins, set to the midpoint
-    # of the gap so each anchor absorbs half of it (negligible when count
-    # collapses to 0 only for short arcs anyway).
+    # `breaks[k]` is the left edge of bin k. An arc with no subanchor gets one break at the midpoint
+    # of its gap.
     breaks: list[int] = [region_start]
     anchor_lens.append(clusters[active_region[0]].end - clusters[active_region[0]].start)
 
@@ -846,36 +718,24 @@ def build_contact_heatmaps(
         anchor_lens.append(anchor_len)
         c = counts[i]
         if c >= 1:
-            # ca.end closes anchor i's bin; c-1 interior breaks tile the gap;
-            # cb.start opens anchor (i+1)'s bin.
             breaks.append(ca_end)
             for j in range(1, c):
                 breaks.append(ca_end + int(gap * j / c))
             breaks.append(cb_start)
         else:
-            # No subanchor bin for this arc; split the gap evenly between
-            # the two flanking anchors with a midpoint break.
             breaks.append((ca_end + cb_start) // 2)
 
     breaks.append(region_end)
 
-    # Bin singleton contacts into the subanchor heatmap.  Kept as a `bisect` loop
-    # (NOT vectorized): `breaks` can be non-monotonic when consecutive anchors
-    # overlap (gap=0 -> cb_start < ca_end), and `np.searchsorted` (which assumes a
-    # sorted array) diverges from `bisect` exactly there.  The loop's bisect
-    # behavior on those breaks mirrors the reference, so it must be preserved; it's
-    # also cheap (O(#singletons in region), tiny next to the N^2 matrix work below).
-    #
-    # Note: Python filters by chromosome (both ends on chr_).  Reference's
-    # createSingletonSubanchorHeatmap does NOT - see
-    # [[project-singleton-chr-filter-divergence]] (intentional divergence).
+    # `breaks` is not monotonic when consecutive anchors overlap. This stays a `bisect` loop.
+    # `np.searchsorted` differs there. Contacts are filtered by chromosome.
     import bisect
 
     anchor_off = np.asarray(anchor_offsets[:n_anchors], dtype=np.intp)
-    al = np.maximum(np.asarray(anchor_lens, dtype=np.float64), 1.0)  # (n_anchors,)
+    al = np.maximum(np.asarray(anchor_lens, dtype=np.float64), 1.0)
 
-    # A full depth anchor contact table, when configured, is the anchor map, normalised the
-    # same way. The singletons then feed the subanchor map alone.
+    # A full depth anchor contact table, when configured, is the anchor map. The singletons then
+    # feed the subanchor map alone.
     table = state.anchor_contacts.get(chr_)
     h_table: F64Array | None = None
     if table is not None:
@@ -886,9 +746,7 @@ def build_contact_heatmaps(
             return h_table, None
 
     if not with_subanchor:
-        # The anchor bins alone. A contact whose either end falls in a subanchor bin is
-        # not an anchor pair and is dropped, as cutting the anchor bins out of the full
-        # matrix would drop it.
+        # A contact with an end in a subanchor bin is not an anchor pair and is dropped.
         bin_anchor = np.full(N, -1, dtype=np.int64)
         bin_anchor[anchor_off] = np.arange(n_anchors)
         h_direct: F64Array = np.zeros((n_anchors, n_anchors), dtype=np.float64)
@@ -924,62 +782,52 @@ def build_contact_heatmaps(
         h_sub[si, ei] += sc
         h_sub[ei, si] += sc
 
-    # Anchor heatmap from raw subanchor values (BEFORE normalization), normalized
-    # by anchor area in Mbp^2.  Mirrors Reference lines 1267-1273; vectorized over
-    # the anchor bins (diagonal stays 0, off-diagonal symmetric).
+    # The anchor heatmap comes from the raw subanchor values, before normalisation, over the anchor
+    # area in Mb squared.
     h_anchor: F64Array = h_sub[np.ix_(anchor_off, anchor_off)] / (np.outer(al, al) / 1e6)
     np.fill_diagonal(h_anchor, 0.0)
     if h_table is not None:
         h_anchor = h_table
 
-    # Which arc each subanchor bin belongs to (-1 at anchor bins).
+    # -1 at anchor bins
     bin_arc_idx: list[int] = [-1] * N
     for i, c in enumerate(counts):
         base = anchor_offsets[i] + 1
         for j in range(c):
             bin_arc_idx[base + j] = i
 
-    # Normalize subanchor heatmap: divide by avg count, then by bin areas (kb^2).
-    # Mirrors Reference lines 1294-1320; vectorized.
+    # Divided by the mean count, then by the bin areas in kb squared.
     avg_count = float(h_sub.mean())
     if avg_count > 1e-6:
         h_sub /= avg_count
 
-        # Bin sizes in kb: anchor bins use the anchor's own length; subanchor bins
-        # use gap_len / count for their arc.
+        # An anchor bin has the length of the anchor. A subanchor bin has the gap length over the
+        # count.
         bin_sizes: F64Array = np.empty(N, dtype=np.float64)
         bai = np.asarray(bin_arc_idx, dtype=np.intp)
         gl = np.asarray(gap_lens, dtype=np.float64)
         cnt = np.maximum(np.asarray(counts, dtype=np.float64), 1.0)
-        per_arc = np.maximum(gl / cnt, 1.0) / 1000.0  # (n_anchors-1,)
+        per_arc = np.maximum(gl / cnt, 1.0) / 1000.0
         sub_mask = bai >= 0
         bin_sizes[sub_mask] = per_arc[bai[sub_mask]]
         bin_sizes[anchor_off] = al / 1000.0
 
         denom = np.outer(bin_sizes, bin_sizes)
         off = denom > 0.0
-        np.fill_diagonal(off, False)  # diagonal untouched (matches the i<j loop)
+        np.fill_diagonal(off, False)  # the diagonal is unchanged
         h_sub[off] = h_sub[off] / denom[off]
 
     return h_anchor, h_sub.astype(np.float32)
 
 
-# --- RNG-ordered positioning ops (the coarse MC spine) ----------------------
-#
-# These consume the global RNG stream (Python `random` via `random_vector_np` and
-# the numba kernels `mc_heatmap`/`mc_ib`) in a fixed order; the coarse stages call
-# them on a linear chain so the layout stays byte-exact.  Each mutates the shared
-# cluster graph in place (writing `clusters[i].pos`).
+# The functions below draw from the global RNG in a fixed order and write `clusters[i].pos`.
 
 
 def reconstruct_heatmap(state: CoarseState) -> None:
-    """
-    Position beads at segment level using singleton heatmap MC.
-    Mirrors Reference LooperSolver::reconstructClustersHeatmap().
+    """Positions the segment beads.
 
-    Dispatches to one of three branches: random-walk segment level, single-segment
-    at origin, or the chr-level + segment-level heatmap MC.  Subsequent levels
-    (IB centroid positioning) run afterwards regardless of branch.
+    Takes one of three branches: a random walk, one segment at the origin or the chromosome and
+    segment heatmap MC.
     """
     current_level = set_level(
         Level.SEGMENT - Level.CHROMOSOME, state.chr_root, state.clusters, state.chrs
@@ -996,7 +844,6 @@ def reconstruct_heatmap(state: CoarseState) -> None:
         place_single_segment(state, current_level)
         return
 
-    # Multi-chromosome runs: position chromosome roots first.
     if len(state.chrs) > 1:
         reconstruct_chromosome_level(state)
 
@@ -1005,9 +852,7 @@ def reconstruct_heatmap(state: CoarseState) -> None:
 
 
 def place_single_segment(state: CoarseState, current_level: ChrLevel) -> None:
-    """Single-segment single-chr case: place the segment at the origin and
-    interpolate its children.  Mirrors the `single_seg` branch of the reference
-    reconstructClustersHeatmap()."""
+    """Places one segment at the origin and interpolates its children."""
     LOG.info("single segment -> place at origin")
     chr_ = state.chrs[0]
     if current_level[chr_]:
@@ -1016,19 +861,10 @@ def place_single_segment(state: CoarseState, current_level: ChrLevel) -> None:
 
 
 def reconstruct_chromosome_level(state: CoarseState) -> None:
-    """
-    Position chromosome root beads via heatmap MC over an n_chr * n_chr
-    inter-chromosomal singleton heatmap.  Mirrors Reference
-    LooperSolver::reconstructClustersHeatmapSingleLevel(0).
+    """Positions the chromosome roots by heatmap MC on the inter chromosomal singleton heatmap.
 
-    For each pair of chromosomes (i, j), the heatmap cell h[i][j] is the
-    sum of singleton scores between those chromosomes.  Self-self contacts
-    are ignored (diagonal stays zero, which `normalize_heatmap_diagonal_total`
-    treats correctly - it normalizes the first non-zero diagonal).
-
-    If no inter-chromosomal singletons are available the MC has no signal
-    to optimize against, so chr roots are scattered randomly around the
-    origin instead.
+    Cell (i, j) is the sum of singleton scores between chromosomes i and j. Without inter
+    chromosomal singletons the roots are scattered around the origin.
     """
     from gnome3d.mc import numba as mc_numba
 
@@ -1060,10 +896,9 @@ def reconstruct_chromosome_level(state: CoarseState) -> None:
                 clusters[root_idx].pos = random_vector_np(100.0, in_2d=s.use_2d)
         return
 
-    # Normalize first non-zero diagonal to 1.0; convert freq → expected dist.
     hd = normalize_heatmap_diagonal_total(h, n_chr, 1.0)
-    # Chromosome pairs have no genomic separation, so every cell shares one expectation and
-    # the background is taken at the mean chromosome span.
+    # Chromosome pairs have no genomic separation. Every cell shares one expectation and the
+    # background is taken at the mean chromosome span.
     spans = [
         float(clusters[state.chr_root[c]].end - clusters[state.chr_root[c]].start)
         for c in state.chrs
@@ -1077,8 +912,7 @@ def reconstruct_chromosome_level(state: CoarseState) -> None:
 
     step_size = avg_dist * s.noise_lvl1
 
-    # Initial chr root positions: scatter around the origin, mirroring Reference
-    # LooperSolver.cpp:308 which does `initial + random_vector(avg_dist)`.
+    # Scattered around the origin.
     initial_pos: F32Array = np.zeros((n_chr, 3), dtype=np.float32)
     for i in range(n_chr):
         initial_pos[i] = random_vector_np(step_size, in_2d=s.use_2d)
@@ -1099,8 +933,7 @@ def reconstruct_chromosome_level(state: CoarseState) -> None:
 
             LOG.info("-> score=%.6f  best=%.6f", score, best_score)
 
-    # Write best positions back into the chr root clusters; segment-level
-    # MC will pick these up as origin via clusters[seg.parent].pos.
+    # The segment level reads these as its origin.
     for i, chr_ in enumerate(state.chrs):
         root_idx = state.chr_root.get(chr_)
         if root_idx is not None:
@@ -1108,12 +941,10 @@ def reconstruct_chromosome_level(state: CoarseState) -> None:
 
 
 def random_walk_segment_level(state: CoarseState, current_level: ChrLevel) -> None:
-    """
-    Position segment-level beads via a chained random walk.
-    Each chromosome starts at the origin, takes one big step of size
-    genomic_length_to_distance(1Mb) to break symmetry, then takes
-    len(segs) small steps of 50 units each (Reference constant).
-    Mirrors Reference LooperSolver.cpp:84-97.
+    """Positions the segment beads on a chained random walk.
+
+    Each chromosome starts at the origin, takes one step of the distance of 1 Mb and then one
+    step of 50 units per segment.
     """
     clusters = state.clusters
     in_2d = state.s.use_2d
@@ -1125,19 +956,15 @@ def random_walk_segment_level(state: CoarseState, current_level: ChrLevel) -> No
                 continue
             LOG.info("%s: %d segment(s)", chr_, len(segs))
             rw_pos: F32Array = np.zeros(3, dtype=np.float32)
-            rw_pos = rw_pos + random_vector_np(size, in_2d=in_2d)  # first point
+            rw_pos = rw_pos + random_vector_np(size, in_2d=in_2d)
             for seg_idx in segs:
                 rw_pos = rw_pos + random_vector_np(50.0, in_2d=in_2d)
                 clusters[seg_idx].pos = rw_pos.copy()
-            # smoothly propagate to IB / anchor levels
             interpolate_children_linear(state, segs)
 
 
 def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> None:
-    """
-    Reconstruct segment-level positions using singleton heatmap MC.
-    Mirrors Reference reconstructClustersHeatmapSingleLevel(1) (segment level).
-    """
+    """Positions the segment beads by singleton heatmap MC."""
     from gnome3d.mc import numba as mc_numba
 
     s = state.s
@@ -1149,19 +976,13 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
         state.singletons, bins, start_ind, total_size, bin_lengths_mb=bin_lengths_mb
     )
 
-    # Fold long-range PET arcs into the segment heatmap.
     add_long_pet_to_segment_heatmap(state, h_raw, bins, start_ind, total_size)
 
-    # Normalize heatmap rows to equal expected sum
     h_norm = normalize_heatmap(h_raw, total_size)
-    # Normalize diagonal total to 1.0
     h_norm = normalize_heatmap_diagonal_total(h_norm, total_size, 1.0)
-    # Scale inter-chr contacts (no-op for single chr)
     if len(state.chrs) > 1:
         h_norm = normalize_heatmap_inter(h_norm, total_size, current_level, s.heatmap_inter_scaling)
 
-    # The conversion is observed over expected at each pair's separation, so it needs where
-    # each bin sits.
     ends = np.cumsum(np.asarray(bin_lengths_mb, dtype=np.float64)) * 1e6
     separations = ends - 0.5 * np.asarray(bin_lengths_mb, dtype=np.float64) * 1e6
     heatmap_dist, avg_dist = create_distance_heatmap(
@@ -1170,7 +991,6 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
     heatmap_dist = np.array(heatmap_dist, dtype=np.float64)
     heatmap_dist_diag = get_diagonal_size(h_norm, total_size)
 
-    # Place initial positions: parent IB position for all segments in chr
     for chr_ in state.chrs:
         segs = current_level.get(chr_, [])
         if not segs:
@@ -1180,8 +1000,6 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
         for seg_idx in segs:
             clusters[seg_idx].pos = origin.copy()
 
-    # Concatenate all segment indices into active_region, keeping a parallel
-    # chromosome list so the epigenomic tracks can be binned per chromosome.
     active_region: list[int] = []
     chr_of: list[str] = []
     for chr_ in state.chrs:
@@ -1222,7 +1040,6 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
     for i, idx in enumerate(active_region):
         clusters[idx].pos = best_pos[i].copy()
 
-    # Interpolate IB and anchor positions from segment positions
     for chr_ in state.chrs:
         segs = current_level.get(chr_, [])
         if segs:
@@ -1230,19 +1047,11 @@ def reconstruct_segment_level(state: CoarseState, current_level: ChrLevel) -> No
 
 
 def position_interaction_blocks(state: CoarseState, segs: list[int], chr_: str) -> None:
-    """
-    Position IB clusters between segment positions.
-    Mirrors Reference positionInteractionBlocks().
-
-    When `use_ib_mc` is set, follows up the initial placement with a small MC
-    pass on the IB centroids (chain bonds + excluded volume) so subsequent
-    IB-level smooth-MC spheres have room to breathe.
-    """
+    """Positions the IB clusters between the segment positions. With `use_ib_mc` an MC pass on the IB centroids follows."""
     clusters = state.clusters
     if len(segs) > 1:
         interpolate_children_linear(state, segs)
     else:
-        # Random walk
         seg = clusters[segs[0]]
         pos: F32Array = np.zeros(3, dtype=np.float32)
         for ib_idx in seg.children:
@@ -1259,16 +1068,16 @@ def block_heatmap_distances(
     chr_: str,
     blocks: list[tuple[int, int, int]],
 ) -> F64Array:
-    """Distance targets between the blocks of one chain, from the run's own contacts.
+    """Returns the distance targets between the blocks of one chain, from the contacts of the run.
 
-    Contacts are binned by block, the bins meeting halfway between neighbouring blocks, then
-    normalised and converted with the law the way the segment heatmap is. A cell with no
-    contact carries 0 and the diagonal band -1, both of which the kernel skips.
+    Contacts are binned by block, with bin edges halfway between neighbouring blocks, then
+    normalised and converted with the law as the segment heatmap is. A cell with no contact holds
+    0 and the diagonal band -1 and the kernel skips both.
 
     Parameters
     ----------
     s
-        The run's settings, carrying the law.
+        The settings of the run.
     singletons
         Contacts on this chromosome.
     chr_
@@ -1305,27 +1114,12 @@ def block_heatmap_distances(
 
 
 def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
-    """
-    Refine IB centroid positions with a small chain-bond + EV + confinement
-    MC pass.  Calls mc_ib directly - no settings clone, no field renaming.
-    EV and confinement read their own IB-level settings (`*_ib`).  Opt-in via
-    `use_ib_mc`.
+    """Refines the IB centroids with an MC pass of chain bonds, excluded volume and confinement,
+    under `use_ib_mc`.
 
-    `ib_refine_scope` chooses what forms one chain.
-
-    "segment", the default, refines each segment's blocks separately and skips a
-    segment holding one block or fewer.  Placement then depends on how blocks are
-    grouped, which is a property of the tree rather than of the chromatin, and
-    denser segment boundaries leave more blocks wherever interpolation put them.
-
-    "chromosome" refines every block on the chromosome as one chain, which removes
-    that dependency.  It is not the default because it also puts every block pair
-    inside the excluded-volume term, and the structures inflate: measured over four
-    GM12878 regions the mean simulated contact density fell from 0.087 to 0.035 and
-    within-block over between-block enrichment worsened about threefold.  The
-    compartment saddle improves, but sparsity alone drags that statistic toward 1.0,
-    so the gain is not separable from the inflation.  Using this scope means
-    re-tuning the IB-level excluded-volume and confinement settings.
+    `ib_refine_scope` sets the chain. "segment" refines the blocks of each segment alone and
+    skips a segment with one block or fewer. "chromosome" refines every block of the chromosome as
+    one chain, which puts every block pair inside the excluded volume term.
     """
     from gnome3d.mc import numba as mc_numba
 
@@ -1408,8 +1202,6 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
             clusters[ib].pos = pos[i].copy()
 
 
-# Re-export so callers can build the chr/segment distance heatmaps without
-# reaching past this module into heatmap.
 __all__ = [
     "CoarseState",
     "COARSE_SEED",
@@ -1422,7 +1214,6 @@ __all__ = [
     "subanchor_counts_per_arc",
     "build_contact_heatmaps",
     "create_distance_heatmap",
-    # RNG-ordered positioning ops (the coarse MC spine)
     "reconstruct_heatmap",
     "place_single_segment",
     "reconstruct_chromosome_level",

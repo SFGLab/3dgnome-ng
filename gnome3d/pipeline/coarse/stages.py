@@ -1,25 +1,11 @@
-"""
-Coarse positioning stages: the cluster-tree spine (hierarchy / chr / segment /
-IB centroid) expressed as pipeline nodes, plus the fan-out into the per-IB chains.
+"""The coarse stages as pipeline nodes and the fan out into the IB chains.
 
-These wrap the RNG-ordered ops in `coarse` (the same functions the
-legacy `skeleton` path drives) as `COARSE`-kind stages over a `CoarsePhase`
-carrier.  Unlike the per-IB kernels, a coarse stage's *work is its `apply`*: it
-mutates the one shared cluster graph in place (positions a level), and the
-registered COARSE runner is a no-op passthrough.  That's deliberate - the coarse
-spine is a coupled serial sequence over one graph (never batched), so there's no
-kernel to fan a `to_problem` into; the kernel split / batching machinery is for
-the isolated IB fan-out downstream.
+A coarse stage does its work in `apply`, which positions one level of the shared cluster graph
+in place. Its runner returns the problem unchanged. `build_coarse_dag` builds the chain of
+stages and gives the last node an `expand` hook that spawns the chain of each IB.
 
-`build_coarse_dag` assembles the spine - picking the branch (random-walk /
-single-segment / chr+segment) exactly as `coarse.reconstruct_heatmap`
-does - and gives the terminal IB-positioning node an `expand` hook that reads the
-positioned graph and spawns each IB's `arcs -> densify -> [heat] -> smooth` chain.
-
-RNG note - exactness: the spine is a *linear chain* (one ready node at a time),
-so the executor runs the ops in the same order the old engine did; the ops don't
-re-seed (they consume the one global stream seeded once upstream), so the coarse
-layout - and thus every IB seed and the final fold - is byte-preserved.
+The stages are one linear chain and draw from one global RNG stream, seeded once at the root.
+Their order must not change.
 """
 
 from __future__ import annotations
@@ -40,16 +26,12 @@ if TYPE_CHECKING:
     from gnome3d.skeleton import IBSeed
 
 
-# COARSE runner: identity.  A coarse stage does its work in `apply` (mutating the
-# shared cluster graph); there is no kernel to dispatch, so the runner passes the
-# (empty) problem through unchanged.
 def _coarse_identity(problem: Problem) -> Result:
     return problem
 
 
 register(StageKind.COARSE, serial=_coarse_identity)
 
-# --- node id helpers --------------------------------------------------------
 
 _COARSE = "coarse"
 
@@ -58,12 +40,10 @@ def _coarse_id(level: str) -> NodeId:
     return f"{_COARSE} :: {level}"
 
 
-# --- coarse stages (work-in-apply graph transforms) -------------------------
-
-
 class _CoarseStage:
-    """Base for the COARSE-kind graph stages: a no-op problem/runner, all work in
-    `apply` (which mutates the shared cluster graph and returns the carrier)."""
+    """Base of the coarse stages. The work is in `apply`, which mutates the shared cluster graph
+    and returns the payload.
+    """
 
     kind = StageKind.COARSE
 
@@ -84,13 +64,10 @@ class _CoarseStage:
 
 
 class RootStage(_CoarseStage):
-    """Source: seed the coarse spine's RNG stream and wrap the pre-built
-    `CoarseState` into the spine's first carrier.
+    """Seeds the global RNG and wraps the built `CoarseState` into the first payload.
 
-    Seeding here (rather than in the caller before the run) makes the seed state
-    the pipeline owns.  It is safe to seed at this point - `build_state` and
-    `build_coarse_dag` consume no RNG - so the first real consumer (chr/segment)
-    sees the exact same stream state as the legacy path."""
+    `build_state` and `build_coarse_dag` draw no random number. Seeding here is early enough.
+    """
 
     def __init__(self, state: CoarseState, seed_offset: int = 0) -> None:
         self._state = state
@@ -102,7 +79,7 @@ class RootStage(_CoarseStage):
 
 
 class ChrLevelStage(_CoarseStage):
-    """Position chromosome roots via the inter-chr heatmap MC (multi-chr only)."""
+    """Positions the chromosome roots by the inter chromosomal heatmap MC."""
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
         phase = self._phase(inputs)
@@ -111,7 +88,7 @@ class ChrLevelStage(_CoarseStage):
 
 
 class SegmentStage(_CoarseStage):
-    """Position segment-level beads via the segment heatmap MC."""
+    """Positions the segment beads by the segment heatmap MC."""
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
         phase = self._phase(inputs)
@@ -121,7 +98,7 @@ class SegmentStage(_CoarseStage):
 
 
 class WalkStage(_CoarseStage):
-    """Position segment-level beads via a chained random walk (random_walk mode)."""
+    """Positions the segment beads on a chained random walk, under `random_walk`."""
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
         phase = self._phase(inputs)
@@ -131,7 +108,7 @@ class WalkStage(_CoarseStage):
 
 
 class OriginStage(_CoarseStage):
-    """Single-segment single-chr case: place at origin + interpolate children."""
+    """Places one segment of one chromosome at the origin and interpolates its children."""
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
         phase = self._phase(inputs)
@@ -141,8 +118,7 @@ class OriginStage(_CoarseStage):
 
 
 class IBPositionStage(_CoarseStage):
-    """Position every chromosome's IB centroids (interpolate / walk + IB-MC).  Its
-    node carries the `expand` hook that fans out the per-IB reconstruction chains."""
+    """Positions the IB centroids of every chromosome. Its node carries the `expand` hook."""
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
         phase = self._phase(inputs)
@@ -159,19 +135,15 @@ def _seg_level(state: CoarseState) -> dict[str, list[int]]:
     return set_level(Level.SEGMENT - Level.CHROMOSOME, state.chr_root, state.clusters, state.chrs)
 
 
-# --- the IB fan-out the expand hook spawns ----------------------------------
-
-
 def _expand_into_ib_chains(seed_offset: int, sink: list[IBSeed]) -> object:
-    """Build the IB-positioning node's `expand` hook.  On completion it reads the
-    positioned graph, gathers every IB's `Seeded` (via the shared
-    `skeleton.gather_ib_seeds`), records them in `sink` (so the caller can map
-    smooth outputs back to chromosomes), and returns the per-IB chain nodes
-    (`ib.ib_chain_nodes` - the IB domain owns the chain shape)."""
+    """Builds the `expand` hook of the IB positioning node.
+
+    The hook gathers the `Seeded` of every IB from the positioned graph, appends them to `sink`
+    and returns the chain nodes of each IB.
+    """
 
     def expand(output: State) -> tuple[list[Node], dict[NodeId, Seeded]]:
-        # Imported lazily to avoid an import cycle (skeleton -> coarse,
-        # this module -> skeleton at call time only).
+        # Imported here. Skeleton imports coarse.
         from gnome3d import skeleton
 
         assert isinstance(output, CoarsePhase)
@@ -182,26 +154,19 @@ def _expand_into_ib_chains(seed_offset: int, sink: list[IBSeed]) -> object:
     return expand
 
 
-# --- the unified coarse DAG -------------------------------------------------
-
-
 def build_coarse_dag(
     state: CoarseState, seed_offset: int = 0, *, fan_out: bool = True
 ) -> tuple[Dag, list[IBSeed]]:
-    """Assemble the coarse spine for `state` and return `(dag, ib_sink)`.
+    """Builds the coarse DAG of `state` and returns `(dag, ib_sink)`.
 
-    The spine branches as follows:
-      * random walk      -> root -> walk    -> ib
-      * single segment   -> root -> origin  -> ib
-      * multi-chromosome -> root -> chr     -> segment -> ib
-      * single-chr/multi -> root -> segment -> ib
+      random walk             root -> walk    -> ib
+      one segment             root -> origin  -> ib
+      several chromosomes     root -> chr     -> segment -> ib
+      one chromosome          root -> segment -> ib
 
-    With `fan_out` (default) the terminal IB node carries an `expand` hook that
-    spawns the per-IB chains at run time and fills ``ib_sink`` (so the caller can
-    group the terminal smooth beads by chromosome).  With ``fan_out=False`` the
-    spine runs the coarse positioning *only* (no IB chains); the ensemble driver
-    uses this to run each members' spines, gather their seeds, then batch all the IB
-    chains together (`reconstruct.reconstruct_ensemble`)."""
+    With `fan_out` the last node spawns the IB chains at run time and fills `ib_sink`. Without it
+    the DAG places the cluster tree alone, which the ensemble driver uses.
+    """
     lvl = _seg_level(state)
     total_segs = sum(len(v) for v in lvl.values())
     single_seg = len(state.chrs) == 1 and total_segs <= 1

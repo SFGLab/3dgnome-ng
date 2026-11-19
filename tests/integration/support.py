@@ -2,7 +2,7 @@
 
 The synthetic inputs follow the model validation of the 3D-GNOME paper of 2016, supplement
 sections III and IV. Each bead of the known structure is one bin that holds a small loop of two
-anchors, and the singleton count of a pair of bins is the inverse of a power law of their
+anchors and the singleton count of a pair of bins is the inverse of a power law of their
 distance.
 """
 

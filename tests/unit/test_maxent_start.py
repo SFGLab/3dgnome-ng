@@ -2,10 +2,9 @@
 
     python tests/unit/test_maxent_start.py
 
-A bridge drawn with its far end from that end's own marginal is a draw from the whole chain, so
-its mean pair distances must be the targets. The law's targets are a valid variogram, so the
-conditional covariance needs no clipping. Window contacts move a pair's target the way the
-heatmap rule does, and the start is a function of its seed.
+The mean pair distances of drawn bridges must be the targets. The targets of the law are a
+valid variogram and the conditional covariance needs no clipping. Window contacts move the
+target of a pair as the heatmap rule does. The start is a function of its seed.
 """
 
 from __future__ import annotations

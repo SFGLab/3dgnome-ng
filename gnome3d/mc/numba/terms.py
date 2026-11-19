@@ -1,15 +1,8 @@
-"""Numba term math + the unified MC kernel.
+"""The energy terms and the inner MC kernel of the numba backend.
 
-Every energy term (chain bonds, excluded volume, confinement, orientation,
-subanchor heat, arc springs, heatmap) has a `_local_*_nb` (per-bead delta) and
-`_init_*_nb` (full score) njit function here.  `_batch_mc_nb` is the single
-inner kernel all four public entries run: it switches on `struct_type`
-(STRUCT_ARCS / STRUCT_CHAIN / STRUCT_HEATMAP) and toggles the optional terms via
-`use_*` flags.
-
-These are the shared building blocks.  The per-kernel public entries live in
-`arcs.py`, `smooth.py`, `heatmap.py`, `ib.py`; they drive this kernel through
-`common._run_outer_loop`.
+Each term has a local function, the score of one bead and an init function, the full score.
+`batch_mc_nb` is the one inner kernel of arcs, smooth and ib. `struct_type` selects the
+structure term and the `use_*` flags the optional terms.
 """
 
 from __future__ import annotations
@@ -23,8 +16,7 @@ from numba import njit as _njit  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d.types import BoolArray, F32Array, F64Array, I8Array, I32Array, I64Array
 
-# Typed wrapper around numba.njit so pyright sees decorated functions
-# with their original signatures.  At runtime this is just numba.njit.
+# A typed wrapper of numba.njit. Pyright sees the signatures of decorated functions.
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -35,7 +27,6 @@ def njit(**kwargs: Any) -> Callable[[F], F]:
     return decorator
 
 
-# Structure-term selector.  Kept as plain ints (numba-friendly).
 STRUCT_ARCS = 0
 STRUCT_CHAIN = 1
 STRUCT_HEATMAP = 2
@@ -43,14 +34,10 @@ STRUCT_HEATMAP = 2
 
 @njit(cache=True, nogil=True)
 def seed_numba(seed: int) -> None:
-    """Seed numba's per-thread RNG so the MC kernels are reproducible from a
-    given seed.  numba keeps its own RNG state, separate from numpy's global
-    and Python's `random`; this is the only way to make `np.random.*` calls
-    inside @njit deterministic.  Used by the pipeline's per-node seeding."""
+    """Seeds the RNG of numba for the calling thread. numba keeps its own RNG state, apart from
+    numpy and `random`.
+    """
     np.random.seed(seed)
-
-
-# Smooth MC helpers
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -139,13 +126,11 @@ def init_smooth_nb(
     return sc
 
 
-# Confinement helpers (soft spherical envelope around a center)
+# Confinement, a soft sphere around a centre.
 #
-#   E(p) = weight * ((|r_p - c| - R) / R)^2   if |r_p - c| > R
-#        = 0                                  otherwise
+# E(p) = weight * ((|r_p - c| - R) / R)^2 if |r_p - c| > R, else 0
 #
-# Per-bead (not per-pair), single-counted globally. Delta is (curr - prev),
-# no factor of 2.
+# Per bead and single counted. The delta is (curr - prev).
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -173,18 +158,16 @@ def init_confine_nb(
     return err
 
 
-# Excluded-volume helpers (harmonic soft repulsion, cutoff at r0)
+# Excluded volume, a soft harmonic repulsion under r0.
 #
-#   E_pair(d) = weight * ((r0 - d) / r0)^2   if d < r0
-#             = 0                            otherwise
+# E_pair(d) = weight * ((r0 - d) / r0)^2 if d < r0, else 0
 #
-# Normalized by r0 so `weight` is dimensionally comparable to spring constants.
-# Global score double-counts pairs (matches the heat-energy convention):
-# sum_{i != j, |i-j| > skip} E_pair(d_ij). Delta is 2 * (local_curr - local_prev).
+# The score counts each pair twice, the sum over i != j with |i - j| > skip. The delta is 2 * (curr
+# - prev).
 
 
 NO_MAT: F64Array = np.zeros((1, 1), dtype=np.float64)
-# The loop weight matrix's stand in when every pair is at one.
+# Stands in for the loop weight matrix when every pair is at one.
 NO_W: F32Array = np.zeros((1, 1), dtype=np.float32)
 NO_F64_3: F64Array = np.zeros(3, dtype=np.float64)
 NO_I64_3: I64Array = np.ones(3, dtype=np.int64)
@@ -221,7 +204,7 @@ def _local_excl_nb(pos: F64Array, p: int, r0: float, weight: float, skip: int) -
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _wall_local_nb(pos: F64Array, p: int, r0: float, skip: int) -> tuple[int, float]:
-    """How many non neighbour beads sit under `r0` from `p`, and by how much in total."""
+    """Returns the number of non neighbour beads under `r0` from `p` and their total depth."""
     n = pos.shape[0]
     cnt = 0
     depth = 0.0
@@ -253,8 +236,9 @@ def _wall_local_cells_nb(
     head: I32Array,
     nxt: I32Array,
 ) -> tuple[int, float]:
-    """`_wall_local_nb` over the grid's twenty seven cell neighbourhood. The count is the same
-    and the depth agrees to rounding, its sum running in cell order."""
+    """`_wall_local_nb` over the twenty seven cells around `p`. The count is the same and the
+    depth agrees to rounding.
+    """
     px = pos[p, 0]
     py = pos[p, 1]
     pz = pos[p, 2]
@@ -262,8 +246,8 @@ def _wall_local_cells_nb(
     nx = int(dim[0])
     ny = int(dim[1])
     nz = int(dim[2])
-    # Clamped as `cell_of_nb` clamps, so a bead beyond the box searches the edge cells, where
-    # every other bead beyond it is filed.
+    # Clamped as `cell_of_nb` clamps. A bead beyond the box searches the edge cells, which hold
+    # every other bead beyond it.
     ix = min(max(int((px - lo[0]) / c), 0), nx - 1)
     iy = min(max(int((py - lo[1]) / c), 0), ny - 1)
     iz = min(max(int((pz - lo[2]) / c), 0), nz - 1)
@@ -311,30 +295,18 @@ def init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
     return err
 
 
-# Affinity helper (A/B compartment segregation)
+# Affinity, the A/B compartment term.
 #
-#   E_pair(d) = weight * g * (1 - exp(-d^2 / (2 r0^2)))
+# E_pair(d) = weight * g * (1 - exp(-d^2 / (2 r0^2)))
 #
-#     g = Ea when both beads are A, Eb when both are B, else 0
-#
-# An attraction: the energy is 0 at contact and rises to `weight * g` far apart.
-# MultiMM writes the same well as a negative energy, which 3dgnome cannot use -
-# its Metropolis rule divides by the running score and is guarded on
-# `score > 0`, so a negative-definite term would silently disable the
-# temperature branch.  Shifting by the well depth changes only an additive
-# constant, not the minimum or the gradient.
-#
-# Every pair participates, matching MultiMM's CustomNonbondedForce, which sets up
-# no bonded exclusions.  A bonded pair sits near the bottom of the well and so
-# contributes almost no gradient.
-#
-# The term double-counts pairs like excluded volume, so the delta is
-# 2 * (local_curr - local_prev).
+# g is Ea when both beads are A, Eb when both are B and 0 otherwise. The energy is 0 at contact and
+# `weight * g` far apart. It must not be negative. The Metropolis rule divides by the running
+# score. Every pair takes part. The score counts each pair twice and the delta is 2 * (curr - prev).
 
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _comp_strength_nb(ci: int, cj: int, ea: float, eb: float) -> float:
-    """Compartment pair strength.  Positive codes are A, negative are B."""
+    """Returns the pair strength. Positive codes are A, negative codes are B."""
     if ci > 0 and cj > 0:
         return ea
     if ci < 0 and cj < 0:
@@ -353,12 +325,10 @@ def local_affinity_nb(
     comp_ea: float,
     comp_eb: float,
 ) -> float:
-    """Compartment energy for bead `p` against every other bead."""
+    """Returns the compartment energy of bead `p` against every other bead."""
     n = pos.shape[0]
     e_comp = 0.0
-    # Per-partner normalisation.  Without it the term sums over N partners while
-    # the chain springs act per bond, so its relative strength would grow with
-    # the region and a weight tuned on a small region would collapse a large one.
+    # Divided by N - 1 partners. The strength of the term does not grow with the region.
     inv_n = 1.0 / (n - 1) if n > 1 else 1.0
     comp_den = 2.0 * comp_r0 * comp_r0
     ci = int(comp_cls[p]) if use_comp else 0
@@ -388,7 +358,7 @@ def init_affinity_nb(
     comp_ea: float,
     comp_eb: float,
 ) -> float:
-    """Full double-counted compartment energy over every ordered pair."""
+    """Returns the compartment energy over every ordered pair."""
     n = pos.shape[0]
     e_comp = 0.0
     for p in range(n):
@@ -405,14 +375,11 @@ def init_affinity_nb(
     return e_comp
 
 
-# Orientation MC helpers (smooth-only)
-
-
 @njit(cache=True, fastmath=True, nogil=True)
 def _calc_orientation_nb(
     pos: F64Array, cind: int, n: int, is_L: bool
 ) -> tuple[float, float, float]:
-    """Returns (ox, oy, oz) normalized orientation vector for anchor at cind."""
+    """Returns the unit orientation vector of the anchor at `cind`."""
     if cind == 0:
         ox = pos[cind + 1, 0] - pos[cind, 0]
         oy = pos[cind + 1, 1] - pos[cind, 1]
@@ -446,7 +413,7 @@ def score_orientation_full_nb(
     motif_weight: float,
     symmetric: bool,
 ) -> float:
-    """Global orientation score with arc weights; used for initialisation only."""
+    """Returns the orientation score with arc weights, for initialisation."""
     n_anchors = anchor_orn.shape[0]
     err = 0.0
     for i in range(n_anchors):
@@ -479,11 +446,10 @@ def _local_score_orientation_nb(
     motif_weight: float,
     symmetric: bool,
 ) -> float:
-    """Local orientation score for anchor k, weighted by per-arc weights.
-    Used for the incremental update: score_orn += 2*(local_curr - local_prev).
-    The weights make this delta exact w.r.t. _score_orientation_full_nb - no drift.
-    Diverges from Reference calcScoreOrientation(orn, anchor_index), which is unweighted
-    and therefore drifts.
+    """Returns the orientation score of anchor k with arc weights.
+
+    The incremental update is `score_orn += 2 * (curr - prev)`. With the weights it is exact
+    against `score_orientation_full_nb`.
     """
     err = 0.0
     for ki in range(nbr_offsets[k], nbr_offsets[k + 1]):
@@ -505,14 +471,9 @@ def _local_score_orientation_nb(
     return err * motif_weight
 
 
-# Heat MC helpers (smooth-only, subanchor heatmap)
-
-
 @njit(cache=True, fastmath=True, nogil=True)
 def local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: float) -> float:
-    """Local heat score for bead p vs all others.
-    Mirrors Reference calcScoreSubanchorHeatmap(int moved) - sums all i != p.
-    """
+    """Returns the heat score of bead p against every other bead."""
     n = pos.shape[0]
     err = 0.0
     for i in range(n):
@@ -532,7 +493,7 @@ def local_heat_nb(pos: F64Array, heat_dist: F64Array, p: int, heat_weight: float
 
 @njit(cache=True, fastmath=True, nogil=True)
 def init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> float:
-    """Global heat score (double-counts pairs, matching Reference calcScoreSubanchorHeatmap())."""
+    """Returns the heat score over every ordered pair."""
     n = pos.shape[0]
     err = 0.0
     for i in range(n):
@@ -551,9 +512,6 @@ def init_heat_nb(pos: F64Array, heat_dist: F64Array, heat_weight: float) -> floa
             row_err += rel * rel
         err += row_err
     return err * heat_weight
-
-
-# Arcs MC helpers
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -579,9 +537,9 @@ def _local_arcs_nb(
         dz = pos[p, 2] - pos[i, 2]
         d = math.sqrt(dx * dx + dy * dy + dz * dz)
         if e <= -0.75:
-            # An arcless pair inside the short range: a weak spring at the background, minus
-            # e, symmetric in log distance so crushing it costs (bg / d)^2. A background is
-            # never under one bead, so the marker -0.5 below cannot be mistaken for one.
+            # An arcless pair inside the short range holds minus its background. It is a weak spring
+            # at the background, symmetric in log distance. A background is at least one bead, so
+            # -0.5 below is not one.
             bg = -e
             rel = (d - bg) / (d if d < bg and d > 1e-10 else bg)
             sc += bg_weight * rel * rel
@@ -596,9 +554,7 @@ def _local_arcs_nb(
     return sc
 
 
-# fastmath matches `_local_arcs_nb`, whose score this replaces on the biased path. The two feed
-# the same incremental total, so a reassociation difference between them would drift it over tens
-# of millions of steps. The gradient only steers a proposal, so its own precision is not critical.
+# fastmath as in `_local_arcs_nb`. The two feed one incremental total and must round alike.
 @njit(cache=True, fastmath=True, nogil=True)
 def init_arcs_nb(
     pos: F64Array,
@@ -638,9 +594,6 @@ def init_arcs_nb(
     return sc
 
 
-# Heatmap MC helpers
-
-
 @njit(cache=True, fastmath=True, nogil=True)
 def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p: int) -> float:
     n = pos.shape[0]
@@ -660,7 +613,7 @@ def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p:
 
 @njit(cache=True, fastmath=True, nogil=True)
 def init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float:
-    """O(N^2) init - parallelised over rows; sum reduction is auto-handled."""
+    """Returns the full heatmap score, in parallel over rows."""
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
@@ -679,36 +632,25 @@ def init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float
     return sc
 
 
-# Unified MC kernel
+# The inner kernel.
 #
-# One numba kernel handles all four stages.  Structure-term variant is
-# selected by `struct_type` (STRUCT_ARCS / STRUCT_CHAIN / STRUCT_HEATMAP).
-# Optional energy terms (heat / orn / excl / conf) are toggled by their use_*
-# flags; their data arrays must still be valid-typed (any shape) since
-# disabled-term arrays are not indexed.
+# The arrays of a term that is off must have a valid type and are not read.
 #
-# Delta conventions:
-#   * structure  : score += struct_delta_factor * (local_curr - local_prev)
-#                  (1.0 for arcs/chain, 2.0 for heatmap)
-#   * heat       : score += 2 * (curr - prev)
-#   * orientation: score += 2 * (curr - prev)
-#   * excluded   : score += 2 * (curr - prev)
-#   * confinement: score += 1 * (curr - prev)
-#   * compartment: score += 2 * (curr - prev)
+# Structure adds `struct_delta_factor * (curr - prev)`, 1 for arcs and chain and 2 for heatmap.
+# Heat, orientation, excluded volume and compartment add 2 * (curr - prev). Confinement adds (curr -
+# prev).
 #
-# Acceptance: ok = (score_new < score) if strict_better else (score_new <= score)
-# Smooth uses strict (preserves prior behaviour); arcs/heatmap use non-strict.
+# A move is kept when `score_new < score` under `strict_better` and when `score_new <= score`
+# otherwise. Smooth is strict.
 
 
-# --- cell grid primitives for the excluded volume term ------------------------------------
-# The grid itself is built by gnome3d/mc/numba/cells.py; these three run inside the step loop,
-# so they live here to keep that module's import one way.
+# The grid is built in cells.py. These functions run in the step loop and are here. Cells.py
+# imports this module.
 
 
 @njit(cache=True, nogil=True)
 def cell_of_nb(x: float, y: float, z: float, lo: F64Array, dim: I64Array, c: float) -> int:
-    """The cell a point falls in, clamped so a bead outside the original extent still lands
-    somewhere valid."""
+    """Returns the cell of a point, clamped to the grid."""
     ix = int((x - lo[0]) / c)
     iy = int((y - lo[1]) / c)
     iz = int((z - lo[2]) / c)
@@ -729,8 +671,7 @@ def cell_of_nb(x: float, y: float, z: float, lo: F64Array, dim: I64Array, c: flo
 
 @njit(cache=True, nogil=True)
 def relink_nb(head: I32Array, nxt: I32Array, where: I32Array, i: int, k_new: int) -> None:
-    """Move bead `i` to cell `k_new`. Unlinking walks the old chain, which holds a handful of
-    beads at this cell size."""
+    """Moves bead `i` to cell `k_new`."""
     k_old = int(where[i])
     if k_old == k_new:
         return
@@ -761,10 +702,12 @@ def local_excl_cells_nb(
     nxt: I32Array,
     buf: I32Array,
 ) -> float:
-    """The excluded volume local score for bead `p` over the grid's twenty seven cell
-    neighbourhood, summed in ascending index order so the result matches `_local_excl_nb` bit
-    for bit. Returns a negative number when more beads lie inside the radius than the buffer
-    holds, which tells the caller to fall back to the full scan for this bead."""
+    """Returns the excluded volume score of bead `p` over the twenty seven cells around it,
+    summed in ascending index order, bit identical to `_local_excl_nb`.
+
+    Returns a negative number when more beads are inside the radius than the buffer holds. The
+    caller then uses the full scan for this bead.
+    """
     px = pos[p, 0]
     py = pos[p, 1]
     pz = pos[p, 2]
@@ -772,8 +715,7 @@ def local_excl_cells_nb(
     nx = int(dim[0])
     ny = int(dim[1])
     nz = int(dim[2])
-    # Clamped as `cell_of_nb` clamps, so a bead beyond the box searches the edge cells, where
-    # every other bead beyond it is filed.
+    # Clamped as `cell_of_nb` clamps.
     ix = min(max(int((px - lo[0]) / c), 0), nx - 1)
     iy = min(max(int((py - lo[1]) / c), 0), ny - 1)
     iz = min(max(int((pz - lo[2]) / c), 0), nz - 1)
@@ -797,7 +739,7 @@ def local_excl_cells_nb(
                             buf[m] = i
                             m += 1
                     i = int(nxt[i])
-    # Insertion sort: only the beads inside the radius reach here, a few dozen of them.
+    # Insertion sort over the few dozen beads inside the radius.
     for a in range(1, m):
         v = buf[a]
         b = a - 1
@@ -829,12 +771,11 @@ def init_excl_cells_nb(
     nxt: I32Array,
     buf: I32Array,
 ) -> float:
-    """The whole excluded volume score through the grid. `init_excl_nb` is a full pair scan,
-    quadratic in the structure and a second or two on a chromosome, and it runs once per call.
-    Summing each bead's local score over the grid gives the same number, since a row here is
-    that function's inner loop, and the rows are added in the same order.
+    """Returns the whole excluded volume score through the grid, the sum of the local scores in
+    bead order, equal to `init_excl_nb`.
 
-    Returns a negative number if any bead overflowed the buffer, so the caller can fall back."""
+    Returns a negative number when a bead overflowed the buffer.
+    """
     err = 0.0
     for i in range(pos.shape[0]):
         row = local_excl_cells_nb(pos, i, r0, weight, skip, lo, dim, c, head, nxt, buf)
@@ -910,8 +851,6 @@ def batch_mc_nb(
     score_comp: float,
     rep_inv_cutoff: float = 0.0,
     bg_weight: float = 0.0,
-    # Cell grid for the excluded volume term. Off by default so every caller that does not
-    # build one passes nothing new. See gnome3d/mc/numba/cells.py.
     use_cells: bool = False,
     cell_lo: F64Array = NO_F64_3,
     cell_dim: I64Array = NO_I64_3,
@@ -940,7 +879,6 @@ def batch_mc_nb(
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
 
-        # --- prev local scores ---
         if struct_type == STRUCT_ARCS:
             loc_struct_prev = _local_arcs_nb(
                 pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight, use_arc_w, arc_w
@@ -1024,13 +962,11 @@ def batch_mc_nb(
                     motifs_symmetric,
                 )
 
-        # --- trial move ---
         pos[p, 0] += dx
         pos[p, 1] += dy
         pos[p, 2] += dz
-        # The hard rules. A capped bead may not leave its sphere, and under the wall a move may
-        # not add a pair under the radius nor deepen the ones there are, so the count only ever
-        # falls. Neither draws a random number, so with both off the stream is untouched.
+        # A capped bead may not leave its sphere. Under the wall a move may not add a pair under the
+        # radius or deepen one. Neither rule draws a random number.
         hard_reject = False
         if use_cap and cap_r[p] > 0.0:
             hx = pos[p, 0] - cap_home[p, 0]
@@ -1050,7 +986,6 @@ def batch_mc_nb(
             ):
                 hard_reject = True
 
-        # --- new local scores ---
         if struct_type == STRUCT_ARCS:
             loc_struct_curr = _local_arcs_nb(
                 pos, exp_mat, p, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight, use_arc_w, arc_w

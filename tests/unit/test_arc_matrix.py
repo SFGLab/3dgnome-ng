@@ -1,13 +1,10 @@
-"""Unit checks for the arcs stage's target matrix under the polymer law.
+"""Unit checks for the target matrix of the arcs stage.
 
     python tests/unit/test_arc_matrix.py
 
-The matrix has four kinds of entry. A pair an arc joins carries the law's contact distance,
-when chain bonds are on. An arcless pair closer than `background_range_bp` carries minus the
-background for its separation when `background_weight` is on, which the kernels score as a
-weak spring symmetric in log distance. Every other arcless pair carries -0.5, which the kernels
-score as the truncated repulsion, and the diagonal is 0. A background is never under one bead,
-so the sign and the magnitude separate the two arcless kinds without a second matrix.
+A pair that an arc joins holds the contact distance of the law. An arcless pair closer than
+`background_range_bp` holds minus its background when `background_weight` is on. Any other
+arcless pair holds -0.5 and the diagonal is 0.
 """
 
 from __future__ import annotations
@@ -87,7 +84,7 @@ def test_two_factors() -> None:
         )
     check("which is under the background", min(weak, strong) < s.polymer.background(50_000))
 
-    # The summary arc data.py adds after a pair's per factor arcs scores 0 with factor -1.
+    # The summary arc that data.py adds after the arcs of a pair has score 0 and factor -1.
     arc = lambda a, b, score, factor: SimpleNamespace(start=a, end=b, score=score, factor=factor)  # noqa: E731
     clusters = [
         SimpleNamespace(arcs=[0, 1, 2], genomic_pos=0),
@@ -131,9 +128,9 @@ def test_loop_contact() -> None:
 
 
 def test_short_range_background() -> None:
-    """With the weight on, arcless pairs inside the range carry minus the background and those
-    beyond it keep the repulsion marker. The kernels score the two kinds differently: a weak
-    spring symmetric in log distance, and the truncated repulsion."""
+    """With the weight on, arcless pairs inside the range hold minus the background and those
+    beyond keep the repulsion marker.
+    """
     print("\n[short range] arcless pairs inside the range sit on the background")
     s = settings()
     s.background_weight = 0.3
@@ -154,7 +151,7 @@ def test_short_range_background() -> None:
 
     pos = np.array([[0.0, 0.0, 0.0], [6.0, 0.0, 0.0], [0.0, 2.0, 0.0]], dtype=np.float64)
     exp = np.zeros((3, 3))
-    exp[0, 1] = exp[1, 0] = -3.0  # background 3, realised 6: spring
+    exp[0, 1] = exp[1, 0] = -3.0  # background 3, realised 6, a spring
     exp[0, 2] = exp[2, 0] = -0.5  # repulsion marker, realised 2
     exp[1, 2] = exp[2, 1] = 2.0  # arc target 2, realised sqrt(40)
     w, cut = 0.3, 0.1
@@ -185,10 +182,10 @@ def test_short_range_background() -> None:
 
 
 def test_contact_background() -> None:
-    """Beyond the short range, an arcless pair whose contact cell says it sits closer than the
-    background carries minus the law's contact distance, and the kernels hold it there with the
-    background spring. A pair at or below its expected contact keeps the repulsion, so the set
-    stays sparse. Inside the range and on arc pairs nothing changes."""
+    """Beyond the short range, an arcless pair whose contact cell puts it under the background
+    holds minus the contact distance of the law. A pair at or under its expected contact keeps
+    the repulsion. Pairs inside the range and arc pairs are unchanged.
+    """
     print("\n[contact background] enriched arcless pairs beyond the range get the law's distance")
     s = settings()
     s.background_weight = 0.3
@@ -198,12 +195,12 @@ def test_contact_background() -> None:
     n = len(mids)
     m0 = arc_expected_matrix(s, mids, [(0, 3, 4)])
     heat = np.zeros((n, n))
-    # three pairs at 500 kb: one enriched, one at the mean, one below
+    # Three pairs at 500 kb, one enriched, one at the mean and one below.
     heat[1, 2] = heat[2, 1] = 8.0
     heat[2, 3] = heat[3, 2] = 1.0
     heat[3, 4] = heat[4, 3] = 0.5
-    heat[0, 1] = heat[1, 0] = 50.0  # inside the range, must be untouched
-    heat[0, 3] = heat[3, 0] = 50.0  # the arc pair, must be untouched
+    heat[0, 1] = heat[1, 0] = 50.0  # inside the range, unchanged
+    heat[0, 3] = heat[3, 0] = 50.0  # the arc pair, unchanged
     m = add_contact_background(m0, mids, heat, s)
     bg = s.polymer.background(450_000)
     check(
@@ -229,9 +226,9 @@ def test_contact_background() -> None:
 
 
 def test_jax_matches_numba() -> None:
-    """The JAX arcs kernel scores the same energy as numba on a matrix that mixes arc springs
-    and arcless pairs under the truncated repulsion. The check that keeps the batch kernel from
-    drifting, which it once did."""
+    """The JAX arcs kernel scores the same energy as numba on a matrix with arc springs and
+    arcless pairs.
+    """
     print("\n[jax] the batched kernel's initial energy is numba's")
     try:
         import os
@@ -277,8 +274,7 @@ def test_jax_matches_numba() -> None:
 
 
 def test_jax_batched_driver_runs() -> None:
-    """The batched JAX arcs driver runs end to end with the short range background on, which is
-    the only thing that exercises the step kernel's vmap axes."""
+    """The batched JAX arcs driver runs with the short range background on."""
     print("\n[jax] the batched driver runs with the background on")
     try:
         import os

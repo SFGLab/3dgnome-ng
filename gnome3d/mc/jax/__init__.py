@@ -1,18 +1,11 @@
-"""JAX backend for the Monte-Carlo loops, split one file per kernel.
+"""The JAX kernels.
 
-Each kernel family is self-contained - it lazily imports JAX (via
-`jax_is_available`), builds and memoises its compiled kernel, and exposes a
-single-problem entry plus (for arcs/smooth) a region-batched entry that anneals K
-different IBs in one vmapped kernel.
+Each kernel imports JAX on first use, builds and caches its compiled function and has an entry
+for one problem and a batched entry that anneals several IBs in one vmapped kernel.
 
-Layout:
-  * `smooth`  - chain bonds + angles (+ EV / heat / CTCF orientation); the hot path
-  * `arcs`    - anchor springs to expected distances (+ EV / confinement)
-  * `heatmap` - pairwise distance-to-expected (+ EV); simplest energy
-
-This `__init__` re-exports the flat API so `from gnome3d.mc import jax as mc_jax;
-mc_jax.mc_smooth_jax_batch(...)` keeps working after the split.  JAX is an optional
-extras dep, imported lazily on first kernel use.
+  smooth       chain bonds and angles, with excluded volume, heat and orientation
+  arcs         anchor springs, with excluded volume and confinement
+  arcs_energy  the energy of the arcs solver on the device
 """
 
 from gnome3d.mc.jax.arcs import mc_arcs_jax, mc_arcs_jax_batch

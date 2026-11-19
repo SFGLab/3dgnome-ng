@@ -1,13 +1,6 @@
-"""
-DENSIFY stage: insert subanchor beads between anchors.
+"""The DENSIFY stage inserts subanchor beads between anchors. It uses no RNG.
 
-Pure port of `Solver._densify_active_region` / `_subanchor_counts_per_arc`:
-same arithmetic, same order, but parameterized on the `Arced` state (anchor
-positions + genomic spans) instead of reaching into the cluster graph.  No RNG,
-so this stage is byte-exact-validatable against the solver on its own.
-
-`anchor_map` here is local - `(bead_index, anchor_index_in_ib)` - never a
-global cluster index, which is what lets the densified IB stay self-contained.
+`anchor_map` holds `(bead_index, anchor_index_in_ib)` pairs.
 """
 
 from __future__ import annotations
@@ -43,9 +36,9 @@ DensifyResult = tuple[
 
 
 def _subanchor_counts(anchor_genomic: list[tuple[int, int, int]], s: Settings) -> list[int]:
-    """Subanchors to insert per consecutive anchor pair.  Mirrors
-    `Solver._subanchor_counts_per_arc` (uniform `loop_density`, or dynamic by
-    in-between span when `use_dynamic_loop_density`)."""
+    """Returns the number of subanchors of each consecutive anchor pair, `loop_density` or by
+    the span between them with `use_dynamic_loop_density`.
+    """
     n_arcs = max(len(anchor_genomic) - 1, 0)
     if not s.use_dynamic_loop_density:
         return [s.loop_density] * n_arcs
@@ -68,13 +61,11 @@ def densify(
     s: Settings,
     track_compartments: list[CompartmentInterval] | None = None,
 ) -> DensifyResult:
-    """Insert subanchor beads between each consecutive anchor pair.  Byte-exact
-    port of `Solver._densify_active_region` (see its docstring for the overlap /
-    span / midpoint conventions).
+    """Inserts subanchor beads between each consecutive anchor pair.
 
-    The compartment track is binned onto the bead ranges produced here, so a
-    subanchor reads the track over its own genomic slot rather than inheriting
-    from a neighbouring anchor."""
+    The compartment track is binned onto the bead ranges. A subanchor reads the track over its
+    own genomic slot.
+    """
     counts = _subanchor_counts(anchor_genomic, s)
     bead_starts: list[int] = []
     bead_ends: list[int] = []
@@ -155,8 +146,7 @@ def densify(
 
 
 def _run(problem: Problem) -> Result:
-    """Serial runner: densify one IB.  (No GPU kernel - DENSIFY registers only a
-    serial runner; the batched executor maps it.)"""
+    """Densifies one IB."""
     return densify(
         problem["anchor_pos"],
         problem["anchor_genomic"],
@@ -171,7 +161,6 @@ class DensifyStage:
     kind = StageKind.DENSIFY
 
     def bucket(self, inputs: tuple[State, ...]) -> int:
-        # Not GPU-batched; bucket only groups the (serial-mapped) densify calls.
         return len(inputs[0].anchor_genomic)  # type: ignore[attr-defined]
 
     def to_problem(self, inputs: tuple[State, ...]) -> Problem:

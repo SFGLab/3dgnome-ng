@@ -1,13 +1,9 @@
 """The arcs energy and its gradient on the device, for the solver.
 
-`gnome3d.mc.numba.arcs_solver.arcs_energy_grad` visits every pair of a chromosome on the CPU
-against a dense target, and at chromosome scope that visit is most of a conformation's wall
-while the GPU idles. This is the same energy, pair for pair and term for term, evaluated on the
-device in row chunks, so an evaluation costs one read of the target matrix. Float32 on the
-device, the rows summed in float64 on the host, so the two agree to about 1e-6 relative and
-not to the bit. Float64 on the device would need JAX's 64 bit mode, which is a process wide
-switch that changes the smooth kernel's integer draws and breaks its loop carries, so it is
-not used.
+This is the energy of `gnome3d.mc.numba.arcs_solver.arcs_energy_grad`, term for term,
+evaluated in row chunks in float32. The rows are summed in float64 on the host. The two agree
+to about 1e-6 relative. The 64 bit mode of JAX is process wide and changes the integer draws of
+the smooth kernel. It is not used.
 """
 
 from __future__ import annotations
@@ -27,9 +23,9 @@ class DeviceArcsEnergy:
     Parameters
     ----------
     exp
-        The target matrix, `exp[j, i]` the entry the CPU kernel reads for the pair (i, j).
+        The target matrix. `exp[j, i]` is the entry the CPU kernel reads for the pair (i, j).
     args
-        The scalar parameters in `arcs_energy_grad`'s order after `exp`.
+        The scalar parameters of `arcs_energy_grad` after `exp`, in its order.
     """
 
     def __init__(self, exp: F64Array, args: tuple[Any, ...], w: F32Array | None = None) -> None:
@@ -45,10 +41,10 @@ class DeviceArcsEnergy:
         excl_skip = int(args[11])
         n = int(exp.shape[0])
         self.n = n
-        # Rows of the transpose are what the CPU kernel reads for one anchor.
+        # A row of the transpose is what the CPU kernel reads for one anchor.
         self._exp_t = jnp.asarray(np.ascontiguousarray(exp.T, dtype=np.float32))
-        # The loop weights ride beside the targets, transposed the same way; None is every
-        # pair at one and the branch is fixed at trace time.
+        # The loop weights are transposed the same way. None is one for every pair, fixed at trace
+        # time.
         use_w = w is not None
         self._w_t = (
             jnp.asarray(np.ascontiguousarray(w.T, dtype=np.float32))
@@ -60,11 +56,13 @@ class DeviceArcsEnergy:
         use_excl = excl_w > 0.0
 
         def row_terms(xi: Any, i: Any, e: Any, wi: Any, pos: Any) -> tuple[Any, Any]:
-            """Anchor i's energy and gradient over every other anchor, then its confinement."""
+            """Returns the energy and gradient of anchor i over every other anchor, then its
+            confinement.
+            """
             diff = xi[None, :] - pos
             d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
             dd = jnp.maximum(d, 1e-10)
-            # Background spring, held at bg = -e, the log symmetric form below the target.
+            # Background spring at bg = -e, symmetric in log distance.
             is_bg = e <= -0.75
             bg = -e
             bg_safe = jnp.where(is_bg, bg, 1.0)
@@ -142,15 +140,16 @@ class DeviceArcsEnergy:
 
 
 class DeviceFactoryEnergy:
-    """The factory term of `gnome3d.mc.numba.arcs_solver.factory_energy_grad` on the device,
-    as a callable on flattened positions, two passes in row chunks: the groups every active
-    anchor sits in, then each anchor's energy and gradient from its own group and its part in
-    the others'. Float32 on the device, summed in float64 on the host.
+    """The factory term of `factory_energy_grad` on the device, as a callable on flattened
+    positions.
+
+    Two passes in row chunks: the group sums of every active anchor, then the energy and gradient
+    of each anchor. Float32 on the device, summed in float64 on the host.
 
     Parameters
     ----------
     act
-        Each anchor's activity, zero for an anchor the term ignores.
+        The activity of each anchor, zero for an anchor without the term.
     weight, radius
         `factory_weight` and `factory_radius`.
     """

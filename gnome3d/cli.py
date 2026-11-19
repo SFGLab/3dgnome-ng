@@ -25,8 +25,9 @@ LOG = log.get("main")
 
 
 def parse_members(spec: str) -> list[int]:
-    """Structure indices from a comma list of numbers and ``lo-hi`` ranges, in the given
-    order and de-duplicated."""
+    """Parses a comma list of numbers and `lo-hi` ranges into structure indices, in order and
+    without repeats.
+    """
     out: list[int] = []
     for part in spec.split(","):
         part = part.strip()
@@ -41,7 +42,7 @@ def parse_members(spec: str) -> list[int]:
 
 
 def _cif_name(entry_base: str, chr_: str, i: int, multi_chr: bool) -> str:
-    """Per-structure CIF filename. Disambiguate per-chr when more than one chr."""
+    """Returns the CIF file name of one structure, with the chromosome when the run has several."""
     if multi_chr:
         return f"{entry_base}_{chr_}_s{i + 1}.cif"
     return f"{entry_base}_s{i + 1}.cif"
@@ -59,14 +60,11 @@ def _run_structure(
     entry_base: str,
     executor: Executor,
 ) -> int:
-    """Reconstruct + write one independent structure via the task-DAG pipeline.
+    """Reconstructs one structure, writes it and returns its bead count.
 
-    ``i`` is the member index, which fixes the seed offset and the output filename. ``pos`` is
-    this structure's 1-based place in the run, which is what the progress label counts: under
-    ``--members`` the two differ, and labelling with ``i`` produced lines like "structure 13/10".
-    Returns total bead count.  Per-member seed offset makes an ensemble vary."""
-    # Scope per structure only when several run - for a single structure the
-    # extra nesting just indents everything for no benefit.
+    `i` is the member index, which sets the seed offset and the file name. `pos` is the 1-based
+    place in the run, which the progress label counts.
+    """
     label = f"structure {pos}/{n}" + (f" (member {i + 1})" if pos != i + 1 else "")
     structure_ctx = log.step(LOG, label) if n > 1 else contextlib.nullcontext()
     with structure_ctx:
@@ -110,7 +108,7 @@ def main() -> None:
             "Chromosomes/region to reconstruct.  Examples: "
             "'chr14:18288319-20307135' (single region), 'chr14' (single chr), "
             "'chr1,chr3,chrX' (comma list), 'chr1-chr22,chrX' (range + extras). "
-            "Default (empty): chr1-chr22,chrX (whole human genome, matches Reference)."
+            "Default (empty): chr1-chr22,chrX (whole human genome)."
         ),
     )
     parser.add_argument(
@@ -169,15 +167,11 @@ def main() -> None:
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    # Build a filesystem-safe base name from the --region argument (or "genome"
-    # when whole-genome default was used).
     raw = args.region.strip() or "genome"
     entry_base = raw.replace(":", "_").replace("-", "_").replace(",", "_")
 
-    # Structures run sequentially: the pipeline parallelises *inside* a
-    # reconstruct (IB batching on the JAX BatchExecutor), and its deterministic
-    # global-RNG seeding can't be threaded across structures safely.  Each
-    # structure gets a distinct per-member seed offset, so an ensemble varies.
+    # Structures run one after another. The seeding uses a global RNG and is not safe across
+    # threads.
     members = parse_members(args.members) if args.members else list(range(args.n_structures))
     if not members:
         sys.exit(f"No structures selected: --members {args.members!r}")

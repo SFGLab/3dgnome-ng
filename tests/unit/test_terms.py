@@ -2,18 +2,10 @@
 
     python tests/unit/test_terms.py
 
-Three properties, which together are what the old scorer harness gave us for the
-parity-era terms:
-
-  * a hand-built configuration whose energy is computable in closed form
-  * the per-bead local scores sum to the full score, the contract the incremental
-    MC update depends on
-  * the term is non-negative over random configurations, which the Metropolis rule
-    requires because it divides by the running score
-
-Plus the two behavioural checks that a closed form cannot express: the compartment
-term actually segregates A from B, and it is inert when its flag is off.
-
+A hand built configuration has an energy in closed form. The local scores per bead sum to the
+full score, which the incremental MC update needs. The term is not negative over random
+configurations, which the Metropolis rule needs. The term segregates A from B and does nothing
+with its flag off.
 """
 
 from __future__ import annotations
@@ -51,7 +43,7 @@ def well(d2: float, r0: float) -> float:
 
 
 def norm(n: int) -> float:
-    """The kernel divides each pair by the partner count. See the doc."""
+    """The kernel divides each pair by the partner count."""
     return 1.0 / (n - 1) if n > 1 else 1.0
 
 
@@ -109,7 +101,7 @@ def test_affinity() -> None:
         sc += local_affinity_nb(q, p, True, qc, R0C, 1.0, EA, EB)
     check("local scores sum to the full score", abs(sc - fc) < 1e-9)
 
-    # N-independence: the 1/(N-1) normalisation is what keeps a weight portable.
+    # The 1 / (N - 1) normalisation keeps the score per bead independent of N.
     per_bead = []
     for n in (20, 200, 2000):
         p = rng.normal(size=(n, 3)) * (n ** (1 / 3))
@@ -185,11 +177,7 @@ def test_behaviour() -> None:
 
 
 def test_jax_agrees() -> None:
-    """The JAX kernel must carry the same affinity energy as numba.
-
-    Skipped when JAX is absent. Tolerance is float32: the JAX path is f32
-    throughout while numba is f64, so exact equality is not the bar.
-    """
+    """The JAX kernel has the same affinity energy as numba, to float32. Skipped without JAX."""
     print("\n[jax] affinity agreement with numba")
     try:
         import jax.numpy as jnp  # noqa: PLC0415

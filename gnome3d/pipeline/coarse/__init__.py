@@ -1,21 +1,11 @@
-"""
-The coarse half of reconstruction: the cluster-tree spine, as a pipeline package.
+"""The coarse stages, which place the cluster tree.
 
-Three modules, separated by role:
-  * `build`   - `CoarseState` (the cluster graph + contact data) and the free
-                functions over it: hierarchy build, the pure heatmap/expected-
-                distance helpers, and the RNG-ordered positioning ops + seeding.
-  * `heatmap` - the vectorized chr/segment distance-heatmap helpers `build` uses.
-  * `stages`  - the `COARSE`-kind pipeline stages + `build_coarse_dag` that wrap
-                `build`'s ops into the unified self-expanding DAG.
+  build    `CoarseState` and the functions over it
+  heatmap  the heatmap to distance helpers
+  stages   the COARSE stages and `build_coarse_dag`
 
-This `__init__` re-exports the `build` surface so callers can write
-`from gnome3d.pipeline import coarse as cb; cb.build_state(...)`.  It does NOT
-import `stages` - `stages` imports the `build` ops back through this package, so
-keeping `stages` out of here avoids a cycle and keeps `import ...coarse` light
-(no stage/registry pull-in).  Take `build_coarse_dag` / `ib_node_id` from
-`gnome3d.pipeline.coarse.stages` directly (importing it also registers the
-COARSE runner).
+This package exports the names of `build`. It does not import `stages`, which imports `build`
+through this package. Import `build_coarse_dag` from `gnome3d.pipeline.coarse.stages`.
 """
 
 from __future__ import annotations

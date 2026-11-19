@@ -43,7 +43,8 @@ break, as in "the kernel reads this array in place, so the caller must not resiz
 
 Do not put a comma before "and". Join the two parts without it. Write two sentences where the joined one reads badly.
 
-Do not use capitals for emphasis. Use backticks only for the identifiers that need them. Use few parentheses. An aside
+Do not use capitals for emphasis. A word in capitals is an acronym or an identifier, not a stressed "not", "is" or
+"all". Use backticks only for the identifiers that need them. Use few parentheses. An aside
 becomes its own sentence or is dropped.
 
 Do not write a compressed riddle. "A dropped loop stays arcless" needs the code to be understood. Spell out the
@@ -57,6 +58,9 @@ and not "pairwise frequency matrix".
 
 Do not use dashes, colons or semicolons as sentence punctuation in a doc comment or an inline comment.
 
+Comments are few. A comment or a doc exists only for a fact that the code and the names do not show. A function whose
+name and signature say everything has no doc.
+
 A doc says what the thing is and how to use it, usually in one or two sentences. It describes the code as it is now.
 It does not hold any of these.
 
@@ -67,6 +71,7 @@ It does not hold any of these.
 - A comment left in place of removed code.
 - Names of libraries, unless the reader must know the library to use the thing.
 - A field by field description of a result that the type already shows.
+- A mention of the reference implementation, of its files or of its functions. The model is its own code now.
 
 History and design reasons go in the commit message. Longer reasoning goes in a note under `design/`.
 
@@ -148,8 +153,8 @@ marks the others ns.
 The tool is 3D-GNOMEᴺᴳ, with a raised NG, in every published text. `gnome3d` is the Python package and appears in
 code, paths and commit messages only.
 
-`legacy/3dnome/MC/` is "the reference" or "the reference implementation". Do not call it by its programming language. Cite
-a place in it as `LooperSolver.cpp:1069-1104`.
+`legacy/3dnome/MC/` is "the reference" or "the reference implementation" in a design note. Do not call it by its
+programming language. Code, comments, docstrings and messages under `gnome3d/`, `tests/` and `web/` do not mention it.
 
 ## Check before handing over
 

@@ -1,22 +1,13 @@
-"""Unit checks that a batched smooth result does not depend on how the batch was formed.
+"""Unit checks that a batched smooth result does not depend on the composition of the batch.
 
     python tests/unit/test_batch_seeding.py
 
-The smooth stage groups interaction blocks into launches and a launch anneals every member
-together. Nothing about that grouping is part of the model, so an interaction block must anneal
-the same way whoever it shares a launch with. That property is what lets the grouping change for
-performance without changing the science.
+A block must anneal the same whatever it shares a launch with. Three things could break that:
+a random stream drawn from the slot in the launch, a converged chain that keeps taking steps
+and padding that reaches the energy or the moves.
 
-Three things could break it. A chain whose random stream is drawn from its slot in the launch
-sees a different stream when the launch is reordered. A chain that converges early keeps taking
-steps while slower neighbours finish, so it anneals further than it would have alone. And a
-chain padded up to a larger bead extent picks up its padding if the padded beads are not fully
-excluded from the energy and the moves.
-
-Every check here compares launches of the same width, because the width itself changes the
-float32 reduction order and Monte Carlo amplifies one unit in the last place into a different
-structure. `test_width_changes_only_the_last_bits` measures that separately. Comparing at equal
-width is what isolates the algorithm from the arithmetic.
+Every check compares launches of the same width. The width changes the float32 reduction
+order, which `test_width_changes_only_the_last_bits` measures.
 """
 
 from __future__ import annotations
@@ -45,7 +36,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 
 
 def settings(steps: int = 400) -> Settings:
-    """A short anneal with excluded volume on, which is the production shape of the term set."""
+    """A short anneal with excluded volume on."""
     s = Settings()
     s.use_excluded_volume = True
     s.exclusion_apply_to_smooth = True
@@ -56,8 +47,7 @@ def settings(steps: int = 400) -> Settings:
     s.spring_stretch = s.spring_squeeze = 0.1
     s.max_temp_smooth = 2.0
     s.mc_stop_steps_smooth = steps
-    # Stop on the accept count rather than the score, so a chain plateaus after a predictable
-    # number of rounds and the "converged early" case is reachable in a short test.
+    # The stop is on the accept count. A chain then plateaus after a known number of rounds.
     s.mc_stop_improvement_smooth = 0.995
     s.mc_stop_successes_smooth = 1
     s.mc_executor_jax_bucket_shapes = True
@@ -65,7 +55,7 @@ def settings(steps: int = 400) -> Settings:
 
 
 def block(n: int, seed: int, spread: float = 1.0) -> dict[str, object]:
-    """One interaction block: a random walk chain with both ends pinned as anchors."""
+    """One interaction block, a random walk chain with both ends fixed as anchors."""
     rng = np.random.default_rng(seed)
     pos = np.cumsum(rng.normal(0.0, spread, size=(n, 3)), axis=0).astype(np.float32)
     dtn = np.linalg.norm(np.diff(pos.astype(np.float64), axis=0), axis=1).astype(np.float32)
@@ -79,7 +69,7 @@ def run(problems: list[dict[str, object]], s: Settings) -> list[np.ndarray]:
 
 
 def test_slot_does_not_matter() -> None:
-    """The same two blocks in either order give each block the same structure."""
+    """Two blocks in either order give each block the same structure."""
     s = settings()
     a, b = block(256, 11), block(256, 22)
     ab, ba = run([a, b], s), run([b, a], s)
@@ -91,7 +81,7 @@ def test_slot_does_not_matter() -> None:
 
 
 def test_partner_does_not_matter() -> None:
-    """A block anneals the same whoever else is in the launch."""
+    """A block anneals the same with any partner in the launch."""
     s = settings()
     a = block(256, 11)
     with_b = run([a, block(256, 22)], s)[0]
@@ -104,13 +94,7 @@ def test_partner_does_not_matter() -> None:
 
 
 def test_a_slower_partner_does_not_over_anneal_it() -> None:
-    """A block that converges early is not carried along by a partner that runs longer.
-
-    Both partners are far more expanded than the block under test, so both take longer to
-    plateau and the launch keeps looping after the block is done. If a converged chain still
-    took steps, it would anneal for as many rounds as its own partner needed and the two
-    results would differ.
-    """
+    """A block that converges early is not carried along by a partner that runs longer."""
     s = settings()
     a = block(256, 11)
     slow_a = run([a, block(1024, 98, spread=8.0)], s)[0]
@@ -123,11 +107,7 @@ def test_a_slower_partner_does_not_over_anneal_it() -> None:
 
 
 def test_padding_does_not_leak() -> None:
-    """A block padded up to a bigger bead extent anneals the same as at a smaller one.
-
-    This is what merging groups across bead buckets does, so if padding reached the energy or
-    the move selection the merge would change every small block in a launch.
-    """
+    """A block padded to a larger bead extent anneals as at a smaller one."""
     s = settings()
     a = block(300, 11)
     small = run([a, block(400, 55)], s)[0]  # the 512 bucket
@@ -140,13 +120,8 @@ def test_padding_does_not_leak() -> None:
 
 
 def test_width_changes_only_the_last_bits() -> None:
-    """Launch width reorders the float32 accumulation, and that is all it does.
-
-    XLA vectorises across the chain axis, so a reduction that runs at one width does not
-    associate the same way at another. The first difference is one unit in the last place of the
-    score, which is arithmetic rather than algorithm. Monte Carlo then amplifies it, because a
-    Metropolis comparison decided by that bit flips and the trajectories part, so a structure
-    cannot be compared bit for bit across widths and this check does not try to.
+    """The launch width changes the order of the float32 sums and nothing else. The first
+    difference is one unit in the last place of the score, which the Monte Carlo then amplifies.
     """
     s = settings(steps=100)
     s.mc_stop_improvement_smooth = 0.0
@@ -163,7 +138,7 @@ def test_width_changes_only_the_last_bits() -> None:
 
 
 def test_packing_splits_only_for_memory() -> None:
-    """The plan is one launch when everything fits, and respects the cap when it does not."""
+    """The plan is one launch when everything fits and follows the cap otherwise."""
     s = settings()
     check(
         "eight small blocks plan as a single launch",
@@ -180,7 +155,7 @@ def test_packing_splits_only_for_memory() -> None:
 
 
 def test_largest_first() -> None:
-    """A launch is shaped by its largest member, so packing takes the largest first."""
+    """Packing takes the largest block first."""
     s = settings()
     s.mc_executor_jax_batch_width_smooth = 2
     plan = _chunk_plan([(256, 1, 1), (4096, 1, 1), (512, 1, 1), (2048, 1, 1)], False, False, s)
@@ -188,7 +163,7 @@ def test_largest_first() -> None:
 
 
 def test_every_block_comes_back() -> None:
-    """Packing reorders the launches, so results have to be put back in input order."""
+    """Results come back in input order."""
     s = settings()
     sizes = [120, 300, 700, 1500, 260, 900, 180]
     blocks = [block(n, 300 + i) for i, n in enumerate(sizes)]

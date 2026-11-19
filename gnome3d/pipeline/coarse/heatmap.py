@@ -1,15 +1,4 @@
-"""
-Heatmap matrix helpers: normalize a contact-frequency matrix and convert it to
-an expected-distance matrix.
-
-Pure numpy functions over an `(n, n)` matrix - no cluster graph, no MC.  Lifted
-out of the former `CoarseModel` (where they were O(N^2) Python list-of-list
-loops that blew up on large Hi-C matrices) so the coarse HEATMAP stages can build
-their distance targets from these, and any caller can reuse them.
-
-Each mirrors the Reference normalize*/createDistanceHeatmap routines; vectorized
-exactly (validated bit/float-equal vs the original loops).
-"""
+"""Normalises a contact frequency matrix and converts it to expected distances."""
 
 from __future__ import annotations
 
@@ -22,13 +11,11 @@ if TYPE_CHECKING:
     from gnome3d.settings import Settings
     from gnome3d.types import BoolArray, ChrLevel, F64Array
 
-# Accepts a freshly-built list-of-list heatmap or an ndarray; np.asarray unifies.
 Matrix: TypeAlias = "F64Array | list[list[float]]"
 
 
 def get_diagonal_size(h: Matrix, n: int) -> int:
-    """Smallest superdiagonal offset holding a non-zero contact (the ignored
-    diagonal band): min `j - i` over upper-triangle cells > 1e-6."""
+    """Returns the smallest offset `j - i` of an upper triangle cell above 1e-6."""
     ha = np.asarray(h)
     iu = np.triu_indices(n)
     mask = ha[iu] > 1e-6
@@ -38,8 +25,7 @@ def get_diagonal_size(h: Matrix, n: int) -> int:
 
 
 def normalize_heatmap(h: Matrix, n: int) -> F64Array:
-    """Row-normalize so every row sums to the grand-average, then symmetrize.
-    Mirrors Reference normalizeHeatmap()."""
+    """Normalises every row to the grand average and symmetrises."""
     ha = np.asarray(h, dtype=np.float64)
     row_sums = ha.sum(axis=1)
     total = float(row_sums.sum())
@@ -52,8 +38,7 @@ def normalize_heatmap(h: Matrix, n: int) -> F64Array:
 
 
 def normalize_heatmap_diagonal_total(h: Matrix, n: int, val: float) -> F64Array:
-    """Scale the whole matrix so the average of the first non-zero diagonal
-    equals `val`.  Mirrors Reference normalizeHeatmapDiagonalTotal()."""
+    """Scales the matrix to a mean of `val` on the first diagonal with a contact."""
     ha = np.asarray(h, dtype=np.float64).copy()
     diag = get_diagonal_size(ha, n)
     count = n - diag
@@ -67,9 +52,9 @@ def normalize_heatmap_diagonal_total(h: Matrix, n: int, val: float) -> F64Array:
 
 
 def normalize_heatmap_inter(h: Matrix, n: int, current_level: ChrLevel, scale: float) -> F64Array:
-    """Scale inter-chromosomal entries by ``scale``, leaving intra-chr blocks
-    unchanged (multiply all by scale, divide intra-chr blocks back).  Mirrors
-    Reference normalizeHeatmapInter()."""
+    """Scales the inter chromosomal entries by `scale` and leaves the blocks within a
+    chromosome unchanged.
+    """
     ha = np.asarray(h, dtype=np.float64)
     chrs_in_order = [c for c in current_level if current_level[c]]
     if len(chrs_in_order) <= 1:
@@ -78,7 +63,7 @@ def normalize_heatmap_inter(h: Matrix, n: int, current_level: ChrLevel, scale: f
     for chr_ in chrs_in_order:
         block_starts.append(block_starts[-1] + len(current_level[chr_]))
     if block_starts[-1] != n:
-        return ha.copy()  # shape mismatch - leave untouched
+        return ha.copy()  # shape mismatch, returned unchanged
     out = ha * scale
     for b in range(len(chrs_in_order)):
         lo, hi = block_starts[b], block_starts[b + 1]
@@ -93,10 +78,12 @@ def _polymer_distances(
     separations_bp: F64Array | None,
     scale_bp: float | None,
 ) -> F64Array:
-    """Per cell targets under the polymer law. `use` marks the cells that carry a contact and
-    lie outside the diagonal band. With separations the expected contact at a separation is the
-    mean over those cells in the same log separation bin, eight bins a decade. Without them every
-    cell shares one expectation and the background is taken at `scale_bp`."""
+    """Returns the target of each cell under the polymer law.
+
+    `use` marks the cells with a contact outside the diagonal band. With separations the expected
+    contact is the mean over those cells in the same log separation bin, eight bins a decade.
+    Without them every cell shares one expectation and the background is taken at `scale_bp`.
+    """
     n = ha.shape[0]
     out = np.zeros((n, n), dtype=np.float64)
     if not use.any():
@@ -112,8 +99,8 @@ def _polymer_distances(
     s_ij = sep[ii, jj]
     key = np.floor(np.log10(np.maximum(s_ij, 1.0)) * 8.0).astype(np.int64)
     f_ij = ha[ii, jj]
-    # `law.heatmap_distance` over every cell of a bin at once. The cells are taken in the order
-    # np.nonzero gives, so each bin's mean sums the same values in the same order.
+    # The cells are taken in the order of np.nonzero. The mean of a bin sums the same values in
+    # the same order.
     s0 = max(int(law.s0_bp), 1)
     for k in np.unique(key):
         sel = key == k
@@ -136,14 +123,13 @@ def create_distance_heatmap(
     separations_bp: F64Array | None = None,
     scale_bp: float | None = None,
 ) -> tuple[F64Array, float]:
-    """Convert a normalised contact frequency heatmap to expected distances under the polymer
-    law. Per cell: no contact gives 0, the diagonal band gives -1, which scoring ignores, and
-    every other cell sits at the background for its separation scaled by observed over expected
-    contact to the minus third. The expectation is the mean of the active cells at that log
-    separation within the heatmap. With `separations_bp` absent, which is the chromosome level
-    where pairs have no genomic separation, every cell shares one expectation and the background
-    is taken at `scale_bp`. Distances are then clipped above the mean positive distance times
-    `heatmap_distance_stretching`. Uses the upper triangle and mirrors it.
+    """Converts a normalised contact frequency heatmap to expected distances under the polymer law.
+
+    A cell with no contact gives 0 and the diagonal band gives -1, which scoring ignores. Every
+    other cell is the background of its separation times observed over expected contact to the
+    minus third. Without `separations_bp`, at the chromosome level, every cell shares one
+    expectation and the background is taken at `scale_bp`. Distances are clipped at the mean
+    positive distance times `heatmap_distance_stretching`. Uses the upper triangle and mirrors it.
     """
     ha = np.asarray(h, dtype=np.float64)
     diag = get_diagonal_size(ha, n)
@@ -153,7 +139,7 @@ def create_distance_heatmap(
     band = np.abs(ii - jj) < diag
     fd = _polymer_distances(law, ha, active & ~band, separations_bp, scale_bp)
     dist = np.where(active, np.where(band, -1.0, fd), 0.0)
-    dist = np.triu(dist) + np.triu(dist, 1).T  # mirror upper -> lower
+    dist = np.triu(dist) + np.triu(dist, 1).T
 
     pos = dist[dist > 0.0]
     avg = float(pos.mean()) if pos.size else 1.0

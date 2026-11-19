@@ -2,11 +2,8 @@
 
     python tests/unit/test_contact_heatmaps.py
 
-The anchor level heatmap scales the arc targets and carries the contact background, and
-production reads it with the subanchor heat term off. It used to be cut out of the full
-subanchor matrix, an N by N float64 held per block whether or not anything read it, which is
-15 GB on a 43,000 bead block. Built directly at anchor resolution it must be the same matrix
-to the byte, and no subanchor matrix is returned.
+The anchor heatmap built at anchor resolution must equal, to the byte, the anchor bins of the
+subanchor matrix and no subanchor matrix is returned.
 """
 
 from __future__ import annotations

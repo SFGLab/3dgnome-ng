@@ -1,11 +1,4 @@
-"""Shared numba driver + array helpers.
-
-`_run_outer_loop` is the Python-side convergence loop every public entry uses:
-it runs `terms._batch_mc_nb` for `stop_steps` at a time and checks the reference-style
-stop condition.  `_prepare_orientation` builds the CSR orientation arrays the
-kernel needs from the Python neighbour dicts.  `_as_f64` / `_dummy_*` produce the
-contiguous / placeholder arrays the kernel's fixed signature expects.
-"""
+"""The driver of the numba kernels and array helpers."""
 
 from __future__ import annotations
 
@@ -42,8 +35,8 @@ def dummy_i32(shape: tuple[int, ...] = (1,)) -> I32Array:
     return np.zeros(shape, dtype=np.int32)
 
 
-# Placeholders for disabled optional-term arrays.  A disabled term is never
-# indexed, so these exist only to give numba a concrete type.  Never written to.
+# Placeholders for the arrays of terms that are off. They give numba a concrete type and are not
+# read.
 NO_I8: I8Array = np.zeros(1, dtype=np.int8)
 NO_F64: F64Array = np.zeros(1, dtype=np.float64)
 NO_MAT: F64Array = np.zeros((1, 1), dtype=np.float64)
@@ -54,7 +47,7 @@ NO_I32: I32Array = np.zeros(1, dtype=np.int32)
 
 
 class AffinityParams(NamedTuple):
-    """Resolved compartment kernel arguments for one MC level."""
+    """The compartment kernel arguments of one MC level."""
 
     use_comp: bool
     comp_cls: I8Array
@@ -74,19 +67,17 @@ def affinity_params(
     bond_scale: float,
     compartment: np.ndarray[Any, Any] | None,
 ) -> AffinityParams:
-    """Resolve the compartment term for one MC level.
+    """Resolves the compartment term of one MC level.
 
-    The term is on only when its master flag, its per-level apply flag and its
-    track are all present, so a missing track silently leaves it off rather than
-    scoring against zeros.  A radius of 0 auto-derives as
-    `auto_factor * bond_scale`, matching the excluded-volume convention.
+    The term is on only when its master flag, its apply flag of the level and its track are
+    present. A radius of 0 becomes `auto_factor * bond_scale`.
 
     Parameters
     ----------
-    level : str
-        One of "smooth", "ib", "heatmap".  Selects the per-level settings.
-    bond_scale : float
-        This level's mean bead-bead target distance, the auto-radius base.
+    level
+        "smooth", "ib" or "heatmap".
+    bond_scale
+        The mean target distance between beads at this level.
     """
     have_c = compartment is not None and compartment.size > 0
     use_comp = (
@@ -114,7 +105,7 @@ def affinity_params(
 
 
 def init_affinity_scores(pw: F64Array, aff: AffinityParams) -> float:
-    """Full compartment score for the starting positions."""
+    """Returns the compartment score of the starting positions."""
     if not aff.any_on:
         return 0.0
     c = init_affinity_nb(
@@ -138,10 +129,10 @@ def prepare_orientation(
     motif_weight: float,
     motifs_symmetric: bool,
 ) -> tuple[I32Array, I32Array, I32Array, F64Array, BoolArray, I32Array, F64Array, float]:
-    """Build numba-friendly orientation arrays from the Python dicts.
+    """Builds the orientation arrays of the kernel from the Python dicts.
 
-    Returns (anchor_ar, nbr_offsets, nbr_indices, nbr_weights, orn_is_L,
-             bead_to_anchor_k, anchor_orn, score_orn).
+    Returns (anchor_ar, nbr_offsets, nbr_indices, nbr_weights, orn_is_L, bead_to_anchor_k,
+    anchor_orn, score_orn).
     """
     from gnome3d.util import calc_orientation as _calc_orn
 
@@ -244,8 +235,6 @@ def run_outer_loop(
     score_conf: float,
     rep_inv_cutoff: float = 0.0,
     bg_weight: float = 0.0,
-    # The affinity term defaults to off so a stage that never uses it (arcs) needs
-    # no extra arguments.  The dummy array is only there to fix numba's types.
     use_comp: bool = False,
     comp_cls: I8Array = NO_I8,
     comp_r0: float = 1.0,
@@ -269,7 +258,7 @@ def run_outer_loop(
     use_arc_w: bool = False,
     arc_w: F32Array = NO_W,
 ) -> float:
-    """Drive the unified kernel until convergence; return the final total score."""
+    """Runs the kernel until convergence and returns the final total score."""
     score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
     ms_score = score
     step_i = 0

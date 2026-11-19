@@ -1,8 +1,4 @@
-"""
-High-level entry point for 3dgnome-ng.
-
-Thin wrappers around the Settings / ContactData / Solver pipeline.
-"""
+"""Entry points of the reconstruction."""
 
 from __future__ import annotations
 
@@ -24,20 +20,10 @@ def simulate(
     region: BedRegion | None = None,
     seed_offset: int = 0,
 ) -> list[dict[str, list[BeadOut]]]:
-    """
-    Core MC reconstruction loop. Takes pre-built Settings and ContactData;
-    does no file I/O. Use this when settings and contact data are constructed
-    in-memory (notebooks, tests, sweeps) instead of being loaded from an .ini
-    file. For the config-file entry points see `run_region` / `run_genome`.
+    """Reconstructs `n_structures` structures from built settings and contact data, with no file I/O.
 
-    Returns one dict[chr -> list[BeadOut]] per structure.
-
-    Runs the task-DAG pipeline under the executor `pick_executor` selects for the
-    backend - `SerialExecutor` (numba) or `BatchExecutor` (JAX).  The ensemble is
-    `reconstruct_ensemble`: each member's coarse spine runs sequentially (distinct
-    per-member seed), then *all* members' per-IB chains run in one batched pass so
-    same-shaped IBs across members fill one GPU launch.  Member i is byte-identical
-    to a standalone `reconstruct(seed_offset=i * MEMBER_SEED_STRIDE)`.
+    Returns one dict of chromosome to bead list per structure. Member i is byte identical to a
+    single run at `seed_offset = i * MEMBER_SEED_STRIDE`.
     """
     executor = pick_executor(settings)
     with log.step(LOG, f"reconstruct {n_structures} structure(s)"):
@@ -66,27 +52,23 @@ def run_region(
     n_structures: int,
     data_dir: str | None = None,
 ) -> list[list[BeadOut]]:
-    """
-    Run MC reconstruction for the given single genomic region or chromosome.
+    """Reconstructs one region or one chromosome from a config file.
 
     Parameters
     ----------
-    config_path : str
-        Path to the .ini config file.
-    region : str
-        Genomic region in 'chr:start-end' format (e.g. 'chr1:18288319-20307135')
-        or a single chromosome name (e.g. 'chr14').  For multi-chromosome runs
-        use `run_genome` instead.
-    n_structures : int
-        Number of independent MC runs to perform.
-    data_dir : str, optional
-        Override data_dir from the config file.
+    config_path
+        Path of the .ini config file.
+    region
+        'chr:start-end' or a chromosome such as 'chr14'.
+    n_structures
+        Number of structures.
+    data_dir
+        Replaces `data_dir` of the config file.
 
     Returns
     -------
-    list of list of BeadOut = (start_bp, end_bp, x, y, z)
-        One entry per structure, sorted by genomic start.
-        Includes both anchor beads and loop_density subanchor beads.
+    list of list of BeadOut
+        One list per structure, sorted by genomic start, anchors and subanchors.
     """
     bed_region = parse_region(region)
     if bed_region is None:
@@ -103,9 +85,6 @@ def run_region(
     if data_dir is not None:
         s.data_dir = str(data_dir)
 
-    # Honor output_level/log_file from the config - these file-config entry
-    # points own logging setup just like cli.main() does (simulate() stays the
-    # bare in-memory primitive so embedders keep control of their own logging).
     log.setup(s.output_level, log_file=s.log_file or None)
 
     data = ContactData.from_files(s, chrs_list, bed_region)
@@ -119,7 +98,7 @@ def run_chromosome(
     n_structures: int,
     data_dir: str | None = None,
 ) -> list[list[BeadOut]]:
-    """Run MC reconstruction for an entire chromosome."""
+    """Reconstructs a whole chromosome from a config file."""
     return run_region(config_path, chrom, n_structures, data_dir=data_dir)
 
 
@@ -129,31 +108,24 @@ def run_genome(
     n_structures: int = 1,
     data_dir: str | None = None,
 ) -> list[dict[str, list[BeadOut]]]:
-    """
-    Run MC reconstruction across multiple chromosomes (or whole genome).
+    """Reconstructs several chromosomes from a config file.
 
     Parameters
     ----------
-    config_path : str
-        Path to the .ini config file.
-    region : str
-        Accepts the same syntax as the CLI --region flag:
-          - empty string -> whole human genome (chr1..chr22, chrX)
-          - 'chr14'      -> single chromosome
-          - 'chr1,chr3,chrX'  -> comma-separated list
-          - 'chr1-chr22,chrX' -> range + extras
-          - 'chr14:18288319-20307135' -> single sub-chromosomal region
-        Matches the Reference `-c` flag's accepted forms.
-    n_structures : int
-        Number of independent MC runs to perform.
-    data_dir : str, optional
-        Override data_dir from the config file.
+    config_path
+        Path of the .ini config file.
+    region
+        '' for chr1 to chr22 and chrX, a chromosome, a list 'chr1,chr3,chrX', a range
+        'chr1-chr22,chrX' or one region 'chr14:18288319-20307135'.
+    n_structures
+        Number of structures.
+    data_dir
+        Replaces `data_dir` of the config file.
 
     Returns
     -------
-    list of dict[chr -> list[BeadOut]]
-        One entry per structure.  Each dict maps chromosome name to its
-        sorted bead list.
+    list of dict
+        One dict of chromosome to sorted bead list per structure.
     """
     chrs_list, bed_region = parse_chrs_arg(region)
     if not chrs_list:
@@ -165,7 +137,6 @@ def run_genome(
     if data_dir is not None:
         s.data_dir = str(data_dir)
 
-    # Honor output_level/log_file from the config (see run_region).
     log.setup(s.output_level, log_file=s.log_file or None)
 
     data = ContactData.from_files(s, chrs_list, bed_region)

@@ -1,11 +1,11 @@
-"""Check SETTINGS.md against the loader and the production config.
+"""Checks SETTINGS.md against the loader and the production config.
 
     python tests/unit/test_settings_doc.py
 
-Every key the loader reads must have a row, every row must be a key the loader reads, the
-default column must be the loader's default and the production column must be what
-`gnome3d.production.CANONICAL` sets, or the default where it sets nothing. Exit status is
-the number of problems.
+Every key the loader reads must have a row and every row must be a key the loader reads. The
+default column must be the default of the loader. The production column must be the value of
+`gnome3d.production.CANONICAL`, or the default where it has none. As a script the exit status
+is the number of problems.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ MC_SECTIONS = ("simulation_heatmap", "simulation_arcs", "simulation_arcs_smooth"
 
 
 def loader_keys() -> dict[tuple[str, str], str]:
-    """(section, key) -> attribute name, from every getter call in the loader."""
+    """Returns (section, key) -> attribute name from every getter call of the loader."""
     tree = ast.parse((ROOT / "gnome3d" / "settings.py").read_text())
     out: dict[tuple[str, str], str] = {}
     for node in ast.walk(tree):
@@ -47,7 +47,7 @@ def loader_keys() -> dict[tuple[str, str], str]:
 
 
 def doc_rows() -> dict[tuple[str, str], tuple[str, str]]:
-    """(section, key) -> (default, production) from the reference's tables."""
+    """Returns (section, key) -> (default, production) from the tables of SETTINGS.md."""
     rows: dict[tuple[str, str], tuple[str, str]] = {}
     sections: list[str] = []
     for line in (ROOT / "SETTINGS.md").read_text().splitlines():
@@ -80,7 +80,7 @@ STAGE_WORD = {
 
 
 def per_stage(cell: str, section: str) -> str:
-    """A shared table cell may spell one value per stage, as in `arcs and ib 100, smooth 50`."""
+    """Returns the value of one stage from a shared table cell such as `arcs and ib 100, smooth 50`."""
     word = STAGE_WORD.get(section)
     if word is None or not re.search(r"[a-z]+ [0-9]", cell):
         return cell

@@ -1,23 +1,14 @@
-"""
-All data the solver needs lives here. Two factory methods cover the two
-supported input paths:
+"""The input data of a run.
 
-ContactData.from_files(settings, chrs, region)
-    Reads anchors, arcs, breakpoints, and singletons from the files
-    referenced by `settings`.
+`ContactData.from_files` reads the files of the settings. `ContactData.from_dataframes` takes
+pandas DataFrames with these columns.
 
-ContactData.from_dataframes(anchors_df, arcs_df, ...)
-    Converts pandas DataFrames into the same internal representation.
-    Expected columns:
-        anchors_df:       chr, start, end[, orientation]
-        arcs_df:          chr_a, start_a, end_a, chr_b, start_b, end_b, score
-        breakpoints_df:   chr, pos
-        singletons_df:    chr1, pos1, chr2, pos2, score
-        compartments_df:  chr, start, end[, label][, value]
-        phasing_df:       chr, start, end, value
-
-Once constructed, a ContactData instance is file-independent and can be
-passed directly to Solver.load().
+    anchors_df       chr, start, end[, orientation]
+    arcs_df          chr_a, start_a, end_a, chr_b, start_b, end_b, score
+    breakpoints_df   chr, pos
+    singletons_df    chr1, pos1, chr2, pos2, score
+    compartments_df  chr, start, end[, label][, value]
+    phasing_df       chr, start, end, value
 """
 
 from __future__ import annotations
@@ -58,9 +49,9 @@ def _empty_anchor_contacts() -> ac.AnchorContactMap:
 
 
 def _load_anchor_contacts(path: str, anchors: AnchorMap) -> ac.AnchorContactMap:
-    """The anchor contact tables of the run's chromosomes, with one always visible line giving
-    how many of the run's anchors the tables hold. A run anchor a table lacks gets no contacts,
-    which the line makes visible rather than silent."""
+    """Loads the anchor contact tables of the run's chromosomes and logs how many of the run's
+    anchors they hold. An anchor a table lacks gets no contacts.
+    """
     tables = ac.load(path, set(anchors))
     found = total = 0
     for chrom, lst in anchors.items():
@@ -84,34 +75,27 @@ def _load_anchor_contacts(path: str, anchors: AnchorMap) -> ac.AnchorContactMap:
 
 @dataclass
 class ContactData:
-    """
-    anchors:     dict[chr -> list[Anchor]] - anchor beads (after empty-anchor removal)
-    arcs:        dict[chr -> list[InteractionArc]] - mapped arcs (after mark_arcs)
-    breakpoints: dict[chr -> list[int]] - segment boundary positions
-    singletons:  list of (chr1, pos1, chr2, pos2, score) contacts
-                 used to build the segment-level heatmap
-    compartments: dict[chr -> list[CompartmentInterval]] - A/B calls, already phased
+    """The input data of a run.
+
+    `anchors` are the anchors that at least one arc ends on. `arcs` are indexed by anchor.
+    `breakpoints` are segment boundary positions. `singletons` build the segment heatmap.
+    `compartments` are phased.
     """
 
     anchors: AnchorMap = field(default_factory=empty_anchor_map)
     arcs: ArcMap = field(default_factory=empty_arc_map)
     breakpoints: BreakpointMap = field(default_factory=empty_breakpoint_map)
     singletons: list[SingletonContact] = field(default_factory=empty_singleton_list)
-    # The polymer law's own fits, made on the whole loaded input before any region filter so a
-    # small region can still supply an exponent.
+    # Fitted on the whole loaded input, before the region filter.
     contact_fit: ContactFit | None = None
     arc_fit: ArcStrengthFit | None = None
-    # One strength fit per factor, keyed by the cluster file's index; `arc_fit` is factor 0's.
+    # One fit per factor, by the index of the cluster file. `arc_fit` is the fit of factor 0.
     arc_fits: dict[int, ArcStrengthFit] = field(default_factory=dict)
-    # Long-range arcs (gap > max_pet_length): not anchor-mapped, folded into the
-    # segment heatmap by Solver. Mirrors Reference InteractionArcs::long_arcs.
+    # Arcs longer than `max_pet_length`. They are not mapped to anchors and go into the segment
+    # heatmap.
     long_arcs: RawArcMap = field(default_factory=empty_raw_arc_map)
-    # Epigenomic track driving the opt-in compartment energy term.  Empty when
-    # no track is configured, which leaves the term inert.
     compartments: CompartmentMap = field(default_factory=empty_compartment_map)
-    # The anchor activity track for the factory term, empty when none is configured.
     activity: SignalMap = field(default_factory=empty_signal_map)
-    # Counts between anchor pairs from a full depth map, empty when none is configured.
     anchor_contacts: ac.AnchorContactMap = field(default_factory=_empty_anchor_contacts)
 
     @classmethod
@@ -121,17 +105,16 @@ class ContactData:
         chrs: list[str],
         region: BedRegion | None = None,
     ) -> ContactData:
-        """
-        Load all engine inputs from the files named in `settings`.
+        """Loads every input from the files of `settings`.
 
         Parameters
         ----------
-        settings : Settings
-            Parsed config.  Must have data_dir and file name attributes set.
-        chrs : list[str]
-            Chromosome names to load (e.g. ['chr1']).
-        region : BedRegion or None
-            Genomic window to restrict to.  None = whole chromosome(s).
+        settings
+            The parsed config, with `data_dir` and the file names set.
+        chrs
+            Chromosomes to load.
+        region
+            Genomic window. None loads whole chromosomes.
         """
         chr_set = set(chrs)
         s = settings
@@ -150,7 +133,7 @@ class ContactData:
             for c, lst in long_f.items():
                 long_arcs.setdefault(c, []).extend(lst)
         if len(s.cluster_files()) > 1:
-            # A stable sort by start merges the files; one file keeps the order it was read in.
+            # The sort is stable. One file keeps the order it was read in.
             for lst in raw_arcs.values():
                 lst.sort(key=lambda a: a.start)
 
@@ -164,16 +147,13 @@ class ContactData:
         breakpoints = load_breakpoints(s.data_path(s.data_segment_split), chrs)
 
         LOG.info("load singletons")
-        # Fit on the whole chromosome set, then cut to the region. A region alone is too narrow
-        # a band to read a decay off.
+        # The exponent is fitted on the whole chromosome set. A region is too narrow a band.
         singletons = load_singletons(s.data_path(s.data_singletons), chr_set, None)
         contact_fit = fit_contact_exponent(singletons)
         arc_fits = fit_arc_strengths(arcs)
         singletons = filter_singletons(singletons, region)
 
-        # Optional second file for inter-chromosomal singletons (matches the
-        # Reference `data_singletons_inter` config key).  Only meaningful for
-        # multi-chromosome runs - inter-chr contacts feed the chr-level MC.
+        # Inter chromosomal singletons feed the chromosome level MC alone.
         if s.data_singletons_inter and len(chrs) > 1:
             inter_path = s.data_path(s.data_singletons_inter)
             LOG.info("load inter-chr singletons")
@@ -228,37 +208,34 @@ class ContactData:
         compartments_df: Any | None = None,
         phasing_df: Any | None = None,
     ) -> ContactData:
-        """
-        Build ContactData from pandas DataFrames.
+        """Builds ContactData from pandas DataFrames.
 
         Parameters
         ----------
-        anchors_df : DataFrame
-            Columns: chr, start, end[, orientation]
-        arcs_df : DataFrame
-            Columns: chr_a, start_a, end_a, chr_b, start_b, end_b, score
-        breakpoints_df : DataFrame or None
-            Columns: chr, pos
-        singletons_df : DataFrame or None
-            Columns: chr1, pos1, chr2, pos2, score
-        chrs : list[str] or None
-            Restrict to these chromosomes.  None = all chromosomes in anchors_df.
-        region : BedRegion or None
-            Genomic window filter.
-        max_pet_length : int
+        anchors_df
+            Columns chr, start, end[, orientation].
+        arcs_df
+            Columns chr_a, start_a, end_a, chr_b, start_b, end_b, score.
+        breakpoints_df
+            Columns chr, pos.
+        singletons_df
+            Columns chr1, pos1, chr2, pos2, score.
+        chrs
+            Chromosomes to keep. None keeps every chromosome of `anchors_df`.
+        region
+            Genomic window.
+        max_pet_length
             Arcs longer than this are discarded.
-        compartments_df : DataFrame or None
-            Columns: chr, start, end[, label][, value].  `label` wins when both
-            are present.  A value-only frame is phased the same way a file is.
-        phasing_df : DataFrame or None
-            Columns: chr, start, end, value.  Used to orient a value-only
-            compartment frame.
+        compartments_df
+            Columns chr, start, end[, label][, value]. `label` wins when both are present. A frame of
+            values is phased as a file is.
+        phasing_df
+            Columns chr, start, end, value. Orients a compartment frame of values.
         """
         chr_set: set[str] = (
             set(chrs) if chrs is not None else {str(c) for c in anchors_df["chr"].unique()}
         )
 
-        # anchors
         anchors: AnchorMap = {}
         for _, row in anchors_df.iterrows():
             c = str(row["chr"])
@@ -270,7 +247,6 @@ class ContactData:
             ori = str(row["orientation"]) if "orientation" in row.index else "N"
             anchors.setdefault(c, []).append(Anchor(c, st, en, ori))
 
-        # raw arcs -> mark -> remove empty
         raw_arcs: RawArcMap = {}
         long_arcs: RawArcMap = {}
         for _, row in arcs_df.iterrows():
@@ -297,7 +273,6 @@ class ContactData:
         arcs = mark_arcs(anchors, raw_arcs)
         anchors = remove_empty_anchors(anchors, arcs)
 
-        # breakpoints
         breakpoints: BreakpointMap = {}
         if breakpoints_df is not None:
             for _, row in breakpoints_df.iterrows():
@@ -306,7 +281,6 @@ class ContactData:
                     continue
                 breakpoints.setdefault(c, []).append(int(row["pos"]))
 
-        # singletons
         singletons: list[SingletonContact] = []
         if singletons_df is not None:
             for _, row in singletons_df.iterrows():
@@ -338,27 +312,19 @@ class ContactData:
         )
 
 
-# Epigenomic track assembly, shared by both factories
-
-
 def _finalize_tracks(
     compartments: CompartmentMap,
     phasing: SignalMap,
     anchors: AnchorMap,
 ) -> CompartmentMap:
-    """
-    Phase the compartment track against the phasing signal.
-
-    Both factories go through here so the file and frame paths cannot pick
-    different rules.
-    """
+    """Phases the compartment track for both factories."""
     if compartments:
         compartments = phase_compartments(compartments, phasing or None, anchors)
     return compartments
 
 
 def _compartments_from_df(df: Any, chr_set: set[str], region: BedRegion | None) -> CompartmentMap:
-    """Build a CompartmentMap from a DataFrame with chr/start/end[/label][/value]."""
+    """Builds a CompartmentMap from a DataFrame with chr, start, end[, label][, value]."""
     out: CompartmentMap = {}
     if df is None:
         return out
@@ -385,7 +351,7 @@ def _compartments_from_df(df: Any, chr_set: set[str], region: BedRegion | None) 
 
 
 def _signal_from_df(df: Any, chr_set: set[str], region: BedRegion | None) -> SignalMap:
-    """Build a SignalMap from a DataFrame with chr/start/end/value."""
+    """Builds a SignalMap from a DataFrame with chr, start, end, value."""
     out: SignalMap = {}
     if df is None:
         return out
@@ -406,12 +372,8 @@ def _signal_from_df(df: Any, chr_set: set[str], region: BedRegion | None) -> Sig
     return out
 
 
-# map RawArcs -> anchor-indexed InteractionArcs
-
-
 def fit_arc_strengths(arcs: ArcMap) -> dict[int, ArcStrengthFit]:
-    """One strength fit per factor over a run's arcs, so a second library's PET counts are
-    read against its own typical count at each span rather than the first's."""
+    """Fits one loop strength per factor over a run's arcs."""
     by_factor: dict[int, list[InteractionArc]] = {}
     for lst in arcs.values():
         for a in lst:
@@ -424,15 +386,7 @@ def mark_arcs(
     anchors: AnchorMap,
     raw_arcs: RawArcMap,
 ) -> ArcMap:
-    """
-    Map genomic-position arcs to anchor-index arcs.
-    Mirrors Reference InteractionArcs::markArcs().
-
-    anchors:  dict[chr -> list[Anchor]]
-    raw_arcs: dict[chr -> list[RawArc]] (sorted by start)
-
-    Returns dict[chr -> list[InteractionArc]].
-    """
+    """Maps arcs in genomic positions to arcs between anchor indices. `raw_arcs` are sorted by start."""
     import bisect
 
     arcs: ArcMap = {}
@@ -441,10 +395,8 @@ def mark_arcs(
         chr_anchors = anchors[chr_]
         chr_raw = raw_arcs.get(chr_, [])
 
-        # Binary-search index: anchor start positions (anchors assumed sorted by start).
-        # For a query pos, bisect gives the last anchor with start <= pos; we then
-        # verify pos <= anchor.end.  Anchors in ChIA-PET data don't overlap, so at
-        # most one candidate needs checking.
+        # Anchors are sorted by start and do not overlap. The last anchor with start <= pos is
+        # the only candidate.
         anc_starts = [a.start for a in chr_anchors]
 
         def find_anchor(pos: int) -> int:
@@ -459,7 +411,7 @@ def mark_arcs(
         result: list[InteractionArc] = []
         tmp_arcs: dict[
             int, list[InteractionArc]
-        ] = {}  # end_idx -> staged arcs for current start group
+        ] = {}  # end index -> arcs staged for the current start
         last_start = -1
 
         def flush(target_list: list[InteractionArc]) -> None:
@@ -526,19 +478,13 @@ def mark_arcs(
     return arcs
 
 
-# keep only anchors that are endpoints of at least one arc
-
-
 def remove_empty_anchors(
     anchors: AnchorMap,
     arcs: ArcMap,
 ) -> AnchorMap:
-    """
-    Remove anchors that are not endpoints of any arc.
-    Mirrors Reference InteractionArcs::removeEmptyAnchors().
+    """Removes the anchors that no arc ends on.
 
-    Returns new anchors dict.
-    Also updates arc start/end indices to reflect removed anchors.
+    Returns the new anchors and rewrites the arc indices in place.
     """
     new_anchors: AnchorMap = {}
     index_maps: dict[str, dict[int, int]] = {}
@@ -548,7 +494,6 @@ def remove_empty_anchors(
         chr_arcs = arcs.get(chr_, [])
         n = len(chr_anchors)
 
-        # Mark which anchors are used
         used = [False] * n
         for arc in chr_arcs:
             if 0 <= arc.start < n:
@@ -556,7 +501,6 @@ def remove_empty_anchors(
             if 0 <= arc.end < n:
                 used[arc.end] = True
 
-        # Build new list and index map
         new_list: list[Anchor] = []
         idx_map: dict[int, int] = {}
         for i, anchor in enumerate(chr_anchors):
@@ -570,7 +514,6 @@ def remove_empty_anchors(
         new_anchors[chr_] = new_list
         index_maps[chr_] = idx_map
 
-    # Remap arc indices
     for chr_ in arcs:
         idx_map = index_maps.get(chr_, {})
         valid_arcs: list[InteractionArc] = []

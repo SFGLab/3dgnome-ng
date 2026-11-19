@@ -1,26 +1,10 @@
-"""
-Executors: turn a Dag into per-node output states.
+"""Executors run a Dag and return the output state of each node.
 
-All walk the DAG by repeatedly taking the *ready* set (`Dag.ready`) and running
-it; they differ only in how a ready set is dispatched.  Each dispatch strategy
-is its own small class (`SerialStrategy`, `ThreadedStrategy`, `BatchStrategy`) -
-
-  * serial   - run each node on its own via the kind's serial (numba) runner;
-  * threaded - run the kind's independent ready nodes across a numba thread pool
-    (the kernels are nogil + thread-local RNG, so CPU-parallel and deterministic);
-  * batch    - group the kind's nodes by ``(kind, bucket)`` and run each group
-    through its batch (JAX) runner in one shot (the `mc_*_jax_batch` entries).
-
-`MixedExecutor` is the workhorse: it assigns each `StageKind` a strategy and
-delegates ready-set dispatch to that strategy.  `SerialExecutor` /
-`ThreadedExecutor` / `BatchExecutor` are uniform-strategy convenience
-constructors; `pick_executor` builds a per-stage mix from settings.  The COARSE
-spine is always inline-serial (one RNG stream across its stages).
-
-Result-equivalence note: a node's RNG seed lives in its `Seeded.seed`, not in
-scheduling order, so bead output is independent of strategy - serial, threaded,
-and batched produce the same structures, which is what lets the fixed-seed-exact
-gate hold across executors.
+Each walks the DAG by its ready set. A strategy decides how a ready set of one kind runs.
+Serial runs each node with the serial runner, threaded runs independent nodes on a thread pool
+and batch runs each `(kind, bucket)` group through the batch runner. COARSE is always serial.
+Its stages share one RNG stream. The seed of a node is in its `Seeded.seed`. The
+output does not depend on the strategy.
 """
 
 from __future__ import annotations
@@ -43,24 +27,20 @@ from gnome3d.pipeline.state import State
 LOG = log.get("executor")
 
 
-# Single-node dispatches (e.g. the coarse chr/segment/ib seeding stages) finish near-instantly and
-# spam two lines each; stay quiet for them unless they turn out slow. Multi-node dispatches and any
-# slow node still log. Heavy single-node stages (arcs/smooth) print their own kernel progress.
+# A dispatch of one node logs only when it is slow.
 _QUIET_MAX_NODES = 1
 _QUIET_MAX_SECS = 0.2
 
 
 def _log_dispatch_start(kind: StageKind, strategy: str, n: int, detail: str = "") -> None:
-    """Standard executor dispatch START line, matching the JAX-kernel format:
-    ``arcs[batch]: 50 nodes (group 1/1, ...), running...``. Suppressed for single trivial nodes."""
+    """Logs the start of a dispatch, `arcs[batch]: 50 nodes (group 1/1, ...), running...`."""
     if n <= _QUIET_MAX_NODES:
         return
     log.status(LOG, "  %s[%s]: %d nodes%s, running...", kind.value, strategy, n, detail)
 
 
 def _log_dispatch_done(kind: StageKind, strategy: str, n: int, secs: float) -> None:
-    """Standard executor dispatch DONE line: ``arcs[batch]: 50 nodes in 11.2s``. Suppressed for a
-    single node that finished fast (keeps the line if it was actually slow)."""
+    """Logs the end of a dispatch, `arcs[batch]: 50 nodes in 11.2s`."""
     if n <= _QUIET_MAX_NODES and secs < _QUIET_MAX_SECS:
         return
     log.status(LOG, "  %s[%s]: %d nodes in %.1fs", kind.value, strategy, n, secs)
@@ -68,21 +48,17 @@ def _log_dispatch_done(kind: StageKind, strategy: str, n: int, secs: float) -> N
 
 @runtime_checkable
 class Executor(Protocol):
-    """Run every node in dependency order, returning each node's output state.
-    Beads are read off the terminal (`Smoothed`) nodes."""
+    """Runs every node in dependency order and returns the output state of each."""
 
     def run(self, dag: Dag) -> dict[NodeId, State]: ...
 
 
 class ExecutorStrategy(StrEnum):
-    """Strategies for running a DAG with a *per-kind* scheduling strategy."""
+    """The scheduling strategy of a stage kind."""
 
     SERIAL = "serial"  # numba, one node at a time
-    THREADED = "threaded"  # numba, independent nodes across a thread pool
-    BATCH = "batch"  # JAX, same-(kind,bucket) nodes in one vmapped launch
-
-
-# --- helpers -----------------------------------------------------------------
+    THREADED = "threaded"  # numba, independent nodes on a thread pool
+    BATCH = "batch"  # JAX, the nodes of one (kind, bucket) in one launch
 
 
 def _ready_or_raise(dag: Dag, done: list[NodeId]) -> list[Node]:
@@ -97,9 +73,7 @@ def _ready_or_raise(dag: Dag, done: list[NodeId]) -> list[Node]:
 def _finish(
     dag: Dag, node: Node, output: State, outputs: dict[NodeId, State], done: list[NodeId]
 ) -> None:
-    """Record a node's output, mark it done, and run its `expand` hook (if any),
-    spawning new nodes into the DAG.  Newly added nodes are picked up by the next
-    `ready` pass, so the loops naturally drain the grown graph."""
+    """Records the output of a node, marks it done and runs its `expand` hook."""
     outputs[node.id] = output
     done.append(node.id)
 
@@ -109,14 +83,11 @@ def _finish(
 
 
 def _run_serial(node: Node, inputs: tuple[State, ...]) -> State:
-    """Compute one node's output (serial runner + apply) - the unit of work a
-    serial step or a worker thread runs.
+    """Computes the output of one node with the serial runner.
 
-    Pure w.r.t. shared state: `to_problem`/`apply` only read the (already-extracted)
-    input states and construct a new state; the kernel re-seeds the thread-local
-    Python RNG and numba's thread-local RNG from the node's seed, so concurrent
-    nodes don't share RNG.  Bookkeeping (recording the output, `expand`) stays on
-    the main thread."""
+    The kernel seeds the thread local RNGs from the node's seed. Threads may run this.
+    Recording the output and `expand` stay on the main thread.
+    """
     runner = runners_for(node.stage.kind).serial
     if runner is None:
         raise RuntimeError(f"no serial runner registered for {node.stage.kind}")
@@ -125,13 +96,9 @@ def _run_serial(node: Node, inputs: tuple[State, ...]) -> State:
     return node.stage.apply(inputs, result)
 
 
-# --- strategies --------------------------------------------------------------
-
-
 @runtime_checkable
 class Strategy(Protocol):
-    """Dispatch one ready set of same-`kind` nodes.  Records outputs and runs
-    `expand` hooks on the main thread via `_finish`."""
+    """Dispatches one ready set of nodes of one kind. Outputs are recorded on the main thread."""
 
     def dispatch(
         self,
@@ -146,8 +113,7 @@ class Strategy(Protocol):
 
 
 class SerialStrategy:
-    """Run nodes one at a time on the calling thread (the deterministic baseline,
-    and the only legal strategy for the COARSE spine)."""
+    """Runs nodes one at a time on the calling thread."""
 
     def dispatch(
         self,
@@ -169,8 +135,7 @@ class SerialStrategy:
 
 
 class ThreadedStrategy:
-    """Run independent ready nodes across a shared `ThreadPoolExecutor`.  The
-    pool is lazily created on first dispatch and torn down via `close()`."""
+    """Runs independent ready nodes on a shared thread pool, created on the first dispatch."""
 
     def __init__(self, max_workers: int) -> None:
         self._max_workers = max_workers
@@ -194,7 +159,6 @@ class ThreadedStrategy:
         pool = self._ensure_pool()
         _log_dispatch_start(kind, "threaded", len(nodes), f" ({self._max_workers} workers)")
         t0 = time.perf_counter()
-        # Compute on the pool; finish (record + expand) on the main thread.
         jobs = [(n, dag.inputs_for(n, outputs)) for n in nodes]
         futures = [pool.submit(_run_serial, n, inp) for n, inp in jobs]
         for (node, _inp), fut in zip(jobs, futures, strict=True):
@@ -208,32 +172,20 @@ class ThreadedStrategy:
 
 
 class BatchStrategy:
-    """Group this kind's ready nodes by their *batch key* and run each group
-    through the batch runner in one launch (serial fallback for kinds with no
-    batch runner, e.g. DENSIFY).
+    """Groups the ready nodes of a kind by their batch key and runs each group through the batch
+    runner in one launch. A kind with no batch runner runs serially.
 
-    The key is the stage's ``batch_key`` - ``(energy-term signature,
-    shape-ladder bucket)`` - not the raw size.  Grouping by the ladder bucket
-    keeps one compiled kernel + one wide launch per bucket (vs one per distinct
-    size), and keeps each batch uniform in the flags ``mc_*_jax_batch`` reads
-    from ``problems[0]``.  Each group is timed and logged (always-on) so a slow
-    launch is never a silent stall.
+    The key is the stage's `batch_key`, the energy term signature and the shape bucket. The
+    kernels read their flags from `problems[0]`. A group must be uniform in them.
 
-    Multi-GPU follows ``mc_multigpu_mode``.  Under the default "groups" the groups themselves are
-    the unit of parallelism: each one stays whole on a single device and different groups run side
-    by side (`multigpu.run_group_parallel`).  That is what scales here, because the batch key
-    splits a dispatch into many narrow groups - a chr1 smooth dispatch is 252 groups, most holding
-    one or two IBs, so splitting inside a group has almost nothing to split.  Keeping a group
-    intact also leaves every IB at the launch position it would have had on one device, and the
-    kernels key their per-step RNG on that position, so output is byte-identical whatever the
-    device count.
-
-    "within" is the older behaviour, sharding one group's IBs across devices (`run_sharded`); it
-    helps only while groups are wider than the device count and it does change the random draw.
-    "off" pins everything to one device.  Results are applied in group order regardless."""
+    Multi GPU follows `mc_multigpu_mode`. Under "groups" each group stays whole on one device and
+    groups run side by side, which is byte identical for any device count. Under "within" one
+    group is split across devices, which changes the random draw. "off" uses one device. Results
+    are applied in group order.
+    """
 
     def __init__(self, multigpu_mode: str = "groups") -> None:
-        self._devices: list[object] | None = None  # visible JAX devices (lazy, jax-only)
+        self._devices: list[object] | None = None  # the visible JAX devices, read on first use
         self._mode = str(multigpu_mode).strip().lower()
 
     def _shard_limit(self) -> int:
@@ -262,8 +214,6 @@ class BatchStrategy:
 
         ordered = list(groups.items())
         devices = self._shard_devices() if runners.batch is not None else []
-        # "groups" keeps each group whole on one device and runs different groups side by side.
-        # "within" splits a single group across devices, which only helps while groups are wide.
         by_group = self._mode == "groups" and len(devices) > 1
         results: list[list[Result] | None] = [None] * len(ordered)
 
@@ -304,8 +254,7 @@ class BatchStrategy:
             for gi in range(len(ordered)):
                 _run_group(gi)
 
-        # Applied on the calling thread in group order, so DAG growth stays deterministic
-        # however the groups were interleaved across devices.
+        # Applied on the calling thread in group order. The growth of the DAG is deterministic.
         for (_key, members), result in zip(ordered, results, strict=True):
             for (node, inputs), one in zip(members, result or [], strict=True):
                 _finish(dag, node, node.stage.apply(inputs, one), outputs, done)
@@ -314,26 +263,13 @@ class BatchStrategy:
         pass
 
 
-# --- executors ---------------------------------------------------------------
-
-
 class MixedExecutor:
-    """Run the DAG with a *per-kind* scheduling strategy.
+    """Runs the DAG with one strategy per stage kind.
 
-    ``strategy`` maps each `StageKind` to ``SERIAL`` | ``THREADED`` | ``BATCH``
-    (kinds absent default to serial).  Dispatch is delegated to a `Strategy`
-    instance per chosen value - `SerialStrategy`, `ThreadedStrategy`,
-    `BatchStrategy` - so this executor stays a thin scheduler over them; the
-    convenience subclasses (`SerialExecutor`, `ThreadedExecutor`, `BatchExecutor`)
-    are just uniform-strategy mixes.  ``pick_executor`` builds it from the
-    per-stage ``mc_executor_*`` settings.
-
-    All three strategies are RNG-isolated per node (numba's RNG is per-OS-thread;
-    the Python noise re-seeds a thread-local RNG), so the structures are
-    byte-identical no matter the strategy - the executor-equivalence the fixed-seed
-    gate relies on.  ``COARSE`` is always forced inline-serial: the coarse spine
-    flows one RNG stream across its stages without re-seeding (so it can't be
-    threaded/batched) and carries the fan-out `expand`; it's a linear chain anyway."""
+    `strategy` maps each `StageKind` to SERIAL, THREADED or BATCH. A kind that is absent runs
+    serially. The structures are byte identical under any strategy. Each node seeds its own
+    RNGs. COARSE is always serial.
+    """
 
     def __init__(
         self,
@@ -396,14 +332,14 @@ class MixedExecutor:
 
 
 class SerialExecutor(MixedExecutor):
-    """Every kind serial with one node at a time (the deterministic baseline)."""
+    """Runs every kind serially."""
 
     def __init__(self) -> None:
         super().__init__(dict.fromkeys(StageKind, ExecutorStrategy.SERIAL))
 
 
 class ThreadedExecutor(MixedExecutor):
-    """Every per-IB kind threaded across `max_workers` numba threads (CPU)."""
+    """Runs every IB kind on `max_workers` numba threads."""
 
     _PER_IB: frozenset[StageKind] = frozenset(
         {
@@ -426,8 +362,9 @@ class ThreadedExecutor(MixedExecutor):
 
 
 class BatchExecutor(MixedExecutor):
-    """The kinds in `batch_kinds` batched on JAX, the rest serial.  `None` =
-    batch every kind that has a batch runner (validation)."""
+    """Batches the kinds in `batch_kinds` on JAX and runs the rest serially. None batches every
+    kind that has a batch runner.
+    """
 
     _BATCHABLE: frozenset[StageKind] = frozenset(
         {

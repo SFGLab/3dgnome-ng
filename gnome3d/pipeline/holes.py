@@ -1,22 +1,14 @@
 """Beads for the holes between blocks.
 
-A block runs until a position no loop covers, so the stretch between the last anchor of one block
-and the first anchor of the next has no beads. With `[holes] use_hole_beads` each such hole gets
-one bead per `target_bp_per_subanchor`, the spacing inside a block, with no cap, drawn from the
-maximum entropy bridge between the two anchors that bound it, the draw `start = maxent` makes for
-a gap. A hole of more than 500 beads is drawn in two levels, a bridge over every 500th bead and
-then a bridge between each two of those, so the cost stays linear in the hole's length. A segment
-is conditioned on its two ends alone, which leaves out its correlation with the rest of the hole.
-The contact map scales the segments and not the coarse level, where beads 500 kb apart share
-almost no counts at 1 kb. The drawn chain then runs through the smooth stage's kernel with its
-two ends fixed, the terms a gap inside a block runs through, so a hole's short range matches the
-blocks'. That pass runs once over the whole chromosome in genomic order with every block bead
-fixed, so the excluded volume and the hard wall act between hole beads and block beads as well as
-within a hole. `[holes] hard_wall = no` leaves the wall out of the pass and keeps the soft excluded
-volume, and `[holes] flank_beads` conditions the draw on that many beads of each flanking block
-besides the two anchors. Confinement is left out, since a sphere about the chromosome's centroid has no
-meaning for one hole. The stretches before the first block and after the last are left empty,
-since a bridge needs two ends. See `design/gap-fill.md`.
+The stretch between the last anchor of one block and the first anchor of the next has no
+beads. With `[holes] use_hole_beads` each hole gets one bead per `target_bp_per_subanchor`,
+drawn from the maximum entropy bridge between its two anchors. A hole of more than 500 beads is
+drawn in two levels, a bridge over every 500th bead and then a bridge between each two of
+those. The drawn chains then run through the smooth kernel once over the whole chromosome,
+with every block bead fixed and without confinement. `[holes] hard_wall = no` leaves the wall
+out of that pass. `[holes] flank_beads` conditions the draw on that many beads of each
+flanking block. The stretches before the first block and after the last stay empty. See
+`design/gap-fill.md`.
 """
 
 from __future__ import annotations
@@ -39,8 +31,9 @@ _SEGMENT = 500
 
 
 def hole_slots(end_a: int, start_b: int, target_bp: int) -> list[tuple[int, int]]:
-    """The genomic slots of a hole's beads, one per `target_bp`, laid out as densification lays
-    out a gap's."""
+    """Returns the genomic slots of the beads of a hole, one per `target_bp`, as densification
+    lays out a gap.
+    """
     span = start_b - end_a
     n = round(span / max(target_bp, 1)) - 1
     if span <= 0 or n < 1:
@@ -60,10 +53,11 @@ def _draw(
     chrom: str,
     flank: tuple[list[BeadOut], list[BeadOut]] = ([], []),
 ) -> F32Array:
-    """Positions of a chain whose first and last beads are fixed at `ends_pos`.
+    """Returns the positions of a chain whose first and last beads are fixed at `ends_pos`.
 
-    `flank` holds block beads before the first bead and after the last, in genomic order. With
-    any, the hole's top level is drawn conditioned on them as well as on the two anchors."""
+    `flank` holds block beads before the first bead and after the last, in genomic order. The top
+    level of the hole is drawn conditioned on them too.
+    """
     law = s.polymer_law()
     stretch = float(s.heatmap_distance_stretching)
     uri = str(s.data_contact_map)
@@ -73,8 +67,7 @@ def _draw(
     pos[0], pos[-1] = ends_pos[0], ends_pos[1]
     left, right = flank
     if left or right:
-        # The top level, every bead of a short hole or the knots of a long one, drawn with the
-        # flanking block beads fixed beside the anchors.
+        # The top level is every bead of a short hole or the knots of a long one.
         top = knots if len(knots) > 2 else list(range(n))
         f_st = [x.start for x in left] + [starts[k] for k in top] + [x.start for x in right]
         f_en = [x.end for x in left] + [ends[k] for k in top] + [x.end for x in right]
@@ -124,18 +117,17 @@ def _draw(
 
 
 def _smooth(chain: list[BeadOut], hole: list[bool], s: Settings, seed: int) -> F32Array:
-    """Positions of `chain` after the smooth stage's kernel has run over it with only the beads
-    marked in `hole` free to move.
+    """Returns the positions of `chain` after the smooth kernel with only the hole beads free.
 
     Parameters
     ----------
     chain
-        One chromosome's beads in genomic order, blocks and holes together.
+        The beads of one chromosome in genomic order, blocks and holes.
     hole
-        Per bead of `chain`, whether it is a hole bead.
+        Per bead, True for a hole bead.
     s
-        Settings. The smooth stage's terms are used as they are, confinement and the compartment
-        term excepted.
+        Settings. The terms of the smooth stage are used, without confinement and the
+        compartment term.
     seed
         Seed of the restart noise and of the kernel.
     """
@@ -148,8 +140,8 @@ def _smooth(chain: list[BeadOut], hole: list[bool], s: Settings, seed: int) -> F
         [float(s.genomic_length_to_distance(int(g))) for g in np.maximum(np.diff(mids), 0)],
         dtype=np.float32,
     )
-    # A bond between two block beads is constant under the pass. Its target is its own length,
-    # so the block's score is the one it already has.
+    # The target of a bond between two block beads is its own length. The pass does not change
+    # the score of a block.
     both = fixed[:-1] & fixed[1:]
     dtn[both] = np.linalg.norm(np.diff(pos, axis=0), axis=1)[both]
     free = ~(fixed[:-1] & fixed[1:])
@@ -172,20 +164,20 @@ def _smooth(chain: list[BeadOut], hole: list[bool], s: Settings, seed: int) -> F
 def fill_holes(
     blocks: list[list[BeadOut]], s: Settings, chrom: str, seed: int
 ) -> list[list[BeadOut]]:
-    """The blocks with one more bead list per hole between two of them.
+    """Returns the blocks with one more bead list per hole.
 
     Parameters
     ----------
     blocks
-        One chromosome's per block bead lists, in any order.
+        The bead lists of one chromosome's blocks, in any order.
     s
-        Settings. Reads `use_hole_beads`, `flank_beads`, `hard_wall`,
-        `target_bp_per_subanchor` and `[data] contact_map`.
+        Settings. Reads `use_hole_beads`, `flank_beads`, `hard_wall`, `target_bp_per_subanchor`
+        and `[data] contact_map`.
     chrom
-        The chromosome, for the contact map and the draw's seed.
+        The chromosome, for the contact map and the seed of the draw.
     seed
-        The structure's seed offset. Each hole draws from a generator seeded by it, the
-        chromosome and the hole's place, so a structure reproduces.
+        The seed offset of the structure. Each hole draws from a generator seeded by it, the
+        chromosome and the place of the hole.
     """
     if not s.use_hole_beads or len(blocks) < 2:
         return blocks

@@ -2,9 +2,8 @@
 
     python tests/unit/test_confinement_radius.py
 
-With `confinement_packing_factor_arcs` at zero the arcs stage gives each block the sphere the
-law says a chain of its span fills, and hands it to the kernels as an explicit radius so all of
-them see one value. With the factor positive nothing changes.
+With `confinement_packing_factor_arcs` at zero each block gets the sphere of the law for its
+span as an explicit radius. With a positive factor nothing changes.
 """
 
 from __future__ import annotations
@@ -80,8 +79,9 @@ def test_settings_for_block() -> None:
 
 
 def test_the_kernel_sees_it() -> None:
-    """A block of repelling anchors ends at the wall, so where it ends says which radius the
-    kernel was given. The derived run must match a run handed the same radius explicitly."""
+    """A block of repelling anchors ends at the wall. The derived run must equal a run given
+    the same radius.
+    """
     rng = np.random.default_rng(3)
     n = 16
     genomic = np.sort(rng.integers(0, 3_000_000, n)).astype(np.int64)
@@ -92,7 +92,7 @@ def test_the_kernel_sees_it() -> None:
     def run(s: Settings) -> np.ndarray:
         s.steps_arcs = 1
         s.arcs_solver = "lbfgs"
-        s.arcs_repulsion_cutoff_factor = 50.0  # long range, so the block reaches the wall
+        s.arcs_repulsion_cutoff_factor = 50.0  # long range, the block reaches the wall
         _score, pos = _run(
             {
                 "anchor_pos": pos0,

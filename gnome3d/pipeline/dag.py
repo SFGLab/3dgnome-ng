@@ -1,17 +1,7 @@
-"""
-The dataflow DAG: nodes with explicit dependencies, the unit an executor schedules.
+"""The DAG of nodes that an executor schedules.
 
-The IB pipeline is a linear chain (`arcs -> densify -> [heat] -> smooth`); the
-coarse levels are an upstream chain (`hierarchy -> chr -> segment -> ib`); the
-skeleton fans out to every IB; an ensemble fans each IB into E seed-varied
-chains.  All of that is just graph shape over the same `Node`/`Dag`.
-
-Two scheduling primitives:
-  * `ready` - nodes whose deps are all done (executors build batching on top).
-  * dynamic expansion - a node may carry an `expand` hook that, on completion,
-    spawns *new* nodes into the running DAG.  This is how the coarse positioning
-    fans out: the IB chains aren't known until the hierarchy is built and the
-    IB centroids positioned, so a fan-out node emits them at runtime.
+A node may spawn new nodes when it completes. The coarse stages fan out into the IB chains
+this way.
 """
 
 from __future__ import annotations
@@ -25,19 +15,17 @@ from gnome3d.pipeline.state import Seeded, State
 
 NodeId: TypeAlias = str
 
-# A node's expansion hook: given the node's output state, return new nodes to add
-# to the running DAG plus the seed states for any new roots among them.
+# Takes the output state of a node and returns new nodes with the seed states of their roots.
 ExpandFn: TypeAlias = Callable[[State], "tuple[list[Node], dict[NodeId, Seeded]]"]
 
 
 @dataclass(frozen=True)
 class Node:
-    """A unit of work: run `stage`` once ``deps`` have produced their states.
+    """One unit of work. `stage` runs when `deps` have produced their states.
 
-    A root node (no deps) takes its input from `Dag.seeds[id]` if present, else
-    no input (a true source - e.g. the coarse hierarchy builder).  ``expand``, if
-    set, is called with this node's output state after it runs and spawns more
-    nodes into the DAG (the coarse fan-out into per-IB chains)."""
+    A root takes its input from `Dag.seeds[id]` when present. `expand` is called with the output
+    state and adds nodes to the DAG.
+    """
 
     id: NodeId
     stage: Stage
@@ -47,15 +35,13 @@ class Node:
 
 @dataclass
 class Dag:
-    """Nodes plus the seed states for roots that consume one (per-IB ``Seeded``;
-    true sources have no seed).  Mutable: `add` merges nodes spawned at runtime
-    by an `expand` hook."""
+    """The nodes and the seed states of the roots. `add` merges nodes spawned at run time."""
 
     nodes: dict[NodeId, Node]
     seeds: dict[NodeId, Seeded]
 
     def ready(self, done: Sequence[NodeId]) -> list[Node]:
-        """Nodes whose deps are all done and which haven't run yet."""
+        """Returns the nodes whose deps are done and that have not run."""
         done_set = set(done)
         return [
             n
@@ -64,8 +50,9 @@ class Dag:
         ]
 
     def inputs_for(self, node: Node, outputs: Mapping[NodeId, State]) -> tuple[State, ...]:
-        """The input states a node's stage receives: its deps' outputs, the
-        skeleton seed for a seeded root, or `()` for a true source."""
+        """Returns the input states of a node: the outputs of its deps, the seed of a seeded
+        root or `()`.
+        """
         if not node.deps:
             seed = self.seeds.get(node.id)
             return (seed,) if seed is not None else ()
@@ -73,7 +60,7 @@ class Dag:
         return tuple(outputs[d] for d in node.deps)
 
     def add(self, nodes: list[Node], seeds: dict[NodeId, Seeded]) -> None:
-        """Merge runtime-spawned nodes (and their root seeds) into the DAG."""
+        """Merges spawned nodes and their root seeds into the DAG."""
         for n in nodes:
             self.nodes[n.id] = n
 

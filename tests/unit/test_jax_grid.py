@@ -1,10 +1,9 @@
-"""The cell grid in the JAX smooth kernel: exact against the full scan, and composes with
-prefetching and the wall.
+"""Unit checks for the cell grid in the JAX smooth kernel: exact against the full scan, with
+prefetching and with the wall.
 
     JAX_PLATFORMS=cuda python tests/unit/test_jax_grid.py
 
-Runs on a GPU only. On the CPU backend XLA copies the whole grid on every relink scatter, so a
-2,500 bead chain takes tens of minutes there, and the check is skipped.
+Runs on a GPU only and is skipped on the CPU backend, which takes tens of minutes.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from test_smooth_levers import _jax_available, chain, check, settings, under  # 
 
 
 def compact_chain(n: int = 2500, seed: int = 0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """A dense random walk with anchors every 25 beads, so cells hold many beads."""
+    """A dense random walk with anchors every 25 beads."""
     rng = np.random.default_rng(seed)
     steps = rng.normal(size=(n, 3)).astype(np.float64)
     steps /= np.linalg.norm(steps, axis=1, keepdims=True)

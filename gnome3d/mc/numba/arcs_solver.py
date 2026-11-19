@@ -1,19 +1,8 @@
-"""Solve the arcs stage instead of annealing it.
+"""Solves the arcs stage by L-BFGS-B.
 
-The arcs landscape is a funnel. Ten Monte Carlo starts from perturbed seeds land within one
-percent of the same energy, with a coefficient of variation of a third of a percent, and
-temperature makes no difference to where a run converges, so there are no basins for a
-stochastic search to escape. Measured on real blocks, two hundred L-BFGS iterations reach the
-Monte Carlo's energy about thirty six times faster, with the ensemble spread slightly wider
-rather than narrower and the geometry, realised distance against the distance an arc asked for,
-matching across the whole distribution.
-
-The energy here is the one `mc_arcs_numba` scores, its arc term plus its confinement, with the
-repulsion cutoff and the confinement centre and radius derived the way that driver derives them.
-It implements every term the arcs stage carries.
-
-Production solves; the annealer stays available as `solver = mc`. See
-design/algorithm-improvements.md.
+The energy is the one `mc_arcs_numba` scores, with the repulsion cutoff and the confinement
+centre and radius derived as that driver derives them. The annealer stays available as
+`solver = mc`. See design/algorithm-improvements.md.
 """
 
 from __future__ import annotations
@@ -56,19 +45,16 @@ def arcs_energy_grad(
     use_w: bool = False,
     arc_w: F32Array = NO_W,
 ) -> tuple[float, F64Array]:
-    """The arcs energy over a whole structure and its gradient, for a flattened `(3N,)` vector.
+    """Returns the arcs energy of a structure and its gradient, for a flattened `(3N,)` vector.
 
-    With `use_w` each arc spring's constant is scaled by `arc_w[j, i]`, the loop's weight;
-    the other terms never read it.
+    With `use_w` the constant of each arc spring is scaled by `arc_w[j, i]`.
 
-    Two counting conventions, both taken from the initialisers the MC scores with. The arc term
-    sums unordered pairs, so visiting each from both ends means halving its energy while its
-    gradient stays whole, the two halves being the derivative with respect to each end. The
-    excluded volume sums ordered pairs and so is counted twice, which means a whole energy and a
-    doubled gradient. Confinement is per anchor and single counted.
+    The arc term sums unordered pairs. Each pair is visited from both ends with half its energy
+    and its whole gradient. The excluded volume sums ordered pairs, with a whole energy and a
+    doubled gradient. Confinement is per anchor.
 
-    Per anchor energies are summed after the loop rather than reduced inside it, because numba's
-    parallel reduction does not cope with a scalar accumulator beside the array writes.
+    The energies per anchor are summed after the loop. A scalar accumulator beside the array
+    writes breaks the parallel reduction of numba.
     """
     n = exp.shape[0]
     pos = x.reshape(n, 3)
@@ -150,14 +136,12 @@ def arcs_energy_grad(
 
 @njit(cache=True, fastmath=True, nogil=True, parallel=True)
 def factory_energy_grad(x: F64Array, act: F64Array, w: float, r: float) -> tuple[float, F64Array]:
-    """The factory term over a whole structure and its gradient, for a flattened `(3N,)` vector.
+    """Returns the factory term of a structure and its gradient, for a flattened `(3N,)` vector.
 
-    An active anchor, one with `act` above zero, gains from the active anchors near it through
-    `S_i = sum_j act_j exp(-d_ij / r)`, and its energy is `w act_i (log(1 + A) - log(1 + S_i))`
-    with `A` the total activity, so joining a group lowers it, a second group lowers it little,
-    and it is never below zero, which the Metropolis rule needs of every term. The gradient on
-    anchor i collects its own `S_i` and its part in every other anchor's, so `S` is built in a
-    first pass over the pairs and read in the second.
+    An anchor with `act` above zero gains from the active anchors near it through
+    `S_i = sum_j act_j exp(-d_ij / r)`. Its energy is `w act_i (log(1 + A) - log(1 + S_i))`,
+    with `A` the total activity, which is at least zero. `S` is built in a first pass over the
+    pairs and read in the second.
     """
     n = act.shape[0]
     pos = x.reshape(n, 3)
@@ -209,17 +193,17 @@ def factory_energy_grad(x: F64Array, act: F64Array, w: float, r: float) -> tuple
 def gyration_windows(
     mids: I64Array, law: PolymerLaw, smallest_bp: int
 ) -> tuple[Any, F64Array, F64Array]:
-    """The windows the gyration term holds and their target radii.
+    """Returns the windows of the gyration term and their target radii.
 
-    Windows tile the anchors' span at every scale from `smallest_bp` doubling up to the span,
-    twice at each scale, the second tiling shifted by half a window. A window holding fewer than
-    four anchors is left out. Its target is the law's radius of gyration for the span its anchors
-    cover.
+    Windows tile the span of the anchors at every scale from `smallest_bp` doubling up to the
+    span, twice at each scale, the second tiling shifted by half a window. A window with fewer
+    than four anchors is left out. The target is the radius of gyration of the law for the span
+    of its anchors.
 
     Returns
     -------
     member, count, target
-        A sparse window by anchor matrix of ones, each window's anchor count, and its target.
+        A sparse window by anchor matrix of ones, the anchor count of each window and its target.
     """
     import scipy.sparse as sp  # noqa: PLC0415
 
@@ -250,8 +234,9 @@ def gyration_windows(
 def gyration_energy_grad(
     x: F64Array, member: Any, count: F64Array, target: F64Array, weight: float
 ) -> tuple[float, F64Array]:
-    """`weight` times the sum over windows of the anchor count times the squared relative misfit
-    of the window's radius of gyration to its target, and the gradient."""
+    """Returns `weight` times the sum over windows of the anchor count times the squared relative
+    misfit of the radius of gyration to its target and the gradient.
+    """
     n = member.shape[1]
     pos = x.reshape(n, 3)
     cen = (member @ pos) / count[:, None]
@@ -274,15 +259,12 @@ def solve_arcs(
     activity: F32Array | None = None,
     mids: I64Array | None = None,
 ) -> tuple[float, F32Array]:
-    """Minimise the arcs energy from `pos`. Returns `(energy, positions)`.
+    """Minimises the arcs energy from `pos`. Returns `(energy, positions)`.
 
-    Mirrors the derivations in `mc_arcs_numba` so the energy is the one the annealer reports.
-    `backend` is where the energy is evaluated, `numba` on the CPU or `jax` on the device; the
-    minimiser itself always runs on the host. The arcs stage passes the executor's choice.
-    `arc_w` is each arc pair's spring weight, or None for every pair at one. `activity` is
-    each anchor's activity for the factory term at `factory_weight`, or None for no term.
-    `mids` are the anchors' genomic midpoints, which the gyration term at `gyration_weight`
-    needs to tile its windows.
+    `backend` is the place of the energy evaluation, `numba` on the CPU or `jax` on the device.
+    The minimiser runs on the host. `arc_w` is the spring weight of each arc pair, None for one.
+    `activity` is the activity of each anchor for the factory term, None for no term. `mids` are
+    the genomic midpoints of the anchors, which the gyration term needs.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -386,18 +368,16 @@ def solve_arcs(
         fun = with_gyration
         fun_args = ()
     if n_it <= 0:
-        # No descent. The start is kept, which is how a drawn start reaches the chains as drawn.
+        # No descent. The start is returned as it is.
         e0, _ = fun(pw.reshape(-1), *fun_args)
         return float(e0), np.ascontiguousarray(pw, dtype=np.float32)
-    # The stop rule. With a tolerance the solve ends when an iteration improves the energy by
-    # less than that fraction of it, L-BFGS-B's own `ftol`, and the iteration count is a safety
-    # cap; without one the cap is the only stop, which on a chromosome it always is.
+    # With a tolerance the solve stops when an iteration improves the energy by less than that
+    # fraction, the `ftol` of L-BFGS-B. The iteration count is a cap.
     options: dict[str, Any] = {"maxiter": n_it, "maxfun": 4 * n_it, "maxcor": 20}
     tol = float(s.arcs_solver_tol)
     if tol > 0.0:
         options["ftol"] = tol
-    # GNOME3D_ARCS_TRACE names a file that gets every evaluation's energy, for choosing the
-    # tolerance from a real solve's trajectory.
+    # GNOME3D_ARCS_TRACE is a file that receives the energy of every evaluation.
     trace_path = os.environ.get("GNOME3D_ARCS_TRACE", "")
     trace: list[float] = []
     objective: Any = fun
@@ -423,8 +403,7 @@ def solve_arcs(
         with open(trace_path, "a") as fh:
             fh.write(f"# {n} anchors, {int(res.nit)} iterations, {res.message}\n")
             fh.write("\n".join(f"{e:.6f}" for e in trace) + "\n")
-    # Which rule stopped the solve is what decides whether more iterations buy anything, so
-    # it is always visible for the large solves.
+    # The rule that stopped a large solve is always logged.
     if n >= 2048:
         log.status(
             LOG,

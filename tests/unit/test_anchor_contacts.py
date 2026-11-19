@@ -2,10 +2,9 @@
 
     python tests/unit/test_anchor_contacts.py
 
-The table shares each pixel between the anchors it overlaps in proportion to the overlap, and a
-run reads it by anchor interval. Under `contact_background_z` an arcless pair whose count lies
-beyond z Poisson deviations of its expectation is held in when above and out when below, and
-every other entry of the target matrix is left as it was.
+The table shares each pixel between the anchors it overlaps in proportion to the overlap. Under
+`contact_background_z` an arcless pair whose count is beyond z Poisson deviations of its
+expectation is held and every other entry of the target matrix is unchanged.
 """
 
 from __future__ import annotations
