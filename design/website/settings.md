@@ -26,6 +26,13 @@ of the job's queue slot before the engine starts, and its output opens the job's
 and the step takes 12 s of a job with the start of its interpreter and the load of the model.
 The site never presents the map as individual specific.
 
+A job keeps the predicted map in its directory as `hicdiffusion.bedpe`, one row per pair of
+8,192 bp bins with the predicted count, in the haplotype's coordinates. The file is listed with
+the job's files and is in its archive. The Contact map tab offers the prediction as a half of
+the map, put onto the grid of the tab by the share of each predicted bin inside a bin of the grid.
+The tab goes to 10 kb bins when the prediction is chosen, the resolution nearest to the model's.
+A job that ran before the file was kept does not offer it.
+
 HiCDiffusion runs in its own interpreter, since its package pins clash with the engine's. The
 Docker image holds its checkout at a fixed commit and that interpreter, and sets the four
 variables of the step. Two parts are data and go below `DATA_DIR`:

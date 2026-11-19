@@ -11,6 +11,9 @@ const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]
 const MAX_BINS = 800
 const NO_DATA: [number, number, number] = [226, 225, 221]
 const SETTLE_MS = 250
+const PREDICTED = 'hicdiffusion.bedpe'
+// HiCDiffusion predicts 8,192 bp bins. This is the resolution of the tab nearest to them.
+const PREDICTED_RES = 10_000
 
 /** A window cut to the job's region and at least ten bins wide, or the whole region when it
  * does not overlap it. */
@@ -87,8 +90,15 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     ['hic', `Hi-C, ${summary.request.cell_type}`],
     ['model', 'This job, 1/(d+1)³ between bins'],
     ['model_count', 'This job, contacts within the median bond'],
+    // A job with a predicted background keeps the prediction as a file.
+    ...(summary.files.some((f) => f.name === PREDICTED) ? [['hicdiffusion', 'HiCDiffusion, predicted from the sequence'] as [string, string]] : []),
     ...Object.keys(summary.loops).map((f): [string, string] => [`loops_${f.toLowerCase()}`, `${f} loops`]),
   ]
+  // The map goes to the resolution of the prediction when the prediction is chosen for a half.
+  const choose = (set: (kind: string) => void, kind: string) => {
+    set(kind)
+    if (kind === 'hicdiffusion') setRes(fitting(locus, PREDICTED_RES))
+  }
   // The map follows the window once a burst of wheel steps settles, not at every step.
   const [settled, setSettled] = useState<Locus>(job)
   useEffect(() => {
@@ -276,7 +286,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             if (i < 0 || j < 0 || i >= d.bins.length || j >= d.bins.length) return
             const [r, c] = [Math.min(i, j), Math.max(i, j)]
             setHover(
-              `x ${settled.chrom}:${bp(d.bins[j])}   y ${settled.chrom}:${bp(d.bins[i])}   ${d.upper_label.split(' ')[0]} ${d.upper[r][c].toFixed(1)}   model ${d.lower[c][r].toFixed(1)}   apart ${(Math.abs(d.bins[j] - d.bins[i]) / 1e6).toFixed(2)} Mb`,
+              `x ${settled.chrom}:${bp(d.bins[j])}   y ${settled.chrom}:${bp(d.bins[i])}   ${d.upper_label.split(' ')[0].replace(/,$/, '')} ${d.upper[r][c].toFixed(1)}   model ${d.lower[c][r].toFixed(1)}   apart ${(Math.abs(d.bins[j] - d.bins[i]) / 1e6).toFixed(2)} Mb`,
             )
           }}
           onMouseLeave={() => setHover(null)}
@@ -308,7 +318,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
         </section>
         <label className="field">
           <span>Upper half</span>
-          <select aria-label="Upper half" value={upperKind} onChange={(e) => setUpper(e.target.value)}>
+          <select aria-label="Upper half" value={upperKind} onChange={(e) => choose(setUpper, e.target.value)}>
             {halves.map(([id, label]) => (
               <option key={id} value={id}>
                 {label}
@@ -318,7 +328,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
         </label>
         <label className="field">
           <span>Lower half</span>
-          <select aria-label="Lower half" value={lowerKind} onChange={(e) => setLower(e.target.value)}>
+          <select aria-label="Lower half" value={lowerKind} onChange={(e) => choose(setLower, e.target.value)}>
             {[...halves.slice(1, 3), halves[0], ...halves.slice(3)].map(([id, label]) => (
               <option key={id} value={id}>
                 {label}

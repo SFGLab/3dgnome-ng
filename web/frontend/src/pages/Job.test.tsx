@@ -57,6 +57,12 @@ describe('Job explorer', () => {
     expect(screen.queryByRole('link', { name: /all files, zip/ })).not.toBeInTheDocument()
   })
 
+  it('lists the HiCDiffusion prediction of a job that kept it among the files', async () => {
+    mockApi([[/summary$/, () => [200, { ...SUMMARY_DONE, files: [...SUMMARY_DONE.files, { name: 'hicdiffusion.bedpe', size: 1_700_000 }] }]]])
+    renderJob()
+    expect(await screen.findByRole('link', { name: /hicdiffusion\.bedpe/ })).toHaveAttribute('href', `/jobs/${KEY}/files/hicdiffusion.bedpe`)
+  })
+
   it('folds the facts and the files of the side panel behind a button, for a narrow screen', async () => {
     mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
     const { container } = renderJob()

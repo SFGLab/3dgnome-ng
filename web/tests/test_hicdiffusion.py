@@ -5,10 +5,12 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 
 from _check import check, done
@@ -70,6 +72,12 @@ def main() -> int:
         check("the job's log holds the model's lines and then the engine's", log.index("fake HiCDiffusion") < log.index("wrote 2 structures"), log)
         sing = (res / "inputs").glob("*")
         check("the job has inputs", any(sing))
+        kept = res / hicdiffusion.MAP_FILE
+        rows = kept.read_text().splitlines() if kept.is_file() else []
+        check("the job keeps the predicted map, one row per pair of bins", len(rows) == 256 * 257 // 2, str(len(rows)))
+        check("a row is a pair of 8,192 bp bins with the predicted count", rows[:1] == ["chr1\t0\t8192\tchr1\t0\t8192\t3.482"], str(rows[:1]))
+        on, first, step, counts = hicdiffusion.read_map(kept)
+        check("the map reads back as the square it was", (on, first, step, counts.shape) == ("chr1", 0, 8192, (256, 256)) and bool((counts == 3.482).all()), str((on, first, step, counts.shape)))
 
         os.environ["FAKE_HICDIFFUSION_FAIL"] = "1"
         res = run_job(req, cat, root / "results" / "b", engine=FAKE_ENGINE)
@@ -89,6 +97,21 @@ def main() -> int:
         check("a HiCDiffusion job is accepted", r.status_code == 201, r.text[:200])
         s = c.get("/api" + r.json()["url"]).json()
         check("and it finishes through the site", s["state"] == "done", str(s)[:300])
+        url = r.json()["url"]
+        listed = [f["name"] for f in c.get(f"/api{url}/summary").json()["files"]]
+        check("the job lists the predicted map among its files", hicdiffusion.MAP_FILE in listed, str(listed))
+        got = c.get(f"{url}/files/{hicdiffusion.MAP_FILE}")
+        check("the predicted map downloads", got.status_code == 200 and got.text.startswith("chr1\t0\t8192\t"), str(got.status_code))
+        with zipfile.ZipFile(io.BytesIO(c.get(f"/api{url}/files.zip").content)) as z:
+            check("the zip of the job holds the predicted map", hicdiffusion.MAP_FILE in z.namelist(), str(z.namelist()))
+        m = c.get(f"/api{url}/contacts", params={"region": "chr1:0-2000000", "res": 25000, "upper": "hicdiffusion", "lower": "model", "norm": "raw"})
+        j = m.json()
+        check("the contact map takes the prediction as a half", m.status_code == 200 and j["upper_label"].startswith("HiCDiffusion"), m.text[:200])
+        # A flat prediction of 3.482 a pixel puts (25000 / 8192) squared pixels into a 25 kb bin.
+        check("a bin of the half holds the predicted counts of its pixels", abs(j["upper"][3][10] - 3.482 * (25000 / 8192) ** 2) < 1e-3, str(j["upper"][3][10]))
+        plain = c.post("/api/jobs", data=form | {"background": "hic", "region": "chr1:0-1900000"})
+        bad = c.get(f"/api{plain.json()['url']}/contacts", params={"region": "chr1:0-1900000", "upper": "hicdiffusion"})
+        check("a job without a prediction refuses the half", bad.status_code == 400 and "hicdiffusion" not in bad.json()["error"].split("is not one of")[1], bad.text[:200])
         os.environ["REFERENCE_FASTA"] = str(root / "none.fa")
         check("the catalog withdraws it once a part is gone", c.get("/api/catalog").json()["hicdiffusion"] is False)
         r = c.post("/api/jobs", data=form | {"region": "chr1:100000-2000000"})

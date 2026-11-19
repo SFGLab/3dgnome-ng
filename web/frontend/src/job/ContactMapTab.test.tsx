@@ -20,11 +20,11 @@ const MAP = {
   scc_about: 'Hi-C of GM12878, 4DN 4DNFIXP4QG5B against this job\'s contacts within the median bond, raw counts, diagonals up to 2 Mb, as the validation battery computes it',
 }
 
-function renderTab() {
+function renderTab(files = SUMMARY_DONE.files) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={client}>
-      <ContactMapTab api={jobApi('jobs', KEY)} summary={{ ...SUMMARY_DONE, region: 'chr1:11500000-11575000' }} />
+      <ContactMapTab api={jobApi('jobs', KEY)} summary={{ ...SUMMARY_DONE, files, region: 'chr1:11500000-11575000' }} />
     </QueryClientProvider>,
   )
 }
@@ -124,6 +124,23 @@ describe('ContactMapTab', () => {
     fireEvent.change(lower, { target: { value: 'model_count' } })
     await new Promise((r) => setTimeout(r, 50))
     expect(f.mock.calls.some(([u]) => String(u).includes('lower=model_count'))).toBe(true)
+  })
+
+  it('offers the HiCDiffusion prediction of a job that kept it, in either half', async () => {
+    const f = mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    renderTab([...SUMMARY_DONE.files, { name: 'hicdiffusion.bedpe', size: 1_700_000 }])
+    await screen.findByText('0.21')
+    const values = (label: string) => within(screen.getByLabelText(label)).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)
+    expect(values('Upper half')).toEqual(['hic', 'model', 'model_count', 'hicdiffusion', 'loops_ctcf', 'loops_rnapii'])
+    expect(values('Lower half')).toEqual(['model', 'model_count', 'hic', 'hicdiffusion', 'loops_ctcf', 'loops_rnapii'])
+    expect(within(screen.getByLabelText('Upper half')).getByRole('option', { name: 'HiCDiffusion, predicted from the sequence' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Upper half'), { target: { value: 'hicdiffusion' } })
+    await new Promise((r) => setTimeout(r, 50))
+    // The tab goes to 10 kb, the resolution nearest to the 8,192 bp bins of the prediction.
+    expect(f.mock.calls.some(([u]) => String(u).includes('upper=hicdiffusion') && String(u).includes('res=10000'))).toBe(true)
+    expect((screen.getByLabelText('Resolution') as HTMLSelectElement).value).toBe('10000')
+    fireEvent.change(screen.getByLabelText('Upper half'), { target: { value: 'hic' } })
+    expect((screen.getByLabelText('Resolution') as HTMLSelectElement).value).toBe('10000')
   })
 
   it('starts the log colour range at a low percentile, not at zero', async () => {

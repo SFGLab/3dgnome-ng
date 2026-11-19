@@ -20,6 +20,7 @@ import pandas as pd
 from gnome3d.geometry import smooth_chain
 
 from . import contacts as cm
+from . import hicdiffusion
 from .marks import read_cif
 
 MAX_GAP = 5_000
@@ -395,10 +396,16 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
     counted = cm.model_map(pos, mid, start, end, res, bond)
 
     loop_sets = {f"loops_{factor.lower()}": (factor, path) for factor, path in _loop_files(job)}
+    predicted = job / hicdiffusion.MAP_FILE
+    kinds = ["hic", "model", "model_count", *(["hicdiffusion"] if predicted.is_file() else []), *loop_sets]
 
     def one(kind: str) -> tuple[np.ndarray, str]:
         if kind == "hic":
             return hic, hic_label
+        if kind == "hicdiffusion" and predicted.is_file():
+            on, first, step, counts = hicdiffusion.read_map(predicted)
+            grid = cm.window_map(counts, first, step, start, end, res)
+            return (grid if on == chrom else np.zeros_like(grid)), "HiCDiffusion, the contacts predicted from the sequence"
         if kind in loop_sets:
             factor, path = loop_sets[kind]
             rows = []
@@ -411,7 +418,7 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
             return cm.multimm_map(pos, mid, start, end, res), f"This job, 1/(d+1)³ between bins, mean of {n_models} structures"
         if kind == "model_count":
             return counted, f"This job, contacts within the median bond, sum of {n_models} structures"
-        raise ExploreError(f"{kind!r} is not one of hic, model, model_count, {', '.join(loop_sets)}")
+        raise ExploreError(f"{kind!r} is not one of {', '.join(kinds)}")
 
     a, la = one(upper)
     b, lb = one(lower)

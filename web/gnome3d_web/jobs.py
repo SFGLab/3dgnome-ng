@@ -18,6 +18,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import numpy as np
+from personal3d.lift import Lift
 
 from . import hicdiffusion
 from .catalog import Catalog
@@ -186,7 +187,9 @@ def run_job(
         hic = None
         if req.background == "hicdiffusion":
             _status(job, stage="hicdiffusion")
-            hic = hicdiffusion.predict(region.chrom, region.start, svs, log, env_extra), region.start
+            cond = hicdiffusion.predict(region.chrom, region.start, svs, log, env_extra)
+            hicdiffusion.write_map(job / hicdiffusion.MAP_FILE, region.chrom, Lift(svs).edge(region.start), cond)
+            hic = cond, region.start
         inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background, own)
         apply_overrides(inputs.config, validate_overrides(req.overrides))
         _status(job, stage="modelling", region=inputs.region, n_svs=inputs.n_svs, skipped_svs=skipped, loops=inputs.loops)

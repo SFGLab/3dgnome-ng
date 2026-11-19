@@ -93,6 +93,18 @@ def hic_map(singletons: pd.DataFrame, chrom: str, start: int, end: int, res: int
     return m
 
 
+def window_map(counts: np.ndarray, first: int, step: int, start: int, end: int, res: int) -> np.ndarray:
+    """A square map on bins of its own put onto the grid of a window. A bin of the map gives a
+    bin of the grid the share of its length that is inside it.
+
+    @param counts the map, bin `i` from `first + i * step`
+    """
+    edges = bins_for(start, end, res)[:, None]
+    lo = (first + np.arange(counts.shape[0]) * step)[None, :]
+    share = np.clip(np.minimum(edges + res, lo + step) - np.maximum(edges, lo), 0, None) / step
+    return share @ counts @ share.T
+
+
 def ice(m: np.ndarray, iterations: int = 200) -> np.ndarray:
     """Iterative correction: rows and columns scaled until every non empty row has one sum."""
     out = m.astype(float).copy()

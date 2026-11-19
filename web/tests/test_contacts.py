@@ -14,7 +14,7 @@ import numpy as np
 from _check import check, done
 from fixture import make_data
 
-from gnome3d_web.contacts import ice, loop_enrichment, median_bond, model_map, multimm_map, rank_agreement, rank_reach, scc
+from gnome3d_web.contacts import ice, loop_enrichment, median_bond, model_map, multimm_map, rank_agreement, rank_reach, scc, window_map
 
 
 def battery_scc(A: np.ndarray, B: np.ndarray, max_sep_bins: int) -> float:
@@ -32,6 +32,14 @@ def battery_scc(A: np.ndarray, B: np.ndarray, max_sep_bins: int) -> float:
 
 
 def main() -> int:
+    small = np.arange(16.0).reshape(4, 4)
+    check("a map on bins of its own keeps its total on a coarser grid", abs(window_map(small, 0, 10, 0, 40, 20).sum() - small.sum()) < 1e-9)
+    check("a coarser bin holds the bins inside it", window_map(small, 0, 10, 0, 40, 20)[0, 1] == small[:2, 2:].sum())
+    fine = window_map(small, 0, 10, 0, 40, 5)
+    check("a finer bin holds its share of the bin around it", fine.shape == (8, 8) and fine[0, 2] == small[0, 1] / 4, str(fine[0, :4]))
+    check("a bin across two bins of the map takes a part of each", abs(window_map(small, 0, 10, 0, 45, 15)[0, 0] - (small[0, 0] + 0.5 * small[0, 1] + 0.5 * small[1, 0] + 0.25 * small[1, 1])) < 1e-9)
+    check("the grid outside the map is empty", window_map(small, 100, 10, 0, 50, 10).sum() == 0)
+
     pos = [np.array([[0.0, 0, 0], [1.0, 0, 0], [9.0, 0, 0]])] * 2
     mids = np.array([1000, 3000, 70000])
     m = model_map(pos, mids, 0, 100000, 25000)

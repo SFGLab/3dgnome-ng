@@ -169,7 +169,7 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
               </ul>
             </li>
             {summary.files
-              .filter((f) => ['ep.tsv', 'marks.json', 'engine.log'].includes(f.name))
+              .filter((f) => ['ep.tsv', 'marks.json', 'engine.log', 'hicdiffusion.bedpe'].includes(f.name))
               .map((f) => (
                 <li key={f.name} className="file">
                   <a href={api.fileUrl(f.name)}>

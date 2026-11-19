@@ -23,13 +23,16 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import numpy as np
-from personal3d.hicdiffusion import Reference, encode, haplotype_window
+import pandas as pd
+from personal3d.hicdiffusion import BIN, Reference, encode, haplotype_window
 
 VARIABLES = ("HICDIFFUSION_DIR", "HICDIFFUSION_PYTHON", "HICDIFFUSION_MODELS", "REFERENCE_FASTA")
 CHECKPOINTS = ("hicdiffusion.ckpt", "hicdiffusion_encoder_decoder.ckpt")
 # The runner has a directory of its own. Python puts a script's directory first on its path
 # and beside the site's modules `import queue` inside torch would find the site's queue.py.
 RUNNER = Path(__file__).resolve().parent / "hicdiffusion_env" / "runner.py"
+# The predicted map of a job, in the job's directory.
+MAP_FILE = "hicdiffusion.bedpe"
 
 
 def missing(env: Mapping[str, str] | None = None) -> list[str]:
@@ -78,3 +81,34 @@ def predict(chrom: str, start: int, svs: list, log: Path, env_extra: Mapping[str
         if rc != 0:
             raise RuntimeError(f"HiCDiffusion exited with {rc}")
         return np.load(dst)["cond"]
+
+
+def write_map(path: Path, chrom: str, start: int, cond: np.ndarray) -> None:  # type: ignore[type-arg]
+    """Write the predicted map as bin pairs, one row per pair of the upper half and the diagonal.
+
+    The columns are those of a contact BEDPE. The seventh is the predicted count, the mean of the
+    two halves of the prediction.
+
+    @param start the position the window begins at, in the haplotype's coordinates
+    @param cond the prediction on the log of one plus the count
+    """
+    counts = np.expm1(np.clip(cond, 0, None))
+    counts = (counts + counts.T) / 2
+    i, j = np.triu_indices(counts.shape[0])
+    rows = pd.DataFrame({0: chrom, 1: start + i * BIN, 2: start + (i + 1) * BIN, 3: chrom, 4: start + j * BIN, 5: start + (j + 1) * BIN, 6: np.round(counts[i, j], 3)})
+    rows.to_csv(path, sep="\t", header=False, index=False)
+
+
+def read_map(path: Path) -> tuple[str, int, int, np.ndarray]:  # type: ignore[type-arg]
+    """The map `write_map` wrote.
+
+    @return the chromosome, the start of the window, the bin and the symmetric counts
+    """
+    rows = pd.read_csv(path, sep="\t", header=None)
+    start, step = int(rows[1].min()), int(rows[2].iloc[0] - rows[1].iloc[0])
+    n = int((rows[4].max() - start) // step) + 1
+    i, j = ((rows[1] - start) // step).to_numpy(), ((rows[4] - start) // step).to_numpy()
+    counts = np.zeros((n, n))
+    counts[i, j] = rows[6].to_numpy()
+    counts[j, i] = rows[6].to_numpy()
+    return str(rows[0].iloc[0]), start, step, counts

@@ -37,7 +37,7 @@ from .siteconfig import ConfigFile
 from .viewer import viewer_payload
 
 HERE = Path(__file__).resolve().parent
-FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|[A-Za-z0-9_.:-]+\.cif)$")
+FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|hicdiffusion\.bedpe|[A-Za-z0-9_.:-]+\.cif)$")
 
 
 class StripBase:
