@@ -25,6 +25,12 @@ function describe(pos: number, chrom: string, ann: Annotations): string {
 
 const mid = (s: Structure, k: number) => Math.round((s.beads[k][0] + s.beads[k][1]) / 2)
 
+/** The stretch of the genome the model keeps solid: the whole chain between the two anchors of
+ * a selected loop, and without one the part of the region chosen on the loop view. */
+export function solidSpan(loop: Loop | null, part: [number, number] | null): [number, number] | null {
+  return loop ? [(loop.a[0] + loop.a[1]) / 2, (loop.b[0] + loop.b[1]) / 2] : part
+}
+
 /** The card of a selected loop: its factor, its two anchors, its span and its PET count. */
 function LoopCard({ loop }: { loop: Loop }) {
   return (
@@ -110,7 +116,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
         focusBeads={pair}
         onPickBead={pick}
         onHoverPosition={setCursor}
-        focusSpan={part}
+        focusSpan={solidSpan(loop, part)}
         above={
           loops.length > 0 && (
             <LoopView
@@ -127,7 +133,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
                 setLoop(i === null ? null : loops[i])
               }}
               cursor={cursor}
-              hint={part ? 'This part of the region stays solid in the model. Click a loop to mark its two anchors. Scroll to zoom.' : 'Click a loop to mark its two anchors in the model. Scroll or drag along the loops to look at a part of the region.'}
+              hint={part ? 'This part of the region stays solid in the model. Click a loop to mark its two anchors and the chain between them. Scroll to zoom.' : 'Click a loop to mark its two anchors and the chain between them in the model. Scroll or drag along the loops to look at a part of the region.'}
             />
           )
         }
