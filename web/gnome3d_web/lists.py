@@ -1,11 +1,8 @@
 """Job lists that several browsers share through a sync code.
 
-A list holds the jobs of one person as the browser keeps them, each with its client route, its
-label, its name and its start time. Every browser that has the code reads and writes the same
-list. A write merges, it never removes. A list made without private jobs refuses them.
-
-The code is 16 characters of Crockford base32, 80 random bits, shown in four groups. Its file is
-named by a digest of the code. The directory does not hold the codes.
+A write merges and does not remove. A list made without private jobs refuses them. The code is
+16 characters of Crockford base32. Its file has a digest of the code as its name and the
+directory does not hold the codes.
 """
 
 from __future__ import annotations

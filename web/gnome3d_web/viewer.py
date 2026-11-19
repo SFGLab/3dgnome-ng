@@ -1,12 +1,9 @@
-"""What the viewer draws for one structure: the chain as a smooth curve and a box around each
+"""The drawing data of one structure: the chain as a smooth curve and a box around each
 promoter and enhancer.
 
-The beads are put in genomic order and smoothed with the Catmull-Rom spline the figures use,
-`gnome3d.geometry.smooth_chain`. Every point of the curve carries a genomic position, linear
-between the midpoints of the two beads of its bond. An element's box is the axis aligned box of
-the curve's points inside its interval, padded. An element shorter than the spacing of the
-points takes the point nearest its centre and its neighbours, when that point is within 5 kb;
-an element farther from the chain gets no box.
+The beads are smoothed with `gnome3d.geometry.smooth_chain`. Every point of the curve has a
+genomic position, linear between the midpoints of the two beads of its bond. The box of an
+element is the padded axis aligned box of the curve points inside its interval.
 """
 
 from __future__ import annotations

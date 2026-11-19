@@ -1,12 +1,9 @@
-"""One sample's structural variants in a region, from any VCF with SVTYPE in its INFO.
+"""The structural variants of one sample in a region, from any VCF with SVTYPE in its INFO.
 
-Variants follow personal3d's convention, 1 based, start the first affected base and end one
-past the last. A deletion, an inversion and a duplication run from the base after POS to END, an
-insertion goes in after POS with the ALT sequence, or with N repeated SVLEN times when ALT is
-symbolic. A duplication is read as tandem, the copy right after the original, which is how the
-1000 Genomes panel calls them. Other types are skipped and counted. A phased genotype puts each allele on its haplotype; an
-unphased one puts the variant on the first. Only variants wholly inside the region are kept,
-the rule the rewiring rules take.
+Coordinates follow personal3d, 1 based, start the first affected base and end one past the
+last. A duplication is read as tandem. Types other than deletion, insertion, inversion and
+duplication are skipped and counted. A phased genotype puts each allele on its haplotype and
+an unphased one puts the variant on the first. Only variants wholly inside the region are kept.
 """
 
 from __future__ import annotations
@@ -88,8 +85,8 @@ def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV]
 
 
 def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[dict[str, object]], dict[str, int]]:
-    """The records of one sample inside the region with their genotype and the haplotypes that
-    carry them and the count of records of other types the sample carries, by type.
+    """The records of one sample inside the region with their genotype and haplotypes. Also
+    returns the count of records of other types, by type.
 
     @raises KeyError when the sample is not a column of the VCF
     """

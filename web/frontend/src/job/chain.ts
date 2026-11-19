@@ -18,9 +18,10 @@ export function stretch(i: number, n: number, k = 6): [number, number] {
   return [Math.max(0, i - k), Math.min(n - 1, i + k)]
 }
 
-/** Fog that starts at the structure's middle and would be full at 2.5 radii behind it, seen from
- * the camera's distance. The far side of the structure is at one radius, so it fades by two
- * fifths and stays readable against the background. */
+/**
+ * Fog that starts at the middle of the structure and would be full at 2.5 radii behind it. The far
+ * side fades by two fifths.
+ */
 export function fogRange(radius: number, cameraDistance: number): [number, number] {
   return [cameraDistance, cameraDistance + 2.5 * radius]
 }
@@ -34,13 +35,13 @@ export function focusMask(n: number, ranges: [number, number][]): Uint8Array | n
   return mask
 }
 
-/** The bead whose tube is drawn under the cursor. Each bond is a tube from one bead to the next;
- * the cursor is on a bond when it lies within that bond's drawn radius, plus two pixels, of the
- * bond's line on the screen. Of the bonds under the cursor the one nearest the camera wins, and
- * of its two beads the one nearer the cursor along it. Null off every tube.
+/**
+ * The bead whose tube is drawn under the cursor, or null. The cursor is on a bond when it is within
+ * the drawn radius of the bond plus two pixels of its line on the screen. The bond nearest the
+ * camera wins and of its two beads the one nearer the cursor.
  *
- * @param chain each bead's screen x and y in pixels, its distance from the camera and the tube's
- *   drawn radius in pixels at that bead
+ * @param chain the screen x and y of each bead in pixels, its distance from the camera and the
+ * drawn radius of the tube in pixels at that bead
  */
 export function pickOnChain(chain: [number, number, number, number][], x: number, y: number): number | null {
   if (chain.length === 1) {

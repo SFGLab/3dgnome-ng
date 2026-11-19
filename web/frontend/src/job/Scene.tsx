@@ -14,19 +14,21 @@ const HOVER = '#2A78D6'
 /** Marks drawn over the chain take no pointer events, or the pointer would hit the mark instead
  * of the bead under it and the hover would flicker between the two. */
 const noRaycast = () => null
-/** The labels over the canvas take no pointer events either. drei's `Html` applies its own
- * `pointerEvents` prop only to transformed labels. The style is set on the wrapper and the
- * inner div by hand. A label that took the pointer would leave the canvas the moment it appeared
- * under a still cursor, clear the hover, vanish and bring the hover back, over and over. */
+/**
+ * The labels over the canvas take no pointer events. drei's `Html` applies its `pointerEvents` prop
+ * only to transformed labels. A label that took the pointer would clear the hover it belongs to.
+ */
 const MARK_STYLE = { pointerEvents: 'none' } as const
-/** The labels lie under everything the page draws over the canvas, the hover box and the key.
- * drei gives a label a z-index by its depth, up to millions, which put a letter over the box. */
+/**
+ * The labels are under the hover box and the key. drei gives a label a z-index by its depth, up to
+ * millions.
+ */
 const MARK_LAYER: [number, number] = [1, 0]
-/** Hover and pick by the screen: every bond is projected as the tube it is drawn as and the
- * front tube under the cursor gives the bead. Casting rays into the meshes flickered between the
- * tubes and the joints and testing bead centres alone missed a zoomed tube between two beads
- * and caught a strand behind. No hover while a drag rotates the view and a click is a press and
- * release that hardly moved. */
+/**
+ * Hover and pick by the screen: every bond is projected as the tube it is drawn as and the front
+ * tube under the cursor gives the bead. No hover while a drag rotates the view. A click is a press
+ * and release that hardly moved.
+ */
 function Picker({
   points,
   tube,
@@ -220,10 +222,8 @@ function ChainPart({ matrices, colors, radius, focus, ghost = false, depthOnly =
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
     }
   }, [matrices, colors, focus, ghost, n])
-  // The ghost is drawn twice. The first pass writes the depth of its nearest surface and no
-  // colour. The second blends its colour where it is that nearest surface, so every pixel gets
-  // one layer of it. Blended in one pass, the spheres at the beads and the strands behind each
-  // other add up to dots and blotches.
+  // The ghost is drawn twice. The first pass writes the depth of its nearest surface and the second
+  // blends its colour there. One pass would add up overlapping spheres and strands to blotches.
   const material = depthOnly ? (
     <meshBasicMaterial colorWrite={false} />
   ) : ghost ? (

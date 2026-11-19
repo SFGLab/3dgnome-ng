@@ -1,11 +1,9 @@
-"""Contact maps by link. The server reads one window of a remote .hic or .mcool file over HTTP
-range requests and keeps only its bin pairs at 25 kb, thinned to the density of the hosted maps.
-The whole file never comes to the server.
+"""Contact maps by link.
 
-A link must be http or https, end in .hic, .mcool or .cool and resolve to a public address.
-Every connection to the link's server resolves its host once and connects to the address it
-checked. A name that turns private between the check and the read is refused. The readers
-reach the file through a local range proxy that makes those connections.
+The server reads one window of a remote .hic or .mcool file over HTTP range requests and keeps
+its bin pairs at 25 kb, thinned to the density of the hosted maps. A link must be http or
+https, end in .hic, .mcool or .cool and resolve to a public address. Every connection goes to
+the address that was checked, through a local range proxy.
 """
 
 from __future__ import annotations
@@ -154,9 +152,8 @@ def check_link(url: str, allow_private: bool) -> str:
 
 
 def probe(url: str, allow_private: bool, timeout: float = HEAD_SECONDS) -> tuple[int, str]:
-    """The size of a remote file whose server answers range requests and the address it is served
-    from after redirects. Every connection, redirects included, goes to an address checked when it
-    is made.
+    """The size of a remote file whose server answers range requests and the address it is
+    served from after redirects.
 
     @raises RemoteError when a hop is private, or the server answers a web page or the whole file
     """
@@ -439,11 +436,11 @@ def _kb(bp: int) -> str:
 
 
 def link_window(url: str, chrom: str, start: int, end: int, per_mb: float, density_from: str, allow_private: bool) -> tuple[bytes, int, str]:
-    """Reads a remote map's window into BEDPE bytes at 25 kb, thinned to per_mb contacts per Mb.
-    Returns the bytes, the file size and the summary.
+    """Reads the window of a remote map into BEDPE bytes at 25 kb, thinned to per_mb contacts
+    per Mb. Returns the bytes, the file size and the summary.
 
     @param density_from the name of the hosted map the density comes from, for the summary
-    @raises RemoteError naming the problem and its fix
+    @raises RemoteError with the problem and its fix
     """
     kind = check_link(url, allow_private)
     size, final = probe(url, allow_private)

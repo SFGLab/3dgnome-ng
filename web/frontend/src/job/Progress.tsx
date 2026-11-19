@@ -28,9 +28,10 @@ function weights(hicdiffusion: boolean): [string, number][] {
 
 const since = (s: number) => (s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`)
 
-/** A queued or running job. Over the page: the stage with its count, the bar and the stages with
- * the time each began after the first. Under them the end of the engine log fills the rest of
- * the screen and follows its last line, unless the reader has scrolled up. */
+/**
+ * A queued or running job: the stage with its count, the bar and the stages, then the end of the
+ * engine log, which follows its last line unless the reader has scrolled up.
+ */
 export function Progress({ summary }: { summary: Summary }) {
   const stage = summary.state === 'queued' ? 'queued' : (summary.stage ?? 'inputs')
   const ws = weights((summary.request.background ?? '') === 'hicdiffusion' || !!summary.request.hicdiffusion)

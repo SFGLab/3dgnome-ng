@@ -1,14 +1,11 @@
-"""The contact map HiCDiffusion predicts for one sequence, run inside HiCDiffusion's environment.
-
-Started by gnome3d_web.hicdiffusion with HiCDiffusion's interpreter and its checkout as the
-working directory. Its modules import. Reads an npz with `seq`, 2,097,152 bases coded A0 C1
-T2 G3 N4, the model's own coding. Writes an npz with `cond`, the encoder decoder's map of 256 by
-256 bins of 8,192 bp on the log of one plus the count. The map is deterministic. The diffusion
-that refines it is not run. A job reads this map alone.
-
-This file stays alone in its directory, see RUNNER in gnome3d_web/hicdiffusion.py.
+"""Predicts the contact map of one sequence, inside the environment of HiCDiffusion.
 
     python runner.py <in.npz> <out.npz> <model.ckpt> <encoder_decoder.ckpt>
+
+Reads an npz with `seq`, 2,097,152 bases coded A0 C1 T2 G3 N4. Writes an npz with `cond`, the
+map of the encoder decoder, 256 by 256 bins of 8,192 bp on the log of one plus the count. The
+diffusion that refines it is not run. This file stays alone in its directory, see RUNNER in
+gnome3d_web/hicdiffusion.py.
 """
 
 import os

@@ -1,6 +1,7 @@
-/* Design tokens from web/design/site.pen, one custom property per Pencil variable. The design
-   defines light values; the dark values are derived here, the factor colours checked with the
-   palette validator against the dark surface. */
+/*
+ * Design tokens from web/design/site.pen, one custom property per Pencil variable. The dark values
+ * are derived here.
+ */
 :root {
   --bg: #FCFCFB;
   /* A clickable element under the pointer: darker on a light page, lighter on a dark one. */

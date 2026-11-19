@@ -1,8 +1,7 @@
 #!/bin/bash
-# The rest of the deep contact map of HFFc6, in eight ranges at once. A connection to the bucket
-# is fast for its first seconds and slows after, so each range is fetched in passes of 25
-# seconds on new connections. The ranges are then appended to the partial file in order, and
-# the whole is checked by its size and its md5, 59581e9ec46ead9619906e4d1fd4c57d.
+# Fetches the rest of the deep contact map of HFFc6 in eight ranges at once, each in passes of 25
+# seconds. The ranges are appended to the partial file in order. The md5 of the whole file is
+# 59581e9ec46ead9619906e4d1fd4c57d.
 #
 #   D=/srv/3dgnome/data/maps/HFFC6 bash web/deploy/maps_hffc6_parallel.sh
 U=https://4dn-open-data-public.s3.amazonaws.com/fourfront-webprod/wfoutput/bd06e6c5-765f-4660-8b1c-23b681bcfff0/4DNFIB59T7NN.mcool

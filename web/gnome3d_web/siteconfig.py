@@ -1,11 +1,9 @@
-"""The site's own configuration, `config.json` beside the catalog.
+"""The configuration of the site, `config.json` beside the catalog.
 
     {"features": {"results": true, "method": true, "trios": false}}
 
-`features` turns parts of the site on and off. `results` and `method` are the two pages with
-their links and `trios` is the nine people on the Results page. A feature the file leaves out
-is on and a site with no file shows everything. The file is read again when it changes. An
-edit needs no restart.
+`results` and `method` are the two pages with their links and `trios` is the nine people on
+the Results page. A feature the file leaves out is on. The file is read again when it changes.
 """
 
 from __future__ import annotations
@@ -64,11 +62,8 @@ def parse(text: str, where: str = "config.json") -> SiteConfig:
 
 
 class ConfigFile:
-    """The configuration of a path, read again when the file changes.
-
-    The first read raises on a file the site cannot read. A site does not start on a broken
-    configuration. A later edit that breaks the file is logged and the last good configuration
-    stays in use.
+    """The configuration of a path, read again when the file changes. The first read raises on
+    a broken file. A later broken edit is logged and the last good configuration stays.
     """
 
     def __init__(self, path: Path) -> None:

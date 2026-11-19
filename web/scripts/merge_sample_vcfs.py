@@ -1,13 +1,10 @@
-"""One multi-sample VCF from a directory of single-sample VCFs of one call set.
+"""Merges a directory of single sample VCFs of one call set into one multi sample VCF.
 
     python merge_sample_vcfs.py <directory> <out.vcf.gz>
 
-The directory holds `<sample>/<sample>.vcf`, each with the records that sample carries, the
-layout the 3D-GNOME 3.0 server keeps the 1000 Genomes structural variants in. A record is the
-same site in two files when its chromosome, position, ID, REF and ALT agree and its QUAL,
-FILTER and INFO are taken from the file read first. A sample that does not list a site gets
-0|0 there. The output is sorted in the header's contig order, compressed with bgzip and indexed
-with tabix, both of which must be on the path.
+The directory holds `<sample>/<sample>.vcf`. Two records are one site when chromosome,
+position, ID, REF and ALT agree. A sample without a site gets 0|0. The output is sorted,
+compressed with bgzip and indexed with tabix.
 """
 
 from __future__ import annotations

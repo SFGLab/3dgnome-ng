@@ -30,10 +30,9 @@ const fits = (start: number, end: number, view: [number, number]) => {
 type Drag = { kind: 'start' | 'end' | 'move'; at: number; from: [number, number] }
 
 /**
- * The loops around a region as arcs over an axis, CTCF above and RNAPII below and the genes as
- * ticks, with the region as a box.
- * With `onRegion` the box is the control of the region: its two edges are sliders and the box
- * itself can be moved. The new coordinates are reported when the drag ends.
+ * The loops around a region as arcs over an axis, CTCF above and RNAPII below, the genes as ticks
+ * and the region as a box. With `onRegion` the edges of the box are sliders and the box can be
+ * moved. The new coordinates are reported when the drag ends.
  */
 export function LoopPreview({ cell, region, factors, onRegion }: { cell: string; region: Region; factors: Factors; onRegion?: (text: string) => void }) {
   // The view moves only when the region no longer fits it, so the picture stays still while the

@@ -4,8 +4,8 @@
 #
 #   SITE=~/site-data RESULTS=~/results PORT=8767 bash scripts/docker_mps_check.sh
 #
-# The MPS daemon runs as this user in a pipe directory under RESULTS and stops at the end, and
-# the containers are stopped and removed with `docker compose down`.
+# The MPS daemon runs as this user in a pipe directory under RESULTS and stops at the end. The
+# containers are removed with `docker compose down`.
 set -uo pipefail
 SITE="${SITE:?set SITE to the site data directory}"
 RESULTS="${RESULTS:?set RESULTS to the results directory}"

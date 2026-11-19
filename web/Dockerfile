@@ -1,12 +1,10 @@
-# Versions as on the CUDA venv the smoke test ran on: Python 3.12, numpy 2.4.4,
-# numba 0.65.1, scipy 1.17.1, jax 0.10.1.
-# The 3D-GNOME site and its worker in one image, the frontend built in a Node stage. Build from
-# the repository root:
+# The 3D-GNOME site and its worker in one image, the frontend built in a Node stage. Python 3.12,
+# numpy 2.4.4, numba 0.65.1, scipy 1.17.1, jax 0.10.1. Build from the repository root:
 #   docker build -f web/Dockerfile -t gnome3d-web .
 #   docker build -f web/Dockerfile --build-arg GPU=1 -t gnome3d-web:gpu .
 FROM node:22-slim AS frontend
-# One dependency of the lockfile is a GitHub repository named by its ssh address. npm needs git
-# for it, and the image has no ssh key, so git reads GitHub over https.
+# One dependency of the lockfile is a GitHub repository at its ssh address. The image has no ssh key
+# and git reads GitHub over https.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
@@ -19,12 +17,10 @@ COPY web/frontend ./
 ARG BASE_PATH=
 RUN BASE_PATH=$BASE_PATH npm run build
 
-# libcurl and htslib are built here from their current releases. Debian 13 ships curl 8.14 and
-# htslib 1.21 and leaves their open advisories unfixed as minor, and the site opens a contact map
-# at an address a user gives through libcurl. This libcurl speaks http and https alone. tabix
-# reads local files alone. hic-straw has no wheel for this Python and is compiled against this
-# libcurl. The compiler and the headers stay in this stage, since a scanner reads the kernel
-# headers they bring as a kernel in the image.
+# libcurl and htslib are built here from their current releases. Debian 13 ships versions with open
+# advisories and the site opens contact maps at addresses a user gives. This libcurl speaks http and
+# https alone. hic-straw has no wheel for this Python and is compiled against this libcurl. The
+# compiler and the headers stay in this stage.
 FROM python:3.12-slim AS native
 RUN apt-get update \
  && apt-get install -y --no-install-recommends g++ make curl ca-certificates xz-utils bzip2 \
@@ -69,11 +65,9 @@ RUN pip install --no-cache-dir pip==26.3 \
  && pip install --no-cache-dir numpy==2.4.4 numba==0.65.1 scipy==1.17.1 threadpoolctl==3.6.0 \
  && if [ "$GPU" = "1" ]; then pip install --no-cache-dir "jax[cuda12]==0.10.1"; else pip install --no-cache-dir jax==0.10.1; fi
 
-# HiCDiffusion at a fixed commit with its own interpreter, Python 3.11 and the packages its
-# requirements pin, which clash with the engine's. Five of those pins carry published
-# advisories and are raised by an override file. On the raised set the model predicts the map it
-# predicts on its own pins, within 3e-4 of a largest value of 4.5.
-# HICDIFFUSION=0 leaves the step out of the image, and the site then does not offer it.
+# HiCDiffusion at a fixed commit with its own interpreter, Python 3.11 and its pinned packages. Five
+# pins with published advisories are raised by an override file. HICDIFFUSION=0 leaves the step out
+# of the image.
 ARG HICDIFFUSION=1
 ARG HICDIFFUSION_COMMIT=f892fb4df826158f0d398fbccc62832d7534f6db
 ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python

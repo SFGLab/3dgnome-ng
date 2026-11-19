@@ -105,9 +105,7 @@ EDITABLE: dict[str, list[Editable]] = {
 
 _BY_KEY = {f"{e.section}.{e.key}": e for group in EDITABLE.values() for e in group}
 
-# The text the form shows under each setting, for a reader who wants to know what the setting
-# does to a model. SETTINGS.md is the engineering reference and keeps the measurements and the
-# history, which do not belong here.
+# The text the form shows under each setting.
 HELP: dict[str, str] = {
     "distance.polymer_exponent": "Exponent of the law that turns genomic separation into 3D distance. 0 measures it from the contact data of the run. A positive value fixes it.",
     "distance.contact_half_saturation": "Loop strength at which a loop pulls its two anchors halfway from their distance without a loop to contact. A smaller value pulls weak loops closer.",

@@ -1,11 +1,9 @@
 """The hosted data, described by `catalog.json` at the root of the data directory.
 
-A cell type is a directory of the files one modelling run reads, the base loops per factor,
-the anchors per factor choice, the base contact map as singletons, segments, centromeres and a
-production config, plus the genes and enhancers the result pages mark. `contact_map`, when
-given, is a cooler URI at 1 kb on the server that the stretches without loops are drawn against. An SV set is one
-bgzipped VCF and the samples it holds. `samples_table`, when given, is a table of those samples
-with sex, population and parents. Paths in the catalog are relative to the data directory.
+A cell type is a directory of the files that one modelling run reads, plus the genes and
+enhancers that the result pages mark. `contact_map` is a cooler URI at 1 kb for the stretches
+without loops. An SV set is one bgzipped VCF and its samples, with an optional
+`samples_table`. Paths in the catalog are relative to the data directory.
 """
 
 from __future__ import annotations
@@ -71,10 +69,8 @@ class SVSet:
     samples_table: Path | None = None
 
     def sample_rows(self) -> list[list[str]]:
-        """The table's rows of the set's samples, in the order of `SAMPLE_COLUMNS`.
-
-        A sample the table lacks gets empty fields. A parent outside the set is left out.
-        Every parent named is a sample a job can be made for.
+        """The rows of the set's samples in the order of `SAMPLE_COLUMNS`. A sample the table
+        lacks gets empty fields and a parent outside the set is left out.
         """
         if self.samples_table is None:
             return []

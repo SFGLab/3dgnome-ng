@@ -1,13 +1,10 @@
-"""The engine's inputs for one request, written to the job's directory.
+"""The inputs of the engine for one request, written to the directory of the job.
 
-The cell type's loops of the region's chromosome are rewired by the sample's variants with the
-2019 rules of personal3d, CTCF and RNAPII separately and the loops wholly inside the region
-are kept. The anchors are the cell type's own, lifted to the haplotype's coordinates, plus any
-loop end the rules made. The singletons of the whole chromosome are kept. The engine fits
-the contact decay on the file, lifted end by end, with a HiCDiffusion window spliced in when
-one is given. Segments, centromeres and compartments are lifted the same way. The config is the cell type's
-with only its data section replaced. Only variants inside the region are applied.
-Coordinates before the region do not move.
+The loops of the cell type on the chromosome are rewired by the variants of the sample with
+the 2019 rules of personal3d. The loops wholly inside the region are kept. Anchors, singletons,
+segments, centromeres and compartments are lifted to the coordinates of the haplotype. A
+HiCDiffusion window is spliced into the singletons when given. The config is the cell type's
+with its data section replaced.
 """
 
 from __future__ import annotations

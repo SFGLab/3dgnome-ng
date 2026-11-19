@@ -354,10 +354,8 @@ def _span(bp: int) -> str:
 
 
 def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str, hic_url: str = "", hic_name: str = "", allow_private: bool = False) -> dict[str, object]:
-    """Two contact maps of a window on one grid, each the Hi-C, the model's MultiMM map or its
-    counted contacts, raw or ICE balanced, with two agreements of the halves: the rank agreement
-    per distance and the stratum adjusted correlation the battery reports, raw Hi-C against
-    contacts within the structures' median bond.
+    """Two contact maps of a window on one grid with two agreements of the halves, the rank
+    agreement per distance and the stratum adjusted correlation.
 
     @param hic_url a deep map of the cell type in place of the job's own input contacts
     @param hic_name the deep map's name for the labels

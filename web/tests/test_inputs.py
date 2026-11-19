@@ -130,9 +130,8 @@ def main() -> int:
         comp = rows(Path(cfg2["data"]["data_dir"]) / cfg2["data"]["compartments"])
         check("a deletion over a compartment's edge joins the two sides there", [c[1:] for c in comp] == [["0", "950000", "A"], ["950000", "2400000", "B"], ["2400000", "3900000", "A"]], str(comp))
 
-        # On HG00512's first haplotype over chr1:1-3 Mb the rules' own cutoff of 0 turned 54 CTCF
-        # loops into 101, 46 of them on 19 bp anchors at weak motifs inside inserted repeats;
-        # triosformer's cutoff of 10 leaves 54 and one new anchor.
+        # The cutoff of 0 of the rules made 101 loops of 54 on this haplotype. The cutoff of 10
+        # leaves 54 and one new anchor.
         from personal3d import motifs, rewrite
 
         seen: list[float] = []

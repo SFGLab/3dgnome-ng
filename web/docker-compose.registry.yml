@@ -1,8 +1,7 @@
-# An image registry on the deployment host, its storage on the host's disk. Run from web/:
+# An image registry on the deployment host. Run from web/:
 #   REGISTRY_ROOT=/srv/registry docker compose -f docker-compose.registry.yml up -d
-# The registry listens on the loopback of the host only and has no login. A machine that builds
-# the image reaches it through an ssh tunnel, and Docker accepts a registry on localhost
-# without TLS:
+# The registry listens on the loopback of the host and has no login. A build machine reaches it
+# through an ssh tunnel:
 #   ssh -N -L 5000:localhost:5000 <host> &
 #   docker push localhost:5000/gnome3d-web:<tag>
 # REGISTRY_USER runs it as the owner of REGISTRY_ROOT.

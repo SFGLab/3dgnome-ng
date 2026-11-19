@@ -28,8 +28,8 @@ const decades = (lo: number, hi: number) => {
 }
 
 /**
- * Runtime against one measure of the model's size, a line per tool, both axes logarithmic. Every point
- * answers to hover and focus with its region, bead count and time and the table under the chart lists them all.
+ * Runtime against one measure of the size of the model, a line per tool, both axes logarithmic. The
+ * table under the chart lists every point.
  */
 export function LineChart({
   title,

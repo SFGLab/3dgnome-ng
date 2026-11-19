@@ -27,9 +27,9 @@ def median_bond(positions: list[np.ndarray]) -> float:
 
 
 def multimm_map(positions: list[np.ndarray], mids: np.ndarray, start: int, end: int, res: int) -> np.ndarray:
-    """MultiMM's map as the battery computes it: per structure the distance between bin centroids
-    in units of the median step between neighbouring bins, 1/(d+1)^3, averaged over the
-    structures. A bin with no bead stays 0.
+    """MultiMM's map as the battery computes it. Per structure it is 1/(d+1)^3 of the distance
+    between bin centroids, in units of the median step between neighbouring bins, averaged over
+    the structures.
 
     @param positions the bead positions of each structure, in one bead order
     @param mids the genomic midpoints of the beads in that order
@@ -133,9 +133,8 @@ def scc(a: np.ndarray, b: np.ndarray, res: int, max_bp: int = 2_000_000) -> floa
 
 def rank_strata(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None = None, max_bp: int = 2_000_000, min_filled: float = 0.5) -> list[tuple[int, int, float]]:
     """The Spearman correlation of each diagonal over the kept bins, as (separation in bins,
-    pairs, correlation), from the first diagonal up to max_bp or to the last one before a
-    diagonal with under min_filled of its pairs above zero in either map. A small ensemble
-    holds no contact at most far pairs and the ranks of a diagonal of zeros are ties.
+    pairs, correlation). Stops at max_bp or before a diagonal with under min_filled of its pairs
+    above zero in either map.
 
     @param keep the bins compared, every bin when None
     """
@@ -157,10 +156,8 @@ def rank_strata(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None 
 
 
 def rank_agreement(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None = None, max_bp: int = 2_000_000, min_filled: float = 0.5) -> float | None:
-    """The diagonals of rank_strata averaged with the diagonal's length as weight. Ranks within
-    one separation carry no distance decay and no scale. A stretch is judged by its pattern
-    and not by its level; the stratum adjusted correlation scores an empty stretch above any
-    filled one where Hi-C is depleted. None when no diagonal counts.
+    """The diagonals of rank_strata averaged with the length of the diagonal as weight. None
+    when no diagonal counts.
     """
     strata = rank_strata(a, b, res, keep, max_bp, min_filled)
     den = sum(n for _, n, _ in strata)

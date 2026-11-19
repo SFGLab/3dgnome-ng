@@ -20,12 +20,11 @@ export function useRegion(cell: string, text: string) {
 /** Text that can be the start of a gene name: two characters or more that are not coordinates. */
 const maybeGene = (text: string) => text.length >= 2 && !text.includes(':')
 
-/** The region field. Typed letters list the genes that match under the field, each with its
- * position. A click, or the arrow keys and Enter, puts a gene's name in the field.
- *
- * The form gets coordinates as they are typed. It gets a gene name once the name is chosen from
- * the list, Enter is pressed or the field is left. A name still being typed can pass through
- * the names of other genes, and each would draw its loops under the field and move the form. */
+/**
+ * The region field. Typed letters list the matching genes under the field. The form gets
+ * coordinates as they are typed and a gene name once it is chosen, Enter is pressed or the field is
+ * left.
+ */
 export function RegionField({ cell, value, onChange }: { cell: string; value: string; onChange: (v: string) => void }) {
   const [draft, setDraft] = useState(value)
   useEffect(() => setDraft(value), [value])

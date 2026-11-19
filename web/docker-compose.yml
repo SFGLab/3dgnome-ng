@@ -1,7 +1,7 @@
 # Web, one worker and Redis. Run from web/:
 #   DATA_DIR=/srv/gnome3d/data RESULTS_DIR=/srv/gnome3d/results docker compose up -d --build
-# The worker asks for one GPU; drop the deploy block on a machine without one and set the
-# cell types' configs to the serial executor, see README.md.
+# The worker asks for one GPU. On a machine without one, drop the deploy block and set the configs
+# of the cell types to the serial executor, see README.md.
 services:
   redis:
     image: redis:7.4-alpine
@@ -22,8 +22,7 @@ services:
       - "${RESULTS_DIR:-./site-results}:/results"
     depends_on: [redis]
 
-  # One worker group per GPU, each worker pinned to its card with a fixed memory pool. A 20 Mb
-  # job of 10 structures needs 0.65 GiB. See README.md for the measurements.
+  # One worker group per GPU, each worker with a fixed memory pool. See README.md.
   worker-gpu0: &worker
     image: gnome3d-web
     restart: unless-stopped

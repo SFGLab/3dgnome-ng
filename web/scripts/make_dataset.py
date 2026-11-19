@@ -1,17 +1,12 @@
-"""Write one cell type's directory for the site from this repository's prepared inputs and
-add it to the catalog.
+r"""Writes the directory of one cell type for the site from the prepared inputs of this
+repository and adds it to the catalog.
 
-    python web/scripts/make_dataset.py <repo data dir> <site data dir> <CELL> \\
-        --gtf gencode.v40.basic.annotation.gtf --enhancers <CELL>_enhancers_hg38.bed \\
+    python web/scripts/make_dataset.py <repo data dir> <site data dir> <CELL> \
+        --gtf gencode.v40.basic.annotation.gtf --enhancers <CELL>_enhancers_hg38.bed \
         [--label "GM12878, lymphoblastoid"] [--lymphoblastoid] [--note "..."]
 
-`--genes` takes the genes.tsv of a cell type already built in place of `--gtf`. The table is the
-same for every cell type of one annotation.
-
-Reads, from `<repo data dir>/<CELL>/`, the production CTCF anchors and the cross line inputs of
-playground/rnapii/crosscell_prep.py, the Hi-C singletons, segments and centromeres and takes
-the arm C config from slurm/ensemble as the template. Files are copied, never linked. The
-site's data directory stands on its own. An existing cell type directory is refused.
+`--genes` takes the genes.tsv of a cell type that is built, in place of `--gtf`. Files are
+copied. An existing cell type directory is refused.
 """
 
 from __future__ import annotations

@@ -1,9 +1,8 @@
-"""Promoters and enhancers on a model's beads and their distances.
+"""Promoters and enhancers on the beads of a model and their distances.
 
-A TSS or an enhancer centre takes the bead whose genomic midpoint is nearest, when that midpoint
-is within 5 kb, the rule the RNAPII comparison uses and is left unmarked otherwise. A gene's
-enhancer distance is the ensemble mean 3D distance to the nearest marked enhancer within 1 Mb
-of its TSS, the enhancer chosen by that mean.
+A TSS or an enhancer centre takes the bead with the nearest genomic midpoint when it is within
+5 kb. The enhancer distance of a gene is the ensemble mean 3D distance to the nearest marked
+enhancer within 1 Mb of its TSS.
 """
 
 from __future__ import annotations

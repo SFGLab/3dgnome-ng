@@ -14,9 +14,11 @@ export type UploadResult = {
   samples: string[]
 }
 
-/** The uploads a job uses in place of the data of a listed cell type. On your own cell type
- * loopsFrom and enhancersFrom name a listed cell type whose loops or enhancers it takes in place
- * of an upload, enhancersFrom none for no enhancers. */
+/**
+ * The uploads a job uses in place of the data of a listed cell type. On your own cell type
+ * loopsFrom and enhancersFrom give a listed cell type whose loops or enhancers it takes,
+ * enhancersFrom none for no enhancers.
+ */
 export type OwnChoice = {
   loops: { factor: string; upload: UploadResult }[]
   anchors: UploadResult | null

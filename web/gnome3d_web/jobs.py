@@ -1,11 +1,9 @@
 """One modelling job, from a request to finished structures and their marks.
 
 A job directory holds `request.json`, `status.json`, the engine inputs under `inputs/`, the
-structures under `models/`, `marks.json`, `ep.tsv` and `engine.log`. `status.json` is rewritten
-at every stage. A page can show where a job is and a failure records the stage and the last
-lines of the log. A job on hosted inputs is keyed by a hash of the normalised request. The
-same request finds the same directory. A job with an upload is private and keyed by a random
-token instead.
+structures under `models/`, `marks.json`, `ep.tsv` and `engine.log`. A job on hosted inputs is
+keyed by a hash of the normalised request. A job with an upload is private and keyed by a
+random token.
 """
 
 from __future__ import annotations
@@ -126,11 +124,11 @@ def _tail(path: Path, n: int = 30) -> str:
 
 
 def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, cell_enhancers: bool = True):  # noqa: ANN001, ANN202
-    """The cell type's genes and enhancers on `chrom` in the haplotype's coordinates, the beads'
-    coordinates, those inside a deletion dropped. A gene or an enhancer inside a duplication is
-    there twice and the gene's second copy carries `COPY` after its name. An enhancers upload
-    replaces the cell type's; with `cell_enhancers` off and no upload there are none, as on your
-    own cell type."""
+    """The genes and enhancers of the cell type on `chrom` in the coordinates of the haplotype.
+
+    Those inside a deletion are dropped. Those inside a duplication are there twice and the second
+    copy of a gene has `COPY` after its name. An enhancers upload replaces the cell type's.
+    """
     import pandas as pd
     from personal3d.lift import Lift
 
@@ -198,9 +196,8 @@ def run_job(
         env = dict(os.environ) | (env_extra or {})
         if "ENGINE_ROOT" in env:
             env["PYTHONPATH"] = env["ENGINE_ROOT"] + (":" + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
-        # The engine skips a structure whose file exists. A job run again after a restart of
-        # the site goes on where it stopped and its log is kept. Otherwise the log begins with
-        # the HiCDiffusion step when it ran and the engine follows.
+        # The engine skips a structure whose file exists. A job run again after a restart goes on
+        # where it stopped and its log is kept.
         kept = len(list((job / "models").glob("*.cif"))) if (job / "models").is_dir() else 0
         with log.open("a" if hic is not None or kept else "w") as fh:
             if kept:

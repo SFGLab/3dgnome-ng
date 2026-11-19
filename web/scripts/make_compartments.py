@@ -1,21 +1,14 @@
-"""Write a cell type's A and B compartments from its Hi-C map.
+r"""Writes the A and B compartments of a cell type from its Hi-C map.
 
     python web/scripts/make_compartments.py <map uri> <genes.tsv> <centromeres.bed> > compartments.bed
 
-The map uri is a cooler at one resolution, `file.mcool::/resolutions/100000`. Each chromosome arm
-is taken alone. Its balanced map is divided by the mean of each diagonal, clipped at the 99.9
-percentile and reduced by one and the eigenvector of the largest eigenvalue is the compartment
-signal. The sign of an eigenvector is arbitrary. It is set so the side with more gene starts is
-A. An arm is left out when the signal does not follow gene density or jumps from bin to bin.
-A call there would be noise. The engine reads the labels as they are and needs no phasing
-track for them.
+The map uri is a cooler at one resolution, `file.mcool::/resolutions/100000`. Each chromosome
+arm is taken alone and the side with more gene starts is A. An arm whose signal does not follow
+gene density is left out. The output is `chr start end label`. One line of JSON per arm goes
+to standard error.
 
-The output is `chr start end label` with neighbouring bins of one label joined. One line of JSON
-per arm goes to standard error: the bins used, the correlation with gene density, the correlation
-of neighbouring bins and the share of A. The site image has what this needs, numpy and cooler.
-
-    docker exec -i <container> python - /data/maps/GM12878/4DNFIXP4QG5B.mcool::/resolutions/100000 \\
-        /data/cell_types/GM12878/genes.tsv /data/cell_types/GM12878/centromeres.bed \\
+    docker exec -i <container> python - /data/maps/GM12878/4DNFIXP4QG5B.mcool::/resolutions/100000 \
+        /data/cell_types/GM12878/genes.tsv /data/cell_types/GM12878/centromeres.bed \
         < web/scripts/make_compartments.py > compartments.bed 2> compartments.stats.jsonl
 """
 

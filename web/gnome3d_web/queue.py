@@ -112,13 +112,8 @@ def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
 
 
 def resume_interrupted(results_dir: Path, pool: LocalPool) -> list[str]:
-    """Queue again the jobs a stop of the web process left running or waiting, oldest first
-    and return their names.
-
-    The local pool holds its jobs in the process. A restart ends a running engine and
-    forgets the waiting jobs and their pages would wait without end. A job without its
-    request on disk cannot be run again and is marked failed. Its page says so and the
-    form accepts the request anew.
+    """Queues again the jobs that a stop of the web process left running or waiting, oldest
+    first. Returns their names. A job without its request on disk is marked failed.
     """
     left = []
     for root in (results_dir / "jobs", results_dir / "private"):

@@ -1,8 +1,9 @@
 import './structure-preview.css'
 
-/** A structure drawn flat: its beads in drawing units from A, each with a depth step, the two
- * marked beads and the distance between them over the ensemble. A is the origin and B is on the
- * x axis. Written by web/scripts/make_previews.py from a finished job. */
+/**
+ * A structure drawn flat: its beads in drawing units from A, each with a depth step, the two marked
+ * beads and the distance between them over the ensemble. Written by web/scripts/make_previews.py.
+ */
 export type PreviewData = { points: number[][]; a: number; b: number; mean: number; sd: number; n: number; structure: number; here: number }
 
 /** Depth steps of a drawing, the farthest first. */
@@ -25,12 +26,12 @@ function piece(pts: number[][], i: number): string {
 const pieces = (pts: number[][], from: number, to: number) =>
   Array.from({ length: Math.max(0, Math.min(to, pts.length - 1) - Math.max(0, from)) }, (_, k) => piece(pts, Math.max(0, from) + k)).join('')
 
-/** A flat drawing of one structure with A and B marked, the line between them and the distance.
- * The chain between A and B is darker than the rest. Each depth step is drawn over the ones
- * behind it with a white edge, so a nearer strand crosses over a farther one.
+/**
+ * A flat drawing of one structure with A and B marked, the line between them and the distance. A
+ * nearer strand is drawn over a farther one.
  *
  * @param view the part drawn as x, y, width and height in drawing units. Drawings to be compared
- *   take one view, so a longer line is a longer distance.
+ * take one view.
  */
 export function StructurePreview({ data, label, view }: { data: PreviewData; label: string; view: [number, number, number, number] }) {
   const { points, a, b } = data

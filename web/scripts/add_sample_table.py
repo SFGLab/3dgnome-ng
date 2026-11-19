@@ -1,14 +1,11 @@
-"""Give an SV call set of the site's catalog a table of its samples.
+"""Gives an SV call set of the catalog a table of its samples.
 
     python web/scripts/add_sample_table.py <site data dir> <NAME> <pedigree file>
 
-The pedigree file is the one of the 1000 Genomes 30x panel,
-`20130606_g1k_3202_samples_ped_population.txt`, with the columns FamilyID, SampleID, FatherID,
-MotherID, Sex, Population and Superpopulation. The table is written to
-`svs/<NAME>.samples.tsv` with the columns sample, sex, population, superpopulation, father and
-mother, one row per sample of the call set. A parent outside the call set is left empty. The
-catalog is copied to `catalog.json.before-sample-table-<NAME>` before its entry gets
-`samples_table`. An existing table is refused.
+The pedigree file is that of the 1000 Genomes 30x panel,
+`20130606_g1k_3202_samples_ped_population.txt`. The table goes to `svs/<NAME>.samples.tsv`
+with the columns sample, sex, population, superpopulation, father and mother. The catalog is
+first copied to `catalog.json.before-sample-table-<NAME>`. An existing table is refused.
 """
 
 from __future__ import annotations

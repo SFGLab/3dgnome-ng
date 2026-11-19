@@ -9,9 +9,8 @@ export default defineConfig({
   base,
   plugins: [react()],
   server: {
-    // npm run dev serves the frontend and passes the server's own paths to FastAPI on port 8000.
-    // With API_ONLY=1 only /api is passed on, and a job page is this build's own. That is the
-    // setting for a look at the frontend against a server that was built for another base path.
+    // npm run dev serves the frontend and passes the paths of the server to FastAPI on port 8000.
+    // With API_ONLY=1 only /api is passed on.
     proxy: process.env.API_ONLY
       ? { '/api': 'http://127.0.0.1:8000' }
       : {

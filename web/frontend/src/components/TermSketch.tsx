@@ -127,10 +127,9 @@ const SKETCHES: Record<string, { text: string; before?: ReactNode; after?: React
     before: <Chain anchors={[0, 5]} hot={[2, 3]} pts={[[6, 58], [22, 24], [38, 60], [54, 24], [70, 60], [86, 30]]} />,
     after: <Chain anchors={[0, 5]} hot={[2, 3]} pts={[[6, 58], [20, 42], [38, 32], [56, 32], [72, 42], [86, 58]]} />,
   },
-  // After the figure of 3D-GNOME. The term is least when the two motif directions are the same
-  // in space. A motif on the reverse strand points against the chain, so motifs that face each
-  // other along the genome are side by side in a hairpin and motifs of one direction in a loop
-  // of a full turn.
+  // After the figure of 3D-GNOME. A motif on the reverse strand points against the chain. Motifs
+  // that face each other along the genome are side by side in a hairpin and motifs of one direction
+  // in a loop of a full turn.
   'chain:CTCF orientation': {
     text: 'Turns the chain at the two anchors of a CTCF loop until their motifs point the same way in space. Motifs that face each other along the genome give a hairpin and motifs of one direction give a loop of a full turn.',
     whole: (

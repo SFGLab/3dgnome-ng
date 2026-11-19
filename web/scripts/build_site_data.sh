@@ -1,11 +1,11 @@
 #!/bin/bash
-# The hosted data the site was smoke tested with on 2026-11-11: three cell types and the HGSVC
-# freeze 4 insertions and deletions. Run from the repository root.
+# Builds the hosted data of three cell types and the HGSVC freeze 4 insertions and deletions. Run
+# from the repository root.
 #
 #   SITE=/srv/gnome3d/data E3D=~/enhancer3d/data HIC_SINGLETONS=data HGSVC=data/_hgsvc \
 #     bash web/scripts/build_site_data.sh
 #
-# Inputs: data/<LINE>/ with the production CTCF anchors and the cross line prep outputs of
+# Inputs: data/<LINE>/ with the production CTCF anchors and the outputs of
 # playground/rnapii/crosscell_prep.py, <LINE>_hic_25kb_singletons.bedpe under HIC_SINGLETONS,
 # GENCODE v40 basic and the EnhancerAtlas beds under E3D, the HGSVC VCF under HGSVC.
 set -euo pipefail

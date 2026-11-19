@@ -292,9 +292,8 @@ def combine_changes(by_factor: list[tuple[str, str]]) -> str:
 
 
 def variant_check(cell, region, factors: str, vcf: Path, sample: str, haplotype: int, own_loops: list[tuple[str, Path]] | None = None, own_anchors: Path | None = None) -> dict[str, object]:  # noqa: ANN001, PLR0913
-    """What a sample's variants on one haplotype do to the loops of a region, one variant at a
-    time, with the counts applied and skipped. Own loops replace the cell type's, with their
-    anchors file or their merged ends as anchors, as the job builds them.
+    """The effect of the variants of a sample on one haplotype on the loops of a region, one
+    variant at a time, with the counts applied and skipped. Own loops replace the cell type's.
 
     @raises KeyError when the sample is not in the VCF
     """

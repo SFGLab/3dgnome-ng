@@ -1036,9 +1036,7 @@
   visibility: hidden;
 }
 
-/* A band of light crosses the frame. The band is a layer of the frame's own size that moves
-   from wholly left of it to wholly right, so nothing of it is in view at either end of a pass
-   and the repeat has no jump. The frame clips it. */
+/* A band of light crosses the frame, from wholly left of it to wholly right. The frame clips it. */
 .contact-frame.empty.loading::before {
   content: '';
   position: absolute;
@@ -1395,10 +1393,7 @@
   color: var(--accent);
 }
 
-/* A running job takes the whole of the page's main part: the stage, the bar and the stages over
-   the log, which has the rest of the screen. */
-/* The height is the page's own, the screen less the header and the footer, so the log can take
-   all that the header of the progress leaves. */
+/* A running job takes the whole main part of the page, the screen less the header and the footer. */
 .job-message:has(> .progress) {
   display: flex;
   box-sizing: border-box;

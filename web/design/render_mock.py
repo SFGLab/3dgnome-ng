@@ -1,14 +1,11 @@
-"""Render the images shown in the design mock, `web/design/site.pen`.
+r"""Renders the images of the design mock, `web/design/site.pen`.
 
     python web/design/render_mock.py design/figures/rnapii-2026-11-12/fig_inputs/maps_GM12878.npz \
         web/design/images
 
-Writes `structure.png`, the medoid conformation of the TNFRSF8 locus with CTCF and RNAPII loops as
-a grey tube with the promoter beads in the site's promoter colour and the enhancer beads in its
-enhancer colour and `contacts.png`, the Hi-C map of chr1:20-25 Mb above the diagonal and the
-summed model map of the same arm below it, each on its own log scale. `structure_ctcf.png`
-is the same locus modelled with CTCF loops alone, for the compare screen. The
-`method_*.png` panels illustrate the Method page, `method_law.png` its distance law.
+Writes `structure.png` and `structure_ctcf.png`, the TNFRSF8 locus with and without RNAPII
+loops, `contacts.png`, the Hi-C map of chr1:20-25 Mb over the model map, and the
+`method_*.png` panels of the Method page.
 """
 
 from __future__ import annotations

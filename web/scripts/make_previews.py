@@ -1,15 +1,12 @@
-"""Write the drawings of the front page's example from finished jobs.
+r"""Writes the drawings of the front page example from finished jobs.
 
     python web/scripts/make_previews.py <api base> <a bp> <b bp> <name>=<job url> ... > previews.json
 
-For each job: the structure whose distance between the two positions is nearest the ensemble's
-mean, turned so the line from the first position to the second runs left to right and both
-positions are in front of the chain and the distance over the ensemble as the site's own
-distance route gives it. The first position is the origin of every drawing and all drawings
-share one scale. A longer line between the positions is a longer distance. Standard library
-only.
+For each job the structure whose distance between the two positions is nearest the ensemble
+mean is drawn, turned to put the line from the first position to the second left to right.
+All drawings share one scale.
 
-    python web/scripts/make_previews.py http://127.0.0.1:8770/new/api 12063302 12449484 \\
+    python web/scripts/make_previews.py http://127.0.0.1:8770/new/api 12063302 12449484 \
         rnapii=/jobs/85c9b9a86ed1d864 ctcf=/jobs/f06f5487896aaca7
 """
 
