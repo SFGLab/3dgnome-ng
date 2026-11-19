@@ -16,7 +16,7 @@ from numba import prange  # type: ignore[reportMissingTypeStubs]
 
 from gnome3d import log
 from gnome3d.mc.numba.terms import NO_W, njit
-from gnome3d.types import F32Array, F64Array, I64Array
+from gnome3d.types import F32Array, F64Array, I32Array, I64Array
 from gnome3d.util import blas_threads
 
 if TYPE_CHECKING:
@@ -249,6 +249,41 @@ def gyration_energy_grad(
     return e, g.reshape(-1)
 
 
+@njit(cache=True, fastmath=True, nogil=True)
+def reach_energy_grad(
+    x: F64Array, pair_i: I32Array, pair_j: I32Array, length: F64Array, weight: float
+) -> tuple[float, F64Array]:
+    """Returns the reach energy and its gradient.
+
+    Pair k of nodes has `length[k]` of chain between its two beads. It has no energy up to that
+    distance and `weight * ((d - length) / length)^2` beyond, the form of a loop spring.
+    """
+    n = x.shape[0] // 3
+    pos = x.reshape(n, 3)
+    g = np.zeros((n, 3))
+    energy = 0.0
+    for k in range(pair_i.shape[0]):
+        i = pair_i[k]
+        j = pair_j[k]
+        dx = pos[i, 0] - pos[j, 0]
+        dy = pos[i, 1] - pos[j, 1]
+        dz = pos[i, 2] - pos[j, 2]
+        d = np.sqrt(dx * dx + dy * dy + dz * dz)
+        reach = length[k]
+        if d <= reach:
+            continue
+        rel = (d - reach) / reach
+        energy += weight * rel * rel
+        w = 2.0 * weight * rel / (reach * d)
+        g[i, 0] += w * dx
+        g[i, 1] += w * dy
+        g[i, 2] += w * dz
+        g[j, 0] -= w * dx
+        g[j, 1] -= w * dy
+        g[j, 2] -= w * dz
+    return energy, g.reshape(-1)
+
+
 def solve_arcs(
     pos: F32Array,
     exp_dist: F64Array,
@@ -258,13 +293,16 @@ def solve_arcs(
     arc_w: F32Array | None = None,
     activity: F32Array | None = None,
     mids: I64Array | None = None,
+    reach: tuple[I32Array, I32Array, F64Array] | None = None,
 ) -> tuple[float, F32Array]:
     """Minimises the arcs energy from `pos`. Returns `(energy, positions)`.
 
     `backend` is the place of the energy evaluation, `numba` on the CPU or `jax` on the device.
     The minimiser runs on the host. `arc_w` is the spring weight of each arc pair, None for one.
     `activity` is the activity of each anchor for the factory term, None for no term. `mids` are
-    the genomic midpoints of the anchors, which the gyration term needs.
+    the genomic midpoints of the anchors, which the gyration term needs. `reach` is the pairs of
+    nodes of a uniform chain and the length of chain between each, for the reach term at the
+    weight of a loop spring.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -366,6 +404,22 @@ def solve_arcs(
             return float(e1) + e2, np.asarray(g1, dtype=np.float64) + g2
 
         fun = with_gyration
+        fun_args = ()
+    if reach is not None and reach[0].shape[0] > 0:
+        reach_i = np.ascontiguousarray(reach[0], dtype=np.int32)
+        reach_j = np.ascontiguousarray(reach[1], dtype=np.int32)
+        reach_len = np.ascontiguousarray(reach[2], dtype=np.float64)
+        reach_w = float(s.spring_stretch_arcs)
+        base_r, base_r_args = fun, fun_args
+
+        def with_reach(x: Any) -> tuple[float, F64Array]:
+            e1, g1 = base_r(x, *base_r_args)
+            e2, g2 = reach_energy_grad(
+                np.asarray(x, dtype=np.float64), reach_i, reach_j, reach_len, reach_w
+            )
+            return float(e1) + e2, np.asarray(g1, dtype=np.float64) + g2
+
+        fun = with_reach
         fun_args = ()
     if n_it <= 0:
         # No descent. The start is returned as it is.

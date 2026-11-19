@@ -25,6 +25,8 @@ Every row is the maintainer's decision.
 | The smooth stage and the contact beads | Small and bounded adjustments are allowed. Three arms: fixed, bounded drift, centre of mass kept |
 | The reach of the chain in the arcs stage | A one sided spring at the loop spring weight beyond k bonds |
 | The orientation term | Three arms: as it is, off, and with the beads beside a site held within their bonds |
+| Contact data of a pair of beads | The Hi-C cell that holds the two beads, at a resolution finer than 25 kb |
+| The order of the build | Three stages with an arms trial after each |
 | The first build | Replaced in place. Comparisons use its trial of 2026-11-19 |
 
 ## Loops
@@ -67,7 +69,19 @@ its position is the position of that bead.
   inequality carries it to every other pair.
 - Excluded volume acts at the radius of a bead, the radius of the smooth stage. It does not act at the mean loop
   target, which was 3.1 beads on the traced region.
-- The gyration term and the contact background are unchanged. They read the genomic midpoints of the beads.
+- The gyration term is unchanged. It reads the genomic midpoints of the beads.
+
+### Contact data
+
+A pair of nodes reads the cell of the contact map that holds its two beads. The map is `[data] contact_map`, a
+cooler, at a resolution finer than 25 kb. The value of a cell is its count over the expectation at its separation,
+and the law puts a pair at the background times that ratio to the minus third.
+
+The default chain reads the singletons at 25 kb. A singleton is given by the start of its bin and a contact is
+counted for the bead that holds that start.
+
+Proposed and not yet decided: the resolution is one setting, measured at 1, 5 and 10 kb, and a cell acts on a pair
+when it passes the Poisson test of `contact_background_z`.
 
 The count of nodes changes between conformations with the draw. The joint solve is over the chromosome as now.
 
@@ -130,6 +144,18 @@ and against the first build.
 - For the draw: the contacts of the pairs of two wide anchors in the pooled map against Hi-C at 1 kb, uniform draw
   against midpoint.
 - For the smooth arms: the three rules on the same arcs solution.
+
+## Stages of the build
+
+1. The contact beads, the summed strengths, the reach spring, the excluded volume at the radius of a bead and the
+   contact data per pair of beads in the arcs stage. The nodes are fixed in the smooth stage. The first build is
+   removed.
+2. The bounded drift arm and the centre of mass arm of the smooth stage.
+3. The arms of the orientation term.
+
+State on 2026-11-19: the draw, the nodes with summed strengths and their target matrix are functions of
+`gnome3d/pipeline/ib/nodes.py`, and the reach spring is a term of `solve_arcs`. No stage of the pipeline calls them
+yet.
 
 ## Settings
 

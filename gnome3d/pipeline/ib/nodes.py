@@ -1,0 +1,130 @@
+"""The contact beads of a conformation on the uniform chain, `design/uniform-chain.md`.
+
+A loop acts on one bead of the span of each of its two anchors. Each loop end draws its bead by
+itself. The distinct contact beads of a chromosome are the nodes of the arcs stage. The strengths
+of the loops on one pair of nodes add.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, NamedTuple
+
+import numpy as np
+
+if TYPE_CHECKING:
+    from gnome3d.polymer import PolymerLaw
+    from gnome3d.settings import Settings
+    from gnome3d.types import F64Array, I32Array, I64Array
+
+DRAWS = ("uniform", "midpoint")
+
+
+class ContactNodes(NamedTuple):
+    """The nodes of one conformation of a chromosome and the loops between them.
+
+    A node is a bead of the chain of a block. Nodes are in the order of the chromosome. Each
+    pair with a loop is listed once with the lower node first.
+    """
+
+    block: I32Array  # (M,) block of each node
+    bead: I32Array  # (M,) bead of the node in the chain of its block
+    mid: I64Array  # (M,) genomic midpoint of the bead
+    pair_i: I32Array  # (P,)
+    pair_j: I32Array  # (P,)
+    strength: F64Array  # (P,) summed strength of the loops of the pair
+    dropped: int  # loops with both ends on one bead
+
+
+def draw_ends(
+    lo: I32Array,
+    hi: I32Array,
+    knot: I32Array,
+    ends: I32Array,
+    rng: np.random.Generator,
+    rule: str = "uniform",
+) -> I64Array:
+    """Returns the contact bead of each loop end, in the chain of the block of its anchor.
+
+    `ends` is (L, 2) anchors. Under `uniform` each end draws a bead of the span of its anchor
+    with equal chance. Under `midpoint` each end takes the knot of its anchor.
+    """
+    if rule not in DRAWS:
+        raise ValueError(f"the draw of a contact bead is uniform or midpoint, got {rule!r}")
+    if rule == "midpoint":
+        out: I64Array = knot[ends].astype(np.int64)
+        return out
+    width = (hi - lo)[ends].astype(np.float64)
+    drawn: I64Array = lo[ends] + np.floor(rng.random(ends.shape) * width).astype(np.int64)
+    return drawn
+
+
+def contact_nodes(
+    edges: list[I64Array],
+    anchor_block: I32Array,
+    ends: I32Array,
+    beads: I64Array,
+    strength: F64Array,
+) -> ContactNodes:
+    """Builds the nodes of a conformation from the contact beads of its loops.
+
+    Parameters
+    ----------
+    edges
+        The bead edges of the chain of each block, `grid_edges`.
+    anchor_block
+        The block of each anchor.
+    ends
+        (L, 2) the two anchors of each kept loop.
+    beads
+        (L, 2) the contact bead of each loop end in the chain of its block, `draw_ends`.
+    strength
+        (L,) the strength of each loop by the law.
+    """
+    sizes = np.array([e.shape[0] - 1 for e in edges], dtype=np.int64)
+    offset = np.concatenate([[0], np.cumsum(sizes)])
+    along = offset[anchor_block[ends]] + beads  # bead counted along the chromosome
+    kept = along[:, 0] != along[:, 1]
+    nodes, inverse = np.unique(along[kept], return_inverse=True)
+    pair = np.sort(inverse.reshape(-1, 2), axis=1)
+    m = int(nodes.shape[0])
+    keys, which = np.unique(pair[:, 0] * max(m, 1) + pair[:, 1], return_inverse=True)
+    counts = np.bincount(which, weights=strength[kept], minlength=keys.shape[0])
+    summed: F64Array = counts.astype(np.float64)
+    block = (np.searchsorted(offset, nodes, side="right") - 1).astype(np.int32)
+    bead = (nodes - offset[block]).astype(np.int32)
+    mid: I64Array = np.zeros(m, dtype=np.int64)
+    for k in range(m):
+        e = edges[int(block[k])]
+        mid[k] = (int(e[bead[k]]) + int(e[bead[k] + 1])) // 2
+    return ContactNodes(
+        block=block,
+        bead=bead,
+        mid=mid,
+        pair_i=(keys // max(m, 1)).astype(np.int32),
+        pair_j=(keys % max(m, 1)).astype(np.int32),
+        strength=summed,
+        dropped=int((~kept).sum()),
+    )
+
+
+def node_targets(nodes: ContactNodes, law: PolymerLaw, s: Settings) -> F64Array:
+    """Returns the arcs target matrix of the nodes, with the marks of `arc_expected_matrix`.
+
+    A pair with a loop holds the contact distance of the law for its summed strength and the
+    separation of its two beads, or one bead under `loop_contact`. A pair without a loop closer
+    than `background_range_bp` holds minus the background of its separation when
+    `background_weight` is on. Any other pair holds -0.5. The diagonal is 0.
+    """
+    m = int(nodes.mid.shape[0])
+    mat: F64Array = np.full((m, m), -0.5, dtype=np.float64)
+    mid = nodes.mid.astype(np.float64)
+    sep = np.abs(mid[:, None] - mid[None, :])
+    if float(s.background_weight) > 0.0:
+        near = (sep > 0.0) & (sep < float(s.background_range_bp))
+        mat[near] = -np.maximum(1.0, (sep[near] / max(int(law.s0_bp), 1)) ** law.nu)
+    np.fill_diagonal(mat, 0.0)
+    for i, j, q in zip(nodes.pair_i, nodes.pair_j, nodes.strength, strict=True):
+        target = 1.0 if s.loop_contact else law.contact_distance(int(sep[i, j]), float(q))
+        mat[i, j] = target
+        mat[j, i] = target
+    return mat
