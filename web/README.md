@@ -27,7 +27,13 @@ CPU image.
 python -m venv venv && venv/bin/pip install -r web/requirements.txt numpy numba scipy jax
 PYTHONPATH=web:web/vendor DATA_DIR=... RESULTS_DIR=/tmp/r QUEUE=thread ENGINE_ROOT=$PWD \
   venv/bin/uvicorn gnome3d_web.app:create_app --factory --reload
-for t in web/tests/test_*.py; do venv/bin/python $t; done
+```
+
+The tests of the server run with pytest, from the repository root:
+
+```bash
+venv/bin/pip install -r web/requirements-dev.txt
+venv/bin/pytest web/tests
 ```
 
 The frontend needs Node 18 or newer:

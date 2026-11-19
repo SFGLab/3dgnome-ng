@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from gnome3d.mc.numba.cells import (  # noqa: E402
+from gnome3d.mc.numba.cells import (
     BUF,
     build_grid,
     cell_of,
@@ -20,14 +17,11 @@ from gnome3d.mc.numba.cells import (  # noqa: E402
     local_excl_cells,
     relink,
 )
-from gnome3d.mc.numba.terms import (  # noqa: E402
+from gnome3d.mc.numba.terms import (
     _local_excl_nb,
     _wall_local_cells_nb,
     _wall_local_nb,
 )
-
-PASS: list[str] = []
-FAIL: list[str] = []
 
 # The scan and the grid add the same pairs in the same order. Both kernels are compiled with
 # fastmath and on x86-64 the compiler adds the pairs of the scan in another order. The two
@@ -37,12 +31,6 @@ ROUNDING = 1e-12
 
 def same(got: float, want: float) -> bool:
     return abs(got - want) <= ROUNDING * max(1.0, abs(want))
-
-
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}{('  ' + detail) if detail else ''}")
 
 
 def compare(
@@ -70,7 +58,7 @@ def compare(
 
 
 def test_random() -> None:
-    print("\n[random] the grid returns the scan's number to rounding")
+    """The grid returns the scan's number to rounding."""
     rng = np.random.default_rng(0)
     for name, pos in (
         ("uniform cloud", rng.normal(0, 8, (2000, 3))),
@@ -84,40 +72,38 @@ def test_random() -> None:
         ("one line", np.column_stack([np.arange(1000.0), np.zeros(1000), np.zeros(1000)])),
     ):
         bad, worst, over = compare(np.ascontiguousarray(pos), 2.0, 10.0, 1)
-        check(
-            f"{name}: equal to rounding for every bead",
-            bad == 0 and over == 0,
-            f"{bad} differ, worst {worst:.2e}, {over} overflow",
+        assert bad == 0 and over == 0, (
+            f"{name}: equal to rounding for every bead"
+            + ": "
+            + f"{bad} differ, worst {worst:.2e}, {over} overflow"
         )
 
 
 def test_edges() -> None:
-    print("\n[edges] the awkward configurations")
+    """The awkward configurations."""
     single = np.zeros((1, 3))
     bad, _, _ = compare(single, 2.0, 10.0, 1)
-    check("a single bead", bad == 0)
+    assert bad == 0, "a single bead"
     same = np.zeros((300, 3))
     bad, worst, over = compare(same, 2.0, 10.0, 1)
-    check("every bead at one point", bad == 0 and over == 0, f"{bad} differ, {over} overflow")
+    assert bad == 0 and over == 0, f"every bead at one point: {bad} differ, {over} overflow"
     rng = np.random.default_rng(3)
     far = np.vstack([rng.normal(0, 1, (200, 3)), rng.normal(500, 1, (200, 3))])
     bad, _, _ = compare(np.ascontiguousarray(far), 2.0, 10.0, 1)
-    check("two clumps far apart", bad == 0)
+    assert bad == 0, "two clumps far apart"
     line = np.column_stack([np.arange(500.0) * 0.01, np.zeros(500), np.zeros(500)])
     for skip in (0, 1, 5):
         bad, _, _ = compare(line, 2.0, 10.0, skip)
-        check(f"skip_neighbors {skip}", bad == 0)
+        assert bad == 0, f"skip_neighbors {skip}"
 
 
 def test_overflow_is_safe() -> None:
-    print("\n[overflow] a buffer too small reports itself instead of being wrong")
+    """A buffer too small reports itself instead of being wrong."""
     rng = np.random.default_rng(5)
     pos = np.ascontiguousarray(rng.normal(0, 1.0, (2000, 3)))
     bad, _, over = compare(pos, 2.0, 10.0, 1, buf_size=64)
-    check(
-        "overflow is signalled, never a wrong number",
-        bad == 0 and over > 0,
-        f"{over} beads overflowed, {bad} wrong",
+    assert bad == 0 and over > 0, (
+        f"overflow is signalled, never a wrong number: {over} beads overflowed, {bad} wrong"
     )
 
 
@@ -134,15 +120,13 @@ def test_real_structure() -> None:
     bond = float(np.median(np.linalg.norm(np.diff(pos, axis=0), axis=1)))
     sub = np.ascontiguousarray(pos[:8000])
     bad, worst, over = compare(sub, 1.5 * bond, 10.0, 1)
-    check(
-        "equal to rounding on 8000 real beads",
-        bad == 0 and over == 0,
-        f"{bad} differ, worst {worst:.2e}, {over} overflow",
+    assert bad == 0 and over == 0, (
+        f"equal to rounding on 8000 real beads: {bad} differ, worst {worst:.2e}, {over} overflow"
     )
 
 
 def test_moves_keep_it_exact() -> None:
-    print("\n[moves] the grid stays right while beads move")
+    """The grid stays right while beads move."""
     rng = np.random.default_rng(11)
     n = 1500
     pos = np.ascontiguousarray(rng.normal(0, 4, (n, 3)))
@@ -161,18 +145,17 @@ def test_moves_keep_it_exact() -> None:
             got = local_excl_cells(pos, p, r0, weight, skip, lo, dim, c, head, nxt, buf)
             if not same(got, want):
                 bad += 1
-    check("still equal to rounding after 4000 moves", bad == 0, f"{bad} of 20 spot checks differ")
+    assert bad == 0, f"still equal to rounding after 4000 moves: {bad} of 20 spot checks differ"
     seen = np.zeros(n, dtype=np.int64)
     for k in range(head.shape[0]):
         i = head[k]
         while i != -1:
             seen[i] += 1
             i = nxt[i]
-    check("every bead is linked exactly once", int(seen.min()) == 1 and int(seen.max()) == 1)
-    check(
-        "every bead is in the cell its position says",
-        all(where[i] == cell_of(pos[i, 0], pos[i, 1], pos[i, 2], lo, dim, c) for i in range(n)),
-    )
+    assert int(seen.min()) == 1 and int(seen.max()) == 1, "every bead is linked exactly once"
+    assert all(
+        where[i] == cell_of(pos[i, 0], pos[i, 1], pos[i, 2], lo, dim, c) for i in range(n)
+    ), "every bead is in the cell its position says"
 
 
 def test_beads_outside_the_box() -> None:
@@ -201,27 +184,9 @@ def test_beads_outside_the_box() -> None:
         cnt1, dep1 = _wall_local_cells_nb(pos, p, r0, skip, lo, dim, c, head, nxt)
         wall_bad += int(cnt0 != cnt1)
         depth_worst = max(depth_worst, abs(dep0 - dep1))
-    check("the test has beads well outside the box", outside > n // 4, f"{outside} of {n}")
-    check(
-        "the excluded volume is equal to rounding out there", bad == 0, f"{bad} of {n} beads differ"
+    assert outside > n // 4, f"the test has beads well outside the box: {outside} of {n}"
+    assert bad == 0, (
+        f"the excluded volume is equal to rounding out there: {bad} of {n} beads differ"
     )
-    check("the wall counts the same pairs out there", wall_bad == 0, f"{wall_bad} of {n} differ")
-    check("the wall depth agrees to rounding", depth_worst < 1e-9, f"worst {depth_worst:.2e}")
-
-
-def main() -> int:
-    print("excluded volume cell grid checks")
-    test_random()
-    test_edges()
-    test_overflow_is_safe()
-    test_moves_keep_it_exact()
-    test_beads_outside_the_box()
-    test_real_structure()
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    for f in FAIL:
-        print(f"  failed: {f}")
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    assert wall_bad == 0, f"the wall counts the same pairs out there: {wall_bad} of {n} differ"
+    assert depth_worst < 1e-9, f"the wall depth agrees to rounding: worst {depth_worst:.2e}"

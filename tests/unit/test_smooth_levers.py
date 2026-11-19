@@ -3,27 +3,14 @@
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
 
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from gnome3d.mc import numba as mc_numba  # noqa: E402
-from gnome3d.pipeline.ib.start import coil_start  # noqa: E402
-from gnome3d.settings import Settings  # noqa: E402
-
-PASS: list[str] = []
-FAIL: list[str] = []
-
-
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}" + (f"   {detail}" if detail else ""))
+from gnome3d.mc import numba as mc_numba
+from gnome3d.pipeline.ib.start import coil_start
+from gnome3d.settings import Settings
 
 
 def under(pos: np.ndarray, r: float) -> int:
@@ -69,9 +56,8 @@ def settings(**kw: object) -> Settings:
 
 def test_off_by_default() -> None:
     s = Settings()
-    check(
-        "all three levers are off by default",
-        not s.smooth_hard_wall and s.smooth_anchor_cap == 0.0 and s.smooth_start == "line",
+    assert not s.smooth_hard_wall and s.smooth_anchor_cap == 0.0 and s.smooth_start == "line", (
+        "all three levers are off by default"
     )
 
 
@@ -81,18 +67,14 @@ def test_wall_never_raises_the_count() -> None:
     mc_numba.seed_numba(1)
     mc_numba.mc_smooth_numba(pos, dtn, fixed, 0.5, settings(smooth_hard_wall=True))
     after = under(pos, 0.7)
-    check(
-        "the wall never lets the count under the radius rise",
-        after <= before,
-        f"{before} -> {after}",
+    assert after <= before, (
+        f"the wall never lets the count under the radius rise: {before} -> {after}"
     )
     pos2, fixed2, dtn2 = chain()
     mc_numba.seed_numba(1)
     mc_numba.mc_smooth_numba(pos2, dtn2, fixed2, 0.5, settings())
-    check(
-        "and ends lower than the soft term alone",
-        after < under(pos2, 0.7),
-        f"wall {after}, soft {under(pos2, 0.7)}",
+    assert after < under(pos2, 0.7), (
+        f"and ends lower than the soft term alone: wall {after}, soft {under(pos2, 0.7)}"
     )
 
 
@@ -102,10 +84,8 @@ def test_wall_holds_once_clear() -> None:
     start = under(pos, 0.7)
     mc_numba.seed_numba(2)
     mc_numba.mc_smooth_numba(pos, dtn, fixed, 0.5, settings(smooth_hard_wall=True))
-    check(
-        "from a coil start the wall drives the count to zero",
-        under(pos, 0.7) == 0,
-        f"start {start}, end {under(pos, 0.7)}",
+    assert under(pos, 0.7) == 0, (
+        f"from a coil start the wall drives the count to zero: start {start}, end {under(pos, 0.7)}"
     )
 
 
@@ -115,34 +95,30 @@ def test_anchor_cap() -> None:
     mc_numba.seed_numba(4)
     mc_numba.mc_smooth_numba(pos, dtn, fixed, 0.5, settings(smooth_anchor_cap=0.5))
     drift = np.linalg.norm(pos[fixed] - home, axis=1)
-    check("anchors move under the cap", drift.max() > 0.0, f"max drift {drift.max():.3f}")
-    check("but never further than the cap times the bond", drift.max() <= 0.5 * 1.0 + 1e-6)
+    assert drift.max() > 0.0, f"anchors move under the cap: max drift {drift.max():.3f}"
+    assert drift.max() <= 0.5 * 1.0 + 1e-6, "but never further than the cap times the bond"
     pos, fixed, dtn = chain()
     home = pos[fixed].copy()
     mc_numba.seed_numba(4)
     mc_numba.mc_smooth_numba(pos, dtn, fixed, 0.5, settings())
-    check("with the cap at zero anchors do not move", np.array_equal(pos[fixed], home))
+    assert np.array_equal(pos[fixed], home), "with the cap at zero anchors do not move"
 
 
 def test_coil_start() -> None:
     pos, fixed, dtn = chain()
     out = coil_start(pos, fixed, dtn, 0.7, np.random.default_rng(5))
-    check("anchors are untouched", np.array_equal(out[fixed], pos[fixed]))
+    assert np.array_equal(out[fixed], pos[fixed]), "anchors are untouched"
     bonds = np.linalg.norm(np.diff(out.astype(np.float64), axis=0), axis=1)
     inner = ~fixed[:-1] & ~fixed[1:]
-    check(
-        "subanchor bonds sit within ten percent of their targets",
-        np.allclose(bonds[inner], dtn[inner], rtol=0.1),
-        f"max relative error {np.max(np.abs(bonds[inner] - dtn[inner]) / dtn[inner]):.2e}",
+    assert np.allclose(bonds[inner], dtn[inner], rtol=0.1), (
+        f"subanchor bonds sit within ten percent of their targets: max relative error {np.max(np.abs(bonds[inner] - dtn[inner]) / dtn[inner]):.2e}"
     )
-    check(
-        "the coil starts with a quarter or less of the line's pairs under the radius",
-        under(out, 0.7) * 4 <= under(pos, 0.7),
-        f"coil {under(out, 0.7)}, line {under(pos, 0.7)}",
+    assert under(out, 0.7) * 4 <= under(pos, 0.7), (
+        f"the coil starts with a quarter or less of the line's pairs under the radius: coil {under(out, 0.7)}, line {under(pos, 0.7)}"
     )
     again = coil_start(pos, fixed, dtn, 0.7, np.random.default_rng(5))
-    check("the start is a function of its seed", np.array_equal(out, again))
-    check("and not the line", np.linalg.norm(out - pos) > 1.0)
+    assert np.array_equal(out, again), "the start is a function of its seed"
+    assert np.linalg.norm(out - pos) > 1.0, "and not the line"
 
 
 def _jax_available() -> bool:
@@ -169,18 +145,14 @@ def test_jax_wall_and_cap() -> None:
     pos2, fixed2, dtn2 = chain()
     mc_jax.mc_smooth_jax(pos2, dtn2, fixed2, 0.5, settings())
     soft = under(pos2, 0.7)
-    check("JAX: the wall never lets the count rise", after <= before, f"{before} -> {after}")
-    check(
-        "JAX: and ends lower than the soft term alone", after < soft, f"wall {after}, soft {soft}"
-    )
+    assert after <= before, f"JAX: the wall never lets the count rise: {before} -> {after}"
+    assert after < soft, f"JAX: and ends lower than the soft term alone: wall {after}, soft {soft}"
     pos, fixed, dtn = chain()
     home = pos[fixed].copy()
     mc_jax.mc_smooth_jax(pos, dtn, fixed, 0.5, settings(smooth_anchor_cap=0.5))
     drift = np.linalg.norm(pos[fixed] - home, axis=1)
-    check(
-        "JAX: anchors move under the cap but never past it",
-        0.0 < drift.max() <= 0.5 + 1e-5,
-        f"max drift {drift.max():.3f}",
+    assert 0.0 < drift.max() <= 0.5 + 1e-5, (
+        f"JAX: anchors move under the cap but never past it: max drift {drift.max():.3f}"
     )
     # The batched path, two problems in one launch.
     problems = []
@@ -205,10 +177,8 @@ def test_jax_wall_and_cap() -> None:
         )
     out = mc_jax.mc_smooth_jax_batch(problems, s)
     ends = [under(np.asarray(o[1]), 0.7) for o in out]
-    check(
-        "JAX batch: the wall never lets the count rise in either chain",
-        all(e <= b for e, b in zip(ends, starts, strict=True)),
-        f"{starts} -> {ends}",
+    assert all(e <= b for e, b in zip(ends, starts, strict=True)), (
+        f"JAX batch: the wall never lets the count rise in either chain: {starts} -> {ends}"
     )
 
 
@@ -224,10 +194,8 @@ def test_jax_prefetch() -> None:
     s8.mc_smooth_chains = 1
     mc_jax.mc_smooth_jax(pos8, dtn8, fixed8, 0.5, s8)
     after = under(pos8, 0.7)
-    check(
-        "JAX prefetch: the wall still never lets the count rise",
-        after <= before,
-        f"{before} -> {after}",
+    assert after <= before, (
+        f"JAX prefetch: the wall still never lets the count rise: {before} -> {after}"
     )
     # The chain has the serial law. Over seeds the final energies agree in the mean.
     means = {}
@@ -252,12 +220,10 @@ def test_jax_prefetch() -> None:
                 }  # fmt: skip
             )
         means[k] = float(np.mean([float(o[0]) for o in mc_jax.mc_smooth_jax_batch(probs, sk)]))
-    check(
-        "JAX prefetch: the mean final energy over six seeds matches the serial chain's",
-        abs(means[8] - means[1]) <= 0.5 * means[1],
-        f"serial {means[1]:.4f}, prefetch 8 {means[8]:.4f}",
+    assert abs(means[8] - means[1]) <= 0.5 * means[1], (
+        f"JAX prefetch: the mean final energy over six seeds matches the serial chain's: serial {means[1]:.4f}, prefetch 8 {means[8]:.4f}"
     )
-    check("JAX prefetch: anchors stay put", np.allclose(pos8[fixed8], chain()[0][fixed8]))
+    assert np.allclose(pos8[fixed8], chain()[0][fixed8]), "JAX prefetch: anchors stay put"
     problems = []
     for seed in (1, 2):
         p, f, d = chain(seed=seed)
@@ -277,26 +243,6 @@ def test_jax_prefetch() -> None:
             }  # fmt: skip
         )
     out = mc_jax.mc_smooth_jax_batch(problems, s8)
-    check(
-        "JAX prefetch: the batched path runs",
-        len(out) == 2 and all(np.isfinite(float(o[0])) for o in out),
+    assert len(out) == 2 and all(np.isfinite(float(o[0])) for o in out), (
+        "JAX prefetch: the batched path runs"
     )
-
-
-def main() -> int:
-    print("smooth lever checks\n")
-    test_off_by_default()
-    test_wall_never_raises_the_count()
-    test_wall_holds_once_clear()
-    test_anchor_cap()
-    test_coil_start()
-    test_jax_wall_and_cap()
-    test_jax_prefetch()
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    for f in FAIL:
-        print(f"  failed: {f}")
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

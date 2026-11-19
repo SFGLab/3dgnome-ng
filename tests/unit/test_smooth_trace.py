@@ -3,26 +3,13 @@
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
 
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from gnome3d.mc import numba as mc_numba  # noqa: E402
-from gnome3d.settings import Settings  # noqa: E402
-
-PASS: list[str] = []
-FAIL: list[str] = []
-
-
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}" + (f"   {detail}" if detail else ""))
+from gnome3d.mc import numba as mc_numba
+from gnome3d.settings import Settings
 
 
 def chain(n: int = 60) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -43,28 +30,20 @@ def settings() -> Settings:
     return s
 
 
-def main() -> int:
-    print("smooth trace checks\n")
+def test_the_callback_is_called_at_least_once_per_run_rounds() -> None:
     frames: list[np.ndarray] = []
     pos, fixed, dtn = chain()
     mc_numba.seed_numba(1)
     mc_numba.mc_smooth_numba(
         pos, dtn, fixed, 0.5, settings(), on_round=lambda p: frames.append(p.copy())
     )
-    check("the callback is called at least once per run", len(frames) >= 1, f"{len(frames)} rounds")
-    check("each frame holds every bead", all(f.shape == pos.shape for f in frames))
-    check("the last frame is the returned chain", np.allclose(frames[-1], pos, atol=1e-6))
-    check(
-        "frames differ, so they are snapshots not one array",
-        len(frames) < 2 or not np.array_equal(frames[0], frames[-1]),
+    assert len(frames) >= 1, f"the callback is called at least once per run: {len(frames)} rounds"
+    assert all(f.shape == pos.shape for f in frames), "each frame holds every bead"
+    assert np.allclose(frames[-1], pos, atol=1e-6), "the last frame is the returned chain"
+    assert len(frames) < 2 or not np.array_equal(frames[0], frames[-1]), (
+        "frames differ, so they are snapshots not one array"
     )
     pos2, fixed2, dtn2 = chain()
     mc_numba.seed_numba(1)
     mc_numba.mc_smooth_numba(pos2, dtn2, fixed2, 0.5, settings())
-    check("the callback changes nothing about the result", np.array_equal(pos, pos2))
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    assert np.array_equal(pos, pos2), "the callback changes nothing about the result"

@@ -3,26 +3,13 @@
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
 
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from gnome3d.pipeline.ib.estimate_dist import _expand_replicates  # noqa: E402
-from gnome3d.settings import Settings  # noqa: E402
-
-PASS: list[str] = []
-FAIL: list[str] = []
-
-
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}" + (f"   {detail}" if detail else ""))
+from gnome3d.pipeline.ib.estimate_dist import _expand_replicates
+from gnome3d.settings import Settings
 
 
 def problem(n: int, seed: int) -> dict[str, object]:
@@ -50,33 +37,18 @@ def seeds_of(problems: list[dict[str, object]]) -> list[int]:
 
 def test_every_replicate_carries_a_seed() -> None:
     got = seeds_of([problem(64, 7)])
-    check("each replicate carries a seed", len(got) == 4 and all(isinstance(x, int) for x in got))
-    check("sibling replicates get different seeds", len(set(got)) == 4, f"{got}")
+    assert len(got) == 4 and all(isinstance(x, int) for x in got), "each replicate carries a seed"
+    assert len(set(got)) == 4, f"sibling replicates get different seeds: {got}"
 
 
 def test_seeds_follow_the_parent_not_the_batch() -> None:
     alone = seeds_of([problem(64, 7)])
     first = seeds_of([problem(64, 7), problem(64, 9)])[:4]
     second = seeds_of([problem(64, 9), problem(64, 7)])[4:]
-    check("a block's replicate seeds do not depend on its partners", alone == first, f"{alone}")
-    check("nor on its position in the batch", alone == second, f"{second}")
+    assert alone == first, f"a block's replicate seeds do not depend on its partners: {alone}"
+    assert alone == second, f"nor on its position in the batch: {second}"
 
 
 def test_different_blocks_get_different_seeds() -> None:
     a, b = seeds_of([problem(64, 7)]), seeds_of([problem(64, 9)])
-    check("two blocks draw disjoint replicate seeds", not set(a) & set(b), f"{a} vs {b}")
-
-
-def main() -> int:
-    print("estimate replicate seeding checks\n")
-    test_every_replicate_carries_a_seed()
-    test_seeds_follow_the_parent_not_the_batch()
-    test_different_blocks_get_different_seeds()
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    for f in FAIL:
-        print(f"  failed: {f}")
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    assert not set(a) & set(b), f"two blocks draw disjoint replicate seeds: {a} vs {b}"

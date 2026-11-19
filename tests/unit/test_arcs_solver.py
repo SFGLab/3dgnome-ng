@@ -3,31 +3,18 @@
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
 
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from gnome3d.mc.numba.arcs_solver import arcs_energy_grad, solve_arcs  # noqa: E402
-from gnome3d.mc.numba.terms import (  # noqa: E402
+from gnome3d.mc.numba.arcs_solver import arcs_energy_grad, solve_arcs
+from gnome3d.mc.numba.terms import (
     init_arcs_nb,
     init_confine_nb,
     init_excl_nb,
 )
-from gnome3d.settings import Settings  # noqa: E402
-
-PASS: list[str] = []
-FAIL: list[str] = []
-
-
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}" + (f"   {detail}" if detail else ""))
+from gnome3d.settings import Settings
 
 
 def block(n: int = 90, seed: int = 3) -> tuple[np.ndarray, np.ndarray, Settings]:
@@ -95,10 +82,8 @@ def test_energy_is_the_one_the_mc_scores() -> None:
             w,
             skip,
         )
-        check(
-            f"the solver's energy is the MC's, {label}",
-            abs(got - want) / max(abs(want), 1e-9) < 1e-12,
-            f"{got:.6f} against {want:.6f}",
+        assert abs(got - want) / max(abs(want), 1e-9) < 1e-12, (
+            f"the solver's energy is the MC's, {label}" + ": " + f"{got:.6f} against {want:.6f}"
         )
     s.use_excluded_volume = False
     s.exclusion_apply_to_arcs = False
@@ -135,7 +120,7 @@ def test_gradient_matches_finite_differences() -> None:
         b[k] -= h
         fd = (arcs_energy_grad(a, *args)[0] - arcs_energy_grad(b, *args)[0]) / (2 * h)
         worst = max(worst, abs(fd - g[k]) / max(abs(fd), 1e-6))
-    check("the gradient matches finite differences", worst < 2e-5, f"worst relative {worst:.2e}")
+    assert worst < 2e-5, f"the gradient matches finite differences: worst relative {worst:.2e}"
 
 
 def test_it_descends() -> None:
@@ -144,11 +129,8 @@ def test_it_descends() -> None:
     s.exclusion_apply_to_arcs = True
     e1, out = solve_arcs(pos, exp, s, iters=200)
     e0, _ = solve_arcs(pos, exp, s, iters=1)
-    check("the solver lowers the energy", e1 < e0, f"{e0:,.1f} to {e1:,.1f}")
-    check(
-        "and returns the shape it was given",
-        out.shape == pos.shape and out.dtype == np.float32,
-    )
+    assert e1 < e0, f"the solver lowers the energy: {e0:,.1f} to {e1:,.1f}"
+    assert out.shape == pos.shape and out.dtype == np.float32, "and returns the shape it was given"
 
 
 def test_the_tolerance_stops_the_solve_and_zero_leaves_it_alone() -> None:
@@ -159,13 +141,11 @@ def test_the_tolerance_stops_the_solve_and_zero_leaves_it_alone() -> None:
     s.arcs_solver_tol = 0.0
     e_cap, x_cap = solve_arcs(pos, exp, s, iters=400)
     e_again, x_again = solve_arcs(pos, exp, s, iters=400)
-    check("at zero the solve repeats itself", np.array_equal(x_cap, x_again) and e_cap == e_again)
+    assert np.array_equal(x_cap, x_again) and e_cap == e_again, "at zero the solve repeats itself"
     s.arcs_solver_tol = 1e-2
     e_tol, _ = solve_arcs(pos, exp, s, iters=400)
-    check(
-        "a loose tolerance stops earlier, at a higher energy",
-        e_tol > e_cap * (1.0 + 1e-6),
-        f"{e_tol:,.3f} against {e_cap:,.3f}",
+    assert e_tol > e_cap * (1.0 + 1e-6), (
+        f"a loose tolerance stops earlier, at a higher energy: {e_tol:,.3f} against {e_cap:,.3f}"
     )
 
 
@@ -198,7 +178,7 @@ def test_loop_weights() -> None:
     ones = np.ones(exp.shape, dtype=np.float32)
     e0, g0 = arcs_energy_grad(pw.reshape(-1), exp, *args)
     e1, g1 = arcs_energy_grad(pw.reshape(-1), exp, *args, True, ones)
-    check("weights of one are the unweighted energy", e0 == e1 and np.array_equal(g0, g1))
+    assert e0 == e1 and np.array_equal(g0, g1), "weights of one are the unweighted energy"
     rng = np.random.default_rng(3)
     w = np.ones(exp.shape, dtype=np.float32)
     arc = exp > 1e-6
@@ -210,10 +190,8 @@ def test_loop_weights() -> None:
         + float(init_confine_nb(pw, cx, cy, cz, cr, float(s.confinement_weight)))
         + float(init_excl_nb(pw, r0, wv, skip))
     )
-    check(
-        "with weights the solver's energy is still the annealer's",
-        abs(ew - want) / max(abs(want), 1e-9) < 1e-12 and ew != e0,
-        f"{ew:.6f} against {want:.6f}",
+    assert abs(ew - want) / max(abs(want), 1e-9) < 1e-12 and ew != e0, (
+        f"with weights the solver's energy is still the annealer's: {ew:.6f} against {want:.6f}"
     )
     try:
         import jax  # noqa: F401, PLC0415
@@ -221,12 +199,9 @@ def test_loop_weights() -> None:
         from gnome3d.mc.jax.arcs_energy import DeviceArcsEnergy  # noqa: PLC0415
 
         ed, gd = DeviceArcsEnergy(exp, args, w)(pw.reshape(-1))
-        check(
-            "the device carries the weighted energy",
-            abs(ed - ew) < 1e-4 * max(1.0, abs(ew))
-            and float(np.max(np.abs(gd - gw))) < 1e-3 * (1.0 + float(np.abs(gw).max())),
-            f"{ed:,.4f} against {ew:,.4f}",
-        )
+        assert abs(ed - ew) < 1e-4 * max(1.0, abs(ew)) and float(np.max(np.abs(gd - gw))) < 1e-3 * (
+            1.0 + float(np.abs(gw).max())
+        ), f"the device carries the weighted energy: {ed:,.4f} against {ew:,.4f}"
     except ImportError:
         pass
     n = 3
@@ -249,12 +224,12 @@ def test_loop_weights() -> None:
     def dist(x: np.ndarray, i: int, j: int) -> float:
         return float(np.linalg.norm(x[i] - x[j]))
 
-    check(
-        "without weights the anchor sits midway, with them nearer the strong partner",
+    assert (
         abs(dist(x_plain, 0, 1) - dist(x_plain, 0, 2)) < 1e-3
-        and dist(x_w, 0, 1) < dist(x_w, 0, 2) - 0.05,
+        and dist(x_w, 0, 1) < dist(x_w, 0, 2) - 0.05
+    ), "without weights the anchor sits midway, with them nearer the strong partner: " + (
         f"plain {dist(x_plain, 0, 1):.3f} / {dist(x_plain, 0, 2):.3f}, "
-        f"weighted {dist(x_w, 0, 1):.3f} / {dist(x_w, 0, 2):.3f}",
+        f"weighted {dist(x_w, 0, 1):.3f} / {dist(x_w, 0, 2):.3f}"
     )
 
 
@@ -267,7 +242,7 @@ def test_the_weight_matrix_follows_the_strength() -> None:
     s = Settings()
     mids = [0, 50_000, 120_000, 400_000]
     arcs = [(0, 1, 30), (1, 2, 3), (0, 3, 6)]
-    check("exponent zero gives no matrix", arc_weight_matrix(s, mids, arcs) is None)
+    assert arc_weight_matrix(s, mids, arcs) is None, "exponent zero gives no matrix"
     s.arc_weight_exponent = 0.5
     law = s.polymer_law()
     w = arc_weight_matrix(s, mids, arcs)
@@ -276,7 +251,7 @@ def test_the_weight_matrix_follows_the_strength() -> None:
     for i, j, sc in arcs:
         q = law.arc_strength(sc, abs(mids[i] - mids[j]))
         ok = ok and abs(w[i, j] - q**0.5) < 1e-6 and w[i, j] == w[j, i]
-    check("an arc pair carries its strength to the exponent, symmetric, others one", ok)
+    assert ok, "an arc pair carries its strength to the exponent, symmetric, others one"
 
 
 def test_device_energy_matches_the_cpu_kernel() -> None:
@@ -323,21 +298,17 @@ def test_device_energy_matches_the_cpu_kernel() -> None:
         worst_g = max(
             worst_g, float(np.max(np.abs(g_dev - g_cpu)) / max(np.max(np.abs(g_cpu)), 1e-12))
         )
-    check("the device energy is the CPU kernel's", worst_e < 1e-5, f"worst relative {worst_e:.1e}")
-    check(
-        "the device gradient is the CPU kernel's", worst_g < 1e-4, f"worst relative {worst_g:.1e}"
-    )
+    assert worst_e < 1e-5, f"the device energy is the CPU kernel's: worst relative {worst_e:.1e}"
+    assert worst_g < 1e-4, f"the device gradient is the CPU kernel's: worst relative {worst_g:.1e}"
     e_dev, _ = solve_arcs(pos, exp, s, iters=50, backend="jax")
     e_cpu, _ = solve_arcs(pos, exp, s, iters=50, backend="numba")
-    check(
-        "the solver on the device reaches the CPU solve's energy",
-        abs(e_dev - e_cpu) / max(abs(e_cpu), 1e-12) < 1e-2,
-        f"{e_cpu:,.4f} against {e_dev:,.4f}",
+    assert abs(e_dev - e_cpu) / max(abs(e_cpu), 1e-12) < 1e-2, (
+        f"the solver on the device reaches the CPU solve's energy: {e_cpu:,.4f} against {e_dev:,.4f}"
     )
 
 
 def test_off_by_default() -> None:
-    check("the stage anneals unless asked otherwise", Settings().arcs_solver == "mc")
+    assert Settings().arcs_solver == "mc", "the stage anneals unless asked otherwise"
 
 
 def test_an_unknown_name_is_refused() -> None:
@@ -360,7 +331,7 @@ def test_an_unknown_name_is_refused() -> None:
         ok = False
     except ValueError:
         ok = True
-    check("a misspelled solver name is refused, not ignored", ok)
+    assert ok, "a misspelled solver name is refused, not ignored"
 
 
 def test_the_batched_runner_solves_on_the_device() -> None:
@@ -393,31 +364,9 @@ def test_the_batched_runner_solves_on_the_device() -> None:
     }
     ((e_dev, _),) = _batch_run([problem])  # type: ignore[list-item]
     e_cpu, _ = _run(problem)  # type: ignore[arg-type]
-    check(
-        "the batch executor solves on the device and reaches the CPU solve's energy",
-        abs(e_dev - e_cpu) < 1e-2 * max(abs(e_cpu), 1.0),
-        f"{e_cpu:,.4f} against {e_dev:,.4f}",
+    assert abs(e_dev - e_cpu) < 1e-2 * max(abs(e_cpu), 1.0), (
+        f"the batch executor solves on the device and reaches the CPU solve's energy: {e_cpu:,.4f} against {e_dev:,.4f}"
     )
-
-
-def main() -> int:
-    print("arcs solver checks\n")
-    test_energy_is_the_one_the_mc_scores()
-    test_gradient_matches_finite_differences()
-    test_it_descends()
-    test_the_tolerance_stops_the_solve_and_zero_leaves_it_alone()
-    test_loop_weights()
-    test_the_weight_matrix_follows_the_strength()
-    test_device_energy_matches_the_cpu_kernel()
-    test_off_by_default()
-    test_an_unknown_name_is_refused()
-    test_the_batched_runner_solves_on_the_device()
-    test_loop_dropout()
-    test_factories()
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    for f in FAIL:
-        print(f"  failed: {f}")
-    return 1 if FAIL else 0
 
 
 def test_loop_dropout() -> None:
@@ -435,25 +384,23 @@ def test_loop_dropout() -> None:
         (int(i), int(i + 1 + rng.integers(1, 5)), int(sc))
         for i, sc in zip(rng.integers(0, 390, 3000), rng.choice([1, 3, 9], 3000), strict=True)
     ]
-    check("off keeps every arc", not s.loop_dropout)
+    assert not s.loop_dropout, "off keeps every arc"
     s.loop_dropout = True
     s.loop_dropout_scale = 1.0
     k1 = dropout_keep(s, mids, arcs, seed=11)
     k2 = dropout_keep(s, mids, arcs, seed=11)
     k3 = dropout_keep(s, mids, arcs, seed=12)
-    check("the same seed keeps the same arcs", k1 == k2)
-    check("another seed keeps other arcs", k1 != k3)
+    assert k1 == k2, "the same seed keeps the same arcs"
+    assert k1 != k3, "another seed keeps other arcs"
     for sc, want in ((1, 0.5), (3, 0.75), (9, 0.9)):
         got = np.mean([k for a, k in zip(arcs, k1, strict=True) if a[2] == sc])
-        check(
-            f"a {sc} PET loop is kept in {want:.2f} of conformations",
-            abs(got - want) < 0.05,
-            f"{got:.3f}",
+        assert abs(got - want) < 0.05, (
+            f"a {sc} PET loop is kept in {want:.2f} of conformations" + ": " + f"{got:.3f}"
         )
     s.loop_dropout_scale = 3.0
     k4 = dropout_keep(s, mids, arcs, seed=11)
     got = np.mean([k for a, k in zip(arcs, k4, strict=True) if a[2] == 3])
-    check("the scale moves the halfway point", abs(got - 0.5) < 0.05, f"{got:.3f}")
+    assert abs(got - 0.5) < 0.05, f"the scale moves the halfway point: {got:.3f}"
 
 
 def test_factories() -> None:
@@ -469,12 +416,10 @@ def test_factories() -> None:
     ]
     want = sum(w * act[i] * (np.log1p(act.sum()) - np.log1p(S[i])) for i in range(4) if act[i] > 0)
     e, g = factory_energy_grad(pos.reshape(-1), act, w, r)
-    check(
-        "the factory energy is its closed form",
-        abs(e - want) < 1e-10,
-        f"{e:.8f} against {want:.8f}",
+    assert abs(e - want) < 1e-10, (
+        f"the factory energy is its closed form: {e:.8f} against {want:.8f}"
     )
-    check("the inactive anchor feels nothing", np.all(g[9:12] == 0.0))
+    assert np.all(g[9:12] == 0.0), "the inactive anchor feels nothing"
     x = pos.reshape(-1).copy()
     num = np.zeros_like(x)
     h = 1e-6
@@ -486,10 +431,8 @@ def test_factories() -> None:
         num[k] = (factory_energy_grad(xp, act, w, r)[0] - factory_energy_grad(xm, act, w, r)[0]) / (
             2 * h
         )
-    check(
-        "the factory gradient matches finite differences",
-        np.max(np.abs(num - g)) < 1e-6,
-        f"{np.max(np.abs(num - g)):.2e}",
+    assert np.max(np.abs(num - g)) < 1e-6, (
+        f"the factory gradient matches finite differences: {np.max(np.abs(num - g)):.2e}"
     )
     rng = np.random.default_rng(2)
     ok = True
@@ -497,7 +440,7 @@ def test_factories() -> None:
         pr = rng.normal(0, 3, size=(30, 3))
         ar = rng.uniform(0, 2, 30) * (rng.random(30) < 0.6)
         ok &= factory_energy_grad(pr.reshape(-1), ar, w, r)[0] >= 0.0
-    check("the term is never below zero", ok)
+    assert ok, "the term is never below zero"
     try:
         import jax  # noqa: F401, PLC0415
 
@@ -507,12 +450,9 @@ def test_factories() -> None:
         ar = rng.uniform(0, 2, 300) * (rng.random(300) < 0.6)
         ec, gc = factory_energy_grad(pr.reshape(-1), ar, w, r)
         ed, gd = DeviceFactoryEnergy(ar, w, r)(pr.reshape(-1))
-        check(
-            "the device carries the factory term",
-            abs(ed - ec) / max(abs(ec), 1e-9) < 1e-4
-            and np.max(np.abs(gd - gc)) < 1e-3 * (1 + np.max(np.abs(gc))),
-            f"{ed:.5f} against {ec:.5f}",
-        )
+        assert abs(ed - ec) / max(abs(ec), 1e-9) < 1e-4 and np.max(np.abs(gd - gc)) < 1e-3 * (
+            1 + np.max(np.abs(gc))
+        ), f"the device carries the factory term: {ed:.5f} against {ec:.5f}"
     except ImportError:
         pass
     # Active anchors with no arcs among them end closer with the term than without.
@@ -539,13 +479,7 @@ def test_factories() -> None:
     def spread(x):
         return float(np.mean([np.linalg.norm(x[i] - x[j]) for i in idx for j in idx if i < j]))
 
-    check("weight zero with an activity leaves the solve alone", np.array_equal(x0, x2))
-    check(
-        "with the term the active anchors sit closer",
-        spread(x1) < spread(x0),
-        f"{spread(x1):.2f} against {spread(x0):.2f}",
+    assert np.array_equal(x0, x2), "weight zero with an activity leaves the solve alone"
+    assert spread(x1) < spread(x0), (
+        f"with the term the active anchors sit closer: {spread(x1):.2f} against {spread(x0):.2f}"
     )
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

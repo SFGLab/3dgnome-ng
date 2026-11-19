@@ -1,6 +1,6 @@
 """Checks SETTINGS.md against the loader and the production config.
 
-    python tests/unit/test_settings_doc.py
+    pytest tests/unit/test_settings_doc.py
 
 Every key the loader reads must have a row and every row must be a key the loader reads. The
 default column must be the default of the loader. The production column must be the value of
@@ -12,14 +12,12 @@ from __future__ import annotations
 
 import ast
 import re
-import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
+from gnome3d.production import CANONICAL
+from gnome3d.settings import Settings
 
-from gnome3d.production import CANONICAL  # noqa: E402
-from gnome3d.settings import Settings  # noqa: E402
+ROOT = Path(__file__).resolve().parents[2]
 
 MC_SECTIONS = ("simulation_heatmap", "simulation_arcs", "simulation_arcs_smooth", "simulation_ib")
 
@@ -141,15 +139,3 @@ def problems() -> tuple[list[str], int, int]:
 def test_settings_doc_matches_the_loader_and_the_production_config() -> None:
     found, _keys, _rows = problems()
     assert not found, "\n".join(found)
-
-
-def main() -> int:
-    found, keys, rows = problems()
-    print(f"{keys} keys read by the loader, {rows} rows in SETTINGS.md, {len(found)} problems")
-    for p in found:
-        print("  " + p)
-    return len(found)
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

@@ -112,15 +112,17 @@ Use `.venv/bin/python`. pytest, ruff and pyright are in the `dev` extra.
 ```bash
 .venv/bin/pytest                      # every test, about two and a half minutes on a laptop
 .venv/bin/pytest -m "not slow"        # without the files that take over a minute
-.venv/bin/python tests/unit/test_polymer.py     # one file as a script
+.venv/bin/pytest tests/unit/test_polymer.py     # one file
+.venv/bin/pytest web/tests            # the site, with web/requirements.txt and web/requirements-dev.txt installed
 ```
 
-`tests/unit/` has one file per feature. A file records its checks through `check(name, cond, detail)`, and
-`tests/conftest.py` fails a test that recorded a failed check. `tests/integration/` runs the whole pipeline on
-synthetic inputs and on one GM12878 region, which is skipped without `data/`.
+The tests are plain pytest: a test function, `assert` with a message that says what holds, fixtures for what
+several tests share. No test file has a `main()`, a script entry or a helper that records results. `tests/unit/`
+has one file per feature. `tests/integration/` runs the whole pipeline on synthetic inputs and on one GM12878
+region, which is skipped without `data/`.
 
 A new energy term gets a unit file after `tests/unit/test_terms.py`: a hand built configuration with an energy in
-closed form, a check that the local scores sum to the full score and a check that the term is non negative.
+closed form, a test that the local scores sum to the full score and a test that the term is non negative.
 
 Run pytest before a commit that touches `gnome3d/`.
 
@@ -165,8 +167,8 @@ Do not run `ruff format` on `web/` or `playground/`. Those files are not formatt
 ### Continuous integration and release
 
 `.github/workflows/tests.yml` runs ruff and pytest on a push to main and on a pull request, on Python 3.11 to 3.14.
-The tests marked slow run in one job on Python 3.12. `.github/workflows/web.yml` runs the test scripts of the site
-and the tests, the lint and the build of the frontend when a change touches `web/`, `gnome3d/` or `pyproject.toml`.
+The tests marked slow run in one job on Python 3.12. `.github/workflows/web.yml` runs the tests of the site with
+`pytest web/tests` and the tests, the lint and the build of the frontend when a change touches `web/`, `gnome3d/` or `pyproject.toml`.
 `.github/workflows/publish.yml` builds the package and uploads it to PyPI when a GitHub release is published.
 
 The version is the latest git tag, read by setuptools-scm. The tag `v0.3.0` gives the version 0.3.0. A commit after

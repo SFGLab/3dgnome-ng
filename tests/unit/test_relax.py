@@ -2,25 +2,11 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from gnome3d.pipeline.relax import cross_block_contacts, relax_blocks  # noqa: E402
-from gnome3d.settings import Settings  # noqa: E402
-from gnome3d.types import BeadOut  # noqa: E402
-
-PASS: list[str] = []
-FAIL: list[str] = []
-
-
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}{('  ' + detail) if detail else ''}")
+from gnome3d.pipeline.relax import cross_block_contacts, relax_blocks
+from gnome3d.settings import Settings
+from gnome3d.types import BeadOut
 
 
 def coil(
@@ -58,19 +44,19 @@ def settings(**kw: object) -> Settings:
 
 
 def test_gate_function() -> None:
-    print("\n[gate] the cross block contact count")
+    """The cross block contact count."""
     rng = np.random.default_rng(1)
     a = coil(0, 60, np.zeros(3), rng, 1.0)
     b = coil(200_000, 60, np.zeros(3), rng, 1.0)  # same centre, full overlap
     c = coil(400_000, 60, np.array([100.0, 0, 0]), rng, 1.0)  # far away
     n_ab, touched_ab = cross_block_contacts([a, b], 1.0)
     n_ac, touched_ac = cross_block_contacts([a, c], 1.0)
-    check("overlapping coils register contacts", n_ab > 50, f"{n_ab} pairs, {touched_ab} beads")
-    check("separated coils register none", n_ac == 0 and touched_ac == 0)
+    assert n_ab > 50, f"overlapping coils register contacts: {n_ab} pairs, {touched_ab} beads"
+    assert n_ac == 0 and touched_ac == 0, "separated coils register none"
 
 
 def test_relax_separates() -> None:
-    print("\n[relax] two overlapping coils are pushed apart with anchors fixed")
+    """Two overlapping coils are pushed apart with anchors fixed."""
     from gnome3d.mc.numba import seed_numba
 
     rng = np.random.default_rng(2)
@@ -83,41 +69,36 @@ def test_relax_separates() -> None:
     np.random.seed(5)
     out = relax_blocks([a, b], settings())
     after, touched = cross_block_contacts(out, 1.0)
-    check(
-        "contacts inside the radius go to zero",
-        after == 0,
-        f"{before} -> {after} ({touched} beads touched)",
+    assert after == 0, (
+        f"contacts inside the radius go to zero: {before} -> {after} ({touched} beads touched)"
     )
     for name, x, y in (("first", a, out[0]), ("second", b, out[1])):
         pa = positions(x)
         pb = positions(y)
         anch = [i for i, bd in enumerate(x) if bd.kind == "anchor"]
-        check(f"{name} coil: anchors did not move", np.allclose(pa[anch], pb[anch]))
+        assert np.allclose(pa[anch], pb[anch]), f"{name} coil: anchors did not move"
         bonds_a = np.linalg.norm(np.diff(pa, axis=0), axis=1)
         bonds_b = np.linalg.norm(np.diff(pb, axis=0), axis=1)
-        check(
-            f"{name} coil: bonds kept within 50 percent",
-            np.all(bonds_b < 1.5 * bonds_a) and np.all(bonds_b > 0.5 * bonds_a),
-            f"max ratio {np.max(bonds_b / bonds_a):.2f}",
+        assert np.all(bonds_b < 1.5 * bonds_a) and np.all(bonds_b > 0.5 * bonds_a), (
+            f"{name} coil: bonds kept within 50 percent"
+            + ": "
+            + f"max ratio {np.max(bonds_b / bonds_a):.2f}"
         )
-    check(
-        "bead count, ranges and kinds preserved",
-        all(
-            (p.start, p.end, p.kind) == (q.start, q.end, q.kind)
-            for x, y in zip([a, b], out, strict=True)
-            for p, q in zip(x, y, strict=True)
-        ),
-    )
+    assert all(
+        (p.start, p.end, p.kind) == (q.start, q.end, q.kind)
+        for x, y in zip([a, b], out, strict=True)
+        for p, q in zip(x, y, strict=True)
+    ), "bead count, ranges and kinds preserved"
 
 
 def test_flag_off() -> None:
-    print("\n[flag] off returns the input")
+    """Off returns the input."""
     rng = np.random.default_rng(3)
     a = coil(0, 20, np.zeros(3), rng, 1.0)
     b = coil(100_000, 20, np.zeros(3), rng, 1.0)
     s = settings(use_cross_block_relax=False)
-    check("flag off returns the blocks unchanged", relax_blocks([a, b], s) == [a, b])
-    check("default is off", Settings().use_cross_block_relax is False)
+    assert relax_blocks([a, b], s) == [a, b], "flag off returns the blocks unchanged"
+    assert Settings().use_cross_block_relax is False, "default is off"
 
 
 def test_local_window_restricts_who_may_move() -> None:
@@ -146,17 +127,14 @@ def test_local_window_restricts_who_may_move() -> None:
     local = moved_count([a, b, c], relax_blocks([a, b, c], s))
     s.relax_local_window = -1
     everything = moved_count([a, b, c], relax_blocks([a, b, c], s))
-    check(
-        "a window moves far fewer beads than letting every subanchor move",
-        0 < local < everything,
-        f"{local} against {everything} of {3 * 60}",
+    assert 0 < local < everything, (
+        f"a window moves far fewer beads than letting every subanchor move: {local} against {everything} of {3 * 60}"
     )
 
 
 def test_local_window_is_off_by_default() -> None:
-    check(
-        "the window defaults to every subanchor, which is what it did before",
-        Settings().relax_local_window < 0,
+    assert Settings().relax_local_window < 0, (
+        "the window defaults to every subanchor, which is what it did before"
     )
 
 
@@ -179,7 +157,7 @@ def test_it_is_reproducible_from_a_given_rng_state() -> None:
         for bi, bo in zip(first, second, strict=True)
         for x, y in zip(bi, bo, strict=True)
     )
-    check("from the same RNG state it gives the same structure", same)
+    assert same, "from the same RNG state it gives the same structure"
 
 
 def test_within_blocks_clears_inner_overlaps() -> None:
@@ -199,32 +177,11 @@ def test_within_blocks_clears_inner_overlaps() -> None:
         dd = np.linalg.norm(q[:, None] - q[None, :], axis=2)
         return int((dd[iu] < 0.7).sum())
 
-    check(
-        "off leaves a lone dense block as it was", inner(off) == before, f"{inner(off)} of {before}"
+    assert inner(off) == before, (
+        f"off leaves a lone dense block as it was: {inner(off)} of {before}"
     )
-    check("on clears most inner overlaps", inner(on) < 0.3 * before, f"{inner(on)} of {before}")
+    assert inner(on) < 0.3 * before, f"on clears most inner overlaps: {inner(on)} of {before}"
     alone = positions(relax_blocks([a], s)[0])
-    check(
-        "on clears them in a lone block too",
-        inner(alone) < 0.3 * before,
-        f"{inner(alone)} of {before}",
+    assert inner(alone) < 0.3 * before, (
+        f"on clears them in a lone block too: {inner(alone)} of {before}"
     )
-
-
-def main() -> int:
-    print("cross block relaxation checks")
-    test_gate_function()
-    test_relax_separates()
-    test_flag_off()
-    test_local_window_restricts_who_may_move()
-    test_within_blocks_clears_inner_overlaps()
-    test_local_window_is_off_by_default()
-    test_it_is_reproducible_from_a_given_rng_state()
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    for f in FAIL:
-        print(f"  failed: {f}")
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

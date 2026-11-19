@@ -2,35 +2,22 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
 from gnome3d.mc.numba.terms import (
-    _local_arcs_nb,  # noqa: E402
-    init_arcs_nb,  # noqa: E402
+    _local_arcs_nb,
+    init_arcs_nb,
 )
-from gnome3d.pipeline.coarse.build import (  # noqa: E402
+from gnome3d.pipeline.coarse.build import (
     _active_arcs,
     add_contact_background,
     arc_expected_matrix,
     repulsion_range,
 )
-from gnome3d.polymer import PolymerLaw  # noqa: E402
-from gnome3d.settings import Settings  # noqa: E402
-
-PASS: list[str] = []
-FAIL: list[str] = []
-
-
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}" + (f"   {detail}" if detail else ""))
+from gnome3d.polymer import PolymerLaw
+from gnome3d.settings import Settings
 
 
 def settings() -> Settings:
@@ -40,42 +27,36 @@ def settings() -> Settings:
 
 
 def test_matrix() -> None:
-    print("\n[matrix] arc pairs carry the law's contact distance, the rest nothing")
+    """Arc pairs carry the law's contact distance, the rest nothing."""
     s = settings()
     mids = [0, 10_000, 50_000, 200_000]
     arcs = [(0, 2, 4), (1, 3, 40)]
     m = arc_expected_matrix(s, mids, arcs)
-    check("diagonal is zero", float(np.abs(np.diag(m)).max()) == 0.0)
-    check(
-        "an arcless pair is the repulsion marker when the short range background is off",
-        m[0, 1] == -0.5 and m[2, 3] == -0.5,
+    assert float(np.abs(np.diag(m)).max()) == 0.0, "diagonal is zero"
+    assert m[0, 1] == -0.5 and m[2, 3] == -0.5, (
+        "an arcless pair is the repulsion marker when the short range background is off"
     )
-    check(
-        "an arc pair carries the law's distance",
-        abs(m[0, 2] - s.arc_expected_distance(4, 50_000)) < 1e-12,
+    assert abs(m[0, 2] - s.arc_expected_distance(4, 50_000)) < 1e-12, (
+        "an arc pair carries the law's distance"
     )
-    check("and is symmetric", m[0, 2] == m[2, 0] and m[1, 3] == m[3, 1])
-    check(
-        "a stronger arc is closer than a weaker one at a longer span",
-        m[1, 3] < s.polymer.background(190_000),
-        f"{m[1, 3]:.3f} against background {s.polymer.background(190_000):.3f}",
+    assert m[0, 2] == m[2, 0] and m[1, 3] == m[3, 1], "and is symmetric"
+    assert m[1, 3] < s.polymer.background(190_000), (
+        f"a stronger arc is closer than a weaker one at a longer span: {m[1, 3]:.3f} against background {s.polymer.background(190_000):.3f}"
     )
-    check("no arc target is under one bead", float(m[m > 0].min()) >= 1.0 - 1e-12)
+    assert float(m[m > 0].min()) >= 1.0 - 1e-12, "no arc target is under one bead"
 
 
 def test_two_factors() -> None:
-    print("\n[two factors] a pair joined by a CTCF and an RNAPII loop is held by the closer")
+    """A pair joined by a CTCF and an RNAPII loop is held by the closer."""
     s = settings()
     mids = [0, 10_000, 50_000]
     weak, strong = s.arc_expected_distance(3, 50_000, 0), s.arc_expected_distance(40, 50_000, 1)
     for order in ([(0, 2, 3, 0), (0, 2, 40, 1)], [(0, 2, 40, 1), (0, 2, 3, 0)]):
         m = arc_expected_matrix(s, mids, order)
-        check(
-            "the pair takes the closer target in either order",
-            abs(m[0, 2] - min(weak, strong)) < 1e-12 and m[0, 2] == m[2, 0],
-            f"{m[0, 2]:.3f} against {weak:.3f} and {strong:.3f}",
+        assert abs(m[0, 2] - min(weak, strong)) < 1e-12 and m[0, 2] == m[2, 0], (
+            f"the pair takes the closer target in either order: {m[0, 2]:.3f} against {weak:.3f} and {strong:.3f}"
         )
-    check("which is under the background", min(weak, strong) < s.polymer.background(50_000))
+    assert min(weak, strong) < s.polymer.background(50_000), "which is under the background"
 
     # The summary arc that data.py adds after the arcs of a pair has score 0 and factor -1.
     arc = lambda a, b, score, factor: SimpleNamespace(start=a, end=b, score=score, factor=factor)  # noqa: E731
@@ -88,55 +69,47 @@ def test_two_factors() -> None:
         clusters=clusters, arcs={"chr1": [arc(0, 2, 3, 0), arc(0, 2, 40, 1), arc(0, 2, 0, -1)]}, s=s
     )
     got_mids, got = _active_arcs(state, [0, 1, 2], "chr1")
-    check(
-        "the summary arc is left out of the active arcs",
-        got == [(0, 2, 3, 0), (0, 2, 40, 1)],
-        str(got),
+    assert got == [(0, 2, 3, 0), (0, 2, 40, 1)], (
+        "the summary arc is left out of the active arcs: " + str(got)
     )
     m = arc_expected_matrix(s, got_mids, got)
-    check(
-        "so the pair is not held at the background",
-        m[0, 2] < s.polymer.background(50_000) - 1e-9,
-        f"{m[0, 2]:.3f}",
+    assert m[0, 2] < s.polymer.background(50_000) - 1e-9, (
+        f"so the pair is not held at the background: {m[0, 2]:.3f}"
     )
 
 
 def test_loop_contact() -> None:
-    print("\n[loop contact] a kept loop is held at contact, one bead, whatever its strength")
+    """A kept loop is held at contact, one bead, whatever its strength."""
     s = settings()
     mids = [0, 10_000, 50_000, 200_000]
     arcs = [(0, 2, 3, 0), (1, 3, 40, 1)]
     off = arc_expected_matrix(s, mids, arcs)
     s.loop_contact = True
     on = arc_expected_matrix(s, mids, arcs)
-    check(
-        "off, the law's part way targets",
-        off[0, 2] > 1.0 + 1e-6 and off[1, 3] > 1.0 + 1e-6,
-        f"{off[0, 2]:.3f} {off[1, 3]:.3f}",
+    assert off[0, 2] > 1.0 + 1e-6 and off[1, 3] > 1.0 + 1e-6, (
+        f"off, the law's part way targets: {off[0, 2]:.3f} {off[1, 3]:.3f}"
     )
-    check(
-        "on, every loop pair at one bead", on[0, 2] == 1.0 and on[1, 3] == 1.0 and on[2, 0] == 1.0
+    assert on[0, 2] == 1.0 and on[1, 3] == 1.0 and on[2, 0] == 1.0, (
+        "on, every loop pair at one bead"
     )
-    check("and the arcless pairs as they were", np.array_equal(on[off <= 0], off[off <= 0]))
+    assert np.array_equal(on[off <= 0], off[off <= 0]), "and the arcless pairs as they were"
 
 
 def test_short_range_background() -> None:
-    print("\n[short range] arcless pairs inside the range sit on the background")
+    """Arcless pairs inside the range sit on the background."""
     s = settings()
     s.background_weight = 0.3
     s.background_range_bp = 100_000
     mids = [0, 10_000, 50_000, 200_000]
     m = arc_expected_matrix(s, mids, [(0, 2, 4)])
-    check(
-        "a pair inside the range carries minus its background",
+    assert (
         abs(m[0, 1] + s.polymer.background(10_000)) < 1e-12
-        and abs(m[1, 2] + s.polymer.background(40_000)) < 1e-12,
-    )
-    check("a pair beyond the range keeps the repulsion marker", m[0, 3] == -0.5 and m[1, 3] == -0.5)
-    check("the arc pair is untouched", m[0, 2] > 0.0)
-    check(
-        "every background is at least one bead, so the two kinds cannot be confused",
-        all(v <= -1.0 for v in m[m < -0.5]),
+        and abs(m[1, 2] + s.polymer.background(40_000)) < 1e-12
+    ), "a pair inside the range carries minus its background"
+    assert m[0, 3] == -0.5 and m[1, 3] == -0.5, "a pair beyond the range keeps the repulsion marker"
+    assert m[0, 2] > 0.0, "the arc pair is untouched"
+    assert all(v <= -1.0 for v in m[m < -0.5]), (
+        "every background is at least one bead, so the two kinds cannot be confused"
     )
 
     pos = np.array([[0.0, 0.0, 0.0], [6.0, 0.0, 0.0], [0.0, 2.0, 0.0]], dtype=np.float64)
@@ -151,23 +124,19 @@ def test_short_range_background() -> None:
         + max(0.0, 1.0 / 2.0 - cut)
         + ((np.sqrt(40.0) - 2.0) / 2.0) ** 2
     )
-    check(
-        "the full score is spring plus repulsion plus arc",
-        abs(full - want) < 1e-12,
-        f"{full:.6f} against {want:.6f}",
+    assert abs(full - want) < 1e-12, (
+        f"the full score is spring plus repulsion plus arc: {full:.6f} against {want:.6f}"
     )
     loc = sum(float(_local_arcs_nb(pos, exp, p, 1.0, 1.0, cut, w)) for p in range(3))
-    check("local scores sum to twice the full score", abs(loc - 2.0 * full) < 1e-12)
+    assert abs(loc - 2.0 * full) < 1e-12, "local scores sum to twice the full score"
     squeezed = pos.copy()
     squeezed[1, 0] = 0.5
-    check(
-        "crushing a background pair to a sixth of its distance costs far more",
-        float(init_arcs_nb(squeezed, exp, 1.0, 1.0, cut, w)) > full + 1.0,
+    assert float(init_arcs_nb(squeezed, exp, 1.0, 1.0, cut, w)) > full + 1.0, (
+        "crushing a background pair to a sixth of its distance costs far more"
     )
     off = float(init_arcs_nb(pos, exp, 1.0, 1.0, cut, 0.0))
-    check(
-        "weight zero scores the background pair as nothing, so production is untouched",
-        abs(off - (max(0.0, 1.0 / 2.0 - cut) + ((np.sqrt(40.0) - 2.0) / 2.0) ** 2)) < 1e-12,
+    assert abs(off - (max(0.0, 1.0 / 2.0 - cut) + ((np.sqrt(40.0) - 2.0) / 2.0) ** 2)) < 1e-12, (
+        "weight zero scores the background pair as nothing, so production is untouched"
     )
 
 
@@ -193,40 +162,34 @@ def test_contact_background() -> None:
     heat[0, 3] = heat[3, 0] = 50.0  # the arc pair, unchanged
     m = add_contact_background(m0, mids, heat, s)
     bg = s.polymer.background(450_000)
-    check(
-        "the enriched pair carries minus a distance under its background",
-        m[1, 2] <= -1.0 and -m[1, 2] < bg,
-        f"{m[1, 2]:.2f} vs bg {bg:.2f}",
+    assert m[1, 2] <= -1.0 and -m[1, 2] < bg, (
+        f"the enriched pair carries minus a distance under its background: {m[1, 2]:.2f} vs bg {bg:.2f}"
     )
-    check("the pair at its expected contact keeps the repulsion", m[2, 3] == -0.5)
-    check("the pair below its expected contact keeps the repulsion", m[3, 4] == -0.5)
-    check("a pair with no contact keeps the repulsion", m[1, 4] == -0.5 and m[2, 5] == -0.5)
-    check("inside the range the short range entry stands", m[0, 1] == m0[0, 1])
-    check("the arc pair is untouched", m[0, 3] == m0[0, 3] and m[0, 3] > 0.0)
-    check("symmetric", np.allclose(m, m.T))
-    check("the input is left alone", np.array_equal(m0, arc_expected_matrix(s, mids, [(0, 3, 4)])))
+    assert m[2, 3] == -0.5, "the pair at its expected contact keeps the repulsion"
+    assert m[3, 4] == -0.5, "the pair below its expected contact keeps the repulsion"
+    assert m[1, 4] == -0.5 and m[2, 5] == -0.5, "a pair with no contact keeps the repulsion"
+    assert m[0, 1] == m0[0, 1], "inside the range the short range entry stands"
+    assert m[0, 3] == m0[0, 3] and m[0, 3] > 0.0, "the arc pair is untouched"
+    assert np.allclose(m, m.T), "symmetric"
+    assert np.array_equal(m0, arc_expected_matrix(s, mids, [(0, 3, 4)])), "the input is left alone"
     s.use_contact_background = False
-    check("off, the matrix is returned as is", add_contact_background(m0, mids, heat, s) is m0)
+    assert add_contact_background(m0, mids, heat, s) is m0, "off, the matrix is returned as is"
     s.use_contact_background = True
     s.background_weight = 0.0
-    check(
-        "without the spring weight there is nothing to hold it, so off",
-        add_contact_background(m0, mids, heat, s) is m0,
+    assert add_contact_background(m0, mids, heat, s) is m0, (
+        "without the spring weight there is nothing to hold it, so off"
     )
 
 
 def test_jax_matches_numba() -> None:
-    print("\n[jax] the batched kernel's initial energy is numba's")
-    try:
-        import os
+    """The batched kernel's initial energy is numba's."""
+    import os
 
-        os.environ.setdefault("JAX_PLATFORMS", "cpu")
-        import jax.numpy as jnp
+    os.environ.setdefault("JAX_PLATFORMS", "cpu")
+    import jax.numpy as jnp
 
-        from gnome3d.mc.jax.arcs import _build_arcs_kernel
-    except Exception as exc:  # noqa: BLE001
-        check("jax available for the cross kernel check", False, str(exc)[:60])
-        return
+    from gnome3d.mc.jax.arcs import _build_arcs_kernel
+
     rng = np.random.default_rng(3)
     n = 40
     pos = rng.normal(0.0, 2.0, (n, 3))
@@ -253,23 +216,18 @@ def test_jax_matches_numba() -> None:
             jnp.float32(bg_w),
         )[0]
     )
-    check(
-        "jax and numba agree on the initial energy",
-        abs(got - want) / max(abs(want), 1e-9) < 1e-4,
-        f"{got:.5f} against {want:.5f}",
+    assert abs(got - want) / max(abs(want), 1e-9) < 1e-4, (
+        f"jax and numba agree on the initial energy: {got:.5f} against {want:.5f}"
     )
 
 
 def test_jax_batched_driver_runs() -> None:
-    print("\n[jax] the batched driver runs with the background on")
-    try:
-        import os
+    """The batched driver runs with the background on."""
+    import os
 
-        os.environ.setdefault("JAX_PLATFORMS", "cpu")
-        from gnome3d.mc import jax as mc_jax
-    except Exception as exc:  # noqa: BLE001
-        check("jax available", False, str(exc)[:60])
-        return
+    os.environ.setdefault("JAX_PLATFORMS", "cpu")
+    from gnome3d.mc import jax as mc_jax
+
     rng = np.random.default_rng(5)
     probs = []
     for _ in range(2):
@@ -289,49 +247,25 @@ def test_jax_batched_driver_runs() -> None:
     s.mc_stop_successes = 1
     out = mc_jax.mc_arcs_jax_batch(probs, s, max_iters=3)
     ok = len(out) == 2 and all(np.isfinite(sc) and p.shape == (24, 3) for sc, p in out)
-    check(
-        "two problems come back with finite scores and the right shapes",
-        ok,
-        f"{[round(float(sc), 3) for sc, _ in out]}",
+    assert ok, (
+        f"two problems come back with finite scores and the right shapes: {[round(float(sc), 3) for sc, _ in out]}"
     )
 
 
 def test_repulsion_range() -> None:
-    print("\n[repulsion off] every repulsion marker cleared, nothing else moves")
+    """Every repulsion marker cleared, nothing else moves."""
     s = settings()
     s.background_weight = 0.1
     mids = [0, 50_000, 150_000, 600_000, 2_000_000]
     arcs = [(0, 4, 5, 0)]
     mat = arc_expected_matrix(s, mids, arcs)
     same = repulsion_range(mat, mids, s)
-    check("on returns the matrix", same is mat)
+    assert same is mat, "on returns the matrix"
     s.arcs_repulsion = False
     out = repulsion_range(mat, mids, s)
     marker = mat == -0.5
-    check(
-        "markers cleared",
-        bool((out[marker] == 0.0).all()) and bool(marker.any()),
-        f"{int(marker.sum())}",
+    assert bool((out[marker] == 0.0).all()) and bool(marker.any()), (
+        f"markers cleared: {int(marker.sum())}"
     )
-    check("every other entry unchanged", bool(np.array_equal(out[~marker], mat[~marker])))
-    check("the loop kept", out[0, 4] == mat[0, 4] and out[0, 4] > 0.0)
-
-
-def main() -> int:
-    print("arc matrix checks")
-    test_matrix()
-    test_two_factors()
-    test_loop_contact()
-    test_repulsion_range()
-    test_short_range_background()
-    test_contact_background()
-    test_jax_matches_numba()
-    test_jax_batched_driver_runs()
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    for f in FAIL:
-        print(f"  failed: {f}")
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    assert bool(np.array_equal(out[~marker], mat[~marker])), "every other entry unchanged"
+    assert out[0, 4] == mat[0, 4] and out[0, 4] > 0.0, "the loop kept"

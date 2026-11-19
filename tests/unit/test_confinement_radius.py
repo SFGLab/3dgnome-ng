@@ -3,27 +3,14 @@
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
 
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from gnome3d.pipeline.ib.arcs import _run, settings_for_block  # noqa: E402
-from gnome3d.polymer import PolymerLaw  # noqa: E402
-from gnome3d.settings import Settings  # noqa: E402
-
-PASS: list[str] = []
-FAIL: list[str] = []
-
-
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}" + (f"   {detail}" if detail else ""))
+from gnome3d.pipeline.ib.arcs import _run, settings_for_block
+from gnome3d.polymer import PolymerLaw
+from gnome3d.settings import Settings
 
 
 def base() -> Settings:
@@ -40,35 +27,31 @@ def test_settings_for_block() -> None:
     genomic = np.array([1_000_000, 1_400_000, 2_100_000, 2_500_000], dtype=np.int64)
     s = base()
     s.confinement_packing_factor_arcs = 1.5
-    check("a positive factor leaves the settings alone", settings_for_block(s, genomic) is s)
+    assert settings_for_block(s, genomic) is s, "a positive factor leaves the settings alone"
     s = base()
     s.confinement_packing_factor_arcs = 0.0
     s.use_confinement = False
-    check("confinement off leaves them alone", settings_for_block(s, genomic) is s)
+    assert settings_for_block(s, genomic) is s, "confinement off leaves them alone"
     s = base()
     s.confinement_packing_factor_arcs = 0.0
     s.confinement_radius_arcs = 4.0
-    check("an explicit radius wins", settings_for_block(s, genomic) is s)
+    assert settings_for_block(s, genomic) is s, "an explicit radius wins"
     s = base()
     s.confinement_packing_factor_arcs = 0.0
     t = settings_for_block(s, genomic)
     want = s.polymer_law().confinement_radius(1_500_000)
-    check(
-        "factor zero derives the radius from the block span",
-        t is not s and abs(t.confinement_radius_arcs - want) < 1e-12,
-        f"{t.confinement_radius_arcs:.4f}",
+    assert t is not s and abs(t.confinement_radius_arcs - want) < 1e-12, (
+        f"factor zero derives the radius from the block span: {t.confinement_radius_arcs:.4f}"
     )
-    check("the original is untouched", s.confinement_radius_arcs == 0.0)
-    check("everything else is shared", t.polymer is s.polymer and t.steps_arcs == s.steps_arcs)
+    assert s.confinement_radius_arcs == 0.0, "the original is untouched"
+    assert t.polymer is s.polymer and t.steps_arcs == s.steps_arcs, "everything else is shared"
     u = settings_for_block(s, [int(g) for g in genomic])  # type: ignore[arg-type]
-    check("the pipeline's plain list works too", abs(u.confinement_radius_arcs - want) < 1e-12)
+    assert abs(u.confinement_radius_arcs - want) < 1e-12, "the pipeline's plain list works too"
     triples = [(int(g) - 5_000, int(g) + 5_000, int(g)) for g in genomic]
     v = settings_for_block(s, triples)
     want3 = s.polymer_law().confinement_radius(1_510_000)
-    check(
-        "the state's (start, end, midpoint) triples span first start to last end",
-        abs(v.confinement_radius_arcs - want3) < 1e-12,
-        f"{v.confinement_radius_arcs:.4f} vs {want3:.4f}",
+    assert abs(v.confinement_radius_arcs - want3) < 1e-12, (
+        f"the state's (start, end, midpoint) triples span first start to last end: {v.confinement_radius_arcs:.4f} vs {want3:.4f}"
     )
 
 
@@ -106,30 +89,14 @@ def test_the_kernel_sees_it() -> None:
     e = base()
     e.confinement_radius_arcs = want
     explicit = run(e)
-    check(
-        "derived and explicit at the same radius agree exactly", np.array_equal(derived, explicit)
+    assert np.array_equal(derived, explicit), (
+        "derived and explicit at the same radius agree exactly"
     )
     radius = np.linalg.norm(derived - derived.mean(0), axis=1).mean()
-    check(
-        "the block fills the law's sphere",
-        0.7 * want < radius < 1.5 * want,
-        f"{radius:.2f} vs {want:.2f}",
+    assert 0.7 * want < radius < 1.5 * want, (
+        f"the block fills the law's sphere: {radius:.2f} vs {want:.2f}"
     )
     f = base()
     f.confinement_packing_factor_arcs = 1.5
     formula = run(f)
-    check("the old formula gives a different block", not np.array_equal(derived, formula))
-
-
-def main() -> int:
-    print("arcs confinement radius checks")
-    test_settings_for_block()
-    test_the_kernel_sees_it()
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    for f in FAIL:
-        print(f"  failed: {f}")
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    assert not np.array_equal(derived, formula), "the old formula gives a different block"

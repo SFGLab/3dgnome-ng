@@ -6,7 +6,7 @@ absolute.
 
 The production column is `gnome3d.production.CANONICAL`. `slurm/ensemble/make_configs.py` generates the ensemble
 configs from it with two changes, `mc_executor_jax_bucket_shapes = yes` and `heat_min_reduction = 0.001`.
-`python tests/unit/test_settings_doc.py` checks every row against the loader, the defaults and the production config.
+`pytest tests/unit/test_settings_doc.py` checks every row against the loader, the defaults and the production config.
 
 The measurements behind a production value are in `design/features.md`.
 
