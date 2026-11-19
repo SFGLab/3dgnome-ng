@@ -87,7 +87,9 @@ RUN if [ "$HICDIFFUSION" = "1" ]; then \
 
 COPY pyproject.toml README.md SETTINGS.md ./
 COPY gnome3d ./gnome3d
-RUN pip install --no-cache-dir --no-deps .
+# The build context has no git history. The version of the engine is the build argument.
+ARG GNOME3D_VERSION=0.0.0
+RUN SETUPTOOLS_SCM_PRETEND_VERSION_FOR_GNOME3D=$GNOME3D_VERSION pip install --no-cache-dir --no-deps .
 
 COPY web/requirements.txt ./web/requirements.txt
 COPY --from=native /wheels /wheels

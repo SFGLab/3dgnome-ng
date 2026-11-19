@@ -1,0 +1,5 @@
+# setuptools-scm adds every tracked file to the source distribution. The package needs these.
+global-exclude *
+include pyproject.toml README.md SETTINGS.md MANIFEST.in
+graft gnome3d
+global-exclude __pycache__ *.py[cod]

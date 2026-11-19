@@ -6,7 +6,13 @@ chromosome or the whole genome.
 
 ## Install
 
-Python 3.10 or later is required.
+Python 3.11 or later is required.
+
+```bash
+pip install gnome3d
+```
+
+A checkout installs in place. The version is the latest git tag.
 
 ```bash
 python -m venv .venv
