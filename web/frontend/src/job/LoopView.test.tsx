@@ -61,7 +61,7 @@ describe('the loop view', () => {
   it('still selects a loop where a drag is also read, and a drag selects none', () => {
     const [onSelect, onWindow] = [vi.fn(), vi.fn()]
     const { container } = render(<LoopView chrom="chr1" region={[1_000_000, 2_000_000]} loops={LOOPS} onSelect={onSelect} onWindow={onWindow} />)
-    const svg = container.querySelector('svg')!
+    const svg = container.querySelector('.loop-view-arcs')!
     svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 500, height: 72, right: 500, bottom: 72, x: 0, y: 0, toJSON: () => ({}) })
     const hit = screen.getByRole('button', { name: describeLoop(LOOPS[0]) })
     fireEvent(hit, new MouseEvent('pointerdown', { clientX: 100, bubbles: true }))
@@ -83,7 +83,7 @@ describe('the loop view', () => {
     expect(zoomed([1_000_000, 2_000_000], [0, 5_000_000], 1_250_000, 0.5)).toEqual([1_125_000, 1_625_000])
     const [onWindow, onReset] = [vi.fn(), vi.fn()]
     const { container } = render(<LoopView chrom="chr1" region={[1_200_000, 1_600_000]} bounds={[1_000_000, 2_000_000]} loops={LOOPS} onWindow={onWindow} onReset={onReset} />)
-    const svg = container.querySelector('svg')!
+    const svg = container.querySelector('.loop-view-arcs')!
     svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 72, right: 400, bottom: 72, x: 0, y: 0, toJSON: () => ({}) })
     fireEvent(svg, new WheelEvent('wheel', { deltaY: -100, clientX: 200, bubbles: true, cancelable: true }))
     expect(onWindow).toHaveBeenLastCalledWith(1_240_000, 1_560_000)
@@ -97,7 +97,7 @@ describe('the loop view', () => {
     const box = container.querySelector('.loop-window')!
     expect(box.getAttribute('x')).toBe('250')
     expect(box.getAttribute('width')).toBe('250')
-    const svg = container.querySelector('svg')!
+    const svg = container.querySelector('.loop-view-arcs')!
     svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 500, height: 72, right: 500, bottom: 72, x: 0, y: 0, toJSON: () => ({}) })
     // jsdom's pointer events carry no position, so mouse events of the same names stand in.
     const at = (type: string, clientX: number) => fireEvent(svg, new MouseEvent(type, { clientX, bubbles: true }))

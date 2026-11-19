@@ -63,17 +63,27 @@
   pointer-events: none;
 }
 
-.loop-view-tools {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+/* The line over the arcs and the buttons at its end. Two lines high, so the view does not move
+   when a short line replaces a long one. */
+.loop-view-head {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  margin-bottom: 4px;
+}
+
+.loop-view-tools {
+  display: flex;
+  flex: none;
+  gap: 6px;
 }
 
 .icon-tool.small {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border-radius: 6px;
 }
 
@@ -129,8 +139,8 @@
 }
 
 .loop-view-line {
-  margin: 4px 0 0;
-  min-height: 18px;
+  margin: 0;
+  min-width: 0;
   font-size: 12px;
   color: var(--muted);
 }

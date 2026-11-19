@@ -124,6 +124,25 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
   const named = over ?? selected
   return (
     <div className="loop-view">
+      {/* The line that says what the view does, or names the loop under the pointer or the selected
+          one, with the two buttons at its end. */}
+      <div className="loop-view-head">
+        <p className="loop-view-line">
+          {named !== null && loops[named] ? <span className="mono">{`${named === selected ? 'Selected: ' : ''}${describeLoop(loops[named])}`}</span> : hint}
+        </p>
+        <div className="loop-view-tools">
+          {selected !== null && onSelect && (
+            <button type="button" className="icon-tool small" aria-label="Clear the selected loop" title="Clear the selected loop" onClick={() => onSelect(null)}>
+              <X size={13} aria-hidden />
+            </button>
+          )}
+          {onReset && (
+            <button type="button" className="icon-tool small" aria-label="Whole region" title="Whole region" onClick={onReset}>
+              <RefreshCw size={13} aria-hidden />
+            </button>
+          )}
+        </div>
+      </div>
       <div className="loop-view-box">
       <svg
         ref={svg}
@@ -200,18 +219,6 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
               </span>
             ) : null
           })}
-        <div className="loop-view-tools">
-          {selected !== null && onSelect && (
-            <button type="button" className="icon-tool small" aria-label="Clear the selected loop" title="Clear the selected loop" onClick={() => onSelect(null)}>
-              <X size={13} aria-hidden />
-            </button>
-          )}
-          {onReset && (
-            <button type="button" className="icon-tool small" aria-label="Whole region" title="Whole region" onClick={onReset}>
-              <RefreshCw size={13} aria-hidden />
-            </button>
-          )}
-        </div>
       </div>
       <div className="loop-view-axis" aria-hidden>
         {/* A tick at either end would run into the edge or the unit. */}
@@ -224,9 +231,6 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
           ))}
         <span className="unit">{`${chrom}, Mb`}</span>
       </div>
-      <p className="loop-view-line">
-        {named !== null && loops[named] ? <span className="mono">{`${named === selected ? 'Selected: ' : ''}${describeLoop(loops[named])}`}</span> : hint}
-      </p>
     </div>
   )
 }
