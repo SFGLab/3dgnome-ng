@@ -297,6 +297,7 @@ def mc_smooth_numba(
             and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
             and compartment is None
             and centre is None
+            and float(settings.motif_bond_limit) <= 0.0
         )
         if simple_config:
             return _mc_smooth_multichain(pos, dtn, fixed, step_size, settings, heat_dist)
@@ -539,6 +540,7 @@ def mc_smooth_numba(
         use_centre=use_centre,
         centre_of=centre_of,
         site_of=site_of,
+        orn_limit=float(settings.motif_bond_limit) if use_orn else 0.0,
     )
     pos[:] = pw.astype(pos.dtype)
     return score

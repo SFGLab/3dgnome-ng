@@ -119,6 +119,7 @@ from a second. The term is in the energy of the solver on both backends. The ann
 | `use_motif_orientation` | bool | no | yes | Scores the angle between the CTCF motif vectors of two anchors that a loop joins, in the smooth stage. |
 | `weight` | float | 1.0 | 50.0 | Weight of the term. |
 | `symmetric_motifs` | bool | yes | yes | Yes scores two motif vectors best when they point the same way. No flips the partner first and opposed vectors score best. |
+| `bond_limit` | float | 0.0 | 0.0 | Above zero, a move of a bead beside an orientation site is refused when it leaves a bond of that bead longer than this many bond targets and longer than it was. The term then cannot stretch the chain beside a site. 0 is no limit. The numba executors run it. Under measurement. |
 
 ## [anchor_heatmap]
 

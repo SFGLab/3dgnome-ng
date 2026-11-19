@@ -640,6 +640,9 @@ def init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float
 # Heat, orientation, excluded volume and compartment add 2 * (curr - prev). Confinement adds (curr -
 # prev).
 #
+# With `orn_limit` above zero a move of a bead beside an orientation site is refused when it leaves
+# a bond of the bead longer than that many targets and longer than before.
+#
 # Under `use_centre` a node keeps the centre of mass of itself, the bead before it and the bead
 # after it. `centre_of` gives that node for each of the three beads, -1 for any other bead.
 # `site_of` gives the orientation site at a bead, -1 for none.
@@ -788,6 +791,31 @@ def init_excl_cells_nb(
             return -1.0
         err += row
     return err
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def bond_stretched_nb(
+    pos: F64Array, dtn: F64Array, i: int, limit: float, ox: float, oy: float, oz: float, at_i: bool
+) -> bool:
+    """Returns True when the bond of beads i and i + 1 is longer than `limit` targets and longer
+    than it was before one of its beads moved by (ox, oy, oz). `at_i` is True when bead i moved
+    and False when bead i + 1 moved.
+    """
+    dx = pos[i + 1, 0] - pos[i, 0]
+    dy = pos[i + 1, 1] - pos[i, 1]
+    dz = pos[i + 1, 2] - pos[i, 2]
+    now = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if now <= limit * dtn[i]:
+        return False
+    if at_i:
+        dx += ox
+        dy += oy
+        dz += oz
+    else:
+        dx -= ox
+        dy -= oy
+        dz -= oz
+    return now > math.sqrt(dx * dx + dy * dy + dz * dz)
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -1025,11 +1053,13 @@ def batch_mc_nb(
     use_centre: bool = False,
     centre_of: I32Array = NO_I32,
     site_of: I32Array = NO_I32,
+    orn_limit: float = 0.0,
 ) -> tuple[float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
     moves = np.zeros(3)
     site_k = np.full(3, -1, dtype=np.int32)
     site_old = np.zeros((3, 3))
+    bond_old = np.zeros(4)
     n_mov = movable.shape[0]
     n_ok = 0
     wall_cnt0 = 0
@@ -1056,6 +1086,16 @@ def batch_mc_nb(
             d_comp = 0.0
             d_cnt = 0
             d_dep = 0.0
+            over = False
+            limit_on = orn_limit > 0.0 and use_orn
+            if limit_on:
+                for b in range(4):
+                    i = c - 2 + b
+                    if 0 <= i < n - 1:
+                        lx = pos[i + 1, 0] - pos[i, 0]
+                        ly = pos[i + 1, 1] - pos[i, 1]
+                        lz = pos[i + 1, 2] - pos[i, 2]
+                        bond_old[b] = math.sqrt(lx * lx + ly * ly + lz * lz)
             for part in range(3):
                 q = c - 1 + part
                 if p == c:
@@ -1117,6 +1157,17 @@ def batch_mc_nb(
                 d_comp += da
                 d_cnt += dn
                 d_dep += dd
+            if limit_on:
+                # The four bonds of the three beads against their lengths before the move.
+                for b in range(4):
+                    i = c - 2 + b
+                    if 0 <= i < n - 1:
+                        lx = pos[i + 1, 0] - pos[i, 0]
+                        ly = pos[i + 1, 1] - pos[i, 1]
+                        lz = pos[i + 1, 2] - pos[i, 2]
+                        now = math.sqrt(lx * lx + ly * ly + lz * lz)
+                        if now > orn_limit * dtn[i] and now > bond_old[b]:
+                            over = True
             d_orn = 0.0
             for part in range(3):
                 site_k[part] = -1
@@ -1145,7 +1196,7 @@ def batch_mc_nb(
                 d_orn += 2.0 * (after - before)
 
             score_new = score + d_struct + d_heat + d_excl + d_conf + d_comp + d_orn
-            if use_wall and (d_cnt > 0 or (d_cnt == 0 and d_dep > 0.0)):
+            if over or (use_wall and (d_cnt > 0 or (d_cnt == 0 and d_dep > 0.0))):
                 ok = False
             else:
                 ok = score_new < score if strict_better else score_new <= score
@@ -1284,6 +1335,12 @@ def batch_mc_nb(
             hy = pos[p, 1] - cap_home[p, 1]
             hz = pos[p, 2] - cap_home[p, 2]
             if hx * hx + hy * hy + hz * hz > cap_r[p] * cap_r[p]:
+                hard_reject = True
+        if orn_limit > 0.0 and orn_k >= 0 and not hard_reject:
+            # A bead beside an orientation site may not stretch a bond past the limit.
+            if p > 0 and bond_stretched_nb(pos, dtn, p - 1, orn_limit, dx, dy, dz, False):
+                hard_reject = True
+            elif p < n - 1 and bond_stretched_nb(pos, dtn, p, orn_limit, dx, dy, dz, True):
                 hard_reject = True
         if use_wall and not hard_reject:
             if use_cells:

@@ -135,6 +135,12 @@ chain and on the first build. With the term off the pooled SCC of the trial move
 six rows on either chain. The arms are the term as it is, the term off, and the term with a move of the two beads
 beside a site refused when it stretches their bonds past a stated length.
 
+The third arm is `[motif_orientation] bond_limit`. A move of a bead beside a site is refused when it leaves a bond
+of that bead longer than the limit, in bond targets, and longer than it was. A bond over the limit can still
+shorten. The rule is a hard rule of the numba kernel, beside the wall and the cap, in the move of one bead and in
+the move of three. On GM12878 chr1 108.5 to 111 Mb, one structure, with the term on, the bonds over 2 and over 3
+beads before the relaxation are 212 and 89 without a limit, 78 and 0 at a limit of 1.5 and 74 and 4 at 1.25.
+
 ## Output
 
 The kind of an output bead is anchor when the bead is under a span, in every conformation. The nodes of a
@@ -179,7 +185,8 @@ volume at the radius of a bead and the contact cells of `gnome3d/pipeline/ib/cel
 beads of the smooth stage and of the relaxation, and the first build is removed. `design/features.md` has the first
 numbers. Stage 2 is built: bounded drift is `anchor_cap`, which the uniform chain runs as it is, and the centre of
 mass rule is a move of three beads of the numba kernel, `step_delta_nb` and `batch_mc_nb` in
-`gnome3d/mc/numba/terms.py`. The JAX kernel does not have it.
+`gnome3d/mc/numba/terms.py`. The JAX kernel does not have it. Stage 3 is built: the third arm of the orientation
+term is `[motif_orientation] bond_limit`, in the numba kernel alone.
 
 ### Trial of stage 1 without the contact cells
 

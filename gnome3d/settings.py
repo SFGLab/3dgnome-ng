@@ -56,6 +56,7 @@ class Settings:
     use_ctcf_motif: bool
     motifs_symmetric: bool
     motif_weight: float
+    motif_bond_limit: float
 
     # ---- anchor heatmap ----
     use_anchor_heatmap: bool
@@ -300,6 +301,7 @@ class Settings:
         self.use_ctcf_motif = False
         self.motifs_symmetric = True
         self.motif_weight = 1.0
+        self.motif_bond_limit = 0.0
 
         # ---- anchor heatmap ----
         self.use_anchor_heatmap = False
@@ -662,6 +664,7 @@ class Settings:
             "motif_orientation", "use_motif_orientation", self.use_ctcf_motif
         )
         self.motif_weight = getf("motif_orientation", "weight", self.motif_weight)
+        self.motif_bond_limit = getf("motif_orientation", "bond_limit", self.motif_bond_limit)
         self.motifs_symmetric = getb("motif_orientation", "symmetric_motifs", self.motifs_symmetric)
 
         # [anchor_heatmap]

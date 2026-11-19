@@ -260,6 +260,7 @@ def run_outer_loop(
     use_centre: bool = False,
     centre_of: I32Array = NO_I32,
     site_of: I32Array = NO_I32,
+    orn_limit: float = 0.0,
 ) -> float:
     """Runs the kernel until convergence and returns the final total score."""
     score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
@@ -350,6 +351,7 @@ def run_outer_loop(
             use_centre,
             centre_of,
             site_of,
+            orn_limit,
         )
         score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
         step_i += stop_steps
