@@ -46,8 +46,7 @@ supplement.
   between an enhancer and a promoter that are joined by an RNAPII loop and by no CTCF loop. Two
   ridges per line, gnome3d with CTCF loops and with CTCF and RNAPII loops, and a grey control
   ridge: enhancer to promoter pairs at the same genomic separation joined by no loop, in the
-  CTCF and RNAPII models. The models are the ten chr1 conformations per arm on the workstation
-  under `~/xc_readout`.
+  CTCF and RNAPII models. The models are the ten chr1 conformations per arm.
 
 ## Figure 2: function, not structure
 
@@ -79,7 +78,7 @@ the autosomes only where the enhancer3d models do.
 
 ## Where the inputs are
 
-On the workstation under `~/xc_readout`. Models: `out/xc/<LINE>_<ARM>` for every line and arm,
+Models: `out/xc/<LINE>_<ARM>` for every line and arm,
 the cudaMMC arm included, with `_60mb` slices beside them. The enhancer3d package is
 `e3dx/enhancer3d`, the code the expression readout ran.
 

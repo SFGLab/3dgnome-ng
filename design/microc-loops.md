@@ -37,7 +37,7 @@ between 20 kb and 1 Mb, and the same split of contacts by separation.
   over its controls. The next section is the reason.
 
 Runs: `playground/rnapii/microc_loops.sh` on the workstation for the cell line arms, the
-`run.sh` beside each table on frodo for the three tools of `out/toolpage60`. Tables in
+`run.sh` beside each table for the three tools of `out/toolpage60`. Tables in
 `playground/rnapii/microc_loops`: `cells_z15` and `tools_z15` with the floor, `cells` and
 `tools` without it for H1ESC and HFFC6, `gm12878` the GM12878 calls, `check` the next section.
 
@@ -142,4 +142,4 @@ placed share above moved is +0.30, +0.39 and +0.33 on GM12878, MultiMM ahead, +0
 - The floor of 15 is one choice. At 20 GM12878 keeps 561 loops and replicates at 0.89, at 10
   it keeps 1,659 at 0.77. A caller run at a stricter false discovery rate would be the
   caller's own way to the same end and is not tried.
-- One region of one chromosome. The genome arrays on eden hold the same arms on chr1 to chr22.
+- One region of one chromosome. The genome arrays on the cluster hold the same arms on chr1 to chr22.

@@ -469,7 +469,7 @@ the batch at about 176 us of kernel time, 2.7 times less:
 | input_reduce_fusion_2 | 14 | 8% | the first accepted proposal and its state picked out |
 | about twenty small fusions | 34 | 19% | bookkeeping |
 
-The preparation before the kernel went from 23 s to 4 s on this run, and on eden, where it was
+The preparation before the kernel went from 23 s to 4 s on this run, and on the cluster, where it was
 56 to 67 s a structure at 65 chains of 25,600 beads, it should be a few seconds.
 
 What is left. The candidate evaluation is the honest work. The grid table is `(cells + 2) x
@@ -516,7 +516,7 @@ already means JAX for every stage, and the solver follows it.
 
 ### 14. Which stage runs where, 2026-11-16. Smooth threaded, arcs on the device
 
-Measured on frodo, 36 cores and an RTX 3090, GM12878 chr1 from 10 Mb, two structures per arm,
+Measured on 36 cores and an RTX 3090, GM12878 chr1 from 10 Mb, two structures per arm,
 wall clock from the command to the last structure. `slurm/ensemble/executor_crossover.sh`,
 tables in `playground/square_blocks/crossover/`.
 

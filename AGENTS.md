@@ -74,6 +74,11 @@ Rules for the code as it stands:
 
 Python environment: `.venv/bin/python`. Use it rather than the system python.
 
+Design goes to `design/`. Every design note, measurement record and piece of documentation is a file there and is
+committed. A text that is personal, quotes a person or describes infrastructure is private and goes to `docs/`. A
+host name, a path on a machine, an account and a deployment record are infrastructure. A note under `design/` states
+hardware by its model, as in "36 cores and an RTX 3090".
+
 ---
 
 ## Algorithm Overview

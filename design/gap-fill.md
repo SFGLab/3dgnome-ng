@@ -71,7 +71,7 @@ stripes a random coil lacks. To follow option 1.
 
 Micro-C, and Micro Capture-C ultra at base pair resolution, Li et al., Cell 2025, doi
 10.1016/j.cell.2025.10.013, hold far more short range counts than Hi-C. H1ESC and HFFC6 Micro-C
-are on the workstation at `/mnt/storagelinux/_hic/<cell>/microc/` as `.hic` files and need a
+are held as `.hic` files and need a
 conversion to cooler before `contact_map` can read them. It feeds option 1 with more counts and
 is no model change by itself.
 
@@ -391,7 +391,7 @@ was stopped. The drawn start with the full solve stays the one arm with a gain, 
 
 ## What sets the anchor floor, 2026-11-15
 
-`slurm/ensemble/arms_trial.sh` on frodo, GM12878 chr1:10-15, 20-25 and 35-40 Mb, five structures,
+`slurm/ensemble/arms_trial.sh` on the RTX 3090 workstation, GM12878 chr1:10-15, 20-25 and 35-40 Mb, five structures,
 one arcs term removed per arm, production rerun beside them. Results in
 `playground/square_blocks/ablate/`. `playground/contact_spread.py` now prints the anchor floor,
 the 1 percent and median quantiles of anchor pair distance over the law.
@@ -539,7 +539,7 @@ Balanced SCC up over gyr01relax on eight of nine runs and level on the ninth. GM
 three structures, pooled: raw SCC 0.379 against 0.361 and production's 0.343, balanced SCC 0.308
 against 0.292 and 0.276, Spearman 0.169 against 0.164 and 0.141, MultiMM 0.681 against 0.637 and
 0.588, cross block overlaps 19.7. The fit of the draw over 11,913 anchors takes 159 iterations and
-the chromosome 25 minutes on frodo.
+the chromosome 25 minutes on 36 cores and an RTX 3090.
 
 ### Hole beads on top, 2026-11-15
 

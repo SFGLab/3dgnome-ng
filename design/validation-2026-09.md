@@ -216,7 +216,7 @@ Decision 2026-09-19: both off in production at chromosome scope, both kept for b
 ## Expression, genome wide
 
 The enhancer3d test on the production ensembles, three cell lines, ten conformations per
-chromosome, run on eden 2026-09-15 to 2026-09-18 and scored 2026-09-19 with the notebook 3
+chromosome, run on the cluster 2026-09-15 to 2026-09-18 and scored 2026-09-19 with the notebook 3
 protocol of `enhancer3d/playground/genome_original_correlation.py`: per gene minimum
 enhancer distance, min max normalised per cell line, the difference between two lines
 correlated against the DESeq2 log2 fold change on the extreme quartile jumps. Spearman, with
@@ -242,7 +242,7 @@ HFFC6 about 7. MultiMM's five structure ensemble with molecular dynamics took 4 
 on the same GPU. The reference on the CPU, one process per structure, took 2 h 15 on HFFC6,
 7.5 to 8.5 h on H1ESC and did not finish GM12878 in 29 hours.
 
-Whole chr1 on eden, one A100 per task, ten conformations per sample, measured from the
+Whole chr1 on the cluster, one A100 per task, ten conformations per sample, measured from the
 output timestamps of the trio arrays. The 2026-09-09 trio run, `out/trio_polymer`, took 39
 to 79 minutes per conformation at 9,500 to 12,300 anchors after the singleton pruning, with
 the stitch and the whole chromosome relaxation on, prefetch 1 and the full excluded volume

@@ -28,7 +28,7 @@ jobs run in the web process on the slots of `GPU_SLOTS`, one GPU id per slot.
 
 ```bash
 cd web
-SITE_ROOT=/mnt/raid/3dgnome-new BASE_PATH=/new PORT=8770 GPU_SLOTS=0,1 \
+SITE_ROOT=/srv/3dgnome BASE_PATH=/new PORT=8770 GPU_SLOTS=0,1 \
   SITE_USER=$(id -u):$(id -g) docker compose -f docker-compose.single.yml up -d --build
 ```
 
@@ -45,7 +45,7 @@ a second `-f`:
 ```yaml
 services:
   site:
-    volumes: ["/mnt/raid/tbooo/release:/data/svs/tbooo:ro"]
+    volumes: ["/srv/tbooo/release:/data/svs/tbooo:ro"]
 ```
 
 ## A registry on the host
@@ -56,7 +56,7 @@ the tag it should run. An earlier tag stays in the registry for a way back.
 
 ```bash
 # on the host, once
-REGISTRY_ROOT=/mnt/raid/registry REGISTRY_USER=$(id -u):$(id -g) \
+REGISTRY_ROOT=/srv/registry REGISTRY_USER=$(id -u):$(id -g) \
   docker compose -f docker-compose.registry.yml up -d
 
 # on the machine that builds, from web/, with a tunnel to the host's registry
@@ -109,7 +109,7 @@ docker compose -f docker-compose.yml -f docker-compose.mps.yml up -d
 Without MPS set `WORKERS_PER_GPU=1`. The host needs the NVIDIA container toolkit; Docker's
 `nvidia` runtime entry alone does not give the containers a GPU.
 
-Measured 2026-11-12 on team-frodo, RTX 3090, with `web/scripts/docker_mps_check.sh`: Redis, the
+Measured 2026-11-12 on an RTX 3090 with `web/scripts/docker_mps_check.sh`: Redis, the
 web container and two workers on GPU 0 with this overlay took six jobs posted at once, GM12878,
 CTCF and RNAPII, 10 structures, 3 Mb windows. Both engines ran on the one MPS server, 1.7 GiB
 each on the card, all six done in 226 s, 95.6 jobs per hour.
@@ -323,7 +323,7 @@ region's chromosome, by drawing contacts without replacement. A deep map and a s
 reach the engine at the density its maps are read at. The whole remote file never comes to the
 server.
 
-Checked 2026-11-12 on team-frodo through the page: an own data job with CTCF and RNAPII loops
+Checked 2026-11-12 through the page: an own data job with CTCF and RNAPII loops
 and contacts read from a local .hic, a job with an uploaded HGSVC VCF, and a job with contacts by
 link to ENCODE ENCFF718AWL.hic, 37 GB, whose 2 Mb window read in about 9 s.
 

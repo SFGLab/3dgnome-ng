@@ -2,8 +2,7 @@
 
 ## Intent
 
-Work on the 3D engine closes with three deliverables, after which the team decides whether
-there is a paper.
+Work on the 3D engine closes with three deliverables.
 
 1. A figure that answers whether adding RNAPII ChIA-PET loops to the CTCF loops brings the
    models closer to reality. Structure and expression are reported side by side with no single
@@ -33,19 +32,19 @@ below.
   pair joined by both a CTCF and an RNAPII loop was held at the background, 406 strong pairs
   on a trio chr1. Every two factor run made without it, the GM12878 sweep and the trio RNAPII
   arms included, is superseded.
-- `~/Desktop/triosformer`. Nine individuals in three trios, per sample CTCF and RNAPII
+- The triosformer project. Nine individuals in three trios, per sample CTCF and RNAPII
   ChIA-PET, HGSVC Hi-C (4DN mcools, independent of the ChIA-PET), HGSVC RNA-seq, and
   `personal3d/`, which reads a person's SVs from HGSVC freeze 4, rewires loops by Sadowski's
   2019 rules, builds a haplotype's 2 Mb sequence window, runs HiCDiffusion on it, lifts the
   map back and writes the engine's inputs. HiCDiffusion weights are archived as
   `hicdiffusion.tar.zst` in `models/manifest.tsv`. Readout scripts
   `analysis/trio_arms_compare.py`, `analysis/trio_arms_jump.py`.
-- `~/Desktop/enhancer3d_cross_cell_lines_analysis`. CTCF only cudaMMC models of GM12878, H1ESC
-  and HFFc6, 100 per line and chromosome, on ARCH (`/data/mw868/models_fixed`), and the
+- The enhancer3D cross cell line analysis. CTCF only cudaMMC models of GM12878, H1ESC
+  and HFFc6, 100 per line and chromosome, and the
   statistics E1 to E3 and the cross line jump statistic. No RNAPII anywhere.
-- The old site, `~/Desktop/3dgnome_webserver` and `~/Desktop/bio/3dgnome_webserver`, Flask
+- The old site, Flask
   calling cudaMMC. Reference for what the user facing flow offered, not a code base to extend.
-  The enhancer3D backend in `~/Desktop/enhancer3D` is not reused either.
+  The enhancer3D backend is not reused either.
 
 ## Part 1. The RNAPII comparison
 
@@ -69,12 +68,12 @@ retry before falling back.
 CTCF loops are the inputs already under `data/<CELL>/`. The builder confirms they are the same
 4DN CTCF ChIA-PET the enhancer3d models were built from and records the accessions. If they
 are not, C and R still use the `data/<CELL>/` files, which production runs on, and the
-mismatch is stated beside every comparison with E (my call).
+mismatch is stated beside every comparison with E.
 
 ### Depth
 
 Replicates are pooled per line and factor. The whole rule of
-`~/Desktop/triosformer/pipeline/trio_resample.py` then applies, per factor (my call): span at
+triosformer's `pipeline/trio_resample.py` then applies, per factor: span at
 most a recorded cap (a parameter of the prep, 1 Mb to start, the trio arms' value, and open to
 10 Mb; production's `max_pet_length` of 1 Mb already keeps longer loops out of the springs and
 folds them into the segment heatmap, so the cap mainly sets which PETs count toward depth),
@@ -87,7 +86,7 @@ picks and records the accessions.
 
 The available files hold clusters at three PETs or more, not the libraries' one PET and up
 clusters `trio_resample.py` measures depth on. Depth here is the PET total over loops passing
-the filters (my call); if the one PET clusters are fetchable from ENCODE or 4DN without much
+the filters; if the one PET clusters are fetchable from ENCODE or 4DN without much
 work, use them instead and say which was used. The gnome3d CTCF arm therefore no longer runs
 on exactly the original enhancer3d inputs, which is accepted.
 
@@ -115,21 +114,18 @@ Per cell line.
 
 Trios, on each person's HGSVC Hi-C background: C and R. C on that background is new; the
 existing `trio_rnapol2_hgsvc` predates the fix and is rerun as R. M is not run on the trios
-(my call, to bound cost; add it if M wins on the cell lines).
+(to bound cost; add it if M wins on the cell lines).
 
 Ten conformations per arm. E is subsampled to ten models per line and chromosome with a
 recorded seed, so every arm enters the enhancer3d statistics at the same ensemble size; E at
 its full 100 is shown as a reference line only. chr1 first for every arm, then the 20
 autosomes the enhancer3d report used for the final figure.
 
-What chr1 decides (my call). C and R go to the autosomes whatever chr1 shows, since the figure
+What chr1 decides. C and R go to the autosomes whatever chr1 shows, since the figure
 needs both. M goes to the autosomes, and to the trios, only if on the cell lines it recovers at
 least half of R's structural loss (SCC and MultiMM, measured from C) while keeping at least
 half of R's expression gain (partial or E3, measured from C). Otherwise M is reported on chr1
 alone.
-
-Jobs on eden and the workstation are launched by the user. The builder writes the configs,
-the prep scripts and the commands.
 
 ### Readouts
 
@@ -159,7 +155,7 @@ Expression.
 - Cell lines: E1, E2, E3 and the cross line jump statistic, by the enhancer3d analysis code,
   on every arm. That code reads cudaMMC models on a uniform 1 kb chain; gnome3d beads are
   irregular. Genes and enhancers map to their nearest bead and are kept only when that bead is
-  within 5 kb (my call, the rule that fixed the earlier coverage artefact where 22 to 25
+  within 5 kb (the rule that fixed the earlier coverage artefact where 22 to 25
   percent of genes sat more than 5 kb from any bead). The same rule is applied to E.
 - Trios: raw and partial correlation of enhancer distance with expression, family separation,
   the jump statistic per contrast, by `trio_arms_compare.py` and `trio_arms_jump.py`.
@@ -221,7 +217,7 @@ be dropping files in and adding a catalogue line.
   after a fixed retention period the builder sets and states on the form.
 - Built on request, not precomputed for every individual. Whether a request is a live wait or
   a queued job with a notice is decided by one measurement made first: the wall of a 2 to 3 Mb
-  region end to end on the workstation GPU, SV rewrite, HiCDiffusion window and a ten
+  region end to end on one GPU, SV rewrite, HiCDiffusion window and a ten
   conformation gnome3d ensemble.
 
 Not reused: the enhancer3D backend (Temporal, MongoDB, Spark), judged overengineered. Temporal
@@ -248,7 +244,6 @@ and the site cannot drift. Builder's call on versioning and what else enters the
 - Not claiming the models are closer to reality if the structure readouts say otherwise.
 - Not presenting HiCDiffusion as individual specific.
 - No new engine physics. Engine work is closed; the summary arc fix is the one change taken.
-- No work on `main`; the user opens the PR. No jobs launched by the builder on shared machines.
 
 ## Open
 
@@ -262,15 +257,11 @@ and the site cannot drift. Builder's call on versioning and what else enters the
 
 Nothing below has been submitted. The branch is `rnapii-crosscell`; it is not pushed.
 
-Cell lines, on eden.
+Cell lines, on the cluster.
 
 ```bash
-# laptop: publish the branch and copy the inputs, which are gitignored
-git -C ~/Desktop/3dgnome-rnapii push -u origin rnapii-crosscell
-for C in GM12878 H1ESC HFFC6; do
-  rsync -av ~/Desktop/3dgnome-torch/data/$C/${C}_xc_* eden:/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/data/$C/
-done
-# eden, in the checkout
+# first publish the branch and copy the gitignored inputs, data/<line>/<line>_xc_*, to the checkout
+# on the cluster, in the checkout
 git fetch origin && git switch rnapii-crosscell
 for i in $(seq 0 8); do DRY=1 SLURM_ARRAY_TASK_ID=$i bash slurm/ensemble/crosscell_arms.sh; done
 sbatch --array=0-8 slurm/ensemble/crosscell_arms.sh
@@ -303,7 +294,7 @@ CONFIG_TAG=_trio_xc_rnapol2_hgsvc OUT=out/xc_trio_rnapol2_hgsvc CHROMS="${A// /,
   sbatch --array=0-188%6 /path/to/triosformer/slurm/trio_ensemble.sh
 ```
 
-Arm E is the existing cudaMMC models of each line's chr1 on ARCH, `/data/mw868/models_fixed/<line>/chr1`.
+Arm E is the existing cudaMMC models of each line's chr1.
 
 Arm M at the spec's absorb distance of 1 kb moves few ends (GM12878 66,608 new RNAPII anchors
 against 69,867 for R). Decide the distance before submitting tasks 2, 5 and 8; the prep takes
@@ -315,7 +306,7 @@ Run after the arrays finish, on the machine holding `out/xc` and the deep maps. 
 line's deep mcool, `<T>` its compartment track, `L` the line.
 
 ```bash
-# arm E: a seeded ten of the cudaMMC .hcm models (faramir models_ccd/<line>/chr1), as gnome3d cifs
+# arm E: a seeded ten of the cudaMMC .hcm models, as gnome3d cifs
 python playground/rnapii/e3d_export.py --hcm-to-cif <E hcm dir>/$L/chr1 out/xc/${L}_E/chr1 --n 10
 python playground/slice_arm.py out/xc/${L}_E/chr1 out/xc/${L}_E_60mb chr1:1-60000000
 

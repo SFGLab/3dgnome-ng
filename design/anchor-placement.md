@@ -1082,8 +1082,8 @@ piece done as far as the input reaches. What would take it further is a denser a
 contact map, since the term holds only 4 percent of the far pairs through the 25 kb pixels,
 and that is a data path change.
 
-**Adopted 2026-09-08 evening, the user's decision.** Production is the deep maps as input, the
-contact background on and the reach at 1.5, with two rules from the user: no input has to be
+**Adopted 2026-09-08 evening.** Production is the deep maps as input, the
+contact background on and the reach at 1.5, with two rules: no input has to be
 deep, so the term degrades to holding next to nothing on a thin map and the data section
 falls back to the ChIA-PET singletons when no Hi-C file is present, and whole genome runs
 take a thinned file. The thinning is a seeded binomial draw on the counts to 5,000 contacts

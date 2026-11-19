@@ -1,6 +1,6 @@
 # 3dgnome against cudaMMC and MultiMM
 
-Measured 2026-11-16 on frodo, 36 cores and one RTX 3090, one job at a time, 3dgnome at commit
+Measured 2026-11-16 on 36 cores and one RTX 3090, one job at a time, 3dgnome at commit
 bb5baa5. Script `slurm/ensemble/tools_trial.sh`. Tables under `playground/square_blocks/tools/`
 for cudaMMC and MultiMM and `playground/square_blocks/tools3/` for 3dgnome.
 

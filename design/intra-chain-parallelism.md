@@ -62,8 +62,8 @@ one percent lower energy.
 
 ## What cudaMMC does, and why it is not the checkerboard
 
-cudaMMC is the closest comparable code, a GPU port of the same reference solver, source at
-`~/Desktop/bio/cudaMMC`. Read the source rather than the paper: the paper says "32 threads try
+cudaMMC is the closest comparable code, a GPU port of the same reference solver. Read the source
+rather than the paper: the paper says "32 threads try
 random moves of that bead", which reads like cooperative scoring, and the code does something
 else.
 
@@ -249,5 +249,4 @@ same experiment, which is the one knob measured to move round count.
 
 Population annealing on GPU, arXiv 1703.03676, and its theory, arXiv 1508.05647, both read.
 Event chain Monte Carlo for dense polymer melts, arXiv 1502.06447, and Krauth's review, arXiv
-2102.07217, both read. cudaMMC, Bioinformatics 39(10) btad588, source at
-`~/Desktop/bio/cudaMMC`, read.
+2102.07217, both read. cudaMMC, Bioinformatics 39(10) btad588, source read.
