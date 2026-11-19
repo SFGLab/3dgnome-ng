@@ -3,9 +3,10 @@
 # Four arms on GM12878 chr1:1-60 Mb, three structures each, on the workstation GPU one at a
 # time, then the battery. Run in the 3dgnome screen:  bash slurm/ensemble/assemble_ablation.sh
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd ~/3dgnome-ng
 C=GM12878; R=chr1:1-60000000; N=3; OUT=out/assemble
-MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 mkdir -p $OUT
 for ARM in prod nostitch norelax neither; do
   INI=$OUT/${C}_$ARM.ini

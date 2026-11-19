@@ -1,4 +1,4 @@
-# Versions as on the team-frodo CUDA venv the smoke test ran on: Python 3.12, numpy 2.4.4,
+# Versions as on the CUDA venv the smoke test ran on: Python 3.12, numpy 2.4.4,
 # numba 0.65.1, scipy 1.17.1, jax 0.10.1.
 # The 3D-GNOME site and its worker in one image, the frontend built in a Node stage. Build from
 # the repository root:

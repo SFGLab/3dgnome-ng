@@ -14,7 +14,7 @@ INFO:root:clustering enriched pixels in region: chr2
 INFO:root:detected 4010 clusters of 4.59+/-5.62 size
 INFO:root:Clustering is complete
 INFO:root:filtered 2770 out of 4010 centroids to reduce the number of false-positives
-HFFC6_chr2_5000.cool: 2770 loops -> /home/nk2/xc_lr/out/readouts/microc/HFFC6_chr2_5000.bedpe
+HFFC6_chr2_5000.cool: 2770 loops -> ~/xc_lr/out/readouts/microc/HFFC6_chr2_5000.bedpe
 INFO:root:creating a Pool of 4 workers
 INFO:root:Using recommended donut-based kernels with w=5, p=2 for binsize=10000
 INFO:root:creating a Pool of 4 workers
@@ -31,4 +31,4 @@ INFO:root:clustering enriched pixels in region: chr2
 INFO:root:detected 3434 clusters of 3.38+/-3.21 size
 INFO:root:Clustering is complete
 INFO:root:filtered 2235 out of 3434 centroids to reduce the number of false-positives
-HFFC6_chr2_10000.cool: 2235 loops -> /home/nk2/xc_lr/out/readouts/microc/HFFC6_chr2_10000.bedpe
+HFFC6_chr2_10000.cool: 2235 loops -> ~/xc_lr/out/readouts/microc/HFFC6_chr2_10000.bedpe

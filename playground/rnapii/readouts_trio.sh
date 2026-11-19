@@ -2,7 +2,7 @@
 # Structure readouts of the trio arms against each person's own HGSVC Hi-C, one array task per
 # person, CPU only. design/2026-11-11-rnapii-release.md.
 #
-#   sbatch --array=0-8 playground/rnapii/readouts_trio.sh
+#   sbatch -A <account> --array=0-8 playground/rnapii/readouts_trio.sh
 #
 # The trio arrays write <OUT>/<SAMPLE>/chr1 for both arms, so each arm is first sliced to a
 # uniquely named directory, out/xc/trio/<SAMPLE>_<ARM>_60mb, and the readouts read those.
@@ -14,7 +14,6 @@
 #SBATCH --mem=48G
 #SBATCH --partition=short
 #SBATCH --time=04:00:00
-#SBATCH --account=sfglab
 
 set -euo pipefail
 ROOT="${ROOT:-$SLURM_SUBMIT_DIR}"

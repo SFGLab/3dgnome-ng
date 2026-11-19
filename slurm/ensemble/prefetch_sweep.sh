@@ -2,9 +2,10 @@
 # Prefetching on the GPU: byte parity at 1 against the previous commit, then a K sweep on
 # chr1:1-8 Mb and two large runs on chr1:1-60 Mb. Workstation, 3dgnome screen.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd ~/3dgnome-ng
 C=GM12878; INI=slurm/ensemble/gm12878_hic_arcs.ini; OUT=out/prefetch
-MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 mkdir -p $OUT
 # parity at prefetch 1: the previous commit in a worktree against the working tree
 if [ ! -d /tmp/g3d_prev ]; then git worktree add --detach /tmp/g3d_prev HEAD~1 >/dev/null 2>&1; ln -sfn $PWD/data /tmp/g3d_prev/data; ln -sfn $PWD/.venv /tmp/g3d_prev/.venv; fi

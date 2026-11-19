@@ -1,6 +1,0 @@
-# Laid over Bertrand's own docker-compose.yml. The volumes are unchanged.
-#   docker compose -f docker-compose.yml -f <this file> up -d --no-build
-# The step back is the same command without this file.
-services:
-  bertrand-docs: { image: "bertrand-docs:2026-11-18" }
-  bertrand-server: { image: "bertrand-server:2026-11-18.2" }

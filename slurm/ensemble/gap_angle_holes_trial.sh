@@ -2,7 +2,7 @@
 # The smooth stage's bend term against the maximum entropy gaps, and beads for the holes between
 # blocks, on three cell lines, workstation, screen gapah. design/gap-fill.md.
 #
-#   DATA=/home/nik/3dgnome-ng/data bash slurm/ensemble/gap_angle_holes_trial.sh
+#   DATA=~/3dgnome-ng/data bash slurm/ensemble/gap_angle_holes_trial.sh
 #
 # The widening trace, out/widen, found the bend term and the excluded volume each widen a drawn
 # gap and the bare kernel keep it on the law. Arms, each slurm/ensemble/<cell>_xc_R.ini with the
@@ -18,6 +18,7 @@
 # 10-15 and 35-40 Mb at five structures, where only 10-15 Mb holds holes. Phase 2, whole chr1 at
 # three structures, scored on the 1-60 Mb slice. A finished arm is not rerun.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
 OUT="${OUT:-out/gapah}"
@@ -27,7 +28,7 @@ CELLS="${CELLS:-GM12878 H1ESC HFFC6}"
 mkdir -p "$OUT"
 git log --format="gap angle and holes trial on %h %s" -1
 
-mcool() { ls /mnt/storagelinux/_hic/$1/*.mcool | head -1; }
+mcool() { ls $HIC_ROOT/$1/*.mcool | head -1; }
 
 write_inis() {  # cell
   c=$(echo "$1" | tr 'A-Z' 'a-z')

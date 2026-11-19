@@ -14,7 +14,7 @@ INFO:root:clustering enriched pixels in region: chr7
 INFO:root:detected 1490 clusters of 3.83+/-4.50 size
 INFO:root:Clustering is complete
 INFO:root:filtered 954 out of 1490 centroids to reduce the number of false-positives
-H1ESC_chr7_5000.cool: 954 loops -> /home/nk2/xc_lr/out/readouts/microc/H1ESC_chr7_5000.bedpe
+H1ESC_chr7_5000.cool: 954 loops -> ~/xc_lr/out/readouts/microc/H1ESC_chr7_5000.bedpe
 INFO:root:creating a Pool of 4 workers
 INFO:root:Using recommended donut-based kernels with w=5, p=2 for binsize=10000
 INFO:root:creating a Pool of 4 workers
@@ -31,4 +31,4 @@ INFO:root:clustering enriched pixels in region: chr7
 INFO:root:detected 1517 clusters of 3.03+/-2.76 size
 INFO:root:Clustering is complete
 INFO:root:filtered 858 out of 1517 centroids to reduce the number of false-positives
-H1ESC_chr7_10000.cool: 858 loops -> /home/nk2/xc_lr/out/readouts/microc/H1ESC_chr7_10000.bedpe
+H1ESC_chr7_10000.cool: 858 loops -> ~/xc_lr/out/readouts/microc/H1ESC_chr7_10000.bedpe

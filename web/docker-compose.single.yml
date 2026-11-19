@@ -1,6 +1,6 @@
 # The site and the engine in one container. Jobs run in the web process on the slots of
 # GPU_SLOTS, one GPU id per slot. Run from web/:
-#   SITE_ROOT=/mnt/raid/3dgnome-new BASE_PATH=/new PORT=8770 GPU_SLOTS=0,1 \
+#   SITE_ROOT=/srv/3dgnome BASE_PATH=/new PORT=8770 GPU_SLOTS=0,1 \
 #     SITE_USER=$(id -u):$(id -g) docker compose -f docker-compose.single.yml up -d --build
 # SITE_ROOT holds data/, which the container only reads, and results/, which it writes as
 # SITE_USER. The port is bound to the host's loopback for a proxy on the host.
@@ -8,7 +8,7 @@
 # queue in Redis and runs the engines in worker containers of the same image.
 # A path of the catalog must exist inside the container. A link out of data/ does not, so a
 # large set kept elsewhere is mounted below /data in an override file:
-#   services: { site: { volumes: ["/mnt/raid/tbooo/release:/data/svs/tbooo:ro"] } }
+#   services: { site: { volumes: ["/srv/tbooo/release:/data/svs/tbooo:ro"] } }
 name: gnome3d-site
 services:
   site:

@@ -29,14 +29,17 @@
 #SBATCH --mem=64G
 #SBATCH --partition=long
 #SBATCH --time=24:00:00
-#SBATCH --account=sfglab
+# The account is given at submission, sbatch -A <account>. --output and --error are relative to
+# the directory of the submission, which must be the checkout. The logs directory must exist
+# before the submission, since slurm opens these files before the script runs:
+#   mkdir -p slurm/ensemble/logs
 #SBATCH --open-mode=append
-#SBATCH --output=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/xc_%A_%a.out
-#SBATCH --error=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/xc_%A_%a.out
+#SBATCH --output=slurm/ensemble/logs/xc_%A_%a.out
+#SBATCH --error=slurm/ensemble/logs/xc_%A_%a.out
 
 set -euo pipefail
 
-ROOT="${ROOT:-/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng}"
+ROOT="${ROOT:-${SLURM_SUBMIT_DIR:-$PWD}}"
 OUT="${OUT:-$ROOT/out/xc}"
 CHROMS="${CHROMS:-chr1}"
 N="${N:-10}"

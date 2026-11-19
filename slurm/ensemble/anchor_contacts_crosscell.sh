@@ -2,7 +2,7 @@
 # The full depth anchor contact table and the two sided contact background on three cell lines,
 # CTCF and RNAPII loops, workstation, screen acxc.
 #
-#   DATA=/home/nik/3dgnome-ng/data bash slurm/ensemble/anchor_contacts_crosscell.sh
+#   DATA=~/3dgnome-ng/data bash slurm/ensemble/anchor_contacts_crosscell.sh
 #
 # Per cell, the chr1 table is written from the cell's own deep map and its cross line anchor
 # file, then four arms, each slurm/ensemble/<cell>_xc_R.ini with the overrides named:
@@ -17,6 +17,7 @@
 # 1-60 Mb slice, with the law readout and the battery, raw and balanced. CELLS picks a subset.
 # A finished arm or table is not redone.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
 OUT="${OUT:-out/acxc}"
@@ -27,7 +28,7 @@ git log --format="anchor contacts cross cell on %h %s" -1
 
 for C in $CELLS; do
   c=$(echo "$C" | tr 'A-Z' 'a-z')
-  MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+  MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
   SING=$DATA/$C/${C}_hic_25kb_singletons.bedpe
   TABLE=$OUT/${C}_anchor_contacts_1kb_chr1.npz
   if [ ! -f "$TABLE" ]; then

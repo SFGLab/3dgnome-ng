@@ -9,14 +9,14 @@
 # Run once per cell line and let it finish before submitting that line's array. The three are
 # independent, so they can run at the same time; each holds one GPU only to verify CUDA.
 #
-# Why a job rather than login-node commands. Installing on eden's login node fails with
+# Why a job rather than login-node commands. Installing on the cluster's login node fails with
 #
 #   RuntimeError: NumPy was built with baseline optimizations: (X86_V2)
 #                 but your machine doesn't support: (X86_V2)
 #
 # because that node's CPU is below the x86-64-v2 baseline current NumPy wheels are built
 # against, so NumPy cannot import there and neither the install nor the data preparation can
-# run. A dgx node is new enough. The install is idempotent, so the second and third cell lines
+# run. A GPU compute node is new enough. The install is idempotent, so the second and third cell lines
 # skip it; pass SKIP_INSTALL=1 to skip it explicitly.
 #
 # The singleton step is the long one: it reads a dense contact matrix per chromosome and writes
@@ -30,19 +30,18 @@
 #SBATCH --mem=64G
 #SBATCH --partition=short
 #SBATCH --time=06:00:00
-#SBATCH --account=sfglab
-# --output/--error are absolute and cannot use $ROOT: sbatch parses #SBATCH lines before the
-# shell runs, and a relative path would resolve against whatever directory you submitted from.
-# The directory must already exist, because slurm opens these files before the script's own
-# mkdir would run. Create it once:  mkdir -p $ROOT/slurm/ensemble/logs
+# The account is given at submission, sbatch -A <account>. --output and --error are relative to
+# the directory of the submission, which must be the checkout. The logs directory must exist
+# before the submission, since slurm opens these files before the script runs:
+#   mkdir -p slurm/ensemble/logs
 #SBATCH --open-mode=append
-#SBATCH --output=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/setup_%x_%j.out
-#SBATCH --error=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/setup_%x_%j.out
+#SBATCH --output=slurm/ensemble/logs/setup_%x_%j.out
+#SBATCH --error=slurm/ensemble/logs/setup_%x_%j.out
 
 set -euo pipefail
 
 CELL="${1:?usage: sbatch slurm/ensemble/setup_cell.sh <GM12878|H1ESC|HFFC6>}"
-ROOT="${ROOT:-/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng}"
+ROOT="${ROOT:-${SLURM_SUBMIT_DIR:-$PWD}}"
 BINSIZE="${BINSIZE:-25000}"
 CHROMS="${CHROMS:-chr1-chr22,chrX}"
 SKIP_INSTALL="${SKIP_INSTALL:-0}"

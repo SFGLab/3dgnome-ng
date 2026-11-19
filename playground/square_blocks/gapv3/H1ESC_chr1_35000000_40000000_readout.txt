@@ -1,4 +1,4 @@
-chr1:35000000-40000000 at 25 kb, 200 bins, Hi-C /mnt/storagelinux/_hic/H1ESC/hic.4DNFI6HDY7WZ.mcool
+chr1:35000000-40000000 at 25 kb, 200 bins, Hi-C /data/_hic/H1ESC/hic.4DNFI6HDY7WZ.mcool
 
 H1ESC_chr1_35000000_40000000_prod: 5 structures, 4205 beads, nu 0.353, 136 of 200 bins hold an anchor
   SCC raw 0.183  balanced 0.243   no structure null raw 0.006  balanced 0.353

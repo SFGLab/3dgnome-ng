@@ -22,7 +22,7 @@ OUT="${OUT:-out/validation}"
 R="${REGION:-chr1:1-60000000}"
 N="${N:-5}"
 MMVENV="${MMVENV:-$HOME/mmvenv}"
-HIC_ROOT="${HIC_ROOT:-/mnt/storagelinux/_hic}"
+HIC_ROOT="${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 CELLS="${CELLS:-GM12878 H1ESC HFFC6}"
 TAG="${TAG:-prod}"  # our arm's directory suffix, so a rerun on changed settings sits beside the last
 mkdir -p "$OUT"

@@ -2,7 +2,7 @@
 # Structure readouts of the two whole genome trio arms against each person's own Hi-C, one
 # array task per person and chromosome, CPU only.
 #
-#   sbatch -A sfglab --array=0-197%24 playground/rnapii/readouts_trio_genome.sh
+#   sbatch -A <account> --array=0-197%24 playground/rnapii/readouts_trio_genome.sh
 #   ROOT=~/trio_lr REPO=~/trio_lr/repo PY=~/3dgnome-ng/.venv/bin/python bash readouts_trio_genome.sh 7
 #
 # Under Slurm the task is the array index. On a workstation it is the first argument, ROOT

@@ -1,5 +1,5 @@
 #!/bin/bash
-# The whole genome cross line readouts on frodo: expression, then the pairs, then structure.
+# The whole genome cross line readouts: expression, then the pairs, then structure.
 cd ~/xc_lr
 export ROOT=$HOME/xc_lr
 D=repo/playground/rnapii/readouts_crossline_genome.sh

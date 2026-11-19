@@ -10,12 +10,13 @@
 # so 0.01 puts the law on the scale of the bonds and 0.1 above it. CHR1_ARMS replaces the arm
 # list for phase 2 and SKIP_CHR1 stops after phase 1.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 C=GM12878
 DATA="${DATA:-data}"
 OUT="${OUT:-out/lawspring}"
 ARMS="${ARMS:-0 0.01 0.1}"
-MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 SING=$DATA/$C/${C}_hic_25kb_singletons.bedpe
 mkdir -p "$OUT"
 git log --format="law spring trial on %h %s" -1

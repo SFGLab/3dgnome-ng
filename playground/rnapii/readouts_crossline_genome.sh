@@ -1,8 +1,8 @@
 #!/bin/bash
 # Whole genome readouts of the cross line RNAPII comparison, one chromosome a call, on a
-# workstation. The models are eden's out/lr, arms C, R and M of the three lines, ten
+# workstation. The models are the cluster's out/lr, arms C, R and M of the three lines, ten
 # conformations a chromosome, and arm E, a seeded ten of the hundred cudaMMC models a chromosome
-# from team-faramir's models_ccd, written as cifs by `e3d_export.py --hcm-to-cif`.
+# of the enhancer3D analysis, written as cifs by `e3d_export.py --hcm-to-cif`.
 #
 #   ROOT=~/xc_lr bash playground/rnapii/readouts_crossline_genome.sh expression chr7
 #   ROOT=~/xc_lr bash playground/rnapii/readouts_crossline_genome.sh structure chr7

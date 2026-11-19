@@ -45,19 +45,20 @@
 # limit. Raising this rather than cutting PER_TASK is safe because each conformation is written
 # as it finishes, so a timeout costs only the one in flight.
 #SBATCH --time=24:00:00
-#SBATCH --account=sfglab
-# Absolute for the same reason as setup_cell.sh: sbatch parses #SBATCH before the shell runs, so
-# these cannot use $ROOT, and the directory must already exist.
+# The account is given at submission, sbatch -A <account>. --output and --error are relative to
+# the directory of the submission, which must be the checkout. The logs directory must exist
+# before the submission, since slurm opens these files before the script runs:
+#   mkdir -p slurm/ensemble/logs
 #SBATCH --open-mode=append
-#SBATCH --output=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/ens_%x_%A_%a.out
-#SBATCH --error=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/ens_%x_%A_%a.out
+#SBATCH --output=slurm/ensemble/logs/ens_%x_%A_%a.out
+#SBATCH --error=slurm/ensemble/logs/ens_%x_%A_%a.out
 
 set -euo pipefail
 
 CELL="${CELL:-${1:-}}"
 [ -n "$CELL" ] || { echo "set CELL=GM12878|H1ESC|HFFC6" >&2; exit 1; }
 
-ROOT="${ROOT:-/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng}"
+ROOT="${ROOT:-${SLURM_SUBMIT_DIR:-$PWD}}"
 LOWER=$(echo "$CELL" | tr '[:upper:]' '[:lower:]')
 # Blocks come from arc gaps. TAD interaction blocks were dropped: a TAD boundary is an
 # insulation call that knows nothing about the arcs, so it cuts through them, orphaning 43.6

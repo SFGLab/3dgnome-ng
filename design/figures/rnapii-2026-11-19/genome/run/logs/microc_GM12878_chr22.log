@@ -1,4 +1,4 @@
-repo/playground/rnapii/microc_genome.sh: line 50: /home/nk2/xc_lr/out/readouts/microc/GM12878_chr22_10000.bedpe: No such file or directory
+repo/playground/rnapii/microc_genome.sh: line 50: ~/xc_lr/out/readouts/microc/GM12878_chr22_10000.bedpe: No such file or directory
 [GM12878 chr22] loops called: 3857 at 5 kb,  at 10 kb
   map RNAPII alone    loops    31 scored    31  contact   6.48
   map none            loops   332 scored   332  contact   6.97

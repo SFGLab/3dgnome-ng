@@ -103,7 +103,7 @@ CANONICAL: dict[str, dict[str, object]] = {
         "mc_executor_arcs": "batch",
         "mc_executor_densify": "threaded",
         "mc_executor_estimate_dist": "batch",
-        # Threaded on numba since 2026-11-16. On frodo, 36 cores and an RTX 3090, GM12878 chr1 at
+        # Threaded on numba since 2026-11-16. On 36 cores and an RTX 3090, GM12878 chr1 at
         # two structures takes 631 s against 807 s with this stage on the device, and a 10 Mb
         # region 35 s against 60 s; the stage alone on chr1 is 53 to 80 s against 122 to 146 s,
         # and 92 s on 8 workers. The cross block relaxation follows it onto numba. Four

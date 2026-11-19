@@ -1,7 +1,7 @@
 #!/bin/bash
 # Micro-C loops and the models at them, chr1:0-60 Mb. design/microc-loops.md.
 #
-#   ROOT=/mnt/storagelinux/xc_readout_lr bash playground/rnapii/microc_loops.sh
+#   ROOT=~/xc_readout_lr bash playground/rnapii/microc_loops.sh
 #
 # ROOT holds repo/, out/xc/<LINE>_<ARM>_60mb and loops/. The slices are the ones hic_slice.py cut
 # for microc_readout.py. Loops are called once per line, a line whose bedpe exists is not called

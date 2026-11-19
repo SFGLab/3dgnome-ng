@@ -1,10 +1,12 @@
 #!/bin/bash
-# The deep contact map of HFFc6 from the public 4DN bucket, on team-aragorn. A long connection
+# The deep contact map of HFFc6 from the public 4DN bucket. A long connection
 # to the bucket slows from 8 MB/s to under 1 MB/s, so each pass ends after 25 seconds and the
 # next resumes the partial file on a new connection. The finished file is checked by its size
-# and its md5 is written beside it; the copy on team-frodo has 59581e9ec46ead9619906e4d1fd4c57d.
+# and its md5 is written beside it; a whole copy has 59581e9ec46ead9619906e4d1fd4c57d.
+#
+#   D=/srv/3dgnome/data/maps/HFFC6 bash web/deploy/maps_hffc6.sh
 B=https://4dn-open-data-public.s3.amazonaws.com/fourfront-webprod/wfoutput
-D=/mnt/raid/3dgnome-new/data/maps/HFFC6
+D="${D:?Set D to the directory that receives the map}"
 N=22837705555
 for i in $(seq 1 20000); do
   [ "$(stat -c %s $D/4DNFIB59T7NN.mcool.part 2>/dev/null)" = "$N" ] && break

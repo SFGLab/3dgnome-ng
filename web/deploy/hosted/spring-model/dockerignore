@@ -1,6 +1,0 @@
-.idea
-.git
-data
-__pycache__
-Dockerfile.bump*
-requirements.bump.txt.*

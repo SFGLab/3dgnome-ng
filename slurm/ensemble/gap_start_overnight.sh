@@ -2,7 +2,7 @@
 # Overnight arms on where a gap's subanchors start, GM12878 with CTCF and RNAPII loops,
 # workstation, screen gapnight.
 #
-#   DATA=/home/nik/3dgnome-ng/data BASE=out/lawspring_run bash slurm/ensemble/gap_start_overnight.sh
+#   DATA=~/3dgnome-ng/data BASE=out/lawspring_run bash slurm/ensemble/gap_start_overnight.sh
 #
 # Arms, each the production ini from BASE with the overrides named:
 #   coil          production, start = coil, hard wall
@@ -13,12 +13,13 @@
 # coil, law and law_nowall, scored on the 1-60 Mb slice. Every phase ends with the law readout
 # and the battery, raw and balanced. A finished arm is not rerun.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 C=GM12878
 DATA="${DATA:-data}"
 BASE="${BASE:-out/lawspring_run}"
 OUT="${OUT:-out/gapnight}"
-MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 SING=$DATA/$C/${C}_hic_25kb_singletons.bedpe
 mkdir -p "$OUT"
 git log --format="gap start overnight on %h %s" -1

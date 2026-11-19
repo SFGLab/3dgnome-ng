@@ -1,4 +1,4 @@
-chr1:1-60000000 at 25 kb, 2400 bins, Hi-C /home/nk2/gapfill-data/_hic/H1ESC/hic.4DNFI6HDY7WZ.mcool
+chr1:1-60000000 at 25 kb, 2400 bins, Hi-C ~/gapfill-data/_hic/H1ESC/hic.4DNFI6HDY7WZ.mcool
 
 H1ESC_chr1_60mb_prod: 3 structures, 43923 beads, nu 0.353, 1339 of 2400 bins hold an anchor
   SCC raw 0.230  balanced 0.210   no structure null raw 0.164  balanced -0.052

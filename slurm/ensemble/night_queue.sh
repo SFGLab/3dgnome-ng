@@ -1,5 +1,5 @@
 #!/bin/bash
-# The tool runs of the night of 2026-11-16 on frodo, one after another. design/tools-comparison.md.
+# The tool runs of the night of 2026-11-16, one after another. design/tools-comparison.md.
 #
 #   DATA=~/gapfill-data bash slurm/ensemble/night_queue.sh
 #

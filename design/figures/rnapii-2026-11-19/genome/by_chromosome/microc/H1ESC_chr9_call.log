@@ -1,4 +1,4 @@
-/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/cooler/_balance.py:182: ConvergenceWarning: Iteration limit reached without convergence on chr9.
+~/3dgnome-ng/.venv/lib/python3.12/site-packages/cooler/_balance.py:182: ConvergenceWarning: Iteration limit reached without convergence on chr9.
   warnings.warn(
 INFO:root:creating a Pool of 4 workers
 INFO:root:Using recommended donut-based kernels with w=7, p=4 for binsize=5000
@@ -16,8 +16,8 @@ INFO:root:clustering enriched pixels in region: chr9
 INFO:root:detected 1207 clusters of 4.02+/-5.08 size
 INFO:root:Clustering is complete
 INFO:root:filtered 792 out of 1207 centroids to reduce the number of false-positives
-H1ESC_chr9_5000.cool: 792 loops -> /home/nk2/xc_lr/out/readouts/microc/H1ESC_chr9_5000.bedpe
-/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/cooler/_balance.py:182: ConvergenceWarning: Iteration limit reached without convergence on chr9.
+H1ESC_chr9_5000.cool: 792 loops -> ~/xc_lr/out/readouts/microc/H1ESC_chr9_5000.bedpe
+~/3dgnome-ng/.venv/lib/python3.12/site-packages/cooler/_balance.py:182: ConvergenceWarning: Iteration limit reached without convergence on chr9.
   warnings.warn(
 INFO:root:creating a Pool of 4 workers
 INFO:root:Using recommended donut-based kernels with w=5, p=2 for binsize=10000
@@ -35,4 +35,4 @@ INFO:root:clustering enriched pixels in region: chr9
 INFO:root:detected 1168 clusters of 3.13+/-2.90 size
 INFO:root:Clustering is complete
 INFO:root:filtered 631 out of 1168 centroids to reduce the number of false-positives
-H1ESC_chr9_10000.cool: 631 loops -> /home/nk2/xc_lr/out/readouts/microc/H1ESC_chr9_10000.bedpe
+H1ESC_chr9_10000.cool: 631 loops -> ~/xc_lr/out/readouts/microc/H1ESC_chr9_10000.bedpe

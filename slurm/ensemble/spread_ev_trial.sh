@@ -2,7 +2,7 @@
 # Drawn anchors with only their overlaps relaxed, three cell lines, workstation, screen spreadev,
 # in a worktree of its own. design/gap-fill.md.
 #
-#   DATA=/home/nik/3dgnome-ng/data REF=/home/nik/3dgnome-lawspring SPREAD=/home/nik/3dgnome-spread2 \
+#   DATA=~/3dgnome-ng/data REF=~/3dgnome-lawspring SPREAD=~/3dgnome-spread2 \
 #     bash slurm/ensemble/spread_ev_trial.sh
 #
 # Waits for SPREAD/spread.log to end, so one job holds the card at a time. Arms, each
@@ -15,6 +15,7 @@
 # chr1:10-15, 20-25 and 35-40 Mb at five structures. Phase 2, whole chr1 on GM12878 and H1ESC at
 # three structures, scored on the 1-60 Mb slice.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
 REF="${REF:-.}"
@@ -26,7 +27,7 @@ mkdir -p "$OUT"
 while ! grep -q "^EXIT" "$SPREAD/spread.log" 2>/dev/null; do sleep 120; done
 git log --format="spread ev trial on %h %s" -1
 
-mcool() { ls /mnt/storagelinux/_hic/$1/*.mcool | head -1; }
+mcool() { ls $HIC_ROOT/$1/*.mcool | head -1; }
 
 write_inis() {  # cell
   c=$(echo "$1" | tr 'A-Z' 'a-z')

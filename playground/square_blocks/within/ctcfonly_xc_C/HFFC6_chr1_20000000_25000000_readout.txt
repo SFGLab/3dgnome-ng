@@ -1,4 +1,4 @@
-chr1:20000000-25000000 at 25 kb, 200 bins, Hi-C /home/nk2/gapfill-data/_hic/HFFC6/hic.4DNFIB59T7NN.mcool
+chr1:20000000-25000000 at 25 kb, 200 bins, Hi-C ~/gapfill-data/_hic/HFFC6/hic.4DNFIB59T7NN.mcool
 
 HFFC6_chr1_20000000_25000000_prod: 5 structures, 3760 beads, nu 0.370, 66 of 200 bins hold an anchor
   SCC raw 0.244  balanced 0.271   no structure null raw 0.071  balanced 0.301

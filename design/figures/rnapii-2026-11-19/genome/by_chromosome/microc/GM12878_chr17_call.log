@@ -14,7 +14,7 @@ INFO:root:clustering enriched pixels in region: chr17
 INFO:root:detected 18141 clusters of 1.93+/-2.61 size
 INFO:root:Clustering is complete
 INFO:root:filtered 7162 out of 18141 centroids to reduce the number of false-positives
-GM12878_chr17_5000.cool: 7162 loops -> /home/nk2/xc_lr/out/readouts/microc/GM12878_chr17_5000.bedpe
+GM12878_chr17_5000.cool: 7162 loops -> ~/xc_lr/out/readouts/microc/GM12878_chr17_5000.bedpe
 INFO:root:creating a Pool of 4 workers
 INFO:root:Using recommended donut-based kernels with w=5, p=2 for binsize=10000
 INFO:root:creating a Pool of 4 workers
@@ -31,4 +31,4 @@ INFO:root:clustering enriched pixels in region: chr17
 INFO:root:detected 24179 clusters of 1.31+/-1.05 size
 INFO:root:Clustering is complete
 INFO:root:filtered 5108 out of 24179 centroids to reduce the number of false-positives
-GM12878_chr17_10000.cool: 5108 loops -> /home/nk2/xc_lr/out/readouts/microc/GM12878_chr17_10000.bedpe
+GM12878_chr17_10000.cool: 5108 loops -> ~/xc_lr/out/readouts/microc/GM12878_chr17_10000.bedpe

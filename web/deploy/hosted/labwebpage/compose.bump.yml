@@ -1,6 +1,0 @@
-# Laid over the lab page's own compose.yaml. The site's files and database are unchanged.
-#   docker compose -f compose.yaml -f <this file> up -d --no-build
-# The step back is the same command without this file.
-services:
-  nginx: { image: "labwebpage-nginx:2026-11-18" }
-  web: { image: "labwebpage-web:2026-11-18" }

@@ -14,45 +14,45 @@ INFO:root:clustering enriched pixels in region: chr22
 INFO:root:detected 9443 clusters of 1.90+/-2.51 size
 INFO:root:Clustering is complete
 INFO:root:filtered 3857 out of 9443 centroids to reduce the number of false-positives
-GM12878_chr22_5000.cool: 3857 loops -> /home/nk2/xc_lr/out/readouts/microc/GM12878_chr22_5000.bedpe
+GM12878_chr22_5000.cool: 3857 loops -> ~/xc_lr/out/readouts/microc/GM12878_chr22_5000.bedpe
 INFO:root:creating a Pool of 4 workers
 INFO:root:Using recommended donut-based kernels with w=5, p=2 for binsize=10000
 INFO:root:creating a Pool of 4 workers
 INFO:root:convolving 30 tiles to build histograms for lambda-bins
 INFO:root:Done building histograms in 2.194 sec ...
 Traceback (most recent call last):
-  File "/home/nk2/xc_lr/repo/playground/rnapii/microc_call_loops.py", line 74, in <module>
+  File "~/xc_lr/repo/playground/rnapii/microc_call_loops.py", line 74, in <module>
     main()
-  File "/home/nk2/xc_lr/repo/playground/rnapii/microc_call_loops.py", line 69, in main
+  File "~/xc_lr/repo/playground/rnapii/microc_call_loops.py", line 69, in main
     n = call(cool, bedpe, nproc)
         ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/nk2/xc_lr/repo/playground/rnapii/microc_call_loops.py", line 49, in call
+  File "~/xc_lr/repo/playground/rnapii/microc_call_loops.py", line 49, in call
     dots = cooltools.dots(clr, expected=expected, view_df=view, nproc=nproc)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/cooltools/api/dotfinder.py", line 1605, in dots
+  File "~/3dgnome-ng/.venv/lib/python3.12/site-packages/cooltools/api/dotfinder.py", line 1605, in dots
     threshold_df, qvalues = determine_thresholds(gw_hist, lambda_bin_fdr)
                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/cooltools/api/dotfinder.py", line 977, in determine_thresholds
+  File "~/3dgnome-ng/.venv/lib/python3.12/site-packages/cooltools/api/dotfinder.py", line 977, in determine_thresholds
     .idxmin()  # index of the first positive difference
      ^^^^^^^^
-  File "/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/frame.py", line 15775, in idxmin
+  File "~/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/frame.py", line 15775, in idxmin
     res = data._reduce(
           ^^^^^^^^^^^^^
-  File "/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/frame.py", line 13635, in _reduce
+  File "~/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/frame.py", line 13635, in _reduce
     res = df._mgr.reduce(blk_func)
           ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/internals/managers.py", line 1694, in reduce
+  File "~/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/internals/managers.py", line 1694, in reduce
     res_blocks = [blk.reduce(func) for blk in self.blocks]
                   ^^^^^^^^^^^^^^^^
-  File "/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/internals/blocks.py", line 358, in reduce
+  File "~/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/internals/blocks.py", line 358, in reduce
     result = func(self.values)
              ^^^^^^^^^^^^^^^^^
-  File "/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/frame.py", line 13565, in blk_func
+  File "~/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/frame.py", line 13565, in blk_func
     return op(values, axis=axis, skipna=skipna, **kwds)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/nanops.py", line 1216, in nanargmin
+  File "~/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/nanops.py", line 1216, in nanargmin
     result = _maybe_arg_null_out(result, axis, mask, skipna)  # type: ignore[arg-type]
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/nanops.py", line 1489, in _maybe_arg_null_out
+  File "~/3dgnome-ng/.venv/lib/python3.12/site-packages/pandas/core/nanops.py", line 1489, in _maybe_arg_null_out
     raise ValueError("Encountered all NA values")
 ValueError: Encountered all NA values

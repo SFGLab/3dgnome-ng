@@ -2,7 +2,7 @@
 # The maximum entropy gap start against the coil start on three cell lines, CTCF and RNAPII
 # loops, workstation, screen gapme. design/gap-fill.md, idea 1.
 #
-#   DATA=/home/nik/3dgnome-ng/data bash slurm/ensemble/gap_maxent_trial.sh
+#   DATA=~/3dgnome-ng/data bash slurm/ensemble/gap_maxent_trial.sh
 #
 # Production arms come from the anchor contacts cross cell run in ACXC, out/acxc, which ran
 # the same configs on the commit before this start existed. Before anything else GM12878
@@ -18,6 +18,7 @@
 # maxent_z3. Every scoring step has the law readout and the battery, raw and balanced, with the
 # production and z3 arms of ACXC beside the new ones. A finished arm is not rerun.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
 OUT="${OUT:-out/gapme}"
@@ -26,7 +27,7 @@ CELLS="${CELLS:-GM12878 H1ESC HFFC6}"
 mkdir -p "$OUT"
 git log --format="gap maxent trial on %h %s" -1
 
-mcool() { ls /mnt/storagelinux/_hic/$1/*.mcool | head -1; }
+mcool() { ls $HIC_ROOT/$1/*.mcool | head -1; }
 
 write_inis() {  # cell
   c=$(echo "$1" | tr 'A-Z' 'a-z')

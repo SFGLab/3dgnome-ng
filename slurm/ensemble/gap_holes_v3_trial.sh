@@ -2,7 +2,7 @@
 # Hole beads with excluded volume against the blocks, three cell lines,
 # workstation, screen gapv3, in a worktree of its own. design/gap-fill.md.
 #
-#   DATA=/home/nik/3dgnome-ng/data REF=/home/nik/3dgnome-lawspring bash slurm/ensemble/gap_holes_v3_trial.sh
+#   DATA=~/3dgnome-ng/data REF=~/3dgnome-lawspring bash slurm/ensemble/gap_holes_v3_trial.sh
 #
 # One arm, slurm/ensemble/<cell>_xc_R.ini with the overrides written:
 #   holes3         production with hole beads, window contacts against the chromosome at 10 kb,
@@ -12,6 +12,7 @@
 # V2/out/gapv2. Phase 1, chr1:10-15 and 35-40 Mb at five structures, the two regions holding
 # holes. Phase 2, whole chr1 at three structures, scored on the 1-60 Mb slice.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
 REF="${REF:-.}"
@@ -23,7 +24,7 @@ CELLS="${CELLS:-GM12878 H1ESC HFFC6}"
 mkdir -p "$OUT"
 git log --format="gap holes v3 trial on %h %s" -1
 
-mcool() { ls /mnt/storagelinux/_hic/$1/*.mcool | head -1; }
+mcool() { ls $HIC_ROOT/$1/*.mcool | head -1; }
 
 write_inis() {  # cell
   c=$(echo "$1" | tr 'A-Z' 'a-z')

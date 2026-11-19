@@ -1,8 +1,8 @@
 #!/bin/bash
 # Readouts of the cross line RNAPII comparison, design/2026-11-11-rnapii-release.md.
 #
-#   ROOT=~/xc_readout bash playground/rnapii/readouts_crossline.sh structure GM12878
-#   ROOT=~/xc_readout bash playground/rnapii/readouts_crossline.sh expression
+#   ROOT=~/xc_readout HIC=~/_hic bash playground/rnapii/readouts_crossline.sh structure GM12878
+#   ROOT=~/xc_readout HIC=~/_hic bash playground/rnapii/readouts_crossline.sh expression
 #
 # structure <LINE>: battery, saddle and pile-up on the line's arms E, C, R and M, chr1:1-60 Mb,
 # against the deep 4DN map, JSON under $ROOT/out/readouts. H1ESC's map has no weights, so its
@@ -16,7 +16,7 @@
 set -euo pipefail
 ROOT="${ROOT:-$HOME/xc_readout}"
 PY="${PY:-$HOME/3dgnome-ng/.venv/bin/python}"
-HIC="${HIC:-/mnt/storagelinux/_hic}"
+HIC="${HIC:?Set HIC to the directory that holds the Hi-C maps of each cell line}"
 DATA="${DATA:-$HOME/3dgnome-ng/data}"
 E3D="${E3D:-$HOME/enhancer3d/data}"
 E3DX="${E3DX:-$ROOT/e3dx}"

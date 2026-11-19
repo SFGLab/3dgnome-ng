@@ -2,19 +2,20 @@
 # The law start for a gap's subanchors against production's compact coil, GM12878 with CTCF and
 # RNAPII loops, workstation, screen lawstart.
 #
-#   DATA=/home/nik/3dgnome-ng/data BASE=out/lawspring_run bash slurm/ensemble/law_start_trial.sh
+#   DATA=~/3dgnome-ng/data BASE=out/lawspring_run bash slurm/ensemble/law_start_trial.sh
 #
 # The coil arm is the law spring trial's weight zero arm in BASE, production as it stands. The
 # law arm is the same config with `start = law`. Two 5 Mb regions at five structures, then the
 # law readout and the battery, raw and balanced, over both arms. SKIP_CHR1 unset runs whole
 # chr1 at three structures per arm afterwards, scored on the 1-60 Mb slice.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 C=GM12878
 DATA="${DATA:-data}"
 BASE="${BASE:-out/lawspring_run}"
 OUT="${OUT:-out/lawstart}"
-MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 SING=$DATA/$C/${C}_hic_25kb_singletons.bedpe
 mkdir -p "$OUT"
 git log --format="law start trial on %h %s" -1
