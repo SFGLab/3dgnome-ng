@@ -30,9 +30,6 @@ pass it on. The server answers 503 with both paths named when the build and the 
 With Docker Compose, `BASE_PATH=/new` in the environment sets both. A proxy rule for `/new/`
 does not match `/new`, and a second rule redirects `/new` to `/new/`.
 
-The page text, the colours and the figures come from the approved design in web/design/site.pen.
-A change of wording goes into the design first.
-
 The Model a region page at `/model` reads the JSON API: `GET /api/catalog`, `GET /api/region`,
 `GET /api/preview` for the loop arcs of a region, `GET /api/settings` for the engine settings a
 user may change, `POST /api/settings/ini` to read an uploaded config, and `POST /api/jobs`, which

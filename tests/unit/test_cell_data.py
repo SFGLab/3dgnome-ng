@@ -2,45 +2,21 @@
 
 from __future__ import annotations
 
-import sys
-import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from gnome3d.production import cell_data_section  # noqa: E402
-
-PASS: list[str] = []
-FAIL: list[str] = []
+from gnome3d.production import cell_data_section
 
 
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}" + (f"   {detail}" if detail else ""))
-
-
-def main() -> int:
-    print("cell data section checks")
-    with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        (root / "GM12878").mkdir()
-        d = cell_data_section("GM12878", str(root))
-        check(
-            "without a Hi-C file the ChIA-PET singletons are the input",
-            d["singletons"] == "GM12878_singletons_lessthan3.bedpe",
-            str(d["singletons"]),
-        )
-        (root / "GM12878" / "GM12878_hic_25kb_singletons.bedpe").write_text("")
-        d = cell_data_section("GM12878", str(root))
-        check(
-            "with a Hi-C file it is the input",
-            d["singletons"] == "GM12878_hic_25kb_singletons.bedpe",
-            str(d["singletons"]),
-        )
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+def test_without_a_hi_c_file_the_chia_pet_singletons_are_the_input(tmp_path: Path) -> None:
+    tmp = str(tmp_path)
+    root = Path(tmp)
+    (root / "GM12878").mkdir()
+    d = cell_data_section("GM12878", str(root))
+    assert d["singletons"] == "GM12878_singletons_lessthan3.bedpe", (
+        "without a Hi-C file the ChIA-PET singletons are the input: " + str(d["singletons"])
+    )
+    (root / "GM12878" / "GM12878_hic_25kb_singletons.bedpe").write_text("")
+    d = cell_data_section("GM12878", str(root))
+    assert d["singletons"] == "GM12878_hic_25kb_singletons.bedpe", (
+        "with a Hi-C file it is the input: " + str(d["singletons"])
+    )

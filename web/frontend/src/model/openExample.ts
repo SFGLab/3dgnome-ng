@@ -1,10 +1,10 @@
 import { api } from '../api'
 import type { Example } from './examples'
 import type { Factors } from './form'
-import { rememberJob } from './recent'
+import { nameOf, rememberJob } from './recent'
 
-/** Structures an example job asks for. Ten keep the first run short; the server's cache serves
- * every later visitor the same job. */
+/** Structures an example job asks for. Ten keep the first run short. The server gives every later
+ * visitor the same job, the first job of the request. */
 export const EXAMPLE_STRUCTURES = 10
 
 function request(e: Example, factors: Factors): FormData {
@@ -27,10 +27,10 @@ export async function openExample(e: Example): Promise<string> {
   // A compare example's two jobs are named by their loop sets, not by the example's title.
   const named = (f: Factors) => `${e.cellLabel} ${e.region}, ${f === 'CTCF+RNAPII' ? 'CTCF and RNAPII' : f} loops`
   const { url } = await api.submit(request(e, e.factors))
-  rememberJob({ url, label: e.compareFactors ? named(e.factors) : `${e.cellLabel} ${e.title}`, name: '', at: Date.now() })
+  rememberJob({ url, label: e.compareFactors ? named(e.factors) : `${e.cellLabel} ${e.title}`, name: nameOf(url), at: Date.now() })
   if (e.compareFactors) {
     const other = await api.submit(request(e, e.compareFactors))
-    rememberJob({ url: other.url, label: named(e.compareFactors), name: '', at: Date.now() })
+    rememberJob({ url: other.url, label: named(e.compareFactors), name: nameOf(other.url), at: Date.now() })
     return `${url}?${new URLSearchParams({ compare: other.url, ...(e.gene ? { gene: e.gene } : {}) })}`
   }
   const q = new URLSearchParams({ ...(e.tab ? { tab: e.tab } : {}), ...(e.gene ? { gene: e.gene } : {}) }).toString()

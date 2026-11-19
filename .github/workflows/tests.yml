@@ -45,5 +45,7 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: pip install -e ".[dev,jax,extract]"
-      # The region test needs the Hi-C contacts of GM12878, which are not in the repository.
-      - run: pytest -m "not data"
+      # The region test needs the Hi-C contacts of GM12878, which are not in the repository. The
+      # tests marked slow run the JAX kernels on the CPU and take half of a full run. No job here
+      # runs them.
+      - run: pytest -m "not data and not slow"

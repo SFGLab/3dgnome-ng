@@ -1236,8 +1236,11 @@
   border-radius: 7px;
 }
 
+/* The buttons of the toolbar are as tall as its checkboxes. */
 .compare-toolbar .action {
-  margin-left: auto;
+  align-self: stretch;
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 .compare-panels {
@@ -1500,6 +1503,3 @@
   pointer-events: none;
 }
 
-.compare-toolbar .link-button {
-  align-self: center;
-}

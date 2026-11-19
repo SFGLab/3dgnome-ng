@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Info } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError, type Region } from '../api'
@@ -11,7 +11,7 @@ import { EMPTY_FORM, type FormState } from '../model/form'
 import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
 import { OwnData, type OwnTab } from '../model/OwnData'
-import { rememberJob } from '../model/recent'
+import { recentJobs, rememberJob } from '../model/recent'
 import { RegionField, useRegion } from '../model/RegionField'
 import { changedSettings } from '../model/settings'
 import { SidePanel } from '../model/SidePanel'
@@ -50,6 +50,9 @@ function toFormData(form: FormState, overrides: Record<string, string>): FormDat
   d.append('haplotype', String(form.haplotype))
   d.append('n_models', String(form.structures))
   d.append('overrides', JSON.stringify(overrides))
+  // A request of the form starts a job of its own, also when the site holds a job of the same
+  // request. An example leaves this out and opens the held job.
+  d.append('fresh', '1')
   if (form.vcfUpload) d.append('vcf_upload', form.vcfUpload.id)
   const own = form.own
   if (own.loops.length || own.anchors || own.contacts || own.enhancers || (form.cell === 'own' && (own.loopsFrom || own.enhancersFrom))) d.append('own', ownField(own))
@@ -104,10 +107,14 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
     if (e) setForm(fromExample(e))
   }, [params])
 
+  // My jobs shows a job by its name, or by its cell type and region when it has none. Two jobs
+  // shown alike cannot be told apart there.
+  const label = region.data ? `${form.cell} ${region.data.label.split(',')[0]}` : `${form.cell} ${form.region}`
+  const shownAs = form.name.trim() || label
+  const sameName = form.region.trim() !== '' && recentJobs().some((j) => (j.name || j.label) === shownAs)
   const submit = useMutation({
     mutationFn: () => api.submit(toFormData(form, schema.data ? changedSettings(schema.data, form.settings) : {})),
     onSuccess: ({ url }) => {
-      const label = region.data ? `${form.cell} ${region.data.label.split(',')[0]}` : `${form.cell} ${form.region}`
       rememberJob({ url, label, name: form.name.trim(), at: Date.now() })
       onSubmitted(url)
     },
@@ -122,7 +129,8 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
     ) : null
 
   const cellType = catalog.data?.cell_types[form.cell]
-  const hicdiffusionOk = !!catalog.data?.hicdiffusion && !(region.data && region.data.end - region.data.start > 2_000_000)
+  const hicdiffusionMb = catalog.data?.hicdiffusion_mb ?? 2
+  const hicdiffusionOk = !!catalog.data?.hicdiffusion && !(region.data && region.data.end - region.data.start > hicdiffusionMb * 1e6)
   useEffect(() => {
     if (form.background === 'hicdiffusion' && catalog.data && !hicdiffusionOk) setForm((f) => ({ ...f, background: 'hic' }))
   }, [form.background, hicdiffusionOk, catalog.data])
@@ -134,7 +142,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
         <header className="page-head">
           <h1>Model a region</h1>
           <p className="lead">
-            Pick a cell type and a region of up to 20 Mb, then choose the loops. A job returns an ensemble of 3D structures with promoters and enhancers marked.
+            {`Pick a cell type and a region of up to ${catalog.data?.max_region_mb ?? 20} Mb, then choose the loops.`} A job returns an ensemble of 3D structures with promoters and enhancers marked.
           </p>
         </header>
         <Step n={1} title="Cell type and region">
@@ -191,6 +199,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
             value={form.background}
             region={region.data}
             available={!!catalog.data?.hicdiffusion}
+            limitMb={hicdiffusionMb}
             lymphoblastoid={cellType?.lymphoblastoid ?? true}
             onChange={(background) => set({ background })}
           />
@@ -198,6 +207,11 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
         </Step>
         <Step n={5} title="Ensemble and simulation settings">
           <EnsembleFields structures={form.structures} name={form.name} max={catalog.data?.max_structures ?? 100} onChange={set} />
+          {sameName && (
+            <p className="notice" role="status">
+              <Info size={14} aria-hidden /> {`My jobs already lists a job as ${shownAs}. Give this job a name of its own to tell the two apart.`}
+            </p>
+          )}
           {schema.data && <SettingsTree schema={schema.data} values={form.settings} onChange={(settings) => set({ settings })} />}
           {stepError(5)}
         </Step>

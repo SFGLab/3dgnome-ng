@@ -18,17 +18,20 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import numpy as np
+from personal3d.lift import Lift
 
 from . import hicdiffusion
 from .catalog import Catalog
 from .inputs import Own, build_inputs
 from .marks import ep_table, mark_beads, read_cif
-from .regions import parse_region
+from .regions import ANY_SPAN, parse_region
 from .settings import Settings
 from .settings_schema import apply_overrides, validate_overrides
 from .svs import read_svs
 
-ENGINE_VERSION = "gnome3d"
+# A part of the key of every shared job. It is not the name of the package. A change gives each
+# request a new key and the site stops finding the jobs it holds.
+ENGINE_VERSION = "gnome3d-ng"
 
 
 def _no_overrides() -> dict[str, str]:
@@ -63,7 +66,7 @@ class JobRequest:
 
 def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
     """The request with its region resolved. Equivalent requests compare equal."""
-    region = parse_region(req.region, catalog.cell_types[req.cell_type].genes(), Settings.from_env().max_span)
+    region = parse_region(req.region, catalog.cell_types[req.cell_type].genes(), ANY_SPAN)
     d = asdict(req)
     d["region"] = str(region)
     # Keys of requests made before overrides and background existed stay the same.
@@ -176,7 +179,7 @@ def run_job(
             contacts=Path(str(o["contacts"])) if o.get("contacts") else None,
             enhancers=Path(str(o["enhancers"])) if o.get("enhancers") else None,
         ) if o else None
-        region = parse_region(req.region, cell.genes(), Settings.from_env().max_span)
+        region = parse_region(req.region, cell.genes(), ANY_SPAN)
         svs: list = []
         skipped = 0
         vcf = Path(req.upload_vcf) if req.upload_vcf else (catalog.sv_sets[req.sv_set].vcf if req.sv_set else None)
@@ -186,7 +189,9 @@ def run_job(
         hic = None
         if req.background == "hicdiffusion":
             _status(job, stage="hicdiffusion")
-            hic = hicdiffusion.predict(region.chrom, region.start, svs, log, env_extra), region.start
+            cond = hicdiffusion.predict(region.chrom, region.start, svs, log, env_extra)
+            hicdiffusion.write_map(job / hicdiffusion.MAP_FILE, region.chrom, Lift(svs).edge(region.start), cond)
+            hic = cond, region.start
         inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background, own)
         apply_overrides(inputs.config, validate_overrides(req.overrides))
         _status(job, stage="modelling", region=inputs.region, n_svs=inputs.n_svs, skipped_svs=skipped, loops=inputs.loops)

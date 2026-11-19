@@ -37,7 +37,7 @@ from .siteconfig import ConfigFile
 from .viewer import viewer_payload
 
 HERE = Path(__file__).resolve().parent
-FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|[A-Za-z0-9_.:-]+\.cif)$")
+FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|hicdiffusion\.bedpe|[A-Za-z0-9_.:-]+\.cif)$")
 
 
 class StripBase:
@@ -60,6 +60,17 @@ class StripBase:
 def create_app() -> FastAPI:
     s = Settings.from_env()
     catalog = Catalog.load(s.data_dir)
+    site_config = ConfigFile(s.site_config or s.data_dir / "config.json")
+
+    def max_span() -> int:
+        """The longest region of a job in bp, from config.json or else from MAX_REGION_MB."""
+        mb = site_config.get().region_mb
+        return s.max_span if mb is None else int(mb * 1_000_000)
+
+    def hicdiffusion_span() -> int:
+        """The longest region of a job with a HiCDiffusion background in bp."""
+        mb = site_config.get().hicdiffusion_mb
+        return HICDIFFUSION_SPAN if mb is None else int(mb * 1_000_000)
     sample_tables: dict[str, list[list[str]]] = {}
 
     def sample_rows(name: str) -> list[list[str]] | None:
@@ -103,7 +114,7 @@ def create_app() -> FastAPI:
                 "catalog": catalog,
                 "factors": FACTOR_CHOICES,
                 "retention": s.retention_days,
-                "max_region_mb": f"{s.max_span / 1e6:g}",
+                "max_region_mb": f"{max_span() / 1e6:g}",
                 "hicdiffusion_missing": hicdiffusion.missing(),
                 "error": error,
                 "v": values or {},
@@ -123,7 +134,11 @@ def create_app() -> FastAPI:
             self.field = field
 
     def create_job(fields: dict[str, str], vcf: bytes | Path | None) -> str:
-        """Checks a job request, queues the job unless the same one exists and returns its url.
+        """Checks a job request, queues its job and returns the url of the job.
+
+        A request on hosted data has a key. Without the field `fresh` the job of that key is
+        returned when the site holds one, which is how an example opens the same job for
+        everyone. With `fresh` set to 1 the request starts a job of its own.
 
         @param fields the form fields of a job request, overrides as JSON text
         @param vcf an uploaded VCF, which makes the job private. The field vcf_upload gives an
@@ -156,13 +171,13 @@ def create_app() -> FastAPI:
         if background not in BACKGROUNDS:
             raise JobError(f"unknown contact background {background!r}", "background")
         try:
-            r = parse_region(fields.get("region", ""), catalog.cell_types[base].genes(), s.max_span)
+            r = parse_region(fields.get("region", ""), catalog.cell_types[base].genes(), max_span())
         except RegionError as e:
             raise JobError(str(e), "region") from e
-        if background == "hicdiffusion" and r.end - r.start > HICDIFFUSION_SPAN:
+        if background == "hicdiffusion" and r.end - r.start > hicdiffusion_span():
             raise JobError(
-                f"{fields['region']!r} spans {r.end - r.start:,} bp. HiCDiffusion predicts up to {HICDIFFUSION_SPAN:,} bp. "
-                "Pick a region of up to 2 Mb, or the Hi-C of the cell type as the contact background.",
+                f"{fields['region']!r} spans {r.end - r.start:,} bp. HiCDiffusion predicts up to {hicdiffusion_span():,} bp. "
+                f"Pick a region of up to {hicdiffusion_span() / 1e6:g} Mb, or the Hi-C of the cell type as the contact background.",
                 "background",
             )
         if background == "hicdiffusion" and hicdiffusion.missing():
@@ -215,7 +230,12 @@ def create_app() -> FastAPI:
         job = shared / key
         st = job / "status.json"
         if st.is_file() and json.loads(st.read_text()).get("state") in ("running", "done", "queued"):
-            return f"/jobs/{key}"
+            if fields.get("fresh") != "1":
+                return f"/jobs/{key}"
+            # The first job of a request has the key of the request. A repeat has a key of its own.
+            key = secrets.token_hex(8)
+            job = shared / key
+            st = job / "status.json"
         job.mkdir(parents=True, exist_ok=True)
         write_json(st, {"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]})
         enqueue(s, req, job)
@@ -297,7 +317,7 @@ def create_app() -> FastAPI:
         if not text:
             return None
         genes = catalog.cell_types[cell].genes() if cell in catalog.cell_types else next(iter(catalog.cell_types.values())).genes()
-        r = parse_region(text, genes, s.max_span)
+        r = parse_region(text, genes, max_span())
         return (r.chrom, r.start, r.end)
 
     @app.post("/api/uploads")
@@ -370,7 +390,7 @@ def create_app() -> FastAPI:
     def api_variants_check(cell: str = Form(...), region: str = Form(...), factors: str = Form("CTCF"), sample: str = Form(...), haplotype: int = Form(0), upload: str = Form(""), sv_set: str = Form(""), own: str = Form("")) -> JSONResponse:  # noqa: PLR0913
         base = cell if cell in catalog.cell_types else next(iter(catalog.cell_types))
         try:
-            r = parse_region(region, catalog.cell_types[base].genes(), s.max_span)
+            r = parse_region(region, catalog.cell_types[base].genes(), max_span())
         except RegionError as e:
             return JSONResponse({"error": str(e), "field": "region"}, 400)
         if upload:
@@ -421,7 +441,7 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": f"unknown cell type {cell!r}"}, 404)
         genes = catalog.cell_types[cell].genes()
         try:
-            r = parse_region(q, genes, s.max_span)
+            r = parse_region(q, genes, max_span())
         except RegionError as e:
             return JSONResponse({"error": str(e)}, 400)
         hit = genes[genes["name"].str.upper() == q.strip().upper()]
@@ -439,7 +459,7 @@ def create_app() -> FastAPI:
         # The form draws the loops around a region as well, its own length on either side. The
         # preview takes three times the longest region a job may have.
         try:
-            r = parse_region(region, ct.genes(), 3 * s.max_span)
+            r = parse_region(region, ct.genes(), 3 * max_span())
         except RegionError as e:
             return JSONResponse({"error": str(e)}, 400)
         loops: dict[str, list[list[int]]] = {}
@@ -493,7 +513,7 @@ def create_app() -> FastAPI:
                 "ep": ep,
                 "private": kind == "private",
                 "retention": s.retention_days,
-                "max_region_mb": f"{s.max_span / 1e6:g}",
+                "max_region_mb": f"{max_span() / 1e6:g}",
             },
         )
 
@@ -575,7 +595,8 @@ def create_app() -> FastAPI:
                 for k, v in catalog.sv_sets.items()
             },
             "factors": list(FACTOR_CHOICES),
-            "max_region_mb": s.max_span / 1e6,
+            "max_region_mb": max_span() / 1e6,
+            "hicdiffusion_mb": hicdiffusion_span() / 1e6,
             "max_structures": s.max_structures,
             "hicdiffusion": not hicdiffusion.missing(),
         }
@@ -711,7 +732,6 @@ def create_app() -> FastAPI:
         return list_answer(shown, record) if record else JSONResponse({"error": NO_LIST}, 404)
 
     index_html = s.frontend_dist / "index.html"
-    site_config = ConfigFile(s.site_config or s.data_dir / "config.json")
     if (s.frontend_dist / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=s.frontend_dist / "assets"), name="assets")
 

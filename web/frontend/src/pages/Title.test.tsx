@@ -1,7 +1,8 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
-import { mockApi } from '../test/api'
+import { CATALOG, mockApi } from '../test/api'
 import { Layout } from '../components/Layout'
 import { ROUTES } from '../routes'
 import { checkCopy } from '../test/copy'
@@ -13,15 +14,18 @@ function Where() {
 }
 
 function renderTitle() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
-    <MemoryRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Title />} />
-          <Route path="*" element={<Where />} />
-        </Routes>
-      </Layout>
-    </MemoryRouter>,
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Title />} />
+            <Route path="*" element={<Where />} />
+          </Routes>
+        </Layout>
+      </MemoryRouter>
+    </QueryClientProvider>,
   )
 }
 
@@ -30,6 +34,13 @@ describe('Title page', () => {
     renderTitle()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('3D-GNOMENG')
     expect(screen.getByText(/computes 3D structures of genomic regions up to 20 Mb/)).toBeInTheDocument()
+  })
+
+  it('states the longest region the server allows', async () => {
+    mockApi([[/^\/api\/catalog$/, () => [200, { ...CATALOG, max_region_mb: 30 }]]])
+    renderTitle()
+    expect(await screen.findByText(/computes 3D structures of genomic regions up to 30 Mb/)).toBeInTheDocument()
+    vi.unstubAllGlobals()
   })
 
   it('links to the form and the results', () => {

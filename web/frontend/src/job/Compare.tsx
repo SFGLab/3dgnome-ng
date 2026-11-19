@@ -168,7 +168,7 @@ export function Compare({
   initial?: string | null
   onOther?: (url: string | null) => void
   /** Called with the gene of a clicked row of the table. Both sides then mark its pair. A click
-   * on the selected row, or on the link of the toolbar, calls it with null. */
+   * on the selected row, or on the button of the toolbar, calls it with null. */
   onGene?: (gene: string | null) => void
   onClose: () => void
 }) {
@@ -199,11 +199,11 @@ export function Compare({
           </label>
         )}
         {gene && onGene && (
-          <button type="button" className="link-button" onClick={() => onGene(null)}>
+          <button type="button" className="action" onClick={() => onGene(null)}>
             {`Clear the selection of ${gene}`}
           </button>
         )}
-        <button type="button" className="link-button" onClick={onClose}>
+        <button type="button" className="action" onClick={onClose}>
           Close the comparison
         </button>
       </div>

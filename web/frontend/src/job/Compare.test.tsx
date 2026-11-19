@@ -124,6 +124,8 @@ describe('Compare', () => {
     expect(onGene).toHaveBeenLastCalledWith(null)
     fireEvent.click(screen.getByRole('button', { name: 'Clear the selection of TNFRSF8' }))
     expect(onGene).toHaveBeenCalledTimes(2)
+    // Both are drawn as the buttons of the job page, not as links.
+    for (const name of ['Clear the selection of TNFRSF8', 'Close the comparison']) expect(screen.getByRole('button', { name })).toHaveClass('action')
   })
 
   it('keeps the ten largest changes in their order and puts a selected gene outside them first', () => {

@@ -1,7 +1,7 @@
 """Unit checks for the cell grid in the JAX smooth kernel: exact against the full scan, with
 prefetching and with the wall.
 
-    JAX_PLATFORMS=cuda python tests/unit/test_jax_grid.py
+    JAX_PLATFORMS=cuda pytest tests/unit/test_jax_grid.py
 
 Runs on a GPU only and is skipped on the CPU backend, which takes tens of minutes.
 """
@@ -9,17 +9,11 @@ Runs on a GPU only and is skipped on the CPU backend, which takes tens of minute
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
 
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
-import numpy as np  # noqa: E402
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-from test_smooth_levers import _jax_available, chain, check, settings, under  # noqa: E402
+import numpy as np
+from test_smooth_levers import _jax_available, chain, settings, under
 
 
 def compact_chain(n: int = 2500, seed: int = 0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -62,15 +56,13 @@ def test_grid_matches_full_scan() -> None:
             runs[grid] = (e, pos.copy())
         e0, p0 = runs[False]
         e1, p1 = runs[True]
-        check(
-            f"grid on and off follow the same trajectory (seed {seed})",
-            np.allclose(p0, p1, atol=1e-3),
-            f"max position difference {np.abs(p0 - p1).max():.2e}",
+        assert np.allclose(p0, p1, atol=1e-3), (
+            f"grid on and off follow the same trajectory (seed {seed})"
+            + ": "
+            + f"max position difference {np.abs(p0 - p1).max():.2e}"
         )
-        check(
-            f"and carry the same energy (seed {seed})",
-            abs(e0 - e1) <= 1e-3 * max(abs(e0), 1e-6),
-            f"full {e0:.5f}, grid {e1:.5f}",
+        assert abs(e0 - e1) <= 1e-3 * max(abs(e0), 1e-6), (
+            f"and carry the same energy (seed {seed})" + ": " + f"full {e0:.5f}, grid {e1:.5f}"
         )
 
 
@@ -111,25 +103,9 @@ def test_grid_with_prefetch_and_wall() -> None:
         ends = [under(np.asarray(o[1]), 0.7) for o in out]
         means[grid] = float(np.mean([float(o[0]) for o in out]))
         if grid:
-            check(
-                "grid with prefetch: the wall never lets the count rise in any chain",
-                all(e <= b for e, b in zip(ends, starts, strict=True)),
-                f"{starts} -> {ends}",
+            assert all(e <= b for e, b in zip(ends, starts, strict=True)), (
+                f"grid with prefetch: the wall never lets the count rise in any chain: {starts} -> {ends}"
             )
-    check(
-        "grid with prefetch: the mean final energy over seeds matches the full scan's",
-        abs(means[True] - means[False]) <= 0.5 * means[False],
-        f"full {means[False]:.4f}, grid {means[True]:.4f}",
+    assert abs(means[True] - means[False]) <= 0.5 * means[False], (
+        f"grid with prefetch: the mean final energy over seeds matches the full scan's: full {means[False]:.4f}, grid {means[True]:.4f}"
     )
-
-
-def main() -> int:
-    test_grid_matches_full_scan()
-    test_grid_with_prefetch_and_wall()
-    from test_smooth_levers import FAIL
-
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

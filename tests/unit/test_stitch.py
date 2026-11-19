@@ -2,30 +2,15 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from gnome3d.pipeline.stitch import (  # noqa: E402
+from gnome3d.pipeline.stitch import (
     _energy_grad,
     stitch_blocks,
     within_block_curve,
 )
-from gnome3d.settings import Settings  # noqa: E402
-from gnome3d.types import BeadOut  # noqa: E402
-
-PASS: list[str] = []
-FAIL: list[str] = []
-
-
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}{('  ' + detail) if detail else ''}")
-
+from gnome3d.settings import Settings
+from gnome3d.types import BeadOut
 
 D = 10.0
 TET = np.array([[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]], dtype=np.float64) * (
@@ -69,50 +54,44 @@ def centroid(bl: list[BeadOut]) -> np.ndarray:
 
 
 def test_curve() -> None:
-    print("\n[curve] the within block curve is read off the structure")
+    """The within block curve is read off the structure."""
     blocks = [block(0, np.zeros(3)), block(100_000, np.array([500.0, 0, 0]))]
     curve = within_block_curve(blocks)
-    check(
-        "flat structure gives a flat curve",
-        abs(curve(2_000) - D) < 1e-6 and abs(curve(3_000) - D) < 1e-6,
+    assert abs(curve(2_000) - D) < 1e-6 and abs(curve(3_000) - D) < 1e-6, (
+        "flat structure gives a flat curve"
     )
-    check("gaps beyond the sampled range clamp", abs(curve(50_000_000) - D) < 1e-6)
+    assert abs(curve(50_000_000) - D) < 1e-6, "gaps beyond the sampled range clamp"
 
 
 def test_boundary_lands_on_curve() -> None:
-    print("\n[boundary] adjacent edges are pulled onto the interior curve")
+    """Adjacent edges are pulled onto the interior curve."""
     blocks = [block(0, np.zeros(3)), block(100_000, np.array([500.0, 0, 0]))]
     before = edge_distance(blocks[0], blocks[1])
     out = stitch_blocks(blocks, settings())
     after = edge_distance(out[0], out[1])
-    check(
-        "edge distance moves from far to the curve",
-        before > 400 and abs(after - D) < 1e-3,
-        f"{before:.1f} -> {after:.4f}, target {D}",
+    assert before > 400 and abs(after - D) < 1e-3, (
+        f"edge distance moves from far to the curve: {before:.1f} -> {after:.4f}, target {D}"
     )
 
 
 def test_rigid() -> None:
-    print("\n[rigid] intra block geometry is untouched")
+    """Intra block geometry is untouched."""
     rng = np.random.default_rng(3)
     blocks = [block(i * 100_000, rng.normal(0, 300, 3)) for i in range(5)]
     out = stitch_blocks(blocks, settings())
     worst = max(
         float(np.abs(pairwise(a) - pairwise(b)).max()) for a, b in zip(blocks, out, strict=True)
     )
-    check("pairwise distances inside every block unchanged", worst < 1e-6, f"max drift {worst:.1e}")
-    check(
-        "bead count, ranges and kinds preserved",
-        all(
-            (a.start, a.end, a.kind) == (b.start, b.end, b.kind)
-            for x, y in zip(blocks, out, strict=True)
-            for a, b in zip(x, y, strict=True)
-        ),
-    )
+    assert worst < 1e-6, f"pairwise distances inside every block unchanged: max drift {worst:.1e}"
+    assert all(
+        (a.start, a.end, a.kind) == (b.start, b.end, b.kind)
+        for x, y in zip(blocks, out, strict=True)
+        for a, b in zip(x, y, strict=True)
+    ), "bead count, ranges and kinds preserved"
 
 
 def test_excluded_volume() -> None:
-    print("\n[ev] centroid excluded volume keeps non adjacent blocks apart")
+    """Centroid excluded volume keeps non adjacent blocks apart."""
     # A middle block of one anchor. Both springs want the edges of the outer blocks at D from one
     # point. Without excluded volume the outer blocks can fold onto each other.
     mid = [BeadOut(100_000, 100_500, 0.0, 0.0, 0.0, "anchor")]
@@ -121,20 +100,16 @@ def test_excluded_volume() -> None:
     held = stitch_blocks(blocks, settings(exclusion_radius_ib=8 * D, boundary_stitch_ev_weight=1.0))
     d_free = float(np.linalg.norm(centroid(free[0]) - centroid(free[2])))
     d_held = float(np.linalg.norm(centroid(held[0]) - centroid(held[2])))
-    check(
-        "outer blocks sit further apart with excluded volume on",
-        d_held > d_free + D,
-        f"{d_free:.2f} -> {d_held:.2f}",
+    assert d_held > d_free + D, (
+        f"outer blocks sit further apart with excluded volume on: {d_free:.2f} -> {d_held:.2f}"
     )
-    check(
-        "excluded volume did not detach the boundaries",
-        edge_distance(held[0], held[1]) < 4 * D and edge_distance(held[1], held[2]) < 4 * D,
-        f"{edge_distance(held[0], held[1]):.1f}, {edge_distance(held[1], held[2]):.1f}",
+    assert edge_distance(held[0], held[1]) < 4 * D and edge_distance(held[1], held[2]) < 4 * D, (
+        f"excluded volume did not detach the boundaries: {edge_distance(held[0], held[1]):.1f}, {edge_distance(held[1], held[2]):.1f}"
     )
 
 
 def test_per_pair_radius() -> None:
-    print("\n[radius] the excluded volume radius comes from the blocks' own size")
+    """The excluded volume radius comes from the blocks' own size."""
     # Each outer tetrahedron has an Rg of D * sqrt(3 / 8) = 6.12 and two of them touch at 12.2
     # apart.
     mid = [BeadOut(100_000, 100_500, 0.0, 0.0, 0.0, "anchor")]
@@ -142,33 +117,31 @@ def test_per_pair_radius() -> None:
     held = stitch_blocks(blocks, settings(exclusion_radius_ib=0.0, boundary_stitch_ev_weight=1.0))
     d = float(np.linalg.norm(centroid(held[0]) - centroid(held[2])))
     rg = float(np.sqrt(np.mean(np.sum((TET - TET.mean(axis=0)) ** 2, axis=1))))
-    check(
-        "outer blocks held at or beyond touching",
-        d > 0.9 * 2 * rg and d > 8.4,
-        f"{d:.2f}, touching {2 * rg:.2f}, old radius 8.4",
+    assert d > 0.9 * 2 * rg and d > 8.4, (
+        f"outer blocks held at or beyond touching: {d:.2f}, touching {2 * rg:.2f}, old radius 8.4"
     )
     fixed = stitch_blocks(
         blocks, settings(exclusion_radius_ib=4 * D, boundary_stitch_ev_weight=1.0)
     )
     d_fixed = float(np.linalg.norm(centroid(fixed[0]) - centroid(fixed[2])))
-    check(
-        "explicit exclusion_radius_ib still overrides", d_fixed > d + D, f"{d_fixed:.2f} vs {d:.2f}"
+    assert d_fixed > d + D, (
+        f"explicit exclusion_radius_ib still overrides: {d_fixed:.2f} vs {d:.2f}"
     )
 
 
 def test_pass_through() -> None:
-    print("\n[pass through] nothing to stitch")
+    """Nothing to stitch."""
     one = [block(0, np.array([7.0, 8.0, 9.0]))]
-    check("single block returned unchanged", stitch_blocks(one, settings()) == one)
+    assert stitch_blocks(one, settings()) == one, "single block returned unchanged"
     sub = [
         block(0, np.zeros(3), ("subanchor",) * 4),
         block(100_000, np.array([500.0, 0, 0]), ("subanchor",) * 4),
     ]
-    check("blocks without anchors returned unchanged", stitch_blocks(sub, settings()) == sub)
+    assert stitch_blocks(sub, settings()) == sub, "blocks without anchors returned unchanged"
 
 
 def test_gradient() -> None:
-    print("\n[gradient] the energy carries its own gradient")
+    """The energy carries its own gradient."""
     rng = np.random.default_rng(0)
     n = 7
     cen = rng.normal(0.0, 10.0, (n, 3))
@@ -188,7 +161,7 @@ def test_gradient() -> None:
         b[k] -= h
         fd = (_energy_grad(a, *args)[0] - _energy_grad(b, *args)[0]) / (2 * h)
         worst = max(worst, abs(fd - g[k]) / max(abs(fd), 1e-6))
-    check("it matches central differences", worst < 1e-5, f"worst relative {worst:.2e}")
+    assert worst < 1e-5, f"it matches central differences: worst relative {worst:.2e}"
 
 
 def test_many_blocks_converge() -> None:
@@ -207,33 +180,7 @@ def test_many_blocks_converge() -> None:
             for k in range(n - 1)
         ]
     )
-    check(
-        "every boundary lands on the curve",
-        float(np.median(ratio)) == 1.0 or abs(float(np.median(ratio)) - 1.0) < 0.05,
-        f"median ratio {np.median(ratio):.3f}, worst {np.max(np.abs(ratio - 1.0)):.3f} off",
+    assert float(np.median(ratio)) == 1.0 or abs(float(np.median(ratio)) - 1.0) < 0.05, (
+        f"every boundary lands on the curve: median ratio {np.median(ratio):.3f}, worst {np.max(np.abs(ratio - 1.0)):.3f} off"
     )
-    check(
-        "and none is left stranded",
-        float(np.max(ratio)) < 2.0,
-        f"max ratio {np.max(ratio):.3f}",
-    )
-
-
-def main() -> int:
-    print("boundary stitch checks")
-    test_curve()
-    test_boundary_lands_on_curve()
-    test_rigid()
-    test_excluded_volume()
-    test_per_pair_radius()
-    test_pass_through()
-    test_gradient()
-    test_many_blocks_converge()
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    for f in FAIL:
-        print(f"  failed: {f}")
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    assert float(np.max(ratio)) < 2.0, f"and none is left stranded: max ratio {np.max(ratio):.3f}"

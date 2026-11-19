@@ -3,26 +3,17 @@
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from gnome3d import reconstruct  # noqa: E402
-from gnome3d.pipeline.executor import ExecutorStrategy  # noqa: E402
-from gnome3d.pipeline.stage import StageKind  # noqa: E402
-from gnome3d.settings import Settings  # noqa: E402
-
-PASS: list[str] = []
-FAIL: list[str] = []
-
-
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}   {detail}")
+from gnome3d import reconstruct
+from gnome3d.pipeline.executor import ExecutorStrategy
+from gnome3d.pipeline.stage import StageKind
+from gnome3d.settings import Settings
 
 
 def strategy(kind: StageKind, value: str, workers: int, jax: bool) -> ExecutorStrategy:
@@ -33,23 +24,27 @@ def strategy(kind: StageKind, value: str, workers: int, jax: bool) -> ExecutorSt
     return reconstruct.stage_strategy(s, kind)
 
 
-def main() -> int:
+@pytest.fixture(scope="module", autouse=True)
+def shared() -> SimpleNamespace:
     T, B, S = ExecutorStrategy.THREADED, ExecutorStrategy.BATCH, ExecutorStrategy.SERIAL
     sm = StageKind.SMOOTH
-    check("auto smooth is threaded at 4 workers with JAX", strategy(sm, "auto", 4, True) == T)
-    check("auto smooth is threaded at 36 workers with JAX", strategy(sm, "auto", 36, True) == T)
-    check("auto smooth is the device at 3 workers with JAX", strategy(sm, "auto", 3, True) == B)
-    check("auto smooth is the device at 1 worker with JAX", strategy(sm, "auto", 1, True) == B)
-    check("auto smooth is threaded at 2 workers without JAX", strategy(sm, "auto", 2, False) == T)
-    check("auto smooth is serial at 1 worker without JAX", strategy(sm, "auto", 1, False) == S)
-    check("a named executor is kept", strategy(sm, "batch", 36, True) == B)
-    check("a named executor is kept at one worker", strategy(sm, "threaded", 1, True) == T)
+    return SimpleNamespace(sm=sm, T=T, B=B, S=S)
+
+
+def test_auto_smooth_is_threaded_at_4_workers_with_jax(shared: SimpleNamespace) -> None:
+    sm, T, B, S = shared.sm, shared.T, shared.B, shared.S
+    assert strategy(sm, "auto", 4, True) == T, "auto smooth is threaded at 4 workers with JAX"
+    assert strategy(sm, "auto", 36, True) == T, "auto smooth is threaded at 36 workers with JAX"
+    assert strategy(sm, "auto", 3, True) == B, "auto smooth is the device at 3 workers with JAX"
+    assert strategy(sm, "auto", 1, True) == B, "auto smooth is the device at 1 worker with JAX"
+    assert strategy(sm, "auto", 2, False) == T, "auto smooth is threaded at 2 workers without JAX"
+    assert strategy(sm, "auto", 1, False) == S, "auto smooth is serial at 1 worker without JAX"
+    assert strategy(sm, "batch", 36, True) == B, "a named executor is kept"
+    assert strategy(sm, "threaded", 1, True) == T, "a named executor is kept at one worker"
+
+
+def test_auto_estimate_stays_on_the_device_with_jax(shared: SimpleNamespace) -> None:
+    B, T = shared.B, shared.T
     est = StageKind.ESTIMATE_DIST
-    check("auto estimate stays on the device with JAX", strategy(est, "auto", 36, True) == B)
-    check("auto arcs is threaded with workers", strategy(StageKind.ARCS, "auto", 36, True) == T)
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+    assert strategy(est, "auto", 36, True) == B, "auto estimate stays on the device with JAX"
+    assert strategy(StageKind.ARCS, "auto", 36, True) == T, "auto arcs is threaded with workers"

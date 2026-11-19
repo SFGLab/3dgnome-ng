@@ -3,27 +3,14 @@
 from __future__ import annotations
 
 import os
-import sys
-from pathlib import Path
 
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
-import numpy as np  # noqa: E402
+import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from gnome3d.mc.numba import seed_numba  # noqa: E402
-from gnome3d.mc.numba.arcs import mc_arcs_numba  # noqa: E402
-from gnome3d.settings import Settings  # noqa: E402
-
-PASS: list[str] = []
-FAIL: list[str] = []
-
-
-def check(name: str, cond: bool, detail: str = "") -> None:
-    (PASS if cond else FAIL).append(name)
-    mark = "\033[32mPASS\033[0m" if cond else "\033[31mFAIL\033[0m"
-    print(f"  {mark}  {name}" + (f"   {detail}" if detail else ""))
+from gnome3d.mc.numba import seed_numba
+from gnome3d.mc.numba.arcs import mc_arcs_numba
+from gnome3d.settings import Settings
 
 
 def block(n: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
@@ -60,13 +47,11 @@ def run(ratio: float | None) -> tuple[float, np.ndarray]:
 
 
 def test_default_matches_the_hardcoded_value() -> None:
-    check("the default is the value that was hardcoded", Settings().mc_stop_ratio_arcs == 0.9999)
+    assert Settings().mc_stop_ratio_arcs == 0.9999, "the default is the value that was hardcoded"
     a_score, a_pos = run(None)
     b_score, b_pos = run(0.9999)
-    check(
-        "setting it to the default changes nothing",
-        a_score == b_score and np.array_equal(a_pos, b_pos),
-        f"{a_score:.6f} vs {b_score:.6f}",
+    assert a_score == b_score and np.array_equal(a_pos, b_pos), (
+        f"setting it to the default changes nothing: {a_score:.6f} vs {b_score:.6f}"
     )
 
 
@@ -89,27 +74,7 @@ def test_the_knob_reaches_the_kernel() -> None:
             rounds[ratio] = len(buf.getvalue().splitlines())
     finally:
         lg.removeHandler(h)
-    check(
-        "a ratio the first round already exceeds stops there",
-        rounds[0.5] == 1,
-        f"{rounds[0.5]} rounds",
+    assert rounds[0.5] == 1, (
+        f"a ratio the first round already exceeds stops there: {rounds[0.5]} rounds"
     )
-    check(
-        "the production ratio runs on",
-        rounds[0.9999] > 10,
-        f"{rounds[0.9999]} rounds",
-    )
-
-
-def main() -> int:
-    print("arcs convergence ratio checks\n")
-    test_default_matches_the_hardcoded_value()
-    test_the_knob_reaches_the_kernel()
-    print(f"\n{len(PASS)} passed, {len(FAIL)} failed")
-    for f in FAIL:
-        print(f"  failed: {f}")
-    return 1 if FAIL else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    assert rounds[0.9999] > 10, f"the production ratio runs on: {rounds[0.9999]} rounds"
