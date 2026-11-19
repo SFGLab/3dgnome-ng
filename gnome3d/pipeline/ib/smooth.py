@@ -62,6 +62,23 @@ def _assemble_beads(
     ]
 
 
+def centre_beads(fixed: BoolArray) -> BoolArray:
+    """Returns the fixed beads that move under `anchor_centre`, each with the bead before it and
+    the bead after it.
+
+    Such a bead is not at an end of the chain, neither of its neighbours is fixed and it is three
+    beads or more from the bead of the rule before it. No bead then belongs to two of them.
+    """
+    n = int(fixed.shape[0])
+    out: BoolArray = np.zeros(n, dtype=np.bool_)
+    last = -3
+    for b in np.flatnonzero(fixed):
+        if 1 <= b <= n - 2 and not fixed[b - 1] and not fixed[b + 1] and b - last >= 3:
+            out[b] = True
+            last = int(b)
+    return out
+
+
 def run_smooth_batch(expanded: list[Problem], s: Settings) -> list[Result]:
     """Runs one batched smooth launch."""
     from gnome3d.mc import jax as mc_jax
@@ -74,6 +91,12 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     noised restarts. Returns one `(score, pos)` per problem.
     """
     s = problems[0]["settings"]
+    if s.smooth_anchor_centre:
+        raise ValueError(
+            "[simulation_arcs_smooth] anchor_centre is on and the smooth stage runs on the batch"
+            " executor, whose kernel has no move of three beads. Set [simulation_backend]"
+            " mc_executor_smooth to threaded or serial."
+        )
     n_restarts = max(1, int(s.steps_smooth))
 
     expanded: list[Problem] = []
@@ -146,6 +169,8 @@ def _run(problem: Problem) -> Result:
     heat = problem["heat_dist"]
     comp = problem["compartment"]
 
+    centre = centre_beads(fixed) if s.smooth_anchor_centre else None
+
     seed_rng(seed)
     mc_numba.seed_numba(seed)
 
@@ -155,7 +180,7 @@ def _run(problem: Problem) -> Result:
         pos_run: F32Array = best_pos.copy()
         add_movable_noise_inplace(pos_run, fixed, step)
         score = mc_numba.mc_smooth_numba(
-            pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat, comp
+            pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat, comp, centre=centre
         )
         if score < best_score or best_score < 0.0:
             best_score = score

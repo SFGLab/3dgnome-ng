@@ -108,10 +108,19 @@ The arcs stage owns the positions of the nodes. Three arms state the freedom of 
 |---|---|
 | Fixed | A node does not move in the smooth stage |
 | Bounded drift | A node moves inside a sphere of a stated radius around its arcs position and a move that leaves the sphere is refused. `smooth_anchor_cap` is this rule |
-| Centre of mass kept | The centre of mass of the beads of each span stays as it is at the start of the stage. A move of one bead of a span by a vector moves another bead of the same span by the opposite vector. A bead under several spans moves only with a partner under the same spans. A span of one bead does not move |
+| Centre of mass kept | The centre of mass of a node, the bead before it and the bead after it stays as it is at the start of the stage. `anchor_centre` is this rule |
 
 No arm has a penalty with a weight between the two stages. Every bead that is not a node moves freely, with the other
 beads of a wide span among them.
+
+The maintainer chose the centre of mass of the node and its two neighbours on 2026-11-19, in place of that of the
+span: a loop acts on one bead, three spans of four are one bead, and the centre of mass of a span at the start of
+the stage is set by the start chain. Under the rule the three beads have two moves. The node moves by the draw and
+its two neighbours by minus half of it each. A neighbour moves by the draw and the other neighbour by minus it.
+Neither neighbour moves alone. A node at an end of the chain, a node beside another node and a node closer than
+three beads to the node of the rule before it stay fixed. Those three cases are the assistant's choice: the centres
+of mass of two nodes that share a bead cannot both stay under moves of three beads. On chr1 108.5 to 111 Mb half of
+the consecutive nodes are one bond apart.
 
 The cross block relaxation follows the arm of the smooth stage. It reads the nodes from the pipeline and not from
 the kind of the output bead.
@@ -168,7 +177,9 @@ and against the first build.
 State on 2026-11-19: stage 1 is built. The joint solve runs on the nodes with the reach spring, the excluded
 volume at the radius of a bead and the contact cells of `gnome3d/pipeline/ib/cells.py`. The nodes are the fixed
 beads of the smooth stage and of the relaxation, and the first build is removed. `design/features.md` has the first
-numbers. The contact cells are not yet measured on a deep map.
+numbers. Stage 2 is built: bounded drift is `anchor_cap`, which the uniform chain runs as it is, and the centre of
+mass rule is a move of three beads of the numba kernel, `step_delta_nb` and `batch_mc_nb` in
+`gnome3d/mc/numba/terms.py`. The JAX kernel does not have it.
 
 ### Trial of stage 1 without the contact cells
 
@@ -252,7 +263,7 @@ A setting is added when a run reads it.
 - `[main] uniform_chain` selects the chain.
 - `[main] contact_bead` is the draw, uniform or midpoint.
 - Bounded drift is `[simulation_arcs_smooth] anchor_cap`, which exists.
-- The centre of mass arm needs one key.
+- The centre of mass arm is `[simulation_arcs_smooth] anchor_centre`.
 
 ## The first build
 

@@ -109,6 +109,7 @@ class Settings:
     steps_smooth: int
     smooth_hard_wall: bool
     smooth_anchor_cap: float
+    smooth_anchor_centre: bool
     smooth_start: str
     smooth_prefetch: int
     smooth_jax_grid: bool
@@ -355,6 +356,7 @@ class Settings:
         self.noise_smooth = 0.5
         self.smooth_hard_wall = False
         self.smooth_anchor_cap = 0.0
+        self.smooth_anchor_centre = False
         self.smooth_start = "line"
         self.smooth_prefetch = 1
         self.smooth_jax_grid = False
@@ -970,6 +972,15 @@ class Settings:
         self.smooth_anchor_cap = getf(
             "simulation_arcs_smooth", "anchor_cap", self.smooth_anchor_cap
         )
+        self.smooth_anchor_centre = getb(
+            "simulation_arcs_smooth", "anchor_centre", self.smooth_anchor_centre
+        )
+        if self.smooth_anchor_centre and self.smooth_anchor_cap > 0.0:
+            raise ValueError(
+                "[simulation_arcs_smooth] anchor_centre is on with anchor_cap above zero. Each is"
+                " one rule for the fixed beads of the smooth stage. Set anchor_cap to 0 or"
+                " anchor_centre to no."
+            )
         self.smooth_start = gets("simulation_arcs_smooth", "start", self.smooth_start)
         self.smooth_prefetch = geti("simulation_arcs_smooth", "prefetch", self.smooth_prefetch)
         if self.smooth_prefetch < 1:

@@ -178,6 +178,7 @@ before nor accepted `stop_condition_successes_threshold` moves.
 | `angle_weight` | float | 1.0 | 1.0 | Weight of the bend term. |
 | `hard_wall` | bool | no | yes | Rejects a move that puts a pair of non neighbours under the excluded volume radius or brings such a pair closer. The count of these pairs can only fall. |
 | `anchor_cap` | float | 0.0 | 0.0 | Lets the anchors move up to this many mean bonds from their position after the arcs stage. 0 keeps them fixed. |
+| `anchor_centre` | bool | no | no | Lets a fixed bead of the smooth stage move with the bead before it and the bead after it. The bead moves by the draw and its two neighbours by minus half of it each, or a neighbour moves by the draw and the other neighbour by minus it. The centre of mass of the three stays where it was at the start of the stage. A fixed bead at an end of the chain, beside another fixed bead or closer than three beads to the fixed bead of the rule before it stays fixed. The numba executors run it. Not with `anchor_cap`. Under measurement on the uniform chain. |
 | `prefetch` | int | 1 | 32 | Number of proposals that one step of the JAX kernel evaluates against the current state. The first accepted in draw order is kept. Numba ignores it. |
 | `jax_grid` | bool | no | yes | Puts the excluded volume and the wall of the JAX kernel on a cell grid. A proposal then visits the 27 cells around it in place of every bead, with the same result. |
 | `jax_grid_min_beads` | int | 4096 | 4096 | The grid is used on launches whose padded bead count reaches this value. |

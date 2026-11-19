@@ -640,6 +640,10 @@ def init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float
 # Heat, orientation, excluded volume and compartment add 2 * (curr - prev). Confinement adds (curr -
 # prev).
 #
+# Under `use_centre` a node keeps the centre of mass of itself, the bead before it and the bead
+# after it. `centre_of` gives that node for each of the three beads, -1 for any other bead.
+# `site_of` gives the orientation site at a bead, -1 for none.
+#
 # A move is kept when `score_new < score` under `strict_better` and when `score_new <= score`
 # otherwise. Smooth is strict.
 
@@ -787,6 +791,158 @@ def init_excl_cells_nb(
 
 
 @njit(cache=True, fastmath=True, nogil=True)
+def step_delta_nb(
+    pos: F64Array,
+    p: int,
+    dx: float,
+    dy: float,
+    dz: float,
+    dtn: F64Array,
+    stretch_k: float,
+    squeeze_k: float,
+    ang_k: float,
+    dist_w: float,
+    ang_w: float,
+    use_heat: bool,
+    heat_dist: F64Array,
+    heat_weight: float,
+    use_excl: bool,
+    excl_r0: float,
+    excl_weight: float,
+    excl_skip: int,
+    use_conf: bool,
+    conf_cx: float,
+    conf_cy: float,
+    conf_cz: float,
+    conf_R: float,
+    conf_weight: float,
+    use_comp: bool,
+    comp_cls: I8Array,
+    comp_r0: float,
+    comp_weight: float,
+    comp_ea: float,
+    comp_eb: float,
+    use_cells: bool,
+    cell_lo: F64Array,
+    cell_dim: I64Array,
+    cell_size: float,
+    cell_head: I32Array,
+    cell_next: I32Array,
+    cell_where: I32Array,
+    cell_buf: I32Array,
+    use_wall: bool,
+) -> tuple[float, float, float, float, float, int, float]:
+    """Moves bead p of a chain by (dx, dy, dz) in place and returns the changes that the move
+    makes: of the structure, heat, excluded volume, confinement and compartment scores, of the
+    count of pairs under the wall radius and of their summed depth.
+
+    The changes of several beads moved one after another sum to the change of the whole move.
+    The cell grid follows the bead.
+    """
+    n = pos.shape[0]
+    s0 = local_smooth_nb(pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
+    h0 = 0.0
+    if use_heat:
+        h0 = local_heat_nb(pos, heat_dist, p, heat_weight)
+    e0 = 0.0
+    if use_excl:
+        if use_cells:
+            e0 = local_excl_cells_nb(
+                pos,
+                p,
+                excl_r0,
+                excl_weight,
+                excl_skip,
+                cell_lo,
+                cell_dim,
+                cell_size,
+                cell_head,
+                cell_next,
+                cell_buf,
+            )
+            if e0 < 0.0:
+                e0 = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+        else:
+            e0 = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+    cnt0 = 0
+    dep0 = 0.0
+    if use_wall:
+        if use_cells:
+            cnt0, dep0 = _wall_local_cells_nb(
+                pos, p, excl_r0, excl_skip, cell_lo, cell_dim, cell_size, cell_head, cell_next
+            )
+        else:
+            cnt0, dep0 = _wall_local_nb(pos, p, excl_r0, excl_skip)
+    c0 = 0.0
+    if use_conf:
+        c0 = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight)
+    a0 = 0.0
+    if use_comp:
+        a0 = local_affinity_nb(pos, p, use_comp, comp_cls, comp_r0, comp_weight, comp_ea, comp_eb)
+
+    pos[p, 0] += dx
+    pos[p, 1] += dy
+    pos[p, 2] += dz
+    if use_cells:
+        relink_nb(
+            cell_head,
+            cell_next,
+            cell_where,
+            p,
+            cell_of_nb(pos[p, 0], pos[p, 1], pos[p, 2], cell_lo, cell_dim, cell_size),
+        )
+
+    s1 = local_smooth_nb(pos, dtn, p, n, stretch_k, squeeze_k, ang_k, dist_w, ang_w)
+    h1 = 0.0
+    if use_heat:
+        h1 = local_heat_nb(pos, heat_dist, p, heat_weight)
+    e1 = 0.0
+    if use_excl:
+        if use_cells:
+            e1 = local_excl_cells_nb(
+                pos,
+                p,
+                excl_r0,
+                excl_weight,
+                excl_skip,
+                cell_lo,
+                cell_dim,
+                cell_size,
+                cell_head,
+                cell_next,
+                cell_buf,
+            )
+            if e1 < 0.0:
+                e1 = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+        else:
+            e1 = _local_excl_nb(pos, p, excl_r0, excl_weight, excl_skip)
+    cnt1 = 0
+    dep1 = 0.0
+    if use_wall:
+        if use_cells:
+            cnt1, dep1 = _wall_local_cells_nb(
+                pos, p, excl_r0, excl_skip, cell_lo, cell_dim, cell_size, cell_head, cell_next
+            )
+        else:
+            cnt1, dep1 = _wall_local_nb(pos, p, excl_r0, excl_skip)
+    c1 = 0.0
+    if use_conf:
+        c1 = _local_confine_nb(pos, p, conf_cx, conf_cy, conf_cz, conf_R, conf_weight)
+    a1 = 0.0
+    if use_comp:
+        a1 = local_affinity_nb(pos, p, use_comp, comp_cls, comp_r0, comp_weight, comp_ea, comp_eb)
+    return (
+        s1 - s0,
+        2.0 * (h1 - h0),
+        2.0 * (e1 - e0),
+        c1 - c0,
+        2.0 * (a1 - a0),
+        cnt1 - cnt0,
+        dep1 - dep0,
+    )
+
+
+@njit(cache=True, fastmath=True, nogil=True)
 def batch_mc_nb(
     pos: F64Array,
     movable: I64Array,
@@ -866,8 +1022,14 @@ def batch_mc_nb(
     cap_r: F64Array = NO_F64,
     use_arc_w: bool = False,
     arc_w: F32Array = NO_W,
+    use_centre: bool = False,
+    centre_of: I32Array = NO_I32,
+    site_of: I32Array = NO_I32,
 ) -> tuple[float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
+    moves = np.zeros(3)
+    site_k = np.full(3, -1, dtype=np.int32)
+    site_old = np.zeros((3, 3))
     n_mov = movable.shape[0]
     n_ok = 0
     wall_cnt0 = 0
@@ -879,6 +1041,154 @@ def batch_mc_nb(
         dx = np.random.uniform(-step_size, step_size)
         dy = np.random.uniform(-step_size, step_size)
         dz = np.random.uniform(-step_size, step_size)
+
+        if use_centre and centre_of[p] >= 0:
+            # The bead belongs to a node that keeps the centre of mass of itself, the bead before
+            # it and the bead after it. The node moves by the draw and its two neighbours by
+            # minus half of it. A neighbour moves by the draw and the other neighbour by minus
+            # it. The single moves of the three beads sum to the change of the whole move. The
+            # sites at the node and two beads from it read a moved bead.
+            c = int(centre_of[p])
+            d_struct = 0.0
+            d_heat = 0.0
+            d_excl = 0.0
+            d_conf = 0.0
+            d_comp = 0.0
+            d_cnt = 0
+            d_dep = 0.0
+            for part in range(3):
+                q = c - 1 + part
+                if p == c:
+                    f = 1.0 if part == 1 else -0.5
+                elif q == p:
+                    f = 1.0
+                elif q == c:
+                    f = 0.0
+                else:
+                    f = -1.0
+                moves[part] = f
+                if f == 0.0:
+                    continue
+                ds, dh, de, dc, da, dn, dd = step_delta_nb(
+                    pos,
+                    q,
+                    f * dx,
+                    f * dy,
+                    f * dz,
+                    dtn,
+                    stretch_k,
+                    squeeze_k,
+                    ang_k,
+                    dist_w,
+                    ang_w,
+                    use_heat,
+                    heat_dist,
+                    heat_weight,
+                    use_excl,
+                    excl_r0,
+                    excl_weight,
+                    excl_skip,
+                    use_conf,
+                    conf_cx,
+                    conf_cy,
+                    conf_cz,
+                    conf_R,
+                    conf_weight,
+                    use_comp,
+                    comp_cls,
+                    comp_r0,
+                    comp_weight,
+                    comp_ea,
+                    comp_eb,
+                    use_cells,
+                    cell_lo,
+                    cell_dim,
+                    cell_size,
+                    cell_head,
+                    cell_next,
+                    cell_where,
+                    cell_buf,
+                    use_wall,
+                )
+                d_struct += ds
+                d_heat += dh
+                d_excl += de
+                d_conf += dc
+                d_comp += da
+                d_cnt += dn
+                d_dep += dd
+            d_orn = 0.0
+            for part in range(3):
+                site_k[part] = -1
+                bead = c - 2 + 2 * part
+                if use_orn and 0 <= bead < n:
+                    site_k[part] = site_of[bead]
+                k = site_k[part]
+                if k < 0:
+                    continue
+                site_old[part, 0] = anchor_orn[k, 0]
+                site_old[part, 1] = anchor_orn[k, 1]
+                site_old[part, 2] = anchor_orn[k, 2]
+                before = _local_score_orientation_nb(
+                    anchor_orn, k, nbr_offsets, nbr_indices, nbr_weights, motif_weight,
+                    motifs_symmetric,
+                )  # fmt: skip
+                ar_k = int(anchor_ar[k])
+                ox, oy, oz = _calc_orientation_nb(pos, ar_k, n, bool(orn_is_L[ar_k]))
+                anchor_orn[k, 0] = ox
+                anchor_orn[k, 1] = oy
+                anchor_orn[k, 2] = oz
+                after = _local_score_orientation_nb(
+                    anchor_orn, k, nbr_offsets, nbr_indices, nbr_weights, motif_weight,
+                    motifs_symmetric,
+                )  # fmt: skip
+                d_orn += 2.0 * (after - before)
+
+            score_new = score + d_struct + d_heat + d_excl + d_conf + d_comp + d_orn
+            if use_wall and (d_cnt > 0 or (d_cnt == 0 and d_dep > 0.0)):
+                ok = False
+            else:
+                ok = score_new < score if strict_better else score_new <= score
+                if not ok and T > 0.0 and score > 0.0:
+                    ok = np.random.random() < jump_scale * math.exp(
+                        -jump_coef * (score_new / score) / T
+                    )
+            if ok:
+                n_ok += 1
+                score = score_new
+                score_struct += d_struct
+                score_heat += d_heat
+                score_excl += d_excl
+                score_conf += d_conf
+                score_comp += d_comp
+                score_orn += d_orn
+            else:
+                for part in range(3):
+                    f = moves[part]
+                    if f == 0.0:
+                        continue
+                    q = c - 1 + part
+                    pos[q, 0] -= f * dx
+                    pos[q, 1] -= f * dy
+                    pos[q, 2] -= f * dz
+                    if use_cells:
+                        relink_nb(
+                            cell_head,
+                            cell_next,
+                            cell_where,
+                            q,
+                            cell_of_nb(
+                                pos[q, 0], pos[q, 1], pos[q, 2], cell_lo, cell_dim, cell_size
+                            ),
+                        )
+                for part in range(3):
+                    k = site_k[part]
+                    if k >= 0:
+                        anchor_orn[k, 0] = site_old[part, 0]
+                        anchor_orn[k, 1] = site_old[part, 1]
+                        anchor_orn[k, 2] = site_old[part, 2]
+            T *= dt
+            continue
 
         if struct_type == STRUCT_ARCS:
             loc_struct_prev = _local_arcs_nb(
