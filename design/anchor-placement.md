@@ -6,7 +6,7 @@ which changes are worth making.
 
 Status, 2026-09-11. The arcs stage now solves every anchor of a chromosome together from a
 Hilbert curve start, so the between block placement this note is about is no longer left to
-the stitch: see `ab-compartments.md` for the measurements and AGENTS.md for the entry. What
+the stitch: see `ab-compartments.md` for the measurements and `features.md` for the entry. What
 follows is the history that led there.
 
 Status, 2026-09-06. Diagnosis complete. B, the boundary stitch, converges and removes the strands between
@@ -1250,7 +1250,7 @@ stitch, option E.
 | boundary jump at 562 kb to 1 Mb | `playground/boundary_wide.py` | 33 | 59, with stitch 0.98 |
 | block layout exponent, coarse | `playground/ib_confine_ablate.py` | 0.021 | 0.214 |
 | enhancer promoter expression | `enhancer3d/playground/beyond_linear.py` | 86 percent of v4 | not yet run |
-| byte exact parity, flag off | see AGENTS.md parity gate | must stay identical | |
+| byte exact parity, flag off | see the byte exactness gate of AGENTS.md | must stay identical | |
 
 Targets are 0.285 for the two exponents and 0.86 for the contact probability slope, from the
 Hi-C. The jump should approach 1.
@@ -1258,7 +1258,7 @@ Hi-C. The jump should approach 1.
 ## Decisions worth making before building
 
 - A and B are divergences from the reference and from cudaMMC. They must be opt in, default
-  off, and recorded in the AGENTS.md divergences section. The parity baseline does not move.
+  off, and recorded in `features.md`. The parity baseline does not move.
 - The packing factor change is configuration, not code, and moves no parity baseline. Whether it
   should be 0.75 or 1.0 is decided by segments with many blocks, not by the 60 Mb region.
 - Better geometry may not improve the expression statistic. If that happens it should be

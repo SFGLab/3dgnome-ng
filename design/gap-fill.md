@@ -9,7 +9,7 @@ hole has no beads at all. Holes are 13 percent of chr1, mostly B compartment, an
 
 Two trials on 2026-11-13 aimed every conformation at the law's mean distance, a spring on bead
 pairs in the smooth stage and a start that matched the law bead by bead. Both lost Pearson and
-MultiMM on every region, recorded in the AGENTS.md divergences. The smooth stage holds bonds and
+MultiMM on every region, recorded in `features.md`. The smooth stage holds bonds and
 nothing inside a gap, and a gap ended at the size its start gave it, 1.2 times the law under
 `start = law`. A contact map is an average over cells, and contacts come from the spread between
 conformations. One structure at the mean has no spread.

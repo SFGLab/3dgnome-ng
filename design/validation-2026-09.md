@@ -138,7 +138,7 @@ pair only ever pulls in, since a pair under expected keeps the repulsion, so Rg 
 20 percent whatever the threshold, the exponent sits under the fit until z 8, overlaps rise
 two to eight times and the saddle falls. Pairs held per band at z 12 run 55,000 under
 500 kb, 49,000 to 2 Mb, 35,000 to 10 Mb and 29,000 beyond. The long loops over 1 Mb added to
-the joint solve were a loss on their own and are dropped, see AGENTS.md.
+the joint solve were a loss on their own and are dropped, see `features.md`.
 
 `contact_map_symmetric` holds pairs significantly under expected farther out as well, at the
 same law. Three structures per arm, pooled:

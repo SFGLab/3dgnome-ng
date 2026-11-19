@@ -1,381 +1,133 @@
-# 3dgnome-ng: Agent Guide
+# 3D-GNOME NG: agent guide
 
-## Project Goal
+## The project
 
-Python reimplementation of the Monte Carlo core of **3dgnome**. The reference implementation in `legacy/3dnome/MC/` is a ~6,400 line simulation that predicts 3D chromosome structure from ChIA-PET and Hi-C contact frequency data. The reimplementation lives in `gnome3d/` and reproduced the reference algorithm as its starting point. MC kernels run on CPU via Numba. A jax path batches regions on the GPU for the genome scale run. Torch is used for GPU device detection.
+3D-GNOME NG predicts the 3D structure of chromosomes from ChIA-PET loops and Hi-C contacts. It returns an ensemble of
+bead chains as mmCIF files, one bead per kilobase by default. The Python package is `gnome3d`. Its kernels run on
+the CPU through numba and on a GPU through JAX. The site under `web/` runs the same package.
 
-Do **not** modify anything inside `legacy/3dnome/`. That directory is the reference implementation - read it, never change it.
+The model began as a port of the Monte Carlo core of 3D-GNOME and is its own code now. It keeps none of the settings
+or distance laws of 3D-GNOME. It keeps the ability to reproduce the results of 3D-GNOME, judged by the validation
+battery. The old code is under `legacy/` and is not developed.
 
-### Terminology
-
-In a design note `legacy/3dnome/MC/` is "the reference" or "the reference implementation", not "C++". Code, comments,
-docstrings and messages under `gnome3d/`, `tests/` and `web/` do not mention it. The model is its own code since
-2026-11-19 and a comment describes what the code does, not what it was ported from.
-
-### Status: results parity, not settings parity
-
-The Python port reached algorithmic parity with the reference and that work is documented and
-frozen in git history. As of 2026-09-06 the project no longer keeps the reference's settings
-or its distance laws. What it keeps is the ability to replicate the reference's results, and
-that is judged by the validation battery, Hi-C correlation, the distance exponent and the
-overlap counts, not by matching the reference's numbers bit for bit.
-
-Rules for the code as it stands:
-
-- **Every physical constant is either measured from the run's own input at load time, or a
-  documented choice with its provenance beside it.** Nothing tuned on this project's datasets
-  becomes a default that silently applies to another. When a measurement cannot be made the
-  run says so in an always visible line and names the fallback.
-- **A setting exists because a run reads it.** A key nothing consults is deleted, not kept for
-  the reference's sake. `SETTINGS.md` is the reference. `tests/unit/test_settings_doc.py`
-  checks every row against the loader, the defaults and the production config, both ways,
-  and runs before any commit that touches settings.
-- **Features are opt in while they are being measured, and become the law once the battery
-  says so.** The old path is then deleted rather than kept behind a flag.
-- **A change meant to be inert is proved inert.** `playground/parity_dump.py` reconstructs one
-  region at the previous commit and on the working tree and compares coordinates exactly. It
-  is the regression tool for refactors, not a contract with the reference.
-- Inside a feature's own code, document any non-obvious behavior; project memory (`[[…]]`
-  links) carries the longer-form rationale.
-- **Where things stand is `SETTINGS.md`'s production column and `gnome3d/production.py`.**
-  The design notes under `design/` record why: `anchor-placement.md` for the distance law and
-  the end passes, `ab-compartments.md` for the compartment work, the chromosome scope and the
-  Hilbert start. Accessibility and nucleus terms were removed on 2026-09-11 after measuring
-  null or harmful; do not reintroduce them without a new idea.
-
----
-
-## Repository Layout
+## Layout
 
 ```
-3dgnome-torch/
-├── gnome3d/                    # Python implementation. MC kernels run on CPU via Numba
-│   ├── simulate.py             # Public reconstruction entry point
-│   ├── reconstruct.py          # The self-expanding task DAG
-│   ├── pipeline/               # Per-stage kernels (coarse, ib)
-│   ├── mc/                     # numba and jax MC kernels (numba/, jax/)
-│   ├── production.py           # The production configuration, CANONICAL and settings_for_cell
-│   ├── settings.py data.py hierarchy.py io.py util.py types.py tracks.py skeleton.py
-├── tests/                      # pytest suite
-│   ├── unit/                   # One file per feature, each also runs as a script
-│   └── integration/            # Whole pipeline on synthetic inputs and on one real region
-├── legacy/                     # Retired code, kept runnable
-│   ├── 3dnome/MC/              # Reference implementation (read only)
-│   │   ├── LooperSolver.cpp/h  # Main solver, all MC loops are here
-│   │   └── ...                 # Chromosome, Heatmap, InteractionArcs, Cluster, lib/
-│   ├── harness/                # integration.py, the reference runner, and tests of playground scripts
-│   └── validation/             # Metrics, studies, the fetch and tracks commands, manifests
-├── data/                       # Input datasets (GM12878, H1ESC, HFFC6). _hic holds 4DN mcools
-├── design/                     # Public design notes and documentation, results under figures/
-├── docs/                       # Private notes, gitignored. Anything personal, quoted or about infrastructure
-├── pyproject.toml              # gnome3d-torch, [validation] extra for the validation package
-├── SETTINGS.md                 # Every config key, default, production value and meaning
-└── AGENTS.md                   # This file
+gnome3d/            the model
+  simulate.py       entry points: simulate, run_region, run_genome
+  cli.py            the gnome3d-ng command
+  production.py     the production configuration, CANONICAL and settings_for_cell
+  settings.py       the loader of every config key
+  data.py io.py     input data and file formats
+  polymer.py        the distance law and its fits
+  hierarchy.py      the cluster tree
+  skeleton.py       the inputs of each block and the joint arcs solve
+  reconstruct.py    the pipeline driver
+  pipeline/         the DAG, the executors and the stages (coarse/, ib/, stitch, relax, holes)
+  mc/numba/         CPU kernels and the arcs solver
+  mc/jax/           GPU kernels
+tests/              pytest suite, unit/ and integration/
+web/                the site: gnome3d_web/ (FastAPI), frontend/ (React), scripts/, tests/
+slurm/ensemble/     cluster and workstation run scripts and their configs
+playground/         research scripts, the validation battery, figures
+design/             public design notes and documentation, results under figures/
+legacy/             3dnome/ (3D-GNOME, read only), harness/, validation/
+data/               input datasets, not in git
+docs/               private notes, not in git
+SETTINGS.md         every config key, its default, its production value and its meaning
 ```
 
-Python environment: `.venv/bin/python`. Use it rather than the system python.
+`CLAUDE.md` is a symlink to this file. Stage `AGENTS.md` in a commit.
 
-Design goes to `design/`. Every design note, measurement record and piece of documentation is a file there and is
-committed. A text that is personal, quotes a person or describes infrastructure is private and goes to `docs/`. A
-host name, a path on a machine, an account and a deployment record are infrastructure. A note under `design/` states
-hardware by its model, as in "36 cores and an RTX 3090".
+## The model
 
----
+### Input
 
-## Algorithm Overview
+A run reads loop anchors, loops per factor, contacts and segment breakpoints. Loops are PET clusters as BEDPE, one
+file per factor, CTCF first. Contacts are singletons as BEDPE, Hi-C bin pairs in production. Optional inputs are a
+compartment track, an anchor activity track, an anchor contact table and a contact map for the gaps. `gnome3d/data.py`
+states the columns.
 
-3dgnome solves chromosome structure as a **coarse-to-fine hierarchical Monte Carlo** problem. There are four nested levels, each feeding the next:
+### Stages
 
-```
-Level 1 (Chromosome)  - whole chromosomes as single beads, inter-chr contacts
-Level 2 (Segment)     - ~100kb–1Mb segments within each chromosome
-Level 3 (Anchor)      - ~5–50kb ChIA-PET loop anchor regions
-Level 4 (Subanchor)   - ~1–10kb fine-resolution loop bases
-```
+The chromosome is a tree of segments, interaction blocks and anchors. A block is a run of anchors between two
+positions that no loop covers.
 
-Each level runs a simulated annealing MC loop, then passes the resulting 3D positions down as constraints for the next level.
+1. Coarse. Places chromosomes, segments and block centroids by Monte Carlo on contact heatmaps. These stages share one
+   random stream and run in a fixed order.
+2. Arcs. Places the anchors. Production solves every anchor of a chromosome together with L-BFGS-B from a maximum
+   entropy draw. The energy has loop springs, background springs for pairs without a loop, a gyration term over
+   genomic windows and excluded volume.
+3. Densify. Inserts subanchor beads between consecutive anchors, one per `target_bp_per_subanchor`.
+4. Smooth. Monte Carlo on the bead chain of each block with the anchors fixed. The energy has bonds, angles, the CTCF
+   motif orientation, excluded volume with a hard wall and confinement.
+5. Assembly. Joins the blocks of a chromosome and runs the cross block relaxation. Hole beads and the boundary stitch
+   are optional.
 
-### Monte Carlo Loop (all levels)
+`design/features.md` has the record of every term and pass.
 
-```
-initialize positions (random or interpolated from parent level)
-T = T_start
-while not converged:
-    i = random bead in active region
-    score_before = local_score(i)
-    apply random displacement to i
-    score_after  = local_score(i)
-    delta = score_after - score_before
-    if delta < 0 or rand() < exp(-tempJumpCoef * (score_after/score_before) / T):
-        accept move  (update global_score += delta)
-    else:
-        reject move  (restore position)
-    T *= dtTemp
-    if milestones_without_improvement >= convergence_threshold:
-        break
-```
+### Distance law
 
-Reference: `LooperSolver.cpp` lines 329–405 (`MonteCarloHeatmap`), 2304–2550 (`MonteCarloArcs`, `MonteCarloArcsSmooth`).
+Every distance is in bead units. One bead is the distance at `target_bp_per_subanchor`. A pair with no contact is at
+`max(1, (s / s0) ^ nu)`. A loop of strength `q` is at `1 + (background - 1) / (1 + q / q_half)`. A heatmap cell is at
+the background times observed over expected contact to the minus third. `nu` is fitted on the singletons of the run at
+load time. A run that cannot fit it logs the fallback.
 
----
+### Monte Carlo rule
 
-## Data Structures
+A move is accepted when it lowers the score, or with probability `exp(-jump_coef * (after / before) / T)`. The rule
+divides by the running score. Every energy term must be non negative.
 
-### Cluster (bead)
-```python
-@dataclass
-class Cluster:
-    pos: Tensor          # shape (3,), float32 - 3D position
-    genomic_pos: int
-    start: int           # genomic range start
-    end: int             # genomic range end
-    orientation: str     # 'L' | 'R' | 'N'  - CTCF motif direction
-    parent: int          # index into parent-level cluster list
-    level: int
-    arcs: list[int]      # indices into arc list
-    children: list[int]
-    is_fixed: bool
-    dist_to_next: float  # expected distance to next bead in chain
-```
+A kernel updates the score by local deltas. The local scores of a term must sum to its full score.
 
-### Heatmap
-```python
-# shape (N, N), float32
-# v[i][j] = contact frequency (or derived expected distance)
-# diagonal_size: strip around diagonal to ignore
-```
+### Executors
 
-### InteractionArc
-```python
-@dataclass
-class InteractionArc:
-    start: int           # cluster index
-    end: int             # cluster index
-    score: int           # PET count or frequency
-    eff_score: int       # aggregated/effective score
-    factor: int          # protein factor (e.g. CTCF)
-```
+Each stage has a setting `mc_executor_<stage>` with the values serial, threaded, batch and auto. Serial and threaded
+run numba. Batch runs JAX. A node seeds its random streams from its own seed. Numba results do not depend on the
+executor or the thread count. JAX kernels are float32 and are not bit identical across launch widths.
 
----
+## Rules of the model
 
-## Energy Functions
+- Every physical constant is measured from the input of the run at load time or is a documented choice with its
+  provenance beside it. A fallback is logged in a line that is always visible.
+- A setting exists only when a run reads it. `SETTINGS.md` has a row for every key.
+  `tests/unit/test_settings_doc.py` checks the rows against the loader, the defaults and the production config. Run
+  it before a commit that touches settings.
+- A feature is opt in while it is measured. It becomes the default when the battery says so and the old path is
+  deleted.
+- A change meant to be inert is proved inert with the byte exactness gate. A change meant to move results runs the
+  battery and is adopted only when it wins there.
+- Arms are judged on the pooled ensemble map, by stratum adjusted correlation and Spearman correlation against Hi-C,
+  with the distance exponent and the overlap counts beside them.
+- The accessibility and nucleus terms were removed on 2026-09-11 after null or harmful measurements. Do not
+  reintroduce them without a new idea.
+- The arcs annealer, `solver = mc`, is kept beside the solver by decision. Do not remove it.
 
-All scoring functions return a scalar; lower is better. Each level uses a subset.
+## Working on the code
 
-### 1. Heatmap score (levels 1 & 2)
-Compares pairwise distances against expected distances derived from contact frequency.
+Use `.venv/bin/python`. pytest, ruff and pyright are in the `dev` extra.
 
-```
-score = sum_{|i-j| in diagonal band} ((d_actual - d_expected)² / d_expected²)
-```
-
-Reference: `calcScoreHeatmapActiveRegion()` line 1752.
-
-### 2. Arc spring score (level 3)
-Spring energy for each pairwise arc interaction:
-
-```
-score = sum_arcs spring_k * ((d_actual - d_expected)² / d_expected²)
-
-spring_k = stretchConstant  if d_actual > d_expected
-           squeezeConstant  if d_actual < d_expected
-```
-
-Reference: `calcScoreDistancesActiveRegion()` line 1548.
-
-### 3. Structure smoothness score (level 4)
-Penalizes sharp bends and length deviations along the bead chain:
-
-```
-score = w_dist  * sum |d_actual - d_expected| / d_expected
-      + w_angle * sum angle(bond_i, bond_{i+1})³
-```
-
-Reference: `calcScoreStructureSmooth()` line 1637.
-
-### 4. CTCF orientation score (level 4)
-For adjacent anchors connected by arcs, penalizes non-convergent CTCF orientations:
-
-```
-score = w_motif * sum angle(orientation_i, orientation_j)²
-```
-
-Reference: `calcScoreOrientation()` line 1673.
-
-### 5. Subanchor heatmap score (level 4)
-Same formula as heatmap score (#1) but applied at fine resolution.
-
-Reference: `calcScoreSubanchorHeatmap()` line 1782.
-
----
-
-## Move Types
-
-| Level | Move | Step size |
-|-------|------|-----------|
-| Chromosome (1) | Random 3D displacement | `avg_distance * noiseCoefficientLevelChr` |
-| Segment (2) | Random 3D displacement | `avg_distance * noiseCoefficientLevelSegment` |
-| Anchor (3) | Random 3D displacement | `~0.01 × avg_distance` |
-| Subanchor (4) | Random 3D displacement | `~5.0` (absolute) |
-| Subanchor (4) | CTCF orientation update | triggered when near-anchor bead moves |
-
-Displacement vectors are sampled from a 3D Gaussian (or uniform sphere). The reference uses `randBall()` / `randBallGaussian()` in `lib/common.h`.
-
----
-
-## Key Parameters (from config.ini)
-
-| Parameter | Meaning |
-|-----------|---------|
-| `tempJumpCoef` | Scale factor in Metropolis criterion |
-| `dtTemp` | Temperature cooling multiplier per step |
-| `noiseCoefficientLevel*` | Step size multiplier per level |
-| `stretchConstant` / `squeezeConstant` | Spring asymmetry |
-| `weightDist` / `weightAngle` | Smoothness energy weights |
-| `motifWeight` | CTCF orientation energy weight |
-| `subanchorHeatmapDistWeight` | Fine-resolution heatmap energy weight |
-| `loopDensity` | Number of interpolated beads between anchors |
-| `convergenceThreshold` | Milestones without improvement to stop |
-
-Full list: `legacy/3dnome/MC/Settings.cpp` and example `data/GM12878/config.ini`.
-
----
-
-## Implementation notes
-
-- Bead positions are `(N, 3)` float64 arrays. Energy functions score the active region only, not all N beads, matching the reference local-score pattern.
-- The inner MC loop is sequential. Each step depends on the previous accept or reject, so a single chain cannot batch its proposals. Parallelism comes from running independent chains or regions at once. The numba path runs one chain per thread with a thread local RNG and stays byte exact. The jax path in `gnome3d/mc/` batches many regions on the GPU for the genome scale run.
-- The MC does stochastic search, not gradient descent. There are no gradients in the loop.
-
----
-
-## Reference Files to Read First
-
-When working on any piece of the rewrite, read the corresponding reference file first:
-
-| Task | Reference |
-|------|-----------|
-| Overall MC structure | `LooperSolver.cpp` lines 329–405, 2304–2550 |
-| All scoring functions | `LooperSolver.cpp` lines 1518–1810 |
-| Densification | `LooperSolver.cpp` line 1811 (`densifyActiveRegion`) |
-| Bead/cluster definition | `Cluster.h`, `Chromosome.h` |
-| Heatmap format | `Heatmap.cpp/h` |
-| Arc format | `InteractionArc.h`, `InteractionArcs.cpp/h` |
-| Distance/frequency mapping | `LooperSolver.cpp` `genomicLengthToDistance()` |
-| Random number generation | `lib/common.h` `randBall`, `randBallGaussian` |
-| Config parameters | `Settings.cpp`, `data/GM12878/config.ini` |
-
----
-
-## Typechecking
-
-The whole `gnome3d/` package is type-checked under **pyright strict mode**. Config lives in `pyproject.toml` under `[tool.pyright]`. Pyright is installed in the project venv:
+### Tests
 
 ```bash
-.venv/bin/pyright              # check all of gnome3d/
-.venv/bin/pyright gnome3d/mc/numba/terms.py  # check one file
+.venv/bin/pytest                      # every test, about two and a half minutes on a laptop
+.venv/bin/pytest -m "not slow"        # without the files that take over a minute
+.venv/bin/python tests/unit/test_polymer.py     # one file as a script
 ```
 
-Run pyright before committing changes to `gnome3d/`. The tree currently reports errors that
-predate the pipeline refactor; the rule for new work is **do not increase the count**. Check the
-baseline with `git stash && .venv/bin/pyright | tail -1` before and after a change.
+`tests/unit/` has one file per feature. A file records its checks through `check(name, cond, detail)`, and
+`tests/conftest.py` fails a test that recorded a failed check. `tests/integration/` runs the whole pipeline on
+synthetic inputs and on one GM12878 region, which is skipped without `data/`.
 
-### Conventions
+A new energy term gets a unit file after `tests/unit/test_terms.py`: a hand built configuration with an energy in
+closed form, a check that the local scores sum to the full score and a check that the term is non negative.
 
-- **Numpy array aliases** live in [gnome3d/types.py](gnome3d/types.py): `F32Array`, `F64Array`, `I32Array`, `I64Array`, `BoolArray`. Use these instead of bare `np.ndarray` so dtype intent is visible.
-- **Semantic int aliases** also in `types.py`: `ClusterIndex`, `LocalArcIndex`, `GenomicPos`. They are `int` at runtime — they document the intent of an `int` parameter (a cluster index into `Solver.clusters` is not the same thing as a chr-relative arc index, even though both are `int`).
-- **Collection aliases**: `AnchorMap`, `ArcMap`, `RawArcMap`, `BreakpointMap`, `ChrRootMap`, `ChrFirstClusterMap`, `ChrLevel`, `SingletonContact`, `BeadOut`. Prefer these over inline `dict[str, list[…]]` spellings.
-- **Output tuples**: `BeadOut = tuple[int, int, float, float, float]` = `(genomic_start_bp, genomic_end_bp, x, y, z)`. First field is start so `sorted(beads, key=lambda b: b[0])` still gives left-to-right genomic order.
-- **Dataclass defaults**: use a named factory function (e.g. `_empty_cluster_index_list`) instead of `field(default_factory=list)` — bare `list` leaks `list[Unknown]` through pyright in strict mode.
+Run pytest before a commit that touches `gnome3d/`.
 
-### Numba interop
+### Byte exactness gate
 
-`@njit` from numba has no type stubs, which would otherwise force every JIT-compiled function to be typed as `Any`. [gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py) wraps it with a typed identity decorator:
-
-```python
-def njit(**kwargs: Any) -> Callable[[F], F]:
-    def decorator(fn: F) -> F:
-        return cast(F, _njit(**kwargs)(fn))
-    return decorator
-```
-
-Decorated functions keep their original signatures under pyright while still being JIT-compiled at runtime. **Do not use `typing.cast` inside `@njit` kernels** — numba's nopython frontend doesn't recognise it. For random-index lines like `int(np.random.randint(0, n))` where numpy stubs return `Any`, use a per-line `# pyright: ignore[reportUnknownArgumentType]` comment instead.
-
-### Formatting and linting
-
-The project uses **`ruff`** for both formatting (Black-compatible) and linting. Config lives in `pyproject.toml` under `[tool.ruff]`. Installed in the project venv.
-
-```bash
-.venv/bin/ruff format gnome3d/ tests/         # apply formatting
-.venv/bin/ruff format --check gnome3d/ tests/  # CI-style dry-run
-.venv/bin/ruff check  gnome3d/ tests/         # lint
-.venv/bin/ruff check  gnome3d/ tests/ --fix   # apply safe auto-fixes
-```
-
-Current state: **0 lint issues, all files formatted**. Lint groups enabled: `E F I UP B C4` (pycodestyle, pyflakes, isort, pyupgrade, bugbear-lite, comprehensions). Run format + lint before committing changes to `gnome3d/` or `tests/`.
-
-Per-file ignores in `pyproject.toml`:
-- `gnome3d/{solver,io,data,hierarchy,mc}.py`: F403/F405 — these modules re-export `gnome3d.types` via `from .types import *`.
-- `gnome3d/data.py`: also B023 — `mark_arcs` uses an intentional closure pattern over loop locals.
-
-### Adding new code
-
-- Annotate every function signature (params + return). Strict mode requires it.
-- Avoid bare `list`, `dict`, `tuple` in annotations — always parameterise.
-- For numpy arrays in non-kernel code, use the aliases (`F32Array`, etc.).
-- Inside `@njit` kernels, parameter and local annotations are advisory only (numba ignores them) but still required for pyright. Keep them realistic — they document the contract.
-
-### Documentation, comments and every other text
-
-`design/writing-rules.md` holds the rules in full. They cover doc comments, inline comments, descriptions of
-settings, error messages, log lines, script output, the website's text, the notes under `design/`, figures and commit
-messages. They apply while the text is written, not as a later cleanup pass. Read that file before writing any of
-these. The short form follows.
-
-Wording, everywhere:
-
-- Plain subject, verb and object. Start with the thing or a verb. Do not open with What, Where, How, Who, Whether,
-  When, Which or Why, in a sentence or a heading.
-- No inversion that leaves a preposition at the end. No clever constructions and no compressed riddles. Spell out the
-  concrete case.
-- No metaphors. Banned words are sits, lives, lands, hears, tells, hands, rides, name as a verb and write for the look
-  of a value.
-- No ", so", "so that", "because" or "unlike X" to justify a design. The reason goes in the commit message. Such a
-  clause stays only when it carries a constraint the next editor would break.
-- No comma before "and". No capitals for emphasis, a word in capitals is an acronym or an identifier. Few backticks and
-  few parentheses.
-
-Doc comments and inline comments:
-
-- Comments are few. A comment exists only for a fact that the code and the names do not show.
-- No mention of the reference implementation, its files or its functions under `gnome3d/`, `tests/` and `web/`.
-- No dashes, colons or semicolons as sentence punctuation.
-- A doc says what the thing is and how to use it, in one or two sentences, as the code is now. No design reasons, no
-  comparisons to sibling code, no callers, no history and no comment left in place of removed code.
-- A function doc leads with a verb, as in "Bins the contacts by anchor. Returns the matrix and the bin edges."
-- An inline comment carries a reason or a constraint the code cannot show. One that restates the line below, a visible
-  type or the callee's doc is removed.
-- A fact that holds across a file is stated once, on the module or the class.
-- Keep parameter and return descriptions. Reword inside them and do not delete them.
-- A style pass is also a correctness pass. Check that a reworded doc is still true and fix a doc that has drifted.
-
-Descriptions and messages:
-
-- A setting's description is one or two sentences, what it does and its default.
-- An error message states the one case that happened, the step and the fix. A message that covers several causes is
-  split at the place in the code that knows the cause.
-
-Before handing over, search the added lines for the wh-openers, the banned words, a preposition at the end of a
-sentence, ", so ", "because" and ", and ". Memory style [[links]] to related notes are fine in a doc.
-
----
-
-## The byte exactness gate
-
-`playground/parity_dump.py` reconstructs one region and dumps `(start, end, x, y, z)` per bead.
-Run it from a worktree at the previous commit and from the working tree, then compare the two
-files exactly. It proves a refactor or a default-off feature changed nothing. Both runs must
-use the same executor settings, since batch grouping selects which chain gets which RNG stream.
+`playground/parity_dump.py` reconstructs one region and dumps every bead. Run it at the previous commit and on the
+working tree with the same executor settings and compare the two files exactly.
 
 ```bash
 git worktree add --detach /tmp/g3d_head HEAD
@@ -384,1085 +136,69 @@ python playground/parity_dump.py /tmp/g3d_head head.npz
 python playground/parity_dump.py "$PWD"       wip.npz
 ```
 
-For the behaviour of a new energy term, unit test it directly. `tests/unit/test_terms.py` is the
-template: a hand built configuration whose energy is computable in closed form, a check that the
-per bead local scores sum to the full score, which the incremental MC update depends on, and a
-check that the term stays non negative over random configurations, which the Metropolis rule
-requires because it divides by the running score.
+### Battery
 
----
+`playground/validation_battery.py` scores structures against a Hi-C map per structure. `playground/ensemble_score.py`
+scores the pooled map of an ensemble. `design/validation-metrics.md` defines the metrics.
 
+### Types
 
-## Tests
+`gnome3d/` is checked by pyright in strict mode, `.venv/bin/pyright`. The tree reports errors that predate the
+pipeline. A change must not increase the count.
 
-`tests/` is a pytest suite. pytest is in the `dev` extra.
+- Use the array aliases of `gnome3d/types.py`, `F32Array`, `F64Array`, `I32Array`, `I64Array` and `BoolArray`, and
+  its collection aliases, in place of bare `np.ndarray` and inline `dict[str, list[...]]`.
+- Annotate every signature. Parameterise `list`, `dict` and `tuple`.
+- `gnome3d/mc/numba/terms.py` wraps `numba.njit` in a typed decorator. Use it for kernels.
+- Do not call `typing.cast` inside an `@njit` kernel. Use a `# pyright: ignore[...]` comment on the line.
+- A dataclass default uses a factory function with a name, as in `empty_cluster_index_list`.
 
-```bash
-.venv/bin/pytest                      # every test, about two and a half minutes on a laptop
-.venv/bin/pytest -m "not slow"        # without the files that take over a minute
-.venv/bin/pytest tests/unit           # the unit checks alone
-.venv/bin/python tests/unit/test_polymer.py     # one file as a script, with its own summary
-```
-
-`tests/unit/` has one file per feature. A file records its checks through a module level
-`check(name, cond, detail)`, and `tests/conftest.py` fails a test that recorded a failed check.
-A new unit file follows `tests/unit/test_terms.py`. `tests/unit/test_settings_doc.py` checks
-`SETTINGS.md` against the loader and `gnome3d/production.py`.
-
-`tests/integration/` runs the whole pipeline on the production settings with every stage on
-one numba thread, a few seconds a file.
-
-| File | Input | Checks |
-|------|-------|--------|
-| `test_synthetic.py` | A known walk of 30 beads, its files written by the test | Every bin modelled, a sorted finite chain, closer to the truth than a random structure, a run repeats, the CIF holds every bead |
-| `test_region.py` | GM12878 chr1:18288319-20307135 under `data/`, skipped without it | 102 anchors, a run repeats, a stronger loop is shorter, loops closer than other anchor pairs, few overlaps |
-
-The marker `slow` is set in `tests/conftest.py` by file name. The marker `data` is on a test
-that reads `data/`.
-
-### Retired comparison against the reference
-
-`legacy/harness/integration.py` runs the reference binary and the Python model on the region of
-`test_region.py` and compares radius of gyration, pooled pair distances and bond lengths with a
-KS test. It needs the binary, `make -C legacy 3dnome`. It is not part of the test run. The
-production settings do not follow the reference's distance laws and the two ensembles are not
-expected to agree.
+### Format and lint
 
 ```bash
-python legacy/harness/integration.py --cpp-only   # the reference alone
-python legacy/harness/integration.py --fast -n 3  # both sides, short schedule
+.venv/bin/ruff format gnome3d/ tests/
+.venv/bin/ruff check  gnome3d/ tests/ --fix
 ```
 
----
-
-## Epigenomic tracks
-
-The compartment energy term reads a plain-text track derived from data the repo already
-fetches.  Build it once per cell line:
-
-```bash
-python -m legacy.validation fetch  --manifest legacy/validation/manifests/<CELL>_hic.json --out data/_hic
-python -m legacy.validation tracks --cell <CELL>
-```
-
-That writes `data/<CELL>/<CELL>_compartments.bedGraph` and `<CELL>_tads.bed` plus a
-lockfile recording resolution, source file and a per-chromosome quality number.  It is
-idempotent, so re-running is free.
-
-Then ablate the term against that cell line's own Hi-C:
-
-```bash
-python -m legacy.validation epigenome --cell <CELL> --hic data/_hic/<CELL>/<file>.mcool \
-                               --region chr1:20000000-40000000
-```
-
-Three traps, each of which produces a silently wrong answer.  Pick the deepest contact file when
-a cell line has several, since a shallow one yields a compartment eigenvector that is pure noise;
-`legacy/validation/studies/tracks.py::_find_one` takes the largest file for this reason, and a lag-1
-autocorrelation below 0.3 warns that the result is noise.  Pass `clip_percentile=99.9` when
-calling `cooltools`' `cis_eig` directly, because it is not that function's default and without it
-outlier pixels dominate the decomposition.  And the eigenvector sign is arbitrary and differs
-between machines for the same input, so a derived track is not reproducible up to sign; anything
-consuming it must either phase it or be invariant to a global flip.
-
----
-
-## Python divergences from reference
-
-Tracked list of intentional deviations from `legacy/3dnome/MC/`. Each entry: what diverges, why, and how to toggle/restore parity. Keep this list current — new entries must be added when introducing diverging behavior, and removed when behavior is brought back into parity.
-
-### Settings hygiene
-
-- **`noise_arcs` removed.** The reference declares `noiseCoefficientLevelAnchor` (read as `noise_arcs` in `[main]`) and multiplies it into a local `noise_size` variable in `LooperSolver.cpp:2085`, but the arc-MC call site on line 2136 passes a hardcoded `noise_size_small=0.005` instead — making the setting effectively dead in the reference. Python uses the same 0.005 hardcoded constant in [pipeline/ib/arcs.py](gnome3d/pipeline/ib/arcs.py); the setting was dropped to avoid implying configurability.
-- **`random_walk` ported.** Previously loaded-but-unused; now drives [pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py), mirroring `LooperSolver.cpp:80-98` (chained 50.0-step walk per chromosome instead of segment-level heatmap MC). Honors `use_2d`.
-- **`long_pet_*` ported.** Long-range arcs (gap > `max_pet_length`) are no longer discarded by [io.load_arcs](gnome3d/io.py) — they are carried on `ContactData.long_arcs` and folded into the segment heatmap by [pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) as `long_pet_scale * arc.score ** long_pet_power`. Mirrors `LooperSolver.cpp:1069-1104`, including the asymmetric `h[st][end] += val` pattern (the downstream symmetrize step in `_normalize_heatmap` averages it to `val` on each side).
-- **Chromosome-level MC ported.** Previously `steps_lvl1` / `noise_lvl1` were inert because Python had no chr-level reconstruction. Now [pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) builds an n_chr × n_chr inter-chromosomal singleton heatmap, normalizes its first non-zero diagonal to 1.0, converts to expected distances, and runs `mc_heatmap` with `steps_lvl1` runs at `noise_lvl1 × avg_dist` step size. Mirrors `LooperSolver.cpp` lines 119-160 and 265-322. Triggered only when `len(chrs) > 1`; single-chr runs are unaffected. If the singleton input has no inter-chr contacts the chr roots are scattered randomly instead.
-- **`normalizeHeatmapInter` ported.** [pipeline/coarse/heatmap.py](gnome3d/pipeline/coarse/heatmap.py) was previously a no-op stub; now it multiplies the segment heatmap by `heatmap_inter_scaling` and divides intra-chromosome blocks back, matching `LooperSolver.cpp:1422-1459`. Net effect: intra-chr unchanged, inter-chr × scale. Active only on multi-chr runs (length-1 `current_level` short-circuits).
-- **Multi-chromosome CLI / API surface.** [cli.py](gnome3d/cli.py) and [simulate.py::run_genome](gnome3d/simulate.py) accept the same syntax as the reference's `-c` flag: single chromosome, comma-separated list, `chrN-chrM` numeric range, or single sub-chromosomal region. Default (empty string) matches the reference: `chr1-chr22,chrX`. Parsing is centralized in [io.py::parse_chrs_arg](gnome3d/io.py). The CLI now writes one CIF per chromosome when more than one chr was requested (using a `_<chr>_` suffix in the filename); single-chr/region runs keep the old single-CIF behavior. `run_region` keeps its original single-region semantics for backward compatibility; `run_genome` returns `list[dict[str, list[BeadOut]]]` so per-chromosome bead lists are preserved.
-- **`data_singletons_inter` loaded.** [data.py::ContactData.from_files](gnome3d/data.py) reads the optional second singletons file (config key `[data] singletons_inter`) and appends to `singletons` whenever `len(chrs) > 1`. Mirrors `LooperSolver.cpp:970` which adds inter-chromosomal singleton files for multi-chr runs. Single-chr runs skip this file (per-chr contacts in the main file are sufficient and the inter file is often a sparse stub).
-
-### Refactors (no behavior change at parity settings)
-
-- **Unified smooth-MC kernel** ([gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py))
-  The reference has separate `MonteCarloArcsSmooth` branches per feature combo. Python collapses the four prior specialized kernels (`_batch_smooth_nb`, `_batch_smooth_heat_nb`, `_batch_smooth_orientation_nb`, `_batch_smooth_orientation_heat_nb`) into one `batch_mc_nb` driven by `use_heat`/`use_orn` flags. Energy terms (struct, heat, orn) are tracked as independent components (`score_struct`, `score_orn`, `score_heat`) and combined per step.
-  Side benefit: heat/orn paths previously did a full O(N) structure recompute every MC step — now incremental like the pure-smooth path. Verified drift stays at float-noise (~1e-9) under the codebase's reciprocal-neighbor invariant.
-
-### Algorithm divergences
-
-- **Loops of more than one factor: `[data] clusters` takes several files, `[data] factors`
-  names them, the first is CTCF.** ([io.load_arcs](gnome3d/io.py),
-  [data.fit_arc_strengths](gnome3d/data.py), [polymer.PolymerLaw.arc_distance](gnome3d/polymer.py),
-  [skeleton.py](gnome3d/skeleton.py)) Every arc carries the index of its file. Each factor gets
-  its own strength fit, so a second library's PET counts are read against its own typical
-  count at each span rather than the first's, and the target matrix converts each arc under
-  its factor's fit. The orientation term reads factor 0's loops alone, since a loop held by
-  anything but CTCF has no motif orientation. One file keeps the arc order it was read in,
-  byte identical by the parity gate. Built 2026-09-19 for RNAPII ChIA-PET as a second factor,
-  `design/rnapii-loops.md`. Unit checks in `tests/unit/test_factors.py`.
-
-  The summary arc the reader writes for a pair two factors join scores 0 with factor -1. The
-  arcs stage leaves it out, since as an arc it gave the pair the background as its target, and
-  a pair two factors join takes the closer of its factors' targets instead of the one written
-  last. Found 2026-10-27 by the trio study: on a trio chr1 406 pairs, strong ones with a median
-  of 14 CTCF and 6 RNAPII PETs, had been held at the background in every run without loop
-  dropout, which drops the summary arc by its score. Unit checks in `tests/unit/test_arc_matrix.py`.
-
-  Why not in the reference: the reference declares `[data] factors` and, for an anchor pair
-  carried by more than one factor, writes a summary arc with `eff_score` zero
-  (`InteractionArcs.cpp:98-141`); it fits no strength per factor and its orientation term
-  reads every arc.
-
-- **IB placement scope: `[simulation_ib] refine_scope = segment | chromosome`, default `segment`.**
-  `segment` is the prior behaviour: each segment's blocks are refined as a separate chain and any
-  segment holding one block or fewer is skipped, so segment grouping decides which blocks get
-  placed at all. `chromosome` refines every block on the chromosome as one chain and removes that
-  dependency.
-
-  `chromosome` is not the default despite being the more principled scoping. It also puts every
-  block pair inside the excluded-volume term and the structures inflate: over four GM12878 regions
-  mean simulated contact density fell 0.087 to 0.035 and within-block over between-block
-  enrichment worsened about threefold. The compartment saddle improves, but sparsity alone drags
-  that statistic toward 1.0, so the gain is not separable from the inflation. Adopting this scope
-  means re-tuning `exclusion_*_ib` and `confinement_*_ib` first.
-
-- **Orientation MC: weighted local scorer**
-  Python uses a weighted local delta in `_local_score_orientation_nb` ([gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py)) so the incremental update is exact w.r.t. `_score_orientation_full_nb`. The reference uses an unweighted local scorer that drifts over many steps. See `[[project-orientation-mc-fix]]`. The reference scorer stayed unweighted for the old unit harness, which has since been removed.
-
-- **Singleton chr filter** (data loading)
-  The reference bins inter-chromosomal singletons by position; Python correctly filters by chromosome. Smooth-MC heat scores diverge 3-5× as a result, but final structures still match. See `[[project-singleton-chr-filter-divergence]]`.
-
-- **`BeadOut` is a NamedTuple with a `kind` field** ([gnome3d/types.py](gnome3d/types.py))
-  Output beads were widened from a 5-tuple `(start, end, x, y, z)` to a 6-field NamedTuple `(start, end, x, y, z, kind)` where `kind: Literal["anchor", "subanchor"]`. Iteration / positional unpacking still works (NamedTuple subclasses tuple) but consumers must expect length 6, not 5. Named access also available: `b.start`, `b.kind`, plus convenience properties `b.midpoint` and `b.span`. The CIF writer emits `kind` via a non-standard `_atom_site.gnome_bead_kind` column and additionally distinguishes anchors (`label_comp_id = ALA`) from subanchors (`label_comp_id = GLY`) so default mmCIF viewers color-code them automatically.
-
-- **Subanchor densification: centered slots instead of single points** ([pipeline/ib/densify.py::densify](gnome3d/pipeline/ib/densify.py))
-  The reference places each subanchor at a single genomic point `ca.end + (j+1) * gap_bp / (ld+1)`, so each subanchor bead has zero genomic width and adjacent anchors collapse all ld subanchors into one point when overlapping. Python keeps the same midpoint positions but gives each subanchor j a slot of width `d_bp = span // (ld+1)` centered on its midpoint. Properties:
-    - Subanchor midpoints, 3D position interpolation (`t = (j+1)/(ld+1)`), and `dtn` are unchanged versus the reference's point scheme.
-    - Each subanchor has a non-degenerate genomic range whenever the in-between region is at least `ld+1` bp wide.
-    - Subanchor starts/ends never coincide with adjacent anchor boundaries (`ca.end` or `cb.start`), so sorting beads by start gives a unique total order — this fixes the bead-collision issue where overlapping anchors produced subanchors sharing a `start` value with the next anchor.
-
-  Behavior on overlapping anchors is controlled by two independent settings:
-
-    - **`overlap_anchor_strict`** (default `False`) — span computation.
-      - `False`: `span = abs(cb.start - ca.end)`; non-overlap tiles the gap `[ca.end, cb.start]`, overlap tiles the overlap `[cb.start, ca.end]` with non-degenerate ranges. Python divergence.
-      - `True`: `span = max(cb.start - ca.end, 0)` matches `LooperSolver.cpp:1829-1831` — overlap clamps to 0 so MC-chain subanchors between overlapping anchors collapse to a single boundary point.
-
-    - **`drop_zero_length_subanchors`** (default `False`) — output filter, independent of the span setting.
-      - `False`: every densified subanchor appears in the `BeadOut` output, even when `start == end`.
-      - `True`: subanchor entries with `start == end` are filtered out of the externally visible bead list. The MC chain still contains them (needed for chain smoothness); only the output is cleaned. Useful in combination with `overlap_anchor_strict = True` to suppress the collapsed-overlap zero-length entries the reference would otherwise emit.
-
-  The invariants are that every subanchor falls inside its gap and that bead starts are unique.
-
-- **Dynamic loop density** — `settings.use_dynamic_loop_density = True` to enable. ([pipeline/ib/densify.py::_subanchor_counts](gnome3d/pipeline/ib/densify.py))
-  The reference (and Python's default) inserts a fixed `loop_density` subanchor count between every adjacent anchor pair, regardless of arc span. With arcs spanning anything from a few hundred bp to hundreds of kb in real ChIA-PET data, this gives **>100× imbalance** in genomic-bp-per-bead between short and long arcs. Dynamic mode picks the count per arc so the *chain segments connecting beads* are roughly `target_bp_per_subanchor` long:
-
-    `n_subanchors = round(span / target) − 1`  (clamped to `[min, max]`)
-
-  An arc with `n` subanchors has `n + 1` consecutive chain segments. Short arcs (`span < 1.5 × target`) round to 1 segment → 0 subanchors → the two anchors are linked directly.
-
-    - `target_bp_per_subanchor` (int, default `5000`) — target genomic distance per chain segment.
-    - `min_subanchors_per_arc` (int, default `0`) — set to `1` to force at least one subanchor between every pair regardless of span.
-    - `max_subanchors_per_arc` (int, default `50`) — cap to avoid runaway counts on huge gaps (a 444 kb arc at 5 kb target would otherwise insert 88 subanchors).
-
-  Both [densify](gnome3d/pipeline/ib/densify.py) and [build_contact_heatmaps](gnome3d/pipeline/coarse/build.py) consume the same subanchor-count output, so the densified bead chain and the subanchor contact heatmap stay in sync — `use_subanchor_heatmap` remains compatible with dynamic mode. For arcs with `count == 0` the contact heatmap merges that gap's half into each flanking anchor's bin (midpoint break); the smooth-MC chain just links the two anchors directly.
-
-  Default behavior (`use_dynamic_loop_density = False`) is unchanged.
-
-### New features (opt-in via settings, default-off)
-
-- **Epigenome energy term** — A/B compartments.
-  Ported from MultiMM (`add_compartment_blocks`).  One flag, default off: `use_compartments`,
-  under `[compartments]`. New `[data]` keys `compartments` and `phasing_track`;
-  `ContactData.from_dataframes` gains the matching frames.
-
-  Divergences worth knowing:
-  - **The attractive term is written shifted and non-negative.** MultiMM writes it as a
-    negative energy, which 3dgnome cannot use: the Metropolis rule divides by the running
-    score and is guarded on `score > 0`, so a negative-definite term would silently disable the
-    temperature branch. The shift changes an additive constant, not the minimum or the gradient.
-  - **The pairwise affinity is divided by `N - 1`.** Not in MultiMM. Without it the term's
-    strength grows with region size, because it sums over all partners while springs act per
-    bond, and a weight tuned on a small region collapses a large one.
-  - **Compartment input is source-agnostic.** CALDER2 reads Juicer `.hic` only, and this repo's
-    Hi-C is 4DN mcool, so a CALDER BED is one supported format rather than the required source.
-    A signed eigenvector track is the recommended input. Eigenvector sign is arbitrary, so
-    phasing is mandatory and explicit; an unphaseable chromosome is left unassigned rather than
-    segregated backwards.
-  - **The JAX smooth kernel carries the affinity term.**
-    `mc_smooth_jax` and `mc_smooth_jax_batch` implement the compartment term, agreeing with
-    numba on initial energy to 1.2e-07 relative. `use_aff` is a static cache-key entry rather
-    than a weight gate, because the term costs an extra O(N) pass per step and making it
-    structural keeps that off runs that do not use it. The score rides the excluded-volume
-    accumulator: both terms are pairwise, double counted and share the factor-2 delta, so
-    the sum is exact for both the Metropolis ratio and the final score, and only the per-term
-    breakdown is lost.
-  - **The estimate-dist dry pass excludes it.** It is attractive, so including it would
-    shrink the estimated distances that become the heat target and the real smooth pass would
-    then compact against an already-compacted target.
-
-  The term is purely attractive and needs excluded volume or confinement enabled alongside
-  it, both of which also default off. See `design/ab-compartments.md`.
-
-
-- **Excluded volume** — `settings.use_excluded_volume = true` to enable.
-  Soft harmonic repulsion preventing bead overlap. For pairs `(i, j)` with `|i - j| > exclusion_skip_neighbors` and `d_ij < r₀`, contributes `exclusion_weight * ((r0 - d)/r0)²` to the score. Implemented as an independent score component with the same `2 * (local_curr - local_prev)` incremental pattern as the heat term.
-
-  **Per-level radius + auto-factor.** EV runs at four different MC levels (arcs / smooth / heatmap / IB) whose natural bead-bead distance scales differ by orders of magnitude — anchor beads sit at unit scale, IB centroids at hundreds of units. Each level has its own radius knob and its own auto-factor knob:
-
-    | Level | Radius field | Factor field | Auto formula (when radius = 0) |
-    |---|---|---|---|
-    | arcs   | `exclusion_radius_arcs`    | `exclusion_auto_factor_arcs`    | `factor × mean(positive arc expected distance)` |
-    | smooth | `exclusion_radius_smooth`  | `exclusion_auto_factor_smooth`  | `factor × mean(dtn)` (chain bond distances) |
-    | heatmap| `exclusion_radius_heatmap` | `exclusion_auto_factor_heatmap` | `factor × mean(active heatmap target distance)` |
-    | ib     | `exclusion_radius_ib`      | `exclusion_auto_factor_ib`      | `factor × mean(IB chain-bond dtn)` |
-
-    All radii default to `0` (auto). All auto factors default to `0.5` ("EV kicks in once beads get closer than half the typical bond distance at that level"). Setting a radius to a positive value disables auto-derive for that level.
-
-  **Gates** (which MC passes consult EV at all):
-    - `use_excluded_volume` (master)
-    - `exclusion_apply_to_arcs` (default false)
-    - `exclusion_apply_to_smooth` (default true)
-    - `exclusion_apply_to_heatmap` (default false)
-    - `exclusion_apply_to_ib` (default true, only kicks in when `use_ib_mc` is on)
-
-  **Shared knobs:**
-    - `exclusion_weight` (k, comparable to spring constants; `Settings` default 0.5, and the
-      tuned config in `gnome3d/production.py` sets 0.1)
-    - `exclusion_skip_neighbors` (skip pairs with `|i-j|` ≤ this; default 1, i.e. skip bonded)
-
-  Ini key names under `[excluded_volume]`: `use_excluded_volume`, `weight`, `apply_to_arcs`, `apply_to_smooth`, `apply_to_heatmap`, `apply_to_ib`, `skip_neighbors`, `radius_arcs`, `radius_smooth`, `radius_heatmap`, `radius_ib`, `auto_factor_arcs`, `auto_factor_smooth`, `auto_factor_heatmap`, `auto_factor_ib`.
-
-  Why not in the reference: 3dnome uses an inverse-distance repulsion only on pairs where the input arc matrix is marked negative — a sparse, conditional repulsion. This adds a global polymer-physics excluded-volume term independent of input data. Touches arc-MC, smooth-MC and IB-MC through the shared `batch_mc_nb`, and heatmap-MC through its own `_batch_heatmap_nb`.
-
-- **IB-level MC pass** — `settings.use_ib_mc = true` to enable. ([pipeline/coarse/build.py::ib_mc_refine](gnome3d/pipeline/coarse/build.py))
-  Address the "central blob" pathology in full-chromosome runs (very visible with `use_dynamic_loop_density = true` + small `target_bp_per_subanchor`): the reference / Python default places IB centroids by random walk or linear interpolation with no MC, so when each IB's smooth-MC fills a fat sphere of beads the spheres overlap into a tangle around the origin.
-
-  This pass runs `mc_ib` over each segment's child IB centroids with chain-bond targets from `genomic_length_to_distance` between consecutive IB midpoints, plus optional excluded volume so IBs push each other apart and optional confinement so the chain doesn't stretch out. `mc_ib` is a **peer stage** to `mc_smooth` — *not* a sub-mode of it. It owns its own MC schedule, chain spring constants, step noise, and EV/confinement knobs. Both stages share only the unified `_batch_mc_nb` kernel; neither extends the other.
-
-  Ini layout (key names follow the same conventions as `[simulation_arcs_smooth]`, `[springs]`, and `[main]`; defaults mirror the smooth stage so existing configs keep working):
-  ```ini
-  [main]
-  noise_ib = 0.5                                    # step_size = noise_ib * mean(dtn)
-
-  [springs]
-  stretch_constant_ib = 0.1
-  squeeze_constant_ib = 0.1
-
-  [simulation_ib]
-  use_ib_mc                              = yes
-  max_temp                               = 20.0
-  delta_temp                             = 0.99995
-  jump_temp_scale                        = 50.0
-  jump_temp_coef                         = 20.0
-  stop_condition_steps                   = 10000
-  stop_condition_improvement_threshold   = 0.995
-  stop_condition_successes_threshold     = 5
-  dist_weight                            = 1.0
-
-  [excluded_volume]
-  apply_to_ib    = yes
-  radius_ib      = 0                                # 0 = auto from IB chain-bond scale
-  auto_factor_ib = 0.5                              # used when radius_ib = 0
-
-  [confinement]
-  use_confinement   = yes
-  apply_to_ib       = yes
-  radius_ib         = 0                             # 0 = auto = packing_factor * mean(dtn) * N^(1/3)
-  packing_factor_ib = 0.75
-  ```
-
-  Why a peer (not a child of smooth): smooth-MC operates on per-IB sub-anchor chains with CTCF orientations, heat maps, and angle springs; IB-MC operates on inter-IB centroids — no orientations, no heat target, no angle term, different spatial scale and tolerance. Conflating their settings makes both stages harder to tune independently.
-
-- **Spherical confinement** — `settings.use_confinement = true` to enable.
-  Soft envelope mimicking a nuclear boundary. For each bead at distance `r` from the per-MC-call centroid, contributes `confinement_weight * ((r - R)/R)²` if `r > R`, else 0. Per-bead (single-counted) — delta is `(local_curr - local_prev)` with no factor of 2. Each MC level has its own radius and packing factor (the spatial scale differs across levels):
-
-  | Level | Radius | Packing factor | Auto formula |
-  |---|---|---|---|
-  | arcs   | `confinement_radius_arcs`   | `confinement_packing_factor_arcs`   (default 1.5)  | `pf × mean(positive arc expected) × N^(1/3)` |
-  | smooth | `confinement_radius_smooth` | `confinement_packing_factor_smooth` (default 1.5)  | `pf × mean(dtn) × N^(1/3)` |
-  | ib     | `confinement_radius_ib`     | `confinement_packing_factor_ib`     (default 0.75) | `pf × mean(IB chain dtn) × N^(1/3)` |
-
-  Shared knobs: `use_confinement` (master toggle), `confinement_weight` (k; comparable to spring constants; default 0.5). Apply flags per level: `confinement_apply_to_arcs`, `confinement_apply_to_smooth`, `confinement_apply_to_ib` (all default true). Center is always the centroid of starting positions at that MC call.
-
-  Motivation: at the IB level, EV pushes IBs apart but only nearest-neighbor chain bonds pull them back, so the segment stretches out into a long sausage. The IB tether (small packing factor → tight sphere around the segment centroid) softly holds the chain together while EV still keeps IB spheres from overlapping. At arc / smooth levels, confinement instead acts as a nuclear-like envelope for under-constrained small IBs.
-
-  The packing factor has a physical floor. The sphere diameter is `2 × pf × N^(1/3)` chain bonds, so below `pf ≈ 0.58` a segment of fewer than `(1/(2·pf))³` blocks is asked to fold into a sphere narrower than one of its own bonds, and the layout is then set by where EV and confinement jam rather than by genomic separation. Measured on GM12878 chr1 the block-layout distance exponent is 0.021 at 0.15, 0.214 at 0.75 and 0.297 at 1.0 against 0.285 from the cell line's own Hi-C contact-probability curve (`playground/ps_curve.py`, `playground/ib_confine_ablate.py`).
-
-- **JAX/CUDA backend** — selected per stage via `mc_executor_<stage> = batch`. ([gnome3d/mc/jax/](gnome3d/mc/jax/))
-
-  Routes selected MC levels to a JAX/CUDA kernel instead of the default numba CPU implementation. Measured ~2× total speedup on chr22 dryrun (21 min → 10:26), peak ~6× per-kernel on the largest smooth-MC call (N=10116: 570s numba → 100s JAX). The win compounds with chromosome size since smooth-MC is ~90% of total wall time.
-
-  Architecture: `gnome3d/mc/numba/` holds the production numba implementations (`mc_heatmap_numba`, `mc_arcs_numba`, `mc_smooth_numba`, `mc_ib_numba`) and `gnome3d/mc/jax/` the JAX peers (`mc_smooth_jax`, `mc_smooth_jax_batch`, `mc_arcs_jax`, `mc_arcs_jax_batch`). There is no dispatcher module: the backend follows from the executor strategy resolved in [reconstruct.py::pick_executor](gnome3d/reconstruct.py), so `batch` means JAX and `serial`/`threaded` mean numba.
-
-  Each MC level has its own JAX-routing flag, defaulting to the regime where JAX is measured to win:
-
-  | level   | JAX kernel terms                                     | default flag       | rationale                                                    |
-  |---------|------------------------------------------------------|--------------------|--------------------------------------------------------------|
-  | smooth  | chain + EV + heat + orient + confinement (full set)  | **on**             | 5–6× win at N≥1024 with full energy terms                    |
-  | arcs    | arc springs + EV + confinement                        | off                | arc energy is sparse; numba's per-pair early-continue wins at N<5000 |
-  | heatmap | heatmap distance + EV                                 | off                | chr-level fires once at N=3-23, below JAX overhead floor; enable for multi-chr |
-  | ib      | not ported                                            | n/a                | <1% of typical wall                                          |
-
-  Settings (under `[simulation_backend]`): the per-stage `mc_executor_<stage>` values
-  (`serial` | `threaded` | `batch` | `auto`). `batch` selects JAX. The old
-  `mc_backend_apply_to_*` flags no longer exist.
-
-  Install: `pip install gnome3d-ng[jax] "jax[cuda12]"` (NVIDIA) or `"jax[rocm6]"` (AMD). Without JAX installed, the dispatcher raises a clear error if `mc_backend="jax"` is set; otherwise it never imports JAX. The `[jax]` extras dep in `pyproject.toml` is **optional** — base install is numba-only.
-
-  Implementation notes:
-  - **Per-shape XLA compile cost** (~1–60s per (N, K, n_anchors) combo) is paid once per machine via the persistent compile cache at `~/.cache/gnome3d/jax` (override with `GNOME3D_JAX_CACHE`).
-  - **Convergence loop runs on-device** via `lax.while_loop` — one JAX call drives the full annealing, no Python sync between batches.
-  - **Float32 throughout the JAX path** — bench showed f64 is 2× slower on consumer GPUs (1/32 throughput) with no quality benefit at production run lengths.
-  - **The smooth kernel accepts a move on the summed local delta, not on `score_new < score`
-    between two running totals.** On a whole chromosome block with the orientation term at its
-    production weight the float32 totals are large enough that one unit in the last place
-    exceeds the gain of resolving a shallow overlap, so such moves read as no change and were
-    refused, and the stage plateaued early: with the coil start and the wall the JAX executor
-    left 254 overlapping pairs per thousand beads on GM12878 chr1:1-60 Mb against 103 on numba,
-    the same profile scaled by 2.4, while the two kernels agreed on any block whose totals
-    stayed small. Deciding on the delta, 2026-09-12, brings JAX to 110 with numba's Hi-C. The
-    totals are still carried for the Metropolis ratio and the plateau test. The JAX parity dump
-    changed with it, by design.
-  - **The smooth kernel prefetches: `[simulation_arcs_smooth] prefetch`, default 1, production
-    32 since 2026-09-19.** Measured on GM12878 chr1:1-8 Mb, 93 percent of the stage's rounds
-    accept under one percent of their proposals, and a step on the GPU costs its latency
-    whatever the arithmetic. Above 1 a step evaluates that many proposals against the current
-    state in one vectorised pass, applies the first accepted in draw order, counts only the
-    proposals up to it as consumed and draws the rest afresh, so a round still delivers its
-    serial step count and every applied move is a Metropolis move from the state it was drawn
-    on; the chain has the serial law and the temperature is carried per chain. At 1 the body
-    and its draws are the serial ones, byte identical to before. Smooth wall on the RTX 4060 Ti:
-    chr1:1-8 Mb 57 s to 6 s at 32, chr1:1-60 Mb 420 s to 125 s at 32 and slower at 64, since
-    the kernel's full excluded volume scan is paid once per proposal. Three structures on 60 Mb
-    at 32 against 1: every battery number level, MultiMM 0.665 against 0.669. Numba ignores the
-    key. Unit checks in `tests/unit/test_smooth_levers.py`, sweep in `slurm/ensemble/prefetch_sweep.sh`,
-    reading and numbers in `design/parallel-mc-and-nn-reading.md`.
-  - **The excluded volume and the wall run on a cell grid in the JAX kernel:
-    `[simulation_arcs_smooth] jax_grid`, default no, production yes since 2026-09-19, on
-    launches of `jax_grid_min_beads` (4096) beads or more.** Cells at least `r0` wide on up to
-    48 per axis, capacity twice the fullest starting cell plus four, a table rebuilt every
-    period of about 2,048 proposals and never written between rebuilds: a bead an accepted
-    move carries away is flagged and listed, and a query takes listed beads from the list at
-    their current position and skips them in the cells, so the sum is exact. Bit identical to
-    the full scan on the GPU. Smooth wall on GM12878 chr1:1-60 Mb at prefetch 32: 116 s to 47
-    to 85 s, three structures level with the full scan on every battery number. Two designs
-    lost on the way and are recorded in `design/parallel-mc-and-nn-reading.md`: a per move
-    relink is a batched scatter under the chain vmap that XLA does out of place and copied the
-    table every step, an hour where the scan took two minutes; a sorted order with a binary
-    search per cell was slower and a finer axis was slower, since the rebuild writes the table.
-    Past 32 proposals a batch gets slower, so the floor is now the number of kernel launches in
-    one step. The check needs a GPU, `tests/unit/test_jax_grid.py`.
-  - **Two host and device costs the profile of 2026-09-20 removed, both byte identical by the
-    parity gate on GM12878 chr1:1-60 Mb.** The orientation term scored a trial move by writing
-    the anchor's new vector into a copy of the whole orientation array, and under the proposal
-    vmap XLA materialised that as a broadcast of the array to one copy per proposal, 82 MB a
-    batch on a chromosome and half of every batch's time; the trial score now takes the vector
-    as an argument and the array is never copied. And the launch's initial energies were
-    computed one chain at a time, each a scan of the chain's beads with a host sync between
-    chains, a minute a structure on a trio chromosome; they are one vectorised call per term
-    now. Kernel on chr1:1-60 Mb, 11 chains, 49.0 s to 35.5 s and the preparation before it 6 s
-    to 1 s on the RTX 4060 Ti. Numbers and the per batch composition in
-    `design/kernel-performance.md`.
-  - **`cli.py` auto-forces `ib_workers=1` when `mc_backend=jax`** — multiple Python threads contending for a single GPU is net-negative; restarts go inside JAX via `mc_smooth_chains` (vmap), not via thread pools.
-  - **Several processes on one card: `XLA_PYTHON_CLIENT_MEM_FRACTION`, JAX's own variable, no
-    setting.** ([mc/jax/share.py](gnome3d/mc/jax/share.py)) JAX preallocates 75 percent of the
-    card when its backend starts. Measured 2026-11-12 on the RTX 4060 Ti with JAX 0.11: a second
-    process on a held card gets a smaller pool than it asked for, `memory_stats()` still reports
-    the full 11.7 GiB, the kernels size their launches from that and XLA aborts the process with
-    a failed check in the allocator. Before the backend starts, `configure_gpu_pool` reads the
-    free memory with nvidia-smi. On a free card it changes nothing. On a held card it sets the
-    pool to the free memory less 0.5 GiB for the CUDA context and logs it, and refuses under
-    1 GiB. A fraction set by hand that does not fit the free memory is refused with the numbers.
-    Several instances that share a card on purpose set the variable in each, adding up to less
-    than 1. A process with a smaller pool packs its launches differently, so its structures are
-    not bit identical to a run on a free card; at a fixed pool it reproduces. Unit checks in
-    `tests/unit/test_gpu_share.py`, two instances on one card in `playground/gpu_share_run.py`.
-  - **The smooth stage is threaded numba in production since 2026-11-16, and `auto` picks it
-    from four workers.** Measured on 36 cores against an RTX 3090 on GM12878 chr1: the stage of
-    52 blocks takes 53 to 80 s threaded, 92 s on 8 workers, and 122 to 146 s on the device, and
-    a 10 Mb region of two structures 35 s against 60 s. The relaxation pass follows it onto
-    numba. The arcs solve stays on the device, 20 s against 106 s. Matched seeds are level on
-    the pooled and battery numbers. The L-BFGS-B calls hold BLAS at up to eight threads,
-    `util.blas_threads`, since OpenBLAS on every core spent a 5 Mb region's fit waking them.
-    `design/kernel-performance.md`, section 14. Unit checks in `tests/unit/test_executor_auto.py`.
-  - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
-
-  **Kernel seeding is process-stable.** Every JAX kernel takes its PRNG offset from
-  `util.stable_seed_offset(log.current(), ...)`, a blake2b digest of the active scope path.
-  The scope path separates concurrent kernels. `PYTHONHASHSEED` no longer affects results,
-  so comparing two runs needs no environment override.
-
-  **The batched smooth kernel seeds each chain from its own seed.** `mc_smooth_jax_batch`
-  takes its launch key from the scope alone and folds each problem's `seed` per chain, rather
-  than taking the key from `problems[0]` and splitting it by slot. Every caller supplies one:
-  the smooth stage from the node, and the estimate stage from the parent block and the
-  replicate number, in `estimate_dist._expand_replicates`. A replicate carried no seed before
-  and would have fallen back to its slot. A chain's stream therefore
-  does not depend on how many chains share the launch, on where it sits among them, or on
-  which sub-batch it lands in. That is what lets the grouping change without changing the
-  algorithm. The arcs kernel and the multi-chain restart kernel still split by slot, which is
-  correct for them: their widths come from settings rather than from grouping.
-
-  What remains is arithmetic, not algorithm. XLA vectorises across the chain axis, so a
-  reduction does not associate the same way at every launch width, and the first difference is
-  one unit in the last place of the float32 score. Monte Carlo amplifies that into a different
-  structure, so a run reproduces at a fixed configuration but structures cannot be compared bit
-  for bit across launch widths. `tests/unit/test_batch_seeding.py` compares at equal width for
-  exactly this reason, and measures the width effect separately.
-
-  Why not in the reference: 3dgnome is CPU-only. The JAX port is a Python-side acceleration of the same algorithm; numerical results agree with numba within float32 RNG-trajectory noise. Harness/parity tests run with default settings (`mc_backend=numba`), so the new backend doesn't affect the parity baseline.
-
-- **Multi-GPU sharding unit: `[simulation_backend] multigpu_mode = groups | within | off`,
-  default `groups`.**
-  The batch strategy splits a dispatch into groups by batch key, then runs the groups. `groups`
-  makes the group the unit of parallelism, keeping each one whole on one device and running
-  different groups side by side. `within` is the older behaviour, splitting one group's IBs
-  across devices. `off` pins to a single device.
-
-  `within` scales only as far as groups are wide, and they are not. A chr1 smooth dispatch is
-  252 groups, 58% of its time in groups holding a single IB, and the estimate-dist dispatch is
-  252 groups with 69% of its time single-IB, because the shape ladder puts differently sized
-  IBs in different buckets. Measured on the chr1 profile, `within` tops out at 1.26x however
-  many GPUs it is given, while whole-group sharding projects 7.96x on 8 and 15.84x on 16.
-
-  `groups` is also the byte-exact one. The kernels key each IB's per-step RNG on its position
-  within the launch, so an unsplit group draws what it would have drawn on one device and the
-  output is identical whatever the device count. `within` changes the draw. Verified two ways
-  on a chr1:1-8000000 TAD-block run: 4 devices against 1 agree on all 3390 beads, and a
-  1-device run on this code is byte-identical to the same run at the previous commit.
-
-  Results are applied in group order on the calling thread however the groups interleaved, so
-  DAG growth stays deterministic.
-
-  Why not in the reference: 3dgnome is CPU-only and single-process.
-
-- **Merged smooth launches: `[simulation_backend] merge_smooth_launches = yes`, default yes.**
-  ([pipeline/ib/smooth.py](gnome3d/pipeline/ib/smooth.py) `batch_key`,
-  [mc/jax/smooth.py](gnome3d/mc/jax/smooth.py) `_chunk_plan`)
-  `SmoothStage.batch_key` was `(heat, orn, comp, bead bucket)`, so a set of interaction
-  blocks agreeing on every energy term was still split into one launch per bead bucket. Cost per
-  step in the batched kernel is flat in the launch width, so that split bought nothing. Measured
-  on a real chr1 GM12878 run, 55.8 percent of smooth time sat in launches of four blocks or
-  fewer at 4.8 to 22 us per step per block, against 0.18 to 0.69 in the sixty four wide
-  `estimate_dist` launches in the same log.
-
-  With the flag the bucket leaves the key and `mc_smooth_jax_batch` packs the group into as few
-  launches as device memory allows, largest first so a launch's shape is fixed by its first
-  member. Memory is the only reason to split: the heat target is one `(B, B)` float32 per chain,
-  and merging every heat carrying group of one real dispatch would need 25.8 GB on a 16 GB card.
-  Modelled on two real runs the merge is 3.7x on GM12878 chr1 and 3.5x on H1ESC chr1.
-
-  Two changes make the merge safe, both unconditional because neither is a feature. Each chain
-  seeds from its own seed rather than its slot, so regrouping does not change the draw. And a
-  converged chain holds its state while the rest of the launch runs on, so a small block ends
-  where it would have ended alone instead of annealing for as long as the largest block needs.
-
-  Both change results once, on every JAX smooth run, and no flag restores the old streams.
-  `merge_smooth_launches = no` restores the old grouping only.
-
-  A merged dispatch is one or two groups where it used to be five to nine, so the multi GPU
-  `groups` mode has fewer groups to shard. The wide groups it produces are what `within` needs,
-  so the two changes point at different modes. Nothing here re-tunes that choice.
-
-  Why not in the reference: 3dgnome is CPU-only and single-process.
-
-- **Boundary stitch: `[boundary_stitch] use_boundary_stitch = yes`, default no, production no since 2026-09-19.** Off at chromosome scope, kept for block scope, see the relaxation entry.
-  ([gnome3d/pipeline/stitch.py](gnome3d/pipeline/stitch.py))
-  The per block chains place anchors only through their own block, so the last anchor of one
-  block and the first anchor of the next have no term coupling them. Measured on GM12878
-  chr1:1-60 Mb at matched separation of 562 kb to 1 Mb, an interior pair sits at 0.092 of
-  `genomic_length_to_distance` and a boundary pair at 5.42, a factor of 59. This pass runs after
-  every chain of a chromosome is done, in `reconstruct.py::_assemble`, and moves each block as a
-  rigid body so every boundary pair sits at the distance the structure's own interior pairs
-  realise at that separation. Rigid means the arcs and smooth results inside a block are
-  untouched.
-
-  Energy is a two sided spring per boundary plus a soft excluded volume between block
-  centroids with a radius per pair of the two blocks' radii of gyration added, or one constant
-  radius for every pair when `exclusion_radius_ib` is positive, minimised with L-BFGS-B over one
-  rotation and one translation per block. The radius came from `genomic_length_to_distance` of
-  the centroid gap at first, 153 units against block radii near 8 on chr1:1-60 Mb, which made
-  the term a compaction penalty instead of an overlap guard. There is no chain bond and no confinement. Keys: `spring_weight` (1.0), `ev_weight`
-  (1.0), `max_iter` (2000, which on a trio chr1 of 1,494 blocks costs 85 seconds and reaches a
-  worst boundary of 1.32 times the curve, against 6.0 at 500 and nothing further at 5000). The pass uses no RNG and runs on the calling thread, so flag off is
-  byte exact and flag on reproduces. Unit checks in `tests/unit/test_stitch.py`.
-
-  **The energy carries its own gradient, and it has to.** Six variables per block puts a real
-  chromosome in the thousands of dimensions, 8,964 for the 1,494 blocks of a trio chr1, where a
-  finite difference gradient costs one evaluation per variable and scipy's default budget of
-  15,000 evaluations buys about one step. The pass ran and moved almost nothing, which showed up
-  as boundaries realised at up to 80 times what the structure's own interior realises at that
-  separation, the visible strands between blocks. Validation had used an 11 block region, 66
-  variables, where the default budget was 220 gradients and the pass converged. The gradient is
-  Gallego and Yezzi's for the rotation derivative, chained through the boundary springs and the
-  centroid excluded volume, and `maxfun` is set from `max_iter` so the budget cannot bind first.
-  Replayed on a finished trio chr1 the worst boundary falls from 79.6 to 1.32 times the curve
-  and the longest from 932 to 13 model units. `playground/restitch_model.py` runs both end of
-  run passes on a finished cif, recovering block membership from the densification rule, so a
-  change to either can be measured without paying for a reconstruction.
-
-  Why not in the reference: the reference has no term across block boundaries either, which is
-  why its structures show the same scatter. See `design/anchor-placement.md`.
-
-- **The distance law.** ([gnome3d/polymer.py](gnome3d/polymer.py), `Settings.polymer_law`,
-  [pipeline/coarse/heatmap.py](gnome3d/pipeline/coarse/heatmap.py), [data.py](gnome3d/data.py))
-  One law sets every distance, in bead units, one bead being the distance at
-  `target_bp_per_subanchor`. A pair with no contact sits at `max(1, (s / s0) ^ nu)`. A loop of
-  strength `q` pulls its pair to `1 + (background - 1) / (1 + q / q_half)`, so a saturated loop
-  sits at one bead and never inside; `q` is the PET count over the typical count at that span
-  fitted on the run's own arcs. A heatmap cell sits at the background times observed over
-  expected to the minus third, the expectation taken within the heatmap at that separation,
-  and at the chromosome level, where pairs have no separation, at the mean chromosome span.
-  `nu` is measured at load from the singletons every run reads, on the whole chromosome set
-  before the region filter. The fit refuses what is not a polymer decay and says so in a
-  STATUS line with the reason, then uses 0.285 as a named fallback; every ChIA-PET singletons
-  file is refused, since it is enrichment filtered around CTCF, and every Hi-C file is
-  accepted. A `Settings` with no law attached builds one from `polymer_exponent` or the
-  fallback and warns once, so no distance call ever answers from a constant silently. Two keys,
-  `polymer_exponent` (0 measures, a positive value pins) and `contact_half_saturation` (1.0).
-
-  It replaced, on 2026-09-06, the reference's chain law, PET law and heatmap frequency law and
-  two later patches on the PET law: fifteen constants copied from one config with no derivation
-  and byte identical across cell lines, three absolute scales for one quantity in a unit with no
-  meaning, and a derived exponent that was a mean over three of our own Hi-C files typed in as
-  a default. Fitted on the inputs we run that exponent is 0.333, 0.299 and 0.298 for GM12878, H1ESC
-  and HFFC6 on the 25 kb files, and 0.343 on the deep GM12878 map. Earlier figures of 0.275,
-  0.299, 0.192 and 0.072 came from a fit that counted rows per separation rather than their
-  counts, fixed 2026-09-08; the fit is contact probability per grid separation now. Measured against the old laws on GM12878, H1ESC and
-  HFFC6, chr1:1-60 Mb, five structures each, raw contact maps: Pearson, Spearman and SCC up on
-  every cell, MultiMM level, anchor overlaps down 96 to 98 percent, subanchor overlaps halved,
-  cross block overlaps down four to ten times. The realised exponent runs 1.3 to 1.5 times the
-  measured input on every cell, which one correction on the background exponent would absorb;
-  not built. The old keys are not read and warn if present. Unit checks in
-  `tests/unit/test_polymer.py` and `tests/unit/test_arc_matrix.py`; `playground/ps_from_singletons.py`
-  fits the exponent on a file by hand. See `design/anchor-placement.md`, option H.
-
-  **Tried and rejected, 2026-09-06: every arcless pair on the background.** The realised
-  exponent overshoot is a kink, not a slope. By band the polymer arms were 0.09 to 0.20 under
-  100 kb and 0.34 to 0.48 above, against inputs of 0.20 to 0.30, since loops pull pairs to
-  touching and nothing holds the arcless pairs between them. The obvious fix, a weak spring
-  holding every arcless pair at the background in place of the `1/d` repulsion, won a sweep on
-  eight real blocks (short band onto the input, overlaps 101 to 27 per thousand) and then lost
-  the three cell battery on every Hi-C statistic: GM12878 Pearson 0.462 to 0.329 and SCC 0.191
-  to 0.130, H1ESC 0.258 to 0.119, HFFC6 0.267 to 0.181, with Rg halved and overlaps up. The
-  kink went, but everything came out flatter than the input. The reason is embedding: an all
-  pairs spring network asking every pair for `s^nu` with `nu` below a third cannot be realised
-  in three dimensions, so the least squares compromise is a mean field blob. The `1/d` never
-  constrained an arcless pair, which is why it did not hit this. The sweep could not see it
-  because every isolated block came out at Rg 3.8 whatever the weight. Reverted the same day;
-  the sweep is kept as `playground/background_weight_sweep.py` for the record and the battery
-  reports the two band exponents from here on. Any future fix for the kink has to be short
-  range only, holding pairs under about 100 kb and leaving the long range free.
-
-  **Built as that, opt in, under measurement: `[springs] background_weight` (0, off) and
-  `background_range_bp` (100000).** An arcless anchor pair inside the range carries minus the
-  background in the arcs matrix and the kernels score it as the log symmetric spring; every
-  other arcless pair carries `-0.5` and keeps the truncated repulsion. A background is never
-  under one bead, so sign and magnitude tell the two kinds apart without a second matrix. The
-  weight sits in every kernel beside the cutoff rather than replacing it, so weight zero is
-  byte exact against the previous commit. JAX matches numba on a matrix carrying both arcless
-  kinds, and the batched driver runs with the background on, both in
-  `tests/unit/test_arc_matrix.py`. Swept in `playground/short_range_sweep.py`. Production since
-  2026-09-07 at weight 0.1: with it the anchors sit on the input curve on all three cells,
-  within blocks and across them. Weights 0.3 and 1.0 pull the closest pairs closer and cost
-  Hi-C at every step.
-
-  Why not in the reference: the reference has the three laws and their constants. This is what
-  they were standing in for.
-
-- **Loop stiffness by strength: `[springs] arc_weight_exponent`, default 0, measured
-  2026-09-22 and left at 0.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
-  `arc_weight_matrix`, [mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py),
-  [mc/jax/arcs_energy.py](gnome3d/mc/jax/arcs_energy.py), the arc terms of
-  [mc/numba/terms.py](gnome3d/mc/numba/terms.py))
-  Every loop pulls with the same spring and only its target differs, so once two targets sit
-  near one bead the stronger loop has nothing to win a competition with. Measured on the trio
-  chromosomes, the strongest third of loops is realised worst, at 0.35 to 0.49 against 0.7 to
-  0.8 for the rest, and the loss follows how many loops share an anchor. With the exponent
-  above zero each arc pair carries its strength to that power as a weight on its spring
-  constant, in the solver's energy on both backends and in the numba annealer's arc term; the
-  targets, the background springs and the repulsion never read it. The weight matrix rides
-  beside the target matrix as float32 and is None at zero, so the kernels take the path they
-  took. The JAX annealer does not carry it and refuses a weighted problem rather than ignore
-  the weights. Unit checks in `tests/unit/test_arcs_solver.py`.
-
-  Measured at exponent 1 on the nine trio chr1 ensembles on the HGSVC map, ten conformations
-  each, against the same arm at zero: target against realised over all loops 0.55 to 0.67 from
-  0.54 to 0.66, within a span band up 0.01 to 0.06, the median realised over target 1.26 to 1.63
-  from 1.29 to 1.65, and the strongest third level at 0.33 to 0.49 from 0.35 to 0.49 while the
-  weak and middle thirds lose 0.005 to 0.02; every expression statistic level. A strong loop's
-  competition is with the background springs and the repulsion among its anchor's partners,
-  which the weight does not touch, so a stronger spring does not let a crowded loop close.
-  Numbers in the triosformer project's tracker, `design/expression-from-structure.md` there,
-  idea 37.
-
-  Why not in the reference: the reference has one spring constant per direction for every arc.
-
-- **Loop dropout per conformation: `[springs] loop_dropout`, default no, under measurement
-  since 2026-09-23.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
-  `dropout_keep`, `_active_arcs`)
-  A PET count is a frequency across cells, and every conformation of an ensemble solves the
-  same targets from a different start, so a loop's count reaches the ensemble only through
-  its target distance, which saturates. With the flag each conformation keeps a loop with
-  probability `q / (q + loop_dropout_scale)`, `q` the law's strength, and a dropped loop
-  leaves its pair arcless for that conformation, so the ensemble mean carries the loop's
-  frequency and a person's count of a shared loop reaches the mean structure. The draw comes
-  from a generator seeded by the conformation, the joint solve's seed or the block's, apart
-  from every other stream, so a run reproduces and the gate holds with the flag off. Kept
-  loops keep the law's target; the anchor set, the densification and the orientation term
-  never read the draw. Measured before it was built, triosformer's tracker idea 43: its 2D form puts the shared loops'
-  strength at +0.03 to +0.06 of the loops' +0.10 person specific part, which bounds what it
-  can carry. Unit checks in `tests/unit/test_arcs_solver.py`.
-
-  **Kept loops at contact: `[springs] loop_contact`, default no, under measurement since
-  2026-10-27.** With it a loop a conformation keeps is held at one bead, touching, instead of
-  the law's part way target, so with the dropout a loop's strength sets how often its anchors
-  are in contact rather than how far they are pulled. Measured by triosformer's loop bench
-  before it was built: a CTCF loop of 3 to 4 PETs asked for two thirds of the background in
-  every conformation sits closer than a control pair on the mean and meets its anchors 0.60
-  times as often within 1.5 beads, since the spring holds it at four to five beads and the
-  control reaches contact by its spread. Off is byte exact. Unit checks in
-  `tests/unit/test_arc_matrix.py`.
-
-  Why not in the reference: the reference solves every arc in every structure.
-
-- **Transcription factories: `[factories] weight`, default 0, with `radius` and
-  `[data] anchor_activity`, under measurement since 2026-09-23.**
-  ([mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py) `factory_energy_grad`,
-  [mc/jax/arcs_energy.py](gnome3d/mc/jax/arcs_energy.py) `DeviceFactoryEnergy`,
-  [pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `calc_anchor_activity`)
-  RNAPOL2 loops enter as pairwise springs like CTCF's, with no many body form. With the
-  weight above zero each anchor carries an activity, the largest value of the track's
-  intervals overlapping it, a broadPeak's signal or a bedGraph's value, and an active anchor
-  is pulled toward the active anchors near it through `w a_i (log(1 + A) - log(1 + S_i))`
-  with `S_i = sum_j a_j exp(-d_ij / r)` and `A` the total activity: a bead gains from joining
-  one group and little from a second, and the term is never below zero, which the Metropolis
-  rule needs. It is in the solver's energy on both backends, the gradient built in two passes
-  since an anchor's move changes every group it is in; the annealers refuse it rather than
-  ignore it, since the term needs a group sum kept per anchor that the local scorer does not
-  have. Weight zero is byte exact. Unit checks in `tests/unit/test_arcs_solver.py`.
-
-  Why not in the reference: the reference has pairwise arc springs and nothing collective.
-
-- **Arcs confinement radius from the law: `[confinement] packing_factor_arcs = 0`, default 1.5.**
-  ([pipeline/ib/arcs.py](gnome3d/pipeline/ib/arcs.py) `settings_for_block`,
-  [polymer.py](gnome3d/polymer.py) `radius_of_gyration`, `confinement_radius`)
-  Above 100 kb nothing holds an arcless anchor pair but the block's confinement sphere, and its
-  radius was the packing factor times the mean arc target times the cube root of the anchor
-  count, a copied constant on a formula with no derivation. Measured on three cells, blocks
-  under 200 kb came out the size the law says and blocks over 2 Mb two to three times it, and
-  every pair beyond 100 kb ran away in proportion, 2.3 times the law at 1.5 Mb.
-
-  At factor zero the radius is derived: a chain of span S whose pairs follow the law has a
-  radius of gyration of `S^nu / sqrt(2 (2 nu + 1)(nu + 1))`, the Gaussian chain's N over 6 at
-  nu one half, and a uniform sphere with that radius of gyration has radius root five thirds of
-  it. The one assumption is that a confined block fills its sphere evenly. The value reaches the
-  annealer, the solver and the JAX kernel as an explicit radius on a per block copy of the
-  settings. The batch executor runs a launch on one settings and refuses rather than run every
-  block at the first block's radius. Unit checks in `tests/unit/test_confinement_radius.py` and
-  `tests/unit/test_polymer.py`.
-
-  Production since 2026-09-07 as the principled form. Alone it moved nothing, the old formula
-  already landed near it. What inflates a block is the arcless repulsion's reach; cutting that
-  puts the long range on the law and the blocks in a pile, Hi-C down and cross block overlaps
-  up nine times, which was the thin input: with the deep maps and the contact background the reach is
-  1.5 in production, see that entry.
-
-  Why not in the reference: the reference has no confinement at all.
-
-- **The smooth step and the subanchor heat term, production 2026-09-07.** `noise_smooth` is one
-  bond per proposal, not the reference's five. At five the bonds never settle and come out 1.2
-  to 1.4 times their target, the chain folds and the distance curve is flat under 100 kb; at
-  one they sit at 1.05 and the curve follows the law from 10 to 100 kb, on H1ESC Hi-C Pearson
-  0.244 to 0.338. `use_subanchor_heatmap` is off: inert on shallow Hi-C, where the pass is
-  skipped for lack of active pairs, and on deep Hi-C it pulls bonds to 0.83 of target once
-  the step lets them settle, GM12878 Pearson 0.476 without it against 0.435 with, at a fifth of
-  the wall. Three cell battery: Pearson and SCC up on every cell, Spearman level, MultiMM down
-  8 to 14 percent. See `design/anchor-placement.md`.
-
-- **Contact data for arcless pairs beyond the short range: `[springs] use_contact_background`,
-  default no.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
-  `add_contact_background`)
-  On the tree's own interaction blocks, which run until a position no arc covers and are 9 on
-  H1ESC chr1:1-60 Mb at a median of 2.65 Mb, pairs up to 2 Mb apart are within one block 93
-  percent of the time, so the range above 100 kb belongs to the arcs stage. An arcless anchor
-  pair there had nothing behind its placement but the repulsion's reach and the sphere, and
-  compacting those pairs without data scrambled the block's own contact map. With the flag the
-  anchor level contact map, the run's singletons binned by anchor, is converted with the law as
-  every heatmap is, and an arcless pair beyond the range whose cell puts it under the background
-  carries minus that distance, which the kernels hold with the background spring. A pair at or
-  below its expected contact keeps the repulsion, so the held set stays sparse; holding every
-  pair at a power law could not be embedded and was rejected. No kernel change. Unit checks in
-  `tests/unit/test_arc_matrix.py`.
-
-  Production since 2026-09-08 together with `arcs_repulsion_cutoff_factor` 1.5, on the deep
-  4DN maps. The files the project had used held 7.8 million, 104 million and 193 million
-  contacts genome wide, so the term held under 1 percent of the far pairs and did nothing;
-  `legacy/validation/manifests/<CELL>_hic.json` now fetch the 2.5 to 4.0 billion contact maps and
-  the shallow ones are kept as `<CELL>_hic_shallow.json` for the record.
-  With those as input, the term on and the reach at 1.5, the structures follow the law from
-  20 kb to 2 Mb within a quarter on three cells, where before every pair beyond 100 kb ran
-  away by 1.3 to 1.8 times; Hi-C against the deep maps is up on GM12878 and HFFC6 and a shade
-  down on H1ESC. Reach 1.0 compacts past the law and doubles cross block overlaps. On a thin
-  map the term holds next to nothing and that is allowed: no input has to be deep, and the
-  reach at 1.5 then behaves as it did on the thin input. Anchors are about 13 kb wide against
-  25 kb pixels, so even a dense map reaches only about 4 percent of the far pairs through
-  the singletons; a denser anchor level map is a data path change and is not built.
-
-  **Tried and dropped, 2026-09-19: the map itself as the background's source.** The run's
-  singletons are thinned 230 fold and binned to anchors that hold few bin centres, so they hold
-  no pair beyond 100 kb, while the raw 25 kb map has 70 million contacts in GM12878 chr1:1-60 Mb
-  and a quarter of the 0.5 to 2 Mb anchor pairs and a tenth of the 2 to 10 Mb pairs three
-  Poisson standard deviations over the expectation at their separation. Reading each pair's
-  pixel from the mcool and holding the significant ones at the law's contact distance was
-  measured over fourteen arms, thresholds 2 to 12 sigma, pooled and not, symmetric with pairs
-  under expected held out, at a tenth to full pull, and across blocks only: SCC 0.374 to 0.39
-  or 0.40 and Pearson 0.312 to up to 0.346, the first compartment eigenvector correlation of
-  ours above 0.1, and on every arm Rg down 15 to 20 percent, within block overlaps two to four
-  times and cross block four to eight times production, the saddle down. A held pair can only
-  pull in, since beyond a few megabases the expectation is under a count and nothing is ever
-  significantly below it; the within block pairs carry the correlation and the across block
-  pairs the shrinkage, and weakening the pull loses both together. Removed the same day.
-  Tables in `design/validation-2026-09.md`; `playground/far_pairs_from_map.py` measures what a
-  map holds.
-
-  Why not in the reference: the reference scales arc targets by the anchor heatmap and has no
-  term on an arcless pair beyond its 1/d.
-
-- **A contact term in the block layout: `[simulation_ib] heatmap_weight`, default 0.**
-  ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py) `block_heatmap_distances`,
-  [mc/numba/ib.py](gnome3d/mc/numba/ib.py))
-  The blocks of a segment were laid out by chain bonds, excluded volume and a sphere, with no
-  contact data at all. The run's contacts are binned by block, the bins meeting halfway between
-  neighbours, normalised and converted with the law the way the segment heatmap is, and the
-  block kernel scores the matrix as its heat term. Weight zero is byte exact. Unit checks in
-  `tests/unit/test_ib_heatmap.py`, which also record that at the defaults' `max_temp_ib` of 20 the
-  layout never cools and ends with bonds nine times their target, while production's 5 settles.
-
-  Why not in the reference: the reference has no block layout pass at all.
-
-- **Cross block relaxation: `[relax] use_cross_block_relax = yes`, default no, production yes since 2026-11-16.**
-  Production with the arcless repulsion off, which tripled cross block overlaps on a chromosome;
-  the pass with `local_window` 1 takes GM12878 chr1 from 62 to 14 per thousand. The paragraph
-  below is the measurement that kept it off from 2026-09-19 with the repulsion on. With
-  `within_blocks` and `ev_radius` 1.0, production since 2026-11-16, overlapping pairs inside a block
-  move too: on CTCF only inputs the coils of two gaps whose anchors sit close met 240 to 300 times
-  per thousand beads, and GM12878 chr1 goes from 246 to 37 within blocks at level balanced SCC.
-  Both end passes were measured at chromosome scope on GM12878 chr1:1-60 Mb, three structures
-  per arm: Hi-C level on all four arms, the joint solve already holding boundary pairs at a
-  median of 1.03 times the curve and none over 2.34, the stitch adding a tenth of Rg through its
-  centroid excluded volume and 17 cross block overlaps per thousand that the relaxation then
-  removed. Both are kept, off, because a chromosome too large for one joint solve is solved by
-  block, and there they are what places one block against the next. `design/validation-2026-09.md`.
-  ([gnome3d/pipeline/relax.py](gnome3d/pipeline/relax.py))
-  The smooth stage's excluded volume acts within one block and the stitch guards block
-  centroids only, so once blocks are stitched together nothing acts between their beads and two
-  coils pass through each other. On GM12878 chr1:1-60 Mb the arm that agrees best with Hi-C
-  had 11.9 percent of its beads within one bond of a bead from another block, four times the
-  parity value. This pass runs the smooth kernel once over the whole chromosome, numba or JAX
-  by `mc_executor_smooth`, with excluded volume on every pair and every anchor held fixed, so
-  the arcs and the stitch are kept and only the subanchor coils re route. Bond targets are the
-  bonds as they are.
-
-  Three things it needs to work, each learned on a toy. The excluded volume acts at 1.5 bonds by
-  default so that at equilibrium nothing is left under one bond, where contacts are counted. The
-  chain springs carry their own weight, `bond_weight` (10), since at the smooth stage's 0.1 the
-  excluded volume tears the coil instead of re routing it. And a little temperature, `temp`
-  (0.1 of `max_temp_smooth`), because untangling two coils needs a bead to cross a neighbour's
-  shell and a greedy pass stalls with contacts left. Keys: `ev_weight` (10), `ev_radius` (0 for
-  1.5 bonds), `noise` (0.5 bonds). Runs after the stitch in `reconstruct.py::_assemble`. The
-  gate is `cross_block_contacts`. Unit checks in `tests/unit/test_relax.py`.
-
-  **`[relax] local_window` (default -1, off) is the better fix.** The round count is proportional
-  to how many beads may move, measured on a real 129,457 bead chromosome at 19 rounds for 159
-  movable, 104 for 1,177 and 850 for 11,766, which extrapolates to the 6,201 a trio run took with
-  all 117,660 subanchors movable. A window of `k` keeps the beads touching another block and `k`
-  chain neighbours either side, so the chain can take up the slack, and freezes everything else.
-  With 53 beads touching, a window of 1 leaves 159 movable and about 19 rounds instead of 6,201.
-  A negative value keeps every subanchor movable, which is what the pass did before.
-
-  It runs on the wrong kernel as well. It picks from `mc_executor_smooth`, which production sets
-  to `batch`, so a pass that is one single chain runs on the JAX kernel where one chain is its
-  worst case. Measured against the trio run's own numbers, 22.6 us a step there against 6.6 on
-  numba with the cell grid.
-
-  Why not in the reference: the reference has no term across blocks at any stage. See
-  `design/anchor-placement.md`, option E.
-
-- **Solving the arcs stage: `[simulation_arcs] solver = mc | lbfgs`, default `mc`, production
-  `lbfgs`.** ([gnome3d/mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py))
-  The arcs landscape is a funnel. Ten Monte Carlo starts from perturbed seeds land within one
-  percent of the same energy at a coefficient of variation of a third of a percent, and
-  temperature makes no difference to where a run converges, so there are no basins for a
-  stochastic search to escape. A quasi Newton descent on the same energy therefore reaches the
-  same minimum.
-
-  `arcs_energy_grad` is the energy `mc_arcs_numba` scores, its arc term plus its truncated
-  repulsion, an excluded volume and confinement, with the cutoff and the confinement centre and
-  radius derived the way that driver derives them, and its gradient. The genomic floor is not
-  implemented and is refused rather than dropped. Restarts, the per anchor start noise and best
-  of are unchanged, so an ensemble still comes from the perturbed starts. Keys: `solver`,
-  `solver_iters` (200).
-
-  Measured over five structures on chr1:1-60Mb the two arms agree on every quality number, Hi-C
-  Pearson 0.403 against 0.405, Spearman 0.318 against 0.321, SCC 0.110 against 0.109, MultiMM
-  0.331 against 0.331, distance exponent 0.240 against 0.249, and the within block anchor
-  overlap rate 89.2 against 89.1 per thousand beads. The stage's two calls fell from 492s to 6s
-  and from 500s to 23s, and the whole five structure run from 1h57m to 1h13m.
-
-  It is a speed change and nothing more. The anchor overlap rate is identical to three figures,
-  so a faster solver of the same energy does not touch the within block compaction that
-  `design/anchor-placement.md` exists for.
-
-  Two ways it could be asked for and silently not run, both refused. An unrecognised name is a
-  `ValueError` rather than a fall through to the annealer. And the batch executor is a JAX
-  annealer with no solver in it, so it raises rather than annealing; the solver needs
-  `mc_executor_arcs = serial` or `threaded`, which is what `CANONICAL` sets. Unit checks in
-  `tests/unit/test_arcs_solver.py`.
-
-  **The solver's energy on the device: `mc_executor_arcs = batch` with the solver, production
-  since 2026-09-20 with `solver_iters` 800.** ([gnome3d/mc/jax/arcs_energy.py](gnome3d/mc/jax/arcs_energy.py))
-  The executor setting decides where every stage runs and `batch` means JAX, so the solver
-  follows it: under `batch` each block is solved in turn with its energy on the device, on its
-  own settings and from its own start, and under `serial` or `threaded` on the CPU. At
-  chromosome scope the solve was most of a conformation's wall and ran on the CPU while the
-  GPU idled: every pair of the chromosome visited against a dense target, up to 450 ms an
-  evaluation on a trio chromosome, and the 200 iteration cap binding on every solve, which
-  the solver's log line now reports. The device evaluates the same energy term for term in row
-  chunks in float32, the rows summed in float64 on the host, so an evaluation costs one read
-  of the target matrix; L-BFGS-B stays on the host. The energy and gradient agree with the
-  numba kernel to about 1e-6 relative on a block carrying every kind of pair, and a solve on
-  either side reaches the same energy; the two are not byte identical, since the summation
-  order differs. On the RTX 4060 Ti, GM12878 chr1, 9,195 anchors: 200 iterations 31.6 s on
-  the CPU to 4.8 s, 800 iterations 104.8 s to 13.4 s at energy 6274 against 6266, and a whole
-  conformation 419 s to 144 s with the cap at 800. Three structures on chr1:1-60 Mb, CPU at
-  200 against device at 200 and at 800: Pearson 0.312, 0.311, 0.312, SCC 0.374, 0.366,
-  0.366, MultiMM 0.666, 0.663, 0.665, Rg 23.4, 23.3, 23.2, anchor overlaps 2.8, 2.7, 2.5 per
-  thousand; the saddle 1.31, 1.38, 1.00 on three structures, which is noise at that count.
-  Float64 on the device would need JAX's 64 bit mode, which is process wide and changes the
-  smooth kernel's integer draws and its loop carries, so it is not used. Unit checks in
-  `tests/unit/test_arcs_solver.py`.
-
-  **The solve stops on the energy: `[simulation_arcs] solver_tol`, default 0, production 1e-6
-  with `solver_iters` 5000 as the safety, since 2026-09-22.** The cap bound on every trio
-  chromosome at 800 and at 3,000. Traced to 8,000 iterations on a chromosome of 23,080 anchors,
-  the relative improvement per iteration falls to 1e-5 by 830 and to 1e-6 by 2,400 and then
-  sits near 1e-6 with no plateau; the energy at 800 is 1.7 percent above the value at 8,000, at
-  2,400 under one percent. The tolerance is L-BFGS-B's own `ftol`, so at zero the options are
-  unchanged and the parity gate holds. `GNOME3D_ARCS_TRACE` names a file that receives every
-  evaluation's energy, which is how the value was chosen, `playground/trace_analysis.py`.
-
-  The annealer is kept by decision, 2026-09-06, not as a leftover. The solver's justification
-  is a funnel landscape measured on a few real blocks. A dataset or an energy change that
-  breaks that assumption has the annealer to fall back on, and the annealer is the reference's
-  own method, so it is the comparison arm for replicating results. Do not propose removing
-  `solver = mc`, its schedule keys or the JAX arcs kernel.
-
-  Why not in the reference: the reference anneals this stage too.
-
-- **Chromosome scope for the arcs stage: `[simulation_arcs] scope = block | chromosome`,
-  default block, with `start = centroid | walk` and `[confinement] weight_arcs`.**
-  ([gnome3d/skeleton.py](gnome3d/skeleton.py) `joint_arcs_solve`,
-  [gnome3d/pipeline/ib/arcs.py](gnome3d/pipeline/ib/arcs.py) `walk_start`)
-  A compartment is a pattern over many blocks, and at block scope nothing places one block's
-  anchors relative to another's but the block layout and the stitch. At chromosome scope every
-  anchor of a chromosome is solved as one problem, each block's anchors starting at the
-  centroid the block layout gave it, on a walk at the law's distance per gap under `walk`, with
-  the target matrix built over the whole chromosome so the loops, the contact background and
-  the compartment term act across blocks, and the law's sphere for the chromosome's span held
-  at `weight_arcs`. The per block arcs stage then passes its anchors through and the chains,
-  the stitch and the relaxation run as at block scope.
-
-  Measured 2026-09-10 on GM12878 chr1:1-60 Mb with the chromosome as one block, before this
-  scope existed: every anchor at one point collapses the solve to Rg 14 against production's
-  22, the walk start alone leaves it at 44, and the walk with the sphere at weight 10 lands at
-  22.9 with Pearson 0.303 against 0.270, SCC level, MultiMM 0.572 against 0.628, cross block
-  overlaps level and the compartment eigenvector correlation 0.22 against 0.05 with the term
-  off. The start decides the long range structure because the arcs energy has no term between
-  far pairs. Block scope, centroid start and weight zero are byte exact by the parity gate.
-  Unit checks in `tests/unit/test_arcs_scope.py` and `tests/unit/test_arcs_start.py`.
-
-  Production since 2026-09-11 at chromosome scope with no arcs sphere, the start the Hilbert
-  curve until 2026-11-16 and the maxent draw since, see the long range entry below.
-  The joint solve holds no arc across blocks and the contact background 80 of 3.5 million
-  cross block pairs on chr1:1-60 Mb, so the start is the long range arrangement, and a
-  Hilbert curve scaled to the law's bond gives it the cube root size growth the maps show
-  beyond a megabase with no weight. Like for like on three cells against the walk with the
-  sphere at 10: Pearson 0.291, 0.318 and 0.304 to 0.295, 0.328 and 0.310, SCC level, MultiMM
-  0.674, 0.667 and 0.673 to 0.631, 0.663 and 0.661, cross block overlaps 176, 173 and 143 to
-  163, 126 and 100, Rg 28, 27 and 30 to 24, 25 and 26. The walk with the sphere was
-  production for one day, 2026-09-10, on the gate that follows. Three cell
-  gate on chr1:1-60 Mb against the deep maps: Pearson 0.271, 0.282 and 0.301 to 0.291, 0.318
-  and 0.304, MultiMM 0.607, 0.568 and 0.652 to 0.674, 0.667 and 0.673, SCC level within 0.01,
-  cross block overlaps 320, 416 and 170 to 176, 173 and 143 per thousand. With the compartment
-  term at 0.5 on top the saddle rises on H1ESC 1.02 to 2.15 and HFFC6 0.71 to 1.09, not on
-  GM12878, and SCC and MultiMM fall 0.07 to 0.10 on every cell, so the term stays opt in.
-
-  **Tried and dropped, 2026-09-19: the loops beyond `max_pet_length` in the joint solve.**
-  The loader sets those loops aside for the segment heatmap, a block scope rule, and at
-  chromosome scope they could join the target matrix as arcs between the anchors holding
-  their ends, 984 loops over 1 Mb on GM12878 chr1. Measured on chr1:1-60 Mb, three
-  structures: Pearson 0.312 to 0.305, SCC 0.374 to 0.360, MultiMM 0.666 to 0.630, Rg 23.4 to
-  19.4, cross block overlaps 20 to 47 per thousand. The arc law sets a loop's target by its
-  PET count alone, so a 3 to 5 PET loop spanning megabases is asked to close to a bead or two
-  and compacts the chromosome. Removed the same day; a span aware target would be option D
-  of `design/anchor-placement.md` again.
-
-  Why not in the reference: the reference solves every block alone.
-
-- **Three smooth stage levers against within block overlaps: `[simulation_arcs_smooth]
-  hard_wall` (default no, production yes), `anchor_cap` (0) and `start` (default line,
-  production coil). The wall and the coil start are production since 2026-09-12.**
-  ([gnome3d/mc/numba/terms.py](gnome3d/mc/numba/terms.py) `batch_mc_nb`,
-  [gnome3d/pipeline/ib/start.py](gnome3d/pipeline/ib/start.py))
-  The smooth stage ended with about 1,200 non neighbour pairs per thousand beads under 0.7 of
-  a bond, twice an ideal chain with no excluded volume, on every cell and every gate. Traced
-  on 2026-09-11: 94 percent are subanchor pairs 4 to 100 beads apart and 86 percent sit in the
-  outer quarter of the radius, where the soft term `0.1 ((r0 - d) / r0)^2` has no force; the
-  stage starts every coil on a straight line, 14,000 pairs per thousand, and pushes out
-  against that term; and the anchors are pinned at 0.4 of an ideal coil's end to end. Widening
-  the soft radius to one bond clears the count but flattens the distance curve and costs Hi-C
-  on three cells, because it pushes every pair under a bond outward, contacts included.
-
-  The wall rejects a move that adds a non neighbour pair under the excluded volume radius or
-  deepens one that is there, so the count only falls and is a hard core once zero. It costs
-  the same neighbour query the soft term makes, on the cell grid. The cap lets anchors move
-  within that many mean bonds of where the arcs put them. The coil start places each gap's
-  subanchors on a compact random bridge between its anchors at the bond targets, drawn from a
-  generator seeded by the problem. Neither rule draws a random number, so with all three off
-  the kernel's stream and the parity gate are untouched. One block, from the stage's own
-  start: soft term alone 766 per thousand; wall 92; compact coil 487; compact coil with the
-  wall 43 at the same Rg and bonds as production; a first clear coil with the wall reaches 0
-  but swells the block by a third, which is why the compact rule is the one built. Both
-  kernels carry the wall and the cap, as static flags on the JAX side since each is a pass per
-  step; the relaxation pass does not. Three cells on the numba kernel, 2026-09-11: coil with
-  the wall against the plain start raises Pearson 0.011 to 0.022 and MultiMM's own metric
-  0.033 to 0.043, cuts overlaps five to seven times within blocks and three to four across at
-  the same Rg, and flattens the short band exponent from 0.33 to 0.21; the cap adds a few
-  percent fewer overlaps and nothing else. Unit checks in `tests/unit/test_smooth_levers.py`;
-  three cell arms in `slurm/ensemble/overlap_levers.sh`.
-
-  Why not in the reference: the reference has no excluded volume at all.
-
-  **Tried and dropped, 2026-11-13: a law spring on bead pairs in the smooth stage.** Traced on a
-  web job, GM12878 chr1:20-25 Mb with CTCF and RNAPII loops, the squares in the contact map are
-  anchorless gaps: anchor pairs sit at 1.0 to 1.2 of the law, subanchor pairs inside a gap at
-  0.76 to 0.87 of it at 50 to 200 kb. Holding every bead pair under a range at the law through
-  the subanchor heat term fixed the gaps, 1.02 at a 200 kb range, and cut overlaps tenfold, and
-  lost the battery on chr1:20-25 and 10-15 Mb at five structures: Pearson 0.504 to 0.330 and
-  0.366 to 0.243, MultiMM 0.671 to 0.630 and 0.613 to 0.545, the 20 to 100 kb contact exponent
-  0.31 to 0.47. A spring at the mean distance removes the fluctuations contacts come from. A
-  wider range was worse and 2 Mb compressed the block, as the all pairs springs did. The smooth
-  wall tripled. Removed the same day; `playground/trace_square_blocks.py`,
-  `playground/law_spring_readout.py` and `slurm/ensemble/law_spring_trial.sh` are the record.
-
-  **Tried and dropped, 2026-11-13: a gap start that follows the law.** Under `start = law` each
-  subanchor took the clear candidate whose distances to the beads 2 to 128 places behind it best
-  matched the law in log, so a gap began at the law's size instead of packed into a ball. No
-  energy term. On chr1:20-25, 10-15 and 35-40 Mb at five structures and chr1 at three, scored
-  on 1-60 Mb, against the coil: Pearson down 0.03 to 0.07 on all four, the distance exponent
-  1.06 to 1.17 times Hi-C down to 0.96 to 1.05, overlaps within blocks down two to twenty
-  times, across blocks on chr1 11.7 to 20.5 per thousand. Gaps ended at about 1.2 of the law,
-  since the smooth stage holds bonds and nothing holds a gap's interior, so its size is the
-  start's. Without the hard wall overlaps rose tenfold, and with the subanchor heat term SCC
-  went negative. Removed the same day; `slurm/ensemble/law_start_trial.sh`,
-  `slurm/ensemble/gap_start_overnight.sh` and `playground/square_blocks/gapnight/` are the record.
-
-  **A maximum entropy gap start: `start = maxent` with `[data] contact_map`, measured 2026-11-14
-  and left opt in.** ([pipeline/ib/maxent.py](gnome3d/pipeline/ib/maxent.py)) Both dropped
-  trials gave every conformation the mean, and a contact map comes from the spread between
-  conformations. Each gap's subanchors are drawn from the Gaussian chain whose mean pair distances
-  are the law's, conditioned on the two anchors, after HIPPS and DIMES (Shi and Thirumalai). With
-  a contact map, a cooler URI at 1 kb, each target is scaled by the count between the 10 kb
-  windows of the pair against a power law fitted on the block's windows, observed over expected
-  to the minus third. One set of springs cannot hold every pair at the law below an exponent of a
-  third, and a distribution can, since the law's mean squared distance is a fractional Brownian
-  motion variogram. The draw comes from the problem's seed. `line` and `coil` are unchanged.
-  On three cells, three 5 Mb regions and chr1 it lost Pearson by 0.01 to 0.05 against the coil
-  with SCC level and the distance exponent nearer Hi-C. The smooth stage widens the drawn gaps to
-  1.2 of the law, where the coil ends under it. `slurm/ensemble/gap_maxent_trial.sh` and
-  `playground/square_blocks/gapme/` are the record.
-  Unit checks in `tests/unit/test_maxent_start.py`, options and trial in `design/gap-fill.md`.
-
-- **Long range in the arcs stage: `[excluded_volume] arcs_repulsion = no`, `[springs]
-  gyration_weight` 0.1, the arcs excluded volume at `auto_factor_arcs` 1.0 and `[simulation_arcs]
-  start = maxent`, production since 2026-11-16.** ([pipeline/coarse/build.py](gnome3d/pipeline/coarse/build.py)
-  `repulsion_range`, [mc/numba/arcs_solver.py](gnome3d/mc/numba/arcs_solver.py) `gyration_windows`,
-  [pipeline/ib/maxent.py](gnome3d/pipeline/ib/maxent.py) `anchor_draw`)
-  Blocks held two to ten times too few contacts from 100 kb to 1 Mb against Hi-C at the right
-  mean size. The arcless repulsion held every far anchor pair of every conformation at one
-  distance, the 1 percent quantile beyond 100 kb at 0.40 to 0.53 of the law, so far pairs never
-  met; an ablation of the arcs terms, one per arm, moved that floor only with the repulsion. Off,
-  the blocks compact a third, so the gyration term holds the radius of gyration of every genomic
-  window of anchors, 100 kb doubling up and tiled twice, at the law's in the solver's energy,
-  which sets the size without holding a pair. The maxent start draws the anchors per
-  conformation from the Gaussian whose pair variances best meet every pair's target, fitted by
-  L-BFGS on a root of the covariance, and the solve descends from it. The cross block
-  relaxation is on with it. Pooled ensemble scores on chr1 1 to 60 Mb, three cells: SCC up 0.017
-  to 0.044, Spearman 0.018 to 0.028, MultiMM 0.06 to 0.10, the distance exponent 1.02 to 1.07
-  of Hi-C's against 1.15 to 1.18, Rg at the law's where production sat 15 percent over it;
-  balanced Pearson down 0.03 to 0.04, which follows the first diagonals. Arms are judged by the
-  pooled map, `playground/ensemble_score.py`, since a per structure score rewards ensembles of one
-  conformation. Unit checks in `tests/unit/test_gyration.py`, `tests/unit/test_maxent_start.py` and
-  `tests/unit/test_arc_matrix.py`.
-
-  Hole beads between blocks, `[holes] use_hole_beads` with `flank_beads`, stay opt in: on this
-  arm they raise Spearman and lower pooled SCC 0.01 to 0.04 on three cells, since a correlation
-  scores an empty hole's zeros against any filled level, while their contacts follow Hi-C's from
-  pair to pair. `design/gap-fill.md` has every arm.
-
-  Why not in the reference: the reference has the `1 / d` repulsion on every arcless pair and
-  solves no size term.
-
-- **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](gnome3d/mc/numba/cells.py),
-  `[simulation_backend] neighbour_grid`, default yes)
-  The excluded volume term sums over pairs closer than `r0` and was implemented as a scan over
-  every bead. Only about fifty beads are ever that close whatever the structure's size, since
-  that is a local density, so on a chromosome the scan did hundreds of times more work than it
-  needed. Profiled on a finished 60 Mb region: the term is 99 percent of an MC step at 42,480
-  beads, growing at 1.29 microseconds per thousand beads, while the useful neighbour count
-  stayed at 57. The initial score was worse, a full pair scan quadratic in the structure.
-
-  Beads are binned into a linked list per cell at cell size `r0`, so the twenty seven cells
-  around a bead hold everything within `r0`. An accepted move unlinks the bead from its old cell
-  and links it into the new one, which keeps the cells exactly `r0` wide with no margin for
-  drift and the grid exact after every move. Both the step term and the initial score go
-  through it.
-
-  Results are identical bit for bit, not merely close, so no trajectory changes and the parity
-  gate is unaffected. Two things make that true: only pairs inside the radius contribute
-  anything, and the sum is built in ascending bead index, the order the full scan uses. A query
-  that finds more neighbours than its buffer holds returns a sentinel and the caller falls back
-  to the full scan, so correctness never depends on a capacity guess.
-
-  Measured on the real structure, same seed, positions and scores identical: 5.3 times faster
-  at 8,000 beads, 11.2 at 20,000, 22.8 at 42,480. It applies to every reconstruction, since the
-  per block smooth stage runs the same term on blocks of up to 16,384 beads, and smooth is most
-  of the pipeline's wall time. The grid is used from 128 beads, where it starts to win: on a
-  block of 1,831 beads with the hard wall the stage takes 4.7 s against 45.9 s on the full
-  scan. Unit checks in `tests/unit/test_cells.py`.
-
-  A query clamps its cell index as the insertion does, since 2026-11-16. The box is the
-  extent the structure had when the grid was built, a bead beyond it is filed in an edge cell,
-  and a query from more than a cell beyond it searched no cell at all, so two beads out there
-  did not see each other, neither the soft term nor the wall. A coil that swells past its
-  starting extent ran without excluded volume in the swollen part. Found on a block the grid
-  and the full scan solved differently. With the clamp the two agree bit for bit at every
-  chain length from 32 to 1,831 beads, wall on and off. The JAX grid clamps both sides and
-  was not affected.
-
----
-
-## Correctness Rules
-
-1. Read the reference source before changing a port of it, and say in the commit what the
-   reference does where the two now differ.
-2. If behavior in the reference source is ambiguous or surprising, document it explicitly
-   rather than working around it.
-3. A change meant to be inert runs the byte exactness gate and is not done until the diff is
-   empty. A change meant to move results runs the validation battery and is not adopted until
-   it wins there.
-4. `.venv/bin/pytest` after touching `gnome3d/`. A new feature gets a unit file under
-   `tests/unit/`.
-5. New physics is measured from the input or documented as a choice, opt in until measured,
-   and then replaces what it supersedes. It is recorded in the divergences section above and
-   in `SETTINGS.md`.
+Do not run `ruff format` on `web/` or `playground/`. Those files are not formatted to this width.
+
+## Writing
+
+`design/writing-rules.md` has the rules in full. They cover comments, docstrings, descriptions of settings, error
+messages, log lines, the text of the site, the notes under `design/`, figures and commit messages. They apply while
+the text is written.
+
+- Plain subject, verb and object. Do not open a sentence or a heading with What, Where, How, Who, Whether, When,
+  Which or Why.
+- No metaphors. Banned words are sits, lives, lands, hears, tells, hands, rides, name as a verb and write for the
+  look of a value.
+- No ", so", "so that", "because" or "unlike X" to justify a design. The reason goes in the commit message.
+- No comma before "and". No capitals for emphasis. Few backticks and few parentheses.
+- Comments are few. A comment exists only for a fact that the code and the names do not show. It has no dashes,
+  colons or semicolons as sentence punctuation.
+- A doc says what the thing is in one or two sentences, as the code is now. A function doc leads with a verb.
+- Code, comments and messages under `gnome3d/`, `tests/` and `web/` do not mention 3D-GNOME's code. A design note
+  may, and calls it the reference.
+- An error message states the one case that happened, the step and the fix.
+- The tool is 3D-GNOMEᴺᴳ in published text. `gnome3d` is the package and appears in code, paths and commit messages.
+
+Design goes to `design/` and is committed. A text that is personal, quotes a person or describes infrastructure goes
+to `docs/`, which is private. A host, a path on a machine, an account and a deployment record are infrastructure. A
+note under `design/` states hardware by its model.
+
+## Records
+
+- `SETTINGS.md` and `gnome3d/production.py` state what holds now.
+- `design/features.md` has every feature with its settings, its code and its measurements.
+- `design/anchor-placement.md` has the distance law, the placement of anchors and the end passes.
+- `design/gap-fill.md` has the gaps, the maximum entropy start, the hole beads and the long range.
+- `design/ab-compartments.md` has the compartment term and the steps that build its track.
+- `design/kernel-performance.md`, `design/parallel-mc-and-nn-reading.md` and `design/intra-chain-parallelism.md` have
+  the performance work.
+- `design/algorithm-improvements.md` has the arcs solver.
+- `design/rnapii-loops.md`, `design/2026-11-11-rnapii-release.md`, `design/2026-11-12-rnapii-figures.md` and
+  `design/microc-loops.md` have the RNAPII work.
+- `design/tools-comparison.md`, `design/validation-2026-09.md` and `design/validation-metrics.md` have the validation.
+- `design/4dn-data-access.md` has the access to 4DN files.
+- `legacy/README.md` has the retired code. `legacy/3dnome/` is read only.
+- `data/memory/MEMORY.md` is the index of the project memory, a local folder outside git.

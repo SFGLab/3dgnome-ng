@@ -91,3 +91,32 @@ in 3D and its expression over 813 genes. Off gives -0.189, bridging -0.194, fibr
 errors. Together with the 10 kb accessibility saddle, where fibre moves away from experiment
 on four regions of four and bridging is inconsistent, both terms stay off. The loops already
 sit at open chromatin, so the track adds nothing the anchors do not carry.
+
+## Building the track
+
+The compartment term reads a text track that is derived from the Hi-C map of the cell line. Build it once per cell
+line.
+
+```bash
+python -m legacy.validation fetch  --manifest legacy/validation/manifests/<CELL>_hic.json --out data/_hic
+python -m legacy.validation tracks --cell <CELL>
+```
+
+This writes `data/<CELL>/<CELL>_compartments.bedGraph`, `<CELL>_tads.bed` and a lockfile with the resolution, the
+source file and a quality number per chromosome. A second run does no work.
+
+The ablation of the term against the Hi-C of the cell line:
+
+```bash
+python -m legacy.validation epigenome --cell <CELL> --hic data/_hic/<CELL>/<file>.mcool \
+                               --region chr1:20000000-40000000
+```
+
+Three traps give a wrong answer without an error.
+
+- A shallow contact file gives an eigenvector of noise. `legacy/validation/studies/tracks.py::_find_one` takes the
+  largest file of a cell line and warns when the lag 1 autocorrelation is below 0.3.
+- `cis_eig` of cooltools needs `clip_percentile=99.9`. It is not the default of that function and outlier pixels
+  dominate the decomposition without it.
+- The sign of the eigenvector is arbitrary and differs between machines for one input. A consumer must phase the
+  track or must not depend on a global flip.
