@@ -86,6 +86,25 @@ describe('Model a region page', () => {
     expect(await within(link).findByText('done')).toBeInTheDocument()
   })
 
+  it('warns when My jobs already shows a job under the name typed', async () => {
+    rememberJob({ url: '/jobs/abc12345', label: 'GM12878 chr1:11.5-12.6 Mb', name: 'TNFRSF8 run', at: 1 })
+    renderModel('/model?example=TNFRSF8')
+    const name = await screen.findByLabelText('Job name (optional)')
+    const warning = 'My jobs already lists a job as TNFRSF8 run. Give this job a name of its own to tell the two apart.'
+    expect(screen.queryByText(warning)).toBeNull()
+    fireEvent.change(name, { target: { value: ' TNFRSF8 run ' } })
+    expect(screen.getByText(warning)).toBeInTheDocument()
+    fireEvent.change(name, { target: { value: 'TNFRSF8 run, again' } })
+    expect(screen.queryByText(warning)).toBeNull()
+  })
+
+  it('warns when a job without a name would read as one My jobs has', async () => {
+    rememberJob({ url: '/jobs/abc12345', label: 'GM12878 TNFRSF8', name: '', at: 1 })
+    renderModel('/model?example=TNFRSF8')
+    await screen.findByLabelText('Job name (optional)')
+    expect(await screen.findByText(/My jobs already lists a job as GM12878 /)).toBeInTheDocument()
+  })
+
   it('names the structures on the submit button', async () => {
     renderModel()
     expect(await screen.findByRole('button', { name: /Build 100 structures/ })).toBeInTheDocument()

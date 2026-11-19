@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Info } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError, type Region } from '../api'
@@ -11,7 +11,7 @@ import { EMPTY_FORM, type FormState } from '../model/form'
 import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
 import { OwnData, type OwnTab } from '../model/OwnData'
-import { rememberJob } from '../model/recent'
+import { recentJobs, rememberJob } from '../model/recent'
 import { RegionField, useRegion } from '../model/RegionField'
 import { changedSettings } from '../model/settings'
 import { SidePanel } from '../model/SidePanel'
@@ -107,10 +107,14 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
     if (e) setForm(fromExample(e))
   }, [params])
 
+  // My jobs shows a job by its name, or by its cell type and region when it has none. Two jobs
+  // shown alike cannot be told apart there.
+  const label = region.data ? `${form.cell} ${region.data.label.split(',')[0]}` : `${form.cell} ${form.region}`
+  const shownAs = form.name.trim() || label
+  const sameName = form.region.trim() !== '' && recentJobs().some((j) => (j.name || j.label) === shownAs)
   const submit = useMutation({
     mutationFn: () => api.submit(toFormData(form, schema.data ? changedSettings(schema.data, form.settings) : {})),
     onSuccess: ({ url }) => {
-      const label = region.data ? `${form.cell} ${region.data.label.split(',')[0]}` : `${form.cell} ${form.region}`
       rememberJob({ url, label, name: form.name.trim(), at: Date.now() })
       onSubmitted(url)
     },
@@ -201,6 +205,11 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
         </Step>
         <Step n={5} title="Ensemble and simulation settings">
           <EnsembleFields structures={form.structures} name={form.name} max={catalog.data?.max_structures ?? 100} onChange={set} />
+          {sameName && (
+            <p className="notice" role="status">
+              <Info size={14} aria-hidden /> {`My jobs already lists a job as ${shownAs}. Give this job a name of its own to tell the two apart.`}
+            </p>
+          )}
           {schema.data && <SettingsTree schema={schema.data} values={form.settings} onChange={(settings) => set({ settings })} />}
           {stepError(5)}
         </Step>
