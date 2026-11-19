@@ -36,7 +36,7 @@ Every row is the maintainer's decision.
 | The resolution of the contact cells | Decided on the larger trial. 5 kb is the working base |
 | The draw of the contact bead | Both draws stay as arms |
 | The rule of the smooth stage for a node | Decided after the trial of the rules |
-| Room for the free chain | Thought through in this note before anything is built, see below |
+| Room for the free chain | Gyration windows under 100 kb first, blobs for the free chain when that does not work |
 | The three bead move and the bond limit in the JAX kernel | After the rules are chosen |
 | The larger trial | Three cells, six regions of 5 Mb across chr1, 20 structures per arm, for the arms that remain |
 | The first build | Replaced in place. Comparisons use its trial of 2026-11-19 |
@@ -344,7 +344,12 @@ Notes on each.
 - A and B can both be measured against C on the trial rows by the close pairs of
   `playground/uniform_overlap_check.py` and the pooled scores.
 
-The assistant's order: B first, one key for the smallest window and one trial; A when B falls short.
+The maintainer on 2026-11-19: B first, A when B does not work.
+
+B is `[springs] gyration_min_bp`, the smallest window of the gyration term, 0 for `background_range_bp`. On GM12878
+chr1 108.5 to 111 Mb, one structure without contact cells and without the orientation term, the bonds under 0.7
+beads before the relaxation are 72 of 2,482 at 100 kb, 103 at 10 kb, 59 at 25 kb and 49 at 50 kb. One structure
+decides nothing. The trial runs 10, 25 and 50 kb on the six rows.
 
 ## Settings
 

@@ -393,7 +393,10 @@ def solve_arcs(
     if gyr_w > 0.0:
         if mids is None:
             raise ValueError("[springs] gyration_weight needs the anchors' genomic midpoints")
-        member, count, target = gyration_windows(mids, s.polymer_law(), int(s.background_range_bp))
+        smallest = (
+            int(s.gyration_min_bp) if int(s.gyration_min_bp) > 0 else int(s.background_range_bp)
+        )
+        member, count, target = gyration_windows(mids, s.polymer_law(), smallest)
         base_g, base_g_args = fun, fun_args
 
         def with_gyration(x: Any) -> tuple[float, F64Array]:

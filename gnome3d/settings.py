@@ -95,6 +95,7 @@ class Settings:
     loop_contact: bool
     factory_weight: float
     gyration_weight: float
+    gyration_min_bp: int
     arcs_repulsion: bool
     factory_radius: float
     background_range_bp: int
@@ -337,6 +338,7 @@ class Settings:
         self.loop_contact = False
         self.factory_weight = 0.0
         self.gyration_weight = 0.0
+        self.gyration_min_bp = 0
         self.arcs_repulsion = True
         self.factory_radius = 2.0
         self.background_weight = 0.0
@@ -645,6 +647,7 @@ class Settings:
         )
         self.background_weight = getf("springs", "background_weight", self.background_weight)
         self.gyration_weight = getf("springs", "gyration_weight", self.gyration_weight)
+        self.gyration_min_bp = geti("springs", "gyration_min_bp", self.gyration_min_bp)
         self.background_range_bp = geti("springs", "background_range_bp", self.background_range_bp)
         self.spring_squeeze_arcs = getf(
             "springs", "squeeze_constant_arcs", self.spring_squeeze_arcs

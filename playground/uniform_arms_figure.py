@@ -45,6 +45,10 @@ ARMS = [
     ("node_c5k_lim125", "cells at 5 kb, bond limit 1.25", "#6250d6", True, "s"),
     ("node_c5k_lim15", "cells at 5 kb, bond limit 1.5", "#6250d6", True, "o"),
     ("node_c5k_centre_lim15", "cells at 5 kb, centre of mass kept, bond limit 1.5", "#e87ba4", True, "s"),
+    ("node_c5k_g10k", "cells at 5 kb, gyration windows from 10 kb", "#e34948", True, "s"),
+    ("node_c5k_g25k", "cells at 5 kb, gyration windows from 25 kb", "#e34948", True, "o"),
+    ("node_c5k_g50k", "cells at 5 kb, gyration windows from 50 kb", "#e34948", True, "D"),
+    ("node_mid_c5k_g25k", "midpoint, cells at 5 kb, gyration windows from 25 kb", "#eb6834", True, "D"),
 ]
 # key, panel title, reference line
 PANELS = [
