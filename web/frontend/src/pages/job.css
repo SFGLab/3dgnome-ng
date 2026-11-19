@@ -818,23 +818,28 @@
 .map-toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
-/* The controls of the toolbar share one height, so their boxes and their labels line up. */
-.map-toolbar .field select,
+/* The controls of the toolbar share one height, so their boxes line up. */
+.map-toolbar > select,
 .map-toolbar .segmented,
 .locus-input {
   box-sizing: border-box;
   height: 36px;
 }
 
-.map-toolbar .field select {
-  padding-top: 0;
-  padding-bottom: 0;
+.map-toolbar > select {
+  width: auto;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
   background-color: var(--surface);
+  color: var(--ink);
+  font: 13px var(--font);
 }
 
 .map-toolbar .segmented {
@@ -852,7 +857,7 @@
 }
 
 /* Wide enough for chr10:100,000,000-120,000,000 in the mono face. */
-.field .locus-input input {
+.locus-input input {
   width: 30ch;
   min-width: 0;
   padding: 0;

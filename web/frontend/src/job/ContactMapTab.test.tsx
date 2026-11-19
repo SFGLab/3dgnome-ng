@@ -161,7 +161,7 @@ describe('ContactMapTab', () => {
     await screen.findByText('0.21')
     const five = within(screen.getByLabelText('Resolution')).getByRole('option', { name: /^5 kb/ }) as HTMLOptionElement
     expect(five.disabled).toBe(true)
-    expect(five.textContent).toBe('5 kb, zoom in to use')
+    expect(five.textContent).toBe('5 kb bins, zoom in to use')
   })
 
   it('says it is reading while a new resolution loads', async () => {
@@ -186,6 +186,16 @@ describe('ContactMapTab', () => {
     await screen.findByText('0.21')
     fireEvent.change(screen.getByLabelText('Resolution'), { target: { value: '5000' } })
     expect(await screen.findByText(/more than 800 bins on a side/)).toBeInTheDocument()
+  })
+
+  it('puts no label over the controls of the toolbar and still names each of them', async () => {
+    mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    const { container } = renderTab()
+    await screen.findByLabelText('Locus')
+    const bar = container.querySelector('.map-toolbar')!
+    for (const word of ['Locus', 'Show', 'Normalization', 'Resolution']) expect(bar.textContent).not.toContain(word)
+    for (const name of ['Locus', 'Normalization', 'Resolution']) expect(screen.getByLabelText(name)).toHaveAttribute('title', name)
+    expect(within(screen.getByLabelText('Resolution')).getByRole('option', { name: '25 kb bins' })).toBeInTheDocument()
   })
 
   it('keeps to the writing rules', async () => {

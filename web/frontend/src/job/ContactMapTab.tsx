@@ -182,45 +182,35 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     <div className="contacts-tab">
       <div className="contacts-main">
         <div className="map-toolbar">
-          <label className="field">
-            <span>Locus</span>
-            <span className="locus-input">
-              <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && go()} />
-              <button type="button" onClick={go}>
-                Go
+          {/* No label stands over a control, as on the other tabs. Each control says what it is by
+              its own text and has its name for a screen reader and as a tooltip. */}
+          <span className="locus-input">
+            <input aria-label="Locus" title="Locus" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && go()} />
+            <button type="button" onClick={go}>
+              Go
+            </button>
+          </span>
+          <div className="segmented" role="group" aria-label="Show">
+            {SHOWS.map(([id, label]) => (
+              <button key={id} type="button" aria-pressed={show === id} onClick={() => setShow(id)}>
+                {label}
               </button>
-            </span>
-          </label>
-          <div className="field">
-            <span>Show</span>
-            <div className="segmented" role="group" aria-label="Show">
-              {SHOWS.map(([id, label]) => (
-                <button key={id} type="button" aria-pressed={show === id} onClick={() => setShow(id)}>
-                  {label}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
-          <label className="field">
-            <span>Normalization</span>
-            <select value={norm} onChange={(e) => setNorm(e.target.value as 'ice' | 'raw')}>
-              <option value="ice">Balanced, ICE</option>
-              <option value="raw">Raw counts</option>
-            </select>
-          </label>
-          <label className="field">
-            <span>Resolution</span>
-            <select aria-label="Resolution" value={res} onChange={(e) => setRes(fitting(locus, Number(e.target.value)))}>
-              {RESOLUTIONS.map((r) => {
-                const tooFine = (locus.end - locus.start) / r > MAX_BINS
-                return (
-                  <option key={r} value={r} disabled={tooFine}>
-                    {`${r / 1000} kb${tooFine ? ', zoom in to use' : ''}`}
-                  </option>
-                )
-              })}
-            </select>
-          </label>
+          <select aria-label="Normalization" title="Normalization" value={norm} onChange={(e) => setNorm(e.target.value as 'ice' | 'raw')}>
+            <option value="ice">Balanced, ICE</option>
+            <option value="raw">Raw counts</option>
+          </select>
+          <select aria-label="Resolution" title="Resolution" value={res} onChange={(e) => setRes(fitting(locus, Number(e.target.value)))}>
+            {RESOLUTIONS.map((r) => {
+              const tooFine = (locus.end - locus.start) / r > MAX_BINS
+              return (
+                <option key={r} value={r} disabled={tooFine}>
+                  {`${r / 1000} kb bins${tooFine ? ', zoom in to use' : ''}`}
+                </option>
+              )
+            })}
+          </select>
           <div className="zoom-buttons">
             <button type="button" className="icon-tool" aria-label="Zoom out" onClick={() => zoom(2)}>
               <ZoomOut size={15} aria-hidden />
