@@ -703,7 +703,8 @@ def local_excl_cells_nb(
     buf: I32Array,
 ) -> float:
     """Returns the excluded volume score of bead `p` over the twenty seven cells around it,
-    summed in ascending index order, bit identical to `_local_excl_nb`.
+    summed in ascending index order. The score equals `_local_excl_nb` to rounding, and to the
+    bit on ARM.
 
     Returns a negative number when more beads are inside the radius than the buffer holds. The
     caller then uses the full scan for this bead.

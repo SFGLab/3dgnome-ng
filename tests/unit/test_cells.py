@@ -29,6 +29,15 @@ from gnome3d.mc.numba.terms import (  # noqa: E402
 PASS: list[str] = []
 FAIL: list[str] = []
 
+# The scan and the grid add the same pairs in the same order. Both kernels are compiled with
+# fastmath and on x86-64 the compiler adds the pairs of the scan in another order. The two
+# numbers then differ in the last bits.
+ROUNDING = 1e-12
+
+
+def same(got: float, want: float) -> bool:
+    return abs(got - want) <= ROUNDING * max(1.0, abs(want))
+
 
 def check(name: str, cond: bool, detail: str = "") -> None:
     (PASS if cond else FAIL).append(name)
@@ -39,7 +48,9 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 def compare(
     pos: np.ndarray, r0: float, weight: float, skip: int, buf_size: int = BUF
 ) -> tuple[int, float, int]:
-    """Runs every bead through both paths. Returns (mismatches, worst difference, overflows)."""
+    """Runs every bead through both paths. Returns the beads that differ by more than rounding,
+    the worst difference and the overflows.
+    """
     lo, dim, c = grid_shape(pos, r0)
     head, nxt, where = build_grid(pos, lo, dim, c)
     buf = np.empty(buf_size, dtype=np.int32)
@@ -52,14 +63,14 @@ def compare(
         if got < 0.0:
             over += 1
             continue
-        if got != want:
+        if not same(got, want):
             bad += 1
-            worst = max(worst, abs(got - want))
+        worst = max(worst, abs(got - want))
     return bad, worst, over
 
 
 def test_random() -> None:
-    print("\n[random] the grid returns the scan's own number")
+    print("\n[random] the grid returns the scan's number to rounding")
     rng = np.random.default_rng(0)
     for name, pos in (
         ("uniform cloud", rng.normal(0, 8, (2000, 3))),
@@ -74,7 +85,7 @@ def test_random() -> None:
     ):
         bad, worst, over = compare(np.ascontiguousarray(pos), 2.0, 10.0, 1)
         check(
-            f"{name}: identical for every bead",
+            f"{name}: equal to rounding for every bead",
             bad == 0 and over == 0,
             f"{bad} differ, worst {worst:.2e}, {over} overflow",
         )
@@ -124,14 +135,14 @@ def test_real_structure() -> None:
     sub = np.ascontiguousarray(pos[:8000])
     bad, worst, over = compare(sub, 1.5 * bond, 10.0, 1)
     check(
-        "identical on 8000 real beads",
+        "equal to rounding on 8000 real beads",
         bad == 0 and over == 0,
         f"{bad} differ, worst {worst:.2e}, {over} overflow",
     )
 
 
 def test_moves_keep_it_exact() -> None:
-    print("\n[moves] the grid stays exact while beads move")
+    print("\n[moves] the grid stays right while beads move")
     rng = np.random.default_rng(11)
     n = 1500
     pos = np.ascontiguousarray(rng.normal(0, 4, (n, 3)))
@@ -148,9 +159,9 @@ def test_moves_keep_it_exact() -> None:
             p = int(rng.integers(0, n))
             want = _local_excl_nb(pos, p, r0, weight, skip)
             got = local_excl_cells(pos, p, r0, weight, skip, lo, dim, c, head, nxt, buf)
-            if got != want:
+            if not same(got, want):
                 bad += 1
-    check("still identical after 4000 moves", bad == 0, f"{bad} of 20 spot checks differ")
+    check("still equal to rounding after 4000 moves", bad == 0, f"{bad} of 20 spot checks differ")
     seen = np.zeros(n, dtype=np.int64)
     for k in range(head.shape[0]):
         i = head[k]
@@ -185,13 +196,15 @@ def test_beads_outside_the_box() -> None:
     for p in range(n):
         want = _local_excl_nb(pos, p, r0, weight, skip)
         got = local_excl_cells(pos, p, r0, weight, skip, lo, dim, c, head, nxt, buf)
-        bad += int(got != want)
+        bad += int(not same(got, want))
         cnt0, dep0 = _wall_local_nb(pos, p, r0, skip)
         cnt1, dep1 = _wall_local_cells_nb(pos, p, r0, skip, lo, dim, c, head, nxt)
         wall_bad += int(cnt0 != cnt1)
         depth_worst = max(depth_worst, abs(dep0 - dep1))
     check("the test has beads well outside the box", outside > n // 4, f"{outside} of {n}")
-    check("the excluded volume is identical out there", bad == 0, f"{bad} of {n} beads differ")
+    check(
+        "the excluded volume is equal to rounding out there", bad == 0, f"{bad} of {n} beads differ"
+    )
     check("the wall counts the same pairs out there", wall_bad == 0, f"{wall_bad} of {n} differ")
     check("the wall depth agrees to rounding", depth_worst < 1e-9, f"worst {depth_worst:.2e}")
 

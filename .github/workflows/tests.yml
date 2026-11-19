@@ -43,6 +43,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+          cache-dependency-path: pyproject.toml
       - run: pip install -e ".[dev,jax,extract]"
       # The region test needs the Hi-C contacts of GM12878, which are not in the repository.
       - run: pytest -m "not data"
