@@ -162,6 +162,14 @@ pipeline. A change must not increase the count.
 
 Do not run `ruff format` on `web/` or `playground/`. Those files are not formatted to this width.
 
+### Continuous integration and release
+
+`.github/workflows/tests.yml` runs ruff and pytest on a push to main and on a pull request, on Python 3.11 to 3.14.
+`.github/workflows/publish.yml` builds the package and uploads it to PyPI when a GitHub release is published.
+
+The version is the latest git tag, read by setuptools-scm. The tag `v0.3.0` gives the version 0.3.0. A commit after
+the tag gets a dev version. `MANIFEST.in` keeps the source distribution to the package.
+
 ## Writing
 
 `design/writing-rules.md` has the rules in full. They cover comments, docstrings, descriptions of settings, error
@@ -200,5 +208,6 @@ note under `design/` states hardware by its model.
   `design/microc-loops.md` have the RNAPII work.
 - `design/tools-comparison.md`, `design/validation-2026-09.md` and `design/validation-metrics.md` have the validation.
 - `design/4dn-data-access.md` has the access to 4DN files.
+- `design/website/` has the deployment, the data directory, the settings, the frontend and the jobs of the site.
 - `legacy/README.md` has the retired code. `legacy/3dnome/` is read only.
 - `data/memory/MEMORY.md` is the index of the project memory, a local folder outside git.

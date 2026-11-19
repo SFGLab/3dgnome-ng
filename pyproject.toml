@@ -1,12 +1,13 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=68", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "gnome3d"
-version = "0.2.0"
+dynamic = ["version"]
 description = "3D chromatin structure modeling from ChIA-PET loops and Hi-C contacts"
-requires-python = ">=3.10"
+readme = "README.md"
+requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.24.0",
     "numba>=0.59.0",
@@ -50,8 +51,15 @@ validation = [
     "pyBigWig>=0.3.18",
 ]
 
+[project.urls]
+Repository = "https://github.com/SFGLab/3dgnome-ng"
+Issues = "https://github.com/SFGLab/3dgnome-ng/issues"
+
 [project.scripts]
 gnome3d = "gnome3d.cli:main"
+
+# The version is the latest git tag. A commit after the tag gets a dev version.
+[tool.setuptools_scm]
 
 [tool.setuptools.packages.find]
 where = ["."]
