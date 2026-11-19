@@ -18,7 +18,7 @@ from gnome3d_web.contacts import ice, loop_enrichment, median_bond, model_map, m
 
 
 def battery_scc(A: np.ndarray, B: np.ndarray, max_sep_bins: int) -> float:
-    """validation/metrics/hic.py _scc, copied: whole diagonals weighted by length and both spreads."""
+    """legacy/validation/metrics/hic.py _scc, copied: whole diagonals weighted by length and both spreads."""
     num = den = 0.0
     for dd in range(1, min(max_sep_bins, A.shape[0] - 1) + 1):
         a, b = np.diagonal(A, dd), np.diagonal(B, dd)
@@ -115,7 +115,7 @@ def main() -> int:
         check("the endpoint returns two square maps on the bins of the resolution", n == 120 and len(r["upper"]) == n and len(r["lower"][0]) == n and r["bins"][1] - r["bins"][0] == 25000, str(n))
         check("the halves are labelled", r["upper_label"].startswith("Hi-C") and "2 structures" in r["lower_label"] and "1/(d+1)" in r["lower_label"], str((r["upper_label"], r["lower_label"])))
         check("the agreement names the two halves it compares", "Hi-C of GMX" in r["scc_about"] and "1/(d+1)" in r["scc_about"] and "raw" in r["scc_about"], str(r.get("scc_about")))
-        check("the rank agreement comes with what it compares", "rank" in r and (r["rank"] is None or -1 <= r["rank"] <= 1) and "ranked" in r["rank_about"] and "balanced" in r["rank_about"], str(r.get("rank_about")))
+        check("the rank agreement comes with what it compares", "rank" in r and (r["rank"] is None or -1 <= r["rank"] <= 1) and "ranked" in r["rank_about"] and "balanced" in r["rank_about"] and isinstance(r["rank_reach"], int), str(r.get("rank_about")))
         counted = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "hic", "lower": "model_count", "norm": "raw"}).json()
         check("the counted model is still offered", "within" in counted["lower_label"], counted.get("lower_label", counted))
         battery = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 25000, "upper": "hic", "lower": "model_count", "norm": "ice"}).json()
@@ -142,7 +142,7 @@ def main() -> int:
         deep = ex.contact_maps(job, "chr1:0-3000000", 25000, "hic", "model", "raw", hic_url="https://example.org/deep.mcool", hic_name="4DN deep map")
         ex.contact_maps(job, "chr1:0-3000000", 25000, "hic", "model", "raw", hic_url="https://example.org/deep.mcool", hic_name="4DN deep map")
         ex.contact_maps(job, "chr1:500000-1500000", 25000, "hic", "model", "raw", hic_url="https://example.org/deep.mcool", hic_name="4DN deep map")
-        check("a deep map is read once per resolution over the job's region, and windows are cut from it", len(reads) == 1 and reads[0][1:3] == (0, 3000000), str(reads))
+        check("a deep map is read once per resolution over the job's region and windows are cut from it", len(reads) == 1 and reads[0][1:3] == (0, 3000000), str(reads))
         check("the Hi-C half names the deep map", "4DN deep map" in deep["upper_label"] and "4DN deep map" in deep["scc_about"], deep["upper_label"])
         check("the agreement is a number or null", r["scc"] is None or -1 <= r["scc"] <= 1, str(r["scc"]))
         bad = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 2000, "upper": "hic", "lower": "model"})

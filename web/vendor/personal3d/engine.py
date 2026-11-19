@@ -10,7 +10,7 @@ A haplotype's inputs are those of the conf arm, written in the haplotype's own c
   segments and centromeres, the base files lifted
 
 The config is the arm's own ini with only its [data] section replaced, so every engine setting
-is the arm's. `run` starts gnome3d-ng on a region in the haplotype's coordinates.
+is the arm's. `run` starts gnome3d on a region in the haplotype's coordinates.
 """
 from __future__ import annotations
 
@@ -28,7 +28,14 @@ FACTOR_ORDER = ("CTCF", "RNAPOL2")
 
 
 def lift_bedpe(df: pd.DataFrame, lifts: dict[str, Lift]) -> pd.DataFrame:
-    """A seven column BEDPE lifted end by end, rows with a deleted end dropped."""
+    """A seven column BEDPE lifted end by end, rows with a deleted end dropped.
+
+    A tandem duplication leaves two copies where the reference has one, and the lift puts a
+    position on the first. A pair inside the duplication is a pair of each copy, so it is
+    written twice. A pair from inside to beyond the duplication's end keeps its distance from
+    the second copy, the one next to that end, so its inner end moves there. A pair from before
+    the duplication keeps its distance to the first copy and stays. The two copies get no pair
+    between them, since the reference has none to give."""
     out = df.copy()
     keep = np.ones(len(df), dtype=bool)
     for c_chrom, c_s, c_e in ((0, 1, 2), (3, 4, 5)):
@@ -42,7 +49,22 @@ def lift_bedpe(df: pd.DataFrame, lifts: dict[str, Lift]) -> pd.DataFrame:
             out.loc[m, c_s] = np.minimum(s, e - 1)
             out.loc[m, c_e] = np.maximum(s + 1, e)
             keep[np.flatnonzero(m)[bad]] = False
-    return out[keep]
+    extra = []
+    for chrom, L in lifts.items():
+        same = ((df[0] == chrom) & (df[3] == chrom)).to_numpy() & keep
+        for a, b, _ in L.duplications:
+            first = same & (df[1].to_numpy() >= a) & (df[2].to_numpy() <= b)
+            second = same & (df[4].to_numpy() >= a) & (df[5].to_numpy() <= b)
+            both = first & second
+            if both.any():
+                twin = out[both].copy()
+                twin[[1, 2, 4, 5]] += b - a
+                extra.append(twin)
+            for inner, cols, other in ((first & ~second, [1, 2], df[4].to_numpy()), (second & ~first, [4, 5], df[1].to_numpy())):
+                move = inner & (other >= b)
+                out.loc[move, cols] += b - a
+    out = out[keep]
+    return pd.concat([out, *extra], ignore_index=True) if extra else out
 
 
 def splice_window(base: pd.DataFrame, chrom: str, start: int, cond: np.ndarray, pred_bp: int) -> pd.DataFrame:
@@ -128,6 +150,6 @@ def write_config(template: Path, data: dict[str, str], dst: Path, header: str = 
 
 
 def run(gnome3d: Path, config: Path, region: str, members: str, out: Path) -> None:
-    """gnome3d-ng on one region, from the engine checkout's venv."""
-    exe = Path(gnome3d) / ".venv" / "bin" / "gnome3d-ng"
-    subprocess.run([str(exe), "--config", str(config), "--region", region, "--members", members, "--out", str(out)], cwd=gnome3d, check=True)
+    """gnome3d on one region, from the engine checkout's venv."""
+    python = Path(gnome3d) / ".venv" / "bin" / "python"
+    subprocess.run([str(python), "-m", "gnome3d.cli", "--config", str(config), "--region", region, "--members", members, "--out", str(out)], cwd=gnome3d, check=True)

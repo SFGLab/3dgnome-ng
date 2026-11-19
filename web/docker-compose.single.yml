@@ -1,0 +1,33 @@
+# The site and the engine in one container. Jobs run in the web process on the slots of GPU_SLOTS,
+# one GPU id per slot. Run from web/:
+#   SITE_ROOT=/srv/3dgnome BASE_PATH=/new PORT=8770 GPU_SLOTS=0,1 \
+#     SITE_USER=$(id -u):$(id -g) docker compose -f docker-compose.single.yml up -d --build
+# SITE_ROOT holds data/, which the container reads, and results/, which it writes as SITE_USER. The
+# port is bound to the loopback of the host. A job that waits in the queue is lost when the
+# container stops. A path of the catalog must exist inside the container. A set kept elsewhere is
+# mounted below /data in an override file:
+#   services: { site: { volumes: ["/srv/tbooo/release:/data/svs/tbooo:ro"] } }
+name: gnome3d-site
+services:
+  site:
+    build: { context: .., dockerfile: web/Dockerfile, args: { GPU: "${GPU:-1}", BASE_PATH: "${BASE_PATH:-}", HICDIFFUSION: "${HICDIFFUSION:-1}" } }
+    image: "${IMAGE:-gnome3d-web}"
+    restart: unless-stopped
+    user: "${SITE_USER:-0:0}"
+    ports: ["127.0.0.1:${PORT:-8000}:8000"]
+    environment:
+      QUEUE: thread
+      GPU_SLOTS: "${GPU_SLOTS:-0}"
+      BASE_PATH: "${BASE_PATH:-}"
+      RETENTION_DAYS: "${RETENTION_DAYS:-14}"
+      MAX_REGION_MB: "${MAX_REGION_MB:-20}"
+      # The image's source directory belongs to root. The caches go next to the results.
+      NUMBA_CACHE_DIR: /results/.numba-cache
+      HOME: /results/.home
+    volumes:
+      - "${SITE_ROOT:?set SITE_ROOT to the directory that holds data/ and results/}/data:/data:ro"
+      - "${SITE_ROOT}/results:/results"
+    deploy:
+      resources:
+        reservations:
+          devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]

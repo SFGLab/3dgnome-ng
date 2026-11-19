@@ -21,7 +21,7 @@ describe('SettingsTree', () => {
     expect(within(tree).queryByText('hard_wall')).toBeNull()
   })
 
-  it('counts a change on its group and in the head, and resets it', () => {
+  it('counts a change on its group and in the head and resets it', () => {
     render(<Harness />)
     fireEvent.change(screen.getByLabelText('polymer_exponent'), { target: { value: '0.3' } })
     expect(within(screen.getByRole('treeitem', { name: /Distance law/ })).getByText('1')).toBeInTheDocument()
@@ -69,6 +69,6 @@ describe('EnsembleFields', () => {
     fireEvent.change(n, { target: { value: '250' } })
     fireEvent.blur(n)
     expect(onChange).toHaveBeenLastCalledWith({ structures: 100 })
-    expect(screen.getByLabelText('Job name, optional')).toHaveAttribute('placeholder', 'e.g. TNFRSF8 with RNAPII loops')
+    expect(screen.getByLabelText('Job name (optional)')).toHaveAttribute('placeholder', 'e.g. TNFRSF8 with RNAPII loops')
   })
 })

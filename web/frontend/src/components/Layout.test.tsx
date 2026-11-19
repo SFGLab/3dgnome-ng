@@ -58,23 +58,33 @@ describe('Layout', () => {
       const { container } = renderLayout()
       const group = screen.getByRole('radiogroup', { name: 'Theme' })
       expect(within(group).getAllByRole('radio').map((r) => r.getAttribute('aria-label'))).toEqual(['System', 'Light', 'Dark'])
-      expect(within(group).getByRole('radio', { name: 'System' })).toBeChecked()
+      // A browser without a choice gets the light theme.
+      expect(within(group).getByRole('radio', { name: 'Light' })).toBeChecked()
+      expect(document.documentElement.dataset.theme).toBe('light')
       fireEvent.click(within(group).getByRole('radio', { name: 'Dark' }))
       expect(document.documentElement.dataset.theme).toBe('dark')
       expect(localStorage.getItem('gnome3d-theme')).toBe('dark')
       fireEvent.click(within(group).getByRole('radio', { name: 'System' }))
       expect(document.documentElement.dataset.theme).toBeUndefined()
+      expect(localStorage.getItem('gnome3d-theme')).toBe('system')
       expect(checkCopy(container)).toEqual([])
     })
 
     it('applies a stored choice', () => {
-      localStorage.setItem('gnome3d-theme', 'light')
+      localStorage.setItem('gnome3d-theme', 'dark')
       renderLayout()
-      expect(document.documentElement.dataset.theme).toBe('light')
-      expect(screen.getByRole('radio', { name: 'Light' })).toBeChecked()
+      expect(document.documentElement.dataset.theme).toBe('dark')
+      expect(screen.getByRole('radio', { name: 'Dark' })).toBeChecked()
     })
 
-    it('stays on the system theme when storage throws', () => {
+    it('follows the system where that was chosen', () => {
+      localStorage.setItem('gnome3d-theme', 'system')
+      renderLayout()
+      expect(document.documentElement.dataset.theme).toBeUndefined()
+      expect(screen.getByRole('radio', { name: 'System' })).toBeChecked()
+    })
+
+    it('starts on the light theme when storage throws', () => {
       vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
         throw new Error('blocked')
       })
@@ -82,9 +92,29 @@ describe('Layout', () => {
         throw new Error('blocked')
       })
       renderLayout()
-      expect(screen.getByRole('radio', { name: 'System' })).toBeChecked()
+      expect(screen.getByRole('radio', { name: 'Light' })).toBeChecked()
       fireEvent.click(screen.getByRole('radio', { name: 'Dark' }))
       expect(document.documentElement.dataset.theme).toBe('dark')
     })
+  })
+
+  it('shows the privacy notice on a first visit and not after it was closed', () => {
+    localStorage.clear()
+    const first = renderLayout()
+    const notice = screen.getByRole('complementary', { name: 'Privacy' })
+    expect(within(notice).getByText(/sets no cookies and does no tracking/)).toBeInTheDocument()
+    expect(within(notice).getByRole('link', { name: 'Privacy notice' })).toHaveAttribute('href', ROUTES.privacy)
+    expect(checkCopy(first.container)).toEqual([])
+    fireEvent.click(within(notice).getByRole('button', { name: 'OK' }))
+    expect(screen.queryByRole('complementary', { name: 'Privacy' })).toBeNull()
+    first.unmount()
+    renderLayout()
+    expect(screen.queryByRole('complementary', { name: 'Privacy' })).toBeNull()
+    localStorage.clear()
+  })
+
+  it('links the privacy notice from the foot of every page', () => {
+    renderLayout()
+    expect(within(screen.getByRole('contentinfo')).getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', ROUTES.privacy)
   })
 })

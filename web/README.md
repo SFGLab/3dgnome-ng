@@ -21,6 +21,60 @@ DATA_DIR=/srv/gnome3d/data RESULTS_DIR=/srv/gnome3d/results PORT=8000 docker com
 The image builds from the repository root, so the engine it runs is the checkout's. `GPU=0`
 builds a CPU image; then remove the worker's `deploy` block and see "CPU only" below.
 
+## One container
+
+docker-compose.single.yml runs the site and the engine in one container of the same image. The
+jobs run in the web process on the slots of `GPU_SLOTS`, one GPU id per slot.
+
+```bash
+cd web
+SITE_ROOT=/srv/3dgnome BASE_PATH=/new PORT=8770 GPU_SLOTS=0,1 \
+  SITE_USER=$(id -u):$(id -g) docker compose -f docker-compose.single.yml up -d --build
+```
+
+`SITE_ROOT` holds two directories. The container reads `data/` and never writes it. It writes
+`results/` as `SITE_USER`, and the JAX and Numba caches go there too. The port is bound to the
+loopback of the host, for a proxy on the host. A job that waits in the queue is lost when the
+container stops; docker-compose.yml keeps its queue in Redis.
+
+A path in `catalog.json` must exist inside the container. `data/` is mounted at `/data`, and a
+`contact_map` is written as `/data/maps/...`. A link that leaves `data/` does not resolve in the
+container. A large set kept elsewhere is mounted below `/data` in an override file, passed with
+a second `-f`:
+
+```yaml
+services:
+  site:
+    volumes: ["/srv/tbooo/release:/data/svs/tbooo:ro"]
+```
+
+## A registry on the host
+
+docker-compose.registry.yml runs an image registry on the deployment host, with its storage in
+`REGISTRY_ROOT`. The image is then built on any machine, pushed under a tag, and the host pulls
+the tag it should run. An earlier tag stays in the registry for a way back.
+
+```bash
+# on the host, once
+REGISTRY_ROOT=/srv/registry REGISTRY_USER=$(id -u):$(id -g) \
+  docker compose -f docker-compose.registry.yml up -d
+
+# on the machine that builds, from web/, with a tunnel to the host's registry
+ssh -N -L 5000:localhost:5000 HOST &
+TAG=$(git rev-parse --short HEAD)
+SITE_ROOT=. IMAGE=localhost:5000/gnome3d-web:$TAG BASE_PATH=/new \
+  docker compose -f docker-compose.single.yml build
+docker push localhost:5000/gnome3d-web:$TAG
+
+# on the host, with the variables of "One container" and the same IMAGE
+docker compose -f docker-compose.single.yml pull
+docker compose -f docker-compose.single.yml up -d --no-build
+```
+
+The registry listens on the loopback of the host and has no login. Docker accepts a registry
+on localhost without TLS, on the host directly and on the building machine through the tunnel.
+`BASE_PATH` is fixed at the build, so an image serves the path it was built for.
+
 ## Workers and GPUs
 
 docker-compose.yml has one worker group per GPU, `worker-gpu0` and `worker-gpu1`, each worker
@@ -55,7 +109,7 @@ docker compose -f docker-compose.yml -f docker-compose.mps.yml up -d
 Without MPS set `WORKERS_PER_GPU=1`. The host needs the NVIDIA container toolkit; Docker's
 `nvidia` runtime entry alone does not give the containers a GPU.
 
-Measured 2026-11-12 on team-frodo, RTX 3090, with `web/scripts/docker_mps_check.sh`: Redis, the
+Measured 2026-11-12 on an RTX 3090 with `web/scripts/docker_mps_check.sh`: Redis, the
 web container and two workers on GPU 0 with this overlay took six jobs posted at once, GM12878,
 CTCF and RNAPII, 10 structures, 3 Mb windows. Both engines ran on the one MPS server, 1.7 GiB
 each on the card, all six done in 226 s, 95.6 jobs per hour.
@@ -81,6 +135,20 @@ npm test            # Vitest, the pages and their text against design/writing-ru
 npm run dev         # Vite on port 5173, passing /api, /jobs, /p and /model to FastAPI on 8000
 npm run build       # writes dist/ for FastAPI
 ```
+
+A site under a path of a host, `https://host/new/`, needs `BASE_PATH=/new` twice, at the build
+and on the server:
+
+```bash
+BASE_PATH=/new npm run build                 # in web/frontend
+BASE_PATH=/new uvicorn gnome3d_web.app:create_app --factory
+```
+
+The build writes the path into its asset links, its router and its API requests. The server
+answers every route under the path and at the root, and the proxy in front may strip the path or
+pass it on. The server answers 503 with both paths named when the build and the server disagree.
+With Docker Compose, `BASE_PATH=/new` in the environment sets both. A proxy rule for `/new/`
+does not match `/new`, and a second rule redirects `/new` to `/new/`.
 
 The page text, the colours and the figures come from the approved design in web/design/site.pen.
 A change of wording goes into the design first.
@@ -108,6 +176,7 @@ DATA_DIR/
   cell_types/<CELL>/   anchors, loops per factor, singletons, segments, centromeres,
                        config.ini, genes.tsv, enhancers.bed
   svs/<NAME>.vcf.gz    one bgzipped VCF per call set, with its .tbi
+  svs/<NAME>.samples.tsv  optional: sex, population and parents of the call set's samples
 ```
 
 A cell type from this repository's prepared inputs, the cross line RNAPII prep of
@@ -133,7 +202,18 @@ python web/scripts/add_sv_set.py $DATA_DIR HGSVC variants_freeze4_sv_insdel_alt.
   --label "HGSVC freeze 4 insertions and deletions"
 ```
 
-Records need SVTYPE of DEL, INS or INV, with END or SVLEN; an insertion's ALT sequence is used
+A table of the call set's samples, from the pedigree file of the 1000 Genomes 30x panel:
+
+```bash
+python web/scripts/add_sample_table.py $DATA_DIR 1KGP 20130606_g1k_3202_samples_ped_population.txt
+```
+
+With it the sample field suggests each sample with its population and sex, lists the samples of
+a population code typed in place of a name, and states the parents and children of the chosen
+sample. For the 30x panel the script reports 3,202 samples, 602 of them with both parents in the
+set.
+
+Records need SVTYPE of DEL, INS, INV or DUP, with END or SVLEN; an insertion's ALT sequence is used
 when it has one. Other types are skipped and counted on the result page. Many large call sets
 are fine: a job reads only its region through tabix.
 
@@ -155,16 +235,33 @@ All by environment, see `gnome3d_web/settings.py`. The ones that matter:
 | `GNOME3D_GPU_POOL_GIB` | unset | the GPU memory pool of each engine process in GiB |
 | `MAX_STRUCTURES` | 100 | the most structures a job may ask for |
 | `UPLOAD_MAX_MB` | 200 | the largest upload; set the proxy's body limit to match |
+| `BASE_PATH` | unset | the path the site is served under, `/new` for a site at `/new/`; the frontend is built with the same value |
 | `LINK_ALLOW_PRIVATE` | off | `1` lets a contact map link point at a private address, for tests only |
 | `LINK_READS` | 4 | contact map links read at once |
 
-HiCDiffusion is offered only when `HICDIFFUSION_DIR`, `HICDIFFUSION_PYTHON`,
-`HICDIFFUSION_MODELS` and `REFERENCE_FASTA` are all set, the checkout, its own interpreter (its
-package pins clash with the engine's), the directory with `hicdiffusion.ckpt` and
-`hicdiffusion_encoder_decoder.ckpt` (triosformer's `models/manifest.tsv` lists the archive), and
-the hg38 FASTA with its `.fai`. Mount them into the worker and set the variables. Its map is
-a contact background from sequence spliced into the cell type's map over a 2 Mb window from the
-region's start; the site never presents it as individual specific.
+HiCDiffusion is a step of a job that asks for it. It predicts the contact background of a 2 Mb
+window from the haplotype's sequence, and the map is spliced into the cell type's map from the
+region's start. The step runs HiCDiffusion's encoder decoder, which is deterministic, on the GPU
+of the job's queue slot before the engine starts, and its output opens the job's log. Measured
+2026-11-17 on an RTX 3090 the prediction takes 2 s and 1.1 GiB of GPU memory, 5 s on the CPU,
+and the step takes 12 s of a job with the start of its interpreter and the load of the model.
+The site never presents the map as individual specific.
+
+HiCDiffusion runs in its own interpreter, since its package pins clash with the engine's. The
+Docker image holds its checkout at a fixed commit and that interpreter, and sets the four
+variables of the step. Two parts are data and go below `DATA_DIR`:
+
+| variable | value in the image | part |
+|---|---|---|
+| `HICDIFFUSION_DIR` | `/opt/hicdiffusion` | the checkout, in the image |
+| `HICDIFFUSION_PYTHON` | `/opt/hicdiffusion-venv/bin/python` | its interpreter, in the image |
+| `HICDIFFUSION_MODELS` | `/data/hicdiffusion` | `hicdiffusion.ckpt` and `hicdiffusion_encoder_decoder.ckpt`; triosformer's `models/manifest.tsv` lists the archive |
+| `REFERENCE_FASTA` | `/data/reference/hg38.fa` | the hg38 FASTA with its `.fai` beside it |
+
+The site offers the step once every part is in place, and the form names it as not set up
+until then. A job that asks for it on such a server is refused with the missing part named.
+`HICDIFFUSION=0` at the build leaves the step out of the image, which is then about 5 GB
+smaller.
 
 ## How long a job takes
 
@@ -182,6 +279,24 @@ own data gets a random link under `/p/`, never enters the shared cache, and is r
 retention sweep the app runs at start. Uploads waiting for a job sit under `RESULTS_DIR/uploads`
 and are swept after the same retention period. Shared jobs are never removed by the site.
 
+## Sync codes
+
+The My jobs page keeps its list in the browser. A sync code puts one list on several browsers
+without an account. `POST /api/lists` stores the browser's jobs and answers a code of 16
+characters, 80 random bits, shown as `K7M2-9QXD-4THP-W3RZ`. `GET /api/lists/{code}` reads the
+list and `PUT /api/lists/{code}` merges a browser's jobs into it and answers the merged list. A
+job on both sides keeps the entry edited last, and a write never removes a job. A browser with
+a code sends its jobs on every page load, every 30 seconds, on return to the tab and after each
+job it starts or renames.
+
+The person chooses on making the code whether the list takes private jobs. A list made without
+them refuses a `/p/` link from any browser, and those jobs stay in the browser that started
+them. A list made with them gives every holder of the code the private links on it.
+
+The lists are files under `RESULTS_DIR/lists`, named by a digest of the code, so the directory
+does not hold the codes. A list holds at most 50 jobs, the newest. The site never removes a
+list.
+
 ## Uploads
 
 The Your own data dialog takes loops, one seven column BEDPE per factor, anchors in BED with an
@@ -197,7 +312,7 @@ the diagonal, the way the hosted maps hold them.
 |---|---|
 | link to a .hic or .mcool | on the server, `POST /api/uploads/link`, over HTTP range requests: hic-straw for .hic, h5py on an fsspec file for .mcool, each in a child process that reads through a range proxy on the loopback interface. Every connection resolves the host once and goes only to the public address it checked, redirects included. A read is stopped after 2 minutes, and at most `LINK_READS` run at once; one more is refused at once. |
 | local .hic file | in the browser, with the hic-straw JavaScript reader, uploaded as a BEDPE |
-| BEDPE of the region | on the user's computer; `gnome3d-ng extract --mcool FILE --region chr:start-end --out region.bedpe` writes it from a local .mcool, with `pip install gnome3d-ng[extract]` for cooler |
+| BEDPE of the region | on the user's computer; `gnome3d extract --mcool FILE --region chr:start-end --out region.bedpe` writes it from a local .mcool, with `pip install gnome3d[extract]` for cooler |
 
 In production the worker's network should also refuse private ranges, as a second guard
 behind the address check: with Docker, a network whose egress rule drops 10.0.0.0/8,
@@ -208,7 +323,7 @@ region's chromosome, by drawing contacts without replacement. A deep map and a s
 reach the engine at the density its maps are read at. The whole remote file never comes to the
 server.
 
-Checked 2026-11-12 on team-frodo through the page: an own data job with CTCF and RNAPII loops
+Checked 2026-11-12 through the page: an own data job with CTCF and RNAPII loops
 and contacts read from a local .hic, a job with an uploaded HGSVC VCF, and a job with contacts by
 link to ENCODE ENCFF718AWL.hic, 37 GB, whose 2 Mb window read in about 9 s.
 

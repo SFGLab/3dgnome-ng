@@ -1,9 +1,4 @@
-"""IB-centroid chain MC (numba).
-
-`mc_ib_numba` is a peer of `mc_smooth_numba` (not a sub-mode): chain bonds only
-(no angle / orientation / heat) plus optional IB-scale excluded volume and
-confinement, driving the shared unified kernel (`STRUCT_CHAIN`).
-"""
+"""The IB centroid chain MC on numba."""
 
 from __future__ import annotations
 
@@ -41,15 +36,11 @@ def mc_ib_numba(
     compartment: np.ndarray[Any, Any] | None = None,
     heat_dist: np.ndarray[Any, Any] | None = None,
 ) -> float:
-    """Numba simulated-annealing implementation for IB-centroid chain MC.
-    Peer to mc_smooth (not a sub-mode of it).  Called by `gnome3d.mc.mc_ib`.
+    """Anneals the IB centroids in place and returns the final score.
 
-    Energy: chain bonds (no angle term, no orientation) + optional IB-scale excluded volume +
-    optional IB-scale confinement + an optional contact term, `heat_dist` being the block
-    pair distance targets scored at `heatmap_weight_ib`, off at weight zero.  All IBs move
-    (no fixed set). Reads only its own settings: `spring_*_ib`, `dist_weight_ib`,
-    `max_temp_ib`/`dt_temp_ib`/`jump_*_ib`/`mc_stop_*_ib` under [simulation_ib],
-    plus the `*_ib` knobs under [excluded_volume] and [confinement].
+    The energy is chain bonds, with optional excluded volume, confinement and a contact term.
+    `heat_dist` holds the block pair distance targets, scored at `heatmap_weight_ib`. Every IB
+    moves. The function reads the `*_ib` settings alone.
     """
     n = pos.shape[0]
     if n <= 1:
@@ -62,8 +53,7 @@ def mc_ib_numba(
     stretch_k = float(settings.spring_stretch_ib)
     squeeze_k = float(settings.spring_squeeze_ib)
     dist_w = float(settings.dist_weight_ib)
-    # IB chain has no angle term: too few IBs for stable angle statistics,
-    # and the chain is meant to be flexible (loops curl back on themselves).
+    # No angle term. The chain has too few IBs for it and must stay flexible.
     ang_k = 0.0
     ang_w = 0.0
 
@@ -142,8 +132,7 @@ def mc_ib_numba(
         use_excl=use_excl,
         excl_r0=excl_r0,
         excl_weight=float(settings.exclusion_weight),
-        # IB chain: only skip the immediate neighbor (the bond itself) so
-        # non-neighbor IBs still repel each other.
+        # Only the bonded neighbour is skipped.
         excl_skip=1,
         use_conf=use_conf,
         conf_cx=conf_cx,

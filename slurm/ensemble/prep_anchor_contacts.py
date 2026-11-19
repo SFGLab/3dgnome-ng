@@ -1,13 +1,10 @@
-"""Write the anchor contact table, `gnome3d.anchor_contacts`, from an mcool and an anchor file.
+r"""Writes the anchor contact table of `gnome3d.anchor_contacts` from an mcool and an anchor file.
 
     python slurm/ensemble/prep_anchor_contacts.py --mcool MAP.mcool --anchors ANCHORS.bed \
         --chroms chr1-chr22,chrX --res 1000 --out data/GM12878/GM12878_anchor_contacts_1kb.npz
 
-The map is read at full depth, raw counts. Only the pixel rows of bins that overlap an anchor
-are read, through the map's row index, and of those only the pixels whose other bin overlaps an
-anchor are kept, so a chromosome costs the anchor bins' share of its pixels. Each pixel is
-shared between the anchors it overlaps in proportion to the overlap. The anchors must be the
-run's anchor file: a run matches its anchors to the table by interval.
+The map is read at full depth, raw counts. Each pixel is shared between the anchors it
+overlaps in proportion to the overlap. The anchors must be the anchor file of the run.
 """
 
 from __future__ import annotations

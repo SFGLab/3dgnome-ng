@@ -199,7 +199,7 @@ def main() -> None:
             print(f"{name:>24s} {k:>4d} {b:>6d}  FAILED: {type(e).__name__}: {e}", flush=True)
 
     analytic()
-    print("\nXLA's cost analysis does NOT see inside the loops: the MC steps run in a")
+    print("\nXLA's cost analysis does not see inside the loops: the MC steps run in a")
     print("while_loop over a fori_loop, and static costing does not unroll either, so the flops")
     print("and bytes it reports are a small fraction of the real work and the percentages above")
     print("are lower bounds, not the roofline. Checked against a hand count: one step on 3 chains")

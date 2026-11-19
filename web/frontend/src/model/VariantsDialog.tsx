@@ -1,5 +1,5 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { CircleAlert, CircleCheck, FileArchive, LoaderCircle, X } from 'lucide-react'
+import { CircleAlert, CircleCheck, FileArchive, LoaderCircle, Upload, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
@@ -31,7 +31,7 @@ const W = 780
 const H = 110
 const AXIS = 62
 
-/** The loops of the region above the axis, own loops in place of the cell type's, and the
+/** The loops of the region above the axis, own loops in place of the cell type's and the
  * variants below it. */
 function Track({ cell, region, factors, own, rows }: { cell: string; region: Region; factors: string; own: OwnChoice | null; rows: VariantRow[] }) {
   const span = `${region.chrom}:${region.start}-${region.end}`
@@ -74,7 +74,7 @@ function Track({ cell, region, factors, own, rows }: { cell: string; region: Reg
 }
 
 /** The structural variants dialog: a hosted call set or an uploaded VCF, its sample and
- * haplotype, and the change each variant makes to the loops of the region. */
+ * haplotype and the change each variant makes to the loops of the region. */
 export function VariantsDialog(props: {
   catalog: Catalog
   cell: string
@@ -96,7 +96,11 @@ export function VariantsDialog(props: {
   const [upload, setUpload] = useState<UploadResult | null>(props.upload ?? null)
   const [failure, setFailure] = useState('')
   const [svSet, setSvSet] = useState(props.svSet || Object.keys(catalog.sv_sets)[0] || '')
-  const [sample, setSample] = useState(props.sample)
+  // One sample for each source, so a look at the other source does not lose the choice.
+  const [chosen, setChosen] = useState<Record<VariantsMode, string>>({ hosted: props.mode === 'hosted' ? props.sample : '', upload: props.mode === 'upload' ? props.sample : '' })
+  const sample = chosen[mode]
+  const setSampleOf = (of: VariantsMode, value: string | ((s: string) => string)) => setChosen((all) => ({ ...all, [of]: typeof value === 'function' ? value(all[of]) : value }))
+  const setSample = (value: string) => setSampleOf(mode, value)
   const [haplotype, setHaplotype] = useState<0 | 1>(props.haplotype)
   const span = region ? `${region.chrom}:${region.start}-${region.end}` : ''
 
@@ -109,7 +113,7 @@ export function VariantsDialog(props: {
       .then((u) => {
         if (!live) return
         setUpload(u)
-        setSample((s) => (u.samples.includes(s) ? s : (u.samples[0] ?? '')))
+        setSampleOf('upload', (s) => (u.samples.includes(s) ? s : (u.samples[0] ?? '')))
       })
       .catch((e: Error) => live && setFailure(e.message))
     return () => {
@@ -198,10 +202,7 @@ export function VariantsDialog(props: {
                 role="tab"
                 aria-selected={mode === id}
                 disabled={id === 'hosted' && !Object.keys(catalog.sv_sets).length}
-                onClick={() => {
-                  setMode(id)
-                  setSample('')
-                }}
+                onClick={() => setMode(id)}
               >
                 {title}
               </button>
@@ -217,7 +218,7 @@ export function VariantsDialog(props: {
                 </span>
               ) : (
                 <label className="add-file">
-                  Choose a VCF compressed with bgzip
+                  <Upload size={14} aria-hidden /> Choose a VCF compressed with bgzip
                   <input type="file" accept=".gz,.bgz" className="visually-hidden" onChange={(e) => e.target.files?.[0] && setFile(e.target.files[0])} />
                 </label>
               )
@@ -271,6 +272,7 @@ export function VariantsDialog(props: {
               <Track cell={cell} region={region} factors={factors} own={own} rows={check.data.variants} />
               {check.data.variants.length > 0 && (
                 <>
+                  <Pager page={variantPage} noun="variants" />
                   <div className="sv-table-wrap">
                     <table className="sv-table">
                       <thead>
@@ -298,7 +300,6 @@ export function VariantsDialog(props: {
                       </tbody>
                     </table>
                   </div>
-                  <Pager page={variantPage} noun="variants" />
                 </>
               )}
             </>

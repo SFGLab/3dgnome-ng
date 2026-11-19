@@ -27,7 +27,7 @@ _spec.loader.exec_module(cm)
 
 from law_spring_readout import read_models  # noqa: E402
 
-from validation.metrics.hic import observed_hic  # noqa: E402
+from legacy.validation.metrics.hic import observed_hic  # noqa: E402
 
 RES = 25_000
 MAX_SEP = 2_000_000 // RES

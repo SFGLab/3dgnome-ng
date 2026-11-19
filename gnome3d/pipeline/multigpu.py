@@ -1,17 +1,9 @@
-"""Multi-GPU batch sharding for the JAX batch strategy.
+"""Runs batch launches on several JAX devices.
 
-The engine never touches SLURM or job submission - those stay external.  It simply uses whatever
-``jax.devices()`` reports (the GPUs the launcher made visible, e.g. via CUDA_VISIBLE_DEVICES) and
-shards work across them.  A batch's IBs are independent MC problems, so a group splits cleanly:
-each device gets a contiguous slice and runs its own sub-launch concurrently.  ``jax.default_device``
-is thread-local (validated), so a per-device worker thread places its sub-launch on its device with
-no cross-talk; each worker also runs in a COPY of the caller's context so it inherits the log scope
-(the kernels seed ``base_key`` from ``log.current()``, a ContextVar empty in a fresh thread).
-
-Reproducibility note: the batched kernels key each IB's per-step RNG on its POSITION in the launch,
-so a different split (i.e. a different GPU count) yields a statistically-equivalent but NOT
-byte-identical random realisation vs single-device.  Multi-GPU is purely a production-speed lever;
-the fixed-seed reproducibility gate runs single-GPU.
+The engine uses the devices `jax.devices()` reports. `jax.default_device` is thread local.
+One worker thread per device places its launches there. Each worker runs in a copy of the
+caller's context. The kernels seed from `log.current()` and a new thread has an empty
+scope.
 """
 
 import contextvars
@@ -21,8 +13,9 @@ from typing import Any
 
 
 def visible_devices(limit: int = 0) -> list[Any]:
-    """JAX devices to shard across: GPUs if any are present, else all devices (covers the CPU
-    multi-device simulation used for local tests).  ``limit`` > 0 caps the count."""
+    """Returns the JAX devices to use, the GPUs when there are any and every device otherwise.
+    `limit` above 0 caps the count.
+    """
     import jax
 
     from gnome3d.mc.jax.util import jax_is_available
@@ -36,8 +29,7 @@ def visible_devices(limit: int = 0) -> list[Any]:
 
 
 def _spans(n_items: int, n_parts: int) -> list[tuple[int, int]]:
-    """Balanced contiguous ``[lo, hi)`` ranges over ``n_items`` - remainder spread over the first
-    parts so chunk sizes differ by at most one (the IBs in a group are equal-shape => equal work)."""
+    """Returns balanced contiguous `[lo, hi)` ranges over `n_items`, sizes at most one apart."""
     base, rem = divmod(n_items, n_parts)
     out: list[tuple[int, int]] = []
     lo = 0
@@ -54,10 +46,12 @@ def run_sharded(
     problems: list[Any],
     devices: Sequence[Any],
 ) -> list[Any]:
-    """Run ``batch_fn(problems)`` split across ``devices``, one concurrent sub-launch per device,
-    returning results in the ORIGINAL problem order.  Falls back to a single in-line call for one
-    device / one problem.  Pure data-parallel - the IBs are independent, so there is no
-    cross-device communication; each device just gets a slice."""
+    """Runs `batch_fn(problems)` split across `devices` and returns the results in the order of
+    `problems`.
+
+    The kernels key the RNG of each IB on its position in the launch. The split changes the
+    random draw.
+    """
     import jax
 
     n = min(len(devices), len(problems))
@@ -75,9 +69,8 @@ def run_sharded(
         except BaseException as exc:  # noqa: BLE001 - surfaced on the main thread below
             errors[i] = exc
 
-    # Run each worker inside a COPY of the main thread's context so it inherits the log scope
-    # (a ContextVar, empty in a fresh thread): the kernels seed their RNG from log.current(), so
-    # without this the workers' base_key would diverge from the single-device path.
+    # Each worker runs in a copy of the caller's context. The kernels seed from `log.current()`,
+    # which is empty in a new thread.
     threads = [
         threading.Thread(
             target=contextvars.copy_context().run, args=(_worker, i, lo, hi), name=f"mgpu-{i}"
@@ -104,21 +97,14 @@ def run_group_parallel(
     n_groups: int,
     devices: Sequence[Any],
 ) -> None:
-    """Run ``group_fn(gi)`` for every group index concurrently across ``devices``.
+    """Runs `group_fn(gi)` for every group index across `devices`.
 
-    One worker thread per device pulls the next unclaimed group off a shared counter and runs it
-    with that device as ``jax.default_device``, so a device starts its next group as soon as it
-    frees up rather than waiting on a barrier.  Groups are independent launches, so this is pure
-    data-parallelism with no cross-device communication.
+    One worker thread per device takes the next unclaimed group and runs it with that device as
+    `jax.default_device`. A group stays whole on one device. The results are byte identical to
+    a run on one device.
 
-    Unlike ``run_sharded`` this keeps each group's problem list intact on one device.  The batched
-    kernels key each IB's per-step RNG on its position within the launch, so an unsplit group draws
-    exactly what it draws single-device.  Results are therefore byte-identical to a one-device run
-    whatever the device count, which is not true of ``run_sharded``.
-
-    ``group_fn`` must be safe to call from a worker thread and must not touch shared scheduler
-    state.  Ordering of side effects is the caller's problem; the caller applies results in group
-    order afterwards.
+    `group_fn` must be safe in a worker thread and must not touch shared scheduler state. The
+    caller applies the results in group order.
     """
     import jax
 

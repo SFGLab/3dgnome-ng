@@ -1,0 +1,11 @@
+[HG00513 chr5] arms: HG00513_C_chr5 HG00513_R_chr5
+23:28:46 pooled score
+chr5, pooled ensemble against Hi-C at 25000 bp, 275 unmapped bins
+                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
+                                HG00513_C_chr5  10   0.296   0.191   0.481   0.174   0.189   0.048                     0.473    0.017    0.076
+                                HG00513_R_chr5  10   0.306   0.198   0.460   0.188   0.197   0.047                     0.451    0.011    0.077
+23:30:00 pile-up
+  map                          models   0  loops   2364  APA 3.920
+  HG00513_C_chr5               models  10  loops   2364  APA 1.472
+  HG00513_R_chr5               models  10  loops   2364  APA 2.162
+23:31:02 done

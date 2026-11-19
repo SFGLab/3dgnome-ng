@@ -1,0 +1,32 @@
+[
+  {
+    "arm": "map",
+    "n_models": 0,
+    "n_loops": 43730,
+    "apa": 1.5524276255804166
+  },
+  {
+    "arm": "GM12878_E_genome",
+    "n_models": 10,
+    "n_loops": 43730,
+    "apa": 5.669706128651972
+  },
+  {
+    "arm": "GM12878_C_genome",
+    "n_models": 10,
+    "n_loops": 43730,
+    "apa": 1.4951199048504562
+  },
+  {
+    "arm": "GM12878_R_genome",
+    "n_models": 10,
+    "n_loops": 43730,
+    "apa": 1.8099345366184934
+  },
+  {
+    "arm": "GM12878_M_genome",
+    "n_models": 10,
+    "n_loops": 43730,
+    "apa": 1.619792486818038
+  }
+]

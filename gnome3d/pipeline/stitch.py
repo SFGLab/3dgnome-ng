@@ -1,24 +1,15 @@
-"""Rigid block stitching across interaction block boundaries.
+"""Rigid block stitching across block boundaries.
 
-The per block chains place anchors only through their own block, so the last anchor of one
-block and the first anchor of the next have no term coupling them and end up as far apart as
-their block centroids happen to be. This pass moves each block as a rigid body so that every
-such boundary pair sits at the distance an interior pair of the same genomic separation
-realises in the same structure. Rigid means every distance inside a block is preserved, so
-the arcs and smooth results are untouched.
+The last anchor of one block and the first anchor of the next have no term between them. This
+pass moves each block as a rigid body and puts every boundary pair at the distance an
+interior pair of the same genomic separation has in the same structure. Distances inside a
+block do not change.
 
-The pass runs after all chains of a chromosome are done, on the calling thread, with no RNG.
-Two terms are minimised over one rotation and one translation per block. A two sided spring
-per boundary, and a soft excluded volume between block centroids with a radius per pair of
-the two blocks' radii of gyration added, so closing a boundary cannot fold a block onto a
-neighbour it shares no edge with. `exclusion_radius_ib`, when positive, replaces that with one
-constant radius for every pair. See [[project_ib_packing_factor]] for why there is no chain bond and no
-confinement here.
-
-The energy carries its own gradient. A chromosome is a thousand or more blocks, so six
-variables per block puts the problem in the thousands of dimensions, where a finite difference
-gradient costs one evaluation per variable and the solver runs out of its evaluation budget
-after one step. See [[project_boundary_stitch]].
+The pass runs after all chains of a chromosome, on the calling thread, with no RNG. It
+minimises a two sided spring per boundary and a soft excluded volume between block centroids
+over one rotation and one translation per block. The radius of a pair is the sum of the two
+radii of gyration, or `exclusion_radius_ib` when that is positive. The energy has an analytic
+gradient. A chromosome has thousands of variables.
 """
 
 from __future__ import annotations
@@ -51,12 +42,12 @@ def _anchor_index(block: list[BeadOut]) -> I64Array:
 def within_block_curve(
     blocks: list[list[BeadOut]], max_pairs: int = 2_000_000, bins_per_decade: int = 8
 ) -> Callable[[int], float] | None:
-    """Median anchor distance against genomic separation, from the structure's own interior
-    pairs. Returns a function of the separation in bp, clamped to the outermost sampled bins,
-    or None when no block holds enough anchor pairs to say anything.
+    """Returns the median anchor distance as a function of genomic separation in bp, from the
+    interior pairs of the structure.
 
-    Pairs are taken over every block separately so no boundary is ever inside one. Above
-    `max_pairs` the pairs are thinned by a fixed stride, which keeps the pass deterministic.
+    The function is clamped to the outermost sampled bins. Returns None when no block has enough
+    anchor pairs. Pairs are taken within each block. Above `max_pairs` they are thinned by a
+    fixed stride.
     """
     seps: list[F64Array] = []
     dists: list[F64Array] = []
@@ -105,7 +96,7 @@ def within_block_curve(
 
 
 def _hat(v: F64Array) -> F64Array:
-    """The skew symmetric matrices of a stack of vectors, shape (..., 3) to (..., 3, 3)."""
+    """Returns the skew symmetric matrices of a stack of vectors, shape (..., 3) to (..., 3, 3)."""
     z = np.zeros(v.shape[:-1], dtype=np.float64)
     x, y, w = v[..., 0], v[..., 1], v[..., 2]
     return np.stack(
@@ -119,11 +110,10 @@ def _hat(v: F64Array) -> F64Array:
 
 
 def _rot_and_jac(rv: F64Array) -> tuple[F64Array, F64Array]:
-    """The rotation matrices of a stack of rotation vectors and their derivatives.
+    """Returns the rotation matrices of a stack of rotation vectors and their derivatives.
 
-    Returns `R` of shape (n, 3, 3) and `dR` of shape (n, 3, 3, 3) where `dR[:, i]` is the
-    derivative of `R` with respect to the i-th component of the rotation vector. The formula is
-    Gallego and Yezzi's, with the small angle limit taken as the generator itself.
+    `R` has shape (n, 3, 3). `dR` has shape (n, 3, 3, 3) and `dR[:, i]` is the derivative by
+    component i of the rotation vector, by the formula of Gallego and Yezzi.
 
     Parameters
     ----------
@@ -160,29 +150,29 @@ def _energy_grad(
     r0: F64Array,
     w_ev: float,
 ) -> tuple[float, F64Array]:
-    """The stitch energy and its gradient at one rotation and one translation per block.
+    """Returns the stitch energy and its gradient.
 
-    The variable vector is the n rotation vectors followed by the n translations, both
-    flattened. Excluded volume pairs are expected to be pre filtered to a positive radius.
+    The variables are the n rotation vectors followed by the n translations, flattened. Every
+    excluded volume pair must have a positive radius.
 
     Parameters
     ----------
     x
         The 6n variables.
     cen
-        Per block anchor centroids, shape (n, 3).
+        Anchor centroid per block, shape (n, 3).
     first, last
-        The first and last anchor of each block relative to its centroid, shape (n, 3).
+        The first and the last anchor of each block relative to its centroid, shape (n, 3).
     target
-        The boundary distance each consecutive block pair is held to, shape (n - 1,).
+        The boundary distance of each consecutive block pair, shape (n - 1,).
     w_spring
-        Weight on the boundary springs.
+        Weight of the boundary springs.
     iu0, iu1
-        Block index pairs carrying the centroid excluded volume.
+        The block index pairs with excluded volume.
     r0
-        The excluded volume radius of each of those pairs.
+        The excluded volume radius of each pair.
     w_ev
-        Weight on the excluded volume.
+        Weight of the excluded volume.
     """
     n = cen.shape[0]
     rv = x[: 3 * n].reshape(n, 3)
@@ -224,16 +214,16 @@ def _energy_grad(
 
 
 def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]]:
-    """Return the blocks with each one moved rigidly so boundary pairs sit on the interior
-    curve. Blocks without anchors pass through untouched and do not take part in the chain.
-    With fewer than two blocks holding anchors, or no usable curve, the input is returned as
-    is.
+    """Returns the blocks, each moved rigidly to put boundary pairs on the interior curve.
+
+    A block without anchors is returned unchanged. With fewer than two blocks with anchors or no
+    curve, the input is returned.
 
     Parameters
     ----------
     blocks
-        One chromosome's per block bead lists, in any order. Chain order is taken from each
-        block's first anchor midpoint.
+        The bead lists of one chromosome's blocks, in any order. The chain order is by the
+        midpoint of each block's first anchor.
     s
         Settings. Reads the `boundary_stitch_*` weights and `exclusion_radius_ib`.
     """
@@ -282,8 +272,8 @@ def stitch_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut
             method="L-BFGS-B",
             options={
                 "maxiter": int(s.boundary_stitch_max_iter),
-                # The evaluation budget must not bind before the iteration count does, which is what
-                # scipy's own default of 15000 did once a chromosome brought thousands of variables.
+                # The evaluation budget must not bind before the iteration count. The scipy default
+                # of 15000 does on a chromosome.
                 "maxfun": 100 * int(s.boundary_stitch_max_iter) + 1000,
                 "ftol": 1e-14,
                 "gtol": 1e-10,

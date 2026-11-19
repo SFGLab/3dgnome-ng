@@ -1,11 +1,12 @@
 #!/bin/bash
-# RNAPII loops as a second factor on GM12878 whole chr1, five structures per arm: CTCF only,
-# and CTCF with the Tang 2015 RNAPII loops. Battery and saddle on the 1-60 Mb slice, then the
-# chr1 enhancer to promoter against expression test of enhancer3d. Workstation, 3dgnome screen.
+# RNAPII loops as a second factor on GM12878 whole chr1, five structures per arm: CTCF only, and
+# CTCF with the RNAPII loops of Tang 2015. Battery and saddle on the 1-60 Mb slice, then the
+# enhancer to promoter test of enhancer3d.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd ~/3dgnome-ng
 C=GM12878; INI=slurm/ensemble/gm12878_hic_arcs.ini; OUT=out/rnapii; R=chr1
-MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 mkdir -p $OUT
 cp $INI $OUT/gm_ctcf.ini
 sed "s/^anchors = .*/anchors = GM12878_anchors_ctcf_rnapii.bed/; s/^clusters = .*/clusters = GM12878_clusters_3+.bedpe,GM12878_rnapii_clusters_3+.bedpe\nfactors = CTCF,RNAPOL2/" $INI > $OUT/gm_both.ini

@@ -93,7 +93,7 @@ def _pair(i: int, cols: list[str], what: str) -> Problem | None:
     if len(cols) == 10 and not cols[6].isdigit():
         return Problem(
             i,
-            f"Line {i} has 10 columns, and column 7 is the letter {cols[6]} where a count is expected.",
+            f"Line {i} has 10 columns and column 7 is the letter {cols[6]} where a count is expected.",
             "This is the loop format of 3D-GNOME 3.0. Move the orientations to the anchors file and keep one file per factor with seven columns.",
         )
     if len(cols) < 7:
@@ -130,7 +130,7 @@ def check_loops(path: Path, region: tuple[str, int, int] | None) -> Check:
     if long:
         tail.append(f"{_n(long, 'loop', 'loops')} longer than 1 Mb {'goes' if long == 1 else 'go'} to the coarse contact map")
     if tail:
-        parts.append(", and ".join(tail) + ".")
+        parts.append(" and ".join(tail) + ".")
     return Check(True, " ".join(parts))
 
 
@@ -143,7 +143,7 @@ def check_anchors(path: Path) -> Check:
         if first is None:
             first = has
         elif has != first:
-            found = f"Line {i} has {'an' if has else 'no'} orientation, and the first line has {'none' if has else 'one'}."
+            found = f"Line {i} has {'an' if has else 'no'} orientation and the first line has {'none' if has else 'one'}."
             return Check(False, error=Problem(i, found, "Give the orientation on every line or on none."))
         if has and cols[3] not in ("L", "R", "N"):
             return Check(False, error=Problem(i, f"Line {i} has orientation {cols[3]!r}.", "Use L, R or N."))
@@ -183,7 +183,7 @@ def check_vcf(path: Path) -> Check:
     with path.open("rb") as f:
         magic = f.read(2)
     if magic != b"\x1f\x8b":
-        return Check(False, error=Problem(0, "The file is not compressed.", "Compress it with bgzip, and index it with tabix for large files."))
+        return Check(False, error=Problem(0, "The file is not compressed.", "Compress it with bgzip and index it with tabix for large files."))
     with gzip.open(path, "rt", errors="replace") as f:
         for line in f:
             if line.startswith("#CHROM"):
@@ -265,6 +265,13 @@ def _change(kind: str, before: dict, after_loops: list, factor: str) -> str:
         if new_anchors:
             return f"adds {_plural(len(new_anchors), f'{factor} anchor')}, {_plural(len(new_loops), 'new loop')}"
         return f"lengthens {_plural(len(changed), 'loop')}" if changed else f"no {factor} motif above the cutoff"
+    if kind == "DUP":
+        # A copy keeps the reference interval of its original. A copied loop has the key of a
+        # loop that is there already and shows as one more loop than the keys count.
+        copied = len(after_loops) - len(keyed) - len(new_loops)
+        if copied > 0 or new_loops:
+            return f"copies {_plural(max(copied, 0), 'loop')}, adds {_plural(len(new_loops), 'new loop')}" if new_loops else f"copies {_plural(copied, 'loop')}"
+        return f"lengthens {_plural(len(changed), 'loop')}" if changed else "no anchor inside"
     if flipped or removed:
         return f"flips {_plural(len(flipped), 'anchor')}, replaces {_plural(len(removed) + len(new_loops), 'loop')}"
     return "no anchor inside"
@@ -272,7 +279,7 @@ def _change(kind: str, before: dict, after_loops: list, factor: str) -> str:
 
 def combine_changes(by_factor: list[tuple[str, str]]) -> str:
     """One sentence for the changes of several loop factors: one verb is summed with the split
-    by factor, different changes are listed, and a factor without change is left out."""
+    by factor, different changes are listed and a factor without change is left out."""
     real = [(f, w) for f, w in by_factor if not w.startswith("no ")]
     if not real:
         return by_factor[0][1] if by_factor else "no anchor inside"
@@ -285,9 +292,8 @@ def combine_changes(by_factor: list[tuple[str, str]]) -> str:
 
 
 def variant_check(cell, region, factors: str, vcf: Path, sample: str, haplotype: int, own_loops: list[tuple[str, Path]] | None = None, own_anchors: Path | None = None) -> dict[str, object]:  # noqa: ANN001, PLR0913
-    """What a sample's variants on one haplotype do to the loops of a region, one variant at a
-    time, with the counts applied and skipped. Own loops replace the cell type's, with their
-    anchors file or their merged ends as anchors, as the job builds them.
+    """The effect of the variants of a sample on one haplotype on the loops of a region, one
+    variant at a time, with the counts applied and skipped. Own loops replace the cell type's.
 
     @raises KeyError when the sample is not in the VCF
     """

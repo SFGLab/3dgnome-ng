@@ -1,6 +1,4 @@
-"""
-File loading for 3dgnome-ng.
-"""
+"""File readers and writers."""
 
 from __future__ import annotations
 
@@ -13,9 +11,7 @@ LOG = log.get("io")
 
 
 def parse_region(region_str: str) -> BedRegion | None:
-    """
-    Parse 'chr:start-end' string.  Returns None on failure.
-    """
+    """Parses 'chr:start-end'. Returns None when it does not parse."""
     try:
         chr_part, range_part = region_str.split(":", 1)
         st, en = range_part.split("-", 1)
@@ -25,13 +21,9 @@ def parse_region(region_str: str) -> BedRegion | None:
 
 
 def _expand_chr_range(token: str) -> list[str]:
-    """
-    Expand 'chrN-chrM' into [chrN, chrN+1, ..., chrM] when both ends are
-    numeric.  Anything else is returned as a single-element list.
-    Examples:
-      'chr1-chr3' -> ['chr1', 'chr2', 'chr3']
-      'chrX'      -> ['chrX']
-      'chr1-chrX' -> ['chr1-chrX']  (non-numeric end: not expanded)
+    """Expands 'chrN-chrM' to the list from chrN to chrM when both ends are numbers.
+
+    'chr1-chr3' gives ['chr1', 'chr2', 'chr3']. Any other token is returned as a list of one.
     """
     if "-" not in token:
         return [token]
@@ -52,15 +44,13 @@ def _expand_chr_range(token: str) -> list[str]:
 
 
 def parse_chrs_arg(arg: str) -> tuple[list[str], BedRegion | None]:
-    """
-    Parse the CLI chromosomes/region argument.  Mirrors the Reference -c flag.
+    """Parses the chromosomes or region argument of the CLI.
 
-    Accepts:
-      'chr14:18288319-20307135' -> (['chr14'], BedRegion(...))    single region
-      'chr14'                   -> (['chr14'], None)              single chromosome
-      'chr1,chr3,chrX'          -> (['chr1','chr3','chrX'], None) comma list
-      'chr1-chr22,chrX'         -> (['chr1',...,'chr22','chrX'], None)  range + extras
-      ''                        -> default whole human genome (chr1..chr22, chrX)
+    'chr14:18288319-20307135' -> (['chr14'], BedRegion(...))
+    'chr14'                   -> (['chr14'], None)
+    'chr1,chr3,chrX'          -> (['chr1', 'chr3', 'chrX'], None)
+    'chr1-chr22,chrX'         -> (['chr1', ..., 'chr22', 'chrX'], None)
+    ''                        -> chr1 to chr22 and chrX
     """
     arg = arg.strip()
     if not arg:
@@ -79,7 +69,6 @@ def parse_chrs_arg(arg: str) -> tuple[list[str], BedRegion | None]:
             continue
         chrs.extend(_expand_chr_range(token))
 
-    # de-dup while preserving order
     seen: set[str] = set()
     unique: list[str] = []
 
@@ -91,20 +80,15 @@ def parse_chrs_arg(arg: str) -> tuple[list[str], BedRegion | None]:
     return unique, None
 
 
-# Load anchors from BED file
-
-
 def load_anchors(
     path: str,
     chr_set: set[str],
     region: BedRegion | None = None,
 ) -> AnchorMap:
-    """
-    Load anchor BED file.  Format: chr start end [orientation]
+    """Loads an anchor BED file, `chr start end [orientation]`.
 
-    Returns dict[chr -> list[Anchor]] (only for chromosomes in chr_set).
-    Anchors are included only if at least one end falls within `region`
-    (if specified).
+    Returns the anchors of the chromosomes in `chr_set`. With a region, an anchor is kept when at
+    least one of its ends is inside.
     """
     anchors: AnchorMap = {}
     if not path or not os.path.exists(path):
@@ -141,9 +125,6 @@ def load_anchors(
     return anchors
 
 
-# Load PET cluster arcs from BEDPE file
-
-
 def load_arcs(
     path: str,
     chr_set: set[str],
@@ -151,16 +132,11 @@ def load_arcs(
     max_pet_length: int = 1_000_000,
     factor: int = 0,
 ) -> tuple[RawArcMap, RawArcMap]:
-    """
-    Load PET cluster BEDPE file.  Format: chr_a start_a end_a chr_b start_b end_b score
-    Every arc carries `factor`, the index of the cluster file it came from.
+    """Loads a PET cluster BEDPE file, `chr_a start_a end_a chr_b start_b end_b score`.
 
-    Returns (raw, long_arcs) where:
-      raw       : dict[chr -> list[RawArc]], sorted by start, intra only
-      long_arcs : dict[chr -> list[RawArc]], arcs with (end-start) > max_pet_length
-
-    Long arcs are not anchor-mapped (they would be too sparse) but are folded back
-    into the segment-level heatmap by Solver, mirroring Reference LooperSolver.cpp:1069-1104.
+    Every arc carries `factor`, the index of its cluster file. Returns `(raw, long_arcs)`. `raw`
+    holds the intra chromosomal arcs sorted by start. `long_arcs` holds the arcs longer than
+    `max_pet_length`, which are not mapped to anchors and go into the segment heatmap.
     """
     raw: RawArcMap = {}
     long_arcs: RawArcMap = {}
@@ -203,7 +179,6 @@ def load_arcs(
                 long_arcs.setdefault(chr_a, []).append(arc)
                 continue
 
-            # Insert maintaining sort order by start
             lst = raw.setdefault(chr_a, [])
             p = len(lst)
             while p > 0 and lst[p - 1].start > arc.start:
@@ -215,15 +190,8 @@ def load_arcs(
     return raw, long_arcs
 
 
-# Load segment breakpoints
-
-
 def load_breakpoints(path: str, chrs: list[str]) -> BreakpointMap:
-    """
-    Load segment breakpoint BED file.  Format: chr pos pos
-
-    Returns dict[chr -> list[int]] of breakpoint positions.
-    """
+    """Loads a segment breakpoint BED file, `chr pos pos`. Returns the positions per chromosome."""
     bp: BreakpointMap = {}
     if not path or not os.path.exists(path):
         return bp
@@ -243,17 +211,11 @@ def load_breakpoints(path: str, chrs: list[str]) -> BreakpointMap:
     return bp
 
 
-# Load epigenomic tracks
-
-
 def compartment_from_label(label: str) -> int:
-    """
-    Map a compartment label to a `Compartment` code.
+    """Maps a compartment label to a `Compartment` code.
 
-    Accepts CALDER hierarchical labels such as `A.1.1` or `B.2.2.2`, the compact
-    `A1` and `B2` spellings, and the bare `A` and `B`.  Matching is on the first
-    one or two levels, so the deeper CALDER ranks collapse onto the same code.
-    Anything unrecognised reads as `NONE`.
+    Accepts CALDER labels such as `A.1.1`, the compact `A1` and `B2` and the bare `A` and `B`.
+    Only the first two levels are read. An unknown label gives `NONE`.
     """
     t = label.strip().upper()
     if t.startswith("A.1") or t.startswith("A1"):
@@ -278,15 +240,11 @@ def load_compartments(
     chr_set: set[str],
     region: BedRegion | None = None,
 ) -> CompartmentMap:
-    """
-    Load compartment calls.  Format: chr start end value_or_label
+    """Loads compartment calls, `chr start end value_or_label`.
 
-    The fourth column is read as a signed eigenvector value when it parses as a
-    float, otherwise as a compartment label.  A value-only track leaves `cls` at
-    `NONE` until it is phased, since the sign of a Hi-C eigenvector is arbitrary.
-    Intervals are kept sorted by start so binning can bisect.
-
-    Returns dict[chr -> list[CompartmentInterval]] for chromosomes in chr_set.
+    The fourth column is a signed eigenvector value when it parses as a float and a label
+    otherwise. A track of values keeps `cls` at `NONE` until it is phased. Returns the intervals
+    of the chromosomes in `chr_set`, sorted by start.
     """
     out: CompartmentMap = {}
     if not path or not os.path.exists(path):
@@ -313,7 +271,7 @@ def load_compartments(
                 cls = compartment_from_label(parts[3])
                 score = 0.0
             else:
-                if score != score:  # NaN rows are gaps in an eigenvector track
+                if score != score:  # a NaN row is a gap of an eigenvector track
                     continue
                 cls = int(Compartment.NONE)
             out.setdefault(chr_, []).append(CompartmentInterval(chr_, start, end, cls, score))
@@ -330,11 +288,11 @@ def load_activity(
     chr_set: set[str],
     region: BedRegion | None = None,
 ) -> SignalMap:
-    """
-    Load an anchor activity track.  Format: a BED whose value is the seventh column when the
-    line has seven or more, the broadPeak signal, and the fourth otherwise, a bedGraph.
+    """Loads an anchor activity track.
 
-    Returns dict[chr -> list[SignalInterval]] for chromosomes in chr_set, sorted by start.
+    The value is the seventh column of a line with seven or more columns, the broadPeak signal,
+    and the fourth column otherwise, as in a bedGraph. Returns the intervals of the chromosomes
+    in `chr_set`, sorted by start.
     """
     out: SignalMap = {}
     if not path or not os.path.exists(path):
@@ -368,12 +326,9 @@ def load_signal(
     chr_set: set[str],
     region: BedRegion | None = None,
 ) -> SignalMap:
-    """
-    Load a continuous track such as ATAC-seq.  Format: chr start end value
+    """Loads a continuous track such as ATAC-seq, `chr start end value`.
 
-    Intervals are kept sorted by start so binning can bisect.
-
-    Returns dict[chr -> list[SignalInterval]] for chromosomes in chr_set.
+    Returns the intervals of the chromosomes in `chr_set`, sorted by start.
     """
     out: SignalMap = {}
     if not path or not os.path.exists(path):
@@ -406,17 +361,12 @@ def load_signal(
     return out
 
 
-# Load singletons
-
-
 def load_singletons(
     path: str,
     chr_set: set[str],
     region: BedRegion | None,
 ) -> list[SingletonContact]:
-    """
-    Read a singletons BEDPE file into a list of (chr1, pos1, chr2, pos2, score).
-    """
+    """Reads a singletons BEDPE file into a list of `(chr1, pos1, chr2, pos2, score)`."""
     contacts: list[SingletonContact] = []
     if not path or not os.path.exists(path):
         LOG.warning("singletons file not found: %s", path)
@@ -448,15 +398,10 @@ def load_singletons(
 def filter_singletons(
     contacts: list[SingletonContact], region: BedRegion | None
 ) -> list[SingletonContact]:
-    """The contacts with both ends inside `region`, or all of them when there is no region.
-    The same test the loader applies, for a list that was loaded unfiltered so the whole
-    chromosome could be fitted first."""
+    """Returns the contacts with both ends inside `region`, or all of them without a region."""
     if region is None:
         return contacts
     return [c for c in contacts if region.contains(c[1]) and region.contains(c[3])]
-
-
-# Create singleton heatmap from pre-loaded contacts
 
 
 def create_singleton_heatmap(
@@ -466,16 +411,10 @@ def create_singleton_heatmap(
     total_size: int,
     bin_lengths_mb: list[float] | None = None,
 ) -> list[list[float]]:
-    """
-    Build a contact frequency heatmap from a list of (chr1,pos1,chr2,pos2,score)
-    tuples (as produced by ContactData.from_files / from_dataframes).
+    """Builds a contact frequency heatmap from `(chr1, pos1, chr2, pos2, score)` contacts.
 
-    Drop-in replacement for create_singleton_heatmap() when data is already
-    in memory rather than in a file.
-
-    bin_lengths_mb: flat list of bin genomic lengths in Mb (global bin index).
-                    When provided, h[i][j] is divided by len_i * len_j after
-                    binning, mirroring Reference createSingletonHeatmap() normalisation.
+    `bin_lengths_mb` holds the genomic length of each global bin in Mb. With it, cell (i, j) is
+    divided by `len_i * len_j`.
     """
     import bisect
 
@@ -512,30 +451,17 @@ def create_singleton_heatmap(
     return h
 
 
-# CIF export
-
-
 def write_cif(
     path: str,
     beads: list[BeadOut],
     entry_id: str = "3dgnome",
 ) -> None:
-    """
-    Write a single structure to an mmCIF file.
+    """Writes one structure to an mmCIF file.
 
-    beads : list of BeadOut = (start_bp, end_bp, x, y, z, kind)
-        One entry per anchor bead, as returned by run_region() for one structure.
-
-    Each bead carries its genomic region and kind in three non-standard extension
-    columns:
-      _atom_site.gnome_region_start  - genomic start (bp)
-      _atom_site.gnome_region_end    - genomic end   (bp)
-      _atom_site.gnome_bead_kind     - "anchor" | "subanchor"
-    Standard mmCIF viewers ignore unknown _atom_site.* columns; downstream tools
-    that want the per-bead genomic span can parse them directly.  As an extra
-    hint to viewers that DO honour residue names, anchor beads use label_comp_id
-    = "ALA" while subanchor beads use "GLY", which gives default color-coding
-    in PyMOL / ChimeraX / Mol* without any custom scripting.
+    Each bead carries its genomic range and kind in three extension columns,
+    `_atom_site.gnome_region_start`, `_atom_site.gnome_region_end` and
+    `_atom_site.gnome_bead_kind`. Anchors have the residue name ALA and subanchors GLY, which
+    viewers colour apart.
     """
     header = f"""data_{entry_id}
 #
@@ -566,7 +492,10 @@ _atom_site.gnome_region_start
 _atom_site.gnome_region_end
 _atom_site.gnome_bead_kind
 """
-    with open(path, "w") as f:
+    # A run that starts again skips a member whose file exists. The file gets its name only when
+    # it is whole.
+    part = path + ".part"
+    with open(part, "w") as f:
         f.write(header)
         for i, bead in enumerate(beads, start=1):
             comp = "ALA" if bead.kind == "anchor" else "GLY"
@@ -575,14 +504,14 @@ _atom_site.gnome_bead_kind
                 f"{bead.x} {bead.y} {bead.z} 1.00 99.99 C "
                 f"{bead.start} {bead.end} {bead.kind}\n"
             )
+    os.replace(part, path)
 
 
 def write_bead_table(path: str, chr_: str, beads: list[BeadOut]) -> None:
-    """Write one structure as a tab separated table, one row per bead.
+    """Writes one structure as a tab separated table, one row per bead.
 
-    Columns are chromosome, genomic start and end in bp, x, y, z and the bead kind, after one
-    header line. The table carries the same beads as the CIF written beside it, for readers
-    that do not parse mmCIF.
+    The columns are chromosome, genomic start and end in bp, x, y, z and the bead kind, after one
+    header line.
     """
     with open(path, "w") as f:
         f.write("#chr\tstart\tend\tx\ty\tz\tkind\n")

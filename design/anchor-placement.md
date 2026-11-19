@@ -6,7 +6,7 @@ which changes are worth making.
 
 Status, 2026-09-11. The arcs stage now solves every anchor of a chromosome together from a
 Hilbert curve start, so the between block placement this note is about is no longer left to
-the stitch: see `ab-compartments.md` for the measurements and AGENTS.md for the entry. What
+the stitch: see `ab-compartments.md` for the measurements and `features.md` for the entry. What
 follows is the history that led there.
 
 Status, 2026-09-06. Diagnosis complete. B, the boundary stitch, converges and removes the strands between
@@ -97,7 +97,7 @@ the Hi-C, which is the same fact on the observable Hi-C measures directly.
 
 Block centroids are placed by the coarse stage with chain bonds between consecutive centroids,
 excluded volume, and a confinement sphere of radius `pf * mean(dtn) * N^(1/3)` per segment.
-`validation/core/config.py::CANONICAL` set `pf = 0.15`, five times tighter than the `Settings`
+`gnome3d/production.py::CANONICAL` set `pf = 0.15`, five times tighter than the `Settings`
 default of 0.75. It entered in commit c7dc086 and never went through the harness grid, which
 had validated 0.75 to 1.0.
 
@@ -195,7 +195,7 @@ relaxes into a free coil. That is the fuzz on each ball rather than a clean path
 ### A. Excluded volume floor that grows with genomic separation. Removed 2026-09-06
 
 Implemented in `gnome3d/pipeline/ib/floor.py`, the arcs stage and both arcs kernels, gated on
-`[excluded_volume] use_genomic_floor`. Unit checks in `harness/test_genomic_floor.py`.
+`[excluded_volume] use_genomic_floor`. Unit checks in `tests/unit/test_genomic_floor.py`.
 
 First measurement, chr1:1-60 Mb on the workstation, same seed as the stitch runs, with the floor
 riding the excluded volume term's weight of 0.1. It failed, and the reason is the weight.
@@ -276,7 +276,7 @@ unbounded `1/d`, which is the known cause of the small interaction block blow up
 ### B. Stitch block edges together. Built, opt in
 
 Implemented in `gnome3d/pipeline/stitch.py`, wired into `reconstruct.py::_assemble`, gated on
-`[boundary_stitch] use_boundary_stitch`. Unit checks in `harness/test_stitch.py`.
+`[boundary_stitch] use_boundary_stitch`. Unit checks in `tests/unit/test_stitch.py`.
 
 Measured through the pipeline on the workstation, chr1:1-60 Mb at packing factor 0.75, flag
 off and flag on from the same seed so the two structures differ only by the pass, then
@@ -336,7 +336,7 @@ arrangement the arcs MC produced untouched. That is the same pass A wants for me
 
 Implemented as `util.arc_target_with_separation`, `Settings.arc_expected_distance` and
 `build.arc_expected_matrix`, gated on `[distance] use_separation_arc_target`, multiplicative above
-a 10 kb pivot. Unit checks in `harness/test_arc_target.py`.
+a 10 kb pivot. Unit checks in `tests/unit/test_arc_target.py`.
 
 Measured alone on chr1:1-60 Mb, same seed and executor as every other arm:
 
@@ -412,7 +412,7 @@ Implemented as `gnome3d/pipeline/relax.py`, the smooth kernel over the whole chr
 excluded volume at 1.5 bonds, bond springs at weight 10, temperature 0.1 of the smooth
 maximum, anchors fixed, gated on `[relax] use_cross_block_relax`, run after the stitch. On a
 toy of two overlapping coils it takes 564 cross block contacts to zero with bonds kept within
-1.44. Unit checks in `harness/test_relax.py`.
+1.44. Unit checks in `tests/unit/test_relax.py`.
 
 Applied offline to the D, C and stitch structure, `playground/relax_offline.py`:
 
@@ -1082,8 +1082,8 @@ piece done as far as the input reaches. What would take it further is a denser a
 contact map, since the term holds only 4 percent of the far pairs through the 25 kb pixels,
 and that is a data path change.
 
-**Adopted 2026-09-08 evening, the user's decision.** Production is the deep maps as input, the
-contact background on and the reach at 1.5, with two rules from the user: no input has to be
+**Adopted 2026-09-08 evening.** Production is the deep maps as input, the
+contact background on and the reach at 1.5, with two rules: no input has to be
 deep, so the term degrades to holding next to nothing on a thin map and the data section
 falls back to the ChIA-PET singletons when no Hi-C file is present, and whole genome runs
 take a thinned file. The thinning is a seeded binomial draw on the counts to 5,000 contacts
@@ -1103,7 +1103,7 @@ the arc springs, and under D the arcs target sensible distances so that competit
 one. Implemented as `build.add_chain_bonds`, consecutive arcless pairs entered into the arcs
 target matrix at `genomic_length_to_distance` of their gap after the heatmap scaling, arc pairs
 kept, gated on `[springs] use_arcs_chain_bonds`. Same spring constants as the arcs; a separate
-weight would need a per pair weight in the kernels. Unit checks in `harness/test_arc_target.py`.
+weight would need a per pair weight in the kernels. Unit checks in `tests/unit/test_arc_target.py`.
 Measured offline on the largest block, 1227 anchors, 1188 bonds, median bond target 1.27,
 under D with and without C:
 
@@ -1250,7 +1250,7 @@ stitch, option E.
 | boundary jump at 562 kb to 1 Mb | `playground/boundary_wide.py` | 33 | 59, with stitch 0.98 |
 | block layout exponent, coarse | `playground/ib_confine_ablate.py` | 0.021 | 0.214 |
 | enhancer promoter expression | `enhancer3d/playground/beyond_linear.py` | 86 percent of v4 | not yet run |
-| byte exact parity, flag off | see AGENTS.md parity gate | must stay identical | |
+| byte exact parity, flag off | see the byte exactness gate of AGENTS.md | must stay identical | |
 
 Targets are 0.285 for the two exponents and 0.86 for the contact probability slope, from the
 Hi-C. The jump should approach 1.
@@ -1258,7 +1258,7 @@ Hi-C. The jump should approach 1.
 ## Decisions worth making before building
 
 - A and B are divergences from the reference and from cudaMMC. They must be opt in, default
-  off, and recorded in the AGENTS.md divergences section. The parity baseline does not move.
+  off, and recorded in `features.md`. The parity baseline does not move.
 - The packing factor change is configuration, not code, and moves no parity baseline. Whether it
   should be 0.75 or 1.0 is decided by segments with many blocks, not by the 60 Mb region.
 - Better geometry may not improve the expression statistic. If that happens it should be

@@ -1,15 +1,10 @@
-"""Start positions for a block's subanchors.
+"""Start positions of the subanchors of a block.
 
-The densification puts each gap's subanchors on the straight line between its two anchors, so
-the smooth stage starts every coil fully collapsed and has to push it open against a term that
-has no force near its radius. The coil start puts them on a random bridge instead: a walk from
-one anchor at the bond targets, pulled toward the other so it lands there, each bead placed at
-a clear candidate when one of twenty draws is clear of the beads already placed in the gap.
-Under the compact rule the clear candidate nearest the gap's midpoint is taken, which keeps
-the coil as small as the clearance allows rather than as open as it can be.
-
-Only beads of the same gap and its two anchors count for clearance. Pairs across gaps are left
-to the smooth stage, whose hard wall only ever lowers their number.
+Densification puts the subanchors of a gap on the line between its two anchors. The coil start
+puts them on a random bridge, a walk from one anchor at the bond targets, pulled toward the
+other. Each bead takes a candidate of twenty draws that is clear of the beads placed in its
+gap. The compact rule takes the clear candidate nearest the midpoint of the gap. Only the
+beads of one gap and its two anchors count for clearance.
 """
 
 from __future__ import annotations
@@ -26,8 +21,9 @@ _DRAWS = 20
 def _bridge_compact_nb(
     a: F64Array, b: F64Array, targets: F64Array, r_avoid: float, normals: F64Array
 ) -> F64Array:
-    """`_bridge` under the compact rule with its draws made beforehand, `normals[j, k]` the
-    k-th draw for bead j. The arithmetic is the Python function's, so the result is identical."""
+    """`_bridge` under the compact rule with the draws made beforehand, `normals[j, k]` the k-th
+    draw of bead j. The result is identical to `_bridge`.
+    """
     m = targets.shape[0] - 1
     out = np.zeros((m, 3), dtype=np.float64)
     pts = np.zeros((m + 2, 3), dtype=np.float64)
@@ -102,7 +98,9 @@ def _bridge_compact_nb(
 def _bridge(
     a: F64Array, b: F64Array, targets: F64Array, r_avoid: float, rng: np.random.Generator, rule: str
 ) -> F64Array:
-    """Positions of the m subanchors between anchors `a` and `b`, `targets` the m + 1 bonds."""
+    """Returns the positions of the m subanchors between anchors `a` and `b`. `targets` are the
+    m + 1 bonds.
+    """
     m = len(targets) - 1
     placed = [a, b]
     out = np.zeros((m, 3), dtype=np.float64)
@@ -137,8 +135,8 @@ def _bridge(
         cur = best
         out[j] = cur
         placed.append(cur)
-    # The walk's last bond is whatever is left to `b`. Spread that residual along the bridge so
-    # every bond carries a share of it instead of the last one carrying it all.
+    # The residual to `b` is spread along the bridge. The last bond does not carry all of
+    # it.
     end = cur + (b - cur) / np.linalg.norm(b - cur) * float(targets[m]) if m else b
     residual = b - end
     for j in range(m):
@@ -154,23 +152,23 @@ def coil_start(
     rng: np.random.Generator,
     rule: str = "compact",
 ) -> F32Array:
-    """The chain with every gap's subanchors on a bridge between its anchors.
+    """Returns the chain with the subanchors of every gap on a bridge between its anchors.
 
     Parameters
     ----------
     pos
-        Bead positions, anchors where the arcs put them. Not modified.
+        Bead positions with the anchors placed. Not modified.
     fixed
         True for anchors.
     dtn
         Bond targets, `dtn[i]` between beads i and i + 1.
     r_avoid
-        Clearance a placed bead keeps from the others of its gap when a draw allows it.
+        The clearance a placed bead keeps from the others of its gap when a draw allows it.
     rng
-        The generator every draw comes from, so the start is a function of its seed.
+        The generator of every draw.
     rule
-        `compact` takes the clear candidate nearest the gap's midpoint, `first` the first clear
-        one.
+        `compact` takes the clear candidate nearest the midpoint of the gap, `first` the first
+        clear one.
     """
     out = pos.astype(np.float64).copy()
     anchors = np.flatnonzero(fixed)
@@ -179,8 +177,8 @@ def coil_start(
         if b - a < 2:
             continue
         if rule == "compact":
-            # Every bead takes all of its draws under this rule, so they can be drawn at once
-            # in the order the loop would have drawn them, and the walk runs compiled.
+            # Under this rule every bead takes all of its draws. They are drawn at once in the
+            # order of the loop.
             normals = rng.normal(size=(b - a - 1, _DRAWS, 3))
             out[a + 1 : b] = _bridge_compact_nb(out[a], out[b], d[a:b], float(r_avoid), normals)
         else:

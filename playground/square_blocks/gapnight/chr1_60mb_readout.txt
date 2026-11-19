@@ -1,4 +1,4 @@
-chr1:1-60000000 at 25 kb, 2400 bins, Hi-C /mnt/storagelinux/_hic/GM12878/hic.4DNFIXP4QG5B.mcool
+chr1:1-60000000 at 25 kb, 2400 bins, Hi-C /data/_hic/GM12878/hic.4DNFIXP4QG5B.mcool
 
 chr1_60mb_coil: 3 structures, 46972 beads, nu 0.344, 1234 of 2400 bins hold an anchor
   SCC raw 0.162  balanced 0.187   no structure null raw 0.376  balanced -0.047

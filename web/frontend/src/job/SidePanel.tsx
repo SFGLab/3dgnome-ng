@@ -1,8 +1,8 @@
-import { Archive, Braces, ChevronLeft, ChevronRight, FileText, Folder, Pencil } from 'lucide-react'
-import { useState } from 'react'
+import { Braces, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Folder, Pencil } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { recentJobs, rememberJob } from '../model/recent'
 import type { JobApi, Summary } from './api'
-import { bp, duration, FACTORS, size } from './format'
+import { bp, duration, FACTORS, size, shortRegion } from './format'
 
 type Props = {
   api: JobApi
@@ -32,7 +32,8 @@ function listedLoops(s: Summary): string {
 
 function variants(s: Summary): string {
   if (!s.n_svs) return 'none'
-  const who = s.request.sample ? `${s.request.sample}, haplotype ${s.request.haplotype + 1}` : 'uploaded VCF'
+  const sample = s.sample_note ? `${s.request.sample} (${s.sample_note})` : s.request.sample
+  const who = s.request.sample ? `${sample}, haplotype ${s.request.haplotype + 1}` : 'uploaded VCF'
   return `${s.n_svs} from ${who}`
 }
 
@@ -41,15 +42,23 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
   const remembered = recentJobs().find((j) => j.url === api.url)
   const [name, setName] = useState(remembered?.name ?? '')
   const [editing, setEditing] = useState(false)
+  const [unfolded, setUnfolded] = useState(false)
   const m = summary.region?.match(/^(\w+):(\d+)-(\d+)$/)
   const region = m ? `${m[1]}:${bp(Number(m[2]))}-${bp(Number(m[3]))}` : summary.request.region
-  const title = name || `${summary.request.cell_type} ${region}`
+  // The heading has the region in megabases, which fits the panel. The line under it has the exact positions.
+  const short = m ? shortRegion(m[1], Number(m[2]), Number(m[3])) : summary.request.region
   const n = summary.structures
-  const model = summary.models[selected - 1]
+  // The file of the structure in view is kept in sight in the list of all of them.
+  const shown = useRef<HTMLLIElement>(null)
+  useEffect(() => {
+    // In braces: a browser may return a promise from the scroll and an effect must return nothing
+    // but its cleanup.
+    shown.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [selected])
   const save = (value: string) => {
     setName(value.trim())
     setEditing(false)
-    rememberJob({ url: api.url, label: remembered?.label ?? `${summary.request.cell_type} ${region}`, name: value.trim(), at: remembered?.at ?? Date.now() })
+    rememberJob({ url: api.url, label: remembered?.label ?? `${summary.request.cell_type} ${short}`, name: value.trim(), at: remembered?.at ?? Date.now() })
   }
   const state =
     summary.state === 'done' && summary.started && summary.finished
@@ -67,7 +76,7 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
     .map(([f, c]) => `${bp(c)} ${f}`)
     .join(', ')
   return (
-    <aside className="job-side">
+    <aside className={unfolded ? 'job-side' : 'job-side folded'}>
       <p className={`job-state ${summary.state}`}>
         <span className="state-dot" /> {state}
       </p>
@@ -81,13 +90,24 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
           onBlur={(e) => save(e.target.value)}
         />
       ) : (
-        <h1 className="job-title">{title}</h1>
+        <h1 className="job-title">
+          {name || (
+            <>
+              {summary.request.cell_type} <span className="nowrap">{short}</span>
+            </>
+          )}
+        </h1>
       )}
       <p className="job-locus">
         {summary.request.cell_type}, {region}
       </p>
       <button type="button" className="link-button" onClick={() => setEditing(true)}>
         <Pencil size={12} aria-hidden /> Rename job
+      </button>
+      {/* On a narrow screen the panel is above the tabs. Its facts and files fold away there, so
+          the model is not a screen below. */}
+      <button type="button" className="side-fold-toggle" aria-expanded={unfolded} onClick={() => setUnfolded((u) => !u)}>
+        {unfolded ? <ChevronUp size={13} aria-hidden /> : <ChevronDown size={13} aria-hidden />} Details and files
       </button>
       <dl className="facts">
         <dt>Loops</dt>
@@ -130,20 +150,24 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
               Random
             </button>
           </div>
+          <div className="side-files">
           <p className="side-label">Files</p>
           <ul className="files">
             <li className="folder">
               <Folder size={14} aria-hidden /> structures <span className="size">{n} files</span>
             </li>
-            {model && (
-              <li className="file selected">
-                <a href={api.fileUrl(model.name)}>
-                  <FileText size={14} aria-hidden /> {model.name}
-                </a>
-                <span className="size">{size(model.size)}</span>
-              </li>
-            )}
-            {n > 1 && <li className="more">{n - 1} more</li>}
+            <li className="models">
+              <ul className="files" aria-label="Structure files">
+                {summary.models.map((f, i) => (
+                  <li key={f.name} className={i === selected - 1 ? 'file selected' : 'file'} ref={i === selected - 1 ? shown : undefined}>
+                    {/* The sizes of the structures are alike. The size is in the tooltip and the name has the row. */}
+                    <a href={api.fileUrl(f.name)} title={`${f.name}, ${size(f.size)}`}>
+                      <FileText size={14} aria-hidden /> {f.name}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </li>
             {summary.files
               .filter((f) => ['ep.tsv', 'marks.json', 'engine.log'].includes(f.name))
               .map((f) => (
@@ -154,12 +178,8 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
                   <span className="size">{size(f.size)}</span>
                 </li>
               ))}
-            <li className="file">
-              <a href={api.zipUrl}>
-                <Archive size={14} aria-hidden /> all files, zip
-              </a>
-            </li>
           </ul>
+          </div>
         </>
       )}
     </aside>

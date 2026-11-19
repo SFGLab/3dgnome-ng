@@ -221,7 +221,7 @@ export function EnsembleFields({ structures, name, max, onChange }: { structures
         />
       </label>
       <label className="field">
-        <span>Job name, optional</span>
+        <span>Job name (optional)</span>
         <input value={name} placeholder="e.g. TNFRSF8 with RNAPII loops" onChange={(e) => onChange({ name: e.target.value })} />
       </label>
     </div>

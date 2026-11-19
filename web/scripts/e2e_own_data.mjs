@@ -1,6 +1,6 @@
 // The own data dialogs end to end through a running site: a job with own loops of two factors
-// and contacts from a local .hic, a job with an uploaded VCF and its variants table, and a job
-// with contacts by link, and your own cell type with listed loops and enhancers. Each step screenshots its dialog at 1440 px and prints the job's url.
+// and contacts from a local .hic, a job with an uploaded VCF and its variants table and a job
+// with contacts by link and your own cell type with listed loops and enhancers. Each step screenshots its dialog at 1440 px and prints the job's url.
 //
 //   SITE=http://127.0.0.1:8796 FILES=dir SHOTS=dir node web/scripts/e2e_own_data.mjs own|vcf|link|owncell
 //

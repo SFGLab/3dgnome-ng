@@ -16,13 +16,14 @@ import pandas as pd
 
 ARM_NAME = {
     "E": "original models (cudaMMC)",
-    "C": "gnome3d, CTCF loops",
-    "R": "gnome3d, CTCF and RNAPII loops",
-    "M": "gnome3d, RNAPII ends merged into CTCF anchors",
+    "C": "3D-GNOMEᴺᴳ, CTCF loops",
+    "R": "3D-GNOMEᴺᴳ, CTCF and RNAPII loops",
+    "M": "3D-GNOMEᴺᴳ, RNAPII ends merged into CTCF anchors",
 }
 ARM_COLOUR = {"E": "#8c8c8c", "C": "#2a78d6", "R": "#eb6834", "M": "#1baf7a"}
 
-_ARM = re.compile(r"^(?P<name>[A-Za-z0-9]+)_(?P<arm>[ECRM])_60mb$")
+# An arm is named by its line, its letter and its scope, chr1:1-60 Mb or the whole genome.
+_ARM = re.compile(r"^(?P<name>[A-Za-z0-9]+)_(?P<arm>[ECRM])_(?:60mb|genome)$")
 
 
 def _rows(path: Path) -> list[dict[str, object]]:
@@ -90,13 +91,33 @@ def microc_classes(readouts: Path) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["line", "arm", "loop_class", "loops", "value"])
 
 
+def by_chromosome(readouts: Path) -> pd.DataFrame:
+    """The readouts one value a chromosome, of `crossline_genome_collect.py`.
+
+    Returns columns line, arm, chrom, measure and value, empty for readouts of one region.
+    """
+    path = readouts / "by_chromosome.tsv"
+    if not path.is_file():
+        return pd.DataFrame(columns=["line", "arm", "chrom", "measure", "value"])
+    return pd.read_csv(path, sep="\t")
+
+
 def trio_paired(trio_dir: Path) -> pd.DataFrame:
     """Per person readouts against the person's own Hi-C.
 
     Returns columns person, arm, measure and value. `loop_pileup` is the model's pile-up at
-    RNAPII loops over the map's, `hic` the stratum adjusted correlation.
+    RNAPII loops over the map's, `hic` the stratum adjusted correlation. A directory holding
+    `trio_genome.json` of `trio_genome_summary.py` is read from that file, the chromosomes
+    already added up. Any other is read per person from the files of `readouts_trio.sh`.
     """
     rows = []
+    genome = trio_dir / "trio_genome.json"
+    if genome.is_file():
+        for r in json.loads(genome.read_text())["people"]:
+            for arm in ("C", "R"):
+                rows.append({"person": r["person"], "arm": arm, "measure": "loop_pileup", "value": float(r[f"pileup_{arm}"])})
+                rows.append({"person": r["person"], "arm": arm, "measure": "hic", "value": float(r[f"scc_{arm}"])})
+        return pd.DataFrame(rows, columns=["person", "arm", "measure", "value"])
     for path in sorted(trio_dir.glob("*_pileup.json")):
         rec = json.loads(path.read_text())
         ref = [float(r["apa"]) for r in rec if r["arm"] == "map"]

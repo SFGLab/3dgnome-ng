@@ -1,17 +1,4 @@
-"""Heatmap-energy MC (numba) - a fully self-contained kernel.
-
-Unlike arcs/smooth/ib (which share the unified `_batch_mc_nb` + `terms` math),
-the heatmap kernel is deliberately standalone: it carries its OWN copies of the
-two energy terms it needs (heatmap distance-to-expected + excluded volume), its
-own MC inner loop (`_batch_heatmap_nb`), and its own convergence driver
-(`_run_heatmap_loop`).  The duplication is intentional - heatmap is the simplest
-energy (double-counted structure, optional EV, non-strict acceptance) and keeping
-it apart means the shared kernel never has to carry a heatmap branch.
-
-`mc_heatmap_numba` is the public entry.  Single-chain runs wire in excluded
-volume; multi-chain runs (`mc_heatmap_chains > 1`) run the same inner kernel with
-EV off across K prange-parallel chains and keep the best.
-"""
+"""The heatmap MC on numba."""
 
 from __future__ import annotations
 
@@ -33,9 +20,7 @@ if TYPE_CHECKING:
 
 LOG = log.get("mc.numba")
 
-# Typed wrapper around numba.njit so pyright sees decorated functions with their
-# original signatures.  At runtime this is just numba.njit.  (Duplicated from
-# `terms` on purpose - this module shares no code with the unified kernel.)
+# A typed wrapper of numba.njit. Pyright sees the signatures of decorated functions.
 F = TypeVar("F", bound=Callable[..., Any])
 
 
@@ -48,9 +33,6 @@ def njit(**kwargs: Any) -> Callable[[F], F]:
 
 def _as_f64(arr: np.ndarray[Any, Any]) -> F64Array:
     return np.ascontiguousarray(arr, dtype=np.float64)
-
-
-# ----- energy terms (heatmap distance-to-expected + excluded volume) -----
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -72,7 +54,7 @@ def _local_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip_col: BoolArray, p:
 
 @njit(cache=True, fastmath=True, nogil=True)
 def _init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float:
-    """O(N^2) init - row-at-a-time so the sum order is stable."""
+    """Returns the full heatmap score, summed row by row in a fixed order."""
     n = pos.shape[0]
     sc = 0.0
     for i in range(n):
@@ -139,11 +121,8 @@ def _init_excl_nb(pos: F64Array, r0: float, weight: float, skip: int) -> float:
 
 
 class CoarseTerms(NamedTuple):
-    """Resolved arguments for the optional compartment term at the coarse level.
-
-    Bundled because the heatmap kernel takes them positionally.  `off()` builds
-    an all-disabled instance whose placeholder array exists only to fix numba's
-    type; a disabled term never indexes it.
+    """The arguments of the optional compartment term at the coarse level. `off()` builds a
+    disabled instance.
     """
 
     use_comp: bool
@@ -175,10 +154,8 @@ def build_coarse_terms(
     bond_scale: float,
     compartment: np.ndarray[Any, Any] | None,
 ) -> CoarseTerms:
-    """Resolve the optional compartment term for one heatmap MC call.
-
-    The term switches on only when its flag and its data are both present, so a
-    missing track leaves it off instead of scoring against zeros.
+    """Resolves the optional compartment term of one heatmap MC call. The term is on only when
+    its flag and its track are present.
     """
     from gnome3d.mc.numba.common import affinity_params
 
@@ -201,7 +178,7 @@ def build_coarse_terms(
 
 
 def init_coarse_scores(pos: F64Array, ct: CoarseTerms) -> float:
-    """Full compartment score at the starting positions."""
+    """Returns the compartment score of the starting positions."""
     comp = 0.0
     if ct.use_comp:
         comp = init_affinity_nb(
@@ -216,10 +193,8 @@ def init_coarse_scores(pos: F64Array, ct: CoarseTerms) -> float:
     return float(comp)
 
 
-# ----- MC inner loop + convergence driver -----
-#
-# Heatmap acceptance is NON-strict (score_new <= score); structure is
-# double-counted (delta factor 2), and so is excluded volume.  All beads move.
+# Acceptance is `score_new <= score`. The structure term and the excluded volume are double counted.
+# Every bead moves.
 
 
 @njit(cache=True, fastmath=True, nogil=True)
@@ -247,10 +222,9 @@ def _batch_heatmap_nb(
     score_excl: float,
     score_comp: float,
 ) -> tuple[float, float, float, float, int]:
-    """One batch of `n_steps` heatmap MC steps for a single chain.
-
-    Carries the heatmap distance term plus the optional excluded-volume and
-    compartment terms.  Returns (T, score_struct, score_excl, score_comp, n_ok)."""
+    """Runs one batch of `n_steps` heatmap MC steps of one chain. Returns (T, score_struct,
+    score_excl, score_comp, n_ok).
+    """
     n = pos.shape[0]
     n_ok = 0
     score = score_struct + score_excl + score_comp
@@ -353,9 +327,7 @@ def _run_heatmap_loop(
     score_excl: float,
     ct: CoarseTerms | None = None,
 ) -> float:
-    """Drive `_batch_heatmap_nb` to convergence; return the final total score.
-    Same reference-style stop condition as the shared driver (plateau / score_eps /
-    ratio guard), specialised to the heatmap term set."""
+    """Runs `_batch_heatmap_nb` until convergence and returns the final total score."""
     if ct is None:
         ct = CoarseTerms.off(pos.shape[0])
     score_comp = init_coarse_scores(pos, ct)
@@ -415,9 +387,6 @@ def _run_heatmap_loop(
         ms_score = score
 
 
-# ----- multi-chain (prange best-of-K restarts; EV off, as the reference) -----
-
-
 @njit(cache=True, parallel=True, nogil=True)
 def _mc_heatmap_kchains_nb(
     pos_k: F64Array,  # (K, N, 3)
@@ -433,20 +402,17 @@ def _mc_heatmap_kchains_nb(
     step_size: float,
     final_scores: F64Array,  # (K,) output
 ) -> None:
-    """Run K independent heatmap MC chains in parallel.  `for k in prange(K)`
-    gives each chain a thread-local execution context with its own RNG state -
-    the cudaMMC-style "K parallel chains, take the best" pattern in pure numba.
-    EV is off here (matches the reference multi-chain path)."""
+    """Runs K independent heatmap MC chains in parallel, without excluded volume. Each `prange`
+    iteration has its own thread local RNG.
+    """
     K = pos_k.shape[0]
-    # Placeholder for the compartment term, which this path never enables.  It
-    # exists only to satisfy the kernel signature; nothing indexes it.
+    # A placeholder for the compartment term, which this path does not use.
     no_i8 = np.zeros(1, dtype=np.int8)
     for k in prange(K):  # pyright: ignore[reportGeneralTypeIssues]
-        pos = pos_k[k]  # view into the (k, :, :) slice
+        pos = pos_k[k]
         T = max_temp
         score = _init_heatmap_nb(pos, exp_safe, skip)
         ms_score = score
-        # Outer convergence loop entirely inside the kernel.
         while True:
             T, score, _se, _sc, n_ok = _batch_heatmap_nb(
                 pos,
@@ -488,11 +454,7 @@ def _mc_heatmap_multichain(
     step_size: float,
     settings: Settings,
 ) -> float:
-    """Run K independent MC chains via `@njit(parallel=True)` + prange, then
-    pick the best.  All chains live in a single kernel launch, so per-thread
-    RNG state is independent (no contention) and Python/GIL is out of the loop
-    once the kernel starts.
-    """
+    """Runs K chains in one kernel launch and keeps the best."""
     n = pos.shape[0]
     if n <= 1:
         return 0.0
@@ -540,27 +502,21 @@ def _mc_heatmap_multichain(
 
 
 def mc_heatmap_numba(
-    pos: np.ndarray[Any, Any],  # (N, 3) float32 - modified in place
-    exp_dist: np.ndarray[Any, Any],  # (N, N) - expected pairwise distances
+    pos: np.ndarray[Any, Any],  # (N, 3), modified in place
+    exp_dist: np.ndarray[Any, Any],  # (N, N) expected distances
     diag_size: int,
     step_size: float,
     settings: Settings,
     compartment: np.ndarray[Any, Any] | None = None,
 ) -> float:
-    """Numba simulated-annealing implementation for heatmap-energy MC.
-    Double-counted structure (delta factor 2). Mirrors Reference
-    LooperSolver::MonteCarloHeatmap().  Called by `gnome3d.mc.mc_heatmap`
-    when `settings.mc_backend != "jax"`.
+    """Anneals the beads in place and returns the final score.
 
-    When `settings.mc_heatmap_chains > 1`, runs that many independent MC
-    chains in parallel via numba threading and keeps the one with the best
-    final score - an embarrassingly-parallel restart strategy.
+    With `mc_heatmap_chains` above 1 that many chains run in parallel and the best is kept.
     """
     n = pos.shape[0]
 
     if int(settings.mc_heatmap_chains) > 1 and compartment is None:
-        # The K-chain kernel carries only the heatmap term, so it can only be
-        # used when the compartment term is inactive.
+        # The K chain kernel has the heatmap term alone and runs only without the compartment term.
         return _mc_heatmap_multichain(pos, exp_dist, diag_size, step_size, settings)
 
     if n <= 1:

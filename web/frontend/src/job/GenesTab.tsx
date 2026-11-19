@@ -26,7 +26,7 @@ type Props = {
 }
 
 /** The Genes tab: every marked gene with its nearest enhancer, the 3D distance over the
- * ensemble and the loop joining them, and a histogram of the distances. */
+ * ensemble and the loop joining them and a histogram of the distances. */
 export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, selected }: Props) {
   const [text, setText] = useState(filter)
   const [chip, setChip] = useState<Chip>('all')
@@ -41,7 +41,7 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
   const page = usePage(shown, `${text}|${chip}|${sort.key}|${sort.up}`)
   const max = Math.max(...rows.map((r) => r.max), 1)
   const header = (key: Key, label: string, num = false) => (
-    <th className={num ? 'num' : undefined} onClick={() => setSort((s) => ({ key, up: s.key === key ? !s.up : true }))}>
+    <th className={num ? 'num' : undefined} aria-sort={sort.key === key ? (sort.up ? 'ascending' : 'descending') : 'none'} onClick={() => setSort((s) => ({ key, up: s.key === key ? !s.up : true }))}>
       {label}
       {sort.key === key && (sort.up ? <ArrowUp size={11} aria-hidden /> : <ArrowDown size={11} aria-hidden />)}
     </th>
@@ -78,6 +78,7 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
             <Download size={13} aria-hidden /> <span className="mono">ep.tsv</span>
           </a>
         </div>
+        <Pager page={page} noun="genes" />
         <table className="genes-table">
           <thead>
             <tr>
@@ -116,7 +117,6 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
             ))}
           </tbody>
         </table>
-        <Pager page={page} noun="genes" />
       </div>
       <section className="side-card hist-card" aria-label="3D distance, all genes">
         <p className="card-label">3D distance, all genes</p>

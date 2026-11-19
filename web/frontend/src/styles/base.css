@@ -29,3 +29,164 @@ code,
 pre {
   font-family: var(--mono);
 }
+
+/* A button that reads as a link. Several pages use it and a page's own stylesheet loads with
+   that page alone. */
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: 12px var(--font);
+  cursor: pointer;
+}
+
+/* A button drawn as a link is underlined under the pointer, as a link is. */
+:is(.link-button, .sync-link, .reset):hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* A labelled control and the message under one. The form and the job page both use them and a
+   page's own stylesheet loads with that page alone. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.field {
+  min-width: 0;
+}
+
+.field select,
+.field input {
+  min-width: 0;
+  max-width: 100%;
+  padding: 9px 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font: 13px var(--font);
+}
+
+.field select:disabled,
+.field input:disabled {
+  opacity: 0.6;
+}
+
+.field-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #C2410C;
+}
+
+/*
+ * Every select draws this arrow in place of the browser's own. The properties are marked important.
+ * A component sets its padding and background with shorthands, which would clear the arrow.
+ */
+select {
+  appearance: none;
+  padding-right: 30px !important;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%) !important;
+  background-position:
+    calc(100% - 16px) 55%,
+    calc(100% - 11px) 55% !important;
+  background-size: 5px 5px !important;
+  background-repeat: no-repeat !important;
+  text-overflow: ellipsis;
+}
+
+/*
+ * Everything that takes a click answers the pointer with a slight change of brightness and a slight
+ * press. The selectors have no weight and the hover rule of a component wins.
+ */
+:where(button, select, summary, a, [role='button'], [role='tab'], [role='option'], label:has(input[type='file']), label:has(input[type='checkbox']), input[type='checkbox'], input[type='radio']) {
+  cursor: pointer;
+  transition:
+    filter 120ms ease,
+    transform 80ms ease;
+}
+
+:where(button, select, summary, a, [role='button'], [role='tab'], [role='option'], label:has(input[type='file']), label:has(input[type='checkbox']), input[type='checkbox'], input[type='radio']):where(:not(:disabled, [aria-disabled='true'])):hover {
+  filter: var(--hover);
+}
+
+:where(button, select, summary, [role='button'], [role='tab'], [role='option'], label:has(input[type='file']), a.button, a.button-link):where(:not(:disabled, [aria-disabled='true'])):active {
+  transform: translateY(1px) scale(0.985);
+}
+
+/*
+ * A tab, a choice of a segmented control, a node of a tree and a step have no background. They get
+ * a tint and the ink colour under the pointer.
+ */
+:is(.job-tab, .segmented button, .node, .wizard-steps [role='tab'], .dialog-tabs [role='tab']):not([aria-selected='true'], [aria-pressed='true'], .open):hover {
+  background-color: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+}
+
+/* A row of a table is tinted under the pointer. A row marked as chosen keeps its mark. A column
+   header that sorts the table is tinted too and shows the pointer of a button. */
+tbody tr:hover > :is(td, th) {
+  background-color: color-mix(in srgb, var(--ink) 4%, transparent);
+}
+
+th[aria-sort] {
+  cursor: pointer;
+  user-select: none;
+}
+
+thead th[aria-sort]:hover {
+  background-color: color-mix(in srgb, var(--ink) 10%, var(--panel));
+  color: var(--ink);
+}
+
+/*
+ * A link is underlined under the pointer. The rule is marked important, as many components draw
+ * their links without the line. A link drawn as a button, a card or the name of the site keeps the
+ * brightness change alone.
+ */
+a:not(.button, .button-link, .cite-button, .chip-button, .action, .brand, .recent-job):hover {
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
+}
+
+:where(a, input[type='checkbox'], input[type='radio'], label:has(input[type='checkbox'])):where(:not(:disabled)):active {
+  filter: var(--hover) opacity(0.75);
+}
+
+:where(button, select, input):disabled {
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, select, summary, a, [role='button'], [role='tab'], [role='option'], label, input) {
+    transition: none;
+  }
+
+  :where(button, select, summary, [role='button'], [role='tab'], [role='option'], label, a):active {
+    transform: none;
+  }
+}
+
+/* The raised NG of the site's name. Its capitals end level with the capitals of the name: it
+   stays on the name's baseline and is lifted by the height of the name's capitals less its own.
+   The capitals of Inter are 0.727 em tall, `--cap`. `--ng` is its size against the name's. */
+sup.ng {
+  --ng: 0.42;
+  --cap: 0.727;
+  position: relative;
+  top: calc(-1em * var(--cap) * (1 / var(--ng) - 1));
+  font-size: calc(var(--ng) * 1em);
+  line-height: 0;
+  vertical-align: baseline;
+  color: var(--accent);
+}

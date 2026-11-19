@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import configparser
+from dataclasses import replace
 import sys
 import tempfile
 from pathlib import Path
@@ -34,6 +35,13 @@ def main() -> int:
         cfg.read(inp.config)
         data = cfg["data"]
         check("a CTCF run reads one loop file and names no factors", "," not in data["clusters"] and "factors" not in data)
+        comp = rows(Path(data["data_dir"]) / data.get("compartments", "none"))
+        check("the cell type's compartments of the chromosome are an input", [c[1:] for c in comp] == [["0", "1000000", "A"], ["1000000", "2500000", "B"], ["2500000", "4000000", "A"]], str(comp))
+        check("the term stays off unless the request turns it on", not cfg.has_section("compartments"))
+        bare = build_inputs(replace(ct, files={k: v for k, v in ct.files.items() if k != "compartments"}), region, "CTCF", [], Path(d) / "bare")
+        cfg_bare = configparser.ConfigParser()
+        cfg_bare.read(bare.config)
+        check("a cell type without compartments names none", "compartments" not in cfg_bare["data"])
         loops = rows(Path(data["data_dir"]) / data["clusters"])
         check("the loops are those inside the region", len(loops) == 14, str(len(loops)))
         check("the region is unchanged without variants", inp.region == "chr1:0-3000000")
@@ -82,6 +90,7 @@ def main() -> int:
         check("without an anchors upload the anchors are the merged loop ends with N", [(a[1], a[2], a[3]) for a in anchors] == [("100000", "101500", "N"), ("300000", "301000", "N"), ("500000", "501000", "N"), ("700000", "701000", "N"), ("900000", "901000", "N")], str(anchors))
         sing = rows(Path(data["data_dir"]) / "singletons.bedpe")
         check("own contacts replace the singletons", len(sing) == 1 and sing[0][6] == "5", str(sing))
+        check("own contacts are not read with the cell type's compartments", "compartments" not in data)
         deep = "".join(f"chr1\t{a}\t{a + 25000}\tchr1\t{a + 50000}\t{a + 75000}\t500\n" for a in range(0, 2_900_000, 25_000))
         (own_dir / "deep.bedpe").write_text(deep)
         inp = build_inputs(ct, region, "own", [], Path(d) / "deep", own=Own(loops=own.loops, contacts=own_dir / "deep.bedpe"))
@@ -113,10 +122,16 @@ def main() -> int:
         check("a deletion shifts the anchors after it by its length", 1_040_000 in starts and 1_100_000 not in starts, str(starts[:8]))
         check("the region shrinks by the deletion", inp.region == "chr1:0-2940000", inp.region)
         check("the variants applied are counted", inp.n_svs == 1)
+        comp = rows(Path(cfg["data"]["data_dir"]) / cfg["data"]["compartments"])
+        check("the compartments move with the variants and stay joined", [c[1:] for c in comp] == [["0", "940000", "A"], ["940000", "2440000", "B"], ["2440000", "3940000", "A"]], str(comp))
+        inside = build_inputs(ct, region, "CTCF", [SV("chr1", 950_001, 1_050_001, "DEL")], Path(d) / "del2")
+        cfg2 = configparser.ConfigParser()
+        cfg2.read(inside.config)
+        comp = rows(Path(cfg2["data"]["data_dir"]) / cfg2["data"]["compartments"])
+        check("a deletion over a compartment's edge joins the two sides there", [c[1:] for c in comp] == [["0", "950000", "A"], ["950000", "2400000", "B"], ["2400000", "3900000", "A"]], str(comp))
 
-        # On HG00512's first haplotype over chr1:1-3 Mb the rules' own cutoff of 0 turned 54 CTCF
-        # loops into 101, 46 of them on 19 bp anchors at weak motifs inside inserted repeats;
-        # triosformer's cutoff of 10 leaves 54 and one new anchor.
+        # The cutoff of 0 of the rules made 101 loops of 54 on this haplotype. The cutoff of 10
+        # leaves 54 and one new anchor.
         from personal3d import motifs, rewrite
 
         seen: list[float] = []

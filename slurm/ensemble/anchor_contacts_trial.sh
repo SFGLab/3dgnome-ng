@@ -1,26 +1,25 @@
 #!/bin/bash
 # The full depth anchor contact table and the two sided contact background against production,
-# GM12878 with CTCF and RNAPII loops, workstation, screen actrial.
+# GM12878 with CTCF and RNAPII loops.
 #
-#   DATA=/home/nik/3dgnome-ng/data BASE=out/gapnight TABLE=out/GM12878_anchor_contacts_1kb_chr1.npz \
+#   DATA=~/3dgnome-ng/data BASE=out/gapnight TABLE=out/GM12878_anchor_contacts_1kb_chr1.npz \
 #     bash slurm/ensemble/anchor_contacts_trial.sh
 #
-# Arms, each the production ini BASE/coil.ini with the overrides named:
-#   prod        production, the thinned 25 kb singletons and the one sided rule
+# Arms, each BASE/coil.ini with overrides:
+#   prod        production
 #   table_old   the anchor map from TABLE, the one sided rule
 #   table_z3    the anchor map from TABLE, pairs beyond three Poisson deviations held in or out
-# Phase 1, chr1:20-25, 10-15 and 35-40 Mb at five structures. Phase 2, whole chr1 at three
-# structures, scored on the 1-60 Mb slice. Every phase ends with the law readout and the
-# battery, raw and balanced. A finished arm is not rerun. ARMS picks a subset; COMPARE names
-# an earlier OUT whose prod arms are scored beside this run's.
+# ARMS picks a subset. COMPARE is an earlier OUT whose prod arms are scored beside this run's. A
+# finished arm is not rerun.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 C=GM12878
 DATA="${DATA:-data}"
 BASE="${BASE:-out/gapnight}"
 OUT="${OUT:-out/actrial}"
 TABLE=$(realpath "${TABLE:?the anchor contact table}")
-MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 SING=$DATA/$C/${C}_hic_25kb_singletons.bedpe
 mkdir -p "$OUT"
 git log --format="anchor contacts trial on %h %s" -1

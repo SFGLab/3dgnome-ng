@@ -9,18 +9,20 @@ of either factor and match each RNAPII-only pair's separation within 10 percent.
         <atlas.bed> <genes.tsv> <common_genes.tsv> <out.tsv>
 
 `models_root/<LINE>_<ARM>/chr1/*.beads.tsv` are read for arms C and R. Writes line, set, arm,
-gene_id, sep and distance, and prints the pair count per set.
+gene_id, sep and distance, and prints the pair count per set. The chromosome is chr1 unless the
+environment names another in `EP_CHROM`.
 """
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-CHROM = "chr1"
+CHROM = os.environ.get("EP_CHROM", "chr1")
 PROMOTER_BP = 1000
 
 

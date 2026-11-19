@@ -1,9 +1,4 @@
-"""Arc-MC (numba): anchor springs to expected distances.
-
-`mc_arcs_numba` is the only entry here.  It drives the shared unified kernel
-(`common._run_outer_loop` with `STRUCT_ARCS`) with single-counted structure
-(delta factor 1) plus optional excluded volume / confinement.
-"""
+"""The arcs annealer on numba: anchor springs to expected distances."""
 
 from __future__ import annotations
 
@@ -38,10 +33,7 @@ def mc_arcs_numba(
     settings: Settings,
     arc_w: F32Array | None = None,
 ) -> float:
-    """Numba simulated-annealing implementation for arc-MC.  Single-counted
-    structure (delta factor 1). Mirrors Reference LooperSolver::MonteCarloArcs().
-    Called by `gnome3d.mc.mc_arcs` when `settings.mc_backend != "jax"`.
-    """
+    """Anneals the anchors in place and returns the final score."""
     n = pos.shape[0]
     if n <= 1:
         return 0.0
@@ -52,7 +44,7 @@ def mc_arcs_numba(
     stretch_k = float(settings.spring_stretch_arcs)
     squeeze_k = float(settings.spring_squeeze_arcs)
 
-    # Non-arc 1/d repulsion cutoff (mirror of _prep_arcs_problem_np): 0 => unbounded (faithful to the reference).
+    # 0 leaves the arcless 1/d repulsion unbounded.
     rep_factor = float(getattr(settings, "arcs_repulsion_cutoff_factor", 0.0))
     rep_inv_cutoff = 0.0
     if rep_factor > 0.0:

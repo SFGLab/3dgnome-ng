@@ -1,15 +1,8 @@
-"""The polymer law, and the contact decay fit that supplies its exponent.
+"""The polymer law and the fit of its exponent on the run's contacts.
 
-Chromatin in a nucleus is crumpled. Mean spatial distance grows with genomic separation as a
-power law, `d ~ s ^ nu`, and two loci meet with probability near `s ^ (-3 nu)`, since the
-capture volume is fixed and the coil volume grows as the cube of its radius. So the exponent
-distance grows with can be read off the run's own contact data: the slope of log contact count
-against log separation is `-3 nu`. Nothing here is a constant taken from another dataset. The
-one number that is, `FALLBACK_NU`, is used only when the input cannot supply its own, and the
-run says so.
-
-See [[project_unified_arc_target]] for why the arcs stage needed this, and
-[[project_polymer_law]] for the design.
+Mean distance grows with genomic separation as `d ~ s ^ nu` and contact probability falls as
+`s ^ (-3 nu)`. The slope of log contact count against log separation is `-3 nu`.
+`FALLBACK_NU` is used only when the input cannot supply an exponent and the run logs that.
 """
 
 from __future__ import annotations
@@ -34,12 +27,11 @@ _SLOPE_RANGE = (-1.6, -0.5)
 
 @dataclass(frozen=True)
 class ContactFit:
-    """What the fit found, and whether it can be used.
+    """The result of the exponent fit.
 
-    `nu` is the exponent distance grows with. When `ok` is false it is `FALLBACK_NU` and
-    `reason` says why the data could not supply one. `lo` and `hi` are the band in bp, `n_pairs`
-    the intra chromosomal pairs inside it and `n_bins` the populated bins the slope was fitted
-    on.
+    `nu` is the exponent. When `ok` is false it is `FALLBACK_NU` and `reason` states the cause.
+    `lo` and `hi` are the band in bp, `n_pairs` the intra chromosomal pairs inside it and `n_bins`
+    the populated bins of the fit.
     """
 
     nu: float
@@ -57,21 +49,17 @@ def _refused(reason: str, lo: int = _BAND_LO, hi: int = _BAND_HI, n: int = 0) ->
 
 
 def fit_contact_exponent(contacts: list[SingletonContact]) -> ContactFit:
-    """Fit the contact decay exponent on a run's singletons.
+    """Fits the contact decay exponent on a run's singletons.
 
-    Intra chromosomal pairs only, on the grid the file is binned to. At each grid separation
-    the contact probability is the counts at that separation over the number of bin pairs on
-    the chromosomes that could hold them, so a deep map with every pixel present and a thin
-    map with most pixels missing read the same curve. The grid step is read from where the
-    separations pile up, since a chromosome's last bin is cut short and sits off the grid.
-    The band starts at 20 kb or at twice the grid step, whichever is larger, so a file binned at 25 kb is fitted from 50 kb, and
-    runs to 1 Mb. The fit is refused, with the reason recorded, when the band holds too few
-    pairs or separations, or when the slope is not a decay a polymer can produce.
+    Uses intra chromosomal pairs on the grid of the file. The contact probability at a grid
+    separation is the counts there over the bin pairs the chromosomes offer at that separation.
+    The band runs from 20 kb or twice the grid step, the larger, to 1 Mb. The fit is refused, with
+    a reason, when the band holds too few pairs or separations or the slope is not a polymer decay.
 
     Parameters
     ----------
     contacts
-        `(chr_a, pos_a, chr_b, pos_b, score)` records, as the singletons loader returns them.
+        `(chr_a, pos_a, chr_b, pos_b, score)` records.
     """
     if not contacts:
         return _refused("no contacts")
@@ -86,8 +74,8 @@ def fit_contact_exponent(contacts: list[SingletonContact]) -> ContactFit:
     pos = sep > 0
     if not pos.any():
         return _refused("no intra chromosomal pairs")
-    # The grid step is where the separations pile up. The smallest one in the file can be an
-    # end bin the chromosome cut short, one midpoint off the grid per chromosome.
+    # The grid step is the smallest separation that many pairs share. The smallest in the file can
+    # be the end bin of a chromosome, which is cut short.
     vals, freq = np.unique(sep[pos], return_counts=True)
     step = float(vals[freq >= 0.1 * freq.max()][0])
     lo = int(max(_BAND_LO, 2 * step))
@@ -98,7 +86,6 @@ def fit_contact_exponent(contacts: list[SingletonContact]) -> ContactFit:
     n_pairs = int(band.sum())
     if n_pairs < _MIN_PAIRS:
         return _refused(f"only {n_pairs:,} pairs in the band", lo, hi, n_pairs)
-    # Counts per grid separation, and the bin pairs each chromosome offers at that separation.
     k = np.rint(sep[band] / step).astype(np.int64)
     k_max = int(k.max())
     counts = np.bincount(k, weights=w[band], minlength=k_max + 1)
@@ -138,12 +125,10 @@ _ARC_MIN_PER_BIN = 10
 
 @dataclass(frozen=True)
 class ArcStrengthFit:
-    """How strong a loop of a given span typically is in this run's own arcs.
+    """The typical PET count of a loop against its span, fitted on the run's arcs.
 
-    `strength(score, span)` is the arc's PET count over the typical count at its span, which is
-    observed over expected read off the arcs themselves rather than a curve from another
-    dataset. When `ok` is false the typical count is a constant and strength follows the PET
-    count alone, scaled by the median.
+    `strength(score, span)` is the PET count over the typical count at that span. When `ok` is
+    false the typical count is one constant, the median.
     """
 
     log_a: float
@@ -162,16 +147,15 @@ class ArcStrengthFit:
 
 
 def fit_arc_strength(arcs: list[InteractionArc]) -> ArcStrengthFit:
-    """Fit the typical PET count against span on a run's arcs.
+    """Fits the typical PET count against span on a run's arcs.
 
-    Arcs are binned in log span, the median count per populated bin is taken, and a power law
-    is fitted through the bin medians. Refused, with the constant fallback, when there are too
-    few arcs or too few populated bins to fit a line through.
+    A power law is fitted through the median count of each log span bin. The fit is refused, with
+    the constant fallback, for too few arcs or too few populated bins.
 
     Parameters
     ----------
     arcs
-        Arcs with their genomic span set, as the loader returns them.
+        Arcs with their genomic span set.
     """
     span = np.array([abs(a.genomic_end - a.genomic_start) for a in arcs], dtype=np.float64)
     score = np.array([a.score for a in arcs], dtype=np.float64)
@@ -202,23 +186,20 @@ def fit_arc_strength(arcs: list[InteractionArc]) -> ArcStrengthFit:
 
 @dataclass(frozen=True)
 class PolymerLaw:
-    """One law for every distance, in bead units.
-
-    The bead is the distance two beads hold at the resolution the run declared, `s0_bp`, so the
-    background there is one by definition and nothing is in a unit that means nothing.
+    """One law for every distance, in bead units. One bead is the distance of two beads `s0_bp` apart.
 
     Parameters
     ----------
     nu
-        The exponent distance grows with, measured from the run's contacts or pinned.
+        The exponent, measured from the run's contacts or pinned.
     s0_bp
-        The separation that is one bead, the run's subanchor spacing.
+        The separation of one bead, the run's subanchor spacing.
     q_half
-        The loop strength, in multiples of a typical loop at that span, at which a contact
-        pulls its pair halfway from the background to touching.
+        The loop strength, in multiples of a typical loop at that span, that pulls a pair halfway
+        from the background to one bead.
     arcs
-        The run's own typical loop strength against span. None makes strength the PET count
-        over its median.
+        The fit of typical loop strength against span. None makes strength the PET count over its
+        median.
     """
 
     nu: float
@@ -226,57 +207,54 @@ class PolymerLaw:
     q_half: float = 1.0
     arcs: ArcStrengthFit | None = None
     arcs_by_factor: dict[int, ArcStrengthFit] = field(default_factory=dict)
-    # A multiplier on a factor's loop strength, so a library whose contacts are more transient
-    # than CTCF's, RNAPII's, pulls less at the same PET count; 0 holds its loops at the background.
+    # A multiplier on the loop strength of a factor. 0 holds its loops at the background.
     strength_by_factor: dict[int, float] = field(default_factory=dict)
 
     def background(self, sep_bp: int) -> float:
-        """The distance two beads that far apart hold with nothing between them. Never under one
-        bead, since two beads cannot be closer than touching."""
+        """Returns the distance of two beads `sep_bp` apart with no contact, at least one bead."""
         sep = max(abs(int(sep_bp)), 1)
         return max(1.0, (sep / max(int(self.s0_bp), 1)) ** self.nu)
 
     def radius_of_gyration(self, span_bp: int) -> float:
-        """The radius of gyration of a chain of `span_bp` whose pair distances follow the law.
+        """Returns the radius of gyration of a chain of `span_bp` whose pair distances follow the law.
 
-        The mean square distance over all pairs of a chain of unit length whose pairs sit at
-        their separation to the power nu is 1 over (2 nu + 1)(nu + 1), and the radius of
-        gyration squared is half the mean square pair distance. At nu one half this is the
-        Gaussian chain's N over 6.
+        The mean square pair distance of a unit chain is 1 / ((2 nu + 1)(nu + 1)) and the squared
+        radius of gyration is half of it.
         """
         nu = self.nu
         return self.background(span_bp) / (2.0 * (2.0 * nu + 1.0) * (nu + 1.0)) ** 0.5
 
     def confinement_radius(self, span_bp: int) -> float:
-        """The sphere a chain of `span_bp` fills under the law. A uniform sphere of radius R
-        has a radius of gyration of R root three fifths, so the radius is root five thirds of
-        the chain's. The assumption is that a confined block fills its sphere evenly."""
+        """Returns the radius of the uniform sphere with the chain's radius of gyration, root five
+        thirds of it.
+        """
         return (5.0 / 3.0) ** 0.5 * self.radius_of_gyration(span_bp)
 
     def contact_distance(self, sep_bp: int, q: float) -> float:
-        """The distance for a pair with loop strength `q`, from the background at no strength
-        to one bead at saturation. Halfway at `q_half`."""
+        """Returns the distance of a pair with loop strength `q`, the background at 0, one bead at
+        saturation and halfway at `q_half`.
+        """
         bg = self.background(sep_bp)
         h = 1.0 / (1.0 + max(q, 0.0) / max(self.q_half, 1e-9))
         return 1.0 + (bg - 1.0) * h
 
     def arc_strength(self, score: int, sep_bp: int, factor: int = 0) -> float:
-        """The strength of an arc of `score` PETs spanning `sep_bp`, the count over the typical
-        count at that span under its factor's fit, or factor 0's when that factor has none,
-        times the factor's multiplier."""
+        """Returns the strength of an arc, its PET count over the typical count at its span, times
+        the factor's multiplier. A factor without a fit uses the fit of factor 0.
+        """
         span = abs(int(sep_bp))
         fit = self.arcs_by_factor.get(factor, self.arcs)
         q = fit.strength(score, span) if fit is not None else float(score)
         return q * self.strength_by_factor.get(factor, 1.0)
 
     def arc_distance(self, score: int, sep_bp: int, factor: int = 0) -> float:
-        """The target for an arc of `score` PETs spanning `sep_bp`."""
+        """Returns the target distance of an arc."""
         return self.contact_distance(abs(int(sep_bp)), self.arc_strength(score, sep_bp, factor))
 
     def heatmap_distance(self, freq: float, expected: float, sep_bp: int) -> float:
-        """The target for a heatmap cell, the background at that separation scaled by observed
-        over expected contact to the minus third, which is the fractal globule relation. No
-        contact is no target."""
+        """Returns the target of a heatmap cell, the background times observed over expected to the
+        minus third. No contact is no target.
+        """
         if freq <= 1e-12 or expected <= 1e-12:
             return 0.0
         return self.background(sep_bp) * (freq / expected) ** (-1.0 / 3.0)

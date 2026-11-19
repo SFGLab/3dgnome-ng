@@ -13,7 +13,7 @@ const RESULTS: Record<string, object> = {
   'GM12878_RNAPII_loops.bedpe': { ok: true, summary: '31,902 loops read. 64 are in the region.', error: null },
   'hichip_loops.txt': {
     ok: false, summary: '',
-    error: { line: 1, found: 'Line 1 has 10 columns, and column 7 is the letter R where a count is expected.', fix: 'This is the loop format of 3D-GNOME 3.0. Move the orientations to the anchors file and keep one file per factor with seven columns.' },
+    error: { line: 1, found: 'Line 1 has 10 columns and column 7 is the letter R where a count is expected.', fix: 'This is the loop format of 3D-GNOME 3.0. Move the orientations to the anchors file and keep one file per factor with seven columns.' },
   },
   'anchors.bed': { ok: true, summary: '1,204 anchors read, with orientations.', error: null },
   'enhancers.bed': { ok: true, summary: '71 enhancers read.', error: null },
@@ -104,7 +104,7 @@ describe('Your own data dialog', () => {
       </QueryClientProvider>,
     )
     expect(screen.getByRole('radio', { name: /None/ })).toBeChecked()
-    fireEvent.click(screen.getByRole('radio', { name: /Enhancers of a listed cell type/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /A listed cell type/ }))
     fireEvent.change(screen.getByLabelText('Enhancers of'), { target: { value: 'H1ESC' } })
     expect(screen.getByRole('tab', { name: /Enhancers/ }).querySelector('.step-uses')?.textContent).toBe('H1ESC')
     fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
@@ -175,7 +175,7 @@ describe('Your own data dialog', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Contacts/ }))
     expect(screen.getAllByRole('radio').map((r) => r.querySelector('.route-title')?.textContent)).toEqual(['Link to a file', 'Local .hic file', 'BEDPE of the region'])
     expect(screen.getByText(/The server must answer range requests/)).toBeInTheDocument()
-    expect(screen.getByText(/gnome3d-ng extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe/)).toBeInTheDocument()
+    expect(screen.getByText(/gnome3d extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe/)).toBeInTheDocument()
     expect(screen.getByText("The map replaces the cell type's map for this job.")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Use this data' })).toBeInTheDocument()
   })

@@ -1,10 +1,5 @@
-"""Smooth-MC (numba): chain bonds + angles, optional CTCF orientation / heat.
-
-`mc_smooth_numba` is the public entry.  The full config (orientation, excluded
-volume, confinement) runs through the shared `common._run_outer_loop`; the simple
-config (chain + optional heat only) with `mc_smooth_chains > 1` dispatches to the
-prange-parallel K-chain kernel here and keeps the best.  `mc_ib_numba` (ib.py) is
-a peer that reuses the same chain term math.
+"""The smooth MC on numba: chain bonds and angles, with optional orientation, heat, excluded
+volume and confinement.
 """
 
 from __future__ import annotations
@@ -52,10 +47,8 @@ if TYPE_CHECKING:
 
 LOG = log.get("mc.numba")
 
-# The chain length from which the excluded volume term runs on the cell grid. The grid gives
-# the same sum, so this is speed alone. Measured 2026-11-16 on prefixes of a real block with
-# the hard wall on, full scan against grid: 0.35 s and 0.36 s at 64 beads, 1.29 s and 0.88 s at
-# 128, 8.2 s and 2.8 s at 512, 45.9 s and 4.7 s at 1,831.
+# The chain length from which the excluded volume term runs on the cell grid. The grid gives the
+# same sum.
 GRID_MIN_BEADS = 128
 
 
@@ -81,9 +74,7 @@ def _batch_smooth_chain_nb(
     score_struct: float,
     score_heat: float,
 ) -> tuple[float, float, float, int]:
-    """One batch of smooth MC steps for a single chain - simplified form (chain
-    bonds + angles + optional heat; no orientation, EV, confinement).  Used
-    only inside the parallel K-chain kernel `_mc_smooth_kchains_nb`."""
+    """Runs one batch of smooth MC steps of one chain with chain bonds, angles and optional heat."""
     n = pos.shape[0]
     n_mov = movable.shape[0]
     n_ok = 0
@@ -118,7 +109,7 @@ def _batch_smooth_chain_nb(
 
         score_new = score_struct_new + score_heat_new
 
-        ok = score_new < score  # smooth uses strict less-than
+        ok = score_new < score  # strict less than
         if not ok and T > 0.0 and score > 0.0:
             ok = np.random.random() < jump_scale * math.exp(-jump_coef * (score_new / score) / T)
 
@@ -158,9 +149,8 @@ def _mc_smooth_kchains_nb(
     ang_w: float,
     final_scores: F64Array,
 ) -> None:
-    """Run K independent smooth MC chains in parallel.  Same pattern as
-    `_mc_heatmap_kchains_nb`: `for k in prange(K)` gives each chain its own
-    thread-local execution context with independent RNG state.
+    """Runs K independent smooth MC chains in parallel. Each `prange` iteration has its own
+    thread local RNG.
     """
     K = pos_k.shape[0]
     for k in prange(K):  # pyright: ignore[reportGeneralTypeIssues]
@@ -210,9 +200,9 @@ def _mc_smooth_multichain(
     settings: Settings,
     heat_dist: np.ndarray[Any, Any] | None,
 ) -> float:
-    """K-chain prange-parallel smooth MC.  Only supports the simple config
-    (chain bonds + optional heat; no orientation/EV/confinement).  Callers
-    must verify those terms are off before dispatching here."""
+    """Runs K chains in parallel and keeps the best. Supports chain bonds and optional heat
+    only. The caller checks that the other terms are off.
+    """
     n = pos.shape[0]
     K = max(1, int(settings.mc_smooth_chains))
 
@@ -282,22 +272,15 @@ def mc_smooth_numba(
     compartment: np.ndarray[Any, Any] | None = None,
     on_round: Callable[[F64Array], None] | None = None,
 ) -> float:
-    """Chain connectivity + angle MC.  Optionally adds CTCF orientation and/or
-    subanchor heat. Anchor beads (fixed=True) never move. Single-counted
-    structure (delta factor 1). Mirrors Reference MonteCarloArcsSmooth.
+    """Anneals the chain in place and returns the final score.
 
-    When `settings.mc_smooth_chains > 1` AND the call uses the simple config
-    (no orientation, no EV, no confinement), dispatches to a prange-parallel
-    K-chain kernel and keeps the best score.  Complex configs fall back to
-    single-chain.
-
-    Called by `gnome3d.mc.mc_smooth` when `settings.mc_backend != "jax"`.
+    Fixed beads do not move. With `mc_smooth_chains` above 1 and only chain bonds and heat on, K
+    chains run in parallel and the best is kept.
     """
     n = pos.shape[0]
     if n <= 2:
         return 0.0
 
-    # Multi-chain dispatch (simple-config path only).
     if int(settings.mc_smooth_chains) > 1:
         simple_config = (
             not bool(getattr(settings, "smooth_hard_wall", False))
@@ -312,8 +295,7 @@ def mc_smooth_numba(
         if simple_config:
             return _mc_smooth_multichain(pos, dtn, fixed, step_size, settings, heat_dist)
 
-    # Anchors join the movable set under the cap, each held within `cap` mean bonds of where
-    # it stands now, which is where the arcs put it.
+    # Under the cap the anchors move too, each within `cap` mean bonds of its place.
     cap_frac = float(getattr(settings, "smooth_anchor_cap", 0.0))
     use_cap = cap_frac > 0.0
     use_wall = bool(getattr(settings, "smooth_hard_wall", False))
@@ -416,8 +398,7 @@ def mc_smooth_numba(
         score_orn = 0.0
 
     score_struct = float(init_smooth_nb(pw, dtn64, stretch_k, squeeze_k, ang_k, dist_w, ang_w))
-    # Cell grid for the excluded volume term. It sums the same pairs in the same order, so this
-    # changes only how long the term takes, both here and in the step loop.
+    # The cell grid sums the same pairs in the same order as the full scan.
     excl_w = float(settings.exclusion_weight)
     excl_skip_n = int(settings.exclusion_skip_neighbors)
     use_cells = (

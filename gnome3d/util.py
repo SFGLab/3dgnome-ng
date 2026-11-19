@@ -1,6 +1,4 @@
-"""
-util functions for 3dgnome-ng.
-"""
+"""Helpers shared across the package."""
 
 from __future__ import annotations
 
@@ -17,20 +15,15 @@ from gnome3d.types import BoolArray, F32Array, F64Array
 
 LOG = log.get("util")
 
-# Measured on a 36 core machine with OpenBLAS: the vector routines L-BFGS-B calls between
-# evaluations cost 6 ms at 36 threads and 0.03 ms at 4 on 90,000 variables, and the maxent fit's
-# objective is fastest at 8 from 350 to 9,195 anchors.
+# The count at which the vector routines of L-BFGS-B and the maxent fit run fastest.
 _OPTIMISER_BLAS_THREADS = 8
 
 
 @contextmanager
 def blas_threads() -> Generator[None]:
-    """Hold the linear algebra library at up to eight threads for the block.
+    """Holds BLAS at up to eight threads for the block.
 
-    scipy's L-BFGS-B does its own vector arithmetic through BLAS, and a library that wakes
-    every core for a vector of some ten thousand numbers spends the call waking them. The
-    limit is process wide while the block runs and never raises a lower count set by the
-    environment.
+    The limit is process wide and does not raise a lower count set by the environment.
     """
     from threadpoolctl import ThreadpoolController
 
@@ -42,12 +35,7 @@ def blas_threads() -> Generator[None]:
         yield
 
 
-# Thread-local RNG for the positioning noise.  The global `random` module is a
-# single `random.Random` instance shared across threads, so a `ThreadedExecutor`
-# running several stages at once would have them clobber each other's stream.  A
-# per-thread `random.Random` is byte-identical for a given seed (the global
-# module IS such an instance) but isolated per thread, so threaded stage
-# execution stays deterministic.  Seed it with `seed_rng`; draw via the helpers.
+# One `random.Random` per thread. A seed draws the stream the global `random` module draws.
 _tls = threading.local()
 
 
@@ -59,22 +47,17 @@ def _rng() -> random.Random:
 
 
 def positioning_rng() -> random.Random:
-    """The calling thread's positioning RNG, for a caller that draws its own shapes."""
+    """Returns the positioning RNG of the calling thread."""
     return _rng()
 
 
 def seed_rng(seed: int) -> None:
-    """Seed the calling thread's positioning RNG (used by `random_vector_np`).
-    Replaces a bare `random.seed`, so coarse seeding and per-stage seeding are
-    thread-isolated; same seed -> same stream as the old global `random`."""
+    """Seeds the positioning RNG of the calling thread."""
     _rng().seed(seed)
 
 
 def random_vector_np(step: float, in_2d: bool = False) -> F32Array:
-    """Uniform cube displacement: each component in [-step, step].
-    Mirrors Reference displace() in lib/common.cpp.  When in_2d is True, the
-    z component is forced to 0 (matches `Settings::use2D` branch).
-    """
+    """Returns a displacement with each component uniform in [-step, step]. z is 0 when `in_2d`."""
     r = _rng()
     z = 0.0 if in_2d else r.uniform(-step, step)
     return np.array(
@@ -88,19 +71,9 @@ def random_vector_np(step: float, in_2d: bool = False) -> F32Array:
 
 
 def add_movable_noise_inplace(pos: F32Array, fixed: BoolArray | None, step: float) -> None:
-    """Add a uniform-cube displacement (each component in [-step, step]) to every
-    non-`fixed` bead of `pos`, in place.  `fixed=None` noises every bead (the
-    arcs case, which has no fixed mask).
+    """Adds a displacement uniform in [-step, step] to every bead not in `fixed`, in place.
 
-    Vectorised, byte-identical replacement for the per-bead loop
-    ``for i in range(n): if not fixed[i]: pos[i] += random_vector_np(step)`` -
-    same Mersenne-Twister stream, same float32 result.  The equivalence rests on:
-      * the loop draws ``z, x, y`` per movable bead (index order), so a flat block
-        of ``3*m`` draws reshaped ``(m, 3)`` reproduces the exact sequence;
-      * ``r.uniform(-s, s) == -s + (2s)*r.random()``, and ``(2s)*x - s`` is the
-        same IEEE-754 value (add is commutative), then rounded to float32.
-    Draws the per-bead ``z`` component even though it lands in column 2, matching
-    the 3D (non-`in_2d`) `random_vector_np` the callers use.
+    Draws z, x, y per bead in bead order, the stream of one `random_vector_np` call per bead.
     """
     idx = np.arange(pos.shape[0]) if fixed is None else np.flatnonzero(~fixed)
     m = int(idx.size)
@@ -108,16 +81,14 @@ def add_movable_noise_inplace(pos: F32Array, fixed: BoolArray | None, step: floa
         return
     draw = _rng().random
     raw = np.fromiter((draw() for _ in range(3 * m)), dtype=np.float64, count=3 * m)
-    disp = (2.0 * step) * raw.reshape(m, 3) - step  # columns: [z, x, y]
+    disp = (2.0 * step) * raw.reshape(m, 3) - step  # columns z, x, y
     pos[idx, 0] += disp[:, 1].astype(np.float32)
     pos[idx, 1] += disp[:, 2].astype(np.float32)
     pos[idx, 2] += disp[:, 0].astype(np.float32)
 
 
 def calc_orientation(pos: F64Array, cind: int, n: int, char_orientation: str) -> F64Array:
-    """
-    Normalized orientation vector for bead at active-region index cind.
-    """
+    """Returns the unit orientation vector of the bead at index `cind`."""
     if cind == 0:
         orn = pos[cind + 1] - pos[cind]
     elif cind == n - 1:

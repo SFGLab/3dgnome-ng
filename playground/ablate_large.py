@@ -1,8 +1,8 @@
 """Large-region expansion ablation. Symptom: tuned Rg 26.95 >> ref 17.52 on large regions
 (opposite of small regions where tuned compacts). Isolate which feature causes it.
 
-parity vs tuned vs tuned-EV vs tuned-noDynamic on ONE large region.
-  - tuned vs tuned-EV: SAME bead count -> isolates excluded-volume's Rg contribution.
+parity vs tuned vs tuned-EV vs tuned-noDynamic on one large region.
+  - tuned vs tuned-EV: same bead count -> isolates excluded-volume's Rg contribution.
   - tuned vs tuned-noDynamic: bead-count confound (dynamic sub-anchors ~2.3x beads).
 """
 import numpy as np
@@ -11,10 +11,10 @@ from pathlib import Path
 
 from gnome3d.settings import Settings
 from gnome3d.data import ContactData
-from validation import cell_config as cc
-from validation import metrics
-from validation.validate import _chrs_and_region, run_ensemble
-import harness.integration as ig
+from legacy.validation import cell_config as cc
+from legacy.validation import metrics
+from legacy.validation.validate import _chrs_and_region, run_ensemble
+import legacy.harness.integration as ig
 
 REGION = "chr2:57942013-77730829"  # 19.8 Mb — the largest, where the median expansion should live
 N = 2
@@ -69,6 +69,6 @@ r_d, n_d, rn_d = measure("tuned - dynamic subanchors", s_nodyn)
 
 print("\n===== VERDICT =====")
 print(f"  tuned Rg {r_t:.2f} (N={n_t}) vs tuned-EV Rg {r_e:.2f} (N={n_e})  "
-      f"-> EV adds {100*(r_t-r_e)/r_e:+.0f}% Rg at SAME N")
+      f"-> EV adds {100*(r_t-r_e)/r_e:+.0f}% Rg at same N")
 print(f"  tuned Rg {r_t:.2f} (N={n_t}) vs tuned-noDyn Rg {r_d:.2f} (N={n_d})  "
       f"-> dynamic beads add {100*(r_t-r_d)/r_d:+.0f}% Rg (N {n_t}->{n_d})")

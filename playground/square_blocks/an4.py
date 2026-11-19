@@ -1,5 +1,5 @@
 import json,sys,numpy as np
-sys.path.insert(0,"/Users/nk2/Desktop/3dgnome-torch/web")
+sys.path.insert(0,__file__.rsplit("/playground/",1)[0]+"/web")
 from gnome3d_web import contacts as cm
 d=json.load(open("raw.json")); H=np.array(d["upper"]); M=np.array(d["lower"])
 bins=np.array(d["bins"]); n=len(bins); res=25000

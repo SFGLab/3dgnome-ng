@@ -56,7 +56,7 @@ from scipy.spatial import KDTree  # noqa: E402
 
 from gnome3d.polymer import FALLBACK_NU, ContactFit, fit_contact_exponent  # noqa: E402
 from gnome3d.types import SingletonContact  # noqa: E402
-from validation.metrics.hic import (  # noqa: E402
+from legacy.validation.metrics.hic import (  # noqa: E402
     hic_correlation,
     multimm_faithful_pearson,
     observed_hic,

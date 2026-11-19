@@ -1,24 +1,22 @@
 #!/bin/bash
-# Overnight arms on where a gap's subanchors start, GM12878 with CTCF and RNAPII loops,
-# workstation, screen gapnight.
+# Arms on the start of the subanchors of a gap, GM12878 with CTCF and RNAPII loops.
 #
-#   DATA=/home/nik/3dgnome-ng/data BASE=out/lawspring_run bash slurm/ensemble/gap_start_overnight.sh
+#   DATA=~/3dgnome-ng/data BASE=out/lawspring_run bash slurm/ensemble/gap_start_overnight.sh
 #
-# Arms, each the production ini from BASE with the overrides named:
+# Arms, each the production ini from BASE with overrides:
 #   coil          production, start = coil, hard wall
 #   law           start = law
 #   law_nowall    start = law, hard_wall = no
-#   law_subheat   start = law, use_subanchor_heatmap = yes, the Hi-C term at the subanchor level
-# Phase 1, three 5 Mb regions at five structures. Phase 2, whole chr1 at three structures for
-# coil, law and law_nowall, scored on the 1-60 Mb slice. Every phase ends with the law readout
-# and the battery, raw and balanced. A finished arm is not rerun.
+#   law_subheat   start = law, use_subanchor_heatmap = yes
+# A finished arm is not rerun.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 C=GM12878
 DATA="${DATA:-data}"
 BASE="${BASE:-out/lawspring_run}"
 OUT="${OUT:-out/gapnight}"
-MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 SING=$DATA/$C/${C}_hic_25kb_singletons.bedpe
 mkdir -p "$OUT"
 git log --format="gap start overnight on %h %s" -1

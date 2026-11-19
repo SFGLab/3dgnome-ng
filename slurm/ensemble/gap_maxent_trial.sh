@@ -1,23 +1,18 @@
 #!/bin/bash
-# The maximum entropy gap start against the coil start on three cell lines, CTCF and RNAPII
-# loops, workstation, screen gapme. design/gap-fill.md, idea 1.
+# The maximum entropy gap start against the coil start on three cell lines, with CTCF and RNAPII
+# loops. design/gap-fill.md, idea 1.
 #
-#   DATA=/home/nik/3dgnome-ng/data bash slurm/ensemble/gap_maxent_trial.sh
+#   DATA=~/3dgnome-ng/data bash slurm/ensemble/gap_maxent_trial.sh
 #
-# Production arms come from the anchor contacts cross cell run in ACXC, out/acxc, which ran
-# the same configs on the commit before this start existed. Before anything else GM12878
-# chr1:20-25 Mb is rerun at production and compared with that run byte for byte, which is the
-# gate that the new code leaves the coil start alone. A difference is reported and the run goes
-# on, since a GPU pool of another size packs launches differently and moves the bits too. New arms, each slurm/ensemble/<cell>_xc_R.ini
-# with the overrides written:
+# Production arms come from ACXC, out/acxc. GM12878 chr1:20-25 Mb is first rerun at production and
+# compared with that run byte for byte. A difference is reported and the run goes on. Arms, each
+# slurm/ensemble/<cell>_xc_R.ini with overrides:
 #   fbm         start maxent, the law alone
-#   maxent      start maxent, the law scaled by window contacts from the cell's map at 1 kb
+#   maxent      start maxent, the law scaled by window contacts from the map of the cell at 1 kb
 #   maxent_z3   maxent with the full depth anchor table and the two sided background at z 3
-# Phase 1, chr1:20-25, 10-15 and 35-40 Mb at five structures on every cell. Phase 2, whole chr1
-# at three structures for fbm and maxent, scored on the 1-60 Mb slice. Phase 3, whole chr1 for
-# maxent_z3. Every scoring step has the law readout and the battery, raw and balanced, with the
-# production and z3 arms of ACXC beside the new ones. A finished arm is not rerun.
+# A finished arm is not rerun.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
 OUT="${OUT:-out/gapme}"
@@ -26,7 +21,7 @@ CELLS="${CELLS:-GM12878 H1ESC HFFC6}"
 mkdir -p "$OUT"
 git log --format="gap maxent trial on %h %s" -1
 
-mcool() { ls /mnt/storagelinux/_hic/$1/*.mcool | head -1; }
+mcool() { ls $HIC_ROOT/$1/*.mcool | head -1; }
 
 write_inis() {  # cell
   c=$(echo "$1" | tr 'A-Z' 'a-z')
@@ -92,7 +87,7 @@ slice60() {  # cell arms...
 
 for C in $CELLS; do write_inis "$C"; done
 
-# Gate, the coil start at production unchanged by this commit.
+# The gate. The coil start at production must be unchanged.
 G=chr1_20000000_25000000
 run GM12878 chr1:20000000-25000000 $G 5 prod
 if cmp -s <(cat "$OUT"/GM12878_${G}_prod/*.cif) <(cat "$ACXC"/GM12878_${G}_prod/*.cif); then

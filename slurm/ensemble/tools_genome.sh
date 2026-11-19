@@ -1,14 +1,12 @@
 #!/bin/bash
-# One whole genome, chr1 to chr22, one structure, on each of 3dgnome, cudaMMC and MultiMM, timed
-# by wall clock on one machine, one job at a time. design/tools-comparison.md.
+# One whole genome, chr1 to chr22, one structure, on each of 3dgnome, cudaMMC and MultiMM, timed by
+# wall clock. design/tools-comparison.md.
 #
 #   DATA=~/gapfill-data OUT=out/toolgenome WAIT=out/toolscale2/scale.log bash slurm/ensemble/tools_genome.sh
 #
-# 3dgnome runs the production config. cudaMMC runs its template config from the tools trial with
-# its own loop density. MultiMM runs the clusters of every chromosome at 3dgnome's total bead
-# count, minimisation and the dynamics the region runs use, and on failure at half and then a
-# quarter of that count. A MultiMM run is stopped after MM_TIMEOUT seconds and its row says so. Each row of OUT/timing.tsv is a tool, its setting, its bead count and
-# its seconds, a failed run with its exit code in place of the beads. Nothing is scored.
+# MultiMM runs at our total bead count and on failure at half and a quarter of it. A MultiMM run
+# stops after MM_TIMEOUT seconds. OUT/timing.tsv has a row per tool with its setting, bead count and
+# seconds, or its exit code for a failed run.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"

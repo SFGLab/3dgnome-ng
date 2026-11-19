@@ -3,7 +3,7 @@
     python playground/singleton_resolution.py MCOOL REGION ARM_DIR THIN
 
 The anchors are the anchor beads of the first structure in ARM_DIR. A singleton is a pixel of
-the map written at its start, as `validation.studies.self_corr.hic_to_singleton_bedpe` writes
+the map written at its start, as `legacy.validation.studies.self_corr.hic_to_singleton_bedpe` writes
 it, and it counts for an anchor pair when both starts fall inside the two anchors, as the
 pipeline's anchor heatmap counts it. Counts are divided by the anchors' lengths, as there.
 

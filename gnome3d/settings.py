@@ -1,8 +1,4 @@
-"""
-Configuration for 3dgnome-ng.
-
-Mirrors Reference Settings class.  All defaults match Settings::init() in Settings.cpp.
-"""
+"""The settings of a run. `SETTINGS.md` documents every key."""
 
 from __future__ import annotations
 
@@ -22,8 +18,7 @@ LOG = log.get("settings")
 
 
 def _all_cores() -> int:
-    """Usable CPU count for ``auto`` worker settings - honours cgroup / CPU-affinity
-    limits on Linux, falls back to the logical core count elsewhere."""
+    """Returns the usable CPU count, which follows cgroup and affinity limits on Linux."""
     try:
         return len(os.sched_getaffinity(0))
     except AttributeError:
@@ -74,11 +69,6 @@ class Settings:
     subanchor_estimate_steps: int
     subanchor_estimate_replicates: int
     subanchor_heat_min_reduction: float
-    # Threads building per-IB contact heatmaps during seed gathering (skeleton).  The
-    # build is O(N^2) numpy per IB and embarrassingly parallel across IBs.  >1 parallelises
-    # it; `auto` uses all usable CPU cores.  NB the (N,N) f32 matrices are large (N up to
-    # ~32k -> ~4 GB each), so keep this modest if you have very large IBs (peak memory
-    # ~= workers * largest matrix; `auto` can be a lot of memory there).
     heatmap_workers: int
 
     # ---- PET / arc length limits ----
@@ -116,7 +106,6 @@ class Settings:
     steps_lvl2: int
     steps_arcs: int
     steps_smooth: int
-    # Smooth stage levers against within block overlaps, all off by default.
     smooth_hard_wall: bool
     smooth_anchor_cap: float
     smooth_start: str
@@ -128,11 +117,6 @@ class Settings:
     noise_lvl1: float
     noise_lvl2: float
     noise_smooth: float
-    # Note: `noise_arcs` is not kept. The Reference reference computes a
-    # multiplied noise_size with noiseCoefficientLevelAnchor (Settings.cpp:364)
-    # but the arc-MC call site passes a hardcoded noise_size_small=0.005 instead
-    # (LooperSolver.cpp:2136). Python uses the same 0.005, so the setting has no
-    # effect either way.
 
     # ---- MC heatmap ----
     max_temp_heatmap: float
@@ -144,72 +128,19 @@ class Settings:
     mc_stop_steps_heatmap: int
 
     # ---- MC parallelism ----
-    # `mc_*_chains` > 1 runs K independent MC chains in parallel
-    # (numba prange + thread-local RNG) and keeps the best by final score.
-    # K=1 disables.  Smooth multichain only triggers when the call uses the
-    # simple chain+heat configuration (no orientation/EV/confinement) - more
-    # complex configs fall back to single-chain.
     mc_heatmap_chains: int
     mc_smooth_chains: int
-    # `ib_workers > 1` processes IBs concurrently (each IB is an independent
-    # subproblem). JIT kernels are nogil=True, so Python threading actually
-    # parallelises here.  `ib_workers = auto` uses all usable CPU cores.
     mc_executor_threaded_workers: int
-    # Per-stage executor: how each IB stage's nodes are scheduled AND which kernel
-    # runs them (the executor implies the backend).  One value per stage:
-    #   'serial'   - numba, one node at a time (deterministic baseline).
-    #   'threaded' - numba, independent nodes across `ib_workers` threads (kernels
-    #                are nogil + thread-local RNG, so byte-identical to serial).
-    #   'batch'    - JAX, same-(kind,bucket) nodes in one vmapped launch (GPU).
-    #   'auto'     - resolve from the legacy mc_backend/ib_workers: jax + the old
-    #                apply-flag -> batch; numba + ib_workers>1 -> threaded; else
-    #                serial.  (Keeps existing configs working until they migrate.)
-    # This replaces the old mc_backend_apply_to_* flags for executor selection;
-    # mc_backend now only selects the *coarse* MC kernel (heatmap/ib).
     mc_executor_arcs: str
     mc_executor_densify: str
     mc_executor_estimate_dist: str
     mc_executor_smooth: str
-    # Pad each JAX kernel's bead count up to a fixed bucket ladder so XLA
-    # compiles ~one kernel per bucket instead of one per distinct region size.
-    # Bounds total compiles regardless of how many distinct-N regions exist.
-    # Padding is inert (pad beads never move + contribute zero energy), so
-    # results are unchanged; this is a pure compile-time optimization.
     mc_executor_jax_bucket_shapes: bool
-    # Put every interaction block that shares an energy term signature into one launch,
-    # instead of splitting it by bead bucket as well.  Cost per step in the batched kernels is
-    # flat in the launch width, so a launch of sixty four chains costs about what a launch of
-    # one costs and the split is pure loss.  Device memory still bounds a launch, and the
-    # packing in `mc_smooth_jax_batch` splits only for that.
     merge_smooth_launches: bool
-    # Cap on the region-batch vmap width (IBs per kernel launch) for the batched
-    # JAX kernels, per kernel.  Excess IBs run in sequential sub-batches.  The cap
-    # exists only to bound device memory (a wider launch is never slower than more
-    # serial sub-batches).  "auto" sizes it from the device's memory limit and the
-    # per-IB footprint at the group's bucket; an integer is a flat max IBs/launch.
-    # Falls back to a fixed heuristic when device memory can't be queried (CPU).
     mc_executor_jax_batch_width_smooth: str
     mc_executor_jax_batch_width_arcs: str
 
-    # How the batch strategy uses several visible GPUs.  "groups" runs whole batch groups
-    # side by side, one group per device, which keeps each group's launch intact and so draws
-    # the same RNG as a one-device run.  "within" splits one group across devices, which only
-    # pays off while groups hold more IBs than there are devices.  "off" pins to one device.
     mc_multigpu_mode: str
-
-    # IB placement scores chain bonds between block centroids, excluded volume and confinement,
-    # and discards every arc crossing a block boundary, so two blocks joined by many CTCF loops
-    # are placed no closer than two joined by none. When on, cross-block arcs become a pairwise
-    # target between centroids. Attraction only: a pair is given a target solely when its arc
-    # support implies a distance SHORTER than its genomic separation already does. Measured on a
-    # 20 Mb region it closes about a fifth of the cross-block distance penalty, because a
-    # centroid is a coarse handle on where a block's edge anchors actually sit.
-
-    # Anchors enter the per-block arc MC collapsed on their block's centroid, and that MC sees
-    # only arcs internal to its block, so a cross-block arc never constrains anything. When on, a
-    # segment-scope anchor pass runs first: every anchor of every block in a segment is placed in
-    # one arc MC, where cross-block arcs are ordinary in-chain arcs. The per-block MC then refines
-    # from those positions, and smooth MC holds anchors fixed, so the joint placement survives.
 
     # ---- MC arcs ----
     max_temp: float
@@ -229,9 +160,6 @@ class Settings:
     exclusion_apply_to_ib: bool
     exclusion_skip_neighbors: int
     mc_neighbour_grid: bool
-    # Per-level radius (one knob per MC level).  0.0 = auto = factor * mean
-    # of that level's natural bond / expected distance.  Each level has its
-    # own factor (default 0.5 - half the typical bead-bead target).
     exclusion_radius_arcs: float
     arcs_repulsion_cutoff_factor: float
     exclusion_radius_smooth: float
@@ -243,8 +171,6 @@ class Settings:
     exclusion_auto_factor_ib: float
 
     # ---- IB-level MC pass (chain bonds + EV between IB centroids) ----
-    # IB MC is a peer stage to smooth/arcs/heatmap, not a sub-mode of smooth.
-    # It owns its own MC schedule, chain spring constants, and step noise.
     use_ib_mc: bool
     max_temp_ib: float
     dt_temp_ib: float
@@ -326,23 +252,6 @@ class Settings:
     mc_stop_improvement_smooth: float
     mc_stop_successes_smooth: int
     mc_stop_steps_smooth: int
-    # Shrink the step size once per outer round, beside the temperature. cudaMMC does this and
-    # we did not. One value per stage, 1.0 meaning the step is held as it always was. The floor
-    # is shared and is a fraction of the starting step: cudaMMC anneals over tens of rounds
-    # where the arcs stage has taken 3,929, and a decay carried that far freezes the chain.
-    # The arcs MC stops when a round improves the score by less than this, relatively. Measured
-    # on real blocks this is the branch that ends every run: the plateau branch also requires the
-    # accept count below its threshold and acceptance sits at 15 to 50 percent throughout. So
-    # this number sets the round count, and the round count is the arcs wall. Smooth and the
-    # interaction-block stage pass 2.0 for the same argument, unreachable, so this is arcs only.
-    # Bias an arcs proposal along the local descent direction by this fraction, 0 being the
-    # isotropic draw the reference makes. The gradient comes free from the same sweep as the
-    # score. It proposes only: the Metropolis rule still rejects, which is what keeps a singular
-    # 1/d repulsion safe where a gradient solver would see unbounded forces.
-    # Anneal the arcs stage or solve it. "mc" is the Monte Carlo the reference uses. "lbfgs"
-    # minimises the same energy directly, which on real blocks reaches the same minimum about
-    # thirty six times faster with the ensemble spread slightly wider and the geometry matching.
-    # The landscape is a funnel, so there is nothing for the stochastic search to escape.
     polymer_exponent: float
     contact_half_saturation: float
     polymer: PolymerLaw | None
@@ -361,10 +270,6 @@ class Settings:
     def _set_defaults(self) -> None:
         # ---- output / misc ----
         self.output_level = 0
-        # Optional path for a full-detail (DEBUG) structured log sink, in
-        # addition to stdout.  Empty -> stdout only.  Handy for reconstructing
-        # parallel (ib_workers>1 / n_structures>1) runs after the fact.  The
-        # --log-file CLI flag overrides this.
         self.log_file = ""
         self.random_walk = False
         self.use_2d = False
@@ -374,31 +279,18 @@ class Settings:
         self.data_dir = ""
         self.data_anchors = ""
         self.data_pet_clusters = ""
-        self.data_factors = ""  # one name per cluster file, comma separated; CTCF when empty
-        self.factor_strength = (
-            ""  # per factor multiplier on loop strength, comma separated; 1 each when empty
-        )
+        self.data_factors = ""
+        self.factor_strength = ""
         self.data_singletons = ""
         self.data_singletons_inter = ""
         self.data_centromeres = ""
         self.data_segment_split = ""
-        # What forms one chain in the IB placement MC. "segment" refines each
-        # segment's blocks separately, which is the prior behaviour and the
-        # default. "chromosome" refines them all together, removing the dependency
-        # on segment grouping but coupling every block pair through excluded
-        # volume; measured over four GM12878 regions that dropped mean simulated
-        # contact density from 0.087 to 0.035 and worsened block cohesion about
-        # threefold, so it needs its own EV and confinement tuning.
         self.ib_refine_scope = "segment"
         self.data_compartments = ""
         self.data_phasing_track = ""
-        # A BED with a signal column, a broadPeak or a bedGraph, giving each anchor the
-        # activity the factory term of [factories] reads; empty leaves the term inert.
         self.data_anchor_activity = ""
-        # Counts between anchor pairs from a full depth map, `gnome3d.anchor_contacts`; empty
-        # builds the anchor contact map from the singletons.
         self.data_anchor_contacts = ""
-        self.data_contact_map = ""  # cooler URI the maxent start reads window counts from
+        self.data_contact_map = ""
 
         # ---- motif orientation ----
         self.use_ctcf_motif = False
@@ -416,14 +308,6 @@ class Settings:
         self.subanchor_heatmap_dist_weight = 1.0
         self.subanchor_estimate_steps = 2
         self.subanchor_estimate_replicates = 5
-        # Opt-in (default 0.0 = off, parity preserved): skip an IB's subanchor
-        # heat-dist entirely when its signal is too sparse to matter.  The
-        # active-pair fraction (n_active / n_pairs) is a provable upper bound on
-        # the mean target-distance reduction the heat term can produce, and it is
-        # known from the raw heatmap BEFORE any dry-smooth trials.  When that
-        # bound is below this threshold, the (expensive) estimate trials are
-        # skipped and the IB smooths without heat.  E.g. 0.001 skips IBs whose
-        # heat could move mean pair distance by <0.1%.  Diverges from parity.
         self.subanchor_heat_min_reduction = 0.0
         self.heatmap_workers = 1
 
@@ -441,41 +325,18 @@ class Settings:
         self.spring_squeeze = 0.1
         self.spring_angular = 0.1
         self.spring_stretch_arcs = 1.0
-        # Each loop's spring scaled by its strength to this power, so a strong loop wins the
-        # competitions a weak one loses. Zero is every loop at the same spring, byte exact.
         self.arc_weight_exponent = 0.0
-        # Each conformation keeps a loop with probability q / (q + scale), q the law's
-        # strength, so the ensemble mean carries the loop's frequency. Off keeps every loop.
         self.loop_dropout = False
         self.loop_dropout_scale = 1.0
-        # A loop a conformation keeps is held at contact, one bead, and not at the law's part
-        # way target, so with the dropout a loop's strength sets how often it is in contact.
         self.loop_contact = False
-        # The factory term: active anchors attract as a group with a saturating collective
-        # energy, weight zero off, radius in beads.
         self.factory_weight = 0.0
         self.gyration_weight = 0.0
         self.arcs_repulsion = True
         self.factory_radius = 2.0
-        # A weak spring holding an arcless anchor pair inside `background_range_bp` at the
-        # background for its separation, in the arcs stage, beside the repulsion that every
-        # other arcless pair keeps. Zero is off. The all pairs version lost the battery because a
-        # power law distance matrix at an exponent under a third cannot be embedded in three
-        # dimensions; a band of it can. See [[project_polymer_law]].
         self.background_weight = 0.0
         self.background_range_bp = 100_000
         self.spring_squeeze_arcs = 1.0
-        # Chain bonds in the arcs MC. Consecutive anchors with no arc between them get a
-        # spring at genomic_length_to_distance of their gap, so an island of anchors joined
-        # only among themselves is tied to its genomic neighbours instead of floating out to
-        # the confinement leash. Same spring constants as the arcs.
-        # Multiplies the chain bond target. At 1 the bonds pull the short range below the
-        # parity values and the distance curve steepens past the Hi-C exponent.
         self.use_contact_background = False
-        # Above zero, the contact background holds an arcless pair whose count is this many
-        # Poisson deviations above or below its expectation, in or out, the expectation taken
-        # over every pair at its separation, zeros included, and tests only pairs whose
-        # expectation is above this value squared. Zero keeps the rule above.
         self.contact_background_z = 0.0
 
         # ---- simulation steps ----
@@ -488,12 +349,12 @@ class Settings:
         self.noise_lvl1 = 1.0
         self.noise_lvl2 = 0.1
         self.noise_smooth = 0.5
-        self.smooth_hard_wall = False  # reject a move that adds or deepens a pair under the radius
-        self.smooth_anchor_cap = 0.0  # anchors may move this many mean bonds from the arcs position
-        self.smooth_start = "line"  # line | coil | maxent, where a gap's subanchors start
-        self.smooth_prefetch = 1  # proposals one JAX step evaluates at once, first accepted kept
-        self.smooth_jax_grid = False  # excluded volume on a cell grid in the JAX kernel
-        self.smooth_jax_grid_min_beads = 4096  # the grid only pays above this many beads
+        self.smooth_hard_wall = False
+        self.smooth_anchor_cap = 0.0
+        self.smooth_start = "line"
+        self.smooth_prefetch = 1
+        self.smooth_jax_grid = False
+        self.smooth_jax_grid_min_beads = 4096
 
         # ---- MC heatmap ----
         self.max_temp_heatmap = 20.0
@@ -528,49 +389,25 @@ class Settings:
         self.mc_stop_steps = 10000
 
         # ---- excluded volume ----
-        # One radius knob per MC level, with auto-derivation when set to 0.0
-        # so the user doesn't need to know the typical bead-bead distance for
-        # each level (anchor MC is unit-scale, smooth MC is unit-scale, heatmap
-        # MC is at heatmap-distance scale, IB MC is at the genomic-distance
-        # scale between IB midpoints). Auto picks `factor * mean(bond)` from
-        # that level's own data - each level has its own factor (default 0.5).
         self.use_excluded_volume = False
-        self.exclusion_weight = 0.5  # k: multiplier (comparable to spring_*)
+        self.exclusion_weight = 0.5
         self.exclusion_apply_to_arcs = False
         self.exclusion_apply_to_smooth = True
         self.exclusion_apply_to_heatmap = False
-        self.exclusion_apply_to_ib = True  # IB-level MC (default on with use_ib_mc)
-        self.exclusion_skip_neighbors = 1  # skip pairs with |i-j| <= this (1 = skip bonded)
-        # Bin beads into a cell grid so the excluded volume term visits the beads within its
-        # radius instead of every bead. The sum is built in the same order, so results are
-        # identical and this only changes how long they take. See gnome3d/mc/numba/cells.py.
+        self.exclusion_apply_to_ib = True
+        self.exclusion_skip_neighbors = 1
         self.mc_neighbour_grid = True
-        # Per-level radius: 0.0 = auto from this level's bond-length mean.
         self.exclusion_radius_arcs = 0.0
         self.exclusion_radius_smooth = 0.0
         self.exclusion_radius_heatmap = 0.0
         self.exclusion_radius_ib = 0.0
-        # Truncate the arcs non-arc 1/d repulsion at factor x mean-arc-distance (0 = off =
-        # unbounded, faithful to the reference; ~2.5 fixes small/sparse IBs blowing up to huge Rg).
         self.arcs_repulsion_cutoff_factor = 0.0
-        # Per-level auto factor: used only when the matching radius is 0.0.
-        # 0.5 means "EV kicks in once beads get closer than half the typical
-        # bond distance at this level".
         self.exclusion_auto_factor_arcs = 0.5
         self.exclusion_auto_factor_smooth = 0.5
         self.exclusion_auto_factor_heatmap = 0.5
         self.exclusion_auto_factor_ib = 0.5
 
         # ---- IB-level MC pass ----
-        # When enabled, each segment runs a small chain-spring + EV MC pass over
-        # its child IB centroids after the initial random-walk / interpolation
-        # placement. Pushes IBs apart so each IB's smooth-MC sphere has room
-        # to breathe - addresses the "central blob" pathology with dynamic
-        # loop density and many subanchors per IB.  EV inside this pass is
-        # controlled by `exclusion_apply_to_ib`, `exclusion_radius_ib`, and
-        # `exclusion_auto_factor_ib` under [excluded_volume]. IB MC owns its
-        # own MC schedule + chain spring constants; defaults mirror the smooth
-        # stage so existing configs behave identically.
         self.use_ib_mc = False
         self.max_temp_ib = 20.0
         self.dt_temp_ib = 0.99995
@@ -586,14 +423,8 @@ class Settings:
         self.noise_ib = 0.5
 
         # ---- confinement ----
-        # Soft sphere around per-MC-call centroid; pulls beads back inside.
-        # Each level has its own radius and packing factor: anchor MC, smooth MC
-        # and IB MC operate at different spatial scales, so the typical "ball
-        # radius" is also different. radius = 0 auto-derives from that level's
-        # own bond data as `packing_factor * mean(bond) * N^(1/3)`.
         self.use_confinement = False
         self.confinement_weight = 0.5
-        # The arcs stage's own confinement weight. Zero uses the shared weight.
         self.confinement_weight_arcs = 0.0
         self.confinement_apply_to_arcs = True
         self.confinement_apply_to_smooth = True
@@ -601,70 +432,39 @@ class Settings:
         self.confinement_radius_arcs = 0.0
         self.confinement_radius_smooth = 0.0
         self.confinement_radius_ib = 0.0
-        # Packing factor for the auto formula; defaults tuned per level.
-        # IB chains are short and should pack tighter (the original blob
-        # pathology comes from over-extending the IB chain) so default < 1.
         self.confinement_packing_factor_arcs = 1.5
         self.confinement_packing_factor_smooth = 1.5
         self.confinement_packing_factor_ib = 0.75
 
         # ---- boundary stitch ----
-        # Rigid post pass that closes the gap between adjacent blocks' edge anchors.
-        # See gnome3d/pipeline/stitch.py.
         self.use_boundary_stitch = False
         self.boundary_stitch_spring_weight = 1.0
         self.boundary_stitch_ev_weight = 1.0
-        # The energy is minimised with its own gradient, so an iteration is one evaluation
-        # and the count is what sets the cost. Measured on a trio chr1 of 1,494 blocks, 500
-        # leaves the worst boundary at 6.0 times the curve, 2000 reaches 1.32 in 85 seconds,
-        # and 5000 finds nothing further. See [[project_boundary_stitch]].
         self.boundary_stitch_max_iter = 2000
 
         # ---- cross block relaxation ----
-        # After the stitch nothing acts between beads of different blocks. This runs the smooth
-        # kernel over the whole chromosome with excluded volume on every pair and anchors fixed,
-        # so the coils re route around each other. See gnome3d/pipeline/relax.py.
         self.use_cross_block_relax = False
         self.relax_ev_weight = 10.0
-        self.relax_ev_radius = 0.0  # 0 = 1.5 times the median bond length
-        self.relax_temp = 0.1  # fraction of max_temp_smooth; a little heat lets coils cross
-        self.relax_noise = 0.5  # step size as a fraction of the median bond length
-        self.relax_bond_weight = 10.0  # chain spring constants during the pass
+        self.relax_ev_radius = 0.0
+        self.relax_temp = 0.1
+        self.relax_noise = 0.5
+        self.relax_bond_weight = 10.0
         self.relax_within_blocks = False
-        # Skip the pass when fewer than this fraction of beads are touching another block.
-        # It anneals the whole chromosome until its own convergence test fires, so it costs the
-        # same however little there is to fix: measured on a trio run at an hour and fifty five
-        # minutes per structure whatever the input, once to move two beads out of 129,457.
-        # Zero keeps it running always, which is what it did before.
-        # How many chain neighbours either side of a bead that touches another block may move.
-        # Negative lets every subanchor move, which is what the pass did before. The round count
-        # is proportional to the movable bead count, measured at 114 rounds for 1,177 movable and
-        # 691 for 11,766 on a real chromosome, so restricting it to the beads that need moving is
-        # where the pass's cost actually goes.
         self.relax_local_window = -1
 
         # ---- holes between blocks ----
-        # Beads for the stretch between two blocks, drawn from the maximum entropy bridge between
-        # the anchors that bound it. See gnome3d/pipeline/holes.py.
         self.use_hole_beads = False
         self.holes_hard_wall = True
         self.holes_flank_beads = 0
 
         # ---- A/B compartments ----
-        # Block-copolymer segregation over a per-bead compartment call, ported
-        # from MultiMM's compartment blocks.  The well is written non-negative
-        # because 3dgnome's Metropolis rule
-        # reads a score ratio and needs a positive total.  Requires a
-        # compartment track under [data]; inert when none is loaded.
         self.use_compartments = False
         self.compartment_weight = 1.0
-        self.compartment_energy_a = 1.0  # MultiMM COB_EA
-        self.compartment_energy_b = 2.0  # MultiMM COB_EB
+        self.compartment_energy_a = 1.0
+        self.compartment_energy_b = 2.0
         self.compartment_apply_to_heatmap = True
         self.compartment_apply_to_ib = True
         self.compartment_apply_to_smooth = True
-        # Interaction range: 0.0 = auto = factor * mean(bond) at that level.
-        # MultiMM uses r_comp = 1.5 * b0, which is the default factor.
         self.compartment_radius_heatmap = 0.0
         self.compartment_radius_ib = 0.0
         self.compartment_radius_smooth = 0.0
@@ -673,35 +473,14 @@ class Settings:
         self.compartment_auto_factor_smooth = 1.5
 
         # ---- overlapping-anchor handling ----
-        # overlap_anchor_strict controls span computation in densification:
-        #   False (default): subanchors tile the overlap region with non-degenerate
-        #     genomic ranges (Python divergence).
-        #   True: reference-parity - overlap clamps to 0, so MC-chain subanchors
-        #     between overlapping anchors are placed at a single boundary point
-        #     (matches LooperSolver.cpp:1829-1831).
-        # drop_zero_length_subanchors is an independent output-filtering toggle:
-        #   False (default): every densified subanchor appears in the BeadOut output,
-        #     even if start == end.
-        #   True: subanchor BeadOut entries with start == end are filtered out of
-        #     the output (the MC chain still contains them; only the externally
-        #     visible bead list drops them). Useful with strict mode to suppress
-        #     the collapsed-overlap zero-length noise.
         self.overlap_anchor_strict = False
         self.drop_zero_length_subanchors = False
 
         # ---- dynamic loop density ----
-        # When False (default), every arc gets exactly self.loop_density subanchors.
-        # When True, subanchor count for arc i is round(span_bp / target_bp_per_subanchor),
-        # clamped to [min_subanchors_per_arc, max_subanchors_per_arc].  Aims to keep
-        # roughly equal genomic distance between beads instead of equal beads per arc.
-        # If the arc span is small relative to the target the count drops toward
-        # min_subanchors_per_arc (0 → adjacent anchors get no subanchors).
-        # The contact-heatmap binning and densification stay in sync - both use the
-        # same per-arc counts, so use_subanchor_heatmap remains compatible.
         self.use_dynamic_loop_density = False
-        self.target_bp_per_subanchor = 5000  # 5 kb per bead at default density
-        self.min_subanchors_per_arc = 0  # allow very short arcs to skip subanchors
-        self.max_subanchors_per_arc = 50  # cap to avoid runaway on huge gaps
+        self.target_bp_per_subanchor = 5000
+        self.min_subanchors_per_arc = 0
+        self.max_subanchors_per_arc = 50
 
         # ---- MC smooth ----
         self.max_temp_smooth = 20.0
@@ -711,47 +490,35 @@ class Settings:
         self.mc_stop_improvement_smooth = 0.995
         self.mc_stop_successes_smooth = 5
         self.mc_stop_steps_smooth = 10000
-        self.polymer_exponent = 0.0  # 0 measures it; a positive value pins it and documents that
+        self.polymer_exponent = 0.0
         self.contact_half_saturation = 1.0
         self.polymer = None
         self.arcs_solver = "mc"
         self.arcs_solver_iters = 200
-        # The solve's stop rule. A positive value stops it when the energy's relative
-        # improvement in an iteration falls under it, and the iteration count is then a
-        # safety cap; at zero the cap alone stops it.
         self.arcs_solver_tol = 0.0
-        # Where a block's anchors start. centroid is every anchor at the block centroid; walk is
-        # a random walk at the law's distance per gap. Under measurement.
         self.arcs_start = "centroid"
-        # centroid, walk or hilbert. block solves each block's anchors alone; chromosome solves every anchor of a
-        # chromosome together from the placed block centroids. Under measurement.
         self.arcs_scope = "block"
         self.mc_stop_ratio_arcs = 0.9999
         self.smooth_dist_weight = 1.0
         self.smooth_angle_weight = 1.0
 
     def load_ini(self, path: str) -> bool:
-        """Load settings from an .ini file, overriding defaults in place."""
+        """Loads settings from an .ini file over the current values."""
         cfg = configparser.ConfigParser()
         cfg.read(path)
         return self._load_from_parser(cfg)
 
     @classmethod
     def from_dict(cls, config: Mapping[str, Mapping[str, object]]) -> Settings:
-        """Build a Settings from a nested ``{section: {key: value}}`` mapping,
-        mirroring the .ini layout — e.g.::
+        """Builds a Settings from a nested `{section: {key: value}}` mapping with the section and
+        key names of the .ini files.
 
             Settings.from_dict({
                 "data": {"data_dir": "data/GM12878/", "anchors": "...bed"},
                 "excluded_volume": {"use_excluded_volume": True},
             })
 
-        Section and key names are exactly those used in the .ini files. Any key
-        not provided keeps its default. Values may be native Python types
-        (bool/int/float/str); they are stringified into the same ConfigParser the
-        .ini path uses, so parsing, type-coercion and unknown-key warnings are
-        identical to ``load_ini``. Use this for notebooks, sweeps, and the
-        validation harness instead of writing temporary .ini files.
+        A key that is absent keeps its default. Values are parsed as `load_ini` parses them.
         """
         cfg = configparser.ConfigParser()
         cfg.read_dict(
@@ -765,12 +532,9 @@ class Settings:
         return s
 
     def _load_from_parser(self, cfg: configparser.ConfigParser) -> bool:
-        """Apply settings from a populated ConfigParser, overriding defaults in
-        place. Shared by `load_ini` (file) and `from_dict` (mapping)."""
-        # Every (section, key) the loader below actually consults.  Used after
-        # all reads to flag unknown keys in sections we own (see
-        # `_warn_unknown_keys`).  Store keys as ConfigParser stores them
-        # (optionxform-normalised) so lookups match the file's options exactly.
+        """Applies the settings of a ConfigParser over the current values."""
+        # Every (section, key) the loader reads, in the spelling of ConfigParser, for the unknown
+        # key check.
         consulted: dict[str, set[str]] = {}
 
         def get(section: str, key: str) -> str | None:
@@ -799,7 +563,7 @@ class Settings:
             return v.strip() if v is not None else default
 
         def getworkers(section: str, key: str, default: int) -> int:
-            """Worker-count getter: ``auto`` -> all usable CPU cores, else an int."""
+            """Returns a worker count, every usable core for `auto`."""
             v = get(section, key)
             if v is None:
                 return default
@@ -807,8 +571,7 @@ class Settings:
             return _all_cores() if v == "auto" else int(v)
 
         def ignore(section: str, key: str) -> None:
-            """Declare a key we deliberately don't read, so the unknown-key
-            check below doesn't flag it (it's recognised, just unused)."""
+            """Declares a key that is accepted and not read. The unknown key check passes it."""
             consulted.setdefault(section, set()).add(cfg.optionxform(key))
 
         # [main]
@@ -826,7 +589,7 @@ class Settings:
         self.steps_smooth = geti("main", "steps_smooth", self.steps_smooth)
         self.noise_lvl1 = getf("main", "noise_lvl1", self.noise_lvl1)
         self.noise_lvl2 = getf("main", "noise_lvl2", self.noise_lvl2)
-        ignore("main", "noise_arcs")  # intentionally unused (see Settings class comment)
+        ignore("main", "noise_arcs")
         self.noise_smooth = getf("main", "noise_smooth", self.noise_smooth)
         self.noise_ib = getf("main", "noise_ib", self.noise_ib)
 
@@ -1026,7 +789,6 @@ class Settings:
         self.mc_neighbour_grid = getb(
             "simulation_backend", "neighbour_grid", self.mc_neighbour_grid
         )
-        # Per-level radii.  Key naming: radius_<level>.  0 = auto.
         self.exclusion_radius_arcs = getf(
             "excluded_volume", "radius_arcs", self.exclusion_radius_arcs
         )
@@ -1041,7 +803,6 @@ class Settings:
             "excluded_volume", "radius_heatmap", self.exclusion_radius_heatmap
         )
         self.exclusion_radius_ib = getf("excluded_volume", "radius_ib", self.exclusion_radius_ib)
-        # Per-level auto-factor.  Used only when the matching radius is 0.
         self.exclusion_auto_factor_arcs = getf(
             "excluded_volume", "auto_factor_arcs", self.exclusion_auto_factor_arcs
         )
@@ -1169,7 +930,7 @@ class Settings:
             "compartments", "auto_factor_smooth", self.compartment_auto_factor_smooth
         )
 
-        # [main] overlapping-anchor handling toggles (kept under [main] for simplicity).
+        # [main]
         self.overlap_anchor_strict = getb(
             "main", "overlap_anchor_strict", self.overlap_anchor_strict
         )
@@ -1177,7 +938,7 @@ class Settings:
             "main", "drop_zero_length_subanchors", self.drop_zero_length_subanchors
         )
 
-        # [main] dynamic loop density toggles.
+        # [main]
         self.use_dynamic_loop_density = getb(
             "main", "use_dynamic_loop_density", self.use_dynamic_loop_density
         )
@@ -1254,22 +1015,12 @@ class Settings:
 
     @staticmethod
     def _warn_unknown_keys(cfg: configparser.ConfigParser, consulted: dict[str, set[str]]) -> None:
-        """Warn about keys present in the file but never read by `load_ini`.
-
-        A "mistype" is any option the loader never asks for: a misspelling
-        (``mc_executor_jax_bukcet_shapes``), a wrong prefix
-        (``jax_bucket_shapes`` instead of ``mc_executor_jax_bucket_shapes``), a
-        stale/renamed name (``mc_executor_heat`` -> ``mc_executor_estimate_dist``),
-        or a key put under the wrong section.  Any of these is silently ignored
-        by ConfigParser, so the setting just doesn't take effect.
-
-        Scoped to sections the loader actually consults, so reference-binary-only
-        sections (e.g. ``[cuda]``) that the Python pipeline never reads don't
-        produce false positives.
+        """Warns about keys in the file that the loader does not read, such as a misspelt or
+        renamed key or a key under the wrong section. Only sections the loader reads are checked.
         """
         for section in cfg.sections():
             known = consulted.get(section)
-            if not known:  # section we don't own; skip to avoid false positives
+            if not known:
                 continue
             for key in cfg.options(section):
                 if key in known:
@@ -1279,10 +1030,9 @@ class Settings:
                 LOG.warning("[%s] unknown key '%s' is ignored%s", section, key, hint)
 
     def polymer_law(self) -> PolymerLaw:
-        """The run's distance law. `build_state` attaches one fitted to the input. Before that,
-        or in code that never loads data, a default is built from `polymer_exponent` or the
-        named fallback and a warning says so once, so every distance call has a law to answer
-        with and none answers with a constant silently."""
+        """Returns the distance law of the run. `build_state` attaches the fitted one. Before that
+        a default is built from `polymer_exponent` or the fallback, with one warning.
+        """
         if self.polymer is None:
             from gnome3d.polymer import FALLBACK_NU, PolymerLaw
 
@@ -1300,9 +1050,11 @@ class Settings:
         return self.polymer
 
     def cluster_files(self) -> list[tuple[str, int, str]]:
-        """The cluster files as (path, factor index, factor name). `[data] clusters` holds one
-        or more paths, comma separated, and `factors` one name each; the first is the CTCF set,
-        which is the one the orientation term reads, so factor 0 is CTCF by convention."""
+        """Returns the cluster files as (path, factor index, factor name).
+
+        `[data] clusters` holds one or more paths, comma separated and `factors` one name each.
+        Factor 0 is CTCF, the set the orientation term reads.
+        """
         paths = [p.strip() for p in str(self.data_pet_clusters).split(",") if p.strip()]
         names = [n.strip() for n in str(self.data_factors).split(",") if n.strip()]
         if names and len(names) != len(paths):
@@ -1314,22 +1066,24 @@ class Settings:
         return [(self.data_path(p), i, names[i]) for i, p in enumerate(paths)]
 
     def factor_strengths(self) -> dict[int, float]:
-        """The multiplier on loop strength per factor index from `[springs] factor_strength`,
-        one value per cluster file in order; a factor not named keeps 1."""
+        """Returns the multiplier on loop strength per factor index from
+        `[springs] factor_strength`, one value per cluster file. A factor without a value has 1.
+        """
         vals = [v.strip() for v in str(self.factor_strength).split(",") if v.strip()]
         return {i: float(v) for i, v in enumerate(vals)}
 
     def genomic_length_to_distance(self, length_bp: int) -> float:
-        """The distance two beads that far apart hold with nothing between them, in beads."""
+        """Returns the distance of two beads `sep_bp` apart with no contact, in beads."""
         return self.polymer_law().background(length_bp)
 
     def arc_expected_distance(self, score: int, sep_bp: int, factor: int = 0) -> float:
-        """The target for an arc of `score` PETs spanning `sep_bp`, in beads, the count read
-        against the strength fit of the arc's own factor."""
+        """Returns the target of an arc of `score` PETs that spans `sep_bp`, in beads, by the
+        strength fit of its factor.
+        """
         return self.polymer_law().arc_distance(score, sep_bp, factor)
 
     def data_path(self, filename: str) -> str:
-        """Resolve a data filename relative to data_dir."""
+        """Returns the path of a data file under `data_dir`."""
         if not filename:
             return ""
         p = Path(self.data_dir) / filename

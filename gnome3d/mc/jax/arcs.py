@@ -1,9 +1,9 @@
-"""JAX arc-MC kernel: anchor springs to expected distances (+ optional EV / confinement).
+"""The arcs annealer on JAX: anchor springs to expected distances, with optional excluded volume
+and confinement.
 
-`mc_arcs_jax` is the single-problem entry; `mc_arcs_jax_batch` anneals K different
-IBs' anchors in one vmapped kernel (region batching).  Both build/compile through
-`_build_arcs_kernel` (memoised in `_kernel_cache`).  Arcs is non-strict, so the
-batched kernel freezes converged chains once they stop improving.
+`mc_arcs_jax` anneals one problem. `mc_arcs_jax_batch` anneals the anchors of K IBs in one
+vmapped kernel. Acceptance is `score_new <= score`. The batched kernel freezes a chain once
+it has converged.
 """
 
 import logging
@@ -31,14 +31,10 @@ if TYPE_CHECKING:
 
 LOG = log.get("mc.jax")
 
-# Compiled-kernel cache (keyed by kernel signature)
 _kernel_cache: dict[Any, Any] = {}
 
-# --- arcs GPU profiling (opt-in via env GNOME3D_ARCS_PROFILE=1) ----------------
-# The per-chain conv_iter spread and the extended per-batch log line are ALWAYS on
-# (byte-exact, cheap host-side stats).  The compile-vs-execute split, cost_analysis,
-# init timing and the per-(K,B) aggregate are gated behind the env flag so a normal
-# production run issues the single kernel call byte-identically to before.
+# Profiling under GNOME3D_ARCS_PROFILE=1: the compile and execute split, the cost analysis, init
+# timing and the totals per (K, B). Without it the kernel is called once and nothing else changes.
 _ARCS_PROFILE: bool = os.environ.get("GNOME3D_ARCS_PROFILE", "").strip().lower() in (
     "1",
     "true",
@@ -48,25 +44,20 @@ _ARCS_PROFILE: bool = os.environ.get("GNOME3D_ARCS_PROFILE", "").strip().lower()
 _arcs_profile: dict[tuple[int, int], dict[str, float]] = {}
 _arcs_seen_shapes: set[tuple[int, int]] = set()
 _arcs_profile_lock = threading.Lock()
-_last_batch_diag: dict[str, Any] = {}  # last region-batch diagnostics (read by bench scripts)
-# Profiling hook (bench only): when set, overrides the arcs score_eps so the kernel
-# "converges" after ~1 outer iter.  Lets the width K-scan measure PER-ITER wall
-# without running each launch to full convergence (thousands of iters for a big IB).
-# Per-iter compute is constant across iters, so 1 iter is a faithful sample.
+_last_batch_diag: dict[str, Any] = {}  # diagnostics of the last batch, read by bench scripts
+# Bench only. Replaces `score_eps`. The kernel stops after about one outer iteration.
 _ARCS_FORCE_SCORE_EPS: float | None = None
 
 
 def _profile_kernel(
     kernel_full_mp: Any, args: tuple[Any, ...], K: int, B: int
 ) -> tuple[Any, float, float, bool, Any]:
-    """Compile/execute split for ONE region-batch (env-gated by GNOME3D_ARCS_PROFILE).
+    """Times the compile and the run of one batch, under GNOME3D_ARCS_PROFILE.
 
-    AOT-compiles via ``.lower(*args).compile()`` to time XLA compilation, then runs
-    the kernel exactly ONCE (the MC body can be very long, so it must execute a
-    single time).  Returns ``(out, compile_ms, run_ms, cold, cost)``: ``cold`` is
-    True the first time this process sees shape ``(K, B)``; ``cost`` is the XLA
-    cost_analysis dict (best-effort, ``None`` on failure).  Pure timing - it never
-    alters the kernel result."""
+    Compiles ahead of time with `.lower(*args).compile()` and runs the kernel once. Returns
+    `(out, compile_ms, run_ms, cold, cost)`. `cold` is True the first time this process sees the
+    shape `(K, B)`. `cost` is the XLA cost analysis, or None.
+    """
     import jax
 
     shape = (K, B)
@@ -78,7 +69,7 @@ def _profile_kernel(
     compiled: Any = None
     try:
         tc = time.perf_counter()
-        compiled = kernel_full_mp.lower(*args).compile()  # the single XLA compile
+        compiled = kernel_full_mp.lower(*args).compile()
         compile_ms = (time.perf_counter() - tc) * 1e3
         try:
             cost = compiled.cost_analysis()
@@ -86,9 +77,7 @@ def _profile_kernel(
             cost = None
     except Exception as e:  # noqa: BLE001 - profiling must never break the run
         LOG.debug("arcs profile: compile timing failed (K=%d B=%d): %s", K, B, e)
-    # Run the AOT executable directly when we have it: that skips the Python
-    # retrace/dispatch a fresh kernel_full_mp(*args) would add to run_ms (the
-    # result is bit-identical).  Fall back to the jitted fn if .compile() failed.
+    # The compiled executable runs directly, which keeps the Python dispatch out of `run_ms`.
     tr = time.perf_counter()
     out = compiled(*args) if compiled is not None else kernel_full_mp(*args)
     jax.block_until_ready(out)
@@ -97,11 +86,9 @@ def _profile_kernel(
 
 
 def dump_arcs_profile() -> None:
-    """Log the per-(K,B) arcs region-batch profile gathered this process.
-
-    Meaningful only when GNOME3D_ARCS_PROFILE=1 (empty otherwise).  Call at the end
-    of an arcs stage / run (or from a bench script) to see where arcs GPU wall went:
-    per shape - launches, cold compiles, compile vs run vs init time, total iters."""
+    """Logs the profile per (K, B) gathered in this process: launches, cold compiles, compile,
+    run and init time and total iterations. Empty without GNOME3D_ARCS_PROFILE=1.
+    """
     with _arcs_profile_lock:
         if not _arcs_profile:
             log.status(LOG, "arcs profile: empty (set GNOME3D_ARCS_PROFILE=1 to collect)")
@@ -135,22 +122,15 @@ def dump_arcs_profile() -> None:
 
 
 def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
-    """Build (or look up cached) compiled arcs-MC kernel.
+    """Builds the compiled arcs kernel, or returns the cached one.
 
-    Arcs MC differs from smooth in three ways:
-      1. **Energy**: pairwise springs from `exp_dist_mat` with a repulsion
-         branch for negative `exp` entries.  No chain bonds, no angles, no
-         heat, no orientation.
-      2. **Acceptance**: non-strict (`score_new <= score`) vs smooth's strict.
-      3. **Convergence**: an additional `stop_when_ratio_above` clause
-         (0.9999 in production) that exits early when improvement stalls.
-
-    Cache key: (n_steps_per_batch, excl_skip).  EV support is always wired
-    (excl_w=0 disables it at runtime, constant-folded by XLA).
+    The energy is pair springs from `exp_dist_mat`, with a repulsion for negative entries.
+    Acceptance is `score_new <= score`. The stop rule has a `stop_when_ratio_above` clause. The
+    cache key is (n_steps_per_batch, excl_skip). Excluded volume is always in the kernel and a
+    weight of 0 turns it off.
     """
     cache_key = ("arcs", n_steps_per_batch, excl_skip)
-    # _kernel_cache is typed for the smooth case; arcs uses string-prefixed
-    # tuple keys to share the same dict without collision.
+    # The keys of arcs start with a string. They do not collide with other kernels.
     if cache_key in _kernel_cache:  # pyright: ignore[reportArgumentType]
         return _kernel_cache[cache_key]  # pyright: ignore[reportArgumentType]
 
@@ -167,12 +147,12 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         rep_inv_cutoff: Any = 0.0,
         bg_weight: Any = 0.0,
     ) -> Any:
-        """Mirror of gnome3d.mc._local_arcs_nb, with bead p virtually at p_pos.
-        Three branches per i:
-          - i == p:            contribute 0
-          - exp[i,p] < 0:      repulsion 1/d (with d clamped to 1e-10 min)
-          - exp[i,p] >= 1e-6:  asymmetric spring (d-e)/e
-          - else (in [0, 1e-6)): contribute 0 (no arc, no repulsion)
+        """Returns the arc score of bead p placed at `p_pos`, as `_local_arcs_nb` computes it.
+
+        i == p              0
+        exp[i, p] < 0       repulsion 1 / d, with d at least 1e-10
+        exp[i, p] >= 1e-6   spring (d - e) / e
+        otherwise           0
         """
         n = pos.shape[0]
         diff = pos - p_pos
@@ -187,7 +167,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         d_safe = jnp.maximum(d, 1e-10)
         rep = jnp.maximum(
             0.0, 1.0 / d_safe - rep_inv_cutoff
-        )  # truncate 1/d at cutoff (0 => unbounded)
+        )  # 1 / d cut at the cutoff, 0 is unbounded
         bg = jnp.maximum(-e, 1e-6)
         bgs = bg_weight * ((d - bg) / jnp.minimum(d_safe, bg)) ** 2  # log symmetric spring
         rep = jnp.where(is_background, bgs, rep)
@@ -206,14 +186,14 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         diff = pos - p_pos
         d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
         idx = jnp.arange(n)
-        # Exclude pad beads (idx >= n_active); no-op when unbucketed (n_active==n).
+        # Pad beads, idx >= n_active, are left out.
         in_range = jnp.logical_and(jnp.abs(idx - p) > excl_skip, idx < n_active)
         rel = jnp.maximum(0.0, (r0 - d) / r0)
         contrib = weight * rel * rel
         return jnp.sum(jnp.where(in_range, contrib, 0.0))
 
     def _local_confine_at(p_pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any) -> Any:
-        """Per-bead soft envelope; see [mc.py::_local_confine_nb]."""
+        """Returns the soft envelope score of one bead."""
         dx = p_pos[0] - cx
         dy = p_pos[1] - cy
         dz = p_pos[2] - cz
@@ -230,8 +210,9 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         rep_inv_cutoff: Any = 0.0,
         bg_weight: Any = 0.0,
     ) -> Any:
-        """O(N^2) init via row-at-a-time scan, summing only upper triangle
-        (i < j) to match gnome3d.mc._init_arcs_nb."""
+        """Returns the full arc score by a scan over rows, summing the upper triangle as
+        `init_arcs_nb` does.
+        """
         n = pos.shape[0]
         idx = jnp.arange(n)
 
@@ -240,7 +221,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
             e = exp_mat[:, i]
             above = idx > i
-            # Match numba: skip e in (-1e-10, 1e-6).
+            # Entries in (-1e-10, 1e-6) are skipped, as in numba.
             is_background = jnp.logical_and(above, e <= -0.75)
             is_repulse = jnp.logical_and(above, jnp.logical_and(e > -0.75, e <= -1e-10))
             is_spring = jnp.logical_and(above, e >= 1e-6)
@@ -248,7 +229,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             d_safe = jnp.maximum(d, 1e-10)
             rep = jnp.maximum(
                 0.0, 1.0 / d_safe - rep_inv_cutoff
-            )  # truncate 1/d at cutoff (0 => unbounded)
+            )  # 1 / d cut at the cutoff, 0 is unbounded
             bg = jnp.maximum(-e, 1e-6)
             bgs = bg_weight * ((d - bg) / jnp.minimum(d_safe, bg)) ** 2  # log symmetric spring
             rep = jnp.where(is_background, bgs, rep)
@@ -271,7 +252,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         def scan_body(carry: Any, i: Any) -> tuple[Any, None]:
             diff = pos - pos[i]
             d = jnp.sqrt(jnp.sum(diff * diff, axis=1))
-            # Mask pad columns (idx >= n_active); zero the whole row if i is pad.
+            # Pad columns are masked and a pad row is zero.
             in_range = jnp.logical_and(jnp.abs(idx - i) > excl_skip, idx < n_active)
             rel = jnp.maximum(0.0, (r0 - d) / r0)
             contrib = weight * rel * rel
@@ -284,7 +265,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
     def _init_confine(
         pos: Any, cx: Any, cy: Any, cz: Any, R: Any, weight: Any, n_active: Any
     ) -> Any:
-        # Sequential (lax.scan) so trailing pad beads don't perturb f32 order.
+        # Sequential. Trailing pad beads do not change the float32 order.
         def _body(carry: Any, i: Any) -> tuple[Any, None]:
             c = _local_confine_at(pos[i], cx, cy, cz, R, weight)
             return carry + jnp.where(i < n_active, c, 0.0), None
@@ -318,9 +299,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         bg_weight: Any,
     ) -> Any:
         k_p, k_d, k_a = jax.random.split(key, 3)
-        # Arcs: all real beads movable (mc.py uses np.arange(n)).  Under bucketing
-        # pos0 is padded; n_active (dynamic) restricts moves to real beads so pad
-        # beads never move (arc term zeroed via exp_mat=0, EV via idx<n_active).
+        # Every real bead moves. `n_active` keeps the pad beads of a bucket still.
         ps = jax.random.randint(k_p, (n_steps_per_batch,), 0, n_active)
         disps = jax.random.uniform(
             k_d,
@@ -347,22 +326,20 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             loc_s_curr = _local_arcs_at(
                 pos, new_p, p, exp_mat, stretch_k, squeeze_k, rep_inv_cutoff, bg_weight
             )
-            # struct_delta_factor = 1 for arcs (single-counted)
+            # Single counted.
             ss_new = ss + (loc_s_curr - loc_s_prev)
 
             loc_e_prev = _local_excl_at(pos, old_p, p, r0, excl_w, n_active)
             loc_e_curr = _local_excl_at(pos, new_p, p, r0, excl_w, n_active)
             se_new = se + 2.0 * (loc_e_curr - loc_e_prev)
 
-            # Confinement: per-bead, delta factor 1.  When conf_w=0 the whole
-            # contribution folds to zero and XLA elides the branch.
+            # Per bead, single counted. At weight 0 XLA removes the branch.
             loc_c_prev = _local_confine_at(old_p, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
             loc_c_curr = _local_confine_at(new_p, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
             sc_new = sc + (loc_c_curr - loc_c_prev)
 
             score_new = ss_new + se_new + sc_new
 
-            # Arcs uses NON-strict acceptance: score_new <= score.
             ok_unc = score_new <= score
             can_jump = jnp.logical_and(T > 0, score > 0)
             exponent = -jc * (score_new / jnp.maximum(score, 1e-30)) / jnp.maximum(T, 1e-30)
@@ -505,15 +482,12 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         pos_f, ss_f, se_f, sc_f, _T_f, final_score, iter_f, _, converged_f = final
         return pos_f, ss_f, se_f, sc_f, final_score, iter_f, converged_f
 
-    # --- multi-problem (region-batched) variant: K DIFFERENT IBs in one kernel,
-    #     per-chain convergence (cf. the smooth kernel_full_mp).  Per-IB arrays
-    #     (exp_mat, step_size, r0, conf_*, n_active) move to axis 0; the schedule,
-    #     springs and weights stay shared.
+    # The batched variant runs K different IBs in one kernel with convergence per chain. The arrays
+    # per IB (exp_mat, step_size, r0, conf_*, n_active) are on axis 0. The schedule, the springs and
+    # the weights are shared.
     #
-    #     Arcs uses NON-strict acceptance, so a chain that has converged would
-    #     DRIFT WORSE if it kept stepping while slower chains finish - so we
-    #     FREEZE converged chains (hold their pos/scores).  The strict smooth
-    #     path is safe to keep stepping and doesn't need this.
+    # A converged chain is frozen. With `score_new <= score` it would drift while slower chains
+    # finish.
     in_axes_mp = (
         0,
         0,
@@ -526,7 +500,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
         None,
         None,  # dt, js, jc (shared)
         None,
-        None,  # stretch_k, squeeze_k (shared; boosted IBs aren't batched)
+        None,  # stretch_k, squeeze_k (shared, boosted IBs are not batched)
         0,  # r0 (per-IB auto excl radius)
         None,  # excl_w (shared)
         0,
@@ -576,7 +550,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
 
         def cond_fn(state: Any) -> Any:
             iter_i = state[6]
-            converged = state[8]  # (K,) per-chain
+            converged = state[8]  # (K,)
             return jnp.logical_and(jnp.logical_not(jnp.all(converged)), iter_i < max_iters)
 
         def body_fn(state: Any) -> Any:
@@ -608,14 +582,14 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
                 rep_inv_cutoff,
                 bg_weight,
             )
-            # Freeze chains already converged (non-strict accept could worsen them).
+            # A converged chain is frozen.
             frozen = conv_prev
             pos = jnp.where(frozen[:, None, None], pos, npos)
             ss = jnp.where(frozen, ss, nss)
             se = jnp.where(frozen, se, nse)
             sc = jnp.where(frozen, sc, nsc)
 
-            score = ss + se + sc  # (K,) per-chain total
+            score = ss + se + sc  # (K,)
             ratio = score / jnp.maximum(ms_score, 1e-30)
             plateaued = jnp.logical_and(score > stop_improvement * ms_score, n_ok < stop_successes)
             eps_done = score < score_eps
@@ -623,10 +597,8 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             converged = jnp.logical_or(
                 jnp.logical_or(jnp.logical_or(plateaued, eps_done), ratio_done), conv_prev
             )
-            # Diagnostics ONLY: latch the outer-iter at which each chain FIRST
-            # converged.  Write-only - never read by cond_fn, never fed to
-            # batched_mp / the freeze mask / RNG key derivation - so the MC
-            # trajectory and outputs stay bit-identical (sentinel 0 = never).
+            # Diagnostics. `conv_iter` records the outer iteration at which each chain first
+            # converged, 0 for none. Nothing reads it inside the kernel.
             newly = jnp.logical_and(converged, jnp.logical_not(conv_prev))
             conv_iter = jnp.where(newly, iter_i + 1, conv_iter)
             return (pos, ss, se, sc, nT, score, iter_i + 1, n_ok, converged, conv_iter)
@@ -641,7 +613,7 @@ def _build_arcs_kernel(n_steps_per_batch: int, excl_skip: int) -> Any:
             jnp.int32(0),
             jnp.zeros((K,), dtype=jnp.int32),  # n_ok filler
             jnp.zeros((K,), dtype=jnp.bool_),  # converged per-chain
-            jnp.zeros((K,), dtype=jnp.int32),  # conv_iter per-chain (diagnostic; 0 = never)
+            jnp.zeros((K,), dtype=jnp.int32),  # conv_iter per chain, 0 for none
         )
         final = jax.lax.while_loop(cond_fn, body_fn, init_state)
         pos_f, ss_f, se_f, sc_f, _T_f, _score_f, iter_f, _nok_f, converged_f, conv_iter_f = final
@@ -664,16 +636,14 @@ def mc_arcs_jax(
     step_size: float,
     settings: "Settings",
 ) -> float:
-    """JAX backend for mc_arcs.  Supports arc springs + EV + (optional)
-    confinement.  Same contract as [mc.mc_arcs].
+    """Anneals the anchors on JAX with arc springs, excluded volume and optional confinement.
 
-    Mutates `pos` in place (writes the best-chain final positions back) and
-    returns the best chain's final score.
+    Writes the final positions of the best chain into `pos` and returns its score.
     """
     if not jax_is_available():
         raise RuntimeError(
             "settings.mc_backend='jax' but JAX is not installed.  "
-            "Install with `pip install gnome3d-ng[jax]` or set mc_backend='numba'."
+            "Install with `pip install gnome3d[jax]` or set mc_backend='numba'."
         )
     import jax
     import jax.numpy as jnp
@@ -682,7 +652,7 @@ def mc_arcs_jax(
     if n <= 1:
         return 0.0
 
-    K: int = 1  # arcs has no multichain in production today
+    K: int = 1  # one chain
     n_steps_per_batch: int = int(settings.mc_stop_steps)
 
     use_excl: bool = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
@@ -700,7 +670,6 @@ def mc_arcs_jax(
     else:
         excl_r0 = 1.0
 
-    # ---- confinement setup (always wired into the kernel; weight=0 disables) ----
     use_conf: bool = bool(settings.use_confinement) and bool(settings.confinement_apply_to_arcs)
     if use_conf:
         conf_cx_v: float = float(pos[:, 0].mean())
@@ -721,11 +690,9 @@ def mc_arcs_jax(
     bundle = _build_arcs_kernel(n_steps_per_batch, excl_skip)
     kernel_full, init_arcs, init_excl, init_confine, _kernel_full_mp = bundle
 
-    # ---- shape bucketing: pad N up to a bucket.  Pad beads are inert: the arc
-    # term is zeroed by exp_mat=0 pad rows/cols (neither spring nor repulsion),
-    # EV/confine are masked by n_active, and the move sampler draws from
-    # [0, n_active) so pad beads never move.  Result == unbucketed at init
-    # (bit-identical); per-step f32 chaos only (arcs uses non-strict acceptance).
+    # Shape bucketing pads N to a bucket. Pad beads do nothing: `exp_mat` is 0 in their rows and
+    # columns, `n_active` masks excluded volume and confinement and moves are drawn from [0,
+    # n_active).
     n_active_v: int = n
     if bool(settings.mc_executor_jax_bucket_shapes):
         B: int = jax_bucket_for(n)
@@ -847,7 +814,7 @@ def mc_arcs_jax(
         )
 
     best_k: int = int(np.argmin(score_per_chain))
-    # Slice off any bucket padding (pos is (n, 3); pos_k is (K, B, 3), B >= n).
+    # The bucket padding is cut off.
     pos[:] = np.asarray(pos_k[best_k][:n]).astype(pos.dtype)
     return float(score_per_chain[best_k])
 
@@ -858,10 +825,7 @@ def _prep_arcs_problem_np(
     settings: "Settings",
     B: int,
 ) -> dict[str, Any]:
-    """One IB's arcs kernel inputs as numpy, padded to bucket B.  Pure numpy
-    mirror of the per-problem prep in `mc_arcs_jax` (per-IB excl radius +
-    confinement envelope); pad beads are inert (exp_mat=0 rows/cols, n_active
-    masks EV/confine)."""
+    """Returns the arcs kernel inputs of one IB as numpy arrays padded to bucket B."""
     n = int(pos.shape[0])
     use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
     excl_r0: Any = 1.0
@@ -886,8 +850,8 @@ def _prep_arcs_problem_np(
         conf_cx = conf_cy = conf_cz = 0.0
         conf_R = 1.0
 
-    # Non-arc 1/d repulsion cutoff: truncate at factor x mean arc distance so sparse/small IBs
-    # don't blow up (the unbounded 1/d has no minimum).  0 => unbounded (faithful to the reference).
+    # The arcless 1 / d repulsion is cut at factor times the mean arc distance. 0 leaves it
+    # unbounded.
     rep_factor = float(getattr(settings, "arcs_repulsion_cutoff_factor", 0.0))
     rep_inv_cutoff = 0.0
     if rep_factor > 0.0:
@@ -919,12 +883,10 @@ def _prep_arcs_problem_np(
 
 
 def _arcs_tensor_bytes(B: int) -> int:
-    """Exact device-tensor bytes for ONE IB of the arcs kernel at bucket B.
-
-    Sums every input/output array of `kernel_full_mp` (each stacked on axis 0, so
-    the batch is K times this); dominated by the (B, B) exp-distance tensor.  Used
-    by `_resolve_arcs_max_k` with `memory.XLA_PEAK_OVERHEAD` to bound the peak."""
-    f4, i4, b1 = 4, 4, 1  # bytes: float32 / int32 / bool
+    """Returns the device tensor bytes of one IB of the arcs kernel at bucket B, the sum of every
+    input and output array. The (B, B) target tensor dominates.
+    """
+    f4, i4, b1 = 4, 4, 1  # bytes of float32, int32 and bool
     inp = (
         B * 3 * f4  # pos_k
         + 3 * f4  # ss/se/sc
@@ -939,14 +901,12 @@ def _arcs_tensor_bytes(B: int) -> int:
 
 
 def _resolve_arcs_max_k(big_b: int, settings: "Settings") -> tuple[int, str]:
-    """Resolve the arcs region-batch vmap width (IBs per launch).
+    """Resolves the vmap width of the arcs batch, the number of IBs per launch.
 
-    `settings.mc_executor_jax_batch_width_arcs` is an integer (flat cap) or
-    "auto".  "auto" computes the kernel's exact per-IB device-tensor bytes
-    (`_arcs_tensor_bytes`), applies `memory.XLA_PEAK_OVERHEAD`, and solves the
-    largest K within the device budget (basis "auto-bytes").  When the budget
-    can't be queried (CPU) it falls back to the conservative `32768/B` shape
-    heuristic (basis "auto-fallback").  Returns (max_k, basis)."""
+    `mc_executor_jax_batch_width_arcs` is an integer or "auto". "auto" takes the bytes per IB,
+    applies `memory.XLA_PEAK_OVERHEAD` and solves for the largest K in the device budget. Without
+    a budget, on the CPU, it uses `32768 / B`. Returns (max_k, basis).
+    """
     w = str(settings.mc_executor_jax_batch_width_arcs).strip().lower()
     if w != "auto":
         return max(1, int(w)), "explicit"
@@ -961,19 +921,13 @@ def mc_arcs_jax_batch(
     settings: "Settings",
     max_iters: int | None = None,
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
-    """Anneal K *different* IBs' anchors in one vmapped kernel (region batching).
+    """Anneals the anchors of K different IBs in one vmapped kernel.
 
-    `max_iters` caps the outer round budget, defaulting to `_MAX_ITERS` of 10000.
-
-    Each problem: `pos` (n,3), ``exp_dist`` (n,n), ``step_size`` (float).  All
-    share the energy-term flags (caller groups by terms + size bucket).  Returns
-    one ``(score, final_pos (n,3))`` per problem, in input order.
-
-    Caps the vmap width (IBs per launch) via
-    `settings.mc_executor_jax_batch_width_arcs` - see `_resolve_arcs_max_k`.  The
-    stacked ``(B, B)`` exp tensor (4*B^2 bytes/IB) dominates the per-IB footprint.
-    Excess IBs run as sequential sub-batches - same discipline as
-    `mc_smooth_jax_batch`; the cap is purely an OOM guard."""
+    Each problem has `pos` (n, 3), `exp_dist` (n, n) and `step_size`. All problems share the
+    energy term flags. `max_iters` caps the outer rounds, 10000 by default. Returns one
+    `(score, final_pos)` per problem in input order. IBs beyond the vmap width of
+    `_resolve_arcs_max_k` run as further launches.
+    """
     if not problems:
         return []
     bucket = bool(settings.mc_executor_jax_bucket_shapes)
@@ -1012,8 +966,9 @@ def _mc_arcs_jax_batch_chunk(
     max_iters: int | None = None,
     chunk_tag: str = "",
 ) -> list[tuple[float, np.ndarray[Any, Any]]]:
-    """One vmapped arcs kernel launch for up to max_k IBs.  `max_iters` caps the
-    outer round budget (``None`` => 10000); used by the polish to bound an outlier."""
+    """Runs one vmapped arcs kernel launch for up to max_k IBs. `max_iters` caps the outer
+    rounds, None for 10000.
+    """
     if not jax_is_available():
         raise RuntimeError("settings.mc_backend='jax' but JAX is not installed.")
     import jax
@@ -1047,7 +1002,6 @@ def _mc_arcs_jax_batch_chunk(
     step_size_k = jnp.asarray(np.array([float(p["step_size"]) for p in problems], dtype=np.float32))
     bg_weight_j = jnp.float32(float(settings.background_weight))
 
-    # shared schedule / weights
     excl_skip = int(settings.exclusion_skip_neighbors)
     n_steps_per_batch = int(settings.mc_stop_steps)
     use_excl = bool(settings.use_excluded_volume) and bool(settings.exclusion_apply_to_arcs)
@@ -1060,7 +1014,6 @@ def _mc_arcs_jax_batch_chunk(
     bundle = _build_arcs_kernel(n_steps_per_batch, excl_skip)
     _kf, init_arcs, init_excl, init_confine, kernel_full_mp = bundle
 
-    # per-IB initial scores (reuse the validated init helpers)
     def init_one(i: int) -> tuple[Any, Any, Any]:
         p1 = pos_k[i : i + 1]  # (1, B, 3)
         na = jnp.int32(int(np.asarray(n_active_k[i])))
@@ -1093,12 +1046,12 @@ def _mc_arcs_jax_batch_chunk(
     sc_k = jnp.concatenate([x[2] for x in inits])
     init_ms = -1.0
     if _ARCS_PROFILE:
-        jax.block_until_ready((ss_k, se_k, sc_k))  # force the O(N^2) init scans
+        jax.block_until_ready((ss_k, se_k, sc_k))  # forces the init scans
         init_ms = (time.perf_counter() - t_init) * 1e3
 
-    # Scope path distinguishes concurrent kernels; the node seed makes the draw
-    # follow from Seeded.seed. Chains within a batch are separated by the kernel's
-    # own per-index fold, so grouping still shifts which chain gets which stream.
+    # The scope path separates concurrent kernels and the node seed makes the draw follow
+    # `Seeded.seed`. The kernel folds the chain index into the key. The grouping decides the
+    # stream of a chain.
     seed_offset = stable_seed_offset(log.current(), problems[0].get("seed"))
     base_key = jax.random.PRNGKey(seed_offset)
 
@@ -1143,20 +1096,16 @@ def _mc_arcs_jax_batch_chunk(
         cold = False
         cost = None
     pos_f, ss_f, se_f, sc_f, iter_f, converged, conv_iter = out
-    score_per_chain = np.asarray(ss_f + se_f + sc_f)  # forces device sync
+    score_per_chain = np.asarray(ss_f + se_f + sc_f)  # syncs the device
     pos_f_np = np.asarray(pos_f)
     elapsed = time.perf_counter() - t0
 
-    # --- convergence-spread diagnostics (host-only; rides the sync above) ----------
-    # conv_iter[k] = outer-iter chain k first converged (0 = never).  When the batch
-    # exits via jnp.all(converged), iter_f == max(conv_iter); when it exits via the
-    # _MAX_ITERS cap, never-converged chains stay 0 (counted in `never`) and
-    # max(conv_iter) over converged chains may be < iter_f.  `wasted` (sum of
-    # iter_f - conv_iter over converged chains) is the frozen-but-stepped overshoot.
+    # `conv_iter[k]` is the outer iteration at which chain k first converged, 0 for none. `wasted`
+    # is the sum of `iter_f - conv_iter` over converged chains.
     it = int(iter_f)
     ci = np.asarray(conv_iter)
     conv_mask = np.asarray(converged)
-    done = ci > 0  # chains that converged AND recorded an iter (== conv_mask)
+    done = ci > 0
     n_conv = int(conv_mask.sum())
     if done.any():
         cd = ci[done]
@@ -1167,8 +1116,7 @@ def _mc_arcs_jax_batch_chunk(
     else:
         p50 = p90 = mx = wasted = 0
     never = K - n_conv
-    # us/iter from execute-only time when profiling (run_ms excludes the XLA compile
-    # that `elapsed` includes on cold launches); else the lumped wall.
+    # Under profiling the time per iteration excludes the XLA compile.
     wall_for_iter = run_ms / 1e3 if (_ARCS_PROFILE and run_ms > 0) else elapsed
     us_per_iter = (wall_for_iter / max(it, 1)) * 1e6
     wasted_frac = 100.0 * wasted / max(it * K, 1)
@@ -1218,7 +1166,7 @@ def _mc_arcs_jax_batch_chunk(
     if _ARCS_PROFILE:
         flops = cost.get("flops") if isinstance(cost, dict) else None
         flops_str = f" flops={flops:.2e}" if flops else ""
-        warm_str = "COLD" if cold else "warm"
+        warm_str = "cold" if cold else "warm"
         prof_tail = (
             f" [compile={compile_ms:.0f}ms run={run_ms:.0f}ms "
             f"init={init_ms:.0f}ms {warm_str}{flops_str}]"

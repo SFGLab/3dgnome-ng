@@ -37,7 +37,7 @@ EQUATIONS: dict[str, tuple[str, int]] = {
     "chain_energy": (
         r"$E_{\mathrm{chain}} = \sum_i w_d k \left(\frac{d_{i,i+1} - t_i}{t_i}\right)^2"
         r" + \sum_i w_a \left(\frac{1 - \cos\theta_i}{2}\right)^3"
-        r"$" "\n" r"$\qquad + \sum_{(i,j) \in C} w_m \left(\frac{1 + \mathbf{o}_i \cdot \mathbf{o}_j}{2}\right)^2"
+        r"$" "\n" r"$\qquad + \sum_{(i,j) \in C} w_m \left(\frac{1 - \mathbf{o}_i \cdot \mathbf{o}_j}{2}\right)^2"
         r" + w_{ev} \sum_{|i - j| > 1} \left(\frac{r_0 - d_{ij}}{r_0}\right)_{+}^{2}"
         r" + w_c \sum_i \left(\frac{r_i - R}{R}\right)_{+}^{2}$",
         DISPLAY,
@@ -50,7 +50,7 @@ EQUATIONS: dict[str, tuple[str, int]] = {
     "t_ev": (r"$w_{ev} \left(\frac{r_0 - d_{ij}}{r_0}\right)^2,\ d_{ij} < r_0$", CELL),
     "t_bond": (r"$w_d k \left(\frac{d_{i,i+1} - t_i}{t_i}\right)^2$", CELL),
     "t_bending": (r"$w_a \left(\frac{1 - \cos\theta_i}{2}\right)^3$", CELL),
-    "t_orientation": (r"$w_m \left(\frac{1 + \mathbf{o}_i \cdot \mathbf{o}_j}{2}\right)^2$", CELL),
+    "t_orientation": (r"$w_m \left(\frac{1 - \mathbf{o}_i \cdot \mathbf{o}_j}{2}\right)^2$", CELL),
     "t_confinement": (r"$w_c \left(\frac{r_i - R}{R}\right)^2,\ r_i > R$", CELL),
 }
 

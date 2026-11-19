@@ -1,10 +1,11 @@
 #!/bin/bash
-# The cell grid in the JAX kernel on the GPU: prefetch K with the grid on, against the
-# prefetch sweep without it. Workstation, 3dgnome screen.
+# The cell grid in the JAX kernel on the GPU: prefetch K with the grid on, against the prefetch
+# sweep without it.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd ~/3dgnome-ng
 C=GM12878; INI=slurm/ensemble/gm12878_hic_arcs.ini; OUT=out/grid
-MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 mkdir -p $OUT
 for K in 32 64 128; do
   I=$OUT/gm_grid_k$K.ini; sed "s/^prefetch = .*/prefetch = $K\njax_grid = yes/" $INI > $I

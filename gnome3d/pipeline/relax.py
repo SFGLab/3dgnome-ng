@@ -1,14 +1,8 @@
-"""Cross block relaxation after the stitch.
+"""Cross block relaxation.
 
-The smooth stage's excluded volume acts within one block and the stitch guards block centroids
-only, so once blocks are stitched together nothing acts between their beads and two coils can
-pass through each other. This runs the smooth kernel once over the whole chromosome with
-excluded volume on every pair and every anchor held fixed, so the arcs and the stitch are kept
-and only the subanchor coils re route around each other. Bond targets are the bonds as they
-are, so the pass changes nothing it does not have to.
-
-The gate is `cross_block_contacts`, bead pairs of different blocks inside the excluded volume
-radius, which the pass exists to drive to zero.
+The excluded volume of the smooth stage acts within one block. This pass runs the smooth
+kernel once over the whole chromosome with excluded volume on every pair and every anchor
+fixed. Only the subanchor coils move. Bond targets are the bonds as they are.
 """
 
 from __future__ import annotations
@@ -30,14 +24,15 @@ def _positions(block: list[BeadOut]) -> F64Array:
 
 
 def cross_block_contacts(blocks: list[list[BeadOut]], radius: float) -> tuple[int, int]:
-    """Pairs of beads from different blocks closer than `radius`, and how many beads take part.
+    """Returns the number of bead pairs of different blocks closer than `radius` and the number
+    of beads in them.
 
     Parameters
     ----------
     blocks
-        One chromosome's per block bead lists.
+        The bead lists of one chromosome's blocks.
     radius
-        The distance below which two beads count as touching, in model units.
+        The distance under which two beads touch, in model units.
     """
     pos = np.concatenate([_positions(b) for b in blocks]) if blocks else np.zeros((0, 3))
     owner = (
@@ -52,7 +47,7 @@ def cross_block_contacts(blocks: list[list[BeadOut]], radius: float) -> tuple[in
 
 
 def _cross_pairs(pos: np.ndarray, owner: np.ndarray, radius: float) -> np.ndarray:
-    """Index pairs, into `pos`, of beads from different blocks closer than `radius`."""
+    """Returns the index pairs of beads of different blocks closer than `radius`."""
     if pos.shape[0] < 2:
         return np.zeros((0, 2), dtype=np.int64)
     pairs = KDTree(pos).query_pairs(radius, output_type="ndarray")
@@ -62,8 +57,9 @@ def _cross_pairs(pos: np.ndarray, owner: np.ndarray, radius: float) -> np.ndarra
 
 
 def _within_overlaps(pos: np.ndarray, owner: np.ndarray, radius: float) -> np.ndarray:
-    """Index pairs, into `pos` in chain order, of non neighbour beads of one block closer than
-    `radius`."""
+    """Returns the index pairs, in chain order, of non neighbour beads of one block closer than
+    `radius`.
+    """
     if pos.shape[0] < 3:
         return np.zeros((0, 2), dtype=np.int64)
     pairs = KDTree(pos).query_pairs(radius, output_type="ndarray")
@@ -75,14 +71,14 @@ def _within_overlaps(pos: np.ndarray, owner: np.ndarray, radius: float) -> np.nd
 
 
 def _relax_settings(s: Settings, bond: float) -> Settings:
-    """A copy of the settings with only chain bonds and excluded volume active."""
+    """Returns a copy of the settings with only chain bonds and excluded volume on."""
     r = copy.copy(s)
     r.use_excluded_volume = True
     r.exclusion_apply_to_smooth = True
     r.exclusion_weight = float(s.relax_ev_weight)
-    # The excluded volume acts at 1.5 bonds by default so that at equilibrium nothing is left
-    # under one bond, which is where contacts are counted. Bonds carry their own weight, since
-    # at the smooth stage's 0.1 the excluded volume tears the coil instead of re routing it.
+    # The excluded volume acts at 1.5 bonds by default. No pair is left under one bond. The
+    # bonds carry their own weight. At the 0.1 of the smooth stage the excluded volume tears the
+    # coil.
     r.exclusion_radius_smooth = float(s.relax_ev_radius) if s.relax_ev_radius > 0.0 else 1.5 * bond
     r.exclusion_skip_neighbors = 1
     r.spring_stretch = float(s.relax_bond_weight)
@@ -90,8 +86,8 @@ def _relax_settings(s: Settings, bond: float) -> Settings:
     r.use_confinement = False
     r.use_compartments = False
     r.max_temp_smooth = float(s.max_temp_smooth) * float(s.relax_temp)
-    # The smooth stage's levers are its own. The pass pins anchors and starts from the chain
-    # as it is, and its wider radius is not the one the wall should act at.
+    # The wall and the anchor cap belong to the smooth stage. The pass fixes anchors and has a wider
+    # radius.
     r.smooth_hard_wall = False
     r.smooth_anchor_cap = 0.0
     r.smooth_start = "line"
@@ -100,16 +96,17 @@ def _relax_settings(s: Settings, bond: float) -> Settings:
 
 
 def relax_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]]:
-    """Return the blocks with their subanchors moved so no two blocks interpenetrate. Anchors do
-    not move. With `use_cross_block_relax` off, or fewer than two blocks and `within_blocks` off,
-    the input is returned as is.
+    """Returns the blocks with their overlaps removed by moving subanchors. Anchors do not move.
+
+    Returns the input with `use_cross_block_relax` off, or with fewer than two blocks and
+    `within_blocks` off.
 
     Parameters
     ----------
     blocks
-        One chromosome's per block bead lists, in any order. The chain is taken in genomic order.
+        The bead lists of one chromosome's blocks, in any order. The chain is in genomic order.
     s
-        Settings. Reads the `relax_*` keys and `mc_executor_smooth` to pick the kernel.
+        Settings. Reads the `relax_*` keys and `mc_executor_smooth`.
     """
     within = bool(getattr(s, "relax_within_blocks", False))
     if not s.use_cross_block_relax or len(blocks) < (1 if within else 2):
@@ -124,13 +121,11 @@ def relax_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]
     dtn: F32Array = bonds.astype(np.float32)
     bond = float(np.median(bonds)) if bonds.size else 1.0
     r = _relax_settings(s, bond)
-    radius = bond  # contacts are counted at one bond; the excluded volume acts wider
+    radius = bond  # contacts are counted at one bond
     before, _ = cross_block_contacts(blocks, radius)
 
-    # Which beads may move. Every subanchor by default, which is what the pass did before, but
-    # the round count is proportional to that number and only a handful of beads touch anything.
-    # A window keeps the beads that touch another block, and that many chain neighbours either
-    # side so the chain can take up the slack, and freezes the rest.
+    # With a window, only the beads that touch another block move, with that many chain neighbours
+    # on either side.
     window = int(getattr(s, "relax_local_window", -1))
     if window >= 0:
         owner_chain = (
@@ -138,9 +133,7 @@ def relax_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]
         )
         touching = np.unique(_cross_pairs(pos, owner_chain, radius).ravel())
         if within:
-            # Non neighbour pairs of one block closer than the battery's overlap distance, 0.7
-            # of a bond, move as well, which takes the coils of two gaps whose anchors the arcs
-            # stage put close apart again.
+            # Non neighbour pairs of one block under 0.7 of a bond move as well.
             inner = _within_overlaps(pos, owner_chain, 0.7 * bond)
             LOG.info("cross block relax: %d overlapping pairs inside blocks", inner.shape[0])
             touching = np.unique(np.concatenate([touching, inner.ravel()]))

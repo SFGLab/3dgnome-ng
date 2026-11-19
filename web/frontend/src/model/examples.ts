@@ -1,7 +1,10 @@
 import type { Factors } from './form'
 
-/** The examples: each a request the form can be filled with, and the tab or second loop set its
- * finished job opens on. */
+/**
+ * The examples: each a request that fills the form and the tab or second loop set its finished job
+ * opens on. Each description is read from the hosted data and must be checked again when the data
+ * changes.
+ */
 export type Example = {
   id: string
   title: string
@@ -35,17 +38,17 @@ export const EXAMPLES: Example[] = [
     title: 'MYC',
     cell: 'GM12878',
     cellLabel: 'GM12878',
-    description: 'The MYC locus and its distal enhancers',
-    region: 'chr8:127,500,000-129,000,000',
+    description: 'MYC and the enhancers 430 to 560 kb upstream that CTCF and RNAPII loops join to its promoter',
+    region: 'chr8:127,000,000-128,500,000',
     factors: 'CTCF+RNAPII',
   },
-  { id: 'HOXA', title: 'HOXA cluster', cell: 'H1ESC', cellLabel: 'H1ESC', description: 'A dense cluster of CTCF loops', region: 'chr7:27,000,000-27,400,000', factors: 'CTCF' },
+  { id: 'HOXA', title: 'HOXA cluster', cell: 'H1ESC', cellLabel: 'H1ESC', description: 'The HOXA gene cluster, 400 kb with 8 CTCF loops', region: 'chr7:27,000,000-27,400,000', factors: 'CTCF' },
   {
     id: 'GSTM1',
     title: 'Deletion at GSTM1',
     cell: 'GM12878',
     cellLabel: 'GM12878, HGSVC',
-    description: 'A common deletion that removes a looped CTCF anchor',
+    description: 'A common 18 kb deletion that removes 4 CTCF anchors and their loops',
     region: 'chr1:109,200,000-110,200,000',
     factors: 'CTCF+RNAPII',
     svSet: 'HGSVC',

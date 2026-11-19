@@ -10,6 +10,7 @@ import shutil
 import threading
 import time
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 import pandas as pd
@@ -25,22 +26,56 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import explore, owndata, remote
-from .catalog import BACKGROUNDS, FACTOR_CHOICES, Catalog
-from .jobs import JobRequest, _member, request_key
-from .queue import enqueue, queue_position, sweep_private
+from . import explore, hicdiffusion, lists, owndata, remote
+from .catalog import BACKGROUNDS, FACTOR_CHOICES, SAMPLE_COLUMNS, Catalog
+from .jobs import JobRequest, _member, request_key, write_json
+from .queue import enqueue, queue_position, resume_after_restart, sweep_private
 from .regions import HICDIFFUSION_SPAN, RegionError, parse_region
 from .settings import Settings
 from .settings_schema import SettingError, parse_ini, schema, validate_overrides
+from .siteconfig import ConfigFile
 from .viewer import viewer_payload
 
 HERE = Path(__file__).resolve().parent
 FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|[A-Za-z0-9_.:-]+\.cif)$")
 
 
+class StripBase:
+    """Removes the base path of the site from a request path that has it. The proxy in front
+    may strip the base path or pass it on.
+    """
+
+    def __init__(self, app: Any, base: str) -> None:
+        self.app = app
+        self.base = base
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        path = scope.get("path", "")
+        if scope["type"] in ("http", "websocket") and (path == self.base or path.startswith(self.base + "/")):
+            raw = scope.get("raw_path") or path.encode()
+            scope = {**scope, "path": path[len(self.base) :] or "/", "raw_path": raw[len(self.base.encode()) :] or b"/"}
+        await self.app(scope, receive, send)
+
+
 def create_app() -> FastAPI:
     s = Settings.from_env()
     catalog = Catalog.load(s.data_dir)
+    sample_tables: dict[str, list[list[str]]] = {}
+
+    def sample_rows(name: str) -> list[list[str]] | None:
+        """The sample table of a call set, read once, or None for a set without one."""
+        sv = catalog.sv_sets.get(name)
+        if sv is None or sv.samples_table is None:
+            return None
+        if name not in sample_tables:
+            sample_tables[name] = sv.sample_rows()
+        return sample_tables[name]
+
+    def sample_note(request: dict[str, object]) -> str:
+        """Population, superpopulation and sex of a job's hosted sample, or an empty string."""
+        rows = sample_rows(str(request.get("sv_set", ""))) or []
+        row = next((r for r in rows if r[0] == request.get("sample")), None)
+        return ", ".join(v for v in (row[2], row[3], row[1]) if v) if row else ""
     templates = Jinja2Templates(directory=str(HERE / "templates"))
 
     def pretty_region(text: str) -> str:
@@ -49,12 +84,16 @@ def create_app() -> FastAPI:
         return f"{m[1]}:{int(m[2]):,}-{int(m[3]):,}" if m else str(text)
 
     templates.env.filters["region"] = pretty_region
+    templates.env.globals["root"] = s.base_path
     app = FastAPI(title="3D-GNOME")
+    if s.base_path:
+        app.add_middleware(StripBase, base=s.base_path)
     shared = s.results_dir / "jobs"
     private = s.results_dir / "private"
     shared.mkdir(parents=True, exist_ok=True)
     private.mkdir(parents=True, exist_ok=True)
     sweep_private(s.results_dir, s.retention_days)
+    resume_after_restart(s)
 
     def form_page(request: Request, error: str = "", status: int = 200, values: dict | None = None) -> HTMLResponse:
         return templates.TemplateResponse(
@@ -65,7 +104,7 @@ def create_app() -> FastAPI:
                 "factors": FACTOR_CHOICES,
                 "retention": s.retention_days,
                 "max_region_mb": f"{s.max_span / 1e6:g}",
-                "hicdiffusion_missing": Settings.hicdiffusion_missing(),
+                "hicdiffusion_missing": hicdiffusion.missing(),
                 "error": error,
                 "v": values or {},
             },
@@ -84,12 +123,12 @@ def create_app() -> FastAPI:
             self.field = field
 
     def create_job(fields: dict[str, str], vcf: bytes | Path | None) -> str:
-        """Checks a job request, queues the job unless the same one exists, and returns its url.
+        """Checks a job request, queues the job unless the same one exists and returns its url.
 
         @param fields the form fields of a job request, overrides as JSON text
-        @param vcf an uploaded VCF, which makes the job private. The field vcf_upload names an
+        @param vcf an uploaded VCF, which makes the job private. The field vcf_upload gives an
             upload in its place.
-        @raises JobError naming the field the request fails on
+        @raises JobError with the field the request fails on
         """
         cell_type = fields.get("cell_type", "")
         factors = fields.get("factors", "CTCF")
@@ -126,8 +165,8 @@ def create_app() -> FastAPI:
                 "Pick a region of up to 2 Mb, or the Hi-C of the cell type as the contact background.",
                 "background",
             )
-        if background == "hicdiffusion" and Settings.hicdiffusion_missing():
-            raise JobError("HiCDiffusion is not set up on this server: " + ", ".join(Settings.hicdiffusion_missing()), "background")
+        if background == "hicdiffusion" and hicdiffusion.missing():
+            raise JobError("HiCDiffusion is not set up on this server: " + ", ".join(hicdiffusion.missing()), "background")
         if sv_set and sv_set not in catalog.sv_sets:
             raise JobError(f"unknown SV set {sv_set!r}", "sv_set")
         if sv_set and sample not in catalog.sv_sets[sv_set].samples:
@@ -178,7 +217,7 @@ def create_app() -> FastAPI:
         if st.is_file() and json.loads(st.read_text()).get("state") in ("running", "done", "queued"):
             return f"/jobs/{key}"
         job.mkdir(parents=True, exist_ok=True)
-        st.write_text(json.dumps({"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]}))
+        write_json(st, {"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]})
         enqueue(s, req, job)
         return f"/jobs/{key}"
 
@@ -241,7 +280,7 @@ def create_app() -> FastAPI:
             url = create_job(fields, await vcf.read() if vcf is not None and vcf.filename else None)
         except JobError as e:
             return form_page(request, str(e), 400, values)
-        return RedirectResponse(url, status_code=303)
+        return RedirectResponse(s.base_path + url, status_code=303)
 
     @app.post("/api/jobs")
     async def api_submit(request: Request, vcf: UploadFile | None = File(None)) -> JSONResponse:  # noqa: B008
@@ -355,6 +394,27 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": f"{sample!r} is not a sample of this VCF", "field": "sample"}, 400)
         return JSONResponse(out)
 
+    gene_names: dict[str, list[tuple[str, str, str, int]]] = {}
+
+    @app.get("/api/genes")
+    def api_genes(cell: str, q: str, limit: int = 8) -> JSONResponse:
+        """Genes of a cell type whose name starts with the text, then those that hold it, for the
+        suggestions of the region field. Each has its name, chromosome and TSS."""
+        if cell not in catalog.cell_types:
+            return JSONResponse({"error": f"unknown cell type {cell!r}"}, 404)
+        text = q.strip().upper()
+        if len(text) < 2:
+            return JSONResponse([])
+        if cell not in gene_names:
+            genes = catalog.cell_types[cell].genes().drop_duplicates("name")
+            gene_names[cell] = sorted((str(n).upper(), str(n), str(c), int(t)) for n, c, t in zip(genes["name"], genes["chrom"], genes["tss"], strict=True))
+        limit = max(1, min(limit, 25))
+        starts = [g for g in gene_names[cell] if g[0].startswith(text)]
+        # The shortest names first. MYC comes before MYCBP.
+        starts.sort(key=lambda g: (len(g[0]), g[0]))
+        holds = [g for g in gene_names[cell] if text in g[0] and not g[0].startswith(text)] if len(starts) < limit else []
+        return JSONResponse([{"name": n, "chrom": c, "tss": t} for _, n, c, t in (starts + holds)[:limit]])
+
     @app.get("/api/region")
     def api_region(cell: str, q: str) -> JSONResponse:
         if cell not in catalog.cell_types:
@@ -376,15 +436,19 @@ def create_app() -> FastAPI:
         if cell not in catalog.cell_types:
             return JSONResponse({"error": f"unknown cell type {cell!r}"}, 404)
         ct = catalog.cell_types[cell]
+        # The form draws the loops around a region as well, its own length on either side. The
+        # preview takes three times the longest region a job may have.
         try:
-            r = parse_region(region, ct.genes(), s.max_span)
+            r = parse_region(region, ct.genes(), 3 * s.max_span)
         except RegionError as e:
             return JSONResponse({"error": str(e)}, 400)
         loops: dict[str, list[list[int]]] = {}
         for factor, name in ct.clusters.items():
             t = pd.read_csv(ct.root / name, sep=r"\s+", header=None, usecols=range(7), comment="#")
             t = t[(t[0] == r.chrom) & (t[3] == r.chrom) & (t[1] >= r.start) & (t[5] <= r.end)]
-            loops[factor] = [[int((a + b) // 2), int((c + e) // 2), int(n)] for a, b, c, e, n in zip(t[1], t[2], t[4], t[5], t[6], strict=True)]
+            # The two anchor middles and the count, then the outer edges, which decide whether a
+            # region holds the loop.
+            loops[factor] = [[int((a + b) // 2), int((c + e) // 2), int(n), int(a), int(e)] for a, b, c, e, n in zip(t[1], t[2], t[4], t[5], t[6], strict=True)]
         g = ct.genes()
         g = g[(g["chrom"] == r.chrom) & (g["tss"] >= r.start) & (g["tss"] < r.end)]
         return JSONResponse(
@@ -421,7 +485,7 @@ def create_app() -> FastAPI:
             request,
             "job.html",
             {
-                "base": f"/{kind}/{key}" if kind == "jobs" else f"/p/{key}",
+                "base": s.base_path + (f"/{kind}/{key}" if kind == "jobs" else f"/p/{key}"),
                 "status": status,
                 "req": req,
                 "cell": cell,
@@ -491,6 +555,14 @@ def create_app() -> FastAPI:
         d = job_dir("private", key)
         return JSONResponse(json.loads((d / "status.json").read_text()))
 
+    @app.get("/api/sv_sets/{name}/samples")
+    def api_sv_samples(name: str) -> JSONResponse:
+        """Sex, population and parents of each sample of a call set that has the table."""
+        rows = sample_rows(name)
+        if rows is None:
+            return JSONResponse({"error": f"no sample table for {name!r}"}, 404)
+        return JSONResponse({"columns": list(SAMPLE_COLUMNS), "rows": rows})
+
     @app.get("/api/catalog")
     def api_catalog() -> dict[str, object]:
         return {
@@ -498,11 +570,14 @@ def create_app() -> FastAPI:
                 k: {"label": c.label, "description": c.description, "data": c.data, "lymphoblastoid": c.lymphoblastoid, "note": c.note}
                 for k, c in catalog.cell_types.items()
             },
-            "sv_sets": {k: {"label": v.label, "samples": v.samples} for k, v in catalog.sv_sets.items()},
+            "sv_sets": {
+                k: {"label": v.label, "samples": v.samples, "sample_table": v.samples_table is not None}
+                for k, v in catalog.sv_sets.items()
+            },
             "factors": list(FACTOR_CHOICES),
             "max_region_mb": s.max_span / 1e6,
             "max_structures": s.max_structures,
-            "hicdiffusion": not Settings.hicdiffusion_missing(),
+            "hicdiffusion": not hicdiffusion.missing(),
         }
 
     @app.get("/api/settings")
@@ -525,7 +600,9 @@ def create_app() -> FastAPI:
         @app.get(base + "/summary", name=f"{kind}_summary")
         def ex_summary(key: str) -> JSONResponse:
             d = guard(key)
-            return JSONResponse(explore.summary(d, queue_position(s, d)))
+            summary = explore.summary(d, queue_position(s, d))
+            summary["sample_note"] = sample_note(summary["request"])
+            return JSONResponse(summary)
 
         @app.get(base + "/structure/{i}", name=f"{kind}_structure")
         def ex_structure(key: str, i: int) -> JSONResponse:
@@ -594,7 +671,47 @@ def create_app() -> FastAPI:
             dirs.append(job_dir(m[1], m[2]))
         return JSONResponse(explore.compare(dirs[0], dirs[1]))
 
+    shared_lists = lists.Lists(s.results_dir / "lists")
+    BAD_CODE = "A sync code has 16 letters and digits, like K7M2-9QXD-4THP-W3RZ."
+    NO_LIST = "No list has this code. Compare it with the computer that shows it."
+
+    async def list_body(request: Request) -> dict[str, Any]:
+        raw = await request.body()
+        if len(raw) > lists.MAX_BODY:
+            raise HTTPException(413)
+        try:
+            body = json.loads(raw or b"{}")
+        except ValueError:
+            raise HTTPException(400) from None
+        return body if isinstance(body, dict) else {}
+
+    def list_answer(code: str, record: dict[str, Any], status: int = 200) -> JSONResponse:
+        return JSONResponse({"code": code, "private": record["private"], "jobs": record["jobs"]}, status)
+
+    @app.post("/api/lists")
+    async def list_create(request: Request) -> JSONResponse:
+        body = await list_body(request)
+        code, record = shared_lists.create(body.get("jobs"), body.get("private") is True)
+        return list_answer(code, record, 201)
+
+    @app.get("/api/lists/{code}")
+    def list_read(code: str) -> JSONResponse:
+        shown = lists.normalise(code)
+        if shown is None:
+            return JSONResponse({"error": BAD_CODE}, 400)
+        record = shared_lists.read(shown)
+        return list_answer(shown, record) if record else JSONResponse({"error": NO_LIST}, 404)
+
+    @app.put("/api/lists/{code}")
+    async def list_update(code: str, request: Request) -> JSONResponse:
+        shown = lists.normalise(code)
+        if shown is None:
+            return JSONResponse({"error": BAD_CODE}, 400)
+        record = shared_lists.update(shown, (await list_body(request)).get("jobs"))
+        return list_answer(shown, record) if record else JSONResponse({"error": NO_LIST}, 404)
+
     index_html = s.frontend_dist / "index.html"
+    site_config = ConfigFile(s.site_config or s.data_dir / "config.json")
     if (s.frontend_dist / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=s.frontend_dist / "assets"), name="assets")
 
@@ -606,6 +723,21 @@ def create_app() -> FastAPI:
             raise HTTPException(404)
         if not index_html.is_file():
             return HTMLResponse(f"The frontend is not built. Run npm run build in web/frontend, or set FRONTEND_DIST. Expected {index_html}.", 503)
-        return HTMLResponse(index_html.read_text())
+        html = index_html.read_text()
+        built = re.search(r'(?:src|href)="([^"]*)/assets/', html)
+        if built and built[1] != s.base_path:
+            return HTMLResponse(
+                f"The frontend is built for the path {built[1] or '/'} and the server has BASE_PATH {s.base_path or '/'}. "
+                f"Build with BASE_PATH={s.base_path or '/'} npm run build in web/frontend, or set BASE_PATH to match.",
+                503,
+            )
+        # The features config.json turns off reach the app in the page itself. It never draws
+        # one first.
+        off = site_config.get().hidden
+        if off:
+            html = html.replace("<head>", f'<head><meta name="site-hide" content="{",".join(off)}">', 1)
+        # The page names its scripts by their hash. A browser asks for the page anew each time. A
+        # new deployment is seen on the next load.
+        return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
     return app

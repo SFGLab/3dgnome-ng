@@ -9,7 +9,7 @@ hole has no beads at all. Holes are 13 percent of chr1, mostly B compartment, an
 
 Two trials on 2026-11-13 aimed every conformation at the law's mean distance, a spring on bead
 pairs in the smooth stage and a start that matched the law bead by bead. Both lost Pearson and
-MultiMM on every region, recorded in the AGENTS.md divergences. The smooth stage holds bonds and
+MultiMM on every region, recorded in `features.md`. The smooth stage holds bonds and
 nothing inside a gap, and a gap ended at the size its start gave it, 1.2 times the law under
 `start = law`. A contact map is an average over cells, and contacts come from the spread between
 conformations. One structure at the mean has no spread.
@@ -44,7 +44,7 @@ exponent nu, a valid covariance for any nu up to one. The unit check confirms it
 The same code fills a hole once a hole has beads.
 
 Built 2026-11-14 as `[simulation_arcs_smooth] start = maxent` with `[data] contact_map`,
-`gnome3d/pipeline/ib/maxent.py`, unit checks in `harness/test_maxent_start.py`. Choices
+`gnome3d/pipeline/ib/maxent.py`, unit checks in `tests/unit/test_maxent_start.py`. Choices
 written beside the code. Windows of up to 10 kb. A pseudocount of 9 on observed and expected,
 the count at which a zero is three Poisson deviations under its expectation. The expectation is a
 power law in separation fitted on the block's own windows. The variance per coordinate is pi d^2
@@ -71,7 +71,7 @@ stripes a random coil lacks. To follow option 1.
 
 Micro-C, and Micro Capture-C ultra at base pair resolution, Li et al., Cell 2025, doi
 10.1016/j.cell.2025.10.013, hold far more short range counts than Hi-C. H1ESC and HFFC6 Micro-C
-are on the workstation at `/mnt/storagelinux/_hic/<cell>/microc/` as `.hic` files and need a
+are held as `.hic` files and need a
 conversion to cooler before `contact_map` can read them. It feeds option 1 with more counts and
 is no model change by itself.
 
@@ -391,7 +391,7 @@ was stopped. The drawn start with the full solve stays the one arm with a gain, 
 
 ## What sets the anchor floor, 2026-11-15
 
-`slurm/ensemble/arms_trial.sh` on frodo, GM12878 chr1:10-15, 20-25 and 35-40 Mb, five structures,
+`slurm/ensemble/arms_trial.sh` on the RTX 3090 workstation, GM12878 chr1:10-15, 20-25 and 35-40 Mb, five structures,
 one arcs term removed per arm, production rerun beside them. Results in
 `playground/square_blocks/ablate/`. `playground/contact_spread.py` now prints the anchor floor,
 the 1 percent and median quantiles of anchor pair distance over the law.
@@ -425,7 +425,7 @@ floor is 0.34 to 0.44 and the contacts 1.3 times production's; at 2.0 the floor 
 
 `[springs] gyration_weight` holds the radius of gyration of every genomic window of anchors at the
 law's, windows at every scale from 100 kb doubling up and tiled twice, in the arcs solver's energy.
-It sets size without holding a pair. Unit checks in `harness/test_gyration.py`. GM12878, three
+It sets size without holding a pair. Unit checks in `tests/unit/test_gyration.py`. GM12878, three
 regions, mean, results in `playground/square_blocks/gyr/`:
 
 | Arm | raw P | raw SCC | bal P | bal SCC | MultiMM | Rg |
@@ -539,7 +539,7 @@ Balanced SCC up over gyr01relax on eight of nine runs and level on the ninth. GM
 three structures, pooled: raw SCC 0.379 against 0.361 and production's 0.343, balanced SCC 0.308
 against 0.292 and 0.276, Spearman 0.169 against 0.164 and 0.141, MultiMM 0.681 against 0.637 and
 0.588, cross block overlaps 19.7. The fit of the draw over 11,913 anchors takes 159 iterations and
-the chromosome 25 minutes on frodo.
+the chromosome 25 minutes on 36 cores and an RTX 3090.
 
 ### Hole beads on top, 2026-11-15
 
@@ -566,7 +566,7 @@ its blocks rather than against them.
 
 `[holes] hard_wall = no` takes the wall out of the hole pass and `[holes] flank_beads` conditions
 the draw on block beads beside the anchors, `conditioned_draw` in `maxent.py`, the bridge when only
-the ends are fixed. Unit checks in `harness/test_maxent_start.py` and `harness/test_holes.py`.
+the ends are fixed. Unit checks in `tests/unit/test_maxent_start.py` and `tests/unit/test_holes.py`.
 chr1:10-15 Mb, pooled balanced SCC over mapped bins, raw in brackets, `playground/square_blocks/hiface/`:
 
 | | mxgyr | holes | no wall | flank 5 | both |
@@ -624,7 +624,7 @@ against 68. The long range fix brings far anchors close and the coils laid down 
 
 `[relax] within_blocks` lets the relaxation move non neighbour pairs of one block closer than 0.7
 of a bond as well as beads touching another block, and with it the pass runs on a lone block.
-Unit checks in `harness/test_relax.py`. At the pass's radius of 1.5 bonds it costs Pearson and
+Unit checks in `tests/unit/test_relax.py`. At the pass's radius of 1.5 bonds it costs Pearson and
 MultiMM; at `ev_radius` 1.0, results in `playground/square_blocks/within/`:
 
 | | overlaps within and across blocks, production then 1.0 | pooled balanced SCC |

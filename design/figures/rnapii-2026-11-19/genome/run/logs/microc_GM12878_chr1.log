@@ -1,0 +1,4 @@
+[GM12878 chr1] loops called: 19054 at 5 kb, 15478 at 10 kb
+  map RNAPII alone    loops   208 scored   208  contact   6.58
+  map none            loops  1535 scored  1535  contact   7.39
+  map moved, no loop  loops  2550 scored  2532  contact   0.96

@@ -29,9 +29,8 @@
   color: var(--ink);
 }
 
-.hero-name sup {
-  font-size: 22px;
-  color: var(--accent);
+.hero-name sup.ng {
+  --ng: 0.393;
   margin-left: 4px;
 }
 
@@ -77,6 +76,7 @@
   color: var(--faint);
 }
 
+/* The rendered structure with its marks, and the key over its lower left corner. */
 .hero-image {
   flex: 1;
   height: 440px;
@@ -88,10 +88,42 @@
   overflow: hidden;
 }
 
-.hero-image img {
+.hero-art {
+  display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+}
+
+.hero-ab {
+  stroke: #151514;
+  stroke-width: 3;
+  stroke-dasharray: 3 9;
+  stroke-linecap: round;
+}
+
+.hero-box {
+  fill: #FFFFFF;
+  stroke: #E4E3DF;
+  stroke-width: 1.5;
+}
+
+.hero-distance {
+  fill: #151514;
+  font: 600 24px var(--font);
+  text-anchor: middle;
+}
+
+.hero-end,
+.hero-point {
+  fill: #151514;
+  stroke: #FFFFFF;
+  stroke-width: 3;
+}
+
+.hero-end-text {
+  fill: #FFFFFF;
+  font: 700 24px var(--font);
+  text-anchor: middle;
 }
 
 .hero-image figcaption {
@@ -135,6 +167,7 @@
 
 .service {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
@@ -145,7 +178,7 @@
 }
 
 .service p {
-  flex: 1;
+  flex: 1 1 220px;
   margin: 0;
 }
 
@@ -210,10 +243,49 @@
   text-decoration: none;
 }
 
-.example img {
+.example img,
+.story-panels {
   width: 100%;
-  height: 170px;
+  height: 330px;
   background: #FFFFFF;
+}
+
+.example img {
+  display: block;
+  object-fit: cover;
+}
+
+/* The first example: two drawings of one locus side by side, on one scale. */
+.example.story {
+  grid-column: span 2;
+}
+
+.story-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 330px;
+}
+
+.story-panel {
+  position: relative;
+  min-width: 0;
+  height: 330px;
+}
+
+.story-panel + .story-panel {
+  border-left: 1px solid #E4E3DF;
+}
+
+.story-tag {
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #FFFFFFE6;
+  font-size: 12px;
+  font-weight: 600;
+  color: #151514;
 }
 
 .example-title {
@@ -251,5 +323,8 @@
   }
   .example-row {
     grid-template-columns: 1fr;
+  }
+  .example.story {
+    grid-column: auto;
   }
 }

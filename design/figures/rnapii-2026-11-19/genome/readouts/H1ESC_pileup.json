@@ -1,0 +1,32 @@
+[
+  {
+    "arm": "map",
+    "n_models": 0,
+    "n_loops": 32450,
+    "apa": 1.3092701772182107
+  },
+  {
+    "arm": "H1ESC_E_genome",
+    "n_models": 10,
+    "n_loops": 32450,
+    "apa": 3.102006717296139
+  },
+  {
+    "arm": "H1ESC_C_genome",
+    "n_models": 10,
+    "n_loops": 32450,
+    "apa": 1.2970171415325806
+  },
+  {
+    "arm": "H1ESC_R_genome",
+    "n_models": 10,
+    "n_loops": 32450,
+    "apa": 1.1902415587338784
+  },
+  {
+    "arm": "H1ESC_M_genome",
+    "n_models": 10,
+    "n_loops": 32450,
+    "apa": 1.3508556415456945
+  }
+]

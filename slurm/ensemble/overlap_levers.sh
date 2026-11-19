@@ -1,28 +1,24 @@
 #!/bin/bash
-# The three smooth stage levers against within block overlaps, on three cells, numba kernels.
+# The three smooth stage levers against overlaps within blocks, on three cells, numba kernels.
 #
 #   bash slurm/ensemble/overlap_levers.sh
 #
-# Six arms per cell, each a copy of the production ini with the smooth stage on the threaded
-# numba kernel, since only that kernel carries the levers and it runs a cell in under five
-# minutes on the workstation, and with the excluded volume radius at 0.7 of a bond, which is
-# the radius the wall acts at and the one the battery counts at:
-#
-#   base        nothing else changed, the like for like baseline on this kernel
-#   wall        hard_wall = yes
-#   wallcap     hard_wall = yes, anchor_cap = 0.5
-#   coil        start = coil
-#   coilwall    start = coil, hard_wall = yes
-#   coilwallcap start = coil, hard_wall = yes, anchor_cap = 0.5
-#
-# Structures go to out/validation/<cell>_<arm> beside the earlier arms, and the battery and the
-# saddle then score every arm of the cell together, the MultiMM arms included.
+# Six arms per cell, each the production ini with the smooth stage on threaded numba and the
+# excluded volume radius at 0.7 of a bond:
+#   base         nothing else changed
+#   wall         hard_wall = yes
+#   wallcap      hard_wall = yes, anchor_cap = 0.5
+#   coil         start = coil
+#   coilwall     start = coil, hard_wall = yes
+#   coilwallcap  start = coil, hard_wall = yes, anchor_cap = 0.5
+# Structures go to out/validation/<cell>_<arm>. The battery and the saddle then score every arm of
+# the cell.
 set -u
 cd "$(dirname "$0")/../.."
 OUT="${OUT:-out/validation}"
 R="${REGION:-chr1:1-60000000}"
 N="${N:-5}"
-HIC_ROOT="${HIC_ROOT:-/mnt/storagelinux/_hic}"
+HIC_ROOT="${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 CELLS="${CELLS:-GM12878 H1ESC HFFC6}"
 ARMS="${ARMS:-base wall wallcap coil coilwall coilwallcap}"
 mkdir -p "$OUT"

@@ -3,7 +3,7 @@ the thinning to the density of the hosted maps.
 
     python web/tests/test_remote.py
 
-A .hic link is checked by hand on team-frodo against a public 4DN file. There is no writer for a
+A .hic link is checked by hand against a public 4DN file. There is no writer for a
 .hic fixture.
 """
 

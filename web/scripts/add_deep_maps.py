@@ -1,11 +1,9 @@
-"""Adds each cell type's deep Hi-C map to a site's catalog.json as hic_url and hic_name, so the
-contact map tab compares a job with the deep map rather than the thinned contacts the job read.
+"""Adds the deep Hi-C map of each cell type to the catalog.json of a site as hic_url and hic_name.
 
     python web/scripts/add_deep_maps.py DATA_DIR/catalog.json
 
-The accession of each cell line comes from validation/manifests/<CELL>_hic.json and its file in
-the 4DN bucket from validation/manifests/4dn_keys.tsv, design/4dn-data-access.md. A cell type
-without a 4DN Hi-C manifest is left as it is. The file is rewritten in place.
+The accessions come from legacy/validation/manifests/<CELL>_hic.json and 4dn_keys.tsv, see
+design/4dn-data-access.md. The file is rewritten in place.
 """
 
 from __future__ import annotations
@@ -21,11 +19,11 @@ BUCKET = "https://4dn-open-data-public.s3.amazonaws.com"
 def deep_maps() -> dict[str, tuple[str, str]]:
     """Cell line to the bucket url and the name of its deep 4DN Hi-C map."""
     keys = {}
-    for line in (ROOT / "validation" / "manifests" / "4dn_keys.tsv").read_text().splitlines()[1:]:
+    for line in (ROOT / "legacy" / "validation" / "manifests" / "4dn_keys.tsv").read_text().splitlines()[1:]:
         acc, key, _ = line.split("\t")
         keys[acc] = key
     out = {}
-    for m in (ROOT / "validation" / "manifests").glob("*_hic.json"):
+    for m in (ROOT / "legacy" / "validation" / "manifests").glob("*_hic.json"):
         spec = json.loads(m.read_text())
         for a in spec.get("assays", []):
             if a.get("source") == "4dn" and a["accession"] in keys:

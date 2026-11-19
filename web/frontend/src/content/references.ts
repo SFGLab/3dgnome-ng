@@ -113,7 +113,7 @@ export const REFERENCES: Reference[] = [
     authors: 'Korsak S, Plewczynski D', venue: 'Methods 223, 106-117',
   },
   {
-    key: 'tang2015', group: 'data', year: 2015, doi: '10.1016/j.cell.2015.11.024',
+    key: 'tang2015', group: 'algorithms', year: 2015, doi: '10.1016/j.cell.2015.11.024',
     title: 'CTCF-mediated human 3D genome architecture reveals chromatin topology for transcription',
     authors: 'Tang Z, Luo OJ, Li X, et al.', venue: 'Cell 163, 1611-1627',
   },
@@ -123,14 +123,54 @@ export const REFERENCES: Reference[] = [
     authors: 'Dekker J, Belmont AS, Guttman M, et al.', venue: 'Nature 549, 219-226',
   },
   {
+    key: 'encode2020', group: 'data', year: 2020, doi: '10.1038/s41586-020-2493-4',
+    title: 'Expanded encyclopaedias of DNA elements in the human and mouse genomes',
+    authors: 'The ENCODE Project Consortium', venue: 'Nature 583, 699-710',
+  },
+  {
+    key: 'hong2025', group: 'data', year: 2025, doi: '10.5281/zenodo.15303879',
+    title: 'Comprehensive mapping of genome structure with ultra-high-resolution 3D genomics and deep learning (experimental data)',
+    authors: 'Hong CKY', venue: 'Zenodo',
+  },
+  {
+    key: 'gencode2021', group: 'data', year: 2021, doi: '10.1093/nar/gkaa1087',
+    title: 'GENCODE 2021',
+    authors: 'Frankish A, Diekhans M, Jungreis I, et al.', venue: 'Nucleic Acids Research 49, D916-D923',
+  },
+  {
+    key: 'grch38', group: 'data', year: 2017, doi: '10.1101/gr.213611.116',
+    title: 'Evaluation of GRCh38 and de novo haploid genome assemblies demonstrates the enduring quality of the reference assembly',
+    authors: 'Schneider VA, Graves-Lindsay T, Howe K, et al.', venue: 'Genome Research 27, 849-864',
+  },
+  {
     key: 'enhanceratlas2020', group: 'data', year: 2020, doi: '10.1093/nar/gkz980',
     title: 'EnhancerAtlas 2.0: an updated resource with enhancer annotation in 586 tissue/cell types across nine species',
     authors: 'Gao T, Qian J', venue: 'Nucleic Acids Research 48, D58-D64',
   },
   {
-    key: 'hgsvc4', group: 'data', year: 2025, unconfirmed: true,
-    title: 'Human Genome Structural Variation Consortium, freeze 4',
-    authors: 'HGSVC', venue: 'reference to confirm',
+    key: 'kgp30x', group: 'data', year: 2022, doi: '10.1016/j.cell.2022.08.004',
+    title: 'High-coverage whole-genome sequencing of the expanded 1000 Genomes Project cohort including 602 trios',
+    authors: 'Byrska-Bishop M, Evani US, Zhao X, et al.', venue: 'Cell 185, 3426-3440',
+  },
+  {
+    key: 'tbooo', group: 'data', year: 2026, url: 'https://github.com/SFGLab/tbooo',
+    title: 'TBOOO, The Biobank Of Our Own: the data layout of a biobank rebuilt from the 1000 Genomes Project and the Simons Genome Diversity Project',
+    authors: 'SFGLab', venue: 'GitHub repository',
+  },
+  {
+    key: 'hgsvc4', group: 'data', year: 2021, doi: '10.1126/science.abf7117',
+    title: 'Haplotype-resolved diverse human genomes and integrated analysis of structural variation',
+    authors: 'Ebert P, Audano PA, Zhu Q, et al.', venue: 'Science 372, eabf7117',
+  },
+  {
+    key: 'sgdp2016', group: 'data', year: 2016, doi: '10.1038/nature18964',
+    title: 'The Simons Genome Diversity Project: 300 genomes from 142 diverse populations',
+    authors: 'Mallick S, Li H, Lipson M, et al.', venue: 'Nature 538, 201-206',
+  },
+  {
+    key: 'beagle2018', group: 'algorithms', year: 2018, doi: '10.1016/j.ajhg.2018.07.015',
+    title: 'A one-penny imputed genome from next-generation reference panels',
+    authors: 'Browning BL, Zhou Y, Browning SR', venue: 'American Journal of Human Genetics 103, 338-348',
   },
   {
     key: 'hicdiffusion2024', group: 'data', year: 2024, doi: '10.1186/s12864-024-10885-z',
@@ -139,15 +179,82 @@ export const REFERENCES: Reference[] = [
   },
 ]
 
-/** The rows of the Cite page's data table. */
-export type DataSource = { data: string; usedFor: string; label: string; ref: string }
+/** An accession with the page of its archive. */
+export type Accession = { id: string; url: string }
+
+/**
+ * A row of the Cite page's data table.
+ * `accessions` are the records the data came from, the experiment or set first and its files
+ * after it. `pending` says what is still to be recorded and stands in the accession column.
+ * A row without `ref` has no confirmed source to cite yet.
+ */
+export type DataSource = { data: string; usedFor: string; accessions: Accession[]; note?: string; pending?: string; label: string; ref?: string }
+
+const encode = (id: string): Accession => ({ id, url: `https://www.encodeproject.org/${id.startsWith('ENCSR') ? 'experiments' : 'files'}/${id}/` })
+const fourDn = (id: string): Accession => ({ id, url: `https://data.4dnucleome.org/${id.startsWith('4DNES') ? 'experiment-set-replicates' : 'files-processed'}/${id}/` })
+const geo = (id: string): Accession => ({ id, url: `https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=${id}` })
 
 export const DATA_SOURCES: DataSource[] = [
-  { data: 'CTCF and RNAPII ChIA-PET, GM12878', usedFor: 'loops', label: 'Tang et al., Cell 2015', ref: 'tang2015' },
-  { data: 'Hi-C, 4DN data portal', usedFor: 'contact background, agreement', label: '4DN Network, Nature 2017', ref: '4dn2017' },
-  { data: 'Enhancers, EnhancerAtlas 2.0', usedFor: 'enhancer marks and distances', label: 'Gao and Qian, NAR 2020', ref: 'enhanceratlas2020' },
-  { data: 'Structural variants, HGSVC freeze 4', usedFor: 'variant structures', label: 'HGSVC, reference to confirm', ref: 'hgsvc4' },
-  { data: 'HiCDiffusion', usedFor: 'contact background from sequence', label: 'Chiliński and Plewczynski, BMC Genomics 2024', ref: 'hicdiffusion2024' },
+  { data: 'CTCF in situ ChIA-PET loops, GM12878', usedFor: 'loops', accessions: [fourDn('4DNES7IB5LY9'), encode('ENCSR184YZV')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'CTCF in situ ChIA-PET loops, H1ESC', usedFor: 'loops', accessions: [fourDn('4DNESR9S8R38'), encode('ENCSR095SXC'), geo('GSE242609')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'CTCF in situ ChIA-PET loops, HFFc6', usedFor: 'loops', accessions: [fourDn('4DNESCQ7ZD21')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  {
+    data: 'RNAPII ChIA-PET loops and peaks, GM12878', usedFor: 'loops',
+    accessions: ['ENCSR905HWW', 'ENCFF040KUS', 'ENCFF913VWM', 'ENCFF109HCZ', 'ENCFF578JKO'].map(encode),
+    label: 'ENCODE, Nature 2020', ref: 'encode2020',
+  },
+  {
+    data: 'RNAPII ChIA-PET loops and peaks, H1ESC', usedFor: 'loops',
+    accessions: ['ENCSR782EKZ', 'ENCFF324UIT', 'ENCFF753NSM', 'ENCFF665IXY', 'ENCFF116RLS'].map(encode),
+    label: 'ENCODE, Nature 2020', ref: 'encode2020',
+  },
+  {
+    data: 'RNAPII ChIA-PET loops and peaks, BJ', usedFor: 'loops of HFFc6', note: 'BJ is another foreskin fibroblast line. It stands in for HFFc6.',
+    accessions: ['ENCSR956IXE', 'ENCFF601NEC', 'ENCFF808QOQ', 'ENCFF775SCY', 'ENCFF428VXI', 'ENCFF084CXY', 'ENCFF953MBK'].map(encode),
+    label: 'ENCODE, Nature 2020', ref: 'encode2020',
+  },
+  { data: 'CTCF ChIP-seq peaks, GM12878', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR000DZN', 'ENCFF796WRU'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'CTCF ChIP-seq peaks, H1ESC', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR000BNH', 'ENCFF497ZGV'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'CTCF ChIP-seq peaks, HFFc6', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR163ULN', 'ENCFF414XTM'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'Hi-C, GM12878', usedFor: 'contact background, agreement', accessions: ['4DNES3JX38V5', '4DNFIXP4QG5B'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'Hi-C, H1ESC', usedFor: 'contact background, agreement', accessions: ['4DNES2M5JIGV', '4DNFI6HDY7WZ'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'Hi-C, HFFc6', usedFor: 'contact background, agreement', accessions: ['4DNES2R6PUEK', '4DNFIB59T7NN'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  {
+    data: 'Micro-C, GM12878', usedFor: 'loops the models are checked against',
+    accessions: [{ id: '10.5281/zenodo.15303879', url: 'https://doi.org/10.5281/zenodo.15303879' }],
+    label: 'Hong, Zenodo 2025', ref: 'hong2025',
+  },
+  { data: 'Micro-C, H1ESC', usedFor: 'loops the models are checked against', accessions: [fourDn('4DNFI2TK7L2F')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'Micro-C, HFFc6', usedFor: 'loops the models are checked against', accessions: [fourDn('4DNFI18Q799K')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
+  { data: 'Gene expression, total RNA-seq of GM12878, H1 and HFFc6', usedFor: 'link to expression', accessions: ['ENCSR820PHH', 'ENCSR895ZTB', 'ENCSR420ZKB'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'Enhancers, EnhancerAtlas 2.0', usedFor: 'enhancer marks and distances', accessions: [], note: 'One file per cell line. The atlas gives no accession.', label: 'Gao and Qian, NAR 2020', ref: 'enhanceratlas2020' },
+  { data: 'Genes, GENCODE release 40, basic annotation', usedFor: 'promoter marks and gene names', accessions: [{ id: 'GENCODE v40', url: 'https://www.gencodegenes.org/human/release_40.html' }], label: 'Frankish et al., NAR 2021', ref: 'gencode2021' },
+  {
+    data: 'Structural variants, 1000 Genomes 30x, 3,202 samples', usedFor: 'variant structures',
+    accessions: [
+      { id: 'PRJEB31736', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB31736' },
+      { id: 'PRJEB36890', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB36890' },
+    ],
+    note: 'The phased panel of the 2,504 unrelated samples and the 698 that complete the trios. Deletions, insertions, inversions and duplications on the autosomes are applied.',
+    label: 'Byrska-Bishop et al., Cell 2022', ref: 'kgp30x',
+  },
+  {
+    data: 'Structural variants, HGSVC freeze 4', usedFor: 'variant structures', note: 'The phased insertions and deletions of 35 samples, variants_freeze4_sv_insdel_alt.vcf.gz.',
+    accessions: [{ id: 'HGSVC2 release v2.0', url: 'https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/HGSVC2/release/v2.0/integrated_callset/' }],
+    label: 'Ebert et al., Science 2021', ref: 'hgsvc4',
+  },
+  {
+    data: 'Structural variants, SGDP, 277 samples, imputed', usedFor: 'variant structures',
+    accessions: [{ id: 'PRJEB9586', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB9586' }],
+    note: 'The project calls single base variants alone. Its samples were lifted to GRCh38 and phased against the 1000 Genomes 30x panel with Beagle 5.5 (Browning et al., AJHG 2018). The structural variants of the panel were then imputed onto them. The set keeps the 35,434 variants with an imputation quality, DR2, of 0.8 or more.',
+    label: 'Mallick et al., Nature 2016', ref: 'sgdp2016',
+  },
+  {
+    data: 'Reference genome, hg38', usedFor: 'sequence for HiCDiffusion',
+    accessions: [{ id: 'GCA_000001405.15', url: 'https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_000001405.15/' }],
+    note: 'GRCh38, the UCSC hg38 FASTA.', label: 'Schneider et al., Genome Research 2017', ref: 'grch38',
+  },
+  { data: 'HiCDiffusion model', usedFor: 'contact background from sequence', accessions: [], note: 'The checkpoints of the authors. They have no accession.', label: 'Chiliński and Plewczynski, BMC Genomics 2024', ref: 'hicdiffusion2024' },
 ]
 
 /** The link of a reference, its DOI or its URL. */

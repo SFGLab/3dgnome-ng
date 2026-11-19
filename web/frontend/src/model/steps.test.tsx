@@ -52,6 +52,73 @@ describe('Variants', () => {
     expect(onChange).toHaveBeenCalledWith({ haplotype: 1 })
   })
 
+  it('takes a typed sample of a large call set once it names one', () => {
+    const onChange = vi.fn()
+    const samples = Array.from({ length: 3202 }, (_, i) => `HG${String(i).padStart(5, '0')}`)
+    const big = { ...CATALOG, sv_sets: { ...CATALOG.sv_sets, KGP: { label: '1000 Genomes', samples } } }
+    render(<Variants catalog={big} svSet="KGP" sample="" haplotype={0} vcfUpload={null} onChange={onChange} onOpen={vi.fn()} />)
+    const field = screen.getByLabelText('Sample')
+    expect(field.tagName).toBe('INPUT')
+    expect(field).toHaveAttribute('placeholder', 'type one of 3,202, e.g. HG00000')
+    fireEvent.change(field, { target: { value: 'HG0009' } })
+    expect(onChange).not.toHaveBeenCalled()
+    expect(field).toHaveAttribute('aria-invalid', 'true')
+    fireEvent.change(field, { target: { value: 'HG00096' } })
+    expect(onChange).toHaveBeenCalledWith({ sample: 'HG00096' })
+  })
+
+  it('drops the sample of a large call set when the text no longer names one', () => {
+    const onChange = vi.fn()
+    const samples = Array.from({ length: 100 }, (_, i) => `NA${String(i).padStart(5, '0')}`)
+    const big = { ...CATALOG, sv_sets: { KGP: { label: '1000 Genomes', samples } } }
+    render(<Variants catalog={big} svSet="KGP" sample="NA00007" haplotype={0} vcfUpload={null} onChange={onChange} onOpen={vi.fn()} />)
+    expect(screen.getByLabelText('Sample')).toHaveValue('NA00007')
+    fireEvent.change(screen.getByLabelText('Sample'), { target: { value: 'NA0000' } })
+    expect(onChange).toHaveBeenCalledWith({ sample: '' })
+  })
+
+  const FAMILY = [
+    { sample: 'HG00731', sex: 'male', population: 'PUR', superpopulation: 'AMR', father: '', mother: '' },
+    { sample: 'HG00732', sex: 'female', population: 'PUR', superpopulation: 'AMR', father: '', mother: '' },
+    { sample: 'HG00733', sex: 'female', population: 'PUR', superpopulation: 'AMR', father: 'HG00731', mother: 'HG00732' },
+    { sample: 'NA19240', sex: 'female', population: 'YRI', superpopulation: 'AFR', father: '', mother: '' },
+  ]
+  const TRIO = { ...CATALOG, sv_sets: { KGP: { label: '1000 Genomes', samples: FAMILY.map((r) => r.sample), sample_table: true } } }
+
+  it('states the population, sex and parents of a chosen sample and chooses a parent on a click', () => {
+    const onChange = vi.fn()
+    render(<Variants catalog={TRIO} svSet="KGP" sample="HG00733" haplotype={0} vcfUpload={null} sampleTable={FAMILY} onChange={onChange} onOpen={vi.fn()} />)
+    const facts = document.querySelector('.sample-facts')!
+    expect(facts.textContent).toBe('HG00733: PUR, AMR, female. Father HG00731. Mother HG00732.')
+    fireEvent.click(screen.getByRole('button', { name: 'HG00732' }))
+    expect(onChange).toHaveBeenCalledWith({ sample: 'HG00732' })
+  })
+
+  it('lists the children of a chosen parent', () => {
+    render(<Variants catalog={TRIO} svSet="KGP" sample="HG00731" haplotype={0} vcfUpload={null} sampleTable={FAMILY} onChange={vi.fn()} onOpen={vi.fn()} />)
+    expect(document.querySelector('.sample-facts')!.textContent).toBe('HG00731: PUR, AMR, male. Child HG00733.')
+  })
+
+  it('lists the samples of a population typed in place of a sample', () => {
+    const onChange = vi.fn()
+    const samples = Array.from({ length: 100 }, (_, i) => `NA${String(i).padStart(5, '0')}`)
+    const table = samples.map((sample, i) => ({ sample, sex: 'female', population: i < 30 ? 'YRI' : 'GBR', superpopulation: i < 30 ? 'AFR' : 'EUR', father: '', mother: '' }))
+    const big = { ...CATALOG, sv_sets: { KGP: { label: '1000 Genomes', samples, sample_table: true } } }
+    render(<Variants catalog={big} svSet="KGP" sample="" haplotype={0} vcfUpload={null} sampleTable={table} onChange={onChange} onOpen={vi.fn()} />)
+    expect(document.querySelector('.sample-facts')).toBeNull()
+    expect(document.querySelector('#sample-names option')).toHaveAttribute('label', 'YRI, AFR, female')
+    fireEvent.change(screen.getByLabelText('Sample'), { target: { value: 'yri' } })
+    const facts = document.querySelector('.sample-facts')!
+    expect(facts.textContent).toMatch(/^YRI, 30 samples: NA00000, NA00001, .* and 20 more\.$/)
+    fireEvent.click(screen.getByRole('button', { name: 'NA00003' }))
+    expect(onChange).toHaveBeenCalledWith({ sample: 'NA00003' })
+  })
+
+  it('shows no sample facts for a call set without a table', () => {
+    render(<Variants catalog={CATALOG} svSet="HGSVC" sample="HG00733" haplotype={0} vcfUpload={null} onChange={vi.fn()} onOpen={vi.fn()} />)
+    expect(document.querySelector('.sample-facts')).toBeNull()
+  })
+
   it('opens the dialog with a VCF file', () => {
     const onOpen = vi.fn()
     render(<Variants catalog={CATALOG} svSet="" sample="" haplotype={0} vcfUpload={null} onChange={vi.fn()} onOpen={onOpen} />)
@@ -69,6 +136,14 @@ describe('Variants', () => {
 })
 
 describe('Background', () => {
+  it('offers the variants once step 1 has a region and says so before', () => {
+    const { rerender } = render(<Variants catalog={CATALOG} svSet="HGSVC" sample="HG00733" haplotype={0} vcfUpload={null} hasRegion={false} onChange={vi.fn()} onOpen={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /Show the variants/ })).toBeNull()
+    expect(screen.getByText('Enter the region in step 1 to see the variants inside it.')).toBeInTheDocument()
+    rerender(<Variants catalog={CATALOG} svSet="HGSVC" sample="HG00733" haplotype={0} vcfUpload={null} hasRegion onChange={vi.fn()} onOpen={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /Show the variants/ })).toBeInTheDocument()
+  })
+
   it('starts on the Hi-C of the cell type', () => {
     render(<Background value="hic" region={REGION_1MB} available lymphoblastoid onChange={() => {}} />)
     expect(screen.getByRole('radio', { name: /Hi-C of this cell type/ })).toBeChecked()

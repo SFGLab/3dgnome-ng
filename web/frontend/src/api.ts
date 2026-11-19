@@ -1,16 +1,23 @@
 /** The site's JSON API. */
 
+import { served } from './base'
+
 export type CellType = { label: string; description: string; data: string[]; lymphoblastoid: boolean; note: string }
 export type Catalog = {
   cell_types: Record<string, CellType>
-  sv_sets: Record<string, { label: string; samples: string[] }>
+  sv_sets: Record<string, { label: string; samples: string[]; sample_table?: boolean }>
   factors: string[]
   max_region_mb: number
   max_structures: number
   hicdiffusion: boolean
 }
+/** A sample of a call set. An unknown field is an empty string and so is a parent the set does not hold. */
+export type SampleRow = { sample: string; sex: string; population: string; superpopulation: string; father: string; mother: string }
+/** A gene the region field suggests. */
+export type GeneHit = { name: string; chrom: string; tss: number }
 export type Region = { chrom: string; start: number; end: number; label: string; gene?: string }
-export type Preview = { loops: Record<string, [number, number, number][]>; counts: Record<string, number>; genes: { name: string; tss: number }[] }
+/** A loop of a preview is its two anchor middles, its PET count and the outer edges of its anchors. */
+export type Preview = { loops: Record<string, number[][]>; counts: Record<string, number>; genes: { name: string; tss: number }[] }
 export type Setting = {
   section: string
   key: string
@@ -40,7 +47,7 @@ export class ApiError extends Error {
 }
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(path, init)
+  const r = await fetch(served(path), init)
   const body = await r.json().catch(() => ({}))
   if (!r.ok) throw new ApiError(body.error ?? `${r.status} from ${path}`, r.status, body.field)
   return body as T
@@ -51,7 +58,12 @@ const q = (params: Record<string, string>) => new URLSearchParams(params).toStri
 export const api = {
   catalog: () => call<Catalog>('/api/catalog'),
   region: (cell: string, text: string) => call<Region>(`/api/region?${q({ cell, q: text })}`),
+  genes: (cell: string, text: string) => call<GeneHit[]>(`/api/genes?${q({ cell, q: text, limit: '25' })}`),
   preview: (cell: string, region: string) => call<Preview>(`/api/preview?${q({ cell, region })}`),
+  sampleTable: (set: string) =>
+    call<{ columns: string[]; rows: string[][] }>(`/api/sv_sets/${encodeURIComponent(set)}/samples`).then((t) =>
+      t.rows.map((r) => Object.fromEntries(t.columns.map((c, i) => [c, r[i] ?? ''])) as SampleRow),
+    ),
   settings: (cell: string) => call<SettingGroup[]>(`/api/settings?${q({ cell })}`),
   parseIni: (file: File) => {
     const form = new FormData()

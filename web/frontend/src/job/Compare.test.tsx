@@ -6,7 +6,7 @@ import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { ANNOTATIONS, GENES, KEY, STRUCTURE, SUMMARY_DONE } from '../test/job'
 import { jobApi } from './api'
-import { Compare } from './Compare'
+import { Compare, shownRows } from './Compare'
 
 vi.mock('./Scene', () => ({ Scene: (p: { markers?: { label: string }[] }) => <div data-testid="scene">{(p.markers ?? []).map((m) => m.label).join('')}</div> }))
 
@@ -47,12 +47,32 @@ describe('Compare', () => {
     rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
     rememberJob({ url: `/jobs/${KEY}`, label: 'GM12878 TNFRSF8', name: 'this one', at: 3 })
     renderCompare()
-    const choose = screen.getByRole('region', { name: 'Compare with another job' })
+    // Both sides are there from the start and the empty side has its list of jobs open.
+    expect(await screen.findByText('CTCF and RNAPII loops')).toBeInTheDocument()
+    expect(screen.getByText('Choose a job to compare')).toBeInTheDocument()
+    const choose = screen.getByRole('group', { name: 'Jobs to compare with' })
     expect(within(choose).getByRole('button', { name: /TNFRSF8 CTCF/ })).toBeInTheDocument()
     expect(within(choose).queryByRole('button', { name: /this one/ })).toBeNull()
     fireEvent.change(within(choose).getByPlaceholderText('Paste a job link'), { target: { value: `https://site/jobs/${OTHER}` } })
     fireEvent.click(within(choose).getByRole('button', { name: 'Compare' }))
     expect(await screen.findByText('CTCF loops')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Jobs to compare with' })).toBeNull()
+  })
+
+  it('opens the jobs under the head of the other side to change it', async () => {
+    rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
+    rememberJob({ url: '/jobs/cccc3333dddd4444', label: 'GM12878 MYC', name: '', at: 1 })
+    renderCompare()
+    fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
+    const head = (await screen.findByText('CTCF loops')).closest('button')!
+    expect(head).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(head)
+    const menu = screen.getByRole('group', { name: 'Jobs to compare with' })
+    expect(within(menu).getByRole('button', { name: 'GM12878 MYC' })).toBeInTheDocument()
+    expect(within(menu).queryByRole('button', { name: /TNFRSF8 CTCF/ })).toBeNull()
+    expect(screen.getAllByTestId('scene')).toHaveLength(2)
+    fireEvent.keyDown(head, { key: 'Escape' })
+    expect(screen.queryByRole('group', { name: 'Jobs to compare with' })).toBeNull()
   })
 
   it('shows two panels, the linked view and the table of changes', async () => {
@@ -71,6 +91,46 @@ describe('Compare', () => {
     expect(within(table).getByText('TNFRSF8, enhancer 385 kb away')).toBeInTheDocument()
     expect(within(table).getByText('2.4 times farther')).toBeInTheDocument()
     expect(within(table).getAllByRole('columnheader').at(-1)!.textContent).toBe('CTCF against CTCF and RNAPII')
+  })
+
+  it('selects the gene of a clicked row of the table', async () => {
+    rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
+    const onGene = vi.fn()
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene={null} onGene={onGene} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
+    const table = await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
+    fireEvent.click(within(table).getByText('TNFRSF8, enhancer 385 kb away'))
+    expect(onGene).toHaveBeenCalledWith('TNFRSF8')
+    expect(screen.queryByRole('button', { name: /Clear the selection/ })).toBeNull()
+  })
+
+  it('clears the selection from the selected row and from the toolbar', async () => {
+    rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
+    const onGene = vi.fn()
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene="TNFRSF8" onGene={onGene} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
+    const table = await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
+    fireEvent.click(within(table).getByText('TNFRSF8, enhancer 385 kb away'))
+    expect(onGene).toHaveBeenLastCalledWith(null)
+    fireEvent.click(screen.getByRole('button', { name: 'Clear the selection of TNFRSF8' }))
+    expect(onGene).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the ten largest changes in their order and puts a selected gene outside them first', () => {
+    const rows = Array.from({ length: 14 }, (_, i) => ({ gene: `G${i}` }))
+    expect(shownRows(rows, 'G3').map((r) => r.gene)).toEqual(rows.slice(0, 10).map((r) => r.gene))
+    expect(shownRows(rows, 'G12').map((r) => r.gene)).toEqual(['G12', ...rows.slice(0, 10).map((r) => r.gene)])
+    expect(shownRows(rows, null)).toHaveLength(10)
   })
 
   it('keeps to the writing rules', async () => {

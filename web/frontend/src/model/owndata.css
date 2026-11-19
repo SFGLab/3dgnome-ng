@@ -69,26 +69,33 @@
   cursor: pointer;
 }
 
+/* The chosen step is marked as a chosen option is everywhere on the form. */
 .wizard-steps [role='tab'][aria-selected='true'] {
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
+  background: var(--accent-soft);
 }
 
-.step-number {
+.wizard-steps [role='tab'][aria-selected='true'] .step-title {
+  color: var(--accent);
+}
+
+.wizard-steps .step-number {
   display: flex;
   flex: none;
   align-items: center;
   justify-content: center;
   width: 20px;
   height: 20px;
+  margin-top: 1px;
+  border: 1px solid var(--line);
   border-radius: 50%;
-  background: var(--line);
-  color: var(--ink);
+  background: var(--surface);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
 }
 
-[aria-selected='true'] .step-number {
+.wizard-steps [aria-selected='true'] .step-number {
+  border-color: var(--accent);
   background: var(--accent);
   color: #FFFFFF;
 }
@@ -144,7 +151,12 @@
   font-weight: 400;
 }
 
+/* Every block of a step is 14px under the one before it, whichever part of the step it belongs
+   to. A step can hold two parts, the choice and the file. */
 .dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   padding: 18px 22px;
   overflow-y: auto;
 }
@@ -152,14 +164,50 @@
 .own-tab {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
+/* The dialog's body has three text styles: plain text, a label and a line of code. */
 .own-tab .rule {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.own-tab .rule p,
+.own-tab .hint,
+.contact-card .contact-body {
   margin: 0;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* The columns of a file, or a command, on a line of their own. */
+.own-tab .columns {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.own-tab .columns code,
+.own-tab .command {
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 12px var(--mono);
+  word-spacing: 0.5em;
+  overflow-wrap: anywhere;
+}
+
+.own-tab .command {
+  display: block;
+  margin-top: 8px;
+  word-spacing: normal;
 }
 
 .factor-row {
@@ -278,16 +326,17 @@
   }
 }
 
+/* A place to choose or drop a file, drawn as the VCF field of the form is. */
 .add-file {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--muted);
-  border-radius: 10px;
-  color: var(--accent);
-  font-size: 14px;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -416,21 +465,21 @@
 .own-select {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  color: var(--muted);
+  gap: 8px;
+  color: var(--ink);
   font-size: 13px;
+  font-weight: 600;
 }
 
 .own-select select {
   align-self: flex-start;
   min-width: 200px;
-  padding: 8px 10px;
+  padding: 9px 10px;
   border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
+  border-radius: 8px;
+  background-color: var(--surface);
   color: var(--ink);
-  font: inherit;
-  font-size: 14px;
+  font: 13px var(--font);
 }
 
 .routes {
@@ -439,11 +488,13 @@
   gap: 8px;
 }
 
+/* A choice of a step. Every choice has one height, with an icon or without, in every step. */
 .route {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  min-height: 62px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
@@ -454,18 +505,24 @@
 }
 
 .route[aria-checked='true'] {
-  border: 1.5px solid var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.route > svg {
+  flex: none;
 }
 
 .route-title {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .route-sub {
   display: block;
-  color: var(--faint);
-  font-size: 11px;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .link-field {
@@ -490,38 +547,31 @@
   gap: 8px;
   flex: 1;
   min-width: 0;
-  padding: 0 10px;
+  padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--muted);
 }
 
 .link-input input {
   flex: 1;
   min-width: 0;
-  padding: 8px 0;
+  padding: 10px 0;
   border: 0;
   background: transparent;
   color: var(--ink);
-  font: 12px var(--mono);
+  font: 13px var(--font);
+  outline: none;
 }
 
 .read-button {
-  padding: 8px 16px;
+  padding: 0 16px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--surface);
   color: var(--ink);
-  font: inherit;
-  font-size: 14px;
+  font: 600 13px var(--font);
   cursor: pointer;
-}
-
-.own-tab .hint {
-  margin: 0;
-  color: var(--faint);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .contact-card {
@@ -530,7 +580,7 @@
   gap: 10px;
   padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .contact-card > svg {
@@ -559,10 +609,6 @@
 }
 
 .contact-card .contact-body {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 

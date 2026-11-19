@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Contacts, JobApi, Summary } from './api'
 import { bp } from './format'
+import { LoopView } from './LoopView'
 import { colour, diverging, emptyRows, halfRange, percentile, transform, type Show } from './heatmap'
 import { parseRegion } from './StructureTab'
 
@@ -29,6 +30,8 @@ const SHOWS: [Show, string][] = [
 ]
 
 type Locus = { chrom: string; start: number; end: number }
+/** The separation the rank correlation reached, as the end of a sentence. Nothing when unknown. */
+const reach = (bp?: number) => (bp ? `, up to ${bp >= 1e6 ? `${bp / 1e6} Mb` : `${bp / 1000} kb`}` : '')
 const fmt = (l: Locus) => `${l.chrom}:${bp(l.start)}-${bp(l.end)}`
 const parse = (t: string): Locus | null => {
   const m = t.replace(/,/g, '').match(/^(\w+):(\d+)-(\d+)$/)
@@ -97,6 +100,8 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     queryKey: ['contacts', api.base, region, res, upperKind, lowerKind, norm],
     queryFn: () => api.contacts({ region, res, upper: upperKind, lower: lowerKind, norm }),
     retry: false,
+    // The map on screen stays, dimmed, while the next view is read.
+    placeholderData: keepPreviousData,
   })
   const annotations = useQuery({ queryKey: ['annotations', api.base], queryFn: api.annotations })
   const upper = maps.data ? transform(maps.data.upper, show) : []
@@ -126,6 +131,12 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     if (canvas.current && maps.data)
       draw(canvas.current, { m: upper, range: shownRange, loops: upperKind.startsWith('loops_') }, { m: lower, range: lowRange, loops: lowerKind.startsWith('loops_') }, log, show)
   })
+  // The window asked for as a part of the map on screen, its start and its width, while the map
+  // on screen is still the wider one. It is the square the next map will fill.
+  const bins = maps.data?.bins ?? []
+  const shown = bins.length > 1 ? { start: bins[0], width: bins.length * (bins[1] - bins[0]) } : null
+  const part = shown ? [(locus.start - shown.start) / shown.width, (locus.end - locus.start) / shown.width] : null
+  const target = part && part[1] < 0.97 && part[0] > -0.02 && part[0] + part[1] < 1.02 ? [Math.max(0, part[0]), Math.min(part[1], 1 - Math.max(0, part[0]))] : null
   const moveTo = (want: Locus) => {
     const next = clamp(want, job, res)
     const r = fitting(next, res)
@@ -167,51 +178,39 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     const n = maps.data?.bins.length ?? 0
     return [Math.floor(((e.clientY - box.top) / box.height) * n), Math.floor(((e.clientX - box.left) / box.width) * n)]
   }
-  const loops = (annotations.data?.loops ?? []).filter((l) => l.a[0] >= settled.start && l.b[1] <= settled.end)
-  const x = (p: number) => ((p - settled.start) / (settled.end - settled.start)) * 600
   return (
     <div className="contacts-tab">
       <div className="contacts-main">
         <div className="map-toolbar">
-          <label className="field">
-            <span>Locus</span>
-            <span className="locus-input">
-              <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && go()} />
-              <button type="button" onClick={go}>
-                Go
+          {/* No label stands over a control, as on the other tabs. Each control says what it is by
+              its own text and has its name for a screen reader and as a tooltip. */}
+          <span className="locus-input">
+            <input aria-label="Locus" title="Locus" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && go()} />
+            <button type="button" onClick={go}>
+              Go
+            </button>
+          </span>
+          <div className="segmented" role="group" aria-label="Show">
+            {SHOWS.map(([id, label]) => (
+              <button key={id} type="button" aria-pressed={show === id} onClick={() => setShow(id)}>
+                {label}
               </button>
-            </span>
-          </label>
-          <div className="field">
-            <span>Show</span>
-            <div className="segmented" role="group" aria-label="Show">
-              {SHOWS.map(([id, label]) => (
-                <button key={id} type="button" aria-pressed={show === id} onClick={() => setShow(id)}>
-                  {label}
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
-          <label className="field">
-            <span>Normalization</span>
-            <select value={norm} onChange={(e) => setNorm(e.target.value as 'ice' | 'raw')}>
-              <option value="ice">Balanced, ICE</option>
-              <option value="raw">Raw counts</option>
-            </select>
-          </label>
-          <label className="field">
-            <span>Resolution</span>
-            <select aria-label="Resolution" value={res} onChange={(e) => setRes(fitting(locus, Number(e.target.value)))}>
-              {RESOLUTIONS.map((r) => {
-                const tooFine = (locus.end - locus.start) / r > MAX_BINS
-                return (
-                  <option key={r} value={r} disabled={tooFine}>
-                    {`${r / 1000} kb${tooFine ? ', zoom in to use' : ''}`}
-                  </option>
-                )
-              })}
-            </select>
-          </label>
+          <select aria-label="Normalization" title="Normalization" value={norm} onChange={(e) => setNorm(e.target.value as 'ice' | 'raw')}>
+            <option value="ice">Balanced, ICE</option>
+            <option value="raw">Raw counts</option>
+          </select>
+          <select aria-label="Resolution" title="Resolution" value={res} onChange={(e) => setRes(fitting(locus, Number(e.target.value)))}>
+            {RESOLUTIONS.map((r) => {
+              const tooFine = (locus.end - locus.start) / r > MAX_BINS
+              return (
+                <option key={r} value={r} disabled={tooFine}>
+                  {`${r / 1000} kb bins${tooFine ? ', zoom in to use' : ''}`}
+                </option>
+              )
+            })}
+          </select>
           <div className="zoom-buttons">
             <button type="button" className="icon-tool" aria-label="Zoom out" onClick={() => zoom(2)}>
               <ZoomOut size={15} aria-hidden />
@@ -232,30 +231,41 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             </button>
           </div>
         </div>
-        <svg className="loop-track" viewBox="0 0 600 34" preserveAspectRatio="none" aria-label="Loops">
-          <text x={4} y={10}>
-            loops
-          </text>
-          {loops.map((l, i) => {
-            const a = x((l.a[0] + l.a[1]) / 2)
-            const b = x((l.b[0] + l.b[1]) / 2)
-            return <path key={i} className={`arc ${l.factor.toLowerCase()}`} d={`M ${a} 34 A ${(b - a) / 2} 30 0 0 1 ${b} 34`} />
-          })}
-        </svg>
-        {maps.data && (
-          <p className="map-labels">
-            <span>{maps.data.lower_label}</span>
-            <span>{maps.data.upper_label}</span>
-          </p>
+        {(annotations.data?.loops.length ?? 0) > 0 && (
+          <div className="loop-overview">
+            <LoopView
+              chrom={job.chrom}
+              region={[job.start, job.end]}
+              loops={annotations.data!.loops}
+              window={[locus.start, locus.end]}
+              onWindow={(start, end) => {
+                moveTo({ chrom: job.chrom, start, end })
+                setNote('')
+              }}
+              onSelect={(i) => {
+                if (i === null) return
+                // The map goes to the loop with a quarter of its length either side.
+                const l = annotations.data!.loops[i]
+                const pad = Math.max((l.b[1] - l.a[0]) / 4, res * 5)
+                moveTo({ chrom: job.chrom, start: l.a[0] - pad, end: l.b[1] + pad })
+                setNote('')
+              }}
+              hint="The box is the part the map shows. Scroll or drag along the loops to choose a part, or click a loop to go to it."
+            />
+          </div>
         )}
         {note && <p className="map-note">{note}</p>}
-        {maps.isFetching && (
-          <p className="map-note" role="status">
-            {`Reading the map at ${res / 1000} kb.`}
-            {upperKind === 'hic' || lowerKind === 'hic' ? ' The first view of a resolution reads the deep Hi-C map, about ten seconds.' : ''}
-          </p>
-        )}
         {maps.isError && <p className="field-error">{maps.error.message}</p>}
+        <div className={`contact-frame${maps.data ? '' : ' empty'}${maps.isFetching ? ' loading' : ''}`}>
+          {maps.isFetching && (
+            <div className="map-loading" role="status">
+              <div className="map-loading-card">
+                <span className="map-spinner" aria-hidden />
+                <strong>{`Reading the map at ${res / 1000} kb.`}</strong>
+              </div>
+            </div>
+          )}
+          {target && <div className="zoom-box" aria-hidden style={{ left: `${target[0] * 100}%`, top: `${target[0] * 100}%`, width: `${target[1] * 100}%`, height: `${target[1] * 100}%` }} />}
         <canvas
           ref={canvas}
           className="contact-canvas"
@@ -276,7 +286,10 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             zoom(1, maps.data.bins[Math.max(0, Math.min(j, maps.data.bins.length - 1))])
           }}
         />
-        <p className="hover-bar mono">{hover ?? ' '}</p>
+        </div>
+        {maps.data && (
+          <p className={`hover-bar mono${hover ? '' : ' idle'}`}>{hover ?? 'Move over the map to read a pair of positions. Double click to zoom in.'}</p>
+        )}
       </div>
       <div className="side-cards">
         <section className="side-card" aria-label="Colour range">
@@ -316,11 +329,12 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
         {maps.data && (
           <section className="side-card" aria-label="Agreement of the two halves">
             <p className="card-label">Agreement of the two halves</p>
-            <p className="big">
-              <span className="big-value">{typeof maps.data.rank === 'number' ? maps.data.rank.toFixed(2) : 'none'}</span> <span className="unit">rank agreement</span>
+            {/* The full account of each number is its tooltip. */}
+            <p className="big" title={maps.data.rank_about}>
+              <span className="big-value">{typeof maps.data.rank === 'number' ? maps.data.rank.toFixed(2) : 'none'}</span> <span className="unit">Spearman correlation</span>
             </p>
-            <p className="card-text">{`Rank correlation at ${res / 1000} kb of ${maps.data.rank_about ?? 'the two maps'}. It compares the pattern at each distance and not the level.`}</p>
-            <p className="card-text">{`Stratum adjusted correlation ${maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}, of ${maps.data.scc_about ?? 'the two maps'}. It also compares the level, and a stretch without beads scores well where Hi-C is depleted.`}</p>
+            <p className="card-text">{`Pairs of bins the same distance apart are compared${reach(maps.data.rank_reach)}. The fall of contacts with distance adds nothing to this number.`}</p>
+            <p className="card-text" title={maps.data.scc_about}>{`SCC ${maps.data.scc === null ? 'none' : maps.data.scc.toFixed(2)}, the same comparison on the values and not their ranks.`}</p>
             {typeof maps.data.loop_enrichment === 'number' && (
               <p className="card-text">{`At the loops the other half is ${maps.data.loop_enrichment.toFixed(1)} times its expected contact at the same distance.`}</p>
             )}

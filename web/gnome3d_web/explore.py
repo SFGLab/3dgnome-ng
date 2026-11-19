@@ -89,7 +89,7 @@ def summary(job: Path, ahead: int | None) -> dict[str, object]:
         "stages": status.get("stages", []),
         "structures_done": len(list((job / "models").glob("*.cif"))) if (job / "models").is_dir() else 0,
         "structures_asked": _json(job / "request.json").get("n_models"),
-        "log_recent": _public_log(_log_tail(job / "engine.log", 12), job) if status.get("state") in ("running", "failed") else "",
+        "log_recent": _public_log(_log_tail(job / "engine.log", 200), job) if status.get("state") in ("running", "failed") else "",
     }
 
 
@@ -99,7 +99,7 @@ def _log_tail(path: Path, n: int) -> str:
         return ""
     with path.open("rb") as f:
         f.seek(0, 2)
-        f.seek(max(0, f.tell() - 16_384))
+        f.seek(max(0, f.tell() - 32_768))
         return "\n".join(f.read().decode(errors="replace").splitlines()[-n:])
 
 
@@ -289,7 +289,7 @@ def genes(job: Path) -> list[dict[str, object]]:
 
 
 def _public_log(text: str, job: Path) -> str:
-    """A log with the job's directory on the server cut from every path, so a private job's
+    """A log with the job's directory on the server cut from every path. A private job's
     location on disk is not shown."""
     for p in {str(job.resolve()), str(job)}:
         text = text.replace(p + "/", "").replace(p, ".")
@@ -325,7 +325,7 @@ def _read_deep(url: str, chrom: str, start: int, end: int, res: int, allow_priva
 
 def _deep_map(job: Path, url: str, chrom: str, start: int, end: int, res: int, allow_private: bool) -> np.ndarray:
     """A deep map's window on the job's grid. The pixels of the job's whole region are read once
-    per resolution and kept in the job directory, so zooming and panning cut windows from them
+    per resolution and kept in the job directory. Zooming and panning cut windows from them
     instead of reading the remote file again."""
     status = _json(job / "status.json").get("region") or f"{chrom}:{start}-{end}"
     jr = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", str(status))
@@ -354,10 +354,8 @@ def _span(bp: int) -> str:
 
 
 def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str, hic_url: str = "", hic_name: str = "", allow_private: bool = False) -> dict[str, object]:
-    """Two contact maps of a window on one grid, each the Hi-C, the model's MultiMM map or its
-    counted contacts, raw or ICE balanced, with two agreements of the halves: the rank agreement
-    per distance, and the stratum adjusted correlation the battery reports, raw Hi-C against
-    contacts within the structures' median bond.
+    """Two contact maps of a window on one grid with two agreements of the halves, the rank
+    agreement per distance and the stratum adjusted correlation.
 
     @param hic_url a deep map of the cell type in place of the job's own input contacts
     @param hic_name the deep map's name for the labels
@@ -388,7 +386,7 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         try:
             hic, hic_label = _deep_map(job, hic_url, chrom, start, end, res, allow_private), f"Hi-C of {cell}, {hic_name or 'deep map'}"
         except Exception:  # noqa: BLE001
-            # A deep map that cannot be read leaves the contacts the job read, and the label says so.
+            # A deep map that cannot be read leaves the contacts the job read and the label says so.
             hic = None
     if hic is None:
         sing = pd.read_csv(job / "inputs" / "singletons.bedpe", sep="\t", header=None, usecols=range(7))
@@ -419,12 +417,12 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
     b, lb = one(lower)
     raw_a, raw_b = a, b
     if norm == "ice":
-        # A loop half is a list of loops, not a contact map, and is never balanced.
+        # A loop half is a list of loops, not a contact map and is never balanced.
         a = a if upper in loop_sets else cm.ice(a)
         b = b if lower in loop_sets else cm.ice(b)
     elif norm != "raw":
         raise ExploreError(f"{norm!r} is not ice or raw")
-    # The rank agreement reads a Hi-C half balanced and over the bins Hi-C maps, since an
+    # The rank agreement reads a Hi-C half balanced and over the bins Hi-C maps. An
     # unmapped bin reads as zero and a bead there would count against the model.
     keep = np.ones(len(raw_a), dtype=bool)
     rk_a, rk_b = raw_a, raw_b
@@ -449,6 +447,7 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
             else f"{la} against {lb}, raw values, diagonals up to 2 Mb"
         ),
         "rank": cm.rank_agreement(rk_a, rk_b, res, keep),
+        "rank_reach": cm.rank_reach(rk_a, rk_b, res, keep),
         "rank_about": f"{la} against {lb}, each distance up to {_span(cm.rank_reach(rk_a, rk_b, res, keep))} ranked on its own, the distances at which half of the pairs hold a contact in both maps"
         + (", Hi-C balanced, over the bins Hi-C maps" if "hic" in (upper, lower) else ""),
         "loop_enrichment": (

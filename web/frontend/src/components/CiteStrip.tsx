@@ -2,7 +2,8 @@ import { ArrowRight, Code, Quote } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../routes'
 
-/** The strip at the foot of every page that asks users to cite the work, with the source code. */
+/** The strip at the foot of every page that asks users to cite the work, with the source code
+ * and the privacy notice. */
 export function CiteStrip() {
   return (
     <footer className="cite-strip">
@@ -13,6 +14,9 @@ export function CiteStrip() {
       </a>
       <Link className="cite-button" to={ROUTES.cite}>
         All citations <ArrowRight size={13} aria-hidden />
+      </Link>
+      <Link className="cite-link" to={ROUTES.privacy}>
+        Privacy
       </Link>
     </footer>
   )

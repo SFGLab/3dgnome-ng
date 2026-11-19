@@ -15,6 +15,7 @@ const MAP = {
   lower_label: 'This job, 1/(d+1)³ between bins, mean of 100 structures',
   scc: 0.37,
   rank: 0.21,
+  rank_reach: 2000000,
   rank_about: 'Hi-C of GM12878 against This job, each distance up to 2 Mb ranked on its own, Hi-C balanced, over the bins Hi-C maps',
   scc_about: 'Hi-C of GM12878, 4DN 4DNFIXP4QG5B against this job\'s contacts within the median bond, raw counts, diagonals up to 2 Mb, as the validation battery computes it',
 }
@@ -47,10 +48,12 @@ describe('ContactMapTab', () => {
     renderTab()
     const card = await screen.findByRole('region', { name: 'Agreement of the two halves' })
     expect(within(card).getByText('0.21')).toBeInTheDocument()
-    expect(within(card).getByText(/Stratum adjusted correlation 0.37/)).toBeInTheDocument()
-    expect(within(card).getByText(/each distance up to 2 Mb ranked on its own/)).toBeInTheDocument()
-    expect(within(card).getByText(/4DN 4DNFIXP4QG5B against this job's contacts within the median bond/)).toBeInTheDocument()
-    expect(document.querySelector('.map-labels')?.textContent).toBe('This job, 1/(d+1)³ between bins, mean of 100 structuresHi-C of GM12878')
+    expect(within(card).getByText('Spearman correlation')).toBeInTheDocument()
+    expect(within(card).getByText('Pairs of bins the same distance apart are compared, up to 2 Mb. The fall of contacts with distance adds nothing to this number.')).toBeInTheDocument()
+    expect(within(card).getByText('SCC 0.37, the same comparison on the values and not their ranks.')).toHaveAttribute('title', expect.stringContaining('within the median bond'))
+    expect(within(card).getByText('0.21').parentElement).toHaveAttribute('title', expect.stringContaining('ranked on its own'))
+    expect(card.textContent!.length).toBeLessThan(260)
+    expect(document.querySelector('.map-labels')).toBeNull()
   })
 
   it('keeps zooming out inside the job region', async () => {
@@ -66,6 +69,26 @@ describe('ContactMapTab', () => {
       expect(a).toBeGreaterThanOrEqual(11_500_000)
       expect(b).toBeLessThanOrEqual(11_575_000)
     }
+  })
+
+  it('marks the part of the map a zoom in will show and no part on a zoom out', async () => {
+    const wide = { ...MAP, bins: [10_000_000, 15_000_000] }
+    mockApi([[/contacts$/, () => [200, wide]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <ContactMapTab api={jobApi('jobs', KEY)} summary={{ ...SUMMARY_DONE, region: 'chr1:10000000-20000000' }} />
+      </QueryClientProvider>,
+    )
+    await screen.findByRole('region', { name: 'Agreement of the two halves' })
+    expect(document.querySelector('.zoom-box')).toBeNull()
+    const canvas = document.querySelector('canvas')!
+    fireEvent.wheel(canvas, { deltaY: -100 })
+    const box = document.querySelector<HTMLElement>('.zoom-box')!
+    expect([box.style.left, box.style.top, box.style.width, box.style.height].map(parseFloat).map(Math.round)).toEqual([10, 10, 80, 80])
+    fireEvent.wheel(canvas, { deltaY: 100 })
+    fireEvent.wheel(canvas, { deltaY: 100 })
+    expect(document.querySelector('.zoom-box')).toBeNull()
   })
 
   it('asks once for a burst of wheel steps', async () => {
@@ -138,7 +161,7 @@ describe('ContactMapTab', () => {
     await screen.findByText('0.21')
     const five = within(screen.getByLabelText('Resolution')).getByRole('option', { name: /^5 kb/ }) as HTMLOptionElement
     expect(five.disabled).toBe(true)
-    expect(five.textContent).toBe('5 kb, zoom in to use')
+    expect(five.textContent).toBe('5 kb bins, zoom in to use')
   })
 
   it('says it is reading while a new resolution loads', async () => {
@@ -163,6 +186,16 @@ describe('ContactMapTab', () => {
     await screen.findByText('0.21')
     fireEvent.change(screen.getByLabelText('Resolution'), { target: { value: '5000' } })
     expect(await screen.findByText(/more than 800 bins on a side/)).toBeInTheDocument()
+  })
+
+  it('puts no label over the controls of the toolbar and still names each of them', async () => {
+    mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    const { container } = renderTab()
+    await screen.findByLabelText('Locus')
+    const bar = container.querySelector('.map-toolbar')!
+    for (const word of ['Locus', 'Show', 'Normalization', 'Resolution']) expect(bar.textContent).not.toContain(word)
+    for (const name of ['Locus', 'Normalization', 'Resolution']) expect(screen.getByLabelText(name)).toHaveAttribute('title', name)
+    expect(within(screen.getByLabelText('Resolution')).getByRole('option', { name: '25 kb bins' })).toBeInTheDocument()
   })
 
   it('keeps to the writing rules', async () => {

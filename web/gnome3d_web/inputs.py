@@ -1,13 +1,10 @@
-"""The engine's inputs for one request, written to the job's directory.
+"""The inputs of the engine for one request, written to the directory of the job.
 
-The cell type's loops of the region's chromosome are rewired by the sample's variants with the
-2019 rules of personal3d, CTCF and RNAPII separately, and the loops wholly inside the region
-are kept. The anchors are the cell type's own, lifted to the haplotype's coordinates, plus any
-loop end the rules made. The singletons of the whole chromosome are kept, since the engine fits
-the contact decay on the file, lifted end by end, with a HiCDiffusion window spliced in when
-one is given. Segments and centromeres are lifted the same way. The config is the cell type's
-with only its data section replaced. Only variants inside the region are applied, so
-coordinates before the region do not move.
+The loops of the cell type on the chromosome are rewired by the variants of the sample with
+the 2019 rules of personal3d. The loops wholly inside the region are kept. Anchors, singletons,
+segments, centromeres and compartments are lifted to the coordinates of the haplotype. A
+HiCDiffusion window is spliced into the singletons when given. The config is the cell type's
+with its data section replaced.
 """
 
 from __future__ import annotations
@@ -38,7 +35,7 @@ def _no_loops() -> list[tuple[str, Path]]:
 
 @dataclass
 class Own:
-    """A job's own files: loops per factor, and anchors, contacts and enhancers in place of the
+    """A job's own files: loops per factor and anchors, contacts and enhancers in place of the
     cell type's. Without anchors the loop ends are the anchors."""
 
     loops: list[tuple[str, Path]] = field(default_factory=_no_loops)
@@ -136,7 +133,7 @@ def build_inputs(
     """Write the inputs for one haplotype under `out` and return the config and the region in
     the haplotype's coordinates. `hic` is a predicted HiCDiffusion window and its reference start.
     `background` none turns off the contact terms and keeps the singletons for the exponent fit.
-    RNAPII alone has its loop ends as anchors, orientation N, and no CTCF orientation term."""
+    RNAPII alone has its loop ends as anchors, orientation N and no CTCF orientation term."""
     out.mkdir(parents=True, exist_ok=True)
     chrom = region.chrom
     L = Lift(svs)
@@ -208,6 +205,14 @@ def build_inputs(
     cen = _read(cell.path("centromeres"), chrom, 3)
     cen[1], cen[2] = L.many(cen[1].to_numpy()), L.many(cen[2].to_numpy())
     cen.to_csv(out / "centromeres.bed", sep="\t", header=False, index=False)
+    # The compartments are the cell type's own and are not read with own contacts. An edge inside a
+    # deletion goes where the deletion joins its two sides. Neighbours stay joined.
+    compartments = "compartments" in cell.files and not (own and own.contacts)
+    if compartments:
+        comp = _read(cell.path("compartments"), chrom, 4)
+        ends = [(L.edge(int(a)), L.edge(int(b))) for a, b in zip(comp[1], comp[2], strict=True)]
+        comp[1], comp[2] = [min(e) for e in ends], [max(e) for e in ends]
+        comp[comp[2] > comp[1]].to_csv(out / "compartments.bed", sep="\t", header=False, index=False)
 
     data = {
         "data_dir": str(out.resolve()),
@@ -218,10 +223,12 @@ def build_inputs(
         "segment_split": "segments.bed",
         "centromeres": "centromeres.bed",
     }
+    if compartments:
+        data["compartments"] = "compartments.bed"
     if len(names) > 1 or factors == "RNAPII" or (own and own.loops):
         data["factors"] = ",".join(names)
     # The beads of a stretch without loops are drawn against the cell type's map, which is in
-    # reference coordinates and is this cell's, so not with variants applied or own contacts.
+    # reference coordinates and is this cell's. It is not used with variants or own contacts.
     if cell.contact_map and not svs and not (own and own.contacts):
         data["contact_map"] = cell.contact_map
     config = engine.write_config(cell.path("config"), data, out / "config.ini", header=f"{cell.name} {region} {factors}")

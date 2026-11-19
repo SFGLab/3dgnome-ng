@@ -20,7 +20,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from validation.metrics.hic import observed_hic, simulated_contacts  # noqa: E402
+from legacy.validation.metrics.hic import observed_hic, simulated_contacts  # noqa: E402
 from validation_battery import CONTACT_BEADS, load  # noqa: E402
 
 BINSIZE = 25_000

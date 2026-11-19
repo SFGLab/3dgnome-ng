@@ -8,4 +8,5 @@ export const ROUTES = {
   results: '/results',
   help: '/help',
   cite: '/cite',
+  privacy: '/privacy',
 } as const

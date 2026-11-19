@@ -13,7 +13,9 @@ the two pixel bins of a loop and its raw count, the seven columns `read_bedpe` r
 
 from __future__ import annotations
 
+import contextlib
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -34,6 +36,29 @@ def write_cooler(slice_path: Path, chrom: str, out: Path) -> int:
     return b
 
 
+@contextlib.contextmanager
+def _idxmin_of_an_empty_column() -> Iterator[None]:
+    """Let `DataFrame.idxmin` answer NaN for a column with no value while the caller runs.
+
+    cooltools 0.7.1 sets the count threshold of each expected count bin with `idxmin` and then
+    fills the bins that have no passing count with a threshold out of reach. pandas 3 raises on
+    such a column where pandas 2 returned NaN, so the caller stops on any map with an empty bin.
+    """
+    plain = pd.DataFrame.idxmin
+
+    def idxmin(self: pd.DataFrame, *args: object, **kwargs: object) -> pd.Series:
+        try:
+            return plain(self, *args, **kwargs)
+        except ValueError:
+            return pd.Series([self[c].idxmin() if self[c].notna().any() else np.nan for c in self.columns], index=self.columns)
+
+    pd.DataFrame.idxmin = idxmin  # type: ignore[method-assign]
+    try:
+        yield
+    finally:
+        pd.DataFrame.idxmin = plain  # type: ignore[method-assign]
+
+
 def call(cool: Path, bedpe: Path, nproc: int) -> int:
     """Balance one cooler, call its loops and write them. Returns the number of loops."""
     import cooler
@@ -46,7 +71,8 @@ def call(cool: Path, bedpe: Path, nproc: int) -> int:
     chrom = str(b["chrom"].iloc[0])
     view = pd.DataFrame({"chrom": [chrom], "start": [int(b["start"].min())], "end": [int(b["end"].max())], "name": [chrom]})
     expected = cooltools.expected_cis(clr, view_df=view, nproc=nproc)
-    dots = cooltools.dots(clr, expected=expected, view_df=view, nproc=nproc)
+    with _idxmin_of_an_empty_column():
+        dots = cooltools.dots(clr, expected=expected, view_df=view, nproc=nproc)
     dots = dots.sort_values(["start1", "start2"])
     cols = ["chrom1", "start1", "end1", "chrom2", "start2", "end2", "count"]
     dots[cols].to_csv(bedpe, sep="\t", header=False, index=False)

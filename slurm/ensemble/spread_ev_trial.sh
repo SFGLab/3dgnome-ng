@@ -1,20 +1,16 @@
 #!/bin/bash
-# Drawn anchors with only their overlaps relaxed, three cell lines, workstation, screen spreadev,
-# in a worktree of its own. design/gap-fill.md.
+# Drawn anchors with only their overlaps relaxed, three cell lines. design/gap-fill.md.
 #
-#   DATA=/home/nik/3dgnome-ng/data REF=/home/nik/3dgnome-lawspring SPREAD=/home/nik/3dgnome-spread2 \
+#   DATA=~/3dgnome-ng/data REF=~/3dgnome-lawspring SPREAD=~/3dgnome-spread2 \
 #     bash slurm/ensemble/spread_ev_trial.sh
 #
-# Waits for SPREAD/spread.log to end, so one job holds the card at a time. Arms, each
-# slurm/ensemble/<cell>_xc_R.ini with the overrides written:
-#   mxev05       anchors drawn from the maximum entropy Gaussian, then up to 200 solver iterations
-#                with every target spring at zero, so only the excluded volume and the arcless
-#                repulsion, its reach at 0.5 of the mean arc target, act
-#   mxev10       the same with the reach at 1.0
-# Production comes from REF/out/acxc and the plain draw from SPREAD/out/spread. Phase 1,
-# chr1:10-15, 20-25 and 35-40 Mb at five structures. Phase 2, whole chr1 on GM12878 and H1ESC at
-# three structures, scored on the 1-60 Mb slice.
+# Waits for SPREAD/spread.log to end. Arms, each slurm/ensemble/<cell>_xc_R.ini with overrides:
+#   mxev05   the maxent draw, then up to 200 solver iterations with every target spring at zero
+#            and the repulsion reach at 0.5 of the mean arc target
+#   mxev10   the same with the reach at 1.0
+# Production comes from REF/out/acxc and the plain draw from SPREAD/out/spread.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
 REF="${REF:-.}"
@@ -26,7 +22,7 @@ mkdir -p "$OUT"
 while ! grep -q "^EXIT" "$SPREAD/spread.log" 2>/dev/null; do sleep 120; done
 git log --format="spread ev trial on %h %s" -1
 
-mcool() { ls /mnt/storagelinux/_hic/$1/*.mcool | head -1; }
+mcool() { ls $HIC_ROOT/$1/*.mcool | head -1; }
 
 write_inis() {  # cell
   c=$(echo "$1" | tr 'A-Z' 'a-z')

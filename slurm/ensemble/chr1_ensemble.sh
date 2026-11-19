@@ -1,25 +1,11 @@
 #!/bin/bash -l
 
-# GM12878 chr1 conformational ensemble: TAD blocks, CTCF anchors, Hi-C singletons, distance
-# map, dynamic subanchors, excluded volume. One array task produces one conformation.
+# GM12878 chr1 ensemble, one conformation per array task.
 #
-#   sbatch --array=0-99%20 slurm/ensemble/chr1_ensemble.sh
-#   PER_TASK=4 sbatch --array=0-24 slurm/ensemble/chr1_ensemble.sh   # 4 conformations per task
+#   sbatch -A <account> --array=0-99%20 slurm/ensemble/chr1_ensemble.sh
+#   PER_TASK=4 sbatch -A <account> --array=0-24 slurm/ensemble/chr1_ensemble.sh
 #
-# Why one GPU per task rather than one big multi-GPU job. Conformations are independent, so a
-# fixed pool of GPUs delivers the most conformations per hour when each one gets a whole
-# conformation to itself. Splitting a single conformation across N GPUs shortens that
-# conformation but does not raise throughput, and it loses a little to load imbalance, so it is
-# the wrong shape for producing 100 of them. Ask for several GPUs only when latency on one
-# structure matters more than total count; multigpu_mode=groups in the ini then uses them, and
-# it is inert on one GPU.
-#
-# --time is 8 h for a measured 5 h 09 m conformation at these settings, on an RTX 4060 Ti. A
-# faster card needs less. Raise PER_TASK and --time together, since the cap applies per task.
-#
-# Requeue safety: a member whose .cif already exists is skipped, so a task that is requeued
-# after NODE_FAIL or a time cap resumes rather than redoing finished work. That also makes it
-# safe to resubmit the same array to fill in whatever is missing.
+# --time is per task. Raise it with PER_TASK. A member whose .cif exists is skipped.
 
 #SBATCH --job-name=gm_chr1_ens
 #SBATCH --nodes=1
@@ -29,21 +15,16 @@
 #SBATCH --mem=48G
 #SBATCH --partition=long
 #SBATCH --time=08:00:00
-#SBATCH --account=sfglab
-# --output/--error are absolute and cannot use $ROOT: sbatch parses #SBATCH lines before
-# the shell runs, and a relative path would resolve against whatever directory you
-# submitted from. The directory must already exist, because slurm opens these files
-# before the script's own mkdir would run. Create it once:
-#   mkdir -p $ROOT/slurm/ensemble/logs
-# Running from a different checkout means also passing --output/--error to sbatch.
+# The account is given with sbatch -A. --output and --error are relative to the checkout, the
+# directory of the submission. Create slurm/ensemble/logs before the submission.
 #SBATCH --open-mode=append
-#SBATCH --output=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/chr1_%A_%a.out
-#SBATCH --error=/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng/slurm/ensemble/logs/chr1_%A_%a.out
+#SBATCH --output=slurm/ensemble/logs/chr1_%A_%a.out
+#SBATCH --error=slurm/ensemble/logs/chr1_%A_%a.out
 
 set -euo pipefail
 
-# Override for a checkout elsewhere, e.g. ROOT=$HOME/3dgnome-ng sbatch ...
-ROOT="${ROOT:-/mnt/evafs/groups/sfglab/nkozlov/3dgnome-ng}"
+# The checkout. The default is the directory of the submission.
+ROOT="${ROOT:-${SLURM_SUBMIT_DIR:-$PWD}}"
 CONFIG="${CONFIG:-$ROOT/slurm/ensemble/gm12878_chr1_hic_tads.ini}"
 OUT="${OUT:-$ROOT/out/chr1_ensemble}"
 PER_TASK="${PER_TASK:-1}"
@@ -54,8 +35,7 @@ cd "$ROOT"
 mkdir -p slurm/ensemble/logs "$OUT"
 source .venv/bin/activate
 
-# Share one XLA cache across the array. Each distinct IB shape compiles once per machine
-# instead of once per task, and with ~250 shapes per conformation that is not a rounding error.
+# One XLA cache for the whole array.
 export GNOME3D_JAX_CACHE="${GNOME3D_JAX_CACHE:-$ROOT/.cache/gnome3d-jax}"
 mkdir -p "$GNOME3D_JAX_CACHE"
 export PYTHONFAULTHANDLER=1
@@ -66,8 +46,7 @@ FIRST=$((TASK * PER_TASK))
 LAST=$((FIRST + PER_TASK - 1))
 MEMBERS="${FIRST}-${LAST}"
 
-# Fail before the allocation is burnt rather than minutes in. data/ is gitignored, so a fresh
-# checkout has none of this and every one of these is a hard requirement.
+# Every input must exist. data/ is not in the repository.
 missing=0
 for f in "$SINGLETONS" \
          "$ROOT/data/GM12878/GM12878_tads.bed" \
@@ -88,9 +67,7 @@ from gnome3d.settings import Settings
 s = Settings()
 assert s.load_ini(sys.argv[1]), f"cannot load {sys.argv[1]}"
 
-# Each of these is a requirement of this ensemble, and each fails silently rather than loudly
-# if it is not set: ChIA-PET singletons instead of Hi-C, or the epigenome terms left on from
-# another run, both produce a plausible structure that answers a different question.
+# Each of these must hold. A wrong value gives a plausible structure of another configuration.
 assert "hic" in s.data_singletons, f"singletons={s.data_singletons!r} does not look Hi-C derived"
 assert s.use_ctcf_motif, "CTCF orientation term is off"
 assert s.use_excluded_volume, "excluded volume is off"
@@ -101,5 +78,5 @@ print(f"[guard] config ok: singletons={s.data_singletons}")
 PYCHECK
 
 echo "[launch] node=$(hostname) task=${TASK} members=${MEMBERS} gpus=${SLURM_GPUS_ON_NODE:-?}"
-srun gnome3d-ng --config "$CONFIG" --region chr1 --members "$MEMBERS" --out "$OUT" \
+srun python -m gnome3d.cli --config "$CONFIG" --region chr1 --members "$MEMBERS" --out "$OUT" \
   --log-file "$ROOT/slurm/ensemble/logs/chr1_${SLURM_ARRAY_JOB_ID:-0}_${TASK}.detail.log"

@@ -1,15 +1,12 @@
 #!/bin/bash
-# cudaMMC on the genome one chromosome at a time, chr1 to chr22, one structure each, timed by
-# wall clock on one machine, one job at a time. design/tools-comparison.md.
+# cudaMMC on the genome one chromosome at a time, chr1 to chr22, one structure each, timed by wall
+# clock. design/tools-comparison.md.
 #
 #   DATA=~/gapfill-data OUT=out/toolgenome bash slurm/ensemble/tools_genome_perchr.sh
 #
-# cudaMMC's genome mode builds a chromosome level heatmap from contacts between chromosomes and
-# stops when it finds none, LooperSolver.cpp:1113. The Hi-C singletons every tool reads here hold
-# contacts within a chromosome only, and 3dgnome's genome run places its chromosomes without them
-# too. Each chromosome is therefore its own cudaMMC run on the template config of the tools trial.
-# OUT/timing_perchr.tsv has a row per chromosome with its bead count and seconds and a last row
-# with the sums. Nothing is scored.
+# The genome mode of cudaMMC needs contacts between chromosomes, which the Hi-C singletons here do
+# not hold. Each chromosome is its own run. OUT/timing_perchr.tsv has a row per chromosome and a
+# last row with the sums.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"

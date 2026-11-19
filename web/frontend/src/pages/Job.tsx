@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { jobApi } from '../job/api'
+import { jobApi, type Loop } from '../job/api'
 import { JobSidePanel } from '../job/SidePanel'
 import { Compare } from '../job/Compare'
 import { Progress } from '../job/Progress'
@@ -13,7 +13,7 @@ import { StructureTab } from '../job/StructureTab'
 import { JobTabs, type Tab } from '../job/Tabs'
 import './job.css'
 
-/** The explorer of one job: its side panel, its tabs, and its state while it is not done. */
+/** The explorer of one job: its side panel, its tabs and its state while it is not done. */
 export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: number }) {
   const { key = '' } = useParams()
   const api = useMemo(() => jobApi(kind, key), [kind, key])
@@ -27,6 +27,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   const go = (next: Record<string, string>) => setParams(next)
   const [gene, setGene] = useState<string | null>(params.get('gene'))
   const [geneFilter, setGeneFilter] = useState('')
+  const [loop, setLoop] = useState<Loop | null>(null)
   const summary = useQuery({
     queryKey: ['summary', api.base],
     queryFn: api.summary,
@@ -63,6 +64,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
                   summary={s}
                   selected={selected}
                   gene={gene}
+                  onGene={setGene}
                   initial={compareTo || null}
                   onOther={(url) => go({ tab, compare: url ?? '' })}
                   onClose={() => go({ tab })}
@@ -75,6 +77,8 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
                   selected={selected}
                   gene={gene}
                   onGene={setGene}
+                  loop={loop}
+                  onLoop={setLoop}
                   onOpenGenes={(g) => {
                     setGeneFilter(g)
                     go({ tab: 'genes' })
@@ -88,13 +92,23 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
                   filter={geneFilter}
                   selected={gene}
                   onSelect={(g) => {
+                    setLoop(null)
                     setGene(g)
                     go({ tab: 'structure' })
                   }}
                 />
               )}
               {!comparing && tab === 'contacts' && <ContactMapTab api={api} summary={s} />}
-              {!comparing && tab === 'loops' && <LoopsTab api={api} />}
+              {!comparing && tab === 'loops' && (
+                <LoopsTab
+                  api={api}
+                  onShow={(l) => {
+                    setGene(null)
+                    setLoop(l)
+                    go({ tab: 'structure' })
+                  }}
+                />
+              )}
               {!comparing && tab === 'log' && <LogTab api={api} />}
             </div>
           </>

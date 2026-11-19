@@ -3,7 +3,9 @@
 The rules and the sequence builder apply a haplotype's variants left to right, each wholly
 after the last. A deletion takes its bases out and shifts what follows up by its length, an
 insertion shifts what follows down by its length, an inversion mirrors the bases it holds and
-shifts nothing. Positions are 0 based.
+shifts nothing. A duplication is tandem. Its bases stay where they are, a second copy follows
+them and shifts what follows down by its length. A reference position inside it lifts to the
+first copy, and `copies` gives its place in the second. Positions are 0 based.
 """
 from __future__ import annotations
 
@@ -33,6 +35,11 @@ class Lift:
                 b = s.end - 1
                 self.events.append(("INV", a, b, shift))
                 last = b
+            elif s.kind == "DUP":
+                b = s.end - 1
+                self.events.append(("DUP", a, b, shift))
+                shift += b - a
+                last = b
         self.final = shift
 
     def __call__(self, pos: int) -> int | None:
@@ -44,7 +51,25 @@ class Lift:
                 return None
             if kind == "INV" and pos < b:
                 return a + before + (b - 1 - pos)
+            if kind == "DUP" and pos < b:
+                return pos + before
         return pos + self.final
+
+    @property
+    def duplications(self) -> list[tuple[int, int, int]]:
+        """Each duplication as its reference interval and the shift of its first copy. The
+        second copy is the first moved down by the interval's length."""
+        return [(a, b, before) for kind, a, b, before in self.events if kind == "DUP"]
+
+    def copies(self, pos: np.ndarray) -> np.ndarray:
+        """The second copy's haplotype position of each reference position inside a
+        duplication, -1 for every other position."""
+        pos = np.asarray(pos, dtype=np.int64)
+        out = np.full(len(pos), -1, dtype=np.int64)
+        for a, b, before in self.duplications:
+            m = (pos >= a) & (pos < b)
+            out[m] = pos[m] + before + (b - a)
+        return out
 
     def edge(self, pos: int) -> int:
         """The haplotype position of a reference position, or where its deletion joins the
@@ -77,6 +102,8 @@ class Lift:
         inside = on & (pos < b[kk])
         dele = inside & (kind[kk] == "DEL")
         inv = inside & (kind[kk] == "INV")
+        dup = inside & (kind[kk] == "DUP")
         out[inv] = a[kk[inv]] + before[kk[inv]] + (b[kk[inv]] - 1 - pos[inv])
+        out[dup] = pos[dup] + before[kk[dup]]
         out[dele] = -1
         return out

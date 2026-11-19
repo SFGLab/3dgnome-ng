@@ -2,9 +2,10 @@
 # The RNAPII factor at a fraction of CTCF's loop strength, GM12878 whole chr1, three structures
 # per arm, against the CTCF only and full strength arms of rnapii_arms.sh.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd ~/3dgnome-ng
 C=GM12878; OUT=out/rnapii; R=chr1
-MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 for F in 0.3 0.1 0; do
   NAME=s$(echo $F | tr -d .)
   sed "s/^background_range_bp = .*/&\nfactor_strength = 1,$F/" $OUT/gm_both.ini > $OUT/gm_$NAME.ini

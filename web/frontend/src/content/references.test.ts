@@ -26,12 +26,16 @@ describe('references', () => {
     }
   })
 
-  it('marks the HGSVC freeze 4 reference as unconfirmed', () => {
-    expect(REFERENCES.find((r) => r.key === 'hgsvc4')?.unconfirmed).toBe(true)
+  it('has no reference and no data row left to confirm', () => {
+    expect(REFERENCES.filter((r) => r.unconfirmed).map((r) => r.key)).toEqual([])
+    expect(DATA_SOURCES.filter((d) => d.pending).map((d) => d.data)).toEqual([])
   })
 
-  it('points every data row at a reference', () => {
+  it('points every data row at a reference, or says the source is to confirm', () => {
     const keys = new Set(REFERENCES.map((r) => r.key))
-    for (const d of DATA_SOURCES) expect(keys, d.data).toContain(d.ref)
+    for (const d of DATA_SOURCES) {
+      if (d.ref) expect(keys, d.data).toContain(d.ref)
+      else expect(d.pending, d.data).toBeDefined()
+    }
   })
 })

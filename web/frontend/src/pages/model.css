@@ -68,8 +68,15 @@
 .cell-card.own {
   border-style: dashed;
   border-color: var(--faint);
-  cursor: not-allowed;
-  opacity: 0.7;
+}
+
+.cell-card.own[aria-checked='true'] {
+  border-color: var(--accent);
+}
+
+/* The own data card is the last card. As the first card of a row it takes the whole row. */
+.cell-card.own:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .cell-name {
@@ -139,16 +146,56 @@
   outline: none;
 }
 
+.region-field {
+  position: relative;
+}
+
+/* The genes that match the typed text, over the content below the field. */
+.gene-options {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  /* About seven genes are seen and the rest scroll. */
+  max-height: 252px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.gene-options li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.gene-options li.active {
+  background: var(--accent-soft);
+}
+
+.gene-name {
+  font-weight: 600;
+}
+
+.gene-place {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .resolved {
   font-size: 12px;
   color: var(--muted);
   white-space: nowrap;
-}
-
-.field-error {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: #C2410C;
 }
 
 .model-side .eyebrow {
@@ -170,10 +217,13 @@
   cursor: pointer;
 }
 
+/* A tag too long to share the line with the title goes below it. */
 .example-top {
   display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 2px 8px;
 }
 
 .example-gene {
@@ -184,6 +234,7 @@
 .example-cell {
   font-size: 11px;
   color: var(--faint);
+  white-space: nowrap;
 }
 
 .example-desc {
@@ -255,6 +306,51 @@
 .axis {
   stroke: var(--muted);
   stroke-width: 1;
+}
+
+/* The region as a box over the loops, its two edges sliders. */
+.region-box {
+  fill: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.region-box.movable {
+  cursor: grab;
+  touch-action: none;
+}
+
+.region-box.movable:active {
+  cursor: grabbing;
+}
+
+.region-edge {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.region-handle {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.region-handle:hover,
+.region-handle:focus-visible {
+  fill: var(--accent-soft);
+  outline: none;
+}
+
+.preview-span {
+  margin-left: auto;
+  font-family: var(--mono);
+}
+
+.preview-hint {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--faint);
 }
 
 .gene-tick {
@@ -342,16 +438,18 @@
 
 .radio-dot {
   flex: none;
-  width: 14px;
-  height: 14px;
-  margin-top: 2px;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
   border: 1.5px solid var(--faint);
   border-radius: 50%;
-  background: #FFFFFF;
+  background: var(--bg);
 }
 
 .option[aria-checked='true'] .radio-dot {
-  border: 4px solid var(--accent);
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 4px, var(--bg) 4.5px);
 }
 
 .option-text {
@@ -385,22 +483,46 @@
   gap: 10px;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.field select,
-.field input {
-  padding: 9px 10px;
-  background: var(--bg);
+/* Opens the dialog with the sample's variants and what each does to the loops. */
+.preview-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 10px 8px 12px;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--ink);
-  font: 13px var(--font);
+  font: 500 13px var(--font);
+  cursor: pointer;
+  transition:
+    border-color 120ms,
+    background 120ms;
+}
+
+.preview-button svg:first-child {
+  color: var(--accent);
+}
+
+.preview-button .chevron {
+  color: var(--muted);
+  transition: transform 120ms;
+}
+
+.preview-button:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.preview-button:hover .chevron {
+  color: var(--accent);
+  transform: translateX(2px);
+}
+
+/* The call set's label is long and the haplotype is one word. */
+.variants .fields {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(7.5rem, 0.8fr);
 }
 
 .upload {
@@ -454,8 +576,9 @@
 @media (max-width: 960px) {
   .options.two,
   .options.three,
-  .fields {
-    grid-template-columns: 1fr;
+  .fields,
+  .variants .fields {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -664,6 +787,15 @@
   font: 12px var(--mono);
 }
 
+/* A choice grows with its longest option. */
+select.value-box {
+  flex: none;
+  width: auto;
+  min-width: 90px;
+  max-width: 100%;
+  margin-left: auto;
+}
+
 .setting.changed .value-box {
   border-color: #D9A400;
 }
@@ -790,5 +922,16 @@
   border-radius: 6px;
   background: var(--surface);
   color: var(--ink);
+  font: inherit;
+}
+
+.sample-facts {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sample-facts .link-button {
+  display: inline;
   font: inherit;
 }

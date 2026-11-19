@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from validation.core.boundaries import call_boundaries  # noqa: E402
+from legacy.validation.core.boundaries import call_boundaries  # noqa: E402
 
 CHROMS = ["chr10", "chr19"]
 

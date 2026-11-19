@@ -62,6 +62,37 @@ def main() -> int:
         check("your own cell type without an enhancers upload marks none", len(enh) == 0, str(enh))
 
         bad = JobRequest(cell_type="GMX", region="chr9:0-1000000", factors="CTCF", n_models=1)
+        # A job the site's restart interrupted is run again in its own directory.
+        part = Path(d) / "results" / "part"
+        run_job(other, cat, part, engine=FAKE)
+        first = (part / "engine.log").read_text()
+        kept = sorted((part / "models").glob("*.cif"))[0]
+        stamp = kept.stat().st_mtime_ns
+        sorted((part / "models").glob("*.cif"))[1].rename(part / "models" / "gone")
+        run_job(other, cat, part, engine=FAKE)
+        log = (part / "engine.log").read_text()
+        check("a job run again keeps the log it had and says where it goes on", log.startswith(first) and "goes on after 1 of 2 structures" in log, log)
+        check("and ends with every structure", len(list((part / "models").glob("*.cif"))) == 2 and json.loads((part / "status.json").read_text())["state"] == "done")
+
+        from gnome3d.io import write_cif
+        from gnome3d.types import BeadOut
+
+        class Stops(Exception):
+            pass
+
+        def beads():  # noqa: ANN202
+            yield BeadOut(0, 10, 0.0, 0.0, 0.0, "anchor")
+            raise Stops
+
+        whole = Path(d) / "whole.cif"
+        try:
+            write_cif(str(whole), beads())  # type: ignore[arg-type]
+        except Stops:
+            pass
+        check("a structure file stopped half way is not there under its name", not whole.exists())
+        write_cif(str(whole), [BeadOut(0, 10, 0.0, 0.0, 0.0, "anchor")])
+        check("a whole one is, with nothing left beside it", whole.exists() and [p.name for p in Path(d).glob("whole*")] == ["whole.cif"])
+
         res = run_job(bad, cat, Path(d) / "results" / "bad", engine=FAKE)
         status = json.loads((res / "status.json").read_text())
         check("an engine failure is a failed job with the log tail", status["state"] == "failed" and "engine exploded" in status["log_tail"], str(status)[:200])

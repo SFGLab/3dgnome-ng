@@ -17,8 +17,8 @@ import numpy as np  # noqa: E402
 
 from gnome3d.data import ContactData  # noqa: E402
 from gnome3d.io import parse_chrs_arg  # noqa: E402
-from validation.core.config import settings_for_cell  # noqa: E402
-from validation.core.ensemble import run_ensemble  # noqa: E402
+from gnome3d.production import settings_for_cell  # noqa: E402
+from legacy.validation.core.ensemble import run_ensemble  # noqa: E402
 
 region = sys.argv[3] if len(sys.argv) > 3 else "chr1:11500000-12600000"
 n = int(sys.argv[4]) if len(sys.argv) > 4 else 3

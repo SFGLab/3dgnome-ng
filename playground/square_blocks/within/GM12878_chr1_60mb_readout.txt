@@ -1,4 +1,4 @@
-chr1:1-60000000 at 25 kb, 2400 bins, Hi-C /home/nk2/gapfill-data/_hic/GM12878/hic.4DNFIXP4QG5B.mcool
+chr1:1-60000000 at 25 kb, 2400 bins, Hi-C ~/gapfill-data/_hic/GM12878/hic.4DNFIXP4QG5B.mcool
 
 GM12878_chr1_60mb_prod: 3 structures, 42489 beads, nu 0.344, 751 of 2400 bins hold an anchor
   SCC raw 0.354  balanced 0.244   no structure null raw 0.295  balanced -0.047

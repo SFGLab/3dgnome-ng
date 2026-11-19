@@ -28,7 +28,7 @@ from gnome3d.pipeline.coarse.build import build_state  # noqa: E402
 from gnome3d.pipeline.stitch import within_block_curve  # noqa: E402
 from gnome3d.settings import Settings  # noqa: E402
 from gnome3d.types import BeadOut  # noqa: E402
-from validation.metrics import hic as H  # noqa: E402
+from legacy.validation.metrics import hic as H  # noqa: E402
 
 cfg, data_dir, chrom, mcool = sys.argv[1:5]
 arms = [a.split("=", 1) for a in sys.argv[5:]]

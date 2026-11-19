@@ -1,4 +1,4 @@
-"""Enhancer and promoter marks on model beads, and the distance table.
+"""Enhancer and promoter marks on model beads and the distance table.
 
     python web/tests/test_marks.py
 """

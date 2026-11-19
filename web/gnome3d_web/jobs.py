@@ -1,11 +1,9 @@
 """One modelling job, from a request to finished structures and their marks.
 
 A job directory holds `request.json`, `status.json`, the engine inputs under `inputs/`, the
-structures under `models/`, `marks.json`, `ep.tsv` and `engine.log`. `status.json` is rewritten
-at every stage, so a page can show where a job is, and a failure records the stage and the last
-lines of the log. A job on hosted inputs is keyed by a hash of the normalised request, so the
-same request finds the same directory. A job with an upload is private and keyed by a random
-token instead.
+structures under `models/`, `marks.json`, `ep.tsv` and `engine.log`. A job on hosted inputs is
+keyed by a hash of the normalised request. A job with an upload is private and keyed by a
+random token.
 """
 
 from __future__ import annotations
@@ -21,6 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
+from . import hicdiffusion
 from .catalog import Catalog
 from .inputs import Own, build_inputs
 from .marks import ep_table, mark_beads, read_cif
@@ -29,7 +28,7 @@ from .settings import Settings
 from .settings_schema import apply_overrides, validate_overrides
 from .svs import read_svs
 
-ENGINE_VERSION = "gnome3d-ng"
+ENGINE_VERSION = "gnome3d"
 
 
 def _no_overrides() -> dict[str, str]:
@@ -63,7 +62,7 @@ class JobRequest:
 
 
 def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
-    """The request with its region resolved, so equivalent requests compare equal."""
+    """The request with its region resolved. Equivalent requests compare equal."""
     region = parse_region(req.region, catalog.cell_types[req.cell_type].genes(), Settings.from_env().max_span)
     d = asdict(req)
     d["region"] = str(region)
@@ -105,43 +104,54 @@ def _status(job: Path, **fields: object) -> None:
         stages.append({"stage": stage, "at": now})
         cur["stages"] = stages
     cur.update(fields, updated=now)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(cur, indent=2))
+    write_json(path, cur)
+
+
+def write_json(path: Path, value: object) -> None:
+    """Write a JSON file whole. A job page reads a job's files while the job runs and a file
+    written in place is empty for a moment."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(value, indent=2))
     tmp.replace(path)
+
+
+# After the name of a gene's second copy in a tandem duplication.
+COPY = ", second copy"
 
 
 def _tail(path: Path, n: int = 30) -> str:
     return "\n".join(path.read_text(errors="replace").splitlines()[-n:]) if path.is_file() else ""
 
 
-def _hicdiffusion(region_start: int, chrom: str, svs: list, fasta: Path) -> tuple[np.ndarray, int]:
-    """HiCDiffusion's deterministic map of the 2 Mb window from the region's start."""
-    from personal3d import hicdiffusion
-
-    ref = hicdiffusion.Reference(fasta)
-    w = hicdiffusion.haplotype_window(ref, chrom, region_start, svs)
-    cond, _ = hicdiffusion.predict([w])
-    return cond[0], region_start
-
-
 def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, cell_enhancers: bool = True):  # noqa: ANN001, ANN202
-    """The cell type's genes and enhancers on `chrom` in the haplotype's coordinates, the beads'
-    coordinates, those inside a deletion dropped. An enhancers upload replaces the cell type's;
-    with `cell_enhancers` off and no upload there are none, as on your own cell type."""
+    """The genes and enhancers of the cell type on `chrom` in the coordinates of the haplotype.
+
+    Those inside a deletion are dropped. Those inside a duplication are there twice and the second
+    copy of a gene has `COPY` after its name. An enhancers upload replaces the cell type's.
+    """
     import pandas as pd
     from personal3d.lift import Lift
 
     L = Lift(svs)
     genes = cell.genes()
     genes = genes[genes["chrom"] == chrom].copy()
+    twin = genes.copy()
+    twin["tss"] = L.copies(genes["tss"].to_numpy())
+    twin = twin[twin["tss"] >= 0]
+    twin["name"] = twin["name"] + COPY
+    twin["gene_id"] = twin["gene_id"].astype(str) + ".copy2"
     genes["tss"] = L.many(genes["tss"].to_numpy())
-    genes = genes[genes["tss"] >= 0]
+    genes = pd.concat([genes[genes["tss"] >= 0], twin], ignore_index=True)
     if enhancers is None and not cell_enhancers:
         return genes, pd.DataFrame({0: pd.Series(dtype=str), 1: pd.Series(dtype=int), 2: pd.Series(dtype=int)})
     enh = pd.read_csv(enhancers or cell.path("enhancers"), sep="\t", header=None, usecols=[0, 1, 2])
     enh = enh[enh[0] == chrom].copy()
-    enh[1], enh[2] = L.many(enh[1].to_numpy()), L.many(enh[2].to_numpy() - 1) + 1
-    return genes, enh[(enh[1] >= 0) & (enh[2] > 0)]
+    start, end = enh[1].to_numpy(), enh[2].to_numpy()
+    second = enh.copy()
+    second[1], second[2] = L.copies(start), L.copies(end - 1) + 1
+    second = second[(second[1] >= 0) & (second[2] > 0)]
+    enh[1], enh[2] = L.many(start), L.many(end - 1) + 1
+    return genes, pd.concat([enh[(enh[1] >= 0) & (enh[2] > 0)], second], ignore_index=True)
 
 
 def run_job(
@@ -151,7 +161,7 @@ def run_job(
     the engine, `python -m gnome3d.cli` from `ENGINE_PYTHON` by default. `env_extra` is added to
     the engine's environment, the GPU of a queue slot for example."""
     job.mkdir(parents=True, exist_ok=True)
-    (job / "request.json").write_text(json.dumps(asdict(req), indent=2))
+    write_json(job / "request.json", asdict(req))
     _status(job, state="running", stage="inputs", started=time.time())
     log = job / "engine.log"
     try:
@@ -176,7 +186,7 @@ def run_job(
         hic = None
         if req.background == "hicdiffusion":
             _status(job, stage="hicdiffusion")
-            hic = _hicdiffusion(region.start, region.chrom, svs, Path(os.environ["REFERENCE_FASTA"]))
+            hic = hicdiffusion.predict(region.chrom, region.start, svs, log, env_extra), region.start
         inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background, own)
         apply_overrides(inputs.config, validate_overrides(req.overrides))
         _status(job, stage="modelling", region=inputs.region, n_svs=inputs.n_svs, skipped_svs=skipped, loops=inputs.loops)
@@ -186,7 +196,13 @@ def run_job(
         env = dict(os.environ) | (env_extra or {})
         if "ENGINE_ROOT" in env:
             env["PYTHONPATH"] = env["ENGINE_ROOT"] + (":" + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
-        with log.open("w") as fh:
+        # The engine skips a structure whose file exists. A job run again after a restart goes on
+        # where it stopped and its log is kept.
+        kept = len(list((job / "models").glob("*.cif"))) if (job / "models").is_dir() else 0
+        with log.open("a" if hic is not None or kept else "w") as fh:
+            if kept:
+                fh.write(f"\nThe job was started again and goes on after {kept} of {req.n_models} structures.\n")
+                fh.flush()
             rc = subprocess.run(cmd, stdout=fh, stderr=subprocess.STDOUT, cwd=env.get("ENGINE_ROOT"), env=env).returncode
         if rc != 0:
             raise RuntimeError(f"the engine exited with {rc}")

@@ -5,7 +5,7 @@ import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { ANNOTATIONS, DISTANCE, GENES, KEY, STRUCTURE, SUMMARY_DONE } from '../test/job'
 import { jobApi } from './api'
-import { StructureTab } from './StructureTab'
+import { solidSpan, StructureTab } from './StructureTab'
 
 vi.mock('./Scene', () => ({
   Scene: (p: { onPick?: (i: number) => void; markers?: { label: string }[] }) => (
@@ -113,4 +113,14 @@ describe('Measure, find a gene and the gene card', () => {
     await screen.findByRole('region', { name: 'Distance A to B' })
     expect(checkCopy(container)).toEqual([])
   })
+
+  it('keeps the whole chain between the anchors of a selected loop solid, and else the chosen part', () => {
+    const loop = { factor: 'CTCF', chrom: 'chr1', a: [1000, 3000] as [number, number], b: [9000, 11000] as [number, number], span: 6000, pets: 4 }
+    // From the middle of one anchor to the middle of the other.
+    expect(solidSpan(loop, null)).toEqual([2000, 10000])
+    expect(solidSpan(loop, [0, 500])).toEqual([2000, 10000])
+    expect(solidSpan(null, [0, 500])).toEqual([0, 500])
+    expect(solidSpan(null, null)).toBeNull()
+  })
+
 })

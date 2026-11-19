@@ -1,0 +1,15 @@
+23:11:23 the pull has ended with 3960 of 3960 structures
+23:43:01 tasks done: 198 pile-ups, 198 pooled scores of 198
+person     loops    SCC C  SCC R  change    pile-up C pile-up R  change   pile-up of the map
+HG00512    95858    0.548  0.585      7%        0.339     0.568     67%   5.244
+HG00513    49103    0.488  0.467     -4%        0.359     0.535     49%   4.239
+HG00514     8921    0.524  0.524      0%        0.361     0.520     44%   4.608
+HG00731    71230    0.548  0.554      1%        0.358     0.549     53%   4.731
+HG00732    49481    0.519  0.521      0%        0.351     0.516     47%   5.437
+HG00733   138467    0.520  0.516     -1%        0.337     0.514     53%   5.100
+GM19238    58673    0.544  0.541     -0%        0.402     0.589     47%   4.447
+GM19239   107261    0.529  0.518     -2%        0.413     0.634     54%   3.789
+GM19240    82292    0.506  0.513      1%        0.351     0.536     53%   4.715
+pile-up at RNAPII loops, relative to the map's: higher with RNAPII loops in 9 of 9, change +44 to +67%, median +53%
+correlation with the whole map: higher with RNAPII loops in 5 of 9, change -4 to +7%, median +0%
+23:43:02 all done

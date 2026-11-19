@@ -1,17 +1,14 @@
 #!/bin/bash
-# Arms against production on chosen regions and cells, one machine, one job at a time.
+# Arms against production on chosen regions and cells.
 #
 #   DATA=~/gapfill-data HIC=~/gapfill-data/_hic OUT=out/arms TAG=name \
 #   CELLS="GM12878 H1ESC HFFC6" REGIONS="chr1:10000000-15000000 chr1:20000000-25000000" N=5 \
 #     bash slurm/ensemble/arms_trial.sh 'arm1:sec.key=val,sec.key=val' 'arm2:sec.key=val' ...
 #
-# Every arm is slurm/ensemble/<cell>$BASE.ini, BASE _xc_R unless set, with its overrides
-# written, and production, the file as it is, runs beside them on the same machine, since another card or pool size does not
-# reproduce a structure bit for bit. A value CONTACT_MAP in an override is replaced by the cell's
-# deepest mcool at 1 kb. A region written chr1 runs the whole chromosome and is scored on
-# chr1:1-60000000. Each region is scored on the pooled ensemble map, the headline, and by the
-# battery per structure on raw and balanced counts, the readout and the contact spread, and the
-# log of the whole trial is OUT/TAG.log.
+# An arm is slurm/ensemble/<cell>$BASE.ini with its overrides, BASE _xc_R unless set. Production
+# runs beside the arms on the same machine. CONTACT_MAP in an override is replaced by the deepest
+# mcool of the cell at 1 kb. A region chr1 runs the whole chromosome and is scored on
+# chr1:1-60000000. The log is OUT/TAG.log.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"

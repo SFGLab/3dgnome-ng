@@ -26,6 +26,7 @@ def make_data(root: Path) -> Path:
     )
     (ct / "segments.bed").write_text("chr1\t0\t0\nchr1\t2000000\t2000000\n")
     (ct / "centromeres.bed").write_text("chr1\t121700000\t125100000\n")
+    (ct / "compartments.bed").write_text("chr1\t0\t1000000\tA\nchr1\t1000000\t2500000\tB\nchr1\t2500000\t4000000\tA\nchr2\t0\t1000000\tB\n")
     (ct / "config.ini").write_text("[main]\nmax_pet_length = 1000000\n\n[data]\n")
     (ct / "genes.tsv").write_text("gene_id\tname\tchrom\ttss\tstrand\nG1\tALPHA\tchr1\t1310000\t+\nG2\tBETA\tchr1\t2600000\t-\n")
     (ct / "enhancers.bed").write_text("chr1\t1490000\t1492000\nchr1\t2700000\t2702000\n")
@@ -36,6 +37,9 @@ def make_data(root: Path) -> Path:
         f.write("chr1\t900000\td1\tN\t<DEL>\t.\tPASS\tSVTYPE=DEL;END=960000;SVLEN=-60000\tGT\t1|0\t0|0\n")
         f.write("chr1\t1700000\ti1\tN\tNACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT\t.\tPASS\tSVTYPE=INS;SVLEN=56\tGT\t0|1\t0|0\n")
         f.write("chr1\t2500000\tb1\tN\t<CNV>\t.\tPASS\tSVTYPE=CNV;END=2600000\tGT\t1|1\t0|0\n")
+    # P1 is the child of P2 and of a father the call set does not hold.
+    (svs / "demo.samples.tsv").write_text(
+        "sample\tsex\tpopulation\tsuperpopulation\tfather\tmother\nP1\tfemale\tPUR\tAMR\tP0\tP2\nP2\tfemale\tPUR\tAMR\t\t\n")
     catalog = {
         "cell_types": {
             "GMX": {
@@ -44,9 +48,13 @@ def make_data(root: Path) -> Path:
                 "clusters": {"CTCF": "ctcf.bedpe", "RNAPII": "rnapii.bedpe"},
                 "singletons": "singletons.bedpe", "segments": "segments.bed", "centromeres": "centromeres.bed",
                 "config": "config.ini", "genes": "genes.tsv", "enhancers": "enhancers.bed", "note": "",
+                "compartments": "compartments.bed",
             }
         },
-        "sv_sets": {"DEMO": {"label": "demo call set", "vcf": "svs/demo.vcf.gz", "samples": ["P1", "P2"]}},
+        "sv_sets": {
+            "DEMO": {"label": "demo call set", "vcf": "svs/demo.vcf.gz", "samples": ["P1", "P2"], "samples_table": "svs/demo.samples.tsv"},
+            "BARE": {"label": "a call set without a table", "vcf": "svs/demo.vcf.gz", "samples": ["P1", "P2"]},
+        },
     }  # fmt: skip
     (root / "catalog.json").write_text(json.dumps(catalog, indent=2))
     return root

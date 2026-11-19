@@ -42,6 +42,10 @@ def main() -> int:
         check("the summary has the state, structures and files", s["state"] == "done" and s["structures"] == 3 and {"ep.tsv", "marks.json", "engine.log"} <= names, str(s)[:200])
         check("the summary has the loop counts and the gene count", s["loops"] == {"CTCF": 14, "RNAPII": 1} and s["genes"] >= 1, str(s)[:300])
         check("a done job is not in the queue", s["ahead"] is None)
+        check("a job without a hosted sample has no sample note", s["sample_note"] == "", str(s.get("sample_note")))
+        hosted = "/api" + c.post("/api/jobs", data=form | {"n_models": "1", "sv_set": "DEMO", "sample": "P1"}).json()["url"]
+        note = c.get(hosted + "/summary").json()["sample_note"]
+        check("a hosted sample's job gives its population and sex", note == "PUR, AMR, female", note)
 
         st = c.get(three + "/structure/2").json()
         check("a structure has a chain with genomic positions", len(st["chain"]) > 100 and len(st["chain"][0]) == 4, str(st["chain"][:2]))
@@ -110,9 +114,9 @@ def main() -> int:
         (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(39)) + f"wrote {run}/models/s3.cif\n")
         tail = ex.summary(run, None)["log_recent"]
         check("the log shows no server path", str(run) not in tail and "wrote models/s3.cif" in tail and str(run) not in ex.log_text(run), tail[-80:])
-        (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(40)))
+        (run / "engine.log").write_text("".join(f"line {k}\n" for k in range(450)))
         live = ex.summary(run, None)
-        check("a running job carries the end of its engine log", live["log_recent"].splitlines()[-1] == "line 39" and len(live["log_recent"].splitlines()) == 12, str(live.get("log_recent"))[:100])
+        check("a running job carries the end of its engine log", live["log_recent"].splitlines()[-1] == "line 449" and len(live["log_recent"].splitlines()) == 200, str(live.get("log_recent"))[-60:])
     return done()
 
 

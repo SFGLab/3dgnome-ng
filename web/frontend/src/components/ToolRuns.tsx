@@ -11,9 +11,8 @@ type Measure = { key: string; label: string; dir: Direction; dirText?: string; r
 const TIE = 0.02
 
 /**
- * The runs of several tools on one task as a table of bars. Each tool has three bars, the beads
- * in its model, its runtime and its runtime per 1,000 beads. Every column has its own scale
- * and names the direction that is better. The two time columns mark their lowest value.
+ * The runs of several tools on one task as a table of bars: the beads of the model, the runtime and
+ * the runtime per 1,000 beads. Every column has its own scale.
  */
 export function ToolRuns({ title, subtitle, unit, runs }: { title: string; subtitle: string; unit: 'seconds' | 'minutes'; runs: ToolRun[] }) {
   const measures: Measure[] = [

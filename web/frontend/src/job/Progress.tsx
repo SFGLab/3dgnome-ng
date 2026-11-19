@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { Summary } from './api'
 
 const WORDS: Record<string, string> = {
@@ -27,8 +28,10 @@ function weights(hicdiffusion: boolean): [string, number][] {
 
 const since = (s: number) => (s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`)
 
-/** A queued or running job: a bar over its stages, the stage and its count, and a status log of
- * the stages with the time each began after the first, then the end of the engine log. */
+/**
+ * A queued or running job: the stage with its count, the bar and the stages, then the end of the
+ * engine log, which follows its last line unless the reader has scrolled up.
+ */
 export function Progress({ summary }: { summary: Summary }) {
   const stage = summary.state === 'queued' ? 'queued' : (summary.stage ?? 'inputs')
   const ws = weights((summary.request.background ?? '') === 'hicdiffusion' || !!summary.request.hicdiffusion)
@@ -53,9 +56,29 @@ export function Progress({ summary }: { summary: Summary }) {
         : (WORDS[stage] ?? stage)
   const stages = summary.stages ?? []
   const t0 = stages[0]?.at ?? 0
+  const log = useRef<HTMLPreElement>(null)
+  const follow = useRef(true)
+  useEffect(() => {
+    const el = log.current
+    if (!el || !follow.current) return
+    const toEnd = () => {
+      el.scrollTop = el.scrollHeight
+    }
+    toEnd()
+    // Once more after the layout has settled and once the log's font has loaded, which changes
+    // the height of its lines.
+    const frame = requestAnimationFrame(toEnd)
+    void document.fonts?.ready.then(() => {
+      if (follow.current) toEnd()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [summary.log_recent])
   return (
     <div className="progress">
-      <p className="progress-line">{line}</p>
+      <div className="progress-head">
+        <p className="progress-line">{line}</p>
+        <span className="progress-pct">{`${pct}%`}</span>
+      </div>
       <div className="progress-bar" role="progressbar" aria-label="Progress of the job" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
         <span style={{ width: `${pct}%` }} />
       </div>
@@ -69,12 +92,18 @@ export function Progress({ summary }: { summary: Summary }) {
           ))}
         </ul>
       )}
-      {summary.log_recent && (
-        <pre className="log-tail" aria-label="End of the engine log">
-          {summary.log_recent}
-        </pre>
-      )}
-      <p className="progress-note">The page refreshes itself and opens the structures when the job is done.</p>
+      <pre
+        className="log-tail live"
+        aria-label="End of the engine log"
+        ref={log}
+        onScroll={(e) => {
+          const el = e.currentTarget
+          // The log follows its end while the reader is at the end.
+          follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+        }}
+      >
+        {summary.log_recent || 'The engine has not written to its log yet.'}
+      </pre>
     </div>
   )
 }

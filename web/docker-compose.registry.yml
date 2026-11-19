@@ -1,0 +1,16 @@
+# An image registry on the deployment host. Run from web/:
+#   REGISTRY_ROOT=/srv/registry docker compose -f docker-compose.registry.yml up -d
+# The registry listens on the loopback of the host and has no login. A build machine reaches it
+# through an ssh tunnel:
+#   ssh -N -L 5000:localhost:5000 <host> &
+#   docker push localhost:5000/gnome3d-web:<tag>
+# REGISTRY_USER runs it as the owner of REGISTRY_ROOT.
+name: gnome3d-registry
+services:
+  registry:
+    image: registry:2
+    restart: unless-stopped
+    user: "${REGISTRY_USER:-0:0}"
+    ports: ["127.0.0.1:${REGISTRY_PORT:-5000}:5000"]
+    volumes:
+      - "${REGISTRY_ROOT:?set REGISTRY_ROOT to the directory that holds the images}:/var/lib/registry"

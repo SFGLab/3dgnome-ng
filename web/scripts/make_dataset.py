@@ -1,14 +1,12 @@
-"""Write one cell type's directory for the site from this repository's prepared inputs, and
-add it to the catalog.
+r"""Writes the directory of one cell type for the site from the prepared inputs of this
+repository and adds it to the catalog.
 
-    python web/scripts/make_dataset.py <repo data dir> <site data dir> <CELL> \\
-        --gtf gencode.v40.basic.annotation.gtf --enhancers <CELL>_enhancers_hg38.bed \\
+    python web/scripts/make_dataset.py <repo data dir> <site data dir> <CELL> \
+        --gtf gencode.v40.basic.annotation.gtf --enhancers <CELL>_enhancers_hg38.bed \
         [--label "GM12878, lymphoblastoid"] [--lymphoblastoid] [--note "..."]
 
-Reads, from `<repo data dir>/<CELL>/`, the production CTCF anchors and the cross line inputs of
-playground/rnapii/crosscell_prep.py, the Hi-C singletons, segments and centromeres, and takes
-the arm C config from slurm/ensemble as the template. Files are copied, never linked, so the
-site's data directory stands on its own. An existing cell type directory is refused.
+`--genes` takes the genes.tsv of a cell type that is built, in place of `--gtf`. Files are
+copied. An existing cell type directory is refused.
 """
 
 from __future__ import annotations
@@ -53,7 +51,8 @@ def main() -> None:
     ap.add_argument("repo_data")
     ap.add_argument("site_data")
     ap.add_argument("cell")
-    ap.add_argument("--gtf", required=True)
+    ap.add_argument("--gtf", default="")
+    ap.add_argument("--genes", default="", help="a genes.tsv already built from the annotation, in place of --gtf")
     ap.add_argument("--enhancers", required=True)
     ap.add_argument("--label", default="")
     ap.add_argument("--lymphoblastoid", action="store_true")
@@ -61,6 +60,8 @@ def main() -> None:
     ap.add_argument("--singletons", default="", help="the Hi-C singletons, when not under the repo data dir")
     ap.add_argument("--contact-map", default="", help="a cooler URI at 1 kb on the server, for the stretches without loops")
     a = ap.parse_args()
+    if bool(a.gtf) == bool(a.genes):
+        raise SystemExit("give one of --gtf and --genes")
     c = a.cell
     src = Path(a.repo_data) / c
     site = Path(a.site_data)
@@ -85,7 +86,12 @@ def main() -> None:
         shutil.copyfile(p, dest / name)
     with (dest / "config.ini").open("a") as fh:
         fh.write(HOLES)
-    n = genes_from_gtf(Path(a.gtf), dest / "genes.tsv")
+    if a.genes:
+        shutil.copyfile(a.genes, dest / "genes.tsv")
+        with (dest / "genes.tsv").open() as fh:
+            n = sum(1 for _ in fh) - 1
+    else:
+        n = genes_from_gtf(Path(a.gtf), dest / "genes.tsv")
     cat_path = site / "catalog.json"
     cat = json.loads(cat_path.read_text()) if cat_path.is_file() else {"cell_types": {}, "sv_sets": {}}
     cat["cell_types"][c] = {
@@ -105,7 +111,7 @@ def main() -> None:
     if a.contact_map:
         cat["cell_types"][c]["contact_map"] = a.contact_map
     cat_path.write_text(json.dumps(cat, indent=2) + "\n")
-    print(f"wrote {dest}, {n} genes, and the catalog entry")
+    print(f"wrote {dest}, {n} genes and the catalog entry")
 
 
 if __name__ == "__main__":

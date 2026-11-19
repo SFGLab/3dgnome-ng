@@ -6,21 +6,13 @@ from gnome3d import log
 
 LOG = log.get("mc.jax.util")
 
-_JAX_AVAILABLE: bool | None = None  # None = not yet probed
+_JAX_AVAILABLE: bool | None = None  # None before the first probe
 _init_lock = threading.Lock()
 
-# Shape-bucket ladder.  When settings.jax_bucket_shapes is on, every kernel's
-# bead count N is padded up to the next bucket so XLA compiles one program per
-# bucket instead of one per distinct region size.
-#
-# The ladder is geometric x2 up to 4096 and roughly x1.25 above it.  The smooth
-# kernel's heat tensor is (N, N), so padding costs the square of the ratio: on a
-# x2 ladder an N just above a boundary wasted 4x on the single largest array,
-# which reached tens of gigabytes of host memory on a whole chromosome.  Above
-# 8192, where that array is 0.27 GB or more, the finer steps cut worst-case waste
-# from 4.00x to 1.64x and mean waste from 2.00x to 1.26x.  Below 4096 the arrays
-# are small enough that x2 is free, and keeping it there holds the compile count
-# down.  N above the top bucket compiles at its exact size (rare).
+# The shape buckets. With `jax_bucket_shapes` the bead count of a kernel is padded to the next
+# bucket. That XLA compiles one program per bucket. The steps are x2 up to 4096 and about x1.25
+# above. The heat tensor is (N, N) and padding costs the square of the ratio. An N above the
+# top bucket compiles at its exact size.
 SHAPE_BUCKETS: tuple[int, ...] = (
     256,
     512,
@@ -38,9 +30,7 @@ SHAPE_BUCKETS: tuple[int, ...] = (
     32768,
 )
 
-# Separate (finer/smaller) ladders for smooth orientation's anchor count and
-# neighbor width - these scale below N, so reusing _SHAPE_BUCKETS would waste a
-# lot at small sizes.
+# Finer buckets for the anchor count and the neighbour width of the orientation term.
 ANCHOR_BUCKETS: tuple[int, ...] = (16, 64, 256, 1024, 4096, 16384)
 NBR_BUCKETS: tuple[int, ...] = (4, 8, 16, 32, 64)
 
@@ -48,8 +38,7 @@ NBR_BUCKETS: tuple[int, ...] = (4, 8, 16, 32, 64)
 def log_kernel_start(
     logger: logging.Logger, stage: str, kernel: str, k: int, b: int, detail: str
 ) -> None:
-    """Standard JAX kernel start line, one format for arcs and smooth:
-    ``arcs[mc]: 719 IBs x 256 beads - <detail>, running...``."""
+    """Logs the start of a JAX kernel, `arcs[mc]: 719 IBs x 256 beads - <detail>, running...`."""
     log.status(
         logger, "    %s[%s]: %d IBs x %d beads - %s, running...", stage, kernel, k, b, detail
     )
@@ -58,12 +47,12 @@ def log_kernel_start(
 def log_kernel_done(
     logger: logging.Logger, stage: str, kernel: str, k: int, secs: float, summary: str
 ) -> None:
-    """Standard JAX kernel done line: ``arcs[mc]: 719 IBs in 268.1s - <summary>``."""
+    """Logs the end of a JAX kernel, `arcs[mc]: 719 IBs in 268.1s - <summary>`."""
     log.status(logger, "    %s[%s]: %d IBs in %.1fs - %s", stage, kernel, k, secs, summary)
 
 
 def jax_is_available() -> bool:
-    """Lazy-import JAX. Returns True on success, False if not installed."""
+    """Imports JAX on first use. Returns False when it is not installed."""
     global _JAX_AVAILABLE
     if _JAX_AVAILABLE is not None:
         return _JAX_AVAILABLE
@@ -120,9 +109,9 @@ _BUDGET_LOGGED: bool = False
 
 
 def _physical_device_total_bytes() -> int | None:
-    """Total physical bytes of GPU 0, independent of the XLA allocator.  vmm / platform expose an
-    EMPTY ``memory_stats()``, so the only reliable budget source under them is the device itself -
-    read it via NVML, then nvidia-smi.  Cached; ``None`` if neither is available."""
+    """Returns the total bytes of GPU 0 by NVML or nvidia-smi, cached, or None. The vmm and
+    platform allocators report an empty `memory_stats()`.
+    """
     global _DEVICE_TOTAL_BYTES, _DEVICE_PROBED
     if _DEVICE_PROBED:
         return _DEVICE_TOTAL_BYTES
@@ -146,20 +135,20 @@ def _physical_device_total_bytes() -> int | None:
             timeout=5,
         ).stdout.split()
         if out:
-            _DEVICE_TOTAL_BYTES = int(float(out[0])) * 1024 * 1024  # MiB -> bytes
+            _DEVICE_TOTAL_BYTES = int(float(out[0])) * 1024 * 1024  # MiB to bytes
     except Exception:  # noqa: BLE001 - nvidia-smi missing / unparseable
         pass
     return _DEVICE_TOTAL_BYTES
 
 
 def jax_device_budget_bytes(fraction: float = 0.95) -> int | None:
-    """Best-effort usable device memory (bytes) for sizing batched kernels.
+    """Returns the usable device memory in bytes for sizing batched kernels, or None on the CPU
+    backend.
 
-    BFC preallocates a fixed pool, so ``memory_stats()['bytes_limit']`` IS the usable budget.
-    vmm / platform grow on demand and expose an EMPTY ``memory_stats()``, so we read the physical
-    device total (NVML / nvidia-smi) instead - allocator-independent.  Returns ``fraction`` * the
-    total, or ``None`` (CPU backend / nothing queryable) so callers fall back to a fixed heuristic.
-    ``fraction`` leaves headroom for kernel scratch beyond the stacked inputs."""
+    The BFC allocator preallocates a pool and `memory_stats()['bytes_limit']` is the budget. The
+    vmm and platform allocators grow on demand and the physical total of the device is read.
+    `fraction` leaves room for kernel scratch.
+    """
     if not jax_is_available():
         return None
     try:
@@ -173,7 +162,7 @@ def jax_device_budget_bytes(fraction: float = 0.95) -> int | None:
         total = stats.get("bytes_reservable_limit") or _physical_device_total_bytes()
         share = os.environ.get("XLA_PYTHON_CLIENT_MEM_FRACTION")
         if total and share:
-            # These allocators do not cap a process, so its share of the card is the budget.
+            # These allocators do not cap a process. Its share of the card is the budget.
             total = int(int(total) * float(share))
     else:
         total = stats.get("bytes_limit")
@@ -193,18 +182,11 @@ def jax_device_budget_bytes(fraction: float = 0.95) -> int | None:
 
 
 def stable_seed_offset(src: str, base: int | None = None) -> int:
-    """PRNG offset for a JAX kernel, stable across processes.
+    """Returns the PRNG offset of a JAX kernel, stable across processes.
 
-    Two runs of one config with one seed must produce one structure. Deriving the
-    offset from `hash()` of a string broke that, because Python salts string
-    hashing per process, so every run of a JAX-backed stage silently explored a
-    different trajectory and `PYTHONHASHSEED=0` was needed to compare two runs.
-    blake2b is stable across processes and machines.
-
-    `src` distinguishes concurrent kernels, normally the active scope path.
-    `base` mixes in the seed the DAG node carries, so the offset follows from
-    `Seeded.seed` the way the numba path's already does. The odd multiplier
-    spreads nearby seeds across the output range before the modulo.
+    The offset comes from a blake2b digest. Python salts `hash()` per process. `src`
+    separates concurrent kernels and is normally the active scope path. `base` mixes in the seed
+    of the DAG node.
     """
     import hashlib
 
@@ -215,7 +197,7 @@ def stable_seed_offset(src: str, base: int | None = None) -> int:
 
 
 def jax_bucket_for(n: int, ladder: tuple[int, ...] = SHAPE_BUCKETS) -> int:
-    """Smallest ladder bucket >= n, or n itself if it exceeds the top bucket."""
+    """Returns the smallest bucket >= n, or n above the top bucket."""
     for b in ladder:
         if n <= b:
             return b

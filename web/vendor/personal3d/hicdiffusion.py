@@ -92,8 +92,8 @@ def haplotype_window(ref: Reference, chrom: str, start: int, svs: list[SV], size
 
     The variants are applied left to right, each one wholly after the last, one that overlaps
     the previous is skipped as the rules skip it. Deleted bases are skipped, an insertion is
-    put in before its position, an inversion is reverse complemented in place. Reference
-    bases are read until the window is full."""
+    put in before its position, an inversion is reverse complemented in place, a duplication's
+    bases are followed by a second copy. Reference bases are read until the window is full."""
     parts, steps, deleted, inverted = [], [], [], []
     pos, have = start, 0
     for s in sorted((v for v in svs if v.chrom == chrom), key=lambda v: v.start):
@@ -116,6 +116,12 @@ def haplotype_window(ref: Reference, chrom: str, start: int, svs: list[SV], size
             inverted.append((a, b, have))
             parts.append(ref.fetch(chrom, a, b).translate(COMPLEMENT)[::-1])
             have += b - a
+            pos = b
+        elif s.kind == "DUP":
+            b = s.end - 1
+            once = ref.fetch(chrom, a, b)
+            parts += [once, once]
+            have += 2 * (b - a)
             pos = b
         steps.append((pos, have))
     while have < size:

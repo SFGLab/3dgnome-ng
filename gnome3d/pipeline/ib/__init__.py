@@ -1,18 +1,6 @@
-"""
-IB reconstruction domain: the per-interaction-block pipeline stages.
+"""The stages of one interaction block: arcs, densify, the optional distance estimate and smooth.
 
-Once the coarse spine (`gnome3d.pipeline.coarse`) has positioned the cluster
-graph, each interaction block reconstructs *independently* as a linear chain of
-stages - arcs (anchor positioning) -> densify (insert subanchors) -> [heat]
-(subanchor distance target) -> smooth (final MC).  Each stage wraps a validated
-kernel (numba `mc_arcs`/`mc_smooth` in `gnome3d.mc`, the densify arithmetic, the
-heat-dist estimate); the orchestration lives in the stage, the math does not.
-
-Importing this package wires the serial (numba / CPU) and batched (JAX) runners
-into the registry, so an executor can run a Dag built from these stages.  This is
-the domain peer of `pipeline.coarse`: coarse owns the coupled positioning spine,
-`ib` owns the isolated per-IB chains (and `chain.ib_chain_nodes`, the chain
-assembly the coarse fan-out calls).
+Importing this package registers the serial and the batch runners.
 """
 
 from __future__ import annotations

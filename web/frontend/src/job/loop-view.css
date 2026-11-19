@@ -1,0 +1,146 @@
+/* The loops of a region as arcs over the genome. */
+.loop-view {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.loop-view-arcs {
+  display: block;
+  width: 100%;
+  height: 88px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  touch-action: none;
+}
+
+.loop-view-arcs.brushable {
+  cursor: crosshair;
+}
+
+.loop-arc {
+  fill: none;
+  stroke-width: 1.2;
+  opacity: 0.55;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.loop-arc.ctcf {
+  stroke: var(--ctcf);
+}
+
+.loop-arc.rnapii {
+  stroke: var(--rnapii);
+}
+
+/* With a loop selected the others step back. */
+.loop-arc.dimmed {
+  opacity: 0.18;
+}
+
+.loop-arc.over {
+  opacity: 1;
+  stroke-width: 2.6;
+}
+
+.loop-arc.selected {
+  opacity: 1;
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.loop-view-box {
+  position: relative;
+}
+
+/* The letters of the selected loop's anchors, on the genome line. */
+.loop-anchor {
+  position: absolute;
+  bottom: -7px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* The line over the arcs and the buttons at its end. Two lines high, so the view does not move
+   when a short line replaces a long one. */
+.loop-view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  margin-bottom: 4px;
+}
+
+.loop-view-tools {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+
+.icon-tool.small {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+}
+
+.loop-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 9;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+  cursor: pointer;
+  outline: none;
+}
+
+.loop-window {
+  fill: color-mix(in srgb, var(--accent) 14%, transparent);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.loop-brush {
+  fill: color-mix(in srgb, var(--accent) 24%, transparent);
+  pointer-events: none;
+}
+
+.loop-cursor {
+  stroke: var(--ink, #151514);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.loop-view-axis {
+  position: relative;
+  height: 16px;
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+.loop-view-axis span {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.loop-view-axis .unit {
+  right: 0;
+  left: auto;
+  top: 2px;
+  transform: none;
+}
+
+.loop-view-line {
+  margin: 0;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--muted);
+}

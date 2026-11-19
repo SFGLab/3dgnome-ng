@@ -1,16 +1,8 @@
-"""
-Sealed state progression for an IB reconstruction.
+"""The states of an IB reconstruction.
 
-A task's data is a *closed chain of frozen states*, each adding exactly what its
-producing stage yields:
+    Seeded -> Arced -> Densified -> DistEstimated -> Smoothed
 
-    Seeded ──arcs──▶ Arced ──densify──▶ Densified ──est_dist──▶ DistEstimated ──smooth──▶ Smoothed
-
-A stage is typed by the state it consumes and the state it produces, so you
-cannot reach for `pos` before densify - the type doesn't carry it.  States are
-immutable; a stage returns the next state rather than mutating a shared bag.
-No field references the solver or the global cluster graph: everything an IB
-needs is copied in, which is what makes the task isolated.
+Each state is frozen and adds the output of its stage. No field refers to the cluster graph.
 """
 
 from __future__ import annotations
@@ -31,83 +23,75 @@ if TYPE_CHECKING:
         I8Array,
     )
 
-# (bead_index_in_densified, anchor_index_in_ib) - abstract, no global cluster ref.
+# (bead index after densify, anchor index in the IB)
 AnchorMapEntry = tuple[int, int]
 
 
 class Orientation(IntEnum):
-    """CTCF motif orientation per anchor.  Stored as an `int8` array (one byte
-    each, vectorizable) instead of a `list[str]` of ``'N'/'L'/'R'`` - same info,
-    ~50x less memory and the form the kernels actually want (``orn == LEFT``).
-    """
+    """The CTCF motif orientation of an anchor, stored as int8."""
 
-    NONE = 0  # no motif call ('N')
-    LEFT = 1  # 'L' - orientation vector is negated downstream
-    RIGHT = 2  # 'R'
+    NONE = 0  # N
+    LEFT = 1  # L, the orientation vector is negated downstream
+    RIGHT = 2  # R
 
 
 @dataclass(frozen=True)
 class Seeded:
-    """Skeleton output / chain input: everything an isolated IB needs, copied in
-    (no solver or cluster references)."""
+    """The input of an IB chain. Everything is copied in."""
 
     settings: Settings
-    seed: int  # RNG seed = f(ib_id, ensemble_member)
-    anchor_seed_pos: F32Array  # (A, 3) seed positions from IB positioning
-    exp_dist: F64Array  # (A, A) arc expected-distance matrix
-    orientations: I8Array | None  # (A,) Orientation codes, or None when motif off
-    anchor_neighbors: dict[int, list[int]] | None  # CTCF motif graph (anchor-local)
+    seed: int  # RNG seed
+    anchor_seed_pos: F32Array  # (A, 3) seed positions
+    exp_dist: F64Array  # (A, A) expected distances of the arcs stage
+    orientations: I8Array | None  # (A,) Orientation codes, None with the motif term off
+    anchor_neighbors: dict[int, list[int]] | None  # motif neighbours by anchor index
     anchor_neighbor_weights: dict[int, list[float]] | None
-    subanchor_heat_raw: F32Array | None  # raw subanchor contact heatmap (or None); float32 (N,N)
+    subanchor_heat_raw: F32Array | None  # (N, N) raw subanchor contact heatmap
     anchor_genomic: list[tuple[int, int, int]]  # (start_bp, end_bp, midpoint_bp) per anchor
     step_size_arcs: float
-    # Compartment track, as the slice of the chromosome track this IB spans.
-    # Carried as intervals rather than an anchor-shaped array so densify can bin
-    # it straight onto subanchor ranges.  None when the track is absent or its
-    # term is off.
+    # The slice of the chromosome's compartment track that this IB spans. None without a track or
+    # with the term off.
     track_compartments: list[CompartmentInterval] | None
-    # Each arc pair's spring weight beside exp_dist, None at exponent zero. Keyword only so
-    # the subclasses' positional fields stay where they are.
+    # The spring weight of each arc pair, None at exponent zero. Keyword only. The positional
+    # fields of the subclasses keep their places.
     arc_w: F32Array | None = field(default=None, kw_only=True)
-    # Each anchor's activity for the factory term, None when the term is off.
+    # The activity of each anchor for the factory term.
     activity: F32Array | None = field(default=None, kw_only=True)
-    # The block's chromosome, which the maximum entropy start reads its contact map by.
     chrom: str = field(default="", kw_only=True)
 
 
 @dataclass(frozen=True)
 class Arced(Seeded):
-    """After arc-spring MC: anchors are positioned."""
+    """After the arcs stage. The anchors are placed."""
 
     anchor_pos: F32Array  # (A, 3)
 
 
 @dataclass(frozen=True)
 class Densified(Arced):
-    """After densify: subanchor beads inserted; arrays are now bead-shaped (N)."""
+    """After densify. Arrays have one entry per bead."""
 
-    pos: F32Array  # (N, 3) anchors + subanchors
-    fixed: BoolArray  # (N,) which beads are pinned during smooth
-    dtn: F32Array  # (N-1,) consecutive-bead bond targets
+    pos: F32Array  # (N, 3) anchors and subanchors
+    fixed: BoolArray  # (N,) beads that smooth does not move
+    dtn: F32Array  # (N-1,) bond targets
     anchor_map: list[AnchorMapEntry]
-    bead_starts: list[int]  # (N,) genomic start per bead
-    bead_ends: list[int]  # (N,) genomic end per bead
+    bead_starts: list[int]  # (N,) genomic start
+    bead_ends: list[int]  # (N,) genomic end
     step_size_smooth: float
-    # Compartment track binned onto bead shape (N).
+    # (N,) compartment per bead
     bead_compartment: I8Array | None
 
 
 @dataclass(frozen=True)
 class DistEstimated(Densified):
-    """After heat-dist estimate: the subanchor distance target (None when the
-    sparse-signal early-out skipped it -> smooth runs without heat)."""
+    """After the distance estimate. `heat_dist` is None when the heat signal is too sparse."""
 
-    heat_dist: F32Array | None  # (N, N); float32 to match the reference float Heatmap
+    heat_dist: F32Array | None  # (N, N) float32
 
 
 @dataclass(frozen=True)
 class Smoothed(DistEstimated):
-    """Terminal: final positions and the write-back beads."""
+    """The final state."""
 
     final_pos: F32Array  # (N, 3)
     beads: list[BeadOut]
@@ -115,27 +99,15 @@ class Smoothed(DistEstimated):
 
 @dataclass(frozen=True)
 class CoarsePhase:
-    """Carrier for the coarse positioning spine (hierarchy -> chr -> segment ->
-    ib), threaded as a *separate* payload from the Seeded IB progression.
+    """The payload of the coarse stages.
 
-    It wraps the shared `CoarseState`: an immutable field set whose cluster
-    objects mutate in place as each coarse stage positions a level (a graph
-    algorithm - there is one graph, the stages write `.pos` into it).  A coarse
-    stage takes a `CoarsePhase`, mutates the graph, and returns a `CoarsePhase`
-    over the same state; the terminal IB-positioning node's `expand` reads the
-    positioned graph to fan out the per-IB `Seeded` chains.
-
-    `seed` is the coarse spine's RNG seed - the root stage seeds the global stream
-    from it and the spine *flows* that one stream in dependency order (it does not
-    re-seed per stage, unlike the per-IB `Seeded.seed`; the coarse levels are a
-    coupled linear sequence, never reordered).  Carried here so the seed is state
-    the pipeline owns, not a side-effect the caller applies before the run.
+    It wraps the shared `CoarseState`, whose clusters each coarse stage positions in place.
+    `seed` seeds the global RNG at the root stage. The coarse stages draw from that one stream in
+    order and do not seed again.
     """
 
     state: CoarseState
     seed: int
 
 
-# The set of payloads that flow through the DAG.  The `Seeded` subclasses are the
-# per-IB progression; `CoarsePhase` is the upstream coarse spine's carrier.
 State: TypeAlias = Seeded | Arced | Densified | DistEstimated | Smoothed | CoarsePhase

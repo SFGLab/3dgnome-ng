@@ -55,11 +55,65 @@ def main() -> int:
         check("a job's page is the app", "FRONTEND-OK" in c.get(r.headers["location"]).text)
         check("a job's file is the server's", c.get(r.headers["location"] + "/files/ep.tsv").status_code == 200)
 
+        check("no part is hidden by default", "site-hide" not in c.get("/").text)
+        (dist / "index.html").write_text("<html><head></head><body>FRONTEND-OK</body></html>")
+        config = root / "data" / "config.json"
+        config.write_text('{"features": {"trios": false, "results": false, "method": true}}')
+        flagged = TestClient(create_app())
+        r = flagged.get("/")
+        check("a feature config.json turns off reaches the app in the page", '<meta name="site-hide" content="results,trios">' in r.text, r.text[:120])
+        config.write_text('{"features": {"trios": false}}')
+        os.utime(config, ns=(1, 1))
+        check("an edit of config.json is read without a restart", '<meta name="site-hide" content="trios">' in flagged.get("/").text)
+        config.write_text('{"features": {"trois": false}}')
+        os.utime(config, ns=(2, 2))
+        check("a broken edit keeps the configuration the site had", '<meta name="site-hide" content="trios">' in flagged.get("/").text)
+        for text, said in (('{"features": {"trois": false}}', "trois"), ('{"features": {"trios": "no"}}', "true or false"), ('{"feature": {}}', "unknown key"), ("{", "not JSON")):
+            config.write_text(text)
+            try:
+                create_app()
+                check(f"a site does not start on a config.json with {said}", False)
+            except ValueError as e:
+                check(f"a site does not start on a config.json with {said}", said in str(e), str(e))
+        config.unlink()
+        check("a site without config.json shows everything", "site-hide" not in TestClient(create_app()).get("/").text)
+        (dist / "index.html").write_text("<html><body>FRONTEND-OK</body></html>")
+
         os.environ["FRONTEND_DIST"] = str(root / "missing")
         bare = TestClient(create_app())
         r = bare.get("/")
         check("without a build the app says so", r.status_code == 503 and "The frontend is not built" in r.text, str(r.status_code))
         check("without a build /model/classic still works", bare.get("/model/classic").status_code == 200)
+
+        # The site under a prefix: BASE_PATH on the server and a build made for the same path.
+        (dist / "index.html").write_text('<html><body>FRONTEND-OK<script src="/new/assets/app.js"></script></body></html>')
+        os.environ.update(FRONTEND_DIST=str(dist), BASE_PATH="/new/")
+        under = TestClient(create_app())
+        for path in ("/new", "/new/", "/new/method", "/new/jobs", "/", "/method", "/newer"):
+            r = under.get(path)
+            check(f"under a prefix {path} returns the app", r.status_code == 200 and "FRONTEND-OK" in r.text, str(r.status_code))
+        for path in ("/new/assets/app.js", "/assets/app.js"):
+            check(f"under a prefix {path} is the asset", "console.log" in under.get(path).text)
+        for path in ("/new/api/catalog", "/api/catalog"):
+            r = under.get(path)
+            check(f"under a prefix {path} is JSON", r.status_code == 200 and r.headers["content-type"].startswith("application/json"), str(r.status_code))
+        check("under a prefix an unknown API path is a 404", under.get("/new/api/nothing").status_code == 404)
+        r = under.post("/new/api/jobs", data=form)
+        check("under a prefix the API gives the job's client route, without the prefix", r.status_code == 201 and r.json()["url"].startswith("/jobs/"), r.text[:80])
+        r = under.post("/new/jobs", data=form, follow_redirects=False)
+        check("under a prefix a job post redirects under the prefix", r.status_code == 303 and r.headers["location"].startswith("/new/jobs/"), r.headers.get("location", ""))
+        page = under.get(r.headers["location"] + "/classic")
+        check("under a prefix the old job page links its files under the prefix", page.status_code == 200 and 'href="/new/jobs/' in page.text and 'href="/new/"' in page.text)
+        check("under a prefix a job's file is the server's", under.get(r.headers["location"] + "/files/ep.tsv").status_code == 200)
+        check("under a prefix the old form posts under the prefix", 'action="/new/jobs"' in under.get("/new/model/classic").text)
+
+        (dist / "index.html").write_text('<html><body>FRONTEND-OK<script src="/assets/app.js"></script></body></html>')
+        r = TestClient(create_app()).get("/new/")
+        check("a build for another path is refused with both paths named", r.status_code == 503 and "built for the path /" in r.text and "BASE_PATH /new" in r.text, r.text[:120])
+        os.environ.pop("BASE_PATH")
+        (dist / "index.html").write_text('<html><body>FRONTEND-OK<script src="/new/assets/app.js"></script></body></html>')
+        r = TestClient(create_app()).get("/")
+        check("a prefixed build at the root is refused", r.status_code == 503 and "built for the path /new" in r.text, r.text[:120])
     return done()
 
 

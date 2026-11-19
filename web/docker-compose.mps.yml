@@ -1,10 +1,9 @@
-# The workers' engines on the host's NVIDIA MPS daemon. Use together with docker-compose.yml:
-#   nvidia-cuda-mps-control -d          # on the host, once, as root or the GPU owner
+# The engines of the workers on the NVIDIA MPS daemon of the host. Use with docker-compose.yml:
+#   nvidia-cuda-mps-control -d          # on the host, once
 #   docker compose -f docker-compose.yml -f docker-compose.mps.yml up -d
-# The workers share the host IPC namespace and the daemon's pipe directory, /tmp/nvidia-mps by
-# default, MPS_PIPE_DIRECTORY to change it. A daemon started without root serves only its own
-# user; MPS_USER=$(id -u):$(id -g) runs the web process and the workers as that user, since both
-# write the job directories.
+# The workers share the IPC namespace of the host and the pipe directory of the daemon, /tmp/nvidia-
+# mps or MPS_PIPE_DIRECTORY. A daemon started without root serves its own user alone. MPS_USER=$(id
+# -u):$(id -g) runs the web process and the workers as that user.
 x-mps: &mps
   ipc: host
   user: "${MPS_USER:-0:0}"

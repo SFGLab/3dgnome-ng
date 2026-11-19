@@ -1,14 +1,13 @@
 #!/bin/bash
-# The smooth and arcs stages on the CPU kernels against the JAX device by region size, GM12878
-# chr1 from 10 Mb, one machine, one job at a time. design/tools-comparison.md.
+# The smooth and arcs stages on the CPU kernels against the JAX device by region size, GM12878 chr1
+# from 10 Mb. design/tools-comparison.md.
 #
 #   DATA=~/gapfill-data OUT=out/crossover SPANS="5 10 20 40 chr1" EXECS="serial threaded batch" \
 #     bash slurm/ensemble/executor_crossover.sh
 #
-# Each span runs N structures under production's executors, `batch`, and with the arcs, estimate
-# and smooth stages on `serial` or `threaded`, or as `hybrid` with the arcs solve on the device and
-# the smooth stage threaded. A span written chr1 is the whole chromosome. Wall
-# clock, bead count and the stage lines of each log go to OUT/crossover.tsv and OUT/stages.txt.
+# batch is production. serial and threaded move the arcs, estimate and smooth stages to numba.
+# hybrid keeps the arcs solve on the device. A span chr1 is the whole chromosome. Results go to
+# OUT/crossover.tsv and OUT/stages.txt.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"

@@ -68,3 +68,53 @@
   font-size: 13px;
   text-decoration: none;
 }
+
+.data-note {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.data-table .accessions {
+  font: 12px var(--mono);
+}
+
+.data-table .accessions a,
+.data-table .accessions span {
+  display: block;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.data-table .accessions .unconfirmed,
+.data-table .accessions .no-accession {
+  font-family: var(--font);
+}
+
+.no-accession {
+  color: var(--faint);
+}
+
+@media (max-width: 720px) {
+  .data-table,
+  .data-table tbody,
+  .data-table tr,
+  .data-table td {
+    display: block;
+  }
+
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table tr {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .data-table td {
+    padding: 2px 0;
+    border: 0;
+  }
+}

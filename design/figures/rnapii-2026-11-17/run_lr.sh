@@ -1,6 +1,6 @@
 #!/bin/bash
-# Cross line readouts on the production of 2026-11-16, arms C, R and M from eden's out/lr, arm E as before.
-R=/mnt/storagelinux/xc_readout_lr
+# Cross line readouts on the production of 2026-11-16, arms C, R and M from the cluster's out/lr, arm E as before.
+R="${R:?Set R to the readout directory}"
 export ROOT=$R
 cd $R
 for L in GM12878 H1ESC HFFC6; do bash repo/playground/rnapii/readouts_crossline.sh structure $L > out/readouts_$L.log 2>&1; done

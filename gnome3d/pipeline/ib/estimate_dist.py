@@ -1,13 +1,7 @@
-"""
-ESTIMATE_DIST stage: estimate the subanchor contact-distance target matrix.
+"""The ESTIMATE_DIST stage estimates the subanchor distance target matrix.
 
-Pure port of `Solver._build_heat_dist_subanchor` = `_estimate_avg_dist` (dry
-smooth-MC passes to get average pairwise distances) + `_heat_dist_from_avg`
-(scale high-contact pairs down by `influence`).  Reads the `Densified` state,
-seeds deterministically from `Seeded.seed`.  Only present in a chain when the
-skeleton's sparse-signal early-out kept it (`IBSeed.wants_heat`).
-
-Serial runner = numba dry smooth (`mc_smooth_numba` with no heat/orientation).
+Dry smooth passes give the average pair distances and pairs with many contacts are scaled
+down by `influence`. The stage is in a chain only when `IBSeed.wants_heat` is set.
 """
 
 from __future__ import annotations
@@ -27,21 +21,13 @@ if TYPE_CHECKING:
     from gnome3d.settings import Settings
     from gnome3d.types import BoolArray, F32Array
 
-_SEED_SALT = 1  # distinct from ARCS(0)/SMOOTH(2) so the noise streams don't correlate
+_SEED_SALT = 1  # differs from ARCS (0) and SMOOTH (2)
 _LOG = log.get("mc.jax")
 
 
 @njit(cache=True, parallel=True, nogil=True, fastmath=True)
 def _accumulate_pairwise_dist(acc: F32Array, pos: F32Array) -> None:
-    """Add the full (n,n) Euclidean distance matrix of `pos` into `acc`, in place.
-
-    Distances are computed directly (subtract then sqrt) exactly like the
-    reference `calcTrueDistancesHeatmapForRegion` (LooperSolver.cpp):
-    `d = (pos_i - pos_j).length()`.  Replaces the `pos[:,None,:] - pos[None,:,:]`
-    broadcast (which materialised an (n,n,3) temporary) *and* the separate (n,n)
-    result it accumulated into - folding the add into the kernel avoids a
-    per-rep temp at the B=32768 bucket.  `acc` is float32 (matching the reference's
-    float Heatmap, which also accumulates in single precision).  prange-parallel."""
+    """Adds the (n, n) distance matrix of `pos` into `acc`, in place and in float32."""
     n = pos.shape[0]
     for i in prange(n):
         xi = pos[i, 0]
@@ -54,18 +40,13 @@ def _accumulate_pairwise_dist(acc: F32Array, pos: F32Array) -> None:
             acc[i, j] += np.sqrt(dx * dx + dy * dy + dz * dz)
 
 
-@njit(cache=True, parallel=True, nogil=True)  # no fastmath: keep bit-identical to the old loop
+@njit(cache=True, parallel=True, nogil=True)  # no fastmath, the result must stay bit identical
 def _fill_heat_dist_inplace(
     avg_dist: F32Array, heat_raw: F32Array, avg_heat: float, influence: float
 ) -> None:
-    """Overwrite `avg_dist` in place with the expected-distance target, mirroring
-    the reference `createExpectedDistSubanchorHeatmap`: high-contact pairs scaled
-    down by `influence`.  Same arithmetic as the old pure-Python double loop
-    (`target = avg_dist * (1 - min(heat/avg_heat*influence, 1))`), but
-    prange-parallel and with no extra (n,n) allocation - the old loop both stalled
-    (~5e8 Python iterations at n=32768) and allocated a second 8.6 GB matrix.
-    Relies on `heat_raw`/`avg_dist` being symmetric (contact heatmaps are); the
-    diagonal stays 0 since `avg_dist[i,i]` is 0."""
+    """Overwrites `avg_dist` in place with the target
+    `avg_dist * (1 - min(heat / avg_heat * influence, 1))`. `heat_raw` and `avg_dist` must be symmetric.
+    """
     n = avg_dist.shape[0]
     for i in prange(n):
         for j in range(n):
@@ -78,10 +59,11 @@ def _fill_heat_dist_inplace(
 def _estimate_avg_dist(
     pos: F32Array, fixed: BoolArray, dtn: F32Array, step: float, s: Settings, seed: int
 ) -> F32Array:
-    """Average pairwise bead distances over dry smooth-MC passes.  Port of
-    `Solver._estimate_avg_dist` (reference sequential path): per replicate, run
-    `n_steps` dry passes from pos+noise, keep the best, accumulate its pairwise
-    distances."""
+    """Returns the average pair distances over dry smooth passes.
+
+    Each replicate runs `n_steps` dry passes from the noised positions and adds the pair distances
+    of its best.
+    """
     from gnome3d.mc import numba as mc_numba
 
     n = len(pos)
@@ -97,11 +79,8 @@ def _estimate_avg_dist(
         for _step in range(n_steps):
             pos_trial: F32Array = pos.copy()
             add_movable_noise_inplace(pos_trial, fixed, step)
-            # Dry pass: no heat, no orientation, and no affinity either.  The
-            # affinity terms are attractive, so including them here would shrink
-            # the estimated pairwise distances that become the heat target, and
-            # the real smooth pass would then compact against an already-compacted
-            # target.  EV and confinement stay because they push outward.
+            # The dry pass has no heat, no orientation and no affinity. Affinity is attractive and
+            # would shrink the distances that become the heat target.
             score = mc_numba.mc_smooth_numba(pos_trial, dtn, fixed, step, s)
             if score < rep_best_score or rep_best_score < 0.0:
                 rep_best_score = score
@@ -114,22 +93,20 @@ def _estimate_avg_dist(
 def _heat_dist_from_avg(
     avg_dist: F32Array, subanchor_heat_raw: F32Array, s: Settings
 ) -> F32Array | None:
-    """Turn avg distances + raw subanchor heat into the expected-distance target
-    (Reference createExpectedDistSubanchorHeatmap): high-contact pairs scaled
-    down by `influence`.  None when the heatmap is empty.  Port of
-    `Solver._heat_dist_from_avg` (sans the INFO logging/counters)."""
-    avg_heat = float(subanchor_heat_raw.mean(dtype=np.float64))  # f64 accum on the f32 matrix
+    """Returns the distance target from the average distances and the raw subanchor heat, None
+    for an empty heatmap.
+    """
+    avg_heat = float(subanchor_heat_raw.mean(dtype=np.float64))  # summed in float64
     if avg_heat < 1e-6:
         return None
     influence = float(s.subanchor_heatmap_influence)
-    # Overwrite avg_dist in place into the target matrix - avg_dist is not needed
-    # afterwards, so this reuses its (n,n) buffer instead of allocating a second.
+    # `avg_dist` is overwritten, which saves a second (n, n) matrix.
     _fill_heat_dist_inplace(avg_dist, subanchor_heat_raw, avg_heat, influence)
     return avg_dist
 
 
 def _run(problem: Problem) -> Result:
-    """Serial runner: estimate avg_dist (dry smooth) then build the target matrix."""
+    """Estimates the average distances and builds the target matrix of one IB."""
     avg = _estimate_avg_dist(
         problem["pos"],
         problem["fixed"],
@@ -142,17 +119,17 @@ def _run(problem: Problem) -> Result:
     return _heat_dist_from_avg(avg, problem["subanchor_heat_raw"], problem["settings"])
 
 
-# Spreads a parent seed and a replicate number across the output range before they are mixed,
-# so two blocks whose seeds differ by one do not hand their replicates overlapping streams.
+# Spreads a parent seed and a replicate number. Blocks with adjacent seeds do not share
+# replicate streams.
 _REPLICATE_STRIDE = 0x9E3779B1
 
 
 def _expand_replicates(problems: list[Problem], per_ib: int) -> tuple[list[Problem], list[int]]:
-    """One dry smooth problem per replicate, and where each input block's run starts.
+    """Returns one dry smooth problem per replicate and the index where the replicates of each
+    block start.
 
-    Each replicate carries a seed fixed by its parent block and its replicate number. The
-    batched kernel seeds a chain from the seed its problem carries, so a replicate without one
-    would fall back to its slot in the launch and the grouping would decide its stream.
+    Each replicate carries a seed set by its block and its number. The batched kernel seeds a
+    chain from that seed. The grouping does not decide its stream.
     """
     expanded: list[Problem] = []
     spans: list[int] = []
@@ -172,7 +149,7 @@ def _expand_replicates(problems: list[Problem], per_ib: int) -> tuple[list[Probl
                     "fixed": fixed,
                     "step_size": step,
                     "seed": (int(prob["seed"]) + rep * _REPLICATE_STRIDE) & 0x7FFFFFFF,
-                    "heat_dist": None,  # dry: chain+EV+conf only
+                    "heat_dist": None,  # dry
                     "char_orientations": None,
                     "anchor_neighbors": None,
                     "anchor_neighbor_weights": None,
@@ -182,10 +159,9 @@ def _expand_replicates(problems: list[Problem], per_ib: int) -> tuple[list[Probl
 
 
 def _batch_run(problems: list[Problem]) -> list[Result]:
-    """Batched (JAX) runner: run every IB's dry-smooth trials in one vmapped
-    kernel (no heat/orientation), then build each IB's target matrix.  Mirrors
-    `JaxSolver._batched_heat_dist`.  Returns one heat_dist (or None) per input
-    problem, in order."""
+    """Runs the dry smooth trials of every IB in one batched kernel and returns one heat_dist
+    or None per problem.
+    """
     from gnome3d.pipeline.ib.smooth import run_smooth_batch
 
     s = problems[0]["settings"]
@@ -221,13 +197,9 @@ class EstimateDistStage:
         return int(inputs[0].pos.shape[0])  # type: ignore[attr-defined]
 
     def batch_key(self, inputs: tuple[State, ...]) -> tuple[object, ...]:
-        """Heat-dist is the dry smooth, with no heat or orientation terms, so nothing but the
-        bead extent could separate two blocks.
-
-        Merging drops that too. The dry pass carries no heat target, which is the only input
-        that grows with the square of the padded extent, so a merged launch of every block's
-        replicates costs tens of megabytes and the packing in `mc_smooth_jax_batch` has no
-        reason to split it."""
+        """The batch key has no bead bucket when launches are merged. The dry pass has no heat
+        target, the only input that grows with the square of the padded extent.
+        """
         st = inputs[0]
         assert isinstance(st, Densified)
         if bool(st.settings.merge_smooth_launches):

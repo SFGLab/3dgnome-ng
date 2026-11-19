@@ -5,7 +5,6 @@ from typing import Literal, NamedTuple, TypeAlias
 import numpy as np
 from numpy.typing import NDArray
 
-# Numpy array aliases used throughout the package.
 F32Array: TypeAlias = NDArray[np.float32]
 F64Array: TypeAlias = NDArray[np.float64]
 I8Array: TypeAlias = NDArray[np.int8]
@@ -14,24 +13,17 @@ I64Array: TypeAlias = NDArray[np.int64]
 BoolArray: TypeAlias = NDArray[np.bool_]
 StrArray: TypeAlias = NDArray[np.str_]
 
-# (chr1, pos1, chr2, pos2, score) singleton contact tuple.
+# (chr1, pos1, chr2, pos2, score)
 SingletonContact: TypeAlias = tuple[str, int, str, int, int]
 
 BeadKind: TypeAlias = Literal["anchor", "subanchor"]
 
 
 class BeadOut(NamedTuple):
-    """One bead in a reconstructed structure.
+    """One bead of a reconstructed structure.
 
-    start/end give the genomic region this bead covers (bp); midpoint =
-    (start+end)//2.  start is the first field so sorted(beads, key=lambda b: b.start)
-    still yields left-to-right genomic order.
-
-    kind is "anchor" for original ChIA-PET loop-base beads (level=Level.ANCHOR)
-    and "subanchor" for the loop_density beads inserted by densification.
-
-    BeadOut is a NamedTuple so it iterates and unpacks like a regular 6-tuple
-    AND supports named access (b.kind, b.start, b.x, ...).
+    `start` and `end` are the genomic range in bp. `kind` is "anchor" for a loop anchor and
+    "subanchor" for a bead that densification inserts.
     """
 
     start: int
@@ -55,7 +47,7 @@ class Anchor:
     chr: str
     start: int
     end: int
-    orientation: str = "N"  # 'L', 'R', or 'N'
+    orientation: str = "N"  # L, R or N
 
     @property
     def center(self) -> int:
@@ -70,28 +62,26 @@ class Anchor:
 
 @dataclass
 class RawArc:
-    """Arc in genomic coordinates (before anchor-index mapping)."""
+    """An arc in genomic coordinates."""
 
-    start: int  # genomic midpoint of left anchor
-    end: int  # genomic midpoint of right anchor
+    start: int  # midpoint of the left anchor, bp
+    end: int  # midpoint of the right anchor, bp
     score: float
     factor: int = 0
 
 
 @dataclass
 class InteractionArc:
-    """Arc after anchor-index mapping."""
+    """An arc between two anchors of one chromosome."""
 
-    start: int  # index into anchors list (local, chr-relative)
-    end: int  # index into anchors list (local, chr-relative)
+    start: int  # index into the chromosome's anchor list
+    end: int  # index into the chromosome's anchor list
     score: int
     eff_score: int = 0
     factor: int = 0
     genomic_start: int = 0
     genomic_end: int = 0
 
-
-# Arc-collection mappings used everywhere downstream.
 
 AnchorMap: TypeAlias = dict[str, list["Anchor"]]
 
@@ -102,24 +92,22 @@ RawArcMap: TypeAlias = dict[str, list["RawArc"]]
 BreakpointMap: TypeAlias = dict[str, list[int]]
 
 
-# Cluster-hierarchy types.
-
-# A cluster index is a position in Solver.clusters (or the global list returned by build_cluster_tree).
+# Index into the global cluster list.
 ClusterIndex: TypeAlias = int
 
-# A local arc index (chr-relative) - position in ArcMap[chr_].
+# Index into `ArcMap[chr]`.
 LocalArcIndex: TypeAlias = int
 
-# A genomic position in basepairs.
+# bp
 GenomicPos: TypeAlias = int
 
-# Per-chromosome root cluster index (level = Level.CHROMOSOME).
+# The chromosome level cluster of each chromosome.
 ChrRootMap: TypeAlias = dict[str, ClusterIndex]
 
-# Per-chromosome index of the first anchor cluster (level = Level.ANCHOR).
+# The first anchor cluster of each chromosome.
 ChrFirstClusterMap: TypeAlias = dict[str, ClusterIndex]
 
-# A traversal "current level" snapshot: chr -> list of cluster indices at that depth.
+# The cluster indices of each chromosome at one level of the tree.
 ChrLevel: TypeAlias = dict[str, list[ClusterIndex]]
 
 
@@ -133,16 +121,11 @@ class BedRegion:
         return self.start <= pos <= self.end
 
 
-# Epigenomic track types, consumed by the opt-in compartment term.
-
-
 class Compartment(IntEnum):
-    """A/B compartment call for one bead, stored as int8.
+    """The A or B call of one bead, stored as int8.
 
-    The encoding follows MultiMM.  Positive codes are A, negative are B, and the
-    magnitude is the subcompartment rank.  A bare `A` label reads as `A2` and a
-    bare `B` label as `B1`, so an A/B-only track occupies `-1`, `0`, `+1` and a
-    subcompartment track needs no separate representation.
+    Positive codes are A, negative codes are B and the magnitude is the subcompartment rank, as in
+    MultiMM. A bare A reads as A2 and a bare B as B1.
     """
 
     B2 = -2
@@ -164,9 +147,8 @@ class Compartment(IntEnum):
 class CompartmentInterval:
     """One compartment call over a genomic range.
 
-    `score` is the signed compartment strength in [-1, 1], positive for A.  It
-    is 0.0 when the source carried only a label, and `cls` is `NONE` when the
-    source carried only a value that has not been phased yet.
+    `score` is the signed strength in [-1, 1], positive for A and 0.0 for a source with labels
+    only. `cls` is `NONE` for a value that is not phased yet.
     """
 
     chr: str
@@ -189,9 +171,6 @@ class SignalInterval:
 CompartmentMap: TypeAlias = dict[str, list["CompartmentInterval"]]
 
 SignalMap: TypeAlias = dict[str, list["SignalInterval"]]
-
-
-# Empty initializers
 
 
 def empty_anchor_map() -> AnchorMap:

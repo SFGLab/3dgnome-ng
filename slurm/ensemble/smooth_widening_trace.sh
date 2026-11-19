@@ -1,8 +1,8 @@
 #!/bin/bash
-# Which smooth stage term widens the maximum entropy gaps, one structure of GM12878
-# chr1:20-25 Mb per arm, workstation. design/gap-fill.md.
+# Finds the smooth stage term that widens the maximum entropy gaps, one structure of GM12878
+# chr1:20-25 Mb per arm. design/gap-fill.md.
 #
-#   DATA=/home/nik/3dgnome-ng/data bash slurm/ensemble/smooth_widening_trace.sh
+#   DATA=~/3dgnome-ng/data bash slurm/ensemble/smooth_widening_trace.sh
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"

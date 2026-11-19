@@ -1,7 +1,8 @@
 .job-page {
   display: grid;
   grid-template-columns: 320px 1fr;
-  min-height: calc(100vh - 100px);
+  /* The screen less the header, 59px, and the footer, 55px. */
+  min-height: calc(100vh - 114px);
 }
 
 .job-side {
@@ -46,6 +47,13 @@
   font-size: 20px;
   font-weight: 700;
   line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+/* The region of the heading stays on one line. */
+.job-title .nowrap {
+  white-space: nowrap;
 }
 
 .rename {
@@ -62,19 +70,6 @@
   margin: 0;
   font: 12px var(--mono);
   color: var(--muted);
-}
-
-.link-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  align-self: flex-start;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--accent);
-  font: 12px var(--font);
-  cursor: pointer;
 }
 
 .facts {
@@ -170,9 +165,24 @@
   color: var(--accent);
 }
 
-.files .more {
-  color: var(--muted);
-  padding-left: 30px;
+/* Every structure's file, in a box that scrolls once the list is long. */
+.files .models {
+  display: block;
+  padding: 0;
+}
+
+/* The structures sit inside their folder: set in from it, with a line down the folder's side. */
+.files .models > ul {
+  max-height: 190px;
+  overflow-y: auto;
+  margin-left: 14px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+/* A long file name is cut, not its icon. */
+.files a svg {
+  flex: none;
 }
 
 .files .size {
@@ -198,10 +208,23 @@
   border-bottom: 1px solid var(--line);
 }
 
+/* The tabs stay on one row and scroll sideways where they do not fit. */
 .job-tabs [role='tablist'] {
   display: flex;
   gap: 4px;
-  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.job-tabs [role='tablist']::-webkit-scrollbar {
+  display: none;
+}
+
+.job-tab {
+  flex: none;
+  white-space: nowrap;
 }
 
 .job-tab {
@@ -234,6 +257,7 @@
 
 .job-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -270,6 +294,7 @@
 
 .log-tail {
   max-height: 400px;
+  margin: 0;
   overflow: auto;
   padding: 12px;
   background: #1E1E1C;
@@ -286,6 +311,14 @@
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
+  /* Named with the panel, so it wins over the rule that hides the button on a wide screen. */
+  .job-side .side-fold-toggle {
+    display: inline-flex;
+  }
+  .job-side.folded .facts,
+  .job-side.folded .side-files {
+    display: none;
+  }
 }
 
 .structure-view {
@@ -293,6 +326,41 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  /* The toolbar lays itself out by the width of the view, not of the screen: the view is
+     narrow beside the cards on a wide screen too. */
+  container: view / inline-size;
+}
+
+.tool-group {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Where the toolbar does not fit one row, the colour choice takes a row of its own under the
+   rest and its three buttons share it. */
+@container view (max-width: 860px) {
+  .view-toolbar .segmented {
+    order: 9;
+    flex: 1 1 100%;
+  }
+  .view-toolbar .segmented button {
+    flex: 1;
+    min-width: 0;
+    white-space: normal;
+    line-height: 1.2;
+  }
+  .view-toolbar .find-gene {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+/* On a phone the gene field has the first row and the tools share the second. */
+@container view (max-width: 420px) {
+  .view-toolbar .find-gene {
+    flex-basis: 100%;
+  }
 }
 
 .view-toolbar {
@@ -347,6 +415,15 @@
   overflow: hidden;
 }
 
+/* With the loops over it the box is as tall as the screen leaves, so both are seen at once. */
+.structure-view.with-above .view-box {
+  height: clamp(380px, calc(100vh - 470px), 640px);
+}
+
+.structure-view.with-above .view-box:fullscreen {
+  height: 100vh;
+}
+
 .view-box:fullscreen {
   height: 100vh;
   border-radius: 0;
@@ -388,6 +465,8 @@
   border-radius: 8px;
   font-size: 12px;
   color: #5B5A56;
+  /* Over the letters of the marks, as the hover box is. */
+  z-index: 2;
 }
 
 .view-legend li {
@@ -408,6 +487,12 @@
   color: var(--faint);
 }
 
+.marker.loop-anchor {
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
+}
+
 .marker {
   display: inline-grid;
   place-items: center;
@@ -421,9 +506,36 @@
 
 .structure-tab {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 20px;
   align-items: start;
+}
+
+/* Shown on a narrow screen alone, where it folds the facts and the files of the side panel. */
+.side-fold-toggle {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 12px var(--font);
+  cursor: pointer;
+}
+
+.side-files {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* A table wider than its place scrolls sideways inside it. */
+.table-scroll {
+  overflow-x: auto;
 }
 
 .side-cards {
@@ -590,15 +702,21 @@
 
 @media (max-width: 1200px) {
   .structure-tab {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 .genes-tab {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 20px;
   align-items: start;
+}
+
+/* The table scrolls sideways inside its column where the column is narrower than it. */
+.genes-main {
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .genes-toolbar {
@@ -778,7 +896,7 @@
 
 @media (max-width: 1200px) {
   .genes-tab {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -792,9 +910,32 @@
 .map-toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 10px;
+}
+
+/* The controls of the toolbar share one height, so their boxes line up. */
+.map-toolbar > select,
+.map-toolbar .segmented,
+.locus-input {
+  box-sizing: border-box;
+  height: 36px;
+}
+
+.map-toolbar > select {
+  width: auto;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background-color: var(--surface);
+  color: var(--ink);
+  font: 13px var(--font);
+}
+
+.map-toolbar .segmented {
+  align-items: stretch;
 }
 
 .locus-input {
@@ -803,13 +944,17 @@
   gap: 6px;
   padding: 4px 4px 4px 10px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 8px;
   background: var(--surface);
 }
 
+/* Wide enough for chr10:100,000,000-120,000,000 in the mono face. */
 .locus-input input {
-  width: 200px;
+  width: 30ch;
+  min-width: 0;
+  padding: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
   color: var(--ink);
   font: 12px var(--mono);
@@ -817,7 +962,7 @@
 }
 
 .locus-input button {
-  padding: 3px 8px;
+  padding: 4px 9px;
   border: 0;
   border-radius: 5px;
   background: var(--ink);
@@ -831,37 +976,152 @@
   gap: 6px;
 }
 
-.loop-track {
-  display: block;
+/* The loop view of the whole region over the map, as wide as the map. */
+.loop-overview {
   width: min(100%, max(320px, calc(100vh - 360px)));
-  height: 34px;
-  background: var(--surface);
+}
+
+.row-action {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
   border: 1px solid var(--line);
   border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.loop-track text {
-  fill: var(--faint);
-  font: 8px var(--font);
+.row-action:hover {
+  background: var(--accent-soft);
 }
 
-.map-labels {
-  display: flex;
-  justify-content: space-between;
-  margin: 6px 0 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
+.contact-frame {
+  position: relative;
+  box-sizing: border-box;
+  /* As wide as the panel and short enough that the whole square fits on the screen. */
+  width: min(100%, max(320px, calc(100vh - 360px)));
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px 6px 0 0;
+  background: #FFFFFF;
+}
+
+/* The part of the map on screen that the next map will show, while zooming in. */
+.zoom-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  pointer-events: none;
 }
 
 .contact-canvas {
   display: block;
-  /* As wide as the panel, and short enough that the whole square fits on the screen. */
-  width: min(100%, max(320px, calc(100vh - 360px)));
-  aspect-ratio: 1;
+  width: 100%;
+  height: 100%;
   image-rendering: pixelated;
+  transition: opacity 150ms;
+}
+
+/* Before the first map arrives the frame takes the theme's surface, not a white square. */
+.contact-frame.empty {
+  background: var(--surface);
+}
+
+.contact-frame.empty .contact-canvas {
+  visibility: hidden;
+}
+
+/* A band of light crosses the frame, from wholly left of it to wholly right. The frame clips it. */
+.contact-frame.empty.loading::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, color-mix(in srgb, var(--ink) 7%, transparent) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: map-sheen 1.8s linear infinite;
+  pointer-events: none;
+}
+
+/* A map already shown stays under the message, dimmed, while the next one is read. */
+.contact-frame.loading:not(.empty) .contact-canvas {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* The frame's lower corners are square only where the hover bar joins it. */
+.contact-frame.empty {
+  border-radius: 6px;
+}
+
+.map-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.map-loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 320px;
+  padding: 16px 20px;
+  background: var(--bg);
   border: 1px solid var(--line);
-  background: #FFFFFF;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 12%);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.map-loading-card strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.map-spinner {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 2px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: map-spin 0.8s linear infinite;
+}
+
+@keyframes map-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes map-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-spinner,
+  .contact-frame.empty.loading::before {
+    animation: none;
+  }
 }
 
 .hover-bar {
@@ -877,6 +1137,13 @@
   white-space: pre;
   overflow: hidden;
 }
+
+/* With nothing under the pointer the bar holds a hint, in a quieter colour. */
+.hover-bar.idle {
+  color: #9A988F;
+  white-space: normal;
+}
+
 
 .range-inputs {
   display: flex;
@@ -919,7 +1186,7 @@
 
 @media (max-width: 1100px) {
   .contacts-tab {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1000,6 +1267,70 @@
   cursor: pointer;
 }
 
+/* The head of the side that shows this job is not a button. */
+.panel-head.fixed {
+  cursor: default;
+}
+
+.panel-head > svg {
+  flex: none;
+  margin-left: auto;
+}
+
+.panel-pick {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The jobs a side can show, under its head and over the view. */
+.panel-menu {
+  position: absolute;
+  z-index: 5;
+  top: 100%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+
+.menu-item {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: 13px var(--font);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--accent-soft);
+}
+
+.panel-menu .paste {
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+/* The side with no job chosen yet. */
+.compare-box.empty-side {
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .factor-line {
   width: 12px;
   height: 3px;
@@ -1052,10 +1383,6 @@
   }
 }
 
-.map-labels {
-  max-width: min(100%, max(320px, calc(100vh - 360px)));
-}
-
 .map-note {
   margin: 0;
   color: var(--muted);
@@ -1066,17 +1393,49 @@
   color: var(--accent);
 }
 
+/* A running job takes the whole main part of the page, the screen less the header and the footer. */
+.job-message:has(> .progress) {
+  display: flex;
+  box-sizing: border-box;
+  height: max(calc(100vh - 114px), 420px);
+  padding: 20px 24px;
+}
+
 .progress {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 12px;
-  max-width: 720px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .progress-line {
   margin: 0;
+  color: var(--ink);
   font-size: 15px;
   font-weight: 600;
+}
+
+.progress-pct {
+  color: var(--muted);
+  font: 13px var(--mono);
+}
+
+/* The log has the screen under the header, down to the footer, and scrolls inside itself. */
+.log-tail.live {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 .progress-bar {
@@ -1094,10 +1453,11 @@
   transition: width 0.6s ease;
 }
 
+/* The stages in a row, each with the time it began. */
 .status-log {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 6px 22px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1106,8 +1466,8 @@
 
 .status-log li {
   display: flex;
-  justify-content: space-between;
-  max-width: 420px;
+  align-items: baseline;
+  gap: 8px;
   color: var(--muted);
 }
 
@@ -1118,12 +1478,6 @@
 .status-time {
   font-family: var(--mono);
   font-size: 12px;
-}
-
-.progress-note {
-  margin: 0;
-  color: var(--faint);
-  font-size: 13px;
 }
 
 /* The hovered bead: a ring in the hover colour around the bead, above the chain. */
@@ -1144,4 +1498,8 @@
 /* The wrapper drei puts around a label over the canvas. It must not take the pointer from the canvas. */
 .scene-mark {
   pointer-events: none;
+}
+
+.compare-toolbar .link-button {
+  align-self: center;
 }

@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { hidden } from '../flags'
 import { ROUTES } from '../routes'
 import { CiteStrip } from './CiteStrip'
+import { PrivacyNotice } from './PrivacyNotice'
 import { ThemeSwitch } from './ThemeSwitch'
 import { Wordmark } from './Wordmark'
 import './layout.css'
@@ -15,17 +17,16 @@ const NAV: [string, string][] = [
   ['Cite', ROUTES.cite],
 ]
 
-/** The top bar, the page and the cite strip. */
+/** The top bar, the page, the cite strip and the privacy notice of a first visit. */
 export function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="layout">
       <header className="top-bar">
         <Link className="brand" to={ROUTES.title}>
           <Wordmark />
-          <span className="tagline">3D chromatin models from loops, contacts and structural variants</span>
         </Link>
         <nav>
-          {NAV.map(([label, to]) => (
+          {NAV.filter(([, to]) => !(to === ROUTES.method && hidden('method')) && !(to === ROUTES.results && hidden('results'))).map(([label, to]) => (
             <NavLink key={to} to={to}>
               {label}
             </NavLink>
@@ -35,6 +36,7 @@ export function Layout({ children }: { children: ReactNode }) {
       </header>
       <main>{children}</main>
       <CiteStrip />
+      <PrivacyNotice />
     </div>
   )
 }

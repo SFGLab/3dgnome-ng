@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { BarChart, ChartKey, type Bar, type Group } from '../components/BarChart'
 import { LineChart, type Line, type Point } from '../components/LineChart'
 import { ToolRuns, type ToolRun } from '../components/ToolRuns'
+import { hidden } from '../flags'
 import { ROUTES } from '../routes'
 import '../styles/doc.css'
 import './results.css'
@@ -13,21 +14,21 @@ const bar = (series: Bar['series'], value: number | null, digits = 2): Bar => ({
 })
 
 const SCC: Group[] = [
-  { name: 'GM12878', bars: [bar('original', 0.22), bar('ctcf', 0.5)] },
-  { name: 'H1ESC', bars: [bar('original', 0.15), bar('ctcf', 0.36)] },
-  { name: 'HFFc6', bars: [bar('original', 0.15), bar('ctcf', 0.43)] },
+  { name: 'GM12878', bars: [bar('original', 0.19), bar('ctcf', 0.53)] },
+  { name: 'H1ESC', bars: [bar('original', 0.13), bar('ctcf', 0.45)] },
+  { name: 'HFFc6', bars: [bar('original', 0.15), bar('ctcf', 0.47)] },
 ]
 
 const DISTANCE: Group[] = [
-  { name: 'GM12878, 16% closer', bars: [bar('ctcf', 4.3, 1), bar('rnapii', 3.6, 1)] },
-  { name: 'H1ESC, 24% closer', bars: [bar('ctcf', 4.0, 1), bar('rnapii', 3.0, 1)] },
+  { name: 'GM12878, 19% closer', bars: [bar('ctcf', 4.3, 1), bar('rnapii', 3.5, 1)] },
+  { name: 'H1ESC, 24% closer', bars: [bar('ctcf', 4.0, 1), bar('rnapii', 3.1, 1)] },
   { name: 'HFFc6, 17% closer', bars: [bar('ctcf', 4.6, 1), bar('rnapii', 3.8, 1)] },
 ]
 
 const EXPRESSION: Group[] = [
-  { name: 'GM12878 and H1ESC', bars: [bar('original', 0.19), bar('ctcf', 0.26), bar('rnapii', 0.28)] },
-  { name: 'H1ESC and HFFc6', bars: [bar('original', 0.12), bar('ctcf', 0.18), bar('rnapii', 0.22)] },
-  { name: 'GM12878 and HFFc6', bars: [bar('original', 0.25), bar('ctcf', 0.29), bar('rnapii', 0.31)] },
+  { name: 'GM12878 and H1ESC', bars: [bar('original', 0.14), bar('ctcf', 0.19), bar('rnapii', 0.24)] },
+  { name: 'H1ESC and HFFc6', bars: [bar('original', 0.14), bar('ctcf', 0.17), bar('rnapii', 0.21)] },
+  { name: 'GM12878 and HFFc6', bars: [bar('original', 0.14), bar('ctcf', 0.23), bar('rnapii', 0.27)] },
 ]
 
 /** The runs of the three tools on one task, each as beads and seconds. A null time is a run that did not finish. */
@@ -38,15 +39,15 @@ const runs = (cudammc: [number, number], multimm: [number, number | null], ours:
 ]
 
 const MICROC: Group[] = [
-  { name: 'GM12878, 902 loops', bars: [bar('original', 0.14), bar('ctcf', 0.21), bar('rnapii', 0.3)] },
-  { name: 'H1ESC, 385 loops', bars: [bar('original', 0.21), bar('ctcf', 0.39), bar('rnapii', 0.42)] },
-  { name: 'HFFc6, 639 loops', bars: [bar('original', 0.15), bar('ctcf', 0.44), bar('rnapii', 0.5)] },
+  { name: 'GM12878, 25,783 loops', bars: [bar('original', 0.12), bar('ctcf', 0.23), bar('rnapii', 0.31)] },
+  { name: 'H1ESC, 10,046 loops', bars: [bar('original', 0.12), bar('ctcf', 0.35), bar('rnapii', 0.4)] },
+  { name: 'HFFc6, 19,192 loops', bars: [bar('original', 0.1), bar('ctcf', 0.39), bar('rnapii', 0.47)] },
 ]
 
 const MICROC_RNAPII: Group[] = [
-  { name: 'GM12878, 65 loops', bars: [bar('ctcf', 0.08), bar('rnapii', 0.67)] },
-  { name: 'H1ESC, 21 loops', bars: [bar('ctcf', 0.32), bar('rnapii', 0.48)] },
-  { name: 'HFFc6, 38 loops', bars: [bar('ctcf', 0.41), bar('rnapii', 0.72)] },
+  { name: 'GM12878, 2,130 loops', bars: [bar('ctcf', 0.13), bar('rnapii', 0.66)] },
+  { name: 'H1ESC, 586 loops', bars: [bar('ctcf', 0.18), bar('rnapii', 0.58)] },
+  { name: 'HFFc6, 1,318 loops', bars: [bar('ctcf', 0.23), bar('rnapii', 0.64)] },
 ]
 
 const TOOLS_MICROC: Group[] = [
@@ -102,13 +103,15 @@ const SECTIONS = [
   ['#runtime', 'Runtime'],
 ]
 
-/** The models against measured data and against cudaMMC and MultiMM, and the runtime of the three. */
+/** The models against measured data and against cudaMMC and MultiMM and the runtime of the three. */
 export function Results() {
+  const trios = !hidden('trios')
+  const sections = SECTIONS.filter(([to]) => (to !== '#trios' || trios) && !(to.startsWith(ROUTES.method) && hidden('method')))
   return (
     <div className="doc-page">
       <aside className="side-panel">
         <p className="eyebrow">On this page</p>
-        {SECTIONS.map(([to, label]) =>
+        {sections.map(([to, label]) =>
           to.startsWith('#') ? (
             <a key={to} href={to}>
               {label}
@@ -124,7 +127,7 @@ export function Results() {
         <header className="page-head">
           <h1>Results</h1>
           <p className="lead">
-            This page compares 3D-GNOMEᴺᴳ models with measured data and with two other tools. It also shows the change in the models when RNAPII loops are added to the CTCF loops. Unless a chart states another region, the models cover chr1:1-60 Mb in the cell lines GM12878, H1ESC and HFFc6, with ten structures per model. The original models are the cudaMMC models of 3D-GNOME 3.0.
+            This page compares 3D-GNOMEᴺᴳ models with measured data and with two other tools. It also shows the change in the models when RNAPII loops are added to the CTCF loops. Unless a chart states another region, the models cover chromosomes 1 to 22 in the cell lines GM12878, H1ESC and HFFc6, with ten structures per chromosome. The original models are the cudaMMC models of 3D-GNOME 3.0.
           </p>
         </header>
         <ChartKey />
@@ -141,32 +144,31 @@ export function Results() {
             <BarChart
               title="Link to expression"
               better="higher"
-              subtitle="The Spearman correlation between the change in enhancer to promoter distance and the change in gene expression between two cell lines. The sign is flipped, and a higher value means a stronger link."
+              subtitle="The Spearman correlation between the change in enhancer to promoter distance and the change in gene expression between two cell lines. The sign is flipped and a higher value means a stronger link."
               groups={EXPRESSION}
             />
           </div>
-          <figure id="trios" className="bar-chart" aria-label="Nine people, three trios">
+          {trios && <figure id="trios" className="bar-chart" aria-label="Nine people, three trios">
             <figcaption>
               <span className="chart-title">Nine people, three trios</span>
-              <span className="chart-sub">The change in the model of each person when RNAPII loops are added, measured against the Hi-C map of that person.</span>
+              <span className="chart-sub">The change in the model of each person when RNAPII loops are added, measured against the Hi-C map of that person on chromosomes 1 to 22.</span>
             </figcaption>
             <div className="stat">
               <span className="stat-value">9 of 9</span>
-              <span className="stat-label">people with more contact enrichment at RNAPII loops. The rise is 39 to 98%, and the median is 57%.</span>
+              <span className="stat-label">people with more contact enrichment at RNAPII loops. The rise is 44 to 67% and the median is 53%.</span>
             </div>
-            <div className="stat">
-              <span className="stat-value">2 of 9</span>
-              <span className="stat-label">people with a higher correlation with the whole Hi-C map. The change is -17 to +29%, and the median is -2%.</span>
-            </div>
-          </figure>
+          </figure>}
         </div>
         <p className="reading-note">
-          With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower.
+          With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower for H1ESC, 0.42 against 0.45. At 10 kb, agreement with Hi-C is higher for pairs under 100 kb apart on GM12878 and HFFc6 and lower for pairs 100 to 500 kb apart on all three cell lines.
+        </p>
+        <p className="reading-note">
+          Each difference was tested with a two sided test. The new models agree better with Hi-C than the original models in every cell line, p &lt; 0.001 in a Wilcoxon signed rank test over the 22 chromosomes. With RNAPII loops the enhancer to promoter distance is smaller in every cell line, p &lt; 0.001 in a signed rank test over the pairs. The link to expression is stronger for every pair of cell lines, p = 0.002 or less in a block bootstrap over the genes.{trios && ' The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.'}
         </p>
         <section id="microc">
           <h2>Micro-C loops</h2>
           <p className="intro">
-            Micro-C resolves loops that Hi-C at 25 kb does not. Loops were called at 5 kb on chr1:0-60 Mb, on the 4DN Micro-C maps of H1ESC and HFFc6 and on the GM12878 Micro-C map of Hong and colleagues, Zenodo record 15303879. A loop is kept only if its signal is strong against its local background, and the kept loops also appear in the Hi-C map of the same cell line. A model places a loop if the two ends of the loop are at least a fifth closer in 3D than pairs at the same genomic separation. Each chart shows the share of loops that a model places, minus the share it places after the same loops are moved away from their position. A model that cannot tell a loop from another pair scores zero.
+            Micro-C resolves loops that Hi-C at 25 kb does not. Loops were called at 5 kb on each of chromosomes 1 to 22, on the 4DN Micro-C maps of H1ESC and HFFc6 and on the GM12878 Micro-C map of Hong and colleagues, Zenodo record 15303879. A loop is kept only if its signal is strong against its local background. The loops kept on chr1:0-60 Mb also appear in the Hi-C map of the same cell line. A model places a loop if the two ends of the loop are at least a fifth closer in 3D than pairs at the same genomic separation. Each chart shows the share of loops that a model places, minus the share it places after the same loops are moved away from their position. A model that cannot tell a loop from another pair scores zero.
           </p>
           <div className="chart-row">
             <BarChart
@@ -183,13 +185,13 @@ export function Results() {
             />
           </div>
           <p className="reading-note">
-            Between 38 and 62 percent of the Micro-C loops have no ChIA-PET loop near them, and the models place few of those. With RNAPII loops added, the models place more of the loops that only RNAPII supports, on every cell line. They also place more of the loops that CTCF supports.
+            Between 46 and 63 percent of the Micro-C loops have no ChIA-PET loop near them and the models place few of those. With RNAPII loops added, the models place more of the loops that only RNAPII supports, on every cell line. They also place more of the loops that CTCF supports. Both rises have p &lt; 0.001 in a signed rank test over the 22 chromosomes.
           </p>
         </section>
         <section id="tools">
           <h2>Other tools</h2>
           <p className="intro">
-            cudaMMC, MultiMM and 3D-GNOMEᴺᴳ were run on the same CTCF loops and the same Hi-C contacts. cudaMMC and MultiMM used their default settings, and MultiMM was set to the same number of beads as 3D-GNOMEᴺᴳ.
+            cudaMMC, MultiMM and 3D-GNOMEᴺᴳ were run on the same CTCF loops and the same Hi-C contacts. cudaMMC and MultiMM used their default settings and MultiMM was set to the same number of beads as 3D-GNOMEᴺᴳ. The charts of this section that compare the models with Hi-C and Micro-C cover chr1:1-60 Mb.
           </p>
           <ChartKey series={['cudammc', 'multimm', 'ctcf']} label="Key of the tools" />
           <div className="chart-row">
@@ -231,7 +233,7 @@ export function Results() {
             />
           </div>
           <p className="reading-note">
-            cudaMMC has beads at both ends of about a quarter of the Micro-C loops, and this limits the share it places. MultiMM has beads at every loop. It places as many loops as 3D-GNOMEᴺᴳ on GM12878 and fewer on the other two cell lines.
+            cudaMMC has beads at both ends of about a quarter of the Micro-C loops and this limits the share it places. MultiMM has beads at every loop. It places as many loops as 3D-GNOMEᴺᴳ on GM12878 and fewer on the other two cell lines.
           </p>
           <p className="reading-note">
             A region of 5 Mb has too few bins for the stratum adjusted correlation to separate the tools. On the nine runs of 20 Mb, 3D-GNOMEᴺᴳ is better than cudaMMC in all nine and better than MultiMM in seven. On chr1:1-60 Mb it is better than both tools in every cell line.
@@ -251,16 +253,16 @@ export function Results() {
             Per 1,000 beads, 3D-GNOMEᴺᴳ is the fastest tool for ten structures of 60 Mb, for one structure of the chromosome and for the genome. MultiMM is the fastest tool at 1 Mb. At equal bead counts cudaMMC is 5 percent faster than 3D-GNOMEᴺᴳ.
           </p>
           <p className="reading-note">
-            3D-GNOMEᴺᴳ models the whole genome in one job. cudaMMC was run on one chromosome at a time, and the chart shows the sum of its 22 runs. MultiMM ran out of memory on the 24 GB card at 1,312,597 beads and at half that number. At a quarter of that number it was stopped after 90 minutes.
+            3D-GNOMEᴺᴳ models the whole genome in one job. cudaMMC was run on one chromosome at a time and the chart shows the sum of its 22 runs. MultiMM ran out of memory on the 24 GB card at 1,312,597 beads and at half that number. At a quarter of that number it was stopped after 90 minutes.
           </p>
           <h3 className="sub-head">Runtime and the size of the region</h3>
           <p className="reading-note">
-            The two charts below show the growth of the runtime of one structure with the size of the task. Each tool modelled eight regions of chr1, from 1 Mb to the whole chromosome of 248 Mb, and each point is one run. Both charts show the same runs. In the left chart the horizontal axis is the size of the region, and the chart shows the time you wait for a region of that size. In the right chart the horizontal axis is the number of beads in the model, and the chart compares the tools at the same number of beads. cudaMMC uses fewer beads than the other two tools for the same region. This lowers its line in the left chart and does not change the right chart.
+            The two charts below show the growth of the runtime of one structure with the size of the task. Each tool modelled eight regions of chr1, from 1 Mb to the whole chromosome of 248 Mb. Each point is one run. Both charts show the same runs. In the left chart the horizontal axis is the size of the region and the chart shows the time you wait for a region of that size. In the right chart the horizontal axis is the number of beads in the model and the chart compares the tools at the same number of beads. cudaMMC uses fewer beads than the other two tools for the same region. This lowers its line in the left chart and does not change the right chart.
           </p>
           <div className="chart-row">
             <LineChart
               title="One structure by region size"
-              subtitle="Regions of 1 to 100 Mb that start at chr1:10 Mb, and the whole chromosome. Both axes are logarithmic."
+              subtitle="Regions of 1 to 100 Mb that start at chr1:10 Mb and the whole chromosome. Both axes are logarithmic."
               better="lower"
               xLabel="region, Mb"
               xTick={(x) => `${x}`}
@@ -276,7 +278,7 @@ export function Results() {
             />
           </div>
           <p className="reading-note">
-            By region size, cudaMMC is the fastest tool from 10 Mb, and below 10 Mb cudaMMC and MultiMM take about the same time. 3D-GNOMEᴺᴳ is faster than MultiMM from about 50 Mb. By bead count, MultiMM is the fastest tool up to about 30,000 beads and 3D-GNOMEᴺᴳ is the fastest above that. cudaMMC takes about the same time as 3D-GNOMEᴺᴳ up to about 7,000 beads and more time above that. Each further structure of the same region costs 3D-GNOMEᴺᴳ less time than the first. One structure of chr1 takes 6.4 minutes and three structures take 11.2 minutes.
+            By region size, cudaMMC is the fastest tool from 10 Mb. Below 10 Mb cudaMMC and MultiMM take about the same time. 3D-GNOMEᴺᴳ is faster than MultiMM from about 50 Mb. By bead count, MultiMM is the fastest tool up to about 30,000 beads and 3D-GNOMEᴺᴳ is the fastest above that. cudaMMC takes about the same time as 3D-GNOMEᴺᴳ up to about 7,000 beads and more time above that. Each further structure of the same region costs 3D-GNOMEᴺᴳ less time than the first. One structure of chr1 takes 6.4 minutes and three structures take 11.2 minutes.
           </p>
         </section>
       </div>

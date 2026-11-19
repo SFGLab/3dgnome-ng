@@ -1,6 +1,7 @@
 import { Copy, ExternalLink, Github, Type } from 'lucide-react'
 import { ReferenceEntry } from '../components/ReferenceEntry'
 import { DATA_SOURCES, REFERENCES, referenceLink } from '../content/references'
+import { hidden } from '../flags'
 import '../styles/doc.css'
 import './cite.css'
 
@@ -48,7 +49,7 @@ export function Cite() {
 
         <section id="cite-gnome3d">
           <h2>
-            Cite 3D-GNOME<sup>NG</sup>
+            Cite 3D-GNOME<sup className="ng">NG</sup>
           </h2>
           <div className="primary-citation">
             <p>{PRIMARY}</p>
@@ -78,7 +79,7 @@ export function Cite() {
 
         <section id="algorithms">
           <h2>Algorithms and measures</h2>
-          <p className="intro">The Method page cites these for the multiscale approach, the distance law, the optimisers and the agreement measure.</p>
+          <p className="intro">{`${hidden('method') ? 'The method builds on these' : 'The Method page cites these'} for the multiscale approach, the distance law, the optimisers and the agreement measure.`}</p>
           {group('algorithms').map((r) => (
             <ReferenceEntry key={r.key} r={r} />
           ))}
@@ -86,29 +87,38 @@ export function Cite() {
 
         <section id="data">
           <h2>Data on this server</h2>
+          <p className="intro">
+            {`Every data set behind the models${hidden('results') ? '' : ' and the Results page'}, with the accession of its archive.`} A row lists the experiment or the set first and its files after it. An entry that says to confirm is not recorded yet.
+          </p>
           <table className="data-table">
             <thead>
               <tr>
                 <th>Data</th>
+                <th>Accession</th>
                 <th>Used for</th>
                 <th>Cite</th>
               </tr>
             </thead>
             <tbody>
               {DATA_SOURCES.map((d) => {
-                const r = REFERENCES.find((x) => x.key === d.ref)!
-                const link = referenceLink(r)
+                const r = REFERENCES.find((x) => x.key === d.ref)
                 return (
                   <tr key={d.data}>
-                    <td className="data-name">{d.data}</td>
-                    <td>{d.usedFor}</td>
-                    <td>
-                      {r.unconfirmed ? (
-                        <span className="unconfirmed">{d.label}</span>
-                      ) : (
-                        <a href={link}>{d.label}</a>
-                      )}
+                    <td className="data-name">
+                      {d.data}
+                      {d.note && <span className="data-note">{d.note}</span>}
                     </td>
+                    <td className="accessions">
+                      {d.accessions.map((a) => (
+                        <a key={a.id} href={a.url}>
+                          {a.id}
+                        </a>
+                      ))}
+                      {d.pending && <span className="unconfirmed">{d.pending}</span>}
+                      {d.accessions.length === 0 && !d.pending && <span className="no-accession">none</span>}
+                    </td>
+                    <td>{d.usedFor}</td>
+                    <td>{r && !r.unconfirmed ? <a href={referenceLink(r)}>{d.label}</a> : <span className="unconfirmed">{d.label}</span>}</td>
                   </tr>
                 )
               })}
@@ -126,7 +136,7 @@ export function Cite() {
         <section id="contact">
           <h2>Contact</h2>
           <p className="intro">
-            Laboratory of Functional and Structural Genomics, led by Dariusz Plewczynski, at the Faculty of Mathematics and Information Science, Warsaw University of Technology, and the Centre of New Technologies, University of Warsaw.
+            Laboratory of Functional and Structural Genomics, led by Dariusz Plewczynski, at the Faculty of Mathematics and Information Science, Warsaw University of Technology and the Centre of New Technologies, University of Warsaw.
           </p>
           <a className="lab-link" href="https://sfglab.mini.pw.edu.pl">
             <ExternalLink size={13} aria-hidden /> sfglab.mini.pw.edu.pl

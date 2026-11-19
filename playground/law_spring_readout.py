@@ -33,7 +33,7 @@ assert _spec is not None and _spec.loader is not None
 cm = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(cm)
 
-from validation.metrics.hic import observed_hic  # noqa: E402
+from legacy.validation.metrics.hic import observed_hic  # noqa: E402
 
 RES = 25_000
 BANDS = ((25_000, 50_000), (50_000, 100_000), (100_000, 200_000))

@@ -1,16 +1,15 @@
 #!/bin/bash
-# The tool runs of the night of 2026-11-16 on frodo, one after another. design/tools-comparison.md.
+# The tool runs of the night of 2026-11-16, one after another. design/tools-comparison.md.
 #
 #   DATA=~/gapfill-data bash slurm/ensemble/night_queue.sh
 #
-#   out/toolpage1    GM12878 chr1:11.5-12.6 Mb, one structure per tool, the site's first run time chart
-#   out/toolpagechr  GM12878 whole chr1, one structure per tool, its third
-#   out/toolpage60   chr1:1-60 Mb, ten structures per tool, GM12878 first, its second chart and its Hi-C chart
-#   out/toolsize     GM12878 chr1 from 10 Mb, one structure per tool at 1, 2, 5, 10, 20, 50 and 100 Mb
-#   out/tools20      three 20 Mb regions dense in loops, five structures, three cells, with the bootstrap
-#   out/toolpage60   the same for H1ESC and HFFC6
+#   out/toolpage1    GM12878 chr1:11.5-12.6 Mb, one structure per tool
+#   out/toolpagechr  GM12878 whole chr1, one structure per tool
+#   out/toolpage60   chr1:1-60 Mb, ten structures per tool, three cells
+#   out/toolsize     GM12878 chr1 from 10 Mb, one structure per tool at 1 to 100 Mb
+#   out/tools20      three 20 Mb regions dense in loops, five structures, three cells
 #   out/toolgenome   one whole genome per tool
-# Every step skips what is already there. Each writes EXIT to OUT/night.done.
+# Every step skips what exists. Each writes EXIT to OUT/night.done.
 set -u
 cd "$(dirname "$0")/../.."
 export DATA="${DATA:-data}" HIC="${HIC:-${DATA:-data}/_hic}"

@@ -1,11 +1,9 @@
-"""One sample's structural variants in a region, from any VCF with SVTYPE in its INFO.
+"""The structural variants of one sample in a region, from any VCF with SVTYPE in its INFO.
 
-Variants follow personal3d's convention, 1 based, start the first affected base and end one
-past the last. A deletion and an inversion run from the base after POS to END, an insertion goes
-in after POS with the ALT sequence, or with N repeated SVLEN times when ALT is symbolic. Other
-types are skipped and counted. A phased genotype puts each allele on its haplotype; an
-unphased one puts the variant on the first. Only variants wholly inside the region are kept,
-the rule the rewiring rules take.
+Coordinates follow personal3d, 1 based, start the first affected base and end one past the
+last. A duplication is read as tandem. Types other than deletion, insertion, inversion and
+duplication are skipped and counted. A phased genotype puts each allele on its haplotype and
+an unphased one puts the variant on the first. Only variants wholly inside the region are kept.
 """
 
 from __future__ import annotations
@@ -20,7 +18,7 @@ from personal3d.variants import SV
 
 from .regions import Region
 
-KINDS = ("DEL", "INS", "INV")
+KINDS = ("DEL", "INS", "INV", "DUP")
 
 
 def _lines(vcf: Path, region: Region) -> Iterator[str]:
@@ -51,8 +49,8 @@ def _alleles(gt: str) -> tuple[bool, bool]:
 
 
 def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV], int]:
-    """The sample's two haplotypes' variants in the region and the number of records skipped
-    for an unsupported type."""
+    """The sample's two haplotypes' variants in the region and the number of records the sample
+    carries there that are skipped for an unsupported type."""
     hap: tuple[list[SV], list[SV]] = ([], [])
     skipped = 0
     col = -1
@@ -64,8 +62,12 @@ def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV]
         info = dict(kv.split("=", 1) if "=" in kv else (kv, "") for kv in x[7].split(";"))
         kind = info.get("SVTYPE", "")
         pos = int(x[1])
+        carried = _alleles(x[col].split(":", 1)[0])
+        if not any(carried):
+            continue
         if kind not in KINDS:
-            skipped += 1
+            if x[0] == region.chrom and region.start <= pos < region.end:
+                skipped += 1
             continue
         if kind == "INS":
             alt = x[4]
@@ -76,16 +78,15 @@ def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV]
             sv = SV(x[0], pos + 1, end + 1, kind)
         if not (sv.chrom == region.chrom and sv.start >= region.start and sv.end <= region.end):
             continue
-        gt = x[col].split(":", 1)[0]
-        for h, on in enumerate(_alleles(gt)):
+        for h, on in enumerate(carried):
             if on:
                 hap[h].append(sv)
     return sorted(hap[0], key=lambda s: s.start), sorted(hap[1], key=lambda s: s.start), skipped
 
 
 def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[dict[str, object]], dict[str, int]]:
-    """The records of one sample inside the region with their genotype and the haplotypes that
-    carry them, and the count of records of other types the sample carries, by type.
+    """The records of one sample inside the region with their genotype and haplotypes. Also
+    returns the count of records of other types, by type.
 
     @raises KeyError when the sample is not a column of the VCF
     """

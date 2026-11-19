@@ -17,9 +17,9 @@ export function Background({ value, region, available, lymphoblastoid, onChange 
   const tooLong = region !== undefined && region.end - region.start > HICDIFFUSION_SPAN
   const reason = !available ? 'HiCDiffusion is not set up on this server.' : tooLong ? 'HiCDiffusion predicts regions up to 2 Mb.' : ''
   const options: [BackgroundId, string, string][] = [
-    ['hic', 'Hi-C of this cell type', '4DN, measured. The default.'],
-    ['hicdiffusion', 'Predicted by HiCDiffusion', 'Predicted from the DNA sequence, for regions up to 2 Mb. Structural variants change the prediction.'],
-    ['none', 'None', 'Loops only. Pairs without a loop get the distance law target.'],
+    ['hic', 'Hi-C of this cell type', 'The Hi-C experiment on this cell line, from 4DN. The default.'],
+    ['hicdiffusion', 'Predicted by HiCDiffusion', 'A contact map predicted from the DNA sequence, for regions up to 2 Mb. Structural variants change the prediction.'],
+    ['none', 'None', 'No contact map. Two points that no loop joins are placed by their distance along the genome alone.'],
   ]
   return (
     <>
@@ -39,7 +39,7 @@ export function Background({ value, region, available, lymphoblastoid, onChange 
       </div>
       {!lymphoblastoid && (
         <p className="notice">
-          <Info size={14} aria-hidden /> HiCDiffusion was trained on GM12878. Its predictions for H1ESC and HFFc6 are outside its training data, and the job page shows a warning.
+          <Info size={14} aria-hidden /> HiCDiffusion was trained on GM12878. Its predictions for H1ESC and HFFc6 are outside its training data and the job page shows a warning.
         </p>
       )}
     </>

@@ -1,0 +1,4 @@
+[H1ESC chr19] loops called: 589 at 5 kb, 391 at 10 kb
+  map RNAPII alone    loops    25 scored    25  contact   7.52
+  map none            loops   218 scored   218  contact   8.33
+  map moved, no loop  loops   361 scored   358  contact   0.95

@@ -17,9 +17,9 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from playground.restitch_model import read_cif  # noqa: E402
-from validation.metrics import hic as contacts  # noqa: E402
-from validation.metrics import structure as smetrics  # noqa: E402
-from validation.studies.epigenome import _track_on_bins  # noqa: E402
+from legacy.validation.metrics import hic as contacts  # noqa: E402
+from legacy.validation.metrics import structure as smetrics  # noqa: E402
+from legacy.validation.studies.epigenome import _track_on_bins  # noqa: E402
 
 
 def main() -> None:

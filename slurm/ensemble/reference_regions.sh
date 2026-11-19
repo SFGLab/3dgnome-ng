@@ -1,10 +1,11 @@
 #!/bin/bash
-# The original 3dgnome pipeline's GM12878 models on four chr1 regions, one hundred each, scored
-# by the battery on each region's window against our chr1:1-60 Mb arms cut to the same window.
+# The GM12878 models of the original 3D-GNOME pipeline on four chr1 regions, one hundred each,
+# scored by the battery against our chr1:1-60 Mb arms cut to the same windows.
 set -u
+: "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd ~/3dgnome-ng
 C=GM12878; SRC=out/reference_regions/$C; OUT=out/validation_regions
-MCOOL=$(ls /mnt/storagelinux/_hic/$C/*.mcool | head -1)
+MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 mkdir -p $OUT
 k=0
 for spec in "results_GM12878_Deni_chr1_74280_3521135 chr1:850000-3500000" \

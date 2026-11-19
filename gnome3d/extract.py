@@ -1,12 +1,9 @@
-"""The bin pairs of one region of a .mcool as a seven column BEDPE.
+"""Writes the bin pairs of one region of a .mcool as a seven column BEDPE.
 
-    gnome3d-ng extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe
+    gnome3d extract --mcool sample.mcool --region chr1:11500000-12600000 --out region.bedpe
 
-Writes the region's intra chromosomal pairs at one resolution, raw counts, one line per pair,
-without the diagonal, the way the hosted contact maps are written. This is the file the
-website takes as a BEDPE of the region, made on the computer that holds the .mcool.
-`--contacts-per-mb` thins the counts to that density by drawing contacts without replacement,
-which keeps every separation's share of the decay.
+The pairs are intra chromosomal, at one resolution, raw counts, without the diagonal.
+`--contacts-per-mb` thins the counts to that density by drawing contacts without replacement.
 """
 
 from __future__ import annotations
@@ -35,7 +32,7 @@ def _words(xs: list[str]) -> str:
 
 
 def parse_region(text: str) -> tuple[str, int, int]:
-    """chr:start-end with optional thousands commas."""
+    """Parses chr:start-end with optional thousands commas."""
     m = re.fullmatch(r"\s*([^:\s]+):([\d,]+)-([\d,]+)\s*", text)
     if not m:
         raise ExtractError(f"{text!r} is not chr:start-end")
@@ -46,8 +43,10 @@ def parse_region(text: str) -> tuple[str, int, int]:
 
 
 def thin(counts: I64Array, target: int, seed: int) -> I64Array:
-    """Counts reduced to a target total by drawing contacts without replacement. Counts at or
-    under the target are returned as they are."""
+    """Reduces the counts to a target total by drawing contacts without replacement.
+
+    Counts at or under the target are returned unchanged.
+    """
     if int(counts.sum()) <= target:
         return counts
     rng = np.random.default_rng(seed)
@@ -83,11 +82,11 @@ def extract(
     """Writes the region's off diagonal bin pairs as BEDPE and returns the number of lines.
 
     @param mcool a .mcool or single resolution .cool file
-    @param region chr:start-end, the chromosome named with or without chr as the file has it
+    @param region chr:start-end, the chromosome with or without chr as in the file
     @param res the bin size in bp, which the file must hold
     @param contacts_per_mb thin to this many contacts per Mb of the region, 0 keeps every contact
     @param seed the seed of the thinning draw
-    @raises ExtractError naming a chromosome or resolution the file lacks
+    @raises ExtractError for a chromosome or a resolution the file lacks
     """
     chrom, start, end = parse_region(region)
     c = _open(mcool, res)
@@ -120,7 +119,7 @@ def extract(
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
-        prog="gnome3d-ng extract",
+        prog="gnome3d extract",
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -139,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         n = extract(a.mcool, a.region, Path(a.out), a.res, a.contacts_per_mb, a.seed)
     except ExtractError as e:
-        print(f"gnome3d-ng extract: {e}", file=sys.stderr)
+        print(f"gnome3d extract: {e}", file=sys.stderr)
         return 2
     print(f"{n:,} bin pairs written to {a.out}", file=sys.stderr)
     return 0

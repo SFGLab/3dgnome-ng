@@ -1,15 +1,8 @@
-"""
-Runner registry: how a stage kind's work actually executes.
+"""The runners of each stage kind.
 
-Each kind registers one or both:
-  * ``serial`` - run ONE problem (numba, or JAX at K=1); used by SerialExecutor,
-    one node at a time.
-  * ``batch``  - run a GROUP of same-(kind,bucket) problems in one shot (the JAX
-    ``mc_*_jax_batch`` entries); used by BatchExecutor.
-
-``DENSIFY`` registers only ``serial`` (no GPU kernel); the batched executor just
-maps it.  Kept free of kernel imports so `pipeline` stays dependency-light - the
-`mc_*` / wiring modules call `register`.
+`serial` runs one problem. `batch` runs a group of problems of one kind and bucket in one
+launch. DENSIFY has no batch runner. This module imports no kernel. The kernel modules call
+`register`.
 """
 
 from __future__ import annotations

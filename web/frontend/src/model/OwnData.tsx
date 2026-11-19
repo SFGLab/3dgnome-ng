@@ -1,5 +1,5 @@
 import { useQueries } from '@tanstack/react-query'
-import { CircleAlert, CircleCheck, FileText, HardDrive, Link2, LoaderCircle, Plus, SquareTerminal, Trash2, Upload, X } from 'lucide-react'
+import { CircleAlert, CircleCheck, FileText, HardDrive, Link2, LoaderCircle, SquareTerminal, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Region } from '../api'
 import { readHicWindow } from './hicLocal'
@@ -87,11 +87,26 @@ function OwnPreview({ cell, region, loops }: { cell: string; region: Region; loo
   )
 }
 
+/** What a step takes: a sentence or two and the columns of the file on a line of their own. */
+function Rule({ text, columns }: { text: string; columns?: string }) {
+  return (
+    <div className="rule">
+      <p>{text}</p>
+      {columns && (
+        <p className="columns">
+          <span>Columns</span>
+          <code>{columns}</code>
+        </p>
+      )}
+    </div>
+  )
+}
+
 /** A tab that takes one file: its rule, the file with its check, or a field to choose one. */
-function OneFile({ kind, rule, entry, onFile, onRemove }: { kind: string; rule: string; entry: Entry | null; onFile: (f: File) => void; onRemove: () => void }) {
+function OneFile({ kind, rule, columns, entry, onFile, onRemove }: { kind: string; rule: string; columns: string; entry: Entry | null; onFile: (f: File) => void; onRemove: () => void }) {
   return (
     <div className="own-tab">
-      <p className="rule">{rule}</p>
+      <Rule text={rule} columns={columns} />
       {entry ? (
         <div className={`factor-row${entry.failure || entry.result?.ok === false ? ' bad' : ''}`} role="group" aria-label={`${kind} file`}>
           <div className="row-head">
@@ -104,7 +119,7 @@ function OneFile({ kind, rule, entry, onFile, onRemove }: { kind: string; rule: 
         </div>
       ) : (
         <label className="add-file">
-          <Plus size={15} aria-hidden /> {`Choose an ${kind} file`}
+          <Upload size={14} aria-hidden /> {`Choose an ${kind} file`}
           <input type="file" className="visually-hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
         </label>
       )}
@@ -115,7 +130,7 @@ function OneFile({ kind, rule, entry, onFile, onRemove }: { kind: string; rule: 
 type EnhSource = 'upload' | 'listed' | 'none'
 const ENH_SOURCES: [EnhSource, string, string][] = [
   ['upload', 'Upload a BED file', 'your enhancers'],
-  ['listed', 'Enhancers of a listed cell type', 'hosted'],
+  ['listed', 'A listed cell type', 'its hosted enhancers'],
   ['none', 'None', 'promoters only'],
 ]
 
@@ -173,9 +188,7 @@ function ContactsTab({
   const span = region ? `${region.chrom}:${region.start}-${region.end}` : 'chr1:11500000-12600000'
   return (
     <div className="own-tab">
-      <p className="rule">
-        {`A contact map at 25 kb is used for the contacts between loops. The server reads only the bins of your region, up to ${maxMb} Mb, and thins a deep map to the density the cell type maps use.`}
-      </p>
+      <Rule text={`A contact map at 25 kb is used for the contacts between loops. The server reads only the bins of your region, up to ${maxMb} Mb and thins a deep map to the density the cell type maps use.`} />
       <div className="routes" role="radiogroup" aria-label="Contact map from">
         {ROUTES.map(([id, title, sub, Icon]) => (
           <button key={id} type="button" role="radio" aria-checked={route === id} className="route" onClick={() => setRoute(id)}>
@@ -212,19 +225,25 @@ function ContactsTab({
             </button>
           </div>
           <p className="hint">
-            The server must answer range requests. 4DN, ENCODE, GEO and S3 links do. The file is not copied, and the server keeps only the bins of your region.
+            The server must answer range requests. 4DN, ENCODE, GEO and S3 links do. The file is not copied and the server keeps only the bins of your region.
           </p>
         </form>
       )}
       {route === 'local' && (
         <label className="add-file">
-          <Plus size={15} aria-hidden /> Choose a .hic file. The page reads only your region and uploads it.
+          <Upload size={14} aria-hidden /> Choose a .hic file. The page reads only your region and uploads it.
           <input type="file" accept=".hic" className="visually-hidden" onChange={(e) => e.target.files?.[0] && onLocal(e.target.files[0])} />
         </label>
       )}
       {route === 'bedpe' && (
+        <p className="columns">
+          <span>Columns</span>
+          <code>chr1 start1 end1 chr2 start2 end2 count</code>
+        </p>
+      )}
+      {route === 'bedpe' && (
         <label className="add-file">
-          <Plus size={15} aria-hidden /> Choose a BEDPE file, columns chr1 start1 end1 chr2 start2 end2 count
+          <Upload size={14} aria-hidden /> Choose a BEDPE file of the region
           <input type="file" className="visually-hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
         </label>
       )}
@@ -233,7 +252,8 @@ function ContactsTab({
         <SquareTerminal size={15} aria-hidden />
         <div className="contact-text">
           <p className="contact-title">A local .mcool file</p>
-          <p className="contact-body">{`Run gnome3d-ng extract --mcool sample.mcool --region ${span} --out region.bedpe on your computer and upload region.bedpe as a BEDPE of the region.`}</p>
+          <p className="contact-body">Extract the region on your computer with this command and upload region.bedpe as a BEDPE of the region.</p>
+          <code className="command">{`gnome3d extract --mcool sample.mcool --region ${span} --out region.bedpe`}</code>
         </div>
       </div>
     </div>
@@ -380,9 +400,7 @@ export function OwnData({
           <div className="dialog-body" role="tabpanel">
             {active === 'loops' && (
               <div className="own-tab">
-                <p className="rule">
-                  One BEDPE file per factor, columns chr1 start1 end1 chr2 start2 end2 count. The first factor is read as CTCF and its loops get the motif orientation term.
-                </p>
+                <Rule text="One BEDPE file per factor. The first factor is read as CTCF and its loops get the motif orientation term." columns="chr1 start1 end1 chr2 start2 end2 count" />
                 {loops.map((l, i) => (
                   <div key={l.key} className={`factor-row${l.failure || l.result?.ok === false ? ' bad' : ''}`} role="group" aria-label={`Loops of factor ${i + 1}`}>
                     <div className="row-head">
@@ -406,7 +424,7 @@ export function OwnData({
                     addLoops(e.dataTransfer.files)
                   }}
                 >
-                  <Plus size={15} aria-hidden /> Add a factor, or drop a BEDPE file here
+                  <Upload size={14} aria-hidden /> Add a factor, or drop a BEDPE file here
                   <input type="file" multiple className="visually-hidden" onChange={(e) => addLoops(e.target.files)} />
                 </label>
                 {region && loops.some((l) => l.result?.ok) && <OwnPreview cell={cell} region={region} loops={loops} />}
@@ -415,7 +433,8 @@ export function OwnData({
             {active === 'anchors' && (
               <OneFile
                 kind="anchors"
-                rule="One BED file, columns chr start end and an optional fourth column with the motif orientation L, R or N. Without a file the anchors are the loop ends, merged where they overlap."
+                rule="One BED file. The fourth column is optional and gives the motif orientation, L, R or N. Without a file the anchors are the loop ends, merged where they overlap."
+                columns="chr start end orientation"
                 entry={single.anchors}
                 onFile={(f) => addSingle('anchors', f)}
                 onRemove={() => setSingle((s) => ({ ...s, anchors: null }))}
@@ -456,13 +475,14 @@ export function OwnData({
                     </select>
                   </label>
                 )}
-                {enhSource === 'none' && <p className="rule">The job marks promoters only.</p>}
+                {enhSource === 'none' && <Rule text="The job marks promoters only." />}
               </div>
             )}
             {active === 'enhancers' && (!ownCell || enhSource === 'upload') && (
               <OneFile
                 kind="enhancers"
-                rule={ownCell ? 'One BED file, columns chr start end.' : 'One BED file, columns chr start end. Without a file the job marks the enhancers of the cell type.'}
+                rule={ownCell ? 'One BED file.' : 'One BED file. Without a file the job marks the enhancers of the cell type.'}
+                columns="chr start end"
                 entry={single.enhancers}
                 onFile={(f) => addSingle('enhancers', f)}
                 onRemove={() => setSingle((s) => ({ ...s, enhancers: null }))}

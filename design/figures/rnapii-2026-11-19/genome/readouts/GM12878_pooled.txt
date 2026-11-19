@@ -1,0 +1,6 @@
+chr1 to chr22, pooled ensemble against Hi-C at 25000 bp, mean over 22 chromosomes weighted by length
+                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
+                              GM12878_E_genome  10   0.159   0.076   0.192   0.238   0.075   0.100                     0.195    0.107    0.035
+                              GM12878_C_genome  10   0.294   0.140   0.530   0.473   0.134   0.305                     0.513    0.279    0.075
+                              GM12878_R_genome  10   0.312   0.150   0.523   0.502   0.145   0.302                     0.492    0.245    0.084
+                              GM12878_M_genome  10   0.321   0.154   0.584   0.508   0.149   0.343                     0.560    0.299    0.084

@@ -12,14 +12,14 @@ const CHOICES: [Theme, string, typeof Sun][] = [
 function stored(): Theme {
   try {
     const t = localStorage.getItem(KEY)
-    return t === 'light' || t === 'dark' ? t : 'system'
+    return t === 'system' || t === 'dark' ? t : 'light'
   } catch {
-    return 'system'
+    return 'light'
   }
 }
 
-/** System, Light or Dark for the whole site. The choice is kept in this browser, and
- * index.html applies it before the first paint. */
+/** System, Light or Dark for the whole site. A browser without a choice gets Light. The choice
+ * is kept in this browser and index.html applies it before the first paint. */
 export function ThemeSwitch() {
   const [theme, setTheme] = useState<Theme>(stored)
   useEffect(() => {
@@ -27,8 +27,7 @@ export function ThemeSwitch() {
     if (theme === 'system') delete root.dataset.theme
     else root.dataset.theme = theme
     try {
-      if (theme === 'system') localStorage.removeItem(KEY)
-      else localStorage.setItem(KEY, theme)
+      localStorage.setItem(KEY, theme)
     } catch {
       // A browser that blocks storage keeps the choice for this page only.
     }

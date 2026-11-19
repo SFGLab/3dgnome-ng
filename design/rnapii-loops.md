@@ -9,8 +9,8 @@ and use the RNAPII data in the expression work. Status: planned, nothing built.
 
 ## What the trios were built on
 
-The trio models already use the ChIA-PET CTCF of the shared Drive folder
-(`1e-hXljTx--kd_AHADU7AgM9AAsWcVTn3`): `playground/trio/trio_fetch.py` takes the depth
+The trio models already use the ChIA-PET CTCF of the shared Drive folder:
+`playground/trio/trio_fetch.py` takes the depth
 matched high quality PET3+ loops from `downsampling/<family>/<sample>_CTCF/`, whose anchors
 both overlap a CTCF peak of the family, the CTCF peaks, and the CTCF ChIA-PET `.hic` for the
 singletons. There was no HiChIP in the pipeline. The CTCF rerun is therefore the rerun on the
@@ -98,7 +98,7 @@ same compaction every attractive term has shown here.
    production, and CTCF with RNAPII in the form step 2 picked. Then the trio enhancer3d
    recipe on both, `enhancer3d/playground/trio_poly_e3d.sh`, with the lab's RNAPII gene body
    signal, 4,266 genes at Spearman over 0.5 with expression, as the comparison feature. With
-   prefetch and the grid a genome arm is about 600 GPU hours on eden against 2,800 before.
+   prefetch and the grid a genome arm is about 600 GPU hours on the cluster against 2,800 before.
 
 ## Decisions taken and open
 
@@ -129,7 +129,7 @@ that way. Next: `[springs] factor_strength`, a multiplier on the factor's loop s
 law, at 0.3, 0.1 and 0, the last holding RNAPII loops at the background so its anchors are
 beads with no pull, the null arm the first pass could not run.
 
-Decision criterion, set by the user 2026-09-20: the RNAPII arm exists to study expression
+Decision criterion, set 2026-09-20: the RNAPII arm exists to study expression
 and the behaviours around active genes, so the expression test is the objective and the
 Hi-C battery is the cost it is read against, not a gate. A strength is chosen for the trios by
 how much expression signal it keeps per unit of structure it costs; full strength stays a
@@ -189,7 +189,7 @@ cluster file, so the second file failing to travel cannot silently run the CTCF 
 The RNAPOL2 depth was not matched within families at first, and the table above is that
 state. The providers' filtered sets were uneven by ten times inside CHS, and the cause was
 their draw, not the libraries: HG00514's RNAPOL2 library is the deepest of its family by four
-times. The user's decision, 2026-09-20: resample from the rawest data the folder holds and
+times. Decided 2026-09-20: resample from the rawest data the folder holds and
 depend on no one else's draw, for both factors, and give a family one RNAPOL2 bead set.
 
 ## Depth resampled from the full libraries, 2026-09-20
@@ -217,7 +217,7 @@ against 2.4 M on the providers' sets and 4.6 M with RNAPOL2, so the runs cost ac
 ## The trios on chr1, 2026-09-20
 
 Arrays 1808796, CTCF only in `out/trio_prod`, and 1808803, CTCF with RNAPOL2 in
-`out/trio_rnapol2`, on eden: chr1, ten conformations, nine samples, both on the resampled
+`out/trio_rnapol2`, on the cluster: chr1, ten conformations, nine samples, both on the resampled
 inputs, both with the arcs solver on the CPU at 200 iterations. The checkout moved to the
 device solver while the second array ran and the running tasks kept their settings, every
 logged solve says 200. Wall per conformation on an A100 from the task times, setup included,
@@ -228,8 +228,7 @@ The enhancer3d recipe is `enhancer3d/playground/trio_arms_e3d.sh`, the chr1 arm 
 `trio_poly_e3d.sh` with the population contrast left out, since at chr1 it keeps under ten
 genes. Each arm's control reads the anchors that arm was built on, `TRIO_ANCHORS` and
 `TRIO_ANCHOR_FILE` in `trio_control.py`. Outputs `playground/trio_prod` and
-`playground/trio_rnapol2` under `~/enhancer3d` on the workstation, the tables and figures
-copied to `~/Desktop/enhancer3d/playground/` under the same names, and
+`playground/trio_rnapol2` of the enhancer3d checkout, and
 `trio_arms_compare.py` writes the table. The first column is the 2026-09-09 polymer run's
 chr1 arm on the providers' inputs, also ten conformations, on the same genes.
 
@@ -275,8 +274,8 @@ their per gene, per sample gene body counts.
 ### Per individual, and the jump statistic per contrast, 2026-09-20
 
 Nothing averaged over people from here on. `enhancer3d/playground/trio_arms_jump.py`
-writes three figures to `playground/trio_arms/` on the workstation, copied to
-`~/Desktop/enhancer3d/playground/trio_arms/`: `trio_arms_individual.png`, every individual's
+writes three figures to `playground/trio_arms/` of the enhancer3d checkout:
+`trio_arms_individual.png`, every individual's
 raw and partial correlation on the three arms; `trio_arms_jump.png`, the enhancer3d
 statistic on every contrast; `trio_arms_jump_ridges.png`, the fold change ridges for the
 child against parents contrasts. The table is `trio_arms_jump.csv`.
@@ -347,8 +346,7 @@ The fold change tables above are differences across cell lines and a person has 
 so this is the port that stands: `enhancer3d/playground/rnapol2_individual.py`, one arm, nine
 people, each on their own model and their own expression, no other cell type and nothing
 averaged. Figures `rnapol2_individual.png` and `rnapol2_individual_ridges.png` under
-`playground/trio_rnapol2/individual/` on the workstation and in
-`~/Desktop/enhancer3d/playground/trio_rnapol2/individual/`, csvs beside them. Genes are those
+`playground/trio_rnapol2/individual/` of the enhancer3d checkout, csvs beside them. Genes are those
 the person expresses at all, 2,268 to 2,467 on chr1.
 
 | within one person, chr1, ranges over the nine | raw | controlling linear distance |

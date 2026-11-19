@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from gnome3d.io import write_cif  # noqa: E402
 from gnome3d.types import BeadOut  # noqa: E402
-from harness.integration import parse_hcm  # noqa: E402
+from legacy.harness.integration import parse_hcm  # noqa: E402
 
 
 def anchor_spans(bed: Path, chrom: str) -> tuple[list[int], list[int]]:

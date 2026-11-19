@@ -1,12 +1,11 @@
-"""Give the cell types of an existing site data directory the current production config.
+"""Gives the cell types of a site data directory the current production config.
 
     python web/scripts/update_site_config.py SITE_DATA TAG [CELL=COOLER_URI ...]
 
-For each cell type of the catalog that has `slurm/ensemble/<cell>_xc_C.ini`, that file with the
-site's hole settings appended is written beside the old config as `config_<TAG>.ini`, and the
-catalog entry is pointed at it. A `CELL=URI` argument sets the cell type's `contact_map`. The old
-config stays, and the catalog as it was is kept as `catalog.json.before-<TAG>`. Nothing is
-overwritten: an existing target stops the run.
+For each cell type with `slurm/ensemble/<cell>_xc_C.ini`, that file with the hole settings of
+the site is written as `config_<TAG>.ini` and the catalog points at it. A `CELL=URI` argument
+sets `contact_map`. The catalog is first copied to `catalog.json.before-<TAG>`. An existing
+target stops the run.
 """
 
 from __future__ import annotations

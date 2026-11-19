@@ -39,7 +39,7 @@ def main() -> int:
         boxes = p["boxes"]
         check("an element off the chain gets no box", len(boxes) == 2, str(len(boxes)))
         a = boxes[0]
-        # bead midpoints sit at s + 1000, x = s / 2000; the promoter spans x 9.5 to 10.5 plus the pad
+        # bead midpoints are at s + 1000, x = s / 2000; the promoter spans x 9.5 to 10.5 plus the pad
         check(
             "a promoter's box spans the chain over its interval, padded",
             a["kind"] == "promoter" and abs(a["min"][0] - 9.4) < 0.3 and abs(a["max"][0] - 10.6) < 0.3,

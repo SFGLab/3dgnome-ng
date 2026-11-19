@@ -1,20 +1,13 @@
 #!/bin/bash
-# The three cell validation gate on the production settings, with MultiMM run on the same inputs.
+# The three cell validation gate on the production settings, with MultiMM on the same inputs.
 #
-#   bash slurm/ensemble/validation_gate.sh                 # all three cells
-#   CELLS="GM12878" bash slurm/ensemble/validation_gate.sh # one cell
+#   bash slurm/ensemble/validation_gate.sh
+#   CELLS="GM12878" bash slurm/ensemble/validation_gate.sh
 #
-# Per cell, in order: our pipeline on the production ini regenerated from CANONICAL, five
-# structures of chr1:1-60 Mb on the GPU; MultiMM at our bead count, loops only and then loops
-# with the phased compartment bed, five members each; the battery over every arm with the
-# exponent yardstick fitted on the cell's own singletons; and the compartment saddle.
-#
-# Runs on the workstation from a project checkout with the project venv and a separate MultiMM
-# venv at $MMVENV (python3 -m venv ~/mmvenv && ~/mmvenv/bin/pip install MultiMM). Sequential,
-# one GPU job at a time. A cell whose arm directory already holds its cifs is not rerun, so the
-# script can be restarted to fill in what is missing. TAG names our arm's directory, so a rerun
-# on changed settings (TAG=ev1) reuses the MultiMM arms and scores beside the earlier tag. The
-# battery counts overlaps at 0.7 of a bond whatever the run's own radius, so arms compare.
+# Per cell: five structures of chr1:1-60 Mb on the production ini, MultiMM at our bead count with
+# loops only and with the compartment bed, then the battery and the saddle over every arm. MultiMM
+# runs from a venv at $MMVENV. A cell whose arm directory holds its cifs is not rerun. TAG sets the
+# directory of our arm.
 set -u
 cd "$(dirname "$0")/../.."
 ROOT=$PWD
@@ -22,7 +15,7 @@ OUT="${OUT:-out/validation}"
 R="${REGION:-chr1:1-60000000}"
 N="${N:-5}"
 MMVENV="${MMVENV:-$HOME/mmvenv}"
-HIC_ROOT="${HIC_ROOT:-/mnt/storagelinux/_hic}"
+HIC_ROOT="${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 CELLS="${CELLS:-GM12878 H1ESC HFFC6}"
 TAG="${TAG:-prod}"  # our arm's directory suffix, so a rerun on changed settings sits beside the last
 mkdir -p "$OUT"
@@ -52,7 +45,7 @@ for C in $CELLS; do
       --platform "${MM_PLATFORM:-OpenCL}" --multimm "$MMVENV/bin/MultiMM" --n "$N" 2>&1 | tail -3
     echo "[$C multimm $ARM] done $(date +%H:%M)"
   done
-  # Every arm of this cell that holds cifs, ours from every tag and the four MultiMM arms.
+  # Every arm of this cell that holds cifs.
   ARMS=$(for A in "$OUT"/${C}_*/; do [ -n "$(ls "$A"*.cif 2>/dev/null)" ] && echo "$A"; done | tr '\n' ' ')
   # shellcheck disable=SC2086
   .venv/bin/python playground/validation_battery.py --balance no --ev-factor 0.7 --singletons "$SING" "$MCOOL" "$R" 25000 $ARMS 2>&1 \

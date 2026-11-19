@@ -1,7 +1,8 @@
-fastapi==0.115.6
-uvicorn==0.34.0
-jinja2==3.1.5
-python-multipart==0.0.20
+fastapi==0.163.2
+starlette==1.10.0
+uvicorn==0.54.0
+jinja2==3.1.6
+python-multipart==0.0.34
 rq==2.1.0
 redis==5.2.1
 pandas==3.0.3
@@ -12,3 +13,5 @@ h5py==3.16.0
 fsspec==2026.9.0
 aiohttp==3.14.5
 hic-straw==1.3.1
+# the engine reads a cell type's contact_map with cooler
+cooler==0.10.4

@@ -20,8 +20,7 @@ LOG = log.get("mc.jax.share")
 
 GIB = 2**30
 JAX_DEFAULT_FRACTION = 0.75
-# Memory outside the pool for the CUDA context and library workspaces, about 130 MiB measured
-# on an RTX 4060 Ti with JAX 0.11, with room for cuBLAS workspaces.
+# Memory outside the pool for the CUDA context and library workspaces.
 RESERVE_BYTES = GIB // 2
 MIN_POOL_BYTES = GIB
 
@@ -34,8 +33,9 @@ class GpuShareError(RuntimeError):
 
 @dataclass(frozen=True)
 class PoolPlan:
-    """The fraction to set before JAX starts, None to leave the environment as it is, and the
-    status line to log, empty for nothing to report."""
+    """The fraction to set before JAX starts, None to leave the environment unchanged and the
+    status line to log, empty for none.
+    """
 
     fraction: float | None
     line: str

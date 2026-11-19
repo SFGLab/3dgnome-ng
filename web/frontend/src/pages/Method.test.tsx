@@ -57,6 +57,27 @@ describe('Method page', () => {
     expect(source(chainTerms, 'Confinement')).toBe('[5, 15]')
   })
 
+  it('draws every term on a small chain with a sentence on what the term does', () => {
+    renderMethod()
+    const anchorTerms = screen.getByRole('table', { name: 'Anchor energy terms' })
+    const chainTerms = screen.getByRole('table', { name: 'Chain energy terms' })
+    expect(anchorTerms.querySelectorAll('svg.term-sketch')).toHaveLength(4)
+    expect(chainTerms.querySelectorAll('svg.term-sketch')).toHaveLength(5)
+    expect(within(within(chainTerms).getByRole('row', { name: /Bending/ })).getByRole('img', { name: 'Straightens sharp turns of the chain.' })).toBeInTheDocument()
+    expect(within(within(anchorTerms).getByRole('row', { name: /Loop spring/ })).getByRole('img', { name: /two anchors of a loop/ })).toBeInTheDocument()
+    // The orientation term is least for motifs that point the same way, as the engine scores it.
+    const orientation = within(chainTerms).getByRole('row', { name: /CTCF orientation/ })
+    expect(within(orientation).getByRole('img', { name: /point the same way in space.*face each other along the genome give a hairpin/ })).toBeInTheDocument()
+    expect(within(orientation).getByAltText(/1 - \\mathbf\{o\}_i \\cdot \\mathbf\{o\}_j/)).toBeInTheDocument()
+  })
+
+  it('gives the rule of each kind of variant, tandem duplications among them', () => {
+    renderMethod()
+    const section = document.getElementById('variants')!
+    expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['Deletion', 'Insertion', 'Inversion', 'Duplication'])
+    expect(section).toHaveTextContent('a loop to an anchor after it moves to the second')
+  })
+
   it('links a citation to its reference', () => {
     renderMethod()
     const links = screen.getAllByRole('link', { name: '17' })

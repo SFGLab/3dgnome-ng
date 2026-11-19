@@ -1,4 +1,5 @@
 import { ApiError } from '../api'
+import { served } from '../base'
 
 export type UploadKind = 'loops' | 'anchors' | 'contacts' | 'enhancers' | 'vcf'
 export type CheckError = { line: number | null; found: string; fix: string }
@@ -13,9 +14,11 @@ export type UploadResult = {
   samples: string[]
 }
 
-/** The uploads a job uses in place of the data of a listed cell type. On your own cell type
- * loopsFrom and enhancersFrom name a listed cell type whose loops or enhancers it takes in place
- * of an upload, enhancersFrom none for no enhancers. */
+/**
+ * The uploads a job uses in place of the data of a listed cell type. On your own cell type
+ * loopsFrom and enhancersFrom give a listed cell type whose loops or enhancers it takes,
+ * enhancersFrom none for no enhancers.
+ */
 export type OwnChoice = {
   loops: { factor: string; upload: UploadResult }[]
   anchors: UploadResult | null
@@ -35,7 +38,7 @@ export async function uploadFile(kind: UploadKind, file: File, where: { cell: st
   form.append('cell', where.cell)
   form.append('region', where.region)
   if (where.factor) form.append('factor', where.factor)
-  const r = await fetch('/api/uploads', { method: 'POST', body: form })
+  const r = await fetch(served('/api/uploads'), { method: 'POST', body: form })
   const body = await r.json().catch(() => ({}))
   if (!r.ok) throw new ApiError(body.error ?? `${r.status} from /api/uploads`, r.status, body.field)
   return body as UploadResult
@@ -43,7 +46,7 @@ export async function uploadFile(kind: UploadKind, file: File, where: { cell: st
 
 /** The loops of a loops upload inside a region, as anchor midpoints and the count. */
 export async function uploadPreview(id: string, cell: string, region: string): Promise<[number, number, number][]> {
-  const r = await fetch(`/api/uploads/${id}/preview?${new URLSearchParams({ cell, region })}`)
+  const r = await fetch(served(`/api/uploads/${id}/preview?${new URLSearchParams({ cell, region })}`))
   return r.ok ? r.json() : []
 }
 
@@ -59,7 +62,7 @@ export function ownField(own: OwnChoice): string {
   })
 }
 
-/** The factor a loops file most likely holds, read from its name, and CTCF for the first file. */
+/** The factor a loops file most likely holds, read from its name and CTCF for the first file. */
 export function guessFactor(name: string, index: number): string {
   const n = name.toUpperCase()
   if (/RNAP|POL2|POLII/.test(n)) return 'RNAPII'
@@ -87,7 +90,7 @@ export async function uploadLink(url: string, where: { cell: string; region: str
   form.append('url', url)
   form.append('cell', where.cell)
   form.append('region', where.region)
-  const r = await fetch('/api/uploads/link', { method: 'POST', body: form })
+  const r = await fetch(served('/api/uploads/link'), { method: 'POST', body: form })
   const body = await r.json().catch(() => ({}))
   if (!r.ok) throw new LinkRefused(body.error ?? `${r.status} from /api/uploads/link`, body.fix ?? '')
   return body as UploadResult

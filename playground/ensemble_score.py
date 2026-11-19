@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT / "playground"))
 
 from validation_battery import CONTACT_BEADS, load  # noqa: E402
 
-from validation.metrics.hic import (  # noqa: E402
+from legacy.validation.metrics.hic import (  # noqa: E402
     _scc,
     observed_hic,
     simulated_contacts,

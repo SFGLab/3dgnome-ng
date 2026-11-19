@@ -1,13 +1,8 @@
-"""
-Epigenomic track handling.
+"""Per bead arrays from compartment tracks, by binning onto beads and phasing an unsigned
+eigenvector.
 
-Turns loaded compartment intervals into the per-bead arrays the MC terms read.
-Two steps live here.  Binning intervals onto bead ranges and phasing an unsigned
-eigenvector track into A and B calls.
-
-Bead ranges are inclusive, so a bead spanning `[s, e]` covers `e - s + 1` bases
-and a zero-length subanchor still covers one.  Track intervals are half open,
-matching BED.
+Bead ranges are inclusive and a zero length subanchor covers one base. Track intervals are half
+open, as in BED.
 """
 
 from __future__ import annotations
@@ -33,17 +28,13 @@ from gnome3d.types import (
 
 LOG = log.get("tracks")
 
-# Either interval flavour, for the helpers that only touch start and end.
 _IntervalT = TypeVar("_IntervalT", CompartmentInterval, SignalInterval)
 
 
 def _candidate_range(iv_starts: list[int], iv_ends: list[int], s: int, e: int) -> tuple[int, int]:
-    """
-    Half-open index range of intervals that can overlap the bead range `[s, e]`.
+    """Returns the half open index range of the intervals that can overlap the bead range `[s, e]`.
 
-    Exact for the sorted non-overlapping intervals a binned track produces.  The
-    caller still measures each candidate, so an overlapping source only costs
-    wasted comparisons.
+    Exact for sorted intervals that do not overlap.
     """
     lo = bisect_right(iv_ends, s)
     hi = bisect_right(iv_starts, e)
@@ -55,24 +46,22 @@ def bin_compartments(
     starts: list[int],
     ends: list[int],
 ) -> tuple[I8Array, F32Array]:
-    """
-    Reduce compartment intervals onto bead ranges.
+    """Reduces compartment intervals onto bead ranges.
 
-    The class is the coverage-weighted majority over the bead, so the call that
-    covers most of the bead wins.  The score is the coverage-weighted mean.  A
-    bead with no overlapping interval gets `NONE` and 0.0.
+    The class of a bead is the call that covers most of it and the score is the coverage weighted
+    mean. A bead with no interval gets `NONE` and 0.0.
 
     Parameters
     ----------
-    intervals : list[CompartmentInterval]
+    intervals
         Sorted by start, for one chromosome.
-    starts, ends : list[int]
+    starts, ends
         Inclusive genomic range per bead.
 
     Returns
     -------
-    (cls, score) : (I8Array, F32Array)
-        Both length len(starts).
+    (cls, score)
+        Both of length `len(starts)`.
     """
     n = len(starts)
     cls: I8Array = np.zeros(n, dtype=np.int8)
@@ -106,12 +95,7 @@ def bin_compartments(
 
 
 def slice_intervals(intervals: list[_IntervalT], lo: int, hi: int) -> list[_IntervalT]:
-    """
-    Intervals overlapping the inclusive genomic range `[lo, hi]`.
-
-    Used to hand one IB just the slice of a chromosome track it can see, so a
-    per-IB task stays self-contained without copying the whole chromosome.
-    """
+    """Returns the intervals that overlap the inclusive range `[lo, hi]`."""
     if not intervals:
         return []
     iv_starts = [iv.start for iv in intervals]
@@ -152,12 +136,9 @@ def _mean_signal_over(
 
 
 def _phase_by_signal(comps: list[CompartmentInterval], signal: list[SignalInterval]) -> bool:
-    """
-    Orient one chromosome so A correlates positively with the signal.
+    """Orients one chromosome by the signal, A on the side that correlates positively.
 
-    Returns True when the decision was made.  A track that overlaps nothing, or
-    whose signal is constant across the compartment intervals, gives no evidence
-    and returns False.
+    Returns False when the track overlaps no signal or the signal is constant over its intervals.
     """
     if not signal:
         return False
@@ -189,11 +170,9 @@ def _phase_by_signal(comps: list[CompartmentInterval], signal: list[SignalInterv
 
 
 def _phase_by_anchors(comps: list[CompartmentInterval], anchors: list[Anchor]) -> bool:
-    """
-    Orient one chromosome so the side holding more loop anchors becomes A.
+    """Orients one chromosome by the anchors, A on the side with more of them, as MultiMM does.
 
-    MultiMM's heuristic.  Returns True when at least one anchor landed in a
-    signed interval, and False when the counts give no evidence.
+    Returns False when no anchor is in a signed interval.
     """
     if not anchors:
         return False
@@ -226,17 +205,11 @@ def phase_compartments(
     phasing_signal: SignalMap | None = None,
     anchors: AnchorMap | None = None,
 ) -> CompartmentMap:
-    """
-    Fill in A and B calls for value-only compartment tracks.
+    """Fills in A and B calls for compartment tracks that hold values only.
 
-    The sign of a Hi-C eigenvector is arbitrary and can differ per chromosome, so
-    a raw PC1 track has to be oriented before it means anything.  Chromosomes
-    whose intervals already carry a class from a label source are left alone.
-
-    Rules in order.  Correlate against `phasing_signal` and orient so A is the
-    high side.  Otherwise put the side holding more loop anchors on A.  When
-    neither applies the chromosome stays `NONE`, which leaves the compartment
-    terms inert there rather than segregating it backwards.
+    The sign of a Hi-C eigenvector is arbitrary per chromosome. A chromosome whose intervals carry
+    a class is left unchanged. Otherwise the signal decides, then the anchor counts. A chromosome
+    that neither decides stays `NONE` and the compartment term does not act on it.
 
     Mutates and returns `comps`.
     """

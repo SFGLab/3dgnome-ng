@@ -52,8 +52,38 @@ describe('Job explorer', () => {
     expect(screen.getByText('118 CTCF, 64 RNAPII')).toBeInTheDocument()
     expect(screen.getByText('CTCF and RNAPII')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /ep\.tsv/ })).toHaveAttribute('href', `/jobs/${KEY}/files/ep.tsv`)
-    expect(screen.getByText('99 more')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /all files, zip/ })).toHaveAttribute('href', `/api/jobs/${KEY}/files.zip`)
+    expect(within(screen.getByRole('list', { name: 'Structure files' })).getAllByRole('listitem')).toHaveLength(SUMMARY_DONE.models.length)
+    // Every file in one archive is the Download all button of the tabs, and the list does not repeat it.
+    expect(screen.queryByRole('link', { name: /all files, zip/ })).not.toBeInTheDocument()
+  })
+
+  it('folds the facts and the files of the side panel behind a button, for a narrow screen', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+    const { container } = renderJob()
+    const toggle = await screen.findByRole('button', { name: 'Details and files' })
+    // The styles show the button and hide the folded parts on a narrow screen alone.
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(container.querySelector('.job-side')).toHaveClass('folded')
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(container.querySelector('.job-side')).not.toHaveClass('folded')
+  })
+
+  it('survives a browser whose scroll returns a promise when the structure changes', async () => {
+    const scroll = vi.fn(() => Promise.resolve())
+    const before = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = scroll as unknown as typeof before
+    try {
+      mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+      renderJob()
+      await screen.findByText('Done in 6 min 12 s')
+      fireEvent.click(screen.getByRole('button', { name: 'Next structure' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Next structure' }))
+      expect(scroll).toHaveBeenCalled()
+      expect(screen.getByLabelText('Structure')).toHaveValue('3')
+    } finally {
+      Element.prototype.scrollIntoView = before
+    }
   })
 
   it('names own loops and an uploaded contact map in the side panel', async () => {

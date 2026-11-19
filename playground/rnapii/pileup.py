@@ -86,7 +86,7 @@ def main() -> None:
     from crosscell_prep import read_bedpe
 
     from playground.validation_battery import CONTACT_BEADS, load
-    from validation.metrics.hic import observed_hic, simulated_contacts
+    from legacy.validation.metrics.hic import observed_hic, simulated_contacts
 
     args = sys.argv[1:]
     k = args.index("--json")
