@@ -27,6 +27,10 @@ def main() -> int:
         check("the cache key ignores how the region was typed", request_key(req, cat) == request_key(same, cat))
         other = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=2)
         check("a different factor choice is a different key", request_key(req, cat) != request_key(other, cat))
+        # A site finds the jobs it holds by this key. A change of the key, of the constant in it
+        # or of the way a request is normalised, leaves every job of a running site unfound.
+        pinned = request_key(JobRequest(cell_type="GMX", region="chr1:0-2000000", factors="CTCF"), cat)
+        check("the key of a request is the one sites already hold", pinned == "c873ddce1421a87d", pinned)
         check("100 structures are kept", JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=100).n_models == 100)
         check("101 structures become 100", JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=101).n_models == 100)
         none = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=2, background="none")

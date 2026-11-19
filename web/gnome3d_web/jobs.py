@@ -29,7 +29,9 @@ from .settings import Settings
 from .settings_schema import apply_overrides, validate_overrides
 from .svs import read_svs
 
-ENGINE_VERSION = "gnome3d"
+# A part of the key of every shared job. It is not the name of the package. A change gives each
+# request a new key and the site stops finding the jobs it holds.
+ENGINE_VERSION = "gnome3d-ng"
 
 
 def _no_overrides() -> dict[str, str]:
