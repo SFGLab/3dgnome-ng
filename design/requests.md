@@ -8,7 +8,7 @@ State words: done, open, waiting, held. A waiting item states the person or the 
 ## Website, 3D-GNOME NG on team-aragorn
 
 The site is at `https://3dgnome.mini.pw.edu.pl/new/` and outside access works since 2026-11-18. It runs
-the image at `03f9acb`. Record: `web/deploy/aragorn.md`.
+the image at `c95a32d`. Record: `web/deploy/aragorn.md`.
 
 | Request | State | Notes |
 |---|---|---|
