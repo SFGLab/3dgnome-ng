@@ -188,11 +188,32 @@ numbers. The contact cells are not yet measured on a deep map.
 - The midpoint is ahead of the uniform draw on raw SCC, 0.332 against 0.319, and level on balanced SCC.
 - Both draws gain balanced SCC over the default chain, 0.02 to 0.03, and lose balanced Pearson, 0.03 to 0.05.
 - HFFC6 chr1 10 to 15 Mb falls from 0.477 to 0.32 to 0.34 of raw SCC on every contact bead arm, as on the first
-  build. Not traced.
+  build. See the bins without a count below.
 - The default chain without its two contact terms scores as the default chain. The missing contact cells do not
   explain a difference between the arms.
 - The battery's overlap count is 9.8 per thousand beads on the default chain, 24.5 with the uniform draw and 15.2
   with the midpoint. The count is still not checked between the chains.
+
+### Bins of Hi-C without a count
+
+The pooled score counts a bin of Hi-C without a count as zero and a model bead there counts against the model. The
+three rows of chr1 10 to 15 Mb have 12, 17 and 20 such bins of 200 and the rows of 20 to 25 Mb have none. The
+default chain caps a gap at 100 beads and has fewer beads in those rows: 2,597, 2,823 and 3,301 against 3,025, 3,900
+and 4,565 of the uniform chain, 16 to 38 percent more. The two rows where the contact beads lose raw SCC are the
+two with 38 percent more beads.
+
+Over the bins that Hi-C maps, mean of the six rows:
+
+| arm | SCC raw | SCC balanced | balanced stratum Spearman |
+|---|---|---|---|
+| default chain | 0.295 | 0.266 | 0.113 |
+| default chain, contact terms off | 0.294 | 0.258 | 0.129 |
+| contact beads, uniform draw | 0.290 | 0.297 | 0.149 |
+| contact beads, midpoint | 0.307 | 0.305 | 0.141 |
+
+HFFC6 chr1 10 to 15 Mb over mapped bins: raw SCC 0.392 on the default chain against 0.311 and 0.289, balanced SCC
+0.309 against 0.313 and 0.300. The loss of that row is in the raw score. The share of it that the beads of the long
+gaps carry is not measured bead by bead.
 
 ## Settings
 

@@ -42,6 +42,8 @@ ARMS = [
 PANELS = [
     ("raw_scc", "Pooled SCC, raw Hi-C", None),
     ("bal_scc", "Pooled SCC, balanced Hi-C", None),
+    ("raw_scc_mapped", "Pooled SCC, raw Hi-C, mapped bins", None),
+    ("bal_scc_mapped", "Pooled SCC, balanced Hi-C, mapped bins", None),
     ("raw_sp", "Pooled Spearman, raw Hi-C", None),
     ("bal_p", "Pooled Pearson, balanced Hi-C", None),
     ("exponent", "Distance exponent over the exponent of Hi-C", 1.0),
@@ -75,6 +77,8 @@ def read_scores(scores: Path) -> dict[tuple[str, str], dict[str, dict[str, float
                     "bal_p": float(f[5]),
                     "bal_sp": float(f[6]),
                     "bal_scc": float(f[7]),
+                    "raw_scc_mapped": float(f[8]),
+                    "bal_scc_mapped": float(f[9]),
                 }
         battery = scores / f"{prefix}_battery_balance_no.txt"
         if battery.is_file():
@@ -95,7 +99,7 @@ def read_scores(scores: Path) -> dict[tuple[str, str], dict[str, dict[str, float
 def figure(data: dict[tuple[str, str], dict[str, dict[str, float]]], path: Path) -> None:
     rows = list(data)
     arms = [a for a in ARMS if any(a[0] in d for d in data.values())]
-    fig, axes = plt.subplots(2, 3, figsize=(15.5, 2.6 + 1.05 * len(rows)), facecolor=SURFACE)
+    fig, axes = plt.subplots(2, 4, figsize=(20.5, 2.6 + 1.05 * len(rows)), facecolor=SURFACE)
     step = min(0.12, 0.8 / max(len(arms), 1))
     for ax, (key, title, ref) in zip(axes.ravel(), PANELS, strict=True):
         ax.set_facecolor(SURFACE)
@@ -165,6 +169,8 @@ def table(data: dict[tuple[str, str], dict[str, dict[str, float]]], path: Path) 
     cols = [
         ("raw_scc", "SCC raw"),
         ("bal_scc", "SCC balanced"),
+        ("raw_scc_mapped", "SCC raw, mapped bins"),
+        ("bal_scc_mapped", "SCC balanced, mapped bins"),
         ("raw_sp", "Spearman raw"),
         ("bal_p", "Pearson balanced"),
         ("exponent", "exponent over Hi-C"),
