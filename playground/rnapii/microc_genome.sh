@@ -30,6 +30,9 @@ declare -A LEN=([chr1]=248956422 [chr2]=242193529 [chr3]=198295559 [chr4]=190214
   [chr7]=159345973 [chr8]=145138636 [chr9]=138394717 [chr10]=133797422 [chr11]=135086622 [chr12]=133275309
   [chr13]=114364328 [chr14]=107043718 [chr15]=101991189 [chr16]=90338345 [chr17]=83257441 [chr18]=80373285
   [chr19]=58617616 [chr20]=64444167 [chr21]=46709983 [chr22]=50818468)
+# One call a line and chromosome at a time. A second call for the same one leaves at once.
+exec 9> "$OUT/${L}_${CHR}.lock"
+flock -n 9 || { echo "[$L $CHR] another call has this task"; exit 0; }
 REGION="$CHR:0-${LEN[$CHR]}"
 SLICE="$SLICES/microc_${L}_${CHR}_5000.npz"
 
