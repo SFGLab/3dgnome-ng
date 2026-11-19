@@ -3,8 +3,9 @@
 The term sums over pairs closer than `r0`. The grid is a linked list per cell. A bead that
 moves is unlinked from its old cell and linked into its new one in constant time and the grid
 is exact after every accepted move. The query and the relink are in `terms.py`, which may not
-import this module. The sum runs in ascending bead index, the order of a full scan. Results
-are bit identical.
+import this module. The sum runs in ascending bead index, the order of a full scan. The grid
+and the scan return the same bits on ARM. On x86-64 the compiler adds the pairs of the scan in
+another order under fastmath and the two agree to rounding.
 """
 
 from __future__ import annotations
