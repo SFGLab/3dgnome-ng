@@ -257,9 +257,19 @@ def run_outer_loop(
     on_round: Callable[[F64Array], None] | None = None,
     use_arc_w: bool = False,
     arc_w: F32Array = NO_W,
+    use_spans: bool = False,
+    span_cen: F64Array = NO_F64_N3,
+    span_home: F64Array = NO_F64_N3,
+    span_inv_n: F64Array = NO_F64,
+    span_off: I32Array = NO_I32,
+    span_anc: I32Array = NO_I32,
+    span_weight: float = 0.0,
+    score_spans: float = 0.0,
 ) -> float:
     """Runs the kernel until convergence and returns the final total score."""
     score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
+    if use_spans:
+        score += score_spans
     ms_score = score
     step_i = 0
     round_i = 0
@@ -272,6 +282,7 @@ def run_outer_loop(
             score_excl,
             score_conf,
             score_comp,
+            score_spans,
             n_ok,
         ) = batch_mc_nb(
             pw,
@@ -344,8 +355,18 @@ def run_outer_loop(
             cap_r,
             use_arc_w,
             arc_w,
+            use_spans,
+            span_cen,
+            span_home,
+            span_inv_n,
+            span_off,
+            span_anc,
+            span_weight,
+            score_spans,
         )
         score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
+        if use_spans:
+            score += score_spans
         step_i += stop_steps
         round_i += 1
         if on_round is not None:

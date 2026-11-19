@@ -42,6 +42,20 @@ class BeadOut(NamedTuple):
         return self.end - self.start + 1
 
 
+class AnchorSpans(NamedTuple):
+    """The anchors of a block as spans of beads of the uniform chain.
+
+    Anchor k holds the beads `lo[k]` to `hi[k] - 1`. `knot[k]` is the bead at its midpoint.
+    `home[k]` is its position from the arcs stage, where the smooth stage holds the centroid of
+    the span.
+    """
+
+    lo: I32Array
+    hi: I32Array
+    knot: I32Array
+    home: F64Array
+
+
 @dataclass
 class Anchor:
     chr: str

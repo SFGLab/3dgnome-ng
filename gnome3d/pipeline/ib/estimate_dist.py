@@ -19,7 +19,7 @@ from gnome3d.util import add_movable_noise_inplace, seed_rng
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
-    from gnome3d.types import BoolArray, F32Array
+    from gnome3d.types import AnchorSpans, BoolArray, F32Array
 
 _SEED_SALT = 1  # differs from ARCS (0) and SMOOTH (2)
 _LOG = log.get("mc.jax")
@@ -57,7 +57,13 @@ def _fill_heat_dist_inplace(
 
 
 def _estimate_avg_dist(
-    pos: F32Array, fixed: BoolArray, dtn: F32Array, step: float, s: Settings, seed: int
+    pos: F32Array,
+    fixed: BoolArray,
+    dtn: F32Array,
+    step: float,
+    s: Settings,
+    seed: int,
+    spans: AnchorSpans | None = None,
 ) -> F32Array:
     """Returns the average pair distances over dry smooth passes.
 
@@ -81,7 +87,7 @@ def _estimate_avg_dist(
             add_movable_noise_inplace(pos_trial, fixed, step)
             # The dry pass has no heat, no orientation and no affinity. Affinity is attractive and
             # would shrink the distances that become the heat target.
-            score = mc_numba.mc_smooth_numba(pos_trial, dtn, fixed, step, s)
+            score = mc_numba.mc_smooth_numba(pos_trial, dtn, fixed, step, s, spans=spans)
             if score < rep_best_score or rep_best_score < 0.0:
                 rep_best_score = score
                 rep_best_pos = pos_trial.copy()
@@ -114,6 +120,7 @@ def _run(problem: Problem) -> Result:
         problem["step_size"],
         problem["settings"],
         problem["seed"],
+        problem["spans"],
     )
 
     return _heat_dist_from_avg(avg, problem["subanchor_heat_raw"], problem["settings"])
@@ -165,6 +172,12 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     from gnome3d.pipeline.ib.smooth import run_smooth_batch
 
     s = problems[0]["settings"]
+    if problems[0]["spans"] is not None:
+        raise ValueError(
+            "[main] uniform_chain is on and the distance estimate runs on the batch executor,"
+            " which has no anchor span term. Set [simulation_backend] mc_executor_estimate_dist"
+            " to threaded or serial."
+        )
     n_reps = int(s.subanchor_estimate_replicates)
     n_steps = int(s.subanchor_estimate_steps)
     per_ib = n_reps * n_steps
@@ -217,6 +230,7 @@ class EstimateDistStage:
             "subanchor_heat_raw": st.subanchor_heat_raw,
             "settings": st.settings,
             "seed": (st.seed + _SEED_SALT) & 0x7FFFFFFF,
+            "spans": st.spans,
         }
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:

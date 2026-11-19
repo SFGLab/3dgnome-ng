@@ -916,6 +916,78 @@ last section are dated records and are not rewritten when production moves on. `
   scores an empty hole's zeros against any filled level, while their contacts follow Hi-C's from
   pair to pair. `design/gap-fill.md` has every arm.
 
+- **Uniform chain with anchors as spans of beads: `[main] uniform_chain = yes`, default no, under
+  measurement since 2026-11-19.** ([pipeline/ib/spans.py](../gnome3d/pipeline/ib/spans.py) `densify_uniform`
+  and `motif_sites`, [mc/numba/terms.py](../gnome3d/mc/numba/terms.py) `init_spans_nb`)
+  The default chain has one bead per anchor of any width and one bead per kilobase between
+  anchors. In the GM12878 anchor file 88 percent of consecutive anchors overlap and 42 percent are
+  nested. The median width is 1.4 kb and 1.2 percent are over 10 kb. With `overlap_anchor_strict`
+  off the densify stage fills each overlap with subanchors. On chr1 108.5 to 111 Mb the beads of
+  the default chain cover 2,823 kb over 2,431 kb of sequence. The output is sorted by start and 62
+  rows of that region leave the chain order. A viewer then draws bonds of 3 to 7 beads between
+  beads of different runs near a nested anchor of 27 kb.
+
+  The uniform chain divides the span of a block, from the start of its first anchor to the end of
+  its last, into beads of equal width, one per `target_bp_per_subanchor`. Every base is in one
+  bead and the sorted output is the chain. The span of an anchor is the run of beads whose
+  midpoints are in its range, and always the knot, the bead at its midpoint. Anchors that overlap
+  share beads. In the joint arcs solve the anchors of a block with their midpoints in one bead
+  are one node, `merge_nodes`: a pair of nodes takes the shortest loop target of its anchor
+  pairs, else their shortest background. The position of the node is the home of the centroid of
+  each of its spans. The solve per block of `scope = block` keeps one node per anchor. The smooth stage moves every bead and adds
+  `anchor_span_weight * |centroid - home|^2` per anchor. The chain starts with each knot at its
+  home and the `smooth_start` bridges between knots. An output bead inside a span has the kind
+  anchor, and the cross block relaxation does not move it.
+
+  The orientation term reads a site at the knot of each anchor with a CTCF loop. The orientation
+  of a site is the direction from the bead before it to the bead after it. Sites are three beads
+  or more apart and one bead or more from each end of the chain. An anchor nearer than that to
+  a site of more loop weight joins the site and its loops go to it.
+
+  With `use_subanchor_heatmap` the singletons are binned to the beads of the uniform chain,
+  `uniform_heatmap`, with the normalisation of the default chain, and the dry passes of the
+  distance estimate hold the spans. The JAX smooth kernel has no span term and the batch executor
+  refuses the setting in the smooth stage and in the distance estimate. A run with the setting off
+  is byte identical to the commit before, by `playground/parity_dump.py`.
+
+  First measurement, one structure of GM12878 chr1 108.5 to 111 Mb at production settings, bonds
+  in chain order after the relaxation, before the nodes were merged:
+
+  | chain | beads | sequence in beads | bonds over 2 beads | bonds over 3 beads | 95th percentile bond | radius of gyration |
+  |---|---|---|---|---|---|---|
+  | default | 2,369 | 2,823 kb | 295 | 131 | 3.20 | 7.4 |
+  | uniform | 2,483 | 2,483 kb | 159 | 44 | 2.16 | 7.3 |
+
+  Trace of the long bonds, 2026-11-19, the same region and one structure per arm, bonds before
+  the relaxation:
+
+  | arm | bonds over 2 beads | bonds over 3 beads | bond beside an anchor, median | pairs under 0.7 beads |
+  |---|---|---|---|---|
+  | default chain | 243 | 117 | 2.48 | 66 |
+  | default chain, orientation term off | 52 | 3 | 1.11 | 61 |
+  | default chain, hard wall off | 103 | 25 | 1.77 | 970 |
+  | uniform chain, nodes merged, span weight 1.0 | 167 | 58 | | 67 |
+  | uniform chain, nodes merged, span weight 0.1 | 121 | 38 | | 47 |
+  | the same, orientation term off | 46 | 0 | | 67 |
+  | the same, hard wall off | 13 | 2 | | 1,593 |
+
+  - The orientation term stretches the bonds beside an oriented anchor on both chains. Its weight
+    is 50 and a bond has 0.1.
+  - The hard wall keeps a stretched bond in place. Off, the bonds recover and the overlaps
+    return.
+  - The relaxation adds 40 to 60 bonds over 2 beads on either chain. It moves free beads and
+    holds the anchor beads.
+  - Before the merge 256 pairs of anchors with one knot had homes a median of 1.16 beads apart,
+    held by the background spring at the floor of the law, one bead. Merged, they share a home.
+  - Nodes one bead apart on the chain have homes a median of 1.5 to 1.7 beads apart. No term of
+    the arcs stage holds chain neighbours within one bond. The arcs excluded volume radius at
+    0.7 and 1.0 beads does not change it. Open.
+  - The span weight was not tuned. At 1.0 the offset of a centroid from its home has a median of
+    0.71 beads, at 0.1 of 1.12 and with the orientation term off of 0.57.
+
+  The battery has not run on this arm. Unit checks in `tests/unit/test_uniform_chain.py` and
+  `tests/integration/test_uniform_pipeline.py`.
+
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](../gnome3d/mc/numba/cells.py),
   `[simulation_backend] neighbour_grid`, default yes)
   The excluded volume term sums over pairs closer than `r0` and was implemented as a scan over

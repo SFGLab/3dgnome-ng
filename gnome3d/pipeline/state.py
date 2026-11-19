@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from gnome3d.pipeline.coarse import CoarseState
     from gnome3d.settings import Settings
     from gnome3d.types import (
+        AnchorSpans,
         BeadOut,
         BoolArray,
         CompartmentInterval,
@@ -80,6 +81,8 @@ class Densified(Arced):
     step_size_smooth: float
     # (N,) compartment per bead
     bead_compartment: I8Array | None
+    # The anchors as spans of beads under `uniform_chain`. No bead is fixed then.
+    spans: AnchorSpans | None = field(default=None, kw_only=True)
 
 
 @dataclass(frozen=True)

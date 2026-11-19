@@ -22,6 +22,7 @@ from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
 from gnome3d.pipeline.ib.arcs import hilbert_start, run_arcs_problem, walk_start
 from gnome3d.pipeline.ib.maxent import anchor_draw
+from gnome3d.pipeline.ib.spans import anchor_spans, grid_edges, merge_nodes, uniform_heatmap
 from gnome3d.settings import Settings
 from gnome3d.tracks import slice_intervals
 from gnome3d.types import (
@@ -29,6 +30,7 @@ from gnome3d.types import (
     F32Array,
     F64Array,
     I8Array,
+    I64Array,
 )
 from gnome3d.util import seed_rng
 
@@ -114,6 +116,24 @@ def _collect_ib_work(
     return work
 
 
+def _anchor_nodes(state: CoarseState, work: list[tuple[str, int, list[int]]]) -> I64Array:
+    """Returns the arcs node of each anchor of a chromosome under `uniform_chain`, in the order
+    of `work`. The anchors of a block with their midpoints in one bead of its chain share a
+    node. Nodes are numbered along the chromosome.
+    """
+    clusters = state.clusters
+    target = int(state.s.target_bp_per_subanchor)
+    out: list[I64Array] = []
+    base = 0
+    for _, _, ar in work:
+        genomic = [(clusters[a].start, clusters[a].end, clusters[a].genomic_pos) for a in ar]
+        _lo, _hi, knot = anchor_spans(genomic, grid_edges(genomic, target))
+        _beads, rank = np.unique(knot, return_inverse=True)
+        out.append(rank.astype(np.int64) + base)
+        base += int(rank.max()) + 1
+    return np.concatenate(out)
+
+
 def joint_arcs_solve(
     state: CoarseState, chr_: str, work: list[tuple[str, int, list[int]]], seed_offset: int
 ) -> None:
@@ -149,7 +169,8 @@ def joint_arcs_solve(
     if s.use_anchor_heatmap and (state.singletons or state.anchor_contacts):
         anchor_heat, _ = cb.build_contact_heatmaps(state, active_all, chr_, with_subanchor=False)
     exp_dist = cb.calc_anchor_expected_distances(state, active_all, chr_, anchor_heat, seed)
-    if s.arcs_start == "maxent":
+    node = _anchor_nodes(state, work) if s.uniform_chain else None
+    if s.arcs_start == "maxent" and node is None:
         # One draw per conformation, placed at the centroid of the block layout.
         mids_all = np.array([clusters[a].genomic_pos for a in active_all], dtype=np.float64)
         draw = anchor_draw(exp_dist, mids_all, law, np.random.default_rng([seed, 7]))
@@ -159,6 +180,30 @@ def joint_arcs_solve(
     anchor_genomic = [
         (clusters[a].start, clusters[a].end, clusters[a].genomic_pos) for a in active_all
     ]
+    if node is not None:
+        # Under `uniform_chain` the anchors with their midpoints in one bead are one node.
+        n_nodes = int(node.max()) + 1
+        size = np.bincount(node, minlength=n_nodes).astype(np.float64)
+        exp_dist, arc_w = merge_nodes(exp_dist, arc_w, node)
+        if activity is not None:
+            activity = (np.bincount(node, weights=activity, minlength=n_nodes) / size).astype(
+                np.float32
+            )
+        g = np.array(anchor_genomic, dtype=np.int64)
+        lo = np.full(n_nodes, np.iinfo(np.int64).max, dtype=np.int64)
+        hi = np.zeros(n_nodes, dtype=np.int64)
+        np.minimum.at(lo, node, g[:, 0])
+        np.maximum.at(hi, node, g[:, 1])
+        mid = np.bincount(node, weights=g[:, 2].astype(np.float64), minlength=n_nodes) / size
+        anchor_genomic = [(int(a), int(b), int(m)) for a, b, m in zip(lo, hi, mid, strict=True)]
+        start = np.stack(
+            [np.bincount(node, weights=pos0[:, c], minlength=n_nodes) / size for c in range(3)],
+            axis=1,
+        )
+        if s.arcs_start == "maxent":
+            draw = anchor_draw(exp_dist, mid, law, np.random.default_rng([seed, 7]))
+            start = draw + start.mean(axis=0)
+        pos0 = np.ascontiguousarray(start, dtype=np.float32)
     # The per block stage passes anchors through at chromosome scope. The joint call runs at
     # block scope on a copy.
     s_joint = copy.copy(s)
@@ -177,7 +222,7 @@ def joint_arcs_solve(
         }  # type: ignore[arg-type]
     )
     for k, a in enumerate(active_all):
-        clusters[a].pos = np.asarray(pos[k], dtype=np.float64)
+        clusters[a].pos = np.asarray(pos[k if node is None else node[k]], dtype=np.float64)
     log.status(
         LOG,
         "joint arcs solve %s: %d anchors in %d blocks, energy %.4g",
@@ -186,6 +231,8 @@ def joint_arcs_solve(
         len(work),
         score,
     )
+    if node is not None:
+        log.status(LOG, "joint arcs solve %s: %d nodes of the uniform chain", chr_, len(pos))
 
 
 def _build_ib_seed(
@@ -247,12 +294,20 @@ def seed_for_ib(
 
     anchor_heat: F64Array | None = None
     subanchor_heat_raw: F32Array | None = None
+    # Under `uniform_chain` the subanchor heatmap is binned to the beads of the uniform chain.
+    default_bins = bool(state.s.use_subanchor_heatmap) and not s.uniform_chain
     if (state.s.use_anchor_heatmap or state.s.use_subanchor_heatmap) and (
         state.singletons or state.anchor_contacts
     ):
         anchor_heat, subanchor_heat_raw = cb.build_contact_heatmaps(
-            state, active_region, chr_, with_subanchor=bool(state.s.use_subanchor_heatmap)
+            state, active_region, chr_, with_subanchor=default_bins
         )
+        if s.uniform_chain and s.use_subanchor_heatmap and state.singletons:
+            edges = grid_edges(
+                [(clusters[ci].start, clusters[ci].end, 0) for ci in active_region],
+                int(s.target_bp_per_subanchor),
+            )
+            subanchor_heat_raw = uniform_heatmap(state.singletons, chr_, edges)
 
     # The seed of the block also selects the conformation for the loop dropout.
     block_seed = (ib_idx * 2_654_435_761 + 40_503 + seed_offset) & 0x7FFFFFFF
@@ -305,7 +360,12 @@ def seed_for_ib(
         subanchor_heat_raw is not None
         and bool(state.s.use_subanchor_heatmap)
         and float(subanchor_heat_raw.mean(dtype=np.float64)) >= 1e-6  # summed in float64
-        and not _heat_signal_negligible(state.s, subanchor_heat_raw, a, ib_label)
+        and not _heat_signal_negligible(
+            state.s,
+            subanchor_heat_raw,
+            int(subanchor_heat_raw.shape[0]) if s.uniform_chain else a,
+            ib_label,
+        )
     )
 
     seed = Seeded(

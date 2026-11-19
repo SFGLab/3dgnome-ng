@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from gnome3d.pipeline.ib.spans import densify_uniform
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import AnchorMapEntry, Arced, Densified, State
 from gnome3d.tracks import bin_compartments
@@ -16,13 +17,14 @@ from gnome3d.tracks import bin_compartments
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
     from gnome3d.types import (
+        AnchorSpans,
         BoolArray,
         CompartmentInterval,
         F32Array,
         I8Array,
     )
 
-# (pos, fixed, starts, ends, dtn, anchor_map, step_size_smooth, compartment)
+# (pos, fixed, starts, ends, dtn, anchor_map, step_size_smooth, compartment, spans)
 DensifyResult = tuple[
     "F32Array",
     "BoolArray",
@@ -32,6 +34,7 @@ DensifyResult = tuple[
     list[AnchorMapEntry],
     float,
     "I8Array | None",
+    "AnchorSpans | None",
 ]
 
 
@@ -64,8 +67,14 @@ def densify(
     """Inserts subanchor beads between each consecutive anchor pair.
 
     The compartment track is binned onto the bead ranges. A subanchor reads the track over its
-    own genomic slot.
+    own genomic slot. With `uniform_chain` the chain is that of `densify_uniform`.
     """
+    if s.uniform_chain:
+        pos_g, fixed_g, starts_g, ends_g, dtn_g, step_g, comp_g, spans = densify_uniform(
+            anchor_pos, anchor_genomic, s, track_compartments
+        )
+        knots: list[AnchorMapEntry] = [(int(b), k) for k, b in enumerate(spans.knot)]
+        return pos_g, fixed_g, starts_g, ends_g, dtn_g, knots, step_g, comp_g, spans
     counts = _subanchor_counts(anchor_genomic, s)
     bead_starts: list[int] = []
     bead_ends: list[int] = []
@@ -142,6 +151,7 @@ def densify(
         anchor_map,
         step_size_smooth,
         compartment,
+        None,
     )
 
 
@@ -176,7 +186,7 @@ class DensifyStage:
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
         st = inputs[0]
         assert isinstance(st, Arced)
-        pos, fixed, starts, ends, dtn, anchor_map, step, compartment = result
+        pos, fixed, starts, ends, dtn, anchor_map, step, compartment, spans = result
         return Densified(
             **vars(st),
             pos=pos,
@@ -187,4 +197,5 @@ class DensifyStage:
             bead_ends=ends,
             step_size_smooth=step,
             bead_compartment=compartment,
+            spans=spans,
         )

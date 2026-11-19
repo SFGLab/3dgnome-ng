@@ -158,6 +158,84 @@ def init_confine_nb(
     return err
 
 
+# Anchor spans, a hold of the centroid of the beads of each anchor at its home.
+#
+# E_k = weight * |c_k - h_k|^2, with c_k the mean position of the beads of anchor k
+#
+# Per anchor and single counted. The local score of a bead sums the anchors that hold it. The
+# delta is (curr - prev).
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def init_spans_nb(
+    pos: F64Array, lo: I32Array, hi: I32Array, home: F64Array, weight: float, cen: F64Array
+) -> float:
+    """Fills `cen` with the centroid of each anchor and returns the spans score."""
+    sc = 0.0
+    for k in range(lo.shape[0]):
+        cx = 0.0
+        cy = 0.0
+        cz = 0.0
+        for i in range(lo[k], hi[k]):
+            cx += pos[i, 0]
+            cy += pos[i, 1]
+            cz += pos[i, 2]
+        m = hi[k] - lo[k]
+        cen[k, 0] = cx / m
+        cen[k, 1] = cy / m
+        cen[k, 2] = cz / m
+        ex = cen[k, 0] - home[k, 0]
+        ey = cen[k, 1] - home[k, 1]
+        ez = cen[k, 2] - home[k, 2]
+        sc += weight * (ex * ex + ey * ey + ez * ez)
+    return sc
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def local_spans_nb(
+    cen: F64Array,
+    home: F64Array,
+    inv_n: F64Array,
+    bead_off: I32Array,
+    bead_anc: I32Array,
+    p: int,
+    dx: float,
+    dy: float,
+    dz: float,
+    weight: float,
+) -> float:
+    """Returns the spans score of the anchors that hold bead p, with the bead moved by
+    (dx, dy, dz).
+    """
+    sc = 0.0
+    for q in range(bead_off[p], bead_off[p + 1]):
+        k = bead_anc[q]
+        ex = cen[k, 0] + dx * inv_n[k] - home[k, 0]
+        ey = cen[k, 1] + dy * inv_n[k] - home[k, 1]
+        ez = cen[k, 2] + dz * inv_n[k] - home[k, 2]
+        sc += weight * (ex * ex + ey * ey + ez * ez)
+    return sc
+
+
+@njit(cache=True, fastmath=True, nogil=True)
+def shift_spans_nb(
+    cen: F64Array,
+    inv_n: F64Array,
+    bead_off: I32Array,
+    bead_anc: I32Array,
+    p: int,
+    dx: float,
+    dy: float,
+    dz: float,
+) -> None:
+    """Moves the centroids of the anchors that hold bead p by a move of the bead."""
+    for q in range(bead_off[p], bead_off[p + 1]):
+        k = bead_anc[q]
+        cen[k, 0] += dx * inv_n[k]
+        cen[k, 1] += dy * inv_n[k]
+        cen[k, 2] += dz * inv_n[k]
+
+
 # Excluded volume, a soft harmonic repulsion under r0.
 #
 # E_pair(d) = weight * ((r0 - d) / r0)^2 if d < r0, else 0
@@ -637,8 +715,8 @@ def init_heatmap_nb(pos: F64Array, exp_safe: F64Array, skip: BoolArray) -> float
 # The arrays of a term that is off must have a valid type and are not read.
 #
 # Structure adds `struct_delta_factor * (curr - prev)`, 1 for arcs and chain and 2 for heatmap.
-# Heat, orientation, excluded volume and compartment add 2 * (curr - prev). Confinement adds (curr -
-# prev).
+# Heat, orientation, excluded volume and compartment add 2 * (curr - prev). Confinement and the
+# anchor spans add (curr - prev).
 #
 # A move is kept when `score_new < score` under `strict_better` and when `score_new <= score`
 # otherwise. Smooth is strict.
@@ -866,13 +944,23 @@ def batch_mc_nb(
     cap_r: F64Array = NO_F64,
     use_arc_w: bool = False,
     arc_w: F32Array = NO_W,
-) -> tuple[float, float, float, float, float, float, float, int]:
+    use_spans: bool = False,
+    span_cen: F64Array = NO_F64_N3,
+    span_home: F64Array = NO_F64_N3,
+    span_inv_n: F64Array = NO_F64,
+    span_off: I32Array = NO_I32,
+    span_anc: I32Array = NO_I32,
+    span_weight: float = 0.0,
+    score_spans: float = 0.0,
+) -> tuple[float, float, float, float, float, float, float, float, int]:
     n = pos.shape[0]
     n_mov = movable.shape[0]
     n_ok = 0
     wall_cnt0 = 0
     wall_depth0 = 0.0
     score = score_struct + score_heat + score_orn + score_excl + score_conf + score_comp
+    if use_spans:
+        score += score_spans
 
     for _ in range(n_steps):
         p: int = int(movable[np.random.randint(0, n_mov)])
@@ -940,6 +1028,12 @@ def batch_mc_nb(
                 comp_weight,
                 comp_ea,
                 comp_eb,
+            )
+
+        loc_spans_prev = 0.0
+        if use_spans:
+            loc_spans_prev = local_spans_nb(
+                span_cen, span_home, span_inv_n, span_off, span_anc, p, 0.0, 0.0, 0.0, span_weight
             )
 
         orn_k: int = -1
@@ -1073,6 +1167,13 @@ def batch_mc_nb(
             + score_conf_new
             + score_comp_new
         )
+        score_spans_new = score_spans
+        if use_spans:
+            loc_spans_curr = local_spans_nb(
+                span_cen, span_home, span_inv_n, span_off, span_anc, p, dx, dy, dz, span_weight
+            )
+            score_spans_new = score_spans + (loc_spans_curr - loc_spans_prev)
+            score_new += score_spans_new
 
         if hard_reject:
             ok = False
@@ -1103,6 +1204,9 @@ def batch_mc_nb(
             score_excl = score_excl_new
             score_conf = score_conf_new
             score_comp = score_comp_new
+            if use_spans:
+                shift_spans_nb(span_cen, span_inv_n, span_off, span_anc, p, dx, dy, dz)
+                score_spans = score_spans_new
         else:
             pos[p, 0] -= dx
             pos[p, 1] -= dy
@@ -1120,5 +1224,6 @@ def batch_mc_nb(
         score_excl,
         score_conf,
         score_comp,
+        score_spans,
         n_ok,
     )
