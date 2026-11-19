@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gnome3d"
 version = "0.2.0"
-description = "3D chromatin structure from ChIA-PET loops and Hi-C contacts"
+description = "3D chromatin structure modeling from ChIA-PET loops and Hi-C contacts"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24.0",
@@ -86,8 +86,6 @@ reportConstantRedefinition = "none"
 target-version = "py311"
 line-length = 100
 extend-exclude = ["legacy/3dnome", ".venv", "build", "dist", "out", "data", "playground"]
-# Honor the excludes even when a path is passed explicitly (e.g. pre-commit / editors),
-# so playground/ scratch scripts are never linted.
 force-exclude = true
 
 [tool.ruff.format]
@@ -106,15 +104,10 @@ ignore = [
 ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
-# Star-imports of the public type aliases are intentional in these modules
 "gnome3d/io.py" = ["F405", "F403"]
 "gnome3d/data.py" = ["F405", "F403", "B023"]
 "gnome3d/hierarchy.py" = ["F405", "F403"]
 "gnome3d/pipeline/coarse/build.py" = ["F405", "F403"]
 "gnome3d/mc/jax/util.py" = ["F401"]
 "legacy/validation/metrics/__init__.py" = ["F405", "F403"]
-
-# The harness uses tight one-liner stubs (lots of `;`), tuple short names like
-# `l` for length, and zip() without strict=. These are intentional for compact
-# test fixtures, not real code.
 "legacy/harness/integration.py" = ["B007", "B905"]

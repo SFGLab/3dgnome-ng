@@ -95,20 +95,6 @@ the stretches without loops. SETTINGS.md describes them.
 `tests/unit/` has one file per feature. `tests/integration/` runs the whole pipeline on synthetic inputs and on one
 GM12878 region when its inputs are under `data/`.
 
-## Repository
-
-| Folder | Content |
-|--------|---------|
-| `gnome3d/` | The model. |
-| `tests/` | The test suite. |
-| `web/` | The website. |
-| `slurm/ensemble/` | Run scripts and configs for a cluster and a workstation. |
-| `playground/` | Research scripts, the validation battery and figures. |
-| `design/` | Design notes. [design/features.md](design/features.md) has every feature with its measurements. |
-| `legacy/` | Retired code, with 3D-GNOME under `legacy/3dnome/`. See [legacy/README.md](legacy/README.md). |
-
-[AGENTS.md](AGENTS.md) describes the model and the rules for a change.
-
 ## Acknowledgements
 
 3D-GNOMEᴺᴳ builds on the 3D-GNOME family of tools and on the work of their authors. Please cite these papers when you
