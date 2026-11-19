@@ -110,7 +110,10 @@ export function Help() {
         <section id="variants">
           <h2>Structural variants</h2>
           <p>
-            Two hosted call sets need no upload. The 1000 Genomes set holds the 3,202 samples of the 30x phased panel and the HGSVC set holds 35 samples of freeze 4. Choose the set, type a sample name such as HG00096 and pick a haplotype. The 1000 Genomes set covers chromosomes 1 to 22.
+            Three hosted call sets need no upload. The 1000 Genomes set holds the 3,202 samples of the 30x phased panel and the HGSVC set holds 35 samples of freeze 4. Choose the set, type a sample name such as HG00096 and pick a haplotype. The 1000 Genomes set covers chromosomes 1 to 22.
+          </p>
+          <p>
+            The SGDP set holds 277 people of the Simons Genome Diversity Project, named as the project names them, S_Adygei-1 for one. Their structural variants are imputed. The project calls single base variants alone. Each person therefore got the structural variants of the 1000 Genomes haplotypes that match theirs. The set keeps the 35,434 variants with an imputation quality, DR2, of 0.8 or more on chromosomes 1 to 22, between 3,400 and 5,400 a person. For 23 people who are in both projects, imputed without their own genomes in the panel, 98.5% of the genotypes agree with the measured ones, 95% of the measured variant alleles were imputed and 95% of the imputed ones were measured. For variants under 1% in the panel the two shares are 85% and 77%. Those 23 are from populations the panel has. Expect less for a person from a population it lacks.
           </p>
           <p>
             Or upload a VCF compressed with bgzip. A record needs SVTYPE of DEL, INS, INV or DUP in its INFO field and END or SVLEN. An insertion uses its ALT sequence when it has one. A duplication is read as tandem, with the copy right after the original. A gene inside it is listed twice, the second time as its second copy. CTCF motifs in that sequence can become new anchors. The result page counts the skipped records of other types. A phased genotype puts each allele on its own haplotype.

@@ -173,6 +173,15 @@ HGDP gives measured structural variants for many of the populations SGDP was cho
 `data/tmp` holds 8.4 TB of per sample splits of chromosomes 1 to 3 and other intermediates. The raid
 is full. Nothing was removed. The maintainer decides which of it goes.
 
+## What was done, 2026-11-19
+
+Step 5 ran on eden for the 22 autosomes. The SGDP calls turned out to hold single base variants
+alone, no insertion or deletion of any length, so the long indel route of step 6 gives nothing.
+The maintainer asked for SGDP on the site, and the set was imputed from the 2022 panel:
+35,434 symbolic records at DR2 of 0.8 or more. The check on the 23 people of both projects is in
+`web/deploy/aragorn.md`. HGDP was not looked into. The panel and the phased SGDP files are on
+aragorn under `data/variants/`, which is what step 2 waited for.
+
 ## Order
 
 1. Sample table. Small data, no modelling.

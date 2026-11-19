@@ -16,7 +16,8 @@ the site's container on the loopback, port 8770, and everything else to the old 
     catalog.json
     cell_types/     GM12878, H1ESC, HFFC6, each with compartments.bed
     maps/<CELL>/    the deep map of each cell type, the catalog's contact_map
-    svs/            HGSVC and 1KGP, one indexed VCF each, and 1KGP.samples.tsv
+    svs/            HGSVC, 1KGP and SGDP, one indexed VCF each, and the sample tables of 1KGP and SGDP
+    variants/       1KGP, the 30x panel of 2022-04-22. SGDP, its GRCh38 phased files. SGDP_sv, its imputed structural variants
     hicdiffusion/   the two checkpoints
     reference/      hg38.fa and its index
   results/          RESULTS_DIR, written by the container as nk2
@@ -57,6 +58,27 @@ container of the site's image with that directory mounted read only. Two samples
 record for record with their source files. The site applies its 51,380 deletions, 31,538
 insertions, 572 inversions and 14,372 duplications, the last read as tandem. The catalog before the set was
 added is `data/catalog.json.before-1kgp`.
+
+## The SGDP call set
+
+`data/svs/SGDP.vcf.gz` holds imputed structural variants of the 277 samples of the Simons Genome
+Diversity Project, 35,434 sites on chromosomes 1 to 22: 17,395 deletions, 13,915 insertions, 3,962
+duplications and 162 inversions, 3,382 to 5,424 a sample. The project's calls hold single base
+variants alone. tbooo lifts them to GRCh38 and phases them against the 30x panel, and
+`playground/sgdp_grch38/sgdp_sv_impute.sbatch` there imputes the panel's 97,862 symbolic records
+onto the samples with Beagle 5.5. `site_sv_set.sh` keeps the records with DR2 of 0.8 or more
+that a sample carries and names the samples by the project's ids. The cut is a choice.
+
+The check. Twenty three people are in both projects. Imputed from a panel without them and their
+relatives on chromosomes 18 to 22, the records the set would keep agree with the panel's own
+genotypes at 98.45 percent, 95.3 percent of the panel's alternate alleles are imputed and 94.6
+percent of the imputed ones are in the panel. Under 1 percent in the panel the two shares are
+84.5 and 76.7 percent. Those people are of the panel's populations, so a sample of a population
+the panel lacks does worse. Table: `playground/sgdp_grch38/results/sv_eval/` in tbooo.
+
+`data/variants/` holds what the set was made from and what the small variant work needs: the
+panel, tbooo's phased SGDP files and the imputed files with dosage and genotype probability.
+The catalog before the set was added is `data/catalog.json.before-sgdp`.
 
 ## Run
 

@@ -163,6 +163,16 @@ export const REFERENCES: Reference[] = [
     authors: 'Ebert P, Audano PA, Zhu Q, et al.', venue: 'Science 372, eabf7117',
   },
   {
+    key: 'sgdp2016', group: 'data', year: 2016, doi: '10.1038/nature18964',
+    title: 'The Simons Genome Diversity Project: 300 genomes from 142 diverse populations',
+    authors: 'Mallick S, Li H, Lipson M, et al.', venue: 'Nature 538, 201-206',
+  },
+  {
+    key: 'beagle2018', group: 'algorithms', year: 2018, doi: '10.1016/j.ajhg.2018.07.015',
+    title: 'A one-penny imputed genome from next-generation reference panels',
+    authors: 'Browning BL, Zhou Y, Browning SR', venue: 'American Journal of Human Genetics 103, 338-348',
+  },
+  {
     key: 'hicdiffusion2024', group: 'data', year: 2024, doi: '10.1186/s12864-024-10885-z',
     title: 'HiCDiffusion - diffusion-enhanced, transformer-based prediction of chromatin interactions from DNA sequences',
     authors: 'Chiliński M, Plewczynski D', venue: 'BMC Genomics 25, 964',
@@ -232,6 +242,12 @@ export const DATA_SOURCES: DataSource[] = [
     data: 'Structural variants, HGSVC freeze 4', usedFor: 'variant structures', note: 'The phased insertions and deletions of 35 samples, variants_freeze4_sv_insdel_alt.vcf.gz.',
     accessions: [{ id: 'HGSVC2 release v2.0', url: 'https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/HGSVC2/release/v2.0/integrated_callset/' }],
     label: 'Ebert et al., Science 2021', ref: 'hgsvc4',
+  },
+  {
+    data: 'Structural variants, SGDP, 277 samples, imputed', usedFor: 'variant structures',
+    accessions: [{ id: 'PRJEB9586', url: 'https://www.ebi.ac.uk/ena/browser/view/PRJEB9586' }],
+    note: 'The project calls single base variants alone. Its samples were lifted to GRCh38 and phased against the 1000 Genomes 30x panel with Beagle 5.5 (Browning et al., AJHG 2018). The structural variants of the panel were then imputed onto them. The set keeps the 35,434 variants with an imputation quality, DR2, of 0.8 or more.',
+    label: 'Mallick et al., Nature 2016', ref: 'sgdp2016',
   },
   {
     data: 'Reference genome, hg38', usedFor: 'sequence for HiCDiffusion',
