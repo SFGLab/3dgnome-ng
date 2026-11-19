@@ -278,6 +278,35 @@ Pairs of nodes that the cells hold in one structure of chr1 10 to 15 Mb, in and 
 The drift moves no pooled score by more than 0.003. The battery's overlap count falls from 21.9 to 18.3 at one
 bead, a count that is not yet checked between the chains.
 
+### Overlaps, checked without the bead kind
+
+`playground/uniform_overlap_check.py` counts the pairs of beads closer than 0.7 model units per thousand beads, over
+every pair and over the pairs that are not next to each other in the file sorted by start. Mean of the six rows,
+five structures per arm, after the relaxation:
+
+| arm | every pair | pairs not next to each other |
+|---|---|---|
+| default chain | 10.2 | 2.6 |
+| contact beads, uniform draw | 37.6 | 10.3 |
+| contact beads, midpoint | 30.5 | 5.9 |
+| contact beads, cells at 5 kb | 34.0 | 6.6 |
+| cells at 5 kb, drift within 1 bead | 24.9 | 3.1 |
+
+- The uniform chain has three to four times the close pairs of the default chain, with and without the contact
+  cells. The count of the battery was right about the direction.
+- Most of them are two consecutive beads closer than 0.7: 7.6 per thousand on the default chain against 24 to 27.
+- On GM12878 chr1 108.5 to 111 Mb, one structure before the relaxation, 83 of 2,482 bonds are under 0.7 beads: 1 of
+  the 76 bonds between two nodes, 8 of the 155 between a node and a free bead and 74 of the 2,251 between two free
+  beads. The bonds between two nodes have a median of 1.05.
+- The short bonds are in the free chain between nodes. No rule of the arcs stage gives the beads between two nodes
+  room: the reach term is one sided, the excluded volume of the solve acts at 0.7 beads between nodes alone, and
+  loops and cells pull nodes with many beads between them together. In the smooth stage a bond at 0.6 beads costs
+  0.016 and the wall does not act between consecutive beads. The relaxation takes the realised bond as its target.
+- The drift within one bead lowers both counts by a third to a half.
+
+Open: a lower bound in the arcs stage for two nodes by the beads between them, a floor for a bond in the smooth
+stage, or both.
+
 ## Settings
 
 A setting is added when a run reads it.
