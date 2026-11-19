@@ -465,6 +465,8 @@
   border-radius: 8px;
   font-size: 12px;
   color: #5B5A56;
+  /* Over the letters of the marks, as the hover box is. */
+  z-index: 2;
 }
 
 .view-legend li {

@@ -19,6 +19,9 @@ const noRaycast = () => null
  * inner div by hand. A label that took the pointer would leave the canvas the moment it appeared
  * under a still cursor, clear the hover, vanish and bring the hover back, over and over. */
 const MARK_STYLE = { pointerEvents: 'none' } as const
+/** The labels lie under everything the page draws over the canvas, the hover box and the key.
+ * drei gives a label a z-index by its depth, up to millions, which put a letter over the box. */
+const MARK_LAYER: [number, number] = [1, 0]
 /** Hover and pick by the screen: every bond is projected as the tube it is drawn as and the
  * front tube under the cursor gives the bead. Casting rays into the meshes flickered between the
  * tubes and the joints and testing bead centres alone missed a zoomed tube between two beads
@@ -311,7 +314,7 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
             <sphereGeometry args={[tube * 2.6, 20, 16]} />
             <meshBasicMaterial color={HOVER} depthTest={false} transparent opacity={0.9} fog={false} />
           </mesh>
-          <Html position={shifted[hovered!]} center wrapperClass="scene-mark" style={MARK_STYLE}>
+          <Html position={shifted[hovered!]} center wrapperClass="scene-mark" style={MARK_STYLE} zIndexRange={MARK_LAYER}>
             <span className="hover-ring" />
           </Html>
         </>
@@ -321,7 +324,7 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
       ))}
       {markers.length === 2 && <Line points={[shift(markers[0].at), shift(markers[1].at)]} color="#151514" lineWidth={1.5} raycast={noRaycast} />}
       {markers.map((m) => (
-        <Html key={m.label} position={shift(m.at)} center wrapperClass="scene-mark" style={MARK_STYLE}>
+        <Html key={m.label} position={shift(m.at)} center wrapperClass="scene-mark" style={MARK_STYLE} zIndexRange={MARK_LAYER}>
           <span className="marker">{m.label}</span>
         </Html>
       ))}
