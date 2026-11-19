@@ -53,7 +53,11 @@ if [ ! -s "$OUT/${L}_${CHR}_5000.json" ]; then
     [ -e "$DEST" ] || ln -s "$ROOT/out/lr/${L}_${A}/$CHR" "$DEST"
     DIRS+=("$DEST")
   done
-  "$PY" "$REPO/playground/rnapii/microc_loop_compare.py" --json "$OUT/${L}_${CHR}_5000.json.part" "$SLICE" "$OUT/${L}_${CHR}_5000.bedpe" \
+  # The scoring holds a chromosome's bin by bin distances, 31 GB for chr3 and more for chr1 and
+  # chr2. The six largest chromosomes take it one at a time, whatever runs beside this call.
+  HOLD=()
+  case "$CHR" in chr1|chr2|chr3|chr4|chr5|chr6) HOLD=(flock "$ROOT/out/microc_large.lock") ;; esac
+  "${HOLD[@]}" "$PY" "$REPO/playground/rnapii/microc_loop_compare.py" --json "$OUT/${L}_${CHR}_5000.json.part" "$SLICE" "$OUT/${L}_${CHR}_5000.bedpe" \
     "ctcf=$ROOT/data/$L/${L}_xc_ctcf_clusters_3+.bedpe" "rnapii=$ROOT/data/$L/${L}_xc_rnapii_clusters_3+.bedpe" min_z=15 \
     "${DIRS[@]}" > "$OUT/${L}_${CHR}_5000.txt" 2>&1
   mv "$OUT/${L}_${CHR}_5000.json.part" "$OUT/${L}_${CHR}_5000.json"
