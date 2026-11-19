@@ -1,23 +1,18 @@
 #!/bin/bash
-# Spread of the block anchors, three cell lines, workstation, screen spread, in a worktree of its
-# own. design/gap-fill.md.
+# Spread of the block anchors, three cell lines. design/gap-fill.md.
 #
 #   DATA=~/3dgnome-ng/data REF=~/3dgnome-lawspring V3=~/3dgnome-gapv3 \
 #     bash slurm/ensemble/spread_trial.sh
 #
-# Waits for V3/gapv3.log to end, so one job holds the card at a time. Arms, each
-# slurm/ensemble/<cell>_xc_R.ini with the overrides written:
-#   reach10      the arcless repulsion's reach at 1.0 of the mean arc target, production 1.5
-#   reach075     the reach at 0.75
-#   dropout      each conformation keeps a loop with probability q / (q + 1)
-#   mx0          anchors drawn once per conformation from the maximum entropy Gaussian for the
-#                arcs targets, no descent
-#   mx30         the draw, then 30 solver iterations
-#   mxfull       the draw, then the production solve
-#   mx0holes     mx0 with hole beads and the contact map
-# Production comes from REF/out/acxc. Gate, production rerun on GM12878 chr1:20-25 Mb against it.
-# Phase 1, chr1:10-15, 20-25 and 35-40 Mb at five structures. Phase 2, whole chr1 on GM12878 and
-# H1ESC at three structures, scored on the 1-60 Mb slice.
+# Waits for V3/gapv3.log to end. Arms, each slurm/ensemble/<cell>_xc_R.ini with overrides:
+#   reach10    the reach of the arcless repulsion at 1.0 of the mean arc target, production 1.5
+#   reach075   the reach at 0.75
+#   dropout    each conformation keeps a loop with probability q / (q + 1)
+#   mx0        anchors drawn once per conformation from the maximum entropy Gaussian, no descent
+#   mx30       the draw, then 30 solver iterations
+#   mxfull     the draw, then the production solve
+#   mx0holes   mx0 with hole beads and the contact map
+# Production comes from REF/out/acxc and is first rerun on GM12878 chr1:20-25 Mb against it.
 set -u
 : "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."

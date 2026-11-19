@@ -1,17 +1,14 @@
 #!/bin/bash
-# Run time against bead count for 3dgnome, cudaMMC and MultiMM on GM12878 chr1, one machine, one
-# job at a time. design/tools-comparison.md.
+# Run time against bead count for 3dgnome, cudaMMC and MultiMM on GM12878 chr1. design/tools-
+# comparison.md.
 #
 #   DATA=~/gapfill-data TOOLS=out/tools OUT=out/toolscale bash slurm/ensemble/tools_scaling.sh
 #
-# The tools trial times each tool as shipped, cudaMMC at its loop density of 5 and MultiMM at our
-# bead count. Here each tool runs at more bead counts, three structures each, timed by wall clock
-# into OUT/timing.tsv:
-#   ours       `[main] target_bp_per_subanchor` 2000 and 4000 beside production's 1000
-#   cudammc    `[main] loop_density` 10 and 20, then the density whose bead count, on the line
-#              through the measured ones, comes nearest ours at 1000
-#   multimm    at the bead counts of our 2000 and 4000 runs
-# Waits for the tools trial and the site check behind it.
+# Three structures per setting, timed by wall clock into OUT/timing.tsv:
+#   ours      `[main] target_bp_per_subanchor` 2000 and 4000 beside the 1000 of production
+#   cudammc   `[main] loop_density` 10 and 20, then the density whose bead count is nearest ours
+#   multimm   at the bead counts of our 2000 and 4000 runs
+# Waits for the tools trial.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"

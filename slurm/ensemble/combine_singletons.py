@@ -1,17 +1,7 @@
-"""Blend ChIA-PET and Hi-C singletons into one file, balanced per cell line.
+r"""Blends ChIA-PET and Hi-C singletons into one file at a chosen mass ratio.
 
-The two assays are wildly unequal in contact mass and unequal by different factors per cell
-line: Hi-C carries 9.1x the ChIA-PET mass in GM12878, 4.2x in H1ESC and 54.6x in HFFC6. Simply
-concatenating would let Hi-C drive the distance targets and would blend the three cell lines in
-three different proportions, which is its own cross-line artefact.
-
-So ChIA-PET is scaled up to a chosen mass ratio against Hi-C, rather than Hi-C being scaled down.
-Hi-C scores are mostly 1. Scaling them down would round to 0, clamp back to 1 and silently
-discard the balancing. Scaling the other way keeps every count an integer and loses nothing.
-
-`--hic-weight 1.0` gives the two assays equal mass. Lower values favour ChIA-PET, higher favour
-Hi-C. This assumes only the ratio matters. The singleton heatmap is normalised downstream
-before it becomes a distance target.
+ChIA-PET is scaled up. Hi-C scores are mostly 1 and scaling them down would round them away.
+`--hic-weight 1.0` gives the two assays equal contact mass.
 
     python slurm/ensemble/combine_singletons.py --cell GM12878 \
         --chiapet data/GM12878/GM12878_singletons_lessthan3.bedpe \
@@ -26,7 +16,7 @@ from pathlib import Path
 
 
 def mass(path: Path) -> tuple[int, int]:
-    """Row count and summed score of a 7-column singleton BEDPE."""
+    """Returns the row count and the summed score of a singleton BEDPE."""
     rows = total = 0
     with path.open() as fh:
         for line in fh:

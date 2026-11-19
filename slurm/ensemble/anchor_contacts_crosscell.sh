@@ -1,21 +1,15 @@
 #!/bin/bash
-# The full depth anchor contact table and the two sided contact background on three cell lines,
-# CTCF and RNAPII loops, workstation, screen acxc.
+# The full depth anchor contact table and the two sided contact background on three cell lines, with
+# CTCF and RNAPII loops.
 #
 #   DATA=~/3dgnome-ng/data bash slurm/ensemble/anchor_contacts_crosscell.sh
 #
-# Per cell, the chr1 table is written from the cell's own deep map and its cross line anchor
-# file, then four arms, each slurm/ensemble/<cell>_xc_R.ini with the overrides named:
-#   prod           production, the thinned 25 kb singletons and the one sided rule
-#   prod_noscale   production with [anchor_heatmap] heatmap_influence 0, loops not shortened by
-#                  their contact count
-#   z3             the table, pairs whose expectation is above nine held in or out at three
-#                  Poisson deviations
-#   z3_noscale     z3 with heatmap_influence 0, the background's effect alone against
-#                  prod_noscale
-# chr1:20-25, 10-15 and 35-40 Mb at five structures, then whole chr1 at three, scored on the
-# 1-60 Mb slice, with the law readout and the battery, raw and balanced. CELLS picks a subset.
-# A finished arm or table is not redone.
+# Four arms per cell, each slurm/ensemble/<cell>_xc_R.ini with overrides:
+#   prod           production
+#   prod_noscale   production with [anchor_heatmap] heatmap_influence 0
+#   z3             the table, pairs held in or out at three Poisson deviations
+#   z3_noscale     z3 with heatmap_influence 0
+# CELLS picks a subset. A finished arm or table is not redone.
 set -u
 : "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."

@@ -1,26 +1,12 @@
 #!/bin/bash -l
 
-# One-time setup for the chr1 ensemble: install the environment, then fetch and derive every
-# input the array job needs. Run this once and watch it finish before submitting the array.
+# One time setup of the chr1 ensemble: installs the environment, fetches the Hi-C and derives the
+# inputs.
 #
-#   sbatch slurm/ensemble/setup.sh
+#   sbatch -A <account> slurm/ensemble/setup.sh
 #
-# Why this is a job rather than login-node commands. Installing on the login node failed with
-#
-#   RuntimeError: NumPy was built with baseline optimizations: (X86_V2)
-#                 but your machine doesn't support: (X86_V2)
-#
-# which says the login node's CPU is older than the x86-64-v2 baseline current NumPy wheels are
-# built against. NumPy therefore cannot even import there, so neither the build nor the data
-# preparation can run on that node. A GPU compute node is new enough. The check below prints the
-# node's level so the next failure of this kind is legible rather than cryptic.
-#
-# Why setup is not folded into the array job. The array runs up to 100 tasks against one venv,
-# and concurrent pip installs into a shared prefix corrupt it. Installing once, here, keeps the
-# array read-only with respect to the environment.
-#
-# Both steps need outbound network from the compute node. If the cluster blocks that, run the
-# install with a pip cache or mirror the lab already provides, and copy the mcool in by hand.
+# Runs as a job. NumPy does not import on a login node with a CPU under x86-64-v2. The array does
+# not install. Concurrent pip installs corrupt a shared venv. Needs network on the compute node.
 
 #SBATCH --job-name=gm_chr1_setup
 #SBATCH --nodes=1
@@ -30,10 +16,8 @@
 #SBATCH --mem=32G
 #SBATCH --partition=short
 #SBATCH --time=04:00:00
-# The account is given at submission, sbatch -A <account>. --output and --error are relative to
-# the directory of the submission, which must be the checkout. The logs directory must exist
-# before the submission, since slurm opens these files before the script runs:
-#   mkdir -p slurm/ensemble/logs
+# The account is given with sbatch -A. --output and --error are relative to the checkout, the
+# directory of the submission. Create slurm/ensemble/logs before the submission.
 #SBATCH --open-mode=append
 #SBATCH --output=slurm/ensemble/logs/setup_%j.out
 #SBATCH --error=slurm/ensemble/logs/setup_%j.out
@@ -50,12 +34,11 @@ SKIP_INSTALL="${SKIP_INSTALL:-0}"
 cd "$ROOT"
 mkdir -p slurm/ensemble/logs
 source .venv/bin/activate
-# Long stages print progress with plain print(); block-buffered into a slurm
-# log that makes a working job look hung for many minutes.
+# Progress reaches the slurm log at once.
 export PYTHONUNBUFFERED=1
 
 echo "[setup] node=$(hostname) python=$(python -V 2>&1)"
-# x86-64 microarchitecture level, the thing the NumPy failure above is really about.
+# The x86-64 level of the node.
 LEVEL=$(awk '/^flags/{if(/avx512f/) print "v4"; else if(/avx2/) print "v3";
                       else if(/sse4_2/) print "v2"; else print "v1"; exit}' /proc/cpuinfo)
 echo "[setup] cpu x86-64 level = $LEVEL (NumPy wheels need v2 or better)"
@@ -64,14 +47,8 @@ if [ "$LEVEL" = "v1" ]; then
   exit 1
 fi
 
-# ---- environment ---------------------------------------------------------------------------
-# Deliberately not `pip install -e ".[validation]"`. That extra also pulls hicrep and pyBigWig,
-# both of which build from an sdist whose setup.py imports numpy, which is where the login-node
-# install died. Neither is needed here: hicrep is declared but never imported anywhere in
-# legacy/validation/, and pyBigWig is imported lazily by the ATAC signal path, which this ensemble
-# skips. scipy, cooler and cooltools are the real requirements - scipy because
-# legacy/validation/studies/synthetic.py imports it at module level and the CLI loads every study,
-# cooler and cooltools for the mcool and the insulation call.
+# Not the validation extra, whose hicrep and pyBigWig build from source. scipy, cooler and cooltools
+# are needed.
 if [ "$SKIP_INSTALL" != "1" ]; then
   echo "[setup] installing"
   pip install --upgrade pip
@@ -88,10 +65,8 @@ print(f'[setup] numpy {numpy.__version__}  jax {jax.__version__}')
 print(f'[setup] jax devices: {jax.devices()}')
 "
 
-# ---- inputs that cannot be downloaded -------------------------------------------------------
-# The manifests under legacy/validation/manifests/ cover Hi-C and epigenomic signal only. The ChIA-PET
-# anchors and loops, the segment breakpoints and the centromeres have no fetch path and must be
-# copied in. Checked first, because everything below is pointless without them.
+# The ChIA-PET anchors and loops, the segment breakpoints and the centromeres have no download and
+# must be copied in.
 missing=0
 for f in "${CELL}_anchors_3+_oriented.bed" "${CELL}_clusters_3+.bedpe" \
          "ccds_all_hg38_merged100k_${CELL}.breakpoints.bed" "hg38_centromeres.bed"; do
@@ -110,8 +85,7 @@ if [ "$missing" = "1" ]; then
   exit 1
 fi
 
-# ---- fetch and derive ------------------------------------------------------------------------
-# All three are idempotent, so a rerun after a partial failure is free.
+# Each step skips work that is done.
 if [ -s "$MCOOL" ]; then
   echo "[setup] have $MCOOL"
 else
@@ -119,8 +93,7 @@ else
   python -m legacy.validation fetch --manifest legacy/validation/manifests/${CELL}_hic.json --out data/_hic
 fi
 
-# Only the TAD boundaries are wanted. Compartments feed the epigenome term, which this ensemble
-# runs without.
+# TAD boundaries only.
 echo "[setup] calling TADs"
 python -m legacy.validation tracks --cell "$CELL" --skip-compartments
 
@@ -128,7 +101,7 @@ echo "[setup] building Hi-C singletons at ${BINSIZE}bp"
 python slurm/ensemble/prep_singletons.py \
   --mcool "$MCOOL" --region chr1 --binsize "$BINSIZE" --out "$SINGLETONS"
 
-# ---- verify what the array job will look for -------------------------------------------------
+# Checks what the array job reads.
 python - "$ROOT/slurm/ensemble/gm12878_chr1_hic_tads.ini" <<'PYCHECK'
 import sys
 from pathlib import Path

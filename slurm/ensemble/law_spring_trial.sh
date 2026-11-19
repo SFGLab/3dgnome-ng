@@ -1,14 +1,10 @@
 #!/bin/bash
-# The smooth stage law spring on GM12878 with CTCF and RNAPII loops, workstation, screen lawspring.
+# The law spring of the smooth stage on GM12878 with CTCF and RNAPII loops.
 #
 #   bash slurm/ensemble/law_spring_trial.sh
 #
-# Phase 1, two 5 Mb regions, five structures per arm, arms law_weight 0, 0.01 and 0.1. Phase 2,
-# whole chr1, three structures per arm, the same arms, scored on the 1-60 Mb slice. Each phase
-# ends with the law readout and the battery, raw and balanced. Weights: the heat term sums over
-# about two hundred partners per bead at 1 kb beads and a 100 kb range against two chain bonds,
-# so 0.01 puts the law on the scale of the bonds and 0.1 above it. CHR1_ARMS replaces the arm
-# list for phase 2 and SKIP_CHR1 stops after phase 1.
+# Arms are law_weight 0, 0.01 and 0.1. CHR1_ARMS replaces the arm list for whole chr1 and SKIP_CHR1
+# stops after the regions.
 set -u
 : "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
@@ -21,7 +17,7 @@ SING=$DATA/$C/${C}_hic_25kb_singletons.bedpe
 mkdir -p "$OUT"
 git log --format="law spring trial on %h %s" -1
 
-# An arm is a weight, or a weight and a range in bp joined by @, 0.1@400000 for example.
+# An arm is a weight, or a weight and a range in bp joined by @, as in 0.1@400000.
 for A in $ARMS ${CHR1_ARMS:-}; do
   W=${A%@*}; RNG=100000; case $A in *@*) RNG=${A#*@} ;; esac
   sed "s/^anchors = .*/anchors = GM12878_anchors_ctcf_rnapii.bed/; s/^clusters = .*/clusters = GM12878_clusters_3+.bedpe,GM12878_rnapii_clusters_3+.bedpe\nfactors = CTCF,RNAPOL2/" \

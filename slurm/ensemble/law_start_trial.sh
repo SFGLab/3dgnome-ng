@@ -1,13 +1,11 @@
 #!/bin/bash
-# The law start for a gap's subanchors against production's compact coil, GM12878 with CTCF and
-# RNAPII loops, workstation, screen lawstart.
+# The law start of the subanchors of a gap against the compact coil of production, GM12878 with CTCF
+# and RNAPII loops.
 #
 #   DATA=~/3dgnome-ng/data BASE=out/lawspring_run bash slurm/ensemble/law_start_trial.sh
 #
-# The coil arm is the law spring trial's weight zero arm in BASE, production as it stands. The
-# law arm is the same config with `start = law`. Two 5 Mb regions at five structures, then the
-# law readout and the battery, raw and balanced, over both arms. SKIP_CHR1 unset runs whole
-# chr1 at three structures per arm afterwards, scored on the 1-60 Mb slice.
+# The coil arm is the weight zero arm of the law spring trial in BASE. The law arm is the same
+# config with `start = law`. SKIP_CHR1 unset runs whole chr1 afterwards.
 set -u
 : "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
@@ -20,7 +18,7 @@ SING=$DATA/$C/${C}_hic_25kb_singletons.bedpe
 mkdir -p "$OUT"
 git log --format="law start trial on %h %s" -1
 
-# The base ini carries the removed law spring keys at weight zero; both arms drop them.
+# The base ini has the removed law spring keys. Both arms drop them.
 .venv/bin/python - "$BASE/law_0.ini" "$OUT" <<'PY'
 import configparser, sys
 src, out = sys.argv[1:3]

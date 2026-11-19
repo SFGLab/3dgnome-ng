@@ -1,6 +1,6 @@
 #!/bin/bash
-# The original 3dgnome pipeline's GM12878 models on four chr1 regions, one hundred each, scored
-# by the battery on each region's window against our chr1:1-60 Mb arms cut to the same window.
+# The GM12878 models of the original 3D-GNOME pipeline on four chr1 regions, one hundred each,
+# scored by the battery against our chr1:1-60 Mb arms cut to the same windows.
 set -u
 : "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd ~/3dgnome-ng

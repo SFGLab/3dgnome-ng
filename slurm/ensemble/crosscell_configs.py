@@ -1,8 +1,9 @@
-"""Arm configs of the cross line RNAPII comparison, `design/2026-11-11-rnapii-release.md`.
+"""Writes the arm configs of the cross line RNAPII comparison,
+`design/2026-11-11-rnapii-release.md`.
 
-One ini per line and arm, the production config of `make_configs.py` with the data section
-pointed at the inputs `playground/rnapii/crosscell_prep.py` writes. C is CTCF only, R is CTCF
-and RNAPII at full strength, M is R with RNAPII loop ends near a CTCF anchor moved onto it.
+One ini per line and arm, the production config with the data section of the inputs of
+`playground/rnapii/crosscell_prep.py`. C is CTCF only, R is CTCF and RNAPII and M is R with
+RNAPII loop ends near a CTCF anchor moved onto it.
 
     python slurm/ensemble/crosscell_configs.py
 """
@@ -24,7 +25,7 @@ ARMS = ("C", "R", "M")
 
 
 def build(cell: str, arm: str) -> configparser.ConfigParser:
-    """The production Hi-C singletons config of `cell` with arm `arm`'s loops and anchors."""
+    """Returns the production config of `cell` with the loops and anchors of arm `arm`."""
     cfg = production(cell, "hic", None)
     data = cfg["data"]
     ctcf = f"{cell}_xc_ctcf_clusters_3+.bedpe"
@@ -40,7 +41,7 @@ def build(cell: str, arm: str) -> configparser.ConfigParser:
 
 
 def _source_note(cell: str) -> str:
-    """The RNAPII source line of the cell's prep record, when it names a stand in line."""
+    """Returns the RNAPII source line of the prep record of the cell when another line stands in."""
     rec = ROOT / "data" / cell / f"{cell}_xc_prep.json"
     if not rec.is_file():
         rec = ROOT / "design" / "plans" / "rnapii-prep-records" / f"{cell}_xc_prep.json"

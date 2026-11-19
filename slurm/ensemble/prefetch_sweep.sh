@@ -1,13 +1,13 @@
 #!/bin/bash
-# Prefetching on the GPU: byte parity at 1 against the previous commit, then a K sweep on
-# chr1:1-8 Mb and two large runs on chr1:1-60 Mb. Workstation, 3dgnome screen.
+# Prefetching on the GPU: byte parity at 1 against the previous commit, then a K sweep on chr1:1-8
+# Mb and two runs on chr1:1-60 Mb.
 set -u
 : "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd ~/3dgnome-ng
 C=GM12878; INI=slurm/ensemble/gm12878_hic_arcs.ini; OUT=out/prefetch
 MCOOL=$(ls $HIC_ROOT/$C/*.mcool | head -1)
 mkdir -p $OUT
-# parity at prefetch 1: the previous commit in a worktree against the working tree
+# Parity at prefetch 1, the previous commit in a worktree against the working tree.
 if [ ! -d /tmp/g3d_prev ]; then git worktree add --detach /tmp/g3d_prev HEAD~1 >/dev/null 2>&1; ln -sfn $PWD/data /tmp/g3d_prev/data; ln -sfn $PWD/.venv /tmp/g3d_prev/.venv; fi
 for T in prev head; do
   R=$([ $T = prev ] && echo /tmp/g3d_prev || echo $PWD)
@@ -22,7 +22,6 @@ def load(p):
 a, b = load("out/prefetch/parity_prev/chr1_1_8000000_s1.cif"), load("out/prefetch/parity_head/chr1_1_8000000_s1.cif")
 print("PARITY prefetch=1 vs previous commit:", "byte identical" if a.shape == b.shape and np.array_equal(a, b) else f"DIFFERS max {np.abs(a-b).max() if a.shape == b.shape else 'shape'}")
 PY
-# the sweep on 8 Mb
 for K in 1 8 16 32 64; do
   I=$OUT/gm_k$K.ini; sed "s/^anchor_cap = .*/&\nprefetch = $K/" $INI > $I
   D=$OUT/k${K}_8mb; mkdir -p $D
@@ -30,7 +29,6 @@ for K in 1 8 16 32 64; do
   echo "[8 Mb K=$K] $(grep -E 'smooth\[mc\]: .* IBs in' $D.log | tail -n 1)"
 done
 .venv/bin/python playground/validation_battery.py --balance no --ev-factor 0.7 --singletons data/$C/${C}_hic_25kb_singletons.bedpe "$MCOOL" chr1:1-8000000 25000 $OUT/k1_8mb $OUT/k8_8mb $OUT/k16_8mb $OUT/k32_8mb $OUT/k64_8mb 2>&1 | grep -E "^\s+(arm|k)"
-# the large case
 for K in 32 64; do
   D=$OUT/k${K}_60mb; mkdir -p $D
   .venv/bin/python -m gnome3d.cli --config $OUT/gm_k$K.ini --data-dir data/$C --region chr1:1-60000000 -n 1 --out $D > $D.log 2>&1

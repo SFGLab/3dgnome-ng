@@ -1,7 +1,8 @@
 #!/bin/bash
-# Are the boundary stitch and the cross block relaxation still needed at chromosome scope?
-# Four arms on GM12878 chr1:1-60 Mb, three structures each, on the workstation GPU one at a
-# time, then the battery. Run in the 3dgnome screen:  bash slurm/ensemble/assemble_ablation.sh
+# The boundary stitch and the cross block relaxation at chromosome scope, four arms on GM12878
+# chr1:1-60 Mb, three structures each, then the battery.
+#
+#   bash slurm/ensemble/assemble_ablation.sh
 set -u
 : "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd ~/3dgnome-ng

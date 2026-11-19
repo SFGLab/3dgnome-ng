@@ -1,26 +1,11 @@
 #!/bin/bash -l
 
-# One-time setup for one cell line: environment, Hi-C, TAD calls, genome-wide Hi-C singletons.
+# One time setup of one cell line: environment, Hi-C, TAD calls and genome wide Hi-C singletons.
 #
-#   sbatch slurm/ensemble/setup_cell.sh GM12878
-#   sbatch slurm/ensemble/setup_cell.sh H1ESC
-#   sbatch slurm/ensemble/setup_cell.sh HFFC6
+#   sbatch -A <account> slurm/ensemble/setup_cell.sh GM12878
 #
-# Run once per cell line and let it finish before submitting that line's array. The three are
-# independent, so they can run at the same time; each holds one GPU only to verify CUDA.
-#
-# Why a job rather than login-node commands. Installing on the cluster's login node fails with
-#
-#   RuntimeError: NumPy was built with baseline optimizations: (X86_V2)
-#                 but your machine doesn't support: (X86_V2)
-#
-# because that node's CPU is below the x86-64-v2 baseline current NumPy wheels are built
-# against, so NumPy cannot import there and neither the install nor the data preparation can
-# run. A GPU compute node is new enough. The install is idempotent, so the second and third cell lines
-# skip it; pass SKIP_INSTALL=1 to skip it explicitly.
-#
-# The singleton step is the long one: it reads a dense contact matrix per chromosome and writes
-# every non-zero intra-chromosomal pair, roughly 20-40 minutes for a genome at 25 kb.
+# Run once per cell line before its array. Runs as a job, see setup.sh. SKIP_INSTALL=1 skips the
+# install. The singleton step takes 20 to 40 minutes for a genome at 25 kb.
 
 #SBATCH --job-name=e3d_setup
 #SBATCH --nodes=1
@@ -30,10 +15,8 @@
 #SBATCH --mem=64G
 #SBATCH --partition=short
 #SBATCH --time=06:00:00
-# The account is given at submission, sbatch -A <account>. --output and --error are relative to
-# the directory of the submission, which must be the checkout. The logs directory must exist
-# before the submission, since slurm opens these files before the script runs:
-#   mkdir -p slurm/ensemble/logs
+# The account is given with sbatch -A. --output and --error are relative to the checkout, the
+# directory of the submission. Create slurm/ensemble/logs before the submission.
 #SBATCH --open-mode=append
 #SBATCH --output=slurm/ensemble/logs/setup_%x_%j.out
 #SBATCH --error=slurm/ensemble/logs/setup_%x_%j.out
@@ -50,8 +33,7 @@ SINGLETONS="$ROOT/data/$CELL/${CELL}_hic_$((BINSIZE / 1000))kb_singletons.bedpe"
 cd "$ROOT"
 mkdir -p slurm/ensemble/logs
 source .venv/bin/activate
-# Long stages print progress with plain print(); block-buffered into a slurm
-# log that makes a working job look hung for many minutes.
+# Progress reaches the slurm log at once.
 export PYTHONUNBUFFERED=1
 
 echo "[setup:$CELL] node=$(hostname)"
@@ -60,10 +42,7 @@ LEVEL=$(awk '/^flags/{if(/avx512f/) print "v4"; else if(/avx2/) print "v3";
 echo "[setup:$CELL] cpu x86-64 level = $LEVEL (NumPy wheels need v2 or better)"
 [ "$LEVEL" = "v1" ] && { echo "[setup] node below the NumPy baseline" >&2; exit 1; }
 
-# Deliberately not `pip install -e ".[validation]"`. That extra also pulls hicrep and pyBigWig,
-# which build from sdists whose setup.py imports numpy, and that build is what fails. Neither is
-# needed: hicrep is declared but never imported anywhere in legacy/validation/, and pyBigWig is used
-# only by the ATAC signal path, which these runs skip.
+# Not the validation extra, whose hicrep and pyBigWig build from source.
 if [ "$SKIP_INSTALL" != "1" ]; then
   pip install --upgrade pip
   pip install -e .
@@ -75,8 +54,8 @@ import jax, numpy
 print(f'[setup] numpy {numpy.__version__}  jax {jax.__version__}  devices {jax.devices()}')
 "
 
-# Inputs with no download path. The manifests cover Hi-C and epigenomic signal only; the
-# ChIA-PET anchors and loops, the segment breakpoints and the centromeres must be copied in.
+# The ChIA-PET anchors and loops, the segment breakpoints and the centromeres have no download and
+# must be copied in.
 missing=0
 for f in "${CELL}_anchors_3+_oriented.bed" "${CELL}_clusters_3+.bedpe" \
          "ccds_all_hg38_merged100k_${CELL}.breakpoints.bed" "hg38_centromeres.bed"; do
@@ -92,18 +71,15 @@ if [ -z "$MCOOL" ]; then
 fi
 echo "[setup:$CELL] mcool = $MCOOL"
 
-# TAD boundaries only. Compartments feed the epigenome term, which these runs leave off.
+# TAD boundaries only.
 if [ -s "data/$CELL/${CELL}_tads.bed" ]; then
   echo "[setup:$CELL] have data/$CELL/${CELL}_tads.bed"
 else
   python -m legacy.validation tracks --cell "$CELL" --skip-compartments
 fi
 
-# The singleton reader fetches the balanced matrix as well as the raw counts, so the resolution
-# it reads must carry balancing weights. GM12878's mcool ships with them at 25 kb; H1ESC's does
-# not, and every chromosome then fails with "No column 'bins/weight' found" leaving an empty
-# file. `validation tracks` already does this for the 10 kb level it calls TADs from, so this is
-# the same one-time step at the resolution the singletons use.
+# The singleton reader needs balancing weights at its resolution. They are computed here when the
+# mcool lacks them.
 BINURI="$MCOOL::/resolutions/$BINSIZE"
 if python -c "
 import sys
@@ -116,8 +92,7 @@ else
   cooler balance -p "${SLURM_CPUS_PER_TASK:-8}" "$BINURI"
 fi
 
-# A previous failed run leaves a zero-row file, and prep_singletons treats any existing output as
-# done, so it would skip regeneration for ever.
+# A failed run leaves an empty file, which prep_singletons would take as done.
 if [ -f "$SINGLETONS" ] && [ ! -s "$SINGLETONS" ]; then
   echo "[setup:$CELL] removing empty $SINGLETONS from an earlier failure"
   rm -f "$SINGLETONS"

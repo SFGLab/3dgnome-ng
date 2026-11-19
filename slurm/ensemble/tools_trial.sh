@@ -7,15 +7,11 @@
 #   CUDAMMC=~/tools/cudaMMC/build/cudaMMC CUDAMMC_TEMPLATE=~/tools/cudaMMC/config.ini \
 #   MULTIMM=~/tools/mmenv/bin/MultiMM bash slurm/ensemble/tools_trial.sh
 #
-# Inputs are the production config's, `slurm/ensemble/<cell>_hic_arcs.ini`: the CTCF anchors and
-# clusters and the Hi-C singletons at 25 kb. cudaMMC reads them through its own template config
-# with only the data section changed and builds its ensemble with `-m`; its beads come from its
-# loop density, its own default. MultiMM reads the clusters as loops at our arm's bead count over
-# our arm's span, through `playground/multimm_arm.py`, and both its minimised and its dynamics
-# ensembles are kept. Every run is timed by wall clock into OUT/timing.tsv with its bead count. A
-# region written chr1 runs the whole chromosome and is scored on chr1:1-60000000. Each region is
-# scored pooled, `playground/ensemble_score.py`, per structure by the battery on raw and balanced
-# counts, and by the contact spread.
+# The inputs are those of slurm/ensemble/<cell>_hic_arcs.ini. cudaMMC reads them through its
+# template config and builds its ensemble with `-m` at its own loop density. MultiMM reads the
+# clusters as loops at the bead count and span of our arm, through playground/multimm_arm.py. Every
+# run is timed into OUT/timing.tsv. A region chr1 runs the whole chromosome and is scored on
+# chr1:1-60000000.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
@@ -71,7 +67,7 @@ c["data"]["clusters"] = d["clusters"]
 c["data"]["factors"] = "CTCF"
 c["data"]["singletons"] = d["singletons"]
 c["data"]["split_singleton_files_by_chr"] = "no"
-# Read only for more than one chromosome; the cis file stands in for it.
+# Read only for more than one chromosome. The cis file stands in.
 c["data"]["singletons_inter"] = d["singletons"]
 c["data"]["segment_split"] = f"{data}/{d['segment_split']}"
 c["data"]["centromeres"] = f"{data}/{d['centromeres']}"
@@ -82,7 +78,7 @@ PY
 
 run_cudammc() {  # cell region n hcmdir cif dir
   C=$1; R=$2; NN=$3; H=$4; D=$5
-  # cudaMMC parses a region as chr:start-end, whatever its README says.
+  # cudaMMC parses a region as chr:start-end.
   local cfg="$OUT/${C}_cudammc.ini" spec="$R"
   [ -f "$cfg" ] || cudammc_config "$C" "slurm/ensemble/$(echo "$C" | tr 'A-Z' 'a-z')_hic_arcs.ini" "$cfg"
   mkdir -p "$H" "$D"

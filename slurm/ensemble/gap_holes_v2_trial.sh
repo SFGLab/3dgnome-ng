@@ -1,17 +1,13 @@
 #!/bin/bash
-# Hole beads against the chromosome expectation and through the smooth kernel, three cell lines,
-# workstation, screen gapv2, in a worktree of its own. design/gap-fill.md.
+# Hole beads against the chromosome expectation and through the smooth kernel, three cell lines.
+# design/gap-fill.md.
 #
 #   DATA=~/3dgnome-ng/data REF=~/3dgnome-lawspring bash slurm/ensemble/gap_holes_v2_trial.sh
 #
-# Waits for REF/gapah.log to end, so one job holds the card at a time. Arms, each
-# slurm/ensemble/<cell>_xc_R.ini with the overrides written:
-#   holes2         production with hole beads, window contacts against the chromosome at 10 kb,
-#                  each hole run through the smooth kernel
-#   maxent2        start maxent with the same expectation for the gaps
-# Production comes from REF/out/acxc and the first hole arm from REF/out/gapah. Phase 1,
-# chr1:10-15 and 35-40 Mb at five structures, the two regions holding holes. Phase 2, whole chr1
-# at three structures for holes2, scored on the 1-60 Mb slice.
+# Waits for REF/gapah.log to end. Arms, each slurm/ensemble/<cell>_xc_R.ini with overrides:
+#   holes2    hole beads, window contacts against the chromosome at 10 kb, through the smooth kernel
+#   maxent2   start maxent with the same expectation for the gaps
+# Production comes from REF/out/acxc and the first hole arm from REF/out/gapah.
 set -u
 : "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."

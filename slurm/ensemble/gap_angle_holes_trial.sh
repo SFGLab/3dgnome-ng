@@ -1,22 +1,16 @@
 #!/bin/bash
-# The smooth stage's bend term against the maximum entropy gaps, and beads for the holes between
-# blocks, on three cell lines, workstation, screen gapah. design/gap-fill.md.
+# The bend term of the smooth stage against the maximum entropy gaps, and hole beads, on three cell
+# lines. design/gap-fill.md.
 #
 #   DATA=~/3dgnome-ng/data bash slurm/ensemble/gap_angle_holes_trial.sh
 #
-# The widening trace, out/widen, found the bend term and the excluded volume each widen a drawn
-# gap and the bare kernel keep it on the law. Arms, each slurm/ensemble/<cell>_xc_R.ini with the
-# overrides written:
+# Arms, each slurm/ensemble/<cell>_xc_R.ini with overrides:
 #   noangle               production with angle_weight 0
-#   maxent_noangle        start maxent with the cell's map at 1 kb, angle_weight 0
+#   maxent_noangle        start maxent with the map of the cell at 1 kb, angle_weight 0
 #   maxent_bare           maxent_noangle with no hard wall and no smooth excluded volume
-#   holes                 production with hole beads, scaled by the cell's map
+#   holes                 production with hole beads, scaled by the map of the cell
 #   holes_maxent_noangle  maxent_noangle with hole beads
-# Production comes from out/acxc and the maxent arm from out/gapme. GM12878 chr1:20-25 Mb at
-# production is rerun first and compared with out/acxc byte for byte; a GPU pool of another size
-# moves the bits as well, so a difference is reported and the run goes on. Phase 1, chr1:20-25,
-# 10-15 and 35-40 Mb at five structures, where only 10-15 Mb holds holes. Phase 2, whole chr1 at
-# three structures, scored on the 1-60 Mb slice. A finished arm is not rerun.
+# Production comes from out/acxc and the maxent arm from out/gapme. A finished arm is not rerun.
 set -u
 : "${HIC_ROOT:?Set HIC_ROOT to the directory that holds the Hi-C maps of each cell line}"
 cd "$(dirname "$0")/../.."
