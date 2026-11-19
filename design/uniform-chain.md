@@ -31,6 +31,14 @@ Every row is the maintainer's decision.
 | The pairs that a cell acts on | Every pair of nodes without a loop, near and far. A pair with a loop keeps its loop target |
 | The counts and the expectation | Raw counts against the mean count at the same separation on the same chromosome and resolution |
 | The order of the build | Three stages with an arms trial after each |
+| The centre of mass that the smooth stage keeps | That of a node, the bead before it and the bead after it |
+| The exceptions of that rule and the reach of the bond limit, both the assistant's | Kept as built |
+| The resolution of the contact cells | Decided on the larger trial. 5 kb is the working base |
+| The draw of the contact bead | Both draws stay as arms |
+| The rule of the smooth stage for a node | Decided after the trial of the rules |
+| Room for the free chain | Thought through in this note before anything is built, see below |
+| The three bead move and the bond limit in the JAX kernel | After the rules are chosen |
+| The larger trial | Three cells, six regions of 5 Mb across chr1, 20 structures per arm, for the arms that remain |
 | The first build | Replaced in place. Comparisons use its trial of 2026-11-19 |
 
 ## Loops
@@ -304,8 +312,39 @@ five structures per arm, after the relaxation:
   0.016 and the wall does not act between consecutive beads. The relaxation takes the realised bond as its target.
 - The drift within one bead lowers both counts by a third to a half.
 
-Open: a lower bound in the arcs stage for two nodes by the beads between them, a floor for a bond in the smooth
-stage, or both.
+## Room for the free chain
+
+Status 2026-11-19: options, nothing built. The maintainer asked for this section before a choice.
+
+A bound on the distance of two nodes by the beads between them is wrong. The two anchors of a loop touch whatever
+the length of the chain between them, and that chain is beside them. The arcs stage is missing the volume of the
+free beads, not a distance between two nodes.
+
+Sizes. A trial region of 5 Mb has 244 to 395 nodes in a conformation and 3,000 to 4,900 beads. Chromosome 1 has
+24,000 to 31,000 anchors in the three cell lines and about 230,000 beads. At the node density of the trial regions,
+49 to 79 a megabase, it has 11,000 to 18,000 nodes. The arcs solve holds the target matrix of every pair of nodes,
+1.0 to 2.6 GB in float64, and the contact cells read two more matrices of that size.
+
+| Option | Rule | New in the solve | Cost on chromosome 1 |
+|---|---|---|---|
+| A. Blobs | A run of free beads between two nodes enters the solve as blobs of b beads. A blob excludes at the radius of gyration of the law for b beads. Consecutive nodes and blobs are within the chain between their centres | One unit per b free beads | b of 10 adds 23,000 units and the matrix grows to 9 to 13 GB. b of 50 adds 4,600 units, 2 to 4 GB |
+| B. Short gyration windows | The gyration term holds every window of four nodes or more at the radius of gyration of the law. It starts at windows of `background_range_bp`, 100 kb. It would start at a smaller window | Windows, no units | A sparse matrix of windows by nodes. Small |
+| C. Drift | A node moves within a sphere in the smooth stage, `anchor_cap` | Nothing | None. Measured: a third to a half fewer close pairs at one bead, the pooled scores to 0.003 |
+| D. Bond floor | A hard least distance of two consecutive beads in the smooth stage | Nothing | None. Not chosen by the maintainer on 2026-11-19 |
+
+Notes on each.
+
+- A states the missing volume directly and makes the arcs stage solve a coarse chain. It needs three choices: the
+  size b, the start of the free beads from the blob positions in the smooth stage, and the contact data of a blob.
+  It is the largest change.
+- B uses a term the model has. The radius of gyration of the law for a span counts every bead of the span, and
+  nodes are a sample of them at the bases of loops. For a window of few nodes the sample is biased. The term holds
+  a window at the radius of the law from both sides.
+- C acts after the cause and does not need the arcs stage.
+- A and B can both be measured against C on the trial rows by the close pairs of
+  `playground/uniform_overlap_check.py` and the pooled scores.
+
+The assistant's order: B first, one key for the smallest window and one trial; A when B falls short.
 
 ## Settings
 
