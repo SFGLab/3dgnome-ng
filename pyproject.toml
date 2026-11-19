@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "gnome3d-ng"
 version = "0.2.0"
-description = "3dgnome reimplementation"
+description = "3D chromatin structure from ChIA-PET loops and Hi-C contacts"
 requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.24.0",

@@ -1,100 +1,113 @@
 # Features and their record
 
-Each entry states what a feature does, its settings, the place of its code and what was measured. The entries are
-dated records and are not rewritten when production moves on. `SETTINGS.md` and `gnome3d/production.py` state what
-holds now. This list was a section of `AGENTS.md` until 2026-11-19. The first two sections describe behaviour the
-model took over from 3D-GNOME, called the reference in these notes.
+Each entry states what a feature does, its settings, the place of its code and what was measured. The entries of the
+last section are dated records and are not rewritten when production moves on. `SETTINGS.md` and
+`gnome3d/production.py` state what holds now.
 
 ## Inputs and command line
 
-- **`noise_arcs` removed.** The reference declares `noiseCoefficientLevelAnchor` (read as `noise_arcs` in `[main]`) and multiplies it into a local `noise_size` variable in `LooperSolver.cpp:2085`, but the arc-MC call site on line 2136 passes a hardcoded `noise_size_small=0.005` instead — making the setting effectively dead in the reference. Python uses the same 0.005 hardcoded constant in [pipeline/ib/arcs.py](../gnome3d/pipeline/ib/arcs.py); the setting was dropped to avoid implying configurability.
-- **`random_walk` ported.** Previously loaded-but-unused; now drives [pipeline/coarse/build.py](../gnome3d/pipeline/coarse/build.py), mirroring `LooperSolver.cpp:80-98` (chained 50.0-step walk per chromosome instead of segment-level heatmap MC). Honors `use_2d`.
-- **`long_pet_*` ported.** Long-range arcs (gap > `max_pet_length`) are no longer discarded by [io.load_arcs](../gnome3d/io.py) — they are carried on `ContactData.long_arcs` and folded into the segment heatmap by [pipeline/coarse/build.py](../gnome3d/pipeline/coarse/build.py) as `long_pet_scale * arc.score ** long_pet_power`. Mirrors `LooperSolver.cpp:1069-1104`, including the asymmetric `h[st][end] += val` pattern (the downstream symmetrize step in `_normalize_heatmap` averages it to `val` on each side).
-- **Chromosome-level MC ported.** Previously `steps_lvl1` / `noise_lvl1` were inert because Python had no chr-level reconstruction. Now [pipeline/coarse/build.py](../gnome3d/pipeline/coarse/build.py) builds an n_chr × n_chr inter-chromosomal singleton heatmap, normalizes its first non-zero diagonal to 1.0, converts to expected distances, and runs `mc_heatmap` with `steps_lvl1` runs at `noise_lvl1 × avg_dist` step size. Mirrors `LooperSolver.cpp` lines 119-160 and 265-322. Triggered only when `len(chrs) > 1`; single-chr runs are unaffected. If the singleton input has no inter-chr contacts the chr roots are scattered randomly instead.
-- **`normalizeHeatmapInter` ported.** [pipeline/coarse/heatmap.py](../gnome3d/pipeline/coarse/heatmap.py) was previously a no-op stub; now it multiplies the segment heatmap by `heatmap_inter_scaling` and divides intra-chromosome blocks back, matching `LooperSolver.cpp:1422-1459`. Net effect: intra-chr unchanged, inter-chr × scale. Active only on multi-chr runs (length-1 `current_level` short-circuits).
-- **Multi-chromosome CLI / API surface.** [cli.py](../gnome3d/cli.py) and [simulate.py::run_genome](../gnome3d/simulate.py) accept the same syntax as the reference's `-c` flag: single chromosome, comma-separated list, `chrN-chrM` numeric range, or single sub-chromosomal region. Default (empty string) matches the reference: `chr1-chr22,chrX`. Parsing is centralized in [io.py::parse_chrs_arg](../gnome3d/io.py). The CLI now writes one CIF per chromosome when more than one chr was requested (using a `_<chr>_` suffix in the filename); single-chr/region runs keep the old single-CIF behavior. `run_region` keeps its original single-region semantics for backward compatibility; `run_genome` returns `list[dict[str, list[BeadOut]]]` so per-chromosome bead lists are preserved.
-- **`data_singletons_inter` loaded.** [data.py::ContactData.from_files](../gnome3d/data.py) reads the optional second singletons file (config key `[data] singletons_inter`) and appends to `singletons` whenever `len(chrs) > 1`. Mirrors `LooperSolver.cpp:970` which adds inter-chromosomal singleton files for multi-chr runs. Single-chr runs skip this file (per-chr contacts in the main file are sufficient and the inter file is often a sparse stub).
+- **Regions.** The command line and `run_genome` take one region such as `chr14:18288319-20307135`, one chromosome,
+  a list `chr1,chr3,chrX` or a range `chr1-chr22,chrX`. An empty value is chr1 to chr22 and chrX.
+  [io.parse_chrs_arg](../gnome3d/io.py) parses the value. A run of several chromosomes writes one CIF per chromosome
+  with the chromosome in the file name. `run_region` returns one bead list per structure. `run_genome` returns one
+  dict of chromosome to bead list per structure.
+
+- **Singletons between chromosomes.** `[data] singletons_inter` is a second singletons file.
+  [data.ContactData.from_files](../gnome3d/data.py) appends it to the singletons in a run of several chromosomes and
+  skips it in a run of one.
+
+- **Chromosome level.** A run of several chromosomes places the chromosome roots first, in
+  [pipeline/coarse/build.py](../gnome3d/pipeline/coarse/build.py). The singleton scores between each pair of
+  chromosomes are summed into a heatmap. The law converts it to distances at the mean chromosome span. The heatmap MC
+  runs `steps_lvl1` times with a step of `noise_lvl1` times the mean distance and the best run is kept. Without
+  singletons between chromosomes the roots are scattered at random.
+
+- **Scaling between chromosomes.** `[heatmaps] inter_scaling` multiplies the cells of the segment heatmap between
+  two chromosomes and leaves the cells within a chromosome unchanged, in
+  [pipeline/coarse/heatmap.py](../gnome3d/pipeline/coarse/heatmap.py). It acts in a run of several chromosomes.
+
+- **Long loops.** A loop longer than `max_pet_length` gets no spring. [io.load_arcs](../gnome3d/io.py) returns these
+  loops apart from the others and `ContactData.long_arcs` holds them. `add_long_pet_to_segment_heatmap` in
+  [pipeline/coarse/build.py](../gnome3d/pipeline/coarse/build.py) adds `long_pet_scale * score ^ long_pet_power` for
+  each of them to the cell of its two segments.
+
+- **Random walk.** `random_walk = yes` places the segment beads of each chromosome on a chained random walk in place
+  of the segment heatmap MC. The walk takes one step of the distance of 1 Mb from the origin and then one step of 50
+  units per segment. It honours `use_2D`.
+
+- **Noise of the arcs stage.** The noise step of the arcs stage is fixed at 0.005, `_ARCS_NOISE` in
+  [skeleton.py](../gnome3d/skeleton.py). No setting changes it.
 
 ## Kernel structure
 
-- **Unified smooth-MC kernel** ([gnome3d/mc/numba/terms.py](../gnome3d/mc/numba/terms.py))
-  The reference has separate `MonteCarloArcsSmooth` branches per feature combo. Python collapses the four prior specialized kernels (`_batch_smooth_nb`, `_batch_smooth_heat_nb`, `_batch_smooth_orientation_nb`, `_batch_smooth_orientation_heat_nb`) into one `batch_mc_nb` driven by `use_heat`/`use_orn` flags. Energy terms (struct, heat, orn) are tracked as independent components (`score_struct`, `score_orn`, `score_heat`) and combined per step.
-  Side benefit: heat/orn paths previously did a full O(N) structure recompute every MC step — now incremental like the pure-smooth path. Verified drift stays at float-noise (~1e-9) under the codebase's reciprocal-neighbor invariant.
+- **One smooth kernel.** `batch_mc_nb` in [mc/numba/terms.py](../gnome3d/mc/numba/terms.py) runs the smooth stage for
+  every combination of terms. Flags turn on the heat, orientation, excluded volume, confinement and compartment
+  terms. Each term keeps its own running score and updates it by local deltas. The score of the chain is their sum.
 
 ## Model
 
-- **Loops of more than one factor: `[data] clusters` takes several files, `[data] factors`
-  names them, the first is CTCF.** ([io.load_arcs](../gnome3d/io.py),
-  [data.fit_arc_strengths](../gnome3d/data.py), [polymer.PolymerLaw.arc_distance](../gnome3d/polymer.py),
-  [skeleton.py](../gnome3d/skeleton.py)) Every arc carries the index of its file. Each factor gets
-  its own strength fit, so a second library's PET counts are read against its own typical
-  count at each span rather than the first's, and the target matrix converts each arc under
-  its factor's fit. The orientation term reads factor 0's loops alone, since a loop held by
-  anything but CTCF has no motif orientation. One file keeps the arc order it was read in,
-  byte identical by the parity gate. Built 2026-09-19 for RNAPII ChIA-PET as a second factor,
-  `design/rnapii-loops.md`. Unit checks in `tests/unit/test_factors.py`.
+- **Loops of more than one factor.** `[data] clusters` takes several files and `[data] factors` gives each a label,
+  CTCF first. Every loop carries the index of its file. Each factor has its own strength fit: the PET counts of a
+  second library are read against the typical count of that library at each span. The target matrix converts
+  each loop with the fit of its factor. The orientation term reads the loops of the first factor alone. A loop that
+  another factor holds has no motif orientation. A run with one file keeps the order of its loops and is byte
+  identical by the parity gate. Built 2026-09-19 for RNAPII ChIA-PET as a second factor, `design/rnapii-loops.md`.
+  The code is [io.load_arcs](../gnome3d/io.py), [data.fit_arc_strengths](../gnome3d/data.py),
+  [polymer.PolymerLaw.arc_distance](../gnome3d/polymer.py) and [skeleton.py](../gnome3d/skeleton.py). Unit checks in
+  `tests/unit/test_factors.py`.
 
-  The summary arc the reader writes for a pair two factors join scores 0 with factor -1. The
-  arcs stage leaves it out, since as an arc it gave the pair the background as its target, and
-  a pair two factors join takes the closer of its factors' targets instead of the one written
-  last. Found 2026-10-27 by the trio study: on a trio chr1 406 pairs, strong ones with a median
-  of 14 CTCF and 6 RNAPII PETs, had been held at the background in every run without loop
-  dropout, which drops the summary arc by its score. Unit checks in `tests/unit/test_arc_matrix.py`.
+  For a pair that two factors join, the reader adds a summary loop with score 0 and factor -1. The arcs stage leaves
+  it out and the pair takes the closer of the targets of its factors. Found 2026-10-27 by the trio study: as a loop
+  the summary gave the pair the background as its target. On a trio chr1 406 pairs, strong ones with a median of 14
+  CTCF and 6 RNAPII PETs, had been held at the background in every run without loop dropout, which drops the summary
+  loop by its score. Unit checks in `tests/unit/test_arc_matrix.py`.
 
-- **IB placement scope: `[simulation_ib] refine_scope = segment | chromosome`, default `segment`.**
-  `segment` is the prior behaviour: each segment's blocks are refined as a separate chain and any
-  segment holding one block or fewer is skipped, so segment grouping decides which blocks get
-  placed at all. `chromosome` refines every block on the chromosome as one chain and removes that
-  dependency.
+- **Scope of block placement.** `[simulation_ib] refine_scope` is `segment` or `chromosome`, default `segment`.
+  `segment` places the blocks of each segment as a separate chain and skips a segment with one block or none. The
+  grouping into segments then decides the set of blocks that are placed. `chromosome` places every block of the
+  chromosome as one chain.
 
-  `chromosome` is not the default despite being the more principled scoping. It also puts every
-  block pair inside the excluded-volume term and the structures inflate: over four GM12878 regions
-  mean simulated contact density fell 0.087 to 0.035 and within-block over between-block
-  enrichment worsened about threefold. The compartment saddle improves, but sparsity alone drags
-  that statistic toward 1.0, so the gain is not separable from the inflation. Adopting this scope
-  means re-tuning `exclusion_*_ib` and `confinement_*_ib` first.
+  `chromosome` is not the default. It puts every pair of blocks inside the excluded volume term and the structures
+  inflate. Over four GM12878 regions the mean simulated contact density fell from 0.087 to 0.035 and the enrichment
+  within blocks over between blocks worsened about threefold. The compartment saddle improves, but sparsity alone
+  moves that statistic toward 1.0 and the gain cannot be separated from the inflation. This scope needs the excluded
+  volume and the confinement of block placement tuned again first.
 
-- **Orientation MC: weighted local scorer**
-  Python uses a weighted local delta in `_local_score_orientation_nb` ([gnome3d/mc/numba/terms.py](../gnome3d/mc/numba/terms.py)) so the incremental update is exact w.r.t. `_score_orientation_full_nb`. The reference uses an unweighted local scorer that drifts over many steps. See `[[project-orientation-mc-fix]]`. The reference scorer stayed unweighted for the old unit harness, which has since been removed.
+- **Orientation term: weighted local score.** `_local_score_orientation_nb` in
+  [mc/numba/terms.py](../gnome3d/mc/numba/terms.py) weights each neighbour of an anchor with the weight of their loop,
+  as `score_orientation_full_nb` does. The update `score_orn += 2 * (curr - prev)` is then exact against the full
+  score.
 
-- **Singleton chr filter** (data loading)
-  The reference bins inter-chromosomal singletons by position; Python correctly filters by chromosome. Smooth-MC heat scores diverge 3-5× as a result, but final structures still match. See `[[project-singleton-chr-filter-divergence]]`.
+- **Singletons are filtered by chromosome.** [io.load_singletons](../gnome3d/io.py) keeps a contact when both of its
+  chromosomes are in the run. In a run of one region both ends must also be inside the region.
 
-- **`BeadOut` is a NamedTuple with a `kind` field** ([gnome3d/types.py](../gnome3d/types.py))
-  Output beads were widened from a 5-tuple `(start, end, x, y, z)` to a 6-field NamedTuple `(start, end, x, y, z, kind)` where `kind: Literal["anchor", "subanchor"]`. Iteration / positional unpacking still works (NamedTuple subclasses tuple) but consumers must expect length 6, not 5. Named access also available: `b.start`, `b.kind`, plus convenience properties `b.midpoint` and `b.span`. The CIF writer emits `kind` via a non-standard `_atom_site.gnome_bead_kind` column and additionally distinguishes anchors (`label_comp_id = ALA`) from subanchors (`label_comp_id = GLY`) so default mmCIF viewers color-code them automatically.
+- **`BeadOut` has a `kind` field.** An output bead is the NamedTuple `(start, end, x, y, z, kind)` of
+  [types.py](../gnome3d/types.py), with `kind` either `anchor` or `subanchor` and the properties `midpoint` and
+  `span`. The CIF writer stores the kind in the column `_atom_site.gnome_bead_kind`. Anchors have the residue name
+  ALA and subanchors GLY, which a viewer colours apart.
 
-- **Subanchor densification: centered slots instead of single points** ([pipeline/ib/densify.py::densify](../gnome3d/pipeline/ib/densify.py))
-  The reference places each subanchor at a single genomic point `ca.end + (j+1) * gap_bp / (ld+1)`, so each subanchor bead has zero genomic width and adjacent anchors collapse all ld subanchors into one point when overlapping. Python keeps the same midpoint positions but gives each subanchor j a slot of width `d_bp = span // (ld+1)` centered on its midpoint. Properties:
-    - Subanchor midpoints, 3D position interpolation (`t = (j+1)/(ld+1)`), and `dtn` are unchanged versus the reference's point scheme.
-    - Each subanchor has a non-degenerate genomic range whenever the in-between region is at least `ld+1` bp wide.
-    - Subanchor starts/ends never coincide with adjacent anchor boundaries (`ca.end` or `cb.start`), so sorting beads by start gives a unique total order — this fixes the bead-collision issue where overlapping anchors produced subanchors sharing a `start` value with the next anchor.
+- **Subanchor slots.** [pipeline/ib/densify.py](../gnome3d/pipeline/ib/densify.py) gives each of the `ld` subanchors
+  between two anchors a slot of the width `d = span // (ld + 1)`. The midpoint of slot `j` is at `(j + 1) * d` from
+  the start of the span and its position is interpolated between the two anchors at `t = (j + 1) / (ld + 1)`. Every
+  subanchor is inside its gap. The starts of the beads are unique whenever the span is at least `ld + 1` bp.
 
-  Behavior on overlapping anchors is controlled by two independent settings:
+  Two settings act on a pair of overlapping anchors.
 
-    - **`overlap_anchor_strict`** (default `False`) — span computation.
-      - `False`: `span = abs(cb.start - ca.end)`; non-overlap tiles the gap `[ca.end, cb.start]`, overlap tiles the overlap `[cb.start, ca.end]` with non-degenerate ranges. Python divergence.
-      - `True`: `span = max(cb.start - ca.end, 0)` matches `LooperSolver.cpp:1829-1831` — overlap clamps to 0 so MC-chain subanchors between overlapping anchors collapse to a single boundary point.
+    - `overlap_anchor_strict`, default no. Off, the span is `abs(start_b - end_a)` and the slots cover the overlap.
+      On, the span is `max(start_b - end_a, 0)` and the subanchors between two overlapping anchors are at one point.
+    - `drop_zero_length_subanchors`, default no. On, a subanchor with `start == end` is left out of the output. The
+      chain keeps it.
 
-    - **`drop_zero_length_subanchors`** (default `False`) — output filter, independent of the span setting.
-      - `False`: every densified subanchor appears in the `BeadOut` output, even when `start == end`.
-      - `True`: subanchor entries with `start == end` are filtered out of the externally visible bead list. The MC chain still contains them (needed for chain smoothness); only the output is cleaned. Useful in combination with `overlap_anchor_strict = True` to suppress the collapsed-overlap zero-length entries the reference would otherwise emit.
+- **Dynamic loop density.** `use_dynamic_loop_density = yes` chooses the subanchor count of each gap by its span,
+  `n = round(span / target_bp_per_subanchor) - 1`, held between `min_subanchors_per_arc` and
+  `max_subanchors_per_arc`. A gap with `n` subanchors has `n + 1` chain segments of about the target length. A gap
+  shorter than 1.5 targets gets no subanchor and its two anchors are bonded directly. Off, every gap gets
+  `loop_density` subanchors and the genomic length per bead differs by more than a hundred times between a short gap
+  and a long one. The code is `_subanchor_counts` in [pipeline/ib/densify.py](../gnome3d/pipeline/ib/densify.py).
 
-  The invariants are that every subanchor falls inside its gap and that bead starts are unique.
-
-- **Dynamic loop density** — `settings.use_dynamic_loop_density = True` to enable. ([pipeline/ib/densify.py::_subanchor_counts](../gnome3d/pipeline/ib/densify.py))
-  The reference (and Python's default) inserts a fixed `loop_density` subanchor count between every adjacent anchor pair, regardless of arc span. With arcs spanning anything from a few hundred bp to hundreds of kb in real ChIA-PET data, this gives **>100× imbalance** in genomic-bp-per-bead between short and long arcs. Dynamic mode picks the count per arc so the *chain segments connecting beads* are roughly `target_bp_per_subanchor` long:
-
-    `n_subanchors = round(span / target) − 1`  (clamped to `[min, max]`)
-
-  An arc with `n` subanchors has `n + 1` consecutive chain segments. Short arcs (`span < 1.5 × target`) round to 1 segment → 0 subanchors → the two anchors are linked directly.
-
-    - `target_bp_per_subanchor` (int, default `5000`) — target genomic distance per chain segment.
-    - `min_subanchors_per_arc` (int, default `0`) — set to `1` to force at least one subanchor between every pair regardless of span.
-    - `max_subanchors_per_arc` (int, default `50`) — cap to avoid runaway counts on huge gaps (a 444 kb arc at 5 kb target would otherwise insert 88 subanchors).
-
-  Both [densify](../gnome3d/pipeline/ib/densify.py) and [build_contact_heatmaps](../gnome3d/pipeline/coarse/build.py) consume the same subanchor-count output, so the densified bead chain and the subanchor contact heatmap stay in sync — `use_subanchor_heatmap` remains compatible with dynamic mode. For arcs with `count == 0` the contact heatmap merges that gap's half into each flanking anchor's bin (midpoint break); the smooth-MC chain just links the two anchors directly.
-
-  Default behavior (`use_dynamic_loop_density = False`) is unchanged.
+  The contact heatmap of the subanchors uses the same counts, in
+  [pipeline/coarse/build.py](../gnome3d/pipeline/coarse/build.py). A gap without subanchors adds one half of its
+  contacts to the bin of each of its two anchors.
 
 ## Features and their measurements
 
