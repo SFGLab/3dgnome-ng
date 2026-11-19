@@ -412,7 +412,7 @@ def create_app() -> FastAPI:
             gene_names[cell] = sorted((str(n).upper(), str(n), str(c), int(t)) for n, c, t in zip(genes["name"], genes["chrom"], genes["tss"], strict=True))
         limit = max(1, min(limit, 25))
         starts = [g for g in gene_names[cell] if g[0].startswith(text)]
-        # The shortest names first, so that MYC comes before MYCBP.
+        # The shortest names first. MYC comes before MYCBP.
         starts.sort(key=lambda g: (len(g[0]), g[0]))
         holds = [g for g in gene_names[cell] if text in g[0] and not g[0].startswith(text)] if len(starts) < limit else []
         return JSONResponse([{"name": n, "chrom": c, "tss": t} for _, n, c, t in (starts + holds)[:limit]])
@@ -438,7 +438,7 @@ def create_app() -> FastAPI:
         if cell not in catalog.cell_types:
             return JSONResponse({"error": f"unknown cell type {cell!r}"}, 404)
         ct = catalog.cell_types[cell]
-        # The form draws the loops around a region as well, its own length on either side, so the
+        # The form draws the loops around a region as well, its own length on either side. The
         # preview takes three times the longest region a job may have.
         try:
             r = parse_region(region, ct.genes(), 3 * s.max_span)
@@ -733,12 +733,12 @@ def create_app() -> FastAPI:
                 f"Build with BASE_PATH={s.base_path or '/'} npm run build in web/frontend, or set BASE_PATH to match.",
                 503,
             )
-        # The features config.json turns off reach the app in the page itself, so it never draws
+        # The features config.json turns off reach the app in the page itself. It never draws
         # one first.
         off = site_config.get().hidden
         if off:
             html = html.replace("<head>", f'<head><meta name="site-hide" content="{",".join(off)}">', 1)
-        # The page names its scripts by their hash. A browser asks for the page anew each time, so a
+        # The page names its scripts by their hash. A browser asks for the page anew each time. A
         # new deployment is seen on the next load.
         return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 

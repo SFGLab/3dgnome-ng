@@ -4,7 +4,7 @@ The whole file never comes to the server.
 
 A link must be http or https, end in .hic, .mcool or .cool and resolve to a public address.
 Every connection to the link's server resolves its host once and connects to the address it
-checked, so a name that turns private between the check and the read is refused. The readers
+checked. A name that turns private between the check and the read is refused. The readers
 reach the file through a local range proxy that makes those connections.
 """
 
@@ -262,7 +262,7 @@ class _Proxy:
     """A range proxy on the loopback interface for the readers. hic-straw reads through curl and
     h5py through aiohttp, neither of which this module can make connect to a checked address,
     so each reads http://127.0.0.1:<port>/<token>/<name> and the proxy fetches the range with
-    the checked opener. A token lives for one read."""
+    the checked opener. A token is valid for one read."""
 
     def __init__(self) -> None:
         self.routes: dict[str, tuple[str, bool]] = {}
@@ -383,8 +383,8 @@ def _child(kind: str, url: str, chrom: str, start: int, end: int, size: int, out
 
 def read_window(url: str, kind: str, chrom: str, start: int, end: int, size: int, allow_private: bool, seconds: float = READ_SECONDS, res: int = RES) -> Window:
     """The window of a remote map, read in a child process through the local proxy and stopped
-    after the time limit. hic-straw holds the interpreter lock while it waits on the network, so
-    in this process it would stall the proxy it reads through."""
+    after the time limit. hic-straw holds the interpreter lock while it waits on the network.
+    In this process it would stall the proxy it reads through."""
     local, token = _local(url, allow_private)
     ctx = multiprocessing.get_context("spawn")
     recv, send = ctx.Pipe(duplex=False)

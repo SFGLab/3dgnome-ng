@@ -1,4 +1,4 @@
-"""Write one cell type's directory for the site from this repository's prepared inputs, and
+"""Write one cell type's directory for the site from this repository's prepared inputs and
 add it to the catalog.
 
     python web/scripts/make_dataset.py <repo data dir> <site data dir> <CELL> \\
@@ -10,7 +10,7 @@ same for every cell type of one annotation.
 
 Reads, from `<repo data dir>/<CELL>/`, the production CTCF anchors and the cross line inputs of
 playground/rnapii/crosscell_prep.py, the Hi-C singletons, segments and centromeres and takes
-the arm C config from slurm/ensemble as the template. Files are copied, never linked, so the
+the arm C config from slurm/ensemble as the template. Files are copied, never linked. The
 site's data directory stands on its own. An existing cell type directory is refused.
 """
 

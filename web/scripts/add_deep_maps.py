@@ -1,4 +1,4 @@
-"""Adds each cell type's deep Hi-C map to a site's catalog.json as hic_url and hic_name, so the
+"""Adds each cell type's deep Hi-C map to a site's catalog.json as hic_url and hic_name. The
 contact map tab compares a job with the deep map rather than the thinned contacts the job read.
 
     python web/scripts/add_deep_maps.py DATA_DIR/catalog.json

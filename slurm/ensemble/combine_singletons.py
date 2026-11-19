@@ -1,16 +1,16 @@
 """Blend ChIA-PET and Hi-C singletons into one file, balanced per cell line.
 
-The two assays are wildly unequal in contact mass, and unequal by different factors per cell
+The two assays are wildly unequal in contact mass and unequal by different factors per cell
 line: Hi-C carries 9.1x the ChIA-PET mass in GM12878, 4.2x in H1ESC and 54.6x in HFFC6. Simply
-concatenating would let Hi-C drive the distance targets, and would blend the three cell lines in
+concatenating would let Hi-C drive the distance targets and would blend the three cell lines in
 three different proportions, which is its own cross-line artefact.
 
 So ChIA-PET is scaled up to a chosen mass ratio against Hi-C, rather than Hi-C being scaled down.
-Hi-C scores are mostly 1, so scaling them down would round to 0, clamp back to 1, and silently
+Hi-C scores are mostly 1. Scaling them down would round to 0, clamp back to 1 and silently
 discard the balancing. Scaling the other way keeps every count an integer and loses nothing.
 
 `--hic-weight 1.0` gives the two assays equal mass. Lower values favour ChIA-PET, higher favour
-Hi-C. This assumes only the ratio matters, since the singleton heatmap is normalised downstream
+Hi-C. This assumes only the ratio matters. The singleton heatmap is normalised downstream
 before it becomes a distance target.
 
     python slurm/ensemble/combine_singletons.py --cell GM12878 \
@@ -64,7 +64,7 @@ def main() -> None:
     if cp_mass == 0:
         sys.exit(f"[combine] ChIA-PET mass is zero: {args.chiapet}")
 
-    # Scale ChIA-PET so that hic_mass == hic_weight * scaled_chiapet_mass.
+    # ChIA-PET is scaled to hic_mass == hic_weight * scaled_chiapet_mass.
     scale = max(1, round(hic_mass / (cp_mass * args.hic_weight)))
     print(
         f"[combine] {args.cell}: ChIA-PET {cp_rows} rows mass {cp_mass}, "

@@ -1,6 +1,6 @@
 """The HiCDiffusion step of a job, the contact map predicted from the haplotype's sequence.
 
-HiCDiffusion, Chiliński and Plewczynski 2024, runs in its own interpreter, since its package
+HiCDiffusion, Chiliński and Plewczynski 2024, runs in its own interpreter. Its package
 pins clash with the engine's. Four variables name its parts.
 
 HICDIFFUSION_DIR     the checkout

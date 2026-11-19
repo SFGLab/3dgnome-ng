@@ -1,6 +1,6 @@
 """Contact maps of a job on one grid: the Hi-C, the model as MultiMM's 1/(d+1)^3 map or as
 counted contacts, ICE balancing and the stratum adjusted correlation of the validation battery
-(legacy/validation/metrics/hic.py), so the site and the battery report one number.
+(legacy/validation/metrics/hic.py). The site and the battery report one number.
 """
 
 from __future__ import annotations
@@ -158,7 +158,7 @@ def rank_strata(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None 
 
 def rank_agreement(a: np.ndarray, b: np.ndarray, res: int, keep: np.ndarray | None = None, max_bp: int = 2_000_000, min_filled: float = 0.5) -> float | None:
     """The diagonals of rank_strata averaged with the diagonal's length as weight. Ranks within
-    one separation carry no distance decay and no scale, so a stretch is judged by its pattern
+    one separation carry no distance decay and no scale. A stretch is judged by its pattern
     and not by its level; the stratum adjusted correlation scores an empty stretch above any
     filled one where Hi-C is depleted. None when no diagonal counts.
     """

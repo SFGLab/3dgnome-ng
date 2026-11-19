@@ -4,9 +4,9 @@
 
 For each job: the structure whose distance between the two positions is nearest the ensemble's
 mean, turned so the line from the first position to the second runs left to right and both
-positions are in front of the chain, and the distance over the ensemble as the site's own
+positions are in front of the chain and the distance over the ensemble as the site's own
 distance route gives it. The first position is the origin of every drawing and all drawings
-share one scale, so a longer line between the positions is a longer distance. Standard library
+share one scale. A longer line between the positions is a longer distance. Standard library
 only.
 
     python web/scripts/make_previews.py http://127.0.0.1:8770/new/api 12063302 12449484 \\
@@ -56,7 +56,7 @@ REACH = 5
 
 def view(points: list[V], ia: int, ib: int) -> tuple[V, V, V]:
     """Axes of the drawing: right, down and toward the viewer. The first runs from a to b. The
-    turn about it is the one that leaves the fewest beads in front of the two marked beads, and
+    turn about it is the one that leaves the fewest beads in front of the two marked beads and
     among equals the one that spreads the chain between them widest on the drawing."""
     e1 = unit(sub(points[ib], points[ia]))
     u = unit(cross(e1, (0.3, 0.5, 0.8)))
@@ -96,7 +96,7 @@ def drawing(base: str, url: str, a_bp: int, b_bp: int) -> dict:
     depth = [dot(p, e3) for p in pts]
     lo, hi = min(depth), max(depth)
     return {
-        # x and y in drawing units from the first position, and the depth step.
+        # x and y in drawing units from the first position and the depth step.
         "points": [[round(SCALE * dot(p, e1)), round(SCALE * dot(p, e2)), min(LAYERS - 1, int(LAYERS * (z - lo) / ((hi - lo) or 1.0)))] for p, z in zip(pts, depth, strict=True)],
         "a": ia,
         "b": ib,

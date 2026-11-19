@@ -4,8 +4,8 @@
         --chroms chr1-chr22,chrX --res 1000 --out data/GM12878/GM12878_anchor_contacts_1kb.npz
 
 The map is read at full depth, raw counts. Only the pixel rows of bins that overlap an anchor
-are read, through the map's row index, and of those only the pixels whose other bin overlaps an
-anchor are kept, so a chromosome costs the anchor bins' share of its pixels. Each pixel is
+are read, through the map's row index. Of those only the pixels whose other bin overlaps an
+anchor are kept. A chromosome costs the anchor bins' share of its pixels. Each pixel is
 shared between the anchors it overlaps in proportion to the overlap. The anchors must be the
 run's anchor file: a run matches its anchors to the table by interval.
 """

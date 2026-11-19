@@ -92,12 +92,12 @@ def queue_position(s: Settings, job_dir: Path) -> int | None:
 
 
 def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
-    # The request is on disk from the moment the job waits, so a waiting job can be queued
+    # The request is on disk from the moment the job waits. A waiting job can be queued
     # again after a restart.
     job_dir.mkdir(parents=True, exist_ok=True)
     write_json(job_dir / "request.json", asdict(req))
     if s.queue == "inline":
-        # Synchronous, so a request returns after its job; for development and tests.
+        # Synchronous. A request returns after its job; for development and tests.
         work(asdict(req), str(job_dir))
         return
     if s.queue == "thread":
@@ -115,9 +115,9 @@ def resume_interrupted(results_dir: Path, pool: LocalPool) -> list[str]:
     """Queue again the jobs a stop of the web process left running or waiting, oldest first
     and return their names.
 
-    The local pool holds its jobs in the process, so a restart ends a running engine and
+    The local pool holds its jobs in the process. A restart ends a running engine and
     forgets the waiting jobs and their pages would wait without end. A job without its
-    request on disk cannot be run again and is marked failed, so its page says so and the
+    request on disk cannot be run again and is marked failed. Its page says so and the
     form accepts the request anew.
     """
     left = []

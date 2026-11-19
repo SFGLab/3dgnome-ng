@@ -266,7 +266,7 @@ def _change(kind: str, before: dict, after_loops: list, factor: str) -> str:
             return f"adds {_plural(len(new_anchors), f'{factor} anchor')}, {_plural(len(new_loops), 'new loop')}"
         return f"lengthens {_plural(len(changed), 'loop')}" if changed else f"no {factor} motif above the cutoff"
     if kind == "DUP":
-        # A copy keeps the reference interval of its original, so a copied loop has the key of a
+        # A copy keeps the reference interval of its original. A copied loop has the key of a
         # loop that is there already and shows as one more loop than the keys count.
         copied = len(after_loops) - len(keyed) - len(new_loops)
         if copied > 0 or new_loops:

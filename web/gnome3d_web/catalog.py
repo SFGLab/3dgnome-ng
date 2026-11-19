@@ -73,8 +73,8 @@ class SVSet:
     def sample_rows(self) -> list[list[str]]:
         """The table's rows of the set's samples, in the order of `SAMPLE_COLUMNS`.
 
-        A sample the table lacks gets empty fields. A parent outside the set is left out, so
-        every parent named is a sample a job can be made for.
+        A sample the table lacks gets empty fields. A parent outside the set is left out.
+        Every parent named is a sample a job can be made for.
         """
         if self.samples_table is None:
             return []

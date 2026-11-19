@@ -1,15 +1,15 @@
 """Write Hi-C bin pairs as a singleton BEDPE the model can ingest.
 
 On a deep map thin with `--contacts-per-mb`: every 25 kb pair is present there, tens of
-millions of rows per chromosome, and the model holds singletons as a list. The thinning is a
+millions of rows per chromosome and the model holds singletons as a list. The thinning is a
 random draw on the counts, which keeps the decay; `--min-count` drops the far pairs first.
 
 Every pair with a count is written. The train/test split that
-``legacy.validation.studies.self_corr`` applies is a validation device, and holding half the contacts
-back would only weaken a production ensemble, so ``holdout=False`` here.
+``legacy.validation.studies.self_corr`` applies is a validation device and holding half the contacts
+back would only weaken a production ensemble. ``holdout=False`` here.
 
 One chromosome at a time even when the whole genome is asked for. The underlying reader
-materialises a dense matrix per region, and a genome-wide one at 25 kb would be far larger than
+materialises a dense matrix per region and a genome-wide one at 25 kb would be far larger than
 memory, while chr1 alone is about 0.8 GB and fits. Only intra-chromosomal pairs are written,
 which is what the model consumes for per-chromosome reconstruction.
 
@@ -24,9 +24,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-# pyproject installs gnome3d* only, so legacy/validation/ is importable from the repo root and nowhere
-# else. Running this file by path puts its own directory on sys.path rather than the root, so
-# the root goes on explicitly and the script works from any working directory.
+# The package legacy.validation is importable from the repository root alone. A script run by path
+# has its own directory on sys.path and the root is added here.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from gnome3d.io import parse_chrs_arg  # noqa: E402
@@ -69,7 +68,7 @@ def main() -> None:
     regions = [args.region] if args.region else parse_chrs_arg(args.chroms)[0]
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    # Written to a temporary file and moved into place at the end, so an interrupted run cannot
+    # Written to a temporary file and moved into place at the end. An interrupted run cannot
     # leave a truncated BEDPE that the job guard would happily accept.
     total = 0
     with tempfile.NamedTemporaryFile("w", dir=out.parent, suffix=".partial", delete=False) as tmp:

@@ -3,11 +3,11 @@
 The cell type's loops of the region's chromosome are rewired by the sample's variants with the
 2019 rules of personal3d, CTCF and RNAPII separately and the loops wholly inside the region
 are kept. The anchors are the cell type's own, lifted to the haplotype's coordinates, plus any
-loop end the rules made. The singletons of the whole chromosome are kept, since the engine fits
+loop end the rules made. The singletons of the whole chromosome are kept. The engine fits
 the contact decay on the file, lifted end by end, with a HiCDiffusion window spliced in when
 one is given. Segments, centromeres and compartments are lifted the same way. The config is the cell type's
-with only its data section replaced. Only variants inside the region are applied, so
-coordinates before the region do not move.
+with only its data section replaced. Only variants inside the region are applied.
+Coordinates before the region do not move.
 """
 
 from __future__ import annotations
@@ -208,8 +208,8 @@ def build_inputs(
     cen = _read(cell.path("centromeres"), chrom, 3)
     cen[1], cen[2] = L.many(cen[1].to_numpy()), L.many(cen[2].to_numpy())
     cen.to_csv(out / "centromeres.bed", sep="\t", header=False, index=False)
-    # The compartments are the cell type's own, so not read with own contacts. An edge inside a
-    # deletion goes where the deletion joins its two sides, so neighbours stay joined.
+    # The compartments are the cell type's own and are not read with own contacts. An edge inside a
+    # deletion goes where the deletion joins its two sides. Neighbours stay joined.
     compartments = "compartments" in cell.files and not (own and own.contacts)
     if compartments:
         comp = _read(cell.path("compartments"), chrom, 4)
@@ -231,7 +231,7 @@ def build_inputs(
     if len(names) > 1 or factors == "RNAPII" or (own and own.loops):
         data["factors"] = ",".join(names)
     # The beads of a stretch without loops are drawn against the cell type's map, which is in
-    # reference coordinates and is this cell's, so not with variants applied or own contacts.
+    # reference coordinates and is this cell's. It is not used with variants or own contacts.
     if cell.contact_map and not svs and not (own and own.contacts):
         data["contact_map"] = cell.contact_map
     config = engine.write_config(cell.path("config"), data, out / "config.ini", header=f"{cell.name} {region} {factors}")

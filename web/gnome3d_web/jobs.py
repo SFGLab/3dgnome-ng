@@ -2,8 +2,8 @@
 
 A job directory holds `request.json`, `status.json`, the engine inputs under `inputs/`, the
 structures under `models/`, `marks.json`, `ep.tsv` and `engine.log`. `status.json` is rewritten
-at every stage, so a page can show where a job is and a failure records the stage and the last
-lines of the log. A job on hosted inputs is keyed by a hash of the normalised request, so the
+at every stage. A page can show where a job is and a failure records the stage and the last
+lines of the log. A job on hosted inputs is keyed by a hash of the normalised request. The
 same request finds the same directory. A job with an upload is private and keyed by a random
 token instead.
 """
@@ -64,7 +64,7 @@ class JobRequest:
 
 
 def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
-    """The request with its region resolved, so equivalent requests compare equal."""
+    """The request with its region resolved. Equivalent requests compare equal."""
     region = parse_region(req.region, catalog.cell_types[req.cell_type].genes(), Settings.from_env().max_span)
     d = asdict(req)
     d["region"] = str(region)
@@ -198,7 +198,7 @@ def run_job(
         env = dict(os.environ) | (env_extra or {})
         if "ENGINE_ROOT" in env:
             env["PYTHONPATH"] = env["ENGINE_ROOT"] + (":" + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
-        # The engine skips a structure whose file exists, so a job run again after a restart of
+        # The engine skips a structure whose file exists. A job run again after a restart of
         # the site goes on where it stopped and its log is kept. Otherwise the log begins with
         # the HiCDiffusion step when it ran and the engine follows.
         kept = len(list((job / "models").glob("*.cif"))) if (job / "models").is_dir() else 0

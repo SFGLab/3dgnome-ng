@@ -1,5 +1,5 @@
 """Stands in for `python -m gnome3d.cli` in tests: writes N straight chain cifs over the region,
-or fails when the region starts with chr9. FAKE_ENGINE_SLEEP holds it for that many seconds, and
+or fails when the region starts with chr9. FAKE_ENGINE_SLEEP holds it for that many seconds and
 FAKE_ENGINE_TRACE receives its start, end and CUDA_VISIBLE_DEVICES."""
 
 from __future__ import annotations

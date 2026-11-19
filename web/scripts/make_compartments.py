@@ -4,10 +4,10 @@
 
 The map uri is a cooler at one resolution, `file.mcool::/resolutions/100000`. Each chromosome arm
 is taken alone. Its balanced map is divided by the mean of each diagonal, clipped at the 99.9
-percentile and reduced by one, and the eigenvector of the largest eigenvalue is the compartment
+percentile and reduced by one and the eigenvector of the largest eigenvalue is the compartment
 signal. The sign of an eigenvector is arbitrary. It is set so the side with more gene starts is
-A. An arm is left out when the signal does not follow gene density or jumps from bin to bin,
-since a call there would be noise. The engine reads the labels as they are and needs no phasing
+A. An arm is left out when the signal does not follow gene density or jumps from bin to bin.
+A call there would be noise. The engine reads the labels as they are and needs no phasing
 track for them.
 
 The output is `chr start end label` with neighbouring bins of one label joined. One line of JSON

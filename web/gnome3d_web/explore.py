@@ -289,7 +289,7 @@ def genes(job: Path) -> list[dict[str, object]]:
 
 
 def _public_log(text: str, job: Path) -> str:
-    """A log with the job's directory on the server cut from every path, so a private job's
+    """A log with the job's directory on the server cut from every path. A private job's
     location on disk is not shown."""
     for p in {str(job.resolve()), str(job)}:
         text = text.replace(p + "/", "").replace(p, ".")
@@ -325,7 +325,7 @@ def _read_deep(url: str, chrom: str, start: int, end: int, res: int, allow_priva
 
 def _deep_map(job: Path, url: str, chrom: str, start: int, end: int, res: int, allow_private: bool) -> np.ndarray:
     """A deep map's window on the job's grid. The pixels of the job's whole region are read once
-    per resolution and kept in the job directory, so zooming and panning cut windows from them
+    per resolution and kept in the job directory. Zooming and panning cut windows from them
     instead of reading the remote file again."""
     status = _json(job / "status.json").get("region") or f"{chrom}:{start}-{end}"
     jr = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", str(status))
@@ -424,7 +424,7 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         b = b if lower in loop_sets else cm.ice(b)
     elif norm != "raw":
         raise ExploreError(f"{norm!r} is not ice or raw")
-    # The rank agreement reads a Hi-C half balanced and over the bins Hi-C maps, since an
+    # The rank agreement reads a Hi-C half balanced and over the bins Hi-C maps. An
     # unmapped bin reads as zero and a bead there would count against the model.
     keep = np.ones(len(raw_a), dtype=bool)
     rk_a, rk_b = raw_a, raw_b

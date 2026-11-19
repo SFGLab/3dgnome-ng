@@ -61,10 +61,8 @@ def build(
     params["simulation_backend"]["mc_executor_jax_bucket_shapes"] = "yes"
     params["subanchor_heatmap"]["heat_min_reduction"] = "0.001"
     if ev_weight is not None:
-        # Excluded volume is a tradeoff, not a nuisance: weight 0.1 was picked because it
-        # cut resolution-normalised overlaps 23% in 20 of 20 GM12878 regions. Lowering it
-        # lets pairs with strong attractive drivers approach while random pairs still do
-        # not, which is why weight is swept here rather than the radius.
+        # A lower weight lets pairs with strong attraction approach. The weight is swept here, not the
+        # radius.
         params["excluded_volume"]["weight"] = str(ev_weight)
 
     for sec, kv in params.items():

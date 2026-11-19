@@ -1,4 +1,4 @@
-"""Stands in for HiCDiffusion's interpreter in tests. It is started as the interpreter, so its
+"""Stands in for HiCDiffusion's interpreter in tests. It is started as the interpreter. Its
 first argument is the runner it would run. It writes a flat map and prints the GPU it was given,
 or fails when FAKE_HICDIFFUSION_FAIL is set."""
 

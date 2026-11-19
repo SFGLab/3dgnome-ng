@@ -5,7 +5,7 @@
 
 Writes `structure.png`, the medoid conformation of the TNFRSF8 locus with CTCF and RNAPII loops as
 a grey tube with the promoter beads in the site's promoter colour and the enhancer beads in its
-enhancer colour, and `contacts.png`, the Hi-C map of chr1:20-25 Mb above the diagonal and the
+enhancer colour and `contacts.png`, the Hi-C map of chr1:20-25 Mb above the diagonal and the
 summed model map of the same arm below it, each on its own log scale. `structure_ctcf.png`
 is the same locus modelled with CTCF loops alone, for the compare screen. The
 `method_*.png` panels illustrate the Method page, `method_law.png` its distance law.
@@ -51,7 +51,7 @@ def structure(maps: np.lib.npyio.NpzFile, out: Path, arm: str = "R") -> None:
 
 def _scaled(m: np.ndarray, held: np.ndarray | None = None) -> np.ndarray:
     """log10 of a map scaled to the 2nd to 99.5th percentile of its nonzero cells off the
-    diagonal, NaN where a bin holds no bead. A model map is zero beyond contact range, so the
+    diagonal, NaN where a bin holds no bead. A model map is zero beyond contact range. The
     scale is set on the cells it fills."""
     v = np.log10(m + np.nanmin(m[m > 0]))
     off = m[np.triu_indices_from(m, 1)] > 0
@@ -78,7 +78,7 @@ def contacts(maps: np.lib.npyio.NpzFile, out: Path) -> None:
 
 def method_steps(maps: np.lib.npyio.NpzFile, out: Path) -> None:
     """Three panels for the Method page from the CTCF and RNAPII locus: the anchors alone as
-    points joined in genomic order, the full chain, and three structures of the ensemble
+    points joined in genomic order, the full chain and three structures of the ensemble
     superposed on the first by the Kabsch rotation, all on one view."""
     xyz, mid, anc = maps["locus_R_xyz"], maps["locus_R_mid"], maps["locus_R_anchor"]
     keep = (mid > 11_990_000) & (mid < 12_520_000)
