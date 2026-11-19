@@ -1,6 +1,6 @@
 """Write the text of each exported design screen, one string per line in document order.
 
-    python web/design/design_text.py web/design/exports
+    python web/design/design_text.py EXPORTS_DIR
 
 Reads every <id>.html that Pencil exported and writes <id>.txt beside it. The text files are
 what a build reads for verbatim copy when the design file itself is not open.
