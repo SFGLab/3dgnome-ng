@@ -20,6 +20,7 @@ dependencies = [
 dev = [
     "ruff>=0.6",
     "pyright>=1.1.380",
+    "pytest>=8",
 ]
 
 # JAX backend for the smooth-MC hot path (settings.mc_backend = 'jax').
@@ -37,8 +38,8 @@ extract = [
     "cooler>=0.9",
 ]
 
-# Validation harness (validation/): structure-quality metrics, Hi-C correlation,
-# and the EV/confinement hyperparameter sweep. Needs SciPy for stats, cooler to
+# The retired validation package (legacy/validation/): structure-quality metrics, Hi-C
+# correlation, the data fetch and the track builder. Needs SciPy for stats, cooler to
 # read 4DN Hi-C .mcool matrices, and hicrep for the stratum-adjusted SCC.
 #     pip install -e .[validation]
 validation = [
@@ -55,6 +56,14 @@ gnome3d-ng = "gnome3d.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["gnome3d*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "slow: takes over a minute on a laptop",
+    "data: reads the local input files under data/, which are not in the repository",
+]
 
 [tool.pyright]
 include = ["gnome3d"]
@@ -76,7 +85,7 @@ reportConstantRedefinition = "none"
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-extend-exclude = ["3dnome", ".venv", "build", "dist", "out", "data", "playground"]
+extend-exclude = ["legacy/3dnome", ".venv", "build", "dist", "out", "data", "playground"]
 # Honor the excludes even when a path is passed explicitly (e.g. pre-commit / editors),
 # so playground/ scratch scripts are never linted.
 force-exclude = true
@@ -103,9 +112,9 @@ ban-relative-imports = "all"
 "gnome3d/hierarchy.py" = ["F405", "F403"]
 "gnome3d/pipeline/coarse/build.py" = ["F405", "F403"]
 "gnome3d/mc/jax/util.py" = ["F401"]
-"validation/metrics/__init__.py" = ["F405", "F403"]
+"legacy/validation/metrics/__init__.py" = ["F405", "F403"]
 
 # The harness uses tight one-liner stubs (lots of `;`), tuple short names like
 # `l` for length, and zip() without strict=. These are intentional for compact
 # test fixtures, not real code.
-"harness/integration.py" = ["B007", "B905"]
+"legacy/harness/integration.py" = ["B007", "B905"]

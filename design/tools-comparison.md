@@ -15,7 +15,7 @@ singletons at 25 kb.
 
 | Tool | Version and settings | Beads |
 |---|---|---|
-| 3dgnome | production config, `validation/core/config.py` | one per 1 kb between anchors |
+| 3dgnome | production config, `gnome3d/production.py` | one per 1 kb between anchors |
 | cudaMMC | its template config, only the data section changed, ensemble by `-m` | its `loop_density` of 5 |
 | MultiMM | 2.1.1 on CUDA, the clusters as loops, minimised and dynamics ensembles kept | our bead count over our span |
 

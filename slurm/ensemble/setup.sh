@@ -68,9 +68,9 @@ fi
 # Deliberately NOT `pip install -e ".[validation]"`. That extra also pulls hicrep and pyBigWig,
 # both of which build from an sdist whose setup.py imports numpy, which is where the login-node
 # install died. Neither is needed here: hicrep is declared but never imported anywhere in
-# validation/, and pyBigWig is imported lazily by the ATAC signal path, which this ensemble
+# legacy/validation/, and pyBigWig is imported lazily by the ATAC signal path, which this ensemble
 # skips. scipy, cooler and cooltools are the real requirements - scipy because
-# validation/studies/synthetic.py imports it at module level and the CLI loads every study,
+# legacy/validation/studies/synthetic.py imports it at module level and the CLI loads every study,
 # cooler and cooltools for the mcool and the insulation call.
 if [ "$SKIP_INSTALL" != "1" ]; then
   echo "[setup] installing"
@@ -89,7 +89,7 @@ print(f'[setup] jax devices: {jax.devices()}')
 "
 
 # ---- inputs that cannot be downloaded -------------------------------------------------------
-# The manifests under validation/manifests/ cover Hi-C and epigenomic signal only. The ChIA-PET
+# The manifests under legacy/validation/manifests/ cover Hi-C and epigenomic signal only. The ChIA-PET
 # anchors and loops, the segment breakpoints and the centromeres have no fetch path and must be
 # copied in. Checked first, because everything below is pointless without them.
 missing=0
@@ -116,13 +116,13 @@ if [ -s "$MCOOL" ]; then
   echo "[setup] have $MCOOL"
 else
   echo "[setup] fetching Hi-C"
-  python -m validation fetch --manifest validation/manifests/${CELL}_hic.json --out data/_hic
+  python -m legacy.validation fetch --manifest legacy/validation/manifests/${CELL}_hic.json --out data/_hic
 fi
 
 # Only the TAD boundaries are wanted. Compartments feed the epigenome term, which this ensemble
 # runs without.
 echo "[setup] calling TADs"
-python -m validation tracks --cell "$CELL" --skip-compartments
+python -m legacy.validation tracks --cell "$CELL" --skip-compartments
 
 echo "[setup] building Hi-C singletons at ${BINSIZE}bp"
 python slurm/ensemble/prep_singletons.py \

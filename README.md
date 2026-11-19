@@ -3,7 +3,8 @@
 Python reimplementation of the [3dgnome](https://bitbucket.org/3dome/3dgnome/src/master/) Monte Carlo chromosome
 structure prediction algorithm.
 
-The reference implementation lives in `3dnome/` (read-only). The rewrite lives in `gnome3d/`.
+The model is in `gnome3d/` and its tests in `tests/`. The reference implementation is in `legacy/3dnome/`
+(read-only), with the retired validation package and harness beside it, see [legacy/README.md](legacy/README.md).
 
 Every config key, its default, its production value and what it does is in [SETTINGS.md](SETTINGS.md).
 
@@ -17,7 +18,7 @@ letter). New features and optimizations will be added iteratively. Use at your o
 - Python 3.10+
 - NumPy >= 1.24
 - Numba >= 0.59
-- g++ (for building the C++ reference binary and the test scorer)
+- g++, only for building the reference binary under `legacy/`
 
 ### Install
 
@@ -27,7 +28,7 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-### Install with dev tooling (ruff + pyright)
+### Install with dev tooling (ruff, pyright and pytest)
 
 ```bash
 pip install -e ".[dev]"
@@ -37,12 +38,22 @@ Alternatively, runtime deps alone can be installed via `pip install -r requireme
 
 ---
 
-## Building the C++ reference
-
-The C++ binary is used only for the integration test (comparing distributions). Build it once:
+## Tests
 
 ```bash
-make 3dnome # builds 3dnome/3dnome
+.venv/bin/pytest                # every test, about two and a half minutes on a laptop
+.venv/bin/pytest -m "not slow"  # without the files that take over a minute
+```
+
+`tests/unit/` has one file per feature and `tests/integration/` runs the whole pipeline, on synthetic inputs and
+on one real region when its inputs are under `data/`.
+
+## Building the reference
+
+The reference binary is used only by the retired comparison in `legacy/harness/integration.py`. Build it once:
+
+```bash
+make -C legacy 3dnome # builds legacy/3dnome/3dnome
 ```
 
 ---
@@ -88,7 +99,7 @@ to `/Projects/GM12878/`. Pass the actual local path instead.
 
 The config sections and every key they take are documented in [SETTINGS.md](SETTINGS.md), including how the
 several distance laws combine into the arcs stage's targets. The production values live in
-`validation/core/config.py::CANONICAL`, and `slurm/ensemble/make_configs.py` generates the per cell line inis from it.
+`gnome3d/production.py::CANONICAL`, and `slurm/ensemble/make_configs.py` generates the per cell line inis from it.
 
 ---
 

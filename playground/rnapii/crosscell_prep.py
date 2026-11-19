@@ -245,7 +245,7 @@ def absorb_ends(
 #     python playground/rnapii/crosscell_prep.py [--max-span 1000000] [--seed 20261111] [--dry-run]
 #
 # Inputs are the production CTCF loops and anchors under data/<C>/ and the ENCODE files the
-# manifests validation/manifests/<C>_rnapii.json fetch into data/_rnapii/<C>/.
+# manifests legacy/validation/manifests/<C>_rnapii.json fetch into data/_rnapii/<C>/.
 
 LINES = ("GM12878", "H1ESC", "HFFC6")
 FACTORS = ("ctcf", "rnapii")
@@ -275,7 +275,7 @@ def build_record(line: str, **fields: object) -> dict[str, object]:
 def _manifest(root: Path, line: str) -> dict[str, object]:
     import json
 
-    return json.loads((root / "validation" / "manifests" / f"{line}_rnapii.json").read_text())
+    return json.loads((root / "legacy" / "validation" / "manifests" / f"{line}_rnapii.json").read_text())
 
 
 def _fetched(root: Path, line: str, prefix: str) -> list[Path]:
@@ -295,7 +295,7 @@ def main() -> None:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from anchor_union import read_anchors, union_anchors
 
-    from validation.core.config import CANONICAL
+    from gnome3d.production import CANONICAL
 
     ap = argparse.ArgumentParser(description="cross line RNAPII inputs")
     ap.add_argument("--max-span", type=int, default=1_000_000)

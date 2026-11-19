@@ -5,7 +5,7 @@ millions of rows per chromosome, and the model holds singletons as a list. The t
 random draw on the counts, which keeps the decay; `--min-count` drops the far pairs first.
 
 Every pair with a count is written. The train/test split that
-``validation.studies.self_corr`` applies is a validation device, and holding half the contacts
+``legacy.validation.studies.self_corr`` applies is a validation device, and holding half the contacts
 back would only weaken a production ensemble, so ``holdout=False`` here.
 
 One chromosome at a time even when the whole genome is asked for. The underlying reader
@@ -24,13 +24,13 @@ import sys
 import tempfile
 from pathlib import Path
 
-# pyproject installs gnome3d* only, so validation/ is importable from the repo root and nowhere
+# pyproject installs gnome3d* only, so legacy/validation/ is importable from the repo root and nowhere
 # else. Running this file by path puts its own directory on sys.path rather than the root, so
 # the root goes on explicitly and the script works from any working directory.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from gnome3d.io import parse_chrs_arg  # noqa: E402
-from validation.studies.self_corr import hic_to_singleton_bedpe  # noqa: E402
+from legacy.validation.studies.self_corr import hic_to_singleton_bedpe  # noqa: E402
 
 
 def main() -> None:

@@ -5,10 +5,10 @@ of these produces a warning rather than silently doing nothing, so a misspelling
 Booleans accept `yes`, `no`, `true`, `false`, `1` and `0`. Filenames in the data section are
 taken relative to `data_dir` unless they are absolute.
 
-The production column is `validation.core.config.CANONICAL`, which every validation run and
+The production column is `gnome3d.production.CANONICAL`, which every validation run and
 the ensemble configs share. The ensemble configs written by the triosformer project's `trio_configs.py`
 add three overrides on top: `mc_executor_jax_bucket_shapes = yes`, `multigpu_mode = groups`
-and `heat_min_reduction = 0.001`. `python harness/check_settings_doc.py` checks every row
+and `heat_min_reduction = 0.001`. `python tests/unit/test_settings_doc.py` checks every row
 against the loader, the defaults and the production config, and is run before a commit that
 touches settings.
 

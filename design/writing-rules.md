@@ -148,7 +148,7 @@ marks the others ns.
 The tool is 3D-GNOMEᴺᴳ, with a raised NG, in every published text. `gnome3d` is the Python package and appears in
 code, paths and commit messages only.
 
-`3dnome/MC/` is "the reference" or "the reference implementation". Do not call it by its programming language. Cite
+`legacy/3dnome/MC/` is "the reference" or "the reference implementation". Do not call it by its programming language. Cite
 a place in it as `LooperSolver.cpp:1069-1104`.
 
 ## Check before handing over

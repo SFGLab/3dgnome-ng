@@ -18,7 +18,7 @@ from gnome3d_web.contacts import ice, loop_enrichment, median_bond, model_map, m
 
 
 def battery_scc(A: np.ndarray, B: np.ndarray, max_sep_bins: int) -> float:
-    """validation/metrics/hic.py _scc, copied: whole diagonals weighted by length and both spreads."""
+    """legacy/validation/metrics/hic.py _scc, copied: whole diagonals weighted by length and both spreads."""
     num = den = 0.0
     for dd in range(1, min(max_sep_bins, A.shape[0] - 1) + 1):
         a, b = np.diagonal(A, dd), np.diagonal(B, dd)

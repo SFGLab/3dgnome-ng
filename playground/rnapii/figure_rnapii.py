@@ -313,7 +313,7 @@ def _loci_cli(args: list[str]) -> None:
     from crosscell_prep import read_bedpe
 
     from playground.validation_battery import CONTACT_BEADS, load
-    from validation.metrics.hic import observed_hic, simulated_contacts
+    from legacy.validation.metrics.hic import observed_hic, simulated_contacts
 
     mcool, region, loops_path, c_dir, r_dir = args
     binsize = 10_000

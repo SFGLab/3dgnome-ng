@@ -1,6 +1,6 @@
 """Contact maps of a job on one grid: the Hi-C, the model as MultiMM's 1/(d+1)^3 map or as
 counted contacts, ICE balancing and the stratum adjusted correlation of the validation battery
-(validation/metrics/hic.py), so the site and the battery report one number.
+(legacy/validation/metrics/hic.py), so the site and the battery report one number.
 """
 
 from __future__ import annotations
@@ -112,7 +112,7 @@ def ice(m: np.ndarray, iterations: int = 200) -> np.ndarray:
 
 
 def scc(a: np.ndarray, b: np.ndarray, res: int, max_bp: int = 2_000_000) -> float | None:
-    """The stratum adjusted correlation as the battery computes it, validation/metrics/hic.py
+    """The stratum adjusted correlation as the battery computes it, legacy/validation/metrics/hic.py
     _scc: the Pearson correlation of each whole diagonal up to max_bp, zeros included, weighted by
     its length and the two standard deviations. None when no diagonal has two maps with
     variance."""

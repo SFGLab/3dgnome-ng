@@ -2,13 +2,13 @@
 
 ## Project Goal
 
-Python reimplementation of the Monte Carlo core of **3dgnome**. The reference implementation in `3dnome/MC/` is a ~6,400 line simulation that predicts 3D chromosome structure from ChIA-PET and Hi-C contact frequency data. The reimplementation lives in `gnome3d/` and reproduced the reference algorithm as its starting point. MC kernels run on CPU via Numba. A jax path batches regions on the GPU for the genome scale run. Torch is used for GPU device detection.
+Python reimplementation of the Monte Carlo core of **3dgnome**. The reference implementation in `legacy/3dnome/MC/` is a ~6,400 line simulation that predicts 3D chromosome structure from ChIA-PET and Hi-C contact frequency data. The reimplementation lives in `gnome3d/` and reproduced the reference algorithm as its starting point. MC kernels run on CPU via Numba. A jax path batches regions on the GPU for the genome scale run. Torch is used for GPU device detection.
 
-Do **not** modify anything inside `3dnome/`. That directory is the reference implementation - read it, never change it.
+Do **not** modify anything inside `legacy/3dnome/`. That directory is the reference implementation - read it, never change it.
 
 ### Terminology
 
-Refer to `3dnome/MC/` as **"the reference"** (or "the reference implementation"), never as "C++". The language it happens to be written in is irrelevant to the design; the relevant fact is that it is the algorithmic source-of-truth we port from. This applies in code comments, docstrings, agent-visible documentation, commit messages, and conversations. When you cite a specific file or line, write `LooperSolver.cpp:1069-1104` — not "the C++ code at...".
+Refer to `legacy/3dnome/MC/` as **"the reference"** (or "the reference implementation"), never as "C++". The language it happens to be written in is irrelevant to the design; the relevant fact is that it is the algorithmic source-of-truth we port from. This applies in code comments, docstrings, agent-visible documentation, commit messages, and conversations. When you cite a specific file or line, write `LooperSolver.cpp:1069-1104` — not "the C++ code at...".
 
 ### Status: results parity, not settings parity
 
@@ -25,7 +25,7 @@ Rules for the code as it stands:
   becomes a default that silently applies to another. When a measurement cannot be made the
   run says so in an always visible line and names the fallback.
 - **A setting exists because a run reads it.** A key nothing consults is deleted, not kept for
-  the reference's sake. `SETTINGS.md` is the reference. `harness/check_settings_doc.py`
+  the reference's sake. `SETTINGS.md` is the reference. `tests/unit/test_settings_doc.py`
   checks every row against the loader, the defaults and the production config, both ways,
   and runs before any commit that touches settings.
 - **Features are opt in while they are being measured, and become the law once the battery
@@ -35,7 +35,7 @@ Rules for the code as it stands:
   is the regression tool for refactors, not a contract with the reference.
 - Inside a feature's own code, document any non-obvious behavior; project memory (`[[…]]`
   links) carries the longer-form rationale.
-- **Where things stand is `SETTINGS.md`'s production column and `validation/core/config.py`.**
+- **Where things stand is `SETTINGS.md`'s production column and `gnome3d/production.py`.**
   The design notes under `design/` record why: `anchor-placement.md` for the distance law and
   the end passes, `ab-compartments.md` for the compartment work, the chromosome scope and the
   Hilbert start. Accessibility and nucleus terms were removed on 2026-09-11 after measuring
@@ -47,23 +47,22 @@ Rules for the code as it stands:
 
 ```
 3dgnome-torch/
-├── 3dnome/MC/                  # Reference implementation (READ ONLY)
-│   ├── LooperSolver.cpp/h      # Main solver, all MC loops live here
-│   ├── Chromosome.cpp/h        # 3D structure, a list of bead positions
-│   ├── HierarchicalChromosome.cpp/h  # Multi-level representation
-│   ├── Heatmap.cpp/h           # 2D contact/frequency matrices
-│   ├── InteractionArcs.cpp/h   # Pairwise arc/interaction management
-│   ├── Cluster.cpp/h           # Single bead definition
-│   └── lib/                    # mtxlib (vec3/mat44), RNG, RMSD utilities
 ├── gnome3d/                    # Python implementation. MC kernels run on CPU via Numba
 │   ├── simulate.py             # Public reconstruction entry point
 │   ├── reconstruct.py          # The self-expanding task DAG
 │   ├── pipeline/               # Per-stage kernels (coarse, ib)
 │   ├── mc/                     # numba and jax MC kernels (numba/, jax/)
+│   ├── production.py           # The production configuration, CANONICAL and settings_for_cell
 │   ├── settings.py data.py hierarchy.py io.py util.py types.py tracks.py skeleton.py
-├── validation/                 # Validation package (studies, metrics, manifests)
-├── harness/
-│   └── integration.py          # Full-MC integration test and the reference runner
+├── tests/                      # pytest suite
+│   ├── unit/                   # One file per feature, each also runs as a script
+│   └── integration/            # Whole pipeline on synthetic inputs and on one real region
+├── legacy/                     # Retired code, kept runnable
+│   ├── 3dnome/MC/              # Reference implementation (READ ONLY)
+│   │   ├── LooperSolver.cpp/h  # Main solver, all MC loops are here
+│   │   └── ...                 # Chromosome, Heatmap, InteractionArcs, Cluster, lib/
+│   ├── harness/                # integration.py, the reference runner, and tests of playground scripts
+│   └── validation/             # Metrics, studies, the fetch and tracks commands, manifests
 ├── data/                       # Input datasets (GM12878, H1ESC, HFFC6). _hic holds 4DN mcools
 ├── design/                     # Public design notes and documentation, results under figures/
 ├── docs/                       # Private notes, gitignored. Anything personal, quoted or about infrastructure
@@ -236,7 +235,7 @@ Displacement vectors are sampled from a 3D Gaussian (or uniform sphere). The ref
 | `loopDensity` | Number of interpolated beads between anchors |
 | `convergenceThreshold` | Milestones without improvement to stop |
 
-Full list: `3dnome/MC/Settings.cpp` and example `data/GM12878/config.ini`.
+Full list: `legacy/3dnome/MC/Settings.cpp` and example `data/GM12878/config.ini`.
 
 ---
 
@@ -305,13 +304,13 @@ Decorated functions keep their original signatures under pyright while still bei
 The project uses **`ruff`** for both formatting (Black-compatible) and linting. Config lives in `pyproject.toml` under `[tool.ruff]`. Installed in the project venv.
 
 ```bash
-.venv/bin/ruff format gnome3d/ harness/         # apply formatting
-.venv/bin/ruff format --check gnome3d/ harness/  # CI-style dry-run
-.venv/bin/ruff check  gnome3d/ harness/         # lint
-.venv/bin/ruff check  gnome3d/ harness/ --fix   # apply safe auto-fixes
+.venv/bin/ruff format gnome3d/ tests/         # apply formatting
+.venv/bin/ruff format --check gnome3d/ tests/  # CI-style dry-run
+.venv/bin/ruff check  gnome3d/ tests/         # lint
+.venv/bin/ruff check  gnome3d/ tests/ --fix   # apply safe auto-fixes
 ```
 
-Current state: **0 lint issues, all files formatted**. Lint groups enabled: `E F I UP B C4` (pycodestyle, pyflakes, isort, pyupgrade, bugbear-lite, comprehensions). Run format + lint before committing changes to `gnome3d/` or `harness/`.
+Current state: **0 lint issues, all files formatted**. Lint groups enabled: `E F I UP B C4` (pycodestyle, pyflakes, isort, pyupgrade, bugbear-lite, comprehensions). Run format + lint before committing changes to `gnome3d/` or `tests/`.
 
 Per-file ignores in `pyproject.toml`:
 - `gnome3d/{solver,io,data,hierarchy,mc}.py`: F403/F405 — these modules re-export `gnome3d.types` via `from .types import *`.
@@ -380,7 +379,7 @@ python playground/parity_dump.py /tmp/g3d_head head.npz
 python playground/parity_dump.py "$PWD"       wip.npz
 ```
 
-For the behaviour of a new energy term, unit test it directly. `harness/test_terms.py` is the
+For the behaviour of a new energy term, unit test it directly. `tests/unit/test_terms.py` is the
 template: a hand built configuration whose energy is computable in closed form, a check that the
 per bead local scores sum to the full score, which the incremental MC update depends on, and a
 check that the term stays non negative over random configurations, which the Metropolis rule
@@ -389,49 +388,45 @@ requires because it divides by the running score.
 ---
 
 
-## Integration Test
+## Tests
 
-`harness/integration.py` runs the reference binary on a small ~2 Mb chr1 region (`chr1:18288319:20307135`, ~34 anchor beads) to produce an ensemble of structures, then runs the Python reimplementation on the same region and compares their bead-position distributions.
-
-### What it measures
-
-| Metric | Method |
-|--------|--------|
-| Radius of gyration | per-structure scalar; compare mean ± std |
-| Pooled pairwise distances | all i<j pairs from all structures; 2-sample KS test |
-| Consecutive bond lengths | chain bond distribution; 2-sample KS test |
-
-PASS criteria: KS statistic ≤ 0.3 and p-value ≥ 0.05 for both pairwise and bond distributions.  The reference run uses `-v 2` (heatmap + arc reconstruction), so leaf beads in the output are the ~34 anchor-level clusters.
-
-### Interface Python must expose
-
-```python
-# gnome3d/simulate.py
-def run_region(config_path: str, region: str, n_structures: int) -> list:
-    """
-    Run MC for the given region and return n_structures conformations.
-    Each conformation is a list of (midpoint_bp, x, y, z) sorted by genomic position,
-    matching the anchor-level beads output by the reference at -v 2.
-    """
-```
-
-### Usage
+`tests/` is a pytest suite. pytest is in the `dev` extra.
 
 ```bash
-# reference run only (no Python required)
-python harness/integration.py --cpp-only   # region: chr1:18288319-20307135 (dash, not colon)
-
-# Full comparison (skips Python side gracefully if not implemented)
-python harness/integration.py
-
-# Faster run for CI (~5s/structure, lower quality)
-python harness/integration.py --fast -n 3
-
-# Keep output files for inspection
-python harness/integration.py --keep
+.venv/bin/pytest                      # every test, about two and a half minutes on a laptop
+.venv/bin/pytest -m "not slow"        # without the files that take over a minute
+.venv/bin/pytest tests/unit           # the unit checks alone
+.venv/bin/python tests/unit/test_polymer.py     # one file as a script, with its own summary
 ```
 
-The test auto-skips the Python comparison if `gnome3d/simulate.py` is missing or raises `NotImplementedError`. It never fails just because the Python side is absent.
+`tests/unit/` has one file per feature. A file records its checks through a module level
+`check(name, cond, detail)`, and `tests/conftest.py` fails a test that recorded a failed check.
+A new unit file follows `tests/unit/test_terms.py`. `tests/unit/test_settings_doc.py` checks
+`SETTINGS.md` against the loader and `gnome3d/production.py`.
+
+`tests/integration/` runs the whole pipeline on the production settings with every stage on
+one numba thread, a few seconds a file.
+
+| File | Input | Checks |
+|------|-------|--------|
+| `test_synthetic.py` | A known walk of 30 beads, its files written by the test | Every bin modelled, a sorted finite chain, closer to the truth than a random structure, a run repeats, the CIF holds every bead |
+| `test_region.py` | GM12878 chr1:18288319-20307135 under `data/`, skipped without it | 102 anchors, a run repeats, a stronger loop is shorter, loops closer than other anchor pairs, few overlaps |
+
+The marker `slow` is set in `tests/conftest.py` by file name. The marker `data` is on a test
+that reads `data/`.
+
+### Retired comparison against the reference
+
+`legacy/harness/integration.py` runs the reference binary and the Python model on the region of
+`test_region.py` and compares radius of gyration, pooled pair distances and bond lengths with a
+KS test. It needs the binary, `make -C legacy 3dnome`. It is not part of the test run. The
+production settings do not follow the reference's distance laws and the two ensembles are not
+expected to agree.
+
+```bash
+python legacy/harness/integration.py --cpp-only   # the reference alone
+python legacy/harness/integration.py --fast -n 3  # both sides, short schedule
+```
 
 ---
 
@@ -441,8 +436,8 @@ The compartment energy term reads a plain-text track derived from data the repo 
 fetches.  Build it once per cell line:
 
 ```bash
-python -m validation fetch  --manifest validation/manifests/<CELL>_hic.json --out data/_hic
-python -m validation tracks --cell <CELL>
+python -m legacy.validation fetch  --manifest legacy/validation/manifests/<CELL>_hic.json --out data/_hic
+python -m legacy.validation tracks --cell <CELL>
 ```
 
 That writes `data/<CELL>/<CELL>_compartments.bedGraph` and `<CELL>_tads.bed` plus a
@@ -452,13 +447,13 @@ idempotent, so re-running is free.
 Then ablate the term against that cell line's own Hi-C:
 
 ```bash
-python -m validation epigenome --cell <CELL> --hic data/_hic/<CELL>/<file>.mcool \
+python -m legacy.validation epigenome --cell <CELL> --hic data/_hic/<CELL>/<file>.mcool \
                                --region chr1:20000000-40000000
 ```
 
 Three traps, each of which produces a silently wrong answer.  Pick the deepest contact file when
 a cell line has several, since a shallow one yields a compartment eigenvector that is pure noise;
-`validation/studies/tracks.py::_find_one` takes the largest file for this reason, and a lag-1
+`legacy/validation/studies/tracks.py::_find_one` takes the largest file for this reason, and a lag-1
 autocorrelation below 0.3 warns that the result is noise.  Pass `clip_percentile=99.9` when
 calling `cooltools`' `cis_eig` directly, because it is not that function's default and without it
 outlier pixels dominate the decomposition.  And the eigenvector sign is arbitrary and differs
@@ -469,7 +464,7 @@ consuming it must either phase it or be invariant to a global flip.
 
 ## Python divergences from reference
 
-Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diverges, why, and how to toggle/restore parity. Keep this list current — new entries must be added when introducing diverging behavior, and removed when behavior is brought back into parity.
+Tracked list of intentional deviations from `legacy/3dnome/MC/`. Each entry: what diverges, why, and how to toggle/restore parity. Keep this list current — new entries must be added when introducing diverging behavior, and removed when behavior is brought back into parity.
 
 ### Settings hygiene
 
@@ -498,14 +493,14 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   its factor's fit. The orientation term reads factor 0's loops alone, since a loop held by
   anything but CTCF has no motif orientation. One file keeps the arc order it was read in,
   byte identical by the parity gate. Built 2026-09-19 for RNAPII ChIA-PET as a second factor,
-  `design/rnapii-loops.md`. Unit checks in `harness/test_factors.py`.
+  `design/rnapii-loops.md`. Unit checks in `tests/unit/test_factors.py`.
 
   The summary arc the reader writes for a pair two factors join scores 0 with factor -1. The
   arcs stage leaves it out, since as an arc it gave the pair the background as its target, and
   a pair two factors join takes the closer of its factors' targets instead of the one written
   last. Found 2026-10-27 by the trio study: on a trio chr1 406 pairs, strong ones with a median
   of 14 CTCF and 6 RNAPII PETs, had been held at the background in every run without loop
-  dropout, which drops the summary arc by its score. Unit checks in `harness/test_arc_matrix.py`.
+  dropout, which drops the summary arc by its score. Unit checks in `tests/unit/test_arc_matrix.py`.
 
   Why not in the reference: the reference declares `[data] factors` and, for an anchor pair
   carried by more than one factor, writes a summary arc with `eff_score` zero
@@ -626,7 +621,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 
   **Shared knobs:**
     - `exclusion_weight` (k, comparable to spring constants; `Settings` default 0.5, and the
-      tuned config in `validation/core/config.py` sets 0.1)
+      tuned config in `gnome3d/production.py` sets 0.1)
     - `exclusion_skip_neighbors` (skip pairs with `|i-j|` ≤ this; default 1, i.e. skip bonded)
 
   Ini key names under `[excluded_volume]`: `use_excluded_volume`, `weight`, `apply_to_arcs`, `apply_to_smooth`, `apply_to_heatmap`, `apply_to_ib`, `skip_neighbors`, `radius_arcs`, `radius_smooth`, `radius_heatmap`, `radius_ib`, `auto_factor_arcs`, `auto_factor_smooth`, `auto_factor_heatmap`, `auto_factor_ib`.
@@ -734,7 +729,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     chr1:1-8 Mb 57 s to 6 s at 32, chr1:1-60 Mb 420 s to 125 s at 32 and slower at 64, since
     the kernel's full excluded volume scan is paid once per proposal. Three structures on 60 Mb
     at 32 against 1: every battery number level, MultiMM 0.665 against 0.669. Numba ignores the
-    key. Unit checks in `harness/test_smooth_levers.py`, sweep in `slurm/ensemble/prefetch_sweep.sh`,
+    key. Unit checks in `tests/unit/test_smooth_levers.py`, sweep in `slurm/ensemble/prefetch_sweep.sh`,
     reading and numbers in `design/parallel-mc-and-nn-reading.md`.
   - **The excluded volume and the wall run on a cell grid in the JAX kernel:
     `[simulation_arcs_smooth] jax_grid`, default no, production yes since 2026-09-19, on
@@ -750,7 +745,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     table every step, an hour where the scan took two minutes; a sorted order with a binary
     search per cell was slower and a finer axis was slower, since the rebuild writes the table.
     Past 32 proposals a batch gets slower, so the floor is now the number of kernel launches in
-    one step. The check needs a GPU, `harness/test_jax_grid.py`.
+    one step. The check needs a GPU, `tests/unit/test_jax_grid.py`.
   - **Two host and device costs the profile of 2026-09-20 removed, both byte identical by the
     parity gate on GM12878 chr1:1-60 Mb.** The orientation term scored a trial move by writing
     the anchor's new vector into a copy of the whole orientation array, and under the proposal
@@ -775,7 +770,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     Several instances that share a card on purpose set the variable in each, adding up to less
     than 1. A process with a smaller pool packs its launches differently, so its structures are
     not bit identical to a run on a free card; at a fixed pool it reproduces. Unit checks in
-    `harness/test_gpu_share.py`, two instances on one card in `playground/gpu_share_run.py`.
+    `tests/unit/test_gpu_share.py`, two instances on one card in `playground/gpu_share_run.py`.
   - **The smooth stage is threaded numba in production since 2026-11-16, and `auto` picks it
     from four workers.** Measured on 36 cores against an RTX 3090 on GM12878 chr1: the stage of
     52 blocks takes 53 to 80 s threaded, 92 s on 8 workers, and 122 to 146 s on the device, and
@@ -783,7 +778,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     numba. The arcs solve stays on the device, 20 s against 106 s. Matched seeds are level on
     the pooled and battery numbers. The L-BFGS-B calls hold BLAS at up to eight threads,
     `util.blas_threads`, since OpenBLAS on every core spent a 5 Mb region's fit waking them.
-    `design/kernel-performance.md`, section 14. Unit checks in `harness/test_executor_auto.py`.
+    `design/kernel-performance.md`, section 14. Unit checks in `tests/unit/test_executor_auto.py`.
   - **Lazy import + thread-safe init** — `mc_jax` module loads without importing JAX; the first call to a JAX-backed entry triggers a one-time banner on stderr (`[mc_jax] JAX backend ready: backend=gpu devices=[...]`).
 
   **Kernel seeding is process-stable.** Every JAX kernel takes its PRNG offset from
@@ -806,7 +801,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   reduction does not associate the same way at every launch width, and the first difference is
   one unit in the last place of the float32 score. Monte Carlo amplifies that into a different
   structure, so a run reproduces at a fixed configuration but structures cannot be compared bit
-  for bit across launch widths. `harness/test_batch_seeding.py` compares at equal width for
+  for bit across launch widths. `tests/unit/test_batch_seeding.py` compares at equal width for
   exactly this reason, and measures the width effect separately.
 
   Why not in the reference: 3dgnome is CPU-only. The JAX port is a Python-side acceleration of the same algorithm; numerical results agree with numba within float32 RNG-trajectory noise. Harness/parity tests run with default settings (`mc_backend=numba`), so the new backend doesn't affect the parity baseline.
@@ -884,7 +879,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   the term a compaction penalty instead of an overlap guard. There is no chain bond and no confinement. Keys: `spring_weight` (1.0), `ev_weight`
   (1.0), `max_iter` (2000, which on a trio chr1 of 1,494 blocks costs 85 seconds and reaches a
   worst boundary of 1.32 times the curve, against 6.0 at 500 and nothing further at 5000). The pass uses no RNG and runs on the calling thread, so flag off is
-  byte exact and flag on reproduces. Unit checks in `harness/test_stitch.py`.
+  byte exact and flag on reproduces. Unit checks in `tests/unit/test_stitch.py`.
 
   **The energy carries its own gradient, and it has to.** Six variables per block puts a real
   chromosome in the thousands of dimensions, 8,964 for the 1,494 blocks of a trio chr1, where a
@@ -933,7 +928,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   cross block overlaps down four to ten times. The realised exponent runs 1.3 to 1.5 times the
   measured input on every cell, which one correction on the background exponent would absorb;
   not built. The old keys are not read and warn if present. Unit checks in
-  `harness/test_polymer.py` and `harness/test_arc_matrix.py`; `playground/ps_from_singletons.py`
+  `tests/unit/test_polymer.py` and `tests/unit/test_arc_matrix.py`; `playground/ps_from_singletons.py`
   fits the exponent on a file by hand. See `design/anchor-placement.md`, option H.
 
   **Tried and rejected, 2026-09-06: every arcless pair on the background.** The realised
@@ -961,7 +956,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   weight sits in every kernel beside the cutoff rather than replacing it, so weight zero is
   byte exact against the previous commit. JAX matches numba on a matrix carrying both arcless
   kinds, and the batched driver runs with the background on, both in
-  `harness/test_arc_matrix.py`. Swept in `playground/short_range_sweep.py`. Production since
+  `tests/unit/test_arc_matrix.py`. Swept in `playground/short_range_sweep.py`. Production since
   2026-09-07 at weight 0.1: with it the anchors sit on the input curve on all three cells,
   within blocks and across them. Weights 0.3 and 1.0 pull the closest pairs closer and cost
   Hi-C at every step.
@@ -983,7 +978,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   targets, the background springs and the repulsion never read it. The weight matrix rides
   beside the target matrix as float32 and is None at zero, so the kernels take the path they
   took. The JAX annealer does not carry it and refuses a weighted problem rather than ignore
-  the weights. Unit checks in `harness/test_arcs_solver.py`.
+  the weights. Unit checks in `tests/unit/test_arcs_solver.py`.
 
   Measured at exponent 1 on the nine trio chr1 ensembles on the HGSVC map, ten conformations
   each, against the same arm at zero: target against realised over all loops 0.55 to 0.67 from
@@ -1011,7 +1006,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   loops keep the law's target; the anchor set, the densification and the orientation term
   never read the draw. Measured before it was built, triosformer's tracker idea 43: its 2D form puts the shared loops'
   strength at +0.03 to +0.06 of the loops' +0.10 person specific part, which bounds what it
-  can carry. Unit checks in `harness/test_arcs_solver.py`.
+  can carry. Unit checks in `tests/unit/test_arcs_solver.py`.
 
   **Kept loops at contact: `[springs] loop_contact`, default no, under measurement since
   2026-10-27.** With it a loop a conformation keeps is held at one bead, touching, instead of
@@ -1021,7 +1016,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   every conformation sits closer than a control pair on the mean and meets its anchors 0.60
   times as often within 1.5 beads, since the spring holds it at four to five beads and the
   control reaches contact by its spread. Off is byte exact. Unit checks in
-  `harness/test_arc_matrix.py`.
+  `tests/unit/test_arc_matrix.py`.
 
   Why not in the reference: the reference solves every arc in every structure.
 
@@ -1039,7 +1034,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   rule needs. It is in the solver's energy on both backends, the gradient built in two passes
   since an anchor's move changes every group it is in; the annealers refuse it rather than
   ignore it, since the term needs a group sum kept per anchor that the local scorer does not
-  have. Weight zero is byte exact. Unit checks in `harness/test_arcs_solver.py`.
+  have. Weight zero is byte exact. Unit checks in `tests/unit/test_arcs_solver.py`.
 
   Why not in the reference: the reference has pairwise arc springs and nothing collective.
 
@@ -1058,8 +1053,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   it. The one assumption is that a confined block fills its sphere evenly. The value reaches the
   annealer, the solver and the JAX kernel as an explicit radius on a per block copy of the
   settings. The batch executor runs a launch on one settings and refuses rather than run every
-  block at the first block's radius. Unit checks in `harness/test_confinement_radius.py` and
-  `harness/test_polymer.py`.
+  block at the first block's radius. Unit checks in `tests/unit/test_confinement_radius.py` and
+  `tests/unit/test_polymer.py`.
 
   Production since 2026-09-07 as the principled form. Alone it moved nothing, the old formula
   already landed near it. What inflates a block is the arcless repulsion's reach; cutting that
@@ -1092,12 +1087,12 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   carries minus that distance, which the kernels hold with the background spring. A pair at or
   below its expected contact keeps the repulsion, so the held set stays sparse; holding every
   pair at a power law could not be embedded and was rejected. No kernel change. Unit checks in
-  `harness/test_arc_matrix.py`.
+  `tests/unit/test_arc_matrix.py`.
 
   Production since 2026-09-08 together with `arcs_repulsion_cutoff_factor` 1.5, on the deep
   4DN maps. The files the project had used held 7.8 million, 104 million and 193 million
   contacts genome wide, so the term held under 1 percent of the far pairs and did nothing;
-  `validation/manifests/<CELL>_hic.json` now fetch the 2.5 to 4.0 billion contact maps and
+  `legacy/validation/manifests/<CELL>_hic.json` now fetch the 2.5 to 4.0 billion contact maps and
   the shallow ones are kept as `<CELL>_hic_shallow.json` for the record.
   With those as input, the term on and the reach at 1.5, the structures follow the law from
   20 kb to 2 Mb within a quarter on three cells, where before every pair beyond 100 kb ran
@@ -1135,7 +1130,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   contact data at all. The run's contacts are binned by block, the bins meeting halfway between
   neighbours, normalised and converted with the law the way the segment heatmap is, and the
   block kernel scores the matrix as its heat term. Weight zero is byte exact. Unit checks in
-  `harness/test_ib_heatmap.py`, which also record that at the defaults' `max_temp_ib` of 20 the
+  `tests/unit/test_ib_heatmap.py`, which also record that at the defaults' `max_temp_ib` of 20 the
   layout never cools and ends with bonds nine times their target, while production's 5 settles.
 
   Why not in the reference: the reference has no block layout pass at all.
@@ -1170,7 +1165,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   (0.1 of `max_temp_smooth`), because untangling two coils needs a bead to cross a neighbour's
   shell and a greedy pass stalls with contacts left. Keys: `ev_weight` (10), `ev_radius` (0 for
   1.5 bonds), `noise` (0.5 bonds). Runs after the stitch in `reconstruct.py::_assemble`. The
-  gate is `cross_block_contacts`. Unit checks in `harness/test_relax.py`.
+  gate is `cross_block_contacts`. Unit checks in `tests/unit/test_relax.py`.
 
   **`[relax] local_window` (default -1, off) is the better fix.** The round count is proportional
   to how many beads may move, measured on a real 129,457 bead chromosome at 19 rounds for 159
@@ -1217,7 +1212,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   `ValueError` rather than a fall through to the annealer. And the batch executor is a JAX
   annealer with no solver in it, so it raises rather than annealing; the solver needs
   `mc_executor_arcs = serial` or `threaded`, which is what `CANONICAL` sets. Unit checks in
-  `harness/test_arcs_solver.py`.
+  `tests/unit/test_arcs_solver.py`.
 
   **The solver's energy on the device: `mc_executor_arcs = batch` with the solver, production
   since 2026-09-20 with `solver_iters` 800.** ([gnome3d/mc/jax/arcs_energy.py](gnome3d/mc/jax/arcs_energy.py))
@@ -1240,7 +1235,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   thousand; the saddle 1.31, 1.38, 1.00 on three structures, which is noise at that count.
   Float64 on the device would need JAX's 64 bit mode, which is process wide and changes the
   smooth kernel's integer draws and its loop carries, so it is not used. Unit checks in
-  `harness/test_arcs_solver.py`.
+  `tests/unit/test_arcs_solver.py`.
 
   **The solve stops on the energy: `[simulation_arcs] solver_tol`, default 0, production 1e-6
   with `solver_iters` 5000 as the safety, since 2026-09-22.** The cap bound on every trio
@@ -1279,7 +1274,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   overlaps level and the compartment eigenvector correlation 0.22 against 0.05 with the term
   off. The start decides the long range structure because the arcs energy has no term between
   far pairs. Block scope, centroid start and weight zero are byte exact by the parity gate.
-  Unit checks in `harness/test_arcs_scope.py` and `harness/test_arcs_start.py`.
+  Unit checks in `tests/unit/test_arcs_scope.py` and `tests/unit/test_arcs_start.py`.
 
   Production since 2026-09-11 at chromosome scope with no arcs sphere, the start the Hilbert
   curve until 2026-11-16 and the maxent draw since, see the long range entry below.
@@ -1338,7 +1333,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   the wall against the plain start raises Pearson 0.011 to 0.022 and MultiMM's own metric
   0.033 to 0.043, cuts overlaps five to seven times within blocks and three to four across at
   the same Rg, and flattens the short band exponent from 0.33 to 0.21; the cap adds a few
-  percent fewer overlaps and nothing else. Unit checks in `harness/test_smooth_levers.py`;
+  percent fewer overlaps and nothing else. Unit checks in `tests/unit/test_smooth_levers.py`;
   three cell arms in `slurm/ensemble/overlap_levers.sh`.
 
   Why not in the reference: the reference has no excluded volume at all.
@@ -1381,7 +1376,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   with SCC level and the distance exponent nearer Hi-C. The smooth stage widens the drawn gaps to
   1.2 of the law, where the coil ends under it. `slurm/ensemble/gap_maxent_trial.sh` and
   `playground/square_blocks/gapme/` are the record.
-  Unit checks in `harness/test_maxent_start.py`, options and trial in `design/gap-fill.md`.
+  Unit checks in `tests/unit/test_maxent_start.py`, options and trial in `design/gap-fill.md`.
 
 - **Long range in the arcs stage: `[excluded_volume] arcs_repulsion = no`, `[springs]
   gyration_weight` 0.1, the arcs excluded volume at `auto_factor_arcs` 1.0 and `[simulation_arcs]
@@ -1402,8 +1397,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   of Hi-C's against 1.15 to 1.18, Rg at the law's where production sat 15 percent over it;
   balanced Pearson down 0.03 to 0.04, which follows the first diagonals. Arms are judged by the
   pooled map, `playground/ensemble_score.py`, since a per structure score rewards ensembles of one
-  conformation. Unit checks in `harness/test_gyration.py`, `harness/test_maxent_start.py` and
-  `harness/test_arc_matrix.py`.
+  conformation. Unit checks in `tests/unit/test_gyration.py`, `tests/unit/test_maxent_start.py` and
+  `tests/unit/test_arc_matrix.py`.
 
   Hole beads between blocks, `[holes] use_hole_beads` with `flank_beads`, stay opt in: on this
   arm they raise Spearman and lower pooled SCC 0.01 to 0.04 on three cells, since a correlation
@@ -1439,7 +1434,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
   per block smooth stage runs the same term on blocks of up to 16,384 beads, and smooth is most
   of the pipeline's wall time. The grid is used from 128 beads, where it starts to win: on a
   block of 1,831 beads with the hard wall the stage takes 4.7 s against 45.9 s on the full
-  scan. Unit checks in `harness/test_cells.py`.
+  scan. Unit checks in `tests/unit/test_cells.py`.
 
   A query clamps its cell index as the insertion does, since 2026-11-16. The box is the
   extent the structure had when the grid was built, a bead beyond it is filed in an edge cell,
@@ -1461,8 +1456,8 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
 3. A change meant to be inert runs the byte exactness gate and is not done until the diff is
    empty. A change meant to move results runs the validation battery and is not adopted until
    it wins there.
-4. `python harness/integration.py` after touching the MC loop, so bead position distributions
-   of reference and Python ensembles stay statistically compatible.
+4. `.venv/bin/pytest` after touching `gnome3d/`. A new feature gets a unit file under
+   `tests/unit/`.
 5. New physics is measured from the input or documented as a choice, opt in until measured,
    and then replaces what it supersedes. It is recorded in the divergences section above and
    in `SETTINGS.md`.

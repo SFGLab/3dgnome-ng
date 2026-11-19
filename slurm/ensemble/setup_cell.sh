@@ -62,7 +62,7 @@ echo "[setup:$CELL] cpu x86-64 level = $LEVEL (NumPy wheels need v2 or better)"
 
 # Deliberately NOT `pip install -e ".[validation]"`. That extra also pulls hicrep and pyBigWig,
 # which build from sdists whose setup.py imports numpy, and that build is what fails. Neither is
-# needed: hicrep is declared but never imported anywhere in validation/, and pyBigWig is used
+# needed: hicrep is declared but never imported anywhere in legacy/validation/, and pyBigWig is used
 # only by the ATAC signal path, which these runs skip.
 if [ "$SKIP_INSTALL" != "1" ]; then
   pip install --upgrade pip
@@ -87,7 +87,7 @@ done
 MCOOL=$(ls "data/_hic/$CELL"/*.mcool 2>/dev/null | head -1 || true)
 if [ -z "$MCOOL" ]; then
   echo "[setup:$CELL] fetching Hi-C"
-  python -m validation fetch --manifest "validation/manifests/${CELL}_hic.json" --out data/_hic
+  python -m legacy.validation fetch --manifest "legacy/validation/manifests/${CELL}_hic.json" --out data/_hic
   MCOOL=$(ls "data/_hic/$CELL"/*.mcool | head -1)
 fi
 echo "[setup:$CELL] mcool = $MCOOL"
@@ -96,7 +96,7 @@ echo "[setup:$CELL] mcool = $MCOOL"
 if [ -s "data/$CELL/${CELL}_tads.bed" ]; then
   echo "[setup:$CELL] have data/$CELL/${CELL}_tads.bed"
 else
-  python -m validation tracks --cell "$CELL" --skip-compartments
+  python -m legacy.validation tracks --cell "$CELL" --skip-compartments
 fi
 
 # The singleton reader fetches the balanced matrix as well as the raw counts, so the resolution

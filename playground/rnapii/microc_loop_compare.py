@@ -126,7 +126,7 @@ def main() -> None:
     from microc_readout import load_slice
 
     from playground.validation_battery import CONTACT_BEADS, load
-    from validation.metrics.hic import simulated_contacts
+    from legacy.validation.metrics.hic import simulated_contacts
 
     args = sys.argv[1:]
     k = args.index("--json")

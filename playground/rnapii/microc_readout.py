@@ -55,7 +55,7 @@ def main() -> None:
     from pileup import apa_score, pile
 
     from playground.validation_battery import CONTACT_BEADS, load
-    from validation.metrics.hic import simulated_contacts
+    from legacy.validation.metrics.hic import simulated_contacts
 
     args = sys.argv[1:]
     k = args.index("--json")

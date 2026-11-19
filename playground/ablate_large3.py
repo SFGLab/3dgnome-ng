@@ -13,10 +13,10 @@ from pathlib import Path
 
 from gnome3d.settings import Settings
 from gnome3d.data import ContactData
-from validation import cell_config as cc
-from validation import metrics
-from validation.validate import _chrs_and_region, run_ensemble
-import harness.integration as ig
+from legacy.validation import cell_config as cc
+from legacy.validation import metrics
+from legacy.validation.validate import _chrs_and_region, run_ensemble
+import legacy.harness.integration as ig
 
 REGION = "chr2:57942013-77730829"  # 19.8 Mb
 N = 1

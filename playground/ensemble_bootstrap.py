@@ -28,7 +28,7 @@ sys.path.insert(0, str(ROOT / "playground"))
 
 from validation_battery import CONTACT_BEADS, load  # noqa: E402
 
-from validation.metrics.hic import observed_hic, simulated_contacts  # noqa: E402
+from legacy.validation.metrics.hic import observed_hic, simulated_contacts  # noqa: E402
 
 RES = 25_000
 BLOCK = 10
@@ -58,7 +58,7 @@ def wcorr(w: np.ndarray, x: np.ndarray, y: np.ndarray) -> float:
 def wscc(w: np.ndarray, sep: np.ndarray, n: int, x: np.ndarray, y: np.ndarray) -> float:
     """The stratum adjusted correlation under pair weights. Each separation's covariance and
     standard deviations are weighted, and its weight is its total weight times the two
-    standard deviations, as `validation.metrics.hic._scc` has it at weight one."""
+    standard deviations, as `legacy.validation.metrics.hic._scc` has it at weight one."""
 
     def by(v: np.ndarray) -> np.ndarray:
         return np.bincount(sep, weights=v, minlength=n)

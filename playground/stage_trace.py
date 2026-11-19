@@ -37,9 +37,9 @@ from gnome3d.tracks import bin_compartments
 from gnome3d.settings import Settings
 from gnome3d.types import BeadOut
 from playground.saddle_split import split_saddle
-from validation.metrics import hic as contacts
-from validation.metrics import structure as smetrics
-from validation.studies.epigenome import _track_on_bins
+from legacy.validation.metrics import hic as contacts
+from legacy.validation.metrics import structure as smetrics
+from legacy.validation.studies.epigenome import _track_on_bins
 
 
 def coords(blocks: list[list[BeadOut]]) -> np.ndarray:

@@ -98,7 +98,7 @@ Builder's call to refine if a better rule shows up in the files.
 
 A branch off `origin/triosformer-expression`, never `main` itself. That branch is `main` plus
 the summary arc fix `75bedc1` and `loop_contact` (`e1e11d9`, opt in and left off). Production settings
-from `validation/core/config.py`, RNAPII at full strength, `[springs] factor_strength = 1,1`.
+from `gnome3d/production.py`, RNAPII at full strength, `[springs] factor_strength = 1,1`.
 Anchors are the union by the rule of `anchor_union.py`.
 
 ### Arms
@@ -133,7 +133,7 @@ Structure, for C, R and M, and for E where its models convert.
 
 - The validation battery and saddle: Pearson, SCC, MultiMM, distance exponent, Rg, overlaps,
   saddle strength, compartment eigenvector correlation.
-- Target maps. Cell lines against their deep 4DN Hi-C (`validation/manifests/<CELL>_hic.json`).
+- Target maps. Cell lines against their deep 4DN Hi-C (`legacy/validation/manifests/<CELL>_hic.json`).
   Production singletons are thinned from the same maps, so this score is shared by every arm
   and fair between them but not independent; the figure states it. Trios against each
   person's HGSVC Hi-C.

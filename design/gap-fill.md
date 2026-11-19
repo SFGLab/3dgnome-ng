@@ -44,7 +44,7 @@ exponent nu, a valid covariance for any nu up to one. The unit check confirms it
 The same code fills a hole once a hole has beads.
 
 Built 2026-11-14 as `[simulation_arcs_smooth] start = maxent` with `[data] contact_map`,
-`gnome3d/pipeline/ib/maxent.py`, unit checks in `harness/test_maxent_start.py`. Choices
+`gnome3d/pipeline/ib/maxent.py`, unit checks in `tests/unit/test_maxent_start.py`. Choices
 written beside the code. Windows of up to 10 kb. A pseudocount of 9 on observed and expected,
 the count at which a zero is three Poisson deviations under its expectation. The expectation is a
 power law in separation fitted on the block's own windows. The variance per coordinate is pi d^2
@@ -425,7 +425,7 @@ floor is 0.34 to 0.44 and the contacts 1.3 times production's; at 2.0 the floor 
 
 `[springs] gyration_weight` holds the radius of gyration of every genomic window of anchors at the
 law's, windows at every scale from 100 kb doubling up and tiled twice, in the arcs solver's energy.
-It sets size without holding a pair. Unit checks in `harness/test_gyration.py`. GM12878, three
+It sets size without holding a pair. Unit checks in `tests/unit/test_gyration.py`. GM12878, three
 regions, mean, results in `playground/square_blocks/gyr/`:
 
 | Arm | raw P | raw SCC | bal P | bal SCC | MultiMM | Rg |
@@ -566,7 +566,7 @@ its blocks rather than against them.
 
 `[holes] hard_wall = no` takes the wall out of the hole pass and `[holes] flank_beads` conditions
 the draw on block beads beside the anchors, `conditioned_draw` in `maxent.py`, the bridge when only
-the ends are fixed. Unit checks in `harness/test_maxent_start.py` and `harness/test_holes.py`.
+the ends are fixed. Unit checks in `tests/unit/test_maxent_start.py` and `tests/unit/test_holes.py`.
 chr1:10-15 Mb, pooled balanced SCC over mapped bins, raw in brackets, `playground/square_blocks/hiface/`:
 
 | | mxgyr | holes | no wall | flank 5 | both |
@@ -624,7 +624,7 @@ against 68. The long range fix brings far anchors close and the coils laid down 
 
 `[relax] within_blocks` lets the relaxation move non neighbour pairs of one block closer than 0.7
 of a bond as well as beads touching another block, and with it the pass runs on a lone block.
-Unit checks in `harness/test_relax.py`. At the pass's radius of 1.5 bonds it costs Pearson and
+Unit checks in `tests/unit/test_relax.py`. At the pass's radius of 1.5 bonds it costs Pearson and
 MultiMM; at `ev_radius` 1.0, results in `playground/square_blocks/within/`:
 
 | | overlaps within and across blocks, production then 1.0 | pooled balanced SCC |

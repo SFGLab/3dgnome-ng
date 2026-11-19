@@ -1,12 +1,12 @@
 # Validation metrics
 
-Every metric the `validation/` package computes, with its source, its definition and what it establishes. The
+Every metric the `legacy/validation/` package computes, with its source, its definition and what it establishes. The
 metrics answer three questions. The first is agreement of the reconstructed structure with the contacts that built
 it. The second is agreement with independent data the model did not see. The third is physical sanity as a polymer.
 
 The reference numbers come from the 3D-GNOME paper of 2016 (Szałaj et al., Genome Research), its supplement, the
 MultiMM paper of 2024, hicrep and Lieberman-Aiden 2009. Function names below point into
-`validation/metrics/structure.py` and `validation/metrics/hic.py`.
+`legacy/validation/metrics/structure.py` and `legacy/validation/metrics/hic.py`.
 
 ## Summary
 
@@ -148,4 +148,4 @@ real chromosomes.
 **Validates.** The engine recovers a structure it should be able to recover. This is the paper's core model
 validation and the only one that can measure absolute fidelity, the true structure being known. Noise robustness is
 the same measurement across increasing Gaussian noise on the heatmap. Fidelity that degrades gently with noise shows
-the solution is stable. See `validation/studies/synthetic.py`.
+the solution is stable. See `legacy/validation/studies/synthetic.py`.

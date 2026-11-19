@@ -201,7 +201,7 @@ which is one float32 ulp, and Monte Carlo then amplifies it into a different str
 reproduces at a fixed configuration, but structures cannot be compared bit for bit across launch
 widths, and this change breaks existing JAX smooth results once.
 
-Nine checks in `harness/test_batch_seeding.py`, which compare at equal width to separate the
+Nine checks in `tests/unit/test_batch_seeding.py`, which compare at equal width to separate the
 algorithm from the arithmetic and measure the width effect on its own. Removing either fix makes
 them fail.
 
@@ -588,4 +588,4 @@ back to the full scan, so correctness never depends on a capacity guess.
 
 Positions and scores identical in every case. `[simulation_backend] neighbour_grid` turns it
 off. Below 2,048 beads the full scan is already cheap and the grid is skipped. The JAX kernels
-are untouched. Fifteen checks in `harness/test_cells.py`.
+are untouched. Fifteen checks in `tests/unit/test_cells.py`.

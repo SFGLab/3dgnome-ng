@@ -5,16 +5,16 @@ transform, median over regions. Report raw-Pearson(log1p), raw-Pearson, Spearman
 import numpy as np
 from scipy.stats import spearmanr
 
-from validation.validate import load_chiapet_contacts, _chrs_and_region
-from validation import contacts as C
-from validation import cell_config as cc
-import harness.integration as ig
+from legacy.validation.validate import load_chiapet_contacts, _chrs_and_region
+from legacy.validation import contacts as C
+from legacy.validation import cell_config as cc
+import legacy.harness.integration as ig
 
 s = cc.settings_for_cell("GM12878", "data", None)
 mcool = "data/_hic/GM12878/4DNFIQ32RWCQ.mcool"
 
 bp = str(ig.DATA_DIR / "ccds_all_hg38_merged100k_GM12878.breakpoints.bed")
-from validation.compare_reference import enumerate_regions
+from legacy.validation.compare_reference import enumerate_regions
 REGIONS = enumerate_regions(bp, 12, chroms=["chr1", "chr2", "chr8", "chr17"],
                             min_ibs=4, max_ibs=15, max_mb=20)
 RES = [100_000, 250_000, 500_000, 1_000_000]

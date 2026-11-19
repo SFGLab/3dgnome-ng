@@ -25,7 +25,7 @@ from hole_readout import holes, read_spans  # noqa: E402
 from law_spring_readout import read_models  # noqa: E402
 from validation_battery import CONTACT_BEADS, load  # noqa: E402
 
-from validation.metrics.hic import observed_hic, simulated_contacts  # noqa: E402
+from legacy.validation.metrics.hic import observed_hic, simulated_contacts  # noqa: E402
 
 
 def main() -> None:
