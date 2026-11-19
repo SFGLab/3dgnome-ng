@@ -326,10 +326,10 @@ five structures per arm, after the relaxation:
 - On GM12878 chr1 108.5 to 111 Mb, one structure before the relaxation, 83 of 2,482 bonds are under 0.7 beads: 1 of
   the 76 bonds between two nodes, 8 of the 155 between a node and a free bead and 74 of the 2,251 between two free
   beads. The bonds between two nodes have a median of 1.05.
-- The short bonds are in the free chain between nodes. No rule of the arcs stage gives the beads between two nodes
-  room: the reach term is one sided, the excluded volume of the solve acts at 0.7 beads between nodes alone, and
-  loops and cells pull nodes with many beads between them together. In the smooth stage a bond at 0.6 beads costs
-  0.016 and the wall does not act between consecutive beads. The relaxation takes the realised bond as its target.
+- The short bonds are in the free chain between nodes. In the smooth stage a bond at 0.6 beads costs 0.016 and the
+  wall does not act between consecutive beads. The relaxation takes the realised bond as its target. The reading
+  of that evening, that the arcs stage gives the beads between two nodes no room, did not hold: see the trial of
+  the gyration windows below.
 - The drift within one bead lowers both counts by a third to a half.
 
 ## Room for the free chain
@@ -370,6 +370,44 @@ B is `[springs] gyration_min_bp`, the smallest window of the gyration term, 0 fo
 chr1 108.5 to 111 Mb, one structure without contact cells and without the orientation term, the bonds under 0.7
 beads before the relaxation are 72 of 2,482 at 100 kb, 103 at 10 kb, 59 at 25 kb and 49 at 50 kb. One structure
 decides nothing. The trial runs 10, 25 and 50 kb on the six rows.
+
+### Trial of the gyration windows, and the cause of the close pairs
+
+`design/figures/uniform-2026-11-19/gyr/` and `scores-gyr/`, step 1 of `slurm/ensemble/uniform_night.sh`, commit
+5f98a91, cells at 5 kb. Mean over the six rows, close pairs per thousand beads:
+
+| arm | SCC raw | SCC balanced | Spearman raw | close pairs | not next to each other |
+|---|---|---|---|---|---|
+| nodes fixed, windows from 100 kb | 0.374 | 0.364 | 0.437 | 34.0 | 6.6 |
+| windows from 50 kb | 0.362 | 0.358 | 0.440 | 33.2 | 6.6 |
+| windows from 25 kb | 0.373 | 0.363 | 0.430 | 33.4 | 6.8 |
+| windows from 10 kb | 0.369 | 0.361 | 0.411 | 38.4 | 7.4 |
+| midpoint, windows from 25 kb | 0.363 | 0.349 | 0.421 | 31.1 | 5.1 |
+| centre of mass kept, windows from 100 kb | 0.386 | 0.374 | 0.439 | 32.7 | 4.3 |
+| centre of mass kept, windows from 50 kb | 0.370 | 0.364 | 0.442 | 32.6 | 4.6 |
+| centre of mass kept, windows from 25 kb | 0.378 | 0.370 | 0.436 | 32.3 | 4.3 |
+
+B does not work. No window size lowers the close pairs and every one lowers SCC.
+
+The close pairs are not a lack of room. Measured the same night:
+
+- On the trace region the bonds under 0.7 beads are spread over the gaps of every length at 22 to 39 per thousand
+  bonds, 55 of the 72 in gaps of more than 20 bonds whose two nodes are 0.04 to 0.09 of the chain apart. They are
+  not at the crowded nodes.
+- A bond is soft. At `squeeze_constant` 0.1 a bond at 0.7 beads costs 0.009. Over the 30 structures of the trial the
+  bonds of the uniform chain have a first percentile of 0.59 and a fifth of 0.77, and 28 per thousand are under 0.7.
+- The default chain has the same tail with the orientation term off, 19 per thousand under 0.7 and a first
+  percentile of 0.63. With the term on it has 8, since the term stretches its bonds, median 1.06 and 95th percentile
+  2.41. The default chain hides its short bonds behind stretched ones.
+- With `squeeze_constant` at 1.0 the trace structure has 2 bonds under 0.7 in place of 72, median bond 1.10.
+- The smooth confinement does not act: the sphere has a radius of 20 beads and 95 percent of the beads are within
+  10.7.
+
+The close pairs that are not next to each other are the overlaps of the chain: 2.6 per thousand on the default
+chain, 6.6 with fixed nodes and 4.3 under the centre of mass rule.
+
+Option A, the blobs, is not built. The cause it answers is not the one measured. The stiffness of a bond is step 4
+of the queue of the night.
 
 ## Settings
 

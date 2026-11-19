@@ -1,0 +1,25 @@
+observed Hi-C chr1:10000000-15000000 at 25,000 bp: 200 bins, raw counts, not comparable with a balanced run
+exponent yardstick: nu 0.352 fitted on HFFC6_hic_25kb_singletons.bedpe
+
+         arm   n   pearson  spearman      SCC   multimm  exponent  vs Hi-C  e20-100k  e100k-1M       Rg   wb-aa   wb-sa      xb
+  HFFC6_chr1_10000000_15000000_prod   5     0.391     0.307    0.360     0.580     0.359    1.02x     0.302     0.405    11.09     0.0     1.1     0.2
+  HFFC6_chr1_10000000_15000000_node_c5k   5     0.403     0.320    0.283     0.611     0.390    1.11x     0.262     0.462    12.17     1.4    16.1     0.0
+  HFFC6_chr1_10000000_15000000_node_c5k_centre   5     0.407     0.323    0.303     0.615     0.389    1.11x     0.263     0.461    12.18     1.1     8.5     0.1
+  HFFC6_chr1_10000000_15000000_node_c5k_g10k   5     0.370     0.283    0.295     0.597     0.365    1.04x     0.245     0.427    10.73     1.9    19.0     1.4
+  HFFC6_chr1_10000000_15000000_node_c5k_g25k   5     0.387     0.304    0.286     0.593     0.379    1.08x     0.262     0.448    11.80     2.0    13.9     0.5
+  HFFC6_chr1_10000000_15000000_node_c5k_g50k   5     0.399     0.317    0.290     0.586     0.383    1.09x     0.248     0.456    12.03     1.6    14.5     0.0
+  HFFC6_chr1_10000000_15000000_node_mid_c5k_g25k   5     0.396     0.315    0.268     0.586     0.390    1.11x     0.253     0.466    12.09     1.5    16.9     0.1
+  HFFC6_chr1_10000000_15000000_ctr_g25k   5     0.394     0.310    0.302     0.596     0.379    1.08x     0.262     0.447    11.80     1.5    10.3     0.6
+  HFFC6_chr1_10000000_15000000_ctr_g50k   5     0.408     0.326    0.302     0.597     0.383    1.09x     0.251     0.455    12.03     0.9     7.4     0.0
+
+  exponent target is 0.352, the fit a run makes on the same file;
+  the project's structures have measured flatter than that, so higher is better here.
+  e20-100k and e100k-1M are the exponent fitted on each band alone; the two should agree
+  with each other and with the cell's measured nu, and a flat short band under a steep
+  long one is loops pulling pairs in with nothing holding the rest at the background.
+  the overlap columns count pairs closer than 0.7 of the structure's own subanchor
+  bond, per thousand beads. wb-aa is
+  anchors inside one block, which only the arcs
+  stage can move; wb-sa is the smooth stage's own excluded volume; xb is across two
+  blocks, which the boundary stitch and the cross block relaxation own. an arm whose
+  beads carry no anchors and no blocks, such as MultiMM, has all its overlaps in wb-sa.

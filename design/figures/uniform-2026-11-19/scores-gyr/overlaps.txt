@@ -1,0 +1,17 @@
+pairs under 0.7 model units per thousand beads: every pair | pairs not next to each other in the file | bond median | beads
+GM12878_chr1_10000000_15000000 | prod:   10.9    1.3 1.07 2597 | node_c5k:   30.9    4.9 1.03 3025 | node_c5k_centre:   31.9    3.0 1.04 3025 | node_c5k_g10k:   39.1    6.8 1.04 3025 | node_c5k_g25k:   32.0    4.2 1.03 3025 | node_c5k_g50k:   30.5    4.5 1.03 3025 | node_mid_c5k_g25k:   23.7    3.6 1.03 3025 | ctr_g25k:   34.1    4.9 1.03 3025 | ctr_g50k:   31.3    3.9 1.04 3025
+GM12878_chr1_20000000_25000000 | prod:   21.6    5.8 1.11 4268 | node_c5k:   53.1    7.3 1.03 4893 | node_c5k_centre:   47.4    5.4 1.05 4893 | node_c5k_g10k:   75.9   13.2 1.04 4893 | node_c5k_g25k:   47.2    6.4 1.03 4893 | node_c5k_g50k:   50.4    6.3 1.03 4893 | node_mid_c5k_g25k:   54.2    7.8 1.05 4893 | ctr_g25k:   44.3    4.5 1.05 4893 | ctr_g50k:   46.3    4.6 1.04 4893
+H1ESC_chr1_10000000_15000000 | prod:    3.9    0.9 1.05 2823 | node_c5k:   31.1    6.8 1.02 3900 | node_c5k_centre:   29.4    6.1 1.02 3900 | node_c5k_g10k:   25.5    6.0 1.01 3900 | node_c5k_g25k:   29.6    6.9 1.01 3900 | node_c5k_g50k:   27.5    6.7 1.01 3900 | node_mid_c5k_g25k:   24.6    4.9 1.02 3900 | ctr_g25k:   25.9    3.6 1.02 3900 | ctr_g50k:   28.0    6.0 1.02 3900
+H1ESC_chr1_20000000_25000000 | prod:   12.2    4.5 1.07 4233 | node_c5k:   41.6    8.4 1.03 4836 | node_c5k_centre:   37.6    5.2 1.04 4836 | node_c5k_g10k:   41.3    6.9 1.03 4836 | node_c5k_g25k:   38.9    9.2 1.03 4836 | node_c5k_g50k:   38.5    7.8 1.03 4836 | node_mid_c5k_g25k:   40.7    4.6 1.04 4836 | ctr_g25k:   38.3    4.4 1.04 4836 | ctr_g50k:   35.2    5.0 1.04 4836
+HFFC6_chr1_10000000_15000000 | prod:    5.4    0.5 1.07 3301 | node_c5k:   20.0    4.5 1.01 4565 | node_c5k_centre:   22.8    2.7 1.02 4565 | node_c5k_g10k:   20.2    4.9 1.01 4565 | node_c5k_g25k:   19.6    5.5 1.01 4565 | node_c5k_g50k:   18.8    4.8 1.01 4565 | node_mid_c5k_g25k:   18.3    5.3 1.01 4565 | ctr_g25k:   20.9    3.9 1.02 4565 | ctr_g50k:   22.4    3.0 1.02 4565
+HFFC6_chr1_20000000_25000000 | prod:    7.0    2.6 1.04 4684 | node_c5k:   27.6    7.8 1.02 4832 | node_c5k_centre:   26.9    3.5 1.04 4832 | node_c5k_g10k:   28.4    6.9 1.02 4832 | node_c5k_g25k:   32.9    8.9 1.02 4832 | node_c5k_g50k:   33.3    9.6 1.02 4832 | node_mid_c5k_g25k:   25.2    4.7 1.02 4832 | ctr_g25k:   30.4    4.4 1.04 4832 | ctr_g50k:   32.4    4.8 1.04 4832
+mean over the rows
+  prod                           10.2    2.6
+  node_c5k                       34.0    6.6
+  node_c5k_centre                32.7    4.3
+  node_c5k_g10k                  38.4    7.4
+  node_c5k_g25k                  33.4    6.8
+  node_c5k_g50k                  33.2    6.6
+  node_mid_c5k_g25k              31.1    5.1
+  ctr_g25k                       32.3    4.3
+  ctr_g50k                       32.6    4.6
