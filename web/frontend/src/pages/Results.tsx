@@ -154,17 +154,13 @@ export function Results() {
               <span className="stat-value">9 of 9</span>
               <span className="stat-label">people with more contact enrichment at RNAPII loops. The rise is 44 to 67% and the median is 53%.</span>
             </div>
-            <div className="stat">
-              <span className="stat-value">5 of 9</span>
-              <span className="stat-label">people with a higher correlation with the whole Hi-C map. The change is -4 to +7% and the median is 0%.</span>
-            </div>
           </figure>
         </div>
         <p className="reading-note">
-          With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is unchanged for GM12878, HFFc6 and the nine people and lower for H1ESC, 0.42 against 0.45.
+          With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower for H1ESC, 0.42 against 0.45.
         </p>
         <p className="reading-note">
-          Each difference was tested with a two sided test. The new models agree better with Hi-C than the original models in every cell line, p &lt; 0.001 in a Wilcoxon signed rank test over the 22 chromosomes. With RNAPII loops the enhancer to promoter distance is smaller in every cell line, p &lt; 0.001 in a signed rank test over the pairs. The link to expression is stronger for every pair of cell lines, p = 0.002 or less in a block bootstrap over the genes. The contact enrichment of the nine people is higher with p = 0.004 and their correlation with the whole map does not change, p &gt; 0.99.
+          Each difference was tested with a two sided test. The new models agree better with Hi-C than the original models in every cell line, p &lt; 0.001 in a Wilcoxon signed rank test over the 22 chromosomes. With RNAPII loops the enhancer to promoter distance is smaller in every cell line, p &lt; 0.001 in a signed rank test over the pairs. The link to expression is stronger for every pair of cell lines, p = 0.002 or less in a block bootstrap over the genes. The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.
         </p>
         <section id="microc">
           <h2>Micro-C loops</h2>

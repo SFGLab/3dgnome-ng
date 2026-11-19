@@ -83,9 +83,9 @@ describe('Results page', () => {
     renderResults()
     // The whole genome readouts of design/figures/rnapii-2026-11-18/readouts/trio_lr/trio_genome.json.
     expect(screen.getByText('9 of 9')).toBeInTheDocument()
-    expect(screen.getByText('5 of 9')).toBeInTheDocument()
+    // A comparison that is not significant is not shown, here the correlation with the whole map.
+    expect(screen.queryByText('5 of 9')).not.toBeInTheDocument()
     expect(screen.getByText(/The rise is 44 to 67% and the median is 53%/)).toBeInTheDocument()
-    expect(screen.getByText(/The change is -4 to \+7% and the median is 0%/)).toBeInTheDocument()
     expect(screen.getByText(/on chromosomes 1 to 22/)).toBeInTheDocument()
   })
 
