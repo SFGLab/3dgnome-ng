@@ -22,6 +22,7 @@ from gnome3d.pipeline import Orientation, Seeded
 from gnome3d.pipeline import coarse as cb
 from gnome3d.pipeline.coarse import CoarseState
 from gnome3d.pipeline.ib.arcs import hilbert_start, run_arcs_problem, walk_start
+from gnome3d.pipeline.ib.cells import hold_by_cells, read_cells
 from gnome3d.pipeline.ib.maxent import anchor_draw
 from gnome3d.pipeline.ib.nodes import (
     ContactNodes,
@@ -227,7 +228,26 @@ def solve_nodes(
     if m < 2:
         return ChromNodes(nodes, centre, orient, nbrs, nbr_w)
 
-    exp_dist = cb.repulsion_range(node_targets(nodes, law, s), [int(x) for x in nodes.mid], s)
+    exp_dist = node_targets(nodes, law, s)
+    if s.use_contact_background and float(s.background_weight) > 0.0:
+        if not s.data_contact_map:
+            log.status(
+                LOG,
+                "joint arcs solve %s: no [data] contact_map, the nodes read no contact data",
+                chr_,
+            )
+        elif float(s.contact_background_z) <= 0.0:
+            raise ValueError(
+                "[main] uniform_chain reads the cells of [data] contact_map under the Poisson"
+                " test and [springs] contact_background_z is 0. Set contact_background_z above"
+                " zero, or use_contact_background to no."
+            )
+        else:
+            count, offset, expected, mapped = read_cells(
+                str(s.data_contact_map), chr_, nodes.mid, int(s.contact_resolution)
+            )
+            exp_dist = hold_by_cells(exp_dist, nodes.mid, count, offset, expected, mapped, law, s)
+    exp_dist = cb.repulsion_range(exp_dist, [int(x) for x in nodes.mid], s)
     pos0: F32Array = np.ascontiguousarray(centre, dtype=np.float32)
     if s.arcs_start == "walk":
         for b in np.unique(nodes.block):

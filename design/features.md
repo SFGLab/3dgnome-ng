@@ -943,9 +943,13 @@ last section are dated records and are not rewritten when production moves on. `
   chain unchanged. A run with the setting off is byte identical to 298685c, by
   `playground/parity_dump.py`.
 
-  Not built yet: the contact data per pair of beads, the two arms of the smooth stage that let a
-  node move, and the arms of the orientation term. The anchor contact map does not reach the
-  nodes.
+  With `use_contact_background` and `[data] contact_map` a pair of nodes without a loop reads the
+  Hi-C cell that holds its two beads at `[springs] contact_resolution`,
+  [pipeline/ib/cells.py](../gnome3d/pipeline/ib/cells.py), under the Poisson test of
+  `contact_background_z`. The anchor contact map and `use_anchor_heatmap` do not reach the nodes.
+
+  Not built yet: the two arms of the smooth stage that let a node move and the arms of the
+  orientation term.
 
   Stage 1 on GM12878 chr1 108.5 to 111 Mb, one structure, 154 nodes from 379 loops of 267 anchors,
   bonds before the relaxation:

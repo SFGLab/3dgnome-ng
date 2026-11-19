@@ -43,7 +43,7 @@ _COUNTS: dict[tuple[str, str, int, int], tuple[F64Array, F64Array]] = {}
 _EXPECTED: dict[tuple[str, str], tuple[float, float] | None] = {}
 _ANNOUNCED: set[str] = set()
 _COOLERS: dict[str, Any] = {}
-_LOCK = threading.Lock()
+COOLER_LOCK = threading.Lock()
 
 
 def law_distances(mids: F64Array, law: PolymerLaw) -> F64Array:
@@ -203,8 +203,9 @@ def bridge(d: F64Array) -> tuple[F64Array, F64Array]:
     return coef, root
 
 
-def _cooler(uri: str) -> Any:
-    with _LOCK:
+def open_cooler(uri: str) -> Any:
+    """Returns the cooler of `uri`, opened once. A read of it holds `COOLER_LOCK`."""
+    with COOLER_LOCK:
         if uri not in _COOLERS:
             import cooler
 
@@ -221,10 +222,10 @@ def window_counts(uri: str, chrom: str, w_st: I64Array, w_en: I64Array) -> F64Ar
     hit = _COUNTS.get(key)
     if hit is not None and len(hit[0]) == len(w_st) and np.array_equal(hit[0], w_st):
         return hit[1]
-    clr = _cooler(uri)
+    clr = open_cooler(uri)
     res = int(clr.binsize)
     region = f"{chrom}:{max(lo, 0)}-{hi}"
-    with _LOCK:
+    with COOLER_LOCK:
         m = clr.matrix(balance=False, sparse=True).fetch(region).tocsr()
         bins = clr.bins().fetch(region)["start"].to_numpy().astype(np.int64)
     up = sp.triu(m, 1)
@@ -270,7 +271,7 @@ def chromosome_expectation(uri: str, chrom: str) -> tuple[float, float] | None:
     path, _, _ = uri.partition("::")
     coarse = f"{path}::/resolutions/{_EXP_RES}"
     try:
-        clr = _cooler(coarse)
+        clr = open_cooler(coarse)
     except (KeyError, OSError, ValueError):
         _EXPECTED[key] = None
         return None
@@ -280,7 +281,7 @@ def chromosome_expectation(uri: str, chrom: str) -> tuple[float, float] | None:
     pairs = np.zeros(nd, dtype=np.float64)
     span = min(_EXP_SPAN, length)
     for lo in np.linspace(0, max(length - span, 0), _EXP_WINDOWS).astype(np.int64):
-        with _LOCK:
+        with COOLER_LOCK:
             m = clr.matrix(balance=False, sparse=True).fetch(f"{chrom}:{lo}-{lo + span}").tocoo()
         n = m.shape[0]
         d = m.col - m.row

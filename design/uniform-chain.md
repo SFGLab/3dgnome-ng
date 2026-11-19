@@ -26,6 +26,10 @@ Every row is the maintainer's decision.
 | The reach of the chain in the arcs stage | A one sided spring at the loop spring weight beyond k bonds |
 | The orientation term | Three arms: as it is, off, and with the beads beside a site held within their bonds |
 | Contact data of a pair of beads | The Hi-C cell that holds the two beads, at a resolution finer than 25 kb |
+| The resolution of the cell | One setting, measured at 1, 5 and 10 kb |
+| The cells that act | A cell that passes the Poisson test of `contact_background_z`, over or under its expectation |
+| The pairs that a cell acts on | Every pair of nodes without a loop, near and far. A pair with a loop keeps its loop target |
+| The counts and the expectation | Raw counts against the mean count at the same separation on the same chromosome and resolution |
 | The order of the build | Three stages with an arms trial after each |
 | The first build | Replaced in place. Comparisons use its trial of 2026-11-19 |
 
@@ -80,8 +84,16 @@ and the law puts a pair at the background times that ratio to the minus third.
 The default chain reads the singletons at 25 kb. A singleton is given by the start of its bin and a contact is
 counted for the bead that holds that start.
 
-Proposed and not yet decided: the resolution is one setting, measured at 1, 5 and 10 kb, and a cell acts on a pair
-when it passes the Poisson test of `contact_background_z`.
+The resolution is `[springs] contact_resolution`. A cell acts on a pair of nodes without a loop when its expectation is
+above z squared and its count is more than z Poisson deviations from it, with z of `contact_background_z`. The pair
+is then held at the background times `((count + 0.5) / (expected + 0.5))` to the minus third, clipped to one bead and
+to `distance_heatmap_stretching` backgrounds, with the background spring. The expectation of a cell is the mean count
+at its offset over the stretch of the chromosome that holds the nodes, pooled in eight bins of offset a decade,
+without the cells of a bin that has no count. Two nodes in one cell are left as they are.
+
+The cells need a deep map. On the map of 7.8 million contacts in the laptop's data no cell of chr1 108.5 to 111 Mb
+has an expectation of 9 at 1, 5 or 10 kb and no pair is held. The maps of the trials hold 2.5 to 4.0 billion
+contacts.
 
 The count of nodes changes between conformations with the draw. The joint solve is over the chromosome as now.
 
@@ -153,9 +165,10 @@ and against the first build.
 2. The bounded drift arm and the centre of mass arm of the smooth stage.
 3. The arms of the orientation term.
 
-State on 2026-11-19: stage 1 is built but for the contact data per pair of beads. The joint solve runs on the
-nodes with the reach spring and the excluded volume at the radius of a bead, the nodes are the fixed beads of the
-smooth stage and of the relaxation, and the first build is removed. `design/features.md` has the first numbers.
+State on 2026-11-19: stage 1 is built. The joint solve runs on the nodes with the reach spring, the excluded
+volume at the radius of a bead and the contact cells of `gnome3d/pipeline/ib/cells.py`. The nodes are the fixed
+beads of the smooth stage and of the relaxation, and the first build is removed. `design/features.md` has the first
+numbers. The contact cells are not yet measured on a deep map.
 
 ## Settings
 

@@ -100,6 +100,7 @@ class Settings:
     spring_squeeze_arcs: float
     use_contact_background: bool
     contact_background_z: float
+    contact_resolution: int
 
     # ---- simulation steps ----
     steps_lvl1: int
@@ -340,6 +341,7 @@ class Settings:
         self.spring_squeeze_arcs = 1.0
         self.use_contact_background = False
         self.contact_background_z = 0.0
+        self.contact_resolution = 5000
 
         # ---- simulation steps ----
         self.steps_lvl1 = 2
@@ -649,6 +651,7 @@ class Settings:
         self.contact_background_z = getf(
             "springs", "contact_background_z", self.contact_background_z
         )
+        self.contact_resolution = geti("springs", "contact_resolution", self.contact_resolution)
         self.spring_stretch_ib = getf("springs", "stretch_constant_ib", self.spring_stretch_ib)
         self.spring_squeeze_ib = getf("springs", "squeeze_constant_ib", self.spring_squeeze_ib)
 
