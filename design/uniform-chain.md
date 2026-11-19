@@ -215,6 +215,36 @@ HFFC6 chr1 10 to 15 Mb over mapped bins: raw SCC 0.392 on the default chain agai
 0.309 against 0.313 and 0.300. The loss of that row is in the raw score. The share of it that the beads of the long
 gaps carry is not measured bead by bead.
 
+### Trial of the contact cells
+
+`design/figures/uniform-2026-11-19/cells/` has the figure and the table, `scores-cells/` the score files. Commit
+00c67bd, the uniform draw unless stated, z of 3, the maps of 2.5 to 4.0 billion contacts. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | SCC raw, mapped bins | SCC balanced, mapped bins | Spearman raw | Pearson balanced | exponent over Hi-C |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.327 | 0.307 | 0.295 | 0.266 | 0.448 | 0.716 | 1.062 |
+| contact beads, no cells | 0.319 | 0.329 | 0.290 | 0.297 | 0.444 | 0.671 | 1.042 |
+| cells at 1 kb | 0.321 | 0.335 | 0.291 | 0.302 | 0.447 | 0.676 | 1.053 |
+| cells at 5 kb | 0.374 | 0.364 | 0.351 | 0.341 | 0.437 | 0.678 | 1.038 |
+| cells at 10 kb | 0.391 | 0.376 | 0.369 | 0.354 | 0.387 | 0.682 | 1.065 |
+| midpoint, no cells | 0.332 | 0.332 | 0.307 | 0.305 | 0.453 | 0.684 | 1.053 |
+| midpoint, cells at 5 kb | 0.374 | 0.361 | 0.352 | 0.336 | 0.411 | 0.667 | 1.013 |
+
+Pairs of nodes that the cells hold in one structure of chr1 10 to 15 Mb, in and out, of all pairs:
+
+| resolution | GM12878, of 29,646 | H1ESC, of 77,815 | HFFC6, of 66,066 |
+|---|---|---|---|
+| 1 kb | 168 and 52 | 54 and 47 | 76 and 33 |
+| 5 kb | 3,761 and 224 | 2,879 and 297 | 2,774 and 398 |
+| 10 kb | 7,141 and 830 | 7,131 and 1,827 | 6,943 and 2,216 |
+
+- At 1 kb few cells pass the test and the scores are those of the arm without cells.
+- At 5 kb raw SCC rises 0.055 and balanced SCC 0.035 over the arm without cells, and 0.047 and 0.057 over the default
+  chain. Spearman falls 0.007.
+- At 10 kb SCC rises a further 0.012 to 0.017 and Spearman falls 0.057 under the arm without cells.
+- The midpoint with cells at 5 kb scores as the uniform draw on SCC and 0.026 lower on Spearman.
+- Balanced Pearson stays 0.03 to 0.05 under the default chain on every contact bead arm.
+
 ## Settings
 
 A setting is added when a run reads it.
