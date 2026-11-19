@@ -165,6 +165,8 @@ Do not run `ruff format` on `web/` or `playground/`. Those files are not formatt
 ### Continuous integration and release
 
 `.github/workflows/tests.yml` runs ruff and pytest on a push to main and on a pull request, on Python 3.11 to 3.14.
+The tests marked slow run in one job on Python 3.12. `.github/workflows/web.yml` runs the test scripts of the site
+and the tests, the lint and the build of the frontend when a change touches `web/`, `gnome3d/` or `pyproject.toml`.
 `.github/workflows/publish.yml` builds the package and uploads it to PyPI when a GitHub release is published.
 
 The version is the latest git tag, read by setuptools-scm. The tag `v0.3.0` gives the version 0.3.0. A commit after
