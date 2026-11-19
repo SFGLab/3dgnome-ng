@@ -123,7 +123,11 @@ def create_app() -> FastAPI:
             self.field = field
 
     def create_job(fields: dict[str, str], vcf: bytes | Path | None) -> str:
-        """Checks a job request, queues the job unless the same one exists and returns its url.
+        """Checks a job request, queues its job and returns the url of the job.
+
+        A request on hosted data has a key. Without the field `fresh` the job of that key is
+        returned when the site holds one, which is how an example opens the same job for
+        everyone. With `fresh` set to 1 the request starts a job of its own.
 
         @param fields the form fields of a job request, overrides as JSON text
         @param vcf an uploaded VCF, which makes the job private. The field vcf_upload gives an
@@ -215,7 +219,12 @@ def create_app() -> FastAPI:
         job = shared / key
         st = job / "status.json"
         if st.is_file() and json.loads(st.read_text()).get("state") in ("running", "done", "queued"):
-            return f"/jobs/{key}"
+            if fields.get("fresh") != "1":
+                return f"/jobs/{key}"
+            # The first job of a request has the key of the request. A repeat has a key of its own.
+            key = secrets.token_hex(8)
+            job = shared / key
+            st = job / "status.json"
         job.mkdir(parents=True, exist_ok=True)
         write_json(st, {"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]})
         enqueue(s, req, job)

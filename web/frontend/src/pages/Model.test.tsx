@@ -106,6 +106,8 @@ describe('Model a region page', () => {
     expect(body.get('factors')).toBe('CTCF+RNAPII')
     expect(body.get('background')).toBe('hic')
     expect(body.get('n_models')).toBe('100')
+    // The form asks for a job of its own. The same request twice gives two jobs.
+    expect(body.get('fresh')).toBe('1')
     expect(JSON.parse(String(body.get('overrides')))).toEqual({ 'distance.polymer_exponent': '0.3' })
     expect(recentJobs()[0]).toMatchObject({ url: '/jobs/abcdef0123456789', name: 'my run' })
   })

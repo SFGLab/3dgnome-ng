@@ -10,7 +10,7 @@ const SECTIONS = [
 ] as const
 
 const STORED: [string, string, string][] = [
-  ['Job requests', 'The region, the cell type, the loops and the settings of a job on hosted data. The same request from anyone opens the same job and its link is not secret.', 'no time limit'],
+  ['Job requests', 'The region, the cell type, the loops and the settings of a job on hosted data. The link of a job is not secret. An example opens the same job for everyone.', 'no time limit'],
   ['Uploaded files and their jobs', 'A VCF, loops, anchors, contacts or enhancers that you upload and the job made from them. The job is private and reachable only through its link.', '14 days, then deleted'],
   ['Synced job lists', 'The links and the names of the jobs on a list that has a sync code. The links of private jobs are on it only if you chose so.', 'until you ask for removal'],
   ['Links to contact maps', 'The address of a contact map that you give in place of an upload. The server reads the file from that address.', 'with the job'],

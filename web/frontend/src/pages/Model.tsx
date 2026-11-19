@@ -50,6 +50,9 @@ function toFormData(form: FormState, overrides: Record<string, string>): FormDat
   d.append('haplotype', String(form.haplotype))
   d.append('n_models', String(form.structures))
   d.append('overrides', JSON.stringify(overrides))
+  // A request of the form starts a job of its own, also when the site holds a job of the same
+  // request. An example leaves this out and opens the held job.
+  d.append('fresh', '1')
   if (form.vcfUpload) d.append('vcf_upload', form.vcfUpload.id)
   const own = form.own
   if (own.loops.length || own.anchors || own.contacts || own.enhancers || (form.cell === 'own' && (own.loopsFrom || own.enhancersFrom))) d.append('own', ownField(own))

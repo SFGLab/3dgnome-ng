@@ -10,8 +10,10 @@ under `RESULTS_DIR/.jax-cache` keeps for the next.
 
 ## Caching and privacy
 
-A request on hosted inputs is keyed by a hash of the normalised request. An identical request
-finds the finished job instead of running again. A request with an uploaded VCF or any of your
+A request on hosted inputs is keyed by a hash of the normalised request. The first job of a
+request has that key as its address. An example posts its request plain and opens the job of
+the key, the same job for every visitor. The form posts with `fresh=1` and starts a job of its
+own each time, under a random key when the site holds the job of the request. A request with an uploaded VCF or any of your
 own data gets a random link under `/p/`, never enters the shared cache, and is removed by the
 retention sweep the app runs at start. Uploads waiting for a job sit under `RESULTS_DIR/uploads`
 and are swept after the same retention period. Shared jobs are never removed by the site.
