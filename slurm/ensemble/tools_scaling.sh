@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run time against bead count for 3dgnome, cudaMMC and MultiMM on GM12878 chr1, one machine, one
-# job at a time. design/plans/2026-11-16-genomes-and-comparison.md.
+# job at a time. design/tools-comparison.md.
 #
 #   DATA=~/gapfill-data TOOLS=out/tools OUT=out/toolscale bash slurm/ensemble/tools_scaling.sh
 #

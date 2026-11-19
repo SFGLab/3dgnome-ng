@@ -1,6 +1,6 @@
 #!/bin/bash
 # 3dgnome against cudaMMC and MultiMM on the same inputs, one machine, one job at a time.
-# design/plans/2026-11-16-genomes-and-comparison.md.
+# design/tools-comparison.md.
 #
 #   DATA=~/gapfill-data HIC=~/gapfill-data/_hic OUT=out/tools N=5 \
 #   CELLS="GM12878 H1ESC HFFC6" REGIONS="chr1:10000000-15000000 chr1" \

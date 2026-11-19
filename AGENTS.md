@@ -65,7 +65,8 @@ Rules for the code as it stands:
 ├── harness/
 │   └── integration.py          # Full-MC integration test and the reference runner
 ├── data/                       # Input datasets (GM12878, H1ESC, HFFC6). _hic holds 4DN mcools
-├── docs/                       # Local-only notes, gitignored and not part of the repo
+├── design/                     # Public design notes and documentation, results under figures/
+├── docs/                       # Private notes, gitignored. Anything personal, quoted or about infrastructure
 ├── pyproject.toml              # gnome3d-torch, [validation] extra for the validation package
 ├── SETTINGS.md                 # Every config key, default, production value and meaning
 └── AGENTS.md                   # This file
