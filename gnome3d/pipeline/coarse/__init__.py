@@ -13,6 +13,7 @@ from __future__ import annotations
 from gnome3d.pipeline.coarse.build import (
     COARSE_SEED,
     CoarseState,
+    active_arcs,
     add_long_pet_to_segment_heatmap,
     build_contact_heatmaps,
     build_state,
@@ -30,6 +31,7 @@ from gnome3d.pipeline.coarse.build import (
     reconstruct_chromosome_level,
     reconstruct_heatmap,
     reconstruct_segment_level,
+    repulsion_range,
     seed_global_rng,
     subanchor_counts_per_arc,
 )
@@ -40,8 +42,10 @@ __all__ = [
     "add_long_pet_to_segment_heatmap",
     "build_contact_heatmaps",
     "build_state",
+    "active_arcs",
     "calc_anchor_activity",
     "calc_anchor_arc_weights",
+    "repulsion_range",
     "dropout_keep",
     "calc_anchor_expected_distances",
     "compute_segment_bins",

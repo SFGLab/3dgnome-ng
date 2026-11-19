@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gnome3d.data import ContactData
 from gnome3d.io import parse_chrs_arg
 from gnome3d.pipeline import coarse as cb
-from gnome3d.pipeline.coarse.build import _active_arcs
+from gnome3d.pipeline.coarse.build import active_arcs
 from gnome3d.settings import Settings
 from gnome3d.skeleton import _collect_ib_work
 
@@ -61,7 +61,7 @@ def main() -> None:
     mids = np.array([cl[a].genomic_pos for a in active], dtype=np.int64)
 
     arc_t = m[m > 1e-6]
-    _, arcs = _active_arcs(state, active, chrom, None)
+    _, arcs = active_arcs(state, active, chrom, None)
     f0 = [s.arc_expected_distance(a[2], int(mids[a[1]] - mids[a[0]]), a[3] if len(a) > 3 else 0) for a in arcs if (a[3] if len(a) > 3 else 0) == 0]
     reach = float(s.arcs_repulsion_cutoff_factor) * float(arc_t.mean())
     print(f"{region}: {n} anchors in {len(work)} blocks, {len(arcs)} arcs, nu {law.nu:.3f}")

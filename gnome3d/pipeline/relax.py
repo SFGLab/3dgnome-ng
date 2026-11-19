@@ -95,8 +95,11 @@ def _relax_settings(s: Settings, bond: float) -> Settings:
     return r
 
 
-def relax_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]]:
+def relax_blocks(
+    blocks: list[list[BeadOut]], s: Settings, held: list[BoolArray] | None = None
+) -> list[list[BeadOut]]:
     """Returns the blocks with their overlaps removed by moving subanchors. Anchors do not move.
+    `held` gives the beads of each block that do not move, in place of the beads of kind anchor.
 
     Returns the input with `use_cross_block_relax` off, or with fewer than two blocks and
     `within_blocks` off.
@@ -116,7 +119,11 @@ def relax_blocks(blocks: list[list[BeadOut]], s: Settings) -> list[list[BeadOut]
     if len(chain) < 3:
         return blocks
     pos: F32Array = np.array([[b.x, b.y, b.z] for b in chain], dtype=np.float32)
-    fixed: BoolArray = np.array([b.kind == "anchor" for b in chain], dtype=np.bool_)
+    fixed: BoolArray = (
+        np.array([b.kind == "anchor" for b in chain], dtype=np.bool_)
+        if held is None
+        else np.concatenate([held[k] for k in order]).astype(np.bool_)
+    )
     bonds = np.linalg.norm(np.diff(pos.astype(np.float64), axis=0), axis=1)
     dtn: F32Array = bonds.astype(np.float32)
     bond = float(np.median(bonds)) if bonds.size else 1.0

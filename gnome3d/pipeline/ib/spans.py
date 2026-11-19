@@ -1,8 +1,9 @@
-"""The uniform chain of a block and its anchors as spans of beads, `[main] uniform_chain`.
+"""The uniform chain of a block and the spans of its anchors, `[main] uniform_chain`.
 
 The chain has one bead per `target_bp_per_subanchor` from the start of the first anchor of the
 block to the end of its last. Every base of the block is in one bead. The span of an anchor is
-the run of beads whose midpoints are in its range. Anchors that overlap share beads.
+the run of beads whose midpoints are in its range. Anchors that overlap share beads. The rules
+of the model are in `design/uniform-chain.md`.
 """
 
 from __future__ import annotations
@@ -12,9 +13,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from gnome3d.tracks import bin_compartments
-from gnome3d.types import AnchorSpans
 
 if TYPE_CHECKING:
+    from gnome3d.pipeline.state import AnchorMapEntry
     from gnome3d.settings import Settings
     from gnome3d.types import (
         BoolArray,
@@ -25,24 +26,20 @@ if TYPE_CHECKING:
         I32Array,
         I64Array,
         SingletonContact,
-        StrArray,
     )
 
-# (pos, fixed, starts, ends, dtn, step_size_smooth, compartment, spans)
+# (pos, fixed, starts, ends, dtn, anchor_map, step_size_smooth, compartment, covered)
 UniformResult = tuple[
     "F32Array",
     "BoolArray",
     list[int],
     list[int],
     "F32Array",
+    "list[AnchorMapEntry]",
     float,
     "I8Array | None",
-    AnchorSpans,
+    "BoolArray",
 ]
-
-# The orientation of a site is the direction from the bead before it to the bead after it. Two
-# sites closer than this many beads would read one bead in common.
-SITE_SPACING = 3
 
 
 def grid_edges(anchor_genomic: list[tuple[int, int, int]], target_bp: int) -> I64Array:
@@ -60,8 +57,9 @@ def grid_edges(anchor_genomic: list[tuple[int, int, int]], target_bp: int) -> I6
 def anchor_spans(
     anchor_genomic: list[tuple[int, int, int]], edges: I64Array
 ) -> tuple[I32Array, I32Array, I32Array]:
-    """Returns `(lo, hi, knot)` per anchor. The span holds the beads whose midpoints are in the
-    range of the anchor and always the knot, the bead at the midpoint of the anchor.
+    """Returns `(lo, hi, knot)` per anchor. The span holds the beads `lo` to `hi - 1`, the beads
+    whose midpoints are in the range of the anchor and always the knot, the bead at the midpoint
+    of the anchor.
     """
     n = int(edges.shape[0]) - 1
     mids = (edges[:-1] + edges[1:]) / 2.0
@@ -74,42 +72,66 @@ def anchor_spans(
     return lo.astype(np.int32), hi.astype(np.int32), knot.astype(np.int32)
 
 
-def _start_chain(knot: I32Array, home: F64Array, n: int, bond: float) -> F64Array:
-    """Returns the start of the chain. A knot is at the mean home of its anchors. The beads
-    between two knots are on the line between them. The beads before the first knot and after
-    the last continue the line at one bond per bead.
+def covered_mask(lo: I32Array, hi: I32Array, n: int) -> BoolArray:
+    """Returns the beads that the span of an anchor holds."""
+    mask: BoolArray = np.zeros(n, dtype=np.bool_)
+    for a, b in zip(lo, hi, strict=True):
+        mask[int(a) : int(b)] = True
+    return mask
+
+
+def start_chain(
+    node_bead: I32Array, node_pos: F64Array, n: int, bond: float, centre: F64Array
+) -> F64Array:
+    """Returns the start of the chain of a block.
+
+    A node is at its position from the arcs stage. The beads between two nodes are on the line
+    between them. The beads before the first node and after the last continue the line at one
+    bond per bead. A block without a node is a straight line through `centre`.
     """
-    beads = np.unique(knot)
-    at = np.zeros((beads.shape[0], 3), dtype=np.float64)
-    for j, b in enumerate(beads):
-        at[j] = home[knot == b].mean(axis=0)
     idx = np.arange(n, dtype=np.float64)
-    pos = np.stack([np.interp(idx, beads, at[:, c]) for c in range(3)], axis=1)
-    first, last = int(beads[0]), int(beads[-1])
-    out = np.array([1.0, 0.0, 0.0])
-    if beads.shape[0] > 1:
-        d = at[0] - at[-1]
+    axis = np.array([1.0, 0.0, 0.0])
+    if node_bead.shape[0] == 0:
+        line: F64Array = centre[None, :] + (idx - (n - 1) / 2.0)[:, None] * bond * axis[None, :]
+        return line
+    pos = np.stack([np.interp(idx, node_bead, node_pos[:, c]) for c in range(3)], axis=1)
+    first, last = int(node_bead[0]), int(node_bead[-1])
+    if node_bead.shape[0] > 1:
+        d = node_pos[0] - node_pos[-1]
         nd = float(np.linalg.norm(d))
         if nd > 1e-9:
-            out = d / nd
+            axis = d / nd
     for i in range(first):
-        pos[i] = at[0] + out * bond * (first - i)
+        pos[i] = node_pos[0] + axis * bond * (first - i)
     for i in range(last + 1, n):
-        pos[i] = at[-1] - out * bond * (i - last)
+        pos[i] = node_pos[-1] - axis * bond * (i - last)
     return pos
 
 
 def densify_uniform(
-    anchor_pos: F32Array,
+    node_bead: I32Array,
+    node_pos: F32Array,
+    centre: F32Array,
     anchor_genomic: list[tuple[int, int, int]],
     s: Settings,
     track_compartments: list[CompartmentInterval] | None = None,
 ) -> UniformResult:
-    """Builds the uniform chain of a block with its anchors as spans of beads. No bead is fixed."""
+    """Builds the uniform chain of a block. The nodes are the fixed beads.
+
+    Parameters
+    ----------
+    node_bead
+        The bead of each node of the block, in bead order.
+    node_pos
+        The position of each node from the arcs stage.
+    centre
+        The centroid of the block, the place of a chain without a node.
+    anchor_genomic
+        The anchors of the block as (start, end, midpoint) triples.
+    """
     edges = grid_edges(anchor_genomic, int(s.target_bp_per_subanchor))
     n = int(edges.shape[0]) - 1
-    lo, hi, knot = anchor_spans(anchor_genomic, edges)
-    home: F64Array = np.asarray(anchor_pos, dtype=np.float64).copy()
+    lo, hi, _knot = anchor_spans(anchor_genomic, edges)
 
     starts = [int(e) for e in edges[:-1]]
     ends = [int(e) for e in edges[1:]]
@@ -118,23 +140,27 @@ def densify_uniform(
         [s.genomic_length_to_distance(int(g)) for g in np.diff(mids)], dtype=np.float32
     )
     bond = float(dtn.mean()) if dtn.size else 1.0
-    pos: F32Array = _start_chain(knot, home, n, bond).astype(np.float32)
+    pos: F32Array = start_chain(
+        node_bead, node_pos.astype(np.float64), n, bond, centre.astype(np.float64)
+    ).astype(np.float32)
     fixed: BoolArray = np.zeros(n, dtype=np.bool_)
+    fixed[node_bead] = True
+    anchor_map: list[AnchorMapEntry] = [(int(b), k) for k, b in enumerate(node_bead)]
 
     compartment: I8Array | None = None
     if track_compartments:
         compartment, _score = bin_compartments(track_compartments, starts, ends)
 
-    step_size_smooth = bond * s.noise_smooth
     return (
         pos,
         fixed,
         starts,
         ends,
         dtn,
-        step_size_smooth,
+        anchor_map,
+        bond * s.noise_smooth,
         compartment,
-        AnchorSpans(lo=lo, hi=hi, knot=knot, home=home),
+        covered_mask(lo, hi, n),
     )
 
 
@@ -164,106 +190,3 @@ def uniform_heatmap(singletons: list[SingletonContact], chrom: str, edges: I64Ar
         kb = np.maximum(np.diff(edges).astype(np.float64), 1.0) / 1000.0
         heat /= mean * np.outer(kb, kb)
     return heat.astype(np.float32)
-
-
-def merge_nodes(
-    exp_dist: F64Array, arc_w: F32Array | None, node: I64Array
-) -> tuple[F64Array, F32Array | None]:
-    """Returns the arcs target matrix and the loop weights with the anchors of one node as one row.
-
-    `node[k]` is the node of anchor k. A pair of nodes takes the shortest loop target of its
-    anchor pairs, else their shortest background, else the repulsion mark of any of them. A
-    pair of anchors inside one node is dropped. The weight is the largest of the loops.
-    """
-    order = np.argsort(node, kind="stable")
-    first = np.flatnonzero(np.diff(node[order], prepend=-1))
-    ep = exp_dist[np.ix_(order, order)]
-
-    def shortest(values: F64Array) -> F64Array:
-        rows: F64Array = np.minimum.reduceat(values, first, axis=0)
-        out: F64Array = np.minimum.reduceat(rows, first, axis=1)
-        return out
-
-    loop = shortest(np.where(ep > 1e-6, ep, np.inf))
-    background = shortest(np.where(ep <= -0.75, -ep, np.inf))
-    mark = (ep < 0.0) & (ep > -0.75)
-    repel = np.logical_or.reduceat(np.logical_or.reduceat(mark, first, axis=0), first, axis=1)
-    merged: F64Array = np.zeros(loop.shape, dtype=np.float64)
-    merged[repel] = -0.5
-    has_bg = np.isfinite(background)
-    merged[has_bg] = -background[has_bg]
-    has_loop = np.isfinite(loop)
-    merged[has_loop] = loop[has_loop]
-    np.fill_diagonal(merged, 0.0)
-    if arc_w is None:
-        return merged, None
-    wp = np.where(ep > 1e-6, arc_w[np.ix_(order, order)], 0.0)
-    w_rows = np.maximum.reduceat(wp, first, axis=0)
-    weights: F32Array = np.maximum.reduceat(w_rows, first, axis=1).astype(np.float32)
-    return merged, weights
-
-
-def knot_mask(spans: AnchorSpans, n: int) -> BoolArray:
-    """Returns the beads that are the knot of an anchor."""
-    mask: BoolArray = np.zeros(n, dtype=np.bool_)
-    mask[spans.knot] = True
-    return mask
-
-
-def covered_mask(spans: AnchorSpans, n: int) -> BoolArray:
-    """Returns the beads that an anchor holds."""
-    mask: BoolArray = np.zeros(n, dtype=np.bool_)
-    for a, b in zip(spans.lo, spans.hi, strict=True):
-        mask[int(a) : int(b)] = True
-    return mask
-
-
-def motif_sites(
-    spans: AnchorSpans,
-    orientations: I8Array,
-    neighbors: dict[int, list[int]],
-    weights: dict[int, list[float]],
-    n: int,
-    code_to_char: dict[int, str],
-) -> tuple[BoolArray, StrArray, dict[int, list[int]], dict[int, list[float]]]:
-    """Returns the orientation sites of a uniform chain as `(site beads, orientation per bead,
-    neighbours per site, weights per site)`. Sites are numbered in bead order.
-
-    An anchor with a CTCF loop makes a site at its knot. A site is `SITE_SPACING` beads or more
-    from every other and one bead or more from each end of the chain. An anchor too near a
-    site of more loop weight joins that site and its loops go to it. The site has the
-    orientation of its heaviest anchor.
-    """
-    site_beads: BoolArray = np.zeros(n, dtype=np.bool_)
-    chars: StrArray = np.array(["N"] * n, dtype="<U1")
-    if n < SITE_SPACING:
-        return site_beads, chars, {}, {}
-    total = {k: float(sum(weights.get(k, []))) for k in neighbors if neighbors[k]}
-    bead_of = {k: int(np.clip(int(spans.knot[k]), 1, n - 2)) for k in total}
-    kept: list[int] = []
-    owner: dict[int, int] = {}
-    for k in sorted(total, key=lambda a: (-total[a], bead_of[a], a)):
-        near = [j for j in kept if abs(bead_of[j] - bead_of[k]) < SITE_SPACING]
-        if near:
-            owner[k] = min(near, key=lambda j: (abs(bead_of[j] - bead_of[k]), bead_of[j]))
-        else:
-            kept.append(k)
-            owner[k] = k
-    kept.sort(key=lambda a: bead_of[a])
-    site_of = {k: i for i, k in enumerate(kept)}
-    for k in kept:
-        site_beads[bead_of[k]] = True
-        chars[bead_of[k]] = code_to_char[int(orientations[k])]
-
-    pair_w: list[dict[int, float]] = [{} for _ in kept]
-    for k, own in owner.items():
-        i = site_of[own]
-        for j, w in zip(neighbors[k], weights[k], strict=True):
-            if j not in owner:
-                continue
-            t = site_of[owner[j]]
-            if t != i:
-                pair_w[i][t] = pair_w[i].get(t, 0.0) + float(w)
-    site_nbrs = {i: sorted(pair_w[i]) for i in range(len(kept))}
-    site_w = {i: [pair_w[i][t] for t in site_nbrs[i]] for i in range(len(kept))}
-    return site_beads, chars, site_nbrs, site_w

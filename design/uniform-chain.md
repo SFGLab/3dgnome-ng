@@ -153,16 +153,16 @@ and against the first build.
 2. The bounded drift arm and the centre of mass arm of the smooth stage.
 3. The arms of the orientation term.
 
-State on 2026-11-19: the draw, the nodes with summed strengths and their target matrix are functions of
-`gnome3d/pipeline/ib/nodes.py`, and the reach spring is a term of `solve_arcs`. No stage of the pipeline calls them
-yet.
+State on 2026-11-19: stage 1 is built but for the contact data per pair of beads. The joint solve runs on the
+nodes with the reach spring and the excluded volume at the radius of a bead, the nodes are the fixed beads of the
+smooth stage and of the relaxation, and the first build is removed. `design/features.md` has the first numbers.
 
 ## Settings
 
 A setting is added when a run reads it.
 
 - `[main] uniform_chain` selects the chain.
-- The draw needs one key with the values uniform and midpoint.
+- `[main] contact_bead` is the draw, uniform or midpoint.
 - Bounded drift is `[simulation_arcs_smooth] anchor_cap`, which exists.
 - The centre of mass arm needs one key.
 

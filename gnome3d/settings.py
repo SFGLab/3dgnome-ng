@@ -89,7 +89,6 @@ class Settings:
     spring_stretch_arcs: float
     arc_weight_exponent: float
     background_weight: float
-    anchor_span_weight: float
     loop_dropout: bool
     loop_dropout_scale: float
     loop_contact: bool
@@ -239,6 +238,7 @@ class Settings:
     overlap_anchor_strict: bool
     drop_zero_length_subanchors: bool
     uniform_chain: bool
+    contact_bead: str
 
     # ---- dynamic loop density ----
     use_dynamic_loop_density: bool
@@ -336,7 +336,6 @@ class Settings:
         self.arcs_repulsion = True
         self.factory_radius = 2.0
         self.background_weight = 0.0
-        self.anchor_span_weight = 1.0
         self.background_range_bp = 100_000
         self.spring_squeeze_arcs = 1.0
         self.use_contact_background = False
@@ -479,6 +478,7 @@ class Settings:
         self.overlap_anchor_strict = False
         self.drop_zero_length_subanchors = False
         self.uniform_chain = False
+        self.contact_bead = "uniform"
 
         # ---- dynamic loop density ----
         self.use_dynamic_loop_density = False
@@ -638,7 +638,6 @@ class Settings:
             "springs", "stretch_constant_arcs", self.spring_stretch_arcs
         )
         self.background_weight = getf("springs", "background_weight", self.background_weight)
-        self.anchor_span_weight = getf("springs", "anchor_span_weight", self.anchor_span_weight)
         self.gyration_weight = getf("springs", "gyration_weight", self.gyration_weight)
         self.background_range_bp = geti("springs", "background_range_bp", self.background_range_bp)
         self.spring_squeeze_arcs = getf(
@@ -943,6 +942,11 @@ class Settings:
             "main", "drop_zero_length_subanchors", self.drop_zero_length_subanchors
         )
         self.uniform_chain = getb("main", "uniform_chain", self.uniform_chain)
+        self.contact_bead = gets("main", "contact_bead", self.contact_bead)
+        if self.contact_bead not in ("uniform", "midpoint"):
+            raise ValueError(
+                f"[main] contact_bead must be uniform or midpoint, got {self.contact_bead!r}"
+            )
 
         # [main]
         self.use_dynamic_loop_density = getb(

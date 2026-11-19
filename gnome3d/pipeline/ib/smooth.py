@@ -13,7 +13,6 @@ import numpy as np
 
 from gnome3d.pipeline.ib.buckets import batch_bucket
 from gnome3d.pipeline.ib.maxent import maxent_start
-from gnome3d.pipeline.ib.spans import covered_mask, knot_mask, motif_sites
 from gnome3d.pipeline.ib.start import coil_start
 from gnome3d.pipeline.stage import Problem, Result, StageKind
 from gnome3d.pipeline.state import AnchorMapEntry, Densified, Orientation, Smoothed, State
@@ -112,18 +111,15 @@ def _start_positions(prob: Problem) -> F32Array:
     if start not in ("coil", "maxent"):
         return pos
     dtn = prob["dtn"]
-    # Under `uniform_chain` the bridges run between the knots of the anchors.
-    spans = prob["spans"]
-    ends = prob["fixed"] if spans is None else knot_mask(spans, pos.shape[0])
     r = float(s.exclusion_radius_smooth)
     if r <= 0.0:
         r = float(s.exclusion_auto_factor_smooth) * float(np.mean(dtn))
     rng = np.random.default_rng(int(prob["seed"]))
     if start == "coil":
-        return coil_start(pos, ends, dtn, r, rng)
+        return coil_start(pos, prob["fixed"], dtn, r, rng)
     return maxent_start(
         pos,
-        ends,
+        prob["fixed"],
         prob["bead_starts"],
         prob["bead_ends"],
         s.polymer_law(),
@@ -159,18 +155,7 @@ def _run(problem: Problem) -> Result:
         pos_run: F32Array = best_pos.copy()
         add_movable_noise_inplace(pos_run, fixed, step)
         score = mc_numba.mc_smooth_numba(
-            pos_run,
-            dtn,
-            fixed,
-            step,
-            s,
-            char_orn,
-            nbrs,
-            nbr_w,
-            heat,
-            comp,
-            spans=problem["spans"],
-            motif_beads=problem["motif_beads"],
+            pos_run, dtn, fixed, step, s, char_orn, nbrs, nbr_w, heat, comp
         )
         if score < best_score or best_score < 0.0:
             best_score = score
@@ -223,18 +208,6 @@ class SmoothStage:
             if st.orientations is not None
             else None
         )
-        nbrs = st.anchor_neighbors
-        nbr_w = st.anchor_neighbor_weights
-        motif_beads: BoolArray | None = None
-        if (
-            st.spans is not None
-            and st.orientations is not None
-            and nbrs is not None
-            and nbr_w is not None
-        ):
-            motif_beads, char_orn, nbrs, nbr_w = motif_sites(
-                st.spans, st.orientations, nbrs, nbr_w, st.pos.shape[0], _CODE_TO_CHAR
-            )
         return {
             "pos": st.pos,
             "dtn": st.dtn,
@@ -243,10 +216,8 @@ class SmoothStage:
             "settings": st.settings,
             "seed": (st.seed + _SEED_SALT) & 0x7FFFFFFF,
             "char_orientations": char_orn,
-            "anchor_neighbors": nbrs,
-            "anchor_neighbor_weights": nbr_w,
-            "spans": st.spans,
-            "motif_beads": motif_beads,
+            "anchor_neighbors": st.anchor_neighbors,
+            "anchor_neighbor_weights": st.anchor_neighbor_weights,
             "heat_dist": getattr(st, "heat_dist", None),
             "compartment": st.bead_compartment,
             "bead_starts": st.bead_starts,
@@ -258,7 +229,8 @@ class SmoothStage:
         st = inputs[0]
         assert isinstance(st, Densified)
         _score, final_pos = result
-        kind = st.fixed if st.spans is None else covered_mask(st.spans, final_pos.shape[0])
+        # On a uniform chain a bead under an anchor has the kind anchor in every conformation.
+        kind = st.fixed if st.covered is None else st.covered
         beads = _assemble_beads(final_pos, kind, st.bead_starts, st.bead_ends, st.settings)
         base: dict[str, Any] = {**vars(st), "heat_dist": getattr(st, "heat_dist", None)}
         return Smoothed(**base, final_pos=final_pos, beads=beads)

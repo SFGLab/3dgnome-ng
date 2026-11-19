@@ -916,9 +916,11 @@ last section are dated records and are not rewritten when production moves on. `
   scores an empty hole's zeros against any filled level, while their contacts follow Hi-C's from
   pair to pair. `design/gap-fill.md` has every arm.
 
-- **Uniform chain with anchors as spans of beads: `[main] uniform_chain = yes`, default no, under
-  measurement since 2026-11-19.** ([pipeline/ib/spans.py](../gnome3d/pipeline/ib/spans.py) `densify_uniform`
-  and `motif_sites`, [mc/numba/terms.py](../gnome3d/mc/numba/terms.py) `init_spans_nb`)
+- **Uniform chain with loops on contact beads: `[main] uniform_chain = yes`, default no, under
+  measurement since 2026-11-19.** ([pipeline/ib/spans.py](../gnome3d/pipeline/ib/spans.py) `densify_uniform`,
+  [pipeline/ib/nodes.py](../gnome3d/pipeline/ib/nodes.py), [skeleton.py](../gnome3d/skeleton.py) `solve_nodes`,
+  [mc/numba/arcs_solver.py](../gnome3d/mc/numba/arcs_solver.py) `reach_energy_grad`)
+  `design/uniform-chain.md` has the rules of the model, the decisions and the stages of the build.
   The default chain has one bead per anchor of any width and one bead per kilobase between
   anchors. In the GM12878 anchor file 88 percent of consecutive anchors overlap and 42 percent are
   nested. The median width is 1.4 kb and 1.2 percent are over 10 kb. With `overlap_anchor_strict`
@@ -930,32 +932,39 @@ last section are dated records and are not rewritten when production moves on. `
   The uniform chain divides the span of a block, from the start of its first anchor to the end of
   its last, into beads of equal width, one per `target_bp_per_subanchor`. Every base is in one
   bead and the sorted output is the chain. The span of an anchor is the run of beads whose
-  midpoints are in its range, and always the knot, the bead at its midpoint. Anchors that overlap
-  share beads. In the joint arcs solve the anchors of a block with their midpoints in one bead
-  are one node, `merge_nodes`: a pair of nodes takes the shortest loop target of its anchor
-  pairs, else their shortest background. The position of the node is the home of the centroid of
-  each of its spans. The solve per block of `scope = block` keeps one node per anchor. The smooth stage moves every bead and adds
-  `anchor_span_weight * |centroid - home|^2` per anchor. The chain starts with each knot at its
-  home and the `smooth_start` bridges between knots. An output bead inside a span has the kind
-  anchor, and the cross block relaxation does not move it.
+  midpoints are in its range. Each end of a kept loop is at one bead of the span of its anchor,
+  drawn per conformation by `contact_bead`. The distinct contact beads of a chromosome are the
+  nodes of the joint arcs solve. The strengths of the loops on one pair of nodes add and go
+  through the law once. Consecutive nodes of a block are held within the chain between them by
+  the reach term, and the excluded volume of the solve acts at the radius of a bead. The nodes
+  are the fixed beads of the smooth stage and the sites of the orientation term, with the
+  orientation of the anchor of the CTCF loop with the most PETs. The relaxation holds the nodes.
+  An output bead under a span has the kind anchor. The numba and the JAX smooth kernels run the
+  chain unchanged. A run with the setting off is byte identical to 298685c, by
+  `playground/parity_dump.py`.
 
-  The orientation term reads a site at the knot of each anchor with a CTCF loop. The orientation
-  of a site is the direction from the bead before it to the bead after it. Sites are three beads
-  or more apart and one bead or more from each end of the chain. An anchor nearer than that to
-  a site of more loop weight joins the site and its loops go to it.
+  Not built yet: the contact data per pair of beads, the two arms of the smooth stage that let a
+  node move, and the arms of the orientation term. The anchor contact map does not reach the
+  nodes.
 
-  With `use_subanchor_heatmap` the singletons are binned to the beads of the uniform chain,
-  `uniform_heatmap`, with the normalisation of the default chain, and the dry passes of the
-  distance estimate hold the spans. A run with the setting off is byte identical to the commit
-  before, by `playground/parity_dump.py`.
+  Stage 1 on GM12878 chr1 108.5 to 111 Mb, one structure, 154 nodes from 379 loops of 267 anchors,
+  bonds before the relaxation:
 
-  The JAX smooth kernel has the span term since 2026-11-19, `_span_delta` in
-  [mc/jax/smooth.py](../gnome3d/mc/jax/smooth.py). It carries no centroid. At each proposal it sums
-  the beads of the spans that hold the bead, up to `span_hold` anchors of `span_len` beads, both
-  static shapes of the kernel, and adds the change to the confinement score. On the CPU backend
-  the running score of the kernel equals the energy of its final chain summed by the numba terms
-  to 1e-4, with the wall and with a prefetch of 8, and a block gives one result alone and in a
-  launch of two. The cost on a GPU is not measured.
+  | arm | bonds over 2 beads | bonds over 3 beads | longest bond | pairs under 0.7 beads |
+  |---|---|---|---|---|
+  | as built | 212 | 89 | 8.90 | 183 |
+  | orientation term off | 23 | 0 | 2.99 | 141 |
+  | hard wall off | 60 | 6 | 3.89 | 1,740 |
+
+  The distance of two consecutive nodes over the chain between them has a median of 0.93 and a
+  95th percentile of 1.15. Of the 76 pairs one bond apart 55 are over 1.02. After the relaxation
+  the as built arm has 301 bonds over 2 beads and 30 pairs under 0.7 beads, and the arm without
+  the orientation term 79 bonds over 2 beads.
+
+  The first build of 2026-11-19, commits 9d8b59f and a898a0e, held the centroid of each span at the
+  arcs position of its anchor with a soft term of the smooth stage and is replaced.
+  `design/uniform-chain.md` has its trial. The measurements below are of the default chain and of
+  that first build.
 
   First measurement, one structure of GM12878 chr1 108.5 to 111 Mb at production settings, bonds
   in chain order after the relaxation, before the nodes were merged:
@@ -992,7 +1001,7 @@ last section are dated records and are not rewritten when production moves on. `
   - The span weight was not tuned. At 1.0 the offset of a centroid from its home has a median of
     0.71 beads, at 0.1 of 1.12 and with the orientation term off of 0.57.
 
-  The battery has not run on this arm. Unit checks in `tests/unit/test_uniform_chain.py` and
+  Unit checks in `tests/unit/test_uniform_chain.py`, `tests/unit/test_contact_nodes.py` and
   `tests/integration/test_uniform_pipeline.py`.
 
 - **Cell grid for excluded volume** ([gnome3d/mc/numba/cells.py](../gnome3d/mc/numba/cells.py),

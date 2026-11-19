@@ -500,7 +500,7 @@ def dropout_keep(
     return keep
 
 
-def _active_arcs(
+def active_arcs(
     state: CoarseState, active_region: list[int], chr_: str, seed: int | None = None
 ) -> tuple[list[int], list[tuple[int, int, int] | tuple[int, int, int, int]]]:
     """Returns the genomic midpoints of the anchors and the arcs among them in active region
@@ -556,7 +556,7 @@ def calc_anchor_arc_weights(
     state: CoarseState, active_region: list[int], chr_: str, seed: int | None = None
 ) -> F32Array | None:
     """Returns the spring weight matrix of the arcs of `calc_anchor_expected_distances`."""
-    mids, arcs = _active_arcs(state, active_region, chr_, seed)
+    mids, arcs = active_arcs(state, active_region, chr_, seed)
     return arc_weight_matrix(state.s, mids, arcs)
 
 
@@ -607,7 +607,7 @@ def calc_anchor_expected_distances(
     """
     s = state.s
     n = len(active_region)
-    mids, arcs = _active_arcs(state, active_region, chr_, seed)
+    mids, arcs = active_arcs(state, active_region, chr_, seed)
     mat = arc_expected_matrix(s, mids, arcs)
 
     if anchor_heatmap is not None and s.use_anchor_heatmap:
@@ -1203,6 +1203,8 @@ def ib_mc_refine(state: CoarseState, segs: list[int], chr_: str) -> None:
 
 
 __all__ = [
+    "active_arcs",
+    "repulsion_range",
     "CoarseState",
     "COARSE_SEED",
     "seed_global_rng",

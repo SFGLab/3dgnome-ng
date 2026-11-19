@@ -73,7 +73,7 @@ def test_strengths_of_loops_on_one_bead_pair_add() -> None:
     assert nodes.mid.tolist() == [12_500, 51_500], "the midpoints of the two beads"
     assert nodes.pair_i.tolist() == [0] and nodes.pair_j.tolist() == [1]
     assert nodes.strength.tolist() == [4.0], "three loops on one bead pair are one loop of the sum"
-    assert nodes.dropped == 0
+    assert (nodes.loop_node >= 0).all()
 
 
 def test_nodes_are_distinct_beads_in_chromosome_order() -> None:
@@ -104,7 +104,7 @@ def test_a_loop_with_both_ends_on_one_bead_is_left_out() -> None:
         beads=np.array([[3, 3], [3, 5]], dtype=np.int64),
         strength=np.array([9.0, 1.0]),
     )
-    assert nodes.dropped == 1 and nodes.strength.tolist() == [1.0]
+    assert nodes.loop_node.tolist() == [[-1, -1], [0, 1]] and nodes.strength.tolist() == [1.0]
     assert nodes.bead.tolist() == [3, 5]
 
 

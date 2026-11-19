@@ -15,13 +15,13 @@ if TYPE_CHECKING:
     from gnome3d.pipeline.coarse import CoarseState
     from gnome3d.settings import Settings
     from gnome3d.types import (
-        AnchorSpans,
         BeadOut,
         BoolArray,
         CompartmentInterval,
         F32Array,
         F64Array,
         I8Array,
+        I32Array,
     )
 
 # (bead index after densify, anchor index in the IB)
@@ -59,6 +59,11 @@ class Seeded:
     # The activity of each anchor for the factory term.
     activity: F32Array | None = field(default=None, kw_only=True)
     chrom: str = field(default="", kw_only=True)
+    # Under `uniform_chain` the nodes of the block, the beads that carry a loop end in this
+    # conformation, and their positions from the joint arcs solve. `orientations` and the
+    # neighbour lists are then per node.
+    node_bead: I32Array | None = field(default=None, kw_only=True)
+    node_pos: F32Array | None = field(default=None, kw_only=True)
 
 
 @dataclass(frozen=True)
@@ -81,8 +86,8 @@ class Densified(Arced):
     step_size_smooth: float
     # (N,) compartment per bead
     bead_compartment: I8Array | None
-    # The anchors as spans of beads under `uniform_chain`. No bead is fixed then.
-    spans: AnchorSpans | None = field(default=None, kw_only=True)
+    # (N,) beads under an anchor, for the kind of the output, under `uniform_chain`.
+    covered: BoolArray | None = field(default=None, kw_only=True)
 
 
 @dataclass(frozen=True)

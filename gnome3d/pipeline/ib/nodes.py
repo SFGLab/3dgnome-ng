@@ -14,7 +14,7 @@ import numpy as np
 if TYPE_CHECKING:
     from gnome3d.polymer import PolymerLaw
     from gnome3d.settings import Settings
-    from gnome3d.types import F64Array, I32Array, I64Array
+    from gnome3d.types import F32Array, F64Array, I32Array, I64Array
 
 DRAWS = ("uniform", "midpoint")
 
@@ -32,7 +32,7 @@ class ContactNodes(NamedTuple):
     pair_i: I32Array  # (P,)
     pair_j: I32Array  # (P,)
     strength: F64Array  # (P,) summed strength of the loops of the pair
-    dropped: int  # loops with both ends on one bead
+    loop_node: I32Array  # (L, 2) node of each loop end, -1 for a loop left out
 
 
 def draw_ends(
@@ -85,6 +85,8 @@ def contact_nodes(
     along = offset[anchor_block[ends]] + beads  # bead counted along the chromosome
     kept = along[:, 0] != along[:, 1]
     nodes, inverse = np.unique(along[kept], return_inverse=True)
+    loop_node: I32Array = np.full(along.shape, -1, dtype=np.int32)
+    loop_node[kept] = inverse.reshape(-1, 2)
     pair = np.sort(inverse.reshape(-1, 2), axis=1)
     m = int(nodes.shape[0])
     keys, which = np.unique(pair[:, 0] * max(m, 1) + pair[:, 1], return_inverse=True)
@@ -103,8 +105,33 @@ def contact_nodes(
         pair_i=(keys // max(m, 1)).astype(np.int32),
         pair_j=(keys % max(m, 1)).astype(np.int32),
         strength=summed,
-        dropped=int((~kept).sum()),
+        loop_node=loop_node,
     )
+
+
+def node_weights(nodes: ContactNodes, s: Settings) -> F32Array | None:
+    """Returns the spring weight of each pair of nodes, the summed strength of its loops to
+    `arc_weight_exponent` and one elsewhere. Returns None at exponent zero.
+    """
+    alpha = float(s.arc_weight_exponent)
+    if alpha <= 0.0:
+        return None
+    m = int(nodes.mid.shape[0])
+    w: F32Array = np.ones((m, m), dtype=np.float32)
+    for i, j, q in zip(nodes.pair_i, nodes.pair_j, nodes.strength, strict=True):
+        w[i, j] = w[j, i] = max(float(q), 1e-6) ** alpha
+    return w
+
+
+def reach_pairs(nodes: ContactNodes, bond: float) -> tuple[I32Array, I32Array, F64Array]:
+    """Returns the consecutive nodes of each block and the length of chain between them, the
+    bonds between the two beads times `bond`.
+    """
+    same = nodes.block[1:] == nodes.block[:-1]
+    first = np.flatnonzero(same).astype(np.int32)
+    second: I32Array = first + 1
+    length: F64Array = (nodes.bead[second] - nodes.bead[first]).astype(np.float64) * bond
+    return first, second, length
 
 
 def node_targets(nodes: ContactNodes, law: PolymerLaw, s: Settings) -> F64Array:

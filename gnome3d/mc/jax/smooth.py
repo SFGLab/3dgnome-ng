@@ -23,7 +23,7 @@ from gnome3d.mc.jax.util import (
     log_kernel_start,
     stable_seed_offset,
 )
-from gnome3d.types import AnchorSpans, F32Array, F64Array, I32Array, I64Array
+from gnome3d.types import F32Array, I32Array, I64Array
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -74,14 +74,8 @@ def _build_smooth_kernel(
     prefetch: int = 1,
     grid_g: int = 0,
     grid_cap: int = 0,
-    span_hold: int = 0,
-    span_len: int = 0,
 ) -> Any:
     """Builds the compiled smooth kernel, or returns the cached one.
-
-    `span_hold` above zero adds the anchor span term of `uniform_chain`. It is the largest
-    number of anchors that hold one bead and `span_len` is the largest number of beads of one
-    span. Both are array shapes and static.
 
     `grid_g` above zero puts the excluded volume and the wall on a cell grid of that many cells
     per axis, each with up to `grid_cap` beads. A proposal then visits the 27 cells around it.
@@ -115,8 +109,6 @@ def _build_smooth_kernel(
         int(prefetch),
         int(grid_g),
         int(grid_cap),
-        int(span_hold),
-        int(span_len),
     )
     if cache_key in _kernel_cache:
         return _kernel_cache[cache_key]
@@ -316,28 +308,6 @@ def _build_smooth_kernel(
         contrib = weight * rel * rel
         return jnp.where(r > R, contrib, 0.0)
 
-    # Anchor spans, a hold of the centroid of the beads of each anchor at its home.
-    #
-    # E_k = weight * |c_k - h_k|^2
-    #
-    # Single counted and kept in the confinement score. The centroids of the anchors that hold the
-    # bead are summed from the positions at each proposal. No centroid is carried.
-
-    def _span_delta(pos: Any, p: Any, disp: Any, spans: Any) -> Any:
-        """Returns the change of the span score when bead p moves by `disp`."""
-        hold, lo, cnt, home, weight = spans
-        ks = hold[p]  # (H,), -1 for no anchor
-        kk = jnp.maximum(ks, 0)
-        offs = jnp.arange(span_len)
-        idx = jnp.minimum(lo[kk][:, None] + offs[None, :], pos.shape[0] - 1)  # (H, L)
-        inside = offs[None, :] < cnt[kk][:, None]
-        inv = 1.0 / jnp.maximum(cnt[kk], 1).astype(pos.dtype)  # (H,)
-        cen = jnp.sum(jnp.where(inside[:, :, None], pos[idx], 0.0), axis=1) * inv[:, None]
-        off = cen - home[kk]  # (H, 3)
-        step = disp[None, :] * inv[:, None]
-        change = jnp.sum((2.0 * off + step) * step, axis=1)
-        return weight * jnp.sum(jnp.where(ks >= 0, change, 0.0))
-
     # Affinity, the compartment term, as `local_affinity_nb` computes it.
     #
     # E_pair = w * g * (1 - exp(-d^2 / (2 r0^2))) / (N - 1), with g = Ea or Eb for a pair of one
@@ -494,7 +464,6 @@ def _build_smooth_kernel(
         n_movable_active: Any,
         cap_home: Any,
         cap_r: Any,
-        spans: Any = None,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any, Any]:
         """Runs one batch of `n_steps_per_batch` MC steps of one chain. Returns (pos_f, ss_f,
         se_f, sh_f, so_f, sc_f, anchor_orn_f, T_f, n_ok).
@@ -619,10 +588,6 @@ def _build_smooth_kernel(
             loc_c_curr = _local_confine_at(new_p, conf_cx, conf_cy, conf_cz, conf_R, conf_w)
             sc_new = sc + (loc_c_curr - loc_c_prev)
             delta = delta + (loc_c_curr - loc_c_prev)
-            if span_hold > 0:
-                d_span = _span_delta(pos, p, disp, spans)
-                sc_new = sc_new + d_span
-                delta = delta + d_span
 
             # A move is accepted on the summed local delta, not on the difference of two running
             # totals. The totals are float32 and on a large block one unit in the last place exceeds
@@ -848,7 +813,6 @@ def _build_smooth_kernel(
         None,  # n_movable_active (shared)
         None,  # cap_home (shared across restarts)
         None,  # cap_r (shared)
-        None,  # spans (shared)
     )
     out_axes = (0, 0, 0, 0, 0, 0, 0, 0, 0)
     batched = jax.vmap(chain_batch, in_axes=in_axes, out_axes=out_axes)
@@ -901,7 +865,6 @@ def _build_smooth_kernel(
         n_movable_active: Any,
         cap_home: Any,
         cap_r: Any,
-        spans: Any = None,
     ) -> Any:
         return batched(
             pos_k,
@@ -950,7 +913,6 @@ def _build_smooth_kernel(
             n_movable_active,
             cap_home,
             cap_r,
-            spans,
         )
 
     # The convergence loop runs on the device in one `lax.while_loop`, one MC batch of all K chains
@@ -1008,7 +970,6 @@ def _build_smooth_kernel(
         n_movable_active: Any,
         cap_home: Any,
         cap_r: Any,
-        spans: Any = None,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -1067,7 +1028,6 @@ def _build_smooth_kernel(
                 n_movable_active,
                 cap_home,
                 cap_r,
-                spans,
             )
             score_per_chain = ss + se + sh + so + sc
             best_idx = jnp.argmin(score_per_chain)
@@ -1354,7 +1314,6 @@ def _build_smooth_kernel(
         0,  # n_movable_active (per-IB)
         0,  # cap_home (per-IB)
         0,  # cap_r (per-IB)
-        0,  # spans (per-IB)
     )
     batched_mp = jax.vmap(chain_batch, in_axes=in_axes_mp, out_axes=out_axes)
 
@@ -1410,7 +1369,6 @@ def _build_smooth_kernel(
         n_movable_active: Any,
         cap_home: Any,
         cap_r: Any,
-        spans: Any = None,
     ) -> Any:
         K = pos_k.shape[0]
 
@@ -1483,7 +1441,6 @@ def _build_smooth_kernel(
                 n_movable_active,
                 cap_home,
                 cap_r,
-                spans,
             )
             # A converged chain keeps its state while the rest of the launch runs.
             pos = hold(pos, prev[0], conv_prev)
@@ -2004,12 +1961,9 @@ def _prep_smooth_problem_np(
     M: int,
     compartment: np.ndarray[Any, Any] | None = None,
     heat_out: np.ndarray[Any, Any] | None = None,
-    motif_beads: np.ndarray[Any, Any] | None = None,
 ) -> dict[str, Any]:
     """Builds the kernel inputs of one IB as numpy arrays padded to a common bucket of B beads,
     A anchors and M neighbours.
-
-    `motif_beads` marks the beads that carry an orientation and defaults to `fixed`.
 
     `heat_out` is an optional (B, B) buffer of the caller that receives the padded heat. The
     caller must zero it. Only the [:n, :n] block is written. Writing into a slice of the
@@ -2049,8 +2003,7 @@ def _prep_smooth_problem_np(
     if use_orn:
         assert char_orientations is not None and anchor_neighbors is not None
         assert anchor_neighbor_weights is not None
-        sites = fixed if motif_beads is None else motif_beads
-        anchor_ar = np.array([int(i) for i in np.where(sites)[0]], dtype=np.int32)
+        anchor_ar = np.array([int(i) for i in np.where(fixed)[0]], dtype=np.int32)
         n_anchors = int(len(anchor_ar))
         nbr_lists = [list(anchor_neighbors.get(k, [])) for k in range(n_anchors)]
         nbr_w_lists = [list(anchor_neighbor_weights.get(k, [])) for k in range(n_anchors)]
@@ -2259,65 +2212,6 @@ def mc_smooth_jax_batch(
     return cast("list[tuple[float, np.ndarray[Any, Any]]]", out)
 
 
-def _site_mask(problem: dict[str, Any]) -> np.ndarray[Any, Any]:
-    """Returns the beads of a problem that carry an orientation, `motif_beads` or `fixed`."""
-    sites = problem.get("motif_beads")
-    return problem["fixed"] if sites is None else sites
-
-
-def _stack_spans(
-    span_sets: list[AnchorSpans],
-    starts: list[np.ndarray[Any, Any]],
-    B: int,
-    weight: float,
-    bucket: bool,
-) -> tuple[tuple[I32Array, I32Array, I32Array, F32Array, F32Array], F32Array, int, int]:
-    """Builds the span inputs of a launch, padded to one shape, and the span score of each start.
-
-    Returns `((hold, lo, cnt, home, weight), scores, span_hold, span_len)`. `hold` is (K, B, H)
-    with the anchors that hold each bead and -1 for none. `lo`, `cnt` and `home` are per anchor.
-    A pad anchor has one bead and no bead refers to it.
-    """
-    from gnome3d.mc.numba.smooth import beads_to_anchors  # noqa: PLC0415
-
-    K = len(span_sets)
-    los: list[I32Array] = [np.asarray(sp.lo, dtype=np.int32) for sp in span_sets]
-    his: list[I32Array] = [np.asarray(sp.hi, dtype=np.int32) for sp in span_sets]
-    holders: list[tuple[I32Array, I32Array]] = [
-        beads_to_anchors(lo, hi, int(start.shape[0]))
-        for lo, hi, start in zip(los, his, starts, strict=True)
-    ]
-    span_hold = max(max(int(np.diff(off).max()), 1) for off, _ in holders)
-    span_len = max(int((hi - lo).max()) for lo, hi in zip(los, his, strict=True))
-    n_anchors = max(int(lo.shape[0]) for lo in los)
-    if bucket:
-        span_hold = 1 << (span_hold - 1).bit_length()
-        span_len = 1 << (span_len - 1).bit_length()
-        n_anchors = jax_bucket_for(n_anchors, ANCHOR_BUCKETS)
-    hold: I32Array = np.full((K, B, span_hold), -1, dtype=np.int32)
-    lo_k: I32Array = np.zeros((K, n_anchors), dtype=np.int32)
-    cnt_k: I32Array = np.ones((K, n_anchors), dtype=np.int32)
-    home_k: F32Array = np.zeros((K, n_anchors, 3), dtype=np.float32)
-    scores: F32Array = np.zeros(K, dtype=np.float32)
-    for i in range(K):
-        lo, hi = los[i], his[i]
-        off, anc = holders[i]
-        home: F64Array = np.asarray(span_sets[i].home, dtype=np.float64)
-        a = int(lo.shape[0])
-        lo_k[i, :a] = lo
-        cnt_k[i, :a] = hi - lo
-        home_k[i, :a] = home.astype(np.float32)
-        for bead in np.flatnonzero(np.diff(off)):
-            held = anc[int(off[bead]) : int(off[bead + 1])]
-            hold[i, int(bead), : int(held.shape[0])] = held
-        ends: F64Array = np.cumsum(np.asarray(starts[i], dtype=np.float64), axis=0)
-        first: F64Array = np.where(lo[:, None] > 0, ends[np.maximum(lo - 1, 0)], 0.0)
-        cen: F64Array = (ends[hi - 1] - first) / (hi - lo)[:, None]
-        scores[i] = weight * float(((cen - home) ** 2).sum())
-    weight_k: F32Array = np.full(K, weight, dtype=np.float32)
-    return (hold, lo_k, cnt_k, home_k, weight_k), scores, span_hold, span_len
-
-
 def _padded_shape(
     problem: dict[str, Any], settings: "Settings", use_orn: bool
 ) -> tuple[int, int, int]:
@@ -2327,7 +2221,7 @@ def _padded_shape(
     b = jax_bucket_for(n) if bucket else n
     if not use_orn:
         return b, 1, 1
-    anchors = int(np.count_nonzero(_site_mask(problem)))
+    anchors = int(np.count_nonzero(problem["fixed"]))
     nbrs = max(
         max((len(problem["anchor_neighbors"].get(k, [])) for k in range(anchors)), default=1), 1
     )
@@ -2395,7 +2289,7 @@ def _mc_smooth_jax_batch_chunk(
         n_i = int(p["pos"].shape[0])
         Bs.append(jax_bucket_for(n_i) if bucket else n_i)
         if use_orn:
-            anchors_i = int(np.count_nonzero(_site_mask(p)))
+            anchors_i = int(np.count_nonzero(p["fixed"]))
             nbrs_i = max(
                 (len(p["anchor_neighbors"].get(k, [])) for k in range(anchors_i)), default=1
             )
@@ -2429,7 +2323,6 @@ def _mc_smooth_jax_batch_chunk(
             M,
             p.get("compartment"),
             heat_all[i] if use_heat else None,
-            p.get("motif_beads"),
         )
         for i, p in enumerate(problems)
     ]
@@ -2500,22 +2393,9 @@ def _mc_smooth_jax_batch_chunk(
                 for p, pr in zip(problems, preps, strict=True)
             ]
         )
-    # Under `uniform_chain` every problem of a launch has spans.
-    spans_k: Any = None
-    span_scores: np.ndarray[Any, Any] | None = None
-    span_hold, span_len = 0, 0
-    if problems[0].get("spans") is not None:
-        span_np, span_scores, span_hold, span_len = _stack_spans(
-            [p["spans"] for p in problems],
-            [np.asarray(p["pos"]) for p in problems],
-            B,
-            float(settings.anchor_span_weight),
-            bucket,
-        )
-        spans_k = tuple(jnp.asarray(a) for a in span_np)
     bundle = _build_smooth_kernel(
         n_steps_per_batch, excl_skip, use_heat, use_orn, M, use_aff, use_wall, use_cap, prefetch,
-        grid_g, grid_cap, span_hold, span_len,
+        grid_g, grid_cap,
     )  # fmt: skip
     (
         _kb,
@@ -2557,9 +2437,6 @@ def _mc_smooth_jax_batch_chunk(
         if use_conf
         else zeros_k
     )
-    if span_scores is not None:
-        # The span term is kept in the confinement score.
-        sc_k = sc_k + jnp.asarray(span_scores)
     if use_orn:
         anchor_orn_k = init_k["anchor_orn"](pos_k, anchor_ar_k, is_L_k)
         so_k = init_k["orn_score"](
@@ -2636,7 +2513,6 @@ def _mc_smooth_jax_batch_chunk(
         n_movable_k,
         cap_home_k,
         cap_r_k,
-        spans_k,
     )
     pos_f, ss_f, se_f, sh_f, so_f, sc_f, _ao_f, _final_score, iter_count, converged = out
     score_per_chain = np.asarray(ss_f + se_f + sh_f + so_f + sc_f)  # syncs the device

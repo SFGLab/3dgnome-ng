@@ -17,14 +17,14 @@ from gnome3d.tracks import bin_compartments
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
     from gnome3d.types import (
-        AnchorSpans,
         BoolArray,
         CompartmentInterval,
         F32Array,
         I8Array,
+        I32Array,
     )
 
-# (pos, fixed, starts, ends, dtn, anchor_map, step_size_smooth, compartment, spans)
+# (pos, fixed, starts, ends, dtn, anchor_map, step_size_smooth, compartment, covered)
 DensifyResult = tuple[
     "F32Array",
     "BoolArray",
@@ -34,7 +34,7 @@ DensifyResult = tuple[
     list[AnchorMapEntry],
     float,
     "I8Array | None",
-    "AnchorSpans | None",
+    "BoolArray | None",
 ]
 
 
@@ -63,18 +63,23 @@ def densify(
     anchor_genomic: list[tuple[int, int, int]],
     s: Settings,
     track_compartments: list[CompartmentInterval] | None = None,
+    node_bead: I32Array | None = None,
+    node_pos: F32Array | None = None,
 ) -> DensifyResult:
     """Inserts subanchor beads between each consecutive anchor pair.
 
     The compartment track is binned onto the bead ranges. A subanchor reads the track over its
-    own genomic slot. With `uniform_chain` the chain is that of `densify_uniform`.
+    own genomic slot. With `uniform_chain` the chain is that of `densify_uniform` with the nodes
+    of the block as its fixed beads. `anchor_pos` then gives the centroid of the block.
     """
     if s.uniform_chain:
-        pos_g, fixed_g, starts_g, ends_g, dtn_g, step_g, comp_g, spans = densify_uniform(
-            anchor_pos, anchor_genomic, s, track_compartments
-        )
-        knots: list[AnchorMapEntry] = [(int(b), k) for k, b in enumerate(spans.knot)]
-        return pos_g, fixed_g, starts_g, ends_g, dtn_g, knots, step_g, comp_g, spans
+        if node_bead is None or node_pos is None:
+            raise ValueError(
+                "[main] uniform_chain is on and the block has no nodes from the joint arcs"
+                " solve. Set [simulation_arcs] scope to chromosome."
+            )
+        centre: F32Array = np.asarray(anchor_pos, dtype=np.float32).mean(axis=0)
+        return densify_uniform(node_bead, node_pos, centre, anchor_genomic, s, track_compartments)
     counts = _subanchor_counts(anchor_genomic, s)
     bead_starts: list[int] = []
     bead_ends: list[int] = []
@@ -162,6 +167,8 @@ def _run(problem: Problem) -> Result:
         problem["anchor_genomic"],
         problem["settings"],
         problem["track_compartments"],
+        problem["node_bead"],
+        problem["node_pos"],
     )
 
 
@@ -181,12 +188,14 @@ class DensifyStage:
             "anchor_genomic": st.anchor_genomic,
             "settings": st.settings,
             "track_compartments": st.track_compartments,
+            "node_bead": st.node_bead,
+            "node_pos": st.node_pos,
         }
 
     def apply(self, inputs: tuple[State, ...], result: Result) -> State:
         st = inputs[0]
         assert isinstance(st, Arced)
-        pos, fixed, starts, ends, dtn, anchor_map, step, compartment, spans = result
+        pos, fixed, starts, ends, dtn, anchor_map, step, compartment, covered = result
         return Densified(
             **vars(st),
             pos=pos,
@@ -197,5 +206,5 @@ class DensifyStage:
             bead_ends=ends,
             step_size_smooth=step,
             bead_compartment=compartment,
-            spans=spans,
+            covered=covered,
         )

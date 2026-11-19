@@ -36,12 +36,11 @@ from gnome3d.mc.numba.terms import (
     init_excl_nb,
     init_heat_nb,
     init_smooth_nb,
-    init_spans_nb,
     local_heat_nb,
     local_smooth_nb,
     njit,
 )
-from gnome3d.types import AnchorSpans, BoolArray, F64Array, I32Array, I64Array
+from gnome3d.types import F64Array, I32Array, I64Array
 
 if TYPE_CHECKING:
     from gnome3d.settings import Settings
@@ -260,22 +259,6 @@ def _mc_smooth_multichain(
     return float(final_scores[best_k])
 
 
-def beads_to_anchors(lo: I32Array, hi: I32Array, n: int) -> tuple[I32Array, I32Array]:
-    """Returns the anchors that hold each bead as offsets and indices. Bead p is held by
-    `indices[offsets[p] : offsets[p + 1]]`.
-    """
-    count = np.zeros(n + 1, dtype=np.int64)
-    for a, b in zip(lo, hi, strict=True):
-        count[int(a) + 1 : int(b) + 1] += 1
-    off: I32Array = np.cumsum(count).astype(np.int32)
-    anc: I32Array = np.zeros(max(int(off[n]), 1), dtype=np.int32)
-    fill = off[:-1].astype(np.int64)
-    for k, (a, b) in enumerate(zip(lo, hi, strict=True)):
-        anc[fill[int(a) : int(b)]] = k
-        fill[int(a) : int(b)] += 1
-    return off, anc
-
-
 def mc_smooth_numba(
     pos: np.ndarray[Any, Any],
     dtn: np.ndarray[Any, Any],
@@ -288,15 +271,11 @@ def mc_smooth_numba(
     heat_dist: np.ndarray[Any, Any] | None = None,
     compartment: np.ndarray[Any, Any] | None = None,
     on_round: Callable[[F64Array], None] | None = None,
-    spans: AnchorSpans | None = None,
-    motif_beads: BoolArray | None = None,
 ) -> float:
     """Anneals the chain in place and returns the final score.
 
     Fixed beads do not move. With `mc_smooth_chains` above 1 and only chain bonds and heat on, K
-    chains run in parallel and the best is kept. With `spans` the centroid of the beads of each
-    anchor is held at its home. `motif_beads` marks the beads that carry an orientation and
-    defaults to `fixed`.
+    chains run in parallel and the best is kept.
     """
     n = pos.shape[0]
     if n <= 2:
@@ -312,7 +291,6 @@ def mc_smooth_numba(
             )
             and not (bool(settings.use_confinement) and bool(settings.confinement_apply_to_smooth))
             and compartment is None
-            and spans is None
         )
         if simple_config:
             return _mc_smooth_multichain(pos, dtn, fixed, step_size, settings, heat_dist)
@@ -402,7 +380,7 @@ def mc_smooth_numba(
             score_orn,
         ) = prepare_orientation(
             pw,
-            fixed if motif_beads is None else motif_beads,
+            fixed,
             char_orientations,
             anchor_neighbors,
             anchor_neighbor_weights,
@@ -465,23 +443,6 @@ def mc_smooth_numba(
         if use_conf
         else 0.0
     )
-
-    use_spans = spans is not None
-    span_weight = float(settings.anchor_span_weight)
-    span_cen = NO_F64_N3
-    span_home = NO_F64_N3
-    span_inv_n = NO_F64
-    span_off = NO_I32
-    span_anc = NO_I32
-    score_spans = 0.0
-    if spans is not None:
-        span_lo: I32Array = np.ascontiguousarray(spans.lo, dtype=np.int32)
-        span_hi: I32Array = np.ascontiguousarray(spans.hi, dtype=np.int32)
-        span_home = np.ascontiguousarray(spans.home, dtype=np.float64)
-        span_inv_n = 1.0 / (span_hi - span_lo).astype(np.float64)
-        span_off, span_anc = beads_to_anchors(span_lo, span_hi, n)
-        span_cen = np.zeros_like(span_home)
-        score_spans = float(init_spans_nb(pw, span_lo, span_hi, span_home, span_weight, span_cen))
 
     score = run_outer_loop(
         pw=pw,
@@ -555,14 +516,6 @@ def mc_smooth_numba(
         cap_home=cap_home,
         cap_r=cap_r,
         on_round=on_round,
-        use_spans=use_spans,
-        span_cen=span_cen,
-        span_home=span_home,
-        span_inv_n=span_inv_n,
-        span_off=span_off,
-        span_anc=span_anc,
-        span_weight=span_weight,
-        score_spans=score_spans,
     )
     pos[:] = pw.astype(pos.dtype)
     return score
