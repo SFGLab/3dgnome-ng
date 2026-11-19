@@ -1,10 +1,4 @@
-"""Unit checks for the seeds of the replicates of the estimate stage.
-
-    python tests/unit/test_estimate_seeds.py
-
-Each replicate must carry its own seed, set by its block and its replicate number and
-independent of the other blocks in the batch.
-"""
+"""Unit checks for the seeds of the replicates of the estimate stage."""
 
 from __future__ import annotations
 
@@ -61,7 +55,6 @@ def test_every_replicate_carries_a_seed() -> None:
 
 
 def test_seeds_follow_the_parent_not_the_batch() -> None:
-    """The replicate seeds of a block do not depend on the rest of the batch."""
     alone = seeds_of([problem(64, 7)])
     first = seeds_of([problem(64, 7), problem(64, 9)])[:4]
     second = seeds_of([problem(64, 9), problem(64, 7)])[4:]

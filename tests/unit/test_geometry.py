@@ -1,7 +1,4 @@
-"""Unit checks for the chain smoothing of `gnome3d/geometry.py`.
-
-python tests/unit/test_geometry.py
-"""
+"""Unit checks for the chain smoothing of `gnome3d/geometry.py`."""
 
 from __future__ import annotations
 

@@ -1,11 +1,4 @@
-"""Unit checks for the target matrix of the arcs stage.
-
-    python tests/unit/test_arc_matrix.py
-
-A pair that an arc joins holds the contact distance of the law. An arcless pair closer than
-`background_range_bp` holds minus its background when `background_weight` is on. Any other
-arcless pair holds -0.5 and the diagonal is 0.
-"""
+"""Unit checks for the target matrix of the arcs stage."""
 
 from __future__ import annotations
 
@@ -128,9 +121,6 @@ def test_loop_contact() -> None:
 
 
 def test_short_range_background() -> None:
-    """With the weight on, arcless pairs inside the range hold minus the background and those
-    beyond keep the repulsion marker.
-    """
     print("\n[short range] arcless pairs inside the range sit on the background")
     s = settings()
     s.background_weight = 0.3
@@ -226,9 +216,6 @@ def test_contact_background() -> None:
 
 
 def test_jax_matches_numba() -> None:
-    """The JAX arcs kernel scores the same energy as numba on a matrix with arc springs and
-    arcless pairs.
-    """
     print("\n[jax] the batched kernel's initial energy is numba's")
     try:
         import os
@@ -274,7 +261,6 @@ def test_jax_matches_numba() -> None:
 
 
 def test_jax_batched_driver_runs() -> None:
-    """The batched JAX arcs driver runs with the short range background on."""
     print("\n[jax] the batched driver runs with the background on")
     try:
         import os

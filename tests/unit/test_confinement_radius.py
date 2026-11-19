@@ -1,10 +1,4 @@
-"""Unit checks for the arcs confinement radius derived from the law.
-
-    python tests/unit/test_confinement_radius.py
-
-With `confinement_packing_factor_arcs` at zero each block gets the sphere of the law for its
-span as an explicit radius. With a positive factor nothing changes.
-"""
+"""Unit checks for the arcs confinement radius derived from the law."""
 
 from __future__ import annotations
 

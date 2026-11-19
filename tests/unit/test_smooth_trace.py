@@ -1,10 +1,4 @@
-"""Unit checks for the `on_round` callback of `mc_smooth_numba`.
-
-    python tests/unit/test_smooth_trace.py
-
-The outer loop calls it after every milestone with the positions of the chain. Without a
-callback nothing changes.
-"""
+"""Unit checks for the `on_round` callback of `mc_smooth_numba`."""
 
 from __future__ import annotations
 

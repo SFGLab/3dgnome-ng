@@ -1,12 +1,4 @@
-"""Unit checks for the arcs solver.
-
-    python tests/unit/test_arcs_solver.py
-
-The energy of the solver must be the one `mc_arcs_numba` scores. Most checks compare it with
-the two init functions of the MC and its gradient with finite differences. An unknown solver
-name raises. Under the batch executor the energy is evaluated on the JAX device and must agree
-with the CPU kernel.
-"""
+"""Unit checks for the arcs solver."""
 
 from __future__ import annotations
 
@@ -160,7 +152,6 @@ def test_it_descends() -> None:
 
 
 def test_the_tolerance_stops_the_solve_and_zero_leaves_it_alone() -> None:
-    """A loose tolerance ends the solve before the cap. At zero the cap alone stops it."""
     pos, exp, s = block(n=120, seed=11)
     s.use_excluded_volume = True
     s.exclusion_apply_to_arcs = True
@@ -289,7 +280,6 @@ def test_the_weight_matrix_follows_the_strength() -> None:
 
 
 def test_device_energy_matches_the_cpu_kernel() -> None:
-    """The device evaluation equals the CPU kernel on a block with every kind of pair."""
     try:
         import jax  # noqa: F401
     except ImportError:
@@ -351,7 +341,6 @@ def test_off_by_default() -> None:
 
 
 def test_an_unknown_name_is_refused() -> None:
-    """An unknown solver name raises."""
     from gnome3d.pipeline.ib.arcs import _run
 
     pos, exp, s = block(40, 5)
@@ -375,9 +364,6 @@ def test_an_unknown_name_is_refused() -> None:
 
 
 def test_the_batched_runner_solves_on_the_device() -> None:
-    """Under the batch executor the solver evaluates its energy on the JAX device and ends
-    where the CPU solve ends.
-    """
     try:
         import jax  # noqa: F401
     except ImportError:
@@ -471,10 +457,6 @@ def test_loop_dropout() -> None:
 
 
 def test_factories() -> None:
-    """The factory term on three anchors against its closed form, its gradient against finite
-    differences, its sign, the device against the CPU and a solve that pulls the active anchors
-    together.
-    """
     from gnome3d.mc.numba.arcs_solver import factory_energy_grad  # noqa: PLC0415
 
     pos = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 3.0, 0.0], [5.0, 5.0, 5.0]])

@@ -1,11 +1,4 @@
-"""Unit checks for the excluded volume cell grid.
-
-    python tests/unit/test_cells.py
-
-The grid must return what the full scan returns, bit for bit: on every bead of a real
-structure, for a bead alone in its cell, for a bead at the corner of the grid, for every bead
-at one point and for a candidate list longer than the buffer.
-"""
+"""Unit checks for the excluded volume cell grid."""
 
 from __future__ import annotations
 
@@ -138,7 +131,6 @@ def test_real_structure() -> None:
 
 
 def test_moves_keep_it_exact() -> None:
-    """The grid stays exact over a long run of moves."""
     print("\n[moves] the grid stays exact while beads move")
     rng = np.random.default_rng(11)
     n = 1500

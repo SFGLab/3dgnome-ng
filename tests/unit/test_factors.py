@@ -1,7 +1,5 @@
 """Unit checks for loops of more than one factor: two cluster files, a strength fit per factor,
 the factor in the target matrix and an orientation graph of the CTCF loops alone.
-
-    python tests/unit/test_factors.py
 """
 
 from __future__ import annotations

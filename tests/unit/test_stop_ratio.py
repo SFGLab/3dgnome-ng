@@ -1,10 +1,4 @@
-"""Unit checks for the settable convergence ratio of the arcs MC.
-
-    python tests/unit/test_stop_ratio.py
-
-The arcs MC stops when a round improves the score by less than a relative amount. Smooth and
-the IB stage pass 2.0, which is not reached.
-"""
+"""Unit checks for the settable convergence ratio of the arcs MC."""
 
 from __future__ import annotations
 
@@ -77,7 +71,6 @@ def test_default_matches_the_hardcoded_value() -> None:
 
 
 def test_the_knob_reaches_the_kernel() -> None:
-    """A ratio that the first round exceeds stops the run there and a tight one does not."""
     import io
     import logging
 

@@ -1,11 +1,4 @@
-"""Unit checks for the maximum entropy gap start.
-
-    python tests/unit/test_maxent_start.py
-
-The mean pair distances of drawn bridges must be the targets. The targets of the law are a
-valid variogram and the conditional covariance needs no clipping. Window contacts move the
-target of a pair as the heatmap rule does. The start is a function of its seed.
-"""
+"""Unit checks for the maximum entropy gap start."""
 
 from __future__ import annotations
 

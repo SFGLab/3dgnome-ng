@@ -1,10 +1,4 @@
-"""Unit checks for the contact term of the block layout.
-
-    python tests/unit/test_ib_heatmap.py
-
-The term bins the contacts of the run by block and converts them to distances with the law.
-The block kernel scores them as its heat term. Weight zero is byte exact.
-"""
+"""Unit checks for the contact term of the block layout."""
 
 from __future__ import annotations
 

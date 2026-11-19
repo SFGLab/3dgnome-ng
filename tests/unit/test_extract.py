@@ -1,10 +1,4 @@
-"""Unit checks for `gnome3d-ng extract`.
-
-    python tests/unit/test_extract.py
-
-The output holds the intra chromosomal pairs at the asked resolution, one line per pair,
-without the diagonal.
-"""
+"""Unit checks for `gnome3d-ng extract`."""
 
 from __future__ import annotations
 

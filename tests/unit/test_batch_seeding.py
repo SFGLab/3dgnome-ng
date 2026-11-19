@@ -2,10 +2,6 @@
 
     python tests/unit/test_batch_seeding.py
 
-A block must anneal the same whatever it shares a launch with. Three things could break that:
-a random stream drawn from the slot in the launch, a converged chain that keeps taking steps
-and padding that reaches the energy or the moves.
-
 Every check compares launches of the same width. The width changes the float32 reduction
 order, which `test_width_changes_only_the_last_bits` measures.
 """
@@ -36,7 +32,6 @@ def check(name: str, cond: bool, detail: str = "") -> None:
 
 
 def settings(steps: int = 400) -> Settings:
-    """A short anneal with excluded volume on."""
     s = Settings()
     s.use_excluded_volume = True
     s.exclusion_apply_to_smooth = True
@@ -69,7 +64,6 @@ def run(problems: list[dict[str, object]], s: Settings) -> list[np.ndarray]:
 
 
 def test_slot_does_not_matter() -> None:
-    """Two blocks in either order give each block the same structure."""
     s = settings()
     a, b = block(256, 11), block(256, 22)
     ab, ba = run([a, b], s), run([b, a], s)
@@ -81,7 +75,6 @@ def test_slot_does_not_matter() -> None:
 
 
 def test_partner_does_not_matter() -> None:
-    """A block anneals the same with any partner in the launch."""
     s = settings()
     a = block(256, 11)
     with_b = run([a, block(256, 22)], s)[0]
@@ -94,7 +87,6 @@ def test_partner_does_not_matter() -> None:
 
 
 def test_a_slower_partner_does_not_over_anneal_it() -> None:
-    """A block that converges early is not carried along by a partner that runs longer."""
     s = settings()
     a = block(256, 11)
     slow_a = run([a, block(1024, 98, spread=8.0)], s)[0]
@@ -107,7 +99,6 @@ def test_a_slower_partner_does_not_over_anneal_it() -> None:
 
 
 def test_padding_does_not_leak() -> None:
-    """A block padded to a larger bead extent anneals as at a smaller one."""
     s = settings()
     a = block(300, 11)
     small = run([a, block(400, 55)], s)[0]  # the 512 bucket
@@ -138,7 +129,6 @@ def test_width_changes_only_the_last_bits() -> None:
 
 
 def test_packing_splits_only_for_memory() -> None:
-    """The plan is one launch when everything fits and follows the cap otherwise."""
     s = settings()
     check(
         "eight small blocks plan as a single launch",
@@ -155,7 +145,6 @@ def test_packing_splits_only_for_memory() -> None:
 
 
 def test_largest_first() -> None:
-    """Packing takes the largest block first."""
     s = settings()
     s.mc_executor_jax_batch_width_smooth = 2
     plan = _chunk_plan([(256, 1, 1), (4096, 1, 1), (512, 1, 1), (2048, 1, 1)], False, False, s)
@@ -163,7 +152,6 @@ def test_largest_first() -> None:
 
 
 def test_every_block_comes_back() -> None:
-    """Results come back in input order."""
     s = settings()
     sizes = [120, 300, 700, 1500, 260, 900, 180]
     blocks = [block(n, 300 + i) for i, n in enumerate(sizes)]

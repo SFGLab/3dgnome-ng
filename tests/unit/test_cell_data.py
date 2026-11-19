@@ -1,9 +1,4 @@
-"""Unit checks for the data section of a cell line.
-
-    python tests/unit/test_cell_data.py
-
-The Hi-C singletons file is the input when it exists and the ChIA-PET singletons otherwise.
-"""
+"""Unit checks for the data section of a cell line."""
 
 from __future__ import annotations
 

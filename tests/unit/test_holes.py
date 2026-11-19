@@ -1,10 +1,4 @@
-"""Unit checks for the hole beads between blocks.
-
-    python tests/unit/test_holes.py
-
-The slots of a hole tile the stretch between two blocks, the blocks are unchanged, the draw
-follows the seed and with the key off nothing changes.
-"""
+"""Unit checks for the hole beads between blocks."""
 
 from __future__ import annotations
 

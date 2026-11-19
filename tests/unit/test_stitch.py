@@ -1,16 +1,4 @@
-"""Unit checks for the boundary stitch pass.
-
-    python tests/unit/test_stitch.py
-
-  * the within block curve is read from the structure
-  * a boundary pair ends on that curve
-  * the geometry inside a block is unchanged
-  * the centroid excluded volume keeps non adjacent blocks apart
-  * the gradient is the gradient of the energy
-  * a chain of chromosome size converges
-
-A chromosome with one block or no anchors passes through unchanged.
-"""
+"""Unit checks for the boundary stitch pass."""
 
 from __future__ import annotations
 
@@ -180,7 +168,6 @@ def test_pass_through() -> None:
 
 
 def test_gradient() -> None:
-    """Against central differences, with the excluded volume active."""
     print("\n[gradient] the energy carries its own gradient")
     rng = np.random.default_rng(0)
     n = 7

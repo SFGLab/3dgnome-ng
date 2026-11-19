@@ -1,11 +1,4 @@
-"""Unit checks for solving the anchors of a chromosome together.
-
-    python tests/unit/test_arcs_scope.py
-
-With `[simulation_arcs] scope = chromosome` every anchor of a chromosome is solved as one
-problem from the placed centroid of each block. The per block arcs stage then passes its
-anchors through. The arcs stage has its own confinement weight.
-"""
+"""Unit checks for solving the anchors of a chromosome together."""
 
 from __future__ import annotations
 

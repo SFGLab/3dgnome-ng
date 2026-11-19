@@ -1,12 +1,4 @@
-"""Unit checks for the compartment energy term.
-
-    python tests/unit/test_terms.py
-
-A hand built configuration has an energy in closed form. The local scores per bead sum to the
-full score, which the incremental MC update needs. The term is not negative over random
-configurations, which the Metropolis rule needs. The term segregates A from B and does nothing
-with its flag off.
-"""
+"""Unit checks for the compartment energy term."""
 
 from __future__ import annotations
 

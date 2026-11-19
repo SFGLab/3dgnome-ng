@@ -1,9 +1,4 @@
-"""Unit checks for the GPU memory pool of a process that shares the card.
-
-    python tests/unit/test_gpu_share.py
-
-`plan_gpu_pool` decides the pool before JAX starts. On a free card it changes nothing.
-"""
+"""Unit checks for the GPU memory pool of a process that shares the card."""
 
 from __future__ import annotations
 

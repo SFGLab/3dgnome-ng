@@ -1,11 +1,4 @@
-"""Unit checks for the cross block relaxation.
-
-    python tests/unit/test_relax.py
-
-The pass runs the smooth kernel over the whole chromosome with excluded volume on every pair
-and the anchors fixed. The count of cross block bead pairs inside the excluded volume radius
-must reach zero.
-"""
+"""Unit checks for the cross block relaxation."""
 
 from __future__ import annotations
 
@@ -190,7 +183,6 @@ def test_it_is_reproducible_from_a_given_rng_state() -> None:
 
 
 def test_within_blocks_clears_inner_overlaps() -> None:
-    """Overlaps inside a block move only with `within_blocks`."""
     rng = np.random.default_rng(5)
     a = coil(0, 80, np.zeros(3), rng, 1.0)
     far = coil(500_000, 20, np.array([100.0, 0.0, 0.0]), rng, 1.0)

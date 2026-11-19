@@ -1,10 +1,4 @@
-"""Unit checks for the windowed gyration term of the arcs solver.
-
-    python tests/unit/test_gyration.py
-
-The gradient matches finite differences, the windows tile every scale twice and a solve from a
-compacted start brings the radius of gyration of each window to the law's.
-"""
+"""Unit checks for the windowed gyration term of the arcs solver."""
 
 from __future__ import annotations
 

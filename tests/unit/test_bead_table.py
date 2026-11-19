@@ -1,7 +1,4 @@
-"""Unit checks for the per bead coordinate table written beside every CIF.
-
-python tests/unit/test_bead_table.py
-"""
+"""Unit checks for the per bead coordinate table written beside every CIF."""
 
 from __future__ import annotations
 

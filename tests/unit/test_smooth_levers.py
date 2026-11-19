@@ -1,12 +1,4 @@
-"""Unit checks for the hard wall, the anchor cap and the coil start of the smooth stage.
-
-    python tests/unit/test_smooth_levers.py
-
-The wall rejects a move that adds a non neighbour pair under the excluded volume radius or
-deepens one. The cap rejects a move that takes an anchor further than the cap from its place.
-The coil start puts the subanchors of each gap on a random bridge between its anchors. With
-all three off the draws of the kernel are unchanged.
-"""
+"""Unit checks for the hard wall, the anchor cap and the coil start of the smooth stage."""
 
 from __future__ import annotations
 
@@ -163,7 +155,6 @@ def _jax_available() -> bool:
 
 
 def test_jax_wall_and_cap() -> None:
-    """The JAX kernel has the same two rules, for one problem and batched."""
     if not _jax_available():
         print("  skip  JAX not available")
         return
@@ -222,7 +213,6 @@ def test_jax_wall_and_cap() -> None:
 
 
 def test_jax_prefetch() -> None:
-    """Prefetching keeps the hard rules, ends where the serial step ends and runs batched."""
     if not _jax_available():
         print("  skip  JAX not available")
         return

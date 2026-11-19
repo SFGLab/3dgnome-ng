@@ -1,11 +1,4 @@
-"""Unit checks for the polymer law and the contact decay fit.
-
-    python tests/unit/test_polymer.py
-
-Contact probability falls as separation to the power `-3 nu`. The fit recovers a known slope
-from clean data, refuses data that is not a decay, such as ChIA-PET singletons and chooses its
-band from the resolution of the data.
-"""
+"""Unit checks for the polymer law and the contact decay fit."""
 
 from __future__ import annotations
 
@@ -158,7 +151,6 @@ def arcs(seed: int, n: int, slope: float = -0.5) -> list[InteractionArc]:
 
 
 def test_arc_strength() -> None:
-    """The strength of a loop is its PET count over the typical count of a loop of its span."""
     print("\n[arcs] typical strength against span, from the run's own arcs")
     f = fit_arc_strength(arcs(1, 5000))
     check("the fit is accepted on enough arcs", f.ok, f.reason)

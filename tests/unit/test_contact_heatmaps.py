@@ -1,10 +1,4 @@
-"""Unit checks for the singleton contact heatmaps.
-
-    python tests/unit/test_contact_heatmaps.py
-
-The anchor heatmap built at anchor resolution must equal, to the byte, the anchor bins of the
-subanchor matrix and no subanchor matrix is returned.
-"""
+"""Unit checks for the singleton contact heatmaps."""
 
 from __future__ import annotations
 

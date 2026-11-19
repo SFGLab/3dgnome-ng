@@ -1,10 +1,4 @@
-"""Unit checks for the walk start and the Hilbert start of the arcs stage.
-
-    python tests/unit/test_arcs_start.py
-
-The walk start places consecutive anchors at the law's distance of their gap along random
-directions.
-"""
+"""Unit checks for the walk start and the Hilbert start of the arcs stage."""
 
 from __future__ import annotations
 
