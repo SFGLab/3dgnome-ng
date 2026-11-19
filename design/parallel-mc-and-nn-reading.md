@@ -164,7 +164,7 @@ is of three kinds.
   conformations, conditioned on sequence and DNase, a thousand structures in 20 minutes at
   20 kb over a 1.28 Mb window, and a diffusion transformer conditioned on Hi-C for E. coli,
   <https://arxiv.org/abs/2603.07472>. This is the only line that competes with what we do, and
-  it is the direction on the cnf branch (`docs/flow-matching-ensembles.md`): a network learns
+  it is the direction on the cnf branch: a network learns
   from our own MC ensembles and then samples in seconds. It needs a large training set of our
   structures first, which the cell line and trio runs of September 2026 start to provide.
 - **Contact map prediction from sequence or epigenome.** Enformer, Avsec et al., Nature Methods

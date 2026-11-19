@@ -1,7 +1,7 @@
 """Resolution-independent structure-validation metrics.
 
 Pure functions over reconstructed structures, either BeadOut lists or plain (N,3) arrays.
-Each maps to a check in docs/validation.md.
+Each is defined in design/validation-metrics.md.
 
   self-consistency    self_consistency        input contact strength vs output 3D distance
   scaling laws        distance_scaling        mean pairwise distance vs genomic separation, a power law

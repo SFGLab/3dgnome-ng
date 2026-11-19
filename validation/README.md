@@ -6,7 +6,7 @@ resolution-independent measures from the 3D-GNOME papers. Everything runs throug
 modelling API (`Settings`, `ContactData`, `simulate`) and scores public output (`BeadOut`) plus the
 user's own input contacts.
 
-The metrics themselves are defined in [../docs/validation-metrics.md](../docs/validation-metrics.md).
+The metrics themselves are defined in [../design/validation-metrics.md](../design/validation-metrics.md).
 Every command for running them on the CUDA box is in [RUNBOOK.md](RUNBOOK.md).
 
 Everything runs through one entry point, `python -m validation <subcommand>`. Run

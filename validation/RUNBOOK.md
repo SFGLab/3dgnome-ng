@@ -2,8 +2,7 @@
 
 Commands for running the validation harness on the CUDA box. Ensembles need n at least 100, the
 3dgnome standard, which is why this is a GPU job. Metric definitions are in
-[../docs/validation-metrics.md](../docs/validation-metrics.md). The sweep plan is in
-[../docs/validation-sweep-plan.md](../docs/validation-sweep-plan.md).
+[../design/validation-metrics.md](../design/validation-metrics.md).
 
 ## 0. Install
 
@@ -89,7 +88,7 @@ it also reports Hi-C SCC and the inverse-distance Pearson, and the cross-data co
 Cross-data correlation runs at `--cross-data-binsize`, which defaults to 1 Mb, the paper's Fig. 2B resolution. At 1 Mb the raw
 log-Pearson is about 0.76 across GM12878 regions, above the paper's 0.67. The observed-over-expected
 number is reported alongside as the decay-stripped structure-only agreement. See
-[../docs/validation-metrics.md](../docs/validation-metrics.md).
+[../design/validation-metrics.md](../design/validation-metrics.md).
 
 The scaling laws are measured in a separate pass on one large region of at least `--law-mb`, default
 20 Mb, the only scale where the fractal-globule power-law window exists. They are not gated on the

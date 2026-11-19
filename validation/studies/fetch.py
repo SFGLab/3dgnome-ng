@@ -1,6 +1,6 @@
 """Experiment data loader. Fetch 4DN and ENCODE files from a declarative manifest.
 
-Sources the data families docs/epigenome-to-structure.md §7 needs, reproducibly.
+Fetches two data families reproducibly.
 
   * epigenomic tracks such as CTCF, RAD21, ATAC/DNase, histone ChIP, RNA-seq, from ENCODE
   * contacts and imaging such as ChIA-PET, Hi-C, MERFISH, from 4DN
@@ -11,7 +11,7 @@ API, downloads it with caching, checksum verification, and skip-if-present, and 
 pinning the resolved accession, md5, and url so a rebuild is byte-identical.
 
 Binning bigWig signal onto a bead grid, the conditioning epitensor, is a downstream transform
-that belongs with the ML model at epigenome-to-structure Phase 0 step 3. That is out of scope
+that belongs with the model that reads it. That is out of scope
 here. This module's job is reproducible acquisition.
 
     python -m validation fetch --manifest validation/manifests/GM12878.json --out data/_epigenome

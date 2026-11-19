@@ -600,7 +600,7 @@ Tracked list of intentional deviations from `3dnome/MC/`. Each entry: what diver
     then compact against an already-compacted target.
 
   The term is purely attractive and needs excluded volume or confinement enabled alongside
-  it, both of which also default off. See the doc.
+  it, both of which also default off. See `design/ab-compartments.md`.
 
 
 - **Excluded volume** — `settings.use_excluded_volume = true` to enable.

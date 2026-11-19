@@ -2,7 +2,7 @@
 
 Drives the public gnome3d modelling API, Settings and ContactData and simulate, exactly as a user
 would, then scores the output ensemble with the resolution-independent metrics in
-validation/metrics/structure.py. See docs/validation.md.
+validation/metrics/structure.py. See design/validation-metrics.md.
 
     python -m validation report --cell GM12878 \\
         --region chr1:18288319-20307135 -n 5

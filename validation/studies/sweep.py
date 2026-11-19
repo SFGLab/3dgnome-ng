@@ -1,6 +1,6 @@
 """EV/confinement hyperparameter sweep, scored by Hi-C correlation and physical sanity.
 
-Implements the plan in docs/validation-sweep-plan.md. For each config and region it runs an
+For each config and region it runs an
 ensemble through the public gnome3d API, scores it with the structure metrics from
 validation/metrics/structure.py and Hi-C correlation against a 4DN .mcool from validation/metrics/hic.py, then
 picks the winning EV/confinement config. The default objective is constrained min-overlap. It
