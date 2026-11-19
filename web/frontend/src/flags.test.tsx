@@ -6,7 +6,7 @@ import { hidden } from './flags'
 import { Cite } from './pages/Cite'
 import { Results } from './pages/Results'
 
-/** The tag the server writes into the page for its `HIDE` setting. */
+/** The tag the server writes into the page for the features its `config.json` turns off. */
 function hide(parts: string) {
   const meta = document.createElement('meta')
   meta.name = 'site-hide'

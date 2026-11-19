@@ -80,12 +80,19 @@ the panel lacks does worse. Table: `playground/sgdp_grch38/results/sv_eval/` in 
 panel, tbooo's phased SGDP files and the imputed files with dosage and genotype probability.
 The catalog before the set was added is `data/catalog.json.before-sgdp`.
 
-## Parts left out
+## Feature flags
 
-`HIDE` in `site.env` is a comma list of `results`, `method` and `trios`. `results` and `method`
-take that page out of the top bar and send its address to the front page. `trios` takes the nine
-people out of the Results page. The site runs with `HIDE=trios`. The server reads it at start, so
-a change needs `up -d` and no build. An unknown name stops the server with the names it takes.
+`data/config.json`, beside the catalog, turns parts of the site on and off. The copy of the
+site's file is `web/deploy/config.json`.
+
+    {"features": {"results": true, "method": true, "trios": false}}
+
+`results` and `method` are the two pages. Off, the page leaves the top bar, its address leads to
+the front page and other pages stop pointing at it. `trios` is the nine people on the Results
+page, off on this site. A feature the file leaves out is on. The server reads the file again
+when it changes, so an edit needs no restart and no build. A site does not start on a file with
+an unknown key or feature, and a broken edit of a running site is logged and the configuration
+it had stays.
 
 ## Run
 

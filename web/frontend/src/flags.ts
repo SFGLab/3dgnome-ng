@@ -1,10 +1,10 @@
-/** The parts of the site the server leaves out, from its `HIDE` setting. */
+/** The parts of the site the server turns off, the features of its `config.json`. */
 
 export type Part = 'results' | 'method' | 'trios'
 
 /**
- * Whether the server hides a part of the site.
- * The server writes the hidden parts into the page as the `site-hide` meta tag, read on each call
+ * Whether a part of the site is turned off.
+ * The server writes the features that are off into the page as the `site-hide` meta tag, read on each call
  * so a test can set it. A page served by the development server has no tag and hides nothing.
  */
 export function hidden(part: Part): boolean {

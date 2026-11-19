@@ -17,9 +17,8 @@ UPLOAD_MAX_MB   the largest upload, in MB, default 200
 LINK_READS    how many contact map links the server reads at once, default 4
 LINK_ALLOW_PRIVATE  1 lets a contact map link point at a private or loopback address, for tests;
               off by default
-HIDE          parts of the site left out, a comma list of results, method and trios. results and
-              method are the two pages, with their links. trios is the nine people on the
-              Results page. Empty by default
+SITE_CONFIG   the site's config.json, default DATA_DIR/config.json. It holds the feature flags,
+              see siteconfig.py. A site without the file shows everything
 HICDIFFUSION_DIR, HICDIFFUSION_PYTHON, HICDIFFUSION_MODELS, REFERENCE_FASTA  the parts of the
               HiCDiffusion step, see hicdiffusion.py; it is offered when every part is in place
 """
@@ -30,20 +29,6 @@ import os
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
-
-
-# The parts of the site HIDE can leave out.
-HIDEABLE = ("results", "method", "trios")
-
-
-def hidden(text: str) -> tuple[str, ...]:
-    """The parts a HIDE value names, in the order of `HIDEABLE`. An unknown name is an error, so
-    a misspelt part is not shown by mistake."""
-    asked = {t.strip().lower() for t in text.split(",") if t.strip()}
-    unknown = sorted(asked - set(HIDEABLE))
-    if unknown:
-        raise ValueError(f"HIDE names {', '.join(unknown)}. It takes {', '.join(HIDEABLE)}.")
-    return tuple(h for h in HIDEABLE if h in asked)
 
 
 def base_path(text: str) -> str:
@@ -68,7 +53,7 @@ class Settings:
     link_allow_private: bool = False
     link_reads: int = 4
     base_path: str = ""
-    hide: tuple[str, ...] = ()
+    site_config: Path | None = None
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -87,6 +72,6 @@ class Settings:
             link_allow_private=os.environ.get("LINK_ALLOW_PRIVATE", "") == "1",
             link_reads=int(os.environ.get("LINK_READS", "4")),
             base_path=base_path(os.environ.get("BASE_PATH", "")),
-            hide=hidden(os.environ.get("HIDE", "")),
+            site_config=Path(os.environ["SITE_CONFIG"]) if os.environ.get("SITE_CONFIG") else None,
             frontend_dist=Path(os.environ.get("FRONTEND_DIST", Path(__file__).resolve().parents[1] / "frontend" / "dist")),
         )

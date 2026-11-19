@@ -57,16 +57,26 @@ def main() -> int:
 
         check("no part is hidden by default", "site-hide" not in c.get("/").text)
         (dist / "index.html").write_text("<html><head></head><body>FRONTEND-OK</body></html>")
-        os.environ["HIDE"] = "trios, Results"
-        r = TestClient(create_app()).get("/")
-        check("HIDE reaches the app in the page", '<meta name="site-hide" content="results,trios">' in r.text, r.text[:120])
-        os.environ["HIDE"] = "trois"
-        try:
-            create_app()
-            check("an unknown part of HIDE is refused", False)
-        except ValueError as e:
-            check("an unknown part of HIDE is refused", "trois" in str(e) and "results, method, trios" in str(e), str(e))
-        del os.environ["HIDE"]
+        config = root / "data" / "config.json"
+        config.write_text('{"features": {"trios": false, "results": false, "method": true}}')
+        flagged = TestClient(create_app())
+        r = flagged.get("/")
+        check("a feature config.json turns off reaches the app in the page", '<meta name="site-hide" content="results,trios">' in r.text, r.text[:120])
+        config.write_text('{"features": {"trios": false}}')
+        os.utime(config, ns=(1, 1))
+        check("an edit of config.json is read without a restart", '<meta name="site-hide" content="trios">' in flagged.get("/").text)
+        config.write_text('{"features": {"trois": false}}')
+        os.utime(config, ns=(2, 2))
+        check("a broken edit keeps the configuration the site had", '<meta name="site-hide" content="trios">' in flagged.get("/").text)
+        for text, said in (('{"features": {"trois": false}}', "trois"), ('{"features": {"trios": "no"}}', "true or false"), ('{"feature": {}}', "unknown key"), ("{", "not JSON")):
+            config.write_text(text)
+            try:
+                create_app()
+                check(f"a site does not start on a config.json with {said}", False)
+            except ValueError as e:
+                check(f"a site does not start on a config.json with {said}", said in str(e), str(e))
+        config.unlink()
+        check("a site without config.json shows everything", "site-hide" not in TestClient(create_app()).get("/").text)
         (dist / "index.html").write_text("<html><body>FRONTEND-OK</body></html>")
 
         os.environ["FRONTEND_DIST"] = str(root / "missing")
