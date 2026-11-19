@@ -1,4 +1,4 @@
-"""Localize the large-region expansion (NOT EV, NOT bead count). All at matched ~5k beads on the
+"""Localize the large-region expansion (not EV, not bead count). All at matched ~5k beads on the
 19.8 Mb region, n=1. Reuse anchors: parity Rg~12.96, tuned-noDyn Rg~24.50 (from ablate_large2).
 
   B  parity + long MC schedule       -> is the expansion just CANONICAL annealing 10x longer?

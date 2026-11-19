@@ -60,7 +60,7 @@ Rules for the code as it stands:
 │   ├── unit/                   # One file per feature, each also runs as a script
 │   └── integration/            # Whole pipeline on synthetic inputs and on one real region
 ├── legacy/                     # Retired code, kept runnable
-│   ├── 3dnome/MC/              # Reference implementation (READ ONLY)
+│   ├── 3dnome/MC/              # Reference implementation (read only)
 │   │   ├── LooperSolver.cpp/h  # Main solver, all MC loops are here
 │   │   └── ...                 # Chromosome, Heatmap, InteractionArcs, Cluster, lib/
 │   ├── harness/                # integration.py, the reference runner, and tests of playground scripts

@@ -60,7 +60,7 @@ LEVEL=$(awk '/^flags/{if(/avx512f/) print "v4"; else if(/avx2/) print "v3";
 echo "[setup:$CELL] cpu x86-64 level = $LEVEL (NumPy wheels need v2 or better)"
 [ "$LEVEL" = "v1" ] && { echo "[setup] node below the NumPy baseline" >&2; exit 1; }
 
-# Deliberately NOT `pip install -e ".[validation]"`. That extra also pulls hicrep and pyBigWig,
+# Deliberately not `pip install -e ".[validation]"`. That extra also pulls hicrep and pyBigWig,
 # which build from sdists whose setup.py imports numpy, and that build is what fails. Neither is
 # needed: hicrep is declared but never imported anywhere in legacy/validation/, and pyBigWig is used
 # only by the ATAC signal path, which these runs skip.

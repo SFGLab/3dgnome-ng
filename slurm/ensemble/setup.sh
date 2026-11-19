@@ -65,7 +65,7 @@ if [ "$LEVEL" = "v1" ]; then
 fi
 
 # ---- environment ---------------------------------------------------------------------------
-# Deliberately NOT `pip install -e ".[validation]"`. That extra also pulls hicrep and pyBigWig,
+# Deliberately not `pip install -e ".[validation]"`. That extra also pulls hicrep and pyBigWig,
 # both of which build from an sdist whose setup.py imports numpy, which is where the login-node
 # install died. Neither is needed here: hicrep is declared but never imported anywhere in
 # legacy/validation/, and pyBigWig is imported lazily by the ATAC signal path, which this ensemble

@@ -113,7 +113,7 @@ cell = sys.argv[2]
 
 # Each of these fails silently rather than loudly if unset: epigenome terms left on from another
 # run produce a plausible structure that answers a different question. The singleton source is
-# deliberately NOT constrained here, since Hi-C, ChIA-PET and the blend are all legitimate arms;
+# deliberately not constrained here, since Hi-C, ChIA-PET and the blend are all legitimate arms;
 # what is checked is that the file exists. Blocks are not checked because they no longer vary,
 # always coming from arc gaps.
 assert cell in s.data_anchors, f"config is not for {cell}: anchors={s.data_anchors!r}"
