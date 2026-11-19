@@ -1,4 +1,4 @@
-import { Archive, Braces, ChevronLeft, ChevronRight, FileText, Folder, Pencil } from 'lucide-react'
+import { Braces, ChevronLeft, ChevronRight, FileText, Folder, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { recentJobs, rememberJob } from '../model/recent'
 import type { JobApi, Summary } from './api'
@@ -171,11 +171,6 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
                   <span className="size">{size(f.size)}</span>
                 </li>
               ))}
-            <li className="file">
-              <a href={api.zipUrl}>
-                <Archive size={14} aria-hidden /> all files, zip
-              </a>
-            </li>
           </ul>
         </>
       )}

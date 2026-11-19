@@ -260,7 +260,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
                 moveTo({ chrom: job.chrom, start: l.a[0] - pad, end: l.b[1] + pad })
                 setNote('')
               }}
-              hint="The box is the part the map shows. Drag along the loops to choose a part or click a loop to go to it."
+              hint="The box is the part the map shows. Scroll or drag along the loops to choose a part, or click a loop to go to it."
             />
           </div>
         )}

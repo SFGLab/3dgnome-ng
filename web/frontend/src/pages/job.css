@@ -171,9 +171,13 @@
   padding: 0;
 }
 
+/* The structures sit inside their folder: set in from it, with a line down the folder's side. */
 .files .models > ul {
   max-height: 190px;
   overflow-y: auto;
+  margin-left: 14px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
 }
 
 /* A long file name is cut, not its icon. */
@@ -354,12 +358,12 @@
   overflow: hidden;
 }
 
-/* With the loops under it the box is as tall as the screen leaves, so both are seen at once. */
-.structure-view.with-below .view-box {
+/* With the loops over it the box is as tall as the screen leaves, so both are seen at once. */
+.structure-view.with-above .view-box {
   height: clamp(380px, calc(100vh - 470px), 640px);
 }
 
-.structure-view.with-below .view-box:fullscreen {
+.structure-view.with-above .view-box:fullscreen {
   height: 100vh;
 }
 
@@ -422,6 +426,12 @@
   margin: 0;
   font-size: 12px;
   color: var(--faint);
+}
+
+.marker.loop-anchor {
+  width: 16px;
+  height: 16px;
+  font-size: 9px;
 }
 
 .marker {

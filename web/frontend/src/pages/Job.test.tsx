@@ -53,7 +53,8 @@ describe('Job explorer', () => {
     expect(screen.getByText('CTCF and RNAPII')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /ep\.tsv/ })).toHaveAttribute('href', `/jobs/${KEY}/files/ep.tsv`)
     expect(within(screen.getByRole('list', { name: 'Structure files' })).getAllByRole('listitem')).toHaveLength(SUMMARY_DONE.models.length)
-    expect(screen.getByRole('link', { name: /all files, zip/ })).toHaveAttribute('href', `/api/jobs/${KEY}/files.zip`)
+    // Every file in one archive is the Download all button of the tabs, and the list does not repeat it.
+    expect(screen.queryByRole('link', { name: /all files, zip/ })).not.toBeInTheDocument()
   })
 
   it('survives a browser whose scroll returns a promise when the structure changes', async () => {

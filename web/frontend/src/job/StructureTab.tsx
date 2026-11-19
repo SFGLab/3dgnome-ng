@@ -111,13 +111,14 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
         onPickBead={pick}
         onHoverPosition={setCursor}
         focusSpan={part}
-        below={
+        above={
           loops.length > 0 && (
             <LoopView
               chrom={region.chrom}
               region={part ?? [region.start, region.end]}
+              bounds={[region.start, region.end]}
               loops={loops}
-              onWindow={(a, b) => setPart([a, b])}
+              onWindow={(a, b) => setPart(a <= region.start && b >= region.end ? null : [a, b])}
               onReset={part ? () => setPart(null) : undefined}
               selected={loopIndex < 0 ? null : loopIndex}
               onSelect={(i) => {
@@ -126,7 +127,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
                 setLoop(i === null ? null : loops[i])
               }}
               cursor={cursor}
-              hint={part ? 'This part of the region stays solid in the model. Click a loop to mark its two anchors.' : 'Click a loop to mark its two anchors in the model. Drag along the loops to look at a part of the region.'}
+              hint={part ? 'This part of the region stays solid in the model. Click a loop to mark its two anchors. Scroll to zoom.' : 'Click a loop to mark its two anchors in the model. Scroll or drag along the loops to look at a part of the region.'}
             />
           )
         }
