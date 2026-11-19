@@ -35,7 +35,7 @@ export function Title() {
       <section className="hero">
         <div className="hero-text">
           <h1 className="hero-name">
-            3D-GNOME<sup>NG</sup>
+            3D-GNOME<sup className="ng">NG</sup>
           </h1>
           <p className="lead">
             3D-GNOMEᴺᴳ computes 3D structures of genomic regions up to 20 Mb from CTCF and RNAPII loops, Hi-C contacts and structural variants. Each job returns an ensemble of

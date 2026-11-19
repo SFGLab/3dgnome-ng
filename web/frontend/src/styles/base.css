@@ -173,3 +173,17 @@ a:not(.button, .button-link, .cite-button, .chip-button, .action, .brand, .recen
     transform: none;
   }
 }
+
+/* The raised NG of the site's name. Its capitals end level with the capitals of the name: it
+   stays on the name's baseline and is lifted by the height of the name's capitals less its own.
+   The capitals of Inter are 0.727 em tall, `--cap`. `--ng` is its size against the name's. */
+sup.ng {
+  --ng: 0.42;
+  --cap: 0.727;
+  position: relative;
+  top: calc(-1em * var(--cap) * (1 / var(--ng) - 1));
+  font-size: calc(var(--ng) * 1em);
+  line-height: 0;
+  vertical-align: baseline;
+  color: var(--accent);
+}

@@ -49,7 +49,7 @@ export function Cite() {
 
         <section id="cite-gnome3d">
           <h2>
-            Cite 3D-GNOME<sup>NG</sup>
+            Cite 3D-GNOME<sup className="ng">NG</sup>
           </h2>
           <div className="primary-citation">
             <p>{PRIMARY}</p>

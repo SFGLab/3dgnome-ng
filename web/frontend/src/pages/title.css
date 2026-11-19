@@ -29,9 +29,8 @@
   color: var(--ink);
 }
 
-.hero-name sup {
-  font-size: 22px;
-  color: var(--accent);
+.hero-name sup.ng {
+  --ng: 0.393;
   margin-left: 4px;
 }
 

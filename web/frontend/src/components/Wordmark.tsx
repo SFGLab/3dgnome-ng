@@ -2,7 +2,7 @@
 export function Wordmark() {
   return (
     <span className="wordmark" data-testid="wordmark">
-      3D-GNOME<sup>NG</sup>
+      3D-GNOME<sup className="ng">NG</sup>
     </span>
   )
 }
