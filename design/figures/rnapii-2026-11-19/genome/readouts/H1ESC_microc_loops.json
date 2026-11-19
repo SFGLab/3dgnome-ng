@@ -1,0 +1,196 @@
+{
+ "binsize": 5000,
+ "chromosomes": 22,
+ "rows": [
+  {
+   "arm": "map",
+   "class": "all",
+   "loops": 10046,
+   "scored": 10046
+  },
+  {
+   "arm": "map",
+   "class": "CTCF",
+   "loops": 4126,
+   "scored": 4126
+  },
+  {
+   "arm": "map",
+   "class": "RNAPII alone",
+   "loops": 586,
+   "scored": 586
+  },
+  {
+   "arm": "map",
+   "class": "none",
+   "loops": 5334,
+   "scored": 5334
+  },
+  {
+   "arm": "map",
+   "class": "moved, no loop",
+   "loops": 9994,
+   "scored": 9930
+  },
+  {
+   "arm": "H1ESC_E_genome",
+   "class": "all",
+   "loops": 10046,
+   "scored": 1463,
+   "placed": 0.12960382241688234,
+   "placed_above_moved": 0.1176966781303104
+  },
+  {
+   "arm": "H1ESC_E_genome",
+   "class": "CTCF",
+   "loops": 4126,
+   "scored": 1191,
+   "placed": 0.2789626757149782,
+   "placed_above_moved": 0.2670555314284062
+  },
+  {
+   "arm": "H1ESC_E_genome",
+   "class": "RNAPII alone",
+   "loops": 586,
+   "scored": 28,
+   "placed": 0.015358361774744027,
+   "placed_above_moved": 0.003451217488172084
+  },
+  {
+   "arm": "H1ESC_E_genome",
+   "class": "none",
+   "loops": 5334,
+   "scored": 244,
+   "placed": 0.02662167229096363,
+   "placed_above_moved": 0.014714528004391688
+  },
+  {
+   "arm": "H1ESC_E_genome",
+   "class": "moved, no loop",
+   "loops": 9994,
+   "scored": 419,
+   "placed": 0.011907144286571943,
+   "placed_above_moved": 0.0
+  },
+  {
+   "arm": "H1ESC_C_genome",
+   "class": "all",
+   "loops": 10046,
+   "scored": 7758,
+   "placed": 0.408520804300219,
+   "placed_above_moved": 0.34708394218294863
+  },
+  {
+   "arm": "H1ESC_C_genome",
+   "class": "CTCF",
+   "loops": 4126,
+   "scored": 3941,
+   "placed": 0.7198254968492487,
+   "placed_above_moved": 0.6583886347319783
+  },
+  {
+   "arm": "H1ESC_C_genome",
+   "class": "RNAPII alone",
+   "loops": 586,
+   "scored": 430,
+   "placed": 0.24061433447098976,
+   "placed_above_moved": 0.1791774723537194
+  },
+  {
+   "arm": "H1ESC_C_genome",
+   "class": "none",
+   "loops": 5334,
+   "scored": 3387,
+   "placed": 0.18616422947131608,
+   "placed_above_moved": 0.12472736735404572
+  },
+  {
+   "arm": "H1ESC_C_genome",
+   "class": "moved, no loop",
+   "loops": 9994,
+   "scored": 6956,
+   "placed": 0.06143686211727036,
+   "placed_above_moved": 0.0
+  },
+  {
+   "arm": "H1ESC_R_genome",
+   "class": "all",
+   "loops": 10046,
+   "scored": 8697,
+   "placed": 0.4686442365120446,
+   "placed_above_moved": 0.39560041021626713
+  },
+  {
+   "arm": "H1ESC_R_genome",
+   "class": "CTCF",
+   "loops": 4126,
+   "scored": 4016,
+   "placed": 0.7893843916626272,
+   "placed_above_moved": 0.7163405653668498
+  },
+  {
+   "arm": "H1ESC_R_genome",
+   "class": "RNAPII alone",
+   "loops": 586,
+   "scored": 513,
+   "placed": 0.6552901023890785,
+   "placed_above_moved": 0.582246276093301
+  },
+  {
+   "arm": "H1ESC_R_genome",
+   "class": "none",
+   "loops": 5334,
+   "scored": 4168,
+   "placed": 0.20003749531308587,
+   "placed_above_moved": 0.1269936690173084
+  },
+  {
+   "arm": "H1ESC_R_genome",
+   "class": "moved, no loop",
+   "loops": 9994,
+   "scored": 8142,
+   "placed": 0.07304382629577746,
+   "placed_above_moved": 0.0
+  },
+  {
+   "arm": "H1ESC_M_genome",
+   "class": "all",
+   "loops": 10046,
+   "scored": 8780,
+   "placed": 0.44555046784789964,
+   "placed_above_moved": 0.37490808241664086
+  },
+  {
+   "arm": "H1ESC_M_genome",
+   "class": "CTCF",
+   "loops": 4126,
+   "scored": 4027,
+   "placed": 0.7273388269510421,
+   "placed_above_moved": 0.6566964415197833
+  },
+  {
+   "arm": "H1ESC_M_genome",
+   "class": "RNAPII alone",
+   "loops": 586,
+   "scored": 547,
+   "placed": 0.5972696245733788,
+   "placed_above_moved": 0.5266272391421201
+  },
+  {
+   "arm": "H1ESC_M_genome",
+   "class": "none",
+   "loops": 5334,
+   "scored": 4206,
+   "placed": 0.2109111361079865,
+   "placed_above_moved": 0.14026875067672775
+  },
+  {
+   "arm": "H1ESC_M_genome",
+   "class": "moved, no loop",
+   "loops": 9994,
+   "scored": 8284,
+   "placed": 0.07064238543125875,
+   "placed_above_moved": 0.0
+  }
+ ]
+}

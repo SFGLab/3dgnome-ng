@@ -29,12 +29,12 @@ def main() -> None:
     print("agreement with Hi-C, SCC")
     print(hic.round(3).to_string())
     print("\nenhancer to promoter distance, RNAPII only pairs, median")
-    for path in sorted(fig_inputs.glob("ep_*.tsv")):
+    for path in sorted([*fig_inputs.glob("ep_*.tsv"), *fig_inputs.glob("ep_*.tsv.gz")]):
         t = pd.read_csv(path, sep="\t")
         t = t[t["set"] == "rnapii_only"]
         med = t.groupby("arm").distance.median()
         n = int(t[t.arm == "C"].shape[0])
-        print(f"  {path.stem[3:]:8s} C {med['C']:.2f}  R {med['R']:.2f}  {100 * (1 - med['R'] / med['C']):.0f}% closer  {n} pairs")
+        print(f"  {path.name[3:].split('.')[0]:8s} C {med['C']:.2f}  R {med['R']:.2f}  {100 * (1 - med['R'] / med['C']):.0f}% closer  {n} pairs")
     arms = tuple(a for a in ("E", "C", "R", "M") if (readouts / f"e3d_{a}" / "summary.tsv").exists())
     draws = link_draws(readouts, arms)
     med = draws.groupby(["pair", "arm"]).value.median().unstack()

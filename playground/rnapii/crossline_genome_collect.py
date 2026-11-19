@@ -18,8 +18,9 @@ out dir gets `readouts/` and `fig_inputs/` as `figures_two.py` takes them.
 - `fig_inputs/ep_<LINE>.tsv` is the pair tables one under the other, with the chromosome.
 
 - `readouts/by_chromosome.tsv` has line, arm, chrom, measure and value, one row a chromosome:
-  `hic`, the raw stratum adjusted correlation of the summed map, and `microc_loops`, the share
-  of Micro-C loops placed above the moved loops. The figures test two arms over these.
+  `hic`, the raw stratum adjusted correlation of the summed map, `microc_loops`, the share of
+  Micro-C loops placed above the moved loops, and the same per class of loop as
+  `microc_loops, <class>`. The figures test two arms over these.
 
 A chromosome whose file is missing is named and left out of that sum, so a partial run can be
 looked at. The counts of chromosomes read are printed per file.
@@ -207,9 +208,12 @@ def by_chromosome(src: Path, out: Path) -> None:
             path = src / "microc" / f"{line}_{chrom}_5000.json"
             if path.is_file():
                 for r in json.loads(path.read_text())["rows"]:
-                    if r["arm"] != "map" and r["class"] == "all" and "placed_above_moved" in r:
-                        rows.append({"line": line, "arm": str(r["arm"])[len(line) + 1 : -len(chrom) - 1], "chrom": chrom,
-                                     "measure": "microc_loops", "value": float(r["placed_above_moved"])})
+                    if r["arm"] == "map" or "placed_above_moved" not in r or str(r["class"]).startswith("moved") or not int(r["loops"]):
+                        continue
+                    # All loops under the measure the dumbbells read, and each class under its own.
+                    measure = "microc_loops" if r["class"] == "all" else f"microc_loops, {r['class']}"
+                    rows.append({"line": line, "arm": str(r["arm"])[len(line) + 1 : -len(chrom) - 1], "chrom": chrom,
+                                 "measure": measure, "value": float(r["placed_above_moved"])})
     if rows:
         d = out / "readouts"
         d.mkdir(parents=True, exist_ok=True)

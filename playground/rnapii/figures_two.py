@@ -162,10 +162,10 @@ def dumbbells(ax: plt.Axes, df: pd.DataFrame, a: str, b: str, measure: str, xlim
         ax.text(vb, row + 0.28, f"{vb:.2f}", ha="center", fontsize=7, color=INK)
         ax.text(va, row - 0.42, f"{va:.2f}", ha="center", fontsize=7, color=MUTED)
         if line in tests:
-            # Over the line between the two dots when they are far apart, else at the end of the
-            # row the dots are not at.
+            # Over the line between the two dots when the mark fits between their values, a third
+            # of the range, else at the end of the row the dots are not at.
             text, span = mark(tests[line][0]), xlim[1] - xlim[0]
-            if abs(va - vb) > 0.2 * span:
+            if abs(va - vb) > 0.33 * span:
                 ax.text((va + vb) / 2, row + 0.2, text, ha="center", va="center", fontsize=6.5, color=MUTED)
             elif min(va, vb) - xlim[0] > 0.3 * span:
                 ax.text(0.02, row, text.replace(", ", "\n", 1), transform=ax.get_yaxis_transform(), ha="left", va="center",
@@ -341,7 +341,10 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
     input reaches."""
     ag = agreement(readouts)
     maps = np.load(inputs / "maps_GM12878.npz")
-    ep = pd.concat(pd.read_csv(inputs / f"ep_{line}.tsv", sep="\t") for line in LINES)
+    # The whole genome tables are kept compressed.
+    ep = pd.concat(
+        pd.read_csv(next(p for p in (inputs / f"ep_{line}.tsv", inputs / f"ep_{line}.tsv.gz") if p.is_file()), sep="\t") for line in LINES
+    )
 
     fig = plt.figure(figsize=(7.2, 10.8), layout="constrained")
     rows = fig.subfigures(4, 1, height_ratios=[0.8, 1.55, 1.05, 1.9], hspace=0.04)
@@ -512,9 +515,11 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
     return fig
 
 
-def _forest(ax: plt.Axes, values: dict[str, tuple[float, float, float] | None], arms: tuple[str, ...]) -> None:
+def _forest(ax: plt.Axes, values: dict[str, tuple[float, float, float] | None], arms: tuple[str, ...],
+            marks: dict[str, str] | None = None) -> None:
     """One row per model set: the value as a dot, with its interval when one is given, and the
-    value written beside it. A panel with no values at all says so once."""
+    value written beside it. A panel with no values at all says so once. With `marks`, a model
+    set's value is followed by the mark of its test against the set the caller compares with."""
     if all(values.get(x) is None for x in arms):
         ax.text(0.5, 0.5, "no Micro-C map for this line", transform=ax.transAxes, ha="center", va="center",
                 color=MUTED, fontsize=7, style="italic")
@@ -530,12 +535,28 @@ def _forest(ax: plt.Axes, values: dict[str, tuple[float, float, float] | None], 
         if np.isfinite(lo):
             ax.plot([lo, hi], [row, row], color=ARM_COLOUR[a], lw=2, alpha=0.5, solid_capstyle="round")
         ax.plot(mid, row, "o", color=ARM_COLOUR[a], ms=7, zorder=3)
-        ax.text(mid, row + 0.3, f"{mid:.2f}", ha="center", fontsize=7, color=INK)
+        ax.text(mid, row + 0.3, f"{mid:.2f}" + (f"  {marks[a]}" if marks and a in marks else ""), ha="center", fontsize=7, color=INK)
     ax.set_ylim(-0.6, len(arms) - 0.3)
     ax.set_yticks(range(len(arms)))
     ax.grid(axis="x", color=GRID, lw=0.6)
     ax.set_axisbelow(True)
     ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(4))
+
+
+def _against_c(per_chrom: pd.DataFrame, measure: str, line: str, arms: tuple[str, ...]) -> dict[str, str]:
+    """The mark of each model set against gnome3d with CTCF loops, a signed rank test over the
+    chromosomes both have a value on. Empty for readouts of one region."""
+    t = per_chrom[(per_chrom.measure == measure) & (per_chrom.line == line)]
+    if t.empty:
+        return {}
+    w = t.pivot_table(index="chrom", columns="arm", values="value")
+    out = {}
+    for a in arms:
+        if a != "C" and a in w.columns and "C" in w.columns:
+            x = w.dropna(subset=[a, "C"])
+            if len(x) >= 6:
+                out[a] = stars(paired(x["C"].to_numpy(), x[a].to_numpy())[0])
+    return out
 
 
 def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
@@ -546,6 +567,9 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
     draws = link_draws(readouts, arms, n=1000)
     classes = microc_classes(readouts)
     by_class = not classes.empty
+    per_chrom = by_chromosome(readouts)
+    # Each other model set against gnome3d with CTCF loops, on the genes of both.
+    link = {a: link_difference(readouts, "C", a, n=4000) for a in arms if a != "C"}
     fig = plt.figure(figsize=(7.2, 11.0 if by_class else 8.4), layout="constrained")
     rows = fig.subfigures(4 if by_class else 3, 1, hspace=0.05)
     microc = _microc_measure(ag)
@@ -564,9 +588,9 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
         allv = m.value
         for ax, line in zip(axes, LINES, strict=True):
             s_ = m[m.line == line].set_index("arm").value
-            _forest(ax, {a: (float(s_[a]), np.nan, np.nan) if a in s_ else None for a in arms}, arms)
+            _forest(ax, {a: (float(s_[a]), np.nan, np.nan) if a in s_ else None for a in arms}, arms, _against_c(per_chrom, measure, line, arms))
             ax.set_title(LINE_LABEL[line].replace("\n", " "), fontsize=8, color=INK)
-            ax.set_xlim(allv.min() - 0.03, allv.max() + 0.03)
+            ax.set_xlim(allv.min() - 0.06, allv.max() + 0.06)
         axes[0].set_yticklabels([textwrap.fill(ARM_NAME[a], 26) for a in arms[::-1]], fontsize=7)
     _row_title(
         rows[2], "c",
@@ -579,7 +603,7 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
         for a in arms:
             v = draws[(draws.pair == pair) & (draws.arm == a)].value.to_numpy()
             vals[a] = (float(np.median(v)), *(float(x) for x in np.percentile(v, [2.5, 97.5])))
-        _forest(ax, vals, arms)
+        _forest(ax, vals, arms, {a: stars(link[a][pair][1]) for a in link if pair in link[a]})
         ax.set_title(PAIR_LABEL[pair], fontsize=8, color=INK)
     axes[0].set_yticklabels([textwrap.fill(ARM_NAME[a], 26) for a in arms[::-1]], fontsize=7)
     if by_class:
@@ -599,8 +623,9 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
                 ax.plot(vb, row, "o", color=ARM_COLOUR["R"], ms=7, zorder=3)
                 ax.text(vb, row + 0.28, f"{vb:.2f}", ha="center", fontsize=7, color=INK)
                 ax.text(va, row - 0.42, f"{va:.2f}", ha="center", fontsize=7, color=MUTED)
-                ax.text(1.0, row, f"{int(c.loops[(cls, 'C')])} loops", transform=ax.get_yaxis_transform(),
-                        ha="right", va="center", fontsize=7, color=MUTED)
+                test = _against_c(per_chrom, f"microc_loops, {cls}", line, ("C", "R")).get("R", "")
+                ax.text(1.0, row, f"{int(c.loops[(cls, 'C')])} loops" + (f"\n{test}" if test else ""), transform=ax.get_yaxis_transform(),
+                        ha="right", va="center", fontsize=7, color=MUTED, linespacing=1.1)
             ax.set_title(LINE_LABEL[line].replace("\n", " "), fontsize=8, color=INK)
             ax.set_ylim(-0.6, len(CLASS_LABEL) - 0.3)
             ax.set_xlim(0, 1.25)
@@ -610,6 +635,13 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
             ax.set_axisbelow(True)
         axes[0].set_yticklabels([CLASS_LABEL[k] for k in list(CLASS_LABEL)[::-1]], fontsize=7)
         rows[3].legend(handles=_handles(("C", "R")), loc="outside lower center", ncol=2, fontsize=7)
+    if len(per_chrom):
+        fig.supxlabel(
+            textwrap.fill(
+                f"{LEGEND}. Every mark is a model set against gnome3d with CTCF loops. a, b, d: Wilcoxon signed rank test over "
+                "the chromosomes. c: block bootstrap of the difference on the genes of both model sets.", 150),
+            fontsize=6.5, color=MUTED,
+        )
     _save(fig, out / "rnapii_supplement")
     return fig
 

@@ -1,0 +1,32 @@
+[
+  {
+    "arm": "map",
+    "n_models": 0,
+    "n_loops": 62482,
+    "apa": 1.6312038585783648
+  },
+  {
+    "arm": "HFFC6_E_genome",
+    "n_models": 10,
+    "n_loops": 62482,
+    "apa": 7.544792791221758
+  },
+  {
+    "arm": "HFFC6_C_genome",
+    "n_models": 10,
+    "n_loops": 62482,
+    "apa": 1.8038079458882736
+  },
+  {
+    "arm": "HFFC6_R_genome",
+    "n_models": 10,
+    "n_loops": 62482,
+    "apa": 2.007854379773386
+  },
+  {
+    "arm": "HFFC6_M_genome",
+    "n_models": 10,
+    "n_loops": 62482,
+    "apa": 2.0728731308140373
+  }
+]

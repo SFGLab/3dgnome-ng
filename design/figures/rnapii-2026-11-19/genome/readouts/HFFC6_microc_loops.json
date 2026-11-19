@@ -1,0 +1,196 @@
+{
+ "binsize": 5000,
+ "chromosomes": 22,
+ "rows": [
+  {
+   "arm": "map",
+   "class": "all",
+   "loops": 19192,
+   "scored": 19192
+  },
+  {
+   "arm": "map",
+   "class": "CTCF",
+   "loops": 8994,
+   "scored": 8994
+  },
+  {
+   "arm": "map",
+   "class": "RNAPII alone",
+   "loops": 1318,
+   "scored": 1318
+  },
+  {
+   "arm": "map",
+   "class": "none",
+   "loops": 8880,
+   "scored": 8880
+  },
+  {
+   "arm": "map",
+   "class": "moved, no loop",
+   "loops": 19076,
+   "scored": 18956
+  },
+  {
+   "arm": "HFFC6_E_genome",
+   "class": "all",
+   "loops": 19192,
+   "scored": 2527,
+   "placed": 0.11004585243851604,
+   "placed_above_moved": 0.10192045927433067
+  },
+  {
+   "arm": "HFFC6_E_genome",
+   "class": "CTCF",
+   "loops": 8994,
+   "scored": 2134,
+   "placed": 0.21514342895263508,
+   "placed_above_moved": 0.2070180357884497
+  },
+  {
+   "arm": "HFFC6_E_genome",
+   "class": "RNAPII alone",
+   "loops": 1318,
+   "scored": 50,
+   "placed": 0.019726858877086494,
+   "placed_above_moved": 0.01160146571290113
+  },
+  {
+   "arm": "HFFC6_E_genome",
+   "class": "none",
+   "loops": 8880,
+   "scored": 343,
+   "placed": 0.017004504504504504,
+   "placed_above_moved": 0.008879111340319141
+  },
+  {
+   "arm": "HFFC6_E_genome",
+   "class": "moved, no loop",
+   "loops": 19076,
+   "scored": 615,
+   "placed": 0.008125393164185363,
+   "placed_above_moved": 0.0
+  },
+  {
+   "arm": "HFFC6_C_genome",
+   "class": "all",
+   "loops": 19192,
+   "scored": 16478,
+   "placed": 0.4463839099624844,
+   "placed_above_moved": 0.38620357865613086
+  },
+  {
+   "arm": "HFFC6_C_genome",
+   "class": "CTCF",
+   "loops": 8994,
+   "scored": 8770,
+   "placed": 0.7040249054925506,
+   "placed_above_moved": 0.643844574186197
+  },
+  {
+   "arm": "HFFC6_C_genome",
+   "class": "RNAPII alone",
+   "loops": 1318,
+   "scored": 1134,
+   "placed": 0.2860394537177542,
+   "placed_above_moved": 0.22585912241140066
+  },
+  {
+   "arm": "HFFC6_C_genome",
+   "class": "none",
+   "loops": 8880,
+   "scored": 6574,
+   "placed": 0.20923423423423423,
+   "placed_above_moved": 0.1490539029278807
+  },
+  {
+   "arm": "HFFC6_C_genome",
+   "class": "moved, no loop",
+   "loops": 19076,
+   "scored": 14993,
+   "placed": 0.060180331306353536,
+   "placed_above_moved": 0.0
+  },
+  {
+   "arm": "HFFC6_R_genome",
+   "class": "all",
+   "loops": 19192,
+   "scored": 18257,
+   "placed": 0.5493434764485202,
+   "placed_above_moved": 0.4700291547877947
+  },
+  {
+   "arm": "HFFC6_R_genome",
+   "class": "CTCF",
+   "loops": 8994,
+   "scored": 8939,
+   "placed": 0.8367800756059596,
+   "placed_above_moved": 0.7574657539452341
+  },
+  {
+   "arm": "HFFC6_R_genome",
+   "class": "RNAPII alone",
+   "loops": 1318,
+   "scored": 1313,
+   "placed": 0.7177541729893778,
+   "placed_above_moved": 0.6384398513286523
+  },
+  {
+   "arm": "HFFC6_R_genome",
+   "class": "none",
+   "loops": 8880,
+   "scored": 8005,
+   "placed": 0.23322072072072073,
+   "placed_above_moved": 0.1539063990599952
+  },
+  {
+   "arm": "HFFC6_R_genome",
+   "class": "moved, no loop",
+   "loops": 19076,
+   "scored": 17559,
+   "placed": 0.07931432166072552,
+   "placed_above_moved": 0.0
+  },
+  {
+   "arm": "HFFC6_M_genome",
+   "class": "all",
+   "loops": 19192,
+   "scored": 18270,
+   "placed": 0.4959879116298458,
+   "placed_above_moved": 0.41609694916392004
+  },
+  {
+   "arm": "HFFC6_M_genome",
+   "class": "CTCF",
+   "loops": 8994,
+   "scored": 8945,
+   "placed": 0.7494996664442962,
+   "placed_above_moved": 0.6696087039783705
+  },
+  {
+   "arm": "HFFC6_M_genome",
+   "class": "RNAPII alone",
+   "loops": 1318,
+   "scored": 1314,
+   "placed": 0.6145675265553869,
+   "placed_above_moved": 0.5346765640894612
+  },
+  {
+   "arm": "HFFC6_M_genome",
+   "class": "none",
+   "loops": 8880,
+   "scored": 8011,
+   "placed": 0.22162162162162163,
+   "placed_above_moved": 0.14173065915569588
+  },
+  {
+   "arm": "HFFC6_M_genome",
+   "class": "moved, no loop",
+   "loops": 19076,
+   "scored": 17559,
+   "placed": 0.07989096246592577,
+   "placed_above_moved": 0.0
+  }
+ ]
+}
