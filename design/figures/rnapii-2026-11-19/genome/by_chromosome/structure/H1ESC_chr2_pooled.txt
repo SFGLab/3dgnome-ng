@@ -1,6 +1,0 @@
-chr2, pooled ensemble against Hi-C at 25000 bp, 374 unmapped bins
-                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
-                                  H1ESC_E_chr2  10   0.140   0.058   0.134   0.183   0.057   0.030                     0.137    0.028   -0.028
-                                  H1ESC_C_chr2  10   0.267   0.100   0.413   0.409   0.097   0.161                     0.410    0.137    0.027
-                                  H1ESC_R_chr2  10   0.305   0.122   0.397   0.437   0.120   0.134                     0.382    0.081    0.012
-                                  H1ESC_M_chr2  10   0.308   0.124   0.418   0.434   0.122   0.136                     0.405    0.082    0.004

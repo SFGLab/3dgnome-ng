@@ -1,6 +1,0 @@
-chr3, pooled ensemble against Hi-C at 25000 bp, 153 unmapped bins
-                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
-                                GM12878_E_chr3  10   0.165   0.135   0.091   0.121   0.135   0.027                     0.090    0.026    0.042
-                                GM12878_C_chr3  10   0.282   0.150   0.247   0.238   0.150   0.051                     0.240    0.042    0.056
-                                GM12878_R_chr3  10   0.296   0.160   0.256   0.257   0.160   0.049                     0.249    0.038    0.052
-                                GM12878_M_chr3  10   0.304   0.163   0.294   0.261   0.163   0.061                     0.287    0.050    0.062

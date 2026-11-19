@@ -1,6 +1,0 @@
-chr5, pooled ensemble against Hi-C at 25000 bp, 248 unmapped bins
-                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
-                                GM12878_E_chr5  10   0.141   0.064   0.199   0.197   0.063   0.088                     0.203    0.094    0.035
-                                GM12878_C_chr5  10   0.265   0.125   0.520   0.389   0.117   0.250                     0.517    0.249    0.056
-                                GM12878_R_chr5  10   0.293   0.144   0.532   0.421   0.139   0.262                     0.522    0.242    0.069
-                                GM12878_M_chr5  10   0.300   0.147   0.580   0.429   0.140   0.295                     0.573    0.283    0.068

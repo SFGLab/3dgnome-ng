@@ -116,7 +116,8 @@ the cudaMMC arm included, with `_60mb` slices beside them. The enhancer3d packag
 ## Results on chromosomes 1 to 22, 2026-11-19
 
 The figures are in `design/figures/rnapii-2026-11-19/genome/figures/` and every number below is
-in `design/figures/rnapii-2026-11-19/genome/readouts/`. Four model sets a cell line, ten
+in `design/figures/rnapii-2026-11-19/genome/readouts/`. The tables per chromosome and the inputs of
+the runs are outside git, in `data/figures/rnapii-2026-11-19/genome/`. Four model sets a cell line, ten
 structures a chromosome: the cudaMMC models, 3D-GNOMEᴺᴳ with CTCF loops, with CTCF and RNAPII
 loops, and with RNAPII ends merged into CTCF anchors. Tests are two sided. Figures 1 and 2 draw
 a comparison only under p 0.05. The supplement draws every comparison and marks the ones over
