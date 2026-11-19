@@ -1,0 +1,438 @@
+{
+ "map": "hic.4DNFIXP4QG5B.mcool",
+ "chrom": "chr18",
+ "rows": [
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.07149689369788104
+  },
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.07279971753386504
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.35187886496370535
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.33149228201880004
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.388423946261046
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.3641051802018116
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.4111290554281748
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.3868250788002752
+  },
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.10929173416286089
+  },
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.11294244173293981
+  },
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "all",
+   "scc": 0.08519430344250732
+  },
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "mapped",
+   "scc": 0.08673919093451
+  },
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "all",
+   "scc": 0.15037638642461082
+  },
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "mapped",
+   "scc": 0.1555450164989148
+  },
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.07742127724179741
+  },
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.07936101961130573
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.43105483267239075
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.4180003070719787
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "all",
+   "scc": 0.442396742619305
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "mapped",
+   "scc": 0.42805967477653345
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "all",
+   "scc": 0.4324881830882232
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "mapped",
+   "scc": 0.4247375020446124
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.14648595445797902
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.13986694366975977
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.4708590992417644
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.4518327628973942
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "all",
+   "scc": 0.5081527200635158
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "mapped",
+   "scc": 0.48942409802809816
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "all",
+   "scc": 0.3744610533524888
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "mapped",
+   "scc": 0.36165466721538814
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.16958499726073378
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.16223267963174237
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.5012896962617114
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.4842504821908568
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "all",
+   "scc": 0.5381200074847562
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "mapped",
+   "scc": 0.52171960108752
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "all",
+   "scc": 0.42103564871332716
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "mapped",
+   "scc": 0.40891064788916764
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.18138640076279708
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.17274367846867436
+  },
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.1815362031443071
+  },
+  {
+   "arm": "GM12878_E_chr18",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.189167606295875
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.518262630064485
+  },
+  {
+   "arm": "GM12878_C_chr18",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.5133479291823259
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.5363009363297386
+  },
+  {
+   "arm": "GM12878_R_chr18",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.520970471573718
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.5816669296959243
+  },
+  {
+   "arm": "GM12878_M_chr18",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.5714763420223921
+  }
+ ]
+}

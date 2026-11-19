@@ -18,7 +18,7 @@ describe('Results page', () => {
   // The cell line charts hold the whole genome readouts of design/figures/rnapii-2026-11-19/genome.
   it('shows the agreement with Hi-C of the original and the new models', () => {
     renderResults()
-    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C' }))).toEqual(['0.10', '0.29', '0.13', '0.45', '0.15', '0.47'])
+    expect(values(screen.getByRole('figure', { name: 'Agreement with Hi-C' }))).toEqual(['0.19', '0.53', '0.13', '0.45', '0.15', '0.47'])
   })
 
   it('shows the enhancer to promoter distances and the link to expression', () => {

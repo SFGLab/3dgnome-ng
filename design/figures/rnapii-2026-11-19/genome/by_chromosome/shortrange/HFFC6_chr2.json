@@ -1,0 +1,438 @@
+{
+ "map": "hic.4DNFIB59T7NN.mcool",
+ "chrom": "chr2",
+ "rows": [
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.07460339117680144
+  },
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.07705369777079189
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.3247812453820992
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.3172371532056726
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.35706329923724833
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.33215758187304384
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.3600402537901765
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 5000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.33445553454009763
+  },
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.11291972233847121
+  },
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.1177878615167461
+  },
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "all",
+   "scc": 0.09525511953507187
+  },
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "mapped",
+   "scc": 0.10023870939777832
+  },
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "all",
+   "scc": 0.15062075299933594
+  },
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "mapped",
+   "scc": 0.15514091049847
+  },
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.0789230106737763
+  },
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.07956978971595015
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.3939499571173981
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.3912859819923906
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "all",
+   "scc": 0.3965358450851212
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "mapped",
+   "scc": 0.39361082181088314
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "all",
+   "scc": 0.4116642867140605
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "mapped",
+   "scc": 0.41047972915232345
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.21636676764160206
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.21686931392832418
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.4314561589886691
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.40774300638638455
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "all",
+   "scc": 0.4739970207023054
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "mapped",
+   "scc": 0.44841017203364975
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "all",
+   "scc": 0.2946228069595954
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "mapped",
+   "scc": 0.2906845089769105
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.14351627936541608
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.14129213253264583
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.4435075498151554
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.41996336340063634
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "all",
+   "scc": 0.4793156901607624
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 0,
+   "sep_hi": 100000,
+   "bins": "mapped",
+   "scc": 0.4529764990185396
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "all",
+   "scc": 0.3539607990329654
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 100000,
+   "sep_hi": 500000,
+   "bins": "mapped",
+   "scc": 0.34916144423074985
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.17522274448083403
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 10000,
+   "sep_lo": 500000,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.1715273826759583
+  },
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.1705538395479252
+  },
+  {
+   "arm": "HFFC6_E_chr2",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.1775103819237711
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.47085309972669726
+  },
+  {
+   "arm": "HFFC6_C_chr2",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.47645487007520576
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.466441943067481
+  },
+  {
+   "arm": "HFFC6_R_chr2",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.44731885703383695
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "all",
+   "scc": 0.5093248557135546
+  },
+  {
+   "arm": "HFFC6_M_chr2",
+   "n_models": 10,
+   "res": 25000,
+   "sep_lo": 0,
+   "sep_hi": 2000000,
+   "bins": "mapped",
+   "scc": 0.4929370451526036
+  }
+ ]
+}

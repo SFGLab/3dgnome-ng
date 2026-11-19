@@ -45,7 +45,7 @@ PAIR_LABEL = {
 MEASURE_LABEL = {
     "hic": "stratum adjusted correlation\nwith Hi-C at 25 kb",
     "microc": "correlation with\nMicro-C at 5 kb",
-    "microc_loops": "share of Micro-C loops placed,\nabove moved loops",
+    "microc_loops": "share of Micro-C loops whose two ends\nthe models bring together, above the\nsame loops shifted away",
 }
 CLASS_LABEL = {"CTCF": "a CTCF loop", "RNAPII alone": "an RNAPII loop\nand no CTCF loop", "none": "no ChIA-PET loop"}
 INK, MUTED, GRID, CONTROL = "#1a1a1a", "#5a5955", "#e4e3df", "#b5b3ad"
@@ -344,12 +344,12 @@ def _agreement_title(ag: pd.DataFrame, who: str, genome: bool = False, measures:
     where = ", chromosomes 1 to 22" if genome else ""
     loops = _microc_measure(ag) == "microc_loops"
     if "hic" not in measures:
-        return (f"Share of Micro-C loops the models place, {who}{where}" if loops
+        return (f"Share of Micro-C loops whose two ends the models bring together, above the same loops shifted away, {who}{where}" if loops
                 else f"Correlation of simulated contact maps with Micro-C, {who}{where}")
     if len(measures) == 1:
         return f"Correlation of simulated contact maps with Hi-C, {who}{where}"
     if loops:
-        return f"Correlation of simulated contact maps with Hi-C, and the share of Micro-C loops the models place, {who}{where}"
+        return f"Correlation of simulated contact maps with Hi-C, and the share of Micro-C loops whose two ends the models bring together, {who}{where}"
     return f"Correlation of simulated contact maps with Hi-C and Micro-C, {who}{where}"
 
 
@@ -372,8 +372,8 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
         pd.read_csv(next(p for p in (inputs / f"ep_{line}.tsv", inputs / f"ep_{line}.tsv.gz") if p.is_file()), sep="\t") for line in LINES
     )
 
-    fig = plt.figure(figsize=(7.2, 10.8), layout="constrained")
-    rows = fig.subfigures(4, 1, height_ratios=[0.8, 1.55, 1.05, 1.9], hspace=0.04)
+    fig = plt.figure(figsize=(7.2, 11.4), layout="constrained")
+    rows = fig.subfigures(4, 1, height_ratios=[0.8, 1.55, 1.45, 1.9], hspace=0.04)
 
     _row_title(rows[0], "a", "Input data read by cudaMMC and by 3D-GNOMEᴺᴳ")
     panel_inputs(rows[0].subplots(), [(maps[f"ensemble_R_{j}_xyz"], maps[f"ensemble_R_{j}_mid"]) for j in range(3)])
@@ -612,8 +612,8 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
     specs = (
         ("a", "Stratum adjusted correlation of simulated contact maps with Hi-C at 25 kb, per cell line, "
               "higher is better", "hic"),
-        ("b", "Share of the loops called on Micro-C that the models place, above the share for the same loops "
-              "moved away, per cell line, higher is better" if microc == "microc_loops" else
+        ("b", "Share of Micro-C loops whose two ends the models bring together, above the same loops "
+              "shifted away, per cell line, higher is better" if microc == "microc_loops" else
               "Correlation of simulated contact maps with Micro-C at 5 kb, per cell line, higher is better",
          microc),
     )
@@ -645,7 +645,7 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
     if by_class:
         _row_title(
             rows[3], "d",
-            "Share of Micro-C loops placed, above moved loops, by the ChIA-PET loop at the Micro-C loop, "
+            "Share of Micro-C loops whose two ends the models bring together, above the same loops shifted away, by the ChIA-PET loop at the Micro-C loop, "
             "3D-GNOMEᴺᴳ with and without RNAPII loops",
         )
         lines = [x for x in LINES if (classes.line == x).any()]

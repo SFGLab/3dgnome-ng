@@ -13,7 +13,7 @@ const bar = (series: Bar['series'], value: number | null, digits = 2): Bar => ({
 })
 
 const SCC: Group[] = [
-  { name: 'GM12878', bars: [bar('original', 0.1), bar('ctcf', 0.29)] },
+  { name: 'GM12878', bars: [bar('original', 0.19), bar('ctcf', 0.53)] },
   { name: 'H1ESC', bars: [bar('original', 0.13), bar('ctcf', 0.45)] },
   { name: 'HFFc6', bars: [bar('original', 0.15), bar('ctcf', 0.47)] },
 ]
