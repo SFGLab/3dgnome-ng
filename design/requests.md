@@ -1,7 +1,7 @@
 # Requests and their state
 
 The maintainer moves between the website and tbooo. This file lists each request, its state and the
-place of its record. It is updated in the same change as the work. Last update 2026-11-18.
+place of its record. It is updated in the same change as the work. Last update 2026-11-19.
 
 State words: done, open, waiting, held. A waiting item states the person or the job it waits for.
 
@@ -79,6 +79,7 @@ the image at `70e60d3`. Record: `web/deploy/aragorn.md`.
 | Files list of the job page | done | 2026-11-19. The structure files are set in under their folder with a line down its side. The entry all files, zip is gone, the Download all button of the tabs is the same archive. |
 | Feature flags of the site | done | 2026-11-19. `config.json` beside the catalog in the site's data, `web/gnome3d_web/siteconfig.py`: `{"features": {"results": true, "method": true, "trios": false}}`. `results` and `method` off take the page out of the top bar and send its address to the front page, and other pages stop pointing at it. `trios` off takes the nine people out of the Results page. The file is read again when it changes, no restart. An unknown key or feature stops a site at start, and a broken edit of a running site is logged and the last configuration stays. It was the environment variable `HIDE` for an hour; the maintainer asked for a config file. The site on team-aragorn has `trios` off, the trios are not shown for this paper. Record in `web/deploy/aragorn.md`, the site's file in `web/deploy/config.json`. |
 | Region field of Model a region: the gene list and the region on the loops | done | 2026-11-19. The gene list holds up to 25 matches and scrolls, about seven seen, and the arrow keys bring a gene into view. The loop picture under the field draws the region with its own length on either side. The region is a box on it: the two edges are sliders, by pointer or arrow keys, and the box itself moves the region. Loops outside the region are faint and the counts are of the loops inside. The field takes the coordinates when the drag ends. `/api/preview` takes three times the longest region for this and returns each loop's outer edges. |
+| Writing rules defined in full | done | 2026-11-19, ahead of cleaning the repository. `design/writing-rules.md` is the full text: scope, wording, doc comments and inline comments, descriptions of settings, error messages and log lines, pages and documents, figures and slides, names and terms, and the search to run before handing over. `AGENTS.md` has the short form under Documentation, comments and every other text. The rules apply while writing. The site's text has an automatic check and comments and docstrings have none. |
 
 ## Other sites on team-aragorn
 

@@ -318,17 +318,45 @@ Per-file ignores in `pyproject.toml`:
 - For numpy arrays in non-kernel code, use the aliases (`F32Array`, etc.).
 - Inside `@njit` kernels, parameter and local annotations are advisory only (numba ignores them) but still required for pyright. Keep them realistic — they document the contract.
 
-### Documentation and comments
+### Documentation, comments and every other text
 
-Write doc strings and comments as short plain sentences. Where a dash or colon would open a clause, start a new sentence instead. Do not use dashes, colons or semicolons as sentence punctuation. Do not emphasise words by writing them in capitals. Keep backtick quotes for identifiers that need them, plain names read fine on their own. Avoid parenthetical asides. Turn an aside into its own sentence or drop it. State plainly what the code does. Do not reach for metaphors.
+`design/writing-rules.md` holds the rules in full. They cover doc comments, inline comments, descriptions of
+settings, error messages, log lines, script output, the website's text, the notes under `design/`, figures and commit
+messages. They apply while the text is written, not as a later cleanup pass. Read that file before writing any of
+these. The short form follows.
 
-A doc describes what the thing is now. It does not record what it used to be, what it is not, or where related code moved. Migration history and cross references to relocated code belong in the commit message or in project memory, not in the source. Memory style [[links]] to related notes are fine.
+Wording, everywhere:
 
-Keep docs short and non redundant. When one fact holds for every function in a file, state it once at the module or class level and let each function doc stay brief. Keep the parameter and return descriptions. When a doc is too long, tighten the sentences rather than deleting the contract.
+- Plain subject, verb and object. Start with the thing or a verb. Do not open with What, Where, How, Who, Whether,
+  When, Which or Why, in a sentence or a heading.
+- No inversion that leaves a preposition at the end. No clever constructions and no compressed riddles. Spell out the
+  concrete case.
+- No metaphors. Banned words are sits, lives, lands, hears, tells, hands, rides, name as a verb and write for the look
+  of a value.
+- No ", so", "so that", "because" or "unlike X" to justify a design. The reason goes in the commit message. Such a
+  clause stays only when it carries a constraint the next editor would break.
+- No comma before "and". No capitals for emphasis. Few backticks and few parentheses.
 
-Do not restate what the line below already shows. A comment earns its place by carrying a constraint or a reason the code cannot express. A comment that paraphrases a visible type or repeats the called function's own doc is noise and should go.
+Doc comments and inline comments:
 
-A style pass is also a correctness pass. While rewriting a doc, confirm the claim still holds and fix drift such as a description of removed behaviour or a stale module name. See [[feedback_doc_comment_style]].
+- No dashes, colons or semicolons as sentence punctuation.
+- A doc says what the thing is and how to use it, in one or two sentences, as the code is now. No design reasons, no
+  comparisons to sibling code, no callers, no history and no comment left in place of removed code.
+- A function doc leads with a verb, as in "Bins the contacts by anchor. Returns the matrix and the bin edges."
+- An inline comment carries a reason or a constraint the code cannot show. One that restates the line below, a visible
+  type or the callee's doc is removed.
+- A fact that holds across a file is stated once, on the module or the class.
+- Keep parameter and return descriptions. Reword inside them and do not delete them.
+- A style pass is also a correctness pass. Check that a reworded doc is still true and fix a doc that has drifted.
+
+Descriptions and messages:
+
+- A setting's description is one or two sentences, what it does and its default.
+- An error message states the one case that happened, the step and the fix. A message that covers several causes is
+  split at the place in the code that knows the cause.
+
+Before handing over, search the added lines for the wh-openers, the banned words, a preposition at the end of a
+sentence, ", so ", "because" and ", and ". Memory style [[links]] to related notes are fine in a doc.
 
 ---
 
