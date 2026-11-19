@@ -162,8 +162,17 @@ def dumbbells(ax: plt.Axes, df: pd.DataFrame, a: str, b: str, measure: str, xlim
         ax.text(vb, row + 0.28, f"{vb:.2f}", ha="center", fontsize=7, color=INK)
         ax.text(va, row - 0.42, f"{va:.2f}", ha="center", fontsize=7, color=MUTED)
         if line in tests:
-            ax.text(0.02, row, mark(tests[line][0]).replace(", ", "\n", 1), transform=ax.get_yaxis_transform(), ha="left", va="center",
-                    fontsize=6.5, color=MUTED, linespacing=1.15)
+            # Over the line between the two dots when they are far apart, else at the end of the
+            # row the dots are not at.
+            text, span = mark(tests[line][0]), xlim[1] - xlim[0]
+            if abs(va - vb) > 0.2 * span:
+                ax.text((va + vb) / 2, row + 0.2, text, ha="center", va="center", fontsize=6.5, color=MUTED)
+            elif min(va, vb) - xlim[0] > 0.3 * span:
+                ax.text(0.02, row, text.replace(", ", "\n", 1), transform=ax.get_yaxis_transform(), ha="left", va="center",
+                        fontsize=6.5, color=MUTED, linespacing=1.15)
+            else:
+                ax.text(0.98, row, text.replace(", ", "\n", 1), transform=ax.get_yaxis_transform(), ha="right", va="center",
+                        fontsize=6.5, color=MUTED, linespacing=1.15)
     ax.set_yticks(range(len(LINES)))
     ax.set_yticklabels([LINE_LABEL[x] for x in LINES[::-1]])
     ax.set_ylim(-0.6, len(LINES) - 0.3)
@@ -312,10 +321,11 @@ def _microc_measure(ag: pd.DataFrame) -> str:
     return "microc_loops" if (ag.measure == "microc_loops").any() else "microc"
 
 
-def _agreement_title(ag: pd.DataFrame, who: str) -> str:
+def _agreement_title(ag: pd.DataFrame, who: str, genome: bool = False) -> str:
+    where = ", chromosomes 1 to 22" if genome else ""
     if _microc_measure(ag) == "microc_loops":
-        return f"Correlation of simulated contact maps with Hi-C, and the share of Micro-C loops the models place, {who}"
-    return f"Correlation of simulated contact maps with Hi-C and Micro-C, {who}"
+        return f"Correlation of simulated contact maps with Hi-C, and the share of Micro-C loops the models place, {who}{where}"
+    return f"Correlation of simulated contact maps with Hi-C and Micro-C, {who}{where}"
 
 
 def _agreement_row(sub: SubFigure, ag: pd.DataFrame, a: str, b: str, per_chrom: pd.DataFrame | None = None) -> None:
@@ -358,7 +368,7 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
         _triangle(ax, maps[key], held, start, binsize, 60, vmin, vmax, label)
     axes[-1].set_xlabel("position on chr1, Mb. Grey bins hold no model beads")
 
-    _row_title(rows[2], "c", _agreement_title(ag, "cudaMMC and gnome3d with CTCF loops"))
+    _row_title(rows[2], "c", _agreement_title(ag, "cudaMMC and gnome3d with CTCF loops", len(by_chromosome(readouts)) > 0))
     _agreement_row(rows[2], ag, "E", "C", by_chromosome(readouts))
 
     where = "chromosomes 1 to 22" if "chrom" in ep.columns and ep.chrom.nunique() > 1 else "chr1"
@@ -432,16 +442,16 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
     _row_title(
         rows[0], "e",
         "Correlation between the change in enhancer to promoter distance and the change in gene expression "
-        "across pairs of cell lines, bootstrap distribution over genes",
+        "across pairs of cell lines, bootstrap distribution over genes" + (", chromosomes 1 to 22" if len(by_chromosome(readouts)) else ""),
     )
     ax = rows[0].subplots()
-    link = link_difference(readouts, "C", "R")
+    link = link_difference(readouts, "C", "R", n=10000)
     joy(ax, _joy_groups(draws, ("C", "R")),
         "minus Spearman correlation over genes, 2,000 block bootstrap draws, larger is a stronger link",
         notes={PAIR_LABEL[k]: [f"difference {d:+.3f}, {mark(pv)}"] for k, (d, pv, _) in link.items()})
     rows[0].legend(handles=_handles(("C", "R")), loc="outside lower center", ncol=2, fontsize=7)
 
-    _row_title(rows[1], "f", _agreement_title(ag, "gnome3d with and without RNAPII loops"))
+    _row_title(rows[1], "f", _agreement_title(ag, "gnome3d with and without RNAPII loops", len(by_chromosome(readouts)) > 0))
     _agreement_row(rows[1], ag, "C", "R", by_chromosome(readouts))
 
     bottom = rows[2].subfigures(1, 2, width_ratios=[0.85, 1.15], wspace=0.03)
