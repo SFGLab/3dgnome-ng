@@ -50,6 +50,12 @@ ARMS = [
     ("node_c5k_g50k", "cells at 5 kb, gyration windows from 50 kb", "#e34948", True, "D"),
     ("node_mid_c5k_g25k", "midpoint, cells at 5 kb, gyration windows from 25 kb", "#eb6834", True, "D"),
 ]
+# An arm without an entry is drawn under its own name, in these styles in the order of the files.
+SPARE = [
+    (colour, filled, marker)
+    for marker, filled in (("o", True), ("s", True), ("D", True), ("o", False), ("s", False))
+    for colour in ("#6250d6", "#e34948", "#008300", "#eda100", "#e87ba4", "#1baf7a")
+]
 # key, panel title, reference line
 PANELS = [
     ("raw_scc", "Pooled SCC, raw Hi-C", None),
@@ -108,9 +114,21 @@ def read_scores(scores: Path) -> dict[tuple[str, str], dict[str, dict[str, float
     return out
 
 
+def arms_of(data: dict[tuple[str, str], dict[str, dict[str, float]]]) -> list[tuple]:
+    """Returns the arms that the scores hold, the known ones first and the rest under their
+    names.
+    """
+    known = [a for a in ARMS if any(a[0] in d for d in data.values())]
+    names = {a[0] for a in ARMS}
+    rest: list[str] = []
+    for d in data.values():
+        rest += [k for k in d if k not in names and k not in rest]
+    return known + [(k, k, *SPARE[i % len(SPARE)]) for i, k in enumerate(rest)]
+
+
 def figure(data: dict[tuple[str, str], dict[str, dict[str, float]]], path: Path) -> None:
     rows = list(data)
-    arms = [a for a in ARMS if any(a[0] in d for d in data.values())]
+    arms = arms_of(data)
     fig, axes = plt.subplots(2, 4, figsize=(20.5, 2.6 + 1.05 * len(rows)), facecolor=SURFACE)
     step = min(0.12, 0.8 / max(len(arms), 1))
     for ax, (key, title, ref) in zip(axes.ravel(), PANELS, strict=True):
@@ -194,7 +212,7 @@ def table(data: dict[tuple[str, str], dict[str, dict[str, float]]], path: Path) 
         "|---|---|---|" + "---|" * len(cols),
     ]
     for (cell, region), arms in data.items():
-        for arm, label, _colour, _filled, _marker in ARMS:
+        for arm, label, _colour, _filled, _marker in arms_of(data):
             if arm not in arms:
                 continue
             vals = " | ".join(
@@ -203,9 +221,7 @@ def table(data: dict[tuple[str, str], dict[str, dict[str, float]]], path: Path) 
             lines.append(f"| {cell} | {region} | {label} | {vals} |")
     lines += ["", "Mean over the cells and regions:", ""]
     lines += ["| arm | " + " | ".join(c for _, c in cols) + " |", "|---|" + "---|" * len(cols)]
-    for arm, label, _colour, _filled, _marker in ARMS:
-        if not any(arm in a for a in data.values()):
-            continue
+    for arm, label, _colour, _filled, _marker in arms_of(data):
         means = []
         for k, _ in cols:
             v = [a[arm][k] for a in data.values() if arm in a and k in a[arm]]
