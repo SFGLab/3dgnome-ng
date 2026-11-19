@@ -286,6 +286,26 @@ Pairs of nodes that the cells hold in one structure of chr1 10 to 15 Mb, in and 
 The drift moves no pooled score by more than 0.003. The battery's overlap count falls from 21.9 to 18.3 at one
 bead, a count that is not yet checked between the chains.
 
+### Trial of the rules
+
+`design/figures/uniform-2026-11-19/rules/` and `scores-rules/`. Commit e4577f1, the uniform draw, cells at 5 kb, z of
+3. Mean over the six rows, with the close pairs of `playground/uniform_overlap_check.py` per thousand beads:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other |
+|---|---|---|---|---|---|---|
+| default chain | 0.327 | 0.307 | 0.448 | 0.716 | 10.2 | 2.6 |
+| nodes fixed | 0.374 | 0.364 | 0.437 | 0.678 | 34.0 | 6.6 |
+| orientation term off | 0.368 | 0.358 | 0.429 | 0.677 | 32.9 | 8.9 |
+| centre of mass kept | 0.386 | 0.374 | 0.439 | 0.678 | 32.7 | 4.3 |
+| bond limit 1.25 | 0.371 | 0.360 | 0.431 | 0.677 | 42.4 | 8.0 |
+| bond limit 1.5 | 0.370 | 0.360 | 0.432 | 0.679 | 40.0 | 7.4 |
+| centre of mass kept, bond limit 1.5 | 0.381 | 0.367 | 0.431 | 0.679 | 42.0 | 5.5 |
+
+- The centre of mass rule gains 0.012 of raw SCC and 0.010 of balanced SCC over the fixed node and has the fewest
+  close pairs that are not next to each other.
+- The bond limit gains nothing and raises the close pairs by a fifth.
+- Without the orientation term the scores fall by 0.006 to 0.008.
+
 ### Overlaps, checked without the bead kind
 
 `playground/uniform_overlap_check.py` counts the pairs of beads closer than 0.7 model units per thousand beads, over
