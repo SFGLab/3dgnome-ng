@@ -119,8 +119,9 @@ the cudaMMC arm included, with `_60mb` slices beside them. The enhancer3d packag
 The figures are in `design/figures/rnapii-2026-11-19/genome/figures/` and every number below is
 in `design/figures/rnapii-2026-11-19/genome/readouts/`. Four model sets a cell line, ten
 structures a chromosome: the cudaMMC models, 3D-GNOMEᴺᴳ with CTCF loops, with CTCF and RNAPII
-loops, and with RNAPII ends merged into CTCF anchors. Tests are two sided. A comparison is
-drawn in a figure only under p 0.05.
+loops, and with RNAPII ends merged into CTCF anchors. Tests are two sided. Figures 1 and 2 draw
+a comparison only under p 0.05. The supplement draws every comparison and marks the ones over
+it ns.
 
 **3D-GNOMEᴺᴳ against cudaMMC, figure 1c.** Stratum adjusted correlation of the summed contact
 map with Hi-C at 25 kb: 0.19 to 0.53 for GM12878, 0.13 to 0.45 for H1 and 0.15 to 0.47 for
@@ -143,7 +144,7 @@ together, above shifted loops: 0.23 to 0.31, 0.35 to 0.40 and 0.39 to 0.47, p un
 every line. For the Micro-C loops an RNAPII loop supports and no CTCF loop does: 0.13 to 0.66 of
 2,130 loops, 0.18 to 0.58 of 586 and 0.23 to 0.64 of 1,318.
 
-**RNAPII loops help Hi-C agreement under 100 kb and cost it from 100 to 500 kb, figure 2g.**
+**RNAPII loops help Hi-C agreement under 100 kb and cost it from 100 to 500 kb, supplement e.**
 Stratum adjusted correlation with Hi-C at 10 kb by genomic separation, median of the 22
 chromosomes, CTCF loops to CTCF and RNAPII loops:
 
@@ -162,6 +163,6 @@ traced. The set with RNAPII ends merged into CTCF anchors loses less from 100 to
 to 0.406, 0.345 to 0.322 and 0.395 to 0.354, and is higher than CTCF loops alone to 2 Mb on
 GM12878, 0.452 to 0.501, and HFFc6, 0.406 to 0.449, both p under 0.001.
 
-**Nine people, figure 2h.** The models reach 0.34 to 0.41 of the contact enrichment each
+**Nine people, figure 2g.** The models reach 0.34 to 0.41 of the contact enrichment each
 person's own Hi-C has at that person's RNAPII loops with CTCF loops alone and 0.51 to 0.63 with
 RNAPII loops, higher in 9 of 9, exact signed rank p 0.004.

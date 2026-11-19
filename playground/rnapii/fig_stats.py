@@ -1,7 +1,8 @@
 """The significance tests the RNAPII figures mark with stars.
 
-A test is made only where a panel compares two sets of many values. A comparison whose test is
-not under `SHOWN` is not drawn, and a value shown beside others for description carries no mark.
+A test is made only where a panel compares two sets of many values. In figures 1 and 2 a
+comparison whose test is not under `SHOWN` is not drawn. The supplement draws every comparison
+and marks the ones over it ns.
 
 Every p value is two sided. The pairs and genes of one chromosome are not independent draws,
 and the nine trio individuals are three families, so the values are a guide to which
@@ -17,7 +18,7 @@ import pandas as pd
 from scipy.stats import mannwhitneyu, wilcoxon
 
 LEGEND = "* p < 0.05, ** p < 0.01, *** p < 0.001, two sided"
-# A comparison is drawn only when its test is under this. One above it is left out of a figure.
+# Figures 1 and 2 draw a comparison only when its test is under this.
 SHOWN = 0.05
 
 
