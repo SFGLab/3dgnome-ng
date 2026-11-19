@@ -32,8 +32,8 @@ from .jobs import JobRequest, _member, request_key, write_json
 from .queue import enqueue, queue_position, resume_after_restart, sweep_private
 from .regions import HICDIFFUSION_SPAN, RegionError, parse_region
 from .settings import Settings
-from .siteconfig import ConfigFile
 from .settings_schema import SettingError, parse_ini, schema, validate_overrides
+from .siteconfig import ConfigFile
 from .viewer import viewer_payload
 
 HERE = Path(__file__).resolve().parent
