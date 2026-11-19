@@ -135,7 +135,8 @@ A title says what is plotted, on which data and for which comparison, as in "Con
 from Hi-C, from ten cudaMMC structures and from ten 3D-GNOMEᴺᴳ structures". A title is not a sentence that argues a
 conclusion. The conclusion goes in the legend or in the text.
 
-A label uses words. "Higher is better" replaces an arrow. "From 0.22 to 0.37" replaces an arrow between two numbers. A figure has no text arrows and no drawings made of characters.
+A label uses words. "Higher is better" replaces an arrow. "From 0.22 to 0.37" replaces an arrow between two numbers. A
+figure has no text arrows and no drawings made of characters.
 
 A bullet point of a slide is a plain full statement. It is not a punchline.
 
