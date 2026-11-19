@@ -16,9 +16,9 @@ import pandas as pd
 
 ARM_NAME = {
     "E": "original models (cudaMMC)",
-    "C": "gnome3d, CTCF loops",
-    "R": "gnome3d, CTCF and RNAPII loops",
-    "M": "gnome3d, RNAPII ends merged into CTCF anchors",
+    "C": "3D-GNOMEᴺᴳ, CTCF loops",
+    "R": "3D-GNOMEᴺᴳ, CTCF and RNAPII loops",
+    "M": "3D-GNOMEᴺᴳ, RNAPII ends merged into CTCF anchors",
 }
 ARM_COLOUR = {"E": "#8c8c8c", "C": "#2a78d6", "R": "#eb6834", "M": "#1baf7a"}
 

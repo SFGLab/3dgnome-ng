@@ -245,7 +245,7 @@ def panel_inputs(ax: plt.Axes, chains: list[tuple[np.ndarray, np.ndarray]]) -> N
         _tube(inset, xyz[::3], cols[::3], 1.4)
     ax.text(8.15, 0.55, "ensemble of structures, coloured by genomic position", ha="center", fontsize=8, color=INK)
     ax.text(0.3, 5.5, "cudaMMC: CTCF loops", fontsize=8, color=MUTED)
-    ax.text(0.3, 5.0, "gnome3d: CTCF loops, RNAPII loops, Hi-C contacts, structural variants", fontsize=8,
+    ax.text(0.3, 5.0, "3D-GNOMEᴺᴳ: CTCF loops, RNAPII loops, Hi-C contacts, structural variants", fontsize=8,
             color=INK)
 
 
@@ -375,12 +375,12 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
     fig = plt.figure(figsize=(7.2, 10.8), layout="constrained")
     rows = fig.subfigures(4, 1, height_ratios=[0.8, 1.55, 1.05, 1.9], hspace=0.04)
 
-    _row_title(rows[0], "a", "Input data read by cudaMMC and by gnome3d")
+    _row_title(rows[0], "a", "Input data read by cudaMMC and by 3D-GNOMEᴺᴳ")
     panel_inputs(rows[0].subplots(), [(maps[f"ensemble_R_{j}_xyz"], maps[f"ensemble_R_{j}_mid"]) for j in range(3)])
 
     _row_title(
         rows[1], "b",
-        "Contact maps of GM12878 chr1:20-25 Mb from Hi-C, from ten cudaMMC structures and from ten gnome3d "
+        "Contact maps of GM12878 chr1:20-25 Mb from Hi-C, from ten cudaMMC structures and from ten 3D-GNOMEᴺᴳ "
         "structures with CTCF loops, on one colour scale",
     )
     axes = rows[1].subplots(3, 1, sharex=True)
@@ -397,7 +397,7 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
         _triangle(ax, maps[key], held, start, binsize, 60, vmin, vmax, label)
     axes[-1].set_xlabel("position on chr1, Mb. Grey bins hold no model beads")
 
-    _row_title(rows[2], "c", _agreement_title(ag, "cudaMMC and gnome3d with CTCF loops", len(by_chromosome(readouts)) > 0))
+    _row_title(rows[2], "c", _agreement_title(ag, "cudaMMC and 3D-GNOMEᴺᴳ with CTCF loops", len(by_chromosome(readouts)) > 0))
     _agreement_row(rows[2], ag, "E", "C", by_chromosome(readouts))
 
     where = "chromosomes 1 to 22" if "chrom" in ep.columns and ep.chrom.nunique() > 1 else "chr1"
@@ -481,7 +481,7 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
     rows[0].legend(handles=_handles(("C", "R")), loc="outside lower center", ncol=2, fontsize=7)
 
     per_chrom = by_chromosome(readouts)
-    _row_title(rows[1], "f", _agreement_title(ag, "gnome3d with and without RNAPII loops", len(per_chrom) > 0,
+    _row_title(rows[1], "f", _agreement_title(ag, "3D-GNOMEᴺᴳ with and without RNAPII loops", len(per_chrom) > 0,
                                               _agreement_measures(ag, "C", "R", per_chrom)))
     _agreement_row(rows[1], ag, "C", "R", per_chrom)
 
@@ -646,7 +646,7 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
         _row_title(
             rows[3], "d",
             "Share of Micro-C loops placed, above moved loops, by the ChIA-PET loop at the Micro-C loop, "
-            "gnome3d with and without RNAPII loops",
+            "3D-GNOMEᴺᴳ with and without RNAPII loops",
         )
         lines = [x for x in LINES if (classes.line == x).any()]
         axes = rows[3].subplots(1, len(lines), sharey=True, sharex=True, squeeze=False)[0]
@@ -674,7 +674,7 @@ def figure_supplement(inputs: Path, readouts: Path, out: Path) -> Figure:
     if len(per_chrom):
         fig.supxlabel(
             textwrap.fill(
-                f"{LEGEND}. A mark is a model set that differs from gnome3d with CTCF loops. a, b, d: Wilcoxon signed rank "
+                f"{LEGEND}. A mark is a model set that differs from 3D-GNOMEᴺᴳ with CTCF loops. a, b, d: Wilcoxon signed rank "
                 "test over the chromosomes. c: block bootstrap of the difference on the genes of both model sets.", 150),
             fontsize=6.5, color=MUTED,
         )
