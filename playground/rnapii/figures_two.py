@@ -30,7 +30,7 @@ from scipy.stats import gaussian_kde  # noqa: E402
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from fig_data import ARM_COLOUR, ARM_NAME, agreement, link_draws, microc_classes, trio_paired  # noqa: E402
+from fig_data import ARM_COLOUR, ARM_NAME, agreement, by_chromosome, link_draws, microc_classes, trio_paired  # noqa: E402
 from fig_stats import LEGEND, ep_tests, link_difference, mark, paired, stars, unpaired  # noqa: E402
 
 from playground.figures.tube import draw, tube_pieces  # noqa: E402
@@ -134,9 +134,22 @@ def joy(
     ax.set_xlabel(xlabel)
 
 
-def dumbbells(ax: plt.Axes, df: pd.DataFrame, a: str, b: str, measure: str, xlim: tuple[float, float]) -> None:
-    """One row per line from arm `a` to arm `b`; a line without the measure says so."""
+def dumbbells(ax: plt.Axes, df: pd.DataFrame, a: str, b: str, measure: str, xlim: tuple[float, float],
+              per_chrom: pd.DataFrame | None = None) -> None:
+    """One row per line from arm `a` to arm `b`; a line without the measure says so.
+
+    With `per_chrom`, the readouts one value a chromosome, each row carries the mark of a signed
+    rank test of the two arms over the chromosomes both have.
+    """
     sub = df[df.measure == measure].set_index(["line", "arm"]).value
+    tests = {}
+    if per_chrom is not None and len(per_chrom):
+        t = per_chrom[per_chrom.measure == measure].pivot_table(index=["line", "chrom"], columns="arm", values="value")
+        for line in LINES:
+            if line in t.index.get_level_values(0) and a in t.columns and b in t.columns:
+                w = t.loc[line].dropna(subset=[a, b])
+                if len(w) >= 6:
+                    tests[line] = (paired(w[a].to_numpy(), w[b].to_numpy())[0], len(w))
     for row, line in enumerate(LINES[::-1]):
         if (line, a) not in sub or (line, b) not in sub:
             ax.text(np.mean(xlim), row, "no Micro-C" if measure.startswith("microc") else "no map",
@@ -148,6 +161,9 @@ def dumbbells(ax: plt.Axes, df: pd.DataFrame, a: str, b: str, measure: str, xlim
         ax.plot(vb, row, "o", color=ARM_COLOUR[b], ms=7, zorder=3)
         ax.text(vb, row + 0.28, f"{vb:.2f}", ha="center", fontsize=7, color=INK)
         ax.text(va, row - 0.42, f"{va:.2f}", ha="center", fontsize=7, color=MUTED)
+        if line in tests:
+            ax.text(0.02, row, mark(tests[line][0]).replace(", ", "\n", 1), transform=ax.get_yaxis_transform(), ha="left", va="center",
+                    fontsize=6.5, color=MUTED, linespacing=1.15)
     ax.set_yticks(range(len(LINES)))
     ax.set_yticklabels([LINE_LABEL[x] for x in LINES[::-1]])
     ax.set_ylim(-0.6, len(LINES) - 0.3)
@@ -302,11 +318,11 @@ def _agreement_title(ag: pd.DataFrame, who: str) -> str:
     return f"Correlation of simulated contact maps with Hi-C and Micro-C, {who}"
 
 
-def _agreement_row(sub: SubFigure, ag: pd.DataFrame, a: str, b: str) -> None:
+def _agreement_row(sub: SubFigure, ag: pd.DataFrame, a: str, b: str, per_chrom: pd.DataFrame | None = None) -> None:
     axes = sub.subplots(1, 2, sharey=True)
     for ax, measure in zip(axes, ("hic", _microc_measure(ag)), strict=True):
         vals = ag[ag.measure == measure].value
-        dumbbells(ax, ag, a, b, measure, (min(0.0, vals.min() - 0.03), vals.max() + 0.05))
+        dumbbells(ax, ag, a, b, measure, (min(0.0, vals.min() - 0.03), vals.max() + 0.05), per_chrom)
     sub.legend(handles=_handles((a, b)), loc="outside lower center", ncol=2, fontsize=7)
 
 
@@ -343,11 +359,13 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
     axes[-1].set_xlabel("position on chr1, Mb. Grey bins hold no model beads")
 
     _row_title(rows[2], "c", _agreement_title(ag, "cudaMMC and gnome3d with CTCF loops"))
-    _agreement_row(rows[2], ag, "E", "C")
+    _agreement_row(rows[2], ag, "E", "C", by_chromosome(readouts))
 
+    where = "chromosomes 1 to 22" if "chrom" in ep.columns and ep.chrom.nunique() > 1 else "chr1"
+    over = " c: Wilcoxon signed rank test of the two model sets over the chromosomes." if len(by_chromosome(readouts)) else ""
     _row_title(
         rows[3], "d",
-        "3D distance between enhancers and promoters on chr1. Pairs joined by an RNAPII loop and by no CTCF "
+        f"3D distance between enhancers and promoters on {where}. Pairs joined by an RNAPII loop and by no CTCF "
         "loop, in models with and without the RNAPII loops, and reference pairs at the same genomic separation "
         "joined by no loop",
     )
@@ -393,7 +411,7 @@ def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
     fig.supxlabel(
         textwrap.fill(
             f"{LEGEND}. d: Wilcoxon signed rank test over the pairs of both model sets, "
-            "Mann-Whitney U test against the reference pairs. The marks stand beside the models with RNAPII loops.", 150),
+            f"Mann-Whitney U test against the reference pairs. The marks stand beside the models with RNAPII loops.{over}", 150),
         fontsize=6.5, color=MUTED,
     )
     _save(fig, out / "rnapii_figure1")
@@ -424,7 +442,7 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
     rows[0].legend(handles=_handles(("C", "R")), loc="outside lower center", ncol=2, fontsize=7)
 
     _row_title(rows[1], "f", _agreement_title(ag, "gnome3d with and without RNAPII loops"))
-    _agreement_row(rows[1], ag, "C", "R")
+    _agreement_row(rows[1], ag, "C", "R", by_chromosome(readouts))
 
     bottom = rows[2].subfigures(1, 2, width_ratios=[0.85, 1.15], wspace=0.03)
     scope = ", chromosomes 1 to 22" if ((trio_dir or readouts / "trio") / "trio_genome.json").is_file() else ""
@@ -475,8 +493,9 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
     )
     fig.supxlabel(
         textwrap.fill(
-            f"{LEGEND}. e: block bootstrap of the difference between the two model sets on the genes of both. "
-            "g: Wilcoxon signed rank test over the nine individuals, exact. h: Mann-Whitney U test.", 150),
+            f"{LEGEND}. e: block bootstrap of the difference between the two model sets on the genes of both."
+            + (" f: Wilcoxon signed rank test of the two model sets over the chromosomes. " if len(by_chromosome(readouts)) else " ")
+            + "g: Wilcoxon signed rank test over the nine individuals, exact. h: Mann-Whitney U test.", 150),
         fontsize=6.5, color=MUTED,
     )
     _save(fig, out / "rnapii_figure2")

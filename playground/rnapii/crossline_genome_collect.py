@@ -17,6 +17,10 @@ out dir gets `readouts/` and `fig_inputs/` as `figures_two.py` takes them.
   share above the moved loops is taken against the arm's moved loops of every chromosome.
 - `fig_inputs/ep_<LINE>.tsv` is the pair tables one under the other, with the chromosome.
 
+- `readouts/by_chromosome.tsv` has line, arm, chrom, measure and value, one row a chromosome:
+  `hic`, the raw stratum adjusted correlation of the summed map, and `microc_loops`, the share
+  of Micro-C loops placed above the moved loops. The figures test two arms over these.
+
 A chromosome whose file is missing is named and left out of that sum, so a partial run can be
 looked at. The counts of chromosomes read are printed per file.
 """
@@ -190,12 +194,36 @@ def pairs(src: Path, out: Path) -> None:
             print(f"pairs {line}: {len(parts)} chromosomes, {len(only)} pairs an RNAPII loop alone joins")
 
 
+def by_chromosome(src: Path, out: Path) -> None:
+    rows = []
+    for line in LINES:
+        for chrom in CHROMS:
+            pooled = src / "structure" / f"{line}_{chrom}_pooled.txt"
+            if pooled.is_file():
+                for ln in pooled.read_text().splitlines():
+                    f = ln.split()
+                    if f and f[0].startswith(f"{line}_") and f[0].endswith(f"_{chrom}"):
+                        rows.append({"line": line, "arm": f[0][len(line) + 1 : -len(chrom) - 1], "chrom": chrom, "measure": "hic", "value": float(f[4])})
+            path = src / "microc" / f"{line}_{chrom}_5000.json"
+            if path.is_file():
+                for r in json.loads(path.read_text())["rows"]:
+                    if r["arm"] != "map" and r["class"] == "all" and "placed_above_moved" in r:
+                        rows.append({"line": line, "arm": str(r["arm"])[len(line) + 1 : -len(chrom) - 1], "chrom": chrom,
+                                     "measure": "microc_loops", "value": float(r["placed_above_moved"])})
+    if rows:
+        d = out / "readouts"
+        d.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(rows).to_csv(d / "by_chromosome.tsv", sep="\t", index=False)
+        print(f"by chromosome: {len(rows)} rows")
+
+
 def main() -> None:
     src, out = Path(sys.argv[1]), Path(sys.argv[2])
     expression(src, out)
     structure(src, out)
     microc(src, out)
     pairs(src, out)
+    by_chromosome(src, out)
 
 
 if __name__ == "__main__":

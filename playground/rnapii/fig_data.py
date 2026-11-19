@@ -22,7 +22,8 @@ ARM_NAME = {
 }
 ARM_COLOUR = {"E": "#8c8c8c", "C": "#2a78d6", "R": "#eb6834", "M": "#1baf7a"}
 
-_ARM = re.compile(r"^(?P<name>[A-Za-z0-9]+)_(?P<arm>[ECRM])_60mb$")
+# An arm is named by its line, its letter and its scope, chr1:1-60 Mb or the whole genome.
+_ARM = re.compile(r"^(?P<name>[A-Za-z0-9]+)_(?P<arm>[ECRM])_(?:60mb|genome)$")
 
 
 def _rows(path: Path) -> list[dict[str, object]]:
@@ -88,6 +89,17 @@ def microc_classes(readouts: Path) -> pd.DataFrame:
                     }
                 )
     return pd.DataFrame(rows, columns=["line", "arm", "loop_class", "loops", "value"])
+
+
+def by_chromosome(readouts: Path) -> pd.DataFrame:
+    """The readouts one value a chromosome, of `crossline_genome_collect.py`.
+
+    Returns columns line, arm, chrom, measure and value, empty for readouts of one region.
+    """
+    path = readouts / "by_chromosome.tsv"
+    if not path.is_file():
+        return pd.DataFrame(columns=["line", "arm", "chrom", "measure", "value"])
+    return pd.read_csv(path, sep="\t")
 
 
 def trio_paired(trio_dir: Path) -> pd.DataFrame:
