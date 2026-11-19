@@ -1,0 +1,29 @@
+min_z 15: 617 of 980 loops kept
+ctcf: 3151 input loops in the region, 447 at a Micro-C loop
+rnapii: 4831 input loops in the region, 117 at a Micro-C loop
+617 Micro-C loops at 5000 bp, all 617, CTCF 324, RNAPII alone 16, none 277, moved, no loop 611
+  H1ESC_E_chr11                    all             loops   617 scored   139  contact  35.44  ratio 0.254  closer 0.99  placed 0.21  above moved +0.20  under 0.95  rank +0.09
+  H1ESC_E_chr11                    CTCF            loops   324 scored   118  contact  36.47  ratio 0.249  closer 1.00  placed 0.36  above moved +0.34  under 0.96  rank +0.12
+  H1ESC_E_chr11                    RNAPII alone    loops    16 scored     0  contact    nan  ratio nan  closer nan  placed 0.00  above moved -0.01  under nan  rank +nan
+  H1ESC_E_chr11                    none            loops   277 scored    21  contact  17.93  ratio 0.458  closer 0.90  placed 0.06  above moved +0.04  under 0.85  rank +0.02
+  H1ESC_E_chr11                    moved, no loop  loops   611 scored    34  contact   0.50  ratio 1.020  closer 0.44  placed 0.01  above moved +0.00  under 0.50  rank +0.15
+  H1ESC_C_chr11                    all             loops   617 scored   555  contact   3.09  ratio 0.783  closer 0.86  placed 0.49  above moved +0.42  under 0.81  rank +0.13
+  H1ESC_C_chr11                    CTCF            loops   324 scored   318  contact   3.57  ratio 0.697  closer 0.93  placed 0.73  above moved +0.66  under 0.90  rank +0.22
+  H1ESC_C_chr11                    RNAPII alone    loops    16 scored    14  contact   1.28  ratio 0.989  closer 0.57  placed 0.25  above moved +0.18  under 0.56  rank +0.21
+  H1ESC_C_chr11                    none            loops   277 scored   223  contact   2.08  ratio 0.873  closer 0.78  placed 0.23  above moved +0.16  under 0.71  rank -0.08
+  H1ESC_C_chr11                    moved, no loop  loops   611 scored   516  contact   0.98  ratio 1.005  closer 0.49  placed 0.07  above moved +0.00  under 0.50  rank +0.12
+  H1ESC_R_chr11                    all             loops   617 scored   570  contact   4.39  ratio 0.742  closer 0.85  placed 0.54  above moved +0.46  under 0.81  rank +0.11
+  H1ESC_R_chr11                    CTCF            loops   324 scored   319  contact   5.85  ratio 0.644  closer 0.96  placed 0.79  above moved +0.71  under 0.92  rank +0.23
+  H1ESC_R_chr11                    RNAPII alone    loops    16 scored    14  contact   1.95  ratio 0.668  closer 0.93  placed 0.62  above moved +0.54  under 0.86  rank -0.16
+  H1ESC_R_chr11                    none            loops   277 scored   237  contact   1.69  ratio 0.921  closer 0.70  placed 0.24  above moved +0.16  under 0.66  rank -0.10
+  H1ESC_R_chr11                    moved, no loop  loops   611 scored   548  contact   0.90  ratio 1.001  closer 0.49  placed 0.09  above moved +0.00  under 0.50  rank +0.08
+  H1ESC_M_chr11                    all             loops   617 scored   576  contact   3.00  ratio 0.779  closer 0.83  placed 0.49  above moved +0.40  under 0.79  rank +0.15
+  H1ESC_M_chr11                    CTCF            loops   324 scored   321  contact   3.75  ratio 0.677  closer 0.94  placed 0.73  above moved +0.63  under 0.89  rank +0.29
+  H1ESC_M_chr11                    RNAPII alone    loops    16 scored    16  contact   1.85  ratio 0.837  closer 0.81  placed 0.50  above moved +0.41  under 0.77  rank +0.11
+  H1ESC_M_chr11                    none            loops   277 scored   239  contact   1.59  ratio 0.915  closer 0.68  placed 0.22  above moved +0.13  under 0.66  rank -0.13
+  H1ESC_M_chr11                    moved, no loop  loops   611 scored   555  contact   1.00  ratio 1.007  closer 0.49  placed 0.09  above moved +0.00  under 0.50  rank +0.15
+  map all             loops   617 scored   617  contact   8.97
+  map CTCF            loops   324 scored   324  contact   9.71
+  map RNAPII alone    loops    16 scored    16  contact   7.17
+  map none            loops   277 scored   277  contact   7.86
+  map moved, no loop  loops   611 scored   609  contact   1.00

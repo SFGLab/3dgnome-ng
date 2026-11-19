@@ -1,0 +1,29 @@
+min_z 15: 1783 of 3010 loops kept
+ctcf: 6472 input loops in the region, 1404 at a Micro-C loop
+rnapii: 11129 input loops in the region, 639 at a Micro-C loop
+1783 Micro-C loops at 5000 bp, all 1783, CTCF 971, RNAPII alone 120, none 692, moved, no loop 1772
+  HFFC6_E_chr1                     all             loops  1783 scored   341  contact  34.20  ratio 0.298  closer 0.95  placed 0.16  above moved +0.15  under 0.89  rank +0.11
+  HFFC6_E_chr1                     CTCF            loops   971 scored   310  contact  40.04  ratio 0.291  closer 0.97  placed 0.28  above moved +0.27  under 0.91  rank +0.12
+  HFFC6_E_chr1                     RNAPII alone    loops   120 scored     5  contact   1.66  ratio 0.997  closer 0.60  placed 0.01  above moved -0.00  under 0.58  rank +nan
+  HFFC6_E_chr1                     none            loops   692 scored    26  contact   2.64  ratio 0.908  closer 0.69  placed 0.02  above moved +0.01  under 0.66  rank -0.28
+  HFFC6_E_chr1                     moved, no loop  loops  1772 scored    79  contact   0.42  ratio 1.014  closer 0.44  placed 0.01  above moved +0.00  under 0.50  rank +0.32
+  HFFC6_C_chr1                     all             loops  1783 scored  1640  contact   2.85  ratio 0.787  closer 0.86  placed 0.48  above moved +0.42  under 0.82  rank +0.19
+  HFFC6_C_chr1                     CTCF            loops   971 scored   958  contact   3.28  ratio 0.702  closer 0.93  placed 0.67  above moved +0.60  under 0.89  rank +0.29
+  HFFC6_C_chr1                     RNAPII alone    loops   120 scored   109  contact   1.72  ratio 0.858  closer 0.75  placed 0.36  above moved +0.29  under 0.72  rank +0.25
+  HFFC6_C_chr1                     none            loops   692 scored   573  contact   1.73  ratio 0.882  closer 0.76  placed 0.24  above moved +0.18  under 0.72  rank -0.09
+  HFFC6_C_chr1                     moved, no loop  loops  1772 scored  1487  contact   1.02  ratio 1.015  closer 0.45  placed 0.07  above moved +0.00  under 0.50  rank +0.13
+  HFFC6_R_chr1                     all             loops  1783 scored  1746  contact   6.12  ratio 0.730  closer 0.87  placed 0.61  above moved +0.53  under 0.83  rank +0.18
+  HFFC6_R_chr1                     CTCF            loops   971 scored   966  contact   9.42  ratio 0.613  closer 0.98  placed 0.85  above moved +0.77  under 0.95  rank +0.34
+  HFFC6_R_chr1                     RNAPII alone    loops   120 scored   118  contact   0.96  ratio 0.731  closer 0.91  placed 0.69  above moved +0.61  under 0.87  rank +0.12
+  HFFC6_R_chr1                     none            loops   692 scored   662  contact   1.11  ratio 0.927  closer 0.69  placed 0.25  above moved +0.17  under 0.65  rank -0.11
+  HFFC6_R_chr1                     moved, no loop  loops  1772 scored  1683  contact   0.96  ratio 0.996  closer 0.51  placed 0.08  above moved +0.00  under 0.50  rank +0.14
+  HFFC6_M_chr1                     all             loops  1783 scored  1749  contact   3.05  ratio 0.774  closer 0.85  placed 0.53  above moved +0.44  under 0.80  rank +0.15
+  HFFC6_M_chr1                     CTCF            loops   971 scored   969  contact   3.80  ratio 0.681  closer 0.95  placed 0.73  above moved +0.64  under 0.90  rank +0.27
+  HFFC6_M_chr1                     RNAPII alone    loops   120 scored   118  contact   2.07  ratio 0.752  closer 0.91  placed 0.59  above moved +0.50  under 0.83  rank +0.11
+  HFFC6_M_chr1                     none            loops   692 scored   662  contact   1.14  ratio 0.924  closer 0.69  placed 0.24  above moved +0.15  under 0.63  rank -0.09
+  HFFC6_M_chr1                     moved, no loop  loops  1772 scored  1687  contact   0.98  ratio 0.989  closer 0.53  placed 0.09  above moved +0.00  under 0.50  rank +0.08
+  map all             loops  1783 scored  1783  contact  12.48
+  map CTCF            loops   971 scored   971  contact  14.35
+  map RNAPII alone    loops   120 scored   120  contact   9.70
+  map none            loops   692 scored   692  contact   9.53
+  map moved, no loop  loops  1772 scored  1760  contact   0.95

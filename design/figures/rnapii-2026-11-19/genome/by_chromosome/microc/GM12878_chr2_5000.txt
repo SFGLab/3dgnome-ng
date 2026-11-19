@@ -1,0 +1,29 @@
+min_z 15: 1971 of 17029 loops kept
+ctcf: 3220 input loops in the region, 677 at a Micro-C loop
+rnapii: 7286 input loops in the region, 649 at a Micro-C loop
+1971 Micro-C loops at 5000 bp, all 1971, CTCF 557, RNAPII alone 186, none 1228, moved, no loop 1967
+  GM12878_E_chr2                   all             loops  1971 scored   309  contact  26.08  ratio 0.333  closer 0.88  placed 0.11  above moved +0.11  under 0.85  rank -0.16
+  GM12878_E_chr2                   CTCF            loops   557 scored   166  contact  32.64  ratio 0.268  closer 0.98  placed 0.28  above moved +0.27  under 0.94  rank +0.09
+  GM12878_E_chr2                   RNAPII alone    loops   186 scored    28  contact   6.29  ratio 0.461  closer 0.86  placed 0.11  above moved +0.10  under 0.80  rank +0.30
+  GM12878_E_chr2                   none            loops  1228 scored   115  contact  15.35  ratio 0.932  closer 0.75  placed 0.04  above moved +0.03  under 0.72  rank -0.30
+  GM12878_E_chr2                   moved, no loop  loops  1967 scored    80  contact   3.62  ratio 1.022  closer 0.45  placed 0.01  above moved +0.00  under 0.50  rank +0.29
+  GM12878_C_chr2                   all             loops  1971 scored  1508  contact   2.47  ratio 0.891  closer 0.73  placed 0.28  above moved +0.24  under 0.71  rank -0.08
+  GM12878_C_chr2                   CTCF            loops   557 scored   523  contact   3.28  ratio 0.671  closer 0.94  placed 0.71  above moved +0.68  under 0.91  rank +0.24
+  GM12878_C_chr2                   RNAPII alone    loops   186 scored   157  contact   1.18  ratio 0.956  closer 0.61  placed 0.16  above moved +0.12  under 0.59  rank +0.10
+  GM12878_C_chr2                   none            loops  1228 scored   828  contact   1.45  ratio 0.969  closer 0.61  placed 0.10  above moved +0.07  under 0.60  rank -0.15
+  GM12878_C_chr2                   moved, no loop  loops  1967 scored  1370  contact   0.91  ratio 1.003  closer 0.48  placed 0.04  above moved +0.00  under 0.50  rank +0.02
+  GM12878_R_chr2                   all             loops  1971 scored  1716  contact   3.48  ratio 0.844  closer 0.80  placed 0.37  above moved +0.32  under 0.76  rank -0.19
+  GM12878_R_chr2                   CTCF            loops   557 scored   541  contact   5.66  ratio 0.642  closer 0.96  placed 0.76  above moved +0.71  under 0.93  rank +0.22
+  GM12878_R_chr2                   RNAPII alone    loops   186 scored   173  contact   1.75  ratio 0.711  closer 0.98  placed 0.70  above moved +0.65  under 0.94  rank +0.02
+  GM12878_R_chr2                   none            loops  1228 scored  1002  contact   1.12  ratio 0.948  closer 0.68  placed 0.14  above moved +0.09  under 0.63  rank -0.20
+  GM12878_R_chr2                   moved, no loop  loops  1967 scored  1613  contact   1.00  ratio 1.001  closer 0.50  placed 0.05  above moved +0.00  under 0.50  rank +0.04
+  GM12878_M_chr2                   all             loops  1971 scored  1740  contact   2.34  ratio 0.869  closer 0.80  placed 0.34  above moved +0.28  under 0.75  rank -0.15
+  GM12878_M_chr2                   CTCF            loops   557 scored   540  contact   3.54  ratio 0.676  closer 0.95  placed 0.73  above moved +0.68  under 0.92  rank +0.26
+  GM12878_M_chr2                   RNAPII alone    loops   186 scored   180  contact   1.34  ratio 0.789  closer 0.91  placed 0.52  above moved +0.46  under 0.86  rank +0.11
+  GM12878_M_chr2                   none            loops  1228 scored  1020  contact   1.00  ratio 0.946  closer 0.70  placed 0.13  above moved +0.08  under 0.65  rank -0.20
+  GM12878_M_chr2                   moved, no loop  loops  1967 scored  1610  contact   0.97  ratio 1.006  closer 0.47  placed 0.05  above moved +0.00  under 0.50  rank +0.02
+  map all             loops  1971 scored  1971  contact   7.93
+  map CTCF            loops   557 scored   557  contact   8.44
+  map RNAPII alone    loops   186 scored   186  contact   7.12
+  map none            loops  1228 scored  1228  contact   7.71
+  map moved, no loop  loops  1967 scored  1950  contact   0.96

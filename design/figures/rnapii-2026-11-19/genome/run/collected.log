@@ -1,0 +1,17 @@
+expression E: GM12878->H1ESC -0.140 on 5436 genes of 22 chromosomes, GM12878->HFFC6 -0.146 on 5028 genes of 22 chromosomes, H1ESC->HFFC6 -0.136 on 5115 genes of 22 chromosomes
+expression C: GM12878->H1ESC -0.194 on 5450 genes of 22 chromosomes, GM12878->HFFC6 -0.231 on 5041 genes of 22 chromosomes, H1ESC->HFFC6 -0.174 on 5134 genes of 22 chromosomes
+expression R: GM12878->H1ESC -0.238 on 5497 genes of 22 chromosomes, GM12878->HFFC6 -0.269 on 5098 genes of 22 chromosomes, H1ESC->HFFC6 -0.215 on 5191 genes of 22 chromosomes
+expression M: GM12878->H1ESC -0.217 on 5497 genes of 22 chromosomes, GM12878->HFFC6 -0.226 on 5097 genes of 22 chromosomes, H1ESC->HFFC6 -0.196 on 5190 genes of 22 chromosomes
+structure GM12878: 22 chromosomes, raw SCC E 0.097, C 0.295, R 0.293, M 0.339
+pile-up GM12878: 22 chromosomes, 43730 loops, map 1.68, E 3.37 of it, C 0.89 of it, R 1.08 of it, M 0.96 of it
+structure H1ESC: 22 chromosomes, raw SCC E 0.134, C 0.453, R 0.419, M 0.459
+pile-up H1ESC: 22 chromosomes, 32450 loops, map 1.31, E 2.37 of it, C 0.99 of it, R 0.91 of it, M 1.03 of it
+structure HFFC6: 22 chromosomes, raw SCC E 0.149, C 0.473, R 0.468, M 0.513
+pile-up HFFC6: 22 chromosomes, 62482 loops, map 1.63, E 4.63 of it, C 1.11 of it, R 1.23 of it, M 1.27 of it
+Micro-C GM12878: 22 chromosomes, 25783 loops, placed above moved E 0.12, C 0.23, R 0.31, M 0.28
+Micro-C H1ESC: 22 chromosomes, 10046 loops, placed above moved E 0.12, C 0.35, R 0.40, M 0.37
+Micro-C HFFC6: 22 chromosomes, 19192 loops, placed above moved E 0.10, C 0.39, R 0.47, M 0.42
+pairs GM12878: 22 chromosomes, 22586 pairs an RNAPII loop alone joins
+pairs H1ESC: 22 chromosomes, 31537 pairs an RNAPII loop alone joins
+pairs HFFC6: 22 chromosomes, 15878 pairs an RNAPII loop alone joins
+by chromosome: 528 rows

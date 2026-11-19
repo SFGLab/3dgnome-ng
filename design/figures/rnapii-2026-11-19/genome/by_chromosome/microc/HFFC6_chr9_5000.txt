@@ -1,0 +1,29 @@
+min_z 15: 862 of 1418 loops kept
+ctcf: 2156 input loops in the region, 559 at a Micro-C loop
+rnapii: 4827 input loops in the region, 305 at a Micro-C loop
+862 Micro-C loops at 5000 bp, all 862, CTCF 400, RNAPII alone 67, none 395, moved, no loop 857
+  HFFC6_E_chr9                     all             loops   862 scored   103  contact  37.22  ratio 0.251  closer 0.98  placed 0.10  above moved +0.10  under 0.92  rank +0.07
+  HFFC6_E_chr9                     CTCF            loops   400 scored    93  contact  37.16  ratio 0.251  closer 0.99  placed 0.21  above moved +0.20  under 0.94  rank +0.02
+  HFFC6_E_chr9                     RNAPII alone    loops    67 scored     1  contact  52.50  ratio 0.531  closer 1.00  placed 0.01  above moved +0.01  under 0.94  rank +nan
+  HFFC6_E_chr9                     none            loops   395 scored     9  contact  41.57  ratio 0.542  closer 0.89  placed 0.02  above moved +0.01  under 0.77  rank +nan
+  HFFC6_E_chr9                     moved, no loop  loops   857 scored    18  contact   0.62  ratio 0.931  closer 0.61  placed 0.01  above moved +0.00  under 0.50  rank +0.11
+  HFFC6_C_chr9                     all             loops   862 scored   735  contact   2.45  ratio 0.794  closer 0.83  placed 0.44  above moved +0.38  under 0.79  rank +0.20
+  HFFC6_C_chr9                     CTCF            loops   400 scored   386  contact   3.02  ratio 0.686  closer 0.92  placed 0.69  above moved +0.64  under 0.90  rank +0.26
+  HFFC6_C_chr9                     RNAPII alone    loops    67 scored    55  contact   0.99  ratio 0.890  closer 0.71  placed 0.31  above moved +0.26  under 0.68  rank +0.19
+  HFFC6_C_chr9                     none            loops   395 scored   294  contact   1.64  ratio 0.911  closer 0.72  placed 0.20  above moved +0.15  under 0.67  rank -0.09
+  HFFC6_C_chr9                     moved, no loop  loops   857 scored   686  contact   0.91  ratio 1.002  closer 0.50  placed 0.05  above moved +0.00  under 0.50  rank +0.15
+  HFFC6_R_chr9                     all             loops   862 scored   834  contact   4.55  ratio 0.748  closer 0.87  placed 0.56  above moved +0.48  under 0.83  rank +0.14
+  HFFC6_R_chr9                     CTCF            loops   400 scored   396  contact   7.50  ratio 0.618  closer 0.97  placed 0.81  above moved +0.74  under 0.95  rank +0.29
+  HFFC6_R_chr9                     RNAPII alone    loops    67 scored    67  contact   2.16  ratio 0.682  closer 0.99  placed 0.76  above moved +0.69  under 0.95  rank +0.20
+  HFFC6_R_chr9                     none            loops   395 scored   371  contact   1.36  ratio 0.904  closer 0.74  placed 0.26  above moved +0.19  under 0.69  rank -0.20
+  HFFC6_R_chr9                     moved, no loop  loops   857 scored   806  contact   0.82  ratio 1.010  closer 0.46  placed 0.07  above moved +0.00  under 0.50  rank +0.06
+  HFFC6_M_chr9                     all             loops   862 scored   834  contact   2.39  ratio 0.788  closer 0.84  placed 0.50  above moved +0.43  under 0.81  rank +0.15
+  HFFC6_M_chr9                     CTCF            loops   400 scored   396  contact   3.22  ratio 0.678  closer 0.95  placed 0.76  above moved +0.68  under 0.92  rank +0.33
+  HFFC6_M_chr9                     RNAPII alone    loops    67 scored    67  contact   1.47  ratio 0.726  closer 0.94  placed 0.70  above moved +0.62  under 0.89  rank +0.02
+  HFFC6_M_chr9                     none            loops   395 scored   371  contact   1.00  ratio 0.921  closer 0.71  placed 0.22  above moved +0.14  under 0.67  rank -0.12
+  HFFC6_M_chr9                     moved, no loop  loops   857 scored   807  contact   0.98  ratio 1.009  closer 0.48  placed 0.08  above moved +0.00  under 0.50  rank +0.02
+  map all             loops   862 scored   862  contact  12.28
+  map CTCF            loops   400 scored   400  contact  14.71
+  map RNAPII alone    loops    67 scored    67  contact   8.73
+  map none            loops   395 scored   395  contact  10.00
+  map moved, no loop  loops   857 scored   851  contact   0.99

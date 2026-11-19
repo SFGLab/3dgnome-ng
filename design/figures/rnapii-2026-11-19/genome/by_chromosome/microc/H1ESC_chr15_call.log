@@ -1,0 +1,36 @@
+/home/nk2/3dgnome-ng/.venv/lib/python3.12/site-packages/cooler/_balance.py:182: ConvergenceWarning: Iteration limit reached without convergence on chr15.
+  warnings.warn(
+INFO:root:creating a Pool of 4 workers
+INFO:root:Using recommended donut-based kernels with w=7, p=4 for binsize=5000
+INFO:root:creating a Pool of 4 workers
+INFO:root:convolving 60 tiles to build histograms for lambda-bins
+INFO:root:Done building histograms in 12.842 sec ...
+INFO:root:Determined thresholds for every lambda-bin ...
+INFO:root:creating a Pool of 4 workers
+INFO:root:convolving 60 tiles to extract enriched pixels
+INFO:root:creating a Pool of 4 workers to tackle 60 tiles
+INFO:root:Done extracting enriched pixels in 11.857 sec ...
+INFO:root:Begin post-processing of 4214 filtered pixels
+INFO:root:preparing to extract needed q-values ...
+INFO:root:clustering enriched pixels in region: chr15
+INFO:root:detected 914 clusters of 4.61+/-5.40 size
+INFO:root:Clustering is complete
+INFO:root:filtered 589 out of 914 centroids to reduce the number of false-positives
+H1ESC_chr15_5000.cool: 589 loops -> /home/nk2/xc_lr/out/readouts/microc/H1ESC_chr15_5000.bedpe
+INFO:root:creating a Pool of 4 workers
+INFO:root:Using recommended donut-based kernels with w=5, p=2 for binsize=10000
+INFO:root:creating a Pool of 4 workers
+INFO:root:convolving 60 tiles to build histograms for lambda-bins
+INFO:root:Done building histograms in 3.427 sec ...
+INFO:root:Determined thresholds for every lambda-bin ...
+INFO:root:creating a Pool of 4 workers
+INFO:root:convolving 60 tiles to extract enriched pixels
+INFO:root:creating a Pool of 4 workers to tackle 60 tiles
+INFO:root:Done extracting enriched pixels in 2.883 sec ...
+INFO:root:Begin post-processing of 2798 filtered pixels
+INFO:root:preparing to extract needed q-values ...
+INFO:root:clustering enriched pixels in region: chr15
+INFO:root:detected 832 clusters of 3.36+/-3.03 size
+INFO:root:Clustering is complete
+INFO:root:filtered 446 out of 832 centroids to reduce the number of false-positives
+H1ESC_chr15_10000.cool: 446 loops -> /home/nk2/xc_lr/out/readouts/microc/H1ESC_chr15_10000.bedpe

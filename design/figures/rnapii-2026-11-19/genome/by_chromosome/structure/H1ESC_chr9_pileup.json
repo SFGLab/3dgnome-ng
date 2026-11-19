@@ -1,0 +1,32 @@
+[
+  {
+    "arm": "map",
+    "n_models": 0,
+    "n_loops": 1066,
+    "apa": 1.2917211353525055
+  },
+  {
+    "arm": "H1ESC_E_chr9",
+    "n_models": 10,
+    "n_loops": 1066,
+    "apa": 3.0557108479397415
+  },
+  {
+    "arm": "H1ESC_C_chr9",
+    "n_models": 10,
+    "n_loops": 1066,
+    "apa": 1.259141290474503
+  },
+  {
+    "arm": "H1ESC_R_chr9",
+    "n_models": 10,
+    "n_loops": 1066,
+    "apa": 0.9031180623652912
+  },
+  {
+    "arm": "H1ESC_M_chr9",
+    "n_models": 10,
+    "n_loops": 1066,
+    "apa": 1.133455599979127
+  }
+]

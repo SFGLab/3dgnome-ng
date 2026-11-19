@@ -1,0 +1,32 @@
+[
+  {
+    "arm": "map",
+    "n_models": 0,
+    "n_loops": 2503,
+    "apa": 1.6768239108152068
+  },
+  {
+    "arm": "HFFC6_E_chr15",
+    "n_models": 10,
+    "n_loops": 2503,
+    "apa": 8.100392647437243
+  },
+  {
+    "arm": "HFFC6_C_chr15",
+    "n_models": 10,
+    "n_loops": 2503,
+    "apa": 1.7376426982093027
+  },
+  {
+    "arm": "HFFC6_R_chr15",
+    "n_models": 10,
+    "n_loops": 2503,
+    "apa": 1.877749761317754
+  },
+  {
+    "arm": "HFFC6_M_chr15",
+    "n_models": 10,
+    "n_loops": 2503,
+    "apa": 1.9925013850108808
+  }
+]

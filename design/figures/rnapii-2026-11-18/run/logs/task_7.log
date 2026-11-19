@@ -1,0 +1,11 @@
+[GM19239 chr1] arms: GM19239_C_chr1 GM19239_R_chr1
+23:14:57 pooled score
+chr1, pooled ensemble against Hi-C at 25000 bp, 1257 unmapped bins
+                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
+                                GM19239_C_chr1  10   0.373   0.231   0.539   0.255   0.230   0.385                     0.504    0.306    0.097
+                                GM19239_R_chr1  10   0.387   0.236   0.543   0.272   0.235   0.364                     0.508    0.274    0.099
+23:16:43 pile-up
+  map                          models   0  loops  11510  APA 4.029
+  GM19239_C_chr1               models  10  loops  11510  APA 1.610
+  GM19239_R_chr1               models  10  loops  11510  APA 2.319
+23:18:17 done

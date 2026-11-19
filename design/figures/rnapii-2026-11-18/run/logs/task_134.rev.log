@@ -1,0 +1,11 @@
+[GM19240 chr15] arms: GM19240_C_chr15 GM19240_R_chr15
+23:28:18 pooled score
+chr15, pooled ensemble against Hi-C at 25000 bp, 1044 unmapped bins
+                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
+                               GM19240_C_chr15  10   0.449   0.280   0.550   0.290   0.281   0.468                     0.468    0.285    0.112
+                               GM19240_R_chr15  10   0.456   0.281   0.553   0.304   0.281   0.467                     0.469    0.272    0.106
+23:28:46 pile-up
+  map                          models   0  loops   2677  APA 4.704
+  GM19240_C_chr15              models  10  loops   2677  APA 1.603
+  GM19240_R_chr15              models  10  loops   2677  APA 2.490
+23:29:10 done

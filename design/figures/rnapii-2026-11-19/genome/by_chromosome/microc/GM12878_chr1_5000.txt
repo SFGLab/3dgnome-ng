@@ -1,0 +1,29 @@
+min_z 15: 2561 of 19054 loops kept
+ctcf: 5224 input loops in the region, 1077 at a Micro-C loop
+rnapii: 9028 input loops in the region, 736 at a Micro-C loop
+2561 Micro-C loops at 5000 bp, all 2561, CTCF 818, RNAPII alone 208, none 1535, moved, no loop 2550
+  GM12878_E_chr1                   all             loops  2561 scored   561  contact  23.34  ratio 0.315  closer 0.84  placed 0.15  above moved +0.13  under 0.83  rank -0.16
+  GM12878_E_chr1                   CTCF            loops   818 scored   320  contact  30.80  ratio 0.239  closer 0.98  placed 0.37  above moved +0.35  under 0.96  rank +0.12
+  GM12878_E_chr1                   RNAPII alone    loops   208 scored    28  contact  16.28  ratio 0.566  closer 0.82  placed 0.09  above moved +0.07  under 0.78  rank -0.27
+  GM12878_E_chr1                   none            loops  1535 scored   213  contact   4.16  ratio 0.982  closer 0.62  placed 0.04  above moved +0.02  under 0.64  rank -0.23
+  GM12878_E_chr1                   moved, no loop  loops  2550 scored   210  contact   0.75  ratio 1.014  closer 0.43  placed 0.02  above moved +0.00  under 0.50  rank +0.22
+  GM12878_C_chr1                   all             loops  2561 scored  2140  contact   2.47  ratio 0.907  closer 0.73  placed 0.28  above moved +0.23  under 0.71  rank -0.12
+  GM12878_C_chr1                   CTCF            loops   818 scored   790  contact   3.21  ratio 0.698  closer 0.91  placed 0.68  above moved +0.63  under 0.89  rank +0.15
+  GM12878_C_chr1                   RNAPII alone    loops   208 scored   178  contact   1.12  ratio 0.976  closer 0.58  placed 0.14  above moved +0.09  under 0.58  rank -0.06
+  GM12878_C_chr1                   none            loops  1535 scored  1172  contact   1.30  ratio 0.970  closer 0.62  placed 0.09  above moved +0.03  under 0.60  rank -0.17
+  GM12878_C_chr1                   moved, no loop  loops  2550 scored  2051  contact   1.00  ratio 1.006  closer 0.47  placed 0.05  above moved +0.00  under 0.50  rank +0.12
+  GM12878_R_chr1                   all             loops  2561 scored  2371  contact   3.59  ratio 0.871  closer 0.77  placed 0.36  above moved +0.30  under 0.73  rank -0.19
+  GM12878_R_chr1                   CTCF            loops   818 scored   798  contact   5.93  ratio 0.665  closer 0.95  placed 0.76  above moved +0.69  under 0.92  rank +0.17
+  GM12878_R_chr1                   RNAPII alone    loops   208 scored   196  contact   1.19  ratio 0.732  closer 0.94  placed 0.64  above moved +0.58  under 0.89  rank +0.03
+  GM12878_R_chr1                   none            loops  1535 scored  1377  contact   0.78  ratio 0.964  closer 0.63  placed 0.12  above moved +0.05  under 0.60  rank -0.16
+  GM12878_R_chr1                   moved, no loop  loops  2550 scored  2290  contact   1.10  ratio 1.004  closer 0.49  placed 0.07  above moved +0.00  under 0.50  rank +0.07
+  GM12878_M_chr1                   all             loops  2561 scored  2391  contact   2.24  ratio 0.892  closer 0.75  placed 0.33  above moved +0.28  under 0.72  rank -0.17
+  GM12878_M_chr1                   CTCF            loops   818 scored   804  contact   3.21  ratio 0.694  closer 0.93  placed 0.70  above moved +0.64  under 0.90  rank +0.16
+  GM12878_M_chr1                   RNAPII alone    loops   208 scored   199  contact   1.10  ratio 0.815  closer 0.84  placed 0.46  above moved +0.40  under 0.80  rank +0.06
+  GM12878_M_chr1                   none            loops  1535 scored  1388  contact   0.93  ratio 0.966  closer 0.63  placed 0.12  above moved +0.06  under 0.60  rank -0.19
+  GM12878_M_chr1                   moved, no loop  loops  2550 scored  2300  contact   0.97  ratio 1.002  closer 0.49  placed 0.06  above moved +0.00  under 0.50  rank +0.06
+  map all             loops  2561 scored  2561  contact   7.84
+  map CTCF            loops   818 scored   818  contact   8.46
+  map RNAPII alone    loops   208 scored   208  contact   6.58
+  map none            loops  1535 scored  1535  contact   7.39
+  map moved, no loop  loops  2550 scored  2532  contact   0.96

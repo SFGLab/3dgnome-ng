@@ -1,0 +1,4 @@
+[HFFC6 chr14] loops called: 1013 at 5 kb, 835 at 10 kb
+  map RNAPII alone    loops    57 scored    57  contact   8.54
+  map none            loops   294 scored   294  contact   9.98
+  map moved, no loop  loops   625 scored   621  contact   0.95

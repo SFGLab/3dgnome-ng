@@ -1,0 +1,11 @@
+[HG00731 chr19] arms: HG00731_C_chr19 HG00731_R_chr19
+23:24:53 pooled score
+chr19, pooled ensemble against Hi-C at 25000 bp, 148 unmapped bins
+                                           arm   n   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC   mapped bins only: raw SCC  bal SCC  bal stratum Spearman
+                               HG00731_C_chr19  10   0.461   0.272   0.583   0.296   0.269   0.368                     0.566    0.302    0.115
+                               HG00731_R_chr19  10   0.483   0.279   0.619   0.343   0.277   0.323                     0.606    0.255    0.091
+23:25:10 pile-up
+  map                          models   0  loops   4582  APA 3.363
+  HG00731_C_chr19              models  10  loops   4582  APA 1.523
+  HG00731_R_chr19              models  10  loops   4582  APA 2.444
+23:25:24 done

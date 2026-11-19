@@ -1,0 +1,34 @@
+INFO:root:creating a Pool of 4 workers
+INFO:root:Using recommended donut-based kernels with w=7, p=4 for binsize=5000
+INFO:root:creating a Pool of 4 workers
+INFO:root:convolving 93 tiles to build histograms for lambda-bins
+INFO:root:Done building histograms in 20.628 sec ...
+INFO:root:Determined thresholds for every lambda-bin ...
+INFO:root:creating a Pool of 4 workers
+INFO:root:convolving 93 tiles to extract enriched pixels
+INFO:root:creating a Pool of 4 workers to tackle 93 tiles
+INFO:root:Done extracting enriched pixels in 18.747 sec ...
+INFO:root:Begin post-processing of 5713 filtered pixels
+INFO:root:preparing to extract needed q-values ...
+INFO:root:clustering enriched pixels in region: chr7
+INFO:root:detected 1490 clusters of 3.83+/-4.50 size
+INFO:root:Clustering is complete
+INFO:root:filtered 954 out of 1490 centroids to reduce the number of false-positives
+H1ESC_chr7_5000.cool: 954 loops -> /home/nk2/xc_lr/out/readouts/microc/H1ESC_chr7_5000.bedpe
+INFO:root:creating a Pool of 4 workers
+INFO:root:Using recommended donut-based kernels with w=5, p=2 for binsize=10000
+INFO:root:creating a Pool of 4 workers
+INFO:root:convolving 93 tiles to build histograms for lambda-bins
+INFO:root:Done building histograms in 6.040 sec ...
+INFO:root:Determined thresholds for every lambda-bin ...
+INFO:root:creating a Pool of 4 workers
+INFO:root:convolving 93 tiles to extract enriched pixels
+INFO:root:creating a Pool of 4 workers to tackle 93 tiles
+INFO:root:Done extracting enriched pixels in 5.364 sec ...
+INFO:root:Begin post-processing of 4602 filtered pixels
+INFO:root:preparing to extract needed q-values ...
+INFO:root:clustering enriched pixels in region: chr7
+INFO:root:detected 1517 clusters of 3.03+/-2.76 size
+INFO:root:Clustering is complete
+INFO:root:filtered 858 out of 1517 centroids to reduce the number of false-positives
+H1ESC_chr7_10000.cool: 858 loops -> /home/nk2/xc_lr/out/readouts/microc/H1ESC_chr7_10000.bedpe

@@ -1,0 +1,12 @@
+r_conf_given_swap          -0.017          -0.0          -0.097
+r_baseline_c1               0.308         0.028           0.177
+r_baseline_c2                0.04         -0.25          -0.017
+n_strict_deseq                297           267             264
+r_strict_conf              -0.061        -0.057          -0.098
+r_strict_swap              -0.078        -0.112          -0.107
+n_jump                         38            32              34
+jump_mean_conf              0.005          0.06           0.004
+jump_mean_swap              0.022         0.008          -0.084
+jump_r_conf                -0.021         -0.29           -0.31
+jump_r_swap                -0.112        -0.391          -0.274
+[pilot] expected sign if shorter distance goes with higher expression: negative r for total/set/conf

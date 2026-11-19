@@ -1,0 +1,29 @@
+min_z 15: 874 of 6323 loops kept
+ctcf: 1586 input loops in the region, 280 at a Micro-C loop
+rnapii: 3198 input loops in the region, 212 at a Micro-C loop
+874 Micro-C loops at 5000 bp, all 874, CTCF 226, RNAPII alone 48, none 600, moved, no loop 873
+  GM12878_E_chr16                  all             loops   874 scored   251  contact  16.04  ratio 0.459  closer 0.82  placed 0.17  above moved +0.15  under 0.74  rank -0.15
+  GM12878_E_chr16                  CTCF            loops   226 scored   101  contact  23.49  ratio 0.249  closer 0.99  placed 0.42  above moved +0.39  under 0.93  rank +0.19
+  GM12878_E_chr16                  RNAPII alone    loops    48 scored    14  contact   4.57  ratio 0.583  closer 0.79  placed 0.21  above moved +0.18  under 0.74  rank -0.24
+  GM12878_E_chr16                  none            loops   600 scored   136  contact   6.88  ratio 0.973  closer 0.71  placed 0.08  above moved +0.05  under 0.60  rank -0.21
+  GM12878_E_chr16                  moved, no loop  loops   873 scored    83  contact   1.73  ratio 0.979  closer 0.58  placed 0.03  above moved +0.00  under 0.50  rank +0.09
+  GM12878_C_chr16                  all             loops   874 scored   667  contact   2.13  ratio 0.923  closer 0.71  placed 0.23  above moved +0.19  under 0.71  rank -0.13
+  GM12878_C_chr16                  CTCF            loops   226 scored   207  contact   2.91  ratio 0.663  closer 0.93  placed 0.69  above moved +0.65  under 0.92  rank +0.17
+  GM12878_C_chr16                  RNAPII alone    loops    48 scored    43  contact   0.95  ratio 0.968  closer 0.63  placed 0.15  above moved +0.11  under 0.60  rank -0.07
+  GM12878_C_chr16                  none            loops   600 scored   417  contact   1.21  ratio 0.973  closer 0.61  placed 0.07  above moved +0.03  under 0.62  rank -0.21
+  GM12878_C_chr16                  moved, no loop  loops   873 scored   639  contact   0.84  ratio 1.014  closer 0.45  placed 0.04  above moved +0.00  under 0.50  rank +0.10
+  GM12878_R_chr16                  all             loops   874 scored   807  contact   3.86  ratio 0.901  closer 0.77  placed 0.31  above moved +0.26  under 0.71  rank -0.20
+  GM12878_R_chr16                  CTCF            loops   226 scored   220  contact   7.31  ratio 0.651  closer 0.97  placed 0.80  above moved +0.74  under 0.95  rank +0.20
+  GM12878_R_chr16                  RNAPII alone    loops    48 scored    48  contact   0.34  ratio 0.787  closer 0.92  placed 0.56  above moved +0.51  under 0.86  rank -0.12
+  GM12878_R_chr16                  none            loops   600 scored   539  contact   0.93  ratio 0.962  closer 0.67  placed 0.11  above moved +0.05  under 0.60  rank -0.22
+  GM12878_R_chr16                  moved, no loop  loops   873 scored   739  contact   0.67  ratio 0.996  closer 0.52  placed 0.06  above moved +0.00  under 0.50  rank +0.10
+  GM12878_M_chr16                  all             loops   874 scored   803  contact   2.01  ratio 0.908  closer 0.75  placed 0.27  above moved +0.21  under 0.70  rank -0.18
+  GM12878_M_chr16                  CTCF            loops   226 scored   220  contact   2.93  ratio 0.682  closer 0.96  placed 0.73  above moved +0.67  under 0.92  rank +0.25
+  GM12878_M_chr16                  RNAPII alone    loops    48 scored    48  contact   1.02  ratio 0.884  closer 0.83  placed 0.25  above moved +0.19  under 0.73  rank +0.12
+  GM12878_M_chr16                  none            loops   600 scored   535  contact   0.93  ratio 0.960  closer 0.66  placed 0.10  above moved +0.04  under 0.60  rank -0.23
+  GM12878_M_chr16                  moved, no loop  loops   873 scored   739  contact   0.92  ratio 0.996  closer 0.52  placed 0.06  above moved +0.00  under 0.50  rank +0.09
+  map all             loops   874 scored   874  contact   7.77
+  map CTCF            loops   226 scored   226  contact   8.40
+  map RNAPII alone    loops    48 scored    48  contact   7.06
+  map none            loops   600 scored   600  contact   7.26
+  map moved, no loop  loops   873 scored   854  contact   0.99

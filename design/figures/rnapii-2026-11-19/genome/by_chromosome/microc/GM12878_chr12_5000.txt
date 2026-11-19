@@ -1,0 +1,29 @@
+min_z 15: 1167 of 10729 loops kept
+ctcf: 2671 input loops in the region, 468 at a Micro-C loop
+rnapii: 5921 input loops in the region, 507 at a Micro-C loop
+1167 Micro-C loops at 5000 bp, all 1167, CTCF 363, RNAPII alone 124, none 680, moved, no loop 1155
+  GM12878_E_chr12                  all             loops  1167 scored   272  contact  22.78  ratio 0.340  closer 0.85  placed 0.17  above moved +0.15  under 0.82  rank -0.25
+  GM12878_E_chr12                  CTCF            loops   363 scored   146  contact  25.44  ratio 0.253  closer 0.98  placed 0.38  above moved +0.36  under 0.94  rank -0.01
+  GM12878_E_chr12                  RNAPII alone    loops   124 scored    21  contact  14.01  ratio 0.276  closer 0.81  placed 0.13  above moved +0.11  under 0.82  rank -0.05
+  GM12878_E_chr12                  none            loops   680 scored   105  contact  10.36  ratio 0.973  closer 0.68  placed 0.06  above moved +0.04  under 0.66  rank -0.38
+  GM12878_E_chr12                  moved, no loop  loops  1155 scored    93  contact   0.59  ratio 1.020  closer 0.46  placed 0.02  above moved +0.00  under 0.50  rank +0.09
+  GM12878_C_chr12                  all             loops  1167 scored   941  contact   2.83  ratio 0.876  closer 0.76  placed 0.31  above moved +0.26  under 0.73  rank -0.13
+  GM12878_C_chr12                  CTCF            loops   363 scored   347  contact   3.72  ratio 0.672  closer 0.93  placed 0.69  above moved +0.64  under 0.89  rank +0.21
+  GM12878_C_chr12                  RNAPII alone    loops   124 scored   100  contact   1.66  ratio 0.904  closer 0.76  placed 0.23  above moved +0.17  under 0.71  rank +0.06
+  GM12878_C_chr12                  none            loops   680 scored   494  contact   1.59  ratio 0.956  closer 0.64  placed 0.12  above moved +0.07  under 0.62  rank -0.19
+  GM12878_C_chr12                  moved, no loop  loops  1155 scored   903  contact   0.97  ratio 1.004  closer 0.48  placed 0.05  above moved +0.00  under 0.50  rank +0.05
+  GM12878_R_chr12                  all             loops  1167 scored  1086  contact   4.52  ratio 0.844  closer 0.80  placed 0.40  above moved +0.33  under 0.76  rank -0.27
+  GM12878_R_chr12                  CTCF            loops   363 scored   357  contact   7.66  ratio 0.661  closer 0.97  placed 0.77  above moved +0.70  under 0.93  rank +0.20
+  GM12878_R_chr12                  RNAPII alone    loops   124 scored   117  contact   2.85  ratio 0.690  closer 0.96  placed 0.73  above moved +0.66  under 0.93  rank -0.11
+  GM12878_R_chr12                  none            loops   680 scored   612  contact   1.03  ratio 0.957  closer 0.67  placed 0.14  above moved +0.08  under 0.62  rank -0.23
+  GM12878_R_chr12                  moved, no loop  loops  1155 scored  1034  contact   1.03  ratio 1.004  closer 0.48  placed 0.06  above moved +0.00  under 0.50  rank +0.08
+  GM12878_M_chr12                  all             loops  1167 scored  1077  contact   2.53  ratio 0.861  closer 0.78  placed 0.37  above moved +0.30  under 0.73  rank -0.21
+  GM12878_M_chr12                  CTCF            loops   363 scored   356  contact   3.87  ratio 0.685  closer 0.94  placed 0.71  above moved +0.65  under 0.90  rank +0.25
+  GM12878_M_chr12                  RNAPII alone    loops   124 scored   121  contact   1.46  ratio 0.755  closer 0.93  placed 0.60  above moved +0.54  under 0.86  rank +0.03
+  GM12878_M_chr12                  none            loops   680 scored   600  contact   1.04  ratio 0.954  closer 0.65  placed 0.15  above moved +0.08  under 0.61  rank -0.22
+  GM12878_M_chr12                  moved, no loop  loops  1155 scored  1028  contact   1.06  ratio 1.000  closer 0.50  placed 0.07  above moved +0.00  under 0.50  rank +0.04
+  map all             loops  1167 scored  1167  contact   7.08
+  map CTCF            loops   363 scored   363  contact   7.44
+  map RNAPII alone    loops   124 scored   124  contact   6.03
+  map none            loops   680 scored   680  contact   7.21
+  map moved, no loop  loops  1155 scored  1153  contact   1.02
