@@ -263,6 +263,21 @@ Pairs of nodes that the cells hold in one structure of chr1 10 to 15 Mb, in and 
 - The midpoint with cells at 5 kb scores as the uniform draw on SCC and 0.026 lower on Spearman.
 - Balanced Pearson stays 0.03 to 0.05 under the default chain on every contact bead arm.
 
+### Trial of the bounded drift
+
+`design/figures/uniform-2026-11-19/drift/` and `scores-drift/`. Commit 00c67bd, the uniform draw, cells at 5 kb, z of
+3. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | overlaps per thousand beads |
+|---|---|---|---|---|---|
+| nodes fixed | 0.374 | 0.364 | 0.437 | 0.678 | 21.9 |
+| drift within 0.3 beads | 0.373 | 0.365 | 0.436 | 0.678 | 21.5 |
+| drift within 0.5 beads | 0.371 | 0.365 | 0.435 | 0.678 | 20.9 |
+| drift within 1 bead | 0.372 | 0.362 | 0.434 | 0.678 | 18.3 |
+
+The drift moves no pooled score by more than 0.003. The battery's overlap count falls from 21.9 to 18.3 at one
+bead, a count that is not yet checked between the chains.
+
 ## Settings
 
 A setting is added when a run reads it.

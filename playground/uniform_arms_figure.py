@@ -37,6 +37,14 @@ ARMS = [
     ("node_c5k", "contact beads, cells at 5 kb", "#1baf7a", True, "o"),
     ("node_c10k", "contact beads, cells at 10 kb", "#1baf7a", True, "D"),
     ("node_mid_c5k", "contact beads, midpoint, cells at 5 kb", "#eb6834", True, "s"),
+    ("node_c5k_nomotif", "cells at 5 kb, orientation off", "#1baf7a", False, "o"),
+    ("node_c5k_cap03", "cells at 5 kb, drift within 0.3 beads", "#eda100", True, "s"),
+    ("node_c5k_cap05", "cells at 5 kb, drift within 0.5 beads", "#eda100", True, "o"),
+    ("node_c5k_cap10", "cells at 5 kb, drift within 1 bead", "#eda100", True, "D"),
+    ("node_c5k_centre", "cells at 5 kb, centre of mass kept", "#e87ba4", True, "o"),
+    ("node_c5k_lim125", "cells at 5 kb, bond limit 1.25", "#6250d6", True, "s"),
+    ("node_c5k_lim15", "cells at 5 kb, bond limit 1.5", "#6250d6", True, "o"),
+    ("node_c5k_centre_lim15", "cells at 5 kb, centre of mass kept, bond limit 1.5", "#e87ba4", True, "s"),
 ]
 # key, panel title, reference line
 PANELS = [
