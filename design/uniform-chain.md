@@ -170,6 +170,30 @@ volume at the radius of a bead and the contact cells of `gnome3d/pipeline/ib/cel
 beads of the smooth stage and of the relaxation, and the first build is removed. `design/features.md` has the first
 numbers. The contact cells are not yet measured on a deep map.
 
+### Trial of stage 1 without the contact cells
+
+`design/figures/uniform-2026-11-19/nodes/` has the figure and the table, `scores-nodes/` the score files. Commit
+28374db, the cells, regions and structures of the trial of the first build. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | exponent over Hi-C |
+|---|---|---|---|---|---|
+| default chain | 0.327 | 0.307 | 0.448 | 0.716 | 1.062 |
+| default chain, orientation off | 0.320 | 0.296 | 0.440 | 0.717 | 1.073 |
+| default chain, contact terms off | 0.327 | 0.302 | 0.446 | 0.717 | 1.047 |
+| contact beads, uniform draw | 0.319 | 0.329 | 0.444 | 0.671 | 1.042 |
+| contact beads, uniform draw, orientation off | 0.314 | 0.323 | 0.437 | 0.670 | 1.050 |
+| contact beads, midpoint | 0.332 | 0.332 | 0.453 | 0.684 | 1.053 |
+| contact beads, midpoint, orientation off | 0.332 | 0.331 | 0.446 | 0.683 | 1.065 |
+
+- The midpoint is ahead of the uniform draw on raw SCC, 0.332 against 0.319, and level on balanced SCC.
+- Both draws gain balanced SCC over the default chain, 0.02 to 0.03, and lose balanced Pearson, 0.03 to 0.05.
+- HFFC6 chr1 10 to 15 Mb falls from 0.477 to 0.32 to 0.34 of raw SCC on every contact bead arm, as on the first
+  build. Not traced.
+- The default chain without its two contact terms scores as the default chain. The missing contact cells do not
+  explain a difference between the arms.
+- The battery's overlap count is 9.8 per thousand beads on the default chain, 24.5 with the uniform draw and 15.2
+  with the midpoint. The count is still not checked between the chains.
+
 ## Settings
 
 A setting is added when a run reads it.

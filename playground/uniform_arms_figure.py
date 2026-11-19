@@ -20,14 +20,23 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.ticker import MaxNLocator
 
-# arm suffix, label, colour, filled
+# arm suffix, label, colour, filled, marker. An arm is drawn when the scores hold it.
 ARMS = [
-    ("prod", "default chain", "#52514e", True),
-    ("nomotif", "default chain, orientation off", "#52514e", False),
-    ("uni", "uniform chain", "#2a78d6", True),
-    ("uni_nomotif", "uniform chain, orientation off", "#2a78d6", False),
-    ("uni_w01", "uniform chain, span weight 0.1", "#eb6834", True),
-    ("uni_w01_nomotif", "uniform chain, span weight 0.1, orientation off", "#eb6834", False),
+    ("prod", "default chain", "#52514e", True, "o"),
+    ("nomotif", "default chain, orientation off", "#52514e", False, "o"),
+    ("nocontact", "default chain, contact terms off", "#52514e", True, "D"),
+    ("uni", "first build", "#2a78d6", True, "o"),
+    ("uni_nomotif", "first build, orientation off", "#2a78d6", False, "o"),
+    ("uni_w01", "first build, span weight 0.1", "#eb6834", True, "o"),
+    ("uni_w01_nomotif", "first build, span weight 0.1, orientation off", "#eb6834", False, "o"),
+    ("node", "contact beads, uniform draw", "#2a78d6", True, "o"),
+    ("node_nomotif", "contact beads, uniform draw, orientation off", "#2a78d6", False, "o"),
+    ("node_mid", "contact beads, midpoint", "#eb6834", True, "o"),
+    ("node_mid_nomotif", "contact beads, midpoint, orientation off", "#eb6834", False, "o"),
+    ("node_c1k", "contact beads, cells at 1 kb", "#1baf7a", True, "s"),
+    ("node_c5k", "contact beads, cells at 5 kb", "#1baf7a", True, "o"),
+    ("node_c10k", "contact beads, cells at 10 kb", "#1baf7a", True, "D"),
+    ("node_mid_c5k", "contact beads, midpoint, cells at 5 kb", "#eb6834", True, "s"),
 ]
 # key, panel title, reference line
 PANELS = [
@@ -85,21 +94,22 @@ def read_scores(scores: Path) -> dict[tuple[str, str], dict[str, dict[str, float
 
 def figure(data: dict[tuple[str, str], dict[str, dict[str, float]]], path: Path) -> None:
     rows = list(data)
+    arms = [a for a in ARMS if any(a[0] in d for d in data.values())]
     fig, axes = plt.subplots(2, 3, figsize=(15.5, 2.6 + 1.05 * len(rows)), facecolor=SURFACE)
-    step = 0.12
+    step = min(0.12, 0.8 / max(len(arms), 1))
     for ax, (key, title, ref) in zip(axes.ravel(), PANELS, strict=True):
         ax.set_facecolor(SURFACE)
         for r, row in enumerate(rows):
-            for a, (arm, _label, colour, filled) in enumerate(ARMS):
+            for a, (arm, _label, colour, filled, marker) in enumerate(arms):
                 v = data[row].get(arm, {}).get(key)
                 if v is None:
                     continue
-                y = r + (a - (len(ARMS) - 1) / 2) * step
+                y = r + (a - (len(arms) - 1) / 2) * step
                 ax.plot(
                     [v],
                     [y],
-                    marker="o",
-                    markersize=8,
+                    marker=marker,
+                    markersize=8 if marker == "o" else 7,
                     markerfacecolor=colour if filled else SURFACE,
                     markeredgecolor=colour,
                     markeredgewidth=1.8,
@@ -126,15 +136,15 @@ def figure(data: dict[tuple[str, str], dict[str, dict[str, float]]], path: Path)
         Line2D(
             [],
             [],
-            marker="o",
-            markersize=8,
+            marker=marker,
+            markersize=8 if marker == "o" else 7,
             linestyle="none",
             markerfacecolor=colour if filled else SURFACE,
             markeredgecolor=colour,
             markeredgewidth=1.8,
             label=label,
         )
-        for _arm, label, colour, filled in ARMS
+        for _arm, label, colour, filled, marker in arms
     ]
     fig.legend(
         handles=handles, loc="lower center", ncol=3, frameon=False, fontsize=9.5, labelcolor=INK
@@ -166,7 +176,7 @@ def table(data: dict[tuple[str, str], dict[str, dict[str, float]]], path: Path) 
         "|---|---|---|" + "---|" * len(cols),
     ]
     for (cell, region), arms in data.items():
-        for arm, label, _colour, _filled in ARMS:
+        for arm, label, _colour, _filled, _marker in ARMS:
             if arm not in arms:
                 continue
             vals = " | ".join(
@@ -175,7 +185,9 @@ def table(data: dict[tuple[str, str], dict[str, dict[str, float]]], path: Path) 
             lines.append(f"| {cell} | {region} | {label} | {vals} |")
     lines += ["", "Mean over the cells and regions:", ""]
     lines += ["| arm | " + " | ".join(c for _, c in cols) + " |", "|---|" + "---|" * len(cols)]
-    for arm, label, _colour, _filled in ARMS:
+    for arm, label, _colour, _filled, _marker in ARMS:
+        if not any(arm in a for a in data.values()):
+            continue
         means = []
         for k, _ in cols:
             v = [a[arm][k] for a in data.values() if arm in a and k in a[arm]]
