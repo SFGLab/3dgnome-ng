@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { BarChart, ChartKey, type Bar, type Group } from '../components/BarChart'
 import { LineChart, type Line, type Point } from '../components/LineChart'
 import { ToolRuns, type ToolRun } from '../components/ToolRuns'
+import { hidden } from '../flags'
 import { ROUTES } from '../routes'
 import '../styles/doc.css'
 import './results.css'
@@ -104,11 +105,13 @@ const SECTIONS = [
 
 /** The models against measured data and against cudaMMC and MultiMM and the runtime of the three. */
 export function Results() {
+  const trios = !hidden('trios')
+  const sections = SECTIONS.filter(([to]) => (to !== '#trios' || trios) && !(to.startsWith(ROUTES.method) && hidden('method')))
   return (
     <div className="doc-page">
       <aside className="side-panel">
         <p className="eyebrow">On this page</p>
-        {SECTIONS.map(([to, label]) =>
+        {sections.map(([to, label]) =>
           to.startsWith('#') ? (
             <a key={to} href={to}>
               {label}
@@ -145,7 +148,7 @@ export function Results() {
               groups={EXPRESSION}
             />
           </div>
-          <figure id="trios" className="bar-chart" aria-label="Nine people, three trios">
+          {trios && <figure id="trios" className="bar-chart" aria-label="Nine people, three trios">
             <figcaption>
               <span className="chart-title">Nine people, three trios</span>
               <span className="chart-sub">The change in the model of each person when RNAPII loops are added, measured against the Hi-C map of that person on chromosomes 1 to 22.</span>
@@ -154,13 +157,13 @@ export function Results() {
               <span className="stat-value">9 of 9</span>
               <span className="stat-label">people with more contact enrichment at RNAPII loops. The rise is 44 to 67% and the median is 53%.</span>
             </div>
-          </figure>
+          </figure>}
         </div>
         <p className="reading-note">
           With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower for H1ESC, 0.42 against 0.45. At 10 kb, agreement with Hi-C is higher for pairs under 100 kb apart on GM12878 and HFFc6 and lower for pairs 100 to 500 kb apart on all three cell lines.
         </p>
         <p className="reading-note">
-          Each difference was tested with a two sided test. The new models agree better with Hi-C than the original models in every cell line, p &lt; 0.001 in a Wilcoxon signed rank test over the 22 chromosomes. With RNAPII loops the enhancer to promoter distance is smaller in every cell line, p &lt; 0.001 in a signed rank test over the pairs. The link to expression is stronger for every pair of cell lines, p = 0.002 or less in a block bootstrap over the genes. The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.
+          Each difference was tested with a two sided test. The new models agree better with Hi-C than the original models in every cell line, p &lt; 0.001 in a Wilcoxon signed rank test over the 22 chromosomes. With RNAPII loops the enhancer to promoter distance is smaller in every cell line, p &lt; 0.001 in a signed rank test over the pairs. The link to expression is stronger for every pair of cell lines, p = 0.002 or less in a block bootstrap over the genes.{trios && ' The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.'}
         </p>
         <section id="microc">
           <h2>Micro-C loops</h2>

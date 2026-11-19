@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { hidden } from '../flags'
 import { ROUTES } from '../routes'
 import { CiteStrip } from './CiteStrip'
 import { PrivacyNotice } from './PrivacyNotice'
@@ -25,7 +26,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <Wordmark />
         </Link>
         <nav>
-          {NAV.map(([label, to]) => (
+          {NAV.filter(([, to]) => !(to === ROUTES.method && hidden('method')) && !(to === ROUTES.results && hidden('results'))).map(([label, to]) => (
             <NavLink key={to} to={to}>
               {label}
             </NavLink>

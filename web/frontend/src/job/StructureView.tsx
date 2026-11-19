@@ -36,6 +36,12 @@ type Props = {
    * stretch of the chain at each stays solid and the rest is drawn see through. */
   focusBeads?: number[]
   onPickBead?: (bead: number) => void
+  /** The genomic position of the chain under the pointer, null when the pointer leaves it. */
+  onHoverPosition?: (bp: number | null) => void
+  /** Drawn between the 3D box and the caption. */
+  below?: ReactNode
+  /** A stretch of the genome, in bp, whose chain stays solid while the rest is see through. */
+  focusSpan?: [number, number] | null
   toolbarStart?: ReactNode
   toolbarEnd?: ReactNode
 }
@@ -82,7 +88,7 @@ export function focusRanges(structure: Structure, beads: number[]): [number, num
 const NO_BEADS: number[] = []
 
 /** The Structure tab's 3D view: toolbar, coloured chain, hover box, legend and caption. */
-export function StructureView({ structure, annotations, region, chrom = '', index, total, mode, onMode, markers, highlight, focusBeads = NO_BEADS, onPickBead, toolbarStart, toolbarEnd }: Props) {
+export function StructureView({ structure, annotations, region, chrom = '', index, total, mode, onMode, markers, highlight, focusBeads = NO_BEADS, onPickBead, onHoverPosition, below, focusSpan = null, toolbarStart, toolbarEnd }: Props) {
   const scene = useRef<SceneHandle>(null)
   const box = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<HoverInfo | null>(null)
@@ -101,8 +107,9 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
     const n = structure.chain.length
     const ranges = focusRanges(structure, focusBeads)
     if (held !== null && held < n) ranges.push(stretch(held, n, FOCUS_REACH))
+    if (focusSpan) ranges.push([chainAt(structure.chain, focusSpan[0]), chainAt(structure.chain, focusSpan[1])])
     return ranges
-  }, [structure, beadsKey, held]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [structure, beadsKey, held, focusSpan?.[0], focusSpan?.[1]]) // eslint-disable-line react-hooks/exhaustive-deps
   const palette = useMemo(readPalette, [])
   const points = useMemo(() => structure.chain.map(([x, y, z]) => [x, y, z] as [number, number, number]), [structure])
   // Keyed on the region's numbers: a parent passes a new array each render and a new colour
@@ -145,7 +152,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
           ]
 
   return (
-    <div className="structure-view">
+    <div className={below ? 'structure-view with-below' : 'structure-view'}>
       <div className="view-toolbar">
         {toolbarStart}
         <div className="segmented" role="group" aria-label="Colour by">
@@ -187,7 +194,10 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
           highlight={highlight}
           focus={focus}
           hovered={hover?.index ?? null}
-          onHover={(i, x, y) => setHover(i === null ? null : { lines: describe(i), x, y, index: i })}
+          onHover={(i, x, y) => {
+            setHover(i === null ? null : { lines: describe(i), x, y, index: i })
+            onHoverPosition?.(i === null ? null : structure.chain[i][3])
+          }}
           onPick={(i) => onPickBead?.(beadAt(structure.beads, structure.chain[i][3]))}
         />
         {hover && (
@@ -208,6 +218,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
           ))}
         </ul>
       </div>
+      {below}
       <p className="view-caption">
         Structure {index} of {total}, about one bead per kb. Drag to rotate and scroll to zoom. Hover over a bead to see its position. The chain at the pointer and at each selected bead stays solid and the rest turns see through. Click two beads to measure the distance between them.
       </p>

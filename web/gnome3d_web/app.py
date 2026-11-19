@@ -727,6 +727,9 @@ def create_app() -> FastAPI:
                 f"Build with BASE_PATH={s.base_path or '/'} npm run build in web/frontend, or set BASE_PATH to match.",
                 503,
             )
+        # The parts HIDE leaves out reach the app in the page itself, so it never draws one first.
+        if s.hide:
+            html = html.replace("<head>", f'<head><meta name="site-hide" content="{",".join(s.hide)}">', 1)
         # The page names its scripts by their hash. A browser asks for the page anew each time, so a
         # new deployment is seen on the next load.
         return HTMLResponse(html, headers={"Cache-Control": "no-cache"})

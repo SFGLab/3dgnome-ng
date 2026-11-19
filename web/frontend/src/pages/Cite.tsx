@@ -1,6 +1,7 @@
 import { Copy, ExternalLink, Github, Type } from 'lucide-react'
 import { ReferenceEntry } from '../components/ReferenceEntry'
 import { DATA_SOURCES, REFERENCES, referenceLink } from '../content/references'
+import { hidden } from '../flags'
 import '../styles/doc.css'
 import './cite.css'
 
@@ -78,7 +79,7 @@ export function Cite() {
 
         <section id="algorithms">
           <h2>Algorithms and measures</h2>
-          <p className="intro">The Method page cites these for the multiscale approach, the distance law, the optimisers and the agreement measure.</p>
+          <p className="intro">{`${hidden('method') ? 'The method builds on these' : 'The Method page cites these'} for the multiscale approach, the distance law, the optimisers and the agreement measure.`}</p>
           {group('algorithms').map((r) => (
             <ReferenceEntry key={r.key} r={r} />
           ))}
@@ -87,7 +88,7 @@ export function Cite() {
         <section id="data">
           <h2>Data on this server</h2>
           <p className="intro">
-            Every data set behind the models and the Results page, with the accession of its archive. A row lists the experiment or the set first and its files after it. An entry that says to confirm is not recorded yet.
+            {`Every data set behind the models${hidden('results') ? '' : ' and the Results page'}, with the accession of its archive.`} A row lists the experiment or the set first and its files after it. An entry that says to confirm is not recorded yet.
           </p>
           <table className="data-table">
             <thead>

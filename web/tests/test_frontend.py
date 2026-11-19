@@ -55,6 +55,20 @@ def main() -> int:
         check("a job's page is the app", "FRONTEND-OK" in c.get(r.headers["location"]).text)
         check("a job's file is the server's", c.get(r.headers["location"] + "/files/ep.tsv").status_code == 200)
 
+        check("no part is hidden by default", "site-hide" not in c.get("/").text)
+        (dist / "index.html").write_text("<html><head></head><body>FRONTEND-OK</body></html>")
+        os.environ["HIDE"] = "trios, Results"
+        r = TestClient(create_app()).get("/")
+        check("HIDE reaches the app in the page", '<meta name="site-hide" content="results,trios">' in r.text, r.text[:120])
+        os.environ["HIDE"] = "trois"
+        try:
+            create_app()
+            check("an unknown part of HIDE is refused", False)
+        except ValueError as e:
+            check("an unknown part of HIDE is refused", "trois" in str(e) and "results, method, trios" in str(e), str(e))
+        del os.environ["HIDE"]
+        (dist / "index.html").write_text("<html><body>FRONTEND-OK</body></html>")
+
         os.environ["FRONTEND_DIST"] = str(root / "missing")
         bare = TestClient(create_app())
         r = bare.get("/")

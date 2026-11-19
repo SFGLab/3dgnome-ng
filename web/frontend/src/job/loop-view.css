@@ -1,0 +1,104 @@
+/* The loops of a region as arcs over the genome. */
+.loop-view {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.loop-view-arcs {
+  display: block;
+  width: 100%;
+  height: 88px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  touch-action: none;
+}
+
+.loop-view-arcs.brushable {
+  cursor: crosshair;
+}
+
+.loop-arc {
+  fill: none;
+  stroke-width: 1.2;
+  opacity: 0.55;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.loop-arc.ctcf {
+  stroke: var(--ctcf);
+}
+
+.loop-arc.rnapii {
+  stroke: var(--rnapii);
+}
+
+.loop-arc.over,
+.loop-arc.selected {
+  opacity: 1;
+  stroke-width: 2.6;
+}
+
+.loop-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 9;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+  cursor: pointer;
+  outline: none;
+}
+
+.loop-window {
+  fill: color-mix(in srgb, var(--accent) 14%, transparent);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.loop-brush {
+  fill: color-mix(in srgb, var(--accent) 24%, transparent);
+  pointer-events: none;
+}
+
+.loop-cursor {
+  stroke: var(--ink, #151514);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.loop-view-axis {
+  position: relative;
+  height: 16px;
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+.loop-view-axis span {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.loop-view-axis .unit {
+  right: 0;
+  left: auto;
+  top: 2px;
+  transform: none;
+}
+
+.loop-view-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 2px 0 0;
+  min-height: 22px;
+  font-size: 12px;
+  color: var(--muted);
+}

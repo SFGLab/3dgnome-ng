@@ -354,6 +354,15 @@
   overflow: hidden;
 }
 
+/* With the loops under it the box is as tall as the screen leaves, so both are seen at once. */
+.structure-view.with-below .view-box {
+  height: clamp(380px, calc(100vh - 470px), 640px);
+}
+
+.structure-view.with-below .view-box:fullscreen {
+  height: 100vh;
+}
+
 .view-box:fullscreen {
   height: 100vh;
   border-radius: 0;
@@ -867,6 +876,27 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 6px;
+}
+
+/* The loop view of the whole region over the map, as wide as the map. */
+.loop-overview {
+  width: min(100%, max(320px, calc(100vh - 360px)));
+}
+
+.row-action {
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.row-action:hover {
+  background: var(--accent-soft);
 }
 
 .loop-track text {

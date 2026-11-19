@@ -3,6 +3,7 @@ import { RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Contacts, JobApi, Summary } from './api'
 import { bp } from './format'
+import { LoopView } from './LoopView'
 import { colour, diverging, emptyRows, halfRange, percentile, transform, type Show } from './heatmap'
 import { parseRegion } from './StructureTab'
 
@@ -242,9 +243,32 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
             </button>
           </div>
         </div>
+        {(annotations.data?.loops.length ?? 0) > 0 && (
+          <div className="loop-overview">
+            <LoopView
+              chrom={job.chrom}
+              region={[job.start, job.end]}
+              loops={annotations.data!.loops}
+              window={[locus.start, locus.end]}
+              onWindow={(start, end) => {
+                moveTo({ chrom: job.chrom, start, end })
+                setNote('')
+              }}
+              onSelect={(i) => {
+                if (i === null) return
+                // The map goes to the loop with a quarter of its length either side.
+                const l = annotations.data!.loops[i]
+                const pad = Math.max((l.b[1] - l.a[0]) / 4, res * 5)
+                moveTo({ chrom: job.chrom, start: l.a[0] - pad, end: l.b[1] + pad })
+                setNote('')
+              }}
+              hint="The box is the part the map shows. Drag along the loops to choose a part or click a loop to go to it."
+            />
+          </div>
+        )}
         <svg className="loop-track" viewBox="0 0 600 34" preserveAspectRatio="none" aria-label="Loops">
           <text x={4} y={10}>
-            loops
+            loops in the map
           </text>
           {loops.map((l, i) => {
             const a = x((l.a[0] + l.a[1]) / 2)

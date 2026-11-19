@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { Cite } from './pages/Cite'
 import { Help } from './pages/Help'
@@ -11,6 +11,7 @@ import { Privacy } from './pages/Privacy'
 import { Results } from './pages/Results'
 import { Title } from './pages/Title'
 import { BASE } from './base'
+import { hidden } from './flags'
 import { ROUTES } from './routes'
 import { startSync } from './sync/sync'
 
@@ -28,8 +29,9 @@ export function App() {
         <Routes>
           <Route path={ROUTES.title} element={<Title />} />
           <Route path={ROUTES.cite} element={<Cite />} />
-          <Route path={ROUTES.method} element={<Method />} />
-          <Route path={ROUTES.results} element={<Results />} />
+          {/* A page the server hides leads to the front page. */}
+          <Route path={ROUTES.method} element={hidden('method') ? <Navigate to={ROUTES.title} replace /> : <Method />} />
+          <Route path={ROUTES.results} element={hidden('results') ? <Navigate to={ROUTES.title} replace /> : <Results />} />
           <Route path={ROUTES.help} element={<Help />} />
           <Route path={ROUTES.model} element={<Model />} />
           <Route path={ROUTES.jobs} element={<MyJobs />} />
