@@ -2,12 +2,22 @@
 
 from __future__ import annotations
 
+import os
+
+os.environ.setdefault("JAX_PLATFORMS", "cpu")
+
 import numpy as np
 import pytest
 
 from gnome3d.mc import numba as mc_numba
 from gnome3d.mc.numba.smooth import beads_to_anchors
-from gnome3d.mc.numba.terms import init_spans_nb, local_spans_nb, shift_spans_nb
+from gnome3d.mc.numba.terms import (
+    init_excl_nb,
+    init_smooth_nb,
+    init_spans_nb,
+    local_spans_nb,
+    shift_spans_nb,
+)
 from gnome3d.pipeline.ib.densify import densify
 from gnome3d.pipeline.ib.spans import (
     SITE_SPACING,
@@ -356,3 +366,65 @@ def test_smooth_without_spans_ignores_the_weight() -> None:
         mc_numba.mc_smooth_numba(pos, dtn, fixed, 1.0, s)
         out.append(pos)
     assert np.array_equal(out[0], out[1])
+
+
+def jax_problem(seed: int = 3) -> dict[str, object]:
+    """A chain of 60 beads with three spans, every centroid two beads from its home."""
+    rng = np.random.default_rng(1)
+    n = 60
+    pos = np.cumsum(rng.normal(size=(n, 3)) * 0.6, axis=0).astype(np.float32)
+    lo, hi = runs([5, 28, 30], [8, 40, 31])
+    home = np.array([pos[a:b].mean(axis=0) + [2.0, 0.0, 0.0] for a, b in zip(lo, hi, strict=True)])
+    spans = AnchorSpans(lo=lo, hi=hi, knot=((lo + hi) // 2).astype(np.int32), home=home)
+    return {
+        "pos": pos,
+        "dtn": np.ones(n - 1, dtype=np.float32),
+        "fixed": np.zeros(n, dtype=np.bool_),
+        "step_size": 1.0,
+        "seed": seed,
+        "spans": spans,
+    }
+
+
+@pytest.mark.parametrize(("wall", "prefetch"), [(False, 1), (True, 1), (True, 8)])
+def test_jax_span_score_is_the_full_energy(wall: bool, prefetch: int) -> None:
+    """The running score of the JAX kernel is the energy of its final chain, summed anew."""
+    pytest.importorskip("jax")
+    from gnome3d.mc import jax as mc_jax
+
+    s = smooth_settings()
+    s.smooth_hard_wall = wall
+    s.smooth_prefetch = prefetch
+    prob = jax_problem()
+    spans = prob["spans"]
+    assert isinstance(spans, AnchorSpans)
+    ((score, pos),) = mc_jax.mc_smooth_jax_batch([prob], s)
+    p64 = pos.astype(np.float64)
+    cen = np.zeros((3, 3))
+    full = (
+        init_smooth_nb(p64, np.ones(59), 0.1, 0.1, 0.1, 1.0, 1.0)
+        + init_excl_nb(p64, 0.7, 0.1, int(s.exclusion_skip_neighbors))
+        + init_spans_nb(p64, spans.lo, spans.hi, spans.home, 1.0, cen)
+    )
+    assert score == pytest.approx(full, abs=1e-3), "float32 running score against float64"
+    off = np.linalg.norm(cen - spans.home, axis=1)
+    assert off.max() < 0.5, f"centroids within half a bead of home, got {off.round(2)}"
+
+
+def test_jax_launch_of_two_blocks_keeps_each_result() -> None:
+    pytest.importorskip("jax")
+    from gnome3d.mc import jax as mc_jax
+
+    s = smooth_settings()
+    first = jax_problem()
+    spans = first["spans"]
+    assert isinstance(spans, AnchorSpans)
+    second = jax_problem(seed=4)
+    second["pos"] = np.asarray(second["pos"])[:45]
+    second["dtn"] = np.ones(44, dtype=np.float32)
+    second["fixed"] = np.zeros(45, dtype=np.bool_)
+    second["spans"] = AnchorSpans(spans.lo[:2], spans.hi[:2], spans.knot[:2], spans.home[:2])
+    both = mc_jax.mc_smooth_jax_batch([first, second], s)
+    (alone,) = mc_jax.mc_smooth_jax_batch([jax_problem()], s)
+    assert np.allclose(both[0][1], alone[1], atol=1e-4), "a block does not depend on its launch"
+    assert both[1][1].shape == (45, 3) and np.isfinite(both[1][1]).all()

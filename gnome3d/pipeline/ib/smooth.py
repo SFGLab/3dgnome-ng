@@ -75,12 +75,6 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     noised restarts. Returns one `(score, pos)` per problem.
     """
     s = problems[0]["settings"]
-    if problems[0]["spans"] is not None:
-        raise ValueError(
-            "[main] uniform_chain is on and the smooth stage runs on the batch executor, which"
-            " has no anchor span term. Set [simulation_backend] mc_executor_smooth to threaded"
-            " or serial."
-        )
     n_restarts = max(1, int(s.steps_smooth))
 
     expanded: list[Problem] = []

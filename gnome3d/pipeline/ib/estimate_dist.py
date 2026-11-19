@@ -120,7 +120,7 @@ def _run(problem: Problem) -> Result:
         problem["step_size"],
         problem["settings"],
         problem["seed"],
-        problem["spans"],
+        problem.get("spans"),
     )
 
     return _heat_dist_from_avg(avg, problem["subanchor_heat_raw"], problem["settings"])
@@ -160,6 +160,7 @@ def _expand_replicates(problems: list[Problem], per_ib: int) -> tuple[list[Probl
                     "char_orientations": None,
                     "anchor_neighbors": None,
                     "anchor_neighbor_weights": None,
+                    "spans": prob.get("spans"),
                 }
             )
     return expanded, spans
@@ -172,12 +173,6 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     from gnome3d.pipeline.ib.smooth import run_smooth_batch
 
     s = problems[0]["settings"]
-    if problems[0]["spans"] is not None:
-        raise ValueError(
-            "[main] uniform_chain is on and the distance estimate runs on the batch executor,"
-            " which has no anchor span term. Set [simulation_backend] mc_executor_estimate_dist"
-            " to threaded or serial."
-        )
     n_reps = int(s.subanchor_estimate_replicates)
     n_steps = int(s.subanchor_estimate_steps)
     per_ib = n_reps * n_steps

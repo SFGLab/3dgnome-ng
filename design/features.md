@@ -946,9 +946,16 @@ last section are dated records and are not rewritten when production moves on. `
 
   With `use_subanchor_heatmap` the singletons are binned to the beads of the uniform chain,
   `uniform_heatmap`, with the normalisation of the default chain, and the dry passes of the
-  distance estimate hold the spans. The JAX smooth kernel has no span term and the batch executor
-  refuses the setting in the smooth stage and in the distance estimate. A run with the setting off
-  is byte identical to the commit before, by `playground/parity_dump.py`.
+  distance estimate hold the spans. A run with the setting off is byte identical to the commit
+  before, by `playground/parity_dump.py`.
+
+  The JAX smooth kernel has the span term since 2026-11-19, `_span_delta` in
+  [mc/jax/smooth.py](../gnome3d/mc/jax/smooth.py). It carries no centroid. At each proposal it sums
+  the beads of the spans that hold the bead, up to `span_hold` anchors of `span_len` beads, both
+  static shapes of the kernel, and adds the change to the confinement score. On the CPU backend
+  the running score of the kernel equals the energy of its final chain summed by the numba terms
+  to 1e-4, with the wall and with a prefetch of 8, and a block gives one result alone and in a
+  launch of two. The cost on a GPU is not measured.
 
   First measurement, one structure of GM12878 chr1 108.5 to 111 Mb at production settings, bonds
   in chain order after the relaxation, before the nodes were merged:
