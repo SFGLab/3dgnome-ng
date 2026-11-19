@@ -167,7 +167,8 @@ Do not run `ruff format` on `web/` or `playground/`. Those files are not formatt
 ### Continuous integration and release
 
 `.github/workflows/tests.yml` runs ruff and pytest on a push to main and on a pull request, on Python 3.11 to 3.14.
-The tests marked slow run in one job on Python 3.12. `.github/workflows/web.yml` runs the tests of the site with
+No job runs the tests marked slow, `tests/unit/test_batch_seeding.py`. Run them with `pytest -m slow` before a
+change of the JAX kernels. `.github/workflows/web.yml` runs the tests of the site with
 `pytest web/tests` and the tests, the lint and the build of the frontend when a change touches `web/`, `gnome3d/` or `pyproject.toml`.
 `.github/workflows/publish.yml` builds the package and uploads it to PyPI when a GitHub release is published.
 
