@@ -20,7 +20,8 @@ out dir gets `readouts/` and `fig_inputs/` as `figures_two.py` takes them.
 - `readouts/by_chromosome.tsv` has line, arm, chrom, measure and value, one row a chromosome:
   `hic`, the raw stratum adjusted correlation of the summed map, `microc_loops`, the share of
   Micro-C loops placed above the moved loops, and the same per class of loop as
-  `microc_loops, <class>`. The figures test two arms over these.
+  `microc_loops, <class>`, and the correlation with Hi-C at short range as
+  `hic <res> kb, <from> to <to> kb`. The figures test two arms over these.
 
 A chromosome whose file is missing is named and left out of that sum, so a partial run can be
 looked at. The counts of chromosomes read are printed per file.
@@ -195,6 +196,12 @@ def pairs(src: Path, out: Path) -> None:
             print(f"pairs {line}: {len(parts)} chromosomes, {len(only)} pairs an RNAPII loop alone joins")
 
 
+def short_range_measure(res: int, lo: int, hi: int) -> str:
+    """The name in `by_chromosome.tsv` of the raw correlation with Hi-C at `res` on the pairs from
+    `lo` to `hi` bp apart, of `short_range_scc.py`."""
+    return f"hic {res // 1000} kb, {lo // 1000} to {hi // 1000} kb"
+
+
 def by_chromosome(src: Path, out: Path) -> None:
     rows = []
     for line in LINES:
@@ -214,6 +221,12 @@ def by_chromosome(src: Path, out: Path) -> None:
                     measure = "microc_loops" if r["class"] == "all" else f"microc_loops, {r['class']}"
                     rows.append({"line": line, "arm": str(r["arm"])[len(line) + 1 : -len(chrom) - 1], "chrom": chrom,
                                  "measure": measure, "value": float(r["placed_above_moved"])})
+            path = src / "shortrange" / f"{line}_{chrom}.json"
+            if path.is_file():
+                for r in json.loads(path.read_text())["rows"]:
+                    if r["bins"] == "all" and np.isfinite(r["scc"]):
+                        rows.append({"line": line, "arm": str(r["arm"])[len(line) + 1 : -len(chrom) - 1], "chrom": chrom,
+                                     "measure": short_range_measure(int(r["res"]), int(r["sep_lo"]), int(r["sep_hi"])), "value": float(r["scc"])})
     if rows:
         d = out / "readouts"
         d.mkdir(parents=True, exist_ok=True)

@@ -157,7 +157,7 @@ export function Results() {
           </figure>
         </div>
         <p className="reading-note">
-          With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower for H1ESC, 0.42 against 0.45.
+          With RNAPII loops, enhancers are closer to their genes and the link to expression is stronger. Agreement with the whole Hi-C map is lower for H1ESC, 0.42 against 0.45. At 10 kb, agreement with Hi-C is higher for pairs under 100 kb apart on GM12878 and HFFc6 and lower for pairs 100 to 500 kb apart on all three cell lines.
         </p>
         <p className="reading-note">
           Each difference was tested with a two sided test. The new models agree better with Hi-C than the original models in every cell line, p &lt; 0.001 in a Wilcoxon signed rank test over the 22 chromosomes. With RNAPII loops the enhancer to promoter distance is smaller in every cell line, p &lt; 0.001 in a signed rank test over the pairs. The link to expression is stronger for every pair of cell lines, p = 0.002 or less in a block bootstrap over the genes. The contact enrichment of the nine people is higher with p = 0.004 in an exact signed rank test.

@@ -150,11 +150,14 @@ def _chromosome_tests(per_chrom: pd.DataFrame | None, measure: str, a: str, b: s
 
 
 def dumbbells(ax: plt.Axes, df: pd.DataFrame, a: str, b: str, measure: str, xlim: tuple[float, float],
-              per_chrom: pd.DataFrame | None = None) -> None:
+              per_chrom: pd.DataFrame | None = None, only_shown: bool = False, xlabel: str | None = None,
+              marks_right: bool = False) -> None:
     """One row per line from arm `a` to arm `b`; a line without the measure says so.
 
     With `per_chrom`, the readouts one value a chromosome, each row carries the mark of a signed
-    rank test of the two arms over the chromosomes both have.
+    rank test of the two arms over the chromosomes both have. With `only_shown`, a line whose
+    two arms do not differ under `SHOWN` keeps its row and is not drawn. `xlabel` replaces the
+    measure's own label. `marks_right` puts every mark at the right end of its row.
     """
     sub = df[df.measure == measure].set_index(["line", "arm"]).value
     tests = _chromosome_tests(per_chrom, measure, a, b)
@@ -162,6 +165,8 @@ def dumbbells(ax: plt.Axes, df: pd.DataFrame, a: str, b: str, measure: str, xlim
         if (line, a) not in sub or (line, b) not in sub:
             ax.text(np.mean(xlim), row, "no Micro-C" if measure.startswith("microc") else "no map",
                     ha="center", va="center", color=MUTED, fontsize=7, style="italic")
+            continue
+        if only_shown and (line not in tests or not tests[line][0] < SHOWN):
             continue
         va, vb = sub[(line, a)], sub[(line, b)]
         ax.plot([va, vb], [row, row], color="#9a9893", lw=1.6, zorder=2)
@@ -173,9 +178,9 @@ def dumbbells(ax: plt.Axes, df: pd.DataFrame, a: str, b: str, measure: str, xlim
             # Over the line between the two dots when the mark fits between their values, a third
             # of the range, else at the end of the row the dots are not at.
             text, span = mark(tests[line][0]), xlim[1] - xlim[0]
-            if abs(va - vb) > 0.33 * span:
+            if not marks_right and abs(va - vb) > 0.33 * span:
                 ax.text((va + vb) / 2, row + 0.2, text, ha="center", va="center", fontsize=6.5, color=MUTED)
-            elif min(va, vb) - xlim[0] > 0.3 * span:
+            elif not marks_right and min(va, vb) - xlim[0] > 0.3 * span:
                 ax.text(0.02, row, text.replace(", ", "\n", 1), transform=ax.get_yaxis_transform(), ha="left", va="center",
                         fontsize=6.5, color=MUTED, linespacing=1.15)
             else:
@@ -186,7 +191,7 @@ def dumbbells(ax: plt.Axes, df: pd.DataFrame, a: str, b: str, measure: str, xlim
     ax.set_ylim(-0.6, len(LINES) - 0.3)
     ax.set_xlim(*xlim)
     ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(5))
-    ax.set_xlabel(MEASURE_LABEL[measure] + ", higher is better")
+    ax.set_xlabel(MEASURE_LABEL[measure] + ", higher is better" if xlabel is None else xlabel)
     ax.grid(axis="x", color=GRID, lw=0.6)
     ax.set_axisbelow(True)
 
@@ -362,6 +367,36 @@ def _agreement_row(sub: SubFigure, ag: pd.DataFrame, a: str, b: str, per_chrom: 
     sub.legend(handles=_handles((a, b)), loc="outside lower center", ncol=2, fontsize=7)
 
 
+# The bands of genomic separation of `short_range_scc.py` at 10 kb, as measure and panel title.
+SEPARATION_BANDS = (
+    ("hic 10 kb, 0 to 100 kb", "pairs under 100 kb apart"),
+    ("hic 10 kb, 100 to 500 kb", "100 to 500 kb apart"),
+    ("hic 10 kb, 500 to 2000 kb", "0.5 to 2 Mb apart"),
+)
+
+
+def _separation_row(sub: SubFigure, per_chrom: pd.DataFrame, a: str, b: str) -> None:
+    """The correlation with Hi-C at 10 kb of two arms, one panel a band of genomic separation.
+
+    A line's value is the median over its chromosomes. A line whose two arms do not differ in a
+    band is not drawn there. Each panel has its own range, since the correlation falls with the
+    separation and the two arms differ by a small part of it.
+    """
+    axes = sub.subplots(1, len(SEPARATION_BANDS), sharey=True)
+    for ax, (measure, title) in zip(axes, SEPARATION_BANDS, strict=True):
+        t = per_chrom[(per_chrom.measure == measure) & per_chrom.arm.isin([a, b])]
+        med = t.groupby(["line", "arm", "measure"], as_index=False).value.median()
+        tests = _chromosome_tests(per_chrom, measure, a, b)
+        drawn = med[med.line.isin([k for k, (p, _) in tests.items() if p < SHOWN])].value
+        lo, hi = (drawn.min(), drawn.max()) if len(drawn) else (0.0, 1.0)
+        # Room at the right for the marks, which all stand there.
+        span = max(hi - lo, 0.02)
+        dumbbells(ax, med, a, b, measure, (lo - 0.3 * span, hi + 1.0 * span), per_chrom, only_shown=True, xlabel="", marks_right=True)
+        ax.set_title(title, fontsize=8, color=INK)
+    axes[1].set_xlabel("stratum adjusted correlation with Hi-C at 10 kb, median of the chromosomes, higher is better")
+    sub.legend(handles=_handles((a, b)), loc="outside lower center", ncol=2, fontsize=7)
+
+
 def figure_one(inputs: Path, readouts: Path, out: Path) -> Figure:
     """gnome3d against cudaMMC on structure, and the enhancer to promoter distances only RNAPII
     input reaches."""
@@ -465,8 +500,15 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
     trio = trio_paired(trio_dir or readouts / "trio")
     maps = np.load(inputs / "maps_GM12878.npz")
 
-    fig = plt.figure(figsize=(7.2, 10.0), layout="constrained")
-    rows = fig.subfigures(3, 1, height_ratios=[1.25, 1.05, 1.5], hspace=0.04)
+    per_chrom = by_chromosome(readouts)
+    banded = bool(len(per_chrom)) and per_chrom.measure.isin([m for m, _ in SEPARATION_BANDS]).any()
+    letters = "efghi" if banded else "efgh"
+    if banded:
+        fig = plt.figure(figsize=(7.2, 12.6), layout="constrained")
+        rows = fig.subfigures(4, 1, height_ratios=[1.25, 1.05, 1.2, 1.5], hspace=0.04)
+    else:
+        fig = plt.figure(figsize=(7.2, 10.0), layout="constrained")
+        rows = fig.subfigures(3, 1, height_ratios=[1.25, 1.05, 1.5], hspace=0.04)
 
     _row_title(
         rows[0], "e",
@@ -480,12 +522,19 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
         notes={PAIR_LABEL[k]: [f"difference {d:+.3f}, {mark(pv)}"] for k, (d, pv, _) in link.items()})
     rows[0].legend(handles=_handles(("C", "R")), loc="outside lower center", ncol=2, fontsize=7)
 
-    per_chrom = by_chromosome(readouts)
     _row_title(rows[1], "f", _agreement_title(ag, "3D-GNOMEᴺᴳ with and without RNAPII loops", len(per_chrom) > 0,
                                               _agreement_measures(ag, "C", "R", per_chrom)))
     _agreement_row(rows[1], ag, "C", "R", per_chrom)
 
-    bottom = rows[2].subfigures(1, 2, width_ratios=[0.85, 1.15], wspace=0.03)
+    if banded:
+        _row_title(
+            rows[2], "g",
+            "Correlation of simulated contact maps with Hi-C by genomic separation, 3D-GNOMEᴺᴳ with and without RNAPII loops, "
+            "chromosomes 1 to 22",
+        )
+        _separation_row(rows[2], per_chrom, "C", "R")
+
+    bottom = rows[-1].subfigures(1, 2, width_ratios=[0.85, 1.15], wspace=0.03)
     scope = ", chromosomes 1 to 22" if ((trio_dir or readouts / "trio") / "trio_genome.json").is_file() else ""
     # One row a person, from the models with CTCF loops to the models with RNAPII loops as well.
     # The value is the model's enrichment over the same person's Hi-C, so the map is the line at one.
@@ -496,7 +545,7 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
     ax = bottom[0].subplots()
     if pv < SHOWN:
         _row_title(
-            bottom[0], "g",
+            bottom[0], letters[-2],
             f"Nine trio individuals, contact enrichment at RNAPII loops in the models against the individual's own Hi-C{scope}", 40,
         )
         # A gap between the three trios, which the people are listed by.
@@ -522,7 +571,7 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
     else:
         ax.set_axis_off()
 
-    _row_title(bottom[1], "h", f"The {LOCUS['gene']} locus in GM12878, medoid of ten structures per model set", 52)
+    _row_title(bottom[1], letters[-1], f"The {LOCUS['gene']} locus in GM12878, medoid of ten structures per model set", 52)
     for ax, arm in zip(bottom[1].subplots(1, 2), ("C", "R"), strict=True):
         n = sum(1 for k in maps.files if k.startswith(f"ensemble_{arm}_") and k.endswith("_xyz"))
         ens = [(maps[f"ensemble_{arm}_{j}_xyz"], maps[f"ensemble_{arm}_{j}_mid"]) for j in range(n)]
@@ -541,8 +590,9 @@ def figure_two(inputs: Path, readouts: Path, out: Path, trio_dir: Path | None = 
     fig.supxlabel(
         textwrap.fill(
             f"{LEGEND}. e: block bootstrap of the difference between the two model sets on the genes of both."
-            + (" f: Wilcoxon signed rank test of the two model sets over the chromosomes. " if len(by_chromosome(readouts)) else " ")
-            + "g: Wilcoxon signed rank test over the nine individuals, exact. h: Mann-Whitney U test.", 150),
+            + (" f: Wilcoxon signed rank test of the two model sets over the chromosomes. " if len(per_chrom) else " ")
+            + ("g: the same test, and a cell line is drawn only in the bands where the two model sets differ. " if banded else "")
+            + f"{letters[-2]}: Wilcoxon signed rank test over the nine individuals, exact. {letters[-1]}: Mann-Whitney U test.", 150),
         fontsize=6.5, color=MUTED,
     )
     _save(fig, out / "rnapii_figure2")
