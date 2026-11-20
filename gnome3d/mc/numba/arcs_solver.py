@@ -284,6 +284,86 @@ def reach_energy_grad(
     return energy, g.reshape(-1)
 
 
+@njit(cache=True, fastmath=True, nogil=True)
+def capped_exclusion_energy_grad(
+    x: F64Array, pair_i: I32Array, pair_j: I32Array, radius: F64Array, full: float, weight: float
+) -> tuple[float, F64Array]:
+    """Returns the change of the excluded volume energy for the pairs with a radius of their own,
+    and its gradient.
+
+    `arcs_energy_grad` scores every pair at the radius `full` of the stage. Pair k is to be scored
+    at `radius[k]`, which is under `full`. The change is the energy at `radius[k]` minus the energy
+    at `full`, in the form of `arcs_energy_grad`, `2 * weight * ((r - d) / r)^2` per pair closer
+    than r. The sum of the two is the excluded volume at the radius of each pair and is not
+    negative.
+    """
+    n = x.shape[0] // 3
+    pos = x.reshape(n, 3)
+    g = np.zeros((n, 3))
+    energy = 0.0
+    for k in range(pair_i.shape[0]):
+        i = pair_i[k]
+        j = pair_j[k]
+        dx = pos[i, 0] - pos[j, 0]
+        dy = pos[i, 1] - pos[j, 1]
+        dz = pos[i, 2] - pos[j, 2]
+        d = np.sqrt(dx * dx + dy * dy + dz * dz)
+        if d >= full:
+            continue
+        dd = d if d > 1e-10 else 1e-10
+        u = (full - d) / full
+        e = -2.0 * weight * u * u
+        w = 4.0 * weight * u / (full * dd)
+        r = radius[k]
+        if d < r:
+            u = (r - d) / r
+            e += 2.0 * weight * u * u
+            w -= 4.0 * weight * u / (r * dd)
+        energy += e
+        g[i, 0] += w * dx
+        g[i, 1] += w * dy
+        g[i, 2] += w * dz
+        g[j, 0] -= w * dx
+        g[j, 1] -= w * dy
+        g[j, 2] -= w * dz
+    return energy, g.reshape(-1)
+
+
+def capped_pairs(
+    exp: F64Array,
+    mids: I64Array | None,
+    s: Settings,
+    full: float,
+    skip: int,
+) -> tuple[I32Array, I32Array, F64Array]:
+    """Returns the pairs whose excluded volume radius is under the radius `full` of the stage, and
+    the radius of each, under `[excluded_volume] arcs_cap`.
+
+    Under `target` the limit of a pair is the distance its spring holds it at, the loop target or
+    the background. A pair without a spring has no limit. Under `chain` the limit is the chain
+    between the two beads, their genomic separation in beads times the bond. Pairs within `skip`
+    of each other in the order of the matrix are left out, as in `arcs_energy_grad`.
+    """
+    n = int(exp.shape[0])
+    if s.exclusion_arcs_cap == "target":
+        held = (exp >= 1e-6) | (exp <= -0.75)
+        limit: F64Array = np.where(held, np.abs(exp), np.inf)
+    else:
+        if mids is None:
+            raise ValueError(
+                "[excluded_volume] arcs_cap = chain needs the genomic midpoints of the anchors"
+            )
+        bp = float(s.target_bp_per_subanchor)
+        bond = float(s.polymer_law().background(int(s.target_bp_per_subanchor)))
+        m = np.asarray(mids, dtype=np.float64)
+        limit = np.abs(m[:, None] - m[None, :]) / bp * bond
+    idx = np.arange(n)
+    apart = (idx[None, :] - idx[:, None]) > skip
+    ci, cj = np.nonzero(apart & (limit < full) & (limit > 0.0))
+    radius: F64Array = np.ascontiguousarray(limit[ci, cj], dtype=np.float64)
+    return ci.astype(np.int32), cj.astype(np.int32), radius
+
+
 def solve_arcs(
     pos: F32Array,
     exp_dist: F64Array,
@@ -302,7 +382,8 @@ def solve_arcs(
     `activity` is the activity of each anchor for the factory term, None for no term. `mids` are
     the genomic midpoints of the anchors, which the gyration term needs. `reach` is the pairs of
     nodes of a uniform chain and the length of chain between each, for the reach term at the
-    weight of a loop spring.
+    weight of a loop spring. Under `[excluded_volume] arcs_cap` the excluded volume of a pair acts
+    at the smaller of the radius of the stage and the limit of the pair.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -424,6 +505,20 @@ def solve_arcs(
 
         fun = with_reach
         fun_args = ()
+    if excl_w > 0.0 and s.exclusion_arcs_cap != "none":
+        cap_i, cap_j, cap_r = capped_pairs(exp64, mids, s, excl_r0, excl_skip)
+        if cap_i.shape[0] > 0:
+            base_c, base_c_args = fun, fun_args
+
+            def with_cap(x: Any) -> tuple[float, F64Array]:
+                e1, g1 = base_c(x, *base_c_args)
+                e2, g2 = capped_exclusion_energy_grad(
+                    np.asarray(x, dtype=np.float64), cap_i, cap_j, cap_r, excl_r0, excl_w
+                )
+                return float(e1) + e2, np.asarray(g1, dtype=np.float64) + g2
+
+            fun = with_cap
+            fun_args = ()
     if n_it <= 0:
         # No descent. The start is returned as it is.
         e0, _ = fun(pw.reshape(-1), *fun_args)

@@ -154,7 +154,7 @@ def solve_nodes(
 
     A node starts at the centroid of its block, on a walk around it under `arcs_start = walk`,
     or from one maxent draw under `arcs_start = maxent`. Consecutive nodes of a block are held
-    within the chain between them. The excluded volume acts at the radius of a bead.
+    within the chain between them. The excluded volume acts at the radius of the arcs stage.
     """
     s = state.s
     clusters = state.clusters
@@ -271,12 +271,6 @@ def solve_nodes(
     s_joint.arcs_scope = "block"
     s_joint.arcs_start = "centroid"
     bond = float(law.background(target))
-    if float(s.exclusion_radius_arcs) <= 0.0:
-        # A node is a bead of the chain. It excludes at the radius of the smooth stage.
-        radius = float(s.exclusion_radius_smooth)
-        s_joint.exclusion_radius_arcs = (
-            radius if radius > 0.0 else float(s.exclusion_auto_factor_smooth) * bond
-        )
     node_genomic = [
         (
             int(edges[int(b)][int(k)]),

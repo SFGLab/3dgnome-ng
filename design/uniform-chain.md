@@ -53,9 +53,10 @@ Every row is the maintainer's decision, after the trials of the night.
 | The squeeze in the settings | No setting implies another. There are two canonical configs, `CANONICAL` of the default chain and `CANONICAL_UNIFORM` of the uniform chain, in `gnome3d/production.py`. A value that works better on the uniform chain is stated in the second: `uniform_chain` and `squeeze_constant` 1.0 so far |
 | The draw of the contact bead | Uniform. The draw at the midpoint is deleted |
 | The orientation term | On as it is. `bond_limit` is deleted |
-| The resolution of the contact cells | Waits for the larger trial, with the ladder alone and the cells at 25 kb added to it |
-| The radius of the arcs excluded volume of a node | Waits for the round at a radius of 3.0, `uniform_night6.sh` |
-| `loop_dropout` | Waits for the larger trial |
+| The radius of the arcs excluded volume of a node | The radius of the arcs stage, capped for a pair by the chain between its two nodes. Built as `[excluded_volume] arcs_cap` with two limits, measured in `uniform_night9.sh` |
+| The resolution of the contact cells | Decided again after the radius rule, 5 kb against the ladder |
+| `loop_dropout` | Decided after the radius rule. The rise of the overlap of the ends under it is traced first |
+| `contact_background_z` | 2 is measured on the larger trial, `uniform_night8.sh` |
 | The three bead move in the JAX kernel | Not yet |
 
 The draw at the midpoint and `bond_limit` were removed on 2026-11-20, and `uniform_chain` implies the centre of
@@ -108,8 +109,23 @@ its position is the position of that bead.
 - Reach. Two nodes with k bonds of chain between them are at most k bonds apart. The term has no cost up to k
   bonds and is a spring at the weight of a loop spring beyond. It acts on consecutive nodes of a block. The triangle
   inequality carries it to every other pair.
-- Excluded volume acts at the radius of a bead, the radius of the smooth stage. It does not act at the mean loop
-  target, which was 3.1 beads on the traced region.
+- Excluded volume acts at the radius of the arcs stage, `auto_factor_arcs` times the mean loop target, 2.6 to
+  3.1 beads, as on the default chain. A node stands for the chain around it and that chain needs the room. The
+  radius of a bead of the first rule, 0.7 of a bond, let the nodes of two megabases pass through each other.
+- The radius of a pair is capped, by the decision of 2026-11-20. The excluded volume does not ask a pair to be
+  further apart than a limit of that pair. Two limits are measured, `[excluded_volume] arcs_cap`:
+
+  | pair of nodes | limit under `target` | limit under `chain` |
+  |---|---|---|
+  | with a loop | the loop target | the chain between the two beads, in bonds |
+  | without a loop, closer than `background_range_bp` | the background of the law at its separation | the chain between the two beads |
+  | held by its contact cell | the distance of the cell | the chain between the two beads |
+  | any other pair | none, the radius of the stage | the chain between the two beads |
+
+  The radius of a pair is the smaller of the radius of the stage and its limit. Under `target` a pair is pushed
+  out no further than the distance its spring holds it at. Under `chain` a pair is pushed out no further than
+  the chain can reach, which changes the pairs with fewer bonds between them than the radius, three beads. The
+  nodes next to each other in the order of the chromosome stay out of the excluded volume, as before.
 - The gyration term is unchanged. It reads the genomic midpoints of the beads.
 
 ### Contact data

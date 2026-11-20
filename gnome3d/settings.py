@@ -164,6 +164,7 @@ class Settings:
     exclusion_skip_neighbors: int
     mc_neighbour_grid: bool
     exclusion_radius_arcs: float
+    exclusion_arcs_cap: str
     arcs_repulsion_cutoff_factor: float
     exclusion_radius_smooth: float
     exclusion_radius_heatmap: float
@@ -405,6 +406,7 @@ class Settings:
         self.exclusion_skip_neighbors = 1
         self.mc_neighbour_grid = True
         self.exclusion_radius_arcs = 0.0
+        self.exclusion_arcs_cap = "none"
         self.exclusion_radius_smooth = 0.0
         self.exclusion_radius_heatmap = 0.0
         self.exclusion_radius_ib = 0.0
@@ -805,6 +807,12 @@ class Settings:
         self.exclusion_radius_arcs = getf(
             "excluded_volume", "radius_arcs", self.exclusion_radius_arcs
         )
+        self.exclusion_arcs_cap = gets("excluded_volume", "arcs_cap", self.exclusion_arcs_cap)
+        if self.exclusion_arcs_cap not in ("none", "target", "chain"):
+            raise ValueError(
+                "[excluded_volume] arcs_cap must be none, target or chain, got"
+                f" {self.exclusion_arcs_cap!r}"
+            )
         self.arcs_repulsion_cutoff_factor = getf(
             "excluded_volume", "arcs_repulsion_cutoff_factor", self.arcs_repulsion_cutoff_factor
         )

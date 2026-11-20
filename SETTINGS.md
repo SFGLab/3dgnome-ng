@@ -243,6 +243,7 @@ mean bond scale.
 | `apply_to_ib` | bool | yes | yes | Applies it in block placement. |
 | `skip_neighbors` | int | 1 | 1 | Pairs this close along the chain are exempt. |
 | `radius_arcs` | float | 0.0 | 0.0 | Radius of the arcs stage. 0 derives it. |
+| `arcs_cap` | str | none | none | The limit of the radius of a pair in the arcs solver. `none` scores every pair at the radius of the stage. `target` scores a pair at the smaller of that radius and the distance its spring holds it at, the loop target or the background. A pair without a spring keeps the radius of the stage. `chain` scores a pair at the smaller of that radius and the chain between its two beads, the genomic separation in beads times the bond. The excluded volume then does not push a pair further apart than its limit. The energy runs on the host. Under measurement on the uniform chain, `design/uniform-chain.md`. |
 | `radius_smooth` | float | 0.0 | 0.0 | Radius of the smooth stage. 0 derives it. |
 | `radius_heatmap` | float | 0.0 | 0.0 | Radius of the heatmap stages. 0 derives it. |
 | `radius_ib` | float | 0.0 | 0.0 | Radius of block placement. 0 derives it. A positive value is also the constant centroid radius of the boundary stitch. |
