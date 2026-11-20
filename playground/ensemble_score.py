@@ -8,6 +8,12 @@ structure of an arm into one map first, at the battery's contact radius, and pri
 log counts, Spearman and SCC against raw and balanced Hi-C at 25 kb, and SCC again over the
 bins Hi-C maps, since an unmapped bin reads as zero and a model bead there counts against it.
 `--res` sets another resolution of the score.
+
+The count of a cell grows with the number of beads in each of its two bins. A chain with beads of
+unequal width has bins with few beads and bins with many, and its map carries that pattern
+without any 3D position. The last two columns are the SCC of the pooled map over the product of
+the bead counts of the two bins, the contacts per bead pair. `playground/pooled_score_check.py`
+has the check.
 """
 
 from __future__ import annotations
@@ -79,23 +85,33 @@ def main() -> None:
     print(
         f"  {'arm':>44s} {'n':>3s}   raw P  raw Sp  raw SCC   bal P  bal Sp  bal SCC"
         "   mapped bins only: raw SCC  bal SCC  bal stratum Spearman"
+        "   per bead pair: raw SCC  bal SCC"
     )
     for d in map(Path, sys.argv[3:]):
         cifs = sorted(d.glob("*.cif"))
         if not cifs:
             continue
         sim = np.zeros((len(bins), len(bins)))
+        beads = np.zeros(len(bins))
         for c in cifs:
             p, m, _, _ = load(c)
             r = CONTACT_BEADS * float(np.median(np.linalg.norm(np.diff(p, axis=0), axis=1)))
             sim += simulated_contacts(p, m, bins, RES, r)
+            idx = np.searchsorted(bins, m, side="right") - 1
+            ok = (idx >= 0) & (idx < len(bins)) & (m < int(bins[-1]) + RES)
+            beads += np.bincount(idx[ok], minlength=len(bins))
         out = scores(sim, raw, every) + scores(sim, bal, every)
         mo = [scores(sim, raw, mapped)[2], scores(sim, bal, mapped)[2], stratum_spearman(sim, bal, mapped)]
+        pair = np.outer(beads, beads)
+        per_pair = np.divide(sim, pair, out=np.zeros_like(sim), where=pair > 0)
+        pp = [scores(per_pair, raw, every)[2], scores(per_pair, bal, every)[2]]
         print(
             f"  {d.name:>44s} {len(cifs):3d}  "
             + "  ".join(f"{v:6.3f}" for v in out)
             + "                    "
             + "   ".join(f"{v:6.3f}" for v in mo)
+            + "                 "
+            + "   ".join(f"{v:6.3f}" for v in pp)
         )
 
 

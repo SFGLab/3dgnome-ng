@@ -755,6 +755,39 @@ map.
   gyration of 6.7 to 7.8 bonds against 8.0 to 8.7 of the default chain, and 1 Mb at each end of the region
   shares its space with the other. The cause is not traced.
 
+### The ends of a region share their space: the excluded volume radius of the arcs stage
+
+A trace on a laptop with the config of the trial, `slurm/ensemble/gm12878_xc_R.ini`, without contact cells, one
+seed per structure and the same seeds in every arm. The distance is between the centroids of the first and the last
+megabase of the region, in bonds. The pairs are the bead pairs of the two megabases within the contact radius.
+
+| GM12878 chr1 200 to 205 Mb, 16 structures | radius of the arcs excluded volume | mean distance after arcs | smallest distance in the output | most pairs | structures over 300 pairs | Rg of the output |
+|---|---|---|---|---|---|---|
+| default chain | 2.67 | 12.0 | 6.5 | 731 | 3 of 16 | 8.37 |
+| uniform chain | 0.70 | 12.5 | 4.6 | 3021 | 6 of 16 | 7.73 |
+| uniform chain, `radius_arcs` 3.0 | 3.00 | 14.3 | 9.0 | 251 | 0 of 16 | 8.34 |
+
+On GM12878 chr1 10 to 15 Mb, eight structures, the smallest distance after arcs is 7.5 on the default chain, 5.5 on
+the uniform chain and 7.1 at a radius of 3.0, with at most 216, 910 and 376 pairs.
+
+- The arcs stage places the megabases. The distance after arcs and the distance in the output correlate at 0.92
+  to 0.97 in every arm. The smooth stage and the relaxation do not move a megabase.
+- A node of the uniform chain excludes at the radius of a bead of the smooth stage, 0.7 of a bond, by the
+  decision of 2026-11-19. An anchor of the default chain excludes at `auto_factor_arcs` times the mean target
+  distance, 2.6 to 3.1 bonds. With `arcs_repulsion` off the excluded volume and the gyration term are all that
+  hold two nodes without a loop and beyond 100 kb apart. At the radius of a bead the nodes of two megabases pass
+  through each other.
+- At a radius of 3.0 no structure of 16 has the overlap and the radius of gyration of the output is that of the
+  default chain. At the radius of a bead the output is 7 percent smaller than its nodes.
+- The trial of the arcs stage had `radius_arcs` 1 as an arm and scored it by SCC, which does not read the largest
+  separations.
+
+A node stands for the chain around it, and that chain needs room that a radius of one bead does not keep. A
+radius of 3.0 on every pair also asks two nodes with one bond of chain between them to be 3 bonds apart, against
+the reach term. The rule of the radius is open. `slurm/ensemble/uniform_night6.sh` measures the radius of 3.0 on
+the larger trial, with and without `loop_dropout`, and `playground/uniform_ends_check.py` counts the overlap of
+the ends for every arm.
+
 ## Settings
 
 A setting is added when a run reads it.

@@ -98,6 +98,10 @@ def read_scores(scores: Path) -> dict[tuple[str, str], dict[str, dict[str, float
                     "raw_scc_mapped": float(f[8]),
                     "bal_scc_mapped": float(f[9]),
                 }
+                if len(f) >= 13:
+                    arms[arm_of(f[0], prefix)].update(
+                        {"raw_scc_pair": float(f[11]), "bal_scc_pair": float(f[12])}
+                    )
         battery = scores / f"{prefix}_battery_balance_no.txt"
         if battery.is_file():
             for line in battery.read_text().splitlines():

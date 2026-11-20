@@ -4,7 +4,8 @@
 
 FIGURES_DIR holds the `scores-<tag>` folders of the trials, as
 `design/figures/uniform-2026-11-19/`. An arm is listed once per set of rows it was scored on,
-with the mean of the pooled scores over those rows and, where a trial has `overlaps.txt`, the
+with the mean of the pooled scores over those rows, the SCC per bead pair where the trial was scored
+with it, and, where a trial has `overlaps.txt`, the
 close pairs per thousand beads. A folder with a file `HELDOUT` is a trial whose runs read one half
 of the contact map and were scored against the other. Its arms are listed apart, under the text of
 the file. A folder with a file `SUPERSEDED` is not listed.
@@ -25,6 +26,8 @@ COLS = [
     ("bal_scc", "SCC balanced"),
     ("raw_scc_mapped", "SCC raw, mapped"),
     ("bal_scc_mapped", "SCC balanced, mapped"),
+    ("raw_scc_pair", "SCC raw, per bead pair"),
+    ("bal_scc_pair", "SCC balanced, per bead pair"),
     ("raw_sp", "Spearman raw"),
     ("bal_p", "Pearson balanced"),
     ("exponent", "exponent over Hi-C"),
@@ -59,8 +62,9 @@ def summary(figures: Path) -> str:
         for arm in arms:
             rows = [d[arm] for d in data.values() if arm in d]
             mean = {
-                k: sum(r[k] for r in rows if k in r) / max(sum(1 for r in rows if k in r), 1)
+                k: sum(r[k] for r in rows if k in r) / sum(1 for r in rows if k in r)
                 for k, _ in COLS
+                if any(k in r for r in rows)
             }
             key = (arm, len(rows), held)
             if key not in seen or (seen[key][2] is None and arm in close):
@@ -74,7 +78,7 @@ def summary(figures: Path) -> str:
         keys.sort(key=lambda k: (k[1], -seen[k][1]["raw_scc"] - seen[k][1]["bal_scc"]))
         for key in keys:
             tag, mean, close = seen[key]
-            vals = " | ".join(f"{mean[k]:.3f}" for k, _ in COLS)
+            vals = " | ".join(f"{mean[k]:.3f}" if k in mean else "" for k, _ in COLS)
             cp = f"{close[0]:.1f} | {close[1]:.1f}" if close else " | "
             lines.append(f"| {LABEL.get(key[0], key[0])} | {tag} | {key[1]} | {vals} | {cp} |")
         lines.append("")
