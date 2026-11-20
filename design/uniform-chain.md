@@ -538,6 +538,49 @@ The round has two faults of its setup. Both were found by a check of the instrum
 The round was stopped in its second step. `slurm/ensemble/uniform_night3.sh` repeats it on the data of production,
 with the contact cells from half a alone.
 
+### Trial on counts the run did not read, with the inputs of production
+
+`design/figures/uniform-2026-11-19/held3/` and `scores-held3/`, step 1 of `slurm/ensemble/uniform_night3.sh`, commit
+1b62c1d. A run reads the data of production. Its contact cells alone come from half a of the deep map, and its
+score is against half b with the weights of the whole map. The default chain and the chain without cells are the
+structures of the earlier trials, scored on half the counts. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other |
+|---|---|---|---|---|---|---|
+| default chain | 0.325 | 0.305 | 0.448 | 0.715 | 10.2 | 2.6 |
+| no cells | 0.331 | 0.333 | 0.456 | 0.667 | 9.6 | 6.2 |
+| cells at 5 kb | 0.366 | 0.361 | 0.459 | 0.683 | 7.8 | 4.0 |
+| cells at 10 kb | 0.378 | 0.361 | 0.437 | 0.677 | 7.6 | 2.9 |
+| cells at 25 kb | 0.423 | 0.400 | 0.403 | 0.710 | 6.8 | 1.4 |
+| ladder from 5 to 25 kb | 0.380 | 0.368 | 0.432 | 0.706 | 6.8 | 2.4 |
+| cells at 5 kb, `loop_dropout` | 0.395 | 0.380 | 0.445 | 0.677 | 5.1 | 2.4 |
+| cells at 25 kb, `loop_dropout` | 0.423 | 0.398 | 0.415 | 0.705 | 3.5 | 1.3 |
+| ladder, `loop_dropout` | 0.402 | 0.384 | 0.460 | 0.718 | 2.9 | 0.9 |
+
+The gain of the cells holds on counts the run did not read. At 5 kb it is 0.035 of raw SCC and 0.03 of balanced SCC
+over the chain without cells. On the map the run read it was 0.07 and 0.05. The cells of this trial read half the
+counts, and a part of the difference is the depth. At 25 kb the gain is 0.09 and 0.07, as on the map the run read.
+
+The same structures scored at 10 kb and at 5 kb, `scores-held3_10k/` and `scores-held3_5k/`, raw and balanced SCC:
+
+| arm | at 25 kb | at 10 kb | at 5 kb | Spearman at 5 kb |
+|---|---|---|---|---|
+| default chain | 0.325, 0.305 | 0.246, 0.216 | 0.178, 0.139 | 0.292 |
+| no cells | 0.331, 0.333 | 0.256, 0.245 | 0.191, 0.166 | 0.325 |
+| cells at 5 kb | 0.366, 0.361 | 0.293, 0.267 | 0.221, 0.182 | 0.326 |
+| cells at 10 kb | 0.378, 0.361 | 0.299, 0.264 | 0.214, 0.176 | 0.304 |
+| cells at 25 kb | 0.423, 0.400 | 0.300, 0.264 | 0.215, 0.177 | 0.302 |
+| ladder from 5 to 25 kb | 0.380, 0.368 | 0.293, 0.264 | 0.220, 0.176 | 0.319 |
+| cells at 5 kb, `loop_dropout` | 0.395, 0.380 | 0.299, 0.267 | 0.218, 0.181 | 0.327 |
+| cells at 25 kb, `loop_dropout` | 0.423, 0.398 | 0.300, 0.265 | 0.211, 0.176 | 0.313 |
+| ladder, `loop_dropout` | 0.402, 0.384 | 0.304, 0.266 | 0.222, 0.178 | 0.335 |
+
+The lead of the cells at 25 kb exists in the score at 25 kb alone. At 10 kb every resolution of the cells scores
+within 0.007, and at 5 kb the cells at 5 kb lead by 0.006 with the higher Spearman. A cell of 25 kb fits the bin of
+the score at 25 kb. It does not place the beads inside the bin better. The uniform chain is ahead of the default
+chain at every resolution of the score, with and without cells. Five structures make a sparse pooled map at 5 kb.
+The larger trial has twenty.
+
 ## Settings
 
 A setting is added when a run reads it.

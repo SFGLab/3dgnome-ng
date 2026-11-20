@@ -12,6 +12,48 @@
 | default chain | heldw | 6 | 0.305 | 0.294 | 0.274 | 0.256 | 0.374 | 0.745 | 1.060 | 3.3 | 1.5 |
 | s_nocells | heldw | 6 | 0.280 | 0.314 | 0.256 | 0.294 | 0.397 | 0.717 | 1.072 | 1.6 | 1.0 |
 
+## Scored on counts the run did not read: inputs of production, contact cells of half a, score at 5k
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| s_c5k | held3_5k | 6 | 0.221 | 0.182 | 0.198 | 0.149 | 0.326 | 0.586 | 0.000 | 7.8 | 4.0 |
+| s_lad25_drop | held3_5k | 6 | 0.222 | 0.178 | 0.200 | 0.144 | 0.335 | 0.598 | 0.000 | 2.9 | 0.9 |
+| s_c5k_drop | held3_5k | 6 | 0.218 | 0.181 | 0.198 | 0.149 | 0.327 | 0.578 | 0.000 | 5.1 | 2.4 |
+| s_lad25 | held3_5k | 6 | 0.220 | 0.176 | 0.196 | 0.139 | 0.319 | 0.602 | 0.000 | 6.8 | 2.4 |
+| s_c25k | held3_5k | 6 | 0.215 | 0.177 | 0.191 | 0.141 | 0.302 | 0.615 | 0.000 | 6.8 | 1.4 |
+| s_c10k | held3_5k | 6 | 0.214 | 0.176 | 0.190 | 0.139 | 0.304 | 0.594 | 0.000 | 7.6 | 2.9 |
+| s_c25k_drop | held3_5k | 6 | 0.211 | 0.176 | 0.189 | 0.143 | 0.313 | 0.600 | 0.000 | 3.5 | 1.3 |
+| s_nocells | held3_5k | 6 | 0.191 | 0.166 | 0.165 | 0.128 | 0.325 | 0.574 | 0.000 | 9.6 | 6.2 |
+| default chain | held3_5k | 6 | 0.178 | 0.139 | 0.150 | 0.098 | 0.292 | 0.570 | 0.000 | 10.2 | 2.6 |
+
+## Scored on counts the run did not read: inputs of production, contact cells of half a, score at 10k
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| s_lad25_drop | held3_10k | 6 | 0.304 | 0.266 | 0.283 | 0.236 | 0.395 | 0.669 | 0.000 | 2.9 | 0.9 |
+| s_c5k_drop | held3_10k | 6 | 0.299 | 0.267 | 0.277 | 0.238 | 0.386 | 0.640 | 0.000 | 5.1 | 2.4 |
+| s_c25k_drop | held3_10k | 6 | 0.300 | 0.265 | 0.278 | 0.235 | 0.361 | 0.666 | 0.000 | 3.5 | 1.3 |
+| s_c25k | held3_10k | 6 | 0.300 | 0.264 | 0.276 | 0.231 | 0.347 | 0.676 | 0.000 | 6.8 | 1.4 |
+| s_c10k | held3_10k | 6 | 0.299 | 0.264 | 0.274 | 0.230 | 0.361 | 0.648 | 0.000 | 7.6 | 2.9 |
+| s_c5k | held3_10k | 6 | 0.293 | 0.267 | 0.269 | 0.235 | 0.388 | 0.644 | 0.000 | 7.8 | 4.0 |
+| s_lad25 | held3_10k | 6 | 0.293 | 0.264 | 0.267 | 0.229 | 0.371 | 0.664 | 0.000 | 6.8 | 2.4 |
+| s_nocells | held3_10k | 6 | 0.256 | 0.245 | 0.226 | 0.207 | 0.386 | 0.631 | 0.000 | 9.6 | 6.2 |
+| default chain | held3_10k | 6 | 0.246 | 0.216 | 0.216 | 0.175 | 0.358 | 0.648 | 0.000 | 10.2 | 2.6 |
+
+## Scored on counts the run did not read: inputs of production, contact cells of half a
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| s_c25k | held3 | 6 | 0.423 | 0.400 | 0.403 | 0.382 | 0.403 | 0.710 | 1.107 | 6.8 | 1.4 |
+| s_c25k_drop | held3 | 6 | 0.423 | 0.398 | 0.407 | 0.381 | 0.415 | 0.705 | 1.173 | 3.5 | 1.3 |
+| s_lad25_drop | held3 | 6 | 0.402 | 0.384 | 0.384 | 0.363 | 0.460 | 0.718 | 1.187 | 2.9 | 0.9 |
+| s_c5k_drop | held3 | 6 | 0.395 | 0.380 | 0.378 | 0.358 | 0.445 | 0.677 | 1.120 | 5.1 | 2.4 |
+| s_lad25 | held3 | 6 | 0.380 | 0.368 | 0.354 | 0.339 | 0.432 | 0.706 | 1.115 | 6.8 | 2.4 |
+| s_c10k | held3 | 6 | 0.378 | 0.361 | 0.351 | 0.330 | 0.437 | 0.677 | 1.020 | 7.6 | 2.9 |
+| s_c5k | held3 | 6 | 0.366 | 0.361 | 0.341 | 0.334 | 0.459 | 0.683 | 1.035 | 7.8 | 4.0 |
+| s_nocells | held3 | 6 | 0.331 | 0.333 | 0.302 | 0.299 | 0.456 | 0.667 | 1.018 | 9.6 | 6.2 |
+| default chain | held3 | 6 | 0.325 | 0.305 | 0.294 | 0.263 | 0.448 | 0.715 | 1.062 | 10.2 | 2.6 |
+
 ## Scored on the map the run read
 
 | arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |

@@ -1,12 +1,13 @@
 """Hi-C agreement of each arm's pooled ensemble map rather than of each structure alone.
 
-    python playground/ensemble_score.py MCOOL REGION ARM_DIR [ARM_DIR ...]
+    python playground/ensemble_score.py [--res BP] MCOOL REGION ARM_DIR [ARM_DIR ...]
 
 The battery scores every structure against Hi-C and averages, which rewards structures that each
 look like the population average. Hi-C is that average, so this pools the contacts of every
 structure of an arm into one map first, at the battery's contact radius, and prints Pearson on
 log counts, Spearman and SCC against raw and balanced Hi-C at 25 kb, and SCC again over the
 bins Hi-C maps, since an unmapped bin reads as zero and a model bead there counts against it.
+`--res` sets another resolution of the score.
 """
 
 from __future__ import annotations
@@ -65,6 +66,10 @@ def stratum_spearman(sim: np.ndarray, obs: np.ndarray, keep: np.ndarray, max_bin
 
 
 def main() -> None:
+    global RES
+    if sys.argv[1] == "--res":
+        RES = int(sys.argv[2])
+        del sys.argv[1:3]
     mcool, region = sys.argv[1], sys.argv[2]
     raw, bins = observed_hic(mcool, region, RES, balance=False)
     bal, _ = observed_hic(mcool, region, RES, balance=True)
