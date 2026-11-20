@@ -776,6 +776,37 @@ at 5 kb are above the default chain in raw SCC on 18 rows of 18 at every resolut
 or 16. Every raw SCC of the default chain in an earlier comparison, the comparison of the tools among them,
 holds this share. Those are not scored again.
 
+### Trial of the loops, the bonds and the node rule on the base
+
+`design/figures/uniform-2026-11-19/combo4p/` and `scores-combo4p/`, with `scores-combo4p_10k/` and
+`scores-combo4p_5k/`, step 3 of `slurm/ensemble/uniform_night4.sh`, commit f5ec43a. Every arm has the cells at
+5 kb and `loop_dropout`, six rows of five structures. Raw and balanced SCC per bead pair, raw Spearman at 25 kb,
+the close pairs, and the structures with more than 300 bead pairs between the end megabases,
+`playground/uniform_ends_check.py`:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.290, 0.304 | 0.223, 0.213 | 0.152, 0.138 | 0.448 | 10.2 | 2.6 | 1 of 30 |
+| cells at 5 kb, no dropout | 0.362, 0.359 | 0.291, 0.264 | 0.220, 0.182 | 0.461 | 7.7 | 4.0 | 4 of 30 |
+| the base with dropout | 0.382, 0.378 | 0.293, 0.268 | 0.215, 0.181 | 0.442 | 5.5 | 2.6 | 9 of 30 |
+| nodes fixed | 0.377, 0.372 | 0.289, 0.263 | 0.213, 0.178 | 0.440 | 6.0 | 3.1 | 10 of 30 |
+| `squeeze_constant` 0.3 | 0.385, 0.374 | 0.294, 0.265 | 0.213, 0.177 | 0.439 | 11.0 | 2.5 | 8 of 30 |
+| `squeeze_constant` 3.0 | 0.385, 0.379 | 0.296, 0.271 | 0.217, 0.183 | 0.444 | 4.2 | 2.6 | 8 of 30 |
+| `loop_dropout_scale` 0.5 | 0.379, 0.370 | 0.298, 0.269 | 0.219, 0.180 | 0.456 | 5.5 | 2.7 | 7 of 30 |
+| `loop_dropout_scale` 2.0 | 0.378, 0.366 | 0.287, 0.257 | 0.206, 0.171 | 0.455 | 3.9 | 1.5 | 9 of 30 |
+| dropout with `loop_contact` | 0.399, 0.379 | 0.300, 0.274 | 0.211, 0.180 | 0.582 | 35.1 | 26.9 | 2 of 30 |
+
+- The centre of mass rule is ahead of the fixed node by 0.002 to 0.006 of SCC at every resolution, with fewer
+  close pairs. The maintainer's choice of the base stands.
+- `squeeze_constant` 0.3 doubles the close pairs at the same scores. 3.0 has a quarter fewer close pairs than 1.0
+  and scores within 0.003.
+- The scale of the dropout moves no score by more than 0.01. At 2.0 the close pairs fall and the scores at 10 and
+  5 kb fall with them.
+- `loop_contact` raises Spearman by 0.14 at 25 kb and has six times the close pairs. It has the ends overlap
+  in 2 structures of 30.
+- The dropout doubles the structures with overlapping ends, from 4 to 9 of 30. A dropped loop leaves fewer nodes
+  for the excluded volume of the arcs stage. Its lower Spearman follows the overlap, as in the section below.
+
 ### The ends of a region share their space: the excluded volume radius of the arcs stage
 
 A trace on a laptop with the config of the trial, `slurm/ensemble/gm12878_xc_R.ini`, without contact cells, one
