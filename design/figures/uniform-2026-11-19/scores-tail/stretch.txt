@@ -1,0 +1,16 @@
+radius of gyration in bonds | bonds over ten per structure | structures with a stretched piece
+GM12878_chr1_10000000_15000000 | prod:    7.8   1.4 0/5 | s_c5k:    7.9   1.2 0/5 | s_lad25:    7.4   1.0 0/5 | s_c5k_drop:    8.0   1.0 0/5 | s_c25k_drop:    7.3   0.8 0/5 | s_lad25_drop:    7.9   1.0 0/5 | s_nocells_drop:    8.0   0.8 0/5 | d_drop:    7.8   1.0 0/5
+GM12878_chr1_20000000_25000000 | prod:    8.2   0.0 0/5 | s_c5k:    8.1   0.0 0/5 | s_lad25:    9.4   0.6 0/5 | s_c5k_drop:    8.2   0.0 0/5 | s_c25k_drop:    9.9   0.2 0/5 | s_lad25_drop:    9.7   0.0 0/5 | s_nocells_drop:    8.2   0.0 0/5 | d_drop:    8.1   0.0 0/5
+H1ESC_chr1_10000000_15000000 | prod:    9.6   0.2 0/5 | s_c5k:   10.8   1.0 0/5 | s_lad25:   11.0   0.4 0/5 | s_c5k_drop:    9.9   1.4 0/5 | s_c25k_drop:   10.6   1.0 0/5 | s_lad25_drop:   10.4   0.8 0/5 | s_nocells_drop:   10.2   1.0 0/5 | d_drop:    9.1   0.0 0/5
+H1ESC_chr1_20000000_25000000 | prod:    8.8   0.0 0/5 | s_c5k:    8.7   0.8 0/5 | s_lad25:    8.6   0.2 0/5 | s_c5k_drop:    8.3   0.0 0/5 | s_c25k_drop:    8.2   0.2 0/5 | s_lad25_drop:    8.3   0.0 0/5 | s_nocells_drop:    8.4   1.0 0/5 | d_drop:    8.7   0.0 0/5
+HFFC6_chr1_10000000_15000000 | prod:   10.4   1.0 0/5 | s_c5k:   11.4   1.0 0/5 | s_lad25:   11.5   1.0 0/5 | s_c5k_drop:   10.7   1.2 0/5 | s_c25k_drop:   11.6   1.0 0/5 | s_lad25_drop:   11.6   1.2 0/5 | s_nocells_drop:   10.7   1.2 0/5 | d_drop:   10.1   1.0 0/5
+HFFC6_chr1_20000000_25000000 | prod:   10.6   0.0 0/5 | s_c5k:   10.1   0.2 0/5 | s_lad25:   10.1   0.4 0/5 | s_c5k_drop:    9.6   0.2 0/5 | s_c25k_drop:    9.8   0.0 0/5 | s_lad25_drop:    9.9   0.4 0/5 | s_nocells_drop:    9.7   0.2 0/5 | d_drop:   10.6   0.4 0/5
+mean over the rows
+  prod                            9.2   0.4 0/30
+  s_c5k                           9.5   0.7 0/30
+  s_lad25                         9.7   0.6 0/30
+  s_c5k_drop                      9.1   0.6 0/30
+  s_c25k_drop                     9.6   0.5 0/30
+  s_lad25_drop                    9.6   0.6 0/30
+  s_nocells_drop                  9.2   0.7 0/30
+  d_drop                          9.1   0.4 0/30

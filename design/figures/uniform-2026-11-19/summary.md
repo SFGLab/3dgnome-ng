@@ -12,6 +12,45 @@
 | default chain | heldw | 6 | 0.305 | 0.294 | 0.274 | 0.256 | 0.374 | 0.745 | 1.060 | 3.3 | 1.5 |
 | s_nocells | heldw | 6 | 0.280 | 0.314 | 0.256 | 0.294 | 0.397 | 0.717 | 1.072 | 1.6 | 1.0 |
 
+## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil, score at 5k
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| s_c5k | tail_5k | 6 | 0.221 | 0.183 | 0.198 | 0.150 | 0.326 | 0.587 | 0.000 |  |  |
+| s_lad25_drop | tail_5k | 6 | 0.221 | 0.179 | 0.197 | 0.142 | 0.335 | 0.594 | 0.000 |  |  |
+| s_c5k_drop | tail_5k | 6 | 0.216 | 0.182 | 0.193 | 0.148 | 0.326 | 0.573 | 0.000 |  |  |
+| s_lad25 | tail_5k | 6 | 0.220 | 0.176 | 0.196 | 0.139 | 0.319 | 0.602 | 0.000 |  |  |
+| s_c25k_drop | tail_5k | 6 | 0.208 | 0.176 | 0.183 | 0.140 | 0.314 | 0.597 | 0.000 |  |  |
+| s_nocells_drop | tail_5k | 6 | 0.198 | 0.171 | 0.174 | 0.135 | 0.327 | 0.572 | 0.000 |  |  |
+| default chain | tail_5k | 6 | 0.178 | 0.139 | 0.150 | 0.098 | 0.292 | 0.570 | 0.000 |  |  |
+| d_drop | tail_5k | 6 | 0.171 | 0.130 | 0.142 | 0.086 | 0.280 | 0.568 | 0.000 |  |  |
+
+## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil, score at 10k
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| s_lad25_drop | tail_10k | 6 | 0.304 | 0.269 | 0.279 | 0.236 | 0.396 | 0.664 | 0.000 |  |  |
+| s_c5k_drop | tail_10k | 6 | 0.295 | 0.271 | 0.270 | 0.238 | 0.385 | 0.634 | 0.000 |  |  |
+| s_c25k_drop | tail_10k | 6 | 0.297 | 0.266 | 0.270 | 0.232 | 0.363 | 0.663 | 0.000 |  |  |
+| s_c5k | tail_10k | 6 | 0.294 | 0.267 | 0.269 | 0.236 | 0.388 | 0.644 | 0.000 |  |  |
+| s_lad25 | tail_10k | 6 | 0.291 | 0.260 | 0.265 | 0.225 | 0.371 | 0.664 | 0.000 |  |  |
+| s_nocells_drop | tail_10k | 6 | 0.272 | 0.253 | 0.245 | 0.217 | 0.386 | 0.635 | 0.000 |  |  |
+| default chain | tail_10k | 6 | 0.246 | 0.216 | 0.216 | 0.175 | 0.358 | 0.648 | 0.000 |  |  |
+| d_drop | tail_10k | 6 | 0.237 | 0.202 | 0.206 | 0.157 | 0.343 | 0.643 | 0.000 |  |  |
+
+## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| s_c25k_drop | tail | 6 | 0.424 | 0.405 | 0.401 | 0.381 | 0.419 | 0.701 | 1.090 | 3.4 | 1.3 |
+| s_lad25_drop | tail | 6 | 0.402 | 0.389 | 0.379 | 0.363 | 0.460 | 0.712 | 1.107 | 3.1 | 1.0 |
+| s_c5k_drop | tail | 6 | 0.388 | 0.384 | 0.364 | 0.357 | 0.442 | 0.669 | 1.043 | 5.5 | 2.6 |
+| s_lad25 | tail | 6 | 0.375 | 0.364 | 0.348 | 0.335 | 0.432 | 0.706 | 1.117 | 7.0 | 2.6 |
+| s_c5k | tail | 6 | 0.367 | 0.363 | 0.343 | 0.336 | 0.461 | 0.684 | 1.032 | 7.7 | 4.0 |
+| s_nocells_drop | tail | 6 | 0.363 | 0.365 | 0.337 | 0.336 | 0.439 | 0.674 | 1.057 | 5.3 | 2.7 |
+| default chain | tail | 6 | 0.325 | 0.305 | 0.294 | 0.263 | 0.448 | 0.715 | 1.062 | 10.2 | 2.6 |
+| d_drop | tail | 6 | 0.322 | 0.294 | 0.288 | 0.245 | 0.428 | 0.701 | 1.035 | 10.3 | 2.9 |
+
 ## Scored on counts the run did not read: inputs of production, contact cells of half a, score at 5k
 
 | arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |

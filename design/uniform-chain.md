@@ -629,6 +629,53 @@ and the arcs stage. Their scores stand. A third of the structures of every arm w
 the scores of those arms are not a result. The arms run again in `slurm/ensemble/uniform_night4.sh`, which also
 keeps the stretch check of every step.
 
+### Trial of the loop dropout with the tails on a coil
+
+`design/figures/uniform-2026-11-19/tail/` and `scores-tail/`, step 1 of `slurm/ensemble/uniform_night4.sh`, commit
+f5ec43a. The inputs are those of the trial above: the data of production, the contact cells from half a, the score
+against half b. The default chain and the chain without cells are the structures of the earlier trials. Mean over
+the six rows, thirty structures per arm:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other | radius of gyration in bonds | structures with a stretched piece |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.325 | 0.305 | 0.448 | 0.715 | 10.2 | 2.6 | 9.2 | 0 of 30 |
+| default chain, `loop_dropout` | 0.322 | 0.294 | 0.428 | 0.701 | 10.3 | 2.9 | 9.1 | 0 of 30 |
+| no cells | 0.331 | 0.333 | 0.456 | 0.667 | 9.6 | 6.2 | 9.3 | 0 of 30 |
+| no cells, `loop_dropout` | 0.363 | 0.365 | 0.439 | 0.674 | 5.3 | 2.7 | 9.2 | 0 of 30 |
+| cells at 5 kb | 0.367 | 0.363 | 0.461 | 0.684 | 7.7 | 4.0 | 9.5 | 0 of 30 |
+| cells at 5 kb, `loop_dropout` | 0.388 | 0.384 | 0.442 | 0.669 | 5.5 | 2.6 | 9.1 | 0 of 30 |
+| ladder from 5 to 25 kb | 0.375 | 0.364 | 0.432 | 0.706 | 7.0 | 2.6 | 9.7 | 0 of 30 |
+| ladder, `loop_dropout` | 0.402 | 0.389 | 0.460 | 0.712 | 3.1 | 1.0 | 9.6 | 0 of 30 |
+| cells at 25 kb, `loop_dropout` | 0.424 | 0.405 | 0.419 | 0.701 | 3.4 | 1.3 | 9.6 | 0 of 30 |
+
+No structure has a stretched piece. The radius of gyration of every arm with the dropout is that of its arm
+without it.
+
+In the score at 25 kb the gain of the dropout on the uniform chain stands with the tails on a coil. It is 0.02 to
+0.03 of SCC with the cells and 0.03 without them. The scores of the stretched structures were within 0.007 of
+these: a piece far from the rest makes no contact and takes no part in the score. The dropout does not gain on the
+default chain. The cause of that difference is not traced.
+
+The same structures scored at 10 kb and at 5 kb, `scores-tail_10k/` and `scores-tail_5k/`, raw and balanced SCC:
+
+| arm | at 25 kb | at 10 kb | at 5 kb | Spearman at 5 kb |
+|---|---|---|---|---|
+| default chain | 0.325, 0.305 | 0.246, 0.216 | 0.178, 0.139 | 0.292 |
+| default chain, `loop_dropout` | 0.322, 0.294 | 0.237, 0.202 | 0.171, 0.130 | 0.280 |
+| no cells | 0.331, 0.333 | 0.256, 0.245 | 0.191, 0.166 | 0.325 |
+| no cells, `loop_dropout` | 0.363, 0.365 | 0.272, 0.253 | 0.198, 0.171 | 0.327 |
+| cells at 5 kb | 0.367, 0.363 | 0.294, 0.267 | 0.221, 0.183 | 0.326 |
+| cells at 5 kb, `loop_dropout` | 0.388, 0.384 | 0.295, 0.271 | 0.216, 0.182 | 0.326 |
+| ladder from 5 to 25 kb | 0.375, 0.364 | 0.291, 0.260 | 0.220, 0.176 | 0.319 |
+| ladder, `loop_dropout` | 0.402, 0.389 | 0.304, 0.269 | 0.221, 0.179 | 0.335 |
+| cells at 25 kb, `loop_dropout` | 0.424, 0.405 | 0.297, 0.266 | 0.208, 0.176 | 0.314 |
+
+With the cells, the gain of the dropout exists in the score at 25 kb alone. At 10 kb it is 0.001 to 0.013 and at
+5 kb the arms tie. Without the cells it is 0.016 at 10 kb and 0.007 at 5 kb. The close pairs are the measure the
+dropout moves at every resolution: from 7.7 to 5.5 per thousand beads with the cells at 5 kb, from 7.0 to 3.1 with
+the ladder and from 9.6 to 5.3 without cells. The default chain with the dropout is behind the default chain at
+every resolution of the score. Five structures make a sparse pooled map at 5 kb. Step 2 has twenty.
+
 ## Settings
 
 A setting is added when a run reads it.
