@@ -1,12 +1,18 @@
 | arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | ctr_c25k | res | 6 | 0.415 | 0.395 | 0.393 | 0.373 | 0.401 | 0.738 | 1.162 | 25.6 | 2.1 |
+| ctr_dropout_contact | draw | 6 | 0.418 | 0.391 | 0.402 | 0.367 | 0.574 | 0.626 | 0.908 | 73.8 | 21.6 |
 | ctr_c5k_z2 | res | 6 | 0.406 | 0.394 | 0.382 | 0.371 | 0.390 | 0.667 | 1.022 | 32.1 | 3.7 |
 | ctr_c10k | res | 6 | 0.401 | 0.384 | 0.379 | 0.362 | 0.388 | 0.682 | 1.067 | 29.7 | 3.4 |
+| ctr_dropout | draw | 6 | 0.397 | 0.385 | 0.384 | 0.371 | 0.445 | 0.689 | 1.127 | 29.0 | 2.9 |
 | contact beads, cells at 10 kb | cells | 6 | 0.391 | 0.376 | 0.369 | 0.354 | 0.387 | 0.682 | 1.065 |  |  |
-| cells at 5 kb, centre of mass kept | gyr | 6 | 0.386 | 0.374 | 0.364 | 0.351 | 0.439 | 0.678 | 1.035 | 32.7 | 4.3 |
+| ctr_w05 | draw | 6 | 0.387 | 0.377 | 0.364 | 0.354 | 0.443 | 0.670 | 1.008 | 35.6 | 5.0 |
+| cells at 5 kb, centre of mass kept | draw | 6 | 0.386 | 0.374 | 0.364 | 0.351 | 0.439 | 0.678 | 1.035 | 32.7 | 4.3 |
+| ctr_motif10 | draw | 6 | 0.382 | 0.372 | 0.358 | 0.348 | 0.435 | 0.680 | 1.038 | 34.9 | 4.7 |
 | cells at 5 kb, centre of mass kept, bond limit 1.5 | rules | 6 | 0.381 | 0.367 | 0.358 | 0.343 | 0.431 | 0.679 | 1.045 |  |  |
 | ctr_g25k | gyr | 6 | 0.378 | 0.370 | 0.356 | 0.348 | 0.436 | 0.679 | 1.022 | 32.3 | 4.3 |
+| ctr_nomotif | draw | 6 | 0.379 | 0.365 | 0.355 | 0.341 | 0.433 | 0.679 | 1.047 | 34.6 | 6.3 |
+| ctr_mid | draw | 6 | 0.377 | 0.367 | 0.352 | 0.340 | 0.417 | 0.668 | 1.008 | 33.7 | 3.9 |
 | contact beads, cells at 5 kb | gyr | 6 | 0.374 | 0.364 | 0.351 | 0.341 | 0.437 | 0.678 | 1.038 | 34.0 | 6.6 |
 | cells at 5 kb, drift within 0.3 beads | drift | 6 | 0.373 | 0.365 | 0.349 | 0.341 | 0.436 | 0.678 | 1.038 |  |  |
 | cells at 5 kb, gyration windows from 25 kb | gyr | 6 | 0.373 | 0.363 | 0.351 | 0.341 | 0.430 | 0.678 | 1.025 | 33.4 | 6.8 |
@@ -32,6 +38,6 @@
 | first build, span weight 0.1 | first | 6 | 0.319 | 0.323 | 0.289 | 0.288 | 0.452 | 0.708 | 1.038 |  |  |
 | contact beads, uniform draw, orientation off | nodes | 6 | 0.314 | 0.323 | 0.287 | 0.293 | 0.437 | 0.670 | 1.050 |  |  |
 | first build, span weight 0.1, orientation off | first | 6 | 0.317 | 0.320 | 0.285 | 0.283 | 0.449 | 0.709 | 1.048 |  |  |
-| default chain | gyr | 6 | 0.327 | 0.307 | 0.295 | 0.266 | 0.448 | 0.716 | 1.062 | 10.2 | 2.6 |
+| default chain | draw | 6 | 0.327 | 0.307 | 0.295 | 0.266 | 0.448 | 0.716 | 1.062 | 10.2 | 2.6 |
 | default chain, contact terms off | nodes | 6 | 0.327 | 0.302 | 0.294 | 0.258 | 0.446 | 0.717 | 1.047 |  |  |
 | default chain, orientation off | first | 6 | 0.320 | 0.296 | 0.289 | 0.254 | 0.440 | 0.717 | 1.073 |  |  |

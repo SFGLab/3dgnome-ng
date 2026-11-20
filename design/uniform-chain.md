@@ -434,6 +434,28 @@ The trial scores the pooled map at 25 kb against the map that the cells are read
 scored cells. A gain there is in part the input read back. The cells need a test on counts that the run did not
 read: the map thinned into two halves, one for the cells and one for the score.
 
+### Trial of the draw and the loops
+
+`design/figures/uniform-2026-11-19/draw/` and `scores-draw/`, step 3 of the night, commit 5f98a91, cells at 5 kb, z of
+3, the centre of mass rule. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other |
+|---|---|---|---|---|---|---|
+| uniform draw | 0.386 | 0.374 | 0.439 | 0.678 | 32.7 | 4.3 |
+| midpoint | 0.377 | 0.367 | 0.417 | 0.668 | 33.7 | 3.9 |
+| `loop_dropout` | 0.397 | 0.385 | 0.445 | 0.689 | 29.0 | 2.9 |
+| `loop_dropout` with `loop_contact` | 0.418 | 0.391 | 0.574 | 0.626 | 73.8 | 21.6 |
+| `arc_weight_exponent` 0.5 | 0.387 | 0.377 | 0.443 | 0.670 | 35.6 | 5.0 |
+| orientation term off | 0.379 | 0.365 | 0.433 | 0.679 | 34.6 | 6.3 |
+| orientation weight 10 | 0.382 | 0.372 | 0.435 | 0.680 | 34.9 | 4.7 |
+
+- The loop dropout gains every column: 0.011 of SCC, 0.006 of Spearman, 0.011 of balanced Pearson and a third fewer
+  close pairs that are not next to each other. A conformation then keeps a loop with a chance by its strength.
+- With the kept loops at one bead Spearman rises to 0.574, from 0.439, and raw SCC to 0.418. Balanced Pearson falls
+  to 0.626 and the close pairs rise five times. The gain and the overlaps come together.
+- The midpoint is under the uniform draw on every score with the centre of mass rule.
+- The loop weight by strength changes nothing. The orientation term at 10 or off loses 0.004 to 0.009 of SCC.
+
 ## Settings
 
 A setting is added when a run reads it.
