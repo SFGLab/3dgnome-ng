@@ -479,6 +479,25 @@ of 3, the centre of mass rule. Mean over the six rows, with the bonds under 0.7 
 
 `squeeze_constant` at 1.0 joins the base of the second round.
 
+### Trial of the arcs stage
+
+`design/figures/uniform-2026-11-19/arcs/` and `scores-arcs/`, step 5 of the night, commit 5f98a91, cells at 5 kb, z of
+3, the centre of mass rule. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other |
+|---|---|---|---|---|---|---|
+| as it is | 0.386 | 0.374 | 0.439 | 0.678 | 32.7 | 4.3 |
+| `background_weight` 0.3 | 0.367 | 0.356 | 0.459 | 0.668 | 35.2 | 4.6 |
+| `background_weight` 1.0 | 0.375 | 0.362 | 0.442 | 0.632 | 44.5 | 7.6 |
+| `gyration_weight` 0.3 | 0.370 | 0.363 | 0.423 | 0.696 | 27.2 | 3.4 |
+| `gyration_weight` 0 | 0.352 | 0.335 | 0.467 | 0.533 | 97.4 | 27.3 |
+| arcs excluded volume at one bead | 0.376 | 0.367 | 0.434 | 0.671 | 33.7 | 3.3 |
+| `background_range_bp` 50 kb | 0.384 | 0.371 | 0.437 | 0.685 | 33.2 | 4.9 |
+
+No setting of the arcs stage beats the values of production on SCC. A stronger background spring trades 0.02 of SCC
+for 0.02 of Spearman. Without the gyration term the chain collapses: balanced Pearson 0.533 and three times the
+close pairs.
+
 ## Settings
 
 A setting is added when a run reads it.

@@ -1,0 +1,16 @@
+pairs under 0.7 model units per thousand beads: every pair | pairs not next to each other in the file | bond median | beads
+GM12878_chr1_10000000_15000000 | prod:   10.9    1.3 1.07 2597 | node_c5k_centre:   31.9    3.0 1.04 3025 | ctr_bg03:   34.7    3.4 1.04 3025 | ctr_bg1:   39.3    4.8 1.04 3025 | ctr_gyr03:   25.3    3.1 1.03 3025 | ctr_gyr0:   79.5   15.0 1.07 3025 | ctr_evarcs1:   33.3    3.7 1.04 3025 | ctr_range50k:   26.0    2.5 1.04 3025
+GM12878_chr1_20000000_25000000 | prod:   21.6    5.8 1.11 4268 | node_c5k_centre:   47.4    5.4 1.05 4893 | ctr_bg03:   50.6    5.4 1.05 4893 | ctr_bg1:   70.4   11.4 1.06 4893 | ctr_gyr03:   44.0    5.2 1.05 4893 | ctr_gyr0:   93.9   19.8 1.07 4893 | ctr_evarcs1:   53.3    5.6 1.05 4893 | ctr_range50k:   47.0    5.7 1.05 4893
+H1ESC_chr1_10000000_15000000 | prod:    3.9    0.9 1.05 2823 | node_c5k_centre:   29.4    6.1 1.02 3900 | ctr_bg03:   28.1    4.3 1.02 3900 | ctr_bg1:   38.1    9.3 1.02 3900 | ctr_gyr03:   23.8    3.2 1.02 3900 | ctr_gyr0:  119.8   48.3 1.09 3900 | ctr_evarcs1:   26.3    2.4 1.02 3900 | ctr_range50k:   29.7    6.9 1.02 3900
+H1ESC_chr1_20000000_25000000 | prod:   12.2    4.5 1.07 4233 | node_c5k_centre:   37.6    5.2 1.04 4836 | ctr_bg03:   43.2    6.8 1.05 4836 | ctr_bg1:   46.2    7.3 1.05 4836 | ctr_gyr03:   33.0    4.5 1.04 4836 | ctr_gyr0:  123.8   38.3 1.09 4836 | ctr_evarcs1:   36.9    3.1 1.04 4836 | ctr_range50k:   41.9    6.5 1.04 4836
+HFFC6_chr1_10000000_15000000 | prod:    5.4    0.5 1.07 3301 | node_c5k_centre:   22.8    2.7 1.02 4565 | ctr_bg03:   20.8    3.1 1.02 4565 | ctr_bg1:   27.1    5.9 1.02 4565 | ctr_gyr03:   16.2    2.4 1.02 4565 | ctr_gyr0:   72.0   17.2 1.05 4565 | ctr_evarcs1:   21.5    2.5 1.02 4565 | ctr_range50k:   21.6    3.5 1.02 4565
+HFFC6_chr1_20000000_25000000 | prod:    7.0    2.6 1.04 4684 | node_c5k_centre:   26.9    3.5 1.04 4832 | ctr_bg03:   33.8    4.4 1.04 4832 | ctr_bg1:   45.8    7.0 1.04 4832 | ctr_gyr03:   21.0    1.8 1.03 4832 | ctr_gyr0:   95.3   25.5 1.06 4832 | ctr_evarcs1:   30.8    2.6 1.04 4832 | ctr_range50k:   33.2    4.5 1.04 4832
+mean over the rows
+  prod                           10.2    2.6
+  node_c5k_centre                32.7    4.3
+  ctr_bg03                       35.2    4.6
+  ctr_bg1                        44.5    7.6
+  ctr_gyr03                      27.2    3.4
+  ctr_gyr0                       97.4   27.3
+  ctr_evarcs1                    33.7    3.3
+  ctr_range50k                   33.2    4.9
