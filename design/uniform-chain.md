@@ -759,6 +759,23 @@ map.
   gyration of 6.7 to 7.8 bonds against 8.0 to 8.7 of the default chain, and 1 Mb at each end of the region
   shares its space with the other. The cause is not traced.
 
+The larger trial scored again with the SCC per bead pair, `scores-large4p/`, `scores-large4p_10k/` and
+`scores-large4p_5k/`. `playground/ensemble_score.py` prints it in its last two columns. Mean over the eighteen
+rows:
+
+| arm | raw SCC at 25 kb | per bead pair | balanced SCC at 25 kb | per bead pair | raw SCC at 10 kb | per bead pair | raw SCC at 5 kb | per bead pair |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.316 | 0.204 | 0.277 | 0.268 | 0.250 | 0.181 | 0.190 | 0.133 |
+| cells at 5 kb | 0.341 | 0.337 | 0.349 | 0.345 | 0.299 | 0.298 | 0.241 | 0.240 |
+| cells at 5 kb, `loop_dropout` | 0.386 | 0.381 | 0.387 | 0.382 | 0.323 | 0.322 | 0.249 | 0.249 |
+| ladder, `loop_dropout` | 0.395 | 0.390 | 0.387 | 0.383 | 0.330 | 0.329 | 0.253 | 0.253 |
+
+A third of the raw SCC of the default chain at 25 kb is the bead counts of its bins. The difference per row is
+-0.07 to 0.29. Balanced SCC moves by 0.009: the balancing takes the coverage out of Hi-C. Per bead pair the cells
+at 5 kb are above the default chain in raw SCC on 18 rows of 18 at every resolution and in balanced SCC on 15
+or 16. Every raw SCC of the default chain in an earlier comparison, the comparison of the tools among them,
+holds this share. Those are not scored again.
+
 ### The ends of a region share their space: the excluded volume radius of the arcs stage
 
 A trace on a laptop with the config of the trial, `slurm/ensemble/gm12878_xc_R.ini`, without contact cells, one
