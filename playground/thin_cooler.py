@@ -1,14 +1,18 @@
 """Split the counts of regions of a contact map into two independent halves.
 
     python playground/thin_cooler.py MCOOL OUT_DIR LABEL REGION [REGION ...]
+    python playground/thin_cooler.py --weights MCOOL HALF_MCOOL
 
 Each raw count of a 1 kb cell inside a region is split by a binomial draw at one half. The two
 halves of a Poisson count are independent Poisson counts. Half `a` is the input of a run and half
 `b` is the map its structures are scored against, which the run did not read. The halves are
 `OUT_DIR/a/LABEL/<name>` and `OUT_DIR/b/LABEL/<name>`, each an mcool at 1, 2, 5, 10 and 25 kb that
-holds the regions alone, balanced over the bins of the regions. Half `a` also gets
-`LABEL_hic_25kb_singletons.bedpe`, its counts at 25 kb as the singletons of a run. The seed is
-fixed.
+holds the regions alone with the balancing weights of MCOOL. A half has the bias of the whole map
+per bin. Weights fitted on the regions alone raise the bins at the ends of a region, which lose
+their contacts beyond it. Half `a` also gets `LABEL_hic_25kb_singletons.bedpe`, its counts at
+25 kb as the singletons of a run. The seed is fixed.
+
+The second form gives an existing half the weights of MCOOL in place.
 """
 
 from __future__ import annotations
@@ -17,10 +21,23 @@ import sys
 from pathlib import Path
 
 import cooler
+import h5py
 import numpy as np
 import pandas as pd
 
 RES = [1000, 2000, 5000, 10000, 25000]
+
+
+def copy_weights(mcool: Path, half: Path) -> None:
+    """Writes the balancing weights of the map into the half at every resolution."""
+    for res in RES:
+        weight = cooler.Cooler(f"{mcool}::/resolutions/{res}").bins()[:]["weight"].to_numpy()
+        with h5py.File(half, "r+") as f:
+            group = f[f"resolutions/{res}/bins"]
+            assert group["start"].shape[0] == weight.shape[0], f"bins differ at {res} bp"
+            if "weight" in group:
+                del group["weight"]
+            group.create_dataset("weight", data=weight)
 
 
 def thin(mcool: Path, out: Path, label: str, regions: list[str], seed: int = 20261120) -> None:
@@ -45,10 +62,7 @@ def thin(mcool: Path, out: Path, label: str, regions: list[str], seed: int = 202
         cooler.create_cooler(str(base), bins, half, ordered=True, dtypes={"count": np.int32})
         final = target / mcool.name
         cooler.zoomify_cooler(str(base), str(final), RES, chunksize=10_000_000, nproc=4)
-        for res in RES:
-            cooler.balance_cooler(
-                cooler.Cooler(f"{final}::/resolutions/{res}"), store=True, cis_only=True
-            )
+        copy_weights(mcool, final)
         print(f"{name}: {int(half['count'].sum()):,} contacts in {len(half):,} cells -> {final}")
         if name == "a":
             coarse = cooler.Cooler(f"{final}::/resolutions/25000")
@@ -65,4 +79,7 @@ def thin(mcool: Path, out: Path, label: str, regions: list[str], seed: int = 202
 
 
 if __name__ == "__main__":
-    thin(Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3], sys.argv[4:])
+    if sys.argv[1] == "--weights":
+        copy_weights(Path(sys.argv[2]), Path(sys.argv[3]))
+    else:
+        thin(Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3], sys.argv[4:])
