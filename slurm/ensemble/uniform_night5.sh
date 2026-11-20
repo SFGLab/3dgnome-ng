@@ -9,8 +9,7 @@
 # cells at 25 kb to out/held4_20, six regions and twenty structures per arm. Step 2 scores every
 # arm of out/held4_20 in one table at 25, 10 and 5 kb, with the close pairs and the stretched
 # pieces. The log is out/held4_20/night5.log.
-# The round runs on the checkout of uniform_night4.sh, commit f5ec43a. A later commit removes a
-# rule of the numba kernel, and the structures of one table are built on one commit.
+# The round runs on the checkout of uniform_night4.sh, commit f5ec43a.
 set -u
 cd "$(dirname "$0")/../.."
 export DATA="${DATA:-$HOME/gapfill-data}" HIC=out/halves/bw CONTACT_HIC=out/halves/a

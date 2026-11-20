@@ -63,8 +63,8 @@ def _assemble_beads(
 
 
 def centre_beads(fixed: BoolArray) -> BoolArray:
-    """Returns the fixed beads that move under `anchor_centre`, each with the bead before it and
-    the bead after it.
+    """Returns the nodes of a uniform chain that move in the smooth stage, each with the bead
+    before it and the bead after it.
 
     Such a bead is not at an end of the chain, neither of its neighbours is fixed and it is three
     beads or more from the bead of the rule before it. No bead then belongs to two of them.
@@ -91,10 +91,10 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     noised restarts. Returns one `(score, pos)` per problem.
     """
     s = problems[0]["settings"]
-    if s.smooth_anchor_centre:
+    if s.uniform_chain:
         raise ValueError(
-            "[simulation_arcs_smooth] anchor_centre is on and the smooth stage runs on the batch"
-            " executor, whose kernel has no move of three beads. Set [simulation_backend]"
+            "[main] uniform_chain is on and the smooth stage runs on the batch executor, whose"
+            " kernel has no move of three beads for a node. Set [simulation_backend]"
             " mc_executor_smooth to threaded or serial."
         )
     n_restarts = max(1, int(s.steps_smooth))
@@ -169,7 +169,7 @@ def _run(problem: Problem) -> Result:
     heat = problem["heat_dist"]
     comp = problem["compartment"]
 
-    centre = centre_beads(fixed) if s.smooth_anchor_centre else None
+    centre = centre_beads(fixed) if s.uniform_chain else None
 
     seed_rng(seed)
     mc_numba.seed_numba(seed)

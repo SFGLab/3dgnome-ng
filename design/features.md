@@ -948,9 +948,9 @@ last section are dated records and are not rewritten when production moves on. `
   [pipeline/ib/cells.py](../gnome3d/pipeline/ib/cells.py), under the Poisson test of
   `contact_background_z`. The anchor contact map and `use_anchor_heatmap` do not reach the nodes.
 
-  Two rules let the smooth stage adjust a node. `anchor_cap` lets it move inside a sphere around
-  its arcs position. `anchor_centre` keeps the centre of mass of the node, the bead before it and
-  the bead after it: the node moves with its two neighbours taking minus half of its move each, or
+  The smooth stage keeps the centre of mass of a node, the bead before it and the bead after it,
+  by the decision of 2026-11-20. Its setting `anchor_centre` and the fixed node of the uniform
+  chain were removed. The rule: the node moves with its two neighbours taking minus half of its move each, or
   a neighbour moves with the other neighbour taking minus its move, `step_delta_nb` in
   [mc/numba/terms.py](../gnome3d/mc/numba/terms.py). The three single moves sum to the change of
   the whole move and the running score equals the full energy, with the orientation term. The

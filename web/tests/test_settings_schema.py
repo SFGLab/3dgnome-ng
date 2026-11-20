@@ -36,10 +36,10 @@ def refused(raw: dict[str, str]) -> str:
     return ""
 
 
-def test_settings_md_has_191_settings() -> None:
+def test_settings_md_has_190_settings() -> None:
     rows = read_settings_md(ROOT / "SETTINGS.md")
     by = {(r.section, r.key): r for r in rows}
-    assert len(rows) == 191, "SETTINGS.md has 191 settings: " + str(len(rows))
+    assert len(rows) == 190, "SETTINGS.md has 190 settings: " + str(len(rows))
     assert ("distance", "polymer_exponent") in by, "polymer_exponent is in [distance]"
     missing = [f"{e.section}.{e.key}" for group in EDITABLE.values() for e in group if (e.section, e.key) not in by]
     assert not missing, "every editable setting is in SETTINGS.md with its section: " + str(missing)

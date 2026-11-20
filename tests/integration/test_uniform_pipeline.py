@@ -25,20 +25,15 @@ from tests.integration import support
 NODES = 12
 
 
-@pytest.fixture(scope="module", params=["serial", "batch", "centre"])
-def beads(
-    request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory
-) -> list[BeadOut]:
-    """The beads of one structure, with the smooth stage on numba, on JAX and under `anchor_centre`."""
-    if request.param == "batch":
-        pytest.importorskip("jax")
+@pytest.fixture(scope="module")
+def beads(tmp_path_factory: pytest.TempPathFactory) -> list[BeadOut]:
+    """The beads of one structure, with the smooth stage on numba."""
     root = tmp_path_factory.mktemp("uniform")
     truth = support.synthetic_structure(NODES, seed=1)
     region, _edges = support.write_inputs(truth, root)
     s = copy.deepcopy(support.cpu_settings(support.CELL, root))
     s.uniform_chain = True
-    s.mc_executor_smooth = "serial" if request.param == "centre" else request.param
-    s.smooth_anchor_centre = request.param == "centre"
+    s.mc_executor_smooth = "serial"
     bed = parse_region(region)
     assert bed is not None
     data = ContactData.from_files(s, [bed.chr], bed)

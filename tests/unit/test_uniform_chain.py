@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from gnome3d.pipeline.ib.densify import densify
+from gnome3d.pipeline.ib.smooth import _batch_run
 from gnome3d.pipeline.ib.spans import (
     anchor_spans,
     covered_mask,
@@ -112,6 +113,17 @@ def test_densify_returns_the_uniform_chain_under_the_flag() -> None:
 def test_densify_needs_the_nodes_of_the_joint_solve() -> None:
     with pytest.raises(ValueError, match="scope to chromosome"):
         densify(np.zeros((5, 3), dtype=np.float32), ANCHORS, chain_settings())
+
+
+def test_the_batch_executor_refuses_the_smooth_stage_of_the_chain() -> None:
+    with pytest.raises(ValueError, match="threaded or serial"):
+        _batch_run([{"settings": chain_settings()}])
+
+
+def test_the_loader_refuses_the_chain_with_an_anchor_cap() -> None:
+    config = {"main": {"uniform_chain": "yes"}, "simulation_arcs_smooth": {"anchor_cap": "0.5"}}
+    with pytest.raises(ValueError, match="anchor_cap to 0"):
+        Settings.from_dict(config)
 
 
 def test_uniform_heatmap_in_closed_form() -> None:

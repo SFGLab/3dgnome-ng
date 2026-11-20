@@ -56,13 +56,17 @@ Every row is the maintainer's decision, after the trials of the night.
 | `loop_dropout` | Waits for the larger trial |
 | The three bead move in the JAX kernel | Not yet |
 
-The draw at the midpoint and `bond_limit` were removed on 2026-11-20. The byte exactness gate on GM12878
-chr1 18.29 to 20.31 Mb is identical for the default chain. For the uniform chain with the centre of mass rule,
-`squeeze_constant` 1.0 and `loop_dropout`, two structures, the removal of the draw is identical and the removal of
-`bond_limit` is not. With `fastmath` off in the numba kernels the two trees are identical. The rule was off at a
-limit of 0, and its removal changes the order of the float operations that the compiler picks in the move of three
-beads. Structures of the uniform chain built after this commit differ from those before it in the last bits of a
-score, which the Monte Carlo amplifies. Arms of one table are built on one commit.
+The draw at the midpoint and `bond_limit` were removed on 2026-11-20, and `uniform_chain` implies the centre of
+mass rule since the same day. The byte exactness gate on GM12878 chr1 18.29 to 20.31 Mb is identical for the
+default chain and for the uniform chain with the centre of mass rule, `squeeze_constant` 1.0 and `loop_dropout`,
+two structures, across the three commits.
+
+A first run of the gate for the uniform chain differed, and commit 01503e1 states a cause that is wrong: the order
+of the float operations under `fastmath`. The cause was the gate. A worktree has its own `data/` folder with the
+files that git tracks, which lack the Hi-C singletons. The run in the worktree fitted the exponent on the ChIA-PET
+singletons, 0.175, and the run in the checkout on the Hi-C singletons, 0.344. With one data folder for every tree
+the dumps are identical. The gate of a config built by `settings_for_cell` passes the data folder as an absolute
+path.
 
 ## Loops
 
@@ -139,7 +143,7 @@ The arcs stage owns the positions of the nodes. Three arms state the freedom of 
 |---|---|
 | Fixed | A node does not move in the smooth stage |
 | Bounded drift | A node moves inside a sphere of a stated radius around its arcs position and a move that leaves the sphere is refused. `smooth_anchor_cap` is this rule |
-| Centre of mass kept | The centre of mass of a node, the bead before it and the bead after it stays as it is at the start of the stage. `anchor_centre` is this rule |
+| Centre of mass kept | The centre of mass of a node, the bead before it and the bead after it stays as it is at the start of the stage. This is the rule of the uniform chain since 2026-11-20. Its setting was `anchor_centre` |
 
 No arm has a penalty with a weight between the two stages. Every bead that is not a node moves freely, with the other
 beads of a wide span among them.
@@ -796,7 +800,9 @@ A setting is added when a run reads it.
 - The draw is uniform over the span. `[main] contact_bead` selected the draw at the midpoint, which lost the trial
   of the draw, and was removed on 2026-11-20.
 - Bounded drift is `[simulation_arcs_smooth] anchor_cap`, which exists.
-- The centre of mass arm is `[simulation_arcs_smooth] anchor_centre`.
+- The centre of mass rule is the rule of the uniform chain. `[simulation_arcs_smooth] anchor_centre` selected it
+  against the fixed node, which lost the trial of the rules and step 3 of `uniform_night4.sh`, and was removed on
+  2026-11-20. The batch executor refuses the smooth stage of the uniform chain until its kernel has the move.
 
 ## The first build
 
