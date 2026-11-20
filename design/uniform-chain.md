@@ -914,6 +914,43 @@ against 9.1.
 The radius of 3.0 on every pair is the test. It pushes apart two nodes with little chain between them, which is
 the likely cost in SCC. The rule of the radius is the maintainer's decision.
 
+### The loop dropout and the overlap of the ends
+
+With `loop_dropout` the ends of a region overlap in more structures, 34 of 360 against 14 at a radius of 3.0 and
+117 against 90 at the radius of a bead. Over the 360 structures of each arm on the larger trial the two end
+megabases are 1.0 bond closer with the dropout, 12.61 against 13.65 at a radius of 3.0 with a standard error of
+0.17, and the radius of gyration of a megabase is the same, 5.28 against 5.26.
+
+Four causes were tested and are not the cause.
+
+- Chain without a node. At a radius of 3.0 the beads of one end in contact with the other end are as far from
+  their nearest node as every bead of the end megabases, a median of 13 to 15 kb.
+- The megabases. Their radius of gyration does not change.
+- The start. The maximum entropy draw realises its targets at a median of 1.000 without the dropout and 1.001
+  with it, and the end megabases are 16.5 and 16.9 bonds apart at the start.
+- The gyration term. With `gyration_weight` 0 the radius of gyration of the region moves by 0.02 without the
+  dropout and by 0.09 with it.
+
+The cause is the excluded volume of the arcs stage. A trace that stops after the joint solve, 120 solves per arm
+on GM12878 chr1 20 to 25 Mb, without contact cells:
+
+| arm | nodes | radius of the excluded volume | end megabases apart after the solve | radius of gyration of the region |
+|---|---|---|---|---|
+| no dropout | 465 | 3.0 | 13.40 ± 0.24 | 8.44 ± 0.02 |
+| dropout | 320 | 3.0 | 12.93 ± 0.27 | 8.30 ± 0.02 |
+| dropout | 320 | 3.4 | 13.19 ± 0.25 | 8.36 ± 0.02 |
+| dropout | 320 | 3.8 | 13.66 ± 0.25 | 8.47 ± 0.02 |
+
+The solve packs the region from a radius of gyration of 9.0 at the start to 8.4. The excluded volume pushes out
+with every pair of nodes inside the radius, and the count of such pairs grows with the square of the number of
+nodes. The dropout leaves 320 nodes of 465 and the region packs 1.7 percent tighter. The megabases keep their size
+and are closer to each other. A radius larger by the ratio of the nodes to the power two thirds, 3.85, gives the
+size without the dropout back.
+
+The push of the excluded volume of the arcs stage depends on the number of nodes of the conformation. A node that
+stands for more chain after the dropout excludes no more than before. A radius of a node from the chain it stands
+for would hold the size under the dropout. That rule is not built.
+
 ## Settings
 
 A setting is added when a run reads it.
