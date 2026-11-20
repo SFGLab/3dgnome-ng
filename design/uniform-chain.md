@@ -456,6 +456,29 @@ read: the map thinned into two halves, one for the cells and one for the score.
 - The midpoint is under the uniform draw on every score with the centre of mass rule.
 - The loop weight by strength changes nothing. The orientation term at 10 or off loses 0.004 to 0.009 of SCC.
 
+### Trial of the smooth stage and the relaxation
+
+`design/figures/uniform-2026-11-19/smooth/` and `scores-smooth/`, step 4 of the night, commit 5f98a91, cells at 5 kb, z
+of 3, the centre of mass rule. Mean over the six rows, with the bonds under 0.7 beads per thousand bonds:
+
+| arm | SCC raw | SCC balanced | Spearman raw | close pairs | not next to each other | bonds under 0.7 | median bond |
+|---|---|---|---|---|---|---|---|
+| as it is | 0.386 | 0.374 | 0.439 | 32.7 | 4.3 | 28.6 | 1.03 |
+| `squeeze_constant` 1.0 | 0.388 | 0.378 | 0.450 | 7.9 | 3.1 | 4.8 | 1.10 |
+| `squeeze_constant` and `stretch_constant` 1.0 | 0.376 | 0.367 | 0.432 | 22.9 | 6.8 | 16.3 | 1.02 |
+| `noise_smooth` 0.5 | 0.373 | 0.362 | 0.429 | 51.1 | 15.6 | 35.9 | 1.01 |
+| no relaxation | 0.389 | 0.375 | 0.434 | 47.9 | 28.2 | 19.9 | 1.02 |
+| no hard wall | 0.374 | 0.366 | 0.438 | 26.6 | 10.9 | 15.9 | 1.03 |
+| excluded volume at one bead | 0.337 | 0.263 | 0.421 | 45.7 | 1.8 | 45.5 | 1.02 |
+
+- A bond that resists a squeeze ten times more has 7.9 close pairs per thousand beads, under the 10.2 of the
+  default chain, and gains 0.011 of Spearman and 0.002 to 0.004 of SCC. The median bond rises from 1.03 to 1.10.
+- With the stretch as stiff as well the gain is lost.
+- The relaxation removes most of the close pairs that are not next to each other, 28.2 without it against 4.3.
+- The half step, no wall and the excluded volume at one bead all lose.
+
+`squeeze_constant` at 1.0 joins the base of the second round.
+
 ## Settings
 
 A setting is added when a run reads it.
