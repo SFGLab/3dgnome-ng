@@ -498,6 +498,46 @@ No setting of the arcs stage beats the values of production on SCC. A stronger b
 for 0.02 of Spearman. Without the gyration term the chain collapses: balanced Pearson 0.533 and three times the
 close pairs.
 
+### Trial on counts the run did not read, with the singletons of the deep map
+
+`design/figures/uniform-2026-11-19/heldw/` and `scores-heldw/`, step 1 of `slurm/ensemble/uniform_night2.sh`, commit
+0b653a9. The earlier trials score a run against the map its contact cells read. Here
+`playground/thin_cooler.py` splits every count of the deep map of a cell into two halves by a binomial draw. The
+halves of a Poisson count are independent. A run reads half a and is scored against half b. The base of every
+uniform arm is the centre of mass rule with `squeeze_constant` 1.0. Mean over the six rows:
+
+| arm | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs | not next to each other |
+|---|---|---|---|---|---|---|
+| default chain | 0.305 | 0.294 | 0.374 | 0.745 | 3.3 | 1.5 |
+| no cells | 0.280 | 0.314 | 0.397 | 0.717 | 1.6 | 1.0 |
+| cells at 5 kb, z of 3 | 0.317 | 0.341 | 0.368 | 0.712 | 1.8 | 0.8 |
+| cells at 5 kb, z of 2 | 0.326 | 0.340 | 0.343 | 0.720 | 1.4 | 0.2 |
+| cells at 10 kb | 0.317 | 0.328 | 0.357 | 0.738 | 1.3 | 0.3 |
+| cells at 25 kb | 0.358 | 0.370 | 0.349 | 0.764 | 1.3 | 0.2 |
+| ladder from 5 to 25 kb | 0.334 | 0.349 | 0.377 | 0.761 | 1.3 | 0.2 |
+| cells at 5 kb, `loop_dropout` | 0.362 | 0.372 | 0.407 | 0.745 | 0.7 | 0.3 |
+| ladder, `loop_dropout` | 0.358 | 0.360 | 0.399 | 0.768 | 0.5 | 0.2 |
+
+The gain of the contact cells holds on counts the run did not read: 0.04 of raw SCC at 5 kb and 0.08 at 25 kb over
+the chain without cells, against 0.07 and 0.09 on the map the run read. `loop_dropout` adds 0.045 of raw SCC and
+0.04 of Spearman at 5 kb.
+
+The round has two faults of its setup. Both were found by a check of the instrument.
+
+- The halves were balanced over the bins of the regions alone. A bin at the end of a region loses its contacts
+  beyond the region and gets a weight 20 to 40 percent above its weight in the whole map. The first score of the
+  round, `scores-held/`, has balanced SCC between 0.13 and 0.19 and is not valid. `thin_cooler.py` now gives a half
+  the weights of the whole map. The table above is the same structures against the reweighted half,
+  scored by `slurm/ensemble/rescore_trial.sh`.
+- Every run read the Hi-C singletons of half a of the deep map. Production reads another file with 20,746 contacts
+  in chr1 10 to 15 Mb of GM12878, where half a has 1.67 million. The exponent of the law is 0.386 with the deep
+  singletons and 0.344 in production. The round is a model on other inputs. Its arms compare with each other and
+  not with the earlier trials. The close pairs of the default chain fall from 10.2 to 3.3 per thousand beads with
+  these inputs, which is a result of its own: deeper singletons and a larger exponent leave the chain more room.
+
+The round was stopped in its second step. `slurm/ensemble/uniform_night3.sh` repeats it on the data of production,
+with the contact cells from half a alone.
+
 ## Settings
 
 A setting is added when a run reads it.

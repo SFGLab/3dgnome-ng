@@ -1,3 +1,17 @@
+## Scored on counts the run did not read: singletons and contact cells of half a of the deep map
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| s_c5k_drop | heldw | 6 | 0.362 | 0.372 | 0.351 | 0.366 | 0.407 | 0.745 | 1.163 | 0.7 | 0.3 |
+| s_c25k | heldw | 6 | 0.358 | 0.370 | 0.336 | 0.353 | 0.349 | 0.764 | 1.157 | 1.3 | 0.2 |
+| s_lad25_drop | heldw | 6 | 0.358 | 0.360 | 0.351 | 0.356 | 0.399 | 0.768 | 1.202 | 0.5 | 0.2 |
+| s_lad25 | heldw | 6 | 0.334 | 0.349 | 0.315 | 0.335 | 0.377 | 0.761 | 1.162 | 1.3 | 0.2 |
+| s_c5k_z2 | heldw | 6 | 0.326 | 0.340 | 0.306 | 0.326 | 0.343 | 0.720 | 1.023 | 1.4 | 0.2 |
+| s_c5k | heldw | 6 | 0.317 | 0.341 | 0.296 | 0.323 | 0.368 | 0.712 | 1.077 | 1.8 | 0.8 |
+| s_c10k | heldw | 6 | 0.317 | 0.328 | 0.294 | 0.308 | 0.357 | 0.738 | 1.073 | 1.3 | 0.3 |
+| default chain | heldw | 6 | 0.305 | 0.294 | 0.274 | 0.256 | 0.374 | 0.745 | 1.060 | 3.3 | 1.5 |
+| s_nocells | heldw | 6 | 0.280 | 0.314 | 0.256 | 0.294 | 0.397 | 0.717 | 1.072 | 1.6 | 1.0 |
+
 ## Scored on the map the run read
 
 | arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |

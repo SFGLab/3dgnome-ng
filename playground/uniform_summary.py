@@ -6,7 +6,8 @@ FIGURES_DIR holds the `scores-<tag>` folders of the trials, as
 `design/figures/uniform-2026-11-19/`. An arm is listed once per set of rows it was scored on,
 with the mean of the pooled scores over those rows and, where a trial has `overlaps.txt`, the
 close pairs per thousand beads. A folder with a file `HELDOUT` is a trial whose runs read one half
-of the contact map and were scored against the other. Its arms are listed apart.
+of the contact map and were scored against the other. Its arms are listed apart, under the text of
+the file. A folder with a file `SUPERSEDED` is not listed.
 """
 
 from __future__ import annotations
@@ -46,13 +47,14 @@ def overlaps(path: Path) -> dict[str, tuple[float, float]]:
 
 
 def summary(figures: Path) -> str:
-    seen: dict[tuple[str, int, bool], tuple[str, dict[str, float], tuple[float, float] | None]] = {}
+    seen: dict[tuple[str, int, str], tuple[str, dict[str, float], tuple[float, float] | None]] = {}
     for scores in sorted(figures.glob("scores*")):
         data = read_scores(scores)
-        if not data:
+        if not data or (scores / "SUPERSEDED").is_file():
             continue
         close = overlaps(scores / "overlaps.txt")
-        held = (scores / "HELDOUT").is_file()
+        marker = scores / "HELDOUT"
+        held = marker.read_text().strip() if marker.is_file() else ""
         arms = sorted({a for d in data.values() for a in d})
         for arm in arms:
             rows = [d[arm] for d in data.values() if arm in d]
@@ -65,10 +67,9 @@ def summary(figures: Path) -> str:
                 seen[key] = (scores.name.replace("scores-", "").replace("scores", "first"), mean, close.get(arm))
     head = "| arm | trial | rows | " + " | ".join(c for _, c in COLS) + " | close pairs | not next |"
     lines: list[str] = []
-    for held, title in ((True, "Scored on counts the run did not read"), (False, "Scored on the map the run read")):
+    for held in sorted({k[2] for k in seen}, reverse=True):
         keys = [k for k in seen if k[2] == held]
-        if not keys:
-            continue
+        title = f"Scored on counts the run did not read: {held}" if held else "Scored on the map the run read"
         lines += [f"## {title}", "", head, "|---|---|---|" + "---|" * (len(COLS) + 2)]
         keys.sort(key=lambda k: (k[1], -seen[k][1]["raw_scc"] - seen[k][1]["bal_scc"]))
         for key in keys:
