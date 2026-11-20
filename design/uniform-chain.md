@@ -867,6 +867,37 @@ the reach term. The rule of the radius is open. `slurm/ensemble/uniform_night6.s
 the larger trial, with and without `loop_dropout`, and `playground/uniform_ends_check.py` counts the overlap of
 the ends for every arm.
 
+### Trial of the radius of the arcs excluded volume
+
+`design/figures/uniform-2026-11-19/ev20q/` and `scores-ev20q/`, with `scores-ev20q_10k/` and `scores-ev20q_5k/`,
+step 1 of `slurm/ensemble/uniform_night6.sh`, commit f5ec43a. The cells at 5 kb with `[excluded_volume]
+radius_arcs` 3.0, with and without `loop_dropout`, beside the same arms at the radius of a bead. Eighteen rows of
+twenty structures, raw and balanced SCC per bead pair:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.181, 0.195 | 0.133, 0.127 | 0.532, 0.463, 0.401 | 0.705 | 11.5 | 3.5 | 12 of 360 |
+| cells at 5 kb | 0.337, 0.345 | 0.298, 0.263 | 0.240, 0.185 | 0.487, 0.462, 0.429 | 0.638 | 10.7 | 5.9 | 90 of 360 |
+| cells at 5 kb, radius 3.0 | 0.313, 0.335 | 0.278, 0.255 | 0.226, 0.181 | 0.547, 0.485, 0.434 | 0.695 | 3.2 | 0.6 | 14 of 360 |
+| cells at 5 kb, `loop_dropout` | 0.381, 0.382 | 0.322, 0.284 | 0.249, 0.197 | 0.461, 0.455, 0.433 | 0.634 | 6.8 | 3.5 | 117 of 360 |
+| cells at 5 kb, `loop_dropout`, radius 3.0 | 0.353, 0.367 | 0.303, 0.274 | 0.236, 0.190 | 0.537, 0.494, 0.450 | 0.688 | 2.3 | 0.5 | 34 of 360 |
+
+No structure of 360 per arm has a stretched piece, and the radius of gyration is 9.4 bonds at a radius of 3.0
+against 9.1.
+
+- The radius of 3.0 takes the overlap of the ends from 90 structures of 360 to 14, the count of the default
+  chain. Spearman at 25 kb rises from 0.487 to 0.547, above the default chain, and it is above the default chain
+  at every resolution. Balanced Pearson rises from 0.638 to 0.695.
+- The close pairs fall from 10.7 to 3.2 per thousand beads and those not next to each other from 5.9 to 0.6, a
+  sixth of the default chain.
+- SCC falls by 0.02 of raw and 0.01 of balanced at 25 kb and by 0.02 and 0.01 at 10 kb. The arm at 3.0 is above
+  the arm at the radius of a bead in raw SCC on 4 rows of 18. It stays above the default chain on 17.
+- With the radius of 3.0 the dropout still gains 0.04 and 0.03 of SCC at 25 kb and has the ends overlap in 34
+  structures of 360 against 14.
+
+The radius of 3.0 on every pair is the test. It pushes apart two nodes with little chain between them, which is
+the likely cost in SCC. The rule of the radius is the maintainer's decision.
+
 ## Settings
 
 A setting is added when a run reads it.
