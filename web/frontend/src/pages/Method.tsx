@@ -166,16 +166,18 @@ export function Method() {
         </Section>
 
         <Section id="targets">
-          <P>The model works with distances. Before it places a bead, a job turns its inputs into target distances, one for each pair of loop anchors. This section follows the steps. The region is split into blocks. A pair of anchors without a loop gets a distance from its genomic separation. A loop gets a shorter distance from its strength. A pair with many Hi-C contacts gets a distance from the contact map. All distances are in bead units and one unit is the mean distance between two points of the chromatin fibre 1 kb apart.</P>
+          <P>The output of a job is a 3D position for every bead. The inputs hold no positions. They hold evidence on which parts of the chromosome are close to each other. A loop records that its two anchors were captured together in a ChIA-PET experiment. The Hi-C map counts the contacts between every two stretches of the genome.</P>
+          <P>The model goes from this evidence to positions in two steps. In the first step it gives each pair of loop anchors one number, the distance the two anchors should have in the structure. This number is the target distance of the pair. A pair joined by a strong loop gets a short target. A pair with no sign of contact gets the distance expected from its separation along the genome. In the second step the anchor phase and the chain phase, sections 3 and 4, move the beads until the distances in the structure are as close to the targets as they can be.</P>
+          <P>This section describes the first step. The region is first split into blocks, the parts that loops cover and the model can build. Three rules then set the targets, one for a pair without a loop, one for a loop and one for a pair with many Hi-C contacts. All distances are in bead units. One unit is the mean distance between two points of the chromatin fibre 1 kb apart.</P>
 
           <h3>Blocks</h3>
-          <P>{'A loop joins two anchors and passes over the chromatin between them. Loops that overlap are grouped into a block. A block ends at a position that no loop passes over, figure 1. Blocks are the computational form of the chromatin contact domains of Tang and colleagues [16] and 3D-GNOME uses them in the same way [1]. Each block becomes one chain of beads. A stretch between two blocks has no loops and the loop data hold no information on its folding. The model places no beads there.'}</P>
+          <P>{'The loops decide which parts of the region the model can build. A loop joins two anchors and passes over the chromatin between them. Loops that overlap are grouped into a block. A block ends at a position that no loop passes over, figure 1. Blocks are the computational form of the chromatin contact domains of Tang and colleagues [16] and 3D-GNOME uses them in the same way [1]. Each block becomes one chain of beads. A stretch between two blocks has no loops and the loop data hold no information on its folding. The model places no beads there.'}</P>
           <Figure n="1" src={methodBlocks} alt="Loops of a 6 Mb region drawn as arcs, the number of loops over each position and the four blocks the region is split into at the positions without loops">
             The split of a region into blocks. CTCF loops of GM12878 on chromosome 1, 236.0 to 242.1 Mb. Top, every arc is one loop and a thicker arc has a higher PET count. Middle, the number of loops that pass over each position. Bottom, the four blocks with their anchors as white lines. A block ends at a position where the number of loops falls to zero. The grey stretches have no loops and get no beads.
           </Figure>
 
           <h3>Distance of a pair without a loop</h3>
-          <P>{'Two points of a chromosome that are further apart along the genome are on average further apart in space. For a pair of anchors without a loop the target is the background distance b(s), a power law of the genomic separation s, as in polymer models of chromatin [3, 17].'}</P>
+          <P>{'Most pairs of anchors have no loop between them. Such a pair still needs a target, the distance expected for two points of one chromosome with no specific contact. Two points that are further apart along the genome are on average further apart in space. The target of a pair without a loop is the background distance b(s), a power law of the genomic separation s, as in polymer models of chromatin [3, 17].'}</P>
           <div className="equations">
             <Equation name="background" />
           </div>
@@ -195,7 +197,7 @@ export function Method() {
           </Figure>
 
           <h3>Distance of a loop</h3>
-          <P>The two anchors of a loop were captured together by ChIA-PET many times. The target of a loop is shorter than the background and a stronger loop has a shorter target. The PET count n of a loop is the number of sequenced read pairs that support it. The count alone is not a fair measure of strength. Long loops have lower counts than short loops and each factor has its own range of counts. The model divides the count of a loop by the typical count of loops of the same span and the same factor f, figure 4a. This ratio is the strength q of the loop. The typical count is a power law of the span, fitted through the median counts of the loops of the job.</P>
+          <P>The two anchors of a loop were captured together by ChIA-PET many times. This is evidence that they are closer in space than a pair without a loop at the same separation. The target of a loop is shorter than the background and a stronger loop has a shorter target. The PET count n of a loop is the number of sequenced read pairs that support it. The count alone is not a fair measure of strength. Long loops have lower counts than short loops and each factor has its own range of counts. The model divides the count of a loop by the typical count of loops of the same span and the same factor f, figure 4a. This ratio is the strength q of the loop. The typical count is a power law of the span, fitted through the median counts of the loops of the job.</P>
           <div className="equations">
             <Equation name="loop_target" />
           </div>
@@ -209,7 +211,7 @@ export function Method() {
           <div className="equations">
             <Equation name="hic_target" />
           </div>
-          <P>{'A cell with the expected count keeps the background distance. A cell with twice the expected count has 0.79 of it and a cell with eight times the expected count has half of it, figure 5 [3]. Section 3 lists the pairs that get a target from the background or from the Hi-C map.'}</P>
+          <P>{'A cell with the expected count keeps the background distance. A cell with twice the expected count has 0.79 of it and a cell with eight times the expected count has half of it, figure 5 [3]. Section 3 lists the pairs that get each kind of target and describes how the anchors are placed to meet the targets.'}</P>
           <Figure n="5" src={methodHic} alt="Target distance over background distance against observed over expected Hi-C contacts, and target distance against genomic separation for cells with 1, 2, 4 and 8 times the expected count">
             The target of a Hi-C cell. a, the target as a share of the background distance, against observed over expected contacts. b, target distance against genomic separation for cells with the expected count and with 2, 4 and 8 times the expected count, with ν = 0.34.
           </Figure>
