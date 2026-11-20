@@ -14,6 +14,7 @@ from gnome3d.pipeline.ib.spans import (
     start_chain,
     uniform_heatmap,
 )
+from gnome3d.pipeline.ib.start import coil_start
 from gnome3d.pipeline.relax import relax_blocks
 from gnome3d.settings import Settings
 from gnome3d.types import BeadOut
@@ -161,3 +162,53 @@ def test_relaxation_holds_the_given_beads_not_the_kind() -> None:
     moved = np.linalg.norm(after - before, axis=1) > 1e-9
     assert not moved[[0, 7, 8, 15]].any(), "the held beads keep their place"
     assert moved.any(), "a bead of kind anchor that is not held moves"
+
+
+def _line(n: int) -> tuple[np.ndarray, np.ndarray]:
+    pos = np.zeros((n, 3), dtype=np.float32)
+    pos[:, 0] = np.arange(n, dtype=np.float32)
+    return pos, np.ones(n - 1, dtype=np.float32)
+
+
+def test_coil_start_coils_the_tails() -> None:
+    pos, dtn = _line(300)
+    fixed = np.zeros(300, dtype=np.bool_)
+    fixed[[100, 110]] = True
+    out = coil_start(pos, fixed, dtn, 0.7, np.random.default_rng(5)).astype(np.float64)
+    assert np.array_equal(out[fixed], pos[fixed]), "the nodes are untouched"
+    bonds = np.linalg.norm(np.diff(out, axis=0), axis=1)
+    tail = np.r_[0:100, 110:299]
+    assert np.allclose(bonds[tail], 1.0, atol=1e-5), (
+        f"every bond of a tail is at its target: {bonds[tail].min():.4f} to {bonds[tail].max():.4f}"
+    )
+    head = float(np.linalg.norm(out[:100] - out[100], axis=1).max())
+    end = float(np.linalg.norm(out[111:] - out[110], axis=1).max())
+    assert head < 12.0, f"a head of 100 beads stays within 12 bonds of its node: {head:.1f}"
+    assert end < 15.0, f"an end of 189 beads stays within 15 bonds of its node: {end:.1f}"
+    again = coil_start(pos, fixed, dtn, 0.7, np.random.default_rng(5)).astype(np.float64)
+    assert np.array_equal(out, again), "the tails are a function of the seed"
+
+
+def test_coil_start_coils_a_chain_without_a_node() -> None:
+    pos, dtn = _line(201)
+    fixed = np.zeros(201, dtype=np.bool_)
+    out = coil_start(pos, fixed, dtn, 0.7, np.random.default_rng(5)).astype(np.float64)
+    assert np.array_equal(out[100], pos[100]), "the middle bead keeps its place"
+    bonds = np.linalg.norm(np.diff(out, axis=0), axis=1)
+    assert np.allclose(bonds, 1.0, atol=1e-5), (
+        f"every bond is at its target: {bonds.min():.4f} to {bonds.max():.4f}"
+    )
+    reach = float(np.linalg.norm(out - out[100], axis=1).max())
+    assert reach < 12.0, f"201 beads stay within 12 bonds of the middle bead: {reach:.1f}"
+
+
+def test_coil_start_draws_nothing_for_a_chain_between_two_anchors() -> None:
+    pos, dtn = _line(40)
+    fixed = np.zeros(40, dtype=np.bool_)
+    fixed[[0, 20, 39]] = True
+    rng = np.random.default_rng(5)
+    coil_start(pos, fixed, dtn, 0.7, rng)
+    ref = np.random.default_rng(5)
+    ref.normal(size=(19, 20, 3))
+    ref.normal(size=(18, 20, 3))
+    assert rng.random() == ref.random(), "a chain with an anchor at both ends has no tail draw"

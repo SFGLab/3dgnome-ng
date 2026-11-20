@@ -165,6 +165,8 @@ conformation are not written to the output.
 | A loop with both contact beads on one bead | Left out of the conformation |
 | An anchor at the end of a block | Its span ends the chain. No bead is added beyond it |
 | An anchor without a loop in the conformation | No node. Its beads are free chain |
+| The beads before the first node of a block and after the last | A tail. Under `start = coil` it starts as a compact walk from its node at the bond targets. Under `start = line` it continues the line of the nodes |
+| A block without a node in the conformation | Its middle bead is at the centroid of the block and the chain is two tails from it |
 
 ## Measurements that decide
 
@@ -453,6 +455,7 @@ read: the map thinned into two halves, one for the cells and one for the score.
   close pairs that are not next to each other. A conformation then keeps a loop with a chance by its strength.
 - With the kept loops at one bead Spearman rises to 0.574, from 0.439, and raw SCC to 0.418. Balanced Pearson falls
   to 0.626 and the close pairs rise five times. The gain and the overlaps come together.
+  These dropout arms carry the stretched tails of the section on the tails below. Their scores are not a result.
 - The midpoint is under the uniform draw on every score with the centre of mass rule.
 - The loop weight by strength changes nothing. The orientation term at 10 or off loses 0.004 to 0.009 of SCC.
 
@@ -580,6 +583,34 @@ within 0.007, and at 5 kb the cells at 5 kb lead by 0.006 with the higher Spearm
 the score at 25 kb. It does not place the beads inside the bin better. The uniform chain is ahead of the default
 chain at every resolution of the score, with and without cells. Five structures make a sparse pooled map at 5 kb.
 The larger trial has twenty.
+
+### Stretched tails, found under the loop dropout
+
+The trials with `loop_dropout` have a radius of gyration of 18 to 65 on chr1 10 to 15 Mb, where the other arms have 8
+to 12. `playground/uniform_stretch_check.py` counts the structures with a piece far from the rest. On HFFC6 chr1
+10 to 15 Mb three structures of five have a bond of 210 to 280 beads across the gap of 355 kb at 13.24 Mb, with
+480 to 1270 beads far from the rest. A run on a laptop without contact cells gives the same three structures.
+
+The cause is the start of the chain in `spans.start_chain`. The beads beyond the last node of a block continued the
+line of the nodes at one bond per bead, and a block without a node was one straight line. Without the dropout
+every anchor with a loop has a node and a tail is short. With the dropout a block loses nodes. A tail of 480 beads
+is then a line 480 bonds long, and a block of 1270 beads whose loops are all dropped is a line through its
+centroid. The smooth stage does not coil a line of that length within its budget. The pooled scores do not show
+it: a piece far from the rest makes no contact, and the bins of the gap have no count.
+
+`start.coil_start` now starts a tail as a walk from its node at the bond targets. Each bead takes the clear
+candidate of twenty draws nearest the node. A chain without a node is two tails from its middle bead. The draws
+of the tails follow the draws of every gap. The default chain has an anchor at both ends and draws nothing new.
+The byte exactness gate is identical for it.
+
+| HFFC6 chr1 10 to 15 Mb, five structures, no cells | radius of gyration in bonds | bonds over ten per structure | structures with a stretched piece |
+|---|---|---|---|
+| no dropout | 7.2 | 0.8 | 0 of 5 |
+| dropout, tails on a line | 54.3 | 11.2 | 4 of 5 |
+| dropout, tails on a coil | 6.9 | 1.0 | 0 of 5 |
+
+Every earlier score of an arm with `loop_dropout` is from structures with stretched tails. The arms run again in
+`slurm/ensemble/uniform_night4.sh`, which also keeps the stretch check of every step.
 
 ## Settings
 
