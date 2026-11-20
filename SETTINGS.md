@@ -98,6 +98,7 @@ squeeze constant for a pair that is too close.
 | `use_contact_background` | bool | no | yes | Holds a pair without a loop beyond `background_range_bp` at the contact distance of the law, with the same spring, when its contact cell puts it closer than the background. A pair at or below its expected contact gets no spring. Needs `use_anchor_heatmap`. |
 | `contact_background_z` | float | 0.0 | 0.0 | Above zero, the contact background holds a pair without a loop when its count is this many Poisson deviations above or below its expectation and the expectation is above this value squared. The target is `background * ((count + 0.5) / (expected + 0.5)) ^ (-1/3)`, clipped to one bead and to `distance_heatmap_stretching` backgrounds. Zero keeps the rule of `use_contact_background`. |
 | `contact_resolution` | int | 5000 | 5000 | The bin of `[data] contact_map`, in bp, that a pair of nodes of a uniform chain reads. The file must hold that resolution. Under measurement at 1, 5 and 10 kb. |
+| `contact_resolution_max` | int | 0 | 0 | Above `contact_resolution`, a pair of nodes whose cell has too low an expectation for the test is read at the next coarser resolution of 2, 5, 10, 25, 50 and 100 kb, up to this one. A pair is then read at the finest resolution that can test it. 0 reads `contact_resolution` alone. Under measurement. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Bond between blocks in block placement, too far. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Bond between blocks in block placement, too close. |
 

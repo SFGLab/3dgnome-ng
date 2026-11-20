@@ -137,3 +137,26 @@ def test_read_cells_from_an_mcool(tmp_path: Path) -> None:
     assert mapped.all()
     with pytest.raises(ValueError, match="has no map at"):
         read_cells(str(path), "chr1", mids, 1000)
+
+
+def test_a_pair_is_read_at_the_finest_resolution_that_can_test_it() -> None:
+    """At the fine resolution only the near pair has an expectation above z squared. Its cell is at
+    its expectation. The coarse resolution could hold it and may not.
+    """
+    mids, offset, _expected, mapped, mat = cells_case()
+    tested = np.zeros((3, 3), dtype=np.bool_)
+    fine_expected = np.where(np.arange(100) <= 16, 25.0, 1.0)
+    fine_count = np.array([[0.0, 25.0, 9.0], [25.0, 0.0, 9.0], [9.0, 9.0, 0.0]])
+    out = hold_by_cells(
+        mat, mids, fine_count, offset, fine_expected, mapped, LAW, settings(), tested
+    )
+    assert np.array_equal(out, mat), "nothing is held at the fine resolution"
+    assert tested[0, 1] and not tested[0, 2], "the near pair is tested, the far pair is not"
+
+    coarse_offset = np.array([[0, 2, 6], [2, 0, 5], [6, 5, 0]], dtype=np.int64)
+    coarse_count = np.array([[0.0, 400.0, 400.0], [400.0, 0.0, 400.0], [400.0, 400.0, 0.0]])
+    out = hold_by_cells(
+        out, mids, coarse_count, coarse_offset, np.full(100, 25.0), mapped, LAW, settings(), tested
+    )
+    assert out[0, 1] == -4.0, "the pair tested at the fine resolution keeps its background"
+    assert out[0, 2] != -0.5 and tested[0, 2], "the far pair is held by its coarse cell"

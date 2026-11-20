@@ -111,6 +111,8 @@ def hold_by_cells(
     mapped: BoolArray,
     law: PolymerLaw,
     s: Settings,
+    tested: BoolArray | None = None,
+    resolution: int = 0,
 ) -> F64Array:
     """Returns the target matrix with the pairs that their cells hold.
 
@@ -120,6 +122,10 @@ def hold_by_cells(
     `distance_heatmap_stretching` backgrounds. It is entered as minus its distance, which the
     kernels score with the background spring. Two nodes in one cell and a node in a bin without
     a count are left as they are.
+
+    `tested` marks the pairs whose cell had an expectation above z squared at a finer resolution.
+    Such a pair is left as it is and the pairs that this resolution can test are added to the
+    marks. A pair is then read at the finest resolution that can test it.
     """
     z_cut = float(s.contact_background_z)
     s0 = max(int(law.s0_bp), 1)
@@ -136,14 +142,13 @@ def hold_by_cells(
         exp = expected[np.minimum(off, expected.shape[0] - 1)]
         obs = count[ii, jj]
         z = (obs - exp) / np.sqrt(np.maximum(exp, 1e-300))
-        sel = (
-            (mat[ii, jj] < 0.0)
-            & (off >= 1)
-            & mapped[ii]
-            & mapped[jj]
-            & (exp > z_cut * z_cut)
-            & (np.abs(z) > z_cut)
+        testable = (
+            (mat[ii, jj] < 0.0) & (off >= 1) & mapped[ii] & mapped[jj] & (exp > z_cut * z_cut)
         )
+        if tested is not None:
+            testable &= ~tested[ii, jj]
+            tested[ii[testable], jj[testable]] = True
+        sel = testable & (np.abs(z) > z_cut)
         if not sel.any():
             continue
         sep = np.abs(pos[jj[sel]] - pos[ii[sel]])
@@ -156,7 +161,8 @@ def hold_by_cells(
         held_out += int((z[sel] < 0).sum())
     log.status(
         LOG,
-        "contact cells: %s pairs of nodes held in, %s held out, of %s at z %.1f",
+        "contact cells at %d bp: %s pairs of nodes held in, %s held out, of %s at z %.1f",
+        int(resolution),
         f"{held_in:,}",
         f"{held_out:,}",
         f"{m * (m - 1) // 2:,}",

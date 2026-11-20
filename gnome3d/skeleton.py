@@ -36,6 +36,7 @@ from gnome3d.pipeline.ib.spans import anchor_spans, grid_edges, uniform_heatmap
 from gnome3d.settings import Settings
 from gnome3d.tracks import slice_intervals
 from gnome3d.types import (
+    BoolArray,
     CompartmentInterval,
     F32Array,
     F64Array,
@@ -46,6 +47,9 @@ from gnome3d.types import (
 from gnome3d.util import seed_rng
 
 LOG = log.get("skeleton")
+
+# The resolutions that `contact_resolution_max` adds above `contact_resolution`.
+_CELL_LADDER = (2000, 5000, 10000, 25000, 50000, 100000)
 
 # The noise step of the arcs stage is fixed.
 _ARCS_NOISE: float = 0.005
@@ -243,10 +247,16 @@ def solve_nodes(
                 " zero, or use_contact_background to no."
             )
         else:
-            count, offset, expected, mapped = read_cells(
-                str(s.data_contact_map), chr_, nodes.mid, int(s.contact_resolution)
-            )
-            exp_dist = hold_by_cells(exp_dist, nodes.mid, count, offset, expected, mapped, law, s)
+            finest = int(s.contact_resolution)
+            ladder = [r for r in _CELL_LADDER if finest < r <= int(s.contact_resolution_max)]
+            tested: BoolArray | None = np.zeros((m, m), dtype=np.bool_) if ladder else None
+            for resolution in [finest, *ladder]:
+                count, offset, expected, mapped = read_cells(
+                    str(s.data_contact_map), chr_, nodes.mid, resolution
+                )
+                exp_dist = hold_by_cells(
+                    exp_dist, nodes.mid, count, offset, expected, mapped, law, s, tested, resolution
+                )
     exp_dist = cb.repulsion_range(exp_dist, [int(x) for x in nodes.mid], s)
     pos0: F32Array = np.ascontiguousarray(centre, dtype=np.float32)
     if s.arcs_start == "walk":
