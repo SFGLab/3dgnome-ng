@@ -778,6 +778,31 @@ at 5 kb are above the default chain in raw SCC on 18 rows of 18 at every resolut
 or 16. Every raw SCC of the default chain in an earlier comparison, the comparison of the tools among them,
 holds this share. Those are not scored again.
 
+### The resolution of the contact cells on the larger trial
+
+`design/figures/uniform-2026-11-19/res20p/` and `scores-res20p/`, with `scores-res20p_10k/` and
+`scores-res20p_5k/`. Step 1 of `slurm/ensemble/uniform_night5.sh` adds the ladder alone and the cells at 25 kb to
+the larger trial, commit f5ec43a. Eighteen rows of twenty structures, raw and balanced SCC per bead pair and raw
+Spearman. The ends overlap in a structure with more than 300 bead pairs between its end megabases:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.181, 0.195 | 0.133, 0.127 | 0.532, 0.463, 0.401 | 11.5 | 3.5 | 12 of 360 |
+| cells at 5 kb | 0.337, 0.345 | 0.298, 0.263 | 0.240, 0.185 | 0.487, 0.462, 0.429 | 10.7 | 5.9 | 90 of 360 |
+| ladder from 5 to 25 kb | 0.343, 0.338 | 0.303, 0.252 | 0.242, 0.176 | 0.442, 0.428, 0.412 | 8.7 | 3.4 | 71 of 360 |
+| cells at 25 kb | 0.385, 0.373 | 0.303, 0.258 | 0.230, 0.175 | 0.395, 0.382, 0.376 | 8.2 | 2.4 | 66 of 360 |
+| cells at 5 kb, `loop_dropout` | 0.381, 0.382 | 0.322, 0.284 | 0.249, 0.197 | 0.461, 0.455, 0.433 | 6.8 | 3.5 | 117 of 360 |
+| ladder, `loop_dropout` | 0.390, 0.383 | 0.329, 0.281 | 0.253, 0.195 | 0.456, 0.451, 0.436 | 4.5 | 1.8 | 77 of 360 |
+
+- The cells at 25 kb lead in the score at 25 kb alone, on 18 rows of 18 over the cells at 5 kb. At 10 kb the three
+  resolutions are within 0.005 of raw SCC, and at 5 kb the cells at 25 kb are behind on 14 rows of 18. Their
+  Spearman is the lowest at every resolution.
+- The ladder and the cells at 5 kb tie. The ladder is ahead in raw SCC on 9 to 11 rows of 18 and behind in
+  balanced SCC and in Spearman. It has a fifth fewer close pairs.
+- The dropout gains 0.01 to 0.04 of SCC at every resolution under either rule of the cells.
+- The ends overlap in a fifth to a third of the structures of every arm of the uniform chain and in 3 percent of
+  the default chain. Every arm of this table has the radius of a bead in the arcs excluded volume.
+
 ### Trial of the loops, the bonds and the node rule on the base
 
 `design/figures/uniform-2026-11-19/combo4p/` and `scores-combo4p/`, with `scores-combo4p_10k/` and
