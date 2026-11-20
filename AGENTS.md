@@ -129,14 +129,21 @@ Run pytest before a commit that touches `gnome3d/`.
 ### Byte exactness gate
 
 `playground/parity_dump.py` reconstructs one region and dumps every bead. Run it at the previous commit and on the
-working tree with the same executor settings and compare the two files exactly.
+working tree with the same executor settings and compare the two files exactly. `--uniform` dumps the uniform chain
+on the production config.
 
 ```bash
 git worktree add --detach /tmp/g3d_head HEAD
-ln -s "$PWD/data" /tmp/g3d_head/data
 python playground/parity_dump.py /tmp/g3d_head head.npz
 python playground/parity_dump.py "$PWD"       wip.npz
+python playground/parity_dump.py --uniform /tmp/g3d_head head_uniform.npz
+python playground/parity_dump.py --uniform "$PWD"       wip_uniform.npz
 ```
+
+A worktree has its own `data/` with the files that git tracks. The first two runs read those files. The runs with
+`--uniform` read `data/` of the directory they are started in, for both trees. A gate that reads the `data/` of each
+tree compares two inputs: the worktree lacks the Hi-C singletons and fits another exponent. Compare the line
+`polymer law` of the two logs before the bytes.
 
 ### Battery
 

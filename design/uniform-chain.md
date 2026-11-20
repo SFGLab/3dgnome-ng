@@ -49,10 +49,12 @@ Every row is the maintainer's decision, after the trials of the night.
 |---|---|
 | The rule of the smooth stage for a node | The centre of mass rule |
 | The bond of the smooth stage against a squeeze | `squeeze_constant` of 1.0 on the uniform chain |
-| The two in the settings | `uniform_chain` implies both, built after step 3 of `uniform_night4.sh` has scored the fixed node and the squeeze at 0.3 and 3 on that base |
+| The node rule in the settings | The centre of mass rule is the one node rule of the chain. Its setting and the fixed node are deleted, after step 3 of `uniform_night4.sh` |
+| The squeeze in the settings | No setting implies another. A value that works better on the uniform chain is stated in the canonical config. `squeeze_constant` stays one key, 1.0 in a config of the uniform chain |
 | The draw of the contact bead | Uniform. The draw at the midpoint is deleted |
 | The orientation term | On as it is. `bond_limit` is deleted |
 | The resolution of the contact cells | Waits for the larger trial, with the ladder alone and the cells at 25 kb added to it |
+| The radius of the arcs excluded volume of a node | Waits for the round at a radius of 3.0, `uniform_night6.sh` |
 | `loop_dropout` | Waits for the larger trial |
 | The three bead move in the JAX kernel | Not yet |
 
