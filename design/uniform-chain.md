@@ -699,6 +699,62 @@ dropout moves at every resolution: from 7.7 to 5.5 per thousand beads with the c
 the ladder and from 9.6 to 5.3 without cells. The default chain with the dropout is behind the default chain at
 every resolution of the score. Five structures make a sparse pooled map at 5 kb. Step 2 has twenty.
 
+### The larger trial on counts the run did not read
+
+`design/figures/uniform-2026-11-19/large4/` and `scores-large4/`, with `scores-large4_10k/` and `scores-large4_5k/`,
+step 2 of `slurm/ensemble/uniform_night4.sh`, commit f5ec43a. Three cells, six regions of 5 Mb of chr1, twenty
+structures per arm. No structure of 360 per arm has a stretched piece. Mean over the eighteen rows, raw and
+balanced SCC and raw Spearman:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.316, 0.277 | 0.250, 0.196 | 0.190, 0.128 | 0.532, 0.463, 0.401 | 0.705 | 11.5 | 3.5 |
+| cells at 5 kb | 0.341, 0.349 | 0.299, 0.263 | 0.241, 0.186 | 0.487, 0.462, 0.429 | 0.638 | 10.7 | 5.9 |
+| cells at 5 kb, `loop_dropout` | 0.386, 0.387 | 0.323, 0.285 | 0.249, 0.198 | 0.461, 0.455, 0.433 | 0.634 | 6.8 | 3.5 |
+| ladder, `loop_dropout` | 0.395, 0.387 | 0.330, 0.282 | 0.253, 0.195 | 0.456, 0.451, 0.436 | 0.670 | 4.5 | 1.8 |
+
+- Balanced SCC at 25 kb is above the default chain on 17 rows of 18 for the cells at 5 kb, raw SCC on 11.
+- The dropout raises raw SCC at 25 kb on 18 rows of 18 and balanced SCC on 17. With twenty structures its gain
+  also shows at 10 kb, 0.02, and at 5 kb, 0.01.
+- Raw Spearman and balanced Pearson at 25 kb are higher for the default chain. Spearman is higher on 12 rows of 18
+  against the cells at 5 kb. At 10 kb the Spearman of the arms ties and at 5 kb the uniform chain is ahead.
+
+### Check of the pooled score
+
+`playground/pooled_score_check.py`, on three rows of the larger trial, the default chain against the cells at 5 kb.
+The pooled map counts the bead pairs within the contact radius and adds each to the bins of its two bead starts.
+
+The beads of a bin. A bin of 25 kb of the uniform chain holds 25 beads. A bin of the default chain holds 0 to 64,
+with a median of 23 to 25. The count of a cell grows with the product of the bead counts of its two bins. The bead
+count of the default chain correlates with the raw coverage of Hi-C at 0.49, 0.09 and 0.36 on the three rows.
+
+| row | arm | raw SCC | raw SCC per bead pair | raw SCC of the bead counts alone | Spearman | Spearman per bead pair | Spearman of the decay alone |
+|---|---|---|---|---|---|---|---|
+| GM12878 200 to 205 Mb | default chain | 0.437 | 0.208 | 0.455 | 0.595 | 0.592 | 0.849 |
+| | cells at 5 kb | 0.382 | 0.382 | 0.171 | 0.450 | 0.449 | 0.699 |
+| GM12878 20 to 25 Mb | default chain | 0.193 | 0.178 | 0.107 | 0.550 | 0.552 | 0.727 |
+| | cells at 5 kb | 0.330 | 0.345 | -0.028 | 0.396 | 0.394 | 0.535 |
+| HFFC6 200 to 205 Mb | default chain | 0.308 | 0.232 | 0.190 | 0.600 | 0.600 | 0.799 |
+| | cells at 5 kb | 0.424 | 0.412 | 0.082 | 0.622 | 0.622 | 0.826 |
+
+Per bead pair is the pooled map over the product of the bead counts. The bead counts alone is that product times
+the mean of each diagonal, a map without a 3D position. The decay alone is the mean of each diagonal of the pooled
+map.
+
+- Raw SCC favours the default chain through its bead counts. On GM12878 200 to 205 Mb a map of the bead counts
+  alone scores 0.455, above the 0.437 of the structures, and the score per bead pair is 0.208. The scores of the
+  uniform chain do not move. The lead of the uniform chain in raw SCC is larger than the tables show.
+- Spearman does not depend on the bead counts. It is set by the decay: the decay alone scores above the map of
+  the structures on every row, and the difference of the two arms in Spearman, 0.145, 0.154 and -0.022, is the
+  difference of their decays alone, 0.150, 0.192 and -0.027.
+- The decay of the uniform chain is not monotone on the GM12878 rows. At 4 Mb the mean count is 0.0175 of the
+  count at 25 kb, above the 0.0076 at 2 Mb. Hi-C has 0.0030 and the default chain 0.0005. The rise is also in
+  the arms without cells.
+- Per structure on GM12878 200 to 205 Mb, the bead pairs in contact over 3.5 Mb are 0 to 496 on the default
+  chain and 0 to 6250 on the uniform chain, over 600 in 7 structures of 20. Those structures have a radius of
+  gyration of 6.7 to 7.8 bonds against 8.0 to 8.7 of the default chain, and 1 Mb at each end of the region
+  shares its space with the other. The cause is not traced.
+
 ## Settings
 
 A setting is added when a run reads it.
