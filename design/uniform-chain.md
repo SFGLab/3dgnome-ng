@@ -409,6 +409,31 @@ chain, 6.6 with fixed nodes and 4.3 under the centre of mass rule.
 Option A, the blobs, is not built. The cause it answers is not the one measured. The stiffness of a bond is step 4
 of the queue of the night.
 
+### Trial of the resolution and the test of the cells
+
+`design/figures/uniform-2026-11-19/res/` and `scores-res/`, step 2 of the night, commit 5f98a91, the uniform draw, the
+centre of mass rule. Mean over the six rows. The pairs held are those of one structure of GM12878 chr1 10 to 15 Mb,
+in and out, of 29,646.
+
+| cells | SCC raw | SCC balanced | Spearman raw | Pearson balanced | close pairs not next to each other | pairs held |
+|---|---|---|---|---|---|---|
+| none | 0.321 | 0.326 | 0.450 | 0.673 | 7.5 | 0 |
+| 5 kb, z of 4 | 0.359 | 0.353 | 0.445 | 0.675 | 6.2 | 2,842 and 107 |
+| 2 kb, z of 3 | 0.353 | 0.353 | 0.430 | 0.671 | 7.4 | 962 and 107 |
+| 5 kb, z of 3 | 0.386 | 0.374 | 0.439 | 0.678 | 4.3 | 3,761 and 224 |
+| 5 kb, z of 2 | 0.406 | 0.394 | 0.390 | 0.667 | 3.7 | 5,528 and 852 |
+| 10 kb, z of 3 | 0.401 | 0.384 | 0.388 | 0.682 | 3.4 | 7,141 and 830 |
+| 25 kb, z of 3 | 0.415 | 0.395 | 0.401 | 0.738 | 2.1 | 13,656 and 2,343 |
+
+- SCC rises with the count of pairs that the cells hold, from 0.32 with none to 0.41 with half of all pairs.
+- Spearman falls from 0.45 to 0.39 to 0.40 once more than a fifth of the pairs are held.
+- At 25 kb balanced Pearson passes that of the default chain, 0.738 against 0.716, and the close pairs that are not
+  next to each other fall under those of the default chain, 2.1 against 2.6.
+
+The trial scores the pooled map at 25 kb against the map that the cells are read from. At 25 kb the cells are the
+scored cells. A gain there is in part the input read back. The cells need a test on counts that the run did not
+read: the map thinned into two halves, one for the cells and one for the score.
+
 ## Settings
 
 A setting is added when a run reads it.
