@@ -1,3 +1,5 @@
+## Scored on the map the run read
+
 | arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | ctr_c25k | res | 6 | 0.415 | 0.395 | 0.393 | 0.373 | 0.401 | 0.738 | 1.162 | 25.6 | 2.1 |
@@ -53,3 +55,4 @@
 | default chain, contact terms off | nodes | 6 | 0.327 | 0.302 | 0.294 | 0.258 | 0.446 | 0.717 | 1.047 |  |  |
 | default chain, orientation off | first | 6 | 0.320 | 0.296 | 0.289 | 0.254 | 0.440 | 0.717 | 1.073 |  |  |
 | ctr_ev1 | smooth | 6 | 0.337 | 0.263 | 0.321 | 0.236 | 0.421 | 0.573 | 0.777 | 45.7 | 1.8 |
+

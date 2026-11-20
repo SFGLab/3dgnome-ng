@@ -5,7 +5,8 @@
 FIGURES_DIR holds the `scores-<tag>` folders of the trials, as
 `design/figures/uniform-2026-11-19/`. An arm is listed once per set of rows it was scored on,
 with the mean of the pooled scores over those rows and, where a trial has `overlaps.txt`, the
-close pairs per thousand beads. The default chain of the same rows is beside each arm.
+close pairs per thousand beads. A folder with a file `HELDOUT` is a trial whose runs read one half
+of the contact map and were scored against the other. Its arms are listed apart.
 """
 
 from __future__ import annotations
@@ -45,13 +46,13 @@ def overlaps(path: Path) -> dict[str, tuple[float, float]]:
 
 
 def summary(figures: Path) -> str:
-    seen: dict[tuple[str, int], tuple[str, dict[str, float], tuple[float, float] | None]] = {}
-    base: dict[int, dict[str, float]] = {}
+    seen: dict[tuple[str, int, bool], tuple[str, dict[str, float], tuple[float, float] | None]] = {}
     for scores in sorted(figures.glob("scores*")):
         data = read_scores(scores)
         if not data:
             continue
         close = overlaps(scores / "overlaps.txt")
+        held = (scores / "HELDOUT").is_file()
         arms = sorted({a for d in data.values() for a in d})
         for arm in arms:
             rows = [d[arm] for d in data.values() if arm in d]
@@ -59,19 +60,23 @@ def summary(figures: Path) -> str:
                 k: sum(r[k] for r in rows if k in r) / max(sum(1 for r in rows if k in r), 1)
                 for k, _ in COLS
             }
-            key = (arm, len(rows))
-            if arm == "prod":
-                base[len(rows)] = mean
+            key = (arm, len(rows), held)
             if key not in seen or (seen[key][2] is None and arm in close):
                 seen[key] = (scores.name.replace("scores-", "").replace("scores", "first"), mean, close.get(arm))
     head = "| arm | trial | rows | " + " | ".join(c for _, c in COLS) + " | close pairs | not next |"
-    lines = [head, "|---|---|---|" + "---|" * (len(COLS) + 2)]
-    order = sorted(seen, key=lambda k: (k[1], -seen[k][1]["raw_scc"] - seen[k][1]["bal_scc"]))
-    for arm, n in order:
-        tag, mean, close = seen[(arm, n)]
-        vals = " | ".join(f"{mean[k]:.3f}" for k, _ in COLS)
-        cp = f"{close[0]:.1f} | {close[1]:.1f}" if close else " | "
-        lines.append(f"| {LABEL.get(arm, arm)} | {tag} | {n} | {vals} | {cp} |")
+    lines: list[str] = []
+    for held, title in ((True, "Scored on counts the run did not read"), (False, "Scored on the map the run read")):
+        keys = [k for k in seen if k[2] == held]
+        if not keys:
+            continue
+        lines += [f"## {title}", "", head, "|---|---|---|" + "---|" * (len(COLS) + 2)]
+        keys.sort(key=lambda k: (k[1], -seen[k][1]["raw_scc"] - seen[k][1]["bal_scc"]))
+        for key in keys:
+            tag, mean, close = seen[key]
+            vals = " | ".join(f"{mean[k]:.3f}" for k, _ in COLS)
+            cp = f"{close[0]:.1f} | {close[1]:.1f}" if close else " | "
+            lines.append(f"| {LABEL.get(key[0], key[0])} | {tag} | {key[1]} | {vals} | {cp} |")
+        lines.append("")
     return "\n".join(lines) + "\n"
 
 

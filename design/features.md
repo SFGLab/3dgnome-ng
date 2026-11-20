@@ -956,6 +956,11 @@ last section are dated records and are not rewritten when production moves on. `
   the whole move and the running score equals the full energy, with the orientation term. The
   JAX kernel does not have the move.
 
+  `[springs] contact_resolution_max` reads a pair at the finest resolution whose cell can be
+  tested, and `[springs] gyration_min_bp` starts the gyration windows under 100 kb.
+  `design/uniform-chain.md` has every trial of the night of 2026-11-19 and
+  `design/figures/uniform-2026-11-19/summary.md` one table of every arm.
+
   `[motif_orientation] bond_limit` refuses a move of a bead beside an orientation site when it
   leaves a bond of that bead longer than the limit and longer than it was, `bond_stretched_nb`.
   On the region above with the term on, the bonds over 3 beads before the relaxation fall from 89
