@@ -16,8 +16,6 @@ if TYPE_CHECKING:
     from gnome3d.settings import Settings
     from gnome3d.types import F32Array, F64Array, I32Array, I64Array
 
-DRAWS = ("uniform", "midpoint")
-
 
 class ContactNodes(NamedTuple):
     """The nodes of one conformation of a chromosome and the loops between them.
@@ -35,24 +33,11 @@ class ContactNodes(NamedTuple):
     loop_node: I32Array  # (L, 2) node of each loop end, -1 for a loop left out
 
 
-def draw_ends(
-    lo: I32Array,
-    hi: I32Array,
-    knot: I32Array,
-    ends: I32Array,
-    rng: np.random.Generator,
-    rule: str = "uniform",
-) -> I64Array:
+def draw_ends(lo: I32Array, hi: I32Array, ends: I32Array, rng: np.random.Generator) -> I64Array:
     """Returns the contact bead of each loop end, in the chain of the block of its anchor.
 
-    `ends` is (L, 2) anchors. Under `uniform` each end draws a bead of the span of its anchor
-    with equal chance. Under `midpoint` each end takes the knot of its anchor.
+    `ends` is (L, 2) anchors. Each end draws a bead of the span of its anchor with equal chance.
     """
-    if rule not in DRAWS:
-        raise ValueError(f"the draw of a contact bead is uniform or midpoint, got {rule!r}")
-    if rule == "midpoint":
-        out: I64Array = knot[ends].astype(np.int64)
-        return out
     width = (hi - lo)[ends].astype(np.float64)
     drawn: I64Array = lo[ends] + np.floor(rng.random(ends.shape) * width).astype(np.int64)
     return drawn

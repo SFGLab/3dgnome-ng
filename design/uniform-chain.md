@@ -41,6 +41,29 @@ Every row is the maintainer's decision.
 | The larger trial | Three cells, six regions of 5 Mb across chr1, 20 structures per arm, for the arms that remain |
 | The first build | Replaced in place. Comparisons use its trial of 2026-11-19 |
 
+## Decisions of 2026-11-20
+
+Every row is the maintainer's decision, after the trials of the night.
+
+| Question | Decision |
+|---|---|
+| The rule of the smooth stage for a node | The centre of mass rule |
+| The bond of the smooth stage against a squeeze | `squeeze_constant` of 1.0 on the uniform chain |
+| The two in the settings | `uniform_chain` implies both, built after step 3 of `uniform_night4.sh` has scored the fixed node and the squeeze at 0.3 and 3 on that base |
+| The draw of the contact bead | Uniform. The draw at the midpoint is deleted |
+| The orientation term | On as it is. `bond_limit` is deleted |
+| The resolution of the contact cells | Waits for the larger trial, with the ladder alone and the cells at 25 kb added to it |
+| `loop_dropout` | Waits for the larger trial |
+| The three bead move in the JAX kernel | Not yet |
+
+The draw at the midpoint and `bond_limit` were removed on 2026-11-20. The byte exactness gate on GM12878
+chr1 18.29 to 20.31 Mb is identical for the default chain. For the uniform chain with the centre of mass rule,
+`squeeze_constant` 1.0 and `loop_dropout`, two structures, the removal of the draw is identical and the removal of
+`bond_limit` is not. With `fastmath` off in the numba kernels the two trees are identical. The rule was off at a
+limit of 0, and its removal changes the order of the float operations that the compiler picks in the move of three
+beads. Structures of the uniform chain built after this commit differ from those before it in the last bits of a
+score, which the Monte Carlo amplifies. Arms of one table are built on one commit.
+
 ## Loops
 
 A PET is one ligation between one place of anchor A and one place of anchor B. A conformation is one cell. In a
@@ -143,11 +166,11 @@ chain and on the first build. With the term off the pooled SCC of the trial move
 six rows on either chain. The arms are the term as it is, the term off, and the term with a move of the two beads
 beside a site refused when it stretches their bonds past a stated length.
 
-The third arm is `[motif_orientation] bond_limit`. A move of a bead beside a site is refused when it leaves a bond
-of that bead longer than the limit, in bond targets, and longer than it was. A bond over the limit can still
-shorten. The rule is a hard rule of the numba kernel, beside the wall and the cap, in the move of one bead and in
-the move of three. On GM12878 chr1 108.5 to 111 Mb, one structure, with the term on, the bonds over 2 and over 3
-beads before the relaxation are 212 and 89 without a limit, 78 and 0 at a limit of 1.5 and 74 and 4 at 1.25.
+The third arm was `[motif_orientation] bond_limit`, a hard rule of the numba kernel. On GM12878 chr1 108.5 to
+111 Mb, one structure, with the term on, the bonds over 2 and over 3 beads before the relaxation were 212 and 89
+without a limit, 78 and 0 at a limit of 1.5 and 74 and 4 at 1.25. In the trial of the rules the limit gained no
+score and raised the close pairs by a fifth. The setting and its rule were removed on 2026-11-20. The term stays
+on as it is.
 
 ## Output
 
@@ -195,8 +218,8 @@ volume at the radius of a bead and the contact cells of `gnome3d/pipeline/ib/cel
 beads of the smooth stage and of the relaxation, and the first build is removed. `design/features.md` has the first
 numbers. Stage 2 is built: bounded drift is `anchor_cap`, which the uniform chain runs as it is, and the centre of
 mass rule is a move of three beads of the numba kernel, `step_delta_nb` and `batch_mc_nb` in
-`gnome3d/mc/numba/terms.py`. The JAX kernel does not have it. Stage 3 is built: the third arm of the orientation
-term is `[motif_orientation] bond_limit`, in the numba kernel alone.
+`gnome3d/mc/numba/terms.py`. The JAX kernel does not have it. Stage 3 was the third arm of the orientation
+term, `[motif_orientation] bond_limit`, measured and removed.
 
 ### Trial of stage 1 without the contact cells
 
@@ -681,7 +704,8 @@ every resolution of the score. Five structures make a sparse pooled map at 5 kb.
 A setting is added when a run reads it.
 
 - `[main] uniform_chain` selects the chain.
-- `[main] contact_bead` is the draw, uniform or midpoint.
+- The draw is uniform over the span. `[main] contact_bead` selected the draw at the midpoint, which lost the trial
+  of the draw, and was removed on 2026-11-20.
 - Bounded drift is `[simulation_arcs_smooth] anchor_cap`, which exists.
 - The centre of mass arm is `[simulation_arcs_smooth] anchor_centre`.
 

@@ -91,12 +91,6 @@ def _batch_run(problems: list[Problem]) -> list[Result]:
     noised restarts. Returns one `(score, pos)` per problem.
     """
     s = problems[0]["settings"]
-    if float(s.motif_bond_limit) > 0.0 and problems[0].get("char_orientations") is not None:
-        raise ValueError(
-            "[motif_orientation] bond_limit is above zero and the smooth stage runs on the batch"
-            " executor, whose kernel has no bond limit. Set [simulation_backend]"
-            " mc_executor_smooth to threaded or serial, or bond_limit to 0."
-        )
     if s.smooth_anchor_centre:
         raise ValueError(
             "[simulation_arcs_smooth] anchor_centre is on and the smooth stage runs on the batch"

@@ -933,7 +933,7 @@ last section are dated records and are not rewritten when production moves on. `
   its last, into beads of equal width, one per `target_bp_per_subanchor`. Every base is in one
   bead and the sorted output is the chain. The span of an anchor is the run of beads whose
   midpoints are in its range. Each end of a kept loop is at one bead of the span of its anchor,
-  drawn per conformation by `contact_bead`. The distinct contact beads of a chromosome are the
+  drawn per conformation with equal chance. The distinct contact beads of a chromosome are the
   nodes of the joint arcs solve. The strengths of the loops on one pair of nodes add and go
   through the law once. Consecutive nodes of a block are held within the chain between them by
   the reach term, and the excluded volume of the solve acts at the radius of a bead. The nodes
@@ -961,10 +961,10 @@ last section are dated records and are not rewritten when production moves on. `
   `design/uniform-chain.md` has every trial of the night of 2026-11-19 and
   `design/figures/uniform-2026-11-19/summary.md` one table of every arm.
 
-  `[motif_orientation] bond_limit` refuses a move of a bead beside an orientation site when it
-  leaves a bond of that bead longer than the limit and longer than it was, `bond_stretched_nb`.
-  On the region above with the term on, the bonds over 3 beads before the relaxation fall from 89
-  to 0 at a limit of 1.5. The JAX kernel does not have the rule.
+  A third arm of the orientation term, `[motif_orientation] bond_limit`, refused a move of a bead
+  beside an orientation site when it left a bond of that bead longer than the limit. In the trial
+  of the rules it gained no score and raised the close pairs by a fifth. It was removed on
+  2026-11-20.
 
   Stage 1 on GM12878 chr1 108.5 to 111 Mb, one structure, 154 nodes from 379 loops of 267 anchors,
   bonds before the relaxation:

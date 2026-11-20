@@ -32,9 +32,9 @@ def settings(**kw: object) -> Settings:
 
 
 def test_uniform_draw_stays_inside_each_span_and_covers_it() -> None:
-    lo, hi, knot = i32([0, 10]), i32([1, 18]), i32([0, 14])
+    lo, hi = i32([0, 10]), i32([1, 18])
     ends = np.tile(i32([[0, 1]]), (4000, 1))
-    beads = draw_ends(lo, hi, knot, ends, np.random.default_rng(0))
+    beads = draw_ends(lo, hi, ends, np.random.default_rng(0))
     assert (beads[:, 0] == 0).all(), "a span of one bead has one choice"
     assert beads[:, 1].min() == 10 and beads[:, 1].max() == 17, "every bead of the span is drawn"
     counts = np.bincount(beads[:, 1] - 10, minlength=8)
@@ -42,21 +42,10 @@ def test_uniform_draw_stays_inside_each_span_and_covers_it() -> None:
 
 
 def test_each_loop_end_draws_by_itself() -> None:
-    lo, hi, knot = i32([0, 10]), i32([8, 18]), i32([4, 14])
+    lo, hi = i32([0, 10]), i32([8, 18])
     ends = np.tile(i32([[0, 1]]), (50, 1))
-    beads = draw_ends(lo, hi, knot, ends, np.random.default_rng(1))
+    beads = draw_ends(lo, hi, ends, np.random.default_rng(1))
     assert len(set(beads[:, 0].tolist())) > 1, "two loops of one anchor can have two contact beads"
-
-
-def test_midpoint_draw_takes_the_knot() -> None:
-    lo, hi, knot = i32([0, 10]), i32([8, 18]), i32([4, 14])
-    beads = draw_ends(lo, hi, knot, i32([[0, 1], [1, 0]]), np.random.default_rng(0), "midpoint")
-    assert beads.tolist() == [[4, 14], [14, 4]]
-
-
-def test_draw_refuses_an_unknown_rule() -> None:
-    with pytest.raises(ValueError, match="uniform or midpoint"):
-        draw_ends(i32([0]), i32([1]), i32([0]), i32([[0, 0]]), np.random.default_rng(0), "centre")
 
 
 def test_strengths_of_loops_on_one_bead_pair_add() -> None:

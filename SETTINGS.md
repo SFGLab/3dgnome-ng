@@ -33,7 +33,6 @@ The measurements behind a production value are in `design/features.md`.
 | `overlap_anchor_strict` | bool | no | no | Sets the span between two overlapping anchors to zero, which puts the subanchors between them at one point. Off spreads them over the overlap with ranges of nonzero width. |
 | `drop_zero_length_subanchors` | bool | no | yes | Leaves subanchors of zero width out of the output. The chain keeps them. |
 | `uniform_chain` | bool | no | no | Builds each block as one bead per `target_bp_per_subanchor` from the start of its first anchor to the end of its last. Every base of the block is in one bead. Each end of a loop is at one bead of the span of its anchor, drawn per conformation, and those beads are the nodes of the joint arcs solve and the fixed beads of the smooth stage. With `[springs] use_contact_background` and `[data] contact_map` a pair of nodes without a loop is held by its Hi-C cell under the Poisson test of `contact_background_z`, which must be above zero. Needs `[simulation_arcs] scope = chromosome` and `solver = lbfgs`. It refuses hole beads, the boundary stitch and the factory term. `design/uniform-chain.md` has the rules. |
-| `contact_bead` | str | uniform | uniform | The bead of a loop end inside the span of its anchor under `uniform_chain`. `uniform` draws every bead of the span with equal chance, per loop end and per conformation. `midpoint` takes the bead at the midpoint of the anchor in every conformation. |
 | `use_dynamic_loop_density` | bool | no | yes | Chooses the subanchor count of each anchor gap to make one chain segment about `target_bp_per_subanchor` long. Off uses `loop_density` for every gap. |
 | `target_bp_per_subanchor` | int | 5000 | 1000 | Genomic length of one chain segment under dynamic density. It is also the bead unit of the distance law. |
 | `min_subanchors_per_arc` | int | 0 | 0 | Lower bound of the count per gap under dynamic density. |
@@ -121,7 +120,6 @@ from a second. The term is in the energy of the solver on both backends. The ann
 | `use_motif_orientation` | bool | no | yes | Scores the angle between the CTCF motif vectors of two anchors that a loop joins, in the smooth stage. |
 | `weight` | float | 1.0 | 50.0 | Weight of the term. |
 | `symmetric_motifs` | bool | yes | yes | Yes scores two motif vectors best when they point the same way. No flips the partner first and opposed vectors score best. |
-| `bond_limit` | float | 0.0 | 0.0 | Above zero, a move of a bead beside an orientation site is refused when it leaves a bond of that bead longer than this many bond targets and longer than it was. The term then cannot stretch the chain beside a site. 0 is no limit. The numba executors run it. Under measurement. |
 
 ## [anchor_heatmap]
 

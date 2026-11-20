@@ -169,16 +169,14 @@ def solve_nodes(
     edges: list[I64Array] = []
     lo_parts: list[I32Array] = []
     hi_parts: list[I32Array] = []
-    knot_parts: list[I32Array] = []
     block_parts: list[I32Array] = []
     for b, (_, _, ar) in enumerate(work):
         genomic = [(clusters[a].start, clusters[a].end, clusters[a].genomic_pos) for a in ar]
         e = grid_edges(genomic, target)
-        lo_b, hi_b, knot_b = anchor_spans(genomic, e)
+        lo_b, hi_b, _knot = anchor_spans(genomic, e)
         edges.append(e)
         lo_parts.append(lo_b)
         hi_parts.append(hi_b)
-        knot_parts.append(knot_b)
         block_parts.append(np.full(len(ar), b, dtype=np.int32))
     anchor_block: I32Array = np.concatenate(block_parts)
 
@@ -196,10 +194,8 @@ def solve_nodes(
     beads = draw_ends(
         np.concatenate(lo_parts),
         np.concatenate(hi_parts),
-        np.concatenate(knot_parts),
         ends,
         np.random.default_rng([seed, 11]),
-        str(s.contact_bead),
     )
     nodes = contact_nodes(edges, anchor_block, ends, beads, strength)
     m = int(nodes.mid.shape[0])

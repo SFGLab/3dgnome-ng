@@ -56,7 +56,6 @@ class Settings:
     use_ctcf_motif: bool
     motifs_symmetric: bool
     motif_weight: float
-    motif_bond_limit: float
 
     # ---- anchor heatmap ----
     use_anchor_heatmap: bool
@@ -243,7 +242,6 @@ class Settings:
     overlap_anchor_strict: bool
     drop_zero_length_subanchors: bool
     uniform_chain: bool
-    contact_bead: str
 
     # ---- dynamic loop density ----
     use_dynamic_loop_density: bool
@@ -303,7 +301,6 @@ class Settings:
         self.use_ctcf_motif = False
         self.motifs_symmetric = True
         self.motif_weight = 1.0
-        self.motif_bond_limit = 0.0
 
         # ---- anchor heatmap ----
         self.use_anchor_heatmap = False
@@ -488,7 +485,6 @@ class Settings:
         self.overlap_anchor_strict = False
         self.drop_zero_length_subanchors = False
         self.uniform_chain = False
-        self.contact_bead = "uniform"
 
         # ---- dynamic loop density ----
         self.use_dynamic_loop_density = False
@@ -672,7 +668,6 @@ class Settings:
             "motif_orientation", "use_motif_orientation", self.use_ctcf_motif
         )
         self.motif_weight = getf("motif_orientation", "weight", self.motif_weight)
-        self.motif_bond_limit = getf("motif_orientation", "bond_limit", self.motif_bond_limit)
         self.motifs_symmetric = getb("motif_orientation", "symmetric_motifs", self.motifs_symmetric)
 
         # [anchor_heatmap]
@@ -958,11 +953,6 @@ class Settings:
             "main", "drop_zero_length_subanchors", self.drop_zero_length_subanchors
         )
         self.uniform_chain = getb("main", "uniform_chain", self.uniform_chain)
-        self.contact_bead = gets("main", "contact_bead", self.contact_bead)
-        if self.contact_bead not in ("uniform", "midpoint"):
-            raise ValueError(
-                f"[main] contact_bead must be uniform or midpoint, got {self.contact_bead!r}"
-            )
 
         # [main]
         self.use_dynamic_loop_density = getb(
