@@ -609,8 +609,25 @@ The byte exactness gate is identical for it.
 | dropout, tails on a line | 54.3 | 11.2 | 4 of 5 |
 | dropout, tails on a coil | 6.9 | 1.0 | 0 of 5 |
 
-Every earlier score of an arm with `loop_dropout` is from structures with stretched tails. The arms run again in
-`slurm/ensemble/uniform_night4.sh`, which also keeps the stretch check of every step.
+The check over the thirty structures of every arm of the earlier trials, six rows of five:
+
+| arm | radius of gyration in bonds | bonds over ten per structure | structures with a stretched piece |
+|---|---|---|---|
+| default chain | 9.2 | 0.4 | 0 of 30 |
+| no cells | 9.3 | 0.6 | 0 of 30 |
+| cells at 5 kb | 9.5 | 0.6 | 0 of 30 |
+| cells at 25 kb | 9.9 | 0.4 | 0 of 30 |
+| ladder from 5 to 25 kb | 9.7 | 0.5 | 0 of 30 |
+| cells at 5 kb, `loop_dropout` | 19.9 | 2.9 | 11 of 30 |
+| cells at 25 kb, `loop_dropout` | 20.1 | 2.7 | 10 of 30 |
+| ladder, `loop_dropout` | 20.3 | 2.8 | 11 of 30 |
+| `loop_dropout` of the trial of the draw | 20.8 | 3.1 | 11 of 30 |
+| `loop_dropout` with `loop_contact` of the trial of the draw | 19.6 | 2.9 | 13 of 30 |
+
+No arm without the dropout has a stretched piece, in these trials and in the trials of the rules, the smooth stage
+and the arcs stage. Their scores stand. A third of the structures of every arm with `loop_dropout` has one, and
+the scores of those arms are not a result. The arms run again in `slurm/ensemble/uniform_night4.sh`, which also
+keeps the stretch check of every step.
 
 ## Settings
 
