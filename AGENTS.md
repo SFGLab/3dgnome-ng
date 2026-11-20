@@ -16,7 +16,7 @@ battery. The old code is under `legacy/` and is not developed.
 gnome3d/            the model
   simulate.py       entry points: simulate, run_region, run_genome
   cli.py            the gnome3d command
-  production.py     the production configuration, CANONICAL and settings_for_cell
+  production.py     the production configurations, CANONICAL, CANONICAL_UNIFORM and settings_for_cell
   settings.py       the loader of every config key
   data.py io.py     input data and file formats
   polymer.py        the distance law and its fits
@@ -208,7 +208,7 @@ note under `design/` states hardware by its model.
 
 ## Records
 
-- `SETTINGS.md` and `gnome3d/production.py` state what holds now.
+- `SETTINGS.md` and `gnome3d/production.py` state what holds now, for the default chain and the uniform chain.
 - `design/features.md` has every feature with its settings, its code and its measurements.
 - `design/anchor-placement.md` has the distance law, the placement of anchors and the end passes.
 - `design/gap-fill.md` has the gaps, the maximum entropy start, the hole beads and the long range.

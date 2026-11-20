@@ -10,6 +10,17 @@ configs from it with two changes, `mc_executor_jax_bucket_shapes = yes` and `hea
 
 The measurements behind a production value are in `design/features.md`.
 
+## The production config of the uniform chain
+
+`gnome3d.production.CANONICAL_UNIFORM` is the production config of the uniform chain. It is `CANONICAL` with the
+keys below, `gnome3d.production.UNIFORM_CHAIN`. No key sets the value of another: a value that the uniform chain
+needs is a row here. `settings_for_cell(cell, uniform=True)` builds the settings from it.
+
+| key | value | measurement |
+|---|---|---|
+| `[main] uniform_chain` | yes | The chain itself. |
+| `[springs] squeeze_constant` | 1.0 | At 0.1 a bond gives way and 33 pairs of beads per thousand are closer than 0.7 of a bond. At 1.0 there are 8, at the same pooled scores. |
+
 ## [main]
 
 | key | type | default | production | meaning |

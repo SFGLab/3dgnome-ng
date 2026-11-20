@@ -1,8 +1,10 @@
 """The production configuration, as a dict, with no .ini file.
 
-`CANONICAL` holds every modelling section. `settings_for_cell("GM12878")` returns a `Settings`
-built from it with the data section of that cell line. `SETTINGS.md` documents each key and its
-production column is this dict.
+`CANONICAL` holds every modelling section of the default chain. `CANONICAL_UNIFORM` is the
+production configuration of the uniform chain, `CANONICAL` with the keys of `UNIFORM_CHAIN`.
+`settings_for_cell("GM12878")` returns a `Settings` built from one of the two with the data
+section of that cell line. `SETTINGS.md` documents each key. Its production column is
+`CANONICAL` and it lists the keys of `UNIFORM_CHAIN`.
 """
 
 from __future__ import annotations
@@ -173,6 +175,27 @@ CANONICAL: dict[str, dict[str, object]] = {
     },
 }
 
+# The keys of the production configuration of the uniform chain that differ from `CANONICAL`.
+UNIFORM_CHAIN: dict[str, dict[str, object]] = {
+    "main": {"uniform_chain": "yes"},
+    # At 0.1 a bond gives way and 33 pairs of beads per thousand are closer than 0.7 of a bond. At
+    # 1.0 there are 8, design/uniform-chain.md.
+    "springs": {"squeeze_constant": 1.0},
+}
+
+
+def with_keys(
+    base: dict[str, dict[str, object]], keys: dict[str, dict[str, object]]
+) -> dict[str, dict[str, object]]:
+    """Returns a deep copy of a configuration with the given keys set."""
+    out = copy.deepcopy(base)
+    for section, kv in keys.items():
+        out.setdefault(section, {}).update(kv)
+    return out
+
+
+CANONICAL_UNIFORM: dict[str, dict[str, object]] = with_keys(CANONICAL, UNIFORM_CHAIN)
+
 # `stop_condition_steps` of each stage by quality.
 _QUALITY_STEPS = {"fast": 1000, "balanced": 5000, "full": 50000}
 
@@ -200,13 +223,16 @@ def settings_for_cell(
     data_root: str = "data",
     quality: str | None = None,
     overrides: dict[str, dict[str, object]] | None = None,
+    uniform: bool = False,
 ) -> Settings:
-    """Builds the Settings of a cell line from `CANONICAL` and the conventional data paths.
+    """Builds the Settings of a cell line from a production configuration and the conventional
+    data paths.
 
     `quality` is fast, balanced or full and sets the `stop_condition_steps` of each stage. None is
-    full. `overrides` is merged on top as {section: {key: value}}.
+    full. `overrides` is merged on top as {section: {key: value}}. `uniform` takes
+    `CANONICAL_UNIFORM`, the configuration of the uniform chain, in place of `CANONICAL`.
     """
-    params = copy.deepcopy(CANONICAL)
+    params = copy.deepcopy(CANONICAL_UNIFORM if uniform else CANONICAL)
     params["data"] = cell_data_section(cell, data_root)
 
     if quality and quality in _QUALITY_STEPS and quality != "full":
@@ -217,8 +243,7 @@ def settings_for_cell(
         params["simulation_ib"]["stop_condition_steps"] = steps
 
     if overrides:
-        for section, kv in overrides.items():
-            params.setdefault(section, {}).update(kv)
+        params = with_keys(params, overrides)
 
     return Settings.from_dict(params)
 

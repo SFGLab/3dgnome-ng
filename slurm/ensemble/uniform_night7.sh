@@ -1,5 +1,7 @@
 #!/bin/bash
 # The seventh round for the uniform chain: squeeze_constant 1.0 on the default chain.
+# Not run. The maintainer chose two canonical configs on 2026-11-20, one per chain, and the
+# question of one value of the key for both chains is closed.
 # design/uniform-chain.md.
 #
 #   DATA=~/gapfill-data bash slurm/ensemble/uniform_night7.sh

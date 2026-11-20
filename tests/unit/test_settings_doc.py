@@ -14,7 +14,7 @@ import ast
 import re
 from pathlib import Path
 
-from gnome3d.production import CANONICAL
+from gnome3d.production import CANONICAL, CANONICAL_UNIFORM, UNIFORM_CHAIN, settings_for_cell
 from gnome3d.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -139,3 +139,43 @@ def problems() -> tuple[list[str], int, int]:
 def test_settings_doc_matches_the_loader_and_the_production_config() -> None:
     found, _keys, _rows = problems()
     assert not found, "\n".join(found)
+
+
+def uniform_rows() -> dict[tuple[str, str], str]:
+    """Returns (section, key) -> value from the table of the uniform chain in SETTINGS.md."""
+    rows: dict[tuple[str, str], str] = {}
+    inside = False
+    for line in (ROOT / "SETTINGS.md").read_text().splitlines():
+        if line.startswith("## "):
+            inside = line == "## The production config of the uniform chain"
+            continue
+        m = re.match(r"^\| `\[([a-z_]+)\] ([A-Za-z_0-9]+)` \| ([^|]*) \|", line)
+        if inside and m:
+            rows[(m.group(1), m.group(2))] = m.group(3).strip()
+    return rows
+
+
+def test_uniform_config_is_the_default_config_with_the_documented_keys() -> None:
+    differs = {
+        (section, key): value
+        for section, kv in CANONICAL_UNIFORM.items()
+        for key, value in kv.items()
+        if CANONICAL.get(section, {}).get(key) != value
+    }
+    stated = {
+        (section, key): value for section, kv in UNIFORM_CHAIN.items() for key, value in kv.items()
+    }
+    assert differs == stated, (
+        "CANONICAL_UNIFORM differs from CANONICAL by the keys of UNIFORM_CHAIN"
+    )
+    doc = uniform_rows()
+    assert {k: norm(v) for k, v in doc.items()} == {k: norm(v) for k, v in stated.items()}, (
+        "the table of the uniform chain in SETTINGS.md is UNIFORM_CHAIN"
+    )
+
+
+def test_settings_for_cell_builds_either_chain() -> None:
+    default = settings_for_cell("GM12878")
+    uniform = settings_for_cell("GM12878", uniform=True)
+    assert not default.uniform_chain and default.spring_squeeze == 0.1, "the default chain"
+    assert uniform.uniform_chain and uniform.spring_squeeze == 1.0, "the uniform chain"
