@@ -7,8 +7,9 @@
 #
 # An arm is slurm/ensemble/<cell>$BASE.ini with its overrides, BASE _xc_R unless set. Production
 # runs beside the arms on the same machine. CONTACT_MAP in an override is replaced by the deepest
-# mcool of the cell at 1 kb. A region chr1 runs the whole chromosome and is scored on
-# chr1:1-60000000. The log is OUT/TAG.log.
+# mcool of the cell at 1 kb, of CONTACT_HIC when set and of HIC otherwise. With the two apart a run
+# reads one map and is scored against another. A region chr1 runs the whole chromosome and is
+# scored on chr1:1-60000000. The log is OUT/TAG.log.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
@@ -24,13 +25,14 @@ LOG="$OUT/$TAG.log"
 git log --format="$TAG on %h %s" -1 >> "$LOG"
 
 mcool() { ls -S "$HIC/$1"/*.mcool | head -1; }
+cmap() { ls -S "${CONTACT_HIC:-$HIC}/$1"/*.mcool | head -1; }
 
 ARMS="prod"
 for spec in "$@"; do ARMS="$ARMS ${spec%%:*}"; done
 
 for C in $CELLS; do
   c=$(echo "$C" | tr 'A-Z' 'a-z')
-  .venv/bin/python - "slurm/ensemble/${c}${BASE}.ini" "$OUT" "$C" "$(mcool "$C")::/resolutions/1000" "$@" <<'PY'
+  .venv/bin/python - "slurm/ensemble/${c}${BASE}.ini" "$OUT" "$C" "$(cmap "$C")::/resolutions/1000" "$@" <<'PY'
 import configparser, sys
 src, out, cell, uri, *specs = sys.argv[1:]
 arms = {"prod": {}}
