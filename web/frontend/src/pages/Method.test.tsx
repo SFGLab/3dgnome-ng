@@ -45,6 +45,24 @@ describe('Method page', () => {
     expect(within(list).getAllByRole('listitem')).toHaveLength(17)
   })
 
+  it('explains the target distances with a figure per step', () => {
+    renderMethod()
+    const section = document.getElementById('targets')!
+    expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Blocks',
+      'Distance of a pair without a loop',
+      'The default exponent',
+      'Distance of a loop',
+      'Distance from the Hi-C map',
+    ])
+    const figures = [...section.querySelectorAll('figure')]
+    expect(figures.map((f) => f.querySelector('figcaption b')?.textContent)).toEqual(['Figure 1', 'Figure 2', 'Figure 3', 'Figure 4', 'Figure 5'])
+    // The default is the mean of the three exponents the page gives.
+    expect(section).toHaveTextContent('The three values are 0.309, 0.269 and 0.277.')
+    expect(((0.309 + 0.269 + 0.277) / 3).toFixed(3)).toBe('0.285')
+    expect(section).toHaveTextContent('uses ν = 0.285')
+  })
+
   it('cites the sources of the shared terms', () => {
     renderMethod()
     const anchorTerms = screen.getByRole('table', { name: 'Anchor energy terms' })

@@ -6,9 +6,13 @@ import { REFERENCES, referenceLink, referenceText } from '../content/references'
 import engineBatching from '../assets/engine/engine_batching.svg'
 import engineGraph from '../assets/engine/engine_graph.svg'
 import methodAnchors from '../assets/method_anchors.png'
+import methodBlocks from '../assets/method_blocks.png'
 import methodChain from '../assets/method_chain.png'
+import methodDefault from '../assets/method_default.png'
 import methodEnsemble from '../assets/method_ensemble.png'
-import methodLaw from '../assets/method_law.png'
+import methodExponent from '../assets/method_exponent.png'
+import methodHic from '../assets/method_hic.png'
+import methodLoops from '../assets/method_loops.png'
 import '../styles/doc.css'
 
 /** The Method page's references in the order of their numbers [1] to [17]. */
@@ -97,6 +101,18 @@ function Section({ id, children }: { id: (typeof SECTIONS)[number][0]; children:
   )
 }
 
+function Figure({ n, src, alt, children }: { n: string; src: string; alt: string; children: string }) {
+  return (
+    <figure className="figure">
+      <img src={src} alt={alt} />
+      <figcaption>
+        <b>Figure {n}</b>
+        {children}
+      </figcaption>
+    </figure>
+  )
+}
+
 function P({ children }: { children: string }) {
   return (
     <p>
@@ -150,21 +166,53 @@ export function Method() {
         </Section>
 
         <Section id="targets">
-          <P>{"Overlapping loops form a block, the computational form of the chromatin contact domains of Tang and colleagues [16] used by 3D-GNOME [1]. The region is split into blocks at points that no loop spans and stretches without loops have no beads. Every pair of anchors then gets a target distance from one law in bead units, one bead being the distance at 1 kb. A pair without a loop has the target b(s), with s the genomic separation, a power law as in polymer models of chromatin [3, 17]. A loop of strength q has the target d(s, q)."}</P>
+          <P>The model works with distances. Before it places a bead, a job turns its inputs into target distances, one for each pair of loop anchors. This section follows the steps. The region is split into blocks. A pair of anchors without a loop gets a distance from its genomic separation. A loop gets a shorter distance from its strength. A pair with many Hi-C contacts gets a distance from the contact map. All distances are in bead units and one unit is the mean distance between two points of the chromatin fibre 1 kb apart.</P>
+
+          <h3>Blocks</h3>
+          <P>{'A loop joins two anchors and passes over the chromatin between them. Loops that overlap are grouped into a block. A block ends at a position that no loop passes over, figure 1. Blocks are the computational form of the chromatin contact domains of Tang and colleagues [16] and 3D-GNOME uses them in the same way [1]. Each block becomes one chain of beads. A stretch between two blocks has no loops and the loop data hold no information on its folding. The model places no beads there.'}</P>
+          <Figure n="1" src={methodBlocks} alt="Loops of a 6 Mb region drawn as arcs, the number of loops over each position and the four blocks the region is split into at the positions without loops">
+            The split of a region into blocks. CTCF loops of GM12878 on chromosome 1, 236.0 to 242.1 Mb. Top, every arc is one loop and a thicker arc has a higher PET count. Middle, the number of loops that pass over each position. Bottom, the four blocks with their anchors as white lines. A block ends at a position where the number of loops falls to zero. The grey stretches have no loops and get no beads.
+          </Figure>
+
+          <h3>Distance of a pair without a loop</h3>
+          <P>{'Two points of a chromosome that are further apart along the genome are on average further apart in space. For a pair of anchors without a loop the target is the background distance b(s), a power law of the genomic separation s, as in polymer models of chromatin [3, 17].'}</P>
           <div className="equations">
             <Equation name="background" />
-            <Equation name="loop_target" />
           </div>
-          <P>{"The exponent nu is fitted at load to the contact probability P(s) of the cell type's Hi-C, which falls as s to the power of minus 3 nu [3, 17]. If the fit fails, the run prints the reason and uses 0.285. The strength q of a loop is its PET count n over the typical count of loops of the same span and factor f. The target shrinks as the PET count grows, as in 3D-GNOME [1] and MultiMM [5]. It saturates at one bead for a strong loop, figure 1. A Hi-C cell converts to a distance the same way, b(s) times observed over expected contacts to the power of minus one third [3]."}</P>
+          <P>{'The exponent ν sets how fast the distance grows with separation. A chain that folds as a random walk has ν = 1/2 and a chain packed as a dense globule has ν = 1/3 [3, 17]. The model does not assume a value. It measures ν on the Hi-C map of the cell type. Two points of a polymer meet less often when the chain between them fills a larger volume. This volume grows as the cube of the distance between the two points. The contact probability P(s) then falls as s to the power of minus 3ν [3, 17].'}</P>
           <div className="equations">
             <Equation name="contact_prob" />
           </div>
-          <figure className="figure">
-            <img src={methodLaw} alt="Target distance against genomic separation for pairs without a loop and for loops of increasing strength" />
-            <figcaption>
-              <b>Figure 1</b>Target distance against genomic separation, with nu = 0.34 as measured on GM12878 Hi-C.
-            </figcaption>
-          </figure>
+          <P>At the start of a job the Hi-C contacts are counted at each separation from 20 kb, or from two bins of the map if that is more, to 1 Mb. Nearly all loops have a span in this range. A straight line is fitted to the counts on logarithmic axes and ν is minus one third of its slope, figure 2a. With ν known the law gives the background distance of any pair, figure 2b.</P>
+          <Figure n="2" src={methodExponent} alt="Hi-C contacts of GM12878 against genomic separation with a line fitted between 50 kb and 1 Mb, and the background distance against separation that the fitted exponent gives">
+            The fit of the exponent. a, Hi-C contacts of GM12878 on chromosome 1 against genomic separation, in 25 kb bins. The contacts at a separation are divided by the number of bin pairs the chromosome has at that separation. The line is fitted to the black points of the shaded range and gives ν = 0.34. b, the background distance for this exponent. Two anchors 100 kb apart have a target of 4.9 bead units.
+          </Figure>
+
+          <h3>The default exponent</h3>
+          <P>{'The fit needs enough contacts. If the map has too few contacts in the range, or the counts do not fall with separation as those of a polymer do, the job prints the reason and uses ν = 0.285. This default is a measurement too. It is the mean of the exponents of three cell lines, GM12878, H1-hESC and HFFc6, each fitted on a Hi-C map of the 4DN data portal between 20 kb and 1 Mb, figure 3. The three values are 0.309, 0.269 and 0.277. They are close to each other and a little below 1/3, the value of a dense globule [3]. The exponent of a job can differ from these values by a few hundredths with the map, its bin size and the chromosome.'}</P>
+          <Figure n="3" src={methodDefault} alt="Contact probability against genomic separation for GM12878, H1-hESC and HFFc6 with a line fitted to each between 20 kb and 1 Mb, and the three exponents 0.309, 0.269 and 0.277 with their mean 0.285">
+            The origin of the default exponent. a, contact probability against genomic separation for three cell lines, from the Hi-C maps 4DNFIQ32RWCQ, 4DNFIHO3CXUQ and 4DNFIDKNBPC3 of the 4DN data portal, chromosomes 1, 2, 5, 11 and 17 in 5 kb bins. The curves are shifted apart. Each line is fitted in the shaded range, 20 kb to 1 Mb. b, the exponent of each cell line. The default, 0.285, is their mean. The dashed line is 1/3.
+          </Figure>
+
+          <h3>Distance of a loop</h3>
+          <P>The two anchors of a loop were captured together by ChIA-PET many times. The target of a loop is shorter than the background and a stronger loop has a shorter target. The PET count n of a loop is the number of sequenced read pairs that support it. The count alone is not a fair measure of strength. Long loops have lower counts than short loops and each factor has its own range of counts. The model divides the count of a loop by the typical count of loops of the same span and the same factor f, figure 4a. This ratio is the strength q of the loop. The typical count is a power law of the span, fitted through the median counts of the loops of the job.</P>
+          <div className="equations">
+            <Equation name="loop_target" />
+          </div>
+          <P>{'A loop with q = 1 is a typical loop of its span. Its target is halfway between the background and one bead. A weak loop stays near the background. A very strong loop approaches one bead, the distance at which its two anchors touch, figure 4b. The target shrinks as the PET count grows, as in 3D-GNOME [1] and MultiMM [5].'}</P>
+          <Figure n="4" src={methodLoops} alt="PET count against span for the CTCF loops of GM12878 on chromosome 1 with the typical count as a line, and target distance against genomic separation for pairs without a loop and for loops of increasing strength">
+            The strength of a loop and its target. a, PET count against span for the 12,474 CTCF loops of GM12878 on chromosome 1. The black line is the typical count, q = 1. A loop on the dashed line has four times the typical count, q = 4. b, target distance against genomic separation for a pair without a loop and for loops of three strengths, with ν = 0.34.
+          </Figure>
+
+          <h3>Distance from the Hi-C map</h3>
+          <P>Two anchors without a loop can still be close in space. The Hi-C map shows such a pair as a cell with more contacts than other cells at the same separation. Each cell has an observed count O. The expected count E(s) is the mean count of all cells at the same separation s. The rule of the exponent fit, contacts fall as the cube of the distance, turns the ratio of the two counts into the target t(s) of the pair.</P>
+          <div className="equations">
+            <Equation name="hic_target" />
+          </div>
+          <P>{'A cell with the expected count keeps the background distance. A cell with twice the expected count has 0.79 of it and a cell with eight times the expected count has half of it, figure 5 [3]. Section 3 lists the pairs that get a target from the background or from the Hi-C map.'}</P>
+          <Figure n="5" src={methodHic} alt="Target distance over background distance against observed over expected Hi-C contacts, and target distance against genomic separation for cells with 1, 2, 4 and 8 times the expected count">
+            The target of a Hi-C cell. a, the target as a share of the background distance, against observed over expected contacts. b, target distance against genomic separation for cells with the expected count and with 2, 4 and 8 times the expected count, with ν = 0.34.
+          </Figure>
         </Section>
 
         <Section id="anchors">
@@ -200,7 +248,7 @@ export function Method() {
             ))}
           </div>
           <p className="panel-caption">
-            <b>Figure 2</b>a, anchor positions after the anchor phase, TNFRSF8 locus, GM12878, CTCF and RNAPII loops. b, the full chain of the same structure, black dots are anchors. c, three structures of the ensemble superposed on the first.
+            <b>Figure 6</b>a, anchor positions after the anchor phase, TNFRSF8 locus, GM12878, CTCF and RNAPII loops. b, the full chain of the same structure, black dots are anchors. c, three structures of the ensemble superposed on the first.
           </p>
         </Section>
 
@@ -209,19 +257,19 @@ export function Method() {
         </Section>
 
         <Section id="engine">
-          <P>A run is a graph of tasks that grows while it runs, figure 3a. The region task adds one task per chromosome, a chromosome task adds its blocks and each chromosome gets one anchor fit and one chain task per block. Each stage has its own executor, serial, threaded or batched on the GPU. Results are applied in a fixed order and a run with the same settings and seed gives the same structures.</P>
-          <P>{'The chain tasks of many blocks run together in JAX [11] launches on the GPU, figure 3b. Each block is padded to the next size on a fixed ladder and blocks with the same energy terms are packed into as few launches as GPU memory allows. Each chain has its own random stream and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. Excluded volume uses a grid of cells rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU and the output does not depend on the number of GPUs.'}</P>
+          <P>A run is a graph of tasks that grows while it runs, figure 7a. The region task adds one task per chromosome, a chromosome task adds its blocks and each chromosome gets one anchor fit and one chain task per block. Each stage has its own executor, serial, threaded or batched on the GPU. Results are applied in a fixed order and a run with the same settings and seed gives the same structures.</P>
+          <P>{'The chain tasks of many blocks run together in JAX [11] launches on the GPU, figure 7b. Each block is padded to the next size on a fixed ladder and blocks with the same energy terms are packed into as few launches as GPU memory allows. Each chain has its own random stream and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. Excluded volume uses a grid of cells rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU and the output does not depend on the number of GPUs.'}</P>
           <P>The chain tasks can also run on the CPU cores, one chain per thread, while the anchor fit stays on the GPU. This is faster on a computer with many CPU cores and the server runs its jobs this way.</P>
           <figure className="figure">
             <img src={engineGraph} alt="Task graph of a run on two chromosomes: a region task, one task per chromosome, its blocks, one anchor fit per chromosome on the CPU with the energy on the GPU, the chains of seven blocks in one batched launch and the assembly" />
             <figcaption>
-              <b>Figure 3a</b>Task graph of a run on two chromosomes.
+              <b>Figure 7a</b>Task graph of a run on two chromosomes.
             </figcaption>
           </figure>
           <figure className="figure padded">
             <img src={engineBatching} alt="Nine blocks of 300 to 3600 beads, each padded to a ladder size of 512 to 4096, sorted largest first and packed into two launches padded to 4096 and 1024" />
             <figcaption>
-              <b>Figure 3b</b>Bucketing and batching of chain tasks. Each block is padded up to the next size on a fixed ladder, which limits how many shapes the GPU compiles. Blocks with the same energy terms are sorted largest first and packed into as few launches as GPU memory allows and a launch pads its members to the size of the first.
+              <b>Figure 7b</b>Bucketing and batching of chain tasks. Each block is padded up to the next size on a fixed ladder, which limits how many shapes the GPU compiles. Blocks with the same energy terms are sorted largest first and packed into as few launches as GPU memory allows and a launch pads its members to the size of the first.
             </figcaption>
           </figure>
         </Section>
