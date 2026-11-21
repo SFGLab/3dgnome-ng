@@ -45,6 +45,27 @@ describe('Job explorer', () => {
     expect(within(tabs).getAllByRole('tab').map((t) => t.textContent)).toEqual(['Structure', 'Genes312', 'Contact map', 'Loops182', 'Log'])
   })
 
+  it('shows the page of a missing address for a job the site does not have, shared or private', async () => {
+    for (const path of ['/jobs/sdfsdfd', '/p/werewwerwe']) {
+      const f = mockApi([[/summary$/, () => [404, { detail: 'Not Found' }]]])
+      const view = renderJob(path)
+      expect(await screen.findByRole('heading', { level: 1, name: 'No structure at this address' })).toBeInTheDocument()
+      expect(screen.getByText('404')).toBeInTheDocument()
+      // The site asks once. A job that is not there is not asked for again.
+      expect(f.mock.calls.filter(([u]) => String(u).endsWith('/summary'))).toHaveLength(1)
+      view.unmount()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('keeps the message of the server for a failure that is not a missing job', async () => {
+    mockApi([[/summary$/, () => [500, { error: 'The results directory cannot be read.' }]]])
+    renderJob()
+    // Such a failure is asked for again three times before the page gives up.
+    expect(await screen.findByText('The results directory cannot be read.', {}, { timeout: 12000 })).toBeInTheDocument()
+    expect(screen.queryByText('404')).toBeNull()
+  }, 15000)
+
   it('shows the facts and the files in the side panel', async () => {
     mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
     renderJob()

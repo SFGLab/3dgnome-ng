@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
+import { ApiError } from '../api'
 import { jobApi, type Loop } from '../job/api'
 import { JobSidePanel } from '../job/SidePanel'
 import { Compare } from '../job/Compare'
@@ -11,7 +12,11 @@ import { LogTab } from '../job/LogTab'
 import { LoopsTab } from '../job/LoopsTab'
 import { StructureTab } from '../job/StructureTab'
 import { JobTabs, type Tab } from '../job/Tabs'
+import { NotFound } from './NotFound'
 import './job.css'
+
+/** Whether the server answered that it has no such job. */
+const missing = (error: unknown) => error instanceof ApiError && error.status === 404
 
 /** The explorer of one job: its side panel, its tabs and its state while it is not done. */
 export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: number }) {
@@ -32,7 +37,11 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
     queryKey: ['summary', api.base],
     queryFn: api.summary,
     refetchInterval: (q) => (q.state.data && ['done', 'failed'].includes(q.state.data.state) ? false : pollMs),
+    // A job the site does not have is not asked for again.
+    retry: (failures, error) => !missing(error) && failures < 3,
   })
+  // The address of a job the site does not have, a deleted private job for one, gets the page of a missing address.
+  if (summary.isError && missing(summary.error)) return <NotFound />
   if (summary.isError)
     return (
       <div className="job-page">
