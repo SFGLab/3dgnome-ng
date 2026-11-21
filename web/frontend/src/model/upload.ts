@@ -30,6 +30,17 @@ export type OwnChoice = {
 
 export const NO_OWN: OwnChoice = { loops: [], anchors: null, contacts: null, enhancers: null }
 
+/** The data of the own data card, named as the data of a listed cell type is: each factor of the
+ * loops, the contacts and the enhancers. A set taken from a listed cell type has its name. */
+export function ownData(own: OwnChoice): string[] {
+  return [
+    ...own.loops.map((l) => l.factor),
+    ...(own.loopsFrom ? [`${own.loopsFrom} loops`] : []),
+    ...(own.contacts ? ['contacts'] : []),
+    ...(own.enhancers ? ['enhancers'] : own.enhancersFrom && own.enhancersFrom !== 'none' ? [`${own.enhancersFrom} enhancers`] : []),
+  ]
+}
+
 /** Sends one file to POST /api/uploads, which stores it and checks it against the region. */
 export async function uploadFile(kind: UploadKind, file: File, where: { cell: string; region: string; factor?: string }): Promise<UploadResult> {
   const form = new FormData()

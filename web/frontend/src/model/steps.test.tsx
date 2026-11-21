@@ -168,11 +168,16 @@ describe('Background', () => {
     expect(screen.getByText('HiCDiffusion is not set up on this server.')).toBeInTheDocument()
   })
 
-  it('warns for a cell type that is not lymphoblastoid', () => {
-    const { rerender } = render(<Background value="hic" region={REGION_1MB} available lymphoblastoid onChange={() => {}} />)
+  it('warns for a cell type that is not lymphoblastoid once HiCDiffusion is chosen', () => {
+    const { rerender } = render(<Background value="hicdiffusion" region={REGION_1MB} available lymphoblastoid onChange={() => {}} />)
     expect(screen.queryByText(/HiCDiffusion was trained on GM12878/)).toBeNull()
+    // Another background of the same cell type has no use for the note.
     rerender(<Background value="hic" region={REGION_1MB} available lymphoblastoid={false} onChange={() => {}} />)
-    expect(screen.getByText(/HiCDiffusion was trained on GM12878/)).toBeInTheDocument()
+    expect(screen.queryByText(/HiCDiffusion was trained on GM12878/)).toBeNull()
+    rerender(<Background value="none" region={REGION_1MB} available lymphoblastoid={false} onChange={() => {}} />)
+    expect(screen.queryByText(/HiCDiffusion was trained on GM12878/)).toBeNull()
+    rerender(<Background value="hicdiffusion" region={REGION_1MB} available lymphoblastoid={false} onChange={() => {}} />)
+    expect(screen.getByText('HiCDiffusion was trained on GM12878. Its predictions for H1ESC and HFFc6 are outside its training data.')).toBeInTheDocument()
   })
 
   it('keeps to the writing rules', () => {

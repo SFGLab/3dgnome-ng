@@ -23,9 +23,10 @@ const maybeGene = (text: string) => text.length >= 2 && !text.includes(':')
 /**
  * The region field. Typed letters list the matching genes under the field. The form gets
  * coordinates as they are typed and a gene name once it is chosen, Enter is pressed or the field is
- * left.
+ * left. With `quiet` a refused region marks the field and its reason is left to the caller, which
+ * shows it elsewhere.
  */
-export function RegionField({ cell, value, onChange }: { cell: string; value: string; onChange: (v: string) => void }) {
+export function RegionField({ cell, value, quiet = false, onChange }: { cell: string; value: string; quiet?: boolean; onChange: (v: string) => void }) {
   const [draft, setDraft] = useState(value)
   useEffect(() => setDraft(value), [value])
   const region = useRegion(cell, value)
@@ -110,7 +111,7 @@ export function RegionField({ cell, value, onChange }: { cell: string; value: st
           ))}
         </ul>
       )}
-      {failed && <p className="field-error">{region.error.message}</p>}
+      {failed && !quiet && <p className="field-error">{region.error.message}</p>}
     </div>
   )
 }

@@ -153,11 +153,12 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
             <CellTypes
               catalog={catalog.data}
               value={form.cell}
+              own={form.own}
               onChange={(cell) => set({ cell, own: { ...form.own, loopsFrom: undefined, enhancersFrom: undefined } })}
               onOwn={() => setDialog({ tab: 'loops', cell: true })}
             />
           )}
-          <RegionField cell={lookup} value={form.region} onChange={(region) => set({ region })} />
+          <RegionField cell={lookup} value={form.region} quiet={!!tooLong && !form.own.loops.length} onChange={(region) => set({ region })} />
           {shownRegion && !form.own.loops.length && <LoopPreview cell={lookup} region={shownRegion} factors={form.factors} maxSpan={maxSpan} onRegion={(region) => set({ region })} />}
           {stepError(1)}
         </Step>

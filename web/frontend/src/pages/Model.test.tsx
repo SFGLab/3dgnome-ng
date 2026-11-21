@@ -45,7 +45,10 @@ describe('Model a region page', () => {
     const card = await screen.findByRole('radio', { name: /GM12878/ })
     expect(within(card).getByText('lymphoblastoid')).toBeInTheDocument()
     expect(within(card).getByText('enhancers')).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: /Your own data/ })).toBeEnabled()
+    // The own data card has a chip for each kind of data given, and none before.
+    const own = screen.getByRole('radio', { name: /Your own data/ })
+    expect(own).toBeEnabled()
+    expect(own.querySelector('.chip')).toBeNull()
   })
 
   it('resolves a gene name to its region', async () => {
@@ -76,8 +79,10 @@ describe('Model a region page', () => {
     const { container } = renderModel()
     const field = await screen.findByLabelText('Region, chr:start-end or a gene name')
     fireEvent.change(field, { target: { value: 'chr11:37,615,000-71,922,000' } })
-    expect(await screen.findByText(/over the 20,000,000 bp limit/)).toBeInTheDocument()
     expect(await screen.findByRole('status')).toHaveTextContent('This region is 34.3 Mb long and a job takes 20 Mb at most. Drag an edge inwards to shorten it.')
+    // The line under the loops is the one message. The field is marked and does not repeat it.
+    expect(screen.queryByText(/over the 20,000,000 bp limit/)).toBeNull()
+    expect(container.querySelector('.region-input')).toHaveClass('error')
     expect(container.querySelector('.loop-preview')).toHaveClass('too-long')
     expect(screen.getByRole('slider', { name: 'End of the region' })).toHaveAttribute('aria-valuenow', '71922000')
     // The button of the line brings the region inside the limit and the field follows.
