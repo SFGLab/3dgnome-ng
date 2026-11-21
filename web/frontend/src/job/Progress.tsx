@@ -1,3 +1,4 @@
+import { duration } from '../lib/format'
 import { Check } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Summary } from '../api'
@@ -27,7 +28,6 @@ function weights(hicdiffusion: boolean): [string, number][] {
       ]
 }
 
-const since = (s: number) => (s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`)
 
 /**
  * A queued or running job: the stage with its count, the bar and the stages, then the end of the
@@ -106,7 +106,7 @@ export function Progress({ summary }: { summary: Summary }) {
           <li key={r.name} className={r.state} aria-current={r.state === 'now' ? 'step' : undefined}>
             {r.state === 'done' ? <Check className="stage-mark" size={13} aria-hidden /> : <span className={r.state === 'now' ? 'stage-mark stage-spinner' : 'stage-mark stage-dot'} aria-hidden />}
             <span>{WORDS[r.name] ?? r.name}</span>
-            {r.took !== null && <span className="status-time">{since(r.took)}</span>}
+            {r.took !== null && <span className="status-time">{duration(r.took)}</span>}
           </li>
         ))}
       </ol>

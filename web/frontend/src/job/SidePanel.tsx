@@ -1,10 +1,12 @@
+import { parseRegion, regionText } from '../lib/region'
 import { Braces, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CopyPlus, FileText, Folder, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { served } from '../base'
 import { recentJobs, rememberJob } from '../myjobs/recent'
 import { ROUTES } from '../routes'
 import type { JobApi, Summary } from '../api'
-import { bp, duration, FACTORS, size, shortRegion, variants } from './format'
+import { variants } from './format'
+import { bp, duration, FACTORS, size, shortRegion } from '../lib/format'
 
 type Props = {
   api: JobApi
@@ -39,10 +41,10 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
   const [editing, setEditing] = useState(false)
   const [unfolded, setUnfolded] = useState(false)
   // A waiting job has no region of its own yet. Its heading reads the coordinates of the request.
-  const m = summary.region?.match(/^(\w+):(\d+)-(\d+)$/) ?? summary.request.region.replace(/,/g, '').match(/^(\w+):(\d+)-(\d+)$/)
-  const region = m ? `${m[1]}:${bp(Number(m[2]))}-${bp(Number(m[3]))}` : summary.request.region
+  const at = parseRegion(summary.region) ?? parseRegion(summary.request.region.replace(/,/g, ''))
+  const region = at ? regionText(at) : summary.request.region
   // The heading has the region in megabases, which fits the panel. The line under it has the exact positions.
-  const short = m ? shortRegion(m[1], Number(m[2]), Number(m[3])) : summary.request.region
+  const short = at ? shortRegion(at.chrom, at.start, at.end) : summary.request.region
   const n = summary.structures
   // The file of the structure in view is kept in sight in the list of all of them.
   const shown = useRef<HTMLLIElement>(null)

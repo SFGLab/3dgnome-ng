@@ -5,11 +5,12 @@ import { recentJobs } from '../myjobs/recent'
 import { compareExpression, compareJobs, jobApi, type JobApi, type Summary } from '../api'
 import { CompareResults, sideNames } from './CompareResults'
 import { readPalette } from './colors'
-import { FACTORS } from './format'
+import { FACTORS } from '../lib/format'
 import { makeCameraLink, type CameraLink } from './cameraLink'
 import { Scene, type SceneHandle } from './Scene'
 import { saveDataUrl } from './savePng'
-import { chainColors, focusRanges, parseRegion } from './structure'
+import { chainColors, focusRanges } from './structure'
+import { parseRegion } from '../lib/region'
 
 const factorColor = (f: string) => (f === 'CTCF' ? 'var(--ctcf)' : 'var(--rnapii)')
 

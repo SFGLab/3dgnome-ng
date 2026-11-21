@@ -1,3 +1,4 @@
+import { saveBlob } from '../lib/download'
 import * as Slider from '@radix-ui/react-slider'
 import { ChevronDown, ChevronRight, Download, Info, RotateCcw, Search, SlidersHorizontal, Upload } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -114,12 +115,7 @@ export function SettingsTree({ schema, values, onChange }: { schema: SettingGrou
     onChange(changedSettings(schema, { ...values, ...r.overrides }))
   }
   const download = () => {
-    const url = URL.createObjectURL(new Blob([toIni(changes)], { type: 'text/plain' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'config_changes.ini'
-    a.click()
-    URL.revokeObjectURL(url)
+    saveBlob(new Blob([toIni(changes)], { type: 'text/plain' }), 'config_changes.ini')
   }
 
   return (

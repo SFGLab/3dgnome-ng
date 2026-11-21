@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { guessFactor, megabytes, NO_OWN, ownData, ownField } from './upload'
+import { guessFactor, NO_OWN, ownData, ownField } from './upload'
+import { megabytes } from '../lib/format'
 import { type UploadResult } from '../api'
 
 describe('upload helpers', () => {

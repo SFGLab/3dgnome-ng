@@ -3,7 +3,8 @@ import { CircleAlert, CircleCheck, FileText, HardDrive, Link2, LoaderCircle, Squ
 import { useEffect, useRef, useState } from 'react'
 import { readHicWindow } from './hicLocal'
 import { ApiError, type Region, type UploadKind, type UploadResult, uploadFile, uploadLink, uploadPreview } from '../api'
-import { guessFactor, megabytes, NO_OWN, type OwnChoice, type OwnExpression } from './upload'
+import { guessFactor, NO_OWN, type OwnChoice, type OwnExpression } from './upload'
+import { megabytes } from '../lib/format'
 import '../styles/dialog.css'
 import './owndata.css'
 

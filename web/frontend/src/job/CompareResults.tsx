@@ -5,7 +5,7 @@ import { CsvButton } from '../components/CsvButton'
 import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
 import { compareGene, type Compare, type ExpressionCompare, type Summary } from '../api'
-import { FACTORS, kb } from './format'
+import { FACTORS, kb } from '../lib/format'
 import { savePng } from './savePng'
 
 const BACKGROUNDS: Record<string, string> = { hic: 'Hi-C', hicdiffusion: 'HiCDiffusion', none: 'no contact map' }

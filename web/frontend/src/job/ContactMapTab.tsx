@@ -2,12 +2,12 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Camera, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Contacts, JobApi, Summary } from '../api'
-import { bp } from './format'
+import { bp } from '../lib/format'
 import { LoopView } from './LoopView'
 import { colour, diverging, emptyRows, halfRange, percentile, transform, type Show } from './heatmap'
 import { mapPicture } from './mapPicture'
 import { saveDataUrl } from './savePng'
-import { parseRegion } from './structure'
+import { type Locus, parseRegion, readRegion, regionText } from '../lib/region'
 import { wheelFactor } from './wheel'
 
 const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]
@@ -39,15 +39,8 @@ const SHOWS: [Show, string][] = [
   ['oe', 'O/E'],
   ['pearson', 'Pearson'],
 ]
-
-type Locus = { chrom: string; start: number; end: number }
 /** The separation the rank correlation reached, as the end of a sentence. Nothing when unknown. */
 const reach = (bp?: number) => (bp ? `, up to ${bp >= 1e6 ? `${bp / 1e6} Mb` : `${bp / 1000} kb`}` : '')
-const fmt = (l: Locus) => `${l.chrom}:${bp(l.start)}-${bp(l.end)}`
-const parse = (t: string): Locus | null => {
-  const m = t.replace(/,/g, '').match(/^(\w+):(\d+)-(\d+)$/)
-  return m && Number(m[3]) > Number(m[2]) ? { chrom: m[1], start: Number(m[2]), end: Number(m[3]) } : null
-}
 
 type Half = { m: number[][]; range: [number, number]; loops: boolean }
 
@@ -83,7 +76,7 @@ function draw(canvas: HTMLCanvasElement, up: Half, low: Half, log: boolean, show
 export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary }) {
   const job = parseRegion(summary.region)!
   const [locus, setLocus] = useState<Locus>(job)
-  const [text, setText] = useState(fmt(job))
+  const [text, setText] = useState(regionText(job))
   // The map opens at 25 kb, or at the finest resolution the region fits when it is too long for that.
   const [res, setRes] = useState(() => fitting(job, 25_000))
   const [show, setShow] = useState<Show>('observed')
@@ -161,7 +154,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     const r = fitting(next, res)
     if (r !== res) setRes(r)
     setLocus(next)
-    setText(fmt(next))
+    setText(regionText(next))
     return next
   }
   const zoom = (f: number, centre = (locus.start + locus.end) / 2, frac?: number) => {
@@ -172,10 +165,10 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     moveTo({ chrom: locus.chrom, start, end: start + width })
   }
   const go = () => {
-    const want = parse(text)
+    const want = readRegion(text)
     if (!want) return
     const next = moveTo(want)
-    setNote(next.start !== want.start || next.end !== want.end || next.chrom !== want.chrom ? `The job covers ${fmt(job)}. The map shows only that region.` : '')
+    setNote(next.start !== want.start || next.end !== want.end || next.chrom !== want.chrom ? `The job covers ${regionText(job)}. The map shows only that region.` : '')
   }
   // A native listener, since React's wheel handler is passive and cannot stop the page scrolling.
   const zoomRef = useRef(zoom)

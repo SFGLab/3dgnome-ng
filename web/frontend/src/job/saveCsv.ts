@@ -1,3 +1,5 @@
+import { saveBlob } from '../lib/download'
+
 /** Saving the rows of a table as a CSV file. */
 
 export type Cell = string | number | null | undefined
@@ -15,9 +17,5 @@ export function csvText(head: string[], rows: Cell[][]): string {
 
 /** Saves a table as `<file>.csv`. */
 export function saveCsv(file: string, head: string[], rows: Cell[][]): void {
-  const link = document.createElement('a')
-  link.href = URL.createObjectURL(new Blob([csvText(head, rows)], { type: 'text/csv' }))
-  link.download = `${file}.csv`
-  link.click()
-  URL.revokeObjectURL(link.href)
+  saveBlob(new Blob([csvText(head, rows)], { type: 'text/csv' }), `${file}.csv`)
 }

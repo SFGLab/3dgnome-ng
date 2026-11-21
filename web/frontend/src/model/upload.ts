@@ -52,7 +52,3 @@ export function guessFactor(name: string, index: number): string {
   if (n.includes('CTCF')) return 'CTCF'
   return index === 0 ? 'CTCF' : `factor ${index + 1}`
 }
-
-/** A file size in MB, in kB below a tenth of a MB and in GB from one GB. */
-export const megabytes = (bytes: number) =>
-  bytes < 104_858 ? `${Math.max(1, Math.round(bytes / 1024))} kB` : bytes < 1_073_741_824 ? `${(bytes / 1_048_576).toFixed(1)} MB` : `${(bytes / 1_073_741_824).toFixed(1)} GB`

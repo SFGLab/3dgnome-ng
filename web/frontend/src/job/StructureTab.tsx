@@ -4,13 +4,14 @@ import { useState } from 'react'
 import type { Annotations, JobApi, Loop, Structure, Summary } from '../api'
 import type { Mode } from './colors'
 import { FindGene } from './FindGene'
-import { bp, kb } from './format'
+import { bp, kb } from '../lib/format'
 import { GeneCard } from './GeneCard'
 import { LoopView } from './LoopView'
 import { sameLoop } from './loops'
 import { DistanceCard } from './Measure'
 import { StructureView } from './StructureView'
-import { beadAt, parseRegion, solidSpan } from './structure'
+import { beadAt, solidSpan } from './structure'
+import { parseRegion } from '../lib/region'
 
 /** What a measured position is: a gene's TSS, an enhancer or a plain coordinate. */
 function describe(pos: number, chrom: string, ann: Annotations): string {

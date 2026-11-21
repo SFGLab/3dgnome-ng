@@ -1,3 +1,5 @@
+import { regionText } from '../lib/region'
+
 /** The picture of a contact map that the page saves: the map with its region, its two halves and its axes. */
 
 export type MapInfo = {
@@ -45,7 +47,7 @@ export function mapPicture(map: HTMLCanvasElement, info: MapInfo): HTMLCanvasEle
   ctx.fillStyle = '#141413'
   ctx.font = '600 22px sans-serif'
   ctx.textBaseline = 'alphabetic'
-  ctx.fillText(`${info.chrom}:${first.toLocaleString('en-US')}-${last.toLocaleString('en-US')}, ${info.res / 1000} kb bins`, LEFT, 30)
+  ctx.fillText(`${regionText({ chrom: info.chrom, start: first, end: last })}, ${info.res / 1000} kb bins`, LEFT, 30)
   ctx.font = '18px sans-serif'
   ctx.fillStyle = '#5C5B57'
   ctx.fillText(`Above the diagonal ${info.upper}. Below it ${info.lower}.`, LEFT, 58)

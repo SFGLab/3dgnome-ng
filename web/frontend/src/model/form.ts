@@ -1,4 +1,5 @@
 import type { Region, Summary } from '../api'
+import { regionText } from '../lib/region'
 import { NO_OWN, type OwnChoice } from './upload'
 import { type UploadResult } from '../api'
 
@@ -48,7 +49,7 @@ export function longRegion(text: string, maxSpan: number): Region | undefined {
   if (!m) return undefined
   const [start, end] = [Number(m[2]), Number(m[3])]
   if (end - start <= maxSpan) return undefined
-  return { chrom: m[1], start, end, label: `${m[1]}:${start.toLocaleString('en-US')}-${end.toLocaleString('en-US')}` }
+  return { chrom: m[1], start, end, label: regionText({ chrom: m[1], start, end }) }
 }
 
 /**

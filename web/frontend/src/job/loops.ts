@@ -1,6 +1,6 @@
 /** The loops of a job as the loop views show them: the zoom, the ticks, the text of a loop and whether two are one. */
 import type { Loop } from '../api'
-import { bp, kb } from './format'
+import { bp, kb } from '../lib/format'
 
 /** The shortest part a zoom leaves, in bp. */
 const MIN_PART = 10_000

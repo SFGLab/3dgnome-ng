@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react'
 import type { GeneRow } from '../api'
-import { bp, kb } from './format'
+import { bp, kb } from '../lib/format'
 
 /** The Selected gene card: the gene's nearest enhancer by mean 3D distance over the ensemble. */
 export function GeneCard({ row, chrom, onOpenGenes }: { row: GeneRow; chrom: string; onOpenGenes: (gene: string) => void }) {

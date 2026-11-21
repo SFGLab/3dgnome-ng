@@ -1,3 +1,5 @@
+import { saveBlob, saveUrl } from '../lib/download'
+
 /** Saving a figure of the page as a PNG file. */
 
 // What a figure's style sheet sets and a picture of it must carry in its own attributes.
@@ -51,10 +53,7 @@ export function standalone(svg: SVGSVGElement, title: string): SVGSVGElement {
 
 /** Saves a picture the page holds as a data address, the view of a structure or a map, as `<file>.png`. */
 export function saveDataUrl(url: string, file: string): void {
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `${file}.png`
-  link.click()
+  saveUrl(url, `${file}.png`)
 }
 
 /** Saves an SVG figure of the page as a PNG at three times its size, with its title above it. */
@@ -74,11 +73,7 @@ export async function savePng(svg: SVGSVGElement, title: string, file: string): 
     canvas.getContext('2d')?.drawImage(image, 0, 0)
     const blob = await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/png'))
     if (!blob) return
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `${file}.png`
-    link.click()
-    URL.revokeObjectURL(link.href)
+    saveBlob(blob, `${file}.png`)
   } finally {
     URL.revokeObjectURL(url)
   }

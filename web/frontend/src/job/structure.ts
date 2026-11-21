@@ -3,11 +3,6 @@ import type { Loop, Annotations, Structure } from '../api'
 import { stretch } from './chain'
 import { colorAt, readPalette, type Mode } from './colors'
 
-export function parseRegion(region: string | null): { chrom: string; start: number; end: number } | null {
-  const m = region?.match(/^(\w+):(\d+)-(\d+)$/)
-  return m ? { chrom: m[1], start: Number(m[2]), end: Number(m[3]) } : null
-}
-
 /** The stretch of the genome the model keeps solid: the whole chain between the two anchors of
  * a selected loop, and without one the part of the region chosen on the loop view. */
 export function solidSpan(loop: Loop | null, part: [number, number] | null): [number, number] | null {
