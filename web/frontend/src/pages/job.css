@@ -1480,6 +1480,11 @@
   vertical-align: bottom;
 }
 
+/* A value stays on one line. The name of a gene with its enhancer may wrap. */
+.compare-scroll .compare-table td:not(:first-child) {
+  white-space: nowrap;
+}
+
 .compare-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
