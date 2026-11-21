@@ -80,6 +80,8 @@ describe('ContactMapTab', () => {
     mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()
     const card = await screen.findByRole('region', { name: 'Agreement of the two halves' })
+    // A map that is read can be saved as a PNG.
+    expect(screen.getByRole('button', { name: 'Save the map as a PNG' })).toBeEnabled()
     expect(within(card).getByText('0.21')).toBeInTheDocument()
     expect(within(card).getByText('Spearman correlation')).toBeInTheDocument()
     expect(within(card).getByText('Pairs of bins the same distance apart are compared, up to 2 Mb. The fall of contacts with distance adds nothing to this number.')).toBeInTheDocument()

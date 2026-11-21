@@ -5,6 +5,7 @@ import { stretch } from './chain'
 import { colorAt, readPalette, type Mode } from './colors'
 import { bp as fmt } from './format'
 import { Scene, type Marker, type SceneHandle } from './Scene'
+import { saveDataUrl } from './savePng'
 
 export type HoverInfo = { lines: string[]; x: number; y: number; index: number }
 
@@ -174,11 +175,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
           aria-label="Save as PNG"
           onClick={() => {
             const url = scene.current?.png()
-            if (!url) return
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `structure_${index}.png`
-            a.click()
+            if (url) saveDataUrl(url, `structure_${index}`)
           }}
         >
           <Camera size={15} aria-hidden />

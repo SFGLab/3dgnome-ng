@@ -1,10 +1,11 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
+import { Camera, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { Contacts, JobApi, Summary } from './api'
 import { bp } from './format'
 import { LoopView } from './LoopView'
 import { colour, diverging, emptyRows, halfRange, percentile, transform, type Show } from './heatmap'
+import { saveDataUrl } from './savePng'
 import { parseRegion } from './StructureTab'
 import { wheelFactor } from './wheel'
 
@@ -245,6 +246,28 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
               }}
             >
               <RefreshCw size={15} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="icon-tool"
+              aria-label="Save the map as a PNG"
+              disabled={!maps.data}
+              onClick={() => {
+                // A bin of the map is a square of pixels, 1200 pixels a side or more.
+                const map = canvas.current
+                if (!map || !maps.data) return
+                const scale = Math.max(1, Math.ceil(1200 / map.width))
+                const out = document.createElement('canvas')
+                out.width = map.width * scale
+                out.height = map.height * scale
+                const ctx = out.getContext('2d')
+                if (!ctx) return
+                ctx.imageSmoothingEnabled = false
+                ctx.drawImage(map, 0, 0, out.width, out.height)
+                saveDataUrl(out.toDataURL('image/png'), `contact_map_${settled.chrom}_${settled.start}_${settled.end}`)
+              }}
+            >
+              <Camera size={15} aria-hidden />
             </button>
           </div>
         </div>

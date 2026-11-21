@@ -113,6 +113,9 @@ describe('Compare', () => {
     expect(picture.querySelector('text')!.textContent).toBe('Enhancer to promoter distance of TNFRSF8')
     expect(picture.querySelector('rect')!.getAttribute('fill')).toBeTruthy()
     expect(picture.getAttribute('width')).toBe('1020')
+    // The picture of each of the two structures can be saved.
+    expect(screen.getByRole('button', { name: 'Save the structure of this job as a PNG' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save the structure of TNFRSF8 CTCF as a PNG' })).toBeInTheDocument()
     // The table is saved whole as a CSV file.
     expect(screen.getByRole('button', { name: 'Save the table as distance_changes.csv' })).toBeInTheDocument()
   })
@@ -194,6 +197,9 @@ describe('Compare', () => {
     const row = within(table).getByRole('row', { name: /TNFRSF8/ })
     expect(within(row).getAllByRole('cell').map((c) => c.textContent)).toEqual(['TNFRSF8', '80.0', '10.0', '8.0 times lower', '2.0e-7', '2.4 times farther'])
     expect(within(within(table).getByRole('row', { name: /MIIP/ })).getAllByRole('cell')[4]).toHaveTextContent('0.200')
+    // A change that is not significant is grey.
+    expect(within(table).getByRole('row', { name: /MIIP/ })).toHaveClass('insignificant')
+    expect(row).not.toHaveClass('insignificant')
     // A fold change in the hundreds comes from next to no reads on one side and is capped.
     expect(within(within(table).getByRole('row', { name: /DRAXIN/ })).getAllByRole('cell')[3]).toHaveTextContent('over 100 times higher')
     expect(screen.getByRole('button', { name: 'Save the table as expression_changes.csv' })).toBeInTheDocument()
@@ -207,10 +213,11 @@ describe('Compare', () => {
     expect([...scatter.querySelectorAll('.axis-title')].map((x) => x.textContent)).toEqual(['3D distance, log2 of the other job over this job', 'Expression, log2 of the other job over this job'])
     expect(scatter.querySelectorAll('.tick').length).toBeGreaterThan(5)
     expect(within(scatter).getByText('adjusted p under 0.05')).toBeInTheDocument()
-    // The open figure can be saved as a PNG. Opening another figure closes this one.
+    // An open figure can be saved as a PNG. Several figures can be open at once.
     expect(within(block).getAllByRole('button', { name: /^Save the figure .* as a PNG$/ })).toHaveLength(1)
     fireEvent.click(within(block).getByRole('button', { name: heads[2] }))
-    expect(within(block).queryByRole('img', { name: /^Change of expression against/ })).toBeNull()
+    expect(within(block).getByRole('img', { name: /^Change of expression against/ })).toBeInTheDocument()
+    expect(within(block).getAllByRole('button', { name: /^Save the figure .* as a PNG$/ })).toHaveLength(2)
     const volcano = within(block).getByRole('img', { name: 'Volcano plot of 3 genes of the region among the genes of the test' })
     expect([...volcano.querySelectorAll('.axis-title')].map((x) => x.textContent)).toEqual(['Expression, log2 of the other job over this job', '-log10 of the adjusted p'])
     // The genes of the test are the background and the genes of the region are drawn over them.
@@ -222,9 +229,11 @@ describe('Compare', () => {
     // The last tick of a capped axis stands for every value above it.
     expect(within(volcano).getByText('50+')).toBeInTheDocument()
     expect(within(block).getByRole('button', { name: 'Save the figure Volcano plot of the change of expression as a PNG' })).toBeInTheDocument()
-    // A second click on the head of the open figure closes it.
+    // A second click on the head of an open figure closes that figure alone.
     fireEvent.click(within(block).getByRole('button', { name: heads[2] }))
-    expect(within(block).queryAllByRole('img')).toHaveLength(0)
+    expect(within(block).getAllByRole('img').map((x) => x.getAttribute('aria-label'))).toEqual(['Change of expression against change of distance for 3 genes'])
+    // The main values are in the column of the figures, under them.
+    expect(block.querySelector('.compare-side .compare-figures + .compare-cards')).not.toBeNull()
     expect(String(f.mock.calls.find(([u]) => String(u).includes('/api/compare/expression'))![0])).toContain(`b=%2Fjobs%2F${OTHER}`)
     expect(checkCopy(container)).toEqual([])
   })

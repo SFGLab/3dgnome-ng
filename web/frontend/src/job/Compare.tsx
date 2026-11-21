@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown } from 'lucide-react'
+import { Camera, ChevronDown } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { recentJobs } from '../model/recent'
 import { compareExpression, compareJobs, jobApi, type JobApi, type Summary } from './api'
@@ -7,7 +7,8 @@ import { CompareResults, sideNames } from './CompareResults'
 import { readPalette } from './colors'
 import { FACTORS } from './format'
 import { makeCameraLink, type CameraLink } from './cameraLink'
-import { Scene } from './Scene'
+import { Scene, type SceneHandle } from './Scene'
+import { saveDataUrl } from './savePng'
 import { chainColors, focusRanges } from './StructureView'
 import { parseRegion } from './StructureTab'
 
@@ -100,6 +101,7 @@ function Panel({
   const annotations = useQuery({ queryKey: ['annotations', api.base], queryFn: api.annotations })
   const genes = useQuery({ queryKey: ['genes', api.base], queryFn: api.genes })
   const palette = useMemo(readPalette, [])
+  const scene = useRef<SceneHandle>(null)
   const s = summary.data
   const region = parseRegion(s?.region ?? null)
   const colors = useMemo(
@@ -130,7 +132,20 @@ function Panel({
       />
       <div className="view-box compare-box">
         {structure.data && (
-          <Scene points={structure.data.chain.map(([x, y, z]) => [x, y, z] as [number, number, number])} colors={colors} markers={markers} focus={focus} link={link} linkId={linkId} />
+          <Scene ref={scene} points={structure.data.chain.map(([x, y, z]) => [x, y, z] as [number, number, number])} colors={colors} markers={markers} focus={focus} link={link} linkId={linkId} />
+        )}
+        {structure.data && (
+          <button
+            type="button"
+            className="icon-tool panel-save"
+            aria-label={`Save the structure of ${label} as a PNG`}
+            onClick={() => {
+              const url = scene.current?.png()
+              if (url) saveDataUrl(url, `structure_${linkId === 'a' ? 'this_job' : 'other_job'}_${index}`)
+            }}
+          >
+            <Camera size={15} aria-hidden />
+          </button>
         )}
         {row && (
           <span className="ab-label">

@@ -49,6 +49,14 @@ export function standalone(svg: SVGSVGElement, title: string): SVGSVGElement {
   return whole
 }
 
+/** Saves a picture the page holds as a data address, the view of a structure or a map, as `<file>.png`. */
+export function saveDataUrl(url: string, file: string): void {
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${file}.png`
+  link.click()
+}
+
 /** Saves an SVG figure of the page as a PNG at three times its size, with its title above it. */
 export async function savePng(svg: SVGSVGElement, title: string, file: string): Promise<void> {
   const whole = standalone(svg, title)

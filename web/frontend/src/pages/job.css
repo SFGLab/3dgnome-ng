@@ -1371,6 +1371,14 @@
   font-size: 11px;
 }
 
+/* The button that saves the picture of one side, in the corner of its view. */
+.panel-save {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+}
+
 .ab-label strong {
   margin-left: 4px;
   color: #FFFFFF;
@@ -1485,11 +1493,27 @@
   white-space: nowrap;
 }
 
+/* The column on the right: the figures, and the main values under them. */
+.compare-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
 .compare-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  margin-bottom: 14px;
+}
+
+.compare-scroll + .pager {
+  margin-top: 14px;
+}
+
+/* A change that is not significant is grey. */
+.compare-table tr.insignificant td {
+  color: var(--faint);
 }
 
 .compare-cards .big {
@@ -1544,7 +1568,7 @@
     grid-template-columns: 1fr;
   }
 
-  .compare-figures {
+  .compare-side {
     max-width: 420px;
   }
 }

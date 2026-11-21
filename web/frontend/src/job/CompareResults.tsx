@@ -221,6 +221,7 @@ function Paged<T extends { gene: string }>({
   label,
   head,
   cells,
+  faint,
   onGene,
 }: {
   rows: T[]
@@ -229,6 +230,8 @@ function Paged<T extends { gene: string }>({
   label: string
   head: string[]
   cells: (r: T) => string[]
+  /** A row whose change is not significant, drawn in grey. */
+  faint: (r: T) => boolean
   onGene?: (gene: string | null) => void
 }) {
   const page = usePage(rows, label)
@@ -252,7 +255,12 @@ function Paged<T extends { gene: string }>({
           </thead>
           <tbody>
             {page.rows.map((r) => (
-              <tr key={r.gene} className={r.gene === gene ? 'selected' : undefined} aria-selected={r.gene === gene} onClick={() => onGene?.(r.gene === gene ? null : r.gene)}>
+              <tr
+                key={r.gene}
+                className={[r.gene === gene ? 'selected' : '', faint(r) ? 'insignificant' : ''].join(' ').trim() || undefined}
+                aria-selected={r.gene === gene}
+                onClick={() => onGene?.(r.gene === gene ? null : r.gene)}
+              >
                 {cells(r).map((c, i) => (
                   <td key={i}>{c}</td>
                 ))}
@@ -267,9 +275,9 @@ function Paged<T extends { gene: string }>({
 }
 
 /**
- * What changed between two jobs, under their structures: the figures in a column, each saved as
- * a PNG by its button, and beside them the main values and the tables of every gene, one tab for
- * the 3D distance and one for the expression. The other job is compared against this one.
+ * What changed between two jobs, under their structures: the tables of every gene, one tab for
+ * the 3D distance and one for the expression, and beside them the figures, each saved as a PNG by
+ * its button, with the main values under them. The other job is compared against this one.
  */
 export function CompareResults({
   urls,
@@ -291,8 +299,8 @@ export function CompareResults({
   onGene?: (gene: string | null) => void
 }) {
   const [tab, setTab] = useState<Tab>('distance')
-  // One figure is open at a time. Undefined is the figure the view starts with.
-  const [opened, setOpened] = useState<Fig | null | undefined>(undefined)
+  // The open figures. Undefined is the figure the view starts with.
+  const [opened, setOpened] = useState<Fig[] | undefined>(undefined)
   const [A, B] = names
   const against = `${B} against ${A}`
   const pick = (name: string) => onGene?.(name === gene ? null : name)
@@ -316,57 +324,11 @@ export function CompareResults({
   const top = volcano ? Math.max(2, Math.ceil(Math.max(...volcano.points.map(([, y]) => y), ...tested.map((t) => t.y)))) : 2
   const line = -Math.log10(0.05)
   const shown: Tab = tab === 'expression' && expressed ? 'expression' : 'distance'
-  const figure = opened === undefined ? (expressed ? 'scatter' : 'box') : opened
-  const toggle = (f: Fig) => setOpened(figure === f ? null : f)
+  const open: Fig[] = opened ?? [expressed ? 'scatter' : 'box']
+  const toggle = (f: Fig) => setOpened(open.includes(f) ? open.filter((x) => x !== f) : [...open, f])
   return (
     <section className="compare-results" aria-label="Changes between the two jobs">
       <div className="compare-tables">
-        <div className="compare-cards">
-          {row && (
-            <section className="side-card" aria-label={`Change of ${row.gene}`}>
-              <p className="card-label">{`${row.gene}, ${against}`}</p>
-              <p className="big">
-                <span className="big-value">{(row.ratio >= 1 ? row.ratio : 1 / row.ratio).toFixed(1)}</span>{' '}
-                <span className="unit">{`times ${row.ratio >= 1 ? 'farther' : 'closer'} in ${B}`}</span>
-              </p>
-              <p className="card-text">{`${row.a.mean.toFixed(1)} ± ${row.a.sd.toFixed(1)} bead units in ${A}, ${row.b.mean.toFixed(1)} ± ${row.b.sd.toFixed(1)} in ${B}. Mann-Whitney p ${pText(row.p)}.`}</p>
-              {eRow && (
-                <>
-                  <p className="big">
-                    <span className="big-value">{2 ** Math.abs(eRow.log2fc) >= 100 ? 'over 100' : (2 ** Math.abs(eRow.log2fc)).toFixed(1)}</span>{' '}
-                    <span className="unit">{`times ${eRow.log2fc >= 0 ? 'higher' : 'lower'} expression in ${B}`}</span>
-                  </p>
-                  <p className="card-text">{`Level ${level(eRow.a)} in ${A}, ${level(eRow.b)} in ${B}. Adjusted p ${pText(eRow.padj)}.`}</p>
-                </>
-              )}
-            </section>
-          )}
-          {expressed && (
-            <section className="side-card" aria-label="Expression against 3D distance">
-              <p className="card-label">Expression against 3D distance</p>
-              {expressed.rho !== null && (
-                <p className="big">
-                  <span className="big-value">{expressed.rho.toFixed(2)}</span> <span className="unit">rank correlation</span>
-                </p>
-              )}
-              <p className="card-text">
-                {expressed.rho !== null
-                  ? `Of the change of expression with the change of distance over ${expressed.rows.length} genes, ${against}.`
-                  : `${expressed.rows.length} genes have expression in both jobs. Five or more give a rank correlation.`}{' '}
-                {expressed.mode === 'deseq2' ? 'Tested with DESeq2.' : expressed.reason}
-              </p>
-            </section>
-          )}
-          {!expressed && (expressionState || expression) && (
-            <p className="compare-note" aria-busy={expressionState === 'wait'}>
-              {expressionState === 'wait'
-                ? 'Comparing the expression of the two jobs.'
-                : expressionState === 'one'
-                  ? 'One of the two jobs has no expression data. Both need it for a comparison of expression.'
-                  : expressionState || (expression?.mode === 'none' ? expression.reason : 'The two jobs share no gene with expression in both.')}
-            </p>
-          )}
-        </div>
         <div className="compare-tabs-row">
           <div className="compare-tabs" role="tablist" aria-label="Tables of the comparison">
             <button type="button" role="tab" aria-selected={shown === 'distance'} className={`chip-button${shown === 'distance' ? ' on' : ''}`} onClick={() => setTab('distance')}>
@@ -422,6 +384,7 @@ export function CompareResults({
               r.ratio >= 1 ? `${r.ratio.toFixed(1)} times farther` : `${(1 / r.ratio).toFixed(1)} times closer`,
               pText(r.p),
             ]}
+            faint={(r) => r.p !== null && r.p >= 0.05}
             onGene={onGene}
           />
         ) : (
@@ -432,77 +395,126 @@ export function CompareResults({
             label="Changes in expression"
             head={['Gene', A, B, `Expression, ${against}`, 'Adjusted p', `3D distance, ${against}`]}
             cells={(r) => [r.gene, level(r.a), level(r.b), fold(r.log2fc), pText(r.padj), times(r.distance, 'farther', 'closer')]}
+            faint={(r) => r.padj !== null && r.padj >= 0.05}
             onGene={onGene}
           />
         )}
       </div>
-      <div className="compare-figures">
-        <Figure
-          title={row ? `Enhancer to promoter distance of ${row.gene}` : 'Enhancer to promoter distance of a gene'}
-          file={`distance_${row?.gene ?? 'gene'}`}
-          open={figure === 'box'}
-          onToggle={() => toggle('box')}
-        >
-          {row && one.data ? (
-            <BoxPlot gene={row.gene} names={names} a={one.data.a} b={one.data.b} />
-          ) : (
-            <p className="figure-empty">
-              {row ? 'Reading the distances.' : 'Select a gene in a table or a plot for the box plot of its distance in the structures of the two jobs.'}
-            </p>
-          )}
-        </Figure>
-        {expressed && (
-          <Figure title="Change of expression against change of distance" file="expression_against_distance" open={figure === 'scatter'} onToggle={() => toggle('scatter')}>
-            <Frame
-              label={`Change of expression against change of distance for ${expressed.rows.length} genes`}
-              xr={[-reach(expressed.rows.map((r) => r.distance)), reach(expressed.rows.map((r) => r.distance))]}
-              yr={[-reach(expressed.rows.map((r) => r.log2fc)), reach(expressed.rows.map((r) => r.log2fc))]}
-              xTitle={`3D distance, log2 of ${B} over ${A}`}
-              yTitle={`Expression, log2 of ${B} over ${A}`}
-              keys={keys}
-            >
-              {(fx, fy) =>
-                expressed.rows.map((r) => (
-                  <circle key={r.gene} className={kind(r)} cx={fx(r.distance)} cy={fy(r.log2fc)} r={r.gene === gene ? 5 : 3} onClick={() => pick(r.gene)}>
-                    <title>{`${r.gene}, distance ${times(r.distance, 'farther', 'closer')}, expression ${fold(r.log2fc)} in ${B}`}</title>
-                  </circle>
-                ))
-              }
-            </Frame>
+      <div className="compare-side">
+        <div className="compare-figures">
+          <Figure
+            title={row ? `Enhancer to promoter distance of ${row.gene}` : 'Enhancer to promoter distance of a gene'}
+            file={`distance_${row?.gene ?? 'gene'}`}
+            open={open.includes('box')}
+            onToggle={() => toggle('box')}
+          >
+            {row && one.data ? (
+              <BoxPlot gene={row.gene} names={names} a={one.data.a} b={one.data.b} />
+            ) : (
+              <p className="figure-empty">
+                {row ? 'Reading the distances.' : 'Select a gene in a table or a plot for the box plot of its distance in the structures of the two jobs.'}
+              </p>
+            )}
           </Figure>
-        )}
-        {expressed && volcano && (
-          <Figure title="Volcano plot of the change of expression" file="expression_volcano" open={figure === 'volcano'} onToggle={() => toggle('volcano')}>
-            <Frame
-              label={`Volcano plot of ${tested.length} genes of the region among the genes of the test`}
-              xr={[-vx, vx]}
-              yr={[0, top]}
-              xTitle={`Expression, log2 of ${B} over ${A}`}
-              yTitle="-log10 of the adjusted p"
-              capped={top >= volcano.p}
-              keys={[...keys, ['back', 'genes outside the region']]}
-            >
-              {(fx, fy) => (
-                <>
-                  {volcano.points.map(([x, y]) => (
-                    <circle key={`${x} ${y}`} className="back" cx={fx(x)} cy={fy(y)} r={1.3} />
-                  ))}
-                  {line < top && <line className="threshold" x1={fx(-vx)} x2={fx(vx)} y1={fy(line)} y2={fy(line)} />}
-                  {line < top && (
-                    <text className="tick" x={fx(vx) - 2} y={fy(line) - 4} textAnchor="end">
-                      adjusted p 0.05
-                    </text>
-                  )}
-                  {tested.map(({ r, x, y }) => (
-                    <circle key={r.gene} className={kind(r)} cx={fx(x)} cy={fy(y)} r={r.gene === gene ? 5 : 3} onClick={() => pick(r.gene)}>
-                      <title>{`${r.gene}, expression ${fold(r.log2fc)} in ${B}, adjusted p ${pText(r.padj)}`}</title>
+          {expressed && (
+            <Figure title="Change of expression against change of distance" file="expression_against_distance" open={open.includes('scatter')} onToggle={() => toggle('scatter')}>
+              <Frame
+                label={`Change of expression against change of distance for ${expressed.rows.length} genes`}
+                xr={[-reach(expressed.rows.map((r) => r.distance)), reach(expressed.rows.map((r) => r.distance))]}
+                yr={[-reach(expressed.rows.map((r) => r.log2fc)), reach(expressed.rows.map((r) => r.log2fc))]}
+                xTitle={`3D distance, log2 of ${B} over ${A}`}
+                yTitle={`Expression, log2 of ${B} over ${A}`}
+                keys={keys}
+              >
+                {(fx, fy) =>
+                  expressed.rows.map((r) => (
+                    <circle key={r.gene} className={kind(r)} cx={fx(r.distance)} cy={fy(r.log2fc)} r={r.gene === gene ? 5 : 3} onClick={() => pick(r.gene)}>
+                      <title>{`${r.gene}, distance ${times(r.distance, 'farther', 'closer')}, expression ${fold(r.log2fc)} in ${B}`}</title>
                     </circle>
-                  ))}
+                  ))
+                }
+              </Frame>
+            </Figure>
+          )}
+          {expressed && volcano && (
+            <Figure title="Volcano plot of the change of expression" file="expression_volcano" open={open.includes('volcano')} onToggle={() => toggle('volcano')}>
+              <Frame
+                label={`Volcano plot of ${tested.length} genes of the region among the genes of the test`}
+                xr={[-vx, vx]}
+                yr={[0, top]}
+                xTitle={`Expression, log2 of ${B} over ${A}`}
+                yTitle="-log10 of the adjusted p"
+                capped={top >= volcano.p}
+                keys={[...keys, ['back', 'genes outside the region']]}
+              >
+                {(fx, fy) => (
+                  <>
+                    {volcano.points.map(([x, y]) => (
+                      <circle key={`${x} ${y}`} className="back" cx={fx(x)} cy={fy(y)} r={1.3} />
+                    ))}
+                    {line < top && <line className="threshold" x1={fx(-vx)} x2={fx(vx)} y1={fy(line)} y2={fy(line)} />}
+                    {line < top && (
+                      <text className="tick" x={fx(vx) - 2} y={fy(line) - 4} textAnchor="end">
+                        adjusted p 0.05
+                      </text>
+                    )}
+                    {tested.map(({ r, x, y }) => (
+                      <circle key={r.gene} className={kind(r)} cx={fx(x)} cy={fy(y)} r={r.gene === gene ? 5 : 3} onClick={() => pick(r.gene)}>
+                        <title>{`${r.gene}, expression ${fold(r.log2fc)} in ${B}, adjusted p ${pText(r.padj)}`}</title>
+                      </circle>
+                    ))}
+                  </>
+                )}
+              </Frame>
+            </Figure>
+          )}
+        </div>
+        <div className="compare-cards">
+          {row && (
+            <section className="side-card" aria-label={`Change of ${row.gene}`}>
+              <p className="card-label">{`${row.gene}, ${against}`}</p>
+              <p className="big">
+                <span className="big-value">{(row.ratio >= 1 ? row.ratio : 1 / row.ratio).toFixed(1)}</span>{' '}
+                <span className="unit">{`times ${row.ratio >= 1 ? 'farther' : 'closer'} in ${B}`}</span>
+              </p>
+              <p className="card-text">{`${row.a.mean.toFixed(1)} ± ${row.a.sd.toFixed(1)} bead units in ${A}, ${row.b.mean.toFixed(1)} ± ${row.b.sd.toFixed(1)} in ${B}. Mann-Whitney p ${pText(row.p)}.`}</p>
+              {eRow && (
+                <>
+                  <p className="big">
+                    <span className="big-value">{2 ** Math.abs(eRow.log2fc) >= 100 ? 'over 100' : (2 ** Math.abs(eRow.log2fc)).toFixed(1)}</span>{' '}
+                    <span className="unit">{`times ${eRow.log2fc >= 0 ? 'higher' : 'lower'} expression in ${B}`}</span>
+                  </p>
+                  <p className="card-text">{`Level ${level(eRow.a)} in ${A}, ${level(eRow.b)} in ${B}. Adjusted p ${pText(eRow.padj)}.`}</p>
                 </>
               )}
-            </Frame>
-          </Figure>
-        )}
+            </section>
+          )}
+          {expressed && (
+            <section className="side-card" aria-label="Expression against 3D distance">
+              <p className="card-label">Expression against 3D distance</p>
+              {expressed.rho !== null && (
+                <p className="big">
+                  <span className="big-value">{expressed.rho.toFixed(2)}</span> <span className="unit">rank correlation</span>
+                </p>
+              )}
+              <p className="card-text">
+                {expressed.rho !== null
+                  ? `Of the change of expression with the change of distance over ${expressed.rows.length} genes, ${against}.`
+                  : `${expressed.rows.length} genes have expression in both jobs. Five or more give a rank correlation.`}{' '}
+                {expressed.mode === 'deseq2' ? 'Tested with DESeq2.' : expressed.reason}
+              </p>
+            </section>
+          )}
+          {!expressed && (expressionState || expression) && (
+            <p className="compare-note" aria-busy={expressionState === 'wait'}>
+              {expressionState === 'wait'
+                ? 'Comparing the expression of the two jobs.'
+                : expressionState === 'one'
+                  ? 'One of the two jobs has no expression data. Both need it for a comparison of expression.'
+                  : expressionState || (expression?.mode === 'none' ? expression.reason : 'The two jobs share no gene with expression in both.')}
+            </p>
+          )}
+        </div>
       </div>
     </section>
   )
