@@ -1078,6 +1078,52 @@ The second round, `slurm/ensemble/uniform_sweep8c.sh`, joins the ladder at a rad
 threshold of 2 and the cap by the target, and tries the ladder up to 50 kb, the ladder at a radius of 2.0 and the
 dropout at a radius of 3.85.
 
+### Second round of the sweep
+
+`design/figures/uniform-2026-11-19/sweep8c/` and `scores-sweep8c/`, with `scores-sweep8c_10k/` and
+`scores-sweep8c_5k/`, `slurm/ensemble/uniform_sweep8c.sh`, commit 43163bd on the code of 5636a87. The rows and
+the inputs of the first round, eight structures per arm. Every new arm has the ladder to 25 kb. Raw and balanced
+SCC per bead pair:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.191, 0.247 | 0.161, 0.169 | 0.112, 0.105 | 0.502, 0.407, 0.335 | 0.723 | 11.2 | 3.5 | 6 of 144 |
+| radius 3.0, cells at 5 kb | 0.289, 0.311 | 0.247, 0.225 | 0.190, 0.151 | 0.517, 0.433, 0.366 | 0.715 | 3.2 | 0.6 | 9 of 144 |
+| radius 3.0, ladder | 0.326, 0.330 | 0.270, 0.232 | 0.203, 0.151 | 0.515, 0.442, 0.380 | 0.749 | 4.3 | 0.5 | 2 of 144 |
+| ladder, `loop_dropout` | 0.360, 0.360 | 0.283, 0.248 | 0.202, 0.158 | 0.518, 0.456, 0.393 | 0.740 | 2.2 | 0.4 | 8 of 144 |
+| ladder, z 2 | 0.357, 0.361 | 0.288, 0.252 | 0.214, 0.162 | 0.520, 0.444, 0.382 | 0.759 | 4.8 | 0.6 | 7 of 144 |
+| ladder, z 2, `loop_dropout` | 0.380, 0.379 | 0.296, 0.259 | 0.210, 0.165 | 0.549, 0.468, 0.399 | 0.753 | 2.3 | 0.4 | 5 of 144 |
+| ladder, `loop_dropout`, cap by the target | 0.363, 0.360 | 0.288, 0.247 | 0.208, 0.158 | 0.525, 0.458, 0.394 | 0.742 | 2.8 | 0.5 | 8 of 144 |
+| ladder, `loop_dropout`, radius 3.85 | 0.352, 0.358 | 0.277, 0.245 | 0.198, 0.156 | 0.526, 0.456, 0.389 | 0.748 | 1.9 | 0.3 | 6 of 144 |
+| ladder, radius 2.0 | 0.328, 0.322 | 0.275, 0.229 | 0.206, 0.151 | 0.477, 0.425, 0.373 | 0.721 | 6.4 | 1.1 | 15 of 144 |
+
+No structure has a stretched piece. The radius of gyration is 9.7 to 10.4 bonds on the arms with the ladder. The
+arm with the ladder up to 50 kb did not run. The map of half a holds no resolution of 50 kb.
+
+The differences at 25 kb over the 18 rows, paired by row, with the p value of the Wilcoxon signed rank test:
+
+| comparison | raw SCC | balanced SCC | Spearman |
+|---|---|---|---|
+| the dropout on the ladder | +0.034 ± 0.006, p 0.0007 | +0.030 ± 0.008, p 0.001 | +0.004 ± 0.004, p 0.4 |
+| z 2 on the ladder | +0.030 ± 0.006, p 0.0001 | +0.031 ± 0.006, p 0.0003 | +0.005 ± 0.009, p 0.5 |
+| z 2 and the dropout on the ladder | +0.054 ± 0.008, p 0.0003 | +0.048 ± 0.010, p 0.00004 | +0.034 ± 0.007, p 0.0004 |
+| z 2 on the ladder with the dropout | +0.020 ± 0.005, p 0.0009 | +0.018 ± 0.004, p 0.001 | +0.030 ± 0.007, p 0.0007 |
+| the cap by the target on the ladder with the dropout | +0.003 ± 0.004, p 0.4 | -0.001 ± 0.004, p 0.8 | +0.007 ± 0.004, p 0.07 |
+| the radius of 3.85 against 3.0 on the ladder with the dropout | -0.008 ± 0.004, p 0.08 | -0.003 ± 0.004, p 0.5 | +0.008 ± 0.005, p 0.2 |
+| the radius of 2.0 against 3.0 on the ladder | +0.002 ± 0.003, p 0.5 | -0.008 ± 0.004, p 0.1 | -0.037 ± 0.010, p 0.002 |
+| ladder, z 2 and the dropout against the default chain | +0.189 ± 0.018, p 0.000008 | +0.132 ± 0.019, p 0.0002 | +0.046 ± 0.012, p 0.002 |
+
+- The ladder, the threshold of 2 and the dropout add up. The three together have a raw SCC of 0.380 against
+  0.191 of the default chain, above it on 18 rows of 18, with a higher Spearman at every resolution, a higher
+  balanced Pearson, a fifth of its close pairs and the same overlap of the ends.
+- With the ladder the threshold of 2 does not cost Spearman. With the cells at 5 kb alone it cost 0.035 on the
+  larger trial.
+- The cap by the target does not change a score on the ladder with the dropout.
+- The radius of 3.85 under the dropout loses 0.008 of raw SCC and has the ends overlap in 6 structures of 144
+  against 8. The overlap of the ends under the dropout is small with the ladder, and a radius of a node from its
+  chain has nothing to repair there.
+- The radius of 2.0 on the ladder gains no SCC and loses 0.037 of Spearman.
+
 ## Settings
 
 A setting is added when a run reads it.
