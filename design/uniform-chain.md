@@ -1473,6 +1473,46 @@ that each band holds:
   with both sides has 0.17 between 1 and 2 Mb. The ladder that reads the cells over their expectation alone
   has none. The structure beyond 1 Mb came with the cells under their expectation.
 
+### The scale beyond 1 Mb
+
+The bands of `playground/band_scc.py` at 25 kb read 0.00 to 0.05 beyond 1 Mb for every arm but the first ladder.
+That number is the limit of the score and not the absence of structure. At 25 kb a pooled map of twenty
+structures holds few contacts between two bins more than 1 Mb apart, and most cells are empty. At 100 kb a cell
+holds sixteen times the pairs.
+
+The two halves of a Hi-C map against each other, balanced, by the separation, over the 18 rows:
+
+| bins | under 250 or 300 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|
+| 25 kb | 0.64 | 0.86 | 0.66 | 0.44 |
+| 100 kb | 0.54 | 0.79 | 0.86 | 0.79 |
+
+The signal beyond 1 Mb is in the data. At 100 kb the two halves agree at 0.86 between 1 and 2 Mb.
+
+The arms at 100 kb against the balanced half the cells did not read, 18 rows of twenty structures, as the pooled
+contacts per bead pair and as the mean distance of the centroids of two bins, with the sign turned:
+
+| arm | contacts: under 300 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb | distance: under 300 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|---|---|
+| the two halves of Hi-C | 0.54 | 0.79 | 0.86 | 0.79 | | | | |
+| default chain | 0.15 | 0.31 | 0.41 | 0.22 | 0.22 | 0.39 | 0.58 | 0.38 |
+| locked config, cells at 5 kb | 0.24 | 0.43 | 0.50 | 0.30 | 0.16 | 0.46 | 0.57 | 0.35 |
+| ladder over its expectation alone | 0.23 | 0.42 | 0.44 | 0.25 | 0.17 | 0.48 | 0.61 | 0.48 |
+| first ladder to 10 kb, both sides | 0.26 | 0.47 | 0.50 | 0.29 | 0.21 | 0.54 | 0.65 | 0.40 |
+| first ladder to 25 kb, both sides | 0.26 | 0.47 | 0.50 | 0.38 | 0.20 | 0.53 | 0.66 | 0.63 |
+
+- Every arm has structure beyond 1 Mb, 0.41 to 0.50 by contacts between 1 and 2 Mb, against 0.86 of the data.
+  The gap is the open problem, and it is as wide under 1 Mb at this resolution.
+- The locked config is over the default chain in every band by contacts.
+- The first ladder to 25 kb is the one arm that adds beyond 2 Mb, 0.38 by contacts and 0.63 by distance against
+  0.30 and 0.35.
+
+The coarse stage of every arm reads the Hi-C singletons of production at 25 kb, which hold the counts of both
+halves. The half that the cells did not read is not held out from that stage, and a part of these correlations
+can come from it. A trial with singletons of one half measures that.
+
+The sentences above that read "no arm has a correlation with Hi-C beyond 1 Mb" state the score at 25 kb.
+
 ## The config locked on 2026-11-21
 
 `gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:
@@ -1497,9 +1537,8 @@ the pseudo count and the bound estimate of a cell, the cap of the radius of a pa
 the product form of the radius from the chain, the midpoint draw, the fixed node, the bond limit of the
 orientation term. Each has its trial above.
 
-Open: no arm has a correlation with Hi-C beyond 1 Mb, and the two halves of a Hi-C map have 0.66 between 1 and
-2 Mb at 25 kb and 0.86 at 100 kb. The three bead move is not in the JAX kernel and the batch executor refuses the
-smooth stage of the uniform chain. The site has no control for the chain.
+Open: the structure beyond 1 Mb, section "The scale beyond 1 Mb". The three bead move is not in the JAX kernel
+and the batch executor refuses the smooth stage of the uniform chain. The site has no control for the chain.
 
 ## Settings
 
