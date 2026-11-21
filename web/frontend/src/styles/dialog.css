@@ -80,6 +80,14 @@
   font-weight: 600;
 }
 
+/* The button of an action that takes something away. It has the red of the site's errors. */
+.dialog-foot .danger {
+  border: 0;
+  background: #A11B12;
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
 .dialog-foot .primary:disabled {
   opacity: 0.4;
   cursor: default;

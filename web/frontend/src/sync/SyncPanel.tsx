@@ -48,11 +48,11 @@ function StopDialog({ code, onStop, onClose }: { code: string; onStop: () => voi
           </div>
         </div>
         <footer className="dialog-foot">
-          <button type="button" className="secondary" onClick={onStop}>
-            Stop syncing
-          </button>
-          <button type="button" className="primary" autoFocus onClick={onClose}>
+          <button type="button" className="secondary" autoFocus onClick={onClose}>
             Keep syncing
+          </button>
+          <button type="button" className="danger" onClick={onStop}>
+            Stop syncing
           </button>
         </footer>
       </div>

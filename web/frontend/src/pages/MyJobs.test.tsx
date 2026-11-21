@@ -125,16 +125,21 @@ describe('My jobs', () => {
     const { container } = renderPage()
     expect(await screen.findByRole('link', { name: 'HFFc6 chr2' })).toBeInTheDocument()
     // The button is beside the code and its two copy buttons.
-    const stop = screen.getByRole('button', { name: 'Stop syncing on this computer' })
-    expect(stop.parentElement).toBe(screen.getByRole('button', { name: 'Copy link' }).parentElement)
-    fireEvent.click(stop)
+    const open = screen.getByRole('button', { name: 'Stop syncing on this computer' })
+    expect(open.parentElement).toBe(screen.getByRole('button', { name: 'Copy link' }).parentElement)
+    fireEvent.click(open)
     const dialog = screen.getByRole('dialog', { name: 'Stop syncing on this computer' })
     expect(dialog).toHaveTextContent('The jobs stay on this computer and the code keeps working on the others.')
     expect(checkCopy(container)).toEqual([])
     expect(checkCopy(dialog)).toEqual([])
-    // Keep syncing is the emphasised button. It closes the dialog and changes nothing.
-    expect(within(dialog).getByRole('button', { name: 'Keep syncing' })).toHaveClass('primary')
-    expect(within(dialog).getByRole('button', { name: 'Stop syncing' })).toHaveClass('secondary')
+    // Stop syncing is the red button at the end, where a dialog has its action. Keep syncing is
+    // plain, at the place of Cancel, and has the focus. It closes the dialog and changes nothing.
+    const [keep, stop] = within(dialog).getAllByRole('button').slice(-2)
+    expect(keep).toHaveTextContent('Keep syncing')
+    expect(keep).toHaveClass('secondary')
+    expect(keep).toHaveFocus()
+    expect(stop).toHaveTextContent('Stop syncing')
+    expect(stop).toHaveClass('danger')
     fireEvent.click(within(dialog).getByRole('button', { name: 'Keep syncing' }))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(syncState()).not.toBeNull()
