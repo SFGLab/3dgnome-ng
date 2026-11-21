@@ -9,7 +9,8 @@ import { parseRegion } from './StructureTab'
 import { wheelFactor } from './wheel'
 
 const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]
-const MAX_BINS = 800
+/** The most bins on a side the server draws, `MAX_BINS` of gnome3d_web/contacts.py. */
+const MAX_BINS = 840
 const NO_DATA: [number, number, number] = [226, 225, 221]
 const SETTLE_MS = 250
 const PREDICTED = 'hicdiffusion.bedpe'
@@ -25,8 +26,12 @@ function clamp(l: Locus, job: Locus, res: number): Locus {
   return { chrom: job.chrom, start: Math.round(start), end: Math.round(start + width) }
 }
 
-/** The finest resolution not finer than `res` that keeps a window under MAX_BINS bins. */
-const fitting = (l: Locus, res: number) => RESOLUTIONS.find((r) => r >= res && (l.end - l.start) / r <= MAX_BINS) ?? RESOLUTIONS[RESOLUTIONS.length - 1]
+/** The bins of a window at a resolution, counted as the server counts them: from the bin that
+ * holds the start, on the grid of the resolution. */
+const binCount = (l: Locus, r: number) => Math.ceil((l.end - (l.start - (l.start % r))) / r)
+
+/** The finest resolution not finer than `res` that keeps a window within MAX_BINS bins. */
+const fitting = (l: Locus, res: number) => RESOLUTIONS.find((r) => r >= res && binCount(l, r) <= MAX_BINS) ?? RESOLUTIONS[RESOLUTIONS.length - 1]
 const SHOWS: [Show, string][] = [
   ['observed', 'Observed'],
   ['oe', 'O/E'],
@@ -77,7 +82,8 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
   const job = parseRegion(summary.region)!
   const [locus, setLocus] = useState<Locus>(job)
   const [text, setText] = useState(fmt(job))
-  const [res, setRes] = useState(25_000)
+  // The map opens at 25 kb, or at the finest resolution the region fits when it is too long for that.
+  const [res, setRes] = useState(() => fitting(job, 25_000))
   const [show, setShow] = useState<Show>('observed')
   const [norm, setNorm] = useState<'ice' | 'raw'>('ice')
   const [upperKind, setUpper] = useState('hic')
@@ -214,7 +220,7 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
           </select>
           <select aria-label="Resolution" title="Resolution" value={res} onChange={(e) => setRes(fitting(locus, Number(e.target.value)))}>
             {RESOLUTIONS.map((r) => {
-              const tooFine = (locus.end - locus.start) / r > MAX_BINS
+              const tooFine = binCount(locus, r) > MAX_BINS
               return (
                 <option key={r} value={r} disabled={tooFine}>
                   {`${r / 1000} kb bins${tooFine ? ', zoom in to use' : ''}`}

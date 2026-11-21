@@ -43,6 +43,26 @@ describe('ContactMapTab', () => {
     expect(url).toContain('lower=model')
   })
 
+  it('opens the longest job at 25 kb and a longer region at the finest resolution it fits', async () => {
+    const asked = async (region: string) => {
+      const f = mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+      const view = render(
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <ContactMapTab api={jobApi('jobs', KEY)} summary={{ ...SUMMARY_DONE, region }} />
+        </QueryClientProvider>,
+      )
+      await screen.findByText('0.21')
+      const first = f.mock.calls.map(([u]) => new URL(String(u), 'http://x')).find((u) => u.pathname.endsWith('/contacts'))!
+      view.unmount()
+      vi.unstubAllGlobals()
+      return first.searchParams.get('res')
+    }
+    // 20 Mb with the bases of its insertions, from a start off the grid: 801 bins at 25 kb.
+    expect(await asked('chr3:120184079-140189332')).toBe('25000')
+    // 30 Mb is 1,200 bins at 25 kb and 600 at 50 kb.
+    expect(await asked('chr3:120000000-150000000')).toBe('50000')
+  })
+
   it('shows the agreement with Hi-C and how it was computed', async () => {
     mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
     renderTab()

@@ -15,6 +15,9 @@ import pytest
 from fixture import make_data
 
 from gnome3d_web.contacts import (
+    MAX_BINS,
+    bins_for,
+    coarsest_fit,
     ice,
     loop_enrichment,
     median_bond,
@@ -134,6 +137,16 @@ def test_the_multimm_map_is_1_d_1_3_of_bin_centroids_in_units_of_the_median(sums
     assert abs(loop_enrichment(loop_px, raised) - 3) < 1e-9, "a map raised at the loop pixels has an enrichment above 1: " + str(loop_enrichment(loop_px, raised))
     assert abs(loop_enrichment(loop_px, flat) - 1) < 1e-9, "a map flat at the loop pixels has an enrichment of 1"
     assert abs(median_bond([np.array([[0.0, 0, 0], [1.0, 0, 0], [3.0, 0, 0], [4.0, 0, 0]])]) - 1.0) < 1e-12, "the median bond of a chain"
+
+
+def test_the_longest_job_fits_a_map_at_25_kb() -> None:
+    longest = 20_000_000
+    # A start off the grid of the bins adds a bin, and insertions add their bases to the region.
+    for start, extra in ((120_184_079, 0), (120_184_079, 5_253), (0, 0), (37_615_000, 500_000)):
+        n = len(bins_for(start, start + longest + extra, 25_000))
+        assert n <= MAX_BINS, f"a job of {longest + extra:,} bp from {start:,} has {n} bins at 25 kb, over {MAX_BINS}"
+        assert coarsest_fit(start, start + longest + extra) <= 25_000, "the finest fit of the longest job is 25 kb or finer"
+    assert coarsest_fit(0, 40_000_000) == 50_000, "a window of 40 Mb fits at 50 kb"
 
 
 def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_path: Path) -> None:

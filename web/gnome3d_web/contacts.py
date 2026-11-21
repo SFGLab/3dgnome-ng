@@ -11,7 +11,10 @@ from scipy.spatial import cKDTree
 
 CONTACT_RADIUS = 1.5
 RESOLUTIONS = (1_000, 2_000, 5_000, 10_000, 25_000, 50_000, 100_000, 250_000, 500_000)
-MAX_BINS = 800
+# A map of this many bins on a side is an answer of 12 MB. It is the 20 Mb of the longest job at
+# 25 kb and a twentieth more, for a start off the grid of the bins and for the bases that
+# insertions add to the region.
+MAX_BINS = 840
 
 
 def bins_for(start: int, end: int, res: int) -> np.ndarray:
