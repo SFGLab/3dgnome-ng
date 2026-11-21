@@ -526,19 +526,39 @@ def compare(a: Path, b: Path) -> dict[str, object]:
     return {"same_region": ra is not None and ra == rb, "rows": rows[:20]}
 
 
+# The volcano plot shows a fold change up to 12 in log2 and an adjusted p down to 1e-50. A gene
+# past either limit is drawn on it.
+VOLCANO_FOLD, VOLCANO_P = 12.0, 50.0
+
+
+def _volcano(table: dict[str, list[float | None]]) -> dict[str, object] | None:
+    """Every tested gene of a contrast as [log2 fold change, -log10 of the adjusted p], for the
+    background of the volcano plot. The points are on a grid of 0.2 by 0.5 with each cell once.
+    None for a contrast without p-values."""
+    cells: set[tuple[float, float]] = set()
+    for fold, padj, *_ in table.values():
+        if fold is None or padj is None:
+            continue
+        x = max(-VOLCANO_FOLD, min(VOLCANO_FOLD, fold))
+        y = VOLCANO_P if padj <= 0 else min(-float(np.log10(padj)), VOLCANO_P)
+        cells.add((round(x * 5) / 5, round(y * 2) / 2))
+    return {"fold": VOLCANO_FOLD, "p": VOLCANO_P, "points": sorted(cells)} if cells else None
+
+
 def compare_expression(a: Path, b: Path, cache: Path) -> dict[str, object]:
     """The expression of job b against job a for the genes both jobs have, beside the change of
     their enhancer to promoter distance.
 
     Each row has the gene, log2 of the distance of b over a, the log2 fold change of the
     expression, its adjusted p or None and the two levels. `rho` is the Spearman correlation of
-    the two changes over the rows, None under five rows. The mode and its reason are those of
-    `expression.contrast`.
+    the two changes over the rows, None under five rows. `volcano` has every gene of the test for
+    the background of the volcano plot, None without a test. The mode and its reason are those
+    of `expression.contrast`.
     """
     c = expression.contrast(a, b, cache)
     table = c.pop("genes", None)
     if not table:
-        return {**c, "rows": [], "rho": None}
+        return {**c, "rows": [], "rho": None, "volcano": None}
     by_id = c.get("key") == "gene_id"
     ga = {r["gene"]: r for r in genes(a)}
     gb = {r["gene"]: r for r in genes(b)}
@@ -555,4 +575,4 @@ def compare_expression(a: Path, b: Path, cache: Path) -> dict[str, object]:
         d = pd.DataFrame(rows)
         rho = float(d["distance"].corr(d["log2fc"], method="spearman"))
         rho = None if not np.isfinite(rho) else round(rho, 3)
-    return {**c, "rows": rows, "rho": rho}
+    return {**c, "rows": rows, "rho": rho, "volcano": _volcano(table)}

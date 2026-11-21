@@ -49,5 +49,6 @@ Step 5 of the form, Gene expression, is optional. It lists the hosted tables tha
 `GET /api/expression?cell=&sv_set=&sample=` returns for the cell type and the sample, and a card
 for a table of the user, which opens the Your own data dialog on its Expression step. A job with expression has an Expression column in the Genes tab. The
 compare view of two such jobs reads `GET /api/compare/expression?a=&b=` and shows the change of
-expression of each gene against the change of its distance to the nearest enhancer, as a plot and
-a table. `design/website/data.md` has the tables and the comparison.
+expression of each gene against the change of its distance to the nearest enhancer, as a plot, a
+volcano plot of the test and a table. Each plot has its two axes named and ticked. The volcano
+plot has every gene of the test in the background, on a grid of 0.2 by 0.5 with each cell once. `design/website/data.md` has the tables and the comparison.

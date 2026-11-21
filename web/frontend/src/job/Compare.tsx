@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { recentJobs } from '../model/recent'
 import { compareExpression, compareJobs, jobApi, type ExpressionCompare, type JobApi, type Summary } from './api'
 import { readPalette } from './colors'
@@ -149,8 +149,7 @@ function Panel({
   )
 }
 
-// The points keep to the inside of the two pads. The labels of the axes are in the pads.
-const SCATTER = { w: 320, h: 220, padX: 46, padY: 26 }
+const PLOT = { w: 340, h: 270, left: 48, right: 12, top: 12, bottom: 40 }
 
 /** How many times a level or a distance changed, from its log2 change, with the word for its direction. */
 const times = (log2: number, up: string, down: string) => `${(2 ** Math.abs(log2)).toFixed(1)} times ${log2 >= 0 ? up : down}`
@@ -159,19 +158,92 @@ const times = (log2: number, up: string, down: string) => `${(2 ** Math.abs(log2
  * in the hundreds that says no more than over 100 times. */
 const fold = (log2: number) => (2 ** Math.abs(log2) >= 100 ? `over 100 times ${log2 >= 0 ? 'higher' : 'lower'}` : times(log2, 'higher', 'lower'))
 
+/** The ticks of an axis from lo to hi at a round step, six at most. */
+function ticks(lo: number, hi: number): number[] {
+  const step = [0.5, 1, 2, 5, 10, 20, 50, 100].find((s) => (hi - lo) / s <= 5) ?? 100
+  const out: number[] = []
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(Math.round(v * 10) / 10)
+  return out
+}
+
+type Scale = (v: number) => number
+
+/** A plot with an axis on the left and one below, each with its ticks and its title, and a dashed line at zero. */
+function Frame({
+  label,
+  xr,
+  yr,
+  xTitle,
+  yTitle,
+  capped = false,
+  children,
+}: {
+  label: string
+  xr: [number, number]
+  yr: [number, number]
+  xTitle: string
+  yTitle: string
+  /** The last tick of the y axis stands for its value and every value above it. */
+  capped?: boolean
+  children: (fx: Scale, fy: Scale) => ReactNode
+}) {
+  const { w, h, left, right, top, bottom } = PLOT
+  const fx: Scale = (v) => left + ((v - xr[0]) / (xr[1] - xr[0])) * (w - left - right)
+  const fy: Scale = (v) => h - bottom - ((v - yr[0]) / (yr[1] - yr[0])) * (h - top - bottom)
+  const middle = (top + h - bottom) / 2
+  return (
+    <svg className="expression-plot" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={label}>
+      {xr[0] < 0 && xr[1] > 0 && <line className="zero" x1={fx(0)} x2={fx(0)} y1={top} y2={h - bottom} />}
+      {yr[0] < 0 && yr[1] > 0 && <line className="zero" x1={left} x2={w - right} y1={fy(0)} y2={fy(0)} />}
+      <line className="axis" x1={left} x2={w - right} y1={h - bottom} y2={h - bottom} />
+      <line className="axis" x1={left} x2={left} y1={top} y2={h - bottom} />
+      {ticks(...xr).map((v) => (
+        <g key={`x${v}`}>
+          <line className="axis" x1={fx(v)} x2={fx(v)} y1={h - bottom} y2={h - bottom + 4} />
+          <text className="tick" x={fx(v)} y={h - bottom + 15} textAnchor="middle">
+            {v}
+          </text>
+        </g>
+      ))}
+      {ticks(...yr).map((v) => (
+        <g key={`y${v}`}>
+          <line className="axis" x1={left - 4} x2={left} y1={fy(v)} y2={fy(v)} />
+          <text className="tick" x={left - 7} y={fy(v) + 3} textAnchor="end">
+            {capped && v === yr[1] ? `${v}+` : v}
+          </text>
+        </g>
+      ))}
+      <text className="axis-title" x={(left + w - right) / 2} y={h - 6} textAnchor="middle">
+        {xTitle}
+      </text>
+      <text className="axis-title" x={12} y={middle} textAnchor="middle" transform={`rotate(-90 12 ${middle})`}>
+        {yTitle}
+      </text>
+      {children(fx, fy)}
+    </svg>
+  )
+}
+
+/** The whole number an axis reaches to, one at least. */
+const reach = (values: number[]) => Math.max(1, Math.ceil(Math.max(0, ...values.map(Math.abs))))
+
 /**
  * The change of expression of the genes two jobs share, the other job against this one, beside
  * the change of their enhancer to promoter distance: what was computed, a plot of one change
- * against the other and the genes whose expression changed most.
+ * against the other, a volcano plot of the test and the genes whose expression changed most.
  */
 function ExpressionChange({ data, gene, onGene }: { data: ExpressionCompare; gene: string | null; onGene?: (gene: string | null) => void }) {
   if (data.mode === 'none') return <p className="compare-note">{data.reason}</p>
   const rows = data.rows
-  const { w, h, padX, padY } = SCATTER
-  const reach = (get: (r: ExpressionCompare['rows'][number]) => number) => Math.max(1, ...rows.map((r) => Math.abs(get(r))))
-  const [rx, ry] = [reach((r) => r.distance), reach((r) => r.log2fc)]
-  const x = (v: number) => w / 2 + (v / rx) * (w / 2 - padX)
-  const y = (v: number) => h / 2 - (v / ry) * (h / 2 - padY)
+  const volcano = data.volcano ?? null
+  const pick = (name: string) => onGene?.(name === gene ? null : name)
+  const kind = (r: ExpressionCompare['rows'][number]) => (r.gene === gene ? 'point selected' : r.padj !== null && r.padj < 0.05 ? 'point sure' : 'point')
+  const [rx, ry] = [reach(rows.map((r) => r.distance)), reach(rows.map((r) => r.log2fc))]
+  // A gene of the region in the volcano plot, kept within the limits of the plot as the other genes are.
+  const tested = volcano ? rows.filter((r) => r.padj !== null).map((r) => ({ r, x: Math.max(-volcano.fold, Math.min(volcano.fold, r.log2fc)), y: r.padj! <= 0 ? volcano.p : Math.min(-Math.log10(r.padj!), volcano.p) })) : []
+  const vx = volcano ? reach([...volcano.points.map(([x]) => x), ...tested.map((t) => t.x)]) : 1
+  const top = volcano ? Math.max(2, Math.ceil(Math.max(...volcano.points.map(([, y]) => y), ...tested.map((t) => t.y)))) : 2
+  const line = -Math.log10(0.05)
   return (
     <>
       <p className="compare-note">
@@ -182,28 +254,50 @@ function ExpressionChange({ data, gene, onGene }: { data: ExpressionCompare; gen
       {rows.length === 0 ? (
         <p className="compare-note">The two jobs share no gene with expression in both.</p>
       ) : (
-        <div className="expression-change">
-          <svg className="expression-scatter" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Change of expression against change of distance for ${rows.length} genes`}>
-            <line className="axis" x1={padX - 6} x2={w - padX + 6} y1={h / 2} y2={h / 2} />
-            <line className="axis" x1={w / 2} x2={w / 2} y1={padY - 6} y2={h - padY + 6} />
-            <text className="axis-label" x={w - 6} y={h / 2 + 3} textAnchor="end">
-              farther
-            </text>
-            <text className="axis-label" x={6} y={h / 2 + 3}>
-              closer
-            </text>
-            <text className="axis-label" x={w / 2} y={12} textAnchor="middle">
-              higher expression
-            </text>
-            <text className="axis-label" x={w / 2} y={h - 6} textAnchor="middle">
-              lower expression
-            </text>
-            {rows.map((r) => (
-              <circle key={r.gene} className={r.gene === gene ? 'point selected' : r.padj !== null && r.padj < 0.05 ? 'point sure' : 'point'} cx={x(r.distance)} cy={y(r.log2fc)} r={r.gene === gene ? 5 : 3}>
-                <title>{`${r.gene}, distance ${times(r.distance, 'farther', 'closer')}, expression ${fold(r.log2fc)}`}</title>
-              </circle>
-            ))}
-          </svg>
+        <>
+          <div className="expression-plots">
+            <figure className="expression-figure">
+              <figcaption>Change of expression against change of distance</figcaption>
+              <Frame label={`Change of expression against change of distance for ${rows.length} genes`} xr={[-rx, rx]} yr={[-ry, ry]} xTitle="3D distance, log2 fold change" yTitle="Expression, log2 fold change">
+                {(fx, fy) =>
+                  rows.map((r) => (
+                    <circle key={r.gene} className={kind(r)} cx={fx(r.distance)} cy={fy(r.log2fc)} r={r.gene === gene ? 5 : 3} onClick={() => pick(r.gene)}>
+                      <title>{`${r.gene}, distance ${times(r.distance, 'farther', 'closer')}, expression ${fold(r.log2fc)}`}</title>
+                    </circle>
+                  ))
+                }
+              </Frame>
+            </figure>
+            {volcano && (
+              <figure className="expression-figure">
+                <figcaption>Volcano plot of the change of expression</figcaption>
+                <Frame label={`Volcano plot of ${tested.length} genes of the region among the genes of the test`} xr={[-vx, vx]} yr={[0, top]} xTitle="Expression, log2 fold change" yTitle="-log10 of the adjusted p" capped={top >= volcano.p}>
+                  {(fx, fy) => (
+                    <>
+                      {volcano.points.map(([x, y]) => (
+                        <circle key={`${x} ${y}`} className="back" cx={fx(x)} cy={fy(y)} r={1.3} />
+                      ))}
+                      {line < top && <line className="threshold" x1={fx(-vx)} x2={fx(vx)} y1={fy(line)} y2={fy(line)} />}
+                      {line < top && (
+                        <text className="tick" x={fx(vx) - 2} y={fy(line) - 4} textAnchor="end">
+                          adjusted p 0.05
+                        </text>
+                      )}
+                      {tested.map(({ r, x, y }) => (
+                        <circle key={r.gene} className={kind(r)} cx={fx(x)} cy={fy(y)} r={r.gene === gene ? 5 : 3} onClick={() => pick(r.gene)}>
+                          <title>{`${r.gene}, expression ${fold(r.log2fc)}, adjusted p ${r.padj! < 0.001 ? r.padj!.toExponential(1) : r.padj!.toFixed(3)}`}</title>
+                        </circle>
+                      ))}
+                    </>
+                  )}
+                </Frame>
+              </figure>
+            )}
+          </div>
+          <p className="compare-note">
+            {`Both changes are log2 of ${data.label_b} over ${data.label_a}. A positive value is a longer distance or a higher expression. A point is a gene of the region, blue with an adjusted p under 0.05. The selected gene is drawn larger.`}
+            {volcano && ' The small grey points of the volcano plot are all the other genes of the test.'}
+          </p>
           <table className="genes-table compare-table" aria-label="Largest changes in expression">
             <thead>
               <tr>
@@ -215,7 +309,7 @@ function ExpressionChange({ data, gene, onGene }: { data: ExpressionCompare; gen
             </thead>
             <tbody>
               {shownRows(rows, gene).map((r) => (
-                <tr key={r.gene} className={r.gene === gene ? 'selected' : undefined} aria-selected={r.gene === gene} onClick={() => onGene?.(r.gene === gene ? null : r.gene)}>
+                <tr key={r.gene} className={r.gene === gene ? 'selected' : undefined} aria-selected={r.gene === gene} onClick={() => pick(r.gene)}>
                   <td>{r.gene}</td>
                   <td>{fold(r.log2fc)}</td>
                   <td>{r.padj === null ? 'no test' : r.padj < 0.001 ? r.padj.toExponential(1) : r.padj.toFixed(3)}</td>
@@ -224,7 +318,7 @@ function ExpressionChange({ data, gene, onGene }: { data: ExpressionCompare; gen
               ))}
             </tbody>
           </table>
-        </div>
+        </>
       )}
     </>
   )

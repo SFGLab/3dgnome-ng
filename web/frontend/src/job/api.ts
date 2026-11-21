@@ -161,5 +161,7 @@ export type ExpressionCompare = {
   label_b?: string
   rho: number | null
   rows: { gene: string; distance: number; log2fc: number; padj: number | null; a: number; b: number }[]
+  /** Every gene of the test as [log2 fold change, -log10 adjusted p], kept within `fold` and `p`. Null without a test. */
+  volcano?: { fold: number; p: number; points: [number, number][] } | null
 }
 export const compareExpression = (a: string, b: string) => call<ExpressionCompare>(`/api/compare/expression?${new URLSearchParams({ a, b })}`)

@@ -132,6 +132,7 @@ describe('Compare', () => {
     const withData = { ...SUMMARY_DONE, expression: { label: 'ENCODE RNA-seq of GM12878, 2 replicates', kind: 'counts' as const, unit: 'TPM', samples: 2, source: 'ENCODE' } }
     const change = {
       mode: 'deseq2', reason: '', label_a: 'ENCODE RNA-seq of GM12878, 2 replicates', label_b: 'ENCODE RNA-seq of H1ESC, 2 replicates', rho: -0.41,
+      volcano: { fold: 12, p: 50, points: [[-3, 6.5], [0, 0], [0.2, 0.5], [1, 0.5], [8.4, 50], [-0.4, 1]] as [number, number][] },
       rows: [
         { gene: 'TNFRSF8', distance: 1.24, log2fc: -3, padj: 0.0000002, a: 80, b: 10 },
         { gene: 'MIIP', distance: -0.2, log2fc: 1, padj: 0.2, a: 5, b: 10 },
@@ -160,7 +161,20 @@ describe('Compare', () => {
     expect(within(within(table).getByRole('row', { name: /MIIP/ })).getAllByRole('cell')[2]).toHaveTextContent('0.200')
     // A fold change in the hundreds comes from next to no reads on one side and is capped.
     expect(within(within(table).getByRole('row', { name: /DRAXIN/ })).getAllByRole('cell')[1]).toHaveTextContent('over 100 times higher')
-    expect(within(block).getByRole('img', { name: 'Change of expression against change of distance for 3 genes' }).querySelectorAll('circle')).toHaveLength(3)
+    const scatter = within(block).getByRole('img', { name: 'Change of expression against change of distance for 3 genes' })
+    expect(scatter.querySelectorAll('circle')).toHaveLength(3)
+    // Each plot names its two axes and has ticks on both.
+    expect([...scatter.querySelectorAll('.axis-title')].map((t) => t.textContent)).toEqual(['3D distance, log2 fold change', 'Expression, log2 fold change'])
+    expect(scatter.querySelectorAll('.tick').length).toBeGreaterThan(5)
+    const volcano = within(block).getByRole('img', { name: 'Volcano plot of 3 genes of the region among the genes of the test' })
+    expect([...volcano.querySelectorAll('.axis-title')].map((t) => t.textContent)).toEqual(['Expression, log2 fold change', '-log10 of the adjusted p'])
+    // The genes of the test are the background and the genes of the region are drawn over them.
+    expect(volcano.querySelectorAll('circle.back')).toHaveLength(6)
+    expect(volcano.querySelectorAll('circle.point')).toHaveLength(3)
+    expect(volcano.querySelectorAll('circle.point.sure')).toHaveLength(1)
+    expect(within(volcano).getByText('adjusted p 0.05')).toBeInTheDocument()
+    // The last tick of a capped axis stands for every value above it.
+    expect(within(volcano).getByText('50+')).toBeInTheDocument()
     expect(String(f.mock.calls.find(([u]) => String(u).includes('/api/compare/expression'))![0])).toContain(`b=%2Fjobs%2F${OTHER}`)
     expect(checkCopy(container)).toEqual([])
   })

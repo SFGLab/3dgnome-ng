@@ -26,6 +26,7 @@ describe('Help page', () => {
       'Segment split, BED',
       'Centromeres, BED',
       'Structural variants, VCF',
+      'Gene expression, table',
     ])
     expect(within(table).getByText(/An uploaded .hic or .mcool map is converted to this format/)).toBeInTheDocument()
   })

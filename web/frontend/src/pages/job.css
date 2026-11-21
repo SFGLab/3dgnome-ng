@@ -1393,14 +1393,80 @@
   font-size: 13px;
 }
 
-.expression-change {
+.expression-plots {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
   gap: 16px;
+  margin-bottom: 8px;
 }
 
-.expression-change .compare-table {
+.expression-figure {
+  flex: none;
+  width: 340px;
+  max-width: 100%;
+  margin: 0;
+}
+
+.expression-figure figcaption {
+  margin-bottom: 6px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.expression-plot {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.expression-plot .axis {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.expression-plot .zero,
+.expression-plot .threshold {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.expression-plot .threshold {
+  stroke: var(--muted);
+}
+
+.expression-plot .tick {
+  fill: var(--muted);
+  font-size: 9px;
+}
+
+.expression-plot .axis-title {
+  fill: var(--ink);
+  font-size: 10px;
+}
+
+.expression-plot .back {
+  fill: var(--faint);
+  opacity: 0.35;
+}
+
+.expression-plot .point {
+  fill: var(--muted);
+  cursor: pointer;
+}
+
+.expression-plot .point.sure {
+  fill: var(--accent);
+}
+
+.expression-plot .point.selected {
+  fill: var(--promoter);
+}
+
+.compare-table {
   flex: 1;
   min-width: 320px;
   margin-top: 0;

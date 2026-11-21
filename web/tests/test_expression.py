@@ -187,6 +187,10 @@ def test_two_jobs_with_replicates_are_compared_with_deseq2(site: SimpleNamespace
     if HAS_DESEQ:
         assert out["mode"] == "deseq2" and out["reason"] == "", "two replicates on each side are tested with DESeq2: " + str(out["mode"])
         assert rows["ALPHA"]["padj"] is not None and rows["ALPHA"]["padj"] < 0.01, "the changed gene is significant: " + str(rows["ALPHA"]["padj"])
+        points = out["volcano"]["points"]
+        assert [0.0, 0.0] in points and len({tuple(p) for p in points}) == len(points) < 400, "the volcano plot has the tested genes on a grid, each cell once, the unchanged genes in one cell: " + str(points[:6])
+        assert all(abs(x) <= out["volcano"]["fold"] and 0 <= y <= out["volcano"]["p"] for x, y in points), "its points keep to the limits of the plot"
+        assert any(2.5 < x < 3.5 and y > 2 for x, y in points), "the changed gene is among them, up and significant"
     else:
         assert out["mode"] == "ratio" and "PyDESeq2 is not installed" in out["reason"], "without PyDESeq2 the answer is a ratio and says why"
     assert out["rho"] is None, "two genes give no correlation"
@@ -201,6 +205,7 @@ def test_one_library_a_side_gives_a_ratio_and_no_test(site: SimpleNamespace) -> 
     out = c.get("/api/compare/expression", params={"a": a, "b": b}).json()
     assert out["mode"] == "ratio" and "two samples or more on each side" in out["reason"], "one library is compared by a ratio: " + str(out.get("reason"))
     assert out["rows"] and all(x["padj"] is None for x in out["rows"]), "a ratio has no p-value"
+    assert out["volcano"] is None, "a ratio has no volcano plot"
     values = site.job(expression="TMM", sv_set="DEMO", sample="P1")
     mixed = c.get("/api/compare/expression", params={"a": a, "b": values}).json()
     assert mixed["mode"] == "none" and "read counts and the other normalised values" in mixed["reason"] and mixed["rows"] == [], "counts and normalised values are not compared: " + str(mixed)

@@ -12,6 +12,7 @@ const FORMATS = [
   ['Segment split, BED', 'chr  position  position', 'Optional. Positions where the coarse segments split.'],
   ['Centromeres, BED', 'chr  start  end', 'One line per chromosome.'],
   ['Structural variants, VCF', 'standard VCF, bgzip', 'See the next section.'],
+  ['Gene expression, table', 'gene  length  sample_1  sample_2', 'Optional. Read counts or normalised values of RNA-seq, tab or comma separated. The length column is optional. See the Gene expression section.'],
 ]
 
 const EXAMPLES = [
@@ -132,8 +133,8 @@ export function Help() {
         <section id="expression">
           <h2>Gene expression</h2>
           <p>
-            Step 5 of the form adds RNA-seq to a job. The step is optional and the structures do not depend on it. With it the Genes tab shows the expression of each gene beside its distances. The comparison of two jobs then shows the
-            change of expression of each gene beside the change of its distance to the nearest enhancer.
+            Gene expression from RNA-seq is the one kind of data on the site that the structures do not depend on. Step 5 of the form adds it to a job and the step is optional. With it the Genes tab shows the expression of each gene
+            beside its distances. The comparison of two jobs then shows the change of expression of each gene beside the change of its distance to the nearest enhancer.
           </p>
           <p>
             The server holds {trios ? 'four' : 'three'} sets. ENCODE has read counts of total RNA-seq for GM12878, H1ESC and HFFc6, with two or three replicates each. A job on a cell type takes the replicates of that cell type. The
@@ -153,6 +154,11 @@ export function Help() {
             The Genes tab shows one level for each gene, the mean over the samples of the job. Read counts with gene lengths give TPM and read counts without lengths give counts per million. Normalised values are shown in their own unit.
           </p>
           <p>
+            The comparison of two jobs with expression has two plots and a table. The first plot has a point for each gene of the region, with the change of its distance to the nearest enhancer on the x axis and the change of its
+            expression on the y axis. Both are log2 of the second job over the first. The second is a volcano plot of the test, with the change of expression on the x axis and the adjusted p on the y axis as its negative log10. Its
+            grey points are all the genes of the test and the genes of the region are drawn over them. A click on a point or on a row of the table selects the gene in both structures.
+          </p>
+          <p>
             Two jobs with read counts and two samples or more each are compared with DESeq2, run by PyDESeq2. The test covers the genes with ten reads or more and gives a log2 fold change and an adjusted p for each. Every other pair
             gives a ratio of the two levels with no test. That holds for read counts with one sample on a side and for normalised values of one set. Read counts are not compared with normalised values. The values of two sets are not
             compared with each other.
@@ -162,6 +168,7 @@ export function Help() {
         <section id="reading">
           <h2>Reading the results</h2>
           <QA q="Bead unit" a="One bead unit is the target distance between two beads 1 kb apart, which is also the bond length. You can compare distances within a job and between jobs of one cell type." />
+          <QA q="Expression column" a="A job with gene expression shows one level for each gene in the Genes tab, the mean over its samples. A gene that the expression table lacks has an empty cell." />
           <QA q="Genes missing from the table" a="The TSS or the nearest enhancer is more than 5 kb from every bead. Beads exist only in stretches with loops." />
           <QA q="Differences between structures" a="Each structure starts from a different random position. Parts of the region with many loops are similar across structures. Parts with few loops vary more." />
         </section>
