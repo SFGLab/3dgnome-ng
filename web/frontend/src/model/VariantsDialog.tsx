@@ -148,7 +148,9 @@ export function VariantsDialog(props: {
     retry: false,
   })
 
-  const variantPage = usePage(check.data?.variants ?? [], fields)
+  // The table goes back to its first page when the check is for other fields. The fields are a new
+  // object at every render and their text is what changes with them.
+  const variantPage = usePage(check.data?.variants ?? [], JSON.stringify(fields))
   const samples = mode === 'upload' ? (upload?.samples ?? []) : (catalog.sv_sets[svSet]?.samples ?? [])
   const n = check.data?.variants.length
   const ready = !!sample && !!source

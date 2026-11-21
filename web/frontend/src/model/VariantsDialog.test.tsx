@@ -89,6 +89,16 @@ describe('Structural variants dialog', () => {
     const table = await screen.findByRole('table')
     expect(within(table).getAllByRole('row').slice(1)).toHaveLength(50)
     expect(screen.getByText('variants 1 to 50 of 60')).toBeInTheDocument()
+    // Next shows the rest and Previous the first page again.
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }))
+    expect(screen.getByText('variants 51 to 60 of 60')).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getAllByRole('row').slice(1)).toHaveLength(10)
+    fireEvent.click(screen.getByRole('button', { name: /Previous/ }))
+    expect(screen.getByText('variants 1 to 50 of 60')).toBeInTheDocument()
+    // Another haplotype is another check and starts at its first page.
+    fireEvent.click(screen.getByRole('button', { name: /Next/ }))
+    fireEvent.change(screen.getByLabelText('Haplotype'), { target: { value: '1' } })
+    expect(await screen.findByText('variants 1 to 50 of 60')).toBeInTheDocument()
   })
 
   it('checks again for the second haplotype', async () => {
