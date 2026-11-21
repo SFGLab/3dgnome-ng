@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
+import { CsvButton } from '../components/CsvButton'
 import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
 import type { JobApi, Loop } from './api'
@@ -14,6 +15,9 @@ export function LoopsTab({ api, onShow }: { api: JobApi; onShow?: (loop: Loop) =
   if (!loops.data) return <div aria-busy="true" />
   return (
     <>
+      <div className="genes-toolbar">
+        <CsvButton file="loops" head={['factor', 'chrom', 'a_start', 'a_end', 'b_start', 'b_end', 'span_bp', 'pets']} rows={() => sorted.map((l) => [l.factor, l.chrom, l.a[0], l.a[1], l.b[0], l.b[1], l.span, l.pets])} />
+      </div>
       <Pager page={page} noun="loops" />
       <div className="table-scroll">
       <table className="genes-table loops-table">

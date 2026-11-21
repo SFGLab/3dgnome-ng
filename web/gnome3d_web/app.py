@@ -664,6 +664,18 @@ def create_app() -> FastAPI:
             dirs.append(job_dir(m[1], m[2]))
         return JSONResponse(explore.compare(dirs[0], dirs[1]))
 
+    @app.get("/api/compare/gene")
+    def api_compare_gene(a: str, b: str, gene: str) -> JSONResponse:
+        """The distances of one gene in the structures of two jobs."""
+        dirs = []
+        for url in (a, b):
+            m = re.fullmatch(r"/(jobs|p)/([A-Za-z0-9_-]{8,64})", url)
+            if not m:
+                raise HTTPException(404)
+            dirs.append(job_dir(m[1], m[2]))
+        out = explore.compare_gene(dirs[0], dirs[1], gene)
+        return JSONResponse(out) if out else JSONResponse({"error": f"{gene} is not a gene of both jobs"}, 404)
+
     @app.get("/api/compare/expression")
     def api_compare_expression(a: str, b: str) -> JSONResponse:
         dirs = []

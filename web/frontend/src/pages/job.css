@@ -1377,14 +1377,155 @@
 }
 
 /* The change of expression of two jobs: a line on what was computed, then the plot beside the table. */
-.compare-expression {
-  margin-top: 22px;
+/* Under the two structures: the values and the tables, and the figures in a column beside them. */
+.compare-results {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+  margin-top: 20px;
 }
 
-.compare-expression h3 {
-  margin: 0 0 6px;
-  font-size: 14px;
-  font-weight: 600;
+/* The figures are an accordion: one is open at a time and the rest show their titles. */
+.compare-figures {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.compare-figure {
+  margin: 0;
+}
+
+.compare-figure + .compare-figure {
+  border-top: 1px solid var(--line);
+}
+
+.compare-figure figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 10px;
+}
+
+.figure-head {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 600 12px var(--font);
+  text-align: left;
+  cursor: pointer;
+}
+
+.compare-figure.open .figure-head svg {
+  transform: rotate(90deg);
+}
+
+.compare-figure .expression-plot {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.figure-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 11px var(--font);
+  cursor: pointer;
+}
+
+.figure-save:hover {
+  color: var(--ink);
+}
+
+.figure-empty {
+  margin: 0;
+  padding: 22px 16px 26px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.compare-tables {
+  min-width: 0;
+}
+
+/* A table keeps to its column: a long head wraps and the rest scrolls. */
+.compare-scroll {
+  overflow-x: auto;
+}
+
+.compare-scroll .compare-table {
+  margin-top: 0;
+}
+
+.compare-scroll .compare-table th {
+  min-width: 5.5em;
+  white-space: normal;
+  vertical-align: bottom;
+}
+
+.compare-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.compare-cards .big {
+  margin-top: 2px;
+}
+
+.compare-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.compare-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.csv-button {
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.compare-tabs .chip-button {
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* The number of genes of a table, drawn as the counts of the tabs of the job are. */
+.compare-tabs .count {
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.compare-tabs .on .count {
+  background: color-mix(in srgb, var(--bg) 22%, transparent);
+  color: var(--bg);
 }
 
 .compare-note {
@@ -1393,25 +1534,14 @@
   font-size: 13px;
 }
 
-.expression-plots {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 8px;
-}
+@media (max-width: 1000px) {
+  .compare-results {
+    grid-template-columns: 1fr;
+  }
 
-.expression-figure {
-  flex: none;
-  width: 340px;
-  max-width: 100%;
-  margin: 0;
-}
-
-.expression-figure figcaption {
-  margin-bottom: 6px;
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 600;
+  .compare-figures {
+    max-width: 420px;
+  }
 }
 
 .expression-plot {
@@ -1466,10 +1596,31 @@
   fill: var(--promoter);
 }
 
-.compare-table {
-  flex: 1;
-  min-width: 320px;
-  margin-top: 0;
+/* The box plot of one gene: the box of each job, its median and a point for each structure. */
+.expression-plot .quartiles {
+  fill: var(--panel);
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.expression-plot .side-1 .quartiles {
+  fill: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  stroke: var(--accent);
+}
+
+.expression-plot .whisker {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+
+.expression-plot .median {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.expression-plot .structure {
+  fill: var(--ink);
+  opacity: 0.55;
 }
 
 .expression-scatter {

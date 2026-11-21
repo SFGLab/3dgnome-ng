@@ -48,7 +48,19 @@ directory as `explore_<name>.json`.
 Step 5 of the form, Gene expression, is optional. It lists the hosted tables that
 `GET /api/expression?cell=&sv_set=&sample=` returns for the cell type and the sample, and a card
 for a table of the user, which opens the Your own data dialog on its Expression step. A job with expression has an Expression column in the Genes tab. The
-compare view of two such jobs reads `GET /api/compare/expression?a=&b=` and shows the change of
-expression of each gene against the change of its distance to the nearest enhancer, as a plot, a
-volcano plot of the test and a table. Each plot has its two axes named and ticked. The volcano
-plot has every gene of the test in the background, on a grid of 0.2 by 0.5 with each cell once. `design/website/data.md` has the tables and the comparison.
+compare view of two such jobs reads `GET /api/compare/expression?a=&b=`.
+
+Under its two structures the compare view has the results, `CompareResults.tsx`. The tables are
+on the left, one tab for the 3D distance and one for the expression, each with every gene of
+both jobs a page at a time. Above them a card has the main values of the selected gene and a
+card the rank correlation of the two changes. The figures are an accordion on the right, under
+the tables on a narrow screen: the box plot of the distance of the selected gene in the
+structures of the two jobs, from `GET /api/compare/gene?a=&b=&gene=`, the plot of the change of
+expression against the change of distance and the volcano plot. A row of `GET /api/compare` has
+the p of a Mann-Whitney U test of the distances. The two jobs are named by the first thing they
+differ in, the cell type, the sample, the loops or the contact background, and every change says
+in which job it is. Each plot has its two axes named and ticked and a key of its marks. The
+volcano plot has every gene of the test in the background, on a grid of 0.2 by 0.5 with each
+cell once. An open figure is saved as a PNG with its title, `savePng.ts`. The tables of a job,
+the genes, the loops and the two tables of the comparison, are saved whole as CSV, `saveCsv.ts`.
+`design/website/data.md` has the tables and the comparison.

@@ -6,7 +6,10 @@ import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { ANNOTATIONS, GENES, KEY, STRUCTURE, SUMMARY_DONE } from '../test/job'
 import { jobApi } from './api'
-import { Compare, shownRows } from './Compare'
+import { Compare } from './Compare'
+import { sideNames } from './CompareResults'
+import { csvText } from './saveCsv'
+import { standalone } from './savePng'
 
 vi.mock('./Scene', () => ({ Scene: (p: { markers?: { label: string }[] }) => <div data-testid="scene">{(p.markers ?? []).map((m) => m.label).join('')}</div> }))
 
@@ -14,8 +17,9 @@ const OTHER = 'fedcba9876543210'
 const CTCF_SUMMARY = { ...SUMMARY_DONE, request: { ...SUMMARY_DONE.request, factors: 'CTCF' } }
 const COMPARE = {
   same_region: true,
-  rows: [{ gene: 'TNFRSF8', linear_bp: 385000, a: { mean: 6.7, sd: 1.9 }, b: { mean: 15.8, sd: 3.4 }, ratio: 15.8 / 6.7 }],
+  rows: [{ gene: 'TNFRSF8', linear_bp: 385000, a: { mean: 6.7, sd: 1.9 }, b: { mean: 15.8, sd: 3.4 }, ratio: 15.8 / 6.7, p: 0.004 }],
 }
+const ONE_GENE = { gene: 'TNFRSF8', a: [5, 6, 7, 9], b: [12, 15, 16, 20], p: 0.004 }
 
 function renderCompare(gene: string | null = 'TNFRSF8') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -35,6 +39,7 @@ describe('Compare', () => {
       [/annotations$/, () => [200, ANNOTATIONS]],
       [new RegExp(`${OTHER}/genes$`), () => [200, [{ ...GENES[0], distance: 15.8, sd: 3.4 }]]],
       [/genes$/, () => [200, GENES]],
+      [/\/api\/compare\/gene$/, () => [200, ONE_GENE]],
       [/\/api\/compare$/, () => [200, COMPARE]],
     ])
   })
@@ -55,7 +60,7 @@ describe('Compare', () => {
     expect(within(choose).queryByRole('button', { name: /this one/ })).toBeNull()
     fireEvent.change(within(choose).getByPlaceholderText('Paste a job link'), { target: { value: `https://site/jobs/${OTHER}` } })
     fireEvent.click(within(choose).getByRole('button', { name: 'Compare' }))
-    expect(await screen.findByText('CTCF loops')).toBeInTheDocument()
+    expect((await screen.findAllByText('CTCF loops')).length).toBeGreaterThan(0)
     expect(screen.queryByRole('group', { name: 'Jobs to compare with' })).toBeNull()
   })
 
@@ -64,7 +69,7 @@ describe('Compare', () => {
     rememberJob({ url: '/jobs/cccc3333dddd4444', label: 'GM12878 MYC', name: '', at: 1 })
     renderCompare()
     fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
-    const head = (await screen.findByText('CTCF loops')).closest('button')!
+    const head = (await screen.findAllByText('CTCF loops')).map((e) => e.closest('button')).find(Boolean)!
     expect(head).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(head)
     const menu = screen.getByRole('group', { name: 'Jobs to compare with' })
@@ -79,18 +84,37 @@ describe('Compare', () => {
     rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
     renderCompare()
     fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
-    expect(await screen.findByText('CTCF and RNAPII loops')).toBeInTheDocument()
-    expect(await screen.findByText('CTCF loops')).toBeInTheDocument()
+    expect((await screen.findAllByText('CTCF and RNAPII loops')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('CTCF loops')).length).toBeGreaterThan(0)
     expect(screen.getAllByTestId('scene')).toHaveLength(2)
     expect(screen.getByRole('checkbox', { name: 'Link rotation and zoom' })).toBeChecked()
     expect(await screen.findByRole('checkbox', { name: 'Same region' })).toBeChecked()
     await screen.findAllByText('15.8 ± 3.4')
     expect([...document.querySelectorAll('.ab-label')].map((e) => e.textContent)).toEqual(['A to B 6.7 ± 1.9', 'A to B 15.8 ± 3.4'])
     expect(screen.getAllByTestId('scene').map((s) => s.textContent)).toEqual(['AB', 'AB'])
-    const table = await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
+    const table = await screen.findByRole('table', { name: 'Changes in enhancer to promoter distance' })
     expect(within(table).getByText('TNFRSF8, enhancer 385 kb away')).toBeInTheDocument()
     expect(within(table).getByText('2.4 times farther')).toBeInTheDocument()
-    expect(within(table).getAllByRole('columnheader').at(-1)!.textContent).toBe('CTCF against CTCF and RNAPII')
+    // The two jobs are named by the loops they differ in, and every change says in which job it is.
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Gene', 'CTCF and RNAPII loops', 'CTCF loops', 'CTCF loops against CTCF and RNAPII loops', 'Mann-Whitney p'])
+    expect(within(table).getByText('0.004')).toBeInTheDocument()
+    // The selected gene has its values in a card and a box plot of its distance in the structures of both jobs.
+    const card = screen.getByRole('region', { name: 'Change of TNFRSF8' })
+    expect(card).toHaveTextContent('2.4 times farther in CTCF loops')
+    expect(card).toHaveTextContent('6.7 ± 1.9 bead units in CTCF and RNAPII loops, 15.8 ± 3.4 in CTCF loops. Mann-Whitney p 0.004.')
+    const box = await screen.findByRole('img', { name: 'Enhancer to promoter distance of TNFRSF8 in the structures of CTCF and RNAPII loops and of CTCF loops' })
+    expect(box.querySelectorAll('rect.quartiles')).toHaveLength(2)
+    expect(box.querySelectorAll('.box circle.structure')).toHaveLength(8)
+    expect([...box.querySelectorAll('.axis-title')].map((x) => x.textContent)).toEqual(['3D distance, bead units'])
+    expect(within(box).getAllByText('4 structures')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Save the figure Enhancer to promoter distance of TNFRSF8 as a PNG' })).toBeInTheDocument()
+    // The picture of a figure stands by itself: its title is written above it and it has a background.
+    const picture = standalone(box as unknown as SVGSVGElement, 'Enhancer to promoter distance of TNFRSF8')
+    expect(picture.querySelector('text')!.textContent).toBe('Enhancer to promoter distance of TNFRSF8')
+    expect(picture.querySelector('rect')!.getAttribute('fill')).toBeTruthy()
+    expect(picture.getAttribute('width')).toBe('1020')
+    // The table is saved whole as a CSV file.
+    expect(screen.getByRole('button', { name: 'Save the table as distance_changes.csv' })).toBeInTheDocument()
   })
 
   it('selects the gene of a clicked row of the table', async () => {
@@ -103,7 +127,7 @@ describe('Compare', () => {
       </QueryClientProvider>,
     )
     fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
-    const table = await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
+    const table = await screen.findByRole('table', { name: 'Changes in enhancer to promoter distance' })
     fireEvent.click(within(table).getByText('TNFRSF8, enhancer 385 kb away'))
     expect(onGene).toHaveBeenCalledWith('TNFRSF8')
     expect(screen.queryByRole('button', { name: /Clear the selection/ })).toBeNull()
@@ -119,7 +143,7 @@ describe('Compare', () => {
       </QueryClientProvider>,
     )
     fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
-    const table = await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
+    const table = await screen.findByRole('table', { name: 'Changes in enhancer to promoter distance' })
     fireEvent.click(within(table).getByText('TNFRSF8, enhancer 385 kb away'))
     expect(onGene).toHaveBeenLastCalledWith(null)
     fireEvent.click(screen.getByRole('button', { name: 'Clear the selection of TNFRSF8' }))
@@ -145,6 +169,7 @@ describe('Compare', () => {
       [/annotations$/, () => [200, ANNOTATIONS]],
       [/genes$/, () => [200, GENES]],
       [/\/api\/compare\/expression$/, () => [200, change]],
+      [/\/api\/compare\/gene$/, () => [200, ONE_GENE]],
       [/\/api\/compare$/, () => [200, COMPARE]],
     ])
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -153,28 +178,53 @@ describe('Compare', () => {
         <Compare api={jobApi('jobs', KEY)} summary={withData} selected={1} gene="TNFRSF8" initial={`/jobs/${OTHER}`} onClose={vi.fn()} />
       </QueryClientProvider>,
     )
-    const block = await screen.findByRole('region', { name: 'Expression against 3D distance' })
-    expect(await within(block).findByText(/The fold change and its adjusted p are those of DESeq2\./)).toHaveTextContent('Over 3 genes the change of expression and the change of distance have a rank correlation of -0.41.')
-    const table = within(block).getByRole('table', { name: 'Largest changes in expression' })
+    // The main value is the rank correlation, as a card, and the text beside it is short.
+    const card = await screen.findByRole('region', { name: 'Expression against 3D distance' })
+    expect(within(card).getByText('-0.41')).toHaveClass('big-value')
+    expect(card).toHaveTextContent('Of the change of expression with the change of distance over 3 genes, the other job against this job. Tested with DESeq2.')
+    expect(screen.getByRole('region', { name: 'Change of TNFRSF8' })).toHaveTextContent('8.0 times lower expression in the other job')
+    // The tables are two tabs. The 3D distance is shown first.
+    const tabs = screen.getByRole('tablist', { name: 'Tables of the comparison' })
+    expect(within(tabs).getAllByRole('tab').map((x) => x.textContent)).toEqual(['3D distance 1', 'Expression 3'])
+    expect(screen.queryByRole('table', { name: 'Changes in expression' })).toBeNull()
+    fireEvent.click(within(tabs).getByRole('tab', { name: 'Expression 3' }))
+    expect(screen.queryByRole('table', { name: 'Changes in enhancer to promoter distance' })).toBeNull()
+    const table = screen.getByRole('table', { name: 'Changes in expression' })
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Gene', 'this job', 'the other job', 'Expression, the other job against this job', 'Adjusted p', '3D distance, the other job against this job'])
     const row = within(table).getByRole('row', { name: /TNFRSF8/ })
-    expect(within(row).getAllByRole('cell').map((c) => c.textContent)).toEqual(['TNFRSF8', '8.0 times lower', '2.0e-7', '2.4 times farther'])
-    expect(within(within(table).getByRole('row', { name: /MIIP/ })).getAllByRole('cell')[2]).toHaveTextContent('0.200')
+    expect(within(row).getAllByRole('cell').map((c) => c.textContent)).toEqual(['TNFRSF8', '80.0', '10.0', '8.0 times lower', '2.0e-7', '2.4 times farther'])
+    expect(within(within(table).getByRole('row', { name: /MIIP/ })).getAllByRole('cell')[4]).toHaveTextContent('0.200')
     // A fold change in the hundreds comes from next to no reads on one side and is capped.
-    expect(within(within(table).getByRole('row', { name: /DRAXIN/ })).getAllByRole('cell')[1]).toHaveTextContent('over 100 times higher')
+    expect(within(within(table).getByRole('row', { name: /DRAXIN/ })).getAllByRole('cell')[3]).toHaveTextContent('over 100 times higher')
+    expect(screen.getByRole('button', { name: 'Save the table as expression_changes.csv' })).toBeInTheDocument()
+    // The figures are an accordion. With expression it starts on the plot of the two changes.
+    const block = screen.getByRole('region', { name: 'Changes between the two jobs' })
+    const heads = ['Enhancer to promoter distance of TNFRSF8', 'Change of expression against change of distance', 'Volcano plot of the change of expression']
+    expect(heads.map((name) => within(block).getByRole('button', { name }).getAttribute('aria-expanded'))).toEqual(['false', 'true', 'false'])
     const scatter = within(block).getByRole('img', { name: 'Change of expression against change of distance for 3 genes' })
-    expect(scatter.querySelectorAll('circle')).toHaveLength(3)
-    // Each plot names its two axes and has ticks on both.
-    expect([...scatter.querySelectorAll('.axis-title')].map((t) => t.textContent)).toEqual(['3D distance, log2 fold change', 'Expression, log2 fold change'])
+    expect(scatter.querySelectorAll(':scope > circle')).toHaveLength(3)
+    // Each plot names its two axes, says which job is over which, has ticks on both and a key of its marks.
+    expect([...scatter.querySelectorAll('.axis-title')].map((x) => x.textContent)).toEqual(['3D distance, log2 of the other job over this job', 'Expression, log2 of the other job over this job'])
     expect(scatter.querySelectorAll('.tick').length).toBeGreaterThan(5)
+    expect(within(scatter).getByText('adjusted p under 0.05')).toBeInTheDocument()
+    // The open figure can be saved as a PNG. Opening another figure closes this one.
+    expect(within(block).getAllByRole('button', { name: /^Save the figure .* as a PNG$/ })).toHaveLength(1)
+    fireEvent.click(within(block).getByRole('button', { name: heads[2] }))
+    expect(within(block).queryByRole('img', { name: /^Change of expression against/ })).toBeNull()
     const volcano = within(block).getByRole('img', { name: 'Volcano plot of 3 genes of the region among the genes of the test' })
-    expect([...volcano.querySelectorAll('.axis-title')].map((t) => t.textContent)).toEqual(['Expression, log2 fold change', '-log10 of the adjusted p'])
+    expect([...volcano.querySelectorAll('.axis-title')].map((x) => x.textContent)).toEqual(['Expression, log2 of the other job over this job', '-log10 of the adjusted p'])
     // The genes of the test are the background and the genes of the region are drawn over them.
-    expect(volcano.querySelectorAll('circle.back')).toHaveLength(6)
-    expect(volcano.querySelectorAll('circle.point')).toHaveLength(3)
-    expect(volcano.querySelectorAll('circle.point.sure')).toHaveLength(1)
+    expect(volcano.querySelectorAll(':scope > circle.back')).toHaveLength(6)
+    expect(volcano.querySelectorAll(':scope > circle.point')).toHaveLength(3)
+    expect(volcano.querySelectorAll(':scope > circle.point.sure')).toHaveLength(1)
     expect(within(volcano).getByText('adjusted p 0.05')).toBeInTheDocument()
+    expect(within(volcano).getByText('genes outside the region')).toBeInTheDocument()
     // The last tick of a capped axis stands for every value above it.
     expect(within(volcano).getByText('50+')).toBeInTheDocument()
+    expect(within(block).getByRole('button', { name: 'Save the figure Volcano plot of the change of expression as a PNG' })).toBeInTheDocument()
+    // A second click on the head of the open figure closes it.
+    fireEvent.click(within(block).getByRole('button', { name: heads[2] }))
+    expect(within(block).queryAllByRole('img')).toHaveLength(0)
     expect(String(f.mock.calls.find(([u]) => String(u).includes('/api/compare/expression'))![0])).toContain(`b=%2Fjobs%2F${OTHER}`)
     expect(checkCopy(container)).toEqual([])
   })
@@ -186,6 +236,7 @@ describe('Compare', () => {
       [/structure\/\d+$/, () => [200, STRUCTURE]],
       [/annotations$/, () => [200, ANNOTATIONS]],
       [/genes$/, () => [200, GENES]],
+      [/\/api\/compare\/gene$/, () => [200, ONE_GENE]],
       [/\/api\/compare$/, () => [200, COMPARE]],
     ])
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -194,23 +245,60 @@ describe('Compare', () => {
         <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene={null} initial={`/jobs/${OTHER}`} onClose={vi.fn()} />
       </QueryClientProvider>,
     )
-    await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
+    await screen.findByRole('table', { name: 'Changes in enhancer to promoter distance' })
     expect(screen.queryByRole('region', { name: 'Expression against 3D distance' })).toBeNull()
     expect(f.mock.calls.some(([u]) => String(u).includes('/api/compare/expression'))).toBe(false)
   })
 
-  it('keeps the ten largest changes in their order and puts a selected gene outside them first', () => {
-    const rows = Array.from({ length: 14 }, (_, i) => ({ gene: `G${i}` }))
-    expect(shownRows(rows, 'G3').map((r) => r.gene)).toEqual(rows.slice(0, 10).map((r) => r.gene))
-    expect(shownRows(rows, 'G12').map((r) => r.gene)).toEqual(['G12', ...rows.slice(0, 10).map((r) => r.gene)])
-    expect(shownRows(rows, null)).toHaveLength(10)
+  it('lists every gene of the comparison and shows the page of the selected one', async () => {
+    const rows = Array.from({ length: 30 }, (_, k) => ({ gene: `G${k}`, linear_bp: 1000 * (k + 1), a: { mean: 2, sd: 0.5 }, b: { mean: 2 + k, sd: 0.5 }, ratio: (2 + k) / 2, p: 0.5 }))
+    mockApi([
+      [new RegExp(`${OTHER}/summary$`), () => [200, CTCF_SUMMARY]],
+      [/summary$/, () => [200, SUMMARY_DONE]],
+      [/structure\/\d+$/, () => [200, STRUCTURE]],
+      [/annotations$/, () => [200, ANNOTATIONS]],
+      [/genes$/, () => [200, GENES]],
+      [/\/api\/compare\/gene$/, () => [200, { gene: 'G27', a: [1, 2], b: [3, 4], p: 0.33 }]],
+      [/\/api\/compare$/, () => [200, { same_region: true, rows }]],
+    ])
+    localStorage.setItem('gnome3d.rows', '25')
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const view = (gene: string | null) => (
+      <QueryClientProvider client={client}>
+        <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene={gene} initial={`/jobs/${OTHER}`} onClose={vi.fn()} />
+      </QueryClientProvider>
+    )
+    const { rerender } = render(view(null))
+    const table = await screen.findByRole('table', { name: 'Changes in enhancer to promoter distance' })
+    // No gene is left out of the table. Thirty genes are two pages of 25.
+    expect(screen.getByRole('tab', { name: '3D distance 30' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(table).getAllByRole('row')).toHaveLength(26)
+    expect(within(table).queryByText(/^G27,/)).toBeNull()
+    expect(screen.getByText(/Select a gene in a table or a plot/)).toBeInTheDocument()
+    // A gene selected in a plot or on the other tab is on a later page. The table goes to that page.
+    rerender(view('G27'))
+    expect(await within(table).findByText(/^G27,/)).toBeInTheDocument()
+    expect(within(table).getByRole('row', { name: /^G27,/ })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('writes a table as CSV, with quotes around a cell that needs them', () => {
+    expect(csvText(['gene', 'note'], [['MYC', 'a, b'], ['TP53', 'say "x"'], ['X', null], ['Y', 1.5]])).toBe('gene,note\r\nMYC,"a, b"\r\nTP53,"say ""x"""\r\nX,\r\nY,1.5\r\n')
+  })
+
+  it('names two jobs by the first thing they differ in', () => {
+    const job = (request: Partial<typeof SUMMARY_DONE.request>) => ({ ...SUMMARY_DONE, request: { ...SUMMARY_DONE.request, ...request } })
+    expect(sideNames(job({ cell_type: 'GM12878' }), job({ cell_type: 'H1ESC', factors: 'CTCF' }))).toEqual(['GM12878', 'H1ESC'])
+    expect(sideNames(job({ sample: '' }), job({ sample: 'HG00512' }))).toEqual(['no variants', 'HG00512'])
+    expect(sideNames(job({ factors: 'CTCF' }), job({ factors: 'CTCF+RNAPII' }))).toEqual(['CTCF loops', 'CTCF and RNAPII loops'])
+    expect(sideNames(job({ background: 'hic' }), job({ background: 'none' }))).toEqual(['Hi-C', 'no contact map'])
+    expect(sideNames(job({}), job({}))).toEqual(['this job', 'the other job'])
   })
 
   it('keeps to the writing rules', async () => {
     rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
     const { container } = renderCompare()
     fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
-    await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
+    await screen.findByRole('table', { name: 'Changes in enhancer to promoter distance' })
     expect(checkCopy(container)).toEqual([])
   })
 })

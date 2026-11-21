@@ -25,6 +25,12 @@ describe('GenesTab', () => {
     ])
   })
 
+  it('offers the table as a CSV file beside the file of the engine', () => {
+    renderTab()
+    expect(screen.getByRole('button', { name: 'Save the table as genes.csv' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /ep\.tsv/ })).toBeInTheDocument()
+  })
+
   it('shows the expression of each gene when the job has it, in its unit', () => {
     renderTab()
     expect(screen.queryByRole('columnheader', { name: /Expression/ })).toBeNull()

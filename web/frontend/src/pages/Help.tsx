@@ -154,9 +154,11 @@ export function Help() {
             The Genes tab shows one level for each gene, the mean over the samples of the job. Read counts with gene lengths give TPM and read counts without lengths give counts per million. Normalised values are shown in their own unit.
           </p>
           <p>
-            The comparison of two jobs with expression has two plots and a table. The first plot has a point for each gene of the region, with the change of its distance to the nearest enhancer on the x axis and the change of its
-            expression on the y axis. Both are log2 of the second job over the first. The second is a volcano plot of the test, with the change of expression on the x axis and the adjusted p on the y axis as its negative log10. Its
-            grey points are all the genes of the test and the genes of the region are drawn over them. A click on a point or on a row of the table selects the gene in both structures.
+            Under the two structures the comparison has two tables with every gene of both jobs, one for the 3D distance and one for the expression, each on its own tab. The other job is compared against this one. Each change
+            says in which job the value is higher or the distance longer. Beside the tables are three figures. The box plot shows the distance of the selected gene to its nearest enhancer in each structure of the two jobs, with the
+            p of a Mann-Whitney U test. The second figure has a point for each gene of the region, with the change of its distance on the x axis and the change of its expression on the y axis, both as log2 of the other job over this
+            one. The third is a volcano plot of the test, with the change of expression on the x axis and the adjusted p on the y axis as its negative log10. A click on a point or on a row of a table selects the gene in both
+            structures.
           </p>
           <p>
             Two jobs with read counts and two samples or more each are compared with DESeq2, run by PyDESeq2. The test covers the genes with ten reads or more and gives a log2 fold change and an adjusted p for each. Every other pair
@@ -168,6 +170,7 @@ export function Help() {
         <section id="reading">
           <h2>Reading the results</h2>
           <QA q="Bead unit" a="One bead unit is the target distance between two beads 1 kb apart, which is also the bond length. You can compare distances within a job and between jobs of one cell type." />
+          <QA q="Saving tables and figures" a="The CSV button beside a table saves all of its rows, also those on its other pages. The PNG button of a figure of the comparison saves the figure with its title." />
           <QA q="Expression column" a="A job with gene expression shows one level for each gene in the Genes tab, the mean over its samples. A gene that the expression table lacks has an empty cell." />
           <QA q="Genes missing from the table" a="The TSS or the nearest enhancer is more than 5 kb from every bead. Beads exist only in stretches with loops." />
           <QA q="Differences between structures" a="Each structure starts from a different random position. Parts of the region with many loops are similar across structures. Parts with few loops vary more." />

@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from gnome3d.geometry import smooth_chain
+from scipy.stats import mannwhitneyu
 
 from . import contacts as cm
 from . import expression, hicdiffusion
@@ -502,16 +503,37 @@ def _once(m: np.ndarray) -> list[list[float]]:
     return [np.round(m[i, i:], 6).tolist() for i in range(len(m))]
 
 
+def _pair_distances(job: Path) -> dict[str, list[float]]:
+    """The enhancer to promoter distance of every gene of a job in each of its structures."""
+
+    def make() -> dict[str, list[float]]:
+        pos, _ = _positions(job)
+        return {str(r["gene"]): [round(float(np.linalg.norm(p[r["promoter_bead"]] - p[r["enhancer_bead"]])), 3) for p in pos] for r in genes(job)}
+
+    return _cached(job, "pair_distances", make)
+
+
+def _rank_p(x: list[float], y: list[float]) -> float | None:
+    """The two sided p of the Mann-Whitney U test of two sets of distances, None with fewer
+    than two structures on a side."""
+    if len(x) < 2 or len(y) < 2:
+        return None
+    p = float(mannwhitneyu(x, y, alternative="two-sided").pvalue)
+    return float(f"{p:.3g}") if np.isfinite(p) else None
+
+
 def compare(a: Path, b: Path) -> dict[str, object]:
-    """The genes both jobs have, with each job's mean and SD of the enhancer to promoter distance
-    and the ratio b over a, the largest changes first, at most 20."""
+    """The genes both jobs have, with each job's mean and SD of the enhancer to promoter distance,
+    the ratio b over a and the p of a Mann-Whitney U test of the distances in the structures of
+    the two jobs, the largest changes first."""
     ra, rb = _json(a / "status.json").get("region"), _json(b / "status.json").get("region")
     ga = {r["gene"]: r for r in genes(a)}
     gb = {r["gene"]: r for r in genes(b)}
+    da, db = _pair_distances(a), _pair_distances(b)
     rows = []
     for name in ga.keys() & gb.keys():
         x, y = ga[name], gb[name]
-        if x["distance"] <= 0:
+        if x["distance"] <= 0 or y["distance"] <= 0:
             continue
         rows.append(
             {
@@ -520,10 +542,20 @@ def compare(a: Path, b: Path) -> dict[str, object]:
                 "a": {"mean": x["distance"], "sd": x["sd"]},
                 "b": {"mean": y["distance"], "sd": y["sd"]},
                 "ratio": y["distance"] / x["distance"],
+                "p": _rank_p(da.get(name, []), db.get(name, [])),
             }
         )
     rows.sort(key=lambda r: max(r["ratio"], 1 / r["ratio"]), reverse=True)
-    return {"same_region": ra is not None and ra == rb, "rows": rows[:20]}
+    return {"same_region": ra is not None and ra == rb, "rows": rows}
+
+
+def compare_gene(a: Path, b: Path, gene: str) -> dict[str, object] | None:
+    """The enhancer to promoter distance of one gene in each structure of job a and of job b,
+    for a box plot, with the p of `compare`. None for a gene one of the jobs lacks."""
+    x, y = _pair_distances(a).get(gene), _pair_distances(b).get(gene)
+    if x is None or y is None:
+        return None
+    return {"gene": gene, "a": x, "b": y, "p": _rank_p(x, y)}
 
 
 # The volcano plot shows a fold change up to 12 in log2 and an adjusted p down to 1e-50. A gene

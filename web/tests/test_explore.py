@@ -116,6 +116,15 @@ def test_two_jobs_on_one_region_compare_on_the_same_region(site: SimpleNamespace
     shared = {r["gene"] for r in c.get(three + "/genes").json()} & {r["gene"] for r in c.get("/api" + other + "/genes").json()}
     assert cmp2["same_region"] is False and {r["gene"] for r in cmp2["rows"]} <= shared, "jobs on different regions say so and list the shared genes only: " + str(cmp2)[:200]
     assert c.get("/api/compare", params={"a": both, "b": "/jobs/nothing123"}).status_code == 404, "a url that is not a job is a 404"
+    # Every shared gene is a row, with the p of the test of its distances in the two sets of structures.
+    assert {r["gene"] for r in cmp["rows"]} == {r["gene"] for r in c.get(three + "/genes").json()} & {r["gene"] for r in c.get("/api" + ctcf + "/genes").json()}, "the rows are all the genes of both jobs"
+    assert all("p" in r and (r["p"] is None or 0 <= r["p"] <= 1) for r in cmp["rows"]), "each row has the p of a Mann-Whitney U test, or none with one structure a side: " + str(cmp["rows"][:1])
+    gene = cmp["rows"][0]["gene"]
+    one = c.get("/api/compare/gene", params={"a": both, "b": ctcf, "gene": gene}).json()
+    n = {"a": c.get(three + "/summary").json()["structures"], "b": c.get("/api" + ctcf + "/summary").json()["structures"]}
+    assert len(one["a"]) == n["a"] and len(one["b"]) == n["b"] and one["p"] == cmp["rows"][0]["p"], "a gene has its distance in each structure of both jobs and the same p: " + str(one)[:200]
+    assert abs(sum(one["a"]) / len(one["a"]) - cmp["rows"][0]["a"]["mean"]) < 0.01, "the mean of the distances is the mean of the row"
+    assert c.get("/api/compare/gene", params={"a": both, "b": ctcf, "gene": "NOT_A_GENE"}).status_code == 404, "a gene that a job lacks is a 404"
 
 
 def test_a_private_job_answers_under_api_p(site: SimpleNamespace) -> None:

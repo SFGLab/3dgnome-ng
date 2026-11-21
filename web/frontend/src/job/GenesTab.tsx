@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, Download, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { CsvButton } from '../components/CsvButton'
 import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
 import type { GeneRow } from './api'
@@ -82,6 +83,11 @@ export function GenesTab({ rows, chrom, structures, expressionUnit = '', epUrl, 
           <a className="chip-button" href={epUrl}>
             <Download size={13} aria-hidden /> <span className="mono">ep.tsv</span>
           </a>
+          <CsvButton
+            file="genes"
+            head={['gene', 'tss', 'nearest_enhancer', 'separation_bp', 'distance_mean', 'distance_sd', 'distance_min', 'distance_q1', 'distance_median', 'distance_q3', 'distance_max', 'structures', 'joined_by', ...(hasExpression ? [`expression${expressionUnit ? `_${expressionUnit}` : ''}`] : [])]}
+            rows={() => shown.map((r) => [r.gene, r.tss, r.enhancer, r.linear_bp, r.distance, r.sd, r.min, r.q1, r.median, r.q3, r.max, r.n, r.joined_by, ...(hasExpression ? [r.expression] : [])])}
+          />
         </div>
         <Pager page={page} noun="genes" />
         <table className="genes-table">
