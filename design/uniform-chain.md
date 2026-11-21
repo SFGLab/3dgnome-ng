@@ -1051,8 +1051,28 @@ other arms.
 - `background_weight` 0.3 gains 0.01 of raw SCC and has the ends overlap in 13 structures against 9.
 
 Step 2 of the sweep, `scores-sweep8b/`, is the subanchor heatmap of the smooth stage at a radius of 3.0, on the
-singletons of production at 25 kb, which are not held out. It scores 0.281 and 0.309 against 0.289 and 0.311, is
-above on 2 rows of 18 in raw SCC, and has 6.4 close pairs per thousand beads against 3.2. It stays off.
+singletons of production at 25 kb, which are not held out. On 12 rows of 18 the term does not act and the
+structures are those of the base. On the 6 rows where it acts raw SCC is above on 2 and below on 4, and three
+of them have 18 to 26 close pairs per thousand beads next to each other against 1 to 3. Over the 18 rows it
+scores 0.281 and 0.309 against 0.289 and 0.311, a difference of -0.008 ± 0.006. It stays off.
+
+The differences of the table over the 18 rows, paired by row, from `playground/arm_stats.py`, with the p value
+of the Wilcoxon signed rank test. The rows of one cell share its data and the p value is a lower bound.
+
+| arm against the radius of 3.0 | raw SCC at 25 kb | balanced SCC at 25 kb | Spearman at 25 kb |
+|---|---|---|---|
+| ladder to 25 kb | +0.037 ± 0.009, p 0.003 | +0.019 ± 0.008, p 0.03 | -0.003 ± 0.015, p 0.7 |
+| `loop_dropout` | +0.036 ± 0.006, p 0.0005 | +0.025 ± 0.006, p 0.001 | +0.001 ± 0.008, p 1.0 |
+| z 2 | +0.035 ± 0.006, p 0.00005 | +0.029 ± 0.006, p 0.0007 | -0.016 ± 0.012, p 0.03 |
+| radius 2.0 | +0.027 ± 0.006, p 0.0003 | +0.013 ± 0.005, p 0.02 | +0.008 ± 0.006, p 0.2 |
+| cap by the target | +0.009 ± 0.004, p 0.06 | +0.004 ± 0.003, p 0.4 | -0.001 ± 0.005, p 1.0 |
+| cap by the chain | +0.003 ± 0.003, p 0.2 | +0.000 ± 0.004, p 0.6 | -0.001 ± 0.003, p 0.5 |
+| derived radius | +0.005 ± 0.003, p 0.09 | +0.001 ± 0.003, p 0.7 | +0.000 ± 0.005, p 1.0 |
+| `background_weight` 0.3 | +0.009 ± 0.005, p 0.06 | +0.006 ± 0.005, p 0.06 | +0.006 ± 0.006, p 0.04 |
+
+The cap by the target against the same arm without it: +0.007 ± 0.003 of raw SCC under the dropout, p 0.02, and
++0.008 ± 0.003 on the derived radius, p 0.02. On the larger trial of twenty structures the threshold of 2 against
+3 at a radius of 3.0 is +0.033 ± 0.005 of raw SCC, p 0.0003, and -0.035 ± 0.013 of Spearman, p 0.01.
 
 The second round, `slurm/ensemble/uniform_sweep8c.sh`, joins the ladder at a radius of 3.0 with the dropout, the
 threshold of 2 and the cap by the target, and tries the ladder up to 50 kb, the ladder at a radius of 2.0 and the

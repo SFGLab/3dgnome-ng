@@ -9,7 +9,8 @@
 # runs beside the arms on the same machine. CONTACT_MAP in an override is replaced by the deepest
 # mcool of the cell at 1 kb, of CONTACT_HIC when set and of HIC otherwise. With the two apart a run
 # reads one map and is scored against another. A region chr1 runs the whole chromosome and is
-# scored on chr1:1-60000000. The log is OUT/TAG.log.
+# scored on chr1:1-60000000. The log is OUT/TAG.log. INI_ONLY=yes writes the config of every arm and
+# builds nothing.
 set -u
 cd "$(dirname "$0")/../.."
 DATA="${DATA:-data}"
@@ -55,6 +56,7 @@ for arm, over in arms.items():
         c.write(fh)
 PY
 done
+[ "${INI_ONLY:-no}" = yes ] && exit 0
 
 for C in $CELLS; do
   M=$(mcool "$C")
