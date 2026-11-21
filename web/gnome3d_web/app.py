@@ -21,11 +21,9 @@ from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
     PlainTextResponse,
-    RedirectResponse,
     Response,
 )
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from . import explore, hicdiffusion, lists, owndata, remote
 from .catalog import BACKGROUNDS, FACTOR_CHOICES, SAMPLE_COLUMNS, Catalog
@@ -35,9 +33,7 @@ from .regions import HICDIFFUSION_SPAN, RegionError, parse_region
 from .settings import Settings
 from .settings_schema import SettingError, parse_ini, schema, validate_overrides
 from .siteconfig import ConfigFile
-from .viewer import viewer_payload
 
-HERE = Path(__file__).resolve().parent
 FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|hicdiffusion\.bedpe|[A-Za-z0-9_.:-]+\.cif)$")
 
 
@@ -103,15 +99,6 @@ def create_app() -> FastAPI:
         rows = sample_rows(str(request.get("sv_set", ""))) or []
         row = next((r for r in rows if r[0] == request.get("sample")), None)
         return ", ".join(v for v in (row[2], row[3], row[1]) if v) if row else ""
-    templates = Jinja2Templates(directory=str(HERE / "templates"))
-
-    def pretty_region(text: str) -> str:
-        """chr1:1000000-3000000 as chr1:1,000,000-3,000,000."""
-        m = re.fullmatch(r"(\w+):(\d+)-(\d+)", str(text))
-        return f"{m[1]}:{int(m[2]):,}-{int(m[3]):,}" if m else str(text)
-
-    templates.env.filters["region"] = pretty_region
-    templates.env.globals["root"] = s.base_path
     app = FastAPI(title="3D-GNOME")
     if s.base_path:
         app.add_middleware(StripBase, base=s.base_path)
@@ -121,26 +108,6 @@ def create_app() -> FastAPI:
     private.mkdir(parents=True, exist_ok=True)
     sweep_private(s.results_dir, s.retention_days)
     resume_after_restart(s)
-
-    def form_page(request: Request, error: str = "", status: int = 200, values: dict | None = None) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request,
-            "index.html",
-            {
-                "catalog": catalog,
-                "factors": FACTOR_CHOICES,
-                "retention": s.retention_days,
-                "max_region_mb": f"{max_span() / 1e6:g}",
-                "hicdiffusion_missing": hicdiffusion.missing(),
-                "error": error,
-                "v": values or {},
-            },
-            status_code=status,
-        )
-
-    @app.get("/model/classic", response_class=HTMLResponse)
-    def index(request: Request) -> HTMLResponse:
-        return form_page(request)
 
     class JobError(ValueError):
         """A job request the server refuses, with the form field it concerns."""
@@ -306,17 +273,6 @@ def create_app() -> FastAPI:
                     raise JobError(f"{key} names {name!r}, which is not a listed cell type", "own")
                 out[key] = str(name)
         return out
-
-    @app.post("/jobs")
-    async def submit(request: Request, vcf: UploadFile | None = File(None)):  # noqa: ANN202, B008
-        values = {k: str(v) for k, v in (await request.form()).items() if k != "vcf"}
-        fields = values | {"background": "hicdiffusion" if values.get("hicdiffusion") else "hic"}
-        fields["n_models"] = str(max(1, min(10, int(values.get("n_models") or 10))))
-        try:
-            url = create_job(fields, await vcf.read() if vcf is not None and vcf.filename else None)
-        except JobError as e:
-            return form_page(request, str(e), 400, values)
-        return RedirectResponse(s.base_path + url, status_code=303)
 
     @app.post("/api/jobs")
     async def api_submit(request: Request, vcf: UploadFile | None = File(None)) -> JSONResponse:  # noqa: B008
@@ -503,44 +459,6 @@ def create_app() -> FastAPI:
             raise HTTPException(404)
         return d
 
-    def page(request: Request, kind: str, key: str) -> HTMLResponse:
-        d = job_dir(kind, key)
-        status = json.loads((d / "status.json").read_text()) if (d / "status.json").is_file() else {"state": "queued"}
-        req = json.loads((d / "request.json").read_text()) if (d / "request.json").is_file() else {}
-        cell = catalog.cell_types.get(str(req.get("cell_type", "")))
-        marks = json.loads((d / "marks.json").read_text()) if (d / "marks.json").is_file() else None
-        ep: list[list[str]] = []
-        if (d / "ep.tsv").is_file():
-            import csv
-
-            with (d / "ep.tsv").open() as fh:
-                for r in list(csv.DictReader(fh, delimiter="\t"))[:25]:
-                    name = r["name"] if r["name"] and r["name"] != r["gene_id"] else r["gene_id"]
-                    ep.append([name, f"{int(r['tss']):,}", f"{int(r['enhancer_centre']):,}", f"{int(r['linear_bp']) / 1000:.1f}", f"{float(r['distance']):.2f}"])
-        return templates.TemplateResponse(
-            request,
-            "job.html",
-            {
-                "base": s.base_path + (f"/{kind}/{key}" if kind == "jobs" else f"/p/{key}"),
-                "status": status,
-                "req": req,
-                "cell": cell,
-                "marks": marks,
-                "ep": ep,
-                "private": kind == "private",
-                "retention": s.retention_days,
-                "max_region_mb": f"{max_span() / 1e6:g}",
-            },
-        )
-
-    @app.get("/jobs/{key}/classic", response_class=HTMLResponse)
-    def shared_job(request: Request, key: str) -> HTMLResponse:
-        return page(request, "jobs", key)
-
-    @app.get("/p/{key}/classic", response_class=HTMLResponse)
-    def private_job(request: Request, key: str) -> HTMLResponse:
-        return page(request, "private", key)
-
     def files(d: Path) -> list[str]:
         out = [p.name for p in d.iterdir() if p.is_file() and FILES.match(p.name) and p.name != "upload.vcf.gz"]
         out += [p.name for p in sorted((d / "models").glob("*.cif"), key=_member)]
@@ -553,21 +471,6 @@ def create_app() -> FastAPI:
         if not p.is_file():
             raise HTTPException(404)
         return FileResponse(p, filename=name)
-
-    def view(d: Path, name: str) -> JSONResponse:
-        cif = name.removesuffix(".json") + ".cif"
-        if not name.endswith(".json") or not FILES.match(cif) or not (d / "models" / cif).is_file():
-            raise HTTPException(404)
-        marks = json.loads((d / "marks.json").read_text()) if (d / "marks.json").is_file() else {}
-        return JSONResponse(viewer_payload(d / "models" / cif, marks.get("elements", [])))
-
-    @app.get("/jobs/{key}/view/{name}")
-    def shared_view(key: str, name: str) -> JSONResponse:
-        return view(job_dir("jobs", key), name)
-
-    @app.get("/p/{key}/view/{name}")
-    def private_view(key: str, name: str) -> JSONResponse:
-        return view(job_dir("private", key), name)
 
     @app.get("/jobs/{key}/files/{name}")
     def shared_file(key: str, name: str) -> FileResponse:

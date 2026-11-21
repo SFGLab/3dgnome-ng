@@ -47,24 +47,21 @@ def test_returns_the_app(site: SimpleNamespace) -> None:
     r = c.get("/assets/app.js")
     assert r.status_code == 200 and "console.log" in r.text, "an asset is served: " + str(r.status_code)
 
-    r = c.get("/model/classic")
-    assert r.status_code == 200 and "GMX, lymphoblastoid" in r.text and "FRONTEND-OK" not in r.text, "/model/classic returns the old form"
     assert "FRONTEND-OK" in c.get("/model").text, "/model returns the app"
 
     r = c.get("/api/catalog")
     assert r.status_code == 200 and r.headers["content-type"].startswith("application/json"), "the catalog API stays JSON"
 
     form = {"cell_type": "GMX", "region": "chr1:0-3000000", "factors": "CTCF", "n_models": "2"}
-    r = c.post("/jobs", data=form, follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"].startswith("/jobs/"), "a job post redirects to its job"
+    r = c.post("/api/jobs", data=form)
+    assert r.status_code == 201 and r.json()["url"].startswith("/jobs/"), "a job post answers with its job: " + r.text[:80]
+    job = r.json()["url"]
 
-    page = c.get(r.headers["location"] + "/classic")
-    assert page.status_code == 200 and "FRONTEND-OK" not in page.text and "done" in page.text, "the job page is the server's, not the app"
     assert c.get("/api/nothing").status_code == 404, "an unknown API path is a 404, not the app"
-    assert c.get(r.headers["location"] + "/files/..%2F..%2Fcatalog.json").status_code == 404, "a path under a job is a 404, not the app"
+    assert c.get(job + "/files/..%2F..%2Fcatalog.json").status_code == 404, "a path under a job is a 404, not the app"
     assert c.get("/p/nothing/files/x").status_code == 404, "a path under a private job is a 404, not the app"
-    assert "FRONTEND-OK" in c.get(r.headers["location"]).text, "a job's page is the app"
-    assert c.get(r.headers["location"] + "/files/ep.tsv").status_code == 200, "a job's file is the server's"
+    assert "FRONTEND-OK" in c.get(job).text, "a job's page is the app"
+    assert c.get(job + "/files/ep.tsv").status_code == 200, "a job's file is the server's"
 
     assert "site-hide" not in c.get("/").text, "no part is hidden by default"
     (dist / "index.html").write_text("<html><head></head><body>FRONTEND-OK</body></html>")
@@ -94,7 +91,7 @@ def test_returns_the_app(site: SimpleNamespace) -> None:
     bare = TestClient(create_app())
     r = bare.get("/")
     assert r.status_code == 503 and "The frontend is not built" in r.text, "without a build the app says so: " + str(r.status_code)
-    assert bare.get("/model/classic").status_code == 200, "without a build /model/classic still works"
+    assert bare.get("/api/catalog").status_code == 200, "without a build the API still answers"
 
     # The site under a prefix: BASE_PATH on the server and a build made for the same path.
     (dist / "index.html").write_text('<html><body>FRONTEND-OK<script src="/new/assets/app.js"></script></body></html>')
@@ -113,13 +110,7 @@ def test_returns_the_app(site: SimpleNamespace) -> None:
     r = under.post("/new/api/jobs", data=form)
     assert r.status_code == 201 and r.json()["url"].startswith("/jobs/"), "under a prefix the API gives the job's client route, without the prefix: " + r.text[:80]
 
-    r = under.post("/new/jobs", data=form, follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"].startswith("/new/jobs/"), "under a prefix a job post redirects under the prefix: " + str(r.headers.get("location", ""))
-
-    page = under.get(r.headers["location"] + "/classic")
-    assert page.status_code == 200 and 'href="/new/jobs/' in page.text and 'href="/new/"' in page.text, "under a prefix the old job page links its files under the prefix"
-    assert under.get(r.headers["location"] + "/files/ep.tsv").status_code == 200, "under a prefix a job's file is the server's"
-    assert 'action="/new/jobs"' in under.get("/new/model/classic").text, "under a prefix the old form posts under the prefix"
+    assert under.get("/new" + r.json()["url"] + "/files/ep.tsv").status_code == 200, "under a prefix a job's file is the server's"
 
 
 def test_a_build_for_another_path_is_refused_with_both_paths_named(site: SimpleNamespace) -> None:

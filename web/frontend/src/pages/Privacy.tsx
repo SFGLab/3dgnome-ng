@@ -51,7 +51,6 @@ export function Privacy() {
             The site keeps three things in the storage of your browser, on your own computer. They are the theme you chose, the list on the My jobs page and the sync code of that list if you made one. The pages need them to work. They stay on your computer and the list goes to the server only
             if you make a sync code. Clearing the site data in your browser removes all three.
           </p>
-          <p>One page is an exception to the rule on other companies. The old result page, at the address of a job followed by /classic, loads its 3D viewer from the jsDelivr network, which then sees your IP address.</p>
         </section>
 
         <section id="server">

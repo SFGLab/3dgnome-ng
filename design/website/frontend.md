@@ -1,8 +1,8 @@
 # Frontend of the site
 
 The pages are a React app in `web/frontend/`, built with Vite to `web/frontend/dist/`. FastAPI
-serves the build: every client route returns `dist/index.html`, and the API, the job pages, the
-private job pages and the old form at `/model` keep their own handlers. Without a build the app
+serves the build: every client route returns `dist/index.html`, and the API and the files of a
+job keep their own handlers. Without a build the app
 answers 503 and says how to build. `FRONTEND_DIST` points the app at another build. The Docker
 image builds the frontend in a Node stage.
 
@@ -35,7 +35,7 @@ The Model a region page at `/model` reads the JSON API: `GET /api/catalog`, `GET
 user may change, `POST /api/settings/ini` to read an uploaded config, and `POST /api/jobs`, which
 answers with the job's url or the field a request fails on. The settings a user may change, with
 their ranges, are listed in `web/gnome3d_web/settings_schema.py`; every other setting keeps the cell
-type's value. The old form is at `/model/classic`.
+type's value.
 
 A job's page at `/jobs/<key>`, or `/p/<token>` for a private job, is the explorer: the Structure
 tab in 3D with hover, two point measurement and a gene card, and the Genes, Contact map, Loops
@@ -43,4 +43,4 @@ and Log tabs, and a compare view of two jobs. It reads `GET /api/jobs/<key>/` fo
 `summary`, `structure/<i>`, `annotations`, `picks`, `distance?a=&b=`, `genes`, `contacts`,
 `loops`, `log` and `files.zip`, the same under `/api/p/<token>/`, and `GET /api/compare?a=&b=`.
 Results that read every structure, the picks and the gene statistics, are written to the job
-directory as `explore_<name>.json`. The old job pages are at `.../classic`.
+directory as `explore_<name>.json`.
