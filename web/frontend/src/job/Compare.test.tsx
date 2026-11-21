@@ -135,6 +135,7 @@ describe('Compare', () => {
       rows: [
         { gene: 'TNFRSF8', distance: 1.24, log2fc: -3, padj: 0.0000002, a: 80, b: 10 },
         { gene: 'MIIP', distance: -0.2, log2fc: 1, padj: 0.2, a: 5, b: 10 },
+        { gene: 'DRAXIN', distance: -0.85, log2fc: 8.41, padj: 1.4e-71, a: 0.2, b: 68 },
       ],
     }
     const f = mockApi([
@@ -152,12 +153,14 @@ describe('Compare', () => {
       </QueryClientProvider>,
     )
     const block = await screen.findByRole('region', { name: 'Expression against 3D distance' })
-    expect(await within(block).findByText(/The fold change and its adjusted p are those of DESeq2\./)).toHaveTextContent('Over 2 genes the change of expression and the change of distance have a rank correlation of -0.41.')
+    expect(await within(block).findByText(/The fold change and its adjusted p are those of DESeq2\./)).toHaveTextContent('Over 3 genes the change of expression and the change of distance have a rank correlation of -0.41.')
     const table = within(block).getByRole('table', { name: 'Largest changes in expression' })
     const row = within(table).getByRole('row', { name: /TNFRSF8/ })
     expect(within(row).getAllByRole('cell').map((c) => c.textContent)).toEqual(['TNFRSF8', '8.0 times lower', '2.0e-7', '2.4 times farther'])
     expect(within(within(table).getByRole('row', { name: /MIIP/ })).getAllByRole('cell')[2]).toHaveTextContent('0.200')
-    expect(within(block).getByRole('img', { name: 'Change of expression against change of distance for 2 genes' }).querySelectorAll('circle')).toHaveLength(2)
+    // A fold change in the hundreds comes from next to no reads on one side and is capped.
+    expect(within(within(table).getByRole('row', { name: /DRAXIN/ })).getAllByRole('cell')[1]).toHaveTextContent('over 100 times higher')
+    expect(within(block).getByRole('img', { name: 'Change of expression against change of distance for 3 genes' }).querySelectorAll('circle')).toHaveLength(3)
     expect(String(f.mock.calls.find(([u]) => String(u).includes('/api/compare/expression'))![0])).toContain(`b=%2Fjobs%2F${OTHER}`)
     expect(checkCopy(container)).toEqual([])
   })

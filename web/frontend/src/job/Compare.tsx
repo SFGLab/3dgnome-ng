@@ -149,10 +149,15 @@ function Panel({
   )
 }
 
-const SCATTER = { w: 320, h: 220, pad: 28 }
+// The points keep to the inside of the two pads. The labels of the axes are in the pads.
+const SCATTER = { w: 320, h: 220, padX: 46, padY: 26 }
 
 /** How many times a level or a distance changed, from its log2 change, with the word for its direction. */
 const times = (log2: number, up: string, down: string) => `${(2 ** Math.abs(log2)).toFixed(1)} times ${log2 >= 0 ? up : down}`
+
+/** The change of an expression level. A gene with next to no reads on one side has a fold change
+ * in the hundreds that says no more than over 100 times. */
+const fold = (log2: number) => (2 ** Math.abs(log2) >= 100 ? `over 100 times ${log2 >= 0 ? 'higher' : 'lower'}` : times(log2, 'higher', 'lower'))
 
 /**
  * The change of expression of the genes two jobs share, the other job against this one, beside
@@ -162,11 +167,11 @@ const times = (log2: number, up: string, down: string) => `${(2 ** Math.abs(log2
 function ExpressionChange({ data, gene, onGene }: { data: ExpressionCompare; gene: string | null; onGene?: (gene: string | null) => void }) {
   if (data.mode === 'none') return <p className="compare-note">{data.reason}</p>
   const rows = data.rows
-  const { w, h, pad } = SCATTER
+  const { w, h, padX, padY } = SCATTER
   const reach = (get: (r: ExpressionCompare['rows'][number]) => number) => Math.max(1, ...rows.map((r) => Math.abs(get(r))))
   const [rx, ry] = [reach((r) => r.distance), reach((r) => r.log2fc)]
-  const x = (v: number) => w / 2 + (v / rx) * (w / 2 - pad)
-  const y = (v: number) => h / 2 - (v / ry) * (h / 2 - pad)
+  const x = (v: number) => w / 2 + (v / rx) * (w / 2 - padX)
+  const y = (v: number) => h / 2 - (v / ry) * (h / 2 - padY)
   return (
     <>
       <p className="compare-note">
@@ -179,23 +184,23 @@ function ExpressionChange({ data, gene, onGene }: { data: ExpressionCompare; gen
       ) : (
         <div className="expression-change">
           <svg className="expression-scatter" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Change of expression against change of distance for ${rows.length} genes`}>
-            <line className="axis" x1={pad} x2={w - pad} y1={h / 2} y2={h / 2} />
-            <line className="axis" x1={w / 2} x2={w / 2} y1={pad} y2={h - pad} />
-            <text className="axis-label" x={w - pad} y={h / 2 - 6} textAnchor="end">
+            <line className="axis" x1={padX - 6} x2={w - padX + 6} y1={h / 2} y2={h / 2} />
+            <line className="axis" x1={w / 2} x2={w / 2} y1={padY - 6} y2={h - padY + 6} />
+            <text className="axis-label" x={w - 6} y={h / 2 + 3} textAnchor="end">
               farther
             </text>
-            <text className="axis-label" x={pad} y={h / 2 - 6}>
+            <text className="axis-label" x={6} y={h / 2 + 3}>
               closer
             </text>
-            <text className="axis-label" x={w / 2 + 6} y={pad + 4}>
+            <text className="axis-label" x={w / 2} y={12} textAnchor="middle">
               higher expression
             </text>
-            <text className="axis-label" x={w / 2 + 6} y={h - pad}>
-              lower
+            <text className="axis-label" x={w / 2} y={h - 6} textAnchor="middle">
+              lower expression
             </text>
             {rows.map((r) => (
               <circle key={r.gene} className={r.gene === gene ? 'point selected' : r.padj !== null && r.padj < 0.05 ? 'point sure' : 'point'} cx={x(r.distance)} cy={y(r.log2fc)} r={r.gene === gene ? 5 : 3}>
-                <title>{`${r.gene}, distance ${times(r.distance, 'farther', 'closer')}, expression ${times(r.log2fc, 'higher', 'lower')}`}</title>
+                <title>{`${r.gene}, distance ${times(r.distance, 'farther', 'closer')}, expression ${fold(r.log2fc)}`}</title>
               </circle>
             ))}
           </svg>
@@ -212,7 +217,7 @@ function ExpressionChange({ data, gene, onGene }: { data: ExpressionCompare; gen
               {shownRows(rows, gene).map((r) => (
                 <tr key={r.gene} className={r.gene === gene ? 'selected' : undefined} aria-selected={r.gene === gene} onClick={() => onGene?.(r.gene === gene ? null : r.gene)}>
                   <td>{r.gene}</td>
-                  <td>{times(r.log2fc, 'higher', 'lower')}</td>
+                  <td>{fold(r.log2fc)}</td>
                   <td>{r.padj === null ? 'no test' : r.padj < 0.001 ? r.padj.toExponential(1) : r.padj.toFixed(3)}</td>
                   <td>{times(r.distance, 'farther', 'closer')}</td>
                 </tr>

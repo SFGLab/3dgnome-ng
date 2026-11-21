@@ -10,7 +10,7 @@ import './owndata.css'
 export type OwnTab = 'loops' | 'anchors' | 'contacts' | 'enhancers'
 
 /** One uploaded file in the dialog: checking, checked, or refused by the server. */
-type Entry = { key: number; factor: string; name: string; size: number; result?: UploadResult; failure?: string; fix?: string }
+export type Entry = { key: number; factor: string; name: string; size: number; result?: UploadResult; failure?: string; fix?: string }
 
 const fromResult = (key: number, factor: string, r: UploadResult): Entry => ({ key, factor, name: r.name, size: r.size, result: r })
 const passed = (e: Entry | null) => !e || !!e.result?.ok
@@ -20,7 +20,7 @@ const W = 780
 const H = 120
 const AXIS = 60
 
-function CheckLine({ entry }: { entry: Entry }) {
+export function CheckLine({ entry }: { entry: Entry }) {
   if (entry.failure) {
     return (
       <p className="check bad">
@@ -47,7 +47,7 @@ function CheckLine({ entry }: { entry: Entry }) {
   )
 }
 
-function FileChip({ entry }: { entry: Entry }) {
+export function FileChip({ entry }: { entry: Entry }) {
   return (
     <span className="file-chip">
       <FileText size={14} aria-hidden />
@@ -89,7 +89,7 @@ function OwnPreview({ cell, region, loops }: { cell: string; region: Region; loo
 }
 
 /** What a step takes: a sentence or two and the columns of the file on a line of their own. */
-function Rule({ text, columns }: { text: string; columns?: string }) {
+export function Rule({ text, columns }: { text: string; columns?: string }) {
   return (
     <div className="rule">
       <p>{text}</p>

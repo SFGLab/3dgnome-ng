@@ -9,6 +9,7 @@ import { jobApi } from '../job/api'
 import { CellTypes } from '../model/CellTypes'
 import { EXAMPLES, type Example } from '../model/examples'
 import { Expression } from '../model/Expression'
+import { ExpressionDialog } from '../model/ExpressionDialog'
 import { EMPTY_FORM, fromRequest, longRegion, readUploads, type FormState } from '../model/form'
 import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
@@ -90,6 +91,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }))
   const [dialog, setDialog] = useState<{ tab: OwnTab; cell: boolean } | null>(null)
+  const [expressionDialog, setExpressionDialog] = useState(false)
   const [svDialog, setSvDialog] = useState<{
     mode: VariantsMode
     file: File | null
@@ -263,7 +265,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           {stepError(4)}
         </Step>
         <Step n={5} title="Gene expression" note="optional">
-          <Expression options={expressionOptions.data ?? []} value={form.expression} cell={cellType?.label.split(',')[0] ?? form.cell} onChange={(expression) => set({ expression })} own={form.ownExpression} onOwn={(ownExpression) => set({ ownExpression })} />
+          <Expression options={expressionOptions.data ?? []} value={form.expression} cell={form.cell} onChange={(expression) => set({ expression })} own={form.ownExpression} onOpen={() => setExpressionDialog(true)} onRemove={() => set({ expression: '', ownExpression: null })} />
           {stepError(5)}
         </Step>
         <Step n={6} title="Ensemble and simulation settings">
@@ -300,6 +302,16 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           onApply={(patch) => {
             set(patch)
             setSvDialog(null)
+          }}
+        />
+      )}
+      {expressionDialog && (
+        <ExpressionDialog
+          initial={form.ownExpression}
+          onClose={() => setExpressionDialog(false)}
+          onUse={(ownExpression) => {
+            set({ expression: 'own', ownExpression })
+            setExpressionDialog(false)
           }}
         />
       )}
