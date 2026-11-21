@@ -1,6 +1,6 @@
 """The job data endpoints of the explorer.
 
-    pytest web/tests/test_explore.py
+    pytest web/tests/test_results.py
 """
 
 from __future__ import annotations

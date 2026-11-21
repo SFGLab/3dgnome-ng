@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from ..engine import hicdiffusion
 from ..regions import RegionError, parse_region
-from ..site import Here
+from ..context import Here
 from . import genes, preview
 from .model import FACTOR_CHOICES, SAMPLE_COLUMNS
 
@@ -48,7 +48,7 @@ def api_region(site: Here, cell: str, q: str) -> JSONResponse:
     except RegionError as e:
         return JSONResponse({"error": str(e)}, 400)
     hit = table[table["name"].str.upper() == q.strip().upper()]
-    label = f"{r.chrom}:{r.start:,}-{r.end:,}, {(r.end - r.start) / 1e6:.1f} Mb"
+    label = f"{r.shown()}, {(r.end - r.start) / 1e6:.1f} Mb"
     body = {"chrom": r.chrom, "start": r.start, "end": r.end, "label": label}
     if len(hit):
         body["gene"] = str(hit.iloc[0]["name"])

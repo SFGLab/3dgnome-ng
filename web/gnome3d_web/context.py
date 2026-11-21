@@ -1,4 +1,7 @@
-"""The site that answers a request: its settings, its hosted data, its limits and its jobs."""
+"""The site a request is answered by: its settings, its hosted data, its limits and its jobs.
+
+The module is not named site or http, which are modules of Python.
+"""
 
 from __future__ import annotations
 

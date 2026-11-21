@@ -20,13 +20,12 @@ import threading
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from functools import lru_cache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from urllib.parse import urlparse
 
 import numpy as np
-import pandas as pd
+
+from .density import thin
 
 RES = 25_000
 READ_SECONDS = 120
@@ -401,29 +400,6 @@ def read_window(url: str, kind: str, chrom: str, start: int, end: int, size: int
     if answer[0] == "refused":
         raise RemoteError(answer[1], answer[2])
     raise RemoteError(f"The file at {_host(url)} could not be read as {kind}.", f"The reader says {answer[1]}.")
-
-
-def thin(counts: np.ndarray, target: int, seed: int) -> np.ndarray:
-    """Counts reduced to a target total by sampling contacts without replacement. A map at or under
-    the target is kept whole."""
-    counts = np.asarray(counts, dtype=np.int64)
-    if counts.sum() <= target:
-        return counts
-    return np.random.default_rng(seed).multivariate_hypergeometric(counts, target)
-
-
-@lru_cache(maxsize=64)
-def hosted_density(singletons: Path, chrom: str) -> float:
-    """Contacts per Mb of a hosted map on one chromosome, its total count over its covered span."""
-    t = pd.read_csv(singletons, sep=r"\s+", header=None, usecols=[0, 3, 5, 6], comment="#")
-    t = t[(t[0] == chrom) & (t[3] == chrom)]
-    if t.empty:
-        t = pd.read_csv(singletons, sep=r"\s+", header=None, usecols=[0, 3, 5, 6], comment="#")
-        t = t[t[0] == t[3]]
-        span = t.groupby(0)[5].max().sum()
-    else:
-        span = t[5].max()
-    return float(t[6].sum()) / max(span / 1e6, 1e-6)
 
 
 def _kb(bp: int) -> str:

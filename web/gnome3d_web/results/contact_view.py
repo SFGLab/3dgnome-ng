@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +11,7 @@ from .. import contacts as cm
 from .. import remote
 from ..engine import hicdiffusion
 from ..jobs import store
+from ..regions import read_region
 from .views import ExploreError, loop_files, positions
 
 
@@ -27,9 +27,8 @@ def _deep_map(job: Path, url: str, chrom: str, start: int, end: int, res: int, a
     """A deep map's window on the job's grid. The pixels of the job's whole region are read once
     per resolution and kept in the job directory. Zooming and panning cut windows from them
     instead of reading the remote file again."""
-    status = store.status(job).get("region") or f"{chrom}:{start}-{end}"
-    jr = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", str(status))
-    rs, re_ = (int(jr[2]), int(jr[3])) if jr else (start, end)
+    whole = read_region(str(store.status(job).get("region") or ""))
+    rs, re_ = (whole.start, whole.end) if whole else (start, end)
     cache = job / f"explore_deep_{chrom}_{rs}_{re_}_{res}.npz"
     if cache.is_file():
         z = np.load(cache)
@@ -61,18 +60,16 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
     @param hic_url a deep map of the cell type in place of the job's own input contacts
     @param hic_name the deep map's name for the labels
     """
-    m = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", region.replace(",", ""))
-    if not m:
+    asked = read_region(region)
+    if asked is None:
         raise ExploreError(f"{region!r} is not chr:start-end")
-    chrom, start, end = m[1], int(m[2]), int(m[3])
+    chrom, start, end = asked.chrom, asked.start, asked.end
     # The window is cut to the job's region: outside it there are no beads to count.
-    job_region = store.status(job).get("region") or ""
-    jr = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", str(job_region))
-    if jr:
-        jc, js, je = jr[1], int(jr[2]), int(jr[3])
-        if chrom != jc or end <= js or start >= je:
-            raise ExploreError(f"{chrom}:{start:,}-{end:,} lies outside the job's region {jc}:{js:,}-{je:,}.")
-        start, end = max(start, js), min(end, je)
+    whole = read_region(str(store.status(job).get("region") or ""))
+    if whole:
+        if chrom != whole.chrom or end <= whole.start or start >= whole.end:
+            raise ExploreError(f"{asked.shown()} lies outside the job's region {whole.shown()}.")
+        start, end = max(start, whole.start), min(end, whole.end)
     if res not in cm.RESOLUTIONS:
         raise ExploreError(f"resolution {res} is not one of {', '.join(f'{r // 1000} kb' for r in cm.RESOLUTIONS)}")
     if len(cm.bins_for(start, end, res)) > cm.MAX_BINS:

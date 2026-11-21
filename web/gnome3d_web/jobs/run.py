@@ -18,7 +18,7 @@ from ..catalog.model import Catalog
 from ..engine import hicdiffusion
 from ..engine.inputs import Own, build_inputs
 from ..engine.settings import apply_overrides, validate_overrides
-from ..regions import ANY_SPAN, parse_region
+from ..regions import ANY_SPAN, parse_region, read_region
 from ..variants.vcf import read_svs
 from .marks import ep_table, mark_beads
 from .request import JobRequest
@@ -155,7 +155,9 @@ def run_job(
         if enh_file is None and req.cell_type == "own" and borrowed != "none":
             enh_file = catalog.cell_types[borrowed].path("enhancers")
         genes, enh = _lifted_marks(cell, region.chrom, svs, enh_file, cell_enhancers=req.cell_type != "own")
-        inputs_lo, inputs_hi = (int(x) for x in inputs.region.split(":")[1].split("-"))
+        modelled = read_region(inputs.region)
+        assert modelled is not None, inputs.region
+        inputs_lo, inputs_hi = modelled.start, modelled.end
         marks = mark_beads(region.chrom, starts, ends, genes, enh)
         (job / "marks.json").write_text(
             json.dumps(

@@ -10,10 +10,10 @@ from pathlib import Path
 from .. import expression
 from ..catalog.model import BACKGROUNDS, FACTOR_CHOICES
 from ..engine import hicdiffusion
-from ..engine.settings import SettingError, validate_overrides
+from ..engine.settings import OverrideError, validate_overrides
 from ..errors import Refused
 from ..regions import RegionError, parse_region
-from ..site import Site
+from ..context import Site
 from ..uploads import store as upload_store
 from . import store
 from .request import JobRequest, request_key
@@ -76,7 +76,7 @@ def create_job(site: Site, fields: dict[str, str]) -> str:
         raise Refused(f"{sample!r} is not a sample of {sv_set}", "sample")
     try:
         overrides = validate_overrides(json.loads(fields.get("overrides") or "{}"))
-    except (SettingError, json.JSONDecodeError, AttributeError) as e:
+    except (OverrideError, json.JSONDecodeError, AttributeError) as e:
         raise Refused(str(e), "overrides") from e
     try:
         n_models = int(fields.get("n_models", "10"))

@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
-from .site import Site
+from .context import Site
 
 # The pages of the app. Any other address gets the app too, which shows its page of a missing address.
 PAGES = {"", "model", "jobs", "examples", "method", "results", "help", "cite", "privacy"}

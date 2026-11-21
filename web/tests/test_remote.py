@@ -151,12 +151,13 @@ def test_a_server_with_range_requests_gives_the_file_size(shared: SimpleNamespac
         assert "private address" in str(e), "a private address is refused at connect: " + str(e)
 
 
-def test_thinning_keeps_the_target_total_never_above_a_count(shared: SimpleNamespace) -> None:
-    remote = shared.remote
-    thinned = remote.thin(np.array([500, 300, 200, 0]), 100, seed=7)
+def test_thinning_keeps_the_target_total_never_above_a_count() -> None:
+    from gnome3d_web.density import thin
+
+    thinned = thin(np.array([500, 300, 200, 0]), 100, seed=7)
     assert thinned.sum() == 100 and bool((thinned <= [500, 300, 200, 0]).all()), "thinning keeps the target total, never above a count: " + str(thinned)
-    assert (remote.thin(np.array([500, 300, 200]), 100, seed=7) == remote.thin(np.array([500, 300, 200]), 100, seed=7)).all(), "thinning is the same for the same seed"
-    assert (remote.thin(np.array([3, 4]), 100, seed=1) == [3, 4]).all(), "a map under the target keeps every contact"
+    assert (thin(np.array([500, 300, 200]), 100, seed=7) == thin(np.array([500, 300, 200]), 100, seed=7)).all(), "thinning is the same for the same seed"
+    assert (thin(np.array([3, 4]), 100, seed=1) == [3, 4]).all(), "a map under the target keeps every contact"
 
 
 def test_an_mcool_link_becomes_a_contacts_upload(shared: SimpleNamespace) -> None:

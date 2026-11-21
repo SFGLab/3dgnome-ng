@@ -18,7 +18,7 @@ _TRUE = {"yes", "true", "1", "on"}
 _FALSE = {"no", "false", "0", "off"}
 
 
-class SettingError(ValueError):
+class OverrideError(ValueError):
     """A setting change the form does not accept, with the key and the allowed values."""
 
 
@@ -175,7 +175,7 @@ def read_settings_md(path: Path = SETTINGS_MD) -> list[SettingRow]:
 
 
 def _format(e: Editable, value: str) -> str:
-    """Returns the value in the form the config takes. Raises SettingError outside the allowed values."""
+    """Returns the value in the form the config takes. Raises OverrideError outside the allowed values."""
     name = f"{e.section}.{e.key}"
     v = value.strip()
     if e.choices == BOOLEAN:
@@ -183,18 +183,18 @@ def _format(e: Editable, value: str) -> str:
             return "yes"
         if v.lower() in _FALSE:
             return "no"
-        raise SettingError(f"{name} takes yes or no, not {value!r}")
+        raise OverrideError(f"{name} takes yes or no, not {value!r}")
     if e.choices:
         if v not in e.choices:
-            raise SettingError(f"{name} takes {', '.join(e.choices)}, not {value!r}")
+            raise OverrideError(f"{name} takes {', '.join(e.choices)}, not {value!r}")
         return v
     try:
         x = float(v)
     except ValueError as err:
-        raise SettingError(f"{name} takes a number from {e.lo:g} to {e.hi:g}, not {value!r}") from err
+        raise OverrideError(f"{name} takes a number from {e.lo:g} to {e.hi:g}, not {value!r}") from err
     assert e.lo is not None and e.hi is not None
     if not e.lo <= x <= e.hi:
-        raise SettingError(f"{name} takes a number from {e.lo:g} to {e.hi:g}, not {value}")
+        raise OverrideError(f"{name} takes a number from {e.lo:g} to {e.hi:g}, not {value}")
     return v
 
 
@@ -203,13 +203,13 @@ def validate_overrides(raw: dict[str, str]) -> dict[str, str]:
 
     @param raw the changes from the form or an uploaded config
     @return the changes, booleans written as yes or no
-    @raises SettingError for a key off the list or a value outside its range
+    @raises OverrideError for a key off the list or a value outside its range
     """
     out = {}
     for name, value in raw.items():
         e = _BY_KEY.get(name)
         if e is None:
-            raise SettingError(f"{name} is not a setting users may change")
+            raise OverrideError(f"{name} is not a setting users may change")
         out[name] = _format(e, str(value))
     return out
 
@@ -246,7 +246,7 @@ def parse_ini(text: str) -> tuple[dict[str, str], list[str]]:
         for key, value in cp.items(section):
             try:
                 ok.update(validate_overrides({f"{section}.{key}": value}))
-            except SettingError as err:
+            except OverrideError as err:
                 refused.append(str(err))
     return ok, refused
 

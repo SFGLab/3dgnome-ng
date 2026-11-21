@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from ..catalog.model import FACTOR_CHOICES
 from ..errors import Refused
 from ..regions import RegionError, parse_region
-from ..site import Here
+from ..context import Here
 from ..uploads import store as uploads
 from .effect import variant_check
 from .vcf import UnknownSample

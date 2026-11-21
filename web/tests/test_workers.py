@@ -1,6 +1,6 @@
 """The local queue: a fixed set of slots, one GPU per slot, jobs waiting for a free slot.
 
-    pytest web/tests/test_queue.py
+    pytest web/tests/test_workers.py
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from gnome3d_web.jobs.run import on_cores
 from gnome3d_web.jobs.workers import LocalPool, resume_interrupted, server_cores, slot_cores
 from gnome3d_web import settings
 from gnome3d_web.jobs.workers import claim_slot
-from gnome3d_web.settings import Settings, SettingsError
+from gnome3d_web.settings import Settings, EnvError
 
 FAKE = [sys.executable, str(Path(__file__).resolve().parent / "fake_engine.py")]
 
@@ -177,7 +177,7 @@ def test_a_worker_variable_the_site_cannot_use_stops_it_with_the_fix(monkeypatch
     for other in WORKER_VARIABLES:
         monkeypatch.delenv(other, raising=False)
     monkeypatch.setenv(name, value)
-    with pytest.raises(SettingsError, match=said):
+    with pytest.raises(EnvError, match=said):
         Settings.from_env()
 
 

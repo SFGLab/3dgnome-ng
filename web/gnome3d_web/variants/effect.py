@@ -88,7 +88,7 @@ def variant_check(cell, region, factors: str, vcf: Path, sample: str, haplotype:
         applied[str(r["type"])] = applied.get(str(r["type"]), 0) + 1
         rows.append({"type": r["type"], "pos": r["pos"], "end": sv.end - 1, "length": r["length"], "genotype": r["genotype"], "change": combine_changes(words)})
     hap = "first" if haplotype == 0 else "second"
-    span = f"{chrom}:{region.start:,}-{region.end:,}"
+    span = region.shown()
     n = len(rows)
     parts = [f"{_plural(n, 'variant')} of {sample} on the {hap} haplotype {'lies' if n == 1 else 'lie'} inside {span}."]
     if applied:

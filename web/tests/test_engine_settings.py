@@ -1,7 +1,7 @@
 """The settings users may change: the schema from SETTINGS.md, validation and the config they
 are written into.
 
-    pytest web/tests/test_settings_schema.py
+    pytest web/tests/test_engine_settings.py
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from gnome3d_web.catalog.model import Catalog
 from gnome3d_web.jobs.request import JobRequest, request_key
 from gnome3d_web.engine.settings import (
     EDITABLE,
-    SettingError,
+    OverrideError,
     apply_overrides,
     parse_ini,
     read_settings_md,
@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def refused(raw: dict[str, str]) -> str:
     try:
         validate_overrides(raw)
-    except SettingError as e:
+    except OverrideError as e:
         return str(e)
     return ""
 

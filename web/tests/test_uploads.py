@@ -1,6 +1,6 @@
 """Uploads of own data: storage with a size cap, the check of each kind, the preview and the sweep.
 
-    pytest web/tests/test_owndata.py
+    pytest web/tests/test_uploads.py
 """
 
 from __future__ import annotations

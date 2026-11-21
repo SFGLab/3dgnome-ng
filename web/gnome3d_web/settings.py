@@ -62,7 +62,7 @@ def card_gib(gpu: str | None) -> float | None:
         return None
 
 
-class SettingsError(ValueError):
+class EnvError(ValueError):
     """A variable of the environment the site cannot use, with the fix as its message."""
 
 
@@ -72,7 +72,7 @@ def _whole(name: str, default: int | None) -> int | None:
     if not text:
         return default
     if not text.isdigit() or int(text) < 1:
-        raise SettingsError(f"{name} is {text!r}. Give a whole number, 1 or more.")
+        raise EnvError(f"{name} is {text!r}. Give a whole number, 1 or more.")
     return int(text)
 
 
@@ -160,7 +160,7 @@ class Settings:
     def from_env(cls) -> Settings:
         cmd = os.environ.get("ENGINE_CMD", "")
         if os.environ.get("GPU_SLOTS"):
-            raise SettingsError(
+            raise EnvError(
                 f"GPU_SLOTS={os.environ['GPU_SLOTS']} is not read. Set GPUS to the ids of the cards and WORKERS_PER_GPU to the "
                 "jobs at once on one card. GPU_SLOTS=0,0,1,1 is GPUS=0,1 with WORKERS_PER_GPU=2."
             )
@@ -168,9 +168,9 @@ class Settings:
         try:
             gpu_pool_gib = float(pool) if pool else None
         except ValueError:
-            raise SettingsError(f"GPU_POOL_GIB is {pool!r}. Give a number of GiB above zero.") from None
+            raise EnvError(f"GPU_POOL_GIB is {pool!r}. Give a number of GiB above zero.") from None
         if gpu_pool_gib is not None and gpu_pool_gib <= 0:
-            raise SettingsError(f"GPU_POOL_GIB is {pool!r}. Give a number of GiB above zero.")
+            raise EnvError(f"GPU_POOL_GIB is {pool!r}. Give a number of GiB above zero.")
         return cls(
             data_dir=Path(os.environ.get("DATA_DIR", "/data")),
             results_dir=Path(os.environ.get("RESULTS_DIR", "/results")),

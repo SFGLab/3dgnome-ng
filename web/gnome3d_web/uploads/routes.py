@@ -9,8 +9,9 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 
 from .. import remote
+from ..density import hosted_density
 from ..regions import RegionError, parse_region
-from ..site import Here, Site
+from ..context import Here, Site
 from . import checks, store
 
 router = APIRouter()
@@ -66,7 +67,7 @@ def read_link(site: Site, url: str, cell: str, region: str) -> JSONResponse:
         return JSONResponse({"error": "Enter the region first.", "fix": "The server reads only the bins of the region from the file.", "field": "region"}, 400)
     base = site.base_cell(cell)
     try:
-        per_mb = remote.hosted_density(base.path("singletons"), reg[0])
+        per_mb = hosted_density(base.path("singletons"), reg[0])
         text, size, summary = remote.link_window(url, *reg, per_mb, base.name, s.link_allow_private)
     except remote.RemoteError as e:
         return JSONResponse({"error": str(e), "fix": e.fix, "field": "url"}, 400)

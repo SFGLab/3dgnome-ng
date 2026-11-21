@@ -11,7 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
 from .errors import Refused, UnknownCell
-from .site import Site
+from .context import Site
 
 
 def packed_json(request: Request, value: object) -> Response:

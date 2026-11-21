@@ -28,6 +28,17 @@ class Region:
     def __str__(self) -> str:
         return f"{self.chrom}:{self.start}-{self.end}"
 
+    def shown(self) -> str:
+        """The region for a reader, its positions with thousands separators."""
+        return f"{self.chrom}:{self.start:,}-{self.end:,}"
+
+
+def read_region(text: str) -> Region | None:
+    """A region the site stated itself, `chr:start-end`, commas allowed. None for any other text.
+    The chromosome of a job on a haplotype can have a name the form does not take."""
+    m = re.fullmatch(r"(chr\w+):(\d+)-(\d+)", text.replace(",", ""))
+    return Region(m[1], int(m[2]), int(m[3])) if m else None
+
 
 def parse_region(text: str, genes: pd.DataFrame, max_span: int = MAX_SPAN) -> Region:
     """`chr:start-end`, commas allowed, or a gene name, which gives a 2 Mb window centred on its

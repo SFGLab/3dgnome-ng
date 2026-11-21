@@ -23,6 +23,7 @@ from personal3d.lift import Lift
 from personal3d.variants import SV
 
 from ..catalog.model import CellType
+from ..density import hosted_density, thin
 from ..regions import Region
 from .settings import apply_overrides
 
@@ -77,8 +78,6 @@ def _thin_to_hosted(sing: pd.DataFrame, cell: CellType, chrom: str) -> pd.DataFr
     """Own contacts thinned to the contacts per Mb of the cell type's hosted map on the
     chromosome, over the span the own contacts cover. Every route of own contacts meets here,
     so a deep map and a shallow one give the engine the density its maps are read at."""
-    from ..remote import hosted_density, thin
-
     span = (int(sing[5].max()) - int(sing[1].min())) / 1e6
     # At least one contact, or a short span would be thinned to nothing.
     target = max(1, round(hosted_density(cell.path("singletons"), chrom) * span))
