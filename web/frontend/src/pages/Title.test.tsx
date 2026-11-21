@@ -39,7 +39,7 @@ describe('Title page', () => {
   it('states the terms of use on the landing page: free, no login and the licence', () => {
     mockApi()
     renderTitle()
-    expect(screen.getByText(/The server is free to use and asks for no login\./)).toBeInTheDocument()
+    expect(screen.getByText(/The server is free to use for all, your data stays private\./)).toBeInTheDocument()
     expect(within(screen.getByRole('main')).getByRole('link', { name: 'GNU General Public License, version 3' })).toHaveAttribute('href', 'https://www.gnu.org/licenses/gpl-3.0.html')
   })
 
@@ -127,7 +127,13 @@ describe('Title page', () => {
     const card = screen.getByRole('button', { name: /VPS13D in GM12878 and H1ESC/ })
     expect(within(card).getByRole('img', { name: /VPS13D locus in GM12878.*2\.5 ± 0\.7 bead units apart/ })).toBeInTheDocument()
     expect(within(card).getByRole('img', { name: /VPS13D locus in H1ESC.*1\.0 ± 0\.1 bead units apart/ })).toBeInTheDocument()
-    expect(card).toHaveTextContent('Each cell type has its own enhancers. VPS13D is 1.7 times more expressed in H1ESC')
+    expect(card).toHaveTextContent('From the promoter A to the nearest enhancer B of each cell type 2.5 ± 0.7 and 1.0 ± 0.1 bead units, expression 1.7 times higher in H1ESC')
+    // The two drawings have one size of view, each about the middle of its own structure.
+    const views = [...card.querySelectorAll('svg.structure-preview')].map((s) => s.getAttribute('viewBox')!.split(' ').map(Number))
+    expect(views[0].slice(2)).toEqual(views[1].slice(2))
+    expect(views[0].slice(0, 2)).not.toEqual(views[1].slice(0, 2))
+    // The card of the deletion has one line of text.
+    expect(screen.getByRole('button', { name: /Deletion at GSTM1/ })).toHaveTextContent('GM12878, the 18 kb deletion of GSTM1 in HG00512')
   })
 
   it('opens the expression example as two jobs of two cell types with their ENCODE expression', async () => {

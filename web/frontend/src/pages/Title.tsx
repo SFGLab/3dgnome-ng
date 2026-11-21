@@ -42,7 +42,16 @@ const CELLS = [
   { tag: 'GM12878', data: expression.gm12878 as PreviewData },
   { tag: 'H1ESC', data: expression.h1esc as PreviewData },
 ]
-const CELLS_VIEW: [number, number, number, number] = [-261, -319, 845, 895]
+/** A view of one size about the middle of each drawing: the two are on one scale and each is centred in its panel. */
+const CELLS_SIZE = [
+  Math.max(...CELLS.map((c) => Math.max(...c.data.points.map((p) => p[0])) - Math.min(...c.data.points.map((p) => p[0])))) + 60,
+  Math.max(...CELLS.map((c) => Math.max(...c.data.points.map((p) => p[1])) - Math.min(...c.data.points.map((p) => p[1])))) + 60,
+]
+const centred = (d: PreviewData): [number, number, number, number] => {
+  const xs = d.points.map((p) => p[0])
+  const ys = d.points.map((p) => p[1])
+  return [(Math.min(...xs) + Math.max(...xs) - CELLS_SIZE[0]) / 2, (Math.min(...ys) + Math.max(...ys) - CELLS_SIZE[1]) / 2, CELLS_SIZE[0], CELLS_SIZE[1]]
+}
 /** The expression of VPS13D in H1ESC over GM12878, from DESeq2 on the ENCODE counts of the site, read on 2026-11-21. */
 const VPS13D_FOLD = 1.7
 
@@ -64,7 +73,7 @@ export function Title() {
             structures with promoters and enhancers marked and the 3D distances between them.
           </p>
           <p className="hero-terms">
-            The server is free to use and asks for no login. 3D-GNOMEᴺᴳ is free software under the{' '}
+            The server is free to use for all, your data stays private. 3D-GNOMEᴺᴳ is free software under the{' '}
             <a href="https://www.gnu.org/licenses/gpl-3.0.html">GNU General Public License, version 3</a>.
           </p>
           <div className="buttons">
@@ -176,14 +185,14 @@ export function Title() {
             </span>
             <span className="example-title">Deletion at GSTM1</span>
             <span className="example-detail">
-              {busy === 'GSTM1' ? 'Opening the job' : `GM12878 with the variants of HG00512. An 18 kb deletion removes GSTM1 and 4 CTCF anchors. A and B are the promoters of GSTM2 and GSTM5 on its two sides`}
+              {busy === 'GSTM1' ? 'Opening the job' : 'GM12878, the 18 kb deletion of GSTM1 in HG00512'}
             </span>
           </button>
           <button type="button" className="example story" disabled={!!busy} onClick={() => open(ALL.find((x) => x.id === 'VPS13D')!)}>
             <span className="story-panels">
               {CELLS.map((p) => (
                 <span key={p.tag} className="story-panel">
-                  <StructurePreview data={p.data} view={CELLS_VIEW} label={`A structure of the VPS13D locus in ${p.tag}, with the promoter A and its nearest enhancer B ${spread(p.data)} bead units apart`} />
+                  <StructurePreview data={p.data} view={centred(p.data)} label={`A structure of the VPS13D locus in ${p.tag}, with the promoter A and its nearest enhancer B ${spread(p.data)} bead units apart`} />
                   <span className="story-tag">{p.tag}</span>
                 </span>
               ))}
@@ -192,7 +201,7 @@ export function Title() {
             <span className="example-detail">
               {busy === 'VPS13D'
                 ? 'Opening the jobs'
-                : `From the promoter A to its nearest enhancer B ${spread(CELLS[0].data)} bead units in GM12878 and ${spread(CELLS[1].data)} in H1ESC. Each cell type has its own enhancers. VPS13D is ${VPS13D_FOLD} times more expressed in H1ESC`}
+                : `From the promoter A to the nearest enhancer B of each cell type ${spread(CELLS[0].data)} and ${spread(CELLS[1].data)} bead units, expression ${VPS13D_FOLD} times higher in H1ESC`}
             </span>
           </button>
         </div>

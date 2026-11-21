@@ -116,7 +116,7 @@ export function Cite() {
                         </a>
                       ))}
                       {d.pending && <span className="unconfirmed">{d.pending}</span>}
-                      {d.accessions.length === 0 && !d.pending && <span className="no-accession">none</span>}
+                      {d.accessions.length === 0 && !d.pending && <span className="no-accession">not available</span>}
                     </td>
                     <td>{d.usedFor}</td>
                     <td>{r && !r.unconfirmed ? <a href={referenceLink(r)}>{d.label}</a> : <span className="unconfirmed">{d.label}</span>}</td>
@@ -137,7 +137,7 @@ export function Cite() {
         <section id="contact">
           <h2>Contact</h2>
           <p className="intro">
-            Laboratory of Functional and Structural Genomics, led by Dariusz Plewczynski, at the Faculty of Mathematics and Information Science, Warsaw University of Technology and the Centre of New Technologies, University of Warsaw.
+            Laboratory of Functional and Structural Genomics, led by prof. Dariusz Plewczyński, at the Faculty of Mathematics and Information Science, Warsaw University of Technology and the Centre of New Technologies, University of Warsaw.
           </p>
           <a className="lab-link" href="https://sfglab.mini.pw.edu.pl">
             <ExternalLink size={13} aria-hidden /> sfglab.mini.pw.edu.pl

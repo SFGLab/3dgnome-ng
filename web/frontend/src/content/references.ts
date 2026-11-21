@@ -229,23 +229,23 @@ export const DATA_SOURCES: DataSource[] = [
   { data: 'CTCF in situ ChIA-PET loops, H1ESC', usedFor: 'loops', accessions: [fourDn('4DNESR9S8R38'), encode('ENCSR095SXC'), geo('GSE242609')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
   { data: 'CTCF in situ ChIA-PET loops, HFFc6', usedFor: 'loops', accessions: [fourDn('4DNESCQ7ZD21')], label: '4DN Network, Nature 2017', ref: '4dn2017' },
   {
-    data: 'RNAPII ChIA-PET loops and peaks, GM12878', usedFor: 'loops',
+    data: 'RNAPII ChIA-PET loops and peaks, GM12878', usedFor: 'loops, peaks for filtering RNAPII loops',
     accessions: ['ENCSR905HWW', 'ENCFF040KUS', 'ENCFF913VWM', 'ENCFF109HCZ', 'ENCFF578JKO'].map(encode),
     label: 'ENCODE, Nature 2020', ref: 'encode2020',
   },
   {
-    data: 'RNAPII ChIA-PET loops and peaks, H1ESC', usedFor: 'loops',
+    data: 'RNAPII ChIA-PET loops and peaks, H1ESC', usedFor: 'loops, peaks for filtering RNAPII loops',
     accessions: ['ENCSR782EKZ', 'ENCFF324UIT', 'ENCFF753NSM', 'ENCFF665IXY', 'ENCFF116RLS'].map(encode),
     label: 'ENCODE, Nature 2020', ref: 'encode2020',
   },
   {
-    data: 'RNAPII ChIA-PET loops and peaks, BJ', usedFor: 'loops of HFFc6', note: 'BJ is another foreskin fibroblast line. It stands in for HFFc6.',
+    data: 'RNAPII ChIA-PET loops and peaks, BJ', usedFor: 'loops of HFFc6, peaks for filtering RNAPII loops', note: 'BJ is another foreskin fibroblast line. It stands in for HFFc6.',
     accessions: ['ENCSR956IXE', 'ENCFF601NEC', 'ENCFF808QOQ', 'ENCFF775SCY', 'ENCFF428VXI', 'ENCFF084CXY', 'ENCFF953MBK'].map(encode),
     label: 'ENCODE, Nature 2020', ref: 'encode2020',
   },
-  { data: 'CTCF ChIP-seq peaks, GM12878', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR000DZN', 'ENCFF796WRU'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
-  { data: 'CTCF ChIP-seq peaks, H1ESC', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR000BNH', 'ENCFF497ZGV'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
-  { data: 'CTCF ChIP-seq peaks, HFFc6', usedFor: 'telling RNAPII loops from CTCF loops', accessions: ['ENCSR163ULN', 'ENCFF414XTM'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'CTCF ChIP-seq peaks, GM12878', usedFor: 'filtering CTCF loops', accessions: ['ENCSR000DZN', 'ENCFF796WRU'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'CTCF ChIP-seq peaks, H1ESC', usedFor: 'filtering CTCF loops', accessions: ['ENCSR000BNH', 'ENCFF497ZGV'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
+  { data: 'CTCF ChIP-seq peaks, HFFc6', usedFor: 'filtering CTCF loops', accessions: ['ENCSR163ULN', 'ENCFF414XTM'].map(encode), label: 'ENCODE, Nature 2020', ref: 'encode2020' },
   { data: 'Hi-C, GM12878', usedFor: 'contact background, agreement', accessions: ['4DNES3JX38V5', '4DNFIXP4QG5B'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
   { data: 'Hi-C, H1ESC', usedFor: 'contact background, agreement', accessions: ['4DNES2M5JIGV', '4DNFI6HDY7WZ'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
   { data: 'Hi-C, HFFc6', usedFor: 'contact background, agreement', accessions: ['4DNES2R6PUEK', '4DNFIB59T7NN'].map(fourDn), label: '4DN Network, Nature 2017', ref: '4dn2017' },
@@ -280,7 +280,7 @@ export const DATA_SOURCES: DataSource[] = [
     note: 'RPKM of the lymphoblastoid cell lines, GD660.GeneQuantRPKM.txt.gz. A person with several libraries has their mean.',
     label: 'Lappalainen et al., Nature 2013', ref: 'geuvadis2013',
   },
-  { data: 'Enhancers, EnhancerAtlas 2.0', usedFor: 'enhancer marks and distances', accessions: [], note: 'One file per cell line. The atlas gives no accession.', label: 'Gao and Qian, NAR 2020', ref: 'enhanceratlas2020' },
+  { data: 'Enhancers, EnhancerAtlas 2.0', usedFor: 'enhancer marks and distances', accessions: [], note: 'One file per cell line.', label: 'Gao and Qian, NAR 2020', ref: 'enhanceratlas2020' },
   { data: 'Genes, GENCODE release 40, basic annotation', usedFor: 'promoter marks and gene names', accessions: [{ id: 'GENCODE v40', url: 'https://www.gencodegenes.org/human/release_40.html' }], label: 'Frankish et al., NAR 2021', ref: 'gencode2021' },
   {
     data: 'Structural variants, 1000 Genomes 30x, 3,202 samples', usedFor: 'variant structures',
@@ -307,7 +307,7 @@ export const DATA_SOURCES: DataSource[] = [
     accessions: [{ id: 'GCA_000001405.15', url: 'https://www.ncbi.nlm.nih.gov/datasets/genome/GCA_000001405.15/' }],
     note: 'GRCh38, the UCSC hg38 FASTA.', label: 'Schneider et al., Genome Research 2017', ref: 'grch38',
   },
-  { data: 'HiCDiffusion model', usedFor: 'contact background from sequence', accessions: [], note: 'The checkpoints of the authors. They have no accession.', label: 'Chiliński and Plewczynski, BMC Genomics 2024', ref: 'hicdiffusion2024' },
+  { data: 'HiCDiffusion model', usedFor: 'contact background from sequence', accessions: [], note: 'The checkpoints of the authors.', label: 'Chiliński and Plewczynski, BMC Genomics 2024', ref: 'hicdiffusion2024' },
 ]
 
 /** The link of a reference, its DOI or its URL. */
