@@ -22,14 +22,16 @@ services:
       - "${RESULTS_DIR:-./site-results}:/results"
     depends_on: [redis]
 
-  # One worker group per GPU, each worker with a fixed memory pool. See design/website/deployment.md.
+  # One worker group per card with WORKERS_PER_GPU workers each. A worker reads the same variables
+  # as the site of docker-compose.single.yml for its GPU memory pool. See design/website/settings.md.
   worker-gpu0: &worker
     image: gnome3d-web
     restart: unless-stopped
     command: ["rq", "worker", "gnome3d", "--url", "redis://redis:6379/0"]
     environment:
       QUEUE: rq
-      GNOME3D_GPU_POOL_GIB: "${GPU_POOL_GIB:-1.5}"
+      WORKERS_PER_GPU: "${WORKERS_PER_GPU:-1}"
+      GPU_POOL_GIB: "${GPU_POOL_GIB:-}"
       REDIS_URL: redis://redis:6379/0
       RETENTION_DAYS: "${RETENTION_DAYS:-14}"
     volumes:
@@ -37,7 +39,7 @@ services:
       - "${RESULTS_DIR:-./site-results}:/results"
     depends_on: [redis, web]
     deploy:
-      replicas: ${WORKERS_PER_GPU:-2}
+      replicas: ${WORKERS_PER_GPU:-1}
       resources:
         reservations:
           devices: [{ driver: nvidia, device_ids: ["0"], capabilities: [gpu] }]
@@ -45,7 +47,7 @@ services:
   worker-gpu1:
     <<: *worker
     deploy:
-      replicas: ${WORKERS_PER_GPU:-2}
+      replicas: ${WORKERS_PER_GPU:-1}
       resources:
         reservations:
           devices: [{ driver: nvidia, device_ids: ["1"], capabilities: [gpu] }]

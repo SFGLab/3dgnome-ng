@@ -1,8 +1,10 @@
-"""Running jobs: rq workers, or a local pool of slots in the web process, one GPU per slot.
+"""Running jobs: rq workers, or a local pool of slots in the web process, one card per slot.
 
-The engine of a job of the local pool runs on a set of cores of its slot, `slot_cores`: the
-cores of the server divided by the slots, or `limits.cores_per_job` of config.json. Two jobs at
-once then do not share cores. An engine takes as many threads as it has cores.
+`Settings` has the workers of the site: the cards, the jobs at once on a card, the cores of a
+job and its GPU memory pool. The local pool has one slot for each job at once, `Settings.slots`.
+The engine of a job runs on the cores of its slot, `slot_cores`, and two jobs at once do not
+share cores. An engine takes as many threads as it has cores. An rq worker is one slot. Its
+container gives it its card and it runs on every core it has.
 """
 
 from __future__ import annotations
@@ -21,7 +23,6 @@ from pathlib import Path
 from .catalog import Catalog
 from .jobs import JobRequest, run_job, write_json
 from .settings import Settings
-from .siteconfig import ConfigError, ConfigFile
 
 log = logging.getLogger(__name__)
 
@@ -57,15 +58,6 @@ def slot_cores(cores: list[int], slot: int, slots: int, per_job: int | None = No
     return sorted(cores[(first + k) % n] for k in range(count))
 
 
-def _cores_per_job(s: Settings) -> int | None:
-    """`limits.cores_per_job` of the site's config.json as it is now, None when it is not set."""
-    try:
-        return ConfigFile(s.site_config or s.data_dir / "config.json").get().cores_per_job
-    except ConfigError as e:
-        log.error("%s The job gets the cores of the server divided by the slots.", e)
-        return None
-
-
 def work(
     req_dict: dict[str, object], job_dir: str, gpu: str | None = None, engine: list[str] | None = None, slot: tuple[int, int] | None = None
 ) -> str:
@@ -75,14 +67,13 @@ def work(
     that slot. Without it the engine has every core of the worker."""
     s = Settings.from_env()
     catalog = Catalog.load(s.data_dir)
-    extra = {"CUDA_VISIBLE_DEVICES": gpu} if gpu is not None else None
-    cores = slot_cores(server_cores(), slot[0], slot[1], _cores_per_job(s)) if slot else []
-    run_job(JobRequest(**req_dict), catalog, Path(job_dir), engine=engine or s.engine_cmd, env_extra=extra, cores=cores or None)  # type: ignore[arg-type]
+    cores = slot_cores(server_cores(), slot[0], slot[1], s.worker_cores) if slot else []
+    run_job(JobRequest(**req_dict), catalog, Path(job_dir), engine=engine or s.engine_cmd, env_extra=s.engine_env(gpu) or None, cores=cores or None)  # type: ignore[arg-type]
     return job_dir
 
 
 class LocalPool:
-    """Runs jobs in the web process on a fixed set of slots, one GPU id per slot. A job waits
+    """Runs jobs in the web process on a fixed set of slots, one card id per slot. A job waits
     for a free slot and its engine sees only the slot's GPU. Waiting jobs are lost when the
     process stops."""
 
@@ -126,7 +117,7 @@ def _local_pool(s: Settings) -> LocalPool:
     global _POOL
     with _POOL_LOCK:
         if _POOL is None:
-            _POOL = LocalPool(s.gpu_slots, s.engine_cmd)
+            _POOL = LocalPool(s.slots, s.engine_cmd)
         return _POOL
 
 

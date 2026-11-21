@@ -1,16 +1,15 @@
 """The configuration of the site, `config.json` beside the catalog.
 
     {"features": {"results": true, "method": true, "trios": false},
-     "limits": {"region_mb": 20, "hicdiffusion_mb": 2, "cores_per_job": 18}}
+     "limits": {"region_mb": 20, "hicdiffusion_mb": 2}}
 
 `results` and `method` are the two pages with their links and `trios` is the nine people on
 the Results page with their RNA-seq in the form. A feature the file leaves out is on.
 
 `region_mb` is the longest region a job may cover and `hicdiffusion_mb` the longest region a
-job with a HiCDiffusion background may cover, both in Mb. `cores_per_job` is the number of cores
-the engine of one job may use. Left out, a job gets the cores of the server divided by the slots
-of the queue. A limit the file leaves out keeps the site's default. The file is read again when
-it changes.
+job with a HiCDiffusion background may cover, both in Mb. A limit the file leaves out keeps the
+site's default. The file is read again when it changes. The workers of the site, their cards
+and their cores are variables of the environment, see settings.py.
 """
 
 from __future__ import annotations
@@ -26,8 +25,8 @@ log = logging.getLogger(__name__)
 
 # The parts of the site a feature flag can turn off.
 FEATURES = ("results", "method", "trios")
-# The limits of a job the file can set: two lengths in Mb and a count of cores.
-LIMITS = ("region_mb", "hicdiffusion_mb", "cores_per_job")
+# The limits of a job the file can set, two lengths in Mb.
+LIMITS = ("region_mb", "hicdiffusion_mb")
 
 
 class ConfigError(ValueError):
@@ -44,7 +43,6 @@ class SiteConfig:
     # None keeps the default of the site.
     region_mb: float | None = None
     hicdiffusion_mb: float | None = None
-    cores_per_job: int | None = None
 
     @property
     def hidden(self) -> tuple[str, ...]:
@@ -80,10 +78,7 @@ def parse(text: str, where: str = "config.json") -> SiteConfig:
     if unknown:
         raise ConfigError(f"{where} names the limit {', '.join(unknown)}. It takes {', '.join(LIMITS)}.")
     for name, value in limits.items():
-        if name == "cores_per_job":
-            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-                raise ConfigError(f"{where}: the limit cores_per_job must be a whole number of cores, 1 or more")
-        elif isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
             raise ConfigError(f"{where}: the limit {name} must be a number of Mb above zero")
     window_mb = HICDIFFUSION_WINDOW / 1e6
     if limits.get("hicdiffusion_mb", 0) > window_mb:
@@ -95,7 +90,6 @@ def parse(text: str, where: str = "config.json") -> SiteConfig:
         features={**_all_on(), **flags},
         region_mb=limits.get("region_mb"),
         hicdiffusion_mb=limits.get("hicdiffusion_mb"),
-        cores_per_job=limits.get("cores_per_job"),
     )
 
 

@@ -16,9 +16,9 @@ from types import SimpleNamespace
 import pytest
 from fixture import make_data
 
-from gnome3d_web import siteconfig
 from gnome3d_web.jobs import JobRequest, on_cores
 from gnome3d_web.queue import LocalPool, resume_interrupted, server_cores, slot_cores
+from gnome3d_web.settings import Settings, SettingsError
 
 FAKE = [sys.executable, str(Path(__file__).resolve().parent / "fake_engine.py")]
 
@@ -112,7 +112,7 @@ def test_each_slot_has_its_share_of_the_cores() -> None:
     assert slot_cores(cores, 0, 2) == list(range(18)) and slot_cores(cores, 1, 2) == list(range(18, 36)), "two slots halve 36 cores"
     four = [slot_cores(cores, i, 4) for i in range(4)]
     assert [len(c) for c in four] == [9] * 4 and sorted(c for s in four for c in s) == cores, "four slots take a quarter each and no core twice"
-    assert slot_cores(cores, 1, 2, 8) == list(range(8, 16)), "a count from the config file is the cores of one job: " + str(slot_cores(cores, 1, 2, 8))
+    assert slot_cores(cores, 1, 2, 8) == list(range(8, 16)), "a count of WORKER_CORES is the cores of one job: " + str(slot_cores(cores, 1, 2, 8))
     assert slot_cores(cores, 0, 2, 36) == cores and slot_cores(cores, 1, 2, 36) == cores, "a count of every core gives each job the whole server"
     assert slot_cores(cores, 1, 2, 100) == cores, "a count above the cores of the server is all of them"
     # The cores of a container are not always 0 to n - 1.
@@ -122,12 +122,36 @@ def test_each_slot_has_its_share_of_the_cores() -> None:
     assert slot_cores([0], 3, 4) == [0] and slot_cores([], 0, 2) == [], "one core serves every slot and no cores is no pinning"
 
 
-def test_the_config_file_takes_the_cores_of_a_job() -> None:
-    assert siteconfig.parse("{}").cores_per_job is None, "left out, the queue divides the cores by the slots"
-    assert siteconfig.parse('{"limits": {"cores_per_job": 12}}').cores_per_job == 12, "the file sets the cores of one job"
-    for bad in ("0", "-2", "2.5", "true", '"8"'):
-        with pytest.raises(siteconfig.ConfigError, match="whole number of cores"):
-            siteconfig.parse('{"limits": {"cores_per_job": %s}}' % bad)
+WORKER_VARIABLES = ("GPUS", "WORKERS_PER_GPU", "WORKER_CORES", "GPU_POOL_GIB", "GPU_SLOTS", "GNOME3D_GPU_POOL_GIB", "XLA_PYTHON_CLIENT_MEM_FRACTION")
+
+
+def test_the_workers_of_the_site_are_four_variables_of_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in WORKER_VARIABLES:
+        monkeypatch.delenv(name, raising=False)
+    one = Settings.from_env()
+    assert one.slots == ["0"] and one.worker_cores is None, "left out, the site runs one job at once on card 0 and divides the cores"
+    assert one.engine_env("0") == {"CUDA_VISIBLE_DEVICES": "0"}, "one job on a card keeps the pool JAX takes"
+    assert one.engine_env() == {}, "a worker without a slot has the cards of its process"
+    monkeypatch.setenv("GPUS", "0, 1")
+    monkeypatch.setenv("WORKERS_PER_GPU", "2")
+    four = Settings.from_env()
+    assert four.slots == ["0", "1", "0", "1"], "two cards with two workers each are four jobs at once, the first two on a card each"
+    assert four.engine_env("1") == {"CUDA_VISIBLE_DEVICES": "1", "XLA_PYTHON_CLIENT_MEM_FRACTION": "0.3750"}, "two jobs on a card halve the pool JAX takes: " + str(four.engine_env("1"))
+    monkeypatch.setenv("GPU_POOL_GIB", "1.5")
+    monkeypatch.setenv("WORKER_CORES", "6")
+    set_ = Settings.from_env()
+    assert set_.worker_cores == 6 and set_.engine_env("0") == {"CUDA_VISIBLE_DEVICES": "0", "GNOME3D_GPU_POOL_GIB": "1.5"}, "a pool in GiB and a count of cores stand over the defaults"
+    monkeypatch.setenv("GNOME3D_GPU_POOL_GIB", "2")
+    assert Settings.from_env().engine_env("0") == {"CUDA_VISIBLE_DEVICES": "0"}, "a pool set for the process itself is left alone"
+
+
+@pytest.mark.parametrize(("name", "value", "said"), [("WORKERS_PER_GPU", "0", "whole number"), ("WORKER_CORES", "2.5", "whole number"), ("GPU_POOL_GIB", "lots", "number of GiB"), ("GPU_SLOTS", "0,0,1,1", "GPUS=0,1 with WORKERS_PER_GPU=2")])
+def test_a_worker_variable_the_site_cannot_use_stops_it_with_the_fix(monkeypatch: pytest.MonkeyPatch, name: str, value: str, said: str) -> None:
+    for other in WORKER_VARIABLES:
+        monkeypatch.delenv(other, raising=False)
+    monkeypatch.setenv(name, value)
+    with pytest.raises(SettingsError, match=said):
+        Settings.from_env()
 
 
 def test_a_command_on_no_cores_is_the_command() -> None:

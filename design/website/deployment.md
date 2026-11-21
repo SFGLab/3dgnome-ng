@@ -21,11 +21,11 @@ build records the latest tag as the version of the engine in the image. Without 
 ## One container
 
 docker-compose.single.yml runs the site and the engine in one container of the same image. The
-jobs run in the web process on the slots of `GPU_SLOTS`, one GPU id per slot.
+jobs run in the web process, `WORKERS_PER_GPU` at once on each card of `GPUS`.
 
 ```bash
 cd web
-SITE_ROOT=/srv/3dgnome BASE_PATH=/new PORT=8770 GPU_SLOTS=0,1 \
+SITE_ROOT=/srv/3dgnome BASE_PATH=/new PORT=8770 GPUS=0,1 WORKERS_PER_GPU=2 \
   SITE_USER=$(id -u):$(id -g) docker compose -f docker-compose.single.yml up -d --build
 ```
 
@@ -75,8 +75,9 @@ on localhost without TLS, on the host directly and on the building machine throu
 ## Workers and GPUs
 
 docker-compose.yml has one worker group per GPU, `worker-gpu0` and `worker-gpu1`, each worker
-pinned to its card. `WORKERS_PER_GPU` sets the workers per card, 2 by default, and
-`GPU_POOL_GIB` the memory pool of each, 1.5 GiB by default. On a machine with one GPU, remove
+pinned to its card. `WORKERS_PER_GPU` sets the workers per card and `GPU_POOL_GIB` the memory
+pool of each. The single container reads the same variables. `design/website/settings.md` has
+the four variables of the workers and their defaults. On a machine with one GPU, remove
 `worker-gpu1`.
 
 A job of 20 Mb and 10 structures needs 0.65 GiB of GPU memory and runs at the same speed in any
@@ -103,7 +104,8 @@ IPC namespace and the daemon's pipe directory:
 docker compose -f docker-compose.yml -f docker-compose.mps.yml up -d
 ```
 
-Without MPS set `WORKERS_PER_GPU=1`. The host needs the NVIDIA container toolkit; Docker's
+Without MPS a second worker on a card adds no throughput. It still lets a short job start beside
+a long one. The host needs the NVIDIA container toolkit; Docker's
 `nvidia` runtime entry alone does not give the containers a GPU.
 
 Measured 2026-11-12 on an RTX 3090 with `web/scripts/docker_mps_check.sh`: Redis, the
@@ -111,8 +113,8 @@ web container and two workers on GPU 0 with this overlay took six jobs posted at
 CTCF and RNAPII, 10 structures, 3 Mb windows. Both engines ran on the one MPS server, 1.7 GiB
 each on the card, all six done in 226 s, 95.6 jobs per hour.
 
-Without Docker, `QUEUE=thread` runs jobs in the web process on the slots of `GPU_SLOTS`, one GPU
-id per slot, `0,0,1,1` for two jobs at once on each of two cards. Waiting jobs are lost when the
+Without Docker, `QUEUE=thread` runs jobs in the web process with the same variables, `GPUS=0,1`
+and `WORKERS_PER_GPU=2` for two jobs at once on each of two cards. Waiting jobs are lost when the
 process stops.
 
 ## CPU only

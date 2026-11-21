@@ -10,13 +10,44 @@ All by environment, see `web/gnome3d_web/settings.py`. The ones that matter:
 | `RETENTION_DAYS` | 14 | a private job is deleted after this many days, as the form says |
 | `ENGINE_CMD` | `python -m gnome3d.cli` | how the worker starts the engine |
 | `MAX_REGION_MB` | 20 | the longest region the form accepts, unless `config.json` sets `limits.region_mb` |
-| `GPU_SLOTS` | `0` | the slots of the `thread` queue, one GPU id per slot |
-| `GNOME3D_GPU_POOL_GIB` | unset | the GPU memory pool of each engine process in GiB |
 | `MAX_STRUCTURES` | 100 | the most structures a job may ask for |
 | `UPLOAD_MAX_MB` | 200 | the largest upload; set the proxy's body limit to match |
 | `BASE_PATH` | unset | the path the site is served under, `/new` for a site at `/new/`; the frontend is built with the same value |
 | `LINK_ALLOW_PRIVATE` | off | `1` lets a contact map link point at a private address, for tests only |
 | `LINK_READS` | 4 | contact map links read at once |
+
+## Workers
+
+Four variables set how many jobs run at once and what each job gets. `Settings` of
+`web/gnome3d_web/settings.py` reads them for both queues, and every compose file and
+`web/scripts/serve_local.sh` pass them on under these names.
+
+| variable | default | meaning |
+|---|---|---|
+| `GPUS` | `0` | the cards the jobs run on, their ids separated by commas |
+| `WORKERS_PER_GPU` | 1 | the jobs at once on one card. The site runs the number of cards times this number of jobs at once |
+| `WORKER_CORES` | the cores of the server divided by the jobs at once | the cores the engine of one job runs on |
+| `GPU_POOL_GIB` | 0.75 of a card divided by `WORKERS_PER_GPU` | the GPU memory pool of the engine of one job, in GiB |
+
+A server with two cards and 36 cores runs four jobs at once with `GPUS=0,1` and
+`WORKERS_PER_GPU=2`. Each job then has 9 cores and a pool of 0.375 of its card. JAX takes 0.75
+of a card for one process, and the default pool divides that share between the workers of the
+card. Each engine needs about 0.5 GiB beside its pool for its CUDA context.
+
+The `thread` queue has one slot for each job at once. The first slots go to one card each, the
+order of the slots of two cards with two workers is 0, 1, 0, 1. Each slot has a set of cores of
+its own, the next `WORKER_CORES` cores of the server, and the engine of its job is started on
+that set. An engine takes as many threads as it has cores. Two jobs at once share no core. A
+count above the share of a job makes the sets overlap, and the number of cores of the server
+gives every job all of them.
+
+With the `rq` queue a worker is one slot. docker-compose.yml starts `WORKERS_PER_GPU` workers on
+each card and a worker has the card of its container. `WORKER_CORES` is not applied there. A
+worker runs on every core its container has.
+
+A change of these variables needs a restart of the site. The site does not start on a value it
+cannot use, and it does not start with `GPU_SLOTS`, the variable these replace.
+`design/website/deployment.md` has the measurements of jobs at once on one card.
 
 ## config.json
 
@@ -25,7 +56,7 @@ the limits of a job. The server reads the file again when it changes. An edit ne
 and no build.
 
     {"features": {"results": true, "method": true, "trios": false},
-     "limits": {"region_mb": 20, "hicdiffusion_mb": 2, "cores_per_job": 18}}
+     "limits": {"region_mb": 20, "hicdiffusion_mb": 2}}
 
 | key | default | meaning |
 |---|---|---|
@@ -33,19 +64,11 @@ and no build.
 | `features.trios` | on | the nine people on the Results page and their RNA-seq: an expression table with `"feature": "trios"` in the catalog, its row of the Cite page and its sentence of the Help page |
 | `limits.region_mb` | `MAX_REGION_MB`, 20 | the longest region of a job, in Mb |
 | `limits.hicdiffusion_mb` | 2 | the longest region of a job with a HiCDiffusion background, in Mb, 2.097152 at most |
-| `limits.cores_per_job` | the cores of the server divided by the slots of `GPU_SLOTS` | the cores the engine of one job runs on, with the `thread` queue |
 
 HiCDiffusion predicts one window of 2,097,152 bp of the haplotype. A longer region would get the
 prediction on its first part alone, and the file is refused with a higher limit. The default
 of 2 Mb leaves room for insertions. The form, the title page and the refusals of the server
 state the limits of the file.
-
-The `thread` queue runs one job per slot of `GPU_SLOTS` at once and an engine takes as many threads
-as it has cores. Each slot has a set of cores of its own, the next `cores_per_job` cores of the
-server, and the engine of its job is started on that set. With two slots on a server of 36 cores a
-job has 18 and two jobs at once share none. A count above that share makes the sets overlap, and
-the number of cores of the server gives every job all of them. The value is read when a job starts.
-A job that runs keeps the cores it started on. The `rq` queue does not set the cores of a job.
 
 A site does not start on a file with an unknown key, feature or limit. A broken edit of a
 running site is logged and the configuration it had stays.

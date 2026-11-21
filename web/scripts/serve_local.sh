@@ -2,7 +2,7 @@
 # The site without Docker or Redis: uvicorn with the thread queue on fixed GPU slots and the
 # NVIDIA MPS daemon for the engines when MPS=1. Run from the repository root.
 #
-#   SITE=~/site-data RESULTS=~/results VENV=~/venv PORT=8766 GPU_SLOTS=0,0 POOL_GIB=1.5 MPS=1 \
+#   SITE=~/site-data RESULTS=~/results VENV=~/venv PORT=8766 GPUS=0 WORKERS_PER_GPU=2 MPS=1 \
 #     bash web/scripts/serve_local.sh
 #
 # With MPS=1 the daemon runs as this user in a pipe directory under RESULTS and stops when the site
@@ -15,7 +15,7 @@ PORT="${PORT:-8766}"
 ROOT="$PWD"
 
 export PYTHONPATH="$ROOT/web:$ROOT/web/vendor" DATA_DIR="$SITE" RESULTS_DIR="$RESULTS" QUEUE=thread
-export GPU_SLOTS="${GPU_SLOTS:-0}" GNOME3D_GPU_POOL_GIB="${POOL_GIB:-1.5}"
+export GPUS="${GPUS:-0}" WORKERS_PER_GPU="${WORKERS_PER_GPU:-1}" WORKER_CORES="${WORKER_CORES:-}" GPU_POOL_GIB="${GPU_POOL_GIB:-}"
 export ENGINE_PYTHON="$VENV/bin/python" ENGINE_ROOT="$ROOT" GNOME3D_JAX_CACHE="$RESULTS/.jax-cache"
 mkdir -p "$RESULTS"
 
