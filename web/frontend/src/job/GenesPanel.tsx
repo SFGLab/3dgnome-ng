@@ -1,13 +1,14 @@
 import { askedOf } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import type { JobApi, Summary } from '../api'
+import { Unanswered } from '../components/Unanswered'
 import { GenesTab } from './GenesTab'
 import { parseRegion } from '../lib/region'
 
 /** The Genes tab with its rows from the job's gene endpoint. */
 export function GenesPanel({ api, summary, filter, selected, onSelect }: { api: JobApi; summary: Summary; filter: string; selected: string | null; onSelect: (g: string) => void }) {
   const genes = useQuery(askedOf(api).genes())
-  if (!genes.data) return <div aria-busy="true" />
+  if (!genes.data) return <Unanswered of={genes} />
   return (
     <GenesTab
       rows={genes.data}

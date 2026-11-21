@@ -4,6 +4,7 @@ import { ArrowRight, Info } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { served } from '../base'
+import { Unanswered } from '../components/Unanswered'
 import { Background } from '../model/Background'
 import { CellTypes } from '../model/CellTypes'
 import { EXAMPLES } from '../model/examples'
@@ -133,6 +134,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
             {`Pick a cell type and a region of up to ${catalog.data?.max_region_mb ?? 20} Mb, then choose the loops.`} A job returns an ensemble of 3D structures with promoters and enhancers marked.
           </p>
         </header>
+        {catalog.isError && <Unanswered of={catalog} />}
         {source && sourceJob.data && (
           <p className="filled-from" role="status">
             The form is filled with the request of <a href={served(source[0])}>{sourceName || `job ${source[2].slice(0, 8)}`}</a>. Change what you need and start a new job.

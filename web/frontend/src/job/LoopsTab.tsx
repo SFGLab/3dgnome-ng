@@ -1,3 +1,4 @@
+import { Unanswered } from '../components/Unanswered'
 import { askedOf } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
@@ -13,7 +14,7 @@ export function LoopsTab({ api, onShow }: { api: JobApi; onShow?: (loop: Loop) =
   const loops = useQuery(askedOf(api).loops())
   const sorted = useMemo(() => [...(loops.data ?? [])].sort((a, b) => a.a[0] - b.a[0]), [loops.data])
   const page = usePage(sorted)
-  if (!loops.data) return <div aria-busy="true" />
+  if (!loops.data) return <Unanswered of={loops} />
   return (
     <>
       <div className="genes-toolbar">

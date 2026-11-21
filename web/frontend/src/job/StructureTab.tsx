@@ -1,3 +1,4 @@
+import { Unanswered } from '../components/Unanswered'
 import { askedOf } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import { Ruler } from 'lucide-react'
@@ -80,7 +81,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
   const pair = row ? [row.promoter_bead, row.enhancer_bead] : (loopBeads ?? picks)
   const distance = useQuery({ ...askedOf(api).distance(s && pair.length === 2 ? mid(s, pair[0]) : 0, s && pair.length === 2 ? mid(s, pair[1]) : 0), enabled: !!s && pair.length === 2 })
   const region = parseRegion(summary.region)
-  if (!s || !annotations.data || !region) return <div className="view-box" aria-busy="true" />
+  if (!s || !annotations.data || !region) return <Unanswered of={[structure, annotations]} className="view-box" />
   const markers = pair.map((k, i) => ({ label: 'AB'[i], at: [s.beads[k][2], s.beads[k][3], s.beads[k][4]] as [number, number, number] }))
   const loops = annotations.data.loops
   const loopIndex = loop ? loops.findIndex((l) => sameLoop(l, loop)) : -1

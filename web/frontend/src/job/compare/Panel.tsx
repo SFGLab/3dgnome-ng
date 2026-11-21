@@ -1,3 +1,4 @@
+import { Unanswered } from '../../components/Unanswered'
 import { askedOf, type JobApi } from '../../api'
 import { useQuery } from '@tanstack/react-query'
 import { Camera, ChevronDown } from 'lucide-react'
@@ -131,6 +132,7 @@ export function Panel({
         onPick={onPick}
       />
       <div className="view-box compare-box">
+        {(summary.isError || structure.isError) && <Unanswered of={[summary, structure]} />}
         {structure.data && (
           <Scene ref={scene} points={points} colors={colors} markers={markers} focus={focus} link={link} linkId={linkId} />
         )}

@@ -1,3 +1,4 @@
+import { Unanswered } from '../../components/Unanswered'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { recentJobs } from '../../myjobs/recent'
@@ -112,6 +113,7 @@ export function Compare({
           </div>
         )}
       </div>
+      {otherApi && (cmp.isError || otherSummary.isError) && <Unanswered of={[otherSummary, cmp]} />}
       {cmp.data && cmp.data.rows.length > 0 && otherApi && otherSummary.data && (
         <CompareResults
           urls={[api.url, otherApi.url]}

@@ -279,6 +279,12 @@ describe('Model a region page', () => {
     expect(alert.closest('section')?.querySelector('h2')?.textContent).toBe('6Ensemble and simulation settings')
   })
 
+  it('says so when the catalog cannot be read', async () => {
+    mockApi([[/^\/api\/catalog$/, () => [500, { error: 'The data directory cannot be read.' }]]])
+    renderModel()
+    expect(await screen.findByText('The data directory cannot be read.', {}, { timeout: 8000 })).toBeInTheDocument()
+  }, 10000)
+
   it('says so when the server does not answer a submission', async () => {
     mockApi([[/^\/api\/jobs$/, () => Promise.reject(new TypeError('Failed to fetch'))]])
     renderModel('/model?example=TNFRSF8')

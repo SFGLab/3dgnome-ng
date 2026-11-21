@@ -173,7 +173,7 @@ export function CompareResults({
               <BoxPlot gene={row.gene} names={names} a={one.data.a} b={one.data.b} />
             ) : (
               <p className="figure-empty">
-                {row ? 'Reading the distances.' : 'Select a gene in a table or a plot for the box plot of its distance in the structures of the two jobs.'}
+                {row ? (one.isError ? one.error.message : 'Reading the distances.') : 'Select a gene in a table or a plot for the box plot of its distance in the structures of the two jobs.'}
               </p>
             )}
           </Figure>
