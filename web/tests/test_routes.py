@@ -31,7 +31,6 @@ ROUTES = sorted(
         ("GET", "/api/sv_sets/{name}/samples"),
         ("POST", "/api/jobs"),
         ("GET", "/api/jobs/{key}"),
-        ("GET", "/api/jobs/{key}/files"),
         ("GET", "/api/p/{key}"),
         ("GET", "/jobs/{key}/files/{name}"),
         ("GET", "/p/{key}/files/{name}"),

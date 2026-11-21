@@ -126,9 +126,9 @@ def shared(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespace:
 
 def test_a_server_with_range_requests_gives_the_file_size(shared: SimpleNamespace) -> None:
     remote, url, size, url_whole = shared.remote, shared.url, shared.size, shared.url_whole
-    assert remote.check_range(f"{url}/test.mcool") == size, "a server with range requests gives the file size"
+    assert remote.probe(f"{url}/test.mcool", allow_private=True)[0] == size, "a server with range requests gives the file size"
     try:
-        remote.check_range(f"{url_whole}/test.mcool")
+        remote.probe(f"{url_whole}/test.mcool", allow_private=True)
         assert False, "a server without range requests is refused"
     except remote.RemoteError as e:
         assert "does not answer range requests" in str(e) and "Local .hic file" in e.fix, "a server without range requests is refused: " + f"{e} {e.fix}"

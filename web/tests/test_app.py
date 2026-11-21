@@ -92,8 +92,9 @@ def test_a_valid_request_answers_with_its_job(form: Any, site: SimpleNamespace) 
     r2 = c.post("/api/jobs", data=form)
     assert r2.json()["url"] == job, "the same request finds the same job"
 
-    names = c.get("/api" + job + "/files").json()
-    assert "ep.tsv" in names and any(n.endswith(".cif") for n in names), "the files API lists the structures and the table: " + str(names)
+    summary = c.get("/api" + job + "/summary").json()
+    names = [f["name"] for f in summary["files"] + summary["models"]]
+    assert "ep.tsv" in names and any(n.endswith(".cif") for n in names), "the summary lists the structures and the table: " + str(names)
     assert c.get(job + "/files/ep.tsv").status_code == 200, "a listed file downloads"
 
     assert c.get(job + "/files/..%2F..%2Fcatalog.json").status_code == 404, "a path outside the job is refused"
@@ -106,7 +107,8 @@ def test_a_valid_request_answers_with_its_job(form: Any, site: SimpleNamespace) 
 def test_an_upload_makes_a_private_job_behind_a_secret_link(form: Any, site: SimpleNamespace) -> None:
     root, c = site.root, site.c
     vcf = (root / "data" / "svs" / "demo.vcf.gz").read_bytes()
-    r = c.post("/api/jobs", data={**form, "sample": "P1"}, files={"vcf": ("mine.vcf.gz", vcf)})
+    upload = c.post("/api/uploads", data={"kind": "vcf"}, files={"file": ("mine.vcf.gz", vcf)}).json()["id"]
+    r = c.post("/api/jobs", data={**form, "sample": "P1", "vcf_upload": upload})
     loc = r.json().get("url", "") if r.status_code == 201 else ""
     assert r.status_code == 201 and loc.startswith("/p/") and len(loc) > 20, "an upload makes a private job behind a secret link: " + r.text[:120]
 

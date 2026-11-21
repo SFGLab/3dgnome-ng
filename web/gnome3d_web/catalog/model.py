@@ -106,7 +106,6 @@ def _no_expression() -> dict[str, Source]:
 
 @dataclass
 class Catalog:
-    root: Path
     cell_types: dict[str, CellType]
     sv_sets: dict[str, SVSet]
     expression: dict[str, Source] = field(default_factory=_no_expression)
@@ -194,4 +193,4 @@ class Catalog:
             for cell in src.cell_types if not src.feature else ():
                 if cell in cts and "RNA-seq" not in cts[cell].data:
                     cts[cell].data.append("RNA-seq")
-        return cls(root=root, cell_types=cts, sv_sets=svs, expression=tables)
+        return cls(cell_types=cts, sv_sets=svs, expression=tables)

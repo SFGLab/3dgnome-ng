@@ -183,11 +183,6 @@ def probe(url: str, allow_private: bool, timeout: float = HEAD_SECONDS) -> tuple
         raise RemoteError(f"{_host(url)} cannot be reached.", "Check the link and try again.") from e
 
 
-def check_range(url: str, timeout: float = HEAD_SECONDS) -> int:
-    """The size of a remote file whose server answers range requests."""
-    return probe(url, allow_private=True, timeout=timeout)[0]
-
-
 def _chrom_name(names: list[str], chrom: str) -> str:
     """The file's name for a chromosome, with or without the chr prefix."""
     bare = chrom.removeprefix("chr")

@@ -11,7 +11,6 @@ import traceback
 from dataclasses import asdict
 from pathlib import Path
 
-import numpy as np
 from personal3d.lift import Lift
 
 from .. import expression
@@ -158,17 +157,11 @@ def run_job(
         genes, enh = _lifted_marks(cell, region.chrom, svs, enh_file, cell_enhancers=req.cell_type != "own")
         inputs_lo, inputs_hi = (int(x) for x in inputs.region.split(":")[1].split("-"))
         marks = mark_beads(region.chrom, starts, ends, genes, enh)
-        # read_cif sorts beads by start; the viewer selects atoms in file order
-        order = np.argsort([int(r.split()[16]) for r in cifs[0].read_text().splitlines() if r.startswith("ATOM")], kind="stable")
         (job / "marks.json").write_text(
             json.dumps(
                 {
                     "promoters": marks.promoters,
                     "enhancers": marks.enhancers,
-                    "viewer": {
-                        "promoters": sorted(int(order[k]) for k in marks.promoters.values()),
-                        "enhancers": sorted(int(order[k]) for k in marks.enhancers),
-                    },
                     "models": [c.name for c in cifs],
                     # haplotype coordinates; a promoter is its TSS and a kilobase either side
                     "elements": [

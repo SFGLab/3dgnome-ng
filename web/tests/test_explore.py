@@ -141,7 +141,8 @@ def test_two_jobs_on_one_region_compare_on_the_same_region(site: SimpleNamespace
 def test_a_private_job_answers_under_api_p(site: SimpleNamespace) -> None:
     root, c, form = site.root, site.c, site.form
     vcf = (root / "data" / "svs" / "demo.vcf.gz").read_bytes()
-    priv = c.post("/api/jobs", data=form | {"n_models": "1"}, files={"vcf": ("mine.vcf.gz", vcf)}).json()["url"]
+    upload = c.post("/api/uploads", data={"kind": "vcf"}, files={"file": ("mine.vcf.gz", vcf)}).json()["id"]
+    priv = c.post("/api/jobs", data=form | {"n_models": "1", "vcf_upload": upload}).json()["url"]
     token = priv.rsplit("/", 1)[1]
     assert c.get(f"/api/p/{token}/summary").status_code == 200, "a private job answers under /api/p"
     assert c.get(f"/api/jobs/{token}/summary").status_code == 404, "a private job is not under /api/jobs"

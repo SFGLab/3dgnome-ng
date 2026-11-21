@@ -20,16 +20,15 @@ from .request import JobRequest, request_key
 from .workers import enqueue
 
 
-def create_job(site: Site, fields: dict[str, str], vcf: bytes | Path | None) -> str:
+def create_job(site: Site, fields: dict[str, str]) -> str:
     """Checks a job request, queues its job and returns the url of the job.
 
     A request on hosted data has a key. Without the field `fresh` the job of that key is
     returned when the site holds one, which is how an example opens the same job for
     everyone. With `fresh` set to 1 the request starts a job of its own.
 
-    @param fields the form fields of a job request, overrides as JSON text
-    @param vcf an uploaded VCF, which makes the job private. The field vcf_upload gives an
-        upload in its place.
+    @param fields the form fields of a job request, overrides as JSON text. The field vcf_upload
+        names an uploaded VCF, which makes the job private.
     @raises Refused with the field the request fails on
     """
     s, catalog, uploads = site.settings, site.catalog, site.settings.uploads_dir
@@ -40,6 +39,7 @@ def create_job(site: Site, fields: dict[str, str], vcf: bytes | Path | None) -> 
     except json.JSONDecodeError as e:
         raise Refused(f"own is not JSON: {e}", "own") from e
     own_dirs = upload_store.own_data(uploads, own_raw, set(catalog.cell_types))
+    vcf = None
     if fields.get("vcf_upload"):
         vcf = upload_store.data_file(upload_store.usable(uploads, fields["vcf_upload"], "vcf", "vcf_upload"))
     if cell_type == "own":
@@ -140,12 +140,10 @@ def create_job(site: Site, fields: dict[str, str], vcf: bytes | Path | None) -> 
     return f"/jobs/{key}"
 
 
-def put_vcf(vcf: bytes | Path, job: Path) -> Path:
+def put_vcf(vcf: Path, job: Path) -> Path:
+    """Copies the uploaded VCF of a request into its job."""
     up = job / "upload.vcf.gz"
-    if isinstance(vcf, Path):
-        shutil.copyfile(vcf, up)
-    else:
-        up.write_bytes(vcf)
+    shutil.copyfile(vcf, up)
     return up
 
 

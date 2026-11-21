@@ -88,10 +88,6 @@ def _thin_to_hosted(sing: pd.DataFrame, cell: CellType, chrom: str) -> pd.DataFr
     return out[out[6] > 0].reset_index(drop=True)
 
 
-def _orientation(anchors: pd.DataFrame) -> dict[tuple[int, int], str]:
-    return {(int(s), int(e)): (str(o) if len(anchors.columns) > 3 else "N") for s, e, o in anchors.iloc[:, 1:4].itertuples(index=False)}
-
-
 def _clusters(loops: pd.DataFrame, anchors: pd.DataFrame) -> list[list]:
     """Loops as the rules' nine columns, orientation from the anchor holding each end's midpoint."""
     starts = anchors[1].to_numpy()
