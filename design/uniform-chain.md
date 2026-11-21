@@ -1351,6 +1351,37 @@ The decay and the SCC trade against each other over the cells. With the weights,
 | no ladder, ratio | 0.377 | 1.04 | 30 of 360 | 0.488 |
 | default chain | 0.268 | 1.04 | 12 of 360 | 0.532 |
 
+### Trial of the cells at 5 kb alone
+
+`design/figures/uniform-2026-11-19/five20/` and `scores-five20/`, with `scores-five20_10k/` and
+`scores-five20_5k/`, `slurm/ensemble/uniform_confirm20.sh` with `TAG=five20`, commit a93ba5a. The cells at 5 kb
+with the bias of the bins in their expectation and the derived radius, at a threshold of 3 and of 2, with and
+without `loop_dropout`, and with the radius of a node from its chain. Eighteen rows of twenty structures, raw
+and balanced SCC per bead pair at 25 kb:
+
+| arm | SCC | Spearman | Pearson balanced | close pairs | ends overlap | exponent over Hi-C | distance at 1 Mb, 4 Mb |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 11.5 | 12 of 360 | 1.044 | 11.4, 15.0 |
+| ladder with both sides, for reference | 0.356, 0.390 | 0.598 | 0.749 | 1.5 | 1 of 360 | 1.161 | 12.8, 20.9 |
+| z 3 | 0.285, 0.323 | 0.544 | 0.688 | 2.9 | 18 of 360 | 1.009 | 11.4, 14.9 |
+| z 2 | 0.297, 0.345 | 0.485 | 0.687 | 2.8 | 21 of 360 | 1.028 | 11.6, 15.4 |
+| z 3, `loop_dropout` | 0.331, 0.358 | 0.530 | 0.682 | 2.2 | 39 of 360 | 1.031 | 11.5, 14.2 |
+| z 2, `loop_dropout` | 0.348, 0.381 | 0.483 | 0.672 | 2.3 | 34 of 360 | 1.042 | 11.6, 15.0 |
+| z 3, `loop_dropout`, `arcs_chain_radius = sum` | 0.335, 0.360 | 0.564 | 0.721 | 1.4 | 18 of 360 | 1.064 | 11.9, 14.9 |
+
+- Every arm at 5 kb has the decay of the default chain, 1.01 to 1.06, and its distances at the long range.
+- The threshold of 2 gains 0.012 to 0.017 of raw SCC and loses 0.05 to 0.06 of Spearman.
+- The dropout gains 0.046 of raw and 0.035 of balanced SCC and has the ends overlap in 39 structures of 360
+  against 18.
+- The radius of a node from its chain takes that overlap back to 18, raises Spearman from 0.530 to 0.564 and
+  balanced Pearson from 0.682 to 0.721, and halves the close pairs. SCC does not change.
+- The arm with the threshold of 3, the dropout and the radius from the chain is 0.131 ± 0.016 of raw and
+  0.092 ± 0.017 of balanced SCC above the default chain, on 18 and 15 rows of 18, with a higher Spearman and
+  balanced Pearson. The ends overlap in 18 structures against 12.
+
+The decisions of 2026-11-21 on the threshold and on the dropout were taken on the six rows of GM12878 and hold
+on the eighteen.
+
 ### Rewrite of the ladder: a cell holds a pair closer and the law holds the long range
 
 Decided by the maintainer on 2026-11-21, after the trials above. The ladder gave two things through one
