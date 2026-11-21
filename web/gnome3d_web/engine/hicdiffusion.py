@@ -107,9 +107,10 @@ def read_map(path: Path) -> tuple[str, int, int, np.ndarray]:  # type: ignore[ty
     @return the chromosome, the start of the window, the bin and the symmetric counts
     """
     rows = pd.read_csv(path, sep="\t", header=None)
-    start, step = int(rows[1].min()), int(rows[2].iloc[0] - rows[1].iloc[0])
-    n = int((rows[4].max() - start) // step) + 1
-    i, j = ((rows[1] - start) // step).to_numpy(), ((rows[4] - start) // step).to_numpy()
+    lo, hi, far = rows[1].to_numpy(), rows[2].to_numpy(), rows[4].to_numpy()
+    start, step = int(lo.min()), int(hi[0] - lo[0])
+    n = int((far.max() - start) // step) + 1
+    i, j = (lo - start) // step, (far - start) // step
     counts = np.zeros((n, n))
     counts[i, j] = rows[6].to_numpy()
     counts[j, i] = rows[6].to_numpy()

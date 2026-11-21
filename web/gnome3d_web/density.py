@@ -33,7 +33,7 @@ def hosted_density(singletons: Path, chrom: str) -> float:
     if t.empty:
         t = pd.read_csv(singletons, sep=r"\s+", header=None, usecols=[0, 3, 5, 6], comment="#")
         t = t[t[0] == t[3]]
-        span = t.groupby(0)[5].max().sum()
+        span = float(np.asarray(t.groupby(0)[5].max()).sum())
     else:
         span = t[5].max()
     return float(t[6].sum()) / max(span / 1e6, 1e-6)

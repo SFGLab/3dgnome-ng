@@ -52,7 +52,7 @@ def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, ce
     if enhancers is None and not cell_enhancers:
         return genes, pd.DataFrame({0: pd.Series(dtype=str), 1: pd.Series(dtype=int), 2: pd.Series(dtype=int)})
     enh = pd.read_csv(enhancers or cell.path("enhancers"), sep="\t", header=None, usecols=[0, 1, 2])  # pyright: ignore[reportCallIssue, reportArgumentType]
-    enh = enh[enh[0] == chrom].copy()
+    enh = enh.loc[enh[0] == chrom].copy()
     start, end = enh[1].to_numpy(), enh[2].to_numpy()
     second = enh.copy()
     second[1], second[2] = L.copies(start), L.copies(end - 1) + 1
