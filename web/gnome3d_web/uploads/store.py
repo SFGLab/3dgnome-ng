@@ -12,6 +12,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import BinaryIO
 
+from ..errors import Refused
 from .checks import Check, _int, records
 
 
@@ -81,4 +82,57 @@ def preview(d: Path, region: tuple[str, int, int]) -> list[list[int]]:
             a, b = int(cols[1]), int(cols[5])
             if a >= region[1] and b <= region[2]:
                 out.append([(a + int(cols[2])) // 2, (int(cols[4]) + b) // 2, int(cols[6])])
+    return out
+
+
+# The id of an upload, a random token.
+ID = re.compile(r"[A-Za-z0-9_-]{8,64}")
+
+
+def find(root: Path, uid: str) -> Path | None:
+    """The directory of an upload under `root`, None for an id the site has no upload of."""
+    d = root / uid
+    return d if ID.fullmatch(uid) and (d / "meta.json").is_file() else None
+
+
+def usable(root: Path, uid: object, kind: str, field: str) -> Path:
+    """The directory of an upload that exists, holds `kind` and passed its check.
+
+    @raises Refused on `field` otherwise
+    """
+    d = find(root, str(uid))
+    if d is None:
+        raise Refused(f"upload {uid!r} does not exist", field)
+    m = meta(d)
+    if m["kind"] != kind:
+        raise Refused(f"upload {uid!r} holds {m['kind']}, not {kind}", field)
+    if not m.get("ok"):
+        raise Refused(f"{m['name']} did not pass its check. Fix the file and upload it again.", field)
+    return d
+
+
+def own_data(root: Path, raw: object, cell_types: set[str]) -> dict:
+    """The upload directories a request names as its own data, each checked to exist, to be of
+    its kind and to have passed its check.
+
+    @raises Refused on the field own otherwise
+    """
+    if not isinstance(raw, dict):
+        raise Refused("own is not an object of uploads", "own")
+    out: dict = {}
+    loops = raw.get("loops") or []
+    if not isinstance(loops, list) or not all(isinstance(x, dict) for x in loops):
+        raise Refused("own loops must be a list of objects with a factor and an upload", "own")
+    if loops:
+        out["loops"] = [(str(x.get("factor") or "loops"), usable(root, x.get("upload"), "loops", "own")) for x in loops]
+    for kind in ("anchors", "contacts", "enhancers"):
+        if raw.get(kind):
+            out[kind] = usable(root, raw[kind], kind, "own")
+    # Your own cell type may take a listed cell type's loops and enhancers in place of uploads.
+    for key, allowed in (("loops_from", cell_types), ("enhancers_from", {*cell_types, "none"})):
+        name = raw.get(key)
+        if name:
+            if name not in allowed:
+                raise Refused(f"{key} names {name!r}, which is not a listed cell type", "own")
+            out[key] = str(name)
     return out

@@ -22,7 +22,7 @@ def job(key: str, at: float, name: str = "", edited: float | None = None, kind: 
 
 @pytest.fixture(scope="module", autouse=True)
 def shared() -> SimpleNamespace:
-    from gnome3d_web import lists
+    from gnome3d_web.lists import store as lists
 
     code = lists.new_code()
     return SimpleNamespace(code=code, lists=lists)

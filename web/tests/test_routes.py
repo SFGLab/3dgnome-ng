@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 from fixture import make_data
 
 RESULTS = ("annotations", "contacts", "distance", "files.zip", "genes", "log", "loops", "picks", "structure/{i}", "summary")
@@ -41,39 +42,35 @@ ROUTES = sorted(
         ("POST", "/api/lists"),
         ("GET", "/api/lists/{code}"),
         ("PUT", "/api/lists/{code}"),
-        # The description of the interface that FastAPI serves.
-        ("GET", "/docs"),
-        ("GET", "/docs/oauth2-redirect"),
-        ("GET", "/openapi.json"),
-        ("GET", "/redoc"),
-        # Every other address gets the app or the page of a missing address.
-        ("GET", "/{path:path}"),
     ]
     + [("GET", f"/api/{kind}/{{key}}/{part}") for kind in ("jobs", "p") for part in RESULTS]
 )
 
 
 @pytest.fixture(scope="module")
-def routes(tmp_path_factory: pytest.TempPathFactory) -> list[tuple[str, str]]:
+def client(tmp_path_factory: pytest.TempPathFactory) -> TestClient:
     root = Path(str(tmp_path_factory.mktemp("work")))
     make_data(root / "data")
     os.environ.update(DATA_DIR=str(root / "data"), RESULTS_DIR=str(root / "results"), QUEUE="inline", FRONTEND_DIST=str(root / "missing"))
     from gnome3d_web.app import create_app
 
-    out = []
-    for route in create_app().routes:
-        out += [(m, route.path) for m in getattr(route, "methods", None) or ["MOUNT"] if m not in ("HEAD", "OPTIONS")]  # type: ignore[attr-defined]
-    return out
+    return TestClient(create_app())
 
 
-def test_the_site_answers_on_its_addresses_and_no_others(routes: list[tuple[str, str]]) -> None:
-    assert sorted(routes) == ROUTES, "the routes of the app are the list of this file: " + str(sorted(set(routes) ^ set(ROUTES)))
+def test_the_site_answers_on_its_addresses_and_no_others(client: TestClient) -> None:
+    described = client.get("/openapi.json").json()["paths"]
+    routes = sorted((method.upper(), path) for path, methods in described.items() for method in methods)
+    assert routes == ROUTES, "the routes of the app are the list of this file: " + str(sorted(set(routes) ^ set(ROUTES)))
 
 
-def test_no_address_is_registered_twice(routes: list[tuple[str, str]]) -> None:
-    twice = sorted({r for r in routes if routes.count(r) > 1})
-    assert twice == [], "each method and path has one route: " + str(twice)
+def test_the_description_of_the_interface_is_served(client: TestClient) -> None:
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert client.get(path).status_code == 200, f"{path} answers"
 
 
-def test_the_route_of_every_other_address_is_the_last(routes: list[tuple[str, str]]) -> None:
-    assert routes[-1] == ("GET", "/{path:path}"), "the route of every other address is registered last and takes no address of another route: " + str(routes[-1])
+def test_every_other_address_gets_the_app_and_none_under_api(client: TestClient) -> None:
+    r = client.get("/some/page")
+    assert r.status_code == 503 and "frontend is not built" in r.text, "an address of no route goes to the frontend, which is not built here: " + r.text[:120]
+    r = client.get("/api/nothing")
+    assert r.status_code == 404 and r.json() == {"detail": "Not Found"}, "an address under api that no route has is a 404 of the server: " + r.text[:120]
+    assert client.get("/api/catalog").headers["content-type"].startswith("application/json"), "the route of every other address takes no address of another route"

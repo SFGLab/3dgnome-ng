@@ -106,6 +106,34 @@ class Settings:
     gpu_pool_gib: float | None = None
 
     @property
+    def jobs_dir(self) -> Path:
+        """The jobs on hosted data, each under the key of its request."""
+        return self.results_dir / "jobs"
+
+    @property
+    def private_dir(self) -> Path:
+        """The jobs with an upload, each under a random token."""
+        return self.results_dir / "private"
+
+    @property
+    def uploads_dir(self) -> Path:
+        return self.results_dir / "uploads"
+
+    @property
+    def lists_dir(self) -> Path:
+        return self.results_dir / "lists"
+
+    @property
+    def contrasts_dir(self) -> Path:
+        """The finished comparisons of the expression of two jobs."""
+        return self.results_dir / "expression"
+
+    @property
+    def locks_dir(self) -> Path:
+        """The lock files by which the rq workers of one server share out the slots."""
+        return self.results_dir / ".slots"
+
+    @property
     def slots(self) -> list[str]:
         """The card of each job that runs at once. The first jobs go to one card each."""
         return [gpu for _ in range(self.workers_per_gpu) for gpu in self.gpus]

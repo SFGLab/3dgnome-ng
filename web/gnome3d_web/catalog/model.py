@@ -72,6 +72,19 @@ class CellType:
 SAMPLE_COLUMNS = ("sample", "sex", "population", "superpopulation", "father", "mother")
 
 
+@lru_cache(maxsize=None)
+def _sample_rows(path: Path, samples: tuple[str, ...]) -> list[list[str]]:
+    table = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False).set_index("sample")
+    table = table.reindex(columns=list(SAMPLE_COLUMNS[1:]), fill_value="")
+    known = set(samples)
+    rows: list[list[str]] = []
+    for name in samples:
+        fields = [str(v) for v in table.loc[name]] if name in table.index else [""] * 5
+        fields[3:] = [parent if parent in known else "" for parent in fields[3:]]
+        rows.append([name, *fields])
+    return rows
+
+
 @dataclass
 class SVSet:
     name: str
@@ -81,20 +94,10 @@ class SVSet:
     samples_table: Path | None = None
 
     def sample_rows(self) -> list[list[str]]:
-        """The rows of the set's samples in the order of `SAMPLE_COLUMNS`. A sample the table
-        lacks gets empty fields and a parent outside the set is left out.
+        """The rows of the set's samples in the order of `SAMPLE_COLUMNS`, read once. A sample the
+        table lacks gets empty fields and a parent outside the set is left out.
         """
-        if self.samples_table is None:
-            return []
-        table = pd.read_csv(self.samples_table, sep="\t", dtype=str, keep_default_na=False).set_index("sample")
-        table = table.reindex(columns=list(SAMPLE_COLUMNS[1:]), fill_value="")
-        known = set(self.samples)
-        rows: list[list[str]] = []
-        for name in self.samples:
-            fields = [str(v) for v in table.loc[name]] if name in table.index else [""] * 5
-            fields[3:] = [parent if parent in known else "" for parent in fields[3:]]
-            rows.append([name, *fields])
-        return rows
+        return _sample_rows(self.samples_table, tuple(self.samples)) if self.samples_table else []
 
 
 def _no_expression() -> dict[str, Source]:
@@ -107,6 +110,12 @@ class Catalog:
     cell_types: dict[str, CellType]
     sv_sets: dict[str, SVSet]
     expression: dict[str, Source] = field(default_factory=_no_expression)
+
+    def sample_note(self, sv_set: str, sample: str) -> str:
+        """Population, superpopulation and sex of a hosted sample, or an empty string."""
+        rows = self.sv_sets[sv_set].sample_rows() if sv_set in self.sv_sets else []
+        row = next((r for r in rows if r[0] == sample), None)
+        return ", ".join(v for v in (row[2], row[3], row[1]) if v) if row else ""
 
     def expression_options(self, cell: str, sample: str = "", hidden: tuple[str, ...] = ()) -> list[dict[str, object]]:
         """The hosted expression a job of a cell type can take: the replicates of the cell type,

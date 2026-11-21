@@ -7,8 +7,20 @@ structures under `models/`, `marks.json`, `ep.tsv` and `engine.log`.
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
+
+# The key of a shared job, the token of a private one and the id of an upload.
+KEY = re.compile(r"[A-Za-z0-9_-]{8,64}")
+
+
+def find(root: Path, key: str) -> Path | None:
+    """The directory of the job of a key under `root`, None for a key the site has no job of."""
+    job = root / key
+    if not KEY.fullmatch(key) or not ((job / "status.json").is_file() or (job / "request.json").is_file()):
+        return None
+    return job
 
 
 def _member(p: Path) -> tuple[int, str]:
