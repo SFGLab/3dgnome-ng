@@ -901,6 +901,11 @@ twenty structures, raw and balanced SCC per bead pair:
 No structure of 360 per arm has a stretched piece, and the radius of gyration is 9.4 bonds at a radius of 3.0
 against 9.1.
 
+The battery per structure over the eight arms of the larger trial is in `all20p/` and `scores-all20p/`. The
+exponent of the decay over that of Hi-C is 1.044 on the default chain, 1.004 with the cells at 5 kb, 1.018 with
+the radius of 3.0, 1.04 with the dropout at either radius and 1.11 to 1.12 with the ladder and with the cells at
+25 kb.
+
 - The radius of 3.0 takes the overlap of the ends from 90 structures of 360 to 14, the count of the default
   chain. Spearman at 25 kb rises from 0.487 to 0.547, above the default chain, and it is above the default chain
   at every resolution. Balanced Pearson rises from 0.638 to 0.695.
