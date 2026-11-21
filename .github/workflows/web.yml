@@ -36,6 +36,9 @@ jobs:
       # VCF through tabix.
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev zlib1g-dev tabix
       - run: pip install -e . -r web/requirements.txt -r web/requirements-dev.txt
+      # The rules of undefined and unused names. The files of the site are not formatted by ruff.
+      - run: pip install ruff==0.15.14
+      - run: ruff check --select F web/gnome3d_web web/tests web/scripts
       - run: pytest web/tests
 
   frontend:

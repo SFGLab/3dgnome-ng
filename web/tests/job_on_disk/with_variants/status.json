@@ -1,0 +1,36 @@
+{
+  "state": "done",
+  "stages": [
+    {
+      "stage": "queued",
+      "at": 1795285583.338689
+    },
+    {
+      "stage": "inputs",
+      "at": 1795285583.3398778
+    },
+    {
+      "stage": "modelling",
+      "at": 1795285583.358252
+    },
+    {
+      "stage": "marks",
+      "at": 1795285583.453365
+    },
+    {
+      "stage": "done",
+      "at": 1795285583.466205
+    }
+  ],
+  "stage": "done",
+  "started": 1795285583.339835,
+  "updated": 1795285583.466205,
+  "region": "chr1:800000-2740000",
+  "n_svs": 1,
+  "skipped_svs": 1,
+  "loops": {
+    "CTCF": 8,
+    "RNAPII": 1
+  },
+  "finished": 1795285583.4661472
+}

@@ -55,6 +55,35 @@ def test_the_key_of_a_request_is_the_one_sites_already_hold(shared: SimpleNamesp
     assert JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=101).n_models == 100, "101 structures become 100"
 
 
+PINNED = {
+    "c873ddce1421a87d": {},
+    "96071a273062bc05": {"overrides": {"main.max_pet_length": "500000"}},
+    "605cacfc38f29170": {"background": "none"},
+    "f66e8e743343f8d5": {"background": "hicdiffusion"},
+    "fb02098fea02316a": {"sv_set": "DEMO", "sample": "P1", "haplotype": 1},
+    "0270be8d18354544": {"region": "ALPHA"},
+    "06fcd575c78e41b2": {"factors": "CTCF+RNAPII"},
+    "25b7a3d8dfead60b": {"n_models": 5},
+    "fc12af0964faecb8": {"n_models": 100},
+}
+
+
+@pytest.mark.parametrize("key", PINNED)
+def test_the_keys_of_the_kinds_of_request_are_the_ones_sites_hold(key: str, shared: SimpleNamespace) -> None:
+    fields = {"cell_type": "GMX", "region": "chr1:0-2000000", "factors": "CTCF", **PINNED[key]}
+    now = request_key(JobRequest(**fields), shared.cat)  # type: ignore[arg-type]
+    assert now == key, f"the key of a request with {PINNED[key]} is the one sites already hold: {now}"
+
+
+def test_requests_that_ask_for_the_same_job_have_one_key(shared: SimpleNamespace) -> None:
+    cat = shared.cat
+    key = lambda **more: request_key(JobRequest(**{"cell_type": "GMX", "region": "chr1:0-2000000", "factors": "CTCF", **more}), cat)  # type: ignore[arg-type]  # noqa: E731
+    assert key(sample="P1", haplotype=1) == key(), "a sample without a call set is not in the key"
+    assert key(n_models=500) == key(n_models=100), "a count of structures over the limit is the limit"
+    assert key(background="hic") == key(), "the Hi-C background is the request without a background"
+    assert key(overrides={}) == key() and key(expression={}) == key(), "empty overrides and no expression are the request without them"
+
+
 def test_the_contact_background_is_in_the_key(other: Any, shared: SimpleNamespace) -> None:
     cat = shared.cat
     none = JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=2, background="none")
@@ -122,8 +151,6 @@ def log_and_first_and_part(other: Any, shared: SimpleNamespace) -> SimpleNamespa
     part = Path(d) / "results" / "part"
     run_job(other, cat, part, engine=FAKE)
     first = (part / "engine.log").read_text()
-    kept = sorted((part / "models").glob("*.cif"))[0]
-    stamp = kept.stat().st_mtime_ns
     sorted((part / "models").glob("*.cif"))[1].rename(part / "models" / "gone")
     run_job(other, cat, part, engine=FAKE)
     log = (part / "engine.log").read_text()
