@@ -33,6 +33,9 @@ const times = (log2: number, up: string, down: string) => `${(2 ** Math.abs(log2
  * in the hundreds that says no more than over 100 times. */
 const fold = (log2: number) => (2 ** Math.abs(log2) >= 100 ? `over 100 times ${log2 >= 0 ? 'higher' : 'lower'}` : times(log2, 'higher', 'lower'))
 
+/** Whether the two jobs measure a gene to two enhancers: the separations differ by more than half a bead. */
+const twoEnhancers = (r: Compare['rows'][number]) => r.linear_bp_b !== undefined && Math.abs(r.linear_bp - r.linear_bp_b) > 500
+
 const pText = (p: number | null) => (p === null ? 'no test' : p < 0.001 ? p.toExponential(1) : p.toFixed(3))
 const level = (v: number) => (v >= 100 ? v.toFixed(0) : v.toFixed(1))
 
@@ -283,6 +286,7 @@ export function CompareResults({
   urls,
   names,
   cmp,
+  shared = false,
   expression,
   expressionState,
   gene,
@@ -292,6 +296,8 @@ export function CompareResults({
   urls: [string, string]
   names: [string, string]
   cmp: Compare
+  /** The comparison keeps to the enhancers both jobs have. */
+  shared?: boolean
   expression?: ExpressionCompare
   /** `wait` while the expression is compared, `one` when one job alone has expression, the message of a failure, or empty. */
   expressionState: string
@@ -307,7 +313,12 @@ export function CompareResults({
   const row = cmp.rows.find((r) => r.gene === gene)
   const expressed = expression && expression.mode !== 'none' && expression.rows.length > 0 ? expression : null
   const eRow = expressed?.rows.find((r) => r.gene === gene)
-  const one = useQuery({ queryKey: ['compare-gene', urls[0], urls[1], gene], queryFn: () => compareGene(urls[0], urls[1], gene!), enabled: !!row, staleTime: Infinity })
+  const one = useQuery({
+    queryKey: ['compare-gene', urls[0], urls[1], gene, shared],
+    queryFn: () => compareGene(urls[0], urls[1], gene!, shared),
+    enabled: !!row,
+    staleTime: Infinity,
+  })
   const volcano = expressed?.volcano ?? null
   const kind = (r: ExpressionRow) => (r.gene === gene ? 'point selected' : r.padj !== null && r.padj < 0.05 ? 'point sure' : 'point')
   const keys: Key[] = [
@@ -351,7 +362,8 @@ export function CompareResults({
               file="distance_changes"
               head={[
                 'gene',
-                'enhancer_separation_bp',
+                `enhancer_separation_bp_${A}`,
+                `enhancer_separation_bp_${B}`,
                 `distance_mean_${A}`,
                 `distance_sd_${A}`,
                 `distance_mean_${B}`,
@@ -359,7 +371,7 @@ export function CompareResults({
                 `distance_ratio_${B}_over_${A}`,
                 'mann_whitney_p',
               ]}
-              rows={() => cmp.rows.map((r) => [r.gene, r.linear_bp, r.a.mean, r.a.sd, r.b.mean, r.b.sd, r.ratio, r.p])}
+              rows={() => cmp.rows.map((r) => [r.gene, r.linear_bp, r.linear_bp_b ?? r.linear_bp, r.a.mean, r.a.sd, r.b.mean, r.b.sd, r.ratio, r.p])}
             />
           ) : (
             <CsvButton
@@ -369,6 +381,13 @@ export function CompareResults({
             />
           )}
         </div>
+        {(cmp.shared || (cmp.differ ?? 0) > 0) && (
+          <p className="compare-note">
+            {cmp.shared
+              ? `Each gene is measured to its nearest enhancer among the ${cmp.shared_enhancers} that both jobs have.`
+              : `Each job measures a gene to its own nearest enhancer. ${cmp.differ} of ${cmp.rows.length} genes have another enhancer in ${B} than in ${A}.`}
+          </p>
+        )}
         {shown === 'distance' ? (
           <Paged<Row>
             rows={cmp.rows}
@@ -377,7 +396,8 @@ export function CompareResults({
             label="Changes in enhancer to promoter distance"
             head={['Gene', A, B, against, 'Mann-Whitney p']}
             cells={(r) => [
-              `${r.gene}, enhancer ${kb(r.linear_bp)} away`,
+              // A job measures a gene to its own nearest enhancer. Two enhancers are both stated.
+              twoEnhancers(r) ? `${r.gene}, enhancer ${kb(r.linear_bp)} away in ${A}, ${kb(r.linear_bp_b!)} in ${B}` : `${r.gene}, enhancer ${kb(r.linear_bp)} away`,
               `${r.a.mean.toFixed(1)} ± ${r.a.sd.toFixed(1)}`,
               `${r.b.mean.toFixed(1)} ± ${r.b.sd.toFixed(1)}`,
               // The ratio is the other job's distance over this job's. Above 1 the other is farther.

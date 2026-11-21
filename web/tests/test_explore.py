@@ -125,6 +125,17 @@ def test_two_jobs_on_one_region_compare_on_the_same_region(site: SimpleNamespace
     assert len(one["a"]) == n["a"] and len(one["b"]) == n["b"] and one["p"] == cmp["rows"][0]["p"], "a gene has its distance in each structure of both jobs and the same p: " + str(one)[:200]
     assert abs(sum(one["a"]) / len(one["a"]) - cmp["rows"][0]["a"]["mean"]) < 0.01, "the mean of the distances is the mean of the row"
     assert c.get("/api/compare/gene", params={"a": both, "b": ctcf, "gene": "NOT_A_GENE"}).status_code == 404, "a gene that a job lacks is a 404"
+    # By default each job has its own enhancer of a gene. Two jobs of one cell type have the same ones.
+    assert cmp["shared"] is False and cmp["differ"] == 0 and cmp["shared_enhancers"] is None, "two jobs of one cell type measure the same enhancers: " + str({k: cmp[k] for k in ("shared", "differ", "shared_enhancers")})
+    assert all({"linear_bp_b", "enhancer_bead_a", "enhancer_bead_b"} <= set(r) and r["linear_bp"] == r["linear_bp_b"] for r in cmp["rows"]), "a row states the enhancer of each job"
+    # With the enhancers that both jobs have, the answer is the same for two jobs of one cell type.
+    both_sets = c.get("/api/compare", params={"a": both, "b": ctcf, "shared": 1}).json()
+    assert both_sets["shared"] is True and both_sets["shared_enhancers"] >= 1, "the shared enhancers are counted: " + str(both_sets["shared_enhancers"])
+    own = {r["gene"]: r for r in cmp["rows"]}
+    for r in both_sets["rows"]:
+        assert abs(r["a"]["mean"] - own[r["gene"]]["a"]["mean"]) < 0.01 and abs(r["b"]["mean"] - own[r["gene"]]["b"]["mean"]) < 0.01, "one set of enhancers gives one distance either way: " + r["gene"]
+    shared_gene = c.get("/api/compare/gene", params={"a": both, "b": ctcf, "gene": gene, "shared": 1}).json()
+    assert shared_gene["a"] == one["a"] and shared_gene["b"] == one["b"], "the distances of one gene agree too"
 
 
 def test_a_private_job_answers_under_api_p(site: SimpleNamespace) -> None:

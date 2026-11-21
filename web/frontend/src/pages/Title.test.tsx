@@ -65,7 +65,7 @@ describe('Title page', () => {
 
   it('shows the TNFRSF8 comparison and the contact map as examples', () => {
     renderTitle()
-    for (const t of ['TNFRSF8 with and without its RNAPII loop', 'Contacts against Hi-C']) {
+    for (const t of ['TNFRSF8 with and without its RNAPII loop', 'Contacts against Hi-C', 'Deletion at GSTM1', 'VPS13D in GM12878 and H1ESC, distance beside expression']) {
       expect(screen.getByText(t)).toBeInTheDocument()
     }
   })
@@ -109,6 +109,49 @@ describe('Title page', () => {
       'GM12878 TNFRSF8, CTCF loops',
       'GM12878 TNFRSF8, CTCF and RNAPII loops',
     ])
+    localStorage.clear()
+    vi.unstubAllGlobals()
+  })
+
+  it('has two rows of examples: a wide card with a narrow one, then a narrow card with a wide one', () => {
+    renderTitle()
+    const rows = [...document.querySelectorAll('.example-row')].map((row) => [...row.querySelectorAll(':scope > .example')].map((card) => card.classList.contains('story')))
+    expect(rows).toEqual([
+      [true, false],
+      [false, true],
+    ])
+  })
+
+  it('draws VPS13D in the two cell types, each with its own nearest enhancer, and says the enhancers differ', () => {
+    renderTitle()
+    const card = screen.getByRole('button', { name: /VPS13D in GM12878 and H1ESC/ })
+    expect(within(card).getByRole('img', { name: /VPS13D locus in GM12878.*2\.5 ± 0\.7 bead units apart/ })).toBeInTheDocument()
+    expect(within(card).getByRole('img', { name: /VPS13D locus in H1ESC.*1\.0 ± 0\.1 bead units apart/ })).toBeInTheDocument()
+    expect(card).toHaveTextContent('Each cell type has its own enhancers. VPS13D is 1.7 times more expressed in H1ESC')
+  })
+
+  it('opens the expression example as two jobs of two cell types with their ENCODE expression', async () => {
+    let n = 0
+    const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: n++ === 0 ? '/jobs/aaaa1111bbbb2222' : '/jobs/cccc3333dddd4444' }]]])
+    renderTitle()
+    fireEvent.click(screen.getByRole('button', { name: /VPS13D in GM12878 and H1ESC/ }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222?compare=%2Fjobs%2Fcccc3333dddd4444&gene=VPS13D'))
+    const posted = fetchMock.mock.calls.filter(([u]) => String(u) === '/api/jobs').map(([, i]) => i!.body as FormData)
+    expect(posted.map((b) => [b.get('cell_type'), b.get('expression'), b.get('region'), b.get('fresh')])).toEqual([
+      ['GM12878', 'ENCODE', 'chr1:11,500,000-12,600,000', null],
+      ['H1ESC', 'ENCODE', 'chr1:11,500,000-12,600,000', null],
+    ])
+    localStorage.clear()
+    vi.unstubAllGlobals()
+  })
+
+  it('opens the deletion example with its call set and its sample', async () => {
+    const fetchMock = mockApi([[/^\/api\/jobs$/, () => [201, { url: '/jobs/aaaa1111bbbb2222' }]]])
+    renderTitle()
+    fireEvent.click(screen.getByRole('button', { name: /Deletion at GSTM1/ }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/jobs/aaaa1111bbbb2222'))
+    const body = fetchMock.mock.calls.find(([u]) => String(u) === '/api/jobs')![1]!.body as FormData
+    expect([body.get('sv_set'), body.get('sample')]).toEqual(['HGSVC', 'HG00512'])
     localStorage.clear()
     vi.unstubAllGlobals()
   })

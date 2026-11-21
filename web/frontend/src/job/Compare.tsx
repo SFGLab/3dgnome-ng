@@ -84,6 +84,7 @@ function Panel({
   gene,
   link,
   linkId,
+  pair,
   choices,
   onPick,
 }: {
@@ -93,6 +94,8 @@ function Panel({
   gene: string | null
   link?: CameraLink
   linkId: string
+  /** The enhancer the comparison measures the selected gene to in this job, and its distance. */
+  pair?: { bead?: number; mean: number; sd: number }
   choices?: Choice[]
   onPick?: (url: string) => void
 }) {
@@ -109,17 +112,18 @@ function Panel({
     [structure.data, annotations.data, region?.start, region?.end, palette], // eslint-disable-line react-hooks/exhaustive-deps
   )
   const row = genes.data?.find((r) => r.gene === gene)
+  const enhancerBead = pair?.bead ?? row?.enhancer_bead
   // The selected gene's promoter and enhancer, marked A and B as on the Structure tab.
   const markers =
     row && structure.data
-      ? [row.promoter_bead, row.enhancer_bead]
+      ? [row.promoter_bead, enhancerBead!]
           .filter((k) => structure.data!.beads[k])
           .map((k, i) => ({ label: 'AB'[i], at: [structure.data!.beads[k][2], structure.data!.beads[k][3], structure.data!.beads[k][4]] as [number, number, number] }))
       : []
   // The chain at the selected gene's promoter and enhancer is solid and the rest see through.
   const focus = useMemo(
-    () => (row && structure.data ? focusRanges(structure.data, [row.promoter_bead, row.enhancer_bead]) : undefined),
-    [structure.data, row?.promoter_bead, row?.enhancer_bead], // eslint-disable-line react-hooks/exhaustive-deps
+    () => (row && structure.data ? focusRanges(structure.data, [row.promoter_bead, enhancerBead!]) : undefined),
+    [structure.data, row?.promoter_bead, enhancerBead], // eslint-disable-line react-hooks/exhaustive-deps
   )
   return (
     <div className="compare-panel">
@@ -149,7 +153,7 @@ function Panel({
         )}
         {row && (
           <span className="ab-label">
-            A to B <strong>{`${row.distance.toFixed(1)} ± ${row.sd.toFixed(1)}`}</strong>
+            A to B <strong>{`${(pair?.mean ?? row.distance).toFixed(1)} ± ${(pair?.sd ?? row.sd).toFixed(1)}`}</strong>
           </span>
         )}
       </div>
@@ -188,13 +192,19 @@ export function Compare({
   const [linked, setLinked] = useState(true)
   const link = useMemo(makeCameraLink, [])
   const otherApi = useMemo(() => (other ? jobApi(other.kind, other.key) : null), [other])
-  const cmp = useQuery({ queryKey: ['compare', api.url, otherApi?.url], queryFn: () => compareJobs(api.url, otherApi!.url), enabled: !!otherApi })
   const otherSummary = useQuery({ queryKey: ['summary', otherApi?.base], queryFn: () => otherApi!.summary(), enabled: !!otherApi })
+  // Two cell types have two sets of enhancers. The comparison can keep to the enhancers both have. Positions are
+  // compared as they are, which holds for two jobs without structural variants.
+  const [sharedOnly, setSharedOnly] = useState(false)
+  const o = otherSummary.data?.request
+  const canShare = !!o && o.cell_type !== summary.request.cell_type && o.cell_type !== 'own' && summary.request.cell_type !== 'own' && !o.sample && !summary.request.sample
+  const shared = sharedOnly && canShare
+  const cmp = useQuery({ queryKey: ['compare', api.url, otherApi?.url, shared], queryFn: () => compareJobs(api.url, otherApi!.url, shared), enabled: !!otherApi })
   // The expression of the two jobs is compared when both have it. The test of two tables takes seconds the first time.
   const bothExpressed = !!summary.expression && !!otherSummary.data?.expression
   const expressed = useQuery({
-    queryKey: ['compare-expression', api.url, otherApi?.url],
-    queryFn: () => compareExpression(api.url, otherApi!.url),
+    queryKey: ['compare-expression', api.url, otherApi?.url, shared],
+    queryFn: () => compareExpression(api.url, otherApi!.url, shared),
     enabled: !!otherApi && bothExpressed,
     staleTime: Infinity,
   })
@@ -202,6 +212,8 @@ export function Compare({
   const choices = recent.filter((j) => j.url !== otherApi?.url).map((j) => ({ url: j.url, name: j.name || j.label }))
   const pick = (url: string) => setOther(parseJobUrl(url))
   const otherJob = otherApi ? recentJobs().find((j) => j.url === otherApi.url) : undefined
+  // The row of the selected gene. Each side marks the enhancer the comparison measures.
+  const chosen = cmp.data?.rows.find((r) => r.gene === gene)
   return (
     <div className="compare">
       <div className="compare-toolbar">
@@ -211,6 +223,11 @@ export function Compare({
         {otherApi && (
           <label className="check">
             <input type="checkbox" checked={cmp.data?.same_region ?? false} readOnly disabled /> Same region
+          </label>
+        )}
+        {canShare && (
+          <label className="check">
+            <input type="checkbox" checked={sharedOnly} onChange={(e) => setSharedOnly(e.target.checked)} /> Enhancers of both jobs only
           </label>
         )}
         {gene && onGene && (
@@ -223,7 +240,7 @@ export function Compare({
         </button>
       </div>
       <div className="compare-panels">
-        <Panel api={api} label="this job" structure={selected} gene={gene} link={linked ? link : undefined} linkId="a" />
+        <Panel api={api} label="this job" structure={selected} gene={gene} link={linked ? link : undefined} linkId="a" pair={chosen && { bead: chosen.enhancer_bead_a, ...chosen.a }} />
         {otherApi ? (
           <Panel
             key={otherApi.url}
@@ -233,6 +250,7 @@ export function Compare({
             gene={gene}
             link={linked ? link : undefined}
             linkId="b"
+            pair={chosen && { bead: chosen.enhancer_bead_b, ...chosen.b }}
             choices={choices}
             onPick={pick}
           />
@@ -250,6 +268,7 @@ export function Compare({
           urls={[api.url, otherApi.url]}
           names={sideNames(summary, otherSummary.data)}
           cmp={cmp.data}
+          shared={shared}
           expression={expressed.data}
           expressionState={bothExpressed ? (expressed.isPending ? 'wait' : expressed.isError ? (expressed.error as Error).message : '') : summary.expression || otherSummary.data.expression ? 'one' : ''}
           gene={gene}

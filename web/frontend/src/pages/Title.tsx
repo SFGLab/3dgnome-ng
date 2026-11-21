@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 import { api } from '../api'
 import contacts from '../assets/contacts.png'
 import previews from '../assets/previews.json'
+import deletion from '../assets/previews_deletion.json'
+import expression from '../assets/previews_expression.json'
 import structure from '../assets/structure.png'
 import { StructurePreview, type PreviewData } from '../components/StructurePreview'
 import { EXAMPLES as ALL } from '../model/examples'
@@ -28,6 +30,21 @@ const STORY = [
   { tag: 'CTCF and RNAPII loops', data: WITH },
   { tag: 'CTCF loops alone', data: WITHOUT },
 ]
+
+/** The drawing of the deletion example: GM12878 with the variants of HG00512. A and B are the promoters of GSTM2
+ * and GSTM5, the genes either side of the deleted GSTM1. */
+const DELETION = deletion.deletion as PreviewData
+const DELETION_VIEW: [number, number, number, number] = [-240, -362, 600, 704]
+
+/** The drawings of the expression example: VPS13D in two cell types, each with the enhancer nearest to it in
+ * that cell type, 20 kb away in GM12878 and 849 bp away in H1ESC. */
+const CELLS = [
+  { tag: 'GM12878', data: expression.gm12878 as PreviewData },
+  { tag: 'H1ESC', data: expression.h1esc as PreviewData },
+]
+const CELLS_VIEW: [number, number, number, number] = [-261, -319, 845, 895]
+/** The expression of VPS13D in H1ESC over GM12878, from DESeq2 on the ENCODE counts of the site, read on 2026-11-21. */
+const VPS13D_FOLD = 1.7
 
 /** The landing page: what the site computes, the examples and the previous services. */
 export function Title() {
@@ -147,6 +164,36 @@ export function Title() {
             <img src={contacts} alt="" />
             <span className="example-title">Contacts against Hi-C</span>
             <span className="example-detail">{busy === 'contacts' ? 'Opening the job' : 'GM12878, chr1:20-25 Mb'}</span>
+          </button>
+        </div>
+        <div className="example-row">
+          <button type="button" className="example" disabled={!!busy} onClick={() => open(ALL.find((x) => x.id === 'GSTM1')!)}>
+            <span className="story-panels one">
+              <span className="story-panel">
+                <StructurePreview data={DELETION} view={DELETION_VIEW} label={`A structure of the GSTM locus with the deletion of GSTM1, with the promoters of GSTM2, A and of GSTM5, B ${spread(DELETION)} bead units apart`} />
+                <span className="story-tag">HG00512</span>
+              </span>
+            </span>
+            <span className="example-title">Deletion at GSTM1</span>
+            <span className="example-detail">
+              {busy === 'GSTM1' ? 'Opening the job' : `GM12878 with the variants of HG00512. An 18 kb deletion removes GSTM1 and 4 CTCF anchors. A and B are the promoters of GSTM2 and GSTM5 on its two sides`}
+            </span>
+          </button>
+          <button type="button" className="example story" disabled={!!busy} onClick={() => open(ALL.find((x) => x.id === 'VPS13D')!)}>
+            <span className="story-panels">
+              {CELLS.map((p) => (
+                <span key={p.tag} className="story-panel">
+                  <StructurePreview data={p.data} view={CELLS_VIEW} label={`A structure of the VPS13D locus in ${p.tag}, with the promoter A and its nearest enhancer B ${spread(p.data)} bead units apart`} />
+                  <span className="story-tag">{p.tag}</span>
+                </span>
+              ))}
+            </span>
+            <span className="example-title">VPS13D in GM12878 and H1ESC, distance beside expression</span>
+            <span className="example-detail">
+              {busy === 'VPS13D'
+                ? 'Opening the jobs'
+                : `From the promoter A to its nearest enhancer B ${spread(CELLS[0].data)} bead units in GM12878 and ${spread(CELLS[1].data)} in H1ESC. Each cell type has its own enhancers. VPS13D is ${VPS13D_FOLD} times more expressed in H1ESC`}
+            </span>
           </button>
         </div>
       </section>

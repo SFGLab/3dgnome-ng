@@ -92,8 +92,30 @@ export type Contacts = {
   rank_reach?: number
   loop_enrichment?: number | null
 }
-/** The genes two jobs share. `ratio` is the distance of b over a and `p` that of a Mann-Whitney U test of the distances in their structures, null with one structure on a side. */
-export type Compare = { same_region: boolean; rows: { gene: string; linear_bp: number; a: { mean: number; sd: number }; b: { mean: number; sd: number }; ratio: number; p: number | null }[] }
+/**
+ * The genes two jobs share. `ratio` is the distance of b over a and `p` that of a Mann-Whitney U
+ * test of the distances in their structures, null with one structure on a side. A job measures a
+ * gene to its own nearest enhancer: `linear_bp` is the separation in a and `linear_bp_b` in b,
+ * and `differ` counts the genes with two enhancers. With `shared` both jobs measure the nearest of
+ * the `shared_enhancers` that the two have.
+ */
+export type Compare = {
+  same_region: boolean
+  differ?: number
+  shared?: boolean
+  shared_enhancers?: number | null
+  rows: {
+    gene: string
+    linear_bp: number
+    linear_bp_b?: number
+    enhancer_bead_a?: number
+    enhancer_bead_b?: number
+    a: { mean: number; sd: number }
+    b: { mean: number; sd: number }
+    ratio: number
+    p: number | null
+  }[]
+}
 
 /**
  * The whole of a symmetric map from the form the server sends, each pair of bins once: row `i`
@@ -147,9 +169,11 @@ export function jobApi(kind: 'jobs' | 'p', key: string) {
 
 export type JobApi = ReturnType<typeof jobApi>
 
-export const compareJobs = (a: string, b: string) => call<Compare>(`/api/compare?${new URLSearchParams({ a, b })}`)
+/** The query of a comparison of two jobs, with the enhancers both have when `shared`. */
+const pair = (a: string, b: string, shared: boolean, more: Record<string, string> = {}) => new URLSearchParams({ a, b, ...more, ...(shared ? { shared: '1' } : {}) })
+export const compareJobs = (a: string, b: string, shared = false) => call<Compare>(`/api/compare?${pair(a, b, shared)}`)
 /** The enhancer to promoter distance of one gene in each structure of two jobs. */
-export const compareGene = (a: string, b: string, gene: string) => call<{ gene: string; a: number[]; b: number[]; p: number | null }>(`/api/compare/gene?${new URLSearchParams({ a, b, gene })}`)
+export const compareGene = (a: string, b: string, gene: string, shared = false) => call<{ gene: string; a: number[]; b: number[]; p: number | null }>(`/api/compare/gene?${pair(a, b, shared, { gene })}`)
 
 /**
  * The expression of job b against job a for the genes both have. `distance` is log2 of the
@@ -167,4 +191,4 @@ export type ExpressionCompare = {
   /** Every gene of the test as [log2 fold change, -log10 adjusted p], kept within `fold` and `p`. Null without a test. */
   volcano?: { fold: number; p: number; points: [number, number][] } | null
 }
-export const compareExpression = (a: string, b: string) => call<ExpressionCompare>(`/api/compare/expression?${new URLSearchParams({ a, b })}`)
+export const compareExpression = (a: string, b: string, shared = false) => call<ExpressionCompare>(`/api/compare/expression?${pair(a, b, shared)}`)

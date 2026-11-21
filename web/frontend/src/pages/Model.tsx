@@ -81,6 +81,7 @@ function fromExample(e: Example): FormState {
     factors: e.factors,
     svSet: e.svSet ?? '',
     sample: e.sample ?? '',
+    expression: e.expression ?? '',
   }
 }
 

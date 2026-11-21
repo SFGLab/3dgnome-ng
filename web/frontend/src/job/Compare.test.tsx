@@ -294,6 +294,51 @@ describe('Compare', () => {
     expect(csvText(['gene', 'note'], [['MYC', 'a, b'], ['TP53', 'say "x"'], ['X', null], ['Y', 1.5]])).toBe('gene,note\r\nMYC,"a, b"\r\nTP53,"say ""x"""\r\nX,\r\nY,1.5\r\n')
   })
 
+  it('states the two enhancers of a gene of two cell types and offers the enhancers both have', async () => {
+    const h1 = { ...SUMMARY_DONE, request: { ...SUMMARY_DONE.request, cell_type: 'H1ESC' } }
+    const own = { same_region: true, differ: 1, shared: false, shared_enhancers: null, rows: [{ gene: 'TNFRSF8', linear_bp: 20000, linear_bp_b: 849, enhancer_bead_a: 3, enhancer_bead_b: 4, a: { mean: 2.5, sd: 0.7 }, b: { mean: 1.0, sd: 0.1 }, ratio: 0.4, p: 0.0002 }] }
+    const both = { same_region: true, differ: 0, shared: true, shared_enhancers: 12, rows: [{ gene: 'TNFRSF8', linear_bp: 20000, linear_bp_b: 20000, enhancer_bead_a: 3, enhancer_bead_b: 3, a: { mean: 2.5, sd: 0.7 }, b: { mean: 2.6, sd: 1.2 }, ratio: 1.04, p: 0.8 }] }
+    const f = mockApi([
+      [new RegExp(`${OTHER}/summary$`), () => [200, h1]],
+      [/summary$/, () => [200, SUMMARY_DONE]],
+      [/structure\/\d+$/, () => [200, STRUCTURE]],
+      [/annotations$/, () => [200, ANNOTATIONS]],
+      [/genes$/, () => [200, GENES]],
+      [/\/api\/compare\/gene$/, () => [200, ONE_GENE]],
+      [/\/api\/compare$/, (u) => [200, u.searchParams.get('shared') === '1' ? both : own]],
+    ])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene="TNFRSF8" initial={`/jobs/${OTHER}`} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    // By default each job has its own nearest enhancer, and the table says so where the two differ.
+    const table = await screen.findByRole('table', { name: 'Changes in enhancer to promoter distance' })
+    expect(within(table).getByText('TNFRSF8, enhancer 20 kb away in GM12878, 849 bp in H1ESC')).toBeInTheDocument()
+    expect(screen.getByText('Each job measures a gene to its own nearest enhancer. 1 of 1 genes have another enhancer in H1ESC than in GM12878.')).toBeInTheDocument()
+    // The distance under each structure is the one of the comparison.
+    expect([...document.querySelectorAll('.ab-label')].map((e) => e.textContent)).toEqual(['A to B 2.5 ± 0.7', 'A to B 1.0 ± 0.1'])
+    expect(checkCopy(container)).toEqual([])
+    // The option is off at first. On, both jobs measure the nearest enhancer they share.
+    const option = screen.getByRole('checkbox', { name: 'Enhancers of both jobs only' })
+    expect(option).not.toBeChecked()
+    fireEvent.click(option)
+    expect(await screen.findByText('Each gene is measured to its nearest enhancer among the 12 that both jobs have.')).toBeInTheDocument()
+    expect(await within(screen.getByRole('table', { name: 'Changes in enhancer to promoter distance' })).findByText('TNFRSF8, enhancer 20 kb away')).toBeInTheDocument()
+    expect(f.mock.calls.some(([u]) => String(u).includes('/api/compare/gene') && String(u).includes('shared=1'))).toBe(true)
+    expect(checkCopy(container)).toEqual([])
+  })
+
+  it('does not offer the shared enhancers to two jobs of one cell type', async () => {
+    rememberJob({ url: `/jobs/${OTHER}`, label: 'GM12878 TNFRSF8', name: 'TNFRSF8 CTCF', at: 2 })
+    renderCompare()
+    fireEvent.click(screen.getByRole('button', { name: /TNFRSF8 CTCF/ }))
+    await screen.findByRole('table', { name: 'Changes in enhancer to promoter distance' })
+    expect(screen.queryByRole('checkbox', { name: 'Enhancers of both jobs only' })).toBeNull()
+    expect(screen.queryByText(/its own nearest enhancer/)).toBeNull()
+  })
+
   it('names two jobs by the first thing they differ in', () => {
     const job = (request: Partial<typeof SUMMARY_DONE.request>) => ({ ...SUMMARY_DONE, request: { ...SUMMARY_DONE.request, ...request } })
     expect(sideNames(job({ cell_type: 'GM12878' }), job({ cell_type: 'H1ESC', factors: 'CTCF' }))).toEqual(['GM12878', 'H1ESC'])

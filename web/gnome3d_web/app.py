@@ -655,17 +655,17 @@ def create_app() -> FastAPI:
     explore_routes("p")
 
     @app.get("/api/compare")
-    def api_compare(a: str, b: str) -> JSONResponse:
+    def api_compare(a: str, b: str, shared: int = 0) -> JSONResponse:
         dirs = []
         for url in (a, b):
             m = re.fullmatch(r"/(jobs|p)/([A-Za-z0-9_-]{8,64})", url)
             if not m:
                 raise HTTPException(404)
             dirs.append(job_dir(m[1], m[2]))
-        return JSONResponse(explore.compare(dirs[0], dirs[1]))
+        return JSONResponse(explore.compare(dirs[0], dirs[1], shared == 1))
 
     @app.get("/api/compare/gene")
-    def api_compare_gene(a: str, b: str, gene: str) -> JSONResponse:
+    def api_compare_gene(a: str, b: str, gene: str, shared: int = 0) -> JSONResponse:
         """The distances of one gene in the structures of two jobs."""
         dirs = []
         for url in (a, b):
@@ -673,18 +673,18 @@ def create_app() -> FastAPI:
             if not m:
                 raise HTTPException(404)
             dirs.append(job_dir(m[1], m[2]))
-        out = explore.compare_gene(dirs[0], dirs[1], gene)
+        out = explore.compare_gene(dirs[0], dirs[1], gene, shared == 1)
         return JSONResponse(out) if out else JSONResponse({"error": f"{gene} is not a gene of both jobs"}, 404)
 
     @app.get("/api/compare/expression")
-    def api_compare_expression(a: str, b: str) -> JSONResponse:
+    def api_compare_expression(a: str, b: str, shared: int = 0) -> JSONResponse:
         dirs = []
         for url in (a, b):
             m = re.fullmatch(r"/(jobs|p)/([A-Za-z0-9_-]{8,64})", url)
             if not m:
                 raise HTTPException(404)
             dirs.append(job_dir(m[1], m[2]))
-        return JSONResponse(explore.compare_expression(dirs[0], dirs[1], s.results_dir / "expression"))
+        return JSONResponse(explore.compare_expression(dirs[0], dirs[1], s.results_dir / "expression", shared == 1))
 
     shared_lists = lists.Lists(s.results_dir / "lists")
     BAD_CODE = "A sync code has 16 letters and digits, like K7M2-9QXD-4THP-W3RZ."

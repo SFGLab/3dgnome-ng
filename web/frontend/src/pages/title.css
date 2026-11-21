@@ -273,6 +273,11 @@
   grid-template-rows: 330px;
 }
 
+/* One drawing in a card of one column. */
+.story-panels.one {
+  grid-template-columns: 1fr;
+}
+
 .story-panel {
   position: relative;
   min-width: 0;

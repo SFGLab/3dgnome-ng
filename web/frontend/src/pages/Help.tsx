@@ -155,7 +155,7 @@ export function Help() {
           </p>
           <p>
             Under the two structures the comparison has two tables with every gene of both jobs, one for the 3D distance and one for the expression, each on its own tab. The other job is compared against this one. Each change
-            says in which job the value is higher or the distance longer. A row with a p of 0.05 or more is grey. Beside the tables are three figures. The box plot shows the distance of the selected gene to its nearest enhancer in each structure of the two jobs, with the
+            says in which job the value is higher or the distance longer. A row with a p of 0.05 or more is grey. A job measures a gene to its own nearest enhancer. Two cell types have two sets of enhancers. The table states both enhancers of a gene where they differ. The option Enhancers of both jobs only measures every gene to the nearest enhancer that the two jobs share. Beside the tables are three figures. The box plot shows the distance of the selected gene to its nearest enhancer in each structure of the two jobs, with the
             p of a Mann-Whitney U test. The second figure has a point for each gene of the region, with the change of its distance on the x axis and the change of its expression on the y axis, both as log2 of the other job over this
             one. The third is a volcano plot of the test, with the change of expression on the x axis and the adjusted p on the y axis as its negative log10. A click on a point or on a row of a table selects the gene in both
             structures.

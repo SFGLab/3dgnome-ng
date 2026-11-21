@@ -59,8 +59,20 @@ structures of the two jobs, from `GET /api/compare/gene?a=&b=&gene=`, the plot o
 expression against the change of distance and the volcano plot. A row of `GET /api/compare` has
 the p of a Mann-Whitney U test of the distances. The two jobs are named by the first thing they
 differ in, the cell type, the sample, the loops or the contact background, and every change says
-in which job it is. Each plot has its two axes named and ticked and a key of its marks. The
+in which job it is. A job measures a gene to its own nearest enhancer, as enhancer3D did with the
+enhancers of each cell line. Two cell types have two sets of enhancers, and a change of distance
+between them can come from a nearer enhancer on the genome as well as from the folding. The table
+states both separations of a gene where they differ and a line counts those genes. For GM12878
+against H1ESC on chr1:11.5-12.6 Mb all 37 genes have two enhancers. The option Enhancers of both
+jobs only, off by default and offered to two cell types without structural variants, measures
+every gene in both jobs to the nearest enhancer that overlaps in the two sets, `shared=1` on the
+three compare routes. Each plot has its two axes named and ticked and a key of its marks. The
 volcano plot has every gene of the test in the background, on a grid of 0.2 by 0.5 with each
-cell once. An open figure is saved as a PNG with its title, `savePng.ts`. The tables of a job,
+cell once. The title page has two rows of examples: the TNFRSF8 comparison over two columns with the contact
+map, then the GSTM1 deletion with the comparison of VPS13D in GM12878 and H1ESC over two columns.
+`web/scripts/make_previews.py` draws each from its finished job, the two cell types each at its own
+enhancer.
+
+An open figure is saved as a PNG with its title, `savePng.ts`. The tables of a job,
 the genes, the loops and the two tables of the comparison, are saved whole as CSV, `saveCsv.ts`.
 `design/website/data.md` has the tables and the comparison.
