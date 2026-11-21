@@ -40,6 +40,8 @@ describe('Layout', () => {
     renderLayout()
     expect(screen.getByText(/If you use these models, please cite 3D-GNOMEᴺᴳ/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /All citations/ })).toHaveAttribute('href', ROUTES.cite)
+    // Every page names the licence of the software.
+    expect(within(screen.getByRole('contentinfo')).getByRole('link', { name: 'GNU GPL v3' })).toHaveAttribute('href', 'https://www.gnu.org/licenses/gpl-3.0.html')
   })
 
   it('renders its children', () => {

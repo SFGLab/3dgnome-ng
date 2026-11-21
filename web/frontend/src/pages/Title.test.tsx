@@ -36,6 +36,13 @@ describe('Title page', () => {
     expect(screen.getByText(/computes 3D structures of genomic regions up to 20 Mb/)).toBeInTheDocument()
   })
 
+  it('states the terms of use on the landing page: free, no login and the licence', () => {
+    mockApi()
+    renderTitle()
+    expect(screen.getByText(/The server is free to use and asks for no login\./)).toBeInTheDocument()
+    expect(within(screen.getByRole('main')).getByRole('link', { name: 'GNU General Public License, version 3' })).toHaveAttribute('href', 'https://www.gnu.org/licenses/gpl-3.0.html')
+  })
+
   it('states the longest region the server allows', async () => {
     mockApi([[/^\/api\/catalog$/, () => [200, { ...CATALOG, max_region_mb: 30 }]]])
     renderTitle()

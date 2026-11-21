@@ -46,6 +46,10 @@ export function Title() {
             {`3D-GNOMEᴺᴳ computes 3D structures of genomic regions up to ${maxMb} Mb from CTCF`} and RNAPII loops, Hi-C contacts and structural variants. Each job returns an ensemble of
             structures with promoters and enhancers marked and the 3D distances between them.
           </p>
+          <p className="hero-terms">
+            The server is free to use and asks for no login. 3D-GNOMEᴺᴳ is free software under the{' '}
+            <a href="https://www.gnu.org/licenses/gpl-3.0.html">GNU General Public License, version 3</a>.
+          </p>
           <div className="buttons">
             <Link className="button primary" to={ROUTES.model}>
               Model a region <ArrowRight size={16} aria-hidden />

@@ -2,8 +2,8 @@ import { ArrowRight, Code, Quote } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../routes'
 
-/** The strip at the foot of every page that asks users to cite the work, with the source code
- * and the privacy notice. */
+/** The strip at the foot of every page that asks users to cite the work, with the source code,
+ * its licence and the privacy notice. */
 export function CiteStrip() {
   return (
     <footer className="cite-strip">
@@ -15,6 +15,9 @@ export function CiteStrip() {
       <Link className="cite-button" to={ROUTES.cite}>
         All citations <ArrowRight size={13} aria-hidden />
       </Link>
+      <a className="cite-link" href="https://www.gnu.org/licenses/gpl-3.0.html">
+        GNU GPL v3
+      </a>
       <Link className="cite-link" to={ROUTES.privacy}>
         Privacy
       </Link>

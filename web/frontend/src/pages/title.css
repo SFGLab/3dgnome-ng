@@ -40,6 +40,13 @@
   color: var(--muted);
 }
 
+/* The terms of use under the lead: free, no login and the licence. */
+.hero-terms {
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .buttons {
   display: flex;
   gap: 12px;

@@ -140,7 +140,7 @@ export function Help() {
         <section id="running">
           <h2>Running gnome3d yourself</h2>
           <p>
-            The server runs the gnome3d Python package. The package runs on a CPU and uses a GPU when one is present. A run reads one config.ini. The settings reference lists every key with its default, the value on this server and its meaning.
+            The server runs the gnome3d Python package. The package runs on a CPU and uses a GPU when one is present. A run reads one config.ini. The settings reference lists every key with its default, the value on this server and its meaning. The package and the code of this site are free software under the GNU General Public License, version 3.
           </p>
           <pre className="code">{'pip install gnome3d\ngnome3d --config config.ini --region chr1:11500000-12600000 -n 10 --out models/'}</pre>
           <table className="doc-table settings" aria-label="Settings">

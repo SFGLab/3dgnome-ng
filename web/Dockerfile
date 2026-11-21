@@ -85,7 +85,7 @@ RUN if [ "$HICDIFFUSION" = "1" ]; then \
    && apt-get purge -y git && apt-get autoremove -y ; \
     fi
 
-COPY pyproject.toml README.md SETTINGS.md ./
+COPY pyproject.toml README.md SETTINGS.md LICENSE ./
 COPY gnome3d ./gnome3d
 # The build context has no git history. The version of the engine is the build argument.
 ARG GNOME3D_VERSION=0.0.0

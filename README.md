@@ -101,6 +101,19 @@ the stretches without loops. SETTINGS.md describes them.
 `tests/unit/` has one file per feature. `tests/integration/` runs the whole pipeline on synthetic inputs and on one
 GM12878 region when its inputs are under `data/`.
 
+## Licence
+
+3D-GNOMEᴺᴳ is free software under the GNU General Public License, version 3. The text is in `LICENSE`. The package
+`gnome3d`, the site under `web/` and the scripts of this repository are under it.
+
+Three parts are the work of others and keep their own terms, each compatible with the licence above.
+
+- `web/vendor/personal3d/rules/` is under the BSD 2-Clause licence in that folder.
+- `legacy/3dnome/MC/lib/` has inih and INIReader under the New BSD licence, mtxlib of Dante Treglia II and
+  Mark A. DeLoura under the terms in its header, and rmsd of Bosco K. Ho under the GNU Lesser General Public
+  License, version 2.1 or later.
+- The fonts of the site, Inter and JetBrains Mono, are under the SIL Open Font License 1.1.
+
 ## Acknowledgements
 
 3D-GNOMEᴺᴳ builds on the 3D-GNOME family of tools and on the work of their authors. Please cite these papers when you
