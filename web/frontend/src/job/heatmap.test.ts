@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DARKEST, colour, diverging, emptyRows, halfRange, transform } from './heatmap'
+import { DARKEST, colour, diverging, emptyRows, halfRange, shownMaps, transform } from './heatmap'
 
 const M = [
   [4, 2, 1],
@@ -95,5 +95,36 @@ describe('halfRange', () => {
 
   it('starts at zero on a linear scale', () => {
     expect(halfRange(m, false)[0]).toBe(0)
+  })
+})
+
+describe('the two halves of a view and their ranges', () => {
+  const square = (v: number) => [
+    [0, v, 2 * v, 3 * v],
+    [v, 0, v, 2 * v],
+    [2 * v, v, 0, v],
+    [3 * v, 2 * v, v, 0],
+  ]
+  const [up, low] = [square(2), square(10)]
+
+  it('gives each half the range of its own values', () => {
+    const view = shownMaps(up, low, 'observed', false, null)
+    expect(view.upperRange).toEqual(halfRange(up, false).map((v) => Math.round(v * 100) / 100))
+    expect(view.lowerRange).toEqual(halfRange(low, false))
+    expect(view.upper).toEqual(up)
+  })
+
+  it('takes a typed range for the upper half and the same share of its spread for the lower', () => {
+    const typed = shownMaps(up, low, 'observed', false, [0, 3])
+    const scale = halfRange(low, false)[1] / halfRange(up, false)[1]
+    expect(typed.upperRange).toEqual([0, 3])
+    expect(typed.lowerRange).toEqual([0, 3 * scale])
+  })
+
+  it('draws a correlation from -1 to 1 and a ratio around zero', () => {
+    expect(shownMaps(up, low, 'pearson', false, null).upperRange).toEqual([-1, 1])
+    const oe = shownMaps(up, low, 'oe', false, null)
+    expect(oe.upperRange[0]).toBe(-oe.upperRange[1])
+    expect(oe.upperRange[1]).toBeGreaterThanOrEqual(0.5)
   })
 })

@@ -1,39 +1,20 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Camera, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Contacts, JobApi, Summary } from '../api'
 import { bp } from '../lib/format'
 import { LoopView } from './LoopView'
-import { colour, diverging, emptyRows, halfRange, percentile, transform, type Show } from './heatmap'
+import { shownMaps, type Show } from './heatmap'
 import { mapPicture } from './export/mapPicture'
 import { saveDataUrl } from './export/savePng'
 import { type Locus, parseRegion, readRegion, regionText } from '../lib/region'
 import { wheelFactor } from './wheel'
-
-const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]
-/** The most bins on a side the server draws, `MAX_BINS` of gnome3d_web/contacts.py. */
-const MAX_BINS = 840
-const NO_DATA: [number, number, number] = [226, 225, 221]
+import { draw } from './mapDraw'
+import { RESOLUTIONS, MAX_BINS, clamp, binCount, fitting } from './mapWindow'
 const SETTLE_MS = 250
 const PREDICTED = 'hicdiffusion.bedpe'
 // HiCDiffusion predicts 8,192 bp bins. This is the resolution of the tab nearest to them.
 const PREDICTED_RES = 10_000
-
-/** A window cut to the job's region and at least ten bins wide, or the whole region when it
- * does not overlap it. */
-function clamp(l: Locus, job: Locus, res: number): Locus {
-  if (l.chrom !== job.chrom || l.end <= job.start || l.start >= job.end) return job
-  const width = Math.min(Math.max(l.end - l.start, res * 10), job.end - job.start)
-  const start = Math.min(Math.max(l.start, job.start), job.end - width)
-  return { chrom: job.chrom, start: Math.round(start), end: Math.round(start + width) }
-}
-
-/** The bins of a window at a resolution, counted as the server counts them: from the bin that
- * holds the start, on the grid of the resolution. */
-const binCount = (l: Locus, r: number) => Math.ceil((l.end - (l.start - (l.start % r))) / r)
-
-/** The finest resolution not finer than `res` that keeps a window within MAX_BINS bins. */
-const fitting = (l: Locus, res: number) => RESOLUTIONS.find((r) => r >= res && binCount(l, r) <= MAX_BINS) ?? RESOLUTIONS[RESOLUTIONS.length - 1]
 const SHOWS: [Show, string][] = [
   ['observed', 'Observed'],
   ['oe', 'O/E'],
@@ -41,36 +22,6 @@ const SHOWS: [Show, string][] = [
 ]
 /** The separation the rank correlation reached, as the end of a sentence. Nothing when unknown. */
 const reach = (bp?: number) => (bp ? `, up to ${bp >= 1e6 ? `${bp / 1e6} Mb` : `${bp / 1000} kb`}` : '')
-
-type Half = { m: number[][]; range: [number, number]; loops: boolean }
-
-/** Each half on its own colour range. A loop half has no empty bins to grey: a row without a loop
- * is a row of zeros, drawn white. */
-function draw(canvas: HTMLCanvasElement, up: Half, low: Half, log: boolean, show: Show) {
-  const [upper, lower] = [up.m, low.m]
-  const ctx = canvas.getContext('2d')
-  const n = upper.length
-  if (!ctx || !n) return
-  canvas.width = n
-  canvas.height = n
-  // Each half on its own scale: the lower half's values are brought to the upper half's range.
-  const span = Math.max(Math.abs(up.range[0]), Math.abs(up.range[1]))
-  const none = upper.map(() => false)
-  const [emptyUp, emptyLow] = [up.loops ? none : emptyRows(upper), low.loops ? none : emptyRows(lower)]
-  const img = ctx.createImageData(n, n)
-  for (let i = 0; i < n; i++)
-    for (let j = 0; j < n; j++) {
-      const v = j >= i ? upper[i][j] : lower[i][j]
-      const range = j >= i ? up.range : low.range
-      // The maps hold no pair within one bin. The main diagonal is drawn as no data.
-      const empty = j >= i ? emptyUp[i] || emptyUp[j] : emptyLow[i] || emptyLow[j]
-      const [r, g, b] =
-        i === j || empty ? NO_DATA : show === 'oe' ? diverging(v > 0 ? Math.log2(v) : -span, span) : show === 'pearson' ? diverging(v, span) : colour(v, range[0], range[1], log)
-      const k = (i * n + j) * 4
-      img.data.set([r, g, b, 255], k)
-    }
-  ctx.putImageData(img, 0, 0)
-}
 
 /** The Contact map tab: the job's Hi-C and its model on one grid, upper and lower half. */
 export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary }) {
@@ -116,33 +67,14 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     placeholderData: keepPreviousData,
   })
   const annotations = useQuery({ queryKey: ['annotations', api.base], queryFn: api.annotations })
-  const upper = maps.data ? transform(maps.data.upper, show) : []
-  const lower = maps.data ? transform(maps.data.lower, show) : []
-  const round = (v: number) => Math.round(v * 100) / 100
-  // Each half gets its own range; a range typed in applies to the upper half and the lower half
-  // keeps the same share of its own spread.
-  const oeSpan =
-    maps.data && show === 'oe'
-      ? Math.max(
-          0.5,
-          round(
-            percentile(
-              upper.map((r) => r.map((v) => (v > 0 ? Math.abs(Math.log2(v)) : 0))),
-              0.95,
-            ),
-          ),
-        )
-      : 1
-  const auto = (m: number[][]): [number, number] => (show === 'oe' ? [-oeSpan, oeSpan] : show === 'pearson' ? [-1, 1] : halfRange(m, log))
-  const autoUp = maps.data ? auto(upper) : ([0, 1] as [number, number])
-  const autoLow = maps.data ? auto(lower) : ([0, 1] as [number, number])
-  const shownRange: [number, number] = range ?? [round(autoUp[0]), round(autoUp[1])]
-  const scale = show === 'observed' && autoUp[1] > 0 ? autoLow[1] / autoUp[1] : 1
-  const lowRange: [number, number] = range ? [range[0] * scale, range[1] * scale] : autoLow
+  // The halves as drawn and their ranges are worked out once for a map and its settings, not at
+  // every move of the pointer over it.
+  const view = useMemo(() => (maps.data ? shownMaps(maps.data.upper, maps.data.lower, show, log, range) : null), [maps.data, show, log, range])
+  const shownRange: [number, number] = view?.upperRange ?? range ?? [0, 1]
+  const [upperLoops, lowerLoops] = [upperKind.startsWith('loops_'), lowerKind.startsWith('loops_')]
   useEffect(() => {
-    if (canvas.current && maps.data)
-      draw(canvas.current, { m: upper, range: shownRange, loops: upperKind.startsWith('loops_') }, { m: lower, range: lowRange, loops: lowerKind.startsWith('loops_') }, log, show)
-  })
+    if (canvas.current && view) draw(canvas.current, { m: view.upper, range: view.upperRange, loops: upperLoops }, { m: view.lower, range: view.lowerRange, loops: lowerLoops }, log, show)
+  }, [view, upperLoops, lowerLoops, log, show])
   // The window asked for as a part of the map on screen, its start and its width, while the map
   // on screen is still the wider one. It is the square the next map will fill.
   const bins = maps.data?.bins ?? []

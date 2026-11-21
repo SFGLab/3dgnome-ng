@@ -102,3 +102,33 @@ export function halfRange(m: number[][], log: boolean): [number, number] {
   const lo = log ? Math.min(percentile(m, 0.05), hi / 10) : 0
   return [lo, hi]
 }
+
+const cents = (v: number) => Math.round(v * 100) / 100
+
+/**
+ * The two halves of a map as a view draws them and the colour range of each. Each half has a
+ * range of its own. A range typed in is the range of the upper half, and the lower half keeps
+ * the same share of its own spread.
+ */
+export function shownMaps(up: number[][], low: number[][], show: Show, log: boolean, range: [number, number] | null) {
+  const upper = transform(up, show)
+  const lower = transform(low, show)
+  const oeSpan =
+    show === 'oe'
+      ? Math.max(
+          0.5,
+          cents(
+            percentile(
+              upper.map((r) => r.map((v) => (v > 0 ? Math.abs(Math.log2(v)) : 0))),
+              0.95,
+            ),
+          ),
+        )
+      : 1
+  const auto = (m: number[][]): [number, number] => (show === 'oe' ? [-oeSpan, oeSpan] : show === 'pearson' ? [-1, 1] : halfRange(m, log))
+  const [autoUp, autoLow] = [auto(upper), auto(lower)]
+  const upperRange: [number, number] = range ?? [cents(autoUp[0]), cents(autoUp[1])]
+  const scale = show === 'observed' && autoUp[1] > 0 ? autoLow[1] / autoUp[1] : 1
+  const lowerRange: [number, number] = range ? [range[0] * scale, range[1] * scale] : autoLow
+  return { upper, lower, upperRange, lowerRange }
+}
