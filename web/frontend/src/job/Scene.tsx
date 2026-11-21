@@ -265,7 +265,6 @@ type Props = {
   points: [number, number, number][]
   colors: string[]
   markers?: Marker[]
-  highlight?: [number, number, number][][]
   onHover?: (index: number | null, x: number, y: number) => void
   onPick?: (index: number) => void
   link?: CameraLink
@@ -275,9 +274,9 @@ type Props = {
   focus?: [number, number][]
 }
 
-/** The chain as lit tubes in a WebGL canvas with depth fog, orbit controls, markers, highlights
+/** The chain as lit tubes in a WebGL canvas with depth fog, orbit controls, markers
  * and the hovered bead marked. */
-export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, colors, markers = [], highlight = [], onHover, onPick, link, linkId = 'scene', hovered = null, focus = NO_FOCUS }, ref) {
+export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, colors, markers = [], onHover, onPick, link, linkId = 'scene', hovered = null, focus = NO_FOCUS }, ref) {
   const controls = useRef<OrbitControlsImpl>(null)
   const gl = useRef<THREE.WebGLRenderer | null>(null)
   const { center, radius } = useMemo(() => {
@@ -368,9 +367,6 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
           </Html>
         </>
       )}
-      {highlight.map((seg, i) => (
-        <Line key={i} points={seg.map(shift)} color="#151514" lineWidth={7} transparent opacity={0.25} raycast={noRaycast} />
-      ))}
       {markers.length === 2 && <Line points={[shift(markers[0].at), shift(markers[1].at)]} color="#151514" lineWidth={1.5} raycast={noRaycast} />}
       {markers.map((m) => (
         <Html key={m.label} position={shift(m.at)} center wrapperClass="scene-mark" style={MARK_STYLE} zIndexRange={MARK_LAYER}>

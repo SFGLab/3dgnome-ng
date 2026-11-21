@@ -20,7 +20,6 @@ type Props = {
   mode: Mode
   onMode: (m: Mode) => void
   markers?: Marker[]
-  highlight?: [number, number, number][][]
   /** The beads of a selection, a gene's promoter and enhancer or a measured pair. A short
    * stretch of the chain at each stays solid and the rest is drawn see through. */
   focusBeads?: number[]
@@ -43,7 +42,7 @@ const MODES: [Mode, string][] = [
 const NO_BEADS: number[] = []
 
 /** The Structure tab's 3D view: toolbar, coloured chain, hover box, legend and caption. */
-export function StructureView({ structure, annotations, region, chrom = '', index, total, mode, onMode, markers, highlight, focusBeads = NO_BEADS, onPickBead, onHoverPosition, above, focusSpan = null, toolbarStart, toolbarEnd }: Props) {
+export function StructureView({ structure, annotations, region, chrom = '', index, total, mode, onMode, markers, focusBeads = NO_BEADS, onPickBead, onHoverPosition, above, focusSpan = null, toolbarStart, toolbarEnd }: Props) {
   const scene = useRef<SceneHandle>(null)
   const box = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<HoverInfo | null>(null)
@@ -146,7 +145,6 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
           points={points}
           colors={colors}
           markers={markers}
-          highlight={highlight}
           focus={focus}
           hovered={hover?.index ?? null}
           onHover={(i, x, y) => {

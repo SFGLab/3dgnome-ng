@@ -79,38 +79,6 @@
   white-space: nowrap;
 }
 
-.dialog-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 0 22px;
-  border-bottom: 1px solid var(--line);
-  overflow-x: auto;
-}
-
-.dialog-tabs [role='tab'] {
-  padding: 10px 12px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.dialog-tabs [role='tab'][aria-selected='true'] {
-  border-bottom-color: var(--accent);
-  font-weight: 600;
-}
-
-.tab-meta {
-  margin-left: 4px;
-  color: var(--faint);
-  font-size: 11px;
-  font-weight: 400;
-}
-
 /* Every block of a step is 14px under the one before it, whichever part of the step it belongs
    to. A step can hold two parts, the choice and the file. */
 .own-tab {

@@ -39,11 +39,6 @@
   margin-left: 1px;
 }
 
-.tagline {
-  color: var(--muted);
-  font-size: 13px;
-}
-
 .top-bar nav {
   display: flex;
   margin-left: auto;
@@ -122,9 +117,6 @@
 }
 
 @media (max-width: 720px) {
-  .tagline {
-    display: none;
-  }
   /* The name and the theme switch share the first row. The links take a second row of their
      own and scroll sideways where they do not fit. */
   .top-bar nav {

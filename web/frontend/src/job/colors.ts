@@ -44,12 +44,6 @@ export function colorAt(mode: Mode, bp: number, ctx: ColorContext): string {
   return chromatinAt(palette.chromatin, t)
 }
 
-/** The relative luminance of a hex colour, for ordering a ramp. */
-export function lightness(c: string): number {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16) / 255)
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b
-}
-
 /** The palette from the page's tokens, with the design's values where a token is missing. */
 export function readPalette(): Palette {
   const css = typeof window === 'undefined' ? null : getComputedStyle(document.documentElement)

@@ -64,9 +64,6 @@ a.link-button {
   gap: 6px;
   font-size: 12px;
   color: var(--muted);
-}
-
-.field {
   min-width: 0;
 }
 
@@ -133,7 +130,7 @@ select {
  * A tab, a choice of a segmented control, a node of a tree and a step have no background. They get
  * a tint and the ink colour under the pointer.
  */
-:is(.job-tab, .segmented button, .node, .wizard-steps [role='tab'], .dialog-tabs [role='tab']):not([aria-selected='true'], [aria-pressed='true'], .open):hover {
+:is(.job-tab, .segmented button, .node, .wizard-steps [role='tab']):not([aria-selected='true'], [aria-pressed='true'], .open):hover {
   background-color: color-mix(in srgb, var(--ink) 6%, transparent);
   color: var(--ink);
 }

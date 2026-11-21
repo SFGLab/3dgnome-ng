@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { chromatinAt, colorAt, lightness, type ColorContext } from './colors'
+import { chromatinAt, colorAt, type ColorContext } from './colors'
+
+/** The relative luminance of a hex colour, for the order of a ramp. */
+function lightness(c: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16) / 255)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
 
 const PALETTE = { promoter: '#EB6834', enhancer: '#1BAF7A', chromatin: '#9A9994', ctcf: '#2A78D6', rnapii: '#7A3FB0' }
 const CTX: ColorContext = {

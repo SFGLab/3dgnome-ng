@@ -1144,7 +1144,6 @@
   white-space: normal;
 }
 
-
 .range-inputs {
   display: flex;
   gap: 8px;
@@ -1188,24 +1187,6 @@
   .contacts-tab {
     grid-template-columns: minmax(0, 1fr);
   }
-}
-
-.compare-choose {
-  max-width: 480px;
-}
-
-.recent-pick {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--bg);
-  color: var(--ink);
-  font: 13px var(--font);
-  text-align: left;
-  cursor: pointer;
 }
 
 .paste {
@@ -1650,39 +1631,6 @@
 .expression-plot .structure {
   fill: var(--ink);
   opacity: 0.55;
-}
-
-.expression-scatter {
-  flex: none;
-  width: 320px;
-  max-width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.expression-scatter .axis {
-  stroke: var(--line);
-  stroke-width: 1;
-}
-
-.expression-scatter .axis-label {
-  fill: var(--faint);
-  font-size: 9px;
-}
-
-.expression-scatter .point {
-  fill: var(--faint);
-  opacity: 0.7;
-}
-
-.expression-scatter .point.sure {
-  fill: var(--accent);
-}
-
-.expression-scatter .point.selected {
-  fill: var(--promoter);
-  opacity: 1;
 }
 
 .compare-table {

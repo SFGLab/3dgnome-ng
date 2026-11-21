@@ -198,14 +198,6 @@
   white-space: nowrap;
 }
 
-.results-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  text-decoration: none;
-}
-
 .examples {
   display: flex;
   flex-direction: column;
