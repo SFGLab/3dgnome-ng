@@ -1,7 +1,7 @@
+import { askedOf, ApiError, jobApi, type Loop } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { ApiError, jobApi, type Loop } from '../api'
 import { JobSidePanel } from '../job/SidePanel'
 import { Compare } from '../job/compare/Compare'
 import { Progress } from '../job/Progress'
@@ -33,8 +33,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   const [geneFilter, setGeneFilter] = useState('')
   const [loop, setLoop] = useState<Loop | null>(null)
   const summary = useQuery({
-    queryKey: ['summary', api.base],
-    queryFn: api.summary,
+    ...askedOf(api).summary(),
     // A finished job is not asked for again, and neither is a job the site does not have.
     refetchInterval: (q) => ((q.state.data && ['done', 'failed'].includes(q.state.data.state)) || missing(q.state.error) ? false : pollMs),
     retry: (failures, error) => !missing(error) && failures < 3,

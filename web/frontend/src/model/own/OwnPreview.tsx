@@ -1,5 +1,5 @@
+import { asked, type Region } from '../../api'
 import { useQueries } from '@tanstack/react-query'
-import { type Region, uploadPreview } from '../../api'
 import type { Entry } from './entry'
 
 const W = 780
@@ -11,7 +11,7 @@ export function OwnPreview({ cell, region, loops }: { cell: string; region: Regi
   const span = `${region.chrom}:${region.start}-${region.end}`
   const ready = loops.filter((l) => l.result?.ok)
   const answers = useQueries({
-    queries: ready.map((l) => ({ queryKey: ['upload-preview', l.result!.id, span], queryFn: () => uploadPreview(l.result!.id, cell, span) })),
+    queries: ready.map((l) => asked.uploadPreview(l.result!.id, cell, span)),
   })
   const x = (p: number) => ((p - region.start) / (region.end - region.start)) * W
   return (

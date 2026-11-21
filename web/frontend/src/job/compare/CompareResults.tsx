@@ -1,7 +1,7 @@
+import { asked, type Compare, type ExpressionCompare } from '../../api'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { CsvButton } from '../../components/CsvButton'
-import { compareGene, type Compare, type ExpressionCompare } from '../../api'
 import { kb } from '../../lib/format'
 import { times, fold, twoEnhancers, pText, level } from './names'
 import { type Key, Frame, BoxPlot } from './plots'
@@ -53,8 +53,7 @@ export function CompareResults({
   const expressed = expression && expression.mode !== 'none' && expression.rows.length > 0 ? expression : null
   const eRow = expressed?.rows.find((r) => r.gene === gene)
   const one = useQuery({
-    queryKey: ['compare-gene', urls[0], urls[1], gene, shared],
-    queryFn: () => compareGene(urls[0], urls[1], gene!, shared),
+    ...asked.compareGene(urls[0], urls[1], gene ?? '', shared),
     enabled: !!row,
     staleTime: Infinity,
   })

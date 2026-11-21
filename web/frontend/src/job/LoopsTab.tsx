@@ -1,3 +1,4 @@
+import { askedOf } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { CsvButton } from '../components/CsvButton'
@@ -9,7 +10,7 @@ import { bp, kb } from '../lib/format'
 /** The Loops tab: every loop the engine read, with its factor, ends, span and PET count. A row
  * can be shown in the model, where its two anchors are marked. */
 export function LoopsTab({ api, onShow }: { api: JobApi; onShow?: (loop: Loop) => void }) {
-  const loops = useQuery({ queryKey: ['loops', api.base], queryFn: api.loops })
+  const loops = useQuery(askedOf(api).loops())
   const sorted = useMemo(() => [...(loops.data ?? [])].sort((a, b) => a.a[0] - b.a[0]), [loops.data])
   const page = usePage(sorted)
   if (!loops.data) return <div aria-busy="true" />

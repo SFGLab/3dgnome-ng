@@ -1,7 +1,7 @@
+import { asked } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Database, ExternalLink, History, Play } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { api } from '../api'
 import contacts from '../assets/contacts.png'
 import previews from '../assets/previews.json'
 import deletion from '../assets/previews_deletion.json'
@@ -59,7 +59,7 @@ const VPS13D_FOLD = 1.7
 export function Title() {
   const { open, busy, error } = useOpenExample()
   // The longest region of a job is the server's to say. 20 Mb stands until the server answers.
-  const catalog = useQuery({ queryKey: ['catalog'], queryFn: api.catalog })
+  const catalog = useQuery(asked.catalog())
   const maxMb = catalog.data?.max_region_mb ?? 20
   return (
     <div className="title-page">

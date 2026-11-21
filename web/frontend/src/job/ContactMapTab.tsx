@@ -1,7 +1,8 @@
+import { askedOf } from '../api'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Camera, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Contacts, JobApi, Summary } from '../api'
+import type { JobApi, Summary } from '../api'
 import { bp } from '../lib/format'
 import { LoopView } from './LoopView'
 import { shownMaps, type Show } from './heatmap'
@@ -59,14 +60,13 @@ export function ContactMapTab({ api, summary }: { api: JobApi; summary: Summary 
     return () => clearTimeout(t)
   }, [locus])
   const region = `${settled.chrom}:${settled.start}-${settled.end}`
-  const maps = useQuery<Contacts, Error>({
-    queryKey: ['contacts', api.base, region, res, upperKind, lowerKind, norm],
-    queryFn: () => api.contacts({ region, res, upper: upperKind, lower: lowerKind, norm }),
+  const maps = useQuery({
+    ...askedOf(api).contacts({ region, res, upper: upperKind, lower: lowerKind, norm }),
     retry: false,
     // The map on screen stays, dimmed, while the next view is read.
     placeholderData: keepPreviousData,
   })
-  const annotations = useQuery({ queryKey: ['annotations', api.base], queryFn: api.annotations })
+  const annotations = useQuery(askedOf(api).annotations())
   // The halves as drawn and their ranges are worked out once for a map and its settings, not at
   // every move of the pointer over it.
   const view = useMemo(() => (maps.data ? shownMaps(maps.data.upper, maps.data.lower, show, log, range) : null), [maps.data, show, log, range])

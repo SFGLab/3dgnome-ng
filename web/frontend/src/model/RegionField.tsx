@@ -1,6 +1,6 @@
+import { asked } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { api } from '../api'
 import { useDebounced, useRegion } from './useRegion'
 
 /** Text that can be the start of a gene name: two characters or more that are not coordinates. */
@@ -26,7 +26,7 @@ export function RegionField({ cell, value, quiet = false, onChange }: { cell: st
     list.current?.children[active]?.scrollIntoView?.({ block: 'nearest' })
   }, [active])
   const settled = draft === value
-  const genes = useQuery({ queryKey: ['genes', cell, typed], queryFn: () => api.genes(cell, typed), enabled: open && maybeGene(typed), staleTime: 60_000, retry: false })
+  const genes = useQuery({ ...asked.geneHits(cell, typed), enabled: open && maybeGene(typed), staleTime: 60_000, retry: false })
   const found = open && maybeGene(text) && typed === text ? (genes.data ?? []) : []
   // A list of the one gene already in the field offers nothing.
   const options = found.length === 1 && found[0].name.toUpperCase() === text.toUpperCase() ? [] : found

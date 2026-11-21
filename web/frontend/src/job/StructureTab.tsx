@@ -1,3 +1,4 @@
+import { askedOf } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import { Ruler } from 'lucide-react'
 import { useState } from 'react'
@@ -69,19 +70,15 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
   const setLoop = (l: Loop | null) => (onLoop ? onLoop(l) : setOwnLoop(l))
   const gene = geneProp !== undefined ? geneProp : ownGene
   const setGene = (g: string | null) => (onGene ? onGene(g) : setOwnGene(g))
-  const structure = useQuery({ queryKey: ['structure', api.base, selected], queryFn: () => api.structure(selected) })
-  const annotations = useQuery({ queryKey: ['annotations', api.base], queryFn: api.annotations })
-  const genes = useQuery({ queryKey: ['genes', api.base], queryFn: api.genes })
+  const structure = useQuery(askedOf(api).structure(selected))
+  const annotations = useQuery(askedOf(api).annotations())
+  const genes = useQuery(askedOf(api).genes())
   const row = genes.data?.find((r) => r.gene === gene)
   const s = structure.data
   // A selected loop is its two anchors: the beads that hold the middles of its two ends.
   const loopBeads = s && loop ? [beadAt(s.beads, (loop.a[0] + loop.a[1]) / 2), beadAt(s.beads, (loop.b[0] + loop.b[1]) / 2)] : null
   const pair = row ? [row.promoter_bead, row.enhancer_bead] : (loopBeads ?? picks)
-  const distance = useQuery({
-    queryKey: ['distance', api.base, pair[0], pair[1]],
-    queryFn: () => api.distance(mid(s!, pair[0]), mid(s!, pair[1])),
-    enabled: !!s && pair.length === 2,
-  })
+  const distance = useQuery({ ...askedOf(api).distance(s && pair.length === 2 ? mid(s, pair[0]) : 0, s && pair.length === 2 ? mid(s, pair[1]) : 0), enabled: !!s && pair.length === 2 })
   const region = parseRegion(summary.region)
   if (!s || !annotations.data || !region) return <div className="view-box" aria-busy="true" />
   const markers = pair.map((k, i) => ({ label: 'AB'[i], at: [s.beads[k][2], s.beads[k][3], s.beads[k][4]] as [number, number, number] }))

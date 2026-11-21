@@ -1,8 +1,8 @@
+import { asked, api, ApiError, type Region, jobApi } from '../api'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowRight, Info } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { api, ApiError, type Region, jobApi } from '../api'
 import { served } from '../base'
 import { Background } from '../model/Background'
 import { CellTypes } from '../model/CellTypes'
@@ -32,7 +32,7 @@ function goTo(url: string) {
 /** The form that starts a job: cell type and region, loops, variants, background and settings. */
 export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => void }) {
   const [params] = useSearchParams()
-  const catalog = useQuery({ queryKey: ['catalog'], queryFn: api.catalog })
+  const catalog = useQuery(asked.catalog())
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const set = (patch: Partial<FormState>) => setForm((f) => ({ ...f, ...patch }))
   const [dialog, setDialog] = useState<{ tab: OwnTab; cell: boolean } | null>(null)
@@ -54,11 +54,8 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   const tooLong = region.isError ? longRegion(form.region, maxSpan) : undefined
   const shownRegion = region.data ?? tooLong ?? (region.isError || !form.region.trim() ? undefined : lastRegion.current)
   const hasSampleTable = Boolean(catalog.data?.sv_sets[form.svSet]?.sample_table)
-  const sampleTable = useQuery({ queryKey: ['sample-table', form.svSet], queryFn: () => api.sampleTable(form.svSet), enabled: hasSampleTable, staleTime: Infinity })
-  const schema = useQuery({
-    queryKey: ['settings', lookup],
-    queryFn: () => api.settings(lookup),
-  })
+  const sampleTable = useQuery({ ...asked.sampleTable(form.svSet), enabled: hasSampleTable, staleTime: Infinity })
+  const schema = useQuery(asked.settings(lookup))
 
   useEffect(() => {
     const e = EXAMPLES.find((x) => x.id === params.get('example'))
@@ -111,8 +108,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   const cellType = catalog.data?.cell_types[form.cell]
   // The hosted expression of the cell type, and of the sample of a hosted call set.
   const expressionOptions = useQuery({
-    queryKey: ['expression', form.cell, form.svSet, form.sample],
-    queryFn: () => api.expression(form.cell, form.svSet, form.sample),
+    ...asked.expression(form.cell, form.svSet, form.sample),
     enabled: !ownCell && !!catalog.data?.cell_types[form.cell],
     staleTime: 60_000,
   })

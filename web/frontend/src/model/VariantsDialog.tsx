@@ -1,9 +1,9 @@
+import { asked, type Catalog, type Region, type VariantRow, type UploadResult, uploadFile } from '../api'
 import { useQueries, useQuery } from '@tanstack/react-query'
 import { CircleAlert, CircleCheck, FileArchive, LoaderCircle, Upload, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
-import { api, type Catalog, type Region, type VariantRow, type UploadResult, uploadFile, uploadPreview } from '../api'
 import type { FormState } from './form'
 import { type OwnChoice, ownField } from './upload'
 import { megabytes } from '../lib/format'
@@ -38,9 +38,9 @@ const AXIS = 62
 function Track({ cell, region, factors, own, rows }: { cell: string; region: Region; factors: string; own: OwnChoice | null; rows: VariantRow[] }) {
   const span = `${region.chrom}:${region.start}-${region.end}`
   const mine = own?.loops ?? []
-  const preview = useQuery({ queryKey: ['preview', cell, span], queryFn: () => api.preview(cell, span), enabled: !mine.length })
+  const preview = useQuery({ ...asked.preview(cell, span), enabled: !mine.length })
   const ownArcs = useQueries({
-    queries: mine.map((l) => ({ queryKey: ['upload-preview', l.upload.id, span], queryFn: () => uploadPreview(l.upload.id, cell, span) })),
+    queries: mine.map((l) => asked.uploadPreview(l.upload.id, cell, span)),
   })
   const x = (p: number) => Math.min(W, Math.max(0, ((p - region.start) / (region.end - region.start)) * W))
   const shown = factors === 'CTCF+RNAPII' ? ['CTCF', 'RNAPII'] : [factors]
@@ -143,8 +143,7 @@ export function VariantsDialog(props: {
     ...(own ? { own: ownField({ ...own, contacts: null, enhancers: null }) } : {}),
   }
   const check = useQuery({
-    queryKey: ['sv-check', fields],
-    queryFn: () => api.variants(fields),
+    ...asked.variants(fields),
     enabled: !!span && !!sample && !!source,
     retry: false,
   })

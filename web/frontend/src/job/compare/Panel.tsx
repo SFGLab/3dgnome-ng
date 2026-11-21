@@ -1,7 +1,7 @@
+import { askedOf, type JobApi } from '../../api'
 import { useQuery } from '@tanstack/react-query'
 import { Camera, ChevronDown } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { type JobApi } from '../../api'
 import { readPalette } from '../colors'
 import { FACTORS } from '../../lib/format'
 import { type CameraLink } from '../cameraLink'
@@ -93,10 +93,10 @@ export function Panel({
   choices?: Choice[]
   onPick?: (url: string) => void
 }) {
-  const summary = useQuery({ queryKey: ['summary', api.base], queryFn: api.summary })
-  const structure = useQuery({ queryKey: ['structure', api.base, index], queryFn: () => api.structure(index) })
-  const annotations = useQuery({ queryKey: ['annotations', api.base], queryFn: api.annotations })
-  const genes = useQuery({ queryKey: ['genes', api.base], queryFn: api.genes })
+  const summary = useQuery(askedOf(api).summary())
+  const structure = useQuery(askedOf(api).structure(index))
+  const annotations = useQuery(askedOf(api).annotations())
+  const genes = useQuery(askedOf(api).genes())
   const palette = useMemo(readPalette, [])
   const scene = useRef<SceneHandle>(null)
   const s = summary.data
@@ -105,6 +105,8 @@ export function Panel({
     () => (structure.data && annotations.data && region ? chainColors(structure.data, annotations.data, [region.start, region.end], 'elements', palette) : []),
     [structure.data, annotations.data, region?.start, region?.end, palette], // eslint-disable-line react-hooks/exhaustive-deps
   )
+  // The scene builds its tubes anew for a new list of points. The list is kept for a structure.
+  const points = useMemo(() => (structure.data?.chain ?? []).map(([x, y, z]) => [x, y, z] as [number, number, number]), [structure.data])
   const row = pair === null ? undefined : genes.data?.find((r) => r.gene === gene)
   const enhancerBead = pair?.bead ?? row?.enhancer_bead
   // The selected gene's promoter and enhancer, marked A and B as on the Structure tab.
@@ -130,7 +132,7 @@ export function Panel({
       />
       <div className="view-box compare-box">
         {structure.data && (
-          <Scene ref={scene} points={structure.data.chain.map(([x, y, z]) => [x, y, z] as [number, number, number])} colors={colors} markers={markers} focus={focus} link={link} linkId={linkId} />
+          <Scene ref={scene} points={points} colors={colors} markers={markers} focus={focus} link={link} linkId={linkId} />
         )}
         {structure.data && (
           <button

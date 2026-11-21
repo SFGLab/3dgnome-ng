@@ -1,6 +1,6 @@
+import { asked, type Region } from '../api'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { api, type Region } from '../api'
 import type { Factors } from './form'
 import { around } from './loopWindow'
 
@@ -46,7 +46,7 @@ export function LoopPreview({ cell, region, factors, maxSpan = Infinity, onRegio
     }
   }, [region.chrom, region.start, region.end, cap]) // eslint-disable-line react-hooks/exhaustive-deps
   const span = `${region.chrom}:${view[0]}-${view[1]}`
-  const preview = useQuery({ queryKey: ['preview', cell, span], queryFn: () => api.preview(cell, span), placeholderData: keepPreviousData })
+  const preview = useQuery({ ...asked.preview(cell, span), placeholderData: keepPreviousData })
   const svg = useRef<SVGSVGElement>(null)
   const drag = useRef<Drag | null>(null)
   const [moved, setMoved] = useState<[number, number] | null>(null)
