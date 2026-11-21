@@ -248,11 +248,21 @@ def solve_nodes(
             ladder = [r for r in _CELL_LADDER if finest < r <= int(s.contact_resolution_max)]
             tested: BoolArray | None = np.zeros((m, m), dtype=np.bool_) if ladder else None
             for resolution in [finest, *ladder]:
-                count, offset, expected, mapped = read_cells(
-                    str(s.data_contact_map), chr_, nodes.mid, resolution
+                count, offset, expected, mapped, node_bias = read_cells(
+                    str(s.data_contact_map), chr_, nodes.mid, resolution, s.contact_bias
                 )
                 exp_dist = hold_by_cells(
-                    exp_dist, nodes.mid, count, offset, expected, mapped, law, s, tested, resolution
+                    exp_dist,
+                    nodes.mid,
+                    count,
+                    offset,
+                    expected,
+                    mapped,
+                    law,
+                    s,
+                    tested,
+                    resolution,
+                    node_bias if s.contact_bias != "none" else None,
                 )
     exp_dist = cb.repulsion_range(exp_dist, [int(x) for x in nodes.mid], s)
     pos0: F32Array = np.ascontiguousarray(centre, dtype=np.float32)

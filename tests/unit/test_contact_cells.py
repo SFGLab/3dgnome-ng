@@ -130,7 +130,10 @@ def test_read_cells_from_an_mcool(tmp_path: Path) -> None:
     cooler.create_cooler(f"{path}::/resolutions/{res}", bins, pix, ordered=True)
 
     mids = np.array([17_500, 22_500, 102_500], dtype=np.int64)  # bins 3, 4 and 20
-    got, offset, expected, mapped = read_cells(f"{path}::/resolutions/1000", "chr1", mids, res)
+    got, offset, expected, mapped, bias = read_cells(
+        f"{path}::/resolutions/1000", "chr1", mids, res
+    )
+    assert bias.tolist() == [1.0, 1.0, 1.0], "the bias of a node is one under none"
     assert got.tolist() == [[0.0, 9.0, 30.0], [9.0, 0.0, 0.0], [30.0, 0.0, 0.0]]
     assert offset.tolist() == [[0, 1, 17], [1, 0, 16], [17, 16, 0]]
     assert expected[1] == pytest.approx(9.0) and expected[2] == pytest.approx(4.0)
@@ -160,3 +163,84 @@ def test_a_pair_is_read_at_the_finest_resolution_that_can_test_it() -> None:
     )
     assert out[0, 1] == -4.0, "the pair tested at the fine resolution keeps its background"
     assert out[0, 2] != -0.5 and tested[0, 2], "the far pair is held by its coarse cell"
+
+
+def biased_mcool(tmp_path: Path, with_weights: bool) -> tuple[str, np.ndarray]:
+    """A map whose count is 40 over the offset times the bias of its two bins. Bin 7 has a
+    quarter of the bias of the others and bin 12 has no weight.
+    """
+    cooler = pytest.importorskip("cooler")
+    import pandas as pd
+
+    res, n = 5000, 30
+    bias = np.ones(n)
+    bias[7] = 0.25
+    bins = pd.DataFrame(
+        {"chrom": "chr1", "start": np.arange(n) * res, "end": (np.arange(n) + 1) * res}
+    )
+    if with_weights:
+        weight = 1.0 / bias
+        weight[12] = np.nan
+        bins["weight"] = weight
+    i, j = np.triu_indices(n, 1)
+    count = np.rint(40.0 / (j - i) * bias[i] * bias[j] * 4.0).astype(np.int64)
+    pix = pd.DataFrame({"bin1_id": i, "bin2_id": j, "count": count})
+    path = tmp_path / ("weights.mcool" if with_weights else "raw.mcool")
+    cooler.create_cooler(f"{path}::/resolutions/{res}", bins, pix, ordered=True)
+    return f"{path}::/resolutions/{res}", bias
+
+
+def test_bias_of_the_weights_takes_a_bin_of_low_coverage_out_of_the_test(tmp_path: Path) -> None:
+    uri, _ = biased_mcool(tmp_path, with_weights=True)
+    res = 5000
+    mids = (np.array([2, 7, 12, 20]) * res + res // 2).astype(np.int64)
+    s = settings()
+    mat = np.full((4, 4), -0.5)
+    np.fill_diagonal(mat, 0.0)
+
+    count, offset, expected, mapped, bias = read_cells(uri, "chr1", mids, res)
+    plain = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s)
+    assert plain[0, 1] < -0.5 and plain[1, 3] < -0.5, (
+        "by the separation alone the bin of low coverage is held out from the others"
+    )
+
+    count, offset, expected, mapped, bias = read_cells(uri, "chr1", mids, res, "weights")
+    assert bias[1] / bias[0] == pytest.approx(0.25), (
+        "the bias of a bin is the inverse of its weight"
+    )
+    assert mapped.tolist() == [True, True, False, True], "a bin without a weight is not mapped"
+    want = expected[offset[0, 1]] * bias[0] * bias[1]
+    assert want == pytest.approx(count[0, 1], rel=0.02), (
+        "the expectation of a cell is the mean at its offset times the two biases"
+    )
+    out = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s, None, res, bias)
+    assert np.array_equal(out, mat), "no cell is off its expectation and no pair is held"
+
+
+def test_a_map_without_weights_is_read_by_the_separation_alone(tmp_path: Path) -> None:
+    uri, _ = biased_mcool(tmp_path, with_weights=False)
+    mids = (np.array([2, 7, 20]) * 5000 + 2500).astype(np.int64)
+    plain = read_cells(uri, "chr1", mids, 5000)
+    fallback = read_cells(uri, "chr1", mids, 5000, "weights")
+    for a, b in zip(plain, fallback, strict=True):
+        assert np.array_equal(a, b), "the reading under weights is the reading under none"
+
+
+def test_a_larger_pseudo_count_draws_a_cell_of_few_counts_to_the_background() -> None:
+    mids, offset, _expected, mapped, mat = cells_case()
+    expected = np.full(100, 5.0)
+    count = np.zeros((3, 3))
+    s = settings()
+    half = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s)
+    assert half[0, 1] == pytest.approx(-4.0 * (0.5 / 5.5) ** (-1.0 / 3.0)), "no count of 5 expected"
+    s.contact_pseudo_count = 4.0
+    four = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s)
+    assert four[0, 1] == pytest.approx(-4.0 * (4.0 / 9.0) ** (-1.0 / 3.0))
+    assert -four[0, 1] < -half[0, 1], "the push is smaller"
+
+
+def test_loader_refuses_an_unknown_bias_and_a_pseudo_count_of_zero() -> None:
+    with pytest.raises(ValueError, match="none or weights"):
+        Settings.from_dict({"springs": {"contact_bias": "coverage"}})
+    with pytest.raises(ValueError, match="above zero"):
+        Settings.from_dict({"springs": {"contact_pseudo_count": "0"}})

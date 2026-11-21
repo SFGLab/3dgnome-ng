@@ -2,9 +2,10 @@
 
 A pair of nodes reads the cell of `[data] contact_map` that holds its two beads, at
 `[springs] contact_resolution`. The counts are raw. The expectation of a cell is the mean count at
-its separation over the stretch of the chromosome that holds the nodes. A pair without a loop is
-held at the distance of the law for its cell when the cell passes the Poisson test of
-`contact_background_z`.
+its separation over the stretch of the chromosome that holds the nodes. Under
+`[springs] contact_bias = weights` it is that mean times the bias of its two bins, the inverse of
+the balancing weight of the map. A pair without a loop is held at the distance of the law for its
+cell when the cell passes the Poisson test of `contact_background_z`.
 """
 
 from __future__ import annotations
@@ -60,13 +61,20 @@ def expected_by_offset(counts: Any, valid: BoolArray) -> F64Array:
 
 
 def read_cells(
-    uri: str, chrom: str, mids: I64Array, resolution: int
-) -> tuple[F64Array, I64Array, F64Array, BoolArray]:
+    uri: str, chrom: str, mids: I64Array, resolution: int, bias: str = "none"
+) -> tuple[F64Array, I64Array, F64Array, BoolArray, F64Array]:
     """Reads the cells of the pairs of nodes from a cooler.
 
-    Returns `(count, offset, expected, mapped)`: the raw count of the cell of each pair of nodes,
-    the offset of that cell from the diagonal in bins, the mean count by offset over the stretch
-    that holds the nodes, and the nodes whose bin has a count.
+    Returns `(count, offset, expected, mapped, node_bias)`: the raw count of the cell of each pair
+    of nodes, the offset of that cell from the diagonal in bins, the mean count by offset over the
+    stretch that holds the nodes, the nodes whose bin has a count, and the bias of the bin of each
+    node. The expectation of the cell of nodes i and j is
+    `expected[offset] * node_bias[i] * node_bias[j]`.
+
+    Under `bias = none` the bias is one. Under `weights` it is the inverse of the balancing weight
+    of the bin over its mean, the mean by offset is taken of the counts over the two biases, and a
+    bin without a weight is not mapped. A map without weights is read as under `none`, with a
+    line in the log.
     """
     from scipy import sparse  # noqa: PLC0415
 
@@ -89,17 +97,39 @@ def read_cells(
         )
     first = int(mids.min()) // res
     last = int(mids.max()) // res
+    stretch = f"{chrom}:{first * res}-{(last + 1) * res}"
+    weight: Any = None
     with COOLER_LOCK:
-        matrix = clr.matrix(balance=False, sparse=True).fetch(
-            f"{chrom}:{first * res}-{(last + 1) * res}"
-        )
+        matrix = clr.matrix(balance=False, sparse=True).fetch(stretch)
+        if bias == "weights":
+            table: Any = clr.bins().fetch(stretch)
+            if "weight" in table.columns:
+                weight = table["weight"].to_numpy(dtype=np.float64)
     upper: Any = sparse.triu(matrix, 1)  # pyright: ignore[reportUnknownMemberType]
     counts: Any = (upper + upper.T).tocsr()
     valid: BoolArray = np.asarray(counts.sum(axis=1)).ravel() > 0
     bins = (mids // res - first).astype(np.int64)
     count: F64Array = np.asarray(counts[bins][:, bins].todense(), dtype=np.float64)
     offset: I64Array = np.abs(bins[:, None] - bins[None, :])
-    return count, offset, expected_by_offset(counts, valid), valid[bins]
+    if bias != "weights":
+        return count, offset, expected_by_offset(counts, valid), valid[bins], np.ones(len(bins))
+    if weight is None:
+        log.status(
+            LOG,
+            "contact cells at %d bp: [data] contact_map has no balancing weights, the"
+            " expectation of a cell is by its separation alone",
+            res,
+        )
+        return count, offset, expected_by_offset(counts, valid), valid[bins], np.ones(len(bins))
+    w: F64Array = np.asarray(weight, dtype=np.float64)
+    weighted: BoolArray = np.isfinite(w) & (w > 0.0)
+    valid &= weighted
+    inverse_weight: F64Array = np.where(weighted, 1.0 / np.where(weighted, w, 1.0), 1.0)
+    scale = float(np.mean(inverse_weight[valid])) if valid.any() else 1.0
+    bin_bias: F64Array = inverse_weight / scale
+    inverse: Any = sparse.diags(1.0 / bin_bias)  # pyright: ignore[reportUnknownMemberType]
+    flat: Any = (inverse @ counts @ inverse).tocsr()
+    return count, offset, expected_by_offset(flat, valid), valid[bins], bin_bias[bins]
 
 
 def hold_by_cells(
@@ -113,21 +143,26 @@ def hold_by_cells(
     s: Settings,
     tested: BoolArray | None = None,
     resolution: int = 0,
+    node_bias: F64Array | None = None,
 ) -> F64Array:
     """Returns the target matrix with the pairs that their cells hold.
 
     A pair without a loop whose cell has an expectation above z squared and a count more than z
     Poisson deviations from it is held at the background times
-    `((count + 0.5) / (expected + 0.5)) ^ (-1/3)`, clipped to one bead and to
-    `distance_heatmap_stretching` backgrounds. It is entered as minus its distance, which the
-    kernels score with the background spring. Two nodes in one cell and a node in a bin without
-    a count are left as they are.
+    `((count + k) / (expected + k)) ^ (-1/3)`, with k of `contact_pseudo_count`, clipped to one
+    bead and to `distance_heatmap_stretching` backgrounds. It is entered as minus its distance,
+    which the kernels score with the background spring. Two nodes in one cell and a node in a bin
+    without a count are left as they are.
+
+    The expectation of a cell is `expected` at its offset, times `node_bias` of its two nodes when
+    that is given.
 
     `tested` marks the pairs whose cell had an expectation above z squared at a finer resolution.
     Such a pair is left as it is and the pairs that this resolution can test are added to the
     marks. A pair is then read at the finest resolution that can test it.
     """
     z_cut = float(s.contact_background_z)
+    pseudo = float(s.contact_pseudo_count)
     s0 = max(int(law.s0_bp), 1)
     stretch = float(s.heatmap_distance_stretching)
     pos = mids.astype(np.float64)
@@ -140,6 +175,8 @@ def hold_by_cells(
         ii = ii + r0
         off = offset[ii, jj]
         exp = expected[np.minimum(off, expected.shape[0] - 1)]
+        if node_bias is not None:
+            exp = exp * node_bias[ii] * node_bias[jj]
         obs = count[ii, jj]
         z = (obs - exp) / np.sqrt(np.maximum(exp, 1e-300))
         testable = (
@@ -153,7 +190,7 @@ def hold_by_cells(
             continue
         sep = np.abs(pos[jj[sel]] - pos[ii[sel]])
         bg = np.maximum(1.0, (np.maximum(sep, 1.0) / s0) ** law.nu)
-        ratio = (obs[sel] + 0.5) / (exp[sel] + 0.5)
+        ratio = (obs[sel] + pseudo) / (exp[sel] + pseudo)
         target = np.clip(bg * ratio ** (-1.0 / 3.0), 1.0, stretch * bg)
         out[ii[sel], jj[sel]] = -target
         out[jj[sel], ii[sel]] = -target
