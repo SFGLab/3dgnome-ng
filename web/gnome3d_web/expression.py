@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -200,12 +201,24 @@ def _deseq(a: pd.DataFrame, b: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def contrast(a: Path, b: Path, cache: Path) -> dict[str, object]:
+def _by_name(table: Table, names: dict[str, str], counts: bool) -> Table:
+    """A table of Ensembl ids as a table of gene names. A gene without a name is left out. Two
+    ids of one name are added for counts and averaged for values."""
+    named = table.data.copy()
+    named.index = pd.Index([names.get(str(g)) for g in named.index], name="name")
+    named = named[named.index.notna()]
+    grouped = named.groupby(level=0, sort=False)
+    return Table("name", grouped.sum() if counts else grouped.mean(), None)
+
+
+def contrast(a: Path, b: Path, cache: Path, names: Callable[[], dict[str, str]] | None = None) -> dict[str, object]:
     """The expression of job b against job a, gene by gene.
 
     Returns `mode`, deseq2, ratio or none, the `reason` of a mode other than deseq2 and `genes`,
     for each gene `[log2 fold change, adjusted p or None, level in a, level in b]`. The genes are
     named as the tables name them, `key`. The result of a pair of tables is kept in `cache`.
+    One table by Ensembl id and one by name are compared by name, with `names`, the name of
+    each id.
     """
     ma, mb = job_meta(a), job_meta(b)
     if ma is None or mb is None:
@@ -213,16 +226,22 @@ def contrast(a: Path, b: Path, cache: Path) -> dict[str, object]:
     base = {"label_a": ma.get("label", ""), "label_b": mb.get("label", ""), "key": ma["key"]}
     if ma["kind"] != mb["kind"]:
         return {**base, "mode": "none", "reason": "One job has read counts and the other normalised values. The two cannot be compared."}
-    if ma["key"] != mb["key"]:
+    mixed = ma["key"] != mb["key"]
+    if mixed and names is None:
         return {**base, "mode": "none", "reason": "One table names its genes by Ensembl id and the other by name."}
+    if mixed:
+        base["key"] = "name"
     counts = ma["kind"] == "counts"
     if not counts and (ma.get("source"), ma.get("unit")) != (mb.get("source"), mb.get("unit")):
         return {**base, "mode": "none", "reason": "The normalised values of the two jobs come from two sources with units of their own."}
-    digest = hashlib.sha256((a / TABLE).read_bytes() + b"|" + (b / TABLE).read_bytes()).hexdigest()[:24]
+    digest = hashlib.sha256((a / TABLE).read_bytes() + b"|" + (b / TABLE).read_bytes() + (b"|by name" if mixed else b"")).hexdigest()[:24]
     kept = cache / f"{digest}.json"
     if kept.is_file():
         return {**base, **json.loads(kept.read_text())}
     ta, tb = _job_table(a), _job_table(b)
+    if mixed and names is not None:
+        ta = _by_name(ta, names(), ma["kind"] == "counts") if ta.key == "gene_id" else ta
+        tb = _by_name(tb, names(), mb["kind"] == "counts") if tb.key == "gene_id" else tb
     if list(ta.data.columns) == list(tb.data.columns) and ta.data.equals(tb.data):
         return {**base, "mode": "none", "reason": "The two jobs have the same samples. Their expression does not differ."}
     genes = ta.data.index.intersection(tb.data.index)

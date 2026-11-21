@@ -40,9 +40,13 @@ def site(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespace:
 
 def test_returns_the_app(site: SimpleNamespace) -> None:
     c, dist, root, TestClient, create_app = site.c, site.dist, site.root, site.TestClient, site.create_app
-    for path in ("/", "/method", "/cite", "/some/deep/link"):
+    for path in ("/", "/method", "/cite", "/model", "/jobs"):
         r = c.get(path)
         assert r.status_code == 200 and "FRONTEND-OK" in r.text, f"{path} returns the app" + ": " + str(r.status_code)
+    # An address the site does not have gets the app too, which shows its page for it, with the status 404.
+    for path in ("/some/deep/link", "/nothing", "/jobs/sdfsdfd", "/p/werewwerwe", "/jobs/0000000000000000"):
+        r = c.get(path)
+        assert r.status_code == 404 and "FRONTEND-OK" in r.text, f"{path} is a missing address with the app as its page" + ": " + str(r.status_code)
 
     r = c.get("/assets/app.js")
     assert r.status_code == 200 and "console.log" in r.text, "an asset is served: " + str(r.status_code)
@@ -97,9 +101,12 @@ def test_returns_the_app(site: SimpleNamespace) -> None:
     (dist / "index.html").write_text('<html><body>FRONTEND-OK<script src="/new/assets/app.js"></script></body></html>')
     os.environ.update(FRONTEND_DIST=str(dist), BASE_PATH="/new/")
     under = TestClient(create_app())
-    for path in ("/new", "/new/", "/new/method", "/new/jobs", "/", "/method", "/newer"):
+    for path in ("/new", "/new/", "/new/method", "/new/jobs", "/", "/method"):
         r = under.get(path)
         assert r.status_code == 200 and "FRONTEND-OK" in r.text, f"under a prefix {path} returns the app" + ": " + str(r.status_code)
+    for path in ("/newer", "/new/nothing"):
+        r = under.get(path)
+        assert r.status_code == 404 and "FRONTEND-OK" in r.text, f"under a prefix {path} is a missing address" + ": " + str(r.status_code)
     for path in ("/new/assets/app.js", "/assets/app.js"):
         assert "console.log" in under.get(path).text, f"under a prefix {path} is the asset"
     for path in ("/new/api/catalog", "/api/catalog"):

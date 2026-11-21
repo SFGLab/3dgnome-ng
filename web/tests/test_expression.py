@@ -267,3 +267,26 @@ def test_a_table_of_a_feature_that_is_off_is_neither_offered_nor_taken(site: Sim
     config.write_text(json.dumps({"features": {"trios": True}, "limits": {}}))
     offered = {o["id"] for o in site.c.get("/api/expression", params=person).json()["options"]}
     assert "PEOPLE" in offered, "the table is offered again with the feature on: " + str(offered)
+
+
+def test_a_table_by_ensembl_id_and_a_table_by_name_are_compared_by_name(tmp_path: Path) -> None:
+    rng = np.random.default_rng(3)
+    named = counts_table(rng, {"n1": 1.0, "n2": 1.0}, {}).drop(columns="length")
+    ids = {name: f"ENSG{1000 + i:011d}" for i, name in enumerate(named.index)}
+    by_id = counts_table(np.random.default_rng(3), {"i1": 2.0, "i2": 2.0}, {"ALPHA": 8.0}).drop(columns="length")
+    by_id.index = pd.Index([ids[n] + ".4" for n in by_id.index], name="gene_id")
+    a, b = tmp_path / "a", tmp_path / "b"
+    for job, table, cols in ((a, named, ["n1", "n2"]), (b, by_id, ["i1", "i2"])):
+        job.mkdir()
+        path = tmp_path / f"{job.name}.tsv"
+        table.to_csv(path, sep="\t")
+        read = expression.read_table(path)
+        expression.write_job(job, read, cols, {"source": job.name, "label": job.name, "kind": "counts", "unit": ""})
+    assert expression.job_meta(a)["key"] == "name" and expression.job_meta(b)["key"] == "gene_id", "the two tables name their genes in two ways"
+    refused = expression.contrast(a, b, tmp_path / "cache")
+    assert refused["mode"] == "none" and "Ensembl id and the other by name" in refused["reason"], "without the names of the ids the two are not compared"
+    names = {i: n for n, i in ids.items()}
+    out = expression.contrast(a, b, tmp_path / "cache", lambda: names)
+    assert out["mode"] in ("deseq2", "ratio") and out["key"] == "name", "with the names of the ids they are compared by name: " + str(out["mode"])
+    assert 2.5 < out["genes"]["ALPHA"][0] < 3.5, "a gene at eight times reads a log2 fold change near 3 across the two ways of naming: " + str(out["genes"]["ALPHA"])
+    assert len(out["genes"]) > 300, "the genes of both tables are compared"

@@ -110,7 +110,8 @@ function Picker({
 
 export type Marker = { label: string; at: [number, number, number] }
 const NO_FOCUS: [number, number][] = []
-export type SceneHandle = { reset: () => void; png: () => string | null }
+/** `png` gives the view as a picture with its marks drawn on it, and `caption` in its lower left corner. */
+export type SceneHandle = { reset: () => void; png: (caption?: string) => string | null }
 
 function CameraSync({ link, id }: { link: CameraLink; id: string }) {
   const { camera, controls } = useThree() as unknown as { camera: THREE.PerspectiveCamera; controls: OrbitControlsImpl | null }
@@ -288,11 +289,59 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
   const tube = useMemo(() => bondRadius(shifted), [shifted])
   const mask = useMemo(() => focusMask(shifted.length, focus), [shifted.length, focus])
   const near = hovered === null || hovered >= shifted.length ? null : stretch(hovered, shifted.length)
+  const shift = (p: [number, number, number]) => [p[0] - center.x, p[1] - center.y, p[2] - center.z] as [number, number, number]
   useImperativeHandle(ref, () => ({
     reset: () => controls.current?.reset(),
-    png: () => gl.current?.domElement.toDataURL('image/png') ?? null,
+    png: (caption?: string) => {
+      const view = gl.current?.domElement
+      const camera = controls.current?.object
+      if (!view) return null
+      // The marks of the page are drawn over the view. The picture gets them drawn in.
+      const out = document.createElement('canvas')
+      out.width = view.width
+      out.height = view.height
+      const ctx = out.getContext('2d')
+      if (!ctx || !camera) return view.toDataURL('image/png')
+      ctx.drawImage(view, 0, 0)
+      const k = view.width / Math.max(view.clientWidth, 1)
+      const at = markers.map((m) => {
+        const p = new THREE.Vector3(...shift(m.at)).project(camera)
+        return [((p.x + 1) / 2) * view.width, ((1 - p.y) / 2) * view.height] as const
+      })
+      if (at.length === 2) {
+        ctx.strokeStyle = '#151514'
+        ctx.lineWidth = 1.5 * k
+        ctx.beginPath()
+        ctx.moveTo(...at[0])
+        ctx.lineTo(...at[1])
+        ctx.stroke()
+      }
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.font = `700 ${11 * k}px sans-serif`
+      markers.forEach((m, i) => {
+        ctx.beginPath()
+        ctx.arc(at[i][0], at[i][1], 10 * k, 0, 2 * Math.PI)
+        ctx.fillStyle = '#151514'
+        ctx.fill()
+        ctx.strokeStyle = '#FFFFFF'
+        ctx.lineWidth = 1.5 * k
+        ctx.stroke()
+        ctx.fillStyle = '#FFFFFF'
+        ctx.fillText(m.label, at[i][0], at[i][1] + 0.5 * k)
+      })
+      if (caption) {
+        ctx.font = `600 ${12 * k}px sans-serif`
+        ctx.textAlign = 'left'
+        const w = ctx.measureText(caption).width + 16 * k
+        ctx.fillStyle = '#151514'
+        ctx.fillRect(12 * k, view.height - 36 * k, w, 24 * k)
+        ctx.fillStyle = '#FFFFFF'
+        ctx.fillText(caption, 20 * k, view.height - 24 * k)
+      }
+      return out.toDataURL('image/png')
+    },
   }))
-  const shift = (p: [number, number, number]) => [p[0] - center.x, p[1] - center.y, p[2] - center.z] as [number, number, number]
   return (
     <Canvas
       camera={{ position: [0, 0, radius * 2.4], fov: 45, near: radius / 100, far: radius * 20 }}

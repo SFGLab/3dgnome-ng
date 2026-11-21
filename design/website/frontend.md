@@ -73,6 +73,15 @@ map, then the GSTM1 deletion with the comparison of VPS13D in GM12878 and H1ESC 
 `web/scripts/make_previews.py` draws each from its finished job, the two cell types each at its own
 enhancer.
 
+An address the site does not have gets the page of a missing address, `NotFound.tsx`, with a
+random chain of 404 steps. That holds for the address of a job the site lacks too. The server
+answers such an address with the app and the status 404.
+
+The Help page has a tutorial on the TNFRSF8 example with links to the finished jobs of every
+example, the sample output of the site, sample input files for every kind of upload under
+`src/assets/samples/`, cut from the hosted GM12878 data of the example region, and a guide to
+every part of a job page.
+
 An open figure is saved as a PNG with its title, `savePng.ts`. The tables of a job,
 the genes, the loops and the two tables of the comparison, are saved whole as CSV, `saveCsv.ts`.
 `design/website/data.md` has the tables and the comparison.

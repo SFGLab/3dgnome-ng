@@ -94,8 +94,9 @@ function Panel({
   gene: string | null
   link?: CameraLink
   linkId: string
-  /** The enhancer the comparison measures the selected gene to in this job, and its distance. */
-  pair?: { bead?: number; mean: number; sd: number }
+  /** The enhancer the comparison measures the selected gene to in this job, and its distance. Null for a gene
+   * the comparison does not hold, which is then not marked. */
+  pair?: { bead?: number; mean: number; sd: number } | null
   choices?: Choice[]
   onPick?: (url: string) => void
 }) {
@@ -111,7 +112,7 @@ function Panel({
     () => (structure.data && annotations.data && region ? chainColors(structure.data, annotations.data, [region.start, region.end], 'elements', palette) : []),
     [structure.data, annotations.data, region?.start, region?.end, palette], // eslint-disable-line react-hooks/exhaustive-deps
   )
-  const row = genes.data?.find((r) => r.gene === gene)
+  const row = pair === null ? undefined : genes.data?.find((r) => r.gene === gene)
   const enhancerBead = pair?.bead ?? row?.enhancer_bead
   // The selected gene's promoter and enhancer, marked A and B as on the Structure tab.
   const markers =
@@ -144,7 +145,7 @@ function Panel({
             className="icon-tool panel-save"
             aria-label={`Save the structure of ${label} as a PNG`}
             onClick={() => {
-              const url = scene.current?.png()
+              const url = scene.current?.png(row ? `A to B ${(pair?.mean ?? row.distance).toFixed(1)} ± ${(pair?.sd ?? row.sd).toFixed(1)}` : undefined)
               if (url) saveDataUrl(url, `structure_${linkId === 'a' ? 'this_job' : 'other_job'}_${index}`)
             }}
           >
@@ -214,6 +215,8 @@ export function Compare({
   const otherJob = otherApi ? recentJobs().find((j) => j.url === otherApi.url) : undefined
   // The row of the selected gene. Each side marks the enhancer the comparison measures.
   const chosen = cmp.data?.rows.find((r) => r.gene === gene)
+  // With the enhancers of both jobs alone, a gene outside the comparison has no enhancer to mark.
+  const absent = shared && cmp.data && gene ? null : undefined
   return (
     <div className="compare">
       <div className="compare-toolbar">
@@ -240,7 +243,7 @@ export function Compare({
         </button>
       </div>
       <div className="compare-panels">
-        <Panel api={api} label="this job" structure={selected} gene={gene} link={linked ? link : undefined} linkId="a" pair={chosen && { bead: chosen.enhancer_bead_a, ...chosen.a }} />
+        <Panel api={api} label="this job" structure={selected} gene={gene} link={linked ? link : undefined} linkId="a" pair={chosen ? { bead: chosen.enhancer_bead_a, ...chosen.a } : absent} />
         {otherApi ? (
           <Panel
             key={otherApi.url}
@@ -250,7 +253,7 @@ export function Compare({
             gene={gene}
             link={linked ? link : undefined}
             linkId="b"
-            pair={chosen && { bead: chosen.enhancer_bead_b, ...chosen.b }}
+            pair={chosen ? { bead: chosen.enhancer_bead_b, ...chosen.b } : absent}
             choices={choices}
             onPick={pick}
           />

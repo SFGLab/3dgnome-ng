@@ -89,7 +89,8 @@ gene lengths, counts per million for counts without and the mean for normalised 
 comparison of two jobs runs DESeq2 through PyDESeq2 when both hold read counts of two samples
 or more, over the genes with ten reads or more. Any other pair of one kind gives a log2 ratio
 of the levels and no p-value. Counts are not compared with normalised values and the values of
-two tables are not compared with each other. A result is kept under `RESULTS_DIR/expression`
+two tables are not compared with each other. One table by Ensembl id and one by gene name are
+compared by name, with the names of the gene table of the site. A result is kept under `RESULTS_DIR/expression`
 by the hash of the two job tables.
 
 The trio individuals are not hosted until their release is cleared.

@@ -4,11 +4,12 @@
 job and its GPU memory pool. The local pool has one slot for each job at once, `Settings.slots`.
 The engine of a job runs on the cores of its slot, `slot_cores`, and two jobs at once do not
 share cores. An engine takes as many threads as it has cores. An rq worker is one slot. Its
-container gives it its card and it runs on every core it has.
+container gives it its card, and it takes a free slot for each job, `claim_slot`, for its cores.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -17,6 +18,7 @@ import shutil
 import threading
 import time
 import traceback
+from collections.abc import Iterator
 from dataclasses import asdict
 from pathlib import Path
 
@@ -37,7 +39,8 @@ def slot_cores(cores: list[int], slot: int, slots: int, per_job: int | None = No
 
     Each slot has the next `per_job` cores of the server. With more cores asked for than the
     server has for every slot, the sets of the slots overlap. A `per_job` of all the cores gives
-    every job the whole server.
+    every job the whole server. Without `per_job` the cores are divided between the slots, and
+    the first slots get one core more where the division leaves a rest.
 
     Parameters
     ----------
@@ -53,9 +56,41 @@ def slot_cores(cores: list[int], slot: int, slots: int, per_job: int | None = No
     n = len(cores)
     if n == 0:
         return []
-    count = min(n, per_job) if per_job else max(1, n // max(slots, 1))
-    first = (slot * count) % n
+    base, rest = divmod(n, max(slots, 1))
+    if per_job or base == 0:
+        count = min(n, per_job) if per_job else 1
+        first = (slot * count) % n
+    else:
+        count = base + (1 if slot < rest else 0)
+        first = slot * base + min(slot, rest)
     return sorted(cores[(first + k) % n] for k in range(count))
+
+
+@contextlib.contextmanager
+def claim_slot(root: Path, total: int) -> Iterator[int | None]:
+    """Takes a free slot of `total` for the time of one job, for workers that are processes of
+    their own and share `root`. The slot is a lock on a file there. Yields its index, None
+    when every slot is taken or the system has no file locks."""
+    try:
+        import fcntl  # noqa: PLC0415
+    except ImportError:
+        yield None
+        return
+    root.mkdir(parents=True, exist_ok=True)
+    for k in range(total):
+        handle = (root / f"{k}.lock").open("w")
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            handle.close()
+            continue
+        try:
+            yield k
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+            handle.close()
+        return
+    yield None
 
 
 def work(
@@ -64,11 +99,18 @@ def work(
     """The function a worker runs, with everything it needs read from the environment. `gpu`
     is the only GPU the engine sees, all of the worker's GPUs when None. `slot` is the index of
     the slot of the local pool and the number of its slots, and gives the engine the cores of
-    that slot. Without it the engine has every core of the worker."""
+    that slot. An rq worker has no slot of its own and takes a free one for the job, so the
+    engines of the workers of one server share no core."""
     s = Settings.from_env()
     catalog = Catalog.load(s.data_dir)
+    request = JobRequest(**req_dict)  # type: ignore[arg-type]
+    if slot is None and s.queue == "rq":
+        with claim_slot(s.results_dir / ".slots", len(s.slots)) as k:
+            cores = slot_cores(server_cores(), k, len(s.slots), s.worker_cores) if k is not None else []
+            run_job(request, catalog, Path(job_dir), engine=engine or s.engine_cmd, env_extra=s.engine_env(gpu) or None, cores=cores or None)
+        return job_dir
     cores = slot_cores(server_cores(), slot[0], slot[1], s.worker_cores) if slot else []
-    run_job(JobRequest(**req_dict), catalog, Path(job_dir), engine=engine or s.engine_cmd, env_extra=s.engine_env(gpu) or None, cores=cores or None)  # type: ignore[arg-type]
+    run_job(request, catalog, Path(job_dir), engine=engine or s.engine_cmd, env_extra=s.engine_env(gpu) or None, cores=cores or None)
     return job_dir
 
 

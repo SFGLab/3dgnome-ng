@@ -30,7 +30,10 @@ services:
     command: ["rq", "worker", "gnome3d", "--url", "redis://redis:6379/0"]
     environment:
       QUEUE: rq
+      # The two worker groups below are the two cards. A worker counts the slots of the server from these.
+      GPUS: "${GPUS:-0,1}"
       WORKERS_PER_GPU: "${WORKERS_PER_GPU:-1}"
+      WORKER_CORES: "${WORKER_CORES:-}"
       GPU_POOL_GIB: "${GPU_POOL_GIB:-}"
       REDIS_URL: redis://redis:6379/0
       RETENTION_DAYS: "${RETENTION_DAYS:-14}"

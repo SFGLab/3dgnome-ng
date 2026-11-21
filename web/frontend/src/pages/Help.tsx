@@ -1,5 +1,16 @@
-import { BookOpen } from 'lucide-react'
+import { ArrowRight, BookOpen, Download } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import anchorsFile from '../assets/samples/anchors.bed?url'
+import contactsFile from '../assets/samples/contacts.bedpe?url'
+import ctcfFile from '../assets/samples/ctcf_loops.bedpe?url'
+import enhancersFile from '../assets/samples/enhancers.bed?url'
+import expressionFile from '../assets/samples/expression.tsv?url'
+import rnapiiFile from '../assets/samples/rnapii_loops.bedpe?url'
+import variantsFile from '../assets/samples/variants.vcf.gz?url'
 import { hidden } from '../flags'
+import { EXAMPLES as EXAMPLE_JOBS } from '../model/examples'
+import { useOpenExample } from '../model/useOpenExample'
+import { ROUTES } from '../routes'
 import '../styles/doc.css'
 import './help.css'
 
@@ -38,11 +49,50 @@ const SETTINGS = [
   ['hard_wall', 'no', 'yes', 'stops chains passing through each other'],
 ]
 
+/** The sample input files: the data of the TNFRSF8 example, chr1:11,500,000-12,600,000 in GM12878, as files to upload. */
+const SAMPLES: [string, string, string][] = [
+  ['anchors.bed', anchorsFile, 'the loop anchors with their CTCF motif orientation'],
+  ['ctcf_loops.bedpe', ctcfFile, '22 CTCF ChIA-PET loops'],
+  ['rnapii_loops.bedpe', rnapiiFile, '118 RNAPII ChIA-PET loops'],
+  ['contacts.bedpe', contactsFile, 'the Hi-C contacts of the region in 25 kb bins'],
+  ['enhancers.bed', enhancersFile, '58 enhancers'],
+  ['variants.vcf.gz', variantsFile, 'a deletion, an insertion and an inversion of one made up sample, as a format example'],
+  ['expression.tsv', expressionFile, 'read counts of the genes of chromosome 1, two replicates of GM12878 and two of H1ESC'],
+]
+
+/** The steps of the tutorial, on the TNFRSF8 example. */
+const STEPS = [
+  'Open Model a region. In step 1 choose GM12878 and type TNFRSF8 into the region field. The site finds the gene and proposes a region around it. The loops of the region are drawn under the field. Drag the box or its two edges to move the region or to change its length.',
+  'In step 2 choose CTCF and RNAPII. The structures then use both loop sets.',
+  'Leave step 3 at none. A call set with a sample there gives the structure of one haplotype of that person.',
+  'In step 4 keep the Hi-C of the cell type as the contact background.',
+  'Step 5 is optional. Choose the ENCODE RNA-seq of GM12878 to see the expression of each gene beside its distances.',
+  'In step 6 set the number of structures to 10 for a first look and press Build. The job page opens at once. It shows the stage of the job, the time each stage took and the place of the job in the queue. A job of this size takes about a minute.',
+  'On the finished job the Structure tab shows one structure of the ensemble. Type TNFRSF8 into Find a gene. Its promoter is marked A and its nearest enhancer B. A card beside the structure gives the distance from A to B over all structures.',
+  'The Genes tab lists every gene of the region with its nearest enhancer and their 3D distance. Sort it by a column or keep the genes that a loop joins to their enhancer.',
+  'The Contact map tab draws the contacts of the structures against the Hi-C map of the cell type and gives the agreement of the two.',
+  'Press Compare with another job and choose a job of the same region, for example one with CTCF loops alone. The two structures are drawn side by side. The tables and figures under them give the change of every gene.',
+  'Download all saves the structures as mmCIF files together with the tables of the job.',
+]
+
+/** The parts of a job page, each with the things it shows. */
+const GUIDE: [string, string][] = [
+  ['Side panel', 'The panel on the left has the state of the job and the time it took, its region, its loops, its variants, its contact background and its expression. The structure field chooses one structure of the ensemble. Medoid is the structure nearest to all the others, Most compact the one with the smallest radius of gyration and Random one picked by chance. The files of the job are listed under it. Rename job gives the job a name in your list. New job from this request opens the form filled with the request of this job.'],
+  ['Structure tab', 'The chain is drawn in 3D with promoters in orange and enhancers in green, or coloured by genomic position. Drag to turn it and scroll to zoom. A bead under the pointer shows its position. The loops of the region are drawn above the structure. A click on a loop marks its two anchors and the chain between them. Find a gene marks the promoter of a gene as A and its nearest enhancer as B, with their distance over all structures. Measure gives the distance between any two beads you click. The three buttons on the right reset the view, save it as a PNG and open it on the full screen.'],
+  ['Genes tab', 'Each row is a gene of the region with its nearest enhancer, their separation along the genome and their 3D distance, the mean over the structures in bead units. The last column draws the distances of the single structures, a line from the least to the greatest with a mark at the median. A job with expression has a column for the level of each gene. The buttons above the table keep the genes joined to their enhancer by a loop, or by an RNAPII loop alone. The card beside the table has the histogram of the distances and their median.'],
+  ['Contact map tab', 'The map has two halves, one above and one below the diagonal. By default the upper half is the Hi-C of the cell type and the lower half the contacts of the structures. Each half can also show the contacts within the median bond length, the HiCDiffusion prediction of a job that has one, or the loops. The map is drawn as observed contacts, as observed over expected, or as the Pearson correlation of its rows. Choose the bin size, zoom with the buttons or the scroll wheel and set the colour range in the card. The card Agreement of the two halves gives the Spearman correlation of bin pairs the same distance apart and the SCC. The camera button saves the map with its axes as a PNG.'],
+  ['Loops tab', 'Every loop the engine read is a row with its factor, its two anchors, its span and its PET count. Show in the model marks the loop on the structure.'],
+  ['Log tab', 'The log of the engine, with the fitted exponent of the distance law, the stages and their times.'],
+  ['Files', 'A job has one mmCIF file for each structure, the table ep.tsv with the enhancer of every gene and their distance, marks.json with the promoters and enhancers marked on the structures. The log of the engine is engine.log. A job with expression has expression.tsv, the samples it used. A job with a HiCDiffusion background has the predicted map as hicdiffusion.bedpe. Download all saves them in one zip file.'],
+  ['Comparison of two jobs', 'Compare with another job draws the structure of this job beside the structure of another job of your list or of a pasted job link. Under the structures the tables list the change of the enhancer to promoter distance of every gene, with the p of a Mann-Whitney U test over the structures of the two jobs. The Gene expression section above has the tables and figures of two jobs with expression.'],
+]
+
 const SECTIONS = [
+  ['tutorial', 'Tutorial'],
   ['formats', 'Input formats'],
   ['variants', 'Structural variants'],
   ['expression', 'Gene expression'],
-  ['reading', 'Reading the results'],
+  ['reading', 'Guide to the results'],
   ['questions', 'Questions'],
   ['running', 'Running gnome3d yourself'],
 ]
@@ -56,7 +106,31 @@ function QA({ q, a }: { q: string; a: string }) {
   )
 }
 
-/** Input formats, reading the results and running the engine yourself. */
+/** The finished jobs of the examples, as links: the sample output of the site. */
+function SampleOutput() {
+  const { open, busy, error } = useOpenExample()
+  return (
+    <>
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      )}
+      <ul className="sample-list" aria-label="Sample output">
+        {EXAMPLE_JOBS.map((e) => (
+          <li key={e.id}>
+            <button type="button" className="sample-link" disabled={!!busy} onClick={() => open(e)}>
+              {busy === e.id ? 'Opening the job' : e.title} <ArrowRight size={13} aria-hidden />
+            </button>
+            <span>{`${e.cellLabel}. ${e.description}.`}</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  )
+}
+
+/** A tutorial, the input formats with sample files, the guide to the results and running the engine yourself. */
 export function Help() {
   const trios = !hidden('trios')
   return (
@@ -72,8 +146,31 @@ export function Help() {
       <div className="reading">
         <header className="page-head">
           <h1>Help</h1>
-          <p className="lead">This page covers your own data, the results and running the engine on your own computer.</p>
+          <p className="lead">This page has a tutorial with sample output, the input formats with sample files, a guide to the results and the way to run the engine on your own computer.</p>
         </header>
+
+        <section id="tutorial">
+          <h2>Tutorial</h2>
+          <p className="intro">
+            The tutorial builds the TNFRSF8 example from the form to the comparison of two jobs. Each step says what to choose. The two links open the form with the example filled in and the finished jobs of the example.
+          </p>
+          <p className="tutorial-links">
+            <Link className="sample-link" to={`${ROUTES.model}?example=TNFRSF8`}>
+              The form with the example filled in <ArrowRight size={13} aria-hidden />
+            </Link>
+            <Link className="sample-link" to={ROUTES.examples}>
+              All examples <ArrowRight size={13} aria-hidden />
+            </Link>
+          </p>
+          <ol className="steps">
+            {STEPS.map((s) => (
+              <li key={s}>{s}</li>
+            ))}
+          </ol>
+          <h3 className="example-head">Sample output</h3>
+          <p>Each link opens a finished job of the site with every tab of its results. An example that nobody has opened before runs first, which takes about a minute.</p>
+          <SampleOutput />
+        </section>
 
         <section id="formats">
           <h2>Input formats</h2>
@@ -113,6 +210,21 @@ export function Help() {
           <p>
             To convert a .mcool map yourself, run prep_singletons.py from the 3D-GNOMEᴺᴳ repository. It writes intra chromosomal bin pairs at a chosen bin size and can thin a deep map.
           </p>
+          <h3 className="example-head">Sample files</h3>
+          <p>
+            The files hold the data of the TNFRSF8 example, chr1:11,500,000-12,600,000 in GM12878. Enter that region in the form and upload the files in Your own data to repeat the example from your own files. The loops and the
+            anchors are 4DN and ENCODE ChIA-PET, the contacts 4DN Hi-C, the enhancers EnhancerAtlas 2.0 and the read counts ENCODE RNA-seq. The Cite page has their accessions.
+          </p>
+          <ul className="sample-list" aria-label="Sample files">
+            {SAMPLES.map(([name, url, about]) => (
+              <li key={name}>
+                <a className="sample-link mono" href={url} download={name}>
+                  <Download size={13} aria-hidden /> {name}
+                </a>
+                <span>{about}</span>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section id="variants">
@@ -168,7 +280,11 @@ export function Help() {
         </section>
 
         <section id="reading">
-          <h2>Reading the results</h2>
+          <h2>Guide to the results</h2>
+          <p className="intro">A finished job has a side panel and five tabs. The guide goes through them in the order of the page, then the files and the comparison of two jobs.</p>
+          {GUIDE.map(([q, a]) => (
+            <QA key={q} q={q} a={a} />
+          ))}
           <QA q="Bead unit" a="One bead unit is the target distance between two beads 1 kb apart, which is also the bond length. You can compare distances within a job and between jobs of one cell type." />
           <QA q="Saving tables and figures" a="The CSV button beside a table saves all of its rows, also those on its other pages. The PNG button of a figure of the comparison saves the figure with its title. The camera button saves the view of a structure or the contact map as a PNG." />
           <QA q="Expression column" a="A job with gene expression shows one level for each gene in the Genes tab, the mean over its samples. A gene that the expression table lacks has an empty cell." />

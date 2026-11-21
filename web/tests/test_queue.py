@@ -18,6 +18,8 @@ from fixture import make_data
 
 from gnome3d_web.jobs import JobRequest, on_cores
 from gnome3d_web.queue import LocalPool, resume_interrupted, server_cores, slot_cores
+from gnome3d_web import settings
+from gnome3d_web.queue import claim_slot
 from gnome3d_web.settings import Settings, SettingsError
 
 FAKE = [sys.executable, str(Path(__file__).resolve().parent / "fake_engine.py")]
@@ -120,6 +122,17 @@ def test_each_slot_has_its_share_of_the_cores() -> None:
     # Three slots of 24 cores on 36: the second slot starts at core 24 and goes on from core 0.
     assert slot_cores(cores, 1, 3, 24) == [*range(12), *range(24, 36)], "sets that do not fit beside each other overlap: " + str(slot_cores(cores, 1, 3, 24))
     assert slot_cores([0], 3, 4) == [0] and slot_cores([], 0, 2) == [], "one core serves every slot and no cores is no pinning"
+    # Eight slots on 36 cores: the division leaves four cores, one more for each of the first four slots.
+    eight = [slot_cores(cores, i, 8) for i in range(8)]
+    assert [len(c) for c in eight] == [5, 5, 5, 5, 4, 4, 4, 4] and sorted(c for s in eight for c in s) == cores, "no core is left without a slot and none is in two: " + str([len(c) for c in eight])
+
+
+def test_workers_that_are_processes_of_their_own_take_a_free_slot_each(tmp_path: Path) -> None:
+    with claim_slot(tmp_path / "slots", 2) as first, claim_slot(tmp_path / "slots", 2) as second, claim_slot(tmp_path / "slots", 2) as third:
+        assert (first, second) == (0, 1), "two jobs at once take the two slots: " + str((first, second))
+        assert third is None, "a job beyond the slots of the server has none"
+    with claim_slot(tmp_path / "slots", 2) as again:
+        assert again == 0, "a slot is free again after its job"
 
 
 WORKER_VARIABLES = ("GPUS", "WORKERS_PER_GPU", "WORKER_CORES", "GPU_POOL_GIB", "GPU_SLOTS", "GNOME3D_GPU_POOL_GIB", "XLA_PYTHON_CLIENT_MEM_FRACTION")
@@ -136,7 +149,17 @@ def test_the_workers_of_the_site_are_four_variables_of_the_environment(monkeypat
     monkeypatch.setenv("WORKERS_PER_GPU", "2")
     four = Settings.from_env()
     assert four.slots == ["0", "1", "0", "1"], "two cards with two workers each are four jobs at once, the first two on a card each"
-    assert four.engine_env("1") == {"CUDA_VISIBLE_DEVICES": "1", "XLA_PYTHON_CLIENT_MEM_FRACTION": "0.3750"}, "two jobs on a card halve the pool JAX takes: " + str(four.engine_env("1"))
+    # With the size of the card each engine keeps 0.5 GiB beside its pool and the pools take nine tenths of the rest.
+    monkeypatch.setattr(settings, "card_gib", lambda gpu: 8.0)
+    assert four.engine_env("1") == {"CUDA_VISIBLE_DEVICES": "1", "GNOME3D_GPU_POOL_GIB": "3.15"}, "two jobs on a card of 8 GiB have 3.15 GiB each: " + str(four.engine_env("1"))
+    monkeypatch.setenv("WORKERS_PER_GPU", "4")
+    eight = Settings.from_env()
+    pool = float(eight.engine_env("0")["GNOME3D_GPU_POOL_GIB"])
+    assert pool == 1.35 and 4 * (pool + 0.5) < 8.0, "four engines with their pools fit a card of 8 GiB: " + str(pool)
+    monkeypatch.setenv("WORKERS_PER_GPU", "2")
+    # A card of unknown size: the share of JAX is divided.
+    monkeypatch.setattr(settings, "card_gib", lambda gpu: None)
+    assert four.engine_env("1") == {"CUDA_VISIBLE_DEVICES": "1", "XLA_PYTHON_CLIENT_MEM_FRACTION": "0.3750"}, "without the size of the card two jobs halve the pool JAX takes: " + str(four.engine_env("1"))
     monkeypatch.setenv("GPU_POOL_GIB", "1.5")
     monkeypatch.setenv("WORKER_CORES", "6")
     set_ = Settings.from_env()

@@ -27,23 +27,27 @@ Four variables set how many jobs run at once and what each job gets. `Settings` 
 | `GPUS` | `0` | the cards the jobs run on, their ids separated by commas |
 | `WORKERS_PER_GPU` | 1 | the jobs at once on one card. The site runs the number of cards times this number of jobs at once |
 | `WORKER_CORES` | the cores of the server divided by the jobs at once | the cores the engine of one job runs on |
-| `GPU_POOL_GIB` | 0.75 of a card divided by `WORKERS_PER_GPU` | the GPU memory pool of the engine of one job, in GiB |
+| `GPU_POOL_GIB` | from the size of the card, see below | the GPU memory pool of the engine of one job, in GiB |
 
 A server with two cards and 36 cores runs four jobs at once with `GPUS=0,1` and
-`WORKERS_PER_GPU=2`. Each job then has 9 cores and a pool of 0.375 of its card. JAX takes 0.75
-of a card for one process, and the default pool divides that share between the workers of the
-card. Each engine needs about 0.5 GiB beside its pool for its CUDA context.
+`WORKERS_PER_GPU=2`. Each job then has 9 cores. One worker on a card keeps the pool JAX takes,
+0.75 of the card. For more workers the site reads the size of the card with nvidia-smi, leaves
+each engine 0.5 GiB beside its pool for its CUDA context and divides nine tenths of the rest
+between the workers: 3.15 GiB each for two workers on a card of 8 GiB and 1.35 GiB each for
+four. Without nvidia-smi the share of JAX is divided by the workers.
 
 The `thread` queue has one slot for each job at once. The first slots go to one card each, the
 order of the slots of two cards with two workers is 0, 1, 0, 1. Each slot has a set of cores of
 its own, the next `WORKER_CORES` cores of the server, and the engine of its job is started on
-that set. An engine takes as many threads as it has cores. Two jobs at once share no core. A
-count above the share of a job makes the sets overlap, and the number of cores of the server
-gives every job all of them.
+that set. An engine takes as many threads as it has cores. Two jobs at once share no core. Where the
+cores do not divide evenly the first slots get one core more: eight slots on 36 cores are four
+of 5 cores and four of 4. A count above the share of a job makes the sets overlap, and the
+number of cores of the server gives every job all of them.
 
 With the `rq` queue a worker is one slot. docker-compose.yml starts `WORKERS_PER_GPU` workers on
-each card and a worker has the card of its container. `WORKER_CORES` is not applied there. A
-worker runs on every core its container has.
+each card and a worker has the card of its container. A worker takes a free slot for each job,
+a lock on a file under `RESULTS_DIR/.slots`, and its engine runs on the cores of that slot. The
+workers of one server then share no core either.
 
 A change of these variables needs a restart of the site. The site does not start on a value it
 cannot use, and it does not start with `GPU_SLOTS`, the variable these replace.

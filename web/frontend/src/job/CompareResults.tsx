@@ -381,6 +381,9 @@ export function CompareResults({
             />
           )}
         </div>
+        {cmp.shared && gene && !row && (
+          <p className="compare-note">{`${gene} has no enhancer that both jobs have. It is not in this comparison and is not marked in the structures.`}</p>
+        )}
         {(cmp.shared || (cmp.differ ?? 0) > 0) && (
           <p className="compare-note">
             {cmp.shared

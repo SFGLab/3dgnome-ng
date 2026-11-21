@@ -54,3 +54,67 @@
   font-size: 12px;
   text-decoration: none;
 }
+
+/* The steps of the tutorial, numbered. */
+.steps {
+  margin: 0 0 6px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.tutorial-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0 0 12px;
+}
+
+/* A list of links, each with a line on what it opens or holds. */
+.sample-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.sample-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.sample-list span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.sample-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: 500 14px var(--font);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.sample-link.mono {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.sample-link:disabled {
+  color: var(--muted);
+  cursor: default;
+}

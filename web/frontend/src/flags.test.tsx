@@ -60,7 +60,11 @@ describe('the parts the server hides', () => {
     )
     expect(cite.container.textContent).toMatch(/PRJEB11271/)
     cite.unmount()
-    const help = render(<Help />)
+    const help = render(
+      <MemoryRouter>
+        <Help />
+      </MemoryRouter>,
+    )
     expect(help.container.textContent).toMatch(/The server holds four sets\..*nine people of three 1000 Genomes trios/)
     help.unmount()
     hide('trios')
@@ -72,7 +76,11 @@ describe('the parts the server hides', () => {
     expect(hiddenCite.container.textContent).not.toMatch(/PRJEB11271|nine people/i)
     expect(hiddenCite.container.textContent).toMatch(/MAGE, 731 people/)
     hiddenCite.unmount()
-    const hiddenHelp = render(<Help />)
+    const hiddenHelp = render(
+      <MemoryRouter>
+        <Help />
+      </MemoryRouter>,
+    )
     expect(hiddenHelp.container.textContent).toMatch(/The server holds three sets\./)
     expect(hiddenHelp.container.textContent).not.toMatch(/trios/i)
   })

@@ -13,6 +13,7 @@ import json
 import re
 import time
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
@@ -626,7 +627,7 @@ def _volcano(table: dict[str, list[float | None]]) -> dict[str, object] | None:
     return {"fold": VOLCANO_FOLD, "p": VOLCANO_P, "points": sorted(cells)} if cells else None
 
 
-def compare_expression(a: Path, b: Path, cache: Path, shared: bool = False) -> dict[str, object]:
+def compare_expression(a: Path, b: Path, cache: Path, shared: bool = False, names: Callable[[], dict[str, str]] | None = None) -> dict[str, object]:
     """The expression of job b against job a for the genes both jobs have, beside the change of
     their enhancer to promoter distance.
 
@@ -637,7 +638,7 @@ def compare_expression(a: Path, b: Path, cache: Path, shared: bool = False) -> d
     of `expression.contrast`.
     The distances are those of `compare` with the same `shared`.
     """
-    c = expression.contrast(a, b, cache)
+    c = expression.contrast(a, b, cache, names)
     table = c.pop("genes", None)
     if not table:
         return {**c, "rows": [], "rho": None, "volcano": None}

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { rememberJob } from '../model/recent'
 import { mockApi } from '../test/api'
@@ -327,6 +327,34 @@ describe('Compare', () => {
     expect(await screen.findByText('Each gene is measured to its nearest enhancer among the 12 that both jobs have.')).toBeInTheDocument()
     expect(await within(screen.getByRole('table', { name: 'Changes in enhancer to promoter distance' })).findByText('TNFRSF8, enhancer 20 kb away')).toBeInTheDocument()
     expect(f.mock.calls.some(([u]) => String(u).includes('/api/compare/gene') && String(u).includes('shared=1'))).toBe(true)
+    expect(checkCopy(container)).toEqual([])
+  })
+
+  it('does not mark a gene that has no enhancer both jobs have', async () => {
+    const h1 = { ...SUMMARY_DONE, request: { ...SUMMARY_DONE.request, cell_type: 'H1ESC' } }
+    const row = { gene: 'MIIP', linear_bp: 1000, linear_bp_b: 1000, enhancer_bead_a: 3, enhancer_bead_b: 3, a: { mean: 2, sd: 0.5 }, b: { mean: 3, sd: 0.5 }, ratio: 1.5, p: 0.2 }
+    mockApi([
+      [new RegExp(`${OTHER}/summary$`), () => [200, h1]],
+      [/summary$/, () => [200, SUMMARY_DONE]],
+      [/structure\/\d+$/, () => [200, STRUCTURE]],
+      [/annotations$/, () => [200, ANNOTATIONS]],
+      [/genes$/, () => [200, GENES]],
+      [/\/api\/compare\/gene$/, () => [404, { error: 'TNFRSF8 is not a gene of both jobs' }]],
+      [/\/api\/compare$/, (u) => [200, { same_region: true, differ: 0, shared: u.searchParams.get('shared') === '1', shared_enhancers: 5, rows: [row] }]],
+    ])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene="TNFRSF8" initial={`/jobs/${OTHER}`} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    // With each job's own enhancer the gene is marked from the gene table of each job.
+    await screen.findByRole('table', { name: 'Changes in enhancer to promoter distance' })
+    await waitFor(() => expect(screen.getAllByTestId('scene').map((s) => s.textContent)).toEqual(['AB', 'AB']))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Enhancers of both jobs only' }))
+    expect(await screen.findByText('TNFRSF8 has no enhancer that both jobs have. It is not in this comparison and is not marked in the structures.')).toBeInTheDocument()
+    expect(screen.getAllByTestId('scene').map((s) => s.textContent)).toEqual(['', ''])
+    expect(document.querySelectorAll('.ab-label')).toHaveLength(0)
     expect(checkCopy(container)).toEqual([])
   })
 

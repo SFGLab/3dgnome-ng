@@ -9,8 +9,9 @@ WORKERS_PER_GPU  the jobs that run at once on one card, default 1. The site runs
               cards times this number of jobs at once
 WORKER_CORES  the cores the engine of one job runs on, default the cores of the server divided
               by the jobs at once. The "thread" queue gives each job a set of its own
-GPU_POOL_GIB  the GPU memory pool of the engine of one job, in GiB. Default the share of a card
-              that JAX takes, 0.75, divided by WORKERS_PER_GPU
+GPU_POOL_GIB  the GPU memory pool of the engine of one job, in GiB. One worker on a card keeps the
+              pool JAX takes. For more the default leaves each engine 0.5 GiB beside its pool and
+              divides nine tenths of the rest of the card between the workers
 ENGINE_CMD    the command that starts the engine, default ENGINE_PYTHON -m gnome3d.cli
 RETENTION_DAYS  how long a private job is kept, default 14
 MAX_REGION_MB   the longest region the form accepts, in Mb, default 20. limits.region_mb of the
@@ -32,14 +33,33 @@ HICDIFFUSION_DIR, HICDIFFUSION_PYTHON, HICDIFFUSION_MODELS, REFERENCE_FASTA  the
 
 from __future__ import annotations
 
+import functools
 import os
 import shlex
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 
 # The share of a card that JAX preallocates for one process.
 JAX_POOL_SHARE = 0.75
+# The memory an engine needs on its card beside its pool, for the CUDA context and the
+# workspaces of the libraries, in GiB. gnome3d.mc.jax.share keeps the same amount free.
+ENGINE_RESERVE_GIB = 0.5
+# The part of the card left after the reserves that the pools of its workers take.
+POOL_SHARE = 0.9
+
+
+@functools.cache
+def card_gib(gpu: str | None) -> float | None:
+    """The memory of a card in GiB, of the smallest card of this process for None, from
+    nvidia-smi. None on a machine without it."""
+    cmd = ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits", *(["-i", gpu] if gpu is not None else [])]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=20, check=True).stdout
+        return min(float(line) for line in out.split()) / 1024
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
 
 
 class SettingsError(ValueError):
@@ -99,7 +119,13 @@ class Settings:
         if self.gpu_pool_gib is not None:
             env["GNOME3D_GPU_POOL_GIB"] = f"{self.gpu_pool_gib:g}"
         elif self.workers_per_gpu > 1:
-            env["XLA_PYTHON_CLIENT_MEM_FRACTION"] = f"{JAX_POOL_SHARE / self.workers_per_gpu:.4f}"
+            n, card = self.workers_per_gpu, card_gib(gpu)
+            pool = POOL_SHARE * (card - n * ENGINE_RESERVE_GIB) / n if card else 0.0
+            if pool >= 1:
+                env["GNOME3D_GPU_POOL_GIB"] = f"{pool:.2f}"
+            else:
+                # A card of unknown size, or one too small for a pool of 1 GiB each: the share of JAX is divided.
+                env["XLA_PYTHON_CLIENT_MEM_FRACTION"] = f"{JAX_POOL_SHARE / n:.4f}"
         return env
 
     @classmethod

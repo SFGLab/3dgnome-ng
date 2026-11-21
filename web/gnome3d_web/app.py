@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import gzip
 import io
 import json
@@ -664,6 +665,12 @@ def create_app() -> FastAPI:
             dirs.append(job_dir(m[1], m[2]))
         return JSONResponse(explore.compare(dirs[0], dirs[1], shared == 1))
 
+    @functools.cache
+    def names_by_id() -> dict[str, str]:
+        """The name of each gene by its Ensembl id without the version, from the gene table of the first cell type."""
+        g = next(iter(catalog.cell_types.values())).genes()
+        return dict(zip(g["gene_id"].astype(str).str.replace(r"\.\d+$", "", regex=True), g["name"].astype(str), strict=True))
+
     @app.get("/api/compare/gene")
     def api_compare_gene(a: str, b: str, gene: str, shared: int = 0) -> JSONResponse:
         """The distances of one gene in the structures of two jobs."""
@@ -684,7 +691,7 @@ def create_app() -> FastAPI:
             if not m:
                 raise HTTPException(404)
             dirs.append(job_dir(m[1], m[2]))
-        return JSONResponse(explore.compare_expression(dirs[0], dirs[1], s.results_dir / "expression", shared == 1))
+        return JSONResponse(explore.compare_expression(dirs[0], dirs[1], s.results_dir / "expression", shared == 1, names_by_id))
 
     shared_lists = lists.Lists(s.results_dir / "lists")
     BAD_CODE = "A sync code has 16 letters and digits, like K7M2-9QXD-4THP-W3RZ."
@@ -729,6 +736,23 @@ def create_app() -> FastAPI:
     if (s.frontend_dist / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=s.frontend_dist / "assets"), name="assets")
 
+    # The pages of the app. Any other address gets the app too, which shows its page of a missing address.
+    PAGES = {"", "model", "jobs", "examples", "method", "results", "help", "cite", "privacy"}
+
+    def known(path: str) -> bool:
+        """Whether an address is a page of the app or the page of a job the site has."""
+        path = path.strip("/")
+        if path in PAGES:
+            return True
+        m = re.fullmatch(r"(jobs|p)/([^/]+)", path)
+        if not m:
+            return False
+        try:
+            job_dir(m[1], m[2])
+        except HTTPException:
+            return False
+        return True
+
     # Registered last: every path no route above answers is a client route of the frontend.
     @app.get("/{path:path}", response_class=HTMLResponse, include_in_schema=False)
     def frontend(path: str) -> HTMLResponse:
@@ -752,6 +776,7 @@ def create_app() -> FastAPI:
             html = html.replace("<head>", f'<head><meta name="site-hide" content="{",".join(off)}">', 1)
         # The page names its scripts by their hash. A browser asks for the page anew each time. A
         # new deployment is seen on the next load.
-        return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
+        # An address the site does not have is answered with the app and the status 404.
+        return HTMLResponse(html, 200 if known(path) else 404, headers={"Cache-Control": "no-cache"})
 
     return app
