@@ -9,12 +9,14 @@ settings, since batch grouping selects which chain gets which RNG stream.
 Without `--uniform` the run reads `data/GM12878/config.ini` of the tree and the files it lists,
 which git tracks. A worktree holds them.
 
-With `--uniform` the run is the production config of GM12878 with `uniform_chain`,
-`squeeze_constant` 1.0 and `loop_dropout`, two structures. It reads the data folder `data/` of
-the directory the script is started in, as an absolute path, for every tree. A worktree has its
-own `data/` with the tracked files alone, without the Hi-C singletons, and a run on it fits
-another exponent. Start both runs in the checkout that holds the data. The line `polymer law`
-of the two logs must be the same.
+With `--uniform` the run is the production config of the uniform chain for GM12878,
+`settings_for_cell("GM12878", uniform=True)`, two structures. It reads the data folder `data/` of
+the directory the script is started in, as an absolute path, for every tree, with the contact
+map of `data/_hic/GM12878/`. A worktree has its own `data/` with the tracked files alone, without
+the Hi-C singletons, and a run on it fits another exponent. Start both runs in the checkout that
+holds the data. The line `polymer law` of the two logs must be the same. The two trees run the
+config of their own `gnome3d/production.py`: a commit that changes `UNIFORM_CHAIN` moves the
+dump, and its gate is run with the keys of the commit before as `overrides`.
 """
 
 import os
@@ -41,11 +43,7 @@ if uniform:
     from gnome3d.production import settings_for_cell  # noqa: E402
     from gnome3d.simulate import simulate  # noqa: E402
 
-    overrides = {
-        "main": {"uniform_chain": "yes"},
-        "springs": {"squeeze_constant": "1.0", "loop_dropout": "yes"},
-    }
-    s = settings_for_cell("GM12878", data_root=data_root, overrides=overrides)
+    s = settings_for_cell("GM12878", data_root=data_root, uniform=True)
     log.setup(s.output_level)
     bed = parse_region(region)
     assert bed is not None, region

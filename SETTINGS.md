@@ -14,12 +14,17 @@ The measurements behind a production value are in `design/features.md`.
 
 `gnome3d.production.CANONICAL_UNIFORM` is the production config of the uniform chain. It is `CANONICAL` with the
 keys below, `gnome3d.production.UNIFORM_CHAIN`. No key sets the value of another: a value that the uniform chain
-needs is a row here. `settings_for_cell(cell, uniform=True)` builds the settings from it.
+needs is a row here. `settings_for_cell(cell, uniform=True)` builds the settings from it, with the largest mcool of
+`<data_root>/_hic/<cell>/` as `[data] contact_map`. Without that file the nodes read no contact cells, with a line in
+the log.
 
 | key | value | measurement |
 |---|---|---|
 | `[main] uniform_chain` | yes | The chain itself. |
 | `[springs] squeeze_constant` | 1.0 | At 0.1 a bond gives way and 33 pairs of beads per thousand are closer than 0.7 of a bond. At 1.0 there are 8, at the same pooled scores. |
+| `[springs] contact_background_z` | 3 | The threshold of the contact cells of `[data] contact_map` at `contact_resolution`, 5 kb. At 2 the pooled SCC is 0.02 higher and Spearman 0.05 lower, on 18 rows of twenty structures. |
+| `[springs] loop_dropout` | yes | 0.046 of raw and 0.035 of balanced pooled SCC over every loop in every conformation. |
+| `[excluded_volume] arcs_chain_radius` | sum | Under the dropout the ends of a region overlap in 39 structures of 360. With the radius of a node from its chain they overlap in 18, Spearman is 0.033 higher and SCC does not change. |
 
 ## [main]
 
@@ -108,8 +113,6 @@ squeeze constant for a pair that is too close.
 | `use_contact_background` | bool | no | yes | Holds a pair without a loop beyond `background_range_bp` at the contact distance of the law, with the same spring, when its contact cell puts it closer than the background. A pair at or below its expected contact gets no spring. Needs `use_anchor_heatmap`. |
 | `contact_background_z` | float | 0.0 | 0.0 | Above zero, the contact background holds a pair without a loop when its count is this many Poisson deviations above or below its expectation and the expectation is above this value squared. The target is `background * ((count + 0.5) / (expected + 0.5)) ^ (-1/3)`, clipped to one bead and to `distance_heatmap_stretching` backgrounds. Zero keeps the rule of `use_contact_background`. |
 | `contact_resolution` | int | 5000 | 5000 | The bin of `[data] contact_map`, in bp, that a pair of nodes of a uniform chain reads. A multi resolution file without that resolution is read at the finest one it holds over it, with a line in the log. The expectation of a cell is the mean count at its separation times the bias of its two bins, the inverse of the balancing weights of the map. A map without weights has a bias of one, with a line in the log. |
-| `contact_resolution_max` | int | 0 | 0 | Above `contact_resolution`, a pair of nodes whose cell has too low an expectation for the test is read at the next coarser resolution of 2, 5, 10, 25, 50 and 100 kb, up to this one. A pair is then read at the finest resolution that can test it. 0 reads `contact_resolution` alone. Under measurement. |
-| `contact_side` | str | both | both | The side of its expectation on which a contact cell holds its pair. `both` holds a pair closer for a count over the expectation and further for a count under it. `over` holds a pair closer for a count over the expectation and does not read a count under it. Under measurement, `design/uniform-chain.md`. |
 | `stretch_constant_ib` | float | 0.1 | 0.1 | Bond between blocks in block placement, too far. |
 | `squeeze_constant_ib` | float | 0.1 | 0.1 | Bond between blocks in block placement, too close. |
 

@@ -33,7 +33,7 @@ Every row is the maintainer's decision.
 | The order of the build | Three stages with an arms trial after each |
 | The centre of mass that the smooth stage keeps | That of a node, the bead before it and the bead after it |
 | The exceptions of that rule and the reach of the bond limit, both the assistant's | Kept as built |
-| The resolution of the contact cells | The ladder is rewritten: a cell holds a pair closer and does not push, and the gyration term holds the long range. Section "Rewrite of the ladder". The pseudo count and the bound estimate are deleted |
+| The resolution of the contact cells | 5 kb alone, with both sides. The ladder is deleted, in its first form and as rewritten: the first expands the region and the second scores under the cells at 5 kb. Locked on 2026-11-21 |
 | The draw of the contact bead | Both draws stay as arms |
 | The rule of the smooth stage for a node | Decided after the trial of the rules |
 | Room for the free chain | Gyration windows under 100 kb first, blobs for the free chain when that does not work |
@@ -59,7 +59,7 @@ Every row is the maintainer's decision, after the trials of the night.
 | The subanchor heatmap | Off, as in production |
 | The expectation of a contact cell | The mean count at the separation times the bias of the two bins, from the balancing weights of the map. It is the one derivation of the expectation and has no key, by the maintainer's word of 2026-11-21 |
 | A map without the resolution of the cells | Read at the finest resolution it holds over the one asked, with a line in the log |
-| The resolution of the contact cells | Decided again after the radius rule, 5 kb against the ladder |
+| The resolution of the contact cells | 5 kb alone, with both sides. The ladder is deleted, in its first form and as rewritten: the first expands the region and the second scores under the cells at 5 kb. Locked on 2026-11-21 |
 | `loop_dropout` | On, with the radius of a node from its chain |
 | `contact_background_z` | 3 |
 | The three bead move in the JAX kernel | Not yet |
@@ -1472,6 +1472,34 @@ that each band holds:
 - Beyond 1 Mb the default chain and the cells at 5 kb have no correlation with Hi-C, 0.00 to 0.04. The ladder
   with both sides has 0.17 between 1 and 2 Mb. The ladder that reads the cells over their expectation alone
   has none. The structure beyond 1 Mb came with the cells under their expectation.
+
+## The config locked on 2026-11-21
+
+`gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:
+
+| part | rule | key |
+|---|---|---|
+| the chain | one bead per kilobase, nodes at the loop ends, the centre of mass rule | `[main] uniform_chain` |
+| the bonds | squeeze as stiff as stretch | `[springs] squeeze_constant` 1.0 |
+| the contact cells | one resolution, 5 kb or the finest the map holds over it. A cell over its expectation holds its pair closer and a cell under it further. The expectation is the mean at the separation times the bias of the two bins from the balancing weights of the map | `[data] contact_map`, `[springs] contact_resolution` |
+| the threshold of a cell | 3 Poisson deviations | `[springs] contact_background_z` 3 |
+| the loops of a conformation | each kept by its strength | `[springs] loop_dropout` |
+| the excluded volume of the arcs stage | the derived radius, from every loop of the chromosome, times the mean of the factors of the two nodes from the chain each stands for | `[excluded_volume] arcs_chain_radius` sum |
+
+On 18 rows of twenty structures, on counts the run did not read, against the default chain: 0.335 and 0.360 of
+raw and balanced SCC per bead pair at 25 kb against 0.204 and 0.268, +0.131 ± 0.016 and +0.092 ± 0.017, on 18 and
+15 rows of 18. Spearman 0.564 against 0.532, on 17 rows. Balanced Pearson 0.721 against 0.705. 1.4 close pairs
+per thousand beads against 11.5. The exponent of the decay over that of Hi-C is 1.06 against 1.04. The ends of a
+region overlap in 18 structures of 360 against 12. No structure has a stretched piece.
+
+Measured and deleted: the ladder of resolutions with both sides and with the cells over their expectation alone,
+the pseudo count and the bound estimate of a cell, the cap of the radius of a pair by the chain and by the target,
+the product form of the radius from the chain, the midpoint draw, the fixed node, the bond limit of the
+orientation term. Each has its trial above.
+
+Open: no arm has a correlation with Hi-C beyond 1 Mb, and the two halves of a Hi-C map have 0.66 between 1 and
+2 Mb at 25 kb and 0.86 at 100 kb. The three bead move is not in the JAX kernel and the batch executor refuses the
+smooth stage of the uniform chain. The site has no control for the chain.
 
 ## Settings
 

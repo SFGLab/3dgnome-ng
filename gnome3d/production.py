@@ -178,9 +178,19 @@ CANONICAL: dict[str, dict[str, object]] = {
 # The keys of the production configuration of the uniform chain that differ from `CANONICAL`.
 UNIFORM_CHAIN: dict[str, dict[str, object]] = {
     "main": {"uniform_chain": "yes"},
-    # At 0.1 a bond gives way and 33 pairs of beads per thousand are closer than 0.7 of a bond. At
-    # 1.0 there are 8, design/uniform-chain.md.
-    "springs": {"squeeze_constant": 1.0},
+    "springs": {
+        # At 0.1 a bond gives way and 33 pairs of beads per thousand are closer than 0.7 of a
+        # bond. At 1.0 there are 8, design/uniform-chain.md.
+        "squeeze_constant": 1.0,
+        # The threshold of the contact cells. At 2 the pooled SCC is 0.02 higher and Spearman
+        # 0.05 lower.
+        "contact_background_z": 3,
+        # 0.046 of raw and 0.035 of balanced SCC over every loop in every conformation.
+        "loop_dropout": "yes",
+    },
+    # Under the dropout fewer nodes stand for more chain each. The radius of a node from its
+    # chain keeps the ends of a region apart, 18 structures of 360 against 39.
+    "excluded_volume": {"arcs_chain_radius": "sum"},
 }
 
 
@@ -218,6 +228,14 @@ def cell_data_section(cell: str, data_root: str = "data") -> dict[str, object]:
     }
 
 
+def cell_contact_map(cell: str, data_root: str = "data") -> str:
+    """Returns the cooler URI of the contact map of a cell line, the largest mcool of
+    `<data_root>/_hic/<cell>/`, or an empty string without one.
+    """
+    maps = sorted((Path(data_root) / "_hic" / cell).glob("*.mcool"), key=lambda f: f.stat().st_size)
+    return f"{maps[-1].resolve()}::/resolutions/1000" if maps else ""
+
+
 def settings_for_cell(
     cell: str,
     data_root: str = "data",
@@ -230,10 +248,13 @@ def settings_for_cell(
 
     `quality` is fast, balanced or full and sets the `stop_condition_steps` of each stage. None is
     full. `overrides` is merged on top as {section: {key: value}}. `uniform` takes
-    `CANONICAL_UNIFORM`, the configuration of the uniform chain, in place of `CANONICAL`.
+    `CANONICAL_UNIFORM`, the configuration of the uniform chain, in place of `CANONICAL`, with
+    the contact map of the cell line, whose cells the nodes of the uniform chain read.
     """
     params = copy.deepcopy(CANONICAL_UNIFORM if uniform else CANONICAL)
     params["data"] = cell_data_section(cell, data_root)
+    if uniform:
+        params["data"]["contact_map"] = cell_contact_map(cell, data_root)
 
     if quality and quality in _QUALITY_STEPS and quality != "full":
         steps = _QUALITY_STEPS[quality]

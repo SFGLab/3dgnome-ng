@@ -158,7 +158,6 @@ def hold_by_cells(
     mapped: BoolArray,
     law: PolymerLaw,
     s: Settings,
-    tested: BoolArray | None = None,
     resolution: int = 0,
     node_bias: F64Array | None = None,
 ) -> F64Array:
@@ -173,15 +172,8 @@ def hold_by_cells(
 
     The expectation of a cell is `expected` at its offset, times `node_bias` of its two nodes when
     that is given.
-
-    Under `[springs] contact_side = over` a cell under its expectation holds no pair.
-
-    `tested` marks the pairs whose cell had an expectation above z squared at a finer resolution.
-    Such a pair is left as it is and the pairs that this resolution can test are added to the
-    marks. A pair is then read at the finest resolution that can test it.
     """
     z_cut = float(s.contact_background_z)
-    over_alone = s.contact_side == "over"
     s0 = max(int(law.s0_bp), 1)
     stretch = float(s.heatmap_distance_stretching)
     pos = mids.astype(np.float64)
@@ -201,10 +193,7 @@ def hold_by_cells(
         testable = (
             (mat[ii, jj] < 0.0) & (off >= 1) & mapped[ii] & mapped[jj] & (exp > z_cut * z_cut)
         )
-        if tested is not None:
-            testable &= ~tested[ii, jj]
-            tested[ii[testable], jj[testable]] = True
-        sel = testable & ((z > z_cut) if over_alone else (np.abs(z) > z_cut))
+        sel = testable & (np.abs(z) > z_cut)
         if not sel.any():
             continue
         sep = np.abs(pos[jj[sel]] - pos[ii[sel]])

@@ -14,7 +14,13 @@ import ast
 import re
 from pathlib import Path
 
-from gnome3d.production import CANONICAL, CANONICAL_UNIFORM, UNIFORM_CHAIN, settings_for_cell
+from gnome3d.production import (
+    CANONICAL,
+    CANONICAL_UNIFORM,
+    UNIFORM_CHAIN,
+    cell_contact_map,
+    settings_for_cell,
+)
 from gnome3d.settings import Settings
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -179,3 +185,18 @@ def test_settings_for_cell_builds_either_chain() -> None:
     uniform = settings_for_cell("GM12878", uniform=True)
     assert not default.uniform_chain and default.spring_squeeze == 0.1, "the default chain"
     assert uniform.uniform_chain and uniform.spring_squeeze == 1.0, "the uniform chain"
+    assert uniform.loop_dropout and uniform.contact_background_z == 3.0, (
+        "the uniform chain drops loops and reads its cells at a threshold of 3"
+    )
+    assert uniform.exclusion_arcs_chain_radius == "sum" and not default.loop_dropout
+    assert default.data_contact_map == "", "the default chain is given no contact map"
+
+
+def test_uniform_config_takes_the_largest_mcool_of_the_cell(tmp_path: Path) -> None:
+    folder = tmp_path / "_hic" / "GM12878"
+    folder.mkdir(parents=True)
+    (folder / "small.mcool").write_bytes(b"1")
+    (folder / "large.mcool").write_bytes(b"12345")
+    uri = cell_contact_map("GM12878", str(tmp_path))
+    assert uri == f"{(folder / 'large.mcool').resolve()}::/resolutions/1000"
+    assert cell_contact_map("H1ESC", str(tmp_path)) == "", "a cell line without a map"

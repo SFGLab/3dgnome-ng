@@ -148,29 +148,6 @@ def test_read_cells_from_an_mcool(tmp_path: Path) -> None:
         read_cells(str(path), "chr1", mids, 1000)
 
 
-def test_a_pair_is_read_at_the_finest_resolution_that_can_test_it() -> None:
-    """At the fine resolution only the near pair has an expectation above z squared. Its cell is at
-    its expectation. The coarse resolution could hold it and may not.
-    """
-    mids, offset, _expected, mapped, mat = cells_case()
-    tested = np.zeros((3, 3), dtype=np.bool_)
-    fine_expected = np.where(np.arange(100) <= 16, 25.0, 1.0)
-    fine_count = np.array([[0.0, 25.0, 9.0], [25.0, 0.0, 9.0], [9.0, 9.0, 0.0]])
-    out = hold_by_cells(
-        mat, mids, fine_count, offset, fine_expected, mapped, LAW, settings(), tested
-    )
-    assert np.array_equal(out, mat), "nothing is held at the fine resolution"
-    assert tested[0, 1] and not tested[0, 2], "the near pair is tested, the far pair is not"
-
-    coarse_offset = np.array([[0, 2, 6], [2, 0, 5], [6, 5, 0]], dtype=np.int64)
-    coarse_count = np.array([[0.0, 400.0, 400.0], [400.0, 0.0, 400.0], [400.0, 400.0, 0.0]])
-    out = hold_by_cells(
-        out, mids, coarse_count, coarse_offset, np.full(100, 25.0), mapped, LAW, settings(), tested
-    )
-    assert out[0, 1] == -4.0, "the pair tested at the fine resolution keeps its background"
-    assert out[0, 2] != -0.5 and tested[0, 2], "the far pair is held by its coarse cell"
-
-
 def biased_mcool(tmp_path: Path, with_weights: bool) -> tuple[str, np.ndarray]:
     """A map whose count is 40 over the offset times the bias of its two bins. Bin 7 has a
     quarter of the bias of the others and bin 12 has no weight.
@@ -213,7 +190,7 @@ def test_bias_of_the_weights_takes_a_bin_of_low_coverage_out_of_the_test(tmp_pat
     assert want == pytest.approx(count[0, 1], rel=0.02), (
         "the expectation of a cell is the mean at its offset times the two biases"
     )
-    out = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s, None, res, bias)
+    out = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s, res, bias)
     assert np.array_equal(out, mat), "no cell is off its expectation and no pair is held"
 
     plain = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s)
@@ -248,17 +225,3 @@ def test_a_run_reads_the_finest_resolution_of_the_map_at_or_over_the_one_it_asks
     assert available_resolution(f"{path}::/resolutions/10000", 5000) == 10_000
     with pytest.raises(ValueError, match="holds no resolution"):
         available_resolution(str(path), 50_000)
-
-
-def test_under_the_side_over_a_cell_under_its_expectation_holds_no_pair() -> None:
-    mids, offset, expected, mapped, mat = cells_case()
-    count = np.array([[0.0, 100.0, 1.0], [100.0, 0.0, 400.0], [1.0, 400.0, 0.0]])
-    both = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, settings())
-    assert both[0, 2] < -0.5, "24 counts under 25 expected hold the pair out"
-    s = settings()
-    s.contact_side = "over"
-    over = hold_by_cells(mat, mids, count, offset, expected, mapped, LAW, s)
-    assert over[0, 2] == mat[0, 2], "the cell under its expectation is not read"
-    assert over[0, 1] == both[0, 1], "the cell over its expectation holds its pair as before"
-    with pytest.raises(ValueError, match="both or over"):
-        Settings.from_dict({"springs": {"contact_side": "under"}})
