@@ -149,25 +149,37 @@
 
 | arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| u_final | confirm20_5k | 18 | 0.263 | 0.208 | 0.255 | 0.193 | 0.263 | 0.207 | 0.474 | 0.669 |  |  |  |
-| s_c5k_r3 | confirm20_5k | 18 | 0.227 | 0.181 | 0.217 | 0.165 | 0.226 | 0.181 | 0.434 | 0.655 |  |  |  |
-| default chain | confirm20_5k | 18 | 0.190 | 0.128 | 0.179 | 0.109 | 0.133 | 0.127 | 0.401 | 0.622 |  |  |  |
+| u_product | chain20_5k | 18 | 0.267 | 0.209 | 0.258 | 0.195 | 0.266 | 0.209 | 0.471 | 0.684 |  |  |  |
+| u_final | chain20_5k | 18 | 0.263 | 0.208 | 0.255 | 0.193 | 0.263 | 0.207 | 0.474 | 0.669 |  |  |  |
+| u_r3_product | chain20_5k | 18 | 0.263 | 0.207 | 0.255 | 0.193 | 0.263 | 0.207 | 0.468 | 0.687 |  |  |  |
+| u_r3_sum | chain20_5k | 18 | 0.262 | 0.207 | 0.254 | 0.193 | 0.262 | 0.207 | 0.473 | 0.677 |  |  |  |
+| u_r3 | chain20_5k | 18 | 0.261 | 0.207 | 0.253 | 0.193 | 0.261 | 0.207 | 0.476 | 0.671 |  |  |  |
+| s_c5k_r3 | chain20_5k | 18 | 0.227 | 0.181 | 0.217 | 0.165 | 0.226 | 0.181 | 0.434 | 0.655 |  |  |  |
+| default chain | chain20_5k | 18 | 0.190 | 0.128 | 0.179 | 0.109 | 0.133 | 0.127 | 0.401 | 0.622 |  |  |  |
 
 ## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil, built on the CPU, score at 10k
 
 | arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| u_final | confirm20_10k | 18 | 0.345 | 0.302 | 0.337 | 0.290 | 0.344 | 0.301 | 0.519 | 0.705 |  |  |  |
-| s_c5k_r3 | confirm20_10k | 18 | 0.279 | 0.256 | 0.270 | 0.243 | 0.278 | 0.255 | 0.485 | 0.682 |  |  |  |
-| default chain | confirm20_10k | 18 | 0.250 | 0.196 | 0.238 | 0.177 | 0.181 | 0.195 | 0.463 | 0.670 |  |  |  |
+| u_product | chain20_10k | 18 | 0.348 | 0.303 | 0.340 | 0.293 | 0.347 | 0.303 | 0.521 | 0.724 |  |  |  |
+| u_r3_product | chain20_10k | 18 | 0.345 | 0.303 | 0.338 | 0.292 | 0.344 | 0.302 | 0.519 | 0.729 |  |  |  |
+| u_final | chain20_10k | 18 | 0.345 | 0.302 | 0.337 | 0.290 | 0.344 | 0.301 | 0.519 | 0.705 |  |  |  |
+| u_r3_sum | chain20_10k | 18 | 0.344 | 0.302 | 0.336 | 0.292 | 0.342 | 0.302 | 0.523 | 0.715 |  |  |  |
+| u_r3 | chain20_10k | 18 | 0.343 | 0.301 | 0.335 | 0.290 | 0.342 | 0.301 | 0.523 | 0.708 |  |  |  |
+| s_c5k_r3 | chain20_10k | 18 | 0.279 | 0.256 | 0.270 | 0.243 | 0.278 | 0.255 | 0.485 | 0.682 |  |  |  |
+| default chain | chain20_10k | 18 | 0.250 | 0.196 | 0.238 | 0.177 | 0.181 | 0.195 | 0.463 | 0.670 |  |  |  |
 
 ## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil, built on the CPU
 
 | arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| u_final | confirm20 | 18 | 0.421 | 0.416 | 0.416 | 0.410 | 0.417 | 0.413 | 0.569 | 0.732 | 1.131 | 2.5 | 0.4 |
-| s_c5k_r3 | confirm20 | 18 | 0.317 | 0.339 | 0.309 | 0.331 | 0.313 | 0.335 | 0.547 | 0.695 | 1.018 | 3.2 | 0.6 |
-| default chain | confirm20 | 18 | 0.316 | 0.277 | 0.305 | 0.260 | 0.204 | 0.268 | 0.532 | 0.705 | 1.044 | 11.5 | 3.5 |
+| u_product | chain20 | 18 | 0.424 | 0.419 | 0.419 | 0.414 | 0.419 | 0.414 | 0.584 | 0.759 | 1.146 | 2.2 | 0.4 |
+| u_r3_sum | chain20 | 18 | 0.420 | 0.418 | 0.415 | 0.413 | 0.415 | 0.413 | 0.581 | 0.746 | 1.135 | 2.3 | 0.4 |
+| u_r3_product | chain20 | 18 | 0.420 | 0.418 | 0.415 | 0.415 | 0.415 | 0.414 | 0.587 | 0.765 | 1.156 | 2.0 | 0.3 |
+| u_final | chain20 | 18 | 0.421 | 0.416 | 0.416 | 0.410 | 0.417 | 0.413 | 0.569 | 0.732 | 1.131 | 2.5 | 0.4 |
+| u_r3 | chain20 | 18 | 0.418 | 0.416 | 0.413 | 0.410 | 0.413 | 0.411 | 0.574 | 0.735 | 1.131 | 2.3 | 0.4 |
+| s_c5k_r3 | chain20 | 18 | 0.317 | 0.339 | 0.309 | 0.331 | 0.313 | 0.335 | 0.547 | 0.695 | 1.018 | 3.2 | 0.6 |
+| default chain | chain20 | 18 | 0.316 | 0.277 | 0.305 | 0.260 | 0.204 | 0.268 | 0.532 | 0.705 | 1.044 | 11.5 | 3.5 |
 
 ## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil
 

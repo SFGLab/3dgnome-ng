@@ -970,7 +970,8 @@ the size, 8.37 of 8.44. The radius at the ratio to the power two thirds restores
 
 #### Proposal: the radius of a node from its chain
 
-Not built. It waits for the maintainer.
+Built on 2026-11-21 as `[excluded_volume] arcs_chain_radius`, off, with this form as `product` and the mean of
+the two factors as `sum`. The trial is under "Trial of the radius under the chosen config".
 
 A node stands for the chain to the midpoints of its two neighbours, `c` beads. The volume a pair excludes grows
 with the cube of its radius. The sum over the pairs keeps its value under a change of the node count when the
@@ -1166,6 +1167,95 @@ whose targets are shorter, and the radius falls:
 The radius of the stage is a constant of the run and here it changes with the draw of the conformation. Under
 the dropout it is smaller where the dropout trace asks for a larger one. The arms of
 `scores-chain20/` measure the chosen config at a radius of 3.0 and with the radius from the chain.
+
+### Trace of the decay and of the overlap of the ends under the chosen config
+
+The mean distance of two beads by their separation, in bonds, over the 18 rows of twenty structures:
+
+| arm | 100 kb | 250 kb | 500 kb | 1 Mb | 2 Mb | 3 Mb | 4 Mb |
+|---|---|---|---|---|---|---|---|
+| default chain | 5.02 | 6.58 | 8.58 | 11.44 | 15.19 | 15.94 | 14.99 |
+| cells at 5 kb, radius 3.0 | 5.06 | 6.60 | 8.52 | 11.44 | 15.20 | 15.90 | 15.14 |
+| ladder alone, radius of a bead | 4.93 | 6.55 | 8.96 | 11.91 | 14.89 | 16.12 | 16.17 |
+| cells at 5 kb, `loop_dropout`, radius 3.0 | 5.00 | 6.58 | 8.58 | 11.56 | 15.05 | 15.20 | 14.25 |
+| cells at 5 kb, z 2, radius 3.0 | 5.11 | 6.93 | 8.73 | 11.32 | 14.99 | 15.98 | 15.39 |
+| chosen config | 4.97 | 6.70 | 9.12 | 12.36 | 15.96 | 17.41 | 18.03 |
+
+The chosen config has the distances of the default chain up to 250 kb and larger ones beyond, by 6 percent at
+500 kb, 8 percent at 1 Mb and 20 percent at 4 Mb. The ladder is the part that expands the range from 500 kb.
+
+The targets of the pairs of nodes, read before the solve on twenty conformations of three rows. A pair with a
+background spring is at the law, held in by its cell below the law or held out above it:
+
+| row | config | pairs held in beyond 100 kb | held out beyond 100 kb | mean target of a pair held in, over the law | of a pair held out | furthest separation with a cell |
+|---|---|---|---|---|---|---|
+| H1ESC chr1 20 to 25 Mb | chosen | 4,050 | 3,520 | 0.75 | 1.4 to 2.1 | 3 Mb |
+| H1ESC chr1 20 to 25 Mb | cells at 5 kb, z 3 | 0 | 0 | | | 100 kb |
+| HFFC6 chr1 200 to 205 Mb | chosen | 10,460 | 4,020 | 0.75 | 1.5 to 2.2 | 3 Mb |
+| HFFC6 chr1 200 to 205 Mb | cells at 5 kb, z 3 | 1,040 | 120 | 0.71 | 1.9 | 250 kb |
+| GM12878 chr1 20 to 25 Mb | chosen | 6,370 | 3,380 | 0.78 | 1.4 to 1.7 | 5 Mb |
+| GM12878 chr1 20 to 25 Mb | cells at 5 kb, z 3 | 2,290 | 240 | 0.74 | 1.6 to 2.1 | 500 kb |
+
+- The ladder gives a spring to thousands of pairs between 100 kb and 3 Mb, where the cells at 5 kb give none.
+- A pair held out is asked further off the law than a pair held in. The distance of a cell is the law times the
+  count over the expectation to the minus third, with a pseudo count of 0.5. A cell of 5 expected counts and
+  none observed passes the test at z 2 and asks for 2.2 times the law, under the clip of 2.5. At 1 to 2 Mb the
+  law is 11 bonds and the region has a radius of gyration of 10.
+- No cell and no loop joins the two end megabases on the two rows whose ends overlap. The distance of the end
+  megabases varies more between conformations, 12.9 ± 4.6 bonds with a smallest of 4.6 on H1ESC against
+  13.6 ± 2.5 and 9.4 with the cells at 5 kb, and 18.3 ± 8.2 against 17.2 ± 3.4 on HFFC6.
+
+The cells that pass the test follow the coverage of their bins. The count is raw and the expectation is the mean
+at the separation. A bin of low coverage is then depleted against every other bin. Over the bins of a row, the
+Spearman correlation of the coverage of a bin with the share of its cells that are held out, at z 2:
+
+| row | resolution | expectation by the separation alone | times the coverage of the two bins | times the root of the coverage | times the inverse balancing weights of the map |
+|---|---|---|---|---|---|
+| H1ESC chr1 20 to 25 Mb | 25 kb | -0.91 | 0.59 | -0.59 | 0.05 |
+| H1ESC chr1 20 to 25 Mb | 5 kb | -0.91 | 0.55 | -0.55 | 0.17 |
+| HFFC6 chr1 200 to 205 Mb | 25 kb | -0.80 | 0.65 | -0.25 | 0.26 |
+| HFFC6 chr1 200 to 205 Mb | 5 kb | -0.87 | 0.61 | -0.38 | 0.26 |
+| GM12878 chr1 20 to 25 Mb | 25 kb | -0.57 | 0.45 | -0.12 | 0.30 |
+| GM12878 chr1 20 to 25 Mb | 5 kb | -0.90 | 0.44 | -0.50 | 0.35 |
+
+With the weights in the expectation the cells over 1.8 times the law fall from 114 to 50 at 25 kb and from 2,276
+to 624 at 5 kb on the H1ESC row. The coverage acts at 5 kb as at 25 kb. The ladder carries it to the long range.
+
+The coverage of a bin is the same in the two halves of a map. A model that follows the coverage scores on the
+raw counts of the half it did not read. The balanced SCC is the score that the coverage does not reach.
+
+`[springs] contact_bias = weights` puts the inverse balancing weights of the map into the expectation and
+`[springs] contact_pseudo_count` sets the pseudo count, commit 059d374, both off. The arms of `scores-bias20/`
+measure them on the chosen config.
+
+The first run of the trace of the targets read the law before the run fits its exponent and counted pairs at the
+law as held out. The table is from the run with the law of the solve.
+
+### Trial of the radius under the chosen config
+
+`design/figures/uniform-2026-11-19/chain20/` and `scores-chain20/`, with `scores-chain20_10k/` and
+`scores-chain20_5k/`, `slurm/ensemble/uniform_confirm20.sh` with `TAG=chain20`, commit 3eb1a72. The chosen
+config with the derived radius, with a radius of 3.0 and with `[excluded_volume] arcs_chain_radius`. Eighteen
+rows of twenty structures, raw and balanced SCC per bead pair at 25 kb:
+
+| arm | SCC | Spearman | Pearson balanced | close pairs | ends overlap | exponent over Hi-C | Rg |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 11.5 | 12 of 360 | 1.044 | 10.0 |
+| derived radius | 0.417, 0.413 | 0.569 | 0.732 | 2.5 | 27 of 360 | 1.131 | 11.2 |
+| radius 3.0 | 0.413, 0.411 | 0.574 | 0.735 | 2.3 | 17 of 360 | 1.131 | 11.2 |
+| radius 3.0, radius from the chain as the mean of the two factors | 0.415, 0.413 | 0.581 | 0.746 | 2.3 | 7 of 360 | 1.135 | 11.3 |
+| radius 3.0, radius from the chain as their product | 0.415, 0.413 | 0.587 | 0.765 | 2.0 | 1 of 360 | 1.156 | 11.5 |
+| derived radius, product | 0.419, 0.414 | 0.584 | 0.759 | 2.2 | 5 of 360 | 1.146 | 11.4 |
+
+- The radius of 3.0 against the derived one takes the overlap of the ends from 27 structures to 17 and changes
+  no score. The decay is as steep. The radius is a part of the overlap and no part of the decay.
+- The radius from the chain takes the overlap to 7 structures as the mean and to 1 as the product. SCC does not
+  change, +0.002 ± 0.003. Balanced Pearson rises by 0.010 ± 0.002 and by 0.030 ± 0.003, on 16 and 18 rows of 18.
+  The product makes the decay steeper, 1.156 against 1.131.
+- A trace that stops after the solve, 120 solves on GM12878 chr1 20 to 25 Mb at a radius of 3.0 without cells:
+  under the dropout the mean form has a radius of gyration of 8.41 and the product 8.72, against 8.30 with one
+  radius and 8.44 without the dropout. Without the dropout they have 8.49 and 8.64. The mean form gives the size
+  back and the product goes over it.
 
 ## Settings
 
