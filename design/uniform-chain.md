@@ -1449,6 +1449,28 @@ The arm with both sides, built on the code where the bias of the bins has no key
 The cells at 5 kb with both sides stay the rule. The side of the cells over their expectation alone loses, and
 with it the ladder as rewritten.
 
+### The threshold and the side of the cells at 5 kb
+
+`design/figures/uniform-2026-11-19/side20/` and `scores-side20/`, `TAG=side20`, commit b7c16d7. The cells at 5 kb
+with `loop_dropout` and `arcs_chain_radius = sum`, at a threshold of 3 and of 2, with both sides and with the
+cells over their expectation alone. Eighteen rows of twenty structures:
+
+| arm | SCC | Spearman | Pearson balanced | ends overlap | exponent over Hi-C |
+|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 12 of 360 | 1.044 |
+| z 3, both sides, the locked config | 0.335, 0.360 | 0.564 | 0.721 | 18 of 360 | 1.064 |
+| z 3, over alone | 0.327, 0.349 | 0.561 | 0.721 | 14 of 360 | 1.071 |
+| z 2, both sides | 0.347, 0.380 | 0.531 | 0.719 | 12 of 360 | 1.069 |
+| z 2, over alone | 0.329, 0.347 | 0.571 | 0.726 | 11 of 360 | 1.076 |
+
+- At either threshold the cells under their expectation are worth their place: without them balanced SCC is
+  0.011 ± 0.005 lower at 3 and 0.033 lower at 2.
+- The threshold of 2 with both sides gains 0.012 ± 0.003 of raw and 0.020 ± 0.004 of balanced SCC, on 14 and 15
+  rows of 18, and loses 0.033 ± 0.009 of Spearman, which is then that of the default chain. The ends overlap in
+  12 structures against 18.
+
+The threshold stays 3, as locked. It is one key of `UNIFORM_CHAIN`, and 2 is the choice of SCC over Spearman.
+
 ### The score by the separation of a pair
 
 `playground/band_scc.py`, on the structures of `out/confirm20`, eighteen rows of twenty structures. The balanced
