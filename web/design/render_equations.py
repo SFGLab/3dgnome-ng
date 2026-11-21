@@ -27,6 +27,7 @@ EQUATIONS: dict[str, tuple[str, int]] = {
     "background": (r"$b(s) = \max\left(1,\ \left(\frac{s}{s_0}\right)^{\nu}\right),\quad s_0 = 1\ \mathrm{kb}$", DISPLAY),
     "loop_target": (r"$d(s, q) = 1 + \frac{b(s) - 1}{1 + q},\quad q = \frac{n}{\bar{n}_f(s)}$", DISPLAY),
     "contact_prob": (r"$P(s) \propto s^{-3\nu}$", DISPLAY),
+    "hic_target": (r"$t(s) = b(s) \left(\frac{O}{E(s)}\right)^{-1/3}$", DISPLAY),
     "anchor_energy": (
         r"$E_{\mathrm{anchor}} = \sum_{(i,j) \in L} k \left(\frac{d_{ij} - t_{ij}}{t_{ij}}\right)^2"
         r" + w_b \sum_{(i,j) \in B} \left(\frac{d_{ij} - b_{ij}}{\min(d_{ij}, b_{ij})}\right)^2"

@@ -6,6 +6,7 @@ import { usePage } from '../components/usePage'
 import { api, type Catalog, type Region, type VariantRow } from '../api'
 import type { FormState } from './form'
 import { megabytes, type OwnChoice, ownField, type UploadResult, uploadFile, uploadPreview } from './upload'
+import '../styles/dialog.css'
 import './owndata.css'
 import './variants.css'
 

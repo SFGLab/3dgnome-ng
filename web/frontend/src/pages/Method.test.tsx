@@ -45,6 +45,37 @@ describe('Method page', () => {
     expect(within(list).getAllByRole('listitem')).toHaveLength(17)
   })
 
+  it('explains the target distances with a figure per step', () => {
+    renderMethod()
+    const section = document.getElementById('targets')!
+    expect(within(section).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Blocks',
+      'Distance of a pair without a loop',
+      'The default exponent',
+      'Distance of a loop',
+      'Distance from the Hi-C map',
+    ])
+    const figures = [...section.querySelectorAll('figure')]
+    expect(figures.map((f) => f.querySelector('figcaption b')?.textContent)).toEqual(['Figure 1', 'Figure 2', 'Figure 3', 'Figure 4', 'Figure 5'])
+    // The default is the mean of the three exponents the page gives.
+    expect(section).toHaveTextContent('The three values, 0.309, 0.269 and 0.277, are close to each other')
+    expect(((0.309 + 0.269 + 0.277) / 3).toFixed(3)).toBe('0.285')
+    expect(section).toHaveTextContent('uses ν = 0.285')
+  })
+
+  it('tells the anchor phase and the chain phase by their terms and the additions of this work', () => {
+    renderMethod()
+    const h3 = (id: string) => within(document.getElementById(id)!).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    expect(h3('anchors')).toEqual(['The four terms', 'The start and the fit'])
+    expect(h3('chain')).toEqual(['The five terms', 'The start and the wall', 'Annealing', 'The last pass'])
+    const anchors = document.getElementById('anchors')!
+    // The three kinds of pair of the figure add up to its pairs.
+    expect(46 + 55 + 1277).toBe((53 * 52) / 2)
+    expect(anchors).toHaveTextContent('53 anchors and 1,378 pairs of anchors')
+    expect(anchors.querySelector('figure figcaption b')?.textContent).toBe('Figure 6')
+    expect(anchors).toHaveTextContent('two are new in this work, the background spring and the window term')
+  })
+
   it('cites the sources of the shared terms', () => {
     renderMethod()
     const anchorTerms = screen.getByRole('table', { name: 'Anchor energy terms' })

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Region } from '../api'
 import { readHicWindow } from './hicLocal'
 import { guessFactor, LinkRefused, megabytes, NO_OWN, type OwnChoice, type UploadKind, type UploadResult, uploadFile, uploadLink, uploadPreview } from './upload'
+import '../styles/dialog.css'
 import './owndata.css'
 
 export type OwnTab = 'loops' | 'anchors' | 'contacts' | 'enhancers'

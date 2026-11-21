@@ -111,8 +111,7 @@
   user-select: all;
 }
 
-.sync-form,
-.sync-stop {
+.sync-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -176,4 +175,18 @@
   .sync-code {
     font-size: 16px;
   }
+}
+
+/* The question before this computer leaves the list. The footer's buttons end at the right. */
+.sync-dialog {
+  width: min(460px, 100%);
+}
+
+.sync-dialog .dialog-body p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.sync-dialog .dialog-foot {
+  justify-content: flex-end;
 }
