@@ -284,6 +284,11 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           </button>
           <span className="timing">The job page shows the progress of the job and its place in the queue.</span>
         </div>
+        {submit.error && !(submit.error instanceof ApiError) && (
+          <p className="field-error" role="alert">
+            The server did not answer. Check the connection and build again.
+          </p>
+        )}
       </div>
       {svDialog && catalog.data && (
         <VariantsDialog

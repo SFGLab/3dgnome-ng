@@ -1,4 +1,6 @@
 /** Formats shared by the explorer. */
+import type { Summary } from './api'
+
 export const bp = (n: number) => n.toLocaleString('en-US')
 
 /** A region in megabases with no more digits than its positions need, chr8:127-128.5 Mb. */
@@ -25,3 +27,12 @@ export function duration(seconds: number): string {
 }
 
 export const FACTORS: Record<string, string> = { CTCF: 'CTCF', RNAPII: 'RNAPII', 'CTCF+RNAPII': 'CTCF and RNAPII' }
+
+/** The variants a job applied and from whom, with the count of those of a type the site does not apply. */
+export function variants(s: Summary): string {
+  const skipped = s.skipped_svs ? `, ${s.skipped_svs} of other types skipped` : ''
+  if (!s.n_svs) return `none${skipped}`
+  const sample = s.sample_note ? `${s.request.sample} (${s.sample_note})` : s.request.sample
+  const who = s.request.sample ? `${sample}, haplotype ${s.request.haplotype + 1}` : 'uploaded VCF'
+  return `${s.n_svs} from ${who}${skipped}`
+}

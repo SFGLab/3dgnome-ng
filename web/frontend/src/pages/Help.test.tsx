@@ -76,7 +76,7 @@ describe('Help page', () => {
 
   it('links the full settings reference', () => {
     renderHelp()
-    expect(screen.getByRole('link', { name: /All 186 settings/ })).toHaveAttribute('href', 'https://github.com/SFGLab/3dgnome-ng/blob/main/SETTINGS.md')
+    expect(screen.getByRole('link', { name: /All settings, from SETTINGS.md/ })).toHaveAttribute('href', 'https://github.com/SFGLab/3dgnome-ng/blob/main/SETTINGS.md')
   })
 
   it('keeps to the writing rules', () => {

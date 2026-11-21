@@ -4,7 +4,7 @@ import { served } from '../base'
 import { recentJobs, rememberJob } from '../model/recent'
 import { ROUTES } from '../routes'
 import type { JobApi, Summary } from './api'
-import { bp, duration, FACTORS, size, shortRegion } from './format'
+import { bp, duration, FACTORS, size, shortRegion, variants } from './format'
 
 type Props = {
   api: JobApi
@@ -30,13 +30,6 @@ function ownLoops(s: Summary): string | null {
 function listedLoops(s: Summary): string {
   const set = FACTORS[s.request.factors] ?? s.request.factors
   return s.request.own?.loops_from ? `${set} of ${s.request.own.loops_from}` : set
-}
-
-function variants(s: Summary): string {
-  if (!s.n_svs) return 'none'
-  const sample = s.sample_note ? `${s.request.sample} (${s.sample_note})` : s.request.sample
-  const who = s.request.sample ? `${sample}, haplotype ${s.request.haplotype + 1}` : 'uploaded VCF'
-  return `${s.n_svs} from ${who}`
 }
 
 /** The job's name, state, facts, structure selector and files. */

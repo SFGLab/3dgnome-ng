@@ -60,6 +60,8 @@ jobs:
       # One dependency of the lockfile is a GitHub repository at its ssh address.
       - run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
       - run: npm ci
+      # The types of the server's answers are generated from src/api/openapi.json and kept in the repository.
+      - run: npm run api && git diff --exit-code -- src/api/schema.d.ts
       - run: npm test
       - run: npm run lint
       - run: npm run build

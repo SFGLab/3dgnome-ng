@@ -234,3 +234,11 @@ def test_every_route_of_the_interface_was_asked(site: SimpleNamespace) -> None:
     assert left == [], "each route with a JSON answer has a test of its shape in this file: " + str(left)
     for method, path in sorted(NOT_JSON):
         assert (method, path) in declared, f"{method} {path} is a route of the interface"
+
+
+def test_the_description_the_types_of_the_frontend_come_from_is_the_one_of_the_server() -> None:
+    from gnome3d_web.app import interface
+
+    kept = Path(__file__).resolve().parents[1] / "frontend" / "src" / "api" / "openapi.json"
+    now = json.dumps(interface().openapi(), indent=1, sort_keys=True) + "\n"
+    assert kept.read_text() == now, "web/frontend/src/api/openapi.json is the description the server gives. Run web/scripts/write_openapi.py, then npm run api in web/frontend."

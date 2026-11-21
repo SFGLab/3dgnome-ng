@@ -333,7 +333,7 @@ export function Help() {
             </tbody>
           </table>
           <a className="settings-link" href="https://github.com/SFGLab/3dgnome-ng/blob/main/SETTINGS.md">
-            <BookOpen size={13} aria-hidden /> All 186 settings, from SETTINGS.md
+            <BookOpen size={13} aria-hidden /> All settings, from SETTINGS.md
           </a>
         </section>
       </div>

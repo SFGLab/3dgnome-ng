@@ -36,8 +36,8 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   const summary = useQuery({
     queryKey: ['summary', api.base],
     queryFn: api.summary,
-    refetchInterval: (q) => (q.state.data && ['done', 'failed'].includes(q.state.data.state) ? false : pollMs),
-    // A job the site does not have is not asked for again.
+    // A finished job is not asked for again, and neither is a job the site does not have.
+    refetchInterval: (q) => ((q.state.data && ['done', 'failed'].includes(q.state.data.state)) || missing(q.state.error) ? false : pollMs),
     retry: (failures, error) => !missing(error) && failures < 3,
   })
   // The address of a job the site does not have, a deleted private job for one, gets the page of a missing address.

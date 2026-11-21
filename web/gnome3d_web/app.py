@@ -17,19 +17,26 @@ from .uploads import routes as uploads
 from .variants import routes as variants
 
 
+def interface() -> FastAPI:
+    """The app with every route and no site behind it. It describes the interface of the site at
+    /openapi.json, and the types of the frontend are generated from that description."""
+    app = FastAPI(title="3D-GNOME")
+    handle_errors(app)
+    for part in (jobs.router, uploads.router, variants.router, catalog.router, engine.router, results.job_routes("jobs"), results.job_routes("p"), results.router, lists.router):
+        app.include_router(part)
+    return app
+
+
 def create_app() -> FastAPI:
     site = Site.from_env()
     s = site.settings
-    app = FastAPI(title="3D-GNOME")
+    app = interface()
     app.state.site = site
     if s.base_path:
         app.add_middleware(StripBase, base=s.base_path)
-    handle_errors(app)
     s.jobs_dir.mkdir(parents=True, exist_ok=True)
     s.private_dir.mkdir(parents=True, exist_ok=True)
     sweep_private(s.results_dir, s.retention_days)
     site.queue.resume()
-    for part in (jobs.router, uploads.router, variants.router, catalog.router, engine.router, results.job_routes("jobs"), results.job_routes("p"), results.router, lists.router):
-        app.include_router(part)
     frontend.serve(app, site)
     return app

@@ -82,7 +82,9 @@ The shape of every JSON answer and of every file the site keeps is declared once
 `TypedDict` in the `shapes.py` of its package. The function that builds an answer has the shape
 as its return type and pyright checks the two against each other. The route names the shape as
 its `response_model`, and the app describes the whole interface at `/openapi.json`. The types of
-the frontend are generated from that description.
+the frontend are generated from that description: `web/scripts/write_openapi.py` writes it to
+`web/frontend/src/api/openapi.json` and `npm run api` writes `src/api/schema.d.ts` from it. Both
+files are in the repository. A test of the server and a step of CI fail while one is stale.
 
 A route still answers with the value its function returned. The shape is checked by pyright and
 by `web/tests/test_contract.py`, not at each request. The contact map of 800 bins is megabytes

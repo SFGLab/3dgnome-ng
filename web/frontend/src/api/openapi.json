@@ -1,0 +1,5482 @@
+{
+ "components": {
+  "schemas": {
+   "AnchorBead": {
+    "properties": {
+     "bead": {
+      "title": "Bead",
+      "type": "integer"
+     },
+     "end": {
+      "title": "End",
+      "type": "integer"
+     },
+     "loops": {
+      "items": {
+       "$ref": "#/components/schemas/LoopEnd"
+      },
+      "title": "Loops",
+      "type": "array"
+     },
+     "start": {
+      "title": "Start",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "bead",
+     "start",
+     "end",
+     "loops"
+    ],
+    "title": "AnchorBead",
+    "type": "object"
+   },
+   "Annotations": {
+    "properties": {
+     "enhancers": {
+      "items": {
+       "maxItems": 2,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "integer"
+        }
+       ],
+       "type": "array"
+      },
+      "title": "Enhancers",
+      "type": "array"
+     },
+     "genes": {
+      "items": {
+       "$ref": "#/components/schemas/NamedGene"
+      },
+      "title": "Genes",
+      "type": "array"
+     },
+     "loops": {
+      "items": {
+       "$ref": "#/components/schemas/Loop"
+      },
+      "title": "Loops",
+      "type": "array"
+     }
+    },
+    "required": [
+     "genes",
+     "enhancers",
+     "loops"
+    ],
+    "title": "Annotations",
+    "type": "object"
+   },
+   "Body_api_settings_ini_api_settings_ini_post": {
+    "properties": {
+     "file": {
+      "contentMediaType": "application/octet-stream",
+      "title": "File",
+      "type": "string"
+     }
+    },
+    "required": [
+     "file"
+    ],
+    "title": "Body_api_settings_ini_api_settings_ini_post",
+    "type": "object"
+   },
+   "Body_api_upload_api_uploads_post": {
+    "properties": {
+     "cell": {
+      "default": "",
+      "title": "Cell",
+      "type": "string"
+     },
+     "factor": {
+      "default": "",
+      "title": "Factor",
+      "type": "string"
+     },
+     "file": {
+      "contentMediaType": "application/octet-stream",
+      "title": "File",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "region": {
+      "default": "",
+      "title": "Region",
+      "type": "string"
+     }
+    },
+    "required": [
+     "kind",
+     "file"
+    ],
+    "title": "Body_api_upload_api_uploads_post",
+    "type": "object"
+   },
+   "Body_api_upload_link_api_uploads_link_post": {
+    "properties": {
+     "cell": {
+      "default": "",
+      "title": "Cell",
+      "type": "string"
+     },
+     "region": {
+      "default": "",
+      "title": "Region",
+      "type": "string"
+     },
+     "url": {
+      "title": "Url",
+      "type": "string"
+     }
+    },
+    "required": [
+     "url"
+    ],
+    "title": "Body_api_upload_link_api_uploads_link_post",
+    "type": "object"
+   },
+   "Body_api_variants_check_api_variants_check_post": {
+    "properties": {
+     "cell": {
+      "title": "Cell",
+      "type": "string"
+     },
+     "factors": {
+      "default": "CTCF",
+      "title": "Factors",
+      "type": "string"
+     },
+     "haplotype": {
+      "default": 0,
+      "title": "Haplotype",
+      "type": "integer"
+     },
+     "own": {
+      "default": "",
+      "title": "Own",
+      "type": "string"
+     },
+     "region": {
+      "title": "Region",
+      "type": "string"
+     },
+     "sample": {
+      "title": "Sample",
+      "type": "string"
+     },
+     "sv_set": {
+      "default": "",
+      "title": "Sv Set",
+      "type": "string"
+     },
+     "upload": {
+      "default": "",
+      "title": "Upload",
+      "type": "string"
+     }
+    },
+    "required": [
+     "cell",
+     "region",
+     "sample"
+    ],
+    "title": "Body_api_variants_check_api_variants_check_post",
+    "type": "object"
+   },
+   "CallSetInfo": {
+    "properties": {
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "sample_table": {
+      "title": "Sample Table",
+      "type": "boolean"
+     },
+     "samples": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Samples",
+      "type": "array"
+     }
+    },
+    "required": [
+     "label",
+     "samples",
+     "sample_table"
+    ],
+    "title": "CallSetInfo",
+    "type": "object"
+   },
+   "CatalogInfo": {
+    "properties": {
+     "cell_types": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/CellTypeInfo"
+      },
+      "title": "Cell Types",
+      "type": "object"
+     },
+     "factors": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Factors",
+      "type": "array"
+     },
+     "hicdiffusion": {
+      "title": "Hicdiffusion",
+      "type": "boolean"
+     },
+     "hicdiffusion_mb": {
+      "title": "Hicdiffusion Mb",
+      "type": "number"
+     },
+     "max_region_mb": {
+      "title": "Max Region Mb",
+      "type": "number"
+     },
+     "max_structures": {
+      "title": "Max Structures",
+      "type": "integer"
+     },
+     "sv_sets": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/CallSetInfo"
+      },
+      "title": "Sv Sets",
+      "type": "object"
+     }
+    },
+    "required": [
+     "cell_types",
+     "sv_sets",
+     "factors",
+     "max_region_mb",
+     "hicdiffusion_mb",
+     "max_structures",
+     "hicdiffusion"
+    ],
+    "title": "CatalogInfo",
+    "type": "object"
+   },
+   "CellTypeInfo": {
+    "properties": {
+     "data": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Data",
+      "type": "array"
+     },
+     "description": {
+      "title": "Description",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "lymphoblastoid": {
+      "title": "Lymphoblastoid",
+      "type": "boolean"
+     },
+     "note": {
+      "title": "Note",
+      "type": "string"
+     }
+    },
+    "required": [
+     "label",
+     "description",
+     "data",
+     "lymphoblastoid",
+     "note"
+    ],
+    "title": "CellTypeInfo",
+    "type": "object"
+   },
+   "ContactMaps": {
+    "properties": {
+     "bins": {
+      "items": {
+       "type": "integer"
+      },
+      "title": "Bins",
+      "type": "array"
+     },
+     "loop_enrichment": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Loop Enrichment"
+     },
+     "lower": {
+      "items": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Lower",
+      "type": "array"
+     },
+     "lower_label": {
+      "title": "Lower Label",
+      "type": "string"
+     },
+     "rank": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rank"
+     },
+     "rank_about": {
+      "title": "Rank About",
+      "type": "string"
+     },
+     "rank_reach": {
+      "title": "Rank Reach",
+      "type": "integer"
+     },
+     "scc": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Scc"
+     },
+     "scc_about": {
+      "title": "Scc About",
+      "type": "string"
+     },
+     "upper": {
+      "items": {
+       "items": {
+        "type": "number"
+       },
+       "type": "array"
+      },
+      "title": "Upper",
+      "type": "array"
+     },
+     "upper_label": {
+      "title": "Upper Label",
+      "type": "string"
+     }
+    },
+    "required": [
+     "bins",
+     "upper",
+     "lower",
+     "upper_label",
+     "lower_label",
+     "scc",
+     "scc_about",
+     "rank",
+     "rank_reach",
+     "rank_about",
+     "loop_enrichment"
+    ],
+    "title": "ContactMaps",
+    "type": "object"
+   },
+   "Distance": {
+    "properties": {
+     "a": {
+      "$ref": "#/components/schemas/End"
+     },
+     "b": {
+      "$ref": "#/components/schemas/End"
+     },
+     "mean": {
+      "title": "Mean",
+      "type": "number"
+     },
+     "n": {
+      "title": "N",
+      "type": "integer"
+     },
+     "sd": {
+      "title": "Sd",
+      "type": "number"
+     },
+     "values": {
+      "items": {
+       "type": "number"
+      },
+      "title": "Values",
+      "type": "array"
+     }
+    },
+    "required": [
+     "a",
+     "b",
+     "values",
+     "mean",
+     "sd",
+     "n"
+    ],
+    "title": "Distance",
+    "type": "object"
+   },
+   "DistanceChange": {
+    "properties": {
+     "a": {
+      "$ref": "#/components/schemas/Spread"
+     },
+     "b": {
+      "$ref": "#/components/schemas/Spread"
+     },
+     "enhancer_bead_a": {
+      "title": "Enhancer Bead A",
+      "type": "integer"
+     },
+     "enhancer_bead_b": {
+      "title": "Enhancer Bead B",
+      "type": "integer"
+     },
+     "gene": {
+      "title": "Gene",
+      "type": "string"
+     },
+     "linear_bp": {
+      "title": "Linear Bp",
+      "type": "integer"
+     },
+     "linear_bp_b": {
+      "title": "Linear Bp B",
+      "type": "integer"
+     },
+     "p": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P"
+     },
+     "ratio": {
+      "title": "Ratio",
+      "type": "number"
+     }
+    },
+    "required": [
+     "gene",
+     "linear_bp",
+     "linear_bp_b",
+     "enhancer_bead_a",
+     "enhancer_bead_b",
+     "a",
+     "b",
+     "ratio",
+     "p"
+    ],
+    "title": "DistanceChange",
+    "type": "object"
+   },
+   "DistanceChanges": {
+    "properties": {
+     "differ": {
+      "title": "Differ",
+      "type": "integer"
+     },
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/DistanceChange"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "same_region": {
+      "title": "Same Region",
+      "type": "boolean"
+     },
+     "shared": {
+      "title": "Shared",
+      "type": "boolean"
+     },
+     "shared_enhancers": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Shared Enhancers"
+     }
+    },
+    "required": [
+     "same_region",
+     "rows",
+     "differ",
+     "shared",
+     "shared_enhancers"
+    ],
+    "title": "DistanceChanges",
+    "type": "object"
+   },
+   "End": {
+    "properties": {
+     "bead": {
+      "title": "Bead",
+      "type": "integer"
+     },
+     "bp": {
+      "title": "Bp",
+      "type": "integer"
+     },
+     "offset": {
+      "title": "Offset",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "bead",
+     "bp",
+     "offset"
+    ],
+    "title": "End",
+    "type": "object"
+   },
+   "ExpressionChange": {
+    "properties": {
+     "a": {
+      "title": "A",
+      "type": "number"
+     },
+     "b": {
+      "title": "B",
+      "type": "number"
+     },
+     "distance": {
+      "title": "Distance",
+      "type": "number"
+     },
+     "gene": {
+      "title": "Gene",
+      "type": "string"
+     },
+     "log2fc": {
+      "title": "Log2Fc",
+      "type": "number"
+     },
+     "padj": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Padj"
+     }
+    },
+    "required": [
+     "gene",
+     "distance",
+     "log2fc",
+     "padj",
+     "a",
+     "b"
+    ],
+    "title": "ExpressionChange",
+    "type": "object"
+   },
+   "ExpressionChanges": {
+    "properties": {
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "label_a": {
+      "title": "Label A",
+      "type": "string"
+     },
+     "label_b": {
+      "title": "Label B",
+      "type": "string"
+     },
+     "mode": {
+      "enum": [
+       "deseq2",
+       "ratio",
+       "none"
+      ],
+      "title": "Mode",
+      "type": "string"
+     },
+     "reason": {
+      "title": "Reason",
+      "type": "string"
+     },
+     "rho": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Rho"
+     },
+     "rows": {
+      "items": {
+       "$ref": "#/components/schemas/ExpressionChange"
+      },
+      "title": "Rows",
+      "type": "array"
+     },
+     "samples_a": {
+      "title": "Samples A",
+      "type": "integer"
+     },
+     "samples_b": {
+      "title": "Samples B",
+      "type": "integer"
+     },
+     "volcano": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Volcano"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "required": [
+     "mode",
+     "reason",
+     "rows",
+     "rho",
+     "volcano"
+    ],
+    "title": "ExpressionChanges",
+    "type": "object"
+   },
+   "ExpressionOption": {
+    "properties": {
+     "columns": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Columns",
+      "type": "array"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "counts",
+       "values"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "other_cell_type": {
+      "title": "Other Cell Type",
+      "type": "boolean"
+     },
+     "unit": {
+      "title": "Unit",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "label",
+     "kind",
+     "unit",
+     "columns",
+     "other_cell_type"
+    ],
+    "title": "ExpressionOption",
+    "type": "object"
+   },
+   "ExpressionOptions": {
+    "properties": {
+     "options": {
+      "items": {
+       "$ref": "#/components/schemas/ExpressionOption"
+      },
+      "title": "Options",
+      "type": "array"
+     }
+    },
+    "required": [
+     "options"
+    ],
+    "title": "ExpressionOptions",
+    "type": "object"
+   },
+   "ExpressionStated": {
+    "properties": {
+     "kind": {
+      "enum": [
+       "counts",
+       "values"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "samples": {
+      "title": "Samples",
+      "type": "integer"
+     },
+     "source": {
+      "title": "Source",
+      "type": "string"
+     },
+     "unit": {
+      "title": "Unit",
+      "type": "string"
+     }
+    },
+    "required": [
+     "label",
+     "kind",
+     "unit",
+     "samples",
+     "source"
+    ],
+    "title": "ExpressionStated",
+    "type": "object"
+   },
+   "FileSize": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "size": {
+      "title": "Size",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "name",
+     "size"
+    ],
+    "title": "FileSize",
+    "type": "object"
+   },
+   "GeneDistances": {
+    "properties": {
+     "a": {
+      "items": {
+       "type": "number"
+      },
+      "title": "A",
+      "type": "array"
+     },
+     "b": {
+      "items": {
+       "type": "number"
+      },
+      "title": "B",
+      "type": "array"
+     },
+     "gene": {
+      "title": "Gene",
+      "type": "string"
+     },
+     "p": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "P"
+     }
+    },
+    "required": [
+     "gene",
+     "a",
+     "b",
+     "p"
+    ],
+    "title": "GeneDistances",
+    "type": "object"
+   },
+   "GeneHit": {
+    "properties": {
+     "chrom": {
+      "title": "Chrom",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "tss": {
+      "title": "Tss",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "name",
+     "chrom",
+     "tss"
+    ],
+    "title": "GeneHit",
+    "type": "object"
+   },
+   "GeneRow": {
+    "properties": {
+     "distance": {
+      "title": "Distance",
+      "type": "number"
+     },
+     "enhancer": {
+      "title": "Enhancer",
+      "type": "integer"
+     },
+     "enhancer_bead": {
+      "title": "Enhancer Bead",
+      "type": "integer"
+     },
+     "expression": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expression"
+     },
+     "gene": {
+      "title": "Gene",
+      "type": "string"
+     },
+     "gene_id": {
+      "title": "Gene Id",
+      "type": "string"
+     },
+     "joined_by": {
+      "title": "Joined By",
+      "type": "string"
+     },
+     "linear_bp": {
+      "title": "Linear Bp",
+      "type": "integer"
+     },
+     "max": {
+      "title": "Max",
+      "type": "number"
+     },
+     "median": {
+      "title": "Median",
+      "type": "number"
+     },
+     "min": {
+      "title": "Min",
+      "type": "number"
+     },
+     "n": {
+      "title": "N",
+      "type": "integer"
+     },
+     "promoter_bead": {
+      "title": "Promoter Bead",
+      "type": "integer"
+     },
+     "promoter_loops": {
+      "title": "Promoter Loops",
+      "type": "integer"
+     },
+     "q1": {
+      "title": "Q1",
+      "type": "number"
+     },
+     "q3": {
+      "title": "Q3",
+      "type": "number"
+     },
+     "sd": {
+      "title": "Sd",
+      "type": "number"
+     },
+     "tss": {
+      "title": "Tss",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "gene",
+     "gene_id",
+     "expression",
+     "tss",
+     "enhancer",
+     "linear_bp",
+     "distance",
+     "promoter_bead",
+     "enhancer_bead",
+     "min",
+     "q1",
+     "median",
+     "q3",
+     "max",
+     "sd",
+     "n",
+     "joined_by",
+     "promoter_loops"
+    ],
+    "title": "GeneRow",
+    "type": "object"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "title": "Detail",
+      "type": "array"
+     }
+    },
+    "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "IniOverrides": {
+    "properties": {
+     "overrides": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Overrides",
+      "type": "object"
+     },
+     "refused": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Refused",
+      "type": "array"
+     }
+    },
+    "required": [
+     "overrides",
+     "refused"
+    ],
+    "title": "IniOverrides",
+    "type": "object"
+   },
+   "JobUrl": {
+    "properties": {
+     "url": {
+      "title": "Url",
+      "type": "string"
+     }
+    },
+    "required": [
+     "url"
+    ],
+    "title": "JobUrl",
+    "type": "object"
+   },
+   "ListedJob": {
+    "properties": {
+     "at": {
+      "title": "At",
+      "type": "number"
+     },
+     "edited": {
+      "title": "Edited",
+      "type": "number"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "url": {
+      "title": "Url",
+      "type": "string"
+     }
+    },
+    "required": [
+     "url",
+     "label",
+     "name",
+     "at"
+    ],
+    "title": "ListedJob",
+    "type": "object"
+   },
+   "Loop": {
+    "properties": {
+     "a": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "title": "A",
+      "type": "array"
+     },
+     "b": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "title": "B",
+      "type": "array"
+     },
+     "chrom": {
+      "title": "Chrom",
+      "type": "string"
+     },
+     "factor": {
+      "title": "Factor",
+      "type": "string"
+     },
+     "pets": {
+      "title": "Pets",
+      "type": "integer"
+     },
+     "span": {
+      "title": "Span",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "factor",
+     "chrom",
+     "a",
+     "b",
+     "span",
+     "pets"
+    ],
+    "title": "Loop",
+    "type": "object"
+   },
+   "LoopEnd": {
+    "properties": {
+     "factor": {
+      "title": "Factor",
+      "type": "string"
+     },
+     "other": {
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "title": "Other",
+      "type": "array"
+     },
+     "pets": {
+      "title": "Pets",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "factor",
+     "other",
+     "pets"
+    ],
+    "title": "LoopEnd",
+    "type": "object"
+   },
+   "Marks": {
+    "properties": {
+     "enhancers": {
+      "items": {
+       "type": "integer"
+      },
+      "title": "Enhancers",
+      "type": "array"
+     },
+     "promoters": {
+      "items": {
+       "$ref": "#/components/schemas/Promoter"
+      },
+      "title": "Promoters",
+      "type": "array"
+     }
+    },
+    "required": [
+     "promoters",
+     "enhancers"
+    ],
+    "title": "Marks",
+    "type": "object"
+   },
+   "Missing": {
+    "description": "The body of the 404 of an address or a job the site does not have.",
+    "properties": {
+     "detail": {
+      "title": "Detail",
+      "type": "string"
+     }
+    },
+    "required": [
+     "detail"
+    ],
+    "title": "Missing",
+    "type": "object"
+   },
+   "NamedGene": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "tss": {
+      "title": "Tss",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "name",
+     "tss"
+    ],
+    "title": "NamedGene",
+    "type": "object"
+   },
+   "OwnStated": {
+    "description": "The own data of a request as a job page states it: the factors of the loops and what else came.",
+    "properties": {
+     "anchors": {
+      "title": "Anchors",
+      "type": "boolean"
+     },
+     "contacts": {
+      "title": "Contacts",
+      "type": "boolean"
+     },
+     "enhancers": {
+      "title": "Enhancers",
+      "type": "boolean"
+     },
+     "enhancers_from": {
+      "title": "Enhancers From",
+      "type": "string"
+     },
+     "loops": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Loops",
+      "type": "array"
+     },
+     "loops_from": {
+      "title": "Loops From",
+      "type": "string"
+     }
+    },
+    "required": [
+     "loops",
+     "anchors",
+     "contacts",
+     "enhancers"
+    ],
+    "title": "OwnStated",
+    "type": "object"
+   },
+   "Picks": {
+    "properties": {
+     "compact": {
+      "title": "Compact",
+      "type": "integer"
+     },
+     "medoid": {
+      "title": "Medoid",
+      "type": "integer"
+     },
+     "random": {
+      "title": "Random",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "medoid",
+     "compact",
+     "random"
+    ],
+    "title": "Picks",
+    "type": "object"
+   },
+   "Preview": {
+    "properties": {
+     "counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Counts",
+      "type": "object"
+     },
+     "genes": {
+      "items": {
+       "$ref": "#/components/schemas/NamedGene"
+      },
+      "title": "Genes",
+      "type": "array"
+     },
+     "loops": {
+      "additionalProperties": {
+       "items": {
+        "maxItems": 5,
+        "minItems": 5,
+        "prefixItems": [
+         {
+          "type": "integer"
+         },
+         {
+          "type": "integer"
+         },
+         {
+          "type": "integer"
+         },
+         {
+          "type": "integer"
+         },
+         {
+          "type": "integer"
+         }
+        ],
+        "type": "array"
+       },
+       "type": "array"
+      },
+      "title": "Loops",
+      "type": "object"
+     }
+    },
+    "required": [
+     "loops",
+     "counts",
+     "genes"
+    ],
+    "title": "Preview",
+    "type": "object"
+   },
+   "ProblemFound": {
+    "properties": {
+     "fix": {
+      "title": "Fix",
+      "type": "string"
+     },
+     "found": {
+      "title": "Found",
+      "type": "string"
+     },
+     "line": {
+      "title": "Line",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "line",
+     "found",
+     "fix"
+    ],
+    "title": "ProblemFound",
+    "type": "object"
+   },
+   "Promoter": {
+    "properties": {
+     "bead": {
+      "title": "Bead",
+      "type": "integer"
+     },
+     "genes": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Genes",
+      "type": "array"
+     }
+    },
+    "required": [
+     "bead",
+     "genes"
+    ],
+    "title": "Promoter",
+    "type": "object"
+   },
+   "Refusal": {
+    "description": "The body of an answer that is no success: the message, the form field it concerns and the fix.",
+    "properties": {
+     "error": {
+      "title": "Error",
+      "type": "string"
+     },
+     "field": {
+      "title": "Field",
+      "type": "string"
+     },
+     "fix": {
+      "title": "Fix",
+      "type": "string"
+     }
+    },
+    "required": [
+     "error"
+    ],
+    "title": "Refusal",
+    "type": "object"
+   },
+   "RegionInfo": {
+    "properties": {
+     "chrom": {
+      "title": "Chrom",
+      "type": "string"
+     },
+     "end": {
+      "title": "End",
+      "type": "integer"
+     },
+     "gene": {
+      "title": "Gene",
+      "type": "string"
+     },
+     "label": {
+      "title": "Label",
+      "type": "string"
+     },
+     "start": {
+      "title": "Start",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "chrom",
+     "start",
+     "end",
+     "label"
+    ],
+    "title": "RegionInfo",
+    "type": "object"
+   },
+   "RequestStated": {
+    "description": "The request of a job without the places of its uploads. The expression is the id of its\nsource. A request of the first form of the site has no background, overrides or expression.",
+    "properties": {
+     "background": {
+      "title": "Background",
+      "type": "string"
+     },
+     "cell_type": {
+      "title": "Cell Type",
+      "type": "string"
+     },
+     "expression": {
+      "title": "Expression",
+      "type": "string"
+     },
+     "factors": {
+      "title": "Factors",
+      "type": "string"
+     },
+     "haplotype": {
+      "title": "Haplotype",
+      "type": "integer"
+     },
+     "hicdiffusion": {
+      "title": "Hicdiffusion",
+      "type": "boolean"
+     },
+     "n_models": {
+      "title": "N Models",
+      "type": "integer"
+     },
+     "overrides": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "title": "Overrides",
+      "type": "object"
+     },
+     "own": {
+      "$ref": "#/components/schemas/OwnStated"
+     },
+     "region": {
+      "title": "Region",
+      "type": "string"
+     },
+     "sample": {
+      "title": "Sample",
+      "type": "string"
+     },
+     "sv_set": {
+      "title": "Sv Set",
+      "type": "string"
+     }
+    },
+    "required": [
+     "cell_type",
+     "region",
+     "factors",
+     "sv_set",
+     "sample",
+     "haplotype",
+     "n_models"
+    ],
+    "title": "RequestStated",
+    "type": "object"
+   },
+   "SampleTable": {
+    "properties": {
+     "columns": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Columns",
+      "type": "array"
+     },
+     "rows": {
+      "items": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "title": "Rows",
+      "type": "array"
+     }
+    },
+    "required": [
+     "columns",
+     "rows"
+    ],
+    "title": "SampleTable",
+    "type": "object"
+   },
+   "Setting": {
+    "properties": {
+     "choices": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Choices"
+     },
+     "default": {
+      "title": "Default",
+      "type": "string"
+     },
+     "hi": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Hi"
+     },
+     "key": {
+      "title": "Key",
+      "type": "string"
+     },
+     "lo": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lo"
+     },
+     "meaning": {
+      "title": "Meaning",
+      "type": "string"
+     },
+     "section": {
+      "title": "Section",
+      "type": "string"
+     },
+     "server": {
+      "title": "Server",
+      "type": "string"
+     },
+     "step": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step"
+     },
+     "type": {
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "section",
+     "key",
+     "type",
+     "default",
+     "server",
+     "lo",
+     "hi",
+     "step",
+     "choices",
+     "meaning"
+    ],
+    "title": "Setting",
+    "type": "object"
+   },
+   "SettingGroup": {
+    "properties": {
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "settings": {
+      "items": {
+       "$ref": "#/components/schemas/Setting"
+      },
+      "title": "Settings",
+      "type": "array"
+     }
+    },
+    "required": [
+     "name",
+     "settings"
+    ],
+    "title": "SettingGroup",
+    "type": "object"
+   },
+   "SharedList": {
+    "properties": {
+     "code": {
+      "title": "Code",
+      "type": "string"
+     },
+     "jobs": {
+      "items": {
+       "$ref": "#/components/schemas/ListedJob"
+      },
+      "title": "Jobs",
+      "type": "array"
+     },
+     "private": {
+      "title": "Private",
+      "type": "boolean"
+     }
+    },
+    "required": [
+     "code",
+     "private",
+     "jobs"
+    ],
+    "title": "SharedList",
+    "type": "object"
+   },
+   "Spread": {
+    "properties": {
+     "mean": {
+      "title": "Mean",
+      "type": "number"
+     },
+     "sd": {
+      "title": "Sd",
+      "type": "number"
+     }
+    },
+    "required": [
+     "mean",
+     "sd"
+    ],
+    "title": "Spread",
+    "type": "object"
+   },
+   "Stage": {
+    "properties": {
+     "at": {
+      "title": "At",
+      "type": "number"
+     },
+     "stage": {
+      "title": "Stage",
+      "type": "string"
+     }
+    },
+    "required": [
+     "stage",
+     "at"
+    ],
+    "title": "Stage",
+    "type": "object"
+   },
+   "Status": {
+    "description": "status.json. A job has `state` from the moment it waits and gains the rest as it runs.",
+    "properties": {
+     "error": {
+      "title": "Error",
+      "type": "string"
+     },
+     "finished": {
+      "title": "Finished",
+      "type": "number"
+     },
+     "log_tail": {
+      "title": "Log Tail",
+      "type": "string"
+     },
+     "loops": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Loops",
+      "type": "object"
+     },
+     "n_svs": {
+      "title": "N Svs",
+      "type": "integer"
+     },
+     "region": {
+      "title": "Region",
+      "type": "string"
+     },
+     "skipped_svs": {
+      "title": "Skipped Svs",
+      "type": "integer"
+     },
+     "stage": {
+      "title": "Stage",
+      "type": "string"
+     },
+     "stages": {
+      "items": {
+       "$ref": "#/components/schemas/Stage"
+      },
+      "title": "Stages",
+      "type": "array"
+     },
+     "started": {
+      "title": "Started",
+      "type": "number"
+     },
+     "state": {
+      "enum": [
+       "queued",
+       "running",
+       "done",
+       "failed"
+      ],
+      "title": "State",
+      "type": "string"
+     },
+     "updated": {
+      "title": "Updated",
+      "type": "number"
+     }
+    },
+    "required": [
+     "state"
+    ],
+    "title": "Status",
+    "type": "object"
+   },
+   "Structure": {
+    "properties": {
+     "anchors": {
+      "items": {
+       "$ref": "#/components/schemas/AnchorBead"
+      },
+      "title": "Anchors",
+      "type": "array"
+     },
+     "beads": {
+      "items": {
+       "maxItems": 6,
+       "minItems": 6,
+       "prefixItems": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "integer"
+        },
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        },
+        {
+         "enum": [
+          "anchor",
+          "subanchor"
+         ],
+         "type": "string"
+        }
+       ],
+       "type": "array"
+      },
+      "title": "Beads",
+      "type": "array"
+     },
+     "chain": {
+      "items": {
+       "maxItems": 4,
+       "minItems": 4,
+       "prefixItems": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        }
+       ],
+       "type": "array"
+      },
+      "title": "Chain",
+      "type": "array"
+     },
+     "marks": {
+      "$ref": "#/components/schemas/Marks"
+     }
+    },
+    "required": [
+     "chain",
+     "beads",
+     "marks",
+     "anchors"
+    ],
+    "title": "Structure",
+    "type": "object"
+   },
+   "Summary": {
+    "properties": {
+     "ahead": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ahead"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Error"
+     },
+     "expression": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ExpressionStated"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "files": {
+      "items": {
+       "$ref": "#/components/schemas/FileSize"
+      },
+      "title": "Files",
+      "type": "array"
+     },
+     "finished": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Finished"
+     },
+     "genes": {
+      "title": "Genes",
+      "type": "integer"
+     },
+     "log_recent": {
+      "title": "Log Recent",
+      "type": "string"
+     },
+     "log_tail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Log Tail"
+     },
+     "loop_count": {
+      "title": "Loop Count",
+      "type": "integer"
+     },
+     "loops": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Loops",
+      "type": "object"
+     },
+     "models": {
+      "items": {
+       "$ref": "#/components/schemas/FileSize"
+      },
+      "title": "Models",
+      "type": "array"
+     },
+     "n_svs": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "N Svs"
+     },
+     "now": {
+      "title": "Now",
+      "type": "number"
+     },
+     "region": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Region"
+     },
+     "request": {
+      "$ref": "#/components/schemas/RequestStated"
+     },
+     "sample_note": {
+      "title": "Sample Note",
+      "type": "string"
+     },
+     "skipped_svs": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Skipped Svs"
+     },
+     "stage": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Stage"
+     },
+     "stages": {
+      "items": {
+       "$ref": "#/components/schemas/Stage"
+      },
+      "title": "Stages",
+      "type": "array"
+     },
+     "started": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Started"
+     },
+     "state": {
+      "enum": [
+       "queued",
+       "running",
+       "done",
+       "failed"
+      ],
+      "title": "State",
+      "type": "string"
+     },
+     "structures": {
+      "title": "Structures",
+      "type": "integer"
+     },
+     "structures_asked": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Structures Asked"
+     },
+     "structures_done": {
+      "title": "Structures Done",
+      "type": "integer"
+     }
+    },
+    "required": [
+     "state",
+     "stage",
+     "error",
+     "log_tail",
+     "ahead",
+     "started",
+     "finished",
+     "region",
+     "request",
+     "loops",
+     "n_svs",
+     "skipped_svs",
+     "structures",
+     "genes",
+     "loop_count",
+     "files",
+     "models",
+     "expression",
+     "stages",
+     "now",
+     "structures_done",
+     "structures_asked",
+     "log_recent"
+    ],
+    "title": "Summary",
+    "type": "object"
+   },
+   "UploadResult": {
+    "properties": {
+     "counts": {
+      "title": "Counts",
+      "type": "boolean"
+     },
+     "error": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ProblemFound"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "title": "Kind",
+      "type": "string"
+     },
+     "name": {
+      "title": "Name",
+      "type": "string"
+     },
+     "ok": {
+      "title": "Ok",
+      "type": "boolean"
+     },
+     "samples": {
+      "items": {
+       "type": "string"
+      },
+      "title": "Samples",
+      "type": "array"
+     },
+     "size": {
+      "title": "Size",
+      "type": "integer"
+     },
+     "summary": {
+      "title": "Summary",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "kind",
+     "name",
+     "size",
+     "ok",
+     "summary",
+     "error",
+     "samples",
+     "counts"
+    ],
+    "title": "UploadResult",
+    "type": "object"
+   },
+   "ValidationError": {
+    "properties": {
+     "ctx": {
+      "title": "Context",
+      "type": "object"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "title": "Location",
+      "type": "array"
+     },
+     "msg": {
+      "title": "Message",
+      "type": "string"
+     },
+     "type": {
+      "title": "Error Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError",
+    "type": "object"
+   },
+   "VariantCheck": {
+    "properties": {
+     "applied": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Applied",
+      "type": "object"
+     },
+     "skipped": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "title": "Skipped",
+      "type": "object"
+     },
+     "summary": {
+      "title": "Summary",
+      "type": "string"
+     },
+     "variants": {
+      "items": {
+       "$ref": "#/components/schemas/VariantRow"
+      },
+      "title": "Variants",
+      "type": "array"
+     }
+    },
+    "required": [
+     "summary",
+     "applied",
+     "skipped",
+     "variants"
+    ],
+    "title": "VariantCheck",
+    "type": "object"
+   },
+   "VariantRow": {
+    "properties": {
+     "change": {
+      "title": "Change",
+      "type": "string"
+     },
+     "end": {
+      "title": "End",
+      "type": "integer"
+     },
+     "genotype": {
+      "title": "Genotype",
+      "type": "string"
+     },
+     "length": {
+      "title": "Length",
+      "type": "integer"
+     },
+     "pos": {
+      "title": "Pos",
+      "type": "integer"
+     },
+     "type": {
+      "title": "Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "type",
+     "pos",
+     "end",
+     "length",
+     "genotype",
+     "change"
+    ],
+    "title": "VariantRow",
+    "type": "object"
+   },
+   "Volcano": {
+    "properties": {
+     "fold": {
+      "title": "Fold",
+      "type": "number"
+     },
+     "p": {
+      "title": "P",
+      "type": "number"
+     },
+     "points": {
+      "items": {
+       "maxItems": 2,
+       "minItems": 2,
+       "prefixItems": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "number"
+        }
+       ],
+       "type": "array"
+      },
+      "title": "Points",
+      "type": "array"
+     }
+    },
+    "required": [
+     "fold",
+     "p",
+     "points"
+    ],
+    "title": "Volcano",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "title": "3D-GNOME",
+  "version": "0.1.0"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/api/catalog": {
+   "get": {
+    "operationId": "api_catalog_api_catalog_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CatalogInfo"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Catalog Api Catalog Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     }
+    },
+    "summary": "Api Catalog"
+   }
+  },
+  "/api/compare": {
+   "get": {
+    "operationId": "api_compare_api_compare_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "a",
+      "required": true,
+      "schema": {
+       "title": "A",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "b",
+      "required": true,
+      "schema": {
+       "title": "B",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "shared",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Shared",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DistanceChanges"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Compare Api Compare Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Compare"
+   }
+  },
+  "/api/compare/expression": {
+   "get": {
+    "operationId": "api_compare_expression_api_compare_expression_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "a",
+      "required": true,
+      "schema": {
+       "title": "A",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "b",
+      "required": true,
+      "schema": {
+       "title": "B",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "shared",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Shared",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExpressionChanges"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Compare Expression Api Compare Expression Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Compare Expression"
+   }
+  },
+  "/api/compare/gene": {
+   "get": {
+    "description": "The distances of one gene in the structures of two jobs.",
+    "operationId": "api_compare_gene_api_compare_gene_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "a",
+      "required": true,
+      "schema": {
+       "title": "A",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "b",
+      "required": true,
+      "schema": {
+       "title": "B",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "gene",
+      "required": true,
+      "schema": {
+       "title": "Gene",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "shared",
+      "required": false,
+      "schema": {
+       "default": 0,
+       "title": "Shared",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/GeneDistances"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Compare Gene Api Compare Gene Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Compare Gene"
+   }
+  },
+  "/api/expression": {
+   "get": {
+    "description": "The hosted expression a job of this cell type, and of this sample of a call set, can take.",
+    "operationId": "api_expression_api_expression_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "cell",
+      "required": true,
+      "schema": {
+       "title": "Cell",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sv_set",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Sv Set",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "sample",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Sample",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ExpressionOptions"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Expression Api Expression Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Expression"
+   }
+  },
+  "/api/genes": {
+   "get": {
+    "description": "The suggestions of the region field.",
+    "operationId": "api_genes_api_genes_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "cell",
+      "required": true,
+      "schema": {
+       "title": "Cell",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": true,
+      "schema": {
+       "title": "Q",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+       "default": 8,
+       "title": "Limit",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/GeneHit"
+         },
+         "title": "Response Api Genes Api Genes Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Genes Api Genes Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Genes"
+   }
+  },
+  "/api/jobs": {
+   "post": {
+    "operationId": "api_submit_api_jobs_post",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/JobUrl"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Submit Api Jobs Post"
+        }
+       }
+      },
+      "description": "Not Found"
+     }
+    },
+    "summary": "Api Submit"
+   }
+  },
+  "/api/jobs/{key}": {
+   "get": {
+    "operationId": "shared_status_api_jobs__key__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Status"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Shared Status Api Jobs  Key  Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Shared Status"
+   }
+  },
+  "/api/jobs/{key}/annotations": {
+   "get": {
+    "operationId": "jobs_annotations_api_jobs__key__annotations_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Annotations"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Jobs Annotations Api Jobs  Key  Annotations Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Jobs Annotations"
+   }
+  },
+  "/api/jobs/{key}/contacts": {
+   "get": {
+    "operationId": "jobs_contacts_api_jobs__key__contacts_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "region",
+      "required": true,
+      "schema": {
+       "title": "Region",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "res",
+      "required": false,
+      "schema": {
+       "default": 25000,
+       "title": "Res",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "upper",
+      "required": false,
+      "schema": {
+       "default": "hic",
+       "title": "Upper",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "lower",
+      "required": false,
+      "schema": {
+       "default": "model",
+       "title": "Lower",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "norm",
+      "required": false,
+      "schema": {
+       "default": "ice",
+       "title": "Norm",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ContactMaps"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Jobs Contacts Api Jobs  Key  Contacts Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Jobs Contacts"
+   }
+  },
+  "/api/jobs/{key}/distance": {
+   "get": {
+    "operationId": "jobs_distance_api_jobs__key__distance_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "a",
+      "required": true,
+      "schema": {
+       "title": "A",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "b",
+      "required": true,
+      "schema": {
+       "title": "B",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Distance"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Jobs Distance Api Jobs  Key  Distance Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Jobs Distance"
+   }
+  },
+  "/api/jobs/{key}/files.zip": {
+   "get": {
+    "operationId": "jobs_zip_api_jobs__key__files_zip_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/zip": {}
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Jobs Zip Api Jobs  Key  Files Zip Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Jobs Zip"
+   }
+  },
+  "/api/jobs/{key}/genes": {
+   "get": {
+    "operationId": "jobs_genes_api_jobs__key__genes_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/GeneRow"
+         },
+         "title": "Response Jobs Genes Api Jobs  Key  Genes Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Jobs Genes Api Jobs  Key  Genes Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Jobs Genes"
+   }
+  },
+  "/api/jobs/{key}/log": {
+   "get": {
+    "operationId": "jobs_log_api_jobs__key__log_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "text/plain": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "text/plain": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Jobs Log Api Jobs  Key  Log Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Jobs Log"
+   }
+  },
+  "/api/jobs/{key}/loops": {
+   "get": {
+    "operationId": "jobs_loops_api_jobs__key__loops_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Loop"
+         },
+         "title": "Response Jobs Loops Api Jobs  Key  Loops Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Jobs Loops Api Jobs  Key  Loops Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Jobs Loops"
+   }
+  },
+  "/api/jobs/{key}/picks": {
+   "get": {
+    "operationId": "jobs_picks_api_jobs__key__picks_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Picks"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Jobs Picks Api Jobs  Key  Picks Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Jobs Picks"
+   }
+  },
+  "/api/jobs/{key}/structure/{i}": {
+   "get": {
+    "operationId": "jobs_structure_api_jobs__key__structure__i__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "i",
+      "required": true,
+      "schema": {
+       "title": "I",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Structure"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Jobs Structure Api Jobs  Key  Structure  I  Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Jobs Structure"
+   }
+  },
+  "/api/jobs/{key}/summary": {
+   "get": {
+    "operationId": "jobs_summary_api_jobs__key__summary_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Summary"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Jobs Summary Api Jobs  Key  Summary Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Jobs Summary"
+   }
+  },
+  "/api/lists": {
+   "post": {
+    "operationId": "list_create_api_lists_post",
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SharedList"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 List Create Api Lists Post"
+        }
+       }
+      },
+      "description": "Not Found"
+     }
+    },
+    "summary": "List Create"
+   }
+  },
+  "/api/lists/{code}": {
+   "get": {
+    "operationId": "list_read_api_lists__code__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "code",
+      "required": true,
+      "schema": {
+       "title": "Code",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SharedList"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 List Read Api Lists  Code  Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "List Read"
+   },
+   "put": {
+    "operationId": "list_update_api_lists__code__put",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "code",
+      "required": true,
+      "schema": {
+       "title": "Code",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SharedList"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 List Update Api Lists  Code  Put"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "List Update"
+   }
+  },
+  "/api/p/{key}": {
+   "get": {
+    "operationId": "private_status_api_p__key__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Status"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Private Status Api P  Key  Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Private Status"
+   }
+  },
+  "/api/p/{key}/annotations": {
+   "get": {
+    "operationId": "p_annotations_api_p__key__annotations_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Annotations"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 P Annotations Api P  Key  Annotations Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "P Annotations"
+   }
+  },
+  "/api/p/{key}/contacts": {
+   "get": {
+    "operationId": "p_contacts_api_p__key__contacts_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "region",
+      "required": true,
+      "schema": {
+       "title": "Region",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "res",
+      "required": false,
+      "schema": {
+       "default": 25000,
+       "title": "Res",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "upper",
+      "required": false,
+      "schema": {
+       "default": "hic",
+       "title": "Upper",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "lower",
+      "required": false,
+      "schema": {
+       "default": "model",
+       "title": "Lower",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "norm",
+      "required": false,
+      "schema": {
+       "default": "ice",
+       "title": "Norm",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ContactMaps"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 P Contacts Api P  Key  Contacts Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "P Contacts"
+   }
+  },
+  "/api/p/{key}/distance": {
+   "get": {
+    "operationId": "p_distance_api_p__key__distance_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "a",
+      "required": true,
+      "schema": {
+       "title": "A",
+       "type": "integer"
+      }
+     },
+     {
+      "in": "query",
+      "name": "b",
+      "required": true,
+      "schema": {
+       "title": "B",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Distance"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 P Distance Api P  Key  Distance Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "P Distance"
+   }
+  },
+  "/api/p/{key}/files.zip": {
+   "get": {
+    "operationId": "p_zip_api_p__key__files_zip_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/zip": {}
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 P Zip Api P  Key  Files Zip Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "P Zip"
+   }
+  },
+  "/api/p/{key}/genes": {
+   "get": {
+    "operationId": "p_genes_api_p__key__genes_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/GeneRow"
+         },
+         "title": "Response P Genes Api P  Key  Genes Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 P Genes Api P  Key  Genes Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "P Genes"
+   }
+  },
+  "/api/p/{key}/log": {
+   "get": {
+    "operationId": "p_log_api_p__key__log_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "text/plain": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "text/plain": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 P Log Api P  Key  Log Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "P Log"
+   }
+  },
+  "/api/p/{key}/loops": {
+   "get": {
+    "operationId": "p_loops_api_p__key__loops_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Loop"
+         },
+         "title": "Response P Loops Api P  Key  Loops Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 P Loops Api P  Key  Loops Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "P Loops"
+   }
+  },
+  "/api/p/{key}/picks": {
+   "get": {
+    "operationId": "p_picks_api_p__key__picks_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Picks"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 P Picks Api P  Key  Picks Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "P Picks"
+   }
+  },
+  "/api/p/{key}/structure/{i}": {
+   "get": {
+    "operationId": "p_structure_api_p__key__structure__i__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "i",
+      "required": true,
+      "schema": {
+       "title": "I",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Structure"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 P Structure Api P  Key  Structure  I  Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "P Structure"
+   }
+  },
+  "/api/p/{key}/summary": {
+   "get": {
+    "operationId": "p_summary_api_p__key__summary_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Summary"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 P Summary Api P  Key  Summary Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "P Summary"
+   }
+  },
+  "/api/preview": {
+   "get": {
+    "operationId": "api_preview_api_preview_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "cell",
+      "required": true,
+      "schema": {
+       "title": "Cell",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "region",
+      "required": true,
+      "schema": {
+       "title": "Region",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Preview"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Preview Api Preview Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Preview"
+   }
+  },
+  "/api/region": {
+   "get": {
+    "operationId": "api_region_api_region_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "cell",
+      "required": true,
+      "schema": {
+       "title": "Cell",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "q",
+      "required": true,
+      "schema": {
+       "title": "Q",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RegionInfo"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Region Api Region Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Region"
+   }
+  },
+  "/api/settings": {
+   "get": {
+    "operationId": "api_settings_api_settings_get",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "cell",
+      "required": true,
+      "schema": {
+       "title": "Cell",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/SettingGroup"
+         },
+         "title": "Response Api Settings Api Settings Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Settings Api Settings Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Settings"
+   }
+  },
+  "/api/settings/ini": {
+   "post": {
+    "operationId": "api_settings_ini_api_settings_ini_post",
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_api_settings_ini_api_settings_ini_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IniOverrides"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Settings Ini Api Settings Ini Post"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Settings Ini"
+   }
+  },
+  "/api/sv_sets/{name}/samples": {
+   "get": {
+    "description": "Sex, population and parents of each sample of a call set that has the table.",
+    "operationId": "api_sv_samples_api_sv_sets__name__samples_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "name",
+      "required": true,
+      "schema": {
+       "title": "Name",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SampleTable"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Sv Samples Api Sv Sets  Name  Samples Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Sv Samples"
+   }
+  },
+  "/api/uploads": {
+   "post": {
+    "operationId": "api_upload_api_uploads_post",
+    "requestBody": {
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_api_upload_api_uploads_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UploadResult"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Upload Api Uploads Post"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "413": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Request Entity Too Large"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     },
+     "503": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Service Unavailable"
+     }
+    },
+    "summary": "Api Upload"
+   }
+  },
+  "/api/uploads/link": {
+   "post": {
+    "operationId": "api_upload_link_api_uploads_link_post",
+    "requestBody": {
+     "content": {
+      "application/x-www-form-urlencoded": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_api_upload_link_api_uploads_link_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UploadResult"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Upload Link Api Uploads Link Post"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "413": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Request Entity Too Large"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     },
+     "503": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Service Unavailable"
+     }
+    },
+    "summary": "Api Upload Link"
+   }
+  },
+  "/api/uploads/{uid}/preview": {
+   "get": {
+    "operationId": "api_upload_preview_api_uploads__uid__preview_get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "uid",
+      "required": true,
+      "schema": {
+       "title": "Uid",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "region",
+      "required": true,
+      "schema": {
+       "title": "Region",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "cell",
+      "required": false,
+      "schema": {
+       "default": "",
+       "title": "Cell",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+           {
+            "type": "integer"
+           },
+           {
+            "type": "integer"
+           },
+           {
+            "type": "integer"
+           }
+          ],
+          "type": "array"
+         },
+         "title": "Response Api Upload Preview Api Uploads  Uid  Preview Get",
+         "type": "array"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Upload Preview Api Uploads  Uid  Preview Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "413": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Request Entity Too Large"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     },
+     "503": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Service Unavailable"
+     }
+    },
+    "summary": "Api Upload Preview"
+   }
+  },
+  "/api/variants/check": {
+   "post": {
+    "operationId": "api_variants_check_api_variants_check_post",
+    "requestBody": {
+     "content": {
+      "application/x-www-form-urlencoded": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_api_variants_check_api_variants_check_post"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VariantCheck"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Api Variants Check Api Variants Check Post"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Api Variants Check"
+   }
+  },
+  "/jobs/{key}/files/{name}": {
+   "get": {
+    "operationId": "shared_file_jobs__key__files__name__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "name",
+      "required": true,
+      "schema": {
+       "title": "Name",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Shared File Jobs  Key  Files  Name  Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Shared File"
+   }
+  },
+  "/p/{key}/files/{name}": {
+   "get": {
+    "operationId": "private_file_p__key__files__name__get",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "key",
+      "required": true,
+      "schema": {
+       "title": "Key",
+       "type": "string"
+      }
+     },
+     {
+      "in": "path",
+      "name": "name",
+      "required": true,
+      "schema": {
+       "title": "Name",
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response"
+     },
+     "400": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Refusal"
+        }
+       }
+      },
+      "description": "Bad Request"
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/Refusal"
+          },
+          {
+           "$ref": "#/components/schemas/Missing"
+          }
+         ],
+         "title": "Response 404 Private File P  Key  Files  Name  Get"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Private File"
+   }
+  }
+ }
+}

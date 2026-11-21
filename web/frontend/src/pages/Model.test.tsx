@@ -280,6 +280,13 @@ describe('Model a region page', () => {
     expect(alert.closest('section')?.querySelector('h2')?.textContent).toBe('6Ensemble and simulation settings')
   })
 
+  it('says so when the server does not answer a submission', async () => {
+    mockApi([[/^\/api\/jobs$/, () => Promise.reject(new TypeError('Failed to fetch'))]])
+    renderModel('/model?example=TNFRSF8')
+    fireEvent.click(await screen.findByRole('button', { name: /Build 100 structures/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('The server did not answer. Check the connection and build again.')
+  })
+
   it('opens the own data dialog from the card and from the loops option', async () => {
     renderModel()
     fireEvent.click(await screen.findByRole('radio', { name: /Your own data/ }))

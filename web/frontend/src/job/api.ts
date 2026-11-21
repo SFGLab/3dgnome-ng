@@ -31,6 +31,8 @@ export type Summary = {
   sample_note?: string
   loops: Record<string, number>
   n_svs: number | null
+  /** The variants of the sample in the region of a type the site does not apply. */
+  skipped_svs?: number | null
   structures: number
   /** The expression of the job: its label, counts or values, the unit of the gene table and the number of samples. */
   expression?: { label: string; kind: 'counts' | 'values'; unit: string; samples: number; source: string } | null
