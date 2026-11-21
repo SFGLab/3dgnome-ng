@@ -164,6 +164,7 @@ describe('Job explorer', () => {
         { stage: 'inputs', at: 1012 },
         { stage: 'modelling', at: 1020 },
       ],
+      now: 1050,
       log_recent: 'structure 1 written\nstructure 2 written',
     }
     mockApi([[/summary$/, () => [200, running]]])
@@ -180,8 +181,15 @@ describe('Job explorer', () => {
     // inputs 5, then modelling's 85 by two fifths: 5 + 34 = 39
     expect(bar).toHaveAttribute('aria-valuenow', '39')
     expect(screen.getByText('Modelling the structures, 2 of 5 written')).toBeInTheDocument()
-    const log = screen.getByRole('list', { name: 'Status log' })
-    expect(within(log).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Queued0 s', 'Building the inputs12 s', 'Modelling the structures20 s'])
+    // Every stage of the job, each with the time it took: 12 s in the queue, 8 s on the inputs,
+    // 30 s of modelling so far. The stage to come has no time.
+    const log = screen.getByRole('list', { name: 'Stages of the job' })
+    const rows = within(log).getAllByRole('listitem')
+    expect(rows.map((li) => li.textContent)).toEqual(['Queued12 s', 'Building the inputs8 s', 'Modelling the structures30 s', 'Marking promoters and enhancers'])
+    expect(rows.map((li) => li.className)).toEqual(['done', 'done', 'now', 'next'])
+    expect(rows[2]).toHaveAttribute('aria-current', 'step')
+    expect(rows[2].querySelector('.stage-spinner')).not.toBeNull()
+    expect(rows[3].querySelector('.status-time')).toBeNull()
     expect(screen.getByText(/structure 2 written/)).toBeInTheDocument()
     expect(checkCopy(container)).toEqual([])
   })

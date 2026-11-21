@@ -1456,7 +1456,8 @@
   transition: width 0.6s ease;
 }
 
-/* The stages in a row, each with the time it began. */
+/* The stages of the job in a row. A finished stage has a tick and the time it took, the running
+   one a spinner and its time so far, a stage to come a dot. */
 .status-log {
   display: flex;
   flex-wrap: wrap;
@@ -1469,13 +1470,47 @@
 
 .status-log li {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 7px;
   color: var(--muted);
 }
 
-.status-log li:last-child {
+.status-log li.now {
   color: var(--ink);
+  font-weight: 600;
+}
+
+.status-log li.next {
+  color: var(--faint);
+}
+
+.stage-mark {
+  flex: none;
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+}
+
+.status-log li.done .stage-mark {
+  color: var(--accent);
+}
+
+.stage-spinner {
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: map-spin 0.8s linear infinite;
+}
+
+.stage-dot {
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-spinner {
+    animation: none;
+  }
 }
 
 .status-time {

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { Check } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Summary } from './api'
 
 const WORDS: Record<string, string> = {
@@ -30,7 +31,9 @@ const since = (s: number) => (s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 
 
 /**
  * A queued or running job: the stage with its count, the bar and the stages, then the end of the
- * engine log, which follows its last line unless the reader has scrolled up.
+ * engine log, which follows its last line unless the reader has scrolled up. The stages are the
+ * ones the job goes through, in order. A finished stage has a tick and the time it took, the
+ * running one a spinner and its time so far, and a stage to come has neither.
  */
 export function Progress({ summary }: { summary: Summary }) {
   const stage = summary.state === 'queued' ? 'queued' : (summary.stage ?? 'inputs')
@@ -54,8 +57,23 @@ export function Progress({ summary }: { summary: Summary }) {
       : stage === 'modelling' && asked
         ? `${WORDS.modelling}, ${done} of ${asked} written`
         : (WORDS[stage] ?? stage)
-  const stages = summary.stages ?? []
-  const t0 = stages[0]?.at ?? 0
+  const reached = summary.stages ?? []
+  // The time of the running stage is counted on the clock of the server, from its answer on.
+  const got = useMemo(() => ({ at: Date.now(), now: summary.now ?? Date.now() / 1000 }), [summary])
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const now = got.now + (Date.now() - got.at) / 1000
+  const plan = ['queued', ...ws.map(([name]) => name)]
+  const rows = plan.map((name) => {
+    const i = reached.findIndex((s) => s.stage === name)
+    if (name === stage) return { name, state: 'now' as const, took: i >= 0 ? Math.max(0, now - reached[i].at) : null }
+    // A stage is over once a later one began. It took the time up to that beginning.
+    if (i >= 0 && i + 1 < reached.length) return { name, state: 'done' as const, took: reached[i + 1].at - reached[i].at }
+    return { name, state: 'next' as const, took: null }
+  })
   const log = useRef<HTMLPreElement>(null)
   const follow = useRef(true)
   useEffect(() => {
@@ -82,16 +100,15 @@ export function Progress({ summary }: { summary: Summary }) {
       <div className="progress-bar" role="progressbar" aria-label="Progress of the job" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
         <span style={{ width: `${pct}%` }} />
       </div>
-      {stages.length > 0 && (
-        <ul className="status-log" aria-label="Status log">
-          {stages.map((s) => (
-            <li key={s.stage}>
-              <span>{WORDS[s.stage] ?? s.stage}</span>
-              <span className="status-time">{since(s.at - t0)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ol className="status-log" aria-label="Stages of the job">
+        {rows.map((r) => (
+          <li key={r.name} className={r.state} aria-current={r.state === 'now' ? 'step' : undefined}>
+            {r.state === 'done' ? <Check className="stage-mark" size={13} aria-hidden /> : <span className={r.state === 'now' ? 'stage-mark stage-spinner' : 'stage-mark stage-dot'} aria-hidden />}
+            <span>{WORDS[r.name] ?? r.name}</span>
+            {r.took !== null && <span className="status-time">{since(r.took)}</span>}
+          </li>
+        ))}
+      </ol>
       <pre
         className="log-tail live"
         aria-label="End of the engine log"

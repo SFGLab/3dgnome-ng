@@ -29,6 +29,8 @@ export type Summary = {
   n_svs: number | null
   structures: number
   stages?: { stage: string; at: number }[]
+  /** The time of the server at this answer, on the clock of `stages`. */
+  now?: number
   structures_done?: number
   structures_asked?: number | null
   log_recent?: string

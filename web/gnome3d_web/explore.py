@@ -11,6 +11,7 @@ import hashlib
 import io
 import json
 import re
+import time
 import zipfile
 from pathlib import Path
 
@@ -88,6 +89,8 @@ def summary(job: Path, ahead: int | None) -> dict[str, object]:
         "files": files,
         "models": [{"name": m.name, "size": m.stat().st_size} for m in models(job) if m.is_file()],
         "stages": status.get("stages", []),
+        # The clock the stages are timed on. A page counts the time of the running stage from it.
+        "now": time.time(),
         "structures_done": len(list((job / "models").glob("*.cif"))) if (job / "models").is_dir() else 0,
         "structures_asked": _json(job / "request.json").get("n_models"),
         "log_recent": _public_log(_log_tail(job / "engine.log", 200), job) if status.get("state") in ("running", "failed") else "",
