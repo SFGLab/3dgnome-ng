@@ -953,8 +953,31 @@ and are closer to each other. A radius larger by the ratio of the nodes to the p
 size without the dropout back.
 
 The push of the excluded volume of the arcs stage depends on the number of nodes of the conformation. A node that
-stands for more chain after the dropout excludes no more than before. A radius of a node from the chain it stands
-for would hold the size under the dropout. That rule is not built.
+stands for more chain after the dropout excludes no more than before.
+
+A larger weight of the term is the weaker lever. The same trace with the dropout at a radius of 3.0:
+
+| weight of the excluded volume | end megabases apart after the solve | radius of gyration of the region |
+|---|---|---|
+| 0.1, production | 12.93 ± 0.27 | 8.30 ± 0.02 |
+| 0.146, times the ratio of the nodes | 13.10 ± 0.27 | 8.33 ± 0.02 |
+| 0.211, times the square of the ratio | 13.33 ± 0.27 | 8.37 ± 0.02 |
+
+The square of the ratio of the nodes gives the count of the pairs without the dropout back and restores half of
+the size, 8.37 of 8.44. The radius at the ratio to the power two thirds restores all of it.
+
+#### Proposal: the radius of a node from its chain
+
+Not built. It waits for the maintainer.
+
+A node stands for the chain to the midpoints of its two neighbours, `c` beads. The volume a pair excludes grows
+with the cube of its radius. The sum over the pairs keeps its value under a change of the node count when the
+radius of a pair is `R * (c_i * c_j / c0^2) ^ (1/3)`, with `R` the radius of the arcs stage and `c0` the mean
+chain of a node of the conformation before the dropout. Without the dropout the mean of the factor is near 1.
+With it the 320 nodes of the trace get a mean radius of 3.85, the value that restored the size. A node beside
+a long stretch without a loop excludes more than a node in a dense run of loops. The cap by the chain of
+`arcs_cap` stays on top of it. The rule needs a radius per pair in the kernel of the solver and in its JAX
+twin, where the radius is one number now.
 
 ### Trial of the threshold of the contact cells
 
