@@ -13,9 +13,9 @@ from types import SimpleNamespace
 import pytest
 from fixture import make_data
 
-from gnome3d_web.catalog import Catalog
-from gnome3d_web.jobs import JobRequest, request_key
-from gnome3d_web.settings_schema import (
+from gnome3d_web.catalog.model import Catalog
+from gnome3d_web.jobs.request import JobRequest, request_key
+from gnome3d_web.engine.settings import (
     EDITABLE,
     SettingError,
     apply_overrides,
@@ -83,7 +83,7 @@ def test_the_groups_follow_the_design(after_and_before_and_cat: SimpleNamespace)
     assert pe["default"] == "0.0" and pe["server"] == "0.0" and pe["hi"] == 0.6 and pe["meaning"], "a setting carries its default, server value, range and meaning: " + str(pe)
     import re as _re
 
-    from gnome3d_web import settings_schema as _schema
+    from gnome3d_web.engine import settings as _schema
 
     keys = {f"{e.section}.{e.key}" for group in _schema.EDITABLE.values() for e in group}
     assert keys == set(_schema.HELP), "every editable setting has its own text and no text is left over: " + str(keys ^ set(_schema.HELP))

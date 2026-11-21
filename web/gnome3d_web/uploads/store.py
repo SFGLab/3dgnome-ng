@@ -1,0 +1,84 @@
+"""The stored file of an upload, its record and what the dialog is told about it.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import secrets
+import shutil
+import time
+from dataclasses import asdict
+from pathlib import Path
+from typing import BinaryIO
+
+from .checks import Check, _int, records
+
+
+CHUNK = 1 << 20
+
+
+class UploadTooLarge(ValueError):
+    """An upload past the size cap."""
+
+
+def store(stream: BinaryIO, name: str, kind: str, root: Path, cap: int, extra: dict[str, str] | None = None) -> Path:
+    """Copies an upload to a new directory under root in chunks and writes its meta.json.
+    Returns the directory. Raises UploadTooLarge past cap bytes, leaving nothing behind."""
+    uid = secrets.token_urlsafe(12)
+    d = root / uid
+    d.mkdir(parents=True)
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "_", Path(name).name) or "upload"
+    size = 0
+    try:
+        with (d / safe).open("wb") as out:
+            while chunk := stream.read(CHUNK):
+                size += len(chunk)
+                if size > cap:
+                    raise UploadTooLarge(f"{name} is more than {cap // (1 << 20)} MB, the largest upload this server takes")
+                out.write(chunk)
+    except UploadTooLarge:
+        shutil.rmtree(d)
+        raise
+    (d / "meta.json").write_text(json.dumps({"id": uid, "kind": kind, "name": safe, "size": size, "created": time.time()} | (extra or {})))
+    return d
+
+
+def meta(d: Path) -> dict[str, object]:
+    return json.loads((d / "meta.json").read_text())
+
+
+def data_file(d: Path) -> Path:
+    return d / str(meta(d)["name"])
+
+
+def record_check(d: Path, c: Check) -> None:
+    """Writes the outcome of the check into the upload's meta.json."""
+    m = meta(d) | {"ok": c.ok}
+    (d / "meta.json").write_text(json.dumps(m))
+
+
+def clean_copy(d: Path, dst: Path) -> Path:
+    """Writes the upload's records tab separated, without header lines or Windows line ends."""
+    with dst.open("w") as out:
+        for _, cols in records(data_file(d)):
+            out.write("\t".join(cols) + "\n")
+    return dst
+
+
+def result(d: Path, c: Check) -> dict[str, object]:
+    m = meta(d)
+    # A map read by link is shown by the remote file's name and size, not the window kept.
+    name, size = m.get("link_name", m["name"]), int(m.get("link_size", m["size"]))  # type: ignore[arg-type]
+    return {"id": m["id"], "kind": m["kind"], "name": name, "size": size, "ok": c.ok, "summary": c.summary, "error": asdict(c.error) if c.error else None, "samples": c.samples, "counts": c.counts}
+
+
+def preview(d: Path, region: tuple[str, int, int]) -> list[list[int]]:
+    """The loops of a loops upload inside a region, as anchor midpoints and the count."""
+    out = []
+    for _, cols in records(data_file(d)):
+        if len(cols) >= 7 and cols[0] == cols[3] == region[0] and _int(cols[6]) is not None:
+            a, b = int(cols[1]), int(cols[5])
+            if a >= region[1] and b <= region[2]:
+                out.append([(a + int(cols[2])) // 2, (int(cols[4]) + b) // 2, int(cols[6])])
+    return out

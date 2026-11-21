@@ -32,7 +32,7 @@ cut to the job's directory. The zip has the same three files. The files on disk 
 the job runs with.
 
 The variants dialog and the job read the variants of a sample with one reader and rewire the
-same loops, `svs.sample_variants` and `inputs.loop_network`.
+same loops, `variants.vcf.sample_variants` and `engine.inputs.loop_network`.
 
 ## Sync codes
 

@@ -38,9 +38,10 @@ def make_parts(root: Path) -> dict[str, str]:
 
 @pytest.fixture(scope="module", autouse=True)
 def shared(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespace:
-    from gnome3d_web import hicdiffusion
-    from gnome3d_web.catalog import Catalog
-    from gnome3d_web.jobs import JobRequest, run_job
+    from gnome3d_web.engine import hicdiffusion
+    from gnome3d_web.catalog.model import Catalog
+    from gnome3d_web.jobs.request import JobRequest
+    from gnome3d_web.jobs.run import run_job
 
     d = str(tmp_path_factory.mktemp("work"))
     root = Path(d)

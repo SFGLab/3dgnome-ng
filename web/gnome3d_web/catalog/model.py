@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from .expression import KINDS as EXPRESSION_KINDS
-from .expression import Source
+from ..expression import KINDS as EXPRESSION_KINDS
+from ..expression import Source
 
 FACTOR_CHOICES = ("CTCF", "RNAPII", "CTCF+RNAPII")
 BACKGROUNDS = ("hic", "hicdiffusion", "none")

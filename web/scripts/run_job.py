@@ -11,8 +11,9 @@ import json
 import sys
 from pathlib import Path
 
-from gnome3d_web.catalog import Catalog
-from gnome3d_web.jobs import JobRequest, run_job
+from gnome3d_web.catalog.model import Catalog
+from gnome3d_web.jobs.request import JobRequest
+from gnome3d_web.jobs.run import run_job
 from gnome3d_web.settings import Settings
 
 

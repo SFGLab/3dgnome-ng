@@ -16,10 +16,11 @@ from types import SimpleNamespace
 import pytest
 from fixture import make_data
 
-from gnome3d_web.jobs import JobRequest, on_cores
-from gnome3d_web.queue import LocalPool, resume_interrupted, server_cores, slot_cores
+from gnome3d_web.jobs.request import JobRequest
+from gnome3d_web.jobs.run import on_cores
+from gnome3d_web.jobs.workers import LocalPool, resume_interrupted, server_cores, slot_cores
 from gnome3d_web import settings
-from gnome3d_web.queue import claim_slot
+from gnome3d_web.jobs.workers import claim_slot
 from gnome3d_web.settings import Settings, SettingsError
 
 FAKE = [sys.executable, str(Path(__file__).resolve().parent / "fake_engine.py")]

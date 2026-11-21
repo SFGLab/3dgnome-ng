@@ -106,11 +106,11 @@ def test_a_private_job_that_waits_has_its_status_on_disk(site: SimpleNamespace) 
 
 
 def test_the_summary_of_a_job_being_written_lists_no_half_written_file(tmp_path: Path) -> None:
-    from gnome3d_web import explore
+    from gnome3d_web.results import views
 
     # A job writes a file under a second name and renames it. A page that asks for the summary at
     # that moment got an error from the file that was gone.
     (tmp_path / "status.json").write_text(json.dumps({"state": "running"}))
     (tmp_path / "status.json.tmp").write_text("{")
-    assert [f["name"] for f in explore.summary(tmp_path, None)["files"]] == ["status.json"], "the summary lists the files and not the one being written"  # type: ignore[union-attr]
-    assert explore._sizes([tmp_path / "gone.json"]) == [], "a file that is gone when its size is read is left out"
+    assert [f["name"] for f in views.summary(tmp_path, None)["files"]] == ["status.json"], "the summary lists the files and not the one being written"  # type: ignore[union-attr]
+    assert views._sizes([tmp_path / "gone.json"]) == [], "a file that is gone when its size is read is left out"

@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-SETTINGS_MD = Path(__file__).resolve().parents[2] / "SETTINGS.md"
+SETTINGS_MD = Path(__file__).resolve().parents[3] / "SETTINGS.md"
 BOOLEAN = ("yes", "no")
 _TRUE = {"yes", "true", "1", "on"}
 _FALSE = {"no", "false", "0", "off"}

@@ -25,15 +25,21 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 
-from . import explore, expression, hicdiffusion, lists, owndata, remote
-from .catalog import BACKGROUNDS, FACTOR_CHOICES, SAMPLE_COLUMNS, Catalog
-from .jobs import JobRequest, _member, request_key
-from .queue import enqueue, queue_position, resume_after_restart, sweep_private
+from . import expression, lists, remote
+from .catalog.model import BACKGROUNDS, FACTOR_CHOICES, SAMPLE_COLUMNS, Catalog
+from .engine import hicdiffusion
+from .engine.settings import SettingError, parse_ini, schema, validate_overrides
+from .jobs.request import JobRequest, request_key
+from .jobs.store import _member
+from .jobs.workers import enqueue, queue_position, resume_after_restart, sweep_private
 from .regions import HICDIFFUSION_SPAN, RegionError, parse_region
+from .results import compare, contact_view, views
 from .settings import Settings
-from .settings_schema import SettingError, parse_ini, schema, validate_overrides
 from .siteconfig import ConfigFile
-from .svs import UnknownSample
+from .uploads import checks as upload_checks
+from .uploads import store as upload_store
+from .variants import effect
+from .variants.vcf import UnknownSample
 
 FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|hicdiffusion\.bedpe|expression\.tsv|[A-Za-z0-9_.:-]+\.cif)$")
 
@@ -137,7 +143,7 @@ def create_app() -> FastAPI:
             raise JobError(f"own is not JSON: {e}", "own") from e
         own_dirs = own_uploads(own_raw)
         if fields.get("vcf_upload"):
-            vcf = owndata.data_file(checked_upload(fields["vcf_upload"], "vcf", "vcf_upload"))
+            vcf = upload_store.data_file(checked_upload(fields["vcf_upload"], "vcf", "vcf_upload"))
         if cell_type == "own":
             if not own_dirs.get("loops") and not own_dirs.get("loops_from"):
                 raise JobError("Your own data needs loops, uploaded or a listed set.", "loops")
@@ -205,10 +211,10 @@ def create_app() -> FastAPI:
             (job / "own").mkdir()
             own: dict[str, object] = {"loops": []}
             for i, (factor, d) in enumerate(own_dirs.get("loops", [])):
-                own["loops"].append([factor, str(owndata.clean_copy(d, job / "own" / f"loops_{i}.bedpe"))])  # type: ignore[union-attr]
+                own["loops"].append([factor, str(upload_store.clean_copy(d, job / "own" / f"loops_{i}.bedpe"))])  # type: ignore[union-attr]
             for kind in ("anchors", "contacts", "enhancers"):
                 if kind in own_dirs:
-                    own[kind] = str(owndata.clean_copy(own_dirs[kind], job / "own" / f"{kind}.txt"))
+                    own[kind] = str(upload_store.clean_copy(own_dirs[kind], job / "own" / f"{kind}.txt"))
             for key in ("loops_from", "enhancers_from"):
                 if key in own_dirs:
                     own[key] = own_dirs[key]
@@ -253,7 +259,7 @@ def create_app() -> FastAPI:
         d = uploads / str(uid)
         if not re.fullmatch(r"[A-Za-z0-9_-]{8,64}", str(uid)) or not (d / "meta.json").is_file():
             raise JobError(f"upload {uid!r} does not exist", field)
-        m = owndata.meta(d)
+        m = upload_store.meta(d)
         if m["kind"] != kind:
             raise JobError(f"upload {uid!r} holds {m['kind']}, not {kind}", field)
         if not m.get("ok"):
@@ -270,7 +276,7 @@ def create_app() -> FastAPI:
         kind = fields.get("expression_kind", "counts")
         if kind not in expression.KINDS:
             raise JobError(f"expression_kind is {kind!r}, not one of {', '.join(expression.KINDS)}", "expression")
-        name = str(owndata.meta(d)["name"])
+        name = str(upload_store.meta(d)["name"])
         try:
             columns = json.loads(fields.get("expression_columns") or "[]")
         except json.JSONDecodeError as e:
@@ -278,7 +284,7 @@ def create_app() -> FastAPI:
         if not isinstance(columns, list) or not all(isinstance(c, str) for c in columns):
             raise JobError("expression_columns must be a list of sample names", "expression")
         try:
-            table = expression.read_table(owndata.data_file(d))
+            table = expression.read_table(upload_store.data_file(d))
             columns = columns or list(table.data.columns)
             missing = [c for c in columns if c not in table.data.columns]
             if missing:
@@ -340,19 +346,19 @@ def create_app() -> FastAPI:
         cap = s.upload_max_mb << 20
         if int(request.headers.get("content-length", "0")) > cap + (1 << 16):
             return JSONResponse({"error": f"{file.filename} is more than {s.upload_max_mb} MB, the largest upload this server takes"}, 413)
-        if kind not in owndata.KINDS:
-            return JSONResponse({"error": f"{kind!r} is not one of {', '.join(owndata.KINDS)}", "field": "kind"}, 400)
+        if kind not in upload_checks.KINDS:
+            return JSONResponse({"error": f"{kind!r} is not one of {', '.join(upload_checks.KINDS)}", "field": "kind"}, 400)
         try:
             reg = region_of(cell, region)
         except RegionError as e:
             return JSONResponse({"error": str(e), "field": "region"}, 400)
         try:
-            d = owndata.store(file.file, file.filename or kind, kind, uploads, cap, {"factor": factor} if factor else None)
-        except owndata.UploadTooLarge as e:
+            d = upload_store.store(file.file, file.filename or kind, kind, uploads, cap, {"factor": factor} if factor else None)
+        except upload_store.UploadTooLarge as e:
             return JSONResponse({"error": str(e)}, 413)
-        c = owndata.check(kind, owndata.data_file(d), reg)
-        owndata.record_check(d, c)
-        return JSONResponse(owndata.result(d, c), 201)
+        c = upload_checks.check(kind, upload_store.data_file(d), reg)
+        upload_store.record_check(d, c)
+        return JSONResponse(upload_store.result(d, c), 201)
 
     # A link read holds a worker thread for up to READ_SECONDS; past the limit a read is refused
     # at once rather than queued behind the others.
@@ -382,10 +388,10 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": str(e), "fix": e.fix, "field": "url"}, 400)
         stem = urlparse(url).path.rsplit("/", 1)[-1]
         extra = {"link": url, "link_name": stem, "link_size": str(size)}
-        d = owndata.store(io.BytesIO(text), f"{stem}.{reg[0]}_{reg[1]}_{reg[2]}.bedpe", "contacts", uploads, s.upload_max_mb << 20, extra)
-        c = owndata.Check(True, summary)
-        owndata.record_check(d, c)
-        return JSONResponse(owndata.result(d, c), 201)
+        d = upload_store.store(io.BytesIO(text), f"{stem}.{reg[0]}_{reg[1]}_{reg[2]}.bedpe", "contacts", uploads, s.upload_max_mb << 20, extra)
+        c = upload_checks.Check(True, summary)
+        upload_store.record_check(d, c)
+        return JSONResponse(upload_store.result(d, c), 201)
 
     def upload_dir(uid: str) -> Path:
         if not re.fullmatch(r"[A-Za-z0-9_-]{8,64}", uid) or not (uploads / uid / "meta.json").is_file():
@@ -399,7 +405,7 @@ def create_app() -> FastAPI:
             reg = region_of(cell, region)
         except RegionError as e:
             return JSONResponse({"error": str(e)}, 400)
-        return JSONResponse(owndata.preview(d, reg) if reg else [])
+        return JSONResponse(upload_store.preview(d, reg) if reg else [])
 
     @app.post("/api/variants/check")
     def api_variants_check(cell: str = Form(...), region: str = Form(...), factors: str = Form("CTCF"), sample: str = Form(...), haplotype: int = Form(0), upload: str = Form(""), sv_set: str = Form(""), own: str = Form("")) -> JSONResponse:  # noqa: PLR0913
@@ -410,7 +416,7 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": str(e), "field": "region"}, 400)
         if upload:
             try:
-                vcf = owndata.data_file(checked_upload(upload, "vcf", "upload"))
+                vcf = upload_store.data_file(checked_upload(upload, "vcf", "upload"))
             except JobError as e:
                 return JSONResponse({"error": str(e), "field": e.field}, 400)
         elif sv_set in catalog.sv_sets:
@@ -421,10 +427,10 @@ def create_app() -> FastAPI:
             own_dirs = own_uploads(json.loads(own or "{}"))
         except (JobError, json.JSONDecodeError) as e:
             return JSONResponse({"error": str(e), "field": "own"}, 400)
-        own_loops = [(f, owndata.data_file(d)) for f, d in own_dirs.get("loops", [])]
-        own_anchors = owndata.data_file(own_dirs["anchors"]) if "anchors" in own_dirs else None
+        own_loops = [(f, upload_store.data_file(d)) for f, d in own_dirs.get("loops", [])]
+        own_anchors = upload_store.data_file(own_dirs["anchors"]) if "anchors" in own_dirs else None
         try:
-            out = owndata.variant_check(catalog.cell_types[base], r, factors if factors in FACTOR_CHOICES else "CTCF", vcf, sample, 1 if haplotype == 1 else 0, own_loops, own_anchors)
+            out = effect.variant_check(catalog.cell_types[base], r, factors if factors in FACTOR_CHOICES else "CTCF", vcf, sample, 1 if haplotype == 1 else 0, own_loops, own_anchors)
         except UnknownSample:
             return JSONResponse({"error": f"{sample!r} is not a sample of this VCF", "field": "sample"}, 400)
         return JSONResponse(out)
@@ -513,7 +519,7 @@ def create_app() -> FastAPI:
         p = d / "models" / name if name.endswith(".cif") else d / name
         if not p.is_file():
             raise HTTPException(404)
-        stated = explore.public_file(d, name)
+        stated = views.public_file(d, name)
         if stated is not None:
             kind = "application/json" if name.endswith(".json") else "text/plain; charset=utf-8"
             return Response(stated, media_type=kind, headers={"Content-Disposition": f'attachment; filename="{name}"'})
@@ -529,7 +535,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/jobs/{key}")
     def shared_status(key: str) -> JSONResponse:
-        return JSONResponse(explore.public_status(job_dir("jobs", key)))
+        return JSONResponse(views.public_status(job_dir("jobs", key)))
 
     @app.get("/api/jobs/{key}/files")
     def shared_files(key: str) -> list[str]:
@@ -537,7 +543,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/p/{key}")
     def private_status(key: str) -> JSONResponse:
-        return JSONResponse(explore.public_status(job_dir("private", key)))
+        return JSONResponse(views.public_status(job_dir("private", key)))
 
     @app.get("/api/sv_sets/{name}/samples")
     def api_sv_samples(name: str) -> JSONResponse:
@@ -593,39 +599,39 @@ def create_app() -> FastAPI:
         @app.get(base + "/summary", name=f"{kind}_summary")
         def ex_summary(key: str) -> JSONResponse:
             d = guard(key)
-            summary = explore.summary(d, queue_position(s, d))
+            summary = views.summary(d, queue_position(s, d))
             summary["sample_note"] = sample_note(summary["request"])
             return JSONResponse(summary)
 
         @app.get(base + "/structure/{i}", name=f"{kind}_structure")
         def ex_structure(key: str, i: int) -> JSONResponse:
             try:
-                return JSONResponse(explore.structure(guard(key), i))
-            except explore.ExploreError as e:
+                return JSONResponse(views.structure(guard(key), i))
+            except views.ExploreError as e:
                 return JSONResponse({"error": str(e)}, 404)
 
         @app.get(base + "/annotations", name=f"{kind}_annotations")
         def ex_annotations(key: str) -> JSONResponse:
-            return JSONResponse(explore.annotations(guard(key)))
+            return JSONResponse(views.annotations(guard(key)))
 
         @app.get(base + "/picks", name=f"{kind}_picks")
         def ex_picks(key: str) -> JSONResponse:
-            return JSONResponse(explore.picks(guard(key)))
+            return JSONResponse(views.picks(guard(key)))
 
         @app.get(base + "/distance", name=f"{kind}_distance")
         def ex_distance(key: str, a: int, b: int) -> JSONResponse:
             try:
-                return JSONResponse(explore.distance(guard(key), a, b))
-            except explore.ExploreError as e:
+                return JSONResponse(views.distance(guard(key), a, b))
+            except views.ExploreError as e:
                 return JSONResponse({"error": str(e)}, 400)
 
         @app.get(base + "/genes", name=f"{kind}_genes")
         def ex_genes(key: str) -> JSONResponse:
-            return JSONResponse(explore.genes(guard(key)))
+            return JSONResponse(views.genes(guard(key)))
 
         @app.get(base + "/loops", name=f"{kind}_loops")
         def ex_loops(key: str) -> JSONResponse:
-            return JSONResponse(explore.loops(guard(key)))
+            return JSONResponse(views.loops(guard(key)))
 
         @app.get(base + "/contacts", name=f"{kind}_contacts")
         def ex_contacts(request: Request, key: str, region: str, res: int = 25000, upper: str = "hic", lower: str = "model", norm: str = "ice") -> Response:
@@ -638,19 +644,19 @@ def create_app() -> FastAPI:
             try:
                 return packed_json(
                     request,
-                    explore.contact_maps(d, region, res, upper, lower, norm, ct.hic_url if deep else "", ct.hic_name if deep else "", s.link_allow_private),  # type: ignore[union-attr]
+                    contact_view.contact_maps(d, region, res, upper, lower, norm, ct.hic_url if deep else "", ct.hic_name if deep else "", s.link_allow_private),  # type: ignore[union-attr]
                 )
-            except explore.ExploreError as e:
+            except views.ExploreError as e:
                 return JSONResponse({"error": str(e)}, 400)
 
         @app.get(base + "/log", name=f"{kind}_log", response_class=PlainTextResponse)
         def ex_log(key: str) -> PlainTextResponse:
-            return PlainTextResponse(explore.log_text(guard(key)))
+            return PlainTextResponse(views.log_text(guard(key)))
 
         @app.get(base + "/files.zip", name=f"{kind}_zip")
         def ex_zip(key: str) -> Response:
             d = guard(key)
-            return Response(explore.zip_bytes(d), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{d.name}.zip"'})
+            return Response(views.zip_bytes(d), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{d.name}.zip"'})
 
     explore_routes("jobs")
     explore_routes("p")
@@ -663,7 +669,7 @@ def create_app() -> FastAPI:
             if not m:
                 raise HTTPException(404)
             dirs.append(job_dir(m[1], m[2]))
-        return JSONResponse(explore.compare(dirs[0], dirs[1], shared == 1))
+        return JSONResponse(compare.compare(dirs[0], dirs[1], shared == 1))
 
     @functools.cache
     def names_by_id() -> dict[str, str]:
@@ -680,7 +686,7 @@ def create_app() -> FastAPI:
             if not m:
                 raise HTTPException(404)
             dirs.append(job_dir(m[1], m[2]))
-        out = explore.compare_gene(dirs[0], dirs[1], gene, shared == 1)
+        out = compare.compare_gene(dirs[0], dirs[1], gene, shared == 1)
         return JSONResponse(out) if out else JSONResponse({"error": f"{gene} is not a gene of both jobs"}, 404)
 
     @app.get("/api/compare/expression")
@@ -691,7 +697,7 @@ def create_app() -> FastAPI:
             if not m:
                 raise HTTPException(404)
             dirs.append(job_dir(m[1], m[2]))
-        return JSONResponse(explore.compare_expression(dirs[0], dirs[1], s.results_dir / "expression", shared == 1, names_by_id))
+        return JSONResponse(compare.compare_expression(dirs[0], dirs[1], s.results_dir / "expression", shared == 1, names_by_id))
 
     shared_lists = lists.Lists(s.results_dir / "lists")
     BAD_CODE = "A sync code has 16 letters and digits, like K7M2-9QXD-4THP-W3RZ."

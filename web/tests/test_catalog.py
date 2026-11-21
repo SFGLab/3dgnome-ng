@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 from fixture import make_data
 
-from gnome3d_web.catalog import Catalog
+from gnome3d_web.catalog.model import Catalog
 from gnome3d_web.regions import RegionError, parse_region
 
 

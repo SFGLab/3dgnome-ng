@@ -111,7 +111,7 @@ def test_two_jobs_from_disk_compare_as_they_did(site: SimpleNamespace) -> None:
 
 
 def test_a_request_of_the_old_form_is_read(site: SimpleNamespace) -> None:
-    from gnome3d_web.jobs import JobRequest
+    from gnome3d_web.jobs.request import JobRequest
 
     req = JobRequest(**site.old)
     assert req.background == "hicdiffusion" and req.overrides == {} and req.own == {} and req.expression == {}, "the old flag is the predicted background and the later fields are empty: " + str(req)

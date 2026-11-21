@@ -34,7 +34,7 @@ The Model a region page at `/model` reads the JSON API: `GET /api/catalog`, `GET
 `GET /api/preview` for the loop arcs of a region, `GET /api/settings` for the engine settings a
 user may change, `POST /api/settings/ini` to read an uploaded config, and `POST /api/jobs`, which
 answers with the job's url or the field a request fails on. The settings a user may change, with
-their ranges, are listed in `web/gnome3d_web/settings_schema.py`; every other setting keeps the cell
+their ranges, are listed in `web/gnome3d_web/engine/settings.py`; every other setting keeps the cell
 type's value.
 
 A job's page at `/jobs/<key>`, or `/p/<token>` for a private job, is the explorer: the Structure

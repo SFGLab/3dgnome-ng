@@ -14,7 +14,7 @@ import pandas as pd
 import pytest
 
 from gnome3d_web.regions import Region
-from gnome3d_web.svs import read_svs, sample_variants
+from gnome3d_web.variants.vcf import read_svs, sample_variants
 from personal3d import engine, rewrite
 from personal3d.hicdiffusion import haplotype_window
 from personal3d.lift import Lift

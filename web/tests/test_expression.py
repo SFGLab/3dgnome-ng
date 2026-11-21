@@ -19,8 +19,8 @@ import pytest
 from fixture import make_data
 
 from gnome3d_web import expression
-from gnome3d_web.catalog import Catalog
-from gnome3d_web.jobs import JobRequest, normalised
+from gnome3d_web.catalog.model import Catalog
+from gnome3d_web.jobs.request import JobRequest, normalised
 
 HAS_DESEQ = importlib.util.find_spec("pydeseq2") is not None
 

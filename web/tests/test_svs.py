@@ -11,7 +11,7 @@ import pytest
 from fixture import make_data
 
 from gnome3d_web.regions import Region
-from gnome3d_web.svs import UnknownSample, read_svs, sample_variants
+from gnome3d_web.variants.vcf import UnknownSample, read_svs, sample_variants
 
 
 def test_a_phased_deletion_lands_on_the_first_haplotype(tmp_path: Path) -> None:

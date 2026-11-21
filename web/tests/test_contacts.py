@@ -219,7 +219,7 @@ def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_
     assert lp_ice["upper"] == lp["upper"], "a loop half is never balanced: " + "ice changed the loop half"
     assert isinstance(lp.get("loop_enrichment"), float), "with loops on one side the card has the enrichment: " + str(lp.get("loop_enrichment"))
 
-    from gnome3d_web import explore as ex
+    from gnome3d_web.results import contact_view as ex
 
     reads: list[tuple] = []
 

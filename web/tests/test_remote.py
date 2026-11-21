@@ -181,9 +181,9 @@ def test_an_mcool_link_becomes_a_contacts_upload(shared: SimpleNamespace) -> Non
     assert j["summary"].startswith("Resolutions from 5 kb to 25 kb, 25 kb is used."), "the summary names the resolutions and the one used: " + str(j["summary"])
     assert "30 contacts in chr1:0-1,000,000 are read" in j["summary"], "the summary counts the contacts read in the window: " + str(j["summary"])
     stored = root / "results" / "uploads" / j["id"]
-    from gnome3d_web import owndata
+    from gnome3d_web.uploads import store as upload_store
 
-    pairs = pd.read_csv(owndata.data_file(stored), sep="\t", header=None)
+    pairs = pd.read_csv(upload_store.data_file(stored), sep="\t", header=None)
     assert len(pairs) == 10 and set(pairs[2] - pairs[1]) == {25_000} and int(pairs[6].sum()) == 30, "the window's off diagonal bin pairs are stored at 25 kb: " + str(pairs.to_string())
 
     r = link(f"{url_signed}/test.mcool")

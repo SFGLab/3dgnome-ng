@@ -177,14 +177,14 @@ def test_a_ten_column_loop_file_is_refused_with_the_design_s_message(site: Simpl
     dele = next((x for x in v.json().get("variants", []) if x["type"] == "DEL"), {})
     assert "H3K27ac" in dele.get("change", "") and "CTCF" not in dele.get("change", ""), "with own loops the check describes the change to those loops: " + v.text[:300]
 
-    from gnome3d_web.owndata import combine_changes
+    from gnome3d_web.variants.effect import combine_changes
 
     assert combine_changes([("CTCF", "lengthens 9 loops"), ("RNAPII", "lengthens 2 loops")]) == "lengthens 11 loops, 9 CTCF and 2 RNAPII", "one verb over two factors is summed with the split"
     assert combine_changes([("CTCF", "removes 1 CTCF anchor and its 2 loops"), ("RNAPII", "shortens 1 loop")]) == "removes 1 CTCF anchor and its 2 loops; shortens 1 loop", "different changes are listed by factor"
     assert combine_changes([("CTCF", "shortens 3 loops"), ("RNAPII", "no anchor inside")]) == "shortens 3 loops", "no change in one factor is left out"
     assert combine_changes([("CTCF", "no anchor inside"), ("RNAPII", "no anchor inside")]) == "no anchor inside", "no change in every factor is said once"
 
-    from gnome3d_web.queue import sweep_private
+    from gnome3d_web.jobs.workers import sweep_private
 
     stale = uploads / lid
     old_t = time.time() - 30 * 86400

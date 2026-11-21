@@ -145,8 +145,8 @@ def test_a_private_job_answers_under_api_p(site: SimpleNamespace) -> None:
     token = priv.rsplit("/", 1)[1]
     assert c.get(f"/api/p/{token}/summary").status_code == 200, "a private job answers under /api/p"
     assert c.get(f"/api/jobs/{token}/summary").status_code == 404, "a private job is not under /api/jobs"
-    from gnome3d_web import explore as ex
-    from gnome3d_web.jobs import _status
+    from gnome3d_web.results import views as ex
+    from gnome3d_web.jobs.store import _status
 
     run = root / "results" / "jobs" / "running0000000001"
     (run / "models").mkdir(parents=True)

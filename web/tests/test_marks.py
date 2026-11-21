@@ -8,7 +8,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from gnome3d_web.marks import ep_table, mark_beads
+from gnome3d_web.jobs.marks import ep_table, mark_beads
 
 
 def test_a_tss_inside_the_chain_marks_its_bead() -> None:

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from personal3d.variants import SV
 
-from .regions import Region
+from ..regions import Region
 
 KINDS = ("DEL", "INS", "INV", "DUP")
 

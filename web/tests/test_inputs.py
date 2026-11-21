@@ -13,8 +13,8 @@ from types import SimpleNamespace
 import pytest
 from fixture import make_data
 
-from gnome3d_web.catalog import Catalog
-from gnome3d_web.inputs import Own, build_inputs, loop_network
+from gnome3d_web.catalog.model import Catalog
+from gnome3d_web.engine.inputs import Own, build_inputs, loop_network
 from gnome3d_web.regions import Region
 from personal3d.variants import SV
 

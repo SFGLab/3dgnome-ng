@@ -14,8 +14,9 @@ from typing import Any
 import pytest
 from fixture import make_data
 
-from gnome3d_web.catalog import Catalog
-from gnome3d_web.jobs import JobRequest, request_key, run_job
+from gnome3d_web.catalog.model import Catalog
+from gnome3d_web.jobs.request import JobRequest, request_key
+from gnome3d_web.jobs.run import run_job
 
 FAKE = [sys.executable, str(Path(__file__).resolve().parent / "fake_engine.py")]
 
@@ -139,7 +140,7 @@ def test_marks_list_promoter_and_enhancer_beads(status_and_res: SimpleNamespace)
 
 def test_a_listed_cell_type_marks_its_own_enhancers(shared: SimpleNamespace) -> None:
     cat = shared.cat
-    from gnome3d_web.jobs import _lifted_marks
+    from gnome3d_web.jobs.run import _lifted_marks
 
     ct = cat.cell_types["GMX"]
     _, enh = _lifted_marks(ct, "chr1", [], None)
