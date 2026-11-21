@@ -103,6 +103,7 @@ class Settings:
     contact_background_z: float
     contact_resolution: int
     contact_resolution_max: int
+    contact_side: str
 
     # ---- simulation steps ----
     steps_lvl1: int
@@ -164,7 +165,6 @@ class Settings:
     exclusion_skip_neighbors: int
     mc_neighbour_grid: bool
     exclusion_radius_arcs: float
-    exclusion_arcs_cap: str
     exclusion_arcs_chain_radius: str
     arcs_repulsion_cutoff_factor: float
     exclusion_radius_smooth: float
@@ -347,6 +347,7 @@ class Settings:
         self.contact_background_z = 0.0
         self.contact_resolution = 5000
         self.contact_resolution_max = 0
+        self.contact_side = "both"
 
         # ---- simulation steps ----
         self.steps_lvl1 = 2
@@ -407,7 +408,6 @@ class Settings:
         self.exclusion_skip_neighbors = 1
         self.mc_neighbour_grid = True
         self.exclusion_radius_arcs = 0.0
-        self.exclusion_arcs_cap = "none"
         self.exclusion_arcs_chain_radius = "none"
         self.exclusion_radius_smooth = 0.0
         self.exclusion_radius_heatmap = 0.0
@@ -662,6 +662,11 @@ class Settings:
         self.contact_resolution_max = geti(
             "springs", "contact_resolution_max", self.contact_resolution_max
         )
+        self.contact_side = gets("springs", "contact_side", self.contact_side)
+        if self.contact_side not in ("both", "over"):
+            raise ValueError(
+                f"[springs] contact_side must be both or over, got {self.contact_side!r}"
+            )
         self.spring_stretch_ib = getf("springs", "stretch_constant_ib", self.spring_stretch_ib)
         self.spring_squeeze_ib = getf("springs", "squeeze_constant_ib", self.spring_squeeze_ib)
 
@@ -809,18 +814,12 @@ class Settings:
         self.exclusion_radius_arcs = getf(
             "excluded_volume", "radius_arcs", self.exclusion_radius_arcs
         )
-        self.exclusion_arcs_cap = gets("excluded_volume", "arcs_cap", self.exclusion_arcs_cap)
-        if self.exclusion_arcs_cap not in ("none", "target"):
-            raise ValueError(
-                "[excluded_volume] arcs_cap must be none or target, got"
-                f" {self.exclusion_arcs_cap!r}"
-            )
         self.exclusion_arcs_chain_radius = gets(
             "excluded_volume", "arcs_chain_radius", self.exclusion_arcs_chain_radius
         )
-        if self.exclusion_arcs_chain_radius not in ("none", "product", "sum"):
+        if self.exclusion_arcs_chain_radius not in ("none", "sum"):
             raise ValueError(
-                "[excluded_volume] arcs_chain_radius must be none, product or sum, got"
+                "[excluded_volume] arcs_chain_radius must be none or sum, got"
                 f" {self.exclusion_arcs_chain_radius!r}"
             )
         self.arcs_repulsion_cutoff_factor = getf(

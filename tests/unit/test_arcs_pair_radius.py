@@ -1,4 +1,4 @@
-"""The excluded volume radius of a pair in the arcs solver, its cap and its rule from the chain."""
+"""The excluded volume radius of a pair of nodes from the chain the nodes stand for."""
 
 from __future__ import annotations
 
@@ -71,34 +71,6 @@ def test_change_of_one_pair_in_closed_form() -> None:
     assert grad[0] == pytest.approx(-grad[6]), "the two beads of the pair have opposite gradients"
 
 
-def test_stage_energy_plus_the_change_is_the_energy_at_the_radius_of_each_pair(
-    cloud: F64Array,
-) -> None:
-    n = len(cloud)
-    exp = np.zeros((n, n))
-    exp[0, 5] = exp[5, 0] = 1.2
-    exp[2, 9] = exp[9, 2] = -2.0
-    exp[3, 4] = exp[4, 3] = 1.5
-    pair_i, pair_j, radius = pair_radii(exp, None, settings(exclusion_arcs_cap="target"), FULL, 1)
-    assert sorted(zip(pair_i.tolist(), pair_j.tolist(), radius.tolist(), strict=True)) == [
-        (0, 5, 1.2),
-        (2, 9, 2.0),
-    ], "a loop and a background pair under the radius, and not the neighbours 3 and 4"
-    x = cloud.reshape(-1)
-    base, _ = stage_energy(x, n)
-    change, _ = pair_radius_energy_grad(x, pair_i, pair_j, radius, FULL, WEIGHT)
-    per_pair = np.full((n, n), FULL)
-    per_pair[0, 5] = 1.2
-    per_pair[2, 9] = 2.0
-    assert base == pytest.approx(by_hand(cloud, np.full((n, n), FULL))), (
-        "the stage scores every pair at its radius"
-    )
-    assert base + change == pytest.approx(by_hand(cloud, per_pair)), (
-        "with the change, each pair at its own"
-    )
-    assert base + change >= 0.0, "the excluded volume is not negative"
-
-
 def test_gradient_of_the_change_matches_a_finite_difference(cloud: F64Array) -> None:
     pair_i = np.array([0, 2, 1], dtype=np.int32)
     pair_j = np.array([5, 9, 7], dtype=np.int32)
@@ -113,28 +85,6 @@ def test_gradient_of_the_change_matches_a_finite_difference(cloud: F64Array) -> 
         e_up, _ = pair_radius_energy_grad(up, pair_i, pair_j, radius, FULL, WEIGHT)
         e_down, _ = pair_radius_energy_grad(down, pair_i, pair_j, radius, FULL, WEIGHT)
         assert grad[k] == pytest.approx((e_up - e_down) / (2 * eps), abs=1e-6), f"coordinate {k}"
-
-
-def test_solver_lets_a_capped_pair_stay_at_its_target() -> None:
-    """Three beads in a row. The outer two have a loop at 1.5 and the radius of the stage is 3."""
-    exp = np.zeros((3, 3))
-    exp[0, 2] = exp[2, 0] = 1.5
-    start = np.array([[0.0, 0, 0], [0.7, 4.0, 0], [1.5, 0, 0]], dtype=np.float32)
-    apart = {}
-    for cap in ("none", "target"):
-        s = settings(exclusion_arcs_cap=cap, exclusion_weight=1.0)
-        s.spring_stretch_arcs = s.spring_squeeze_arcs = 0.1
-        _, pos = solve_arcs(start, exp, s, iters=200)
-        apart[cap] = float(np.linalg.norm(pos[0] - pos[2]))
-    assert apart["none"] > 1.9, (
-        f"at the radius of the stage the pair is pushed out, got {apart['none']:.2f}"
-    )
-    assert apart["target"] == pytest.approx(1.5, abs=0.02), "with the cap the pair is at its target"
-
-
-def test_loader_refuses_an_unknown_cap() -> None:
-    with pytest.raises(ValueError, match="none or target"):
-        Settings.from_dict({"excluded_volume": {"arcs_cap": "law"}})
 
 
 def test_change_of_one_pair_with_a_radius_above_the_stage() -> None:
@@ -163,32 +113,26 @@ def test_chain_share_is_the_chain_between_the_midpoints_to_the_neighbours() -> N
     )
 
 
-@pytest.mark.parametrize("rule", ["product", "sum"])
 def test_stage_energy_plus_the_change_is_the_energy_at_the_radius_from_the_chain(
-    cloud: F64Array, rule: str
+    cloud: F64Array,
 ) -> None:
     n = len(cloud)
     share = np.random.default_rng(5).uniform(0.2, 4.0, size=n)
     f = np.cbrt(share)
-    want = FULL * (
-        f[:, None] * f[None, :] if rule == "product" else 0.5 * (f[:, None] + f[None, :])
+    radius = FULL * 0.5 * (f[:, None] + f[None, :])
+    pair_i, pair_j, own = pair_radii(share, FULL, 1)
+    assert own == pytest.approx(radius[pair_i, pair_j]), "the radius of each pair"
+    assert len(pair_i) == (n - 1) * (n - 2) // 2, "every pair two or more apart in order"
+    x = cloud.reshape(-1).copy()
+    base, _ = stage_energy(x, n)
+    assert base == pytest.approx(by_hand(cloud, np.full((n, n), FULL))), (
+        "the stage scores every pair at its radius"
     )
-    exp = np.zeros((n, n))
-    exp[0, 5] = exp[5, 0] = 1.2
-    for cap in ("none", "target"):
-        radius = want.copy()
-        if cap == "target":
-            radius[0, 5] = radius[5, 0] = min(radius[0, 5], 1.2)
-        s = settings(exclusion_arcs_chain_radius=rule, exclusion_arcs_cap=cap)
-        pair_i, pair_j, own = pair_radii(exp, share, s, FULL, 1)
-        assert own == pytest.approx(radius[pair_i, pair_j]), f"the radius of each pair under {cap}"
-        x = cloud.reshape(-1).copy()
-        base, _ = stage_energy(x, n)
-        change, _ = pair_radius_energy_grad(x, pair_i, pair_j, own, FULL, WEIGHT)
-        assert base + change == pytest.approx(by_hand(cloud, radius)), (
-            f"the excluded volume at the radius of each pair under {rule} and cap {cap}"
-        )
-        assert base + change >= 0.0, "the excluded volume is not negative"
+    change, _ = pair_radius_energy_grad(x, pair_i, pair_j, own, FULL, WEIGHT)
+    assert base + change == pytest.approx(by_hand(cloud, radius)), (
+        "with the change, each pair at the radius from its chain"
+    )
+    assert base + change >= 0.0, "the excluded volume is not negative"
 
 
 def test_gradient_with_radii_on_both_sides_of_the_stage_matches_a_finite_difference(
@@ -214,26 +158,27 @@ def test_solver_pushes_a_pair_out_to_the_radius_from_its_chain() -> None:
     exp = np.zeros((3, 3))
     start = np.array([[0.0, 0, 0], [0.5, 9.0, 0], [3.5, 0, 0]], dtype=np.float32)
     apart = {}
-    for rule, share in (("none", None), ("product", np.array([8.0, 1.0, 8.0]))):
+    for rule, share in (("none", None), ("sum", np.array([64.0, 1.0, 64.0]))):
         s = settings(exclusion_arcs_chain_radius=rule, exclusion_weight=1.0)
         _, pos = solve_arcs(start, exp, s, iters=200, share=share)
         apart[rule] = float(np.linalg.norm(pos[0] - pos[2]))
     assert apart["none"] == pytest.approx(3.5, abs=0.01), (
         "beyond the radius of the stage, not moved"
     )
-    assert apart["product"] > 11.9, (
-        f"a pair of nodes with eight times the chain is out at four radii, got {apart['product']:.2f}"
+    assert apart["sum"] > 11.9, (
+        f"a pair of nodes with 64 times the chain is out at four radii, got {apart['sum']:.2f}"
     )
 
 
 def test_radius_from_the_chain_needs_the_chain() -> None:
-    s = settings(exclusion_arcs_chain_radius="product")
+    s = settings(exclusion_arcs_chain_radius="sum", exclusion_weight=1.0)
+    start = np.zeros((3, 3), dtype=np.float32)
     with pytest.raises(ValueError, match="needs the chain of each node"):
-        pair_radii(np.zeros((4, 4)), None, s, FULL, 1)
+        solve_arcs(start, np.zeros((3, 3)), s, iters=1)
 
 
 def test_loader_refuses_an_unknown_rule_and_a_rule_without_the_uniform_chain() -> None:
-    with pytest.raises(ValueError, match="none, product or sum"):
+    with pytest.raises(ValueError, match="none or sum"):
         Settings.from_dict({"excluded_volume": {"arcs_chain_radius": "cube"}})
     with pytest.raises(ValueError, match="uniform_chain is off"):
         Settings.from_dict({"excluded_volume": {"arcs_chain_radius": "sum"}})

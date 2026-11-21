@@ -33,7 +33,7 @@ Every row is the maintainer's decision.
 | The order of the build | Three stages with an arms trial after each |
 | The centre of mass that the smooth stage keeps | That of a node, the bead before it and the bead after it |
 | The exceptions of that rule and the reach of the bond limit, both the assistant's | Kept as built |
-| The resolution of the contact cells | Open between the cells at 5 kb alone and a rewrite of the ladder. The pseudo count and the bound estimate of a cell were measured and are deleted, as more machinery over a ladder that expands the region. The trial `scores-five20/` measures the cells at 5 kb |
+| The resolution of the contact cells | The ladder is rewritten: a cell holds a pair closer and does not push, and the gyration term holds the long range. Section "Rewrite of the ladder". The pseudo count and the bound estimate are deleted |
 | The draw of the contact bead | Both draws stay as arms |
 | The rule of the smooth stage for a node | Decided after the trial of the rules |
 | Room for the free chain | Gyration windows under 100 kb first, blobs for the free chain when that does not work |
@@ -54,14 +54,14 @@ Every row is the maintainer's decision, after the trials of the night.
 | The draw of the contact bead | Uniform. The draw at the midpoint is deleted |
 | The orientation term | On as it is. `bond_limit` is deleted |
 | The radius of the arcs excluded volume of a node | The key `[excluded_volume] radius_arcs` at 0, the derived radius. Under `loop_dropout` it is derived from every loop of the chromosome, before the dropout. Decided on 2026-11-21 |
-| The cap of the radius of a pair | The cap by the chain is deleted. The cap by the target is an opt in key, off |
-| A radius of a node from its chain | Built as `[excluded_volume] arcs_chain_radius`, an opt in key, off |
+| The cap of the radius of a pair | Deleted on 2026-11-21, both limits |
+| A radius of a node from its chain | `[excluded_volume] arcs_chain_radius = sum`, on with the dropout in the uniform canonical config. The product form is deleted |
 | The subanchor heatmap | Off, as in production |
 | The expectation of a contact cell | The mean count at the separation times the bias of the two bins, from the balancing weights of the map. It is the one derivation of the expectation and has no key, by the maintainer's word of 2026-11-21 |
 | A map without the resolution of the cells | Read at the finest resolution it holds over the one asked, with a line in the log |
 | The resolution of the contact cells | Decided again after the radius rule, 5 kb against the ladder |
-| `loop_dropout` | Open, measured again on the cells at 5 kb in `scores-five20/` |
-| `contact_background_z` | Open, 2 against 3 measured again on the cells at 5 kb in `scores-five20/` |
+| `loop_dropout` | On, with the radius of a node from its chain |
+| `contact_background_z` | 3 |
 | The three bead move in the JAX kernel | Not yet |
 
 The draw at the midpoint and `bond_limit` were removed on 2026-11-20, and `uniform_chain` implies the centre of
@@ -1350,6 +1350,39 @@ The decay and the SCC trade against each other over the cells. With the weights,
 | bound | 0.335 | 1.10 | 24 of 360 | 0.592 |
 | no ladder, ratio | 0.377 | 1.04 | 30 of 360 | 0.488 |
 | default chain | 0.268 | 1.04 | 12 of 360 | 0.532 |
+
+### Rewrite of the ladder: a cell holds a pair closer and the law holds the long range
+
+Decided by the maintainer on 2026-11-21, after the trials above. The ladder gave two things through one
+mechanism. It carried the contact evidence of bins too sparse to test at 5 kb. And its thousands of springs near
+the law between 100 kb and 3 Mb kept a region from folding back on itself: the distance of two beads grows up to
+4 Mb in every arm with the ladder, and on the default chain it is 15.9 bonds at 3 Mb and 15.0 at 4 Mb, where
+the law gives 18.2. The arcs solve has no other term that holds a pair beyond `background_range_bp` at the law.
+The maximum entropy start has the end megabases 16.5 to 16.9 bonds apart and the solve packs them to 13.4. The
+cost of the mechanism was the push of the cells under their expectation, which put the range from 500 kb to
+1 Mb 8 to 14 percent over the default chain.
+
+The rewrite gives each of the two jobs its own term.
+
+| case | rule |
+|---|---|
+| a cell over its expectation, at 5, 10 or 25 kb | holds its pair of nodes closer, at the background times the count over the expectation to the minus third, as before |
+| a cell under its expectation | is not read. A low count where few counts are expected does not measure how far apart two beads are |
+| a pair whose cell at 5 kb can be tested and is not over its expectation | keeps what it had. It is not read at a coarser resolution |
+| a pair without a loop closer than `background_range_bp` | holds the background of the law, as before |
+| the size of every genomic window from `background_range_bp` up | held at the radius of gyration of the law by the gyration term of the solve, `[springs] gyration_weight`, the term that production has for the long range since 2026-11-16 |
+
+The gyration term is close to no term on a region of 5 Mb at its weight of 0.1: without it the radius of
+gyration of the region moves by 0.02 bonds. The trial measures the weight at which it holds the long range,
+before any new term is written.
+
+The side of the cells is the key `[springs] contact_side` for the trial, `both` or `over`. The side that loses
+is deleted with the key.
+
+Also decided on 2026-11-21: the threshold of the cells is 3, since 2 costs 0.09 of Spearman on the cells at
+5 kb for 0.02 of SCC. `loop_dropout` is on with `[excluded_volume] arcs_chain_radius = sum`, which takes the
+overlap of the ends under the dropout from 23 structures of 120 to 10 on the rows of GM12878 with no change of
+SCC. The product form of that radius and the cap of the radius by the target are deleted.
 
 ## Settings
 

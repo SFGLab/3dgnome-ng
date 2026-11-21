@@ -331,44 +331,18 @@ def pair_radius_energy_grad(
     return energy, g.reshape(-1)
 
 
-def pair_radii(
-    exp: F64Array,
-    share: F64Array | None,
-    s: Settings,
-    full: float,
-    skip: int,
-) -> tuple[I32Array, I32Array, F64Array]:
+def pair_radii(share: F64Array, full: float, skip: int) -> tuple[I32Array, I32Array, F64Array]:
     """Returns the pairs whose excluded volume radius is not the radius `full` of the stage, and
-    the radius of each.
+    the radius of each, for `[excluded_volume] arcs_chain_radius = sum`.
 
-    Under `[excluded_volume] arcs_chain_radius` the radius of a pair grows with the chain its two
-    nodes stand for. `share` is that chain per node over the mean chain of a node. With
-    `f = share ^ (1/3)` the radius is `full * f_i * f_j` under `product` and
-    `full * (f_i + f_j) / 2` under `sum`.
-
-    Under `[excluded_volume] arcs_cap = target` the radius of a pair is no more than the distance
-    its spring holds it at, the loop target or the background. A pair without a spring has no
-    limit.
-
-    Pairs within `skip` of each other in the order of the matrix are left out, as in
-    `arcs_energy_grad`.
+    The radius of a pair grows with the chain its two nodes stand for. `share` is that chain per
+    node over the mean chain of a node. With `f = share ^ (1/3)` the radius of a pair is
+    `full * (f_i + f_j) / 2`, the distance of two blobs of chain. Pairs within `skip` of each
+    other in the order of the matrix are left out, as in `arcs_energy_grad`.
     """
-    n = int(exp.shape[0])
-    radius: F64Array = np.full((n, n), full, dtype=np.float64)
-    if s.exclusion_arcs_chain_radius != "none":
-        if share is None:
-            raise ValueError(
-                "[excluded_volume] arcs_chain_radius needs the chain of each node, which the"
-                " node solve of [main] uniform_chain gives. Set arcs_chain_radius to none."
-            )
-        f = np.cbrt(np.asarray(share, dtype=np.float64))
-        if s.exclusion_arcs_chain_radius == "product":
-            radius = full * f[:, None] * f[None, :]
-        else:
-            radius = full * 0.5 * (f[:, None] + f[None, :])
-    if s.exclusion_arcs_cap == "target":
-        held = (exp >= 1e-6) | (exp <= -0.75)
-        radius = np.where(held, np.minimum(radius, np.abs(exp)), radius)
+    f = np.cbrt(np.asarray(share, dtype=np.float64))
+    n = int(f.shape[0])
+    radius: F64Array = full * 0.5 * (f[:, None] + f[None, :])
     idx = np.arange(n)
     apart = (idx[None, :] - idx[:, None]) > skip
     ci, cj = np.nonzero(apart & (radius != full) & (radius > 0.0))
@@ -396,8 +370,8 @@ def solve_arcs(
     the genomic midpoints of the anchors, which the gyration term needs. `reach` is the pairs of
     nodes of a uniform chain and the length of chain between each, for the reach term at the
     weight of a loop spring. `share` is the chain each node stands for over the mean chain of a
-    node, for `[excluded_volume] arcs_chain_radius`. Under that key and under
-    `[excluded_volume] arcs_cap` the excluded volume of a pair acts at the radius of `pair_radii`.
+    node, for `[excluded_volume] arcs_chain_radius`. Under that key the excluded volume of a pair
+    acts at the radius of `pair_radii`.
     """
     from scipy.optimize import minimize  # noqa: PLC0415
 
@@ -519,9 +493,13 @@ def solve_arcs(
 
         fun = with_reach
         fun_args = ()
-    own_radius = s.exclusion_arcs_cap == "target" or s.exclusion_arcs_chain_radius != "none"
-    if excl_w > 0.0 and own_radius:
-        own_i, own_j, own_r = pair_radii(exp64, share, s, excl_r0, excl_skip)
+    if excl_w > 0.0 and s.exclusion_arcs_chain_radius != "none":
+        if share is None:
+            raise ValueError(
+                "[excluded_volume] arcs_chain_radius needs the chain of each node, which the"
+                " node solve of [main] uniform_chain gives. Set arcs_chain_radius to none."
+            )
+        own_i, own_j, own_r = pair_radii(share, excl_r0, excl_skip)
         if own_i.shape[0] > 0:
             base_c, base_c_args = fun, fun_args
 
