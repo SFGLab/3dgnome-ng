@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import gzip
+import json
 import os
 import sys
 from pathlib import Path
@@ -202,6 +204,17 @@ def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_
     assert len(reads) == 1 and reads[0][1:3] == (0, 3000000), "a deep map is read once per resolution over the job's region and windows are cut from it: " + str(reads)
     assert "4DN deep map" in deep["upper_label"] and "4DN deep map" in deep["scc_about"], "the Hi-C half names the deep map: " + str(deep["upper_label"])
     assert r["scc"] is None or -1 <= r["scc"] <= 1, "the agreement is a number or null: " + str(r["scc"])
+
+    # The answer is gzipped for a client that takes gzip and plain for one that does not.
+    ask = {"region": "chr1:0-3000000", "res": 25000, "upper": "hic", "lower": "model", "norm": "raw"}
+    plain = c.get(f"/api{url}/contacts", params=ask, headers={"Accept-Encoding": "identity"})
+    assert "content-encoding" not in plain.headers and plain.json() == r, "a client that takes no gzip gets the answer plain: " + str(dict(plain.headers))
+    with c.stream("GET", f"/api{url}/contacts", params=ask, headers={"Accept-Encoding": "gzip, deflate"}) as zipped:
+        sent = b"".join(zipped.iter_raw())
+    assert zipped.headers["content-encoding"] == "gzip" and zipped.headers["vary"] == "Accept-Encoding", "a client that takes gzip gets gzip: " + str(dict(zipped.headers))
+    assert zipped.headers["content-type"] == "application/json", "the answer is still JSON: " + zipped.headers["content-type"]
+    assert json.loads(gzip.decompress(sent)) == r, "the gzipped answer holds the same maps"
+    assert len(sent) < len(plain.content) / 2, f"the gzipped answer is under half of the plain one: {len(sent)} against {len(plain.content)}"
 
     bad = c.get(f"/api{url}/contacts", params={"region": "chr1:0-3000000", "res": 2000, "upper": "hic", "lower": "model"})
     assert bad.status_code == 400 and "5 kb" in bad.json()["error"], "too many bins is a 400 naming a resolution that fits: " + bad.text

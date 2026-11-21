@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import io
 import json
 import re
@@ -38,6 +39,21 @@ from .viewer import viewer_payload
 
 HERE = Path(__file__).resolve().parent
 FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|hicdiffusion\.bedpe|[A-Za-z0-9_.:-]+\.cif)$")
+
+
+def packed_json(request: Request, value: object) -> Response:
+    """Returns a JSON answer, gzipped for a client that takes gzip. For an answer of megabytes.
+
+    Level 1 takes the contact map of 800 bins from 11 MB to under 5 MB in a fifth of a second.
+    A higher level saves a tenth more and takes several times as long.
+    """
+    body = json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":")).encode("utf-8")
+    headers = {"Vary": "Accept-Encoding"}
+    takes = [e.split(";")[0].strip().lower() for e in request.headers.get("accept-encoding", "").split(",")]
+    if "gzip" in takes:
+        body = gzip.compress(body, compresslevel=1)
+        headers["Content-Encoding"] = "gzip"
+    return Response(body, media_type="application/json", headers=headers)
 
 
 class StripBase:
@@ -656,7 +672,7 @@ def create_app() -> FastAPI:
             return JSONResponse(explore.loops(guard(key)))
 
         @app.get(base + "/contacts", name=f"{kind}_contacts")
-        def ex_contacts(key: str, region: str, res: int = 25000, upper: str = "hic", lower: str = "model", norm: str = "ice") -> JSONResponse:
+        def ex_contacts(request: Request, key: str, region: str, res: int = 25000, upper: str = "hic", lower: str = "model", norm: str = "ice") -> Response:
             d = guard(key)
             req = json.loads((d / "request.json").read_text()) if (d / "request.json").is_file() else {}
             ct = catalog.cell_types.get(str(req.get("cell_type", "")))
@@ -664,8 +680,9 @@ def create_app() -> FastAPI:
             # hosted map: not with own contacts, not with a predicted background.
             deep = ct is not None and ct.hic_url and not (req.get("own") or {}).get("contacts") and req.get("background", "hic") == "hic"
             try:
-                return JSONResponse(
-                    explore.contact_maps(d, region, res, upper, lower, norm, ct.hic_url if deep else "", ct.hic_name if deep else "", s.link_allow_private)  # type: ignore[union-attr]
+                return packed_json(
+                    request,
+                    explore.contact_maps(d, region, res, upper, lower, norm, ct.hic_url if deep else "", ct.hic_name if deep else "", s.link_allow_private),  # type: ignore[union-attr]
                 )
             except explore.ExploreError as e:
                 return JSONResponse({"error": str(e)}, 400)
