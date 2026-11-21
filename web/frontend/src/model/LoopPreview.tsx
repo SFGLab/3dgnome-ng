@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { api, type Region } from '../api'
 import type { Factors } from './form'
+import { around } from './loopWindow'
 
 const W = 780
 const H = 150
@@ -13,22 +14,6 @@ const STEP = 1_000
 const plural = (n: number, word: string) => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`
 const mb = (n: number) => `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)} Mb`
 const round = (p: number) => Math.round(p / STEP) * STEP
-
-/**
- * The stretch drawn around a region: the region with its own length on either side, from 0. The
- * stretch is `cap` bp at most. A region that leaves less room gets less on either side, and a
- * region of `cap` or more is drawn from a little before its start.
- */
-export function around(start: number, end: number, cap = Infinity): [number, number] {
-  const span = end - start
-  if (span >= cap) {
-    const from = Math.max(0, start - Math.floor(cap / 20))
-    return [from, from + cap]
-  }
-  const pad = Math.min(span, Math.floor((cap - span) / 2))
-  const from = Math.max(0, start - pad)
-  return [from, from === 0 ? Math.max(end + pad, span + 2 * pad) : end + pad]
-}
 
 /** Whether a region is drawn well in a view: inside it and between an eighth and seven tenths of it. */
 const fits = (start: number, end: number, view: [number, number]) => {

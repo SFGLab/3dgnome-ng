@@ -6,14 +6,12 @@ import type { Mode } from './colors'
 import { FindGene } from './FindGene'
 import { bp, kb } from './format'
 import { GeneCard } from './GeneCard'
-import { LoopView, sameLoop } from './LoopView'
+import { LoopView } from './LoopView'
+import { sameLoop } from './loops'
 import { DistanceCard } from './Measure'
-import { beadAt, StructureView } from './StructureView'
-
-export function parseRegion(region: string | null): { chrom: string; start: number; end: number } | null {
-  const m = region?.match(/^(\w+):(\d+)-(\d+)$/)
-  return m ? { chrom: m[1], start: Number(m[2]), end: Number(m[3]) } : null
-}
+import { StructureView } from './StructureView'
+import { beadAt } from './structure'
+import { parseRegion, solidSpan } from './structure'
 
 /** What a measured position is: a gene's TSS, an enhancer or a plain coordinate. */
 function describe(pos: number, chrom: string, ann: Annotations): string {
@@ -24,12 +22,6 @@ function describe(pos: number, chrom: string, ann: Annotations): string {
 }
 
 const mid = (s: Structure, k: number) => Math.round((s.beads[k][0] + s.beads[k][1]) / 2)
-
-/** The stretch of the genome the model keeps solid: the whole chain between the two anchors of
- * a selected loop, and without one the part of the region chosen on the loop view. */
-export function solidSpan(loop: Loop | null, part: [number, number] | null): [number, number] | null {
-  return loop ? [(loop.a[0] + loop.a[1]) / 2, (loop.b[0] + loop.b[1]) / 2] : part
-}
 
 /** The card of a selected loop: its factor, its two anchors, its span and its PET count. */
 function LoopCard({ loop }: { loop: Loop }) {

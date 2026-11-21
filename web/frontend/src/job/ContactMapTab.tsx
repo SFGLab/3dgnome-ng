@@ -7,7 +7,7 @@ import { LoopView } from './LoopView'
 import { colour, diverging, emptyRows, halfRange, percentile, transform, type Show } from './heatmap'
 import { mapPicture } from './mapPicture'
 import { saveDataUrl } from './savePng'
-import { parseRegion } from './StructureTab'
+import { parseRegion } from './structure'
 import { wheelFactor } from './wheel'
 
 const RESOLUTIONS = [5_000, 10_000, 25_000, 50_000, 100_000, 250_000]

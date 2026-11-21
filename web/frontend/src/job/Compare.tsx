@@ -9,8 +9,8 @@ import { FACTORS } from './format'
 import { makeCameraLink, type CameraLink } from './cameraLink'
 import { Scene, type SceneHandle } from './Scene'
 import { saveDataUrl } from './savePng'
-import { chainColors, focusRanges } from './StructureView'
-import { parseRegion } from './StructureTab'
+import { chainColors, focusRanges } from './structure'
+import { parseRegion } from './structure'
 
 const factorColor = (f: string) => (f === 'CTCF' ? 'var(--ctcf)' : 'var(--rnapii)')
 

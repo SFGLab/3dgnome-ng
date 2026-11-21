@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
-import { around, LoopPreview } from './LoopPreview'
+import { LoopPreview } from './LoopPreview'
+import { around } from './loopWindow'
 
 function renderPreview(factors: 'CTCF' | 'RNAPII' | 'CTCF+RNAPII' = 'CTCF+RNAPII') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })

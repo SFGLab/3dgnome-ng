@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { checkCopy } from '../test/copy'
-import { chainAt, StructureView } from './StructureView'
+import { StructureView } from './StructureView'
+import { chainAt } from './structure'
 
 vi.mock('./Scene', () => ({ Scene: () => <div data-testid="scene" /> }))
 
