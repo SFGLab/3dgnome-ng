@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mockApi } from '../test/api'
-import { checkCopy } from '../test/copy'
-import { readHicWindow } from './hicLocal'
+import { mockApi } from '../../test/api'
+import { checkCopy } from '../../test/copy'
+import { readHicWindow } from '../hicLocal'
 import { OwnData } from './OwnData'
 
-vi.mock('./hicLocal', () => ({ readHicWindow: vi.fn(async () => 'chr1\t11600000\t11625000\tchr1\t11900000\t11925000\t12\n') }))
+vi.mock('../hicLocal', () => ({ readHicWindow: vi.fn(async () => 'chr1\t11600000\t11625000\tchr1\t11900000\t11925000\t12\n') }))
 
 const RESULTS: Record<string, object> = {
   'GM12878_CTCF_loops.bedpe': { ok: true, summary: '12,433 loops read. 118 are in the region.', error: null },

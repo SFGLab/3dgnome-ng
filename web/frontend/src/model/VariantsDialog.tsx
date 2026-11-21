@@ -8,7 +8,7 @@ import type { FormState } from './form'
 import { type OwnChoice, ownField } from './upload'
 import { megabytes } from '../lib/format'
 import '../styles/dialog.css'
-import './owndata.css'
+import './own/owndata.css'
 import './variants.css'
 
 export type VariantsMode = 'hosted' | 'upload'
