@@ -53,10 +53,10 @@ Every row is the maintainer's decision, after the trials of the night.
 | The squeeze in the settings | No setting implies another. There are two canonical configs, `CANONICAL` of the default chain and `CANONICAL_UNIFORM` of the uniform chain, in `gnome3d/production.py`. A value that works better on the uniform chain is stated in the second: `uniform_chain` and `squeeze_constant` 1.0 so far |
 | The draw of the contact bead | Uniform. The draw at the midpoint is deleted |
 | The orientation term | On as it is. `bond_limit` is deleted |
-| The radius of the arcs excluded volume of a node | The radius of the arcs stage, capped for a pair by the chain between its two nodes. Built as `[excluded_volume] arcs_cap` with two limits, measured in `uniform_night9.sh` |
+| The radius of the arcs excluded volume of a node | The radius of the arcs stage, capped for a pair by the chain between its two nodes. Built as `[excluded_volume] arcs_cap` with two limits, measured in `uniform_sweep8.sh` |
 | The resolution of the contact cells | Decided again after the radius rule, 5 kb against the ladder |
 | `loop_dropout` | Decided after the radius rule. The rise of the overlap of the ends under it is traced first |
-| `contact_background_z` | 2 is measured on the larger trial, `uniform_night8.sh` |
+| `contact_background_z` | Open. 2 gains 0.03 of SCC at a radius of 3.0 and costs 0.035 of Spearman, `uniform_night8.sh` |
 | The three bead move in the JAX kernel | Not yet |
 
 The draw at the midpoint and `bond_limit` were removed on 2026-11-20, and `uniform_chain` implies the centre of
@@ -950,6 +950,34 @@ size without the dropout back.
 The push of the excluded volume of the arcs stage depends on the number of nodes of the conformation. A node that
 stands for more chain after the dropout excludes no more than before. A radius of a node from the chain it stands
 for would hold the size under the dropout. That rule is not built.
+
+### Trial of the threshold of the contact cells
+
+`design/figures/uniform-2026-11-19/z20p/` and `scores-z20p/`, with `scores-z20p_10k/` and `scores-z20p_5k/`,
+`slurm/ensemble/uniform_night8.sh`, commit f5ec43a. The cells at 5 kb with `contact_background_z` 2 beside the
+same arms at 3, at the radius of a bead and at `[excluded_volume] radius_arcs` 3.0. Eighteen rows of twenty
+structures, raw and balanced SCC per bead pair:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other | ends overlap |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.181, 0.195 | 0.133, 0.126 | 0.532, 0.463, 0.401 | 0.705 | 11.5 | 3.5 | 12 of 360 |
+| z 3 | 0.337, 0.345 | 0.298, 0.263 | 0.240, 0.185 | 0.487, 0.462, 0.429 | 0.638 | 10.7 | 5.9 | 90 of 360 |
+| z 2 | 0.363, 0.363 | 0.315, 0.271 | 0.250, 0.189 | 0.429, 0.407, 0.381 | 0.606 | 10.1 | 5.0 | 83 of 360 |
+| z 3, radius 3.0 | 0.313, 0.335 | 0.278, 0.255 | 0.226, 0.181 | 0.547, 0.485, 0.434 | 0.695 | 3.2 | 0.6 | 14 of 360 |
+| z 2, radius 3.0 | 0.346, 0.362 | 0.302, 0.272 | 0.241, 0.188 | 0.512, 0.459, 0.416 | 0.689 | 3.4 | 0.5 | 16 of 360 |
+
+No structure of 360 per arm has a stretched piece.
+
+- At a radius of 3.0 the threshold of 2 gains 0.03 of raw and 0.03 of balanced SCC at 25 kb, 0.02 and 0.02 at
+  10 kb and 0.015 and 0.01 at 5 kb. It is above the threshold of 3 in raw SCC on 17 rows of 18 at 25 kb, 18 at
+  10 kb and 17 at 5 kb.
+- The gain costs Spearman, 0.512 against 0.547 at 25 kb, 0.459 against 0.485 at 10 kb and 0.416 against 0.434
+  at 5 kb. At 25 kb the arm is below the default chain, 0.532. Balanced Pearson is 0.689 against 0.695.
+- The close pairs and the overlap of the ends do not change with the threshold.
+- At the radius of a bead the threshold of 2 has the lowest Spearman of the trial, 0.429.
+
+The threshold of 2 with the radius of 3.0 has the SCC of the threshold of 3 at the radius of a bead, with the
+close pairs and the ends of the radius of 3.0. It is a comparison of the sweep of `uniform_sweep8.sh`.
 
 ## Settings
 
