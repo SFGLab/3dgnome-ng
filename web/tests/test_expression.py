@@ -56,7 +56,7 @@ def site(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespace:
     catalog["expression"] = {
         "LINES": {"label": "Lines RNA-seq", "file": "expression/lines.tsv", "kind": "counts", "cell_types": {"GMX": ["a1", "a2"]}},
         "OTHER": {"label": "Other RNA-seq", "file": "expression/other.tsv", "kind": "counts", "cell_types": {"GMX": ["b1", "b2"], "FBX": ["b1", "b2"]}},
-        "PEOPLE": {"label": "People mRNA-seq", "file": "expression/people.tsv", "kind": "counts", "people": True, "lymphoblastoid": True},
+        "PEOPLE": {"label": "People mRNA-seq", "file": "expression/people.tsv", "kind": "counts", "people": True, "lymphoblastoid": True, "feature": "trios"},
         "TMM": {"label": "Panel", "file": "expression/tmm.tsv", "kind": "values", "unit": "TMM", "people": True, "lymphoblastoid": True},
     }
     (data / "catalog.json").write_text(json.dumps(catalog))
@@ -247,3 +247,17 @@ def test_normalised_values_are_refused_as_counts_and_a_request_without_a_table_i
     assert r.status_code == 400 and "needs a table" in r.json()["error"], "your own expression without an upload is refused"
     bad = site.c.post("/api/uploads", data={"kind": "expression"}, files={"file": ("genes.txt", b"gene\nALPHA\nBETA\n")}).json()
     assert not bad["ok"] and "one column or more of samples" in bad["error"]["found"], "a table without samples fails its check with the reason"
+
+
+def test_a_table_of_a_feature_that_is_off_is_neither_offered_nor_taken(site: SimpleNamespace) -> None:
+    config = site.data / "config.json"
+    person = {"cell": "GMX", "sv_set": "DEMO", "sample": "P1"}
+    form = {**site.form, "sv_set": "DEMO", "sample": "P1", "expression": "PEOPLE"}
+    config.write_text(json.dumps({"features": {"trios": False}}))
+    offered = {o["id"] for o in site.c.get("/api/expression", params=person).json()["options"]}
+    assert offered == {"LINES", "OTHER", "TMM"}, "the table of the trios is not offered while the feature is off: " + str(offered)
+    r = site.c.post("/api/jobs", data=form)
+    assert r.status_code == 400 and r.json()["field"] == "expression", "a request for the hidden table is refused: " + r.text
+    config.write_text(json.dumps({"features": {"trios": True}, "limits": {}}))
+    offered = {o["id"] for o in site.c.get("/api/expression", params=person).json()["options"]}
+    assert "PEOPLE" in offered, "the table is offered again with the feature on: " + str(offered)

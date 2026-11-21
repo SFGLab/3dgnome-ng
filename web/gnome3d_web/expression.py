@@ -51,6 +51,8 @@ class Source:
     people: bool = False
     # The samples are lymphoblastoid cell lines. Another cell type gets a warning with them.
     lymphoblastoid: bool = False
+    # The feature of config.json the table belongs to. The table is not offered while it is off.
+    feature: str = ""
 
 
 @dataclass
@@ -62,12 +64,15 @@ class Table:
     length: pd.Series | None = None
 
 
-def read_table(path: Path) -> Table:
-    """Reads a table of genes by samples."""
+def read_table(path: Path, samples: list[str] | None = None) -> Table:
+    """Reads a table of genes by samples. With `samples` it reads those columns alone, beside the
+    genes and their lengths, which keeps a table of hundreds of samples quick to read."""
     try:
-        t = pd.read_csv(path, sep="\t", comment="#")
-        if t.shape[1] < 2:
-            t = pd.read_csv(path, sep=",", comment="#")
+        head = pd.read_csv(path, sep="\t", comment="#", nrows=0)
+        sep = "\t" if head.shape[1] >= 2 else ","
+        names = list(pd.read_csv(path, sep=sep, comment="#", nrows=0).columns)
+        keep = None if samples is None else [c for i, c in enumerate(names) if i == 0 or str(c).lower() == "length" or str(c) in samples]
+        t = pd.read_csv(path, sep=sep, comment="#", usecols=keep)
     except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as e:
         raise ExpressionError(f"{Path(path).name} is not a table of genes by samples: {e}") from e
     if t.shape[1] < 2 or t.empty:

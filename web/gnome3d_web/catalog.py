@@ -108,14 +108,17 @@ class Catalog:
     sv_sets: dict[str, SVSet]
     expression: dict[str, Source] = field(default_factory=_no_expression)
 
-    def expression_options(self, cell: str, sample: str = "") -> list[dict[str, object]]:
+    def expression_options(self, cell: str, sample: str = "", hidden: tuple[str, ...] = ()) -> list[dict[str, object]]:
         """The hosted expression a job of a cell type can take: the replicates of the cell type,
         and with a hosted sample the libraries of that person. Each option has the id of its
         source, a label, the kind, the unit, the columns and `other_cell_type`, true for a
-        person's lymphoblastoid line beside a cell type that is not lymphoblastoid."""
+        person's lymphoblastoid line beside a cell type that is not lymphoblastoid. A source of
+        a feature in `hidden` is left out."""
         ct = self.cell_types.get(cell)
         out: list[dict[str, object]] = []
         for src in self.expression.values():
+            if src.feature in hidden:
+                continue
             columns = src.cell_types.get(cell, [])
             who = cell
             if not columns and src.people and sample and sample in _columns(src.path):
@@ -175,6 +178,6 @@ class Catalog:
             tables[name] = Source(
                 name=name, label=e.get("label", name), path=root / e["file"], kind=e["kind"], unit=e.get("unit", ""),
                 cell_types={k: list(v) for k, v in e.get("cell_types", {}).items()},
-                people=bool(e.get("people", False)), lymphoblastoid=bool(e.get("lymphoblastoid", False)),
+                people=bool(e.get("people", False)), lymphoblastoid=bool(e.get("lymphoblastoid", False)), feature=str(e.get("feature", "")),
             )  # fmt: skip
         return cls(root=root, cell_types=cts, sv_sets=svs, expression=tables)

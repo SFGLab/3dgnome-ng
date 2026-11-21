@@ -189,7 +189,7 @@ def create_app() -> FastAPI:
             req.expression = own_table[2] | {"path": ""}
         elif wanted:
             # A hosted table, by the id of its source. The columns are the ones of the cell type or of the sample.
-            option = next((o for o in catalog.expression_options(base, sample if sv_set else "") if o["id"] == wanted), None)
+            option = next((o for o in catalog.expression_options(base, sample if sv_set else "", site_config.get().hidden) if o["id"] == wanted), None)
             if option is None:
                 raise JobError(f"{wanted!r} has no expression for {cell_type}" + (f" and {sample}" if sv_set else ""), "expression")
             src = catalog.expression[wanted]
@@ -570,7 +570,7 @@ def create_app() -> FastAPI:
         if cell not in catalog.cell_types:
             return JSONResponse({"error": f"unknown cell type {cell!r}"}, 404)
         known = sv_set in catalog.sv_sets and sample in catalog.sv_sets[sv_set].samples
-        return JSONResponse({"options": catalog.expression_options(cell, sample if known else "")})
+        return JSONResponse({"options": catalog.expression_options(cell, sample if known else "", site_config.get().hidden)})
 
     @app.get("/api/settings")
     def api_settings(cell: str) -> JSONResponse:

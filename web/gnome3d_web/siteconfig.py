@@ -4,7 +4,7 @@
      "limits": {"region_mb": 20, "hicdiffusion_mb": 2, "cores_per_job": 18}}
 
 `results` and `method` are the two pages with their links and `trios` is the nine people on
-the Results page. A feature the file leaves out is on.
+the Results page with their RNA-seq in the form. A feature the file leaves out is on.
 
 `region_mb` is the longest region a job may cover and `hicdiffusion_mb` the longest region a
 job with a HiCDiffusion background may cover, both in Mb. `cores_per_job` is the number of cores

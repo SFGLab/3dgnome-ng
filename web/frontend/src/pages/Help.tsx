@@ -1,4 +1,5 @@
 import { BookOpen } from 'lucide-react'
+import { hidden } from '../flags'
 import '../styles/doc.css'
 import './help.css'
 
@@ -24,6 +25,10 @@ chr1    12101200  del1  N    <DEL>  .     PASS    SVTYPE=DEL;END=12118400    GT 
 chr1    12255010  ins1  N    <INS>  .     PASS    SVTYPE=INS;SVLEN=310       GT      1|1
 chr1    12390500  inv1  N    <INV>  .     PASS    SVTYPE=INV;END=12402750    GT      1|0`
 
+const EXPRESSION = `gene             length  control_1  control_2  treated_1  treated_2
+ENSG00000120949  3667    1840       1722       95         121
+ENSG00000116688  7402    311        290        302        335`
+
 const SETTINGS = [
   ['target_bp_per_subanchor', '5000', '1000', 'genomic length of one chain segment, in bp'],
   ['polymer_exponent', '0', '0', 'distance law exponent, 0 fits it from the Hi-C'],
@@ -35,6 +40,7 @@ const SETTINGS = [
 const SECTIONS = [
   ['formats', 'Input formats'],
   ['variants', 'Structural variants'],
+  ['expression', 'Gene expression'],
   ['reading', 'Reading the results'],
   ['questions', 'Questions'],
   ['running', 'Running gnome3d yourself'],
@@ -51,6 +57,7 @@ function QA({ q, a }: { q: string; a: string }) {
 
 /** Input formats, reading the results and running the engine yourself. */
 export function Help() {
+  const trios = !hidden('trios')
   return (
     <div className="doc-page">
       <aside className="side-panel">
@@ -120,6 +127,36 @@ export function Help() {
           </p>
           <pre className="code">{VCF}</pre>
           <p className="small">An uploaded file and everything built from it are private, reachable only through the job's link and deleted after 14 days.</p>
+        </section>
+
+        <section id="expression">
+          <h2>Gene expression</h2>
+          <p>
+            Step 5 of the form adds RNA-seq to a job. The step is optional and the structures do not depend on it. With it the Genes tab shows the expression of each gene beside its distances. The comparison of two jobs then shows the
+            change of expression of each gene beside the change of its distance to the nearest enhancer.
+          </p>
+          <p>
+            The server holds {trios ? 'four' : 'three'} sets. ENCODE has read counts of total RNA-seq for GM12878, H1ESC and HFFc6, with two or three replicates each. A job on a cell type takes the replicates of that cell type. The
+            other {trios ? 'three' : 'two'} sets are of people. {trios && 'One has read counts of the nine people of three 1000 Genomes trios, a single library each. '}MAGE has TMM values of 731 people of the 1000 Genomes panel and
+            GEUVADIS has RPKM of 462. A job takes the library of a person when the sample chosen in step 3 is in the set.
+          </p>
+          <p>
+            The RNA-seq of every person was measured on a lymphoblastoid cell line, the cell type of GM12878. The form shows a warning when such a set is chosen beside H1ESC or HFFc6. The expression then comes from another cell type
+            than the loops do.
+          </p>
+          <p>
+            You can upload a table of your own in place of a hosted set. The table is tab or comma separated. Its first column holds the gene as an Ensembl id or a gene name. Every other column of numbers is a sample. A column named
+            length gives the length of the gene in bp. The output of featureCounts is read as it is. After the upload choose the samples of the job and state that the values are read counts or normalised values.
+          </p>
+          <pre className="code">{EXPRESSION}</pre>
+          <p>
+            The Genes tab shows one level for each gene, the mean over the samples of the job. Read counts with gene lengths give TPM and read counts without lengths give counts per million. Normalised values are shown in their own unit.
+          </p>
+          <p>
+            Two jobs with read counts and two samples or more each are compared with DESeq2, run by PyDESeq2. The test covers the genes with ten reads or more and gives a log2 fold change and an adjusted p for each. Every other pair
+            gives a ratio of the two levels with no test. That holds for read counts with one sample on a side and for normalised values of one set. Read counts are not compared with normalised values. The values of two sets are not
+            compared with each other.
+          </p>
         </section>
 
         <section id="reading">

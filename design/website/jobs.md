@@ -44,6 +44,11 @@ a VCF compressed with bgzip. `POST /api/uploads` stores each file in chunks unde
 `UPLOAD_MAX_MB` cap and checks it on arrival; the dialog shows the check and holds the job until
 every file passes. A job copies the files it uses into its own directory.
 
+The Gene expression step takes a table of genes by samples, uploaded with the kind `expression`.
+The check lists the samples and states that the values are whole numbers or not. The request
+names the upload in `expression_upload`, the chosen samples in `expression_columns` and counts
+or values in `expression_kind`. The job is private, as a job with any other upload is.
+
 Contacts come by one of three routes, and each ends as the region's bin pairs at 25 kb without
 the diagonal, the way the hosted maps hold them.
 

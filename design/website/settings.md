@@ -30,7 +30,7 @@ and no build.
 | key | default | meaning |
 |---|---|---|
 | `features.results`, `features.method` | on | the two pages. Off, the page leaves the top bar and its address leads to the front page |
-| `features.trios` | on | the nine people on the Results page |
+| `features.trios` | on | the nine people on the Results page and their RNA-seq: an expression table with `"feature": "trios"` in the catalog, its row of the Cite page and its sentence of the Help page |
 | `limits.region_mb` | `MAX_REGION_MB`, 20 | the longest region of a job, in Mb |
 | `limits.hicdiffusion_mb` | 2 | the longest region of a job with a HiCDiffusion background, in Mb, 2.097152 at most |
 | `limits.cores_per_job` | the cores of the server divided by the slots of `GPU_SLOTS` | the cores the engine of one job runs on, with the `thread` queue |

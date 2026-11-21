@@ -1,7 +1,7 @@
 import { Copy, ExternalLink, Github, Type } from 'lucide-react'
 import { ReferenceEntry } from '../components/ReferenceEntry'
 import { DATA_SOURCES, REFERENCES, referenceLink } from '../content/references'
-import { hidden } from '../flags'
+import { hidden, type Part } from '../flags'
 import '../styles/doc.css'
 import './cite.css'
 
@@ -28,7 +28,8 @@ function copy(text: string) {
 
 /** Every citation for models made on this server. */
 export function Cite() {
-  const group = (g: string) => REFERENCES.filter((r) => r.group === g)
+  const shown = (x: { feature?: Part }) => !x.feature || !hidden(x.feature)
+  const group = (g: string) => REFERENCES.filter((r) => r.group === g && shown(r))
   return (
     <div className="doc-page">
       <aside className="side-panel">
@@ -100,7 +101,7 @@ export function Cite() {
               </tr>
             </thead>
             <tbody>
-              {DATA_SOURCES.map((d) => {
+              {DATA_SOURCES.filter(shown).map((d) => {
                 const r = REFERENCES.find((x) => x.key === d.ref)
                 return (
                   <tr key={d.data}>

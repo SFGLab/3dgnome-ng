@@ -222,8 +222,8 @@ def run_job(
         # The table of an upload is in the job since the request. A hosted table is read here.
         if req.expression.get("path"):
             e = req.expression
-            table = expression.read_table(Path(str(e["path"])))
             columns = [str(c) for c in e["columns"]]  # type: ignore[union-attr]
+            table = expression.read_table(Path(str(e["path"])), columns)
             if e["kind"] == "counts":
                 expression.check_counts(table, columns, str(e["label"]))
             expression.write_job(job, table, columns, {k: e.get(k, "") for k in ("source", "label", "kind", "unit")})
