@@ -1415,6 +1415,40 @@ Also decided on 2026-11-21: the threshold of the cells is 3, since 2 costs 0.09 
 overlap of the ends under the dropout from 23 structures of 120 to 10 on the rows of GM12878 with no change of
 SCC. The product form of that radius and the cap of the radius by the target are deleted.
 
+### Trial of the rewritten ladder
+
+`design/figures/uniform-2026-11-19/pull20/` and `scores-pull20/`, with `scores-pull20_10k/` and
+`scores-pull20_5k/`, `slurm/ensemble/uniform_confirm20.sh` with `TAG=pull20`, commit b7c16d7. The threshold of 3,
+`loop_dropout` and `arcs_chain_radius = sum` on every arm. Eighteen rows of twenty structures, raw and balanced
+SCC per bead pair at 25 kb, and the balanced SCC of the bands of `playground/band_scc.py`:
+
+| arm | SCC | Spearman | ends overlap | exponent over Hi-C | distance at 1 Mb, 4 Mb | SCC under 250 kb | 250 kb to 1 Mb | 1 to 2 Mb |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 12 of 360 | 1.044 | 11.4, 15.0 | 0.241 | 0.385 | 0.03 |
+| cells at 5 kb, both sides | 0.335, 0.360 | 0.564 | 18 of 360 | 1.064 | 11.9, 14.9 | 0.338 | 0.471 | 0.04 |
+| cells at 5 kb, over the expectation alone | 0.327, 0.349 | 0.561 | 14 of 360 | 1.071 | 12.0, 15.1 | 0.326 | 0.465 | 0.05 |
+| ladder to 25 kb, over alone | 0.325, 0.343 | 0.579 | 15 of 360 | 1.054 | 11.6, 16.3 | 0.326 | 0.417 | 0.05 |
+| ladder, over alone, `gyration_weight` 0.3 | 0.320, 0.339 | 0.567 | 13 of 360 | 1.078 | 11.9, 16.6 | 0.319 | 0.431 | 0.04 |
+| ladder, over alone, `gyration_weight` 1.0 | 0.309, 0.328 | 0.554 | 15 of 360 | 1.091 | 12.0, 17.5 | 0.309 | 0.426 | 0.02 |
+| cells at 5 kb, over alone, `gyration_weight` 1.0 | 0.307, 0.328 | 0.545 | 12 of 360 | 1.093 | 12.2, 15.6 | 0.307 | 0.437 | 0.05 |
+
+The arm with both sides, built on the code where the bias of the bins has no key, has the scores of the arm of
+`scores-five20/` to the last digit.
+
+- The rewritten ladder does what it was written for. The distance at 1 Mb is that of the default chain and the
+  distance grows up to 4 Mb. The exponent over Hi-C is 1.05.
+- It does not beat the cells at 5 kb with both sides. Raw SCC is 0.010 ± 0.006 under, balanced SCC 0.017 ± 0.007
+  under on 14 rows of 18, Spearman 0.015 ± 0.006 over on 12 rows. The loss is between 250 kb and 1 Mb, 0.417
+  against 0.471.
+- At 5 kb the cells under their expectation are worth their place: without them balanced SCC is 0.011 ± 0.005
+  lower.
+- A larger `gyration_weight` holds the long range further apart, 17.5 bonds at 4 Mb at a weight of 1.0, and
+  costs 0.02 to 0.03 of SCC with or without the ladder.
+- No arm has a correlation with Hi-C beyond 1 Mb.
+
+The cells at 5 kb with both sides stay the rule. The side of the cells over their expectation alone loses, and
+with it the ladder as rewritten.
+
 ### The score by the separation of a pair
 
 `playground/band_scc.py`, on the structures of `out/confirm20`, eighteen rows of twenty structures. The balanced
