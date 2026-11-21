@@ -8,7 +8,7 @@ export const SUMMARY_DONE: Summary = {
   started: 1000, finished: 1372, region: 'chr1:11500000-12600000',
   request: { cell_type: 'GM12878', region: 'chr1:11,500,000-12,600,000', factors: 'CTCF+RNAPII', background: 'hic', sv_set: '', sample: '', haplotype: 0, n_models: 100 },
   loops: { CTCF: 118, RNAPII: 64 }, n_svs: 0, structures: 100, genes: 312, loop_count: 182,
-  files: [{ name: 'ep.tsv', size: 38000 }, { name: 'marks.json', size: 6000 }, { name: 'engine.log', size: 22000 }],
+  files: [{ name: 'engine.log', size: 22000 }, { name: 'ep.tsv', size: 38000 }, { name: 'marks.json', size: 6000 }, { name: 'request.json', size: 400 }, { name: 'status.json', size: 900 }],
   models: Array.from({ length: 100 }, (_, i) => ({ name: `chr1_11500000_12600000_s${i + 1}.cif`, size: 412000 })),
   skipped_svs: 0, expression: null, stages: [], now: 1372, structures_done: 100, structures_asked: 100, log_recent: '',
 }

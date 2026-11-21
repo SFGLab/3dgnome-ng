@@ -180,16 +180,14 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
                 ))}
               </ul>
             </li>
-            {summary.files
-              .filter((f) => ['ep.tsv', 'marks.json', 'engine.log', 'hicdiffusion.bedpe'].includes(f.name))
-              .map((f) => (
-                <li key={f.name} className="file">
-                  <a href={api.fileUrl(f.name)}>
-                    {f.name.endsWith('.json') ? <Braces size={14} aria-hidden /> : <FileText size={14} aria-hidden />} {f.name}
-                  </a>
-                  <span className={cn('size')}>{size(f.size)}</span>
-                </li>
-              ))}
+            {summary.files.map((f) => (
+              <li key={f.name} className="file">
+                <a href={api.fileUrl(f.name)}>
+                  {f.name.endsWith('.json') ? <Braces size={14} aria-hidden /> : <FileText size={14} aria-hidden />} {f.name}
+                </a>
+                <span className={cn('size')}>{size(f.size)}</span>
+              </li>
+            ))}
           </ul>
           </div>
         </>

@@ -72,7 +72,8 @@ describe('Job explorer', () => {
     expect(await screen.findByText('Done in 6 min 12 s')).toBeInTheDocument()
     expect(screen.getByText('118 CTCF, 64 RNAPII')).toBeInTheDocument()
     expect(screen.getByText('CTCF and RNAPII')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /ep\.tsv/ })).toHaveAttribute('href', `/jobs/${KEY}/files/ep.tsv`)
+    // Every file the summary lists is a download of the panel.
+    for (const f of SUMMARY_DONE.files) expect(screen.getByRole('link', { name: f.name })).toHaveAttribute('href', `/jobs/${KEY}/files/${f.name}`)
     expect(within(screen.getByRole('list', { name: 'Structure files' })).getAllByRole('listitem')).toHaveLength(SUMMARY_DONE.models.length)
     // Every file in one archive is the Download all button of the tabs, and the list does not repeat it.
     expect(screen.queryByRole('link', { name: /all files, zip/ })).not.toBeInTheDocument()
