@@ -29,6 +29,7 @@ from gnome3d.pipeline.ib.nodes import (
     chain_share,
     contact_nodes,
     draw_ends,
+    mean_loop_target,
     node_targets,
     node_weights,
     reach_pairs,
@@ -290,12 +291,29 @@ def solve_nodes(
         )
         for b, k, mid in zip(nodes.block, nodes.bead, nodes.mid, strict=True)
     ]
+    # Under the dropout a constant of the conformation is read from every loop of the chromosome.
+    mids_all: list[int] = []
+    arcs_all: list[tuple[int, int, int] | tuple[int, int, int, int]] = []
+    if s.loop_dropout:
+        mids_all, arcs_all = cb.active_arcs(state, active_all, chr_, None)
+    derived = bool(s.use_excluded_volume) and bool(s.exclusion_apply_to_arcs)
+    if s.loop_dropout and derived and float(s.exclusion_radius_arcs) <= 0.0:
+        s_joint.exclusion_radius_arcs = float(s.exclusion_auto_factor_arcs) * mean_loop_target(
+            mids_all, arcs_all, law, s
+        )
+        log.status(
+            LOG,
+            "joint arcs solve %s: radius of the excluded volume %.2f, from the %d loops before"
+            " the dropout",
+            chr_,
+            float(s_joint.exclusion_radius_arcs),
+            len(arcs_all),
+        )
     share: F64Array | None = None
     if s.exclusion_arcs_chain_radius != "none":
         every = m
         if s.loop_dropout:
             # The count of nodes of a conformation that keeps every loop, from a draw of its own.
-            _, arcs_all = cb.active_arcs(state, active_all, chr_, None)
             ends_all: I32Array = np.array([(a[0], a[1]) for a in arcs_all], dtype=np.int32).reshape(
                 -1, 2
             )

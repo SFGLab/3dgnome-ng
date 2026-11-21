@@ -94,6 +94,27 @@ def contact_nodes(
     )
 
 
+def mean_loop_target(
+    mids: list[int],
+    arcs: list[tuple[int, int, int] | tuple[int, int, int, int]],
+    law: PolymerLaw,
+    s: Settings,
+) -> float:
+    """Returns the mean target of the loops of a chromosome, each at the midpoints of its two
+    anchors, or 1 without a loop. `arcs` are `(anchor, anchor, score[, factor])`.
+    """
+    if not arcs:
+        return 1.0
+    if s.loop_contact:
+        return 1.0
+    total = 0.0
+    for arc in arcs:
+        sep = abs(int(mids[arc[0]]) - int(mids[arc[1]]))
+        q = law.arc_strength(int(arc[2]), sep, int(arc[3]) if len(arc) > 3 else 0)
+        total += float(law.contact_distance(sep, float(q)))
+    return total / len(arcs)
+
+
 def chain_share(mid: I64Array, start: int, end: int, count: int) -> F64Array:
     """Returns the chain each node stands for over the mean chain of a node.
 

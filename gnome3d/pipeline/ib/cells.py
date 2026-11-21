@@ -157,12 +157,19 @@ def hold_by_cells(
     The expectation of a cell is `expected` at its offset, times `node_bias` of its two nodes when
     that is given.
 
+    Under `[springs] contact_estimate = bound` the test and the distance read the square roots of
+    the count and of the expectation, each with 3/8 added, whose difference has the same spread on
+    both sides. A cell is held when twice that difference is beyond z, and its distance is the
+    background times `(bound / root of the expectation) ^ (-2/3)`, with the bound the root of
+    the count moved z / 2 towards the expectation. A cell at the threshold is at the background.
+
     `tested` marks the pairs whose cell had an expectation above z squared at a finer resolution.
     Such a pair is left as it is and the pairs that this resolution can test are added to the
     marks. A pair is then read at the finest resolution that can test it.
     """
     z_cut = float(s.contact_background_z)
     pseudo = float(s.contact_pseudo_count)
+    by_bound = s.contact_estimate == "bound"
     s0 = max(int(law.s0_bp), 1)
     stretch = float(s.heatmap_distance_stretching)
     pos = mids.astype(np.float64)
@@ -178,7 +185,14 @@ def hold_by_cells(
         if node_bias is not None:
             exp = exp * node_bias[ii] * node_bias[jj]
         obs = count[ii, jj]
-        z = (obs - exp) / np.sqrt(np.maximum(exp, 1e-300))
+        root_obs: F64Array = obs
+        root_exp: F64Array = exp
+        if by_bound:
+            root_obs = np.sqrt(obs + 0.375)
+            root_exp = np.sqrt(exp + 0.375)
+            z = 2.0 * (root_obs - root_exp)
+        else:
+            z = (obs - exp) / np.sqrt(np.maximum(exp, 1e-300))
         testable = (
             (mat[ii, jj] < 0.0) & (off >= 1) & mapped[ii] & mapped[jj] & (exp > z_cut * z_cut)
         )
@@ -190,7 +204,10 @@ def hold_by_cells(
             continue
         sep = np.abs(pos[jj[sel]] - pos[ii[sel]])
         bg = np.maximum(1.0, (np.maximum(sep, 1.0) / s0) ** law.nu)
-        ratio = (obs[sel] + pseudo) / (exp[sel] + pseudo)
+        ratio: F64Array = (obs[sel] + pseudo) / (exp[sel] + pseudo)
+        if by_bound:
+            bound: F64Array = root_obs[sel] - np.sign(z[sel]) * 0.5 * z_cut
+            ratio = (bound / root_exp[sel]) ** 2
         target = np.clip(bg * ratio ** (-1.0 / 3.0), 1.0, stretch * bg)
         out[ii[sel], jj[sel]] = -target
         out[jj[sel], ii[sel]] = -target

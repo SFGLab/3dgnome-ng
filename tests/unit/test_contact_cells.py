@@ -244,3 +244,38 @@ def test_loader_refuses_an_unknown_bias_and_a_pseudo_count_of_zero() -> None:
         Settings.from_dict({"springs": {"contact_bias": "coverage"}})
     with pytest.raises(ValueError, match="above zero"):
         Settings.from_dict({"springs": {"contact_pseudo_count": "0"}})
+
+
+def test_the_bound_gives_a_cell_without_a_count_a_smaller_push_and_no_jump_at_the_threshold() -> (
+    None
+):
+    mids, offset, _expected, mapped, mat = cells_case()
+    expected = np.full(100, 5.0)
+    s = settings()
+    s.contact_estimate = "bound"
+    root_exp = np.sqrt(5.375)
+
+    none = hold_by_cells(mat, mids, np.zeros((3, 3)), offset, expected, mapped, LAW, s)
+    want = 4.0 * ((np.sqrt(0.375) + 1.0) / root_exp) ** (-2.0 / 3.0)
+    assert none[0, 1] == pytest.approx(-want), "no count of 5 expected, the bound one root over"
+    assert want / 4.0 == pytest.approx(1.274, abs=0.001), "1.27 backgrounds, 2.2 under ratio"
+
+    many = np.array([[0.0, 20.0, 0.0], [20.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+    out = hold_by_cells(mat, mids, many, offset, expected, mapped, LAW, s)
+    want = 4.0 * ((np.sqrt(20.375) - 1.0) / root_exp) ** (-2.0 / 3.0)
+    assert out[0, 1] == pytest.approx(-want), "20 counts of 5 expected, the bound one root under"
+
+    ten = np.array([[0.0, 10.0, 5.0], [10.0, 0.0, 5.0], [5.0, 5.0, 0.0]])
+    out = hold_by_cells(mat, mids, ten, offset, expected, mapped, LAW, s)
+    assert out[0, 1] == mat[0, 1], "10 counts of 5 expected are 1.8 roots over and are not held"
+
+    just = np.array([[0.0, 11.0, 5.0], [11.0, 0.0, 5.0], [5.0, 5.0, 0.0]])
+    out = hold_by_cells(mat, mids, just, offset, expected, mapped, LAW, s)
+    assert -4.0 < out[0, 1] / 1.0 and out[0, 1] == pytest.approx(-4.0, rel=0.03), (
+        "a cell just over the threshold is held near the background"
+    )
+
+
+def test_loader_refuses_an_unknown_estimate() -> None:
+    with pytest.raises(ValueError, match="ratio or bound"):
+        Settings.from_dict({"springs": {"contact_estimate": "median"}})

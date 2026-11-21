@@ -11,7 +11,8 @@ from gnome3d.mc.numba.arcs_solver import (
     pair_radius_energy_grad,
     solve_arcs,
 )
-from gnome3d.pipeline.ib.nodes import chain_share
+from gnome3d.pipeline.ib.nodes import chain_share, mean_loop_target
+from gnome3d.polymer import PolymerLaw
 from gnome3d.settings import Settings
 from gnome3d.types import F64Array
 
@@ -236,3 +237,19 @@ def test_loader_refuses_an_unknown_rule_and_a_rule_without_the_uniform_chain() -
         Settings.from_dict({"excluded_volume": {"arcs_chain_radius": "cube"}})
     with pytest.raises(ValueError, match="uniform_chain is off"):
         Settings.from_dict({"excluded_volume": {"arcs_chain_radius": "sum"}})
+
+
+def test_mean_loop_target_is_the_mean_of_the_contact_distances_of_every_loop() -> None:
+    law = PolymerLaw(nu=0.5, s0_bp=1000, q_half=1.0)
+    mids = [0, 16_000, 64_000]
+    arcs = [(0, 1, 1), (0, 2, 3), (1, 2, 1, 0)]
+    want = np.mean(
+        [
+            law.contact_distance(16_000, law.arc_strength(1, 16_000, 0)),
+            law.contact_distance(64_000, law.arc_strength(3, 64_000, 0)),
+            law.contact_distance(48_000, law.arc_strength(1, 48_000, 0)),
+        ]
+    )
+    s = settings()
+    assert mean_loop_target(mids, arcs, law, s) == pytest.approx(want)
+    assert mean_loop_target(mids, [], law, s) == 1.0, "a chromosome without a loop"
