@@ -182,7 +182,7 @@ def test_the_longest_job_fits_a_map_at_25_kb() -> None:
     assert coarsest_fit(0, 40_000_000) == 50_000, "a window of 40 Mb fits at 50 kb"
 
 
-def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_path: Path) -> None:
+def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     d = str(tmp_path)
     root = Path(d)
     make_data(root / "data")
@@ -228,7 +228,7 @@ def test_the_endpoint_returns_two_square_maps_on_the_bins_of_the_resolution(tmp_
         b0 = np.arange(start - start % res, end, res)
         return b0[:-1], b0[1:], np.full(len(b0) - 1, 7)
 
-    ex._read_deep = fake
+    monkeypatch.setattr(ex, "_read_deep", fake)
     job = root / "results" / "jobs" / url.split("/")[-1]
     deep = ex.contact_maps(job, "chr1:0-3000000", 25000, "hic", "model", "raw", hic_url="https://example.org/deep.mcool", hic_name="4DN deep map")
     ex.contact_maps(job, "chr1:0-3000000", 25000, "hic", "model", "raw", hic_url="https://example.org/deep.mcool", hic_name="4DN deep map")

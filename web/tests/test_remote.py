@@ -124,7 +124,7 @@ def shared(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespace:
     return SimpleNamespace(remote=remote, url=url, size=size, url_whole=url_whole, data=data, root=root, url_signed=url_signed, url_page=url_page, url_slow=url_slow, with_ranges=with_ranges, whole=whole, page=page, signed=signed, slow=slow)
 
 
-def test_a_server_with_range_requests_gives_the_file_size(shared: SimpleNamespace) -> None:
+def test_a_server_with_range_requests_gives_the_file_size(shared: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     remote, url, size, url_whole = shared.remote, shared.url, shared.size, shared.url_whole
     assert remote.probe(f"{url}/test.mcool", allow_private=True)[0] == size, "a server with range requests gives the file size"
     try:
@@ -138,11 +138,9 @@ def test_a_server_with_range_requests_gives_the_file_size(shared: SimpleNamespac
     assert size_seen == size and final == f"{url}/test.mcool", "a redirect is followed to the file it names: " + str(final)
     seen: list[str] = []
     real_resolve = remote._resolve
-    remote._resolve = lambda host, p: seen.append(host) or real_resolve(host, p)
-    try:
+    with monkeypatch.context() as m:
+        m.setattr(remote, "_resolve", lambda host, p: seen.append(host) or real_resolve(host, p))
         remote.probe(hop.replace("127.0.0.1", "localhost"), allow_private=True)
-    finally:
-        remote._resolve = real_resolve
     assert seen == ["localhost", "localhost"], "every connection, the redirect's too, resolves through the checked resolver: " + str(seen)
     try:
         remote.probe(hop.replace("127.0.0.1", "localhost", 1), allow_private=False)
@@ -160,7 +158,7 @@ def test_thinning_keeps_the_target_total_never_above_a_count() -> None:
     assert (thin(np.array([3, 4]), 100, seed=1) == [3, 4]).all(), "a map under the target keeps every contact"
 
 
-def test_an_mcool_link_becomes_a_contacts_upload(shared: SimpleNamespace) -> None:
+def test_an_mcool_link_becomes_a_contacts_upload(shared: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     data, root, url, size, url_signed, url_whole, url_page, url_slow, remote, with_ranges, whole, page, signed, slow = shared.data, shared.root, shared.url, shared.size, shared.url_signed, shared.url_whole, shared.url_page, shared.url_slow, shared.remote, shared.with_ranges, shared.whole, shared.page, shared.signed, shared.slow
     os.environ.update(
         DATA_DIR=str(data), RESULTS_DIR=str(root / "results"), QUEUE="inline", FRONTEND_DIST=str(root / "missing"), LINK_ALLOW_PRIVATE="1",
@@ -227,11 +225,9 @@ def test_an_mcool_link_becomes_a_contacts_upload(shared: SimpleNamespace) -> Non
     port = url.rsplit(":", 1)[1]
     answers_dns = iter([["8.8.8.8"]])
     real = remote._resolve
-    remote._resolve = lambda host, p: next(answers_dns, ["127.0.0.1"]) if host == "rebind.test" else real(host, p)
-    try:
+    with monkeypatch.context() as m:
+        m.setattr(remote, "_resolve", lambda host, p: next(answers_dns, ["127.0.0.1"]) if host == "rebind.test" else real(host, p))
         r = link(f"http://rebind.test:{port}/test.mcool", client=strict)
-    finally:
-        remote._resolve = real
     assert r.status_code == 400 and "private" in r.json()["error"], "a name that resolves public at the check and private at the read is refused: " + r.text
     for srv in (with_ranges, whole, page, signed, slow):
         srv.shutdown()
