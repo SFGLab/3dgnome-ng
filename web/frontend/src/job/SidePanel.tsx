@@ -43,7 +43,8 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
   const [name, setName] = useState(remembered?.name ?? '')
   const [editing, setEditing] = useState(false)
   const [unfolded, setUnfolded] = useState(false)
-  const m = summary.region?.match(/^(\w+):(\d+)-(\d+)$/)
+  // A waiting job has no region of its own yet. Its heading reads the coordinates of the request.
+  const m = summary.region?.match(/^(\w+):(\d+)-(\d+)$/) ?? summary.request.region.replace(/,/g, '').match(/^(\w+):(\d+)-(\d+)$/)
   const region = m ? `${m[1]}:${bp(Number(m[2]))}-${bp(Number(m[3]))}` : summary.request.region
   // The heading has the region in megabases, which fits the panel. The line under it has the exact positions.
   const short = m ? shortRegion(m[1], Number(m[2]), Number(m[3])) : summary.request.region

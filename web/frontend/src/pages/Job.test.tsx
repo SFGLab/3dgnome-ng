@@ -194,6 +194,19 @@ describe('Job explorer', () => {
     expect(checkCopy(container)).toEqual([])
   })
 
+  it('heads a waiting job with the region of the request in megabases', async () => {
+    const waiting = { ...SUMMARY_DONE, state: 'queued', stage: null, region: null, ahead: 2, models: [], structures: 0, stages: [{ stage: 'queued', at: 1000 }], now: 1754, request: { ...SUMMARY_DONE.request, region: 'chr3:120,184,079-140,184,000' } }
+    mockApi([[/summary$/, () => [200, waiting]]])
+    renderJob()
+    expect(await screen.findByText('Waiting in the queue behind 2 jobs')).toBeInTheDocument()
+    // The whole coordinates do not fit the panel on one line. They are on the line under the heading.
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('GM12878 chr3:120.184-140.184 Mb')
+    expect(screen.getByText(/chr3:120,184,079-140,184,000/)).toBeInTheDocument()
+    const rows = within(screen.getByRole('list', { name: 'Stages of the job' })).getAllByRole('listitem')
+    expect(rows.map((li) => li.textContent)).toEqual(['Queued12 min 34 s', 'Building the inputs', 'Modelling the structures', 'Marking promoters and enhancers'])
+    expect(rows.map((li) => li.className)).toEqual(['now', 'next', 'next', 'next'])
+  })
+
   it('shows a failed job with its error and log', async () => {
     mockApi([[/summary$/, () => [200, { ...SUMMARY_DONE, state: 'failed', error: 'RuntimeError: engine exploded', log_tail: 'line 1\nengine exploded', models: [] }]]])
     renderJob()
