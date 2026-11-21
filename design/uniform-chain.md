@@ -1543,8 +1543,14 @@ twenty structures, raw and balanced SCC per bead pair at 25 kb:
   16 rows of 18, with or without its cells. The gain is the chain: the equal beads, the nodes at the loop ends,
   the dropout and the radius of a node from its chain.
 
+The same two arms on the inputs of production, `scores-nocells20/`, `TAG=nocells20`, eighteen rows of twenty
+structures: 0.335 and 0.360 with the cells against 0.324 and 0.343 without, +0.011 ± 0.005 of raw and
++0.017 ± 0.005 of balanced SCC, on 12 and 15 rows of 18, with the same Spearman, 0.564 and 0.563. The default
+chain has 0.204 and 0.268. On those inputs the cells are a fifth of the gain of the uniform chain in balanced
+SCC and on the singletons of one half a twentieth.
+
 The structure of both chains comes from the loops and from the distance law. Hi-C, read as one spring per pair
-of beads from the count of its cell, adds close to nothing at 5 kb. The ladder with both sides is the one form
+of beads from the count of its cell, adds 0.005 to 0.017 of balanced SCC at 5 kb. The ladder with both sides is the one form
 that carried a signal of the half it did not read beyond 1 Mb, and it expanded the range from 500 kb to 1 Mb.
 
 ## The config locked on 2026-11-21
