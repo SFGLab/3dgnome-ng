@@ -12,6 +12,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from .shapes import SettingGroup
+
 SETTINGS_MD = Path(__file__).resolve().parents[3] / "SETTINGS.md"
 BOOLEAN = ("yes", "no")
 _TRUE = {"yes", "true", "1", "on"}
@@ -251,7 +253,7 @@ def parse_ini(text: str) -> tuple[dict[str, str], list[str]]:
     return ok, refused
 
 
-def schema(cell_config: Path) -> list[dict[str, object]]:
+def schema(cell_config: Path) -> list[SettingGroup]:
     """The editable settings in groups, each with its type, default, the value of the cell
     type's config, its range or choices and the text of `HELP`."""
     rows = {(r.section, r.key): r for r in read_settings_md()}

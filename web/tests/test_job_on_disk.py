@@ -80,6 +80,8 @@ def test_a_job_from_disk_answers_as_it_did(site: SimpleNamespace, name: str, rou
     now = thin(r.json())
     if route == "summary":
         now.pop("now")
+        # The summary states the skipped variants since 2026-11-21.
+        assert now.pop("skipped_svs") == (1 if name == "with_variants" else 0), "the summary has the count of skipped variants of the status"
     assert difference(site.said[name][route], now) == "", f"{route} of {name} is the answer the job gave when it was written"
 
 

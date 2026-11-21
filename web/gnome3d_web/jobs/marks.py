@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from ..frames import rows
+
 MAX_GAP = 5_000
 MAX_LINEAR = 1_000_000
 
@@ -41,7 +43,7 @@ def mark_beads(chrom: str, starts: np.ndarray, ends: np.ndarray, genes: pd.DataF
     mids = (starts + ends) // 2
     lo, hi = int(starts.min()), int(ends.max())
     m = Marks()
-    for g in genes[genes["chrom"] == chrom].itertuples(index=False):
+    for g in rows(genes[genes["chrom"] == chrom]):
         if lo <= g.tss <= hi and (k := _nearest(mids, int(g.tss))) is not None:
             m.promoters[str(g.gene_id)] = k
     e = enhancers[enhancers[0] == chrom]
@@ -81,4 +83,4 @@ def ep_table(models: list[np.ndarray], marks: Marks, genes: pd.DataFrame, starts
                 "bead_mid": int(mids[b]),
             }
         )
-    return pd.DataFrame(rows, columns=["gene_id", "name", "tss", "promoter_bead", "enhancer_bead", "enhancer_centre", "linear_bp", "distance", "bead_mid"])
+    return pd.DataFrame(rows, columns=["gene_id", "name", "tss", "promoter_bead", "enhancer_bead", "enhancer_centre", "linear_bp", "distance", "bead_mid"])  # pyright: ignore[reportArgumentType]

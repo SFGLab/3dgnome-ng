@@ -100,34 +100,7 @@ def create_job(site: Site, fields: dict[str, str]) -> str:
         src = catalog.expression[wanted]
         req.expression = {"source": src.name, "columns": option["columns"], "kind": src.kind, "unit": src.unit, "label": option["label"]}
     if own_dirs or vcf is not None or own_table is not None:
-        token = secrets.token_urlsafe(18)
-        job = s.private_dir / token
-        job.mkdir(parents=True)
-        if own_table is not None:
-            expression.write_job(job, own_table[0], own_table[1], own_table[2])
-    if own_dirs:
-        (job / "own").mkdir()
-        own: dict[str, object] = {"loops": []}
-        for i, (factor, d) in enumerate(own_dirs.get("loops", [])):
-            own["loops"].append([factor, str(upload_store.clean_copy(d, job / "own" / f"loops_{i}.bedpe"))])  # type: ignore[union-attr]
-        for kind in ("anchors", "contacts", "enhancers"):
-            if kind in own_dirs:
-                own[kind] = str(upload_store.clean_copy(own_dirs[kind], job / "own" / f"{kind}.txt"))
-        for key in ("loops_from", "enhancers_from"):
-            if key in own_dirs:
-                own[key] = own_dirs[key]
-        req.own = own
-        if vcf is not None:
-            req.upload_vcf = str(put_vcf(vcf, job))
-            req.sv_set = ""
-        enqueue(site.queue, req, job)
-        return f"/p/{token}"
-    if vcf is not None:
-        req.upload_vcf = str(put_vcf(vcf, job))
-        req.sv_set = ""
-    if vcf is not None or own_table is not None:
-        enqueue(site.queue, req, job)
-        return f"/p/{token}"
+        return private_job(site, req, own_dirs, vcf, own_table)
     key = request_key(req, catalog)
     job = s.jobs_dir / key
     if store.taken(job):
@@ -138,6 +111,32 @@ def create_job(site: Site, fields: dict[str, str]) -> str:
         job = s.jobs_dir / key
     enqueue(site.queue, req, job)
     return f"/jobs/{key}"
+
+
+def private_job(site: Site, req: JobRequest, own_dirs: dict, vcf: Path | None, own_table: tuple[expression.Table, list[str], dict[str, object]] | None) -> str:
+    """Starts the job of a request with uploads under a random token. The table, the own data and
+    the VCF are copied into the job, and the request has their places there."""
+    token = secrets.token_urlsafe(18)
+    job = site.settings.private_dir / token
+    job.mkdir(parents=True)
+    if own_table is not None:
+        expression.write_job(job, own_table[0], own_table[1], own_table[2])
+    if own_dirs:
+        (job / "own").mkdir()
+        loops = [[factor, str(upload_store.clean_copy(d, job / "own" / f"loops_{i}.bedpe"))] for i, (factor, d) in enumerate(own_dirs.get("loops", []))]
+        own: dict[str, object] = {"loops": loops}
+        for kind in ("anchors", "contacts", "enhancers"):
+            if kind in own_dirs:
+                own[kind] = str(upload_store.clean_copy(own_dirs[kind], job / "own" / f"{kind}.txt"))
+        for key in ("loops_from", "enhancers_from"):
+            if key in own_dirs:
+                own[key] = own_dirs[key]
+        req.own = own
+    if vcf is not None:
+        req.upload_vcf = str(put_vcf(vcf, job))
+        req.sv_set = ""
+    enqueue(site.queue, req, job)
+    return f"/p/{token}"
 
 
 def put_vcf(vcf: Path, job: Path) -> Path:

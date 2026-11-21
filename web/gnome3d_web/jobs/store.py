@@ -15,8 +15,11 @@ import time
 import zipfile
 from collections.abc import Iterable
 from pathlib import Path
+from typing import cast
 
 import numpy as np
+
+from .shapes import FileSize, OwnStated, RequestStated, Status
 
 
 # The key of a shared job and the token of a private one.
@@ -49,9 +52,10 @@ def request(job: Path) -> dict:
     return read_json(job / "request.json")
 
 
-def status(job: Path) -> dict:
+def status(job: Path) -> Status:
     """The status of a job. A job without the file waits."""
-    return read_json(job / "status.json") or {"state": "queued"}
+    kept = read_json(job / "status.json")
+    return cast(Status, kept) if kept else {"state": "queued"}
 
 
 def set_status(job: Path, **fields: object) -> None:
@@ -117,10 +121,10 @@ def log_end(path: Path, n: int) -> str:
         return "\n".join(f.read().decode(errors="replace").splitlines()[-n:])
 
 
-def sizes(paths: Iterable[Path]) -> list[dict[str, object]]:
+def sizes(paths: Iterable[Path]) -> list[FileSize]:
     """The name and the size of each file. A job writes a file under a second name and renames it,
     and that second file can be gone between the listing and the reading of its size."""
-    out: list[dict[str, object]] = []
+    out: list[FileSize] = []
     for p in paths:
         with contextlib.suppress(FileNotFoundError):
             if p.is_file() and not p.name.endswith(".tmp"):
@@ -128,19 +132,20 @@ def sizes(paths: Iterable[Path]) -> list[dict[str, object]]:
     return out
 
 
-def public_request(req: dict) -> dict:
+def public_request(req: dict) -> RequestStated:
     """The request without the server's paths of uploaded files."""
-    out = {k: v for k, v in req.items() if k not in ("upload_vcf", "own", "expression")}
+    out = cast(RequestStated, {k: v for k, v in req.items() if k not in ("upload_vcf", "own", "expression")})
     # The source of the expression by its id. The table of an upload has a path on the server.
     if req.get("expression"):
         out["expression"] = str(req["expression"].get("source", ""))
     own = req.get("own") or {}
     if own:
-        out["own"] = {
-            "loops": [f for f, _ in own.get("loops", [])],
-            **{k: bool(own.get(k)) for k in ("anchors", "contacts", "enhancers")},
-            **{k: own[k] for k in ("loops_from", "enhancers_from") if own.get(k)},
-        }
+        stated: OwnStated = {"loops": [f for f, _ in own.get("loops", [])], "anchors": bool(own.get("anchors")), "contacts": bool(own.get("contacts")), "enhancers": bool(own.get("enhancers"))}
+        if own.get("loops_from"):
+            stated["loops_from"] = own["loops_from"]
+        if own.get("enhancers_from"):
+            stated["enhancers_from"] = own["enhancers_from"]
+        out["own"] = stated
     return out
 
 
@@ -152,12 +157,14 @@ def public_log(text: str, job: Path) -> str:
     return text
 
 
-def public_status(job: Path) -> dict[str, object]:
+def public_status(job: Path) -> Status:
     """The status of a job without the paths of the server in its error and its log."""
     out = status(job)
-    for k in ("error", "log_tail"):
-        if out.get(k):
-            out[k] = public_log(str(out[k]), job)
+    error, end = out.get("error"), out.get("log_tail")
+    if error:
+        out["error"] = public_log(str(error), job)
+    if end:
+        out["log_tail"] = public_log(str(end), job)
     return out
 
 

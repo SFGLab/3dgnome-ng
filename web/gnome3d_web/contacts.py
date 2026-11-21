@@ -3,6 +3,9 @@ counted contacts, ICE balancing and the stratum adjusted correlation of the vali
 (legacy/validation/metrics/hic.py). The site and the battery report one number.
 """
 
+# pandas states the type of a column and of a selection too loosely for these checks.
+# pyright: reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 import numpy as np

@@ -10,8 +10,28 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 
+from typing_extensions import NotRequired, TypedDict
+
 from .errors import Refused, UnknownCell
 from .context import Site
+
+
+class Refusal(TypedDict):
+    """The body of an answer that is no success: the message, the form field it concerns and the fix."""
+
+    error: str
+    field: NotRequired[str]
+    fix: NotRequired[str]
+
+
+class Missing(TypedDict):
+    """The body of the 404 of an address or a job the site does not have."""
+
+    detail: str
+
+
+# The refusals a route can answer with, for the description of the interface.
+REFUSALS: dict[int | str, dict[str, Any]] = {400: {"model": Refusal}, 404: {"model": Refusal | Missing}}
 
 
 def packed_json(request: Request, value: object) -> Response:

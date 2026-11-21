@@ -7,15 +7,17 @@ from fastapi.responses import JSONResponse
 
 from ..engine import hicdiffusion
 from ..regions import RegionError, parse_region
+from ..answers import REFUSALS
 from ..context import Here
 from . import genes, preview
 from .model import FACTOR_CHOICES, SAMPLE_COLUMNS
+from .shapes import CatalogInfo, ExpressionOptions, GeneHit, Preview, RegionInfo, SampleTable
 
-router = APIRouter()
+router = APIRouter(responses=REFUSALS)
 
 
-@router.get("/api/catalog")
-def api_catalog(site: Here) -> dict[str, object]:
+@router.get("/api/catalog", response_model=CatalogInfo)
+def api_catalog(site: Here) -> CatalogInfo:
     catalog = site.catalog
     return {
         "cell_types": {
@@ -34,13 +36,13 @@ def api_catalog(site: Here) -> dict[str, object]:
     }
 
 
-@router.get("/api/genes")
+@router.get("/api/genes", response_model=list[GeneHit])
 def api_genes(site: Here, cell: str, q: str, limit: int = 8) -> JSONResponse:
     """The suggestions of the region field."""
     return JSONResponse(genes.find(site.cell(cell), q, limit))
 
 
-@router.get("/api/region")
+@router.get("/api/region", response_model=RegionInfo)
 def api_region(site: Here, cell: str, q: str) -> JSONResponse:
     table = site.cell(cell).genes()
     try:
@@ -55,7 +57,7 @@ def api_region(site: Here, cell: str, q: str) -> JSONResponse:
     return JSONResponse(body)
 
 
-@router.get("/api/preview")
+@router.get("/api/preview", response_model=Preview)
 def api_preview(site: Here, cell: str, region: str) -> JSONResponse:
     ct = site.cell(cell)
     # The form draws the loops around a region as well, its own length on either side. The
@@ -67,7 +69,7 @@ def api_preview(site: Here, cell: str, region: str) -> JSONResponse:
     return JSONResponse(preview.around(ct, r))
 
 
-@router.get("/api/sv_sets/{name}/samples")
+@router.get("/api/sv_sets/{name}/samples", response_model=SampleTable)
 def api_sv_samples(site: Here, name: str) -> JSONResponse:
     """Sex, population and parents of each sample of a call set that has the table."""
     sv = site.catalog.sv_sets.get(name)
@@ -76,7 +78,7 @@ def api_sv_samples(site: Here, name: str) -> JSONResponse:
     return JSONResponse({"columns": list(SAMPLE_COLUMNS), "rows": sv.sample_rows()})
 
 
-@router.get("/api/expression")
+@router.get("/api/expression", response_model=ExpressionOptions)
 def api_expression(site: Here, cell: str, sv_set: str = "", sample: str = "") -> JSONResponse:
     """The hosted expression a job of this cell type, and of this sample of a call set, can take."""
     catalog = site.catalog

@@ -39,6 +39,9 @@ jobs:
       # The rules of undefined and unused names. The files of the site are not formatted by ruff.
       - run: pip install ruff==0.15.14
       - run: ruff check --select F web/gnome3d_web web/tests web/scripts
+      # The types of the server code, the declared shapes of its answers among them.
+      - run: pip install pyright==1.1.409
+      - run: pyright -p web/pyrightconfig.json
       - run: pytest web/tests
 
   frontend:

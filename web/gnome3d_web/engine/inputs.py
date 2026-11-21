@@ -7,6 +7,9 @@ HiCDiffusion window is spliced into the singletons when given. The config is the
 with its data section replaced.
 """
 
+# pandas states the type of a column and of a selection too loosely for these checks.
+# pyright: reportReturnType=false, reportArgumentType=false, reportAttributeAccessIssue=false
+
 from __future__ import annotations
 
 import hashlib

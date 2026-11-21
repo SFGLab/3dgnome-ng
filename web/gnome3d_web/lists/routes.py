@@ -8,12 +8,14 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from ..answers import REFUSALS
 from ..context import Here
+from .shapes import SharedList
 from .store import MAX_BODY, normalise
 
 BAD_CODE = "A sync code has 16 letters and digits, like K7M2-9QXD-4THP-W3RZ."
 NO_LIST = "No list has this code. Compare it with the computer that shows it."
-router = APIRouter()
+router = APIRouter(responses=REFUSALS)
 
 
 async def _body(request: Request) -> dict[str, Any]:
@@ -31,14 +33,14 @@ def _answer(code: str, record: dict[str, Any], status: int = 200) -> JSONRespons
     return JSONResponse({"code": code, "private": record["private"], "jobs": record["jobs"]}, status)
 
 
-@router.post("/api/lists")
+@router.post("/api/lists", response_model=SharedList, status_code=201)
 async def list_create(site: Here, request: Request) -> JSONResponse:
     body = await _body(request)
     code, record = site.lists.create(body.get("jobs"), body.get("private") is True)
     return _answer(code, record, 201)
 
 
-@router.get("/api/lists/{code}")
+@router.get("/api/lists/{code}", response_model=SharedList)
 def list_read(site: Here, code: str) -> JSONResponse:
     shown = normalise(code)
     if shown is None:
@@ -47,7 +49,7 @@ def list_read(site: Here, code: str) -> JSONResponse:
     return _answer(shown, record) if record else JSONResponse({"error": NO_LIST}, 404)
 
 
-@router.put("/api/lists/{code}")
+@router.put("/api/lists/{code}", response_model=SharedList)
 async def list_update(site: Here, code: str, request: Request) -> JSONResponse:
     shown = normalise(code)
     if shown is None:

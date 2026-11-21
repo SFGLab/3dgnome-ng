@@ -12,6 +12,7 @@ from .. import remote
 from ..engine import hicdiffusion
 from ..jobs import store
 from ..regions import read_region
+from .shapes import ContactMaps
 from .views import ExploreError, loop_files, positions
 
 
@@ -52,7 +53,7 @@ def _span(bp: int) -> str:
     return f"{bp / 1e6:g} Mb" if bp >= 1_000_000 else f"{bp // 1000} kb"
 
 
-def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str, hic_url: str = "", hic_name: str = "", allow_private: bool = False) -> dict[str, object]:
+def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str, hic_url: str = "", hic_name: str = "", allow_private: bool = False) -> ContactMaps:
     """Two contact maps of a window on one grid with two agreements of the halves, the rank
     agreement per distance and the stratum adjusted correlation. Each map is symmetric and is
     returned with each pair of bins once, as `_once` writes it.

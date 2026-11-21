@@ -6,6 +6,9 @@ https, end in .hic, .mcool or .cool and resolve to a public address. Every conne
 the address that was checked, through a local range proxy.
 """
 
+# h5py and hic-straw state the types of their files too loosely for these checks.
+# pyright: reportGeneralTypeIssues=false, reportIndexIssue=false, reportArgumentType=false, reportOperatorIssue=false, reportCallIssue=false
+
 from __future__ import annotations
 
 import functools

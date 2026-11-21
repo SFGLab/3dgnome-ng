@@ -7,12 +7,12 @@ import re
 import secrets
 import shutil
 import time
-from dataclasses import asdict
 from pathlib import Path
 from typing import BinaryIO
 
 from ..errors import Refused
-from .checks import Check, whole, records
+from .checks import Check, records, whole
+from .shapes import LoopDrawn, Meta, UploadResult
 
 
 CHUNK = 1 << 20
@@ -44,7 +44,7 @@ def store(stream: BinaryIO, name: str, kind: str, root: Path, cap: int, extra: d
     return d
 
 
-def meta(d: Path) -> dict[str, object]:
+def meta(d: Path) -> Meta:
     return json.loads((d / "meta.json").read_text())
 
 
@@ -66,14 +66,14 @@ def clean_copy(d: Path, dst: Path) -> Path:
     return dst
 
 
-def result(d: Path, c: Check) -> dict[str, object]:
+def result(d: Path, c: Check) -> UploadResult:
     m = meta(d)
     # A map read by link is shown by the remote file's name and size, not the window kept.
     name, size = m.get("link_name", m["name"]), int(m.get("link_size", m["size"]))  # type: ignore[arg-type]
-    return {"id": m["id"], "kind": m["kind"], "name": name, "size": size, "ok": c.ok, "summary": c.summary, "error": asdict(c.error) if c.error else None, "samples": c.samples, "counts": c.counts}
+    return {"id": m["id"], "kind": m["kind"], "name": name, "size": size, "ok": c.ok, "summary": c.summary, "error": {"line": c.error.line, "found": c.error.found, "fix": c.error.fix} if c.error else None, "samples": c.samples, "counts": c.counts}
 
 
-def preview(d: Path, region: tuple[str, int, int]) -> list[list[int]]:
+def preview(d: Path, region: tuple[str, int, int]) -> list[LoopDrawn]:
     """The loops of a loops upload inside a region, as anchor midpoints and the count."""
     out = []
     for _, cols in records(data_file(d)):

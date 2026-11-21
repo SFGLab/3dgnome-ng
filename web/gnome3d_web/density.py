@@ -4,6 +4,9 @@ The engine reads every contact map at the depth of the hosted maps. Contacts of 
 file or from a link, are thinned to that depth.
 """
 
+# pandas states the type of a column and of a selection too loosely for these checks.
+# pyright: reportCallIssue=false, reportArgumentType=false
+
 from __future__ import annotations
 
 from functools import lru_cache

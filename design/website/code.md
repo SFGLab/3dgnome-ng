@@ -49,7 +49,8 @@ lists/
   store.py        the shared job lists
 ```
 
-Each package with routes has them in its `routes.py`.
+Each package with routes has them in its `routes.py` and the shapes of its answers and of its
+files in its `shapes.py`.
 
 ## Rules
 
@@ -75,12 +76,31 @@ and a module named `site`, `http` or `queue` there would be found in place of Py
 The packages import in one direction: `catalog`, then `engine`, then `jobs`. `uploads` is used
 by `jobs/submit.py` and by `variants`. `results` reads through `jobs/store.py`.
 
+## Shapes
+
+The shape of every JSON answer and of every file the site keeps is declared once, as a
+`TypedDict` in the `shapes.py` of its package. The function that builds an answer has the shape
+as its return type and pyright checks the two against each other. The route names the shape as
+its `response_model`, and the app describes the whole interface at `/openapi.json`. The types of
+the frontend are generated from that description.
+
+A route still answers with the value its function returned. The shape is checked by pyright and
+by `web/tests/test_contract.py`, not at each request. The contact map of 800 bins is megabytes
+of JSON, and a check of every number of it at each request would cost more than the map.
+
+`pyright -p web/pyrightconfig.json` checks the package in basic mode. Five modules that work on
+tables turn off the rules that pandas and h5py trip: `remote.py`, `expression.py`,
+`engine/inputs.py`, `contacts.py` and `density.py`.
+
 ## What a change must not move by accident
 
-Three tests state what running sites and links in the wild depend on. A change of one of them is
+Four tests state what running sites and links in the wild depend on. A change of one of them is
 a decision and is made in the test.
 
 - `web/tests/test_routes.py` lists every method and path of the interface.
 - `web/tests/test_jobs.py` pins the keys of ten kinds of request. A site finds its jobs by them.
+- `web/tests/test_contract.py` asks every route and compares the answer with its declared
+  shape: every key declared, no key undeclared, every value of its type. It fails for a route
+  it has not asked.
 - `web/tests/test_job_on_disk.py` reads two job directories written before the refactor of
   2026-11-21 and compares the answers with the ones of that time.

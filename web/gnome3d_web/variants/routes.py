@@ -7,18 +7,20 @@ import json
 from fastapi import APIRouter, Form
 from fastapi.responses import JSONResponse
 
+from ..answers import REFUSALS
 from ..catalog.model import FACTOR_CHOICES
 from ..errors import Refused
 from ..regions import RegionError, parse_region
 from ..context import Here
 from ..uploads import store as uploads
 from .effect import variant_check
+from .shapes import VariantCheck
 from .vcf import UnknownSample
 
-router = APIRouter()
+router = APIRouter(responses=REFUSALS)
 
 
-@router.post("/api/variants/check")
+@router.post("/api/variants/check", response_model=VariantCheck)
 def api_variants_check(site: Here, cell: str = Form(...), region: str = Form(...), factors: str = Form("CTCF"), sample: str = Form(...), haplotype: int = Form(0), upload: str = Form(""), sv_set: str = Form(""), own: str = Form("")) -> JSONResponse:  # noqa: PLR0913
     catalog, root = site.catalog, site.settings.uploads_dir
     base = site.base_cell(cell)

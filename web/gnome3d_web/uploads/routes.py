@@ -11,10 +11,13 @@ from fastapi.responses import JSONResponse
 from .. import remote
 from ..density import hosted_density
 from ..regions import RegionError, parse_region
+from ..answers import REFUSALS, Refusal
 from ..context import Here, Site
 from . import checks, store
+from .shapes import LoopDrawn, UploadResult
 
-router = APIRouter()
+# An upload over the cap is 413 and a link read past the limit of reads at once is 503.
+router = APIRouter(responses={**REFUSALS, 413: {"model": Refusal}, 503: {"model": Refusal}})
 
 
 def region_of(site: Site, cell: str, text: str) -> tuple[str, int, int] | None:
@@ -25,7 +28,7 @@ def region_of(site: Site, cell: str, text: str) -> tuple[str, int, int] | None:
     return (r.chrom, r.start, r.end)
 
 
-@router.post("/api/uploads")
+@router.post("/api/uploads", response_model=UploadResult, status_code=201)
 async def api_upload(site: Here, request: Request, kind: str = Form(...), file: UploadFile = File(...), cell: str = Form(""), region: str = Form(""), factor: str = Form("")) -> JSONResponse:  # noqa: B008
     s = site.settings
     cap = s.upload_max_mb << 20
@@ -46,7 +49,7 @@ async def api_upload(site: Here, request: Request, kind: str = Form(...), file: 
     return JSONResponse(store.result(d, c), 201)
 
 
-@router.post("/api/uploads/link")
+@router.post("/api/uploads/link", response_model=UploadResult, status_code=201)
 def api_upload_link(site: Here, url: str = Form(...), cell: str = Form(""), region: str = Form("")) -> JSONResponse:
     if not site.link_slots.acquire(blocking=False):
         return JSONResponse({"error": "The server is reading other links. Try again in a minute.", "fix": "Or choose Local .hic file or BEDPE of the region.", "field": "url"}, 503)
@@ -79,7 +82,7 @@ def read_link(site: Site, url: str, cell: str, region: str) -> JSONResponse:
     return JSONResponse(store.result(d, c), 201)
 
 
-@router.get("/api/uploads/{uid}/preview")
+@router.get("/api/uploads/{uid}/preview", response_model=list[LoopDrawn])
 def api_upload_preview(site: Here, uid: str, region: str, cell: str = "") -> JSONResponse:
     d = store.find(site.settings.uploads_dir, uid)
     if d is None:

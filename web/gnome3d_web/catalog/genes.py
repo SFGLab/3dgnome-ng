@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 from .model import Catalog, CellType
+from .shapes import GeneHit
 
 
 @lru_cache(maxsize=None)
@@ -17,7 +18,7 @@ def _by_name(table: Path) -> list[tuple[str, str, str, int]]:
     return sorted((str(n).upper(), str(n), str(c), int(t)) for n, c, t in zip(genes["name"], genes["chrom"], genes["tss"], strict=True))
 
 
-def find(cell: CellType, text: str, limit: int) -> list[dict[str, object]]:
+def find(cell: CellType, text: str, limit: int) -> list[GeneHit]:
     """Genes of a cell type whose name starts with the text, then those that hold it. Each has
     its name, chromosome and TSS. A text under two letters finds none."""
     text = text.strip().upper()

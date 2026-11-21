@@ -17,6 +17,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .shapes import ListedJob
+
 ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 GROUPS = 4
 GROUP = 4
@@ -27,7 +29,7 @@ _ROUTE = re.compile(r"/(jobs|p)/[A-Za-z0-9_-]{1,64}")
 _LOOKALIKE = str.maketrans({"O": "0", "I": "1", "L": "1"})
 _LOCK = threading.Lock()
 
-Job = dict[str, Any]
+Job = ListedJob
 
 
 def new_code() -> str:

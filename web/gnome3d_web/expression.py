@@ -10,6 +10,9 @@ and every other numeric column is a sample. A column `length` gives the length o
 bp. The output of featureCounts is read as it is.
 """
 
+# pandas states the type of a column and of a selection too loosely for these checks.
+# pyright: reportCallIssue=false, reportArgumentType=false, reportIndexIssue=false, reportAttributeAccessIssue=false, reportReturnType=false
+
 from __future__ import annotations
 
 import hashlib
@@ -18,6 +21,9 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal, cast
+
+from typing_extensions import NotRequired, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -124,7 +130,19 @@ def write_job(job: Path, table: Table, columns: list[str], meta: dict[str, objec
     (job / META).write_text(json.dumps({**meta, "key": table.key, "columns": columns}, indent=1))
 
 
-def job_meta(job: Path) -> dict[str, object] | None:
+class Meta(TypedDict):
+    """expression.json of a job: the source of the table, what the page calls it, counts or values,
+    the unit of values, the column the genes are named by and the samples."""
+
+    source: NotRequired[str]
+    label: NotRequired[str]
+    kind: Literal["counts", "values"]
+    unit: NotRequired[str]
+    key: str
+    columns: list[str]
+
+
+def job_meta(job: Path) -> Meta | None:
     """What the expression of a job is, None for a job without it."""
     p = job / META
     return json.loads(p.read_text()) if p.is_file() and (job / TABLE).is_file() else None
@@ -154,7 +172,7 @@ def job_levels(job: Path) -> tuple[dict[str, float], str, str] | None:
     if meta is None:
         return None
     table = _job_table(job)
-    values, unit = level(table, str(meta["kind"]))
+    values, unit = level(table, meta["kind"])
     return {str(k): float(v) for k, v in values.items() if np.isfinite(v)}, unit or str(meta.get("unit", "")), table.key
 
 
@@ -213,7 +231,32 @@ def _by_name(table: Table, names: dict[str, str], counts: bool) -> Table:
     return Table("name", grouped.sum() if counts else grouped.mean(), None)
 
 
-def contrast(a: Path, b: Path, cache: Path, names: Callable[[], dict[str, str]] | None = None) -> dict[str, object]:
+class Contrast(TypedDict):
+    """What a comparison of the expression of two jobs is: deseq2, ratio or none, the reason of a
+    mode other than deseq2, the labels of the two tables, the column their genes are named by and
+    the samples on each side."""
+
+    mode: Literal["deseq2", "ratio", "none"]
+    reason: str
+    label_a: NotRequired[str]
+    label_b: NotRequired[str]
+    key: NotRequired[str]
+    samples_a: NotRequired[int]
+    samples_b: NotRequired[int]
+
+
+class Tested(Contrast):
+    # For each gene the log2 fold change, the adjusted p or None, the level in a and in b.
+    genes: NotRequired[dict[str, tuple[float, float | None, float, float]]]
+
+
+class _Labels(TypedDict):
+    label_a: str
+    label_b: str
+    key: str
+
+
+def contrast(a: Path, b: Path, cache: Path, names: Callable[[], dict[str, str]] | None = None) -> Tested:
     """The expression of job b against job a, gene by gene.
 
     Returns `mode`, deseq2, ratio or none, the `reason` of a mode other than deseq2 and `genes`,
@@ -225,7 +268,7 @@ def contrast(a: Path, b: Path, cache: Path, names: Callable[[], dict[str, str]] 
     ma, mb = job_meta(a), job_meta(b)
     if ma is None or mb is None:
         return {"mode": "none", "reason": "One of the two jobs has no expression data."}
-    base = {"label_a": ma.get("label", ""), "label_b": mb.get("label", ""), "key": ma["key"]}
+    base: _Labels = {"label_a": ma.get("label", ""), "label_b": mb.get("label", ""), "key": ma["key"]}
     if ma["kind"] != mb["kind"]:
         return {**base, "mode": "none", "reason": "One job has read counts and the other normalised values. The two cannot be compared."}
     mixed = ma["key"] != mb["key"]
@@ -239,7 +282,7 @@ def contrast(a: Path, b: Path, cache: Path, names: Callable[[], dict[str, str]] 
     digest = hashlib.sha256((a / TABLE).read_bytes() + b"|" + (b / TABLE).read_bytes() + (b"|by name" if mixed else b"")).hexdigest()[:24]
     kept = cache / f"{digest}.json"
     if kept.is_file():
-        return {**base, **json.loads(kept.read_text())}
+        return cast(Tested, {**base, **json.loads(kept.read_text())})
     ta, tb = _job_table(a), _job_table(b)
     if mixed and names is not None:
         ta = _by_name(ta, names(), ma["kind"] == "counts") if ta.key == "gene_id" else ta
@@ -275,4 +318,4 @@ def contrast(a: Path, b: Path, cache: Path, names: Callable[[], dict[str, str]] 
     }
     cache.mkdir(parents=True, exist_ok=True)
     kept.write_text(json.dumps(out))
-    return {**base, **out}
+    return cast(Tested, {**base, **out})

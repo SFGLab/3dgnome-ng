@@ -11,13 +11,16 @@ import traceback
 from dataclasses import asdict
 from pathlib import Path
 
+import pandas as pd
 from personal3d.lift import Lift
+from personal3d.variants import SV
 
 from .. import expression
 from ..catalog.model import Catalog
 from ..engine import hicdiffusion
 from ..engine.inputs import Own, build_inputs
 from ..engine.settings import apply_overrides, validate_overrides
+from ..frames import rows
 from ..regions import ANY_SPAN, parse_region, read_region
 from ..variants.vcf import read_svs
 from .marks import ep_table, mark_beads
@@ -35,9 +38,6 @@ def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, ce
     Those inside a deletion are dropped. Those inside a duplication are there twice and the second
     copy of a gene has `COPY` after its name. An enhancers upload replaces the cell type's.
     """
-    import pandas as pd
-    from personal3d.lift import Lift
-
     L = Lift(svs)
     genes = cell.genes()
     genes = genes[genes["chrom"] == chrom].copy()
@@ -50,7 +50,7 @@ def _lifted_marks(cell, chrom: str, svs: list, enhancers: Path | None = None, ce
     genes = pd.concat([genes[genes["tss"] >= 0], twin], ignore_index=True)
     if enhancers is None and not cell_enhancers:
         return genes, pd.DataFrame({0: pd.Series(dtype=str), 1: pd.Series(dtype=int), 2: pd.Series(dtype=int)})
-    enh = pd.read_csv(enhancers or cell.path("enhancers"), sep="\t", header=None, usecols=[0, 1, 2])
+    enh = pd.read_csv(enhancers or cell.path("enhancers"), sep="\t", header=None, usecols=[0, 1, 2])  # pyright: ignore[reportCallIssue, reportArgumentType]
     enh = enh[enh[0] == chrom].copy()
     start, end = enh[1].to_numpy(), enh[2].to_numpy()
     second = enh.copy()
@@ -102,12 +102,12 @@ def run_job(
             enhancers=Path(str(o["enhancers"])) if o.get("enhancers") else None,
         ) if o else None
         region = parse_region(req.region, cell.genes(), ANY_SPAN)
-        svs: list = []
+        svs: list[SV] = []
         skipped = 0
         vcf = Path(req.upload_vcf) if req.upload_vcf else (catalog.sv_sets[req.sv_set].vcf if req.sv_set else None)
         if vcf is not None:
             haps = read_svs(vcf, req.sample, region)
-            svs, skipped = haps[req.haplotype], haps[2]
+            svs, skipped = (haps[1] if req.haplotype == 1 else haps[0]), haps[2]
         hic = None
         if req.background == "hicdiffusion":
             set_status(job, stage="hicdiffusion")
@@ -168,7 +168,7 @@ def run_job(
                     # haplotype coordinates; a promoter is its TSS and a kilobase either side
                     "elements": [
                         {"kind": "promoter", "name": str(g.name), "start": int(g.tss) - 1000, "end": int(g.tss) + 1000}
-                        for g in genes.itertuples(index=False)
+                        for g in rows(genes)
                         if inputs_lo <= int(g.tss) < inputs_hi
                     ]
                     + [

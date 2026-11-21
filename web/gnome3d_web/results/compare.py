@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -11,7 +12,8 @@ from scipy.stats import mannwhitneyu
 
 from .. import expression
 from ..jobs import store
-from .views import MAX_GAP, annotations, cached, genes, nearest, positions
+from .shapes import DistanceChanges, ExpressionChange, ExpressionChanges, GeneDistances, Volcano
+from .views import MAX_GAP, cached, features, genes, nearest, positions
 
 
 def _pair_distances(job: Path) -> dict[str, list[float]]:
@@ -60,7 +62,7 @@ def _pairs(a: Path, b: Path, shared: bool) -> tuple[dict[str, dict[str, object]]
             x, y = ga[name], gb[name]
             out[name] = {"linear": (x["linear_bp"], y["linear_bp"]), "beads": (x["enhancer_bead"], y["enhancer_bead"]), "values": (da.get(name, []), db.get(name, []))}
         return out, None
-    ea, eb = annotations(a)["enhancers"], annotations(b)["enhancers"]
+    ea, eb = features(a)["enhancers"], features(b)["enhancers"]
     centres = sorted({(max(s1, s2) + min(e1, e2)) // 2 for s1, e1 in ea for s2, e2 in eb if s1 < e2 and s2 < e1})  # type: ignore[union-attr]
     (pa, ma), (pb, mb) = positions(a), positions(b)
     for name in ga.keys() & gb.keys():
@@ -81,7 +83,7 @@ def _spread(values: list[float]) -> dict[str, float]:
     return {"mean": float(v.mean()), "sd": float(v.std(ddof=1)) if len(v) > 1 else 0.0}
 
 
-def compare(a: Path, b: Path, shared: bool = False) -> dict[str, object]:
+def compare(a: Path, b: Path, shared: bool = False) -> DistanceChanges:
     """The genes both jobs have, with each job's mean and SD of the enhancer to promoter distance,
     the ratio b over a and the p of a Mann-Whitney U test of the distances in the structures of
     the two jobs, the largest changes first.
@@ -108,7 +110,7 @@ def compare(a: Path, b: Path, shared: bool = False) -> dict[str, object]:
     return {"same_region": ra is not None and ra == rb, "rows": rows, "differ": differ, "shared": shared, "shared_enhancers": n_shared}
 
 
-def compare_gene(a: Path, b: Path, gene: str, shared: bool = False) -> dict[str, object] | None:
+def compare_gene(a: Path, b: Path, gene: str, shared: bool = False) -> GeneDistances | None:
     """The enhancer to promoter distance of one gene in each structure of job a and of job b,
     for a box plot, with the p of `compare`. None for a gene one of the jobs lacks."""
     pair = _pairs(a, b, shared)[0].get(gene)
@@ -123,7 +125,7 @@ def compare_gene(a: Path, b: Path, gene: str, shared: bool = False) -> dict[str,
 VOLCANO_FOLD, VOLCANO_P = 12.0, 50.0
 
 
-def _volcano(table: dict[str, list[float | None]]) -> dict[str, object] | None:
+def _volcano(table: dict[str, tuple[float, float | None, float, float]]) -> Volcano | None:
     """Every tested gene of a contrast as [log2 fold change, -log10 of the adjusted p], for the
     background of the volcano plot. The points are on a grid of 0.2 by 0.5 with each cell once.
     None for a contrast without p-values."""
@@ -137,7 +139,7 @@ def _volcano(table: dict[str, list[float | None]]) -> dict[str, object] | None:
     return {"fold": VOLCANO_FOLD, "p": VOLCANO_P, "points": sorted(cells)} if cells else None
 
 
-def compare_expression(a: Path, b: Path, cache: Path, shared: bool = False, names: Callable[[], dict[str, str]] | None = None) -> dict[str, object]:
+def compare_expression(a: Path, b: Path, cache: Path, shared: bool = False, names: Callable[[], dict[str, str]] | None = None) -> ExpressionChanges:
     """The expression of job b against job a for the genes both jobs have, beside the change of
     their enhancer to promoter distance.
 
@@ -149,13 +151,14 @@ def compare_expression(a: Path, b: Path, cache: Path, shared: bool = False, name
     The distances are those of `compare` with the same `shared`.
     """
     c = expression.contrast(a, b, cache, names)
-    table = c.pop("genes", None)
+    table = c.get("genes")
+    head = cast(expression.Contrast, {k: v for k, v in c.items() if k != "genes"})
     if not table:
-        return {**c, "rows": [], "rho": None, "volcano": None}
+        return {**head, "rows": [], "rho": None, "volcano": None}
     by_id = c.get("key") == "gene_id"
     ids = {r["gene"]: r["gene_id"] for r in genes(a)}
-    rows = []
-    for d in compare(a, b, shared)["rows"]:  # type: ignore[union-attr]
+    rows: list[ExpressionChange] = []
+    for d in compare(a, b, shared)["rows"]:
         name = d["gene"]
         e = table.get(str(ids[name]).removesuffix(".copy2").split(".")[0] if by_id else name)
         if e is None:
@@ -164,7 +167,7 @@ def compare_expression(a: Path, b: Path, cache: Path, shared: bool = False, name
     rows.sort(key=lambda r: (-abs(r["log2fc"]), r["gene"]))
     rho = None
     if len(rows) >= 5:
-        d = pd.DataFrame(rows)
-        rho = float(d["distance"].corr(d["log2fc"], method="spearman"))
+        frame = pd.DataFrame(rows)
+        rho = float(frame["distance"].corr(frame["log2fc"], method="spearman"))  # pyright: ignore[reportArgumentType, reportCallIssue]
         rho = None if not np.isfinite(rho) else round(rho, 3)
-    return {**c, "rows": rows, "rho": rho, "volcano": _volcano(table)}
+    return {**head, "rows": rows, "rho": rho, "volcano": _volcano(table)}

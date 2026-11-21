@@ -15,6 +15,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from personal3d.variants import SV
+from typing_extensions import TypedDict
 
 from ..regions import Region
 
@@ -52,14 +53,35 @@ class UnknownSample(Exception):
     """The sample is not a column of the VCF."""
 
 
-def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[dict[str, object]], dict[str, int]]:
+class Record(TypedDict):
+    """A variant a sample carries: the variant, its type, its position in the VCF, its length,
+    the genotype and whether the first and the second haplotype carry it."""
+
+    sv: SV
+    type: str
+    pos: int
+    length: int
+    genotype: str
+    haps: tuple[bool, bool]
+
+
+def _info(text: str) -> dict[str, str]:
+    """The INFO column of a record by key. A flag has an empty value."""
+    out = {}
+    for part in text.split(";"):
+        key, _, value = part.partition("=")
+        out[key] = value
+    return out
+
+
+def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[Record], dict[str, int]]:
     """The records of one sample inside the region with their genotype and haplotypes, in the
     order of the file. Also returns the count of records of other types, by type. The preview of
     the variants and the job both take the variants from here.
 
     @raises UnknownSample when the sample is not a column of the VCF
     """
-    records: list[dict[str, object]] = []
+    records: list[Record] = []
     skipped: dict[str, int] = {}
     col = -1
     for line in _lines(vcf, region):
@@ -69,7 +91,7 @@ def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[dict[s
                 raise UnknownSample(f"{sample!r} is not a sample of the VCF")
             col = 9 + x[9:].index(sample)
             continue
-        info = dict(kv.split("=", 1) if "=" in kv else (kv, "") for kv in x[7].split(";"))
+        info = _info(x[7])
         kind = info.get("SVTYPE", "")
         pos = int(x[1])
         gt = x[col].split(":", 1)[0]
@@ -102,5 +124,6 @@ def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV]
     @raises UnknownSample when the sample is not a column of the VCF
     """
     records, skipped = sample_variants(vcf, sample, region)
-    first, second = ([r["sv"] for r in records if r["haps"][h]] for h in (0, 1))  # type: ignore[index]
-    return sorted(first, key=lambda s: s.start), sorted(second, key=lambda s: s.start), sum(skipped.values())  # type: ignore[arg-type, return-value]
+    first = [r["sv"] for r in records if r["haps"][0]]
+    second = [r["sv"] for r in records if r["haps"][1]]
+    return sorted(first, key=lambda s: s.start), sorted(second, key=lambda s: s.start), sum(skipped.values())

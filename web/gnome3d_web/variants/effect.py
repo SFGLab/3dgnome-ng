@@ -8,6 +8,7 @@ from pathlib import Path
 from personal3d import motifs, rewrite
 
 from ..engine.inputs import loop_network
+from .shapes import VariantCheck
 from .vcf import sample_variants
 
 
@@ -62,7 +63,7 @@ def combine_changes(by_factor: list[tuple[str, str]]) -> str:
     return "; ".join(dict.fromkeys(w for _, w in real))
 
 
-def variant_check(cell, region, factors: str, vcf: Path, sample: str, haplotype: int, own_loops: list[tuple[str, Path]] | None = None, own_anchors: Path | None = None) -> dict[str, object]:  # noqa: ANN001, PLR0913
+def variant_check(cell, region, factors: str, vcf: Path, sample: str, haplotype: int, own_loops: list[tuple[str, Path]] | None = None, own_anchors: Path | None = None) -> VariantCheck:  # noqa: ANN001, PLR0913
     """The effect of the variants of a sample on one haplotype on the loops of a region, one
     variant at a time, with the counts applied and skipped. Own loops replace the cell type's.
 
