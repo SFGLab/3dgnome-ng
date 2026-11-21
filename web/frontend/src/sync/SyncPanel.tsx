@@ -1,4 +1,4 @@
-import { Check, Copy, Link2, RefreshCw } from 'lucide-react'
+import { Check, Copy, Link2, RefreshCw, Unlink } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useRecentJobs } from '../model/useRecentJobs'
 import { createList, formatCode, fullCode, joinLink, joinList, readList, startSync, stopSync, syncNow, syncState, useSyncStatus, type SharedList } from './sync'
@@ -248,9 +248,11 @@ export function SyncPanel({ initialCode = '', onCodeUsed }: { initialCode?: stri
           </div>
         </div>
       ) : (
-        <button type="button" className="sync-link" onClick={() => setMode('stop')}>
-          Stop syncing on this computer
-        </button>
+        <div className="sync-actions">
+          <button type="button" className="sync-button" onClick={() => setMode('stop')}>
+            <Unlink size={14} aria-hidden /> Stop syncing on this computer
+          </button>
+        </div>
       )}
     </section>
   )
