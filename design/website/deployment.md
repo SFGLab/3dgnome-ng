@@ -113,6 +113,14 @@ web container and two workers on GPU 0 with this overlay took six jobs posted at
 CTCF and RNAPII, 10 structures, 3 Mb windows. Both engines ran on the one MPS server, 1.7 GiB
 each on the card, all six done in 226 s, 95.6 jobs per hour.
 
+Measured 2026-11-21 on a server with two RTX 2080 SUPER of 8 GiB and 36 cores, without MPS, in the
+single container with `GPUS=0,1`, `WORKERS_PER_GPU=4` and `GPU_POOL_GIB=1.25`: eight jobs posted
+at once, GM12878, CTCF and RNAPII, 10 structures, a region of 1.1 Mb. All eight ran at once, four
+on each card with 4 cores each, and finished in 65 to 105 s, the last after 112 s. A card held
+5.4 GiB at most. The same job alone on 18 cores takes 33 to 50 s. A pool of 1.25 GiB and 0.5 GiB
+for the CUDA context of each engine keep four engines within a card of 8 GiB. The default pool of
+four workers, 1.5 GiB, leaves a card of that size no room.
+
 Without Docker, `QUEUE=thread` runs jobs in the web process with the same variables, `GPUS=0,1`
 and `WORKERS_PER_GPU=2` for two jobs at once on each of two cards. Waiting jobs are lost when the
 process stops.
