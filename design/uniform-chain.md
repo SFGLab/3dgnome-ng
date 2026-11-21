@@ -1415,6 +1415,30 @@ Also decided on 2026-11-21: the threshold of the cells is 3, since 2 costs 0.09 
 overlap of the ends under the dropout from 23 structures of 120 to 10 on the rows of GM12878 with no change of
 SCC. The product form of that radius and the cap of the radius by the target are deleted.
 
+### The score by the separation of a pair
+
+`playground/band_scc.py`, on the structures of `out/confirm20`, eighteen rows of twenty structures. The balanced
+SCC per bead pair at 25 kb, split into four bands of diagonals, with the share of the weight of the whole score
+that each band holds:
+
+| arm | whole | under 250 kb | 250 kb to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|
+| share of the weight | | 0.81 to 0.84 | 0.16 to 0.19 | under 0.01 | under 0.01 |
+| default chain | 0.268 | 0.241 | 0.385 | 0.028 | 0.014 |
+| cells at 5 kb, z 2, dropout, radius 3.0 | 0.377 | 0.358 | 0.468 | 0.032 | 0.001 |
+| ladder to 10 kb with both sides, the same | 0.387 | 0.368 | 0.481 | 0.083 | 0.018 |
+| ladder to 25 kb with both sides, the same | 0.392 | 0.368 | 0.492 | 0.168 | 0.063 |
+| cells at 5 kb, z 3, dropout, radius from the chain | 0.360 | 0.338 | 0.471 | 0.044 | 0.011 |
+| ladder to 25 kb over its expectation alone, 8 rows | 0.374 | 0.367 | 0.419 | 0.023 | 0.002 |
+
+- The score reads the pairs under 1 Mb. Four fifths of its weight are under 250 kb and less than a hundredth is
+  beyond 1 Mb. A model with or without structure beyond 1 Mb has the same SCC.
+- The gain of the uniform chain over the default chain, 0.092, is under 250 kb, 0.089 of it.
+- The gain of the ladder with both sides over the cells at 5 kb, 0.016, is under 250 kb too, 0.014 of it.
+- Beyond 1 Mb the default chain and the cells at 5 kb have no correlation with Hi-C, 0.00 to 0.04. The ladder
+  with both sides has 0.17 between 1 and 2 Mb. The ladder that reads the cells over their expectation alone
+  has none. The structure beyond 1 Mb came with the cells under their expectation.
+
 ## Settings
 
 A setting is added when a run reads it.
