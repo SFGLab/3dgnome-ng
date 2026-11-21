@@ -58,7 +58,7 @@ describe('Method page', () => {
     const figures = [...section.querySelectorAll('figure')]
     expect(figures.map((f) => f.querySelector('figcaption b')?.textContent)).toEqual(['Figure 1', 'Figure 2', 'Figure 3', 'Figure 4', 'Figure 5'])
     // The default is the mean of the three exponents the page gives.
-    expect(section).toHaveTextContent('The three values are 0.309, 0.269 and 0.277.')
+    expect(section).toHaveTextContent('The three values, 0.309, 0.269 and 0.277, are close to each other')
     expect(((0.309 + 0.269 + 0.277) / 3).toFixed(3)).toBe('0.285')
     expect(section).toHaveTextContent('uses ν = 0.285')
   })
