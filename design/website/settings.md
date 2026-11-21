@@ -6,7 +6,7 @@ All by environment, see `web/gnome3d_web/settings.py`. The ones that matter:
 |---|---|---|
 | `DATA_DIR` | `/data` | the hosted data |
 | `RESULTS_DIR` | `/results` | jobs, `jobs/` shared, `private/` from uploads |
-| `QUEUE` | `rq` | `rq` with `REDIS_URL`, `thread` or `inline` for development |
+| `QUEUE` | `rq` | `rq` with `REDIS_URL`, `thread` for a pool in the web process or `inline` for development. Another value is refused at start |
 | `RETENTION_DAYS` | 14 | a private job is deleted after this many days, as the form says |
 | `ENGINE_CMD` | `python -m gnome3d.cli` | how the worker starts the engine |
 | `MAX_REGION_MB` | 20 | the longest region the form accepts, unless `config.json` sets `limits.region_mb` |

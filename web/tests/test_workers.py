@@ -18,7 +18,7 @@ from fixture import make_data
 
 from gnome3d_web.jobs.request import JobRequest
 from gnome3d_web.jobs.run import on_cores
-from gnome3d_web.jobs.workers import LocalPool, resume_interrupted, server_cores, slot_cores
+from gnome3d_web.jobs.workers import LocalPool, Rq, enqueue, queue_of, resume_interrupted, server_cores, slot_cores, work
 from gnome3d_web import settings
 from gnome3d_web.jobs.workers import claim_slot
 from gnome3d_web.settings import Settings, EnvError
@@ -205,3 +205,52 @@ def test_the_engine_of_a_slot_runs_on_the_cores_of_the_slot(shared: SimpleNamesp
     assert seen == want, f"each engine has the cores of its slot and the GPU of its slot: {seen} against {want}"
     a, b = (set(c.split(",")) for _, c in sorted(want))
     assert not a & b, "the two slots share no core"
+
+
+def test_a_job_goes_to_rq_by_the_name_of_work_and_a_worker_runs_it_on_a_claimed_slot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    waiting: list[SimpleNamespace] = []
+
+    class Queue:
+        """Stands in for the queue of rq. It keeps what the site gives it."""
+
+        def __init__(self, name: str, connection: object = None, default_timeout: int | None = None) -> None:
+            self.name, self.connection = name, connection
+
+        def enqueue(self, func: object, *args: object, job_timeout: int | None = None) -> None:
+            waiting.append(SimpleNamespace(queue=self.name, at=self.connection, func=func, args=args, timeout=job_timeout))
+
+        @property
+        def jobs(self) -> list[SimpleNamespace]:
+            return waiting
+
+    monkeypatch.setitem(sys.modules, "rq", SimpleNamespace(Queue=Queue))
+    monkeypatch.setitem(sys.modules, "redis", SimpleNamespace(Redis=SimpleNamespace(from_url=lambda url: url)))
+    make_data(tmp_path / "data")
+    env = dict(DATA_DIR=str(tmp_path / "data"), RESULTS_DIR=str(tmp_path / "results"), QUEUE="rq", REDIS_URL="redis://queue:6379/0", GPUS="0", WORKERS_PER_GPU="2", ENGINE_CMD=" ".join(FAKE))
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    s = Settings.from_env()
+    queue = queue_of(s)
+    assert isinstance(queue, Rq), "QUEUE=rq is the queue of rq"
+    req = JobRequest(cell_type="GMX", region="chr1:0-2000000", factors="CTCF", n_models=1)
+    first, second = s.jobs_dir / "first0000001", s.jobs_dir / "second000001"
+    enqueue(queue, req, first)
+    enqueue(queue, req, second)
+    state = lambda job: json.loads((job / "status.json").read_text())["state"]  # noqa: E731
+    assert state(first) == state(second) == "queued" and (second / "request.json").is_file(), "a job given to rq has its request and the status queued on disk"
+    job = waiting[0]
+    assert (job.queue, job.at, job.timeout) == ("gnome3d", "redis://queue:6379/0", 6 * 3600), "the job is on the queue gnome3d at REDIS_URL with six hours to run: " + str(job)
+    # A job that waits in Redis names the function by its module and its name.
+    assert job.func is work and (work.__module__, work.__qualname__) == ("gnome3d_web.jobs.workers", "work"), "an rq worker finds the function as gnome3d_web.jobs.workers.work"
+    assert job.args == (asdict(req), str(first)), "with the request and the directory of the job"
+    assert queue.ahead(first) == 0 and queue.ahead(second) == 1 and queue.ahead(s.jobs_dir / "other0000001") is None, "a job knows the jobs that wait before it"
+    job.func(*job.args)
+    assert state(first) == "done", "a worker that takes the job runs it: " + state(first)
+    assert sorted(p.name for p in s.locks_dir.iterdir()) and state(second) == "queued", "it ran on a slot it claimed and the other job still waits"
+    assert queue.resume() == [], "the web process queues nothing again, rq keeps its jobs through a restart"
+
+
+def test_a_queue_of_another_name_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("QUEUE", "threads")
+    with pytest.raises(EnvError, match="inline, thread, rq"):
+        Settings.from_env()

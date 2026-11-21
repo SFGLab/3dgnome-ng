@@ -10,7 +10,6 @@ from .engine import routes as engine
 from .answers import StripBase, handle_errors
 from .jobs import routes as jobs
 from .jobs.store import sweep_private
-from .jobs.workers import resume_after_restart
 from .lists import routes as lists
 from .results import routes as results
 from .context import Site
@@ -29,7 +28,7 @@ def create_app() -> FastAPI:
     s.jobs_dir.mkdir(parents=True, exist_ok=True)
     s.private_dir.mkdir(parents=True, exist_ok=True)
     sweep_private(s.results_dir, s.retention_days)
-    resume_after_restart(s)
+    site.queue.resume()
     for part in (jobs.router, uploads.router, variants.router, catalog.router, engine.router, results.job_routes("jobs"), results.job_routes("p"), results.router, lists.router):
         app.include_router(part)
     frontend.serve(app, site)

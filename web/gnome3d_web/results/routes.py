@@ -9,7 +9,6 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from ..catalog import genes
 from ..answers import job_at, job_of, packed_json
 from ..jobs import store
-from ..jobs.workers import queue_position
 from ..context import Here
 from . import compare, contact_view, views
 
@@ -23,7 +22,7 @@ def job_routes(kind: str) -> APIRouter:
     @routes.get("/summary", name=f"{kind}_summary")
     def summary(site: Here, key: str) -> JSONResponse:
         d = job_of(site, kind, key)
-        out = views.summary(d, queue_position(site.settings, d))
+        out = views.summary(d, site.queue.ahead(d))
         request: dict[str, object] = out["request"]  # type: ignore[assignment]
         out["sample_note"] = site.catalog.sample_note(str(request.get("sv_set", "")), str(request.get("sample", "")))
         return JSONResponse(out)

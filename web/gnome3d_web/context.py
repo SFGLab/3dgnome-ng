@@ -15,6 +15,7 @@ from fastapi import Depends, Request
 from .catalog.model import Catalog, CellType
 from .errors import UnknownCell
 from .jobs import store
+from .jobs.workers import JobQueue, queue_of
 from .lists.store import Lists
 from .regions import HICDIFFUSION_SPAN
 from .settings import Settings
@@ -27,6 +28,7 @@ class Site:
     catalog: Catalog
     config: ConfigFile
     lists: Lists
+    queue: JobQueue
     # A link read holds a worker thread for up to READ_SECONDS. Past the limit a read is refused
     # at once and does not wait behind the others.
     link_slots: threading.BoundedSemaphore
@@ -39,6 +41,7 @@ class Site:
             catalog=Catalog.load(s.data_dir),
             config=ConfigFile(s.site_config or s.data_dir / "config.json"),
             lists=Lists(s.lists_dir),
+            queue=queue_of(s),
             link_slots=threading.BoundedSemaphore(max(1, s.link_reads)),
         )
 

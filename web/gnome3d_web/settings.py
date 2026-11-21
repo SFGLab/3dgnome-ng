@@ -62,6 +62,10 @@ def card_gib(gpu: str | None) -> float | None:
         return None
 
 
+# A job runs at once in its request, in a thread of the web process or in an rq worker.
+QUEUES = ("inline", "thread", "rq")
+
+
 class EnvError(ValueError):
     """A variable of the environment the site cannot use, with the fix as its message."""
 
@@ -171,10 +175,13 @@ class Settings:
             raise EnvError(f"GPU_POOL_GIB is {pool!r}. Give a number of GiB above zero.") from None
         if gpu_pool_gib is not None and gpu_pool_gib <= 0:
             raise EnvError(f"GPU_POOL_GIB is {pool!r}. Give a number of GiB above zero.")
+        queue = os.environ.get("QUEUE", "rq")
+        if queue not in QUEUES:
+            raise EnvError(f"QUEUE is {queue!r}. Set it to one of {', '.join(QUEUES)}.")
         return cls(
             data_dir=Path(os.environ.get("DATA_DIR", "/data")),
             results_dir=Path(os.environ.get("RESULTS_DIR", "/results")),
-            queue=os.environ.get("QUEUE", "rq"),
+            queue=queue,
             redis_url=os.environ.get("REDIS_URL", "redis://redis:6379/0"),
             engine_cmd=shlex.split(cmd) if cmd else None,
             retention_days=int(os.environ.get("RETENTION_DAYS", "14")),

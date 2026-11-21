@@ -1,4 +1,4 @@
-"""Running jobs: rq workers, or a local pool of slots in the web process, one card per slot.
+"""Running jobs: at once in a request, on a local pool of slots in the web process, one card per slot, or in rq workers.
 
 `Settings` has the workers of the site: the cards, the jobs at once on a card, the cores of a
 job and its GPU memory pool. The local pool has one slot for each job at once, `Settings.slots`.
@@ -106,7 +106,7 @@ def work(
     catalog = Catalog.load(s.data_dir)
     request = JobRequest(**req_dict)  # type: ignore[arg-type]
     if slot is None and s.queue == "rq":
-        with claim_slot(s.results_dir / ".slots", len(s.slots)) as k:
+        with claim_slot(s.locks_dir, len(s.slots)) as k:
             cores = slot_cores(server_cores(), k, len(s.slots), s.worker_cores) if k is not None else []
             run_job(request, catalog, Path(job_dir), engine=engine or s.engine_cmd, env_extra=s.engine_env(gpu) or None, cores=cores or None)
         return job_dir
@@ -152,53 +152,87 @@ class LocalPool:
         return waiting.index(job_dir) if job_dir in waiting else None
 
 
-_POOL: LocalPool | None = None
-_POOL_LOCK = threading.Lock()
+class Inline:
+    """Runs a job inside the request that submits it. A request returns after its job. For
+    development and tests."""
 
+    def start(self, req: JobRequest, job: Path) -> None:
+        work(asdict(req), str(job))
 
-def _local_pool(s: Settings) -> LocalPool:
-    global _POOL
-    with _POOL_LOCK:
-        if _POOL is None:
-            _POOL = LocalPool(s.slots, s.engine_cmd)
-        return _POOL
-
-
-def queue_position(s: Settings, job_dir: Path) -> int | None:
-    """The number of jobs waiting in front of a job, None when it is not waiting."""
-    if s.queue == "thread":
-        return _local_pool(s).position(str(job_dir))
-    if s.queue == "inline":
+    def ahead(self, job: Path) -> int | None:
         return None
-    from redis import Redis
-    from rq import Queue
 
-    q = Queue("gnome3d", connection=Redis.from_url(s.redis_url))
-    for i, job in enumerate(q.jobs):
-        if len(job.args) > 1 and job.args[1] == str(job_dir):
-            return i
-    return None
+    def resume(self) -> list[str]:
+        return []
 
 
-def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
-    # The request and the first status are on disk from the moment the job waits. A restart
-    # finds a waiting job by its status and queues it again.
+class Threads:
+    """Runs jobs in threads of the web process, on the local pool. The queue of the single
+    container."""
+
+    def __init__(self, s: Settings) -> None:
+        self._results = s.results_dir
+        self.pool = LocalPool(s.slots, s.engine_cmd)
+
+    def start(self, req: JobRequest, job: Path) -> None:
+        self.pool.submit(asdict(req), str(job))
+
+    def ahead(self, job: Path) -> int | None:
+        return self.pool.position(str(job))
+
+    def resume(self) -> list[str]:
+        return resume_interrupted(self._results, self.pool)
+
+
+class Rq:
+    """Gives jobs to rq workers through Redis. The workers keep their jobs through a restart of
+    the web process. A waiting job names `work` by its module and its name."""
+
+    NAME = "gnome3d"
+    TIMEOUT = 6 * 3600
+
+    def __init__(self, s: Settings) -> None:
+        self._url = s.redis_url
+
+    def _queue(self):  # noqa: ANN202
+        from redis import Redis
+        from rq import Queue
+
+        return Queue(self.NAME, connection=Redis.from_url(self._url), default_timeout=self.TIMEOUT)
+
+    def start(self, req: JobRequest, job: Path) -> None:
+        self._queue().enqueue(work, asdict(req), str(job), job_timeout=self.TIMEOUT)
+
+    def ahead(self, job: Path) -> int | None:
+        for i, waiting in enumerate(self._queue().jobs):
+            if len(waiting.args) > 1 and waiting.args[1] == str(job):
+                return i
+        return None
+
+    def resume(self) -> list[str]:
+        return []
+
+
+# The queue of a site. `start` runs or queues a job. `ahead` is the number of jobs waiting in
+# front of a job, None when it is not waiting. `resume` queues again the jobs a stop of the web
+# process left and returns their names.
+JobQueue = Inline | Threads | Rq
+
+
+def queue_of(s: Settings) -> JobQueue:
+    """The queue the setting QUEUE names."""
+    if s.queue == "inline":
+        return Inline()
+    return Threads(s) if s.queue == "thread" else Rq(s)
+
+
+def enqueue(queue: JobQueue, req: JobRequest, job_dir: Path) -> None:
+    """Puts a job on the queue. Its request and its first status are on disk from the moment it
+    waits, and a restart finds a waiting job by its status."""
     job_dir.mkdir(parents=True, exist_ok=True)
     write_json(job_dir / "request.json", asdict(req))
     queued(job_dir)
-    if s.queue == "inline":
-        # Synchronous. A request returns after its job; for development and tests.
-        work(asdict(req), str(job_dir))
-        return
-    if s.queue == "thread":
-        _local_pool(s).submit(asdict(req), str(job_dir))
-        return
-    from redis import Redis
-    from rq import Queue
-
-    Queue("gnome3d", connection=Redis.from_url(s.redis_url), default_timeout=6 * 3600).enqueue(
-        work, asdict(req), str(job_dir), job_timeout=6 * 3600
-    )
+    queue.start(req, job_dir)
 
 
 def resume_interrupted(results_dir: Path, pool: LocalPool) -> list[str]:
@@ -226,8 +260,3 @@ def resume_interrupted(results_dir: Path, pool: LocalPool) -> list[str]:
         pool.submit(req, str(job))
         again.append(job.name)
     return again
-
-
-def resume_after_restart(s: Settings) -> list[str]:
-    """`resume_interrupted` for the local pool. Other queues keep their jobs through a restart."""
-    return resume_interrupted(s.results_dir, _local_pool(s)) if s.queue == "thread" else []

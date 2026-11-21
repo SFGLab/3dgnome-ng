@@ -120,13 +120,13 @@ def create_job(site: Site, fields: dict[str, str]) -> str:
         if vcf is not None:
             req.upload_vcf = str(put_vcf(vcf, job))
             req.sv_set = ""
-        enqueue(s, req, job)
+        enqueue(site.queue, req, job)
         return f"/p/{token}"
     if vcf is not None:
         req.upload_vcf = str(put_vcf(vcf, job))
         req.sv_set = ""
     if vcf is not None or own_table is not None:
-        enqueue(s, req, job)
+        enqueue(site.queue, req, job)
         return f"/p/{token}"
     key = request_key(req, catalog)
     job = s.jobs_dir / key
@@ -136,7 +136,7 @@ def create_job(site: Site, fields: dict[str, str]) -> str:
         # The first job of a request has the key of the request. A repeat has a key of its own.
         key = secrets.token_hex(8)
         job = s.jobs_dir / key
-    enqueue(s, req, job)
+    enqueue(site.queue, req, job)
     return f"/jobs/{key}"
 
 
