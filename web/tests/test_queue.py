@@ -91,17 +91,20 @@ def test_a_restart_queues_again_the_running_and_the_waiting_job(shared: SimpleNa
     # A restart: one job was running, one waited with its request on disk, one waited without
     # it and one had finished.
     results = root / "restart"
-    def left(name: str, state: str, request: bool) -> Path:
-        job = results / "jobs" / name
+    def left(name: str, state: str, request: bool, kind: str = "jobs") -> Path:
+        job = results / kind / name
         job.mkdir(parents=True)
         (job / "status.json").write_text(json.dumps({"state": state}))
         if request:
             (job / "request.json").write_text(json.dumps(asdict(JobRequest(cell_type="GMX", region="chr1:0-2000000", factors="CTCF", n_models=1))))
         return job
     running, waiting, lost, finished = left("running", "running", True), left("waiting", "queued", True), left("lost", "queued", False), left("finished", "done", True)
+    private = left("private_waiting", "queued", True, "private")
     fresh = LocalPool(["0"], engine=FAKE)
     again = resume_interrupted(results, fresh)
     fresh.join()
+    assert "private_waiting" in again and json.loads((private / "status.json").read_text())["state"] == "done", "a waiting private job is queued again and finishes: " + str(again)
+    again = [name for name in again if name != "private_waiting"]
     state = lambda job: json.loads((job / "status.json").read_text())  # noqa: E731
     assert sorted(again) == ["running", "waiting"], "a restart queues again the running and the waiting job: " + str(again)
     assert state(running)["state"] == "done" and state(waiting)["state"] == "done", "both then finish: " + str((state(running)["state"], state(waiting)["state"]))

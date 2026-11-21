@@ -120,6 +120,38 @@ def _snap(loops: pd.DataFrame, anchors: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def loop_network(
+    cell: CellType, region: Region, factors: str, own_loops: list[tuple[str, Path]], own_anchors: Path | None
+) -> tuple[pd.DataFrame, int, list[tuple[str, list[list]]]]:
+    """The anchors of the region's chromosome, the length the rules give that chromosome and the
+    loops of each factor on those anchors. Own loops replace the loops of the cell type and each
+    of their ends is moved to the anchor that holds its midpoint. RNAPII alone keeps the anchors
+    that hold an end of an RNAPII loop, without their orientation. The job and the preview of the
+    variants both rewire these loops."""
+    chrom = region.chrom
+    if own_loops:
+        anchors = _read(own_anchors, chrom, 4) if own_anchors else _loop_end_anchors([p for _, p in own_loops], chrom)
+        if anchors.shape[1] < 4:
+            anchors[3] = "N"
+        anchors = anchors.sort_values(1).reset_index(drop=True)
+    else:
+        anchors = _read(cell.anchors_for(factors), chrom, 4).sort_values(1).reset_index(drop=True)
+    if factors == "RNAPII":
+        ends = _read(cell.clusters_for("RNAPII")[0][1], chrom, 7)
+        spans = list(zip(ends[1], ends[2], strict=True)) + list(zip(ends[4], ends[5], strict=True))
+        hit = np.zeros(len(anchors), dtype=bool)
+        for s, e in spans:
+            hit |= (anchors[1].to_numpy() < e) & (anchors[2].to_numpy() > s)
+        anchors = anchors[hit].reset_index(drop=True)
+        anchors[3] = "N"
+    length = int(anchors[2].max()) + 10_000_000 if len(anchors) else region.end + 10_000_000
+    network = []
+    for factor, path in own_loops or cell.clusters_for(factors):
+        raw = _read(path, chrom, 7)
+        network.append((factor, _clusters(_snap(raw, anchors) if own_loops else raw, anchors)))
+    return anchors, length, network
+
+
 def build_inputs(
     cell: CellType,
     region: Region,
@@ -137,31 +169,13 @@ def build_inputs(
     out.mkdir(parents=True, exist_ok=True)
     chrom = region.chrom
     L = Lift(svs)
-    sources = own.loops if own and own.loops else cell.clusters_for(factors)
-    if own and own.loops:
-        anchors = _read(own.anchors, chrom, 4) if own.anchors else _loop_end_anchors([p for _, p in own.loops], chrom)
-        if anchors.shape[1] < 4:
-            anchors[3] = "N"
-        anchors = anchors.sort_values(1).reset_index(drop=True)
-    else:
-        anchors = _read(cell.anchors_for(factors), chrom, 4).sort_values(1).reset_index(drop=True)
-    if factors == "RNAPII":
-        ends = _read(cell.clusters_for("RNAPII")[0][1], chrom, 7)
-        spans = list(zip(ends[1], ends[2], strict=True)) + list(zip(ends[4], ends[5], strict=True))
-        hit = np.zeros(len(anchors), dtype=bool)
-        for s, e in spans:
-            hit |= (anchors[1].to_numpy() < e) & (anchors[2].to_numpy() > s)
-        anchors = anchors[hit].reset_index(drop=True)
-        anchors[3] = "N"
-    length = int(anchors[2].max()) + 10_000_000 if len(anchors) else region.end + 10_000_000
+    anchors, length, network = loop_network(cell, region, factors, own.loops if own else [], own.anchors if own else None)
 
     files: list[str] = []
     names: list[str] = []
     counts: dict[str, int] = {}
     extra: dict[tuple[int, int], str] = {}
-    for fac, path in sources:
-        raw = _read(path, chrom, 7)
-        clusters = _clusters(_snap(raw, anchors) if own and own.loops else raw, anchors)
+    for fac, clusters in network:
         if svs:
             # An inserted motif becomes an anchor only above triosformer's score cutoff. At the
             # rules' own 0, repeats inside insertions made dozens of 19 bp anchors per region.

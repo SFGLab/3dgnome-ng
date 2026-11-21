@@ -7,13 +7,14 @@ Results that read every structure are cached as explore_<name>.json in the job d
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import io
 import json
 import re
 import time
 import zipfile
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 import numpy as np
@@ -81,15 +82,26 @@ def _public_expression(job: Path) -> dict[str, object] | None:
     return {"label": meta.get("label", ""), "kind": meta["kind"], "unit": levels[1] if levels else "", "samples": len(meta["columns"]), "source": meta.get("source", "")}  # type: ignore[arg-type]
 
 
+def _sizes(paths: Iterable[Path]) -> list[dict[str, object]]:
+    """The name and the size of each file. A job writes a file under a second name and renames it,
+    and that second file can be gone between the listing and the reading of its size."""
+    out: list[dict[str, object]] = []
+    for p in paths:
+        with contextlib.suppress(FileNotFoundError):
+            if p.is_file() and not p.name.endswith(".tmp"):
+                out.append({"name": p.name, "size": p.stat().st_size})
+    return out
+
+
 def summary(job: Path, ahead: int | None) -> dict[str, object]:
     """The state, the request, the counts and the files of a job."""
     status = _json(job / "status.json") or {"state": "queued"}
-    files = [{"name": p.name, "size": p.stat().st_size} for p in sorted(job.iterdir()) if p.is_file() and not p.name.startswith(("explore_", "upload."))]
+    files = _sizes(p for p in sorted(job.iterdir()) if not p.name.startswith(("explore_", "upload.")))
     ep = job / "ep.tsv"
     return {
         "state": status.get("state"),
         "stage": status.get("stage"),
-        "error": status.get("error"),
+        "error": _public_log(str(status["error"]), job) if status.get("error") else None,
         "log_tail": _public_log(status["log_tail"], job) if status.get("log_tail") else None,
         "ahead": ahead,
         "started": status.get("started"),
@@ -102,7 +114,7 @@ def summary(job: Path, ahead: int | None) -> dict[str, object]:
         "genes": max(0, len(ep.read_text().splitlines()) - 1) if ep.is_file() else 0,
         "loop_count": sum(status.get("loops", {}).values()),
         "files": files,
-        "models": [{"name": m.name, "size": m.stat().st_size} for m in models(job) if m.is_file()],
+        "models": _sizes(models(job)),
         "expression": _public_expression(job),
         "stages": status.get("stages", []),
         # The clock the stages are timed on. A page counts the time of the running stage from it.
@@ -327,6 +339,27 @@ def _public_log(text: str, job: Path) -> str:
     return text
 
 
+def public_status(job: Path) -> dict[str, object]:
+    """The status of a job without the paths of the server in its error and its log."""
+    status = _json(job / "status.json") or {"state": "queued"}
+    for k in ("error", "log_tail"):
+        if status.get(k):
+            status[k] = _public_log(str(status[k]), job)
+    return status
+
+
+def public_file(job: Path, name: str) -> bytes | None:
+    """The request, the status or the log of a job as a download has it, without the paths of
+    the server. None for every other file, which a download has as it is on disk."""
+    if name == "request.json":
+        return json.dumps(_public_request(_json(job / name)), indent=2).encode()
+    if name == "status.json":
+        return json.dumps(public_status(job), indent=2).encode()
+    if name == "engine.log":
+        return log_text(job).encode()
+    return None
+
+
 def log_text(job: Path) -> str:
     """The engine log."""
     path = job / "engine.log"
@@ -339,7 +372,13 @@ def zip_bytes(job: Path) -> bytes:
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
         for p in sorted(job.rglob("*")):
             rel = p.relative_to(job)
-            if p.is_file() and not rel.name.startswith(("explore_", "upload.")) and not re.match(r"inputs/", str(rel)):
+            if not p.is_file() or rel.name.startswith(("explore_", "upload.")) or rel.name.endswith(".tmp") or re.match(r"inputs/", str(rel)):
+                continue
+            stated = public_file(job, rel.name) if rel.parent == Path(".") else None
+            if stated is not None:
+                z.writestr(str(rel), stated)
+                continue
+            with contextlib.suppress(FileNotFoundError):
                 z.write(p, str(rel))
     return buf.getvalue()
 
@@ -593,7 +632,7 @@ def compare(a: Path, b: Path, shared: bool = False) -> dict[str, object]:
         rows.append(
             {"gene": name, "linear_bp": la, "linear_bp_b": lb, "enhancer_bead_a": ka, "enhancer_bead_b": kb, "a": x, "b": y, "ratio": y["mean"] / x["mean"], "p": _rank_p(va, vb)}
         )
-    rows.sort(key=lambda r: max(r["ratio"], 1 / r["ratio"]), reverse=True)
+    rows.sort(key=lambda r: (-max(r["ratio"], 1 / r["ratio"]), r["gene"]))
     differ = sum(1 for r in rows if abs(r["linear_bp"] - r["linear_bp_b"]) > SAME_ENHANCER_BP)
     return {"same_region": ra is not None and ra == rb, "rows": rows, "differ": differ, "shared": shared, "shared_enhancers": n_shared}
 
@@ -651,7 +690,7 @@ def compare_expression(a: Path, b: Path, cache: Path, shared: bool = False, name
         if e is None:
             continue
         rows.append({"gene": name, "distance": round(float(np.log2(d["ratio"])), 4), "log2fc": e[0], "padj": e[1], "a": e[2], "b": e[3]})
-    rows.sort(key=lambda r: abs(r["log2fc"]), reverse=True)
+    rows.sort(key=lambda r: (-abs(r["log2fc"]), r["gene"]))
     rho = None
     if len(rows) >= 5:
         d = pd.DataFrame(rows)

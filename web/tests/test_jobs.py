@@ -65,6 +65,7 @@ PINNED = {
     "06fcd575c78e41b2": {"factors": "CTCF+RNAPII"},
     "25b7a3d8dfead60b": {"n_models": 5},
     "fc12af0964faecb8": {"n_models": 100},
+    "7d5e0b32a2eb3e80": {"expression": {"source": "LINES", "columns": ["a1", "a2"], "kind": "counts", "unit": "", "label": "Lines RNA-seq of GMX, 2 replicates"}},
 }
 
 
@@ -82,6 +83,10 @@ def test_requests_that_ask_for_the_same_job_have_one_key(shared: SimpleNamespace
     assert key(n_models=500) == key(n_models=100), "a count of structures over the limit is the limit"
     assert key(background="hic") == key(), "the Hi-C background is the request without a background"
     assert key(overrides={}) == key() and key(expression={}) == key(), "empty overrides and no expression are the request without them"
+    table = {"source": "LINES", "columns": ["a1", "a2"], "kind": "counts"}
+    moved = {**table, "label": "Another label", "unit": "TPM", "path": "/another/place/lines.tsv"}
+    assert key(expression=table) == key(expression=moved) == "7d5e0b32a2eb3e80", "the label of a table and its place on a server are not in the key"
+    assert key(expression={**table, "columns": ["a1"]}) != key(expression=table) != key(expression={**table, "source": "OTHER"}), "its columns and its source are"
 
 
 def test_the_contact_background_is_in_the_key(other: Any, shared: SimpleNamespace) -> None:

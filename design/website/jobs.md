@@ -18,6 +18,22 @@ own data gets a random link under `/p/`, never enters the shared cache, and is r
 retention sweep the app runs at start. Uploads waiting for a job sit under `RESULTS_DIR/uploads`
 and are swept after the same retention period. Shared jobs are never removed by the site.
 
+The key takes the expression of a request by the id of its source, its columns and its kind. The
+label of a table and its place on the server are not in the key. A job reads a hosted table from
+the place the catalog gives its source.
+
+A job has its request and the status `queued` on disk from the moment it waits, shared or
+private. A restart of the site finds the waiting and the running jobs by that status and queues
+them again.
+
+The downloads of a job state no path of the server. `request.json` is the request as the job
+page states it, without the places of uploads. `status.json` and `engine.log` have their paths
+cut to the job's directory. The zip has the same three files. The files on disk keep the paths
+the job runs with.
+
+The variants dialog and the job read the variants of a sample with one reader and rewire the
+same loops, `svs.sample_variants` and `inputs.loop_network`.
+
 ## Sync codes
 
 The My jobs page keeps its list in the browser. A sync code puts one list on several browsers

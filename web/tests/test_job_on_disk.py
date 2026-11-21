@@ -102,11 +102,11 @@ def test_a_file_of_a_job_from_disk_is_served(site: SimpleNamespace) -> None:
 def test_two_jobs_from_disk_compare_as_they_did(site: SimpleNamespace) -> None:
     c, said = site.c, site.said["compare"]
     pair = "a=/jobs/with_variants&b=/jobs/with_expression"
-    # Both genes have the ratio 1 here. Rows of one ratio have no order of their own.
-    by_gene = lambda answer: {**answer, "rows": sorted(answer["rows"], key=lambda r: r["gene"])}  # noqa: E731
     for q in ("", "&shared=1"):
         now = c.get(f"/api/compare?{pair}{q}").json()
-        assert difference(by_gene(said[q]), by_gene(now)) == "", "the comparison of the distances is the one of the time, with " + repr(q)
+        assert difference(said[q], now) == "", "the comparison of the distances is the one of the time, with " + repr(q)
+    # Both genes have the ratio 1 here. Rows of one ratio are in the order of their names.
+    assert [r["gene"] for r in c.get(f"/api/compare?{pair}").json()["rows"]] == ["ALPHA", "BETA"], "rows of one ratio are ordered by gene"
     assert difference(said["gene"], c.get(f"/api/compare/gene?{pair}&gene=ALPHA").json()) == "", "the comparison of one gene is the one of the time"
 
 

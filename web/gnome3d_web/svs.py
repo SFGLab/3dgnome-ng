@@ -48,47 +48,16 @@ def _alleles(gt: str) -> tuple[bool, bool]:
     return first, second
 
 
-def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV], int]:
-    """The sample's two haplotypes' variants in the region and the number of records the sample
-    carries there that are skipped for an unsupported type."""
-    hap: tuple[list[SV], list[SV]] = ([], [])
-    skipped = 0
-    col = -1
-    for line in _lines(vcf, region):
-        x = line.split("\t")
-        if line.startswith("#"):
-            col = x.index(sample)
-            continue
-        info = dict(kv.split("=", 1) if "=" in kv else (kv, "") for kv in x[7].split(";"))
-        kind = info.get("SVTYPE", "")
-        pos = int(x[1])
-        carried = _alleles(x[col].split(":", 1)[0])
-        if not any(carried):
-            continue
-        if kind not in KINDS:
-            if x[0] == region.chrom and region.start <= pos < region.end:
-                skipped += 1
-            continue
-        if kind == "INS":
-            alt = x[4]
-            seq = alt[1:] if not alt.startswith("<") else "N" * abs(int(info.get("SVLEN", "0").split(",")[0]))
-            sv = SV(x[0], pos + 1, pos + 1, "INS", seq)
-        else:
-            end = int(info["END"]) if "END" in info else pos + abs(int(info["SVLEN"].split(",")[0]))
-            sv = SV(x[0], pos + 1, end + 1, kind)
-        if not (sv.chrom == region.chrom and sv.start >= region.start and sv.end <= region.end):
-            continue
-        for h, on in enumerate(carried):
-            if on:
-                hap[h].append(sv)
-    return sorted(hap[0], key=lambda s: s.start), sorted(hap[1], key=lambda s: s.start), skipped
+class UnknownSample(Exception):
+    """The sample is not a column of the VCF."""
 
 
 def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[dict[str, object]], dict[str, int]]:
-    """The records of one sample inside the region with their genotype and haplotypes. Also
-    returns the count of records of other types, by type.
+    """The records of one sample inside the region with their genotype and haplotypes, in the
+    order of the file. Also returns the count of records of other types, by type. The preview of
+    the variants and the job both take the variants from here.
 
-    @raises KeyError when the sample is not a column of the VCF
+    @raises UnknownSample when the sample is not a column of the VCF
     """
     records: list[dict[str, object]] = []
     skipped: dict[str, int] = {}
@@ -97,18 +66,19 @@ def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[dict[s
         x = line.split("\t")
         if line.startswith("#"):
             if sample not in x[9:]:
-                raise KeyError(sample)
-            col = x.index(sample)
+                raise UnknownSample(f"{sample!r} is not a sample of the VCF")
+            col = 9 + x[9:].index(sample)
             continue
         info = dict(kv.split("=", 1) if "=" in kv else (kv, "") for kv in x[7].split(";"))
         kind = info.get("SVTYPE", "")
         pos = int(x[1])
         gt = x[col].split(":", 1)[0]
         haps = _alleles(gt)
-        if not any(haps) or not (x[0] == region.chrom and region.start <= pos < region.end):
+        if not any(haps) or x[0] != region.chrom:
             continue
         if kind not in KINDS:
-            skipped[kind or "unknown"] = skipped.get(kind or "unknown", 0) + 1
+            if region.start <= pos < region.end:
+                skipped[kind or "unknown"] = skipped.get(kind or "unknown", 0) + 1
             continue
         if kind == "INS":
             alt = x[4]
@@ -119,7 +89,18 @@ def sample_variants(vcf: Path, sample: str, region: Region) -> tuple[list[dict[s
             end = int(info["END"]) if "END" in info else pos + abs(int(info["SVLEN"].split(",")[0]))
             sv = SV(x[0], pos + 1, end + 1, kind)
             length = end - pos
-        if sv.end > region.end:
+        if sv.start < region.start or sv.end > region.end:
             continue
         records.append({"sv": sv, "type": kind, "pos": pos, "length": length, "genotype": gt, "haps": haps})
     return records, skipped
+
+
+def read_svs(vcf: Path, sample: str, region: Region) -> tuple[list[SV], list[SV], int]:
+    """The sample's two haplotypes' variants in the region and the number of records the sample
+    carries there that are skipped for an unsupported type.
+
+    @raises UnknownSample when the sample is not a column of the VCF
+    """
+    records, skipped = sample_variants(vcf, sample, region)
+    first, second = ([r["sv"] for r in records if r["haps"][h]] for h in (0, 1))  # type: ignore[index]
+    return sorted(first, key=lambda s: s.start), sorted(second, key=lambda s: s.start), sum(skipped.values())  # type: ignore[arg-type, return-value]

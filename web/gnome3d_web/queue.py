@@ -180,10 +180,11 @@ def queue_position(s: Settings, job_dir: Path) -> int | None:
 
 
 def enqueue(s: Settings, req: JobRequest, job_dir: Path) -> None:
-    # The request is on disk from the moment the job waits. A waiting job can be queued
-    # again after a restart.
+    # The request and the first status are on disk from the moment the job waits. A restart
+    # finds a waiting job by its status and queues it again.
     job_dir.mkdir(parents=True, exist_ok=True)
     write_json(job_dir / "request.json", asdict(req))
+    write_json(job_dir / "status.json", {"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]})
     if s.queue == "inline":
         # Synchronous. A request returns after its job; for development and tests.
         work(asdict(req), str(job_dir))

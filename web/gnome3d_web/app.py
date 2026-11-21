@@ -10,7 +10,6 @@ import re
 import secrets
 import shutil
 import threading
-import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -28,12 +27,13 @@ from fastapi.staticfiles import StaticFiles
 
 from . import explore, expression, hicdiffusion, lists, owndata, remote
 from .catalog import BACKGROUNDS, FACTOR_CHOICES, SAMPLE_COLUMNS, Catalog
-from .jobs import JobRequest, _member, request_key, write_json
+from .jobs import JobRequest, _member, request_key
 from .queue import enqueue, queue_position, resume_after_restart, sweep_private
 from .regions import HICDIFFUSION_SPAN, RegionError, parse_region
 from .settings import Settings
 from .settings_schema import SettingError, parse_ini, schema, validate_overrides
 from .siteconfig import ConfigFile
+from .svs import UnknownSample
 
 FILES = re.compile(r"^(ep\.tsv|marks\.json|engine\.log|status\.json|request\.json|hicdiffusion\.bedpe|expression\.tsv|[A-Za-z0-9_.:-]+\.cif)$")
 
@@ -187,14 +187,14 @@ def create_app() -> FastAPI:
         own_table = None
         if wanted == "own":
             own_table = own_expression(fields)
-            req.expression = own_table[2] | {"path": ""}
+            req.expression = own_table[2]
         elif wanted:
             # A hosted table, by the id of its source. The columns are the ones of the cell type or of the sample.
             option = next((o for o in catalog.expression_options(base, sample if sv_set else "", site_config.get().hidden) if o["id"] == wanted), None)
             if option is None:
                 raise JobError(f"{wanted!r} has no expression for {cell_type}" + (f" and {sample}" if sv_set else ""), "expression")
             src = catalog.expression[wanted]
-            req.expression = {"source": src.name, "path": str(src.path), "columns": option["columns"], "kind": src.kind, "unit": src.unit, "label": option["label"]}
+            req.expression = {"source": src.name, "columns": option["columns"], "kind": src.kind, "unit": src.unit, "label": option["label"]}
         if own_dirs or vcf is not None or own_table is not None:
             token = secrets.token_urlsafe(18)
             job = private / token
@@ -234,8 +234,6 @@ def create_app() -> FastAPI:
             key = secrets.token_hex(8)
             job = shared / key
             st = job / "status.json"
-        job.mkdir(parents=True, exist_ok=True)
-        write_json(st, {"state": "queued", "stages": [{"stage": "queued", "at": time.time()}]})
         enqueue(s, req, job)
         return f"/jobs/{key}"
 
@@ -290,7 +288,7 @@ def create_app() -> FastAPI:
         except expression.ExpressionError as e:
             raise JobError(str(e), "expression") from e
         samples = "1 sample" if len(columns) == 1 else f"{len(columns)} samples"
-        return table, columns, {"source": "upload", "label": f"Your own table {name}, {samples}", "kind": kind, "unit": ""}
+        return table, columns, {"source": expression.UPLOAD, "label": f"Your own table {name}, {samples}", "kind": kind, "unit": ""}
 
     def own_uploads(raw: object) -> dict:
         """The upload directories a job request names, each checked to exist, to be of its kind
@@ -427,7 +425,7 @@ def create_app() -> FastAPI:
         own_anchors = owndata.data_file(own_dirs["anchors"]) if "anchors" in own_dirs else None
         try:
             out = owndata.variant_check(catalog.cell_types[base], r, factors if factors in FACTOR_CHOICES else "CTCF", vcf, sample, 1 if haplotype == 1 else 0, own_loops, own_anchors)
-        except KeyError:
+        except UnknownSample:
             return JSONResponse({"error": f"{sample!r} is not a sample of this VCF", "field": "sample"}, 400)
         return JSONResponse(out)
 
@@ -509,26 +507,29 @@ def create_app() -> FastAPI:
         out += [p.name for p in sorted((d / "models").glob("*.cif"), key=_member)]
         return sorted(set(out))
 
-    def send(d: Path, name: str) -> FileResponse:
+    def send(d: Path, name: str) -> Response:
         if not FILES.match(name):
             raise HTTPException(404)
         p = d / "models" / name if name.endswith(".cif") else d / name
         if not p.is_file():
             raise HTTPException(404)
+        stated = explore.public_file(d, name)
+        if stated is not None:
+            kind = "application/json" if name.endswith(".json") else "text/plain; charset=utf-8"
+            return Response(stated, media_type=kind, headers={"Content-Disposition": f'attachment; filename="{name}"'})
         return FileResponse(p, filename=name)
 
     @app.get("/jobs/{key}/files/{name}")
-    def shared_file(key: str, name: str) -> FileResponse:
+    def shared_file(key: str, name: str) -> Response:
         return send(job_dir("jobs", key), name)
 
     @app.get("/p/{key}/files/{name}")
-    def private_file(key: str, name: str) -> FileResponse:
+    def private_file(key: str, name: str) -> Response:
         return send(job_dir("private", key), name)
 
     @app.get("/api/jobs/{key}")
     def shared_status(key: str) -> JSONResponse:
-        d = job_dir("jobs", key)
-        return JSONResponse(json.loads((d / "status.json").read_text()))
+        return JSONResponse(explore.public_status(job_dir("jobs", key)))
 
     @app.get("/api/jobs/{key}/files")
     def shared_files(key: str) -> list[str]:
@@ -536,8 +537,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/p/{key}")
     def private_status(key: str) -> JSONResponse:
-        d = job_dir("private", key)
-        return JSONResponse(json.loads((d / "status.json").read_text()))
+        return JSONResponse(explore.public_status(job_dir("private", key)))
 
     @app.get("/api/sv_sets/{name}/samples")
     def api_sv_samples(name: str) -> JSONResponse:

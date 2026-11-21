@@ -79,9 +79,12 @@ def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:
     d["hicdiffusion"] = d["background"] == "hicdiffusion"
     if d["background"] in ("hic", "hicdiffusion"):
         del d["background"]
-    # The key of a request without expression is the one it had before expression existed.
+    # The key of a request without expression is the one it had before expression existed. A
+    # table is in the key by its source, its columns and its kind. Its label is not.
     if not d["expression"]:
         del d["expression"]
+    else:
+        d["expression"] = {k: d["expression"].get(k) for k in ("source", "columns", "kind")}
     if not (req.sv_set or req.upload_vcf):
         d["sample"], d["haplotype"] = "", 0
     return d
@@ -219,11 +222,15 @@ def run_job(
             hicdiffusion.write_map(job / hicdiffusion.MAP_FILE, region.chrom, Lift(svs).edge(region.start), cond)
             hic = cond, region.start
         inputs = build_inputs(cell, region, req.factors, svs, job / "inputs", hic, req.background, own)
-        # The table of an upload is in the job since the request. A hosted table is read here.
-        if req.expression.get("path"):
+        # The table of an upload is in the job since the request. A hosted table is read here,
+        # from the place the catalog gives its source.
+        if req.expression and req.expression.get("source") != expression.UPLOAD:
             e = req.expression
+            source = catalog.expression.get(str(e.get("source")))
+            if source is None:
+                raise ValueError(f"the site has no expression table {e.get('source')!r}")
             columns = [str(c) for c in e["columns"]]  # type: ignore[union-attr]
-            table = expression.read_table(Path(str(e["path"])), columns)
+            table = expression.read_table(source.path, columns)
             if e["kind"] == "counts":
                 expression.check_counts(table, columns, str(e["label"]))
             expression.write_job(job, table, columns, {k: e.get(k, "") for k in ("source", "label", "kind", "unit")})

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import sys
 import time
@@ -79,3 +80,37 @@ def test_a_private_job_runs_in_a_thread_too(site: SimpleNamespace) -> None:
     assert r.status_code == 201 and r.json()["url"].startswith("/p/"), "a job with an own table is private: " + r.text
     summary = finished(c, r.json()["url"])
     assert summary["state"] == "done" and summary["expression"], "the private job finishes with its expression: " + str((summary["state"], summary["error"]))
+
+
+def test_a_private_job_that_waits_has_its_status_on_disk(site: SimpleNamespace) -> None:
+    c = site.c
+    table = "gene\tmine\nALPHA\t12.5\nBETA\t3.0\n"
+    up = c.post("/api/uploads", data={"kind": "expression", "cell_type": "GMX"}, files={"file": ("mine.tsv", io.BytesIO(table.encode()), "text/plain")}).json()["id"]
+    os.environ["FAKE_ENGINE_SLEEP"] = "1.5"
+    try:
+        first = c.post("/api/jobs", data={**FORM, "region": "chr1:0-2100000"}).json()["url"]
+        until = time.time() + 30
+        while c.get(f"/api{first}/summary").json()["state"] == "queued" and time.time() < until:
+            time.sleep(0.01)
+        private = c.post("/api/jobs", data={**FORM, "expression": "own", "expression_upload": up, "expression_columns": "[\"mine\"]", "expression_kind": "values"}).json()["url"]
+        on_disk = site.root / "results" / "private" / private.split("/")[-1] / "status.json"
+        # A restart of the site finds the jobs to queue again by this file.
+        assert on_disk.is_file() and json.loads(on_disk.read_text())["state"] == "queued", "the waiting private job has the status queued on disk"
+        assert (on_disk.parent / "request.json").is_file(), "and its request"
+        r = c.get(f"/api{private}")
+        assert r.status_code == 200 and r.json()["state"] == "queued", "its status route answers: " + r.text[:200]
+        states = [finished(c, url)["state"] for url in (first, private)]
+    finally:
+        del os.environ["FAKE_ENGINE_SLEEP"]
+    assert states == ["done", "done"], "both jobs finish: " + str(states)
+
+
+def test_the_summary_of_a_job_being_written_lists_no_half_written_file(tmp_path: Path) -> None:
+    from gnome3d_web import explore
+
+    # A job writes a file under a second name and renames it. A page that asks for the summary at
+    # that moment got an error from the file that was gone.
+    (tmp_path / "status.json").write_text(json.dumps({"state": "running"}))
+    (tmp_path / "status.json.tmp").write_text("{")
+    assert [f["name"] for f in explore.summary(tmp_path, None)["files"]] == ["status.json"], "the summary lists the files and not the one being written"  # type: ignore[union-attr]
+    assert explore._sizes([tmp_path / "gone.json"]) == [], "a file that is gone when its size is read is left out"

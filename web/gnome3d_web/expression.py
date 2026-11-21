@@ -22,6 +22,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+# The source of a table that came with the request.
+UPLOAD = "upload"
 KINDS = ("counts", "values")
 TABLE = "expression.tsv"
 META = "expression.json"
