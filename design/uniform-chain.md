@@ -1124,6 +1124,49 @@ The differences at 25 kb over the 18 rows, paired by row, with the p value of th
   chain has nothing to repair there.
 - The radius of 2.0 on the ladder gains no SCC and loses 0.037 of Spearman.
 
+### Confirmation of the chosen config at twenty structures
+
+`design/figures/uniform-2026-11-19/confirm20/` and `scores-confirm20/`, with `scores-confirm20_10k/` and
+`scores-confirm20_5k/`, `slurm/ensemble/uniform_confirm20.sh`, commit c3dc42d. The config chosen by the maintainer
+on 2026-11-21 after the second round: the ladder to 25 kb over cells at 5 kb, `contact_background_z` 2,
+`loop_dropout` and the derived radius of the arcs stage. Eighteen rows of twenty structures, built nine at a time
+with JAX on the CPU, beside the default chain and the cells at 5 kb with a radius of 3.0 of the larger trial.
+Raw and balanced SCC per bead pair:
+
+| arm | SCC at 25 kb | SCC at 10 kb | SCC at 5 kb | Spearman at 25, 10, 5 kb | Pearson balanced at 25 kb | close pairs | not next to each other | ends overlap | exponent over Hi-C |
+|---|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.181, 0.195 | 0.133, 0.126 | 0.532, 0.463, 0.401 | 0.705 | 11.5 | 3.5 | 12 of 360 | 1.044 |
+| cells at 5 kb, radius 3.0 | 0.313, 0.335 | 0.278, 0.255 | 0.226, 0.181 | 0.547, 0.485, 0.434 | 0.695 | 3.2 | 0.6 | 14 of 360 | 1.018 |
+| chosen config | 0.417, 0.413 | 0.344, 0.301 | 0.263, 0.207 | 0.569, 0.519, 0.475 | 0.732 | 2.5 | 0.4 | 27 of 360 | 1.131 |
+
+The chosen config against the default chain, paired over the 18 rows:
+
+| score | 25 kb | 10 kb | 5 kb |
+|---|---|---|---|
+| raw SCC | +0.212 ± 0.021, 18 rows of 18, p 0.000008 | +0.163 ± 0.017, 18 rows, p 0.000008 | +0.130 ± 0.016, 17 rows, p 0.0003 |
+| balanced SCC | +0.145 ± 0.021, 18 rows, p 0.0002 | +0.106 ± 0.015, 16 rows, p 0.00005 | +0.081 ± 0.012, 16 rows, p 0.00005 |
+| Spearman | +0.036 ± 0.019, 12 rows, p 0.09 | +0.056 ± 0.009, 17 rows, p 0.00005 | +0.073 ± 0.006, 18 rows, p 0.000008 |
+| balanced Pearson | +0.027 ± 0.007, 14 rows, p 0.003 | +0.035 ± 0.006, 16 rows, p 0.00005 | +0.047 ± 0.007, 17 rows, p 0.0003 |
+
+No structure of 360 has a stretched piece. The radius of gyration of the battery is 11.2 bonds against 10.0 of the
+default chain, and the decay is 13 percent steeper than that of Hi-C against 4 percent.
+
+The ends overlap in 27 structures of 360 against 12 of the default chain, on H1ESC and HFFC6 for the most part.
+On the sweep the same config at a radius of 3.0 had 5 of 144. The derived radius is the cause under test. It is
+`auto_factor_arcs` times the mean target of the loops of the conformation. The dropout keeps the stronger loops,
+whose targets are shorter, and the radius falls:
+
+| row | nodes, with the dropout and without | derived radius with the dropout | derived radius without |
+|---|---|---|---|
+| GM12878 chr1 20 to 25 Mb | 327, 468 | 2.33, 2.25 to 2.40 over three conformations | 2.68 |
+| GM12878 chr1 60 to 65 Mb | 57, 91 | 2.85 | 3.40 |
+| HFFC6 chr1 20 to 25 Mb | 412, 607 | 2.87 | 3.14 |
+| HFFC6 chr1 60 to 65 Mb | 160, 249 | 3.34 | 3.71 |
+
+The radius of the stage is a constant of the run and here it changes with the draw of the conformation. Under
+the dropout it is smaller where the dropout trace asks for a larger one. The arms of
+`scores-chain20/` measure the chosen config at a radius of 3.0 and with the radius from the chain.
+
 ## Settings
 
 A setting is added when a run reads it.

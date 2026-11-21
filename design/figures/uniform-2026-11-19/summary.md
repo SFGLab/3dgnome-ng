@@ -145,6 +145,30 @@
 | w_r3_heat | sweep8b | 18 | 0.287 | 0.315 | 0.275 | 0.303 | 0.281 | 0.309 | 0.517 | 0.718 |  | 6.4 | 0.6 |
 | default chain | sweep8a | 18 | 0.300 | 0.261 | 0.289 | 0.245 | 0.191 | 0.247 | 0.502 | 0.723 |  | 11.2 | 3.5 |
 
+## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil, built on the CPU, score at 5k
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| u_final | confirm20_5k | 18 | 0.263 | 0.208 | 0.255 | 0.193 | 0.263 | 0.207 | 0.474 | 0.669 |  |  |  |
+| s_c5k_r3 | confirm20_5k | 18 | 0.227 | 0.181 | 0.217 | 0.165 | 0.226 | 0.181 | 0.434 | 0.655 |  |  |  |
+| default chain | confirm20_5k | 18 | 0.190 | 0.128 | 0.179 | 0.109 | 0.133 | 0.127 | 0.401 | 0.622 |  |  |  |
+
+## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil, built on the CPU, score at 10k
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| u_final | confirm20_10k | 18 | 0.345 | 0.302 | 0.337 | 0.290 | 0.344 | 0.301 | 0.519 | 0.705 |  |  |  |
+| s_c5k_r3 | confirm20_10k | 18 | 0.279 | 0.256 | 0.270 | 0.243 | 0.278 | 0.255 | 0.485 | 0.682 |  |  |  |
+| default chain | confirm20_10k | 18 | 0.250 | 0.196 | 0.238 | 0.177 | 0.181 | 0.195 | 0.463 | 0.670 |  |  |  |
+
+## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil, built on the CPU
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| u_final | confirm20 | 18 | 0.421 | 0.416 | 0.416 | 0.410 | 0.417 | 0.413 | 0.569 | 0.732 | 1.131 | 2.5 | 0.4 |
+| s_c5k_r3 | confirm20 | 18 | 0.317 | 0.339 | 0.309 | 0.331 | 0.313 | 0.335 | 0.547 | 0.695 | 1.018 | 3.2 | 0.6 |
+| default chain | confirm20 | 18 | 0.316 | 0.277 | 0.305 | 0.260 | 0.204 | 0.268 | 0.532 | 0.705 | 1.044 | 11.5 | 3.5 |
+
 ## Scored on counts the run did not read: inputs of production, contact cells of half a, tails on a coil
 
 | arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
