@@ -55,7 +55,7 @@ The notes are under `design/website/`.
 
 | Note | Content |
 |---|---|
-| [code.md](../design/website/code.md) | The layout of the server code, its rules and the tests that guard the interface |
+| [code.md](../design/website/code.md) | The layout of the server and of the frontend code, their rules and the tests that guard the interface |
 | [deployment.md](../design/website/deployment.md) | The compose files, one container, the registry on the host, workers and GPUs, MPS, a site without a GPU |
 | [data.md](../design/website/data.md) | The data directory, cell types, SV call sets and sample tables |
 | [settings.md](../design/website/settings.md) | The environment variables and the HiCDiffusion step |
