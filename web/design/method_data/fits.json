@@ -16,5 +16,15 @@
   "intercept": 11.827814766285574,
   "lo": 50000,
   "hi": 1000000
+ },
+ "anchor_pairs": {
+  "anchors": 53,
+  "pairs": 1378,
+  "loop": 46,
+  "background": 55,
+  "hic": 0,
+  "none": 1277,
+  "windows": 64,
+  "range_bp": 100000
  }
 }

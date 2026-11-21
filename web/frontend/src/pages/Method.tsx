@@ -5,6 +5,7 @@ import { TermSketch } from '../components/TermSketch'
 import { REFERENCES, referenceLink, referenceText } from '../content/references'
 import engineBatching from '../assets/engine/engine_batching.svg'
 import engineGraph from '../assets/engine/engine_graph.svg'
+import methodAnchorTerms from '../assets/method_anchor_terms.png'
 import methodAnchors from '../assets/method_anchors.png'
 import methodBlocks from '../assets/method_blocks.png'
 import methodChain from '../assets/method_chain.png'
@@ -218,22 +219,54 @@ export function Method() {
         </Section>
 
         <Section id="anchors">
-          <P>{'All anchors of a chromosome are placed in one fit. Each structure starts from a random draw of the anchor positions. The draw comes from a Gaussian model that is fitted once per run and its mean pair distances are as close to the target distances as a Gaussian model allows, as in the maximum entropy models of Shi and Thirumalai [4]. L-BFGS-B [6, 7] then minimises the anchor energy below, with L the anchor pairs joined by a loop, B the pairs held at the background and W a set of genomic windows. A loop spring uses k_s when the pair is further apart than its target t and k_q otherwise. The window term keeps each part of the chromosome at the size the distance law gives for its length. The windows start at 100 kb and double in size up to the whole chromosome and each size is placed twice, the second time shifted by half a window. The GPU evaluates the pair terms and their gradient, the optimiser runs on the CPU and the fit stops when the relative improvement per iteration drops below 1e-6.'}</P>
+          <P>{"The anchor phase places the loop anchors, the points of the chromosome on which the data are most informative. The targets of section 2 cover only a small share of the anchor pairs, however. The region of figure 1 has 53 anchors and 1,378 pairs of anchors. Of these, 46 are joined by a loop and 55 are closer than 100 kb and get the background distance, while the other 1,277 have no target of their own, figure 6a. A structure built from the targets alone would hold its loops and leave nearly everything else to chance."}</P>
+          <P>{"The anchor energy therefore combines four terms. Two come from earlier models and two are new in this work, the background spring and the window term. In the energy below L is the set of anchor pairs joined by a loop, B the pairs held at the background and W a set of genomic windows."}</P>
           <div className="equations">
             <Equation name="anchor_energy" />
           </div>
+
+          <h3>The four terms</h3>
+          <P>{"The loop springs pull the two anchors of every loop to the loop target, as in 3D-GNOME [1]. A spring uses the constant k_s when the pair is further apart than its target t and k_q otherwise. On their own the loop springs give a structure that is too compact below 100 kb, since they close every loop while nothing keeps the anchors between two loops apart."}</P>
+          <P>{"The background spring is the first new term. It holds every pair of anchors closer than 100 kb at the background distance b(s), which keeps the anchors between two loops at the spacing of a chain without contacts. The limit of 100 kb is deliberate. The law gives the mean distance of a pair over many structures and one compact structure cannot have every pair at its mean at once. In a test with the spring on every pair the fit returned a compressed average of all targets, with half the radius of gyration and a lower agreement with Hi-C on three cell lines. A far pair with more Hi-C contacts than expected gets the same spring at its Hi-C target. Such pairs are rare and the region of figure 6 has none."}</P>
+          <P>{"The window term is the second new term. It sets the size of the structure at every scale without holding a single pair. For a genomic window it takes the radius of gyration R_g of the anchors inside, which is the root mean square distance of these anchors from their centre. It compares this radius with the radius R_w of a chain that follows the distance law over the same span. The windows start at 100 kb and double in size up to the whole chromosome. Each size is placed twice, the second time shifted by half a window, which puts every border of one placement in the middle of a window of the other, figure 6b. A window with fewer than four anchors is left out."}</P>
+          <P>{"Inside a window the anchors stay free to arrange themselves, which lets two distant anchors meet in one structure and stay apart in the next. An earlier version kept distant pairs apart with a repulsion between them. Every far pair then had the same distance in every structure and the ensemble had two to ten times fewer contacts than Hi-C between 100 kb and 1 Mb."}</P>
+          <P>{"The excluded volume term keeps two anchors from taking the same place, as in polymer models [5, 14]. The loop springs have a weight of 1 and the three other terms a weight of 0.1. A loop therefore wins wherever it disagrees with another term, while the weaker terms shape everything the loops leave open."}</P>
           <Terms label="Anchor energy terms" terms={ANCHOR_TERMS} phase="anchor" />
           <p className="panel-caption">Each drawing shows a few anchors in their order along the genome, before the term acts and after. Blue marks the anchors and the distance or radius the term reads.</p>
+          <Figure n="6" src={methodAnchorTerms} alt="A matrix of the anchor pairs of a 6 Mb region coloured by the kind of target, with loops and background pairs near the diagonal and most pairs without a target, and the genomic windows of the window term from 100 kb to 3.2 Mb drawn over the anchors">
+            The terms of the anchor energy on the region of figure 1. a, every pair of the 53 anchors, coloured by its target. Loops and background pairs are close to the diagonal and no pair of two blocks has a target. b, the windows of the window term. Each size has two rows, the second shifted by half a window. A filled window has four or more anchors and enters the energy, an empty one is left out.
+          </Figure>
+
+          <h3>The start and the fit</h3>
+          <P>{"The anchor energy has many structures of nearly the same value. They differ in the arrangement of the far anchors, which no term holds and an ensemble should contain this variety. Each structure therefore starts from its own random draw of all anchor positions. The draw comes from a Gaussian model that is fitted once per job, with mean pair distances as close to the targets as a Gaussian model allows, as in the maximum entropy models of Shi and Thirumalai [4]."}</P>
+          <P>{"L-BFGS-B [6, 7] then lowers the anchor energy from the draw and stops when the relative improvement per iteration falls below 1e-6. The draw decides the arrangement of the distant parts of the chromosome in each structure, while the fit brings the loops and the sizes to their targets. All anchors of a chromosome are fitted together, which lets the windows and the Hi-C targets act across the borders of blocks. The GPU evaluates the pair terms and their gradient and the optimiser runs on the CPU."}</P>
+          <P>{"A gradient method is enough for this energy. In tests on real blocks, simulated annealing from ten different starts ended within one percent of the same energy, a sign that the energy has no separate minima for a random search to escape. The gradient method reaches that energy in seconds where annealing took minutes."}</P>
         </Section>
 
         <Section id="chain">
-          <P>{"The beads between two anchors start on a compact random coil at the bond targets and the anchors stay where the anchor phase put them. Simulated annealing [8] moves one bead at a time and scores the chain energy below, with C the anchor pairs joined by a CTCF loop and o the direction of the CTCF motif at an anchor. A move that lowers the energy is accepted and a move that raises it is accepted with the probability below, where E' is the energy after the move. The temperature T falls by a constant factor each step [1, 9]. A wall rejects any move that brings two beads closer than the excluded volume radius. After the chains of all blocks are finished, a last pass moves the beads that still overlap, within a block or between two blocks. The pass keeps the anchors fixed."}</P>
+          <P>{"After the anchor phase only the anchors have positions. The chromatin between two neighbouring anchors is filled with beads, about one per kilobase, none of which is the end of a loop. The chain phase therefore treats each stretch between two anchors as a piece of polymer and asks of it what holds for any chromatin fibre. The fibre is connected, it does not bend sharply, it does not pass through itself and it stays within the volume of its block. One further term uses data, the direction of the CTCF motifs at the anchors. The anchors do not move in this phase, which keeps every loop as the anchor phase placed it."}</P>
+          <P>{"In the chain energy below C is the set of anchor pairs joined by a CTCF loop and o the direction of the CTCF motif at an anchor."}</P>
           <div className="equations">
             <Equation name="chain_energy" />
-            <Equation name="acceptance_plain" />
           </div>
+
+          <h3>The five terms</h3>
+          <P>{"The bond term keeps consecutive beads at the bond target and the bending term straightens sharp turns, both as in 3D-GNOME [1]. The orientation term acts on the two anchors of a CTCF loop. It turns the chain at each anchor until the two motifs point the same way in space, which gives a hairpin for motifs that face each other along the genome [1]. The excluded volume term pushes apart two beads that are closer than the radius r_0 and the confinement term pulls back a bead that leaves a sphere around the centre of its block [5, 14, 15]."}</P>
           <Terms label="Chain energy terms" terms={CHAIN_TERMS} phase="chain" />
           <p className="panel-caption">Each drawing shows a short chain, before the term acts and after. Dark beads are anchors. The drawing of the orientation term follows 3D-GNOME [1] and shows two loops. On top are the directions of the two CTCF motifs along the genome and below is the loop that brings the two motifs side by side pointing the same way. Motifs that face each other give a hairpin and motifs of one direction give a loop of a full turn.</p>
+
+          <h3>The start and the wall</h3>
+          <P>{"Overlapping beads were the main fault of the first chains and two additions of this work remove them. The first is a wall. The excluded volume term is soft and its push fades to zero as two beads approach the distance r_0, which leaves most overlaps in place near that distance. The wall rejects every move that creates an overlap or deepens an existing one, after which the number of overlaps can only fall."}</P>
+          <P>{"The second addition is the start. A chain that starts on a straight line between its anchors begins with thousands of overlaps and has to push its way out of them. Each stretch now starts as a compact random coil between its two anchors, with its bonds already at their targets. On a test block the soft term alone ended with 766 overlapping pairs per thousand beads, the wall alone with 92, the coil start alone with 487 and the two together with 43. On three cell lines the two together cut the overlaps within blocks five to seven times and left the size of the structures unchanged."}</P>
+
+          <h3>Annealing</h3>
+          <P>{"Simulated annealing [8] moves one bead at a time and scores the chain energy. A move that lowers the energy is accepted. A move that raises it is accepted with the probability below, where E' is the energy after the move. The temperature T falls by a constant factor at each step [1, 9], which makes uphill moves rarer as the chain settles."}</P>
+          <div className="equations">
+            <Equation name="acceptance_plain" />
+          </div>
+
+          <h3>The last pass</h3>
+          <P>{"Each block is annealed on its own, which leaves nothing to keep the beads of one block out of another. A last pass therefore looks at the whole chromosome once all chains are finished. It finds the beads that overlap a bead of another block or of their own block and moves only these beads and their two neighbours along the chain, with every anchor fixed. On chromosome 1 of GM12878 the pass lowers the overlaps between blocks from 62 to 14 per thousand beads and the overlaps within blocks from 246 to 37."}</P>
           <div className="panels">
             {[
               [methodAnchors, 'a', 'Anchor positions after the fit. TNFRSF8 locus, GM12878, CTCF and RNAPII loops.'],
@@ -250,7 +283,7 @@ export function Method() {
             ))}
           </div>
           <p className="panel-caption">
-            <b>Figure 6</b>a, anchor positions after the anchor phase, TNFRSF8 locus, GM12878, CTCF and RNAPII loops. b, the full chain of the same structure, black dots are anchors. c, three structures of the ensemble superposed on the first.
+            <b>Figure 7</b>a, anchor positions after the anchor phase, TNFRSF8 locus, GM12878, CTCF and RNAPII loops. b, the full chain of the same structure, black dots are anchors. c, three structures of the ensemble superposed on the first.
           </p>
         </Section>
 
@@ -259,19 +292,19 @@ export function Method() {
         </Section>
 
         <Section id="engine">
-          <P>A run is a graph of tasks that grows while it runs, figure 7a. The region task adds one task per chromosome, a chromosome task adds its blocks and each chromosome gets one anchor fit and one chain task per block. Each stage has its own executor, serial, threaded or batched on the GPU. Results are applied in a fixed order and a run with the same settings and seed gives the same structures.</P>
-          <P>{'The chain tasks of many blocks run together in JAX [11] launches on the GPU, figure 7b. Each block is padded to the next size on a fixed ladder and blocks with the same energy terms are packed into as few launches as GPU memory allows. Each chain has its own random stream and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. Excluded volume uses a grid of cells rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU and the output does not depend on the number of GPUs.'}</P>
+          <P>A run is a graph of tasks that grows while it runs, figure 8a. The region task adds one task per chromosome, a chromosome task adds its blocks and each chromosome gets one anchor fit and one chain task per block. Each stage has its own executor, serial, threaded or batched on the GPU. Results are applied in a fixed order and a run with the same settings and seed gives the same structures.</P>
+          <P>{'The chain tasks of many blocks run together in JAX [11] launches on the GPU, figure 8b. Each block is padded to the next size on a fixed ladder and blocks with the same energy terms are packed into as few launches as GPU memory allows. Each chain has its own random stream and the grouping of chains into launches does not change the result of a chain. A chain that converges holds its state while the rest of the launch continues. Each annealing step tests 32 proposals against the current state and applies the first accepted one, which keeps the serial Metropolis rule. Excluded volume uses a grid of cells rebuilt every 2,048 proposals. With several GPUs each launch group goes whole to one GPU and the output does not depend on the number of GPUs.'}</P>
           <P>The chain tasks can also run on the CPU cores, one chain per thread, while the anchor fit stays on the GPU. This is faster on a computer with many CPU cores and the server runs its jobs this way.</P>
           <figure className="figure">
             <img src={engineGraph} alt="Task graph of a run on two chromosomes: a region task, one task per chromosome, its blocks, one anchor fit per chromosome on the CPU with the energy on the GPU, the chains of seven blocks in one batched launch and the assembly" />
             <figcaption>
-              <b>Figure 7a</b>Task graph of a run on two chromosomes.
+              <b>Figure 8a</b>Task graph of a run on two chromosomes.
             </figcaption>
           </figure>
           <figure className="figure padded">
             <img src={engineBatching} alt="Nine blocks of 300 to 3600 beads, each padded to a ladder size of 512 to 4096, sorted largest first and packed into two launches padded to 4096 and 1024" />
             <figcaption>
-              <b>Figure 7b</b>Bucketing and batching of chain tasks. Each block is padded up to the next size on a fixed ladder, which limits how many shapes the GPU compiles. Blocks with the same energy terms are sorted largest first and packed into as few launches as GPU memory allows and a launch pads its members to the size of the first.
+              <b>Figure 8b</b>Bucketing and batching of chain tasks. Each block is padded up to the next size on a fixed ladder, which limits how many shapes the GPU compiles. Blocks with the same energy terms are sorted largest first and packed into as few launches as GPU memory allows and a launch pads its members to the size of the first.
             </figcaption>
           </figure>
         </Section>

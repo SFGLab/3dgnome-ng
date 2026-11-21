@@ -63,6 +63,19 @@ describe('Method page', () => {
     expect(section).toHaveTextContent('uses ν = 0.285')
   })
 
+  it('tells the anchor phase and the chain phase by their terms and the additions of this work', () => {
+    renderMethod()
+    const h3 = (id: string) => within(document.getElementById(id)!).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    expect(h3('anchors')).toEqual(['The four terms', 'The start and the fit'])
+    expect(h3('chain')).toEqual(['The five terms', 'The start and the wall', 'Annealing', 'The last pass'])
+    const anchors = document.getElementById('anchors')!
+    // The three kinds of pair of the figure add up to its pairs.
+    expect(46 + 55 + 1277).toBe((53 * 52) / 2)
+    expect(anchors).toHaveTextContent('53 anchors and 1,378 pairs of anchors')
+    expect(anchors.querySelector('figure figcaption b')?.textContent).toBe('Figure 6')
+    expect(anchors).toHaveTextContent('two are new in this work, the background spring and the window term')
+  })
+
   it('cites the sources of the shared terms', () => {
     renderMethod()
     const anchorTerms = screen.getByRole('table', { name: 'Anchor energy terms' })

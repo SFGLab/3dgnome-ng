@@ -6,7 +6,7 @@ r"""Renders the figures of section 2 of the Method page, blocks and target dista
 `tables` reads the GM12878 inputs of production and the contact probability table of three cell
 lines from `playground/ps_curve.py`, and writes the small tables the figures plot. `figures`
 draws `method_blocks.png`, `method_exponent.png`, `method_default.png`, `method_loops.png` and
-`method_hic.png` from those tables alone.
+`method_hic.png` of section 2 and `method_anchor_terms.png` of section 3 from those tables alone.
 """
 
 from __future__ import annotations
@@ -100,9 +100,66 @@ def tables(data_root: str, ps_curve: str, out: Path) -> None:
 
     three = pd.read_csv(ps_curve)
     three.to_csv(out / "three_cells.csv", index=False)
+    fits["anchor_pairs"] = anchor_tables(data_root, out)
     (out / "fits.json").write_text(json.dumps(fits, indent=1) + "\n")
     print(json.dumps(fits, indent=1))
     print(blocks[inside].to_string())
+
+
+def anchor_tables(data_root: str, out: Path) -> dict[str, int]:
+    """Writes the kind of every anchor pair of the region and the windows of the window term, as
+    the joint anchor solve of a job on the region builds them."""
+    from gnome3d.data import ContactData
+    from gnome3d.hierarchy import Level
+    from gnome3d.io import parse_region
+    from gnome3d.mc.numba.arcs_solver import gyration_windows
+    from gnome3d.pipeline.coarse import build as cb
+    from gnome3d.production import settings_for_cell
+
+    s = settings_for_cell(CELL, data_root)
+    region = parse_region(f"{CHROM}:{REGION[0]}-{REGION[1]}")
+    data = ContactData.from_files(s, [CHROM], region)
+    state = cb.build_state(s, data, [CHROM], region)
+    cl = state.clusters
+    ibs = [c for c in cl if c.level == Level.INTERACTION_BLOCK and len(c.children) > 1]
+    active = [a for ib in ibs for a in ib.children]
+    block = np.concatenate([np.full(len(ib.children), k) for k, ib in enumerate(ibs)])
+    heat, _ = cb.build_contact_heatmaps(state, active, CHROM, with_subanchor=False)
+    mat = cb.calc_anchor_expected_distances(state, active, CHROM, heat, None)
+    mids = np.array([cl[a].genomic_pos for a in active], dtype=np.int64)
+    sep = np.abs(mids[:, None] - mids[None, :])
+    rng = int(s.background_range_bp)
+    # 1 a loop, 2 the background under the range, 3 a Hi-C target beyond it, 0 no target.
+    kind = np.zeros(mat.shape, dtype=np.int64)
+    kind[mat > 0] = 1
+    kind[(mat <= -1) & (sep < rng)] = 2
+    kind[(mat <= -1) & (sep >= rng)] = 3
+    np.fill_diagonal(kind, -1)
+    assert ((mat == 0) == (kind <= 0)).all()
+    pd.DataFrame(kind).to_csv(out / "anchor_pairs.csv", index=False, header=False)
+    pd.DataFrame({"mid": mids, "block": block}).to_csv(out / "anchor_mids.csv", index=False)
+
+    law = s.polymer_law()
+    member, _, target = gyration_windows(mids, law, rng)
+    rows = []
+    lo, hi = int(mids.min()), int(mids.max())
+    w = rng
+    while w <= hi - lo:
+        for tiling, off in enumerate((0, w // 2)):
+            lab = (mids - lo + off) // w
+            for v in np.unique(lab):
+                n = int((lab == v).sum())
+                rows.append((w, tiling, lo - off + int(v) * w, lo - off + (int(v) + 1) * w, n))
+        w *= 2
+    win = pd.DataFrame(rows, columns=["size", "tiling", "start", "end", "anchors"])
+    assert int((win.anchors >= 4).sum()) == member.shape[0] == len(target)
+    win.to_csv(out / "windows.csv", index=False)
+    iu = np.triu_indices(len(mids), 1)
+    k = kind[iu]
+    return {
+        "anchors": len(mids), "pairs": int(k.size), "loop": int((k == 1).sum()), "background": int((k == 2).sum()),
+        "hic": int((k == 3).sum()), "none": int((k == 0).sum()), "windows": int(member.shape[0]), "range_bp": rng,
+    }
 
 
 # ---------------------------------------------------------------------------------------------
@@ -386,6 +443,76 @@ def hic_targets(tab: Path, out: Path) -> None:
     save(fig, out / "method_hic.png")
 
 
+def anchor_terms(tab: Path, out: Path) -> None:
+    """The kind of target of every anchor pair of the region and the windows of the window term."""
+    from matplotlib.colors import ListedColormap
+    from matplotlib.patches import Patch
+
+    kind = pd.read_csv(tab / "anchor_pairs.csv", header=None).to_numpy()
+    anchors = pd.read_csv(tab / "anchor_mids.csv")
+    win = pd.read_csv(tab / "windows.csv")
+    n_of = json.loads((tab / "fits.json").read_text())["anchor_pairs"]
+    n = len(anchors)
+    mb = 1e6
+
+    fig, (ax, bx) = plt.subplots(1, 2, figsize=(WIDTH, 4.4), gridspec_kw={"width_ratios": [1, 1.25]})
+    shown = np.ma.masked_less(kind, 0)
+    ax.imshow(shown, cmap=ListedColormap([GAP, BLUE, INK, "#eb6834"]), vmin=0, vmax=3, interpolation="nearest")
+    cuts = np.flatnonzero(np.diff(anchors.block)) + 0.5
+    for c in cuts:
+        ax.axhline(c, color="white", lw=1.6)
+        ax.axvline(c, color="white", lw=1.6)
+    centres = [float(np.flatnonzero(anchors.block == b).mean()) for b in sorted(anchors.block.unique())]
+    ax.set_xticks(centres)
+    ax.set_xticklabels([f"block {b + 1}" for b in range(len(centres))], fontsize=8.5)
+    ax.set_yticks(centres)
+    ax.set_yticklabels([f"block {b + 1}" for b in range(len(centres))], fontsize=8.5, rotation=90, va="center")
+    ax.tick_params(length=0)
+    for side in ax.spines.values():
+        side.set_visible(False)
+    ax.set_xlim(-0.5, n - 0.5)
+    ax.set_ylim(n - 0.5, -0.5)
+    handles = [
+        Patch(fc=BLUE, label=f"loop, {n_of['loop']} pairs"),
+        Patch(fc=INK, label=f"background, {n_of['background']} pairs"),
+        Patch(fc=GAP, ec="#d9d8d3", label=f"no target, {n_of['none']:,} pairs"),
+    ]
+    if n_of["hic"]:
+        handles.insert(2, Patch(fc="#eb6834", label=f"Hi-C target, {n_of['hic']} pairs"))
+    ax.legend(handles=handles, frameon=False, fontsize=8.5, loc="upper center", bbox_to_anchor=(0.5, -0.08), ncol=1, handlelength=1.2)
+    ax.set_title(f"{n} anchors, {n_of['pairs']:,} pairs", fontsize=9.5, color=INK, pad=6)
+    letter(ax, "a")
+
+    sizes = sorted(win["size"].unique())
+    for k, size in enumerate(sizes):
+        for tiling in (0, 1):
+            y = k + (0.2 if tiling == 0 else -0.2)
+            rows = win[(win["size"] == size) & (win.tiling == tiling)]
+            for start, end, count in rows[["start", "end", "anchors"]].itertuples(index=False):
+                kept = count >= 4
+                bx.add_patch(
+                    plt.Rectangle(
+                        (start / mb, y - 0.15), (end - start) / mb, 0.3,
+                        fc=BLUE if kept else "none", ec=BLUE if kept else "#c9c8c3", lw=0.6, alpha=0.75 if kept else 1.0,
+                    )
+                )
+    bx.vlines(anchors.mid / mb, -1.05, -0.65, color=INK, lw=0.6)
+    bx.text(REGION[0] / mb - 0.08, -0.85, "anchors", ha="right", va="center", fontsize=8.5)
+    bx.set_yticks(range(len(sizes)))
+    bx.set_yticklabels([f"{s / 1e6:g} Mb" if s >= 1e6 else f"{s / 1e3:g} kb" for s in sizes], fontsize=8.5)
+    bx.set_ylim(-1.15, len(sizes) - 0.4)
+    bx.set_xlim(REGION[0] / mb, REGION[1] / mb)
+    bx.set_xlabel("position on chromosome 1, Mb", fontsize=9.5)
+    bx.set_ylabel("size of the window", fontsize=9.5)
+    bx.tick_params(axis="y", length=0)
+    bx.tick_params(labelsize=8.5)
+    bx.spines[["top", "right", "left"]].set_visible(False)
+    bx.set_title(f"{n_of['windows']} windows with four or more anchors", fontsize=9.5, color=INK, pad=6)
+    letter(bx, "b")
+    fig.tight_layout(w_pad=2.4, rect=(0, 0.14, 1, 1))
+    save(fig, out / "method_anchor_terms.png")
+
+
 def main() -> None:
     if sys.argv[1] == "tables":
         tables(sys.argv[2], sys.argv[3], Path(sys.argv[4]))
@@ -397,6 +524,7 @@ def main() -> None:
     default(tab, out)
     loop_targets(tab, out)
     hic_targets(tab, out)
+    anchor_terms(tab, out)
 
 
 if __name__ == "__main__":
