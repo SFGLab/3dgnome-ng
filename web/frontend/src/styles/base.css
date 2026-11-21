@@ -45,6 +45,11 @@ pre {
   cursor: pointer;
 }
 
+/* A link drawn with the buttons that read as links has their look: no line until the pointer is on it. */
+a.link-button {
+  text-decoration: none;
+}
+
 /* A button drawn as a link is underlined under the pointer, as a link is. */
 :is(.link-button, .sync-link, .reset):hover {
   text-decoration: underline;

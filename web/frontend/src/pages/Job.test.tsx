@@ -214,6 +214,12 @@ describe('Job explorer', () => {
     expect(document.querySelector('pre.log-tail')?.textContent).toBe('line 1\nengine exploded')
   })
 
+  it('links to the form filled with the request of the job', async () => {
+    mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
+    renderJob()
+    expect(await screen.findByRole('link', { name: /New job from this request/ })).toHaveAttribute('href', `/model?from=${encodeURIComponent(`/jobs/${KEY}`)}`)
+  })
+
   it('renames the job in this browser', async () => {
     mockApi([[/summary$/, () => [200, SUMMARY_DONE]]])
     renderJob()

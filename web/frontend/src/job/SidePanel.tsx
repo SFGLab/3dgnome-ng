@@ -1,6 +1,8 @@
-import { Braces, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Folder, Pencil } from 'lucide-react'
+import { Braces, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CopyPlus, FileText, Folder, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { served } from '../base'
 import { recentJobs, rememberJob } from '../model/recent'
+import { ROUTES } from '../routes'
 import type { JobApi, Summary } from './api'
 import { bp, duration, FACTORS, size, shortRegion } from './format'
 
@@ -105,6 +107,10 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
       <button type="button" className="link-button" onClick={() => setEditing(true)}>
         <Pencil size={12} aria-hidden /> Rename job
       </button>
+      {/* The form of Model a region, filled with the request of this job. */}
+      <a className="link-button" href={served(`${ROUTES.model}?from=${encodeURIComponent(api.url)}`)}>
+        <CopyPlus size={12} aria-hidden /> New job from this request
+      </a>
       {/* On a narrow screen the panel is above the tabs. Its facts and files fold away there, so
           the model is not a screen below. */}
       <button type="button" className="side-fold-toggle" aria-expanded={unfolded} onClick={() => setUnfolded((u) => !u)}>

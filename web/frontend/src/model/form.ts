@@ -1,4 +1,5 @@
 import type { Region } from '../api'
+import type { Summary } from '../job/api'
 import { NO_OWN, type OwnChoice, type UploadResult } from './upload'
 
 /** The state of the Model a region form. The cell type own means the job reads only uploads. */
@@ -46,3 +47,31 @@ export function longRegion(text: string, maxSpan: number): Region | undefined {
   if (end - start <= maxSpan) return undefined
   return { chrom: m[1], start, end, label: `${m[1]}:${start.toLocaleString('en-US')}-${end.toLocaleString('en-US')}` }
 }
+
+/**
+ * The form filled with the request of a job, to start another job from it. The files a job read
+ * from uploads are not part of its request as the site shows it and are left out: the loops,
+ * the contacts and the enhancers of your own data and an uploaded VCF. A job on your own cell
+ * type gets the listed cell type its loops came from, or the first one.
+ */
+export function fromRequest(r: Summary['request'], cells: string[]): FormState {
+  const factors: Factors = r.factors === 'CTCF' || r.factors === 'RNAPII' ? r.factors : 'CTCF+RNAPII'
+  const asked = r.hicdiffusion ? 'hicdiffusion' : (r.background ?? 'hic')
+  const background: Background = asked === 'hicdiffusion' || asked === 'none' ? asked : 'hic'
+  return {
+    ...EMPTY_FORM,
+    cell: r.cell_type === 'own' ? (r.own?.loops_from ?? cells[0] ?? EMPTY_FORM.cell) : r.cell_type,
+    region: r.region,
+    factors,
+    svSet: r.sv_set,
+    // A sample without a call set was read from an uploaded VCF, which the form does not have.
+    sample: r.sv_set ? r.sample : '',
+    haplotype: r.sv_set && r.haplotype === 1 ? 1 : 0,
+    background,
+    structures: r.n_models,
+    settings: { ...(r.overrides ?? {}) },
+  }
+}
+
+/** Whether a job read files from uploads, which a form filled from its request lacks. */
+export const readUploads = (r: Summary['request']) => !!r.own || (!r.sv_set && !!r.sample)

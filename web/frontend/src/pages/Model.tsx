@@ -5,9 +5,10 @@ import { useSearchParams } from 'react-router-dom'
 import { api, ApiError, type Region } from '../api'
 import { served } from '../base'
 import { Background } from '../model/Background'
+import { jobApi } from '../job/api'
 import { CellTypes } from '../model/CellTypes'
 import { EXAMPLES, type Example } from '../model/examples'
-import { EMPTY_FORM, longRegion, type FormState } from '../model/form'
+import { EMPTY_FORM, fromRequest, longRegion, readUploads, type FormState } from '../model/form'
 import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
 import { OwnData, type OwnTab } from '../model/OwnData'
@@ -110,6 +111,27 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
     if (e) setForm(fromExample(e))
   }, [params])
 
+  // A link from a job's page fills the form with the request of that job.
+  const source = /^\/(jobs|p)\/([A-Za-z0-9_-]{8,64})$/.exec(params.get('from') ?? '')
+  const sourceJob = useQuery({
+    queryKey: ['request-of', source?.[0]],
+    queryFn: () => jobApi(source![1] as 'jobs' | 'p', source![2]).summary(),
+    enabled: !!source,
+    retry: false,
+    staleTime: Infinity,
+  })
+  // The job as My jobs shows it in this browser, by its name or by its cell type and region.
+  const sourceKnown = source ? recentJobs().find((j) => j.url === source[0]) : undefined
+  const sourceName = sourceKnown?.name || sourceKnown?.label || ''
+  const cellNames = cells.join(',')
+  // The form is filled once for a link. A later read of the catalog must not undo what was typed since.
+  const filledFrom = useRef('')
+  useEffect(() => {
+    if (!source || !sourceJob.data || !catalog.data || filledFrom.current === source[0]) return
+    filledFrom.current = source[0]
+    setForm(fromRequest(sourceJob.data.request, cellNames.split(',').filter(Boolean)))
+  }, [source, sourceJob.data, catalog.data, cellNames])
+
   // My jobs shows a job by its name, or by its cell type and region when it has none. Two jobs
   // shown alike cannot be told apart there.
   const label = region.data ? `${form.cell} ${region.data.label.split(',')[0]}` : `${form.cell} ${form.region}`
@@ -148,6 +170,17 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
             {`Pick a cell type and a region of up to ${catalog.data?.max_region_mb ?? 20} Mb, then choose the loops.`} A job returns an ensemble of 3D structures with promoters and enhancers marked.
           </p>
         </header>
+        {source && sourceJob.data && (
+          <p className="filled-from" role="status">
+            The form is filled with the request of <a href={served(source[0])}>{sourceName || `job ${source[2].slice(0, 8)}`}</a>. Change what you need and start a new job.
+            {readUploads(sourceJob.data.request) && ' That job read uploaded files. They are not filled in. Add them again in their steps.'}
+          </p>
+        )}
+        {source && sourceJob.isError && (
+          <p className="filled-from" role="alert">
+            The job of this link was not found and the form is not filled.
+          </p>
+        )}
         <Step n={1} title="Cell type and region">
           {catalog.data && (
             <CellTypes

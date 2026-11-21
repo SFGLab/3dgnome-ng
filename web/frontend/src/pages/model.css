@@ -586,6 +586,17 @@
   cursor: pointer;
 }
 
+/* The line over the form that says which job it was filled from. */
+.filled-from {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 13px;
+}
+
 .notice {
   display: flex;
   align-items: flex-start;

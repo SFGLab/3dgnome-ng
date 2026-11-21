@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { rememberJob } from '../model/recent'
 import { mockApi } from '../test/api'
+import { SUMMARY_DONE } from '../test/job'
 import { recentJobs } from '../model/recent'
 import { checkCopy } from '../test/copy'
 import { Model } from './Model'
@@ -104,6 +105,42 @@ describe('Model a region page', () => {
   it('opens filled from an example link', async () => {
     renderModel('/model?example=TNFRSF8')
     await waitFor(() => expect(screen.getByLabelText('Region, chr:start-end or a gene name')).toHaveValue('TNFRSF8'))
+  })
+
+  it('fills the form with the request of a job it is opened from', async () => {
+    const request = { cell_type: 'H1ESC', region: 'chr8:127,500,000-129,000,000', factors: 'CTCF', background: 'none', sv_set: 'HGSVC', sample: 'HG00733', haplotype: 1, n_models: 7, overrides: { 'springs.gyration_weight': '0.3' } }
+    const fetchMock = mockApi([
+      [/^\/api\/jobs\/abcdef0123456789\/summary$/, () => [200, { ...SUMMARY_DONE, request }]],
+      [/^\/api\/jobs$/, () => [201, { url: '/jobs/new0000000000000' }]],
+    ])
+    renderModel(`/model?from=${encodeURIComponent('/jobs/abcdef0123456789')}`)
+    expect(await screen.findByRole('status')).toHaveTextContent('The form is filled with the request of job abcdef01. Change what you need and start a new job.')
+    await waitFor(() => expect(screen.getByLabelText('Region, chr:start-end or a gene name')).toHaveValue('chr8:127,500,000-129,000,000'))
+    expect(screen.getByRole('radio', { name: /H1ESC/ })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: /^None/ })).toHaveAttribute('aria-checked', 'true')
+    // The new job is posted with the request of the old one.
+    fireEvent.click(await screen.findByRole('button', { name: /Build 7 structures/ }))
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u, o]) => String(u).endsWith('/api/jobs') && (o as RequestInit)?.method === 'POST')).toBe(true))
+    const body = fetchMock.mock.calls.find(([u, o]) => String(u).endsWith('/api/jobs') && (o as RequestInit)?.method === 'POST')![1]!.body as FormData
+    expect(Object.fromEntries(['cell_type', 'region', 'factors', 'background', 'sv_set', 'sample', 'haplotype', 'n_models'].map((k) => [k, body.get(k)]))).toEqual({
+      cell_type: 'H1ESC', region: 'chr8:127,500,000-129,000,000', factors: 'CTCF', background: 'none', sv_set: 'HGSVC', sample: 'HG00733', haplotype: '1', n_models: '7',
+    })
+  })
+
+  it('says which files a form filled from a job lacks, and when the job is not found', async () => {
+    const request = { cell_type: 'GM12878', region: 'TNFRSF8', factors: 'CTCF+RNAPII', background: 'hic', sv_set: '', sample: 'HG00733', haplotype: 1, n_models: 10 }
+    mockApi([
+      [/^\/api\/p\/tokentokentoken1\/summary$/, () => [200, { ...SUMMARY_DONE, request }]],
+      [/^\/api\/jobs\/gone000000000000\/summary$/, () => [404, { error: 'no such job' }]],
+    ])
+    const first = renderModel(`/model?from=${encodeURIComponent('/p/tokentokentoken1')}`)
+    expect(await screen.findByRole('status')).toHaveTextContent('That job read uploaded files. They are not filled in. Add them again in their steps.')
+    await waitFor(() => expect(screen.getByLabelText('Region, chr:start-end or a gene name')).toHaveValue('TNFRSF8'))
+    first.unmount()
+    renderModel(`/model?from=${encodeURIComponent('/jobs/gone000000000000')}`)
+    expect(await screen.findByText('The job of this link was not found and the form is not filled.')).toBeInTheDocument()
+    // A link that is not a job of this site asks for nothing.
+    expect(screen.getByLabelText('Region, chr:start-end or a gene name')).toHaveValue('')
   })
 
   it('lists the recent jobs of this browser', async () => {

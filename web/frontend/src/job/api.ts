@@ -21,6 +21,8 @@ export type Summary = {
     sample: string
     haplotype: number
     n_models: number
+    /** The engine settings the request changed, keyed section.key. */
+    overrides?: Record<string, string>
     own?: { loops: string[]; anchors: boolean; contacts: boolean; enhancers: boolean; loops_from?: string; enhancers_from?: string }
   }
   /** Population, superpopulation and sex of a hosted sample, where its call set has them. */
