@@ -3,29 +3,33 @@ import { CircleAlert, CircleCheck, FileText, LoaderCircle, Trash2, Upload } from
 import type { ReactNode } from 'react'
 import { megabytes } from '../../lib/format'
 import type { Entry } from './entry'
+import { scoped } from '../../lib/css'
+import sheet from './owndata.module.css'
+
+const cn = scoped(sheet)
 
 export function CheckLine({ entry }: { entry: Entry }) {
   if (entry.failure) {
     return (
-      <p className="check bad">
+      <p className={cn('check bad')}>
         <CircleAlert size={14} aria-hidden /> {entry.failure}
       </p>
     )
   }
   if (!entry.result) {
     return (
-      <p className="check">
-        <LoaderCircle size={14} aria-hidden className="spin" /> Checking the file.
+      <p className={cn('check')}>
+        <LoaderCircle size={14} aria-hidden className={cn('spin')} /> Checking the file.
       </p>
     )
   }
   const r = entry.result
   return r.ok ? (
-    <p className="check good">
+    <p className={cn('check good')}>
       <CircleCheck size={14} aria-hidden /> {r.summary}
     </p>
   ) : (
-    <p className="check bad" role="alert">
+    <p className={cn('check bad')} role="alert">
       <CircleAlert size={14} aria-hidden /> {r.error?.found} {r.error?.fix}
     </p>
   )
@@ -33,10 +37,10 @@ export function CheckLine({ entry }: { entry: Entry }) {
 
 export function FileChip({ entry }: { entry: Entry }) {
   return (
-    <span className="file-chip">
+    <span className={cn('file-chip')}>
       <FileText size={14} aria-hidden />
-      <span className="file-name">{entry.name}</span>
-      <span className="file-size">{megabytes(entry.size)}</span>
+      <span className={cn('file-name')}>{entry.name}</span>
+      <span className={cn('file-size')}>{megabytes(entry.size)}</span>
     </span>
   )
 }
@@ -44,10 +48,10 @@ export function FileChip({ entry }: { entry: Entry }) {
 /** What a step takes: a sentence or two and the columns of the file on a line of their own. */
 export function Rule({ text, columns }: { text: string; columns?: string }) {
   return (
-    <div className="rule">
+    <div className={cn('rule')}>
       <p>{text}</p>
       {columns && (
-        <p className="columns">
+        <p className={cn('columns')}>
           <span>Columns</span>
           <code>{columns}</code>
         </p>
@@ -75,11 +79,11 @@ export function OneFile({
   children?: ReactNode
 }) {
   return (
-    <div className="own-tab">
+    <div className={cn('own-tab')}>
       <Rule text={rule} columns={columns} />
       {entry ? (
-        <div className={`factor-row${entry.failure || entry.result?.ok === false ? ' bad' : ''}`} role="group" aria-label={`${kind} file`}>
-          <div className="row-head">
+        <div className={cn(`factor-row${entry.failure || entry.result?.ok === false ? ' bad' : ''}`)} role="group" aria-label={`${kind} file`}>
+          <div className={cn('row-head')}>
             <FileChip entry={entry} />
             <button type="button" className="icon-button" aria-label={`Remove ${entry.name}`} onClick={onRemove}>
               <Trash2 size={15} aria-hidden />
@@ -88,9 +92,9 @@ export function OneFile({
           <CheckLine entry={entry} />
         </div>
       ) : (
-        <label className="add-file">
+        <label className={cn('add-file')}>
           <Upload size={14} aria-hidden /> {`Choose an ${kind} file`}
-          <input type="file" className="visually-hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+          <input type="file" className={cn('visually-hidden')} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
         </label>
       )}
       {children}

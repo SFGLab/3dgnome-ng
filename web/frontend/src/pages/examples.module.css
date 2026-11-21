@@ -26,6 +26,32 @@
   cursor: progress;
 }
 
+/* An example reads the same in the list of this page and beside the form. A tag too long to share
+   the line with the title goes below it. */
+.example-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 8px;
+}
+
+.example-gene {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.example-cell {
+  font-size: 11px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.example-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .example-item .example-top {
   display: flex;
   justify-content: space-between;
@@ -52,12 +78,12 @@
 }
 
 /* These pages have no side panel, so the reading column takes the left gutter itself. */
-.doc-page.examples-page {
+:global(.doc-page).examples-page {
   padding-left: 48px;
 }
 
 @media (max-width: 900px) {
-  .doc-page.examples-page {
+  :global(.doc-page).examples-page {
     padding-left: 16px;
     padding-right: 16px;
   }

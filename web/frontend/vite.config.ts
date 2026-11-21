@@ -22,5 +22,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
+    // A test finds an element by the plain name of its class. The scoped names of the build are not made.
+    css: { modules: { classNameStrategy: 'non-scoped' } },
   },
 })

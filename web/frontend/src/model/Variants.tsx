@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react'
 import { ChevronRight, Dna, Upload, X } from 'lucide-react'
 import type { Catalog, SampleRow, UploadResult } from '../api'
 import type { FormState } from './form'
+import { scoped } from '../lib/css'
+import sheet from './model.module.css'
+
+const cn = scoped(sheet)
 
 type Props = {
   catalog: Catalog
@@ -77,7 +81,7 @@ function SampleFacts({ rows, table, sample, text, onPick }: { rows: SampleRow[];
   if (row) {
     const children = rows.filter((r) => r.father === sample || r.mother === sample).map((r) => r.sample)
     return (
-      <p className="sample-facts">
+      <p className={cn('sample-facts')}>
         {`${sample}: ${describe(row) || 'no record'}.`}
         {row.father && <> Father {pick(row.father)}.</>}
         {row.mother && <> Mother {pick(row.mother)}.</>}
@@ -95,7 +99,7 @@ function SampleFacts({ rows, table, sample, text, onPick }: { rows: SampleRow[];
   if (!members.length) return null
   const shown = members.length <= LISTED ? members : members.slice(0, LISTED - 2)
   return (
-    <p className="sample-facts">
+    <p className={cn('sample-facts')}>
       {`${code}, ${members.length.toLocaleString('en-US')} samples: `}
       {list(shown)}
       {shown.length < members.length ? ` and ${(members.length - shown.length).toLocaleString('en-US')} more.` : '.'}
@@ -111,8 +115,8 @@ export function Variants({ catalog, svSet, sample, haplotype, vcfUpload: vcf, sa
   const rows = sampleTable ?? []
   const table = new Map(rows.map((r) => [r.sample, r]))
   return (
-    <div className="variants">
-      <div className="fields">
+    <div className={cn('variants')}>
+      <div className={cn('fields')}>
         <label className="field">
           <span>Hosted call set</span>
           <select value={svSet} disabled={vcf !== null} onChange={(e) => onChange({ svSet: e.target.value, sample: '' })}>
@@ -149,7 +153,7 @@ export function Variants({ catalog, svSet, sample, haplotype, vcfUpload: vcf, sa
       </div>
       {!vcf && rows.length > 0 && <SampleFacts rows={rows} table={table} sample={sample} text={typed} onPick={(v) => onChange({ sample: v })} />}
       {vcf ? (
-        <div className="upload chosen">
+        <div className={cn('upload chosen')}>
           <Upload size={14} aria-hidden />
           <span>{vcf.name}</span>
           <button type="button" className="icon-button" aria-label="Remove the VCF" onClick={() => onChange({ vcfUpload: null })}>
@@ -157,18 +161,18 @@ export function Variants({ catalog, svSet, sample, haplotype, vcfUpload: vcf, sa
           </button>
         </div>
       ) : (
-        <label className="upload">
+        <label className={cn('upload')}>
           <Upload size={14} aria-hidden />
           <span>Or drop your own VCF here. The file must be compressed with bgzip and have SVTYPE of DEL, INS, INV or DUP.</span>
           <input type="file" accept=".gz,.bgz" onChange={(e) => e.target.files?.[0] && onOpen('upload', e.target.files[0])} />
         </label>
       )}
-      {((svSet && sample) || vcf) && !hasRegion && <p className="sample-facts">Enter the region in step 1 to see the variants inside it.</p>}
+      {((svSet && sample) || vcf) && !hasRegion && <p className={cn('sample-facts')}>Enter the region in step 1 to see the variants inside it.</p>}
       {((svSet && sample) || vcf) && hasRegion && (
-        <button type="button" className="preview-button" onClick={() => onOpen(vcf ? 'upload' : 'hosted', null)}>
+        <button type="button" className={cn('preview-button')} onClick={() => onOpen(vcf ? 'upload' : 'hosted', null)}>
           <Dna size={15} aria-hidden />
           <span>Show the variants in the region</span>
-          <ChevronRight size={14} className="chevron" aria-hidden />
+          <ChevronRight size={14} className={cn('chevron')} aria-hidden />
         </button>
       )}
     </div>

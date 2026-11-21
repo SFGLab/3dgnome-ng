@@ -1,6 +1,10 @@
 import type { OwnExpression } from '../upload'
 import type { Entry } from './entry'
 import { OneFile } from './parts'
+import { scoped } from '../../lib/css'
+import sheet from './owndata.module.css'
+
+const cn = scoped(sheet)
 
 /** The expression step: a table of genes by samples, the samples the job takes and what its values are. */
 export function ExpressionStep({
@@ -31,23 +35,23 @@ export function ExpressionStep({
     >
       {table?.result?.ok && (
         <>
-          <fieldset className="own-samples">
+          <fieldset className={cn('own-samples')}>
             <legend>Samples of this job</legend>
             {table.result.samples.map((s) => (
-              <label key={s} className="own-sample">
+              <label key={s} className={cn('own-sample')}>
                 <input type="checkbox" checked={samples.includes(s)} onChange={() => toggleSample(s)} />
                 {s}
               </label>
             ))}
           </fieldset>
-          <label className="own-select">
+          <label className={cn('own-select')}>
             <span>The values are</span>
             <select value={valueKind} onChange={(e) => setValueKind(e.target.value === 'values' ? 'values' : 'counts')}>
               <option value="counts">read counts</option>
               <option value="values">normalised, such as TPM or TMM</option>
             </select>
           </label>
-          <p className="hint">
+          <p className={cn('hint')}>
             {valueKind === 'counts'
               ? 'Two jobs with two samples or more each are compared with DESeq2. With one sample on a side the comparison is a ratio with no test.'
               : 'Two jobs with normalised values are compared by the ratio of their values, with no test.'}

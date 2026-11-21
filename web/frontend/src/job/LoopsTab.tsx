@@ -7,6 +7,10 @@ import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
 import type { JobApi, Loop } from '../api'
 import { bp, kb } from '../lib/format'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
+
+const cn = scoped(sheet)
 
 /** The Loops tab: every loop the engine read, with its factor, ends, span and PET count. A row
  * can be shown in the model, where its two anchors are marked. */
@@ -17,19 +21,19 @@ export function LoopsTab({ api, onShow }: { api: JobApi; onShow?: (loop: Loop) =
   if (!loops.data) return <Unanswered of={loops} />
   return (
     <>
-      <div className="genes-toolbar">
+      <div className={cn('genes-toolbar')}>
         <CsvButton file="loops" head={['factor', 'chrom', 'a_start', 'a_end', 'b_start', 'b_end', 'span_bp', 'pets']} rows={() => sorted.map((l) => [l.factor, l.chrom, l.a[0], l.a[1], l.b[0], l.b[1], l.span, l.pets])} />
       </div>
       <Pager page={page} noun="loops" />
-      <div className="table-scroll">
-      <table className="genes-table loops-table">
+      <div className={cn('table-scroll')}>
+      <table className={cn('genes-table loops-table')}>
         <thead>
           <tr>
             <th>Factor</th>
             <th>Anchor A</th>
             <th>Anchor B</th>
-            <th className="num">Span</th>
-            <th className="num">PETs</th>
+            <th className={cn('num')}>Span</th>
+            <th className={cn('num')}>PETs</th>
             {onShow && <th />}
           </tr>
         </thead>
@@ -37,15 +41,15 @@ export function LoopsTab({ api, onShow }: { api: JobApi; onShow?: (loop: Loop) =
           {page.rows.map((l, i) => (
             <tr key={i}>
               <td>
-                <span className={`loop-badge ${l.factor === 'RNAPII' ? 'rnapii' : 'ctcf'}`}>{l.factor}</span>
+                <span className={cn(`loop-badge ${l.factor === 'RNAPII' ? 'rnapii' : 'ctcf'}`)}>{l.factor}</span>
               </td>
               <td className="mono">{`${l.chrom}:${bp(l.a[0])}-${bp(l.a[1])}`}</td>
               <td className="mono">{`${l.chrom}:${bp(l.b[0])}-${bp(l.b[1])}`}</td>
-              <td className="num">{kb(l.span)}</td>
-              <td className="num">{l.pets}</td>
+              <td className={cn('num')}>{kb(l.span)}</td>
+              <td className={cn('num')}>{l.pets}</td>
               {onShow && (
                 <td>
-                  <button type="button" className="row-action" onClick={() => onShow(l)}>
+                  <button type="button" className={cn('row-action')} onClick={() => onShow(l)}>
                     Show in the model
                   </button>
                 </td>

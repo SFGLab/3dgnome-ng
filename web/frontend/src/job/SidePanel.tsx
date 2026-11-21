@@ -7,6 +7,10 @@ import { ROUTES } from '../routes'
 import type { JobApi, Summary } from '../api'
 import { variants } from './format'
 import { bp, duration, FACTORS, size, shortRegion } from '../lib/format'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
+
+const cn = scoped(sheet)
 
 type Props = {
   api: JobApi
@@ -74,13 +78,13 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
     .map(([f, c]) => `${bp(c)} ${f}`)
     .join(', ')
   return (
-    <aside className={unfolded ? 'job-side' : 'job-side folded'}>
-      <p className={`job-state ${summary.state}`}>
-        <span className="state-dot" /> {state}
+    <aside className={cn(unfolded ? 'job-side' : 'job-side folded')}>
+      <p className={cn(`job-state ${summary.state}`)}>
+        <span className={cn('state-dot')} /> {state}
       </p>
       {editing ? (
         <input
-          className="rename"
+          className={cn('rename')}
           aria-label="Job name"
           defaultValue={name}
           autoFocus
@@ -88,15 +92,15 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
           onBlur={(e) => save(e.target.value)}
         />
       ) : (
-        <h1 className="job-title">
+        <h1 className={cn('job-title')}>
           {name || (
             <>
-              {summary.request.cell_type} <span className="nowrap">{short}</span>
+              {summary.request.cell_type} <span className={cn('nowrap')}>{short}</span>
             </>
           )}
         </h1>
       )}
-      <p className="job-locus">
+      <p className={cn('job-locus')}>
         {summary.request.cell_type}, {region}
       </p>
       <button type="button" className="link-button" onClick={() => setEditing(true)}>
@@ -108,10 +112,10 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
       </a>
       {/* On a narrow screen the panel is above the tabs. Its facts and files fold away there, so
           the model is not a screen below. */}
-      <button type="button" className="side-fold-toggle" aria-expanded={unfolded} onClick={() => setUnfolded((u) => !u)}>
+      <button type="button" className={cn('side-fold-toggle')} aria-expanded={unfolded} onClick={() => setUnfolded((u) => !u)}>
         {unfolded ? <ChevronUp size={13} aria-hidden /> : <ChevronDown size={13} aria-hidden />} Details and files
       </button>
-      <dl className="facts">
+      <dl className={cn('facts')}>
         <dt>Loops</dt>
         <dd>{ownLoops(summary) ?? listedLoops(summary)}</dd>
         <dt>Loops in region</dt>
@@ -131,8 +135,8 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
       </dl>
       {n > 0 && (
         <>
-          <p className="side-label">Structure</p>
-          <div className="structure-select">
+          <p className={cn('side-label')}>Structure</p>
+          <div className={cn('structure-select')}>
             <button type="button" aria-label="Previous structure" disabled={selected <= 1} onClick={() => onSelect(selected - 1)}>
               <ChevronLeft size={14} aria-hidden />
             </button>
@@ -147,7 +151,7 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
               <ChevronRight size={14} aria-hidden />
             </button>
           </div>
-          <div className="picks">
+          <div className={cn('picks')}>
             <button type="button" onClick={() => onPick('medoid')}>
               Medoid
             </button>
@@ -158,16 +162,16 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
               Random
             </button>
           </div>
-          <div className="side-files">
-          <p className="side-label">Files</p>
-          <ul className="files">
+          <div className={cn('side-files')}>
+          <p className={cn('side-label')}>Files</p>
+          <ul className={cn('files')}>
             <li className="folder">
-              <Folder size={14} aria-hidden /> structures <span className="size">{n} files</span>
+              <Folder size={14} aria-hidden /> structures <span className={cn('size')}>{n} files</span>
             </li>
-            <li className="models">
-              <ul className="files" aria-label="Structure files">
+            <li className={cn('models')}>
+              <ul className={cn('files')} aria-label="Structure files">
                 {summary.models.map((f, i) => (
-                  <li key={f.name} className={i === selected - 1 ? 'file selected' : 'file'} ref={i === selected - 1 ? shown : undefined}>
+                  <li key={f.name} className={cn(i === selected - 1 ? 'file selected' : 'file')} ref={i === selected - 1 ? shown : undefined}>
                     {/* The sizes of the structures are alike. The size is in the tooltip and the name has the row. */}
                     <a href={api.fileUrl(f.name)} title={`${f.name}, ${size(f.size)}`}>
                       <FileText size={14} aria-hidden /> {f.name}
@@ -183,7 +187,7 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
                   <a href={api.fileUrl(f.name)}>
                     {f.name.endsWith('.json') ? <Braces size={14} aria-hidden /> : <FileText size={14} aria-hidden />} {f.name}
                   </a>
-                  <span className="size">{size(f.size)}</span>
+                  <span className={cn('size')}>{size(f.size)}</span>
                 </li>
               ))}
           </ul>

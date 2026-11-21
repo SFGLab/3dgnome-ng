@@ -2,6 +2,10 @@ import { duration } from '../lib/format'
 import { Check } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Summary } from '../api'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
+
+const cn = scoped(sheet)
 
 const WORDS: Record<string, string> = {
   queued: 'Queued',
@@ -93,26 +97,26 @@ export function Progress({ summary }: { summary: Summary }) {
     return () => cancelAnimationFrame(frame)
   }, [summary.log_recent])
   return (
-    <div className={stage === 'queued' ? 'progress waiting' : 'progress'}>
-      <div className="progress-head">
-        <p className="progress-line">{line}</p>
-        <span className="progress-pct">{`${pct}%`}</span>
+    <div className={cn(stage === 'queued' ? 'progress waiting' : 'progress')}>
+      <div className={cn('progress-head')}>
+        <p className={cn('progress-line')}>{line}</p>
+        <span className={cn('progress-pct')}>{`${pct}%`}</span>
       </div>
-      <div className="progress-bar" role="progressbar" aria-label="Progress of the job" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+      <div className={cn('progress-bar')} role="progressbar" aria-label="Progress of the job" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
         <span style={{ width: `${pct}%` }} />
       </div>
-      <ol className="status-log" aria-label="Stages of the job">
+      <ol className={cn('status-log')} aria-label="Stages of the job">
         {rows.map((r) => (
-          <li key={r.name} className={r.state} aria-current={r.state === 'now' ? 'step' : undefined}>
-            {r.state === 'done' ? <Check className="stage-mark" size={13} aria-hidden /> : <span className={r.state === 'now' ? 'stage-mark stage-spinner' : 'stage-mark stage-dot'} aria-hidden />}
+          <li key={r.name} className={cn(r.state)} aria-current={r.state === 'now' ? 'step' : undefined}>
+            {r.state === 'done' ? <Check className={cn('stage-mark')} size={13} aria-hidden /> : <span className={cn(r.state === 'now' ? 'stage-mark stage-spinner' : 'stage-mark stage-dot')} aria-hidden />}
             <span>{WORDS[r.name] ?? r.name}</span>
-            {r.took !== null && <span className="status-time">{duration(r.took)}</span>}
+            {r.took !== null && <span className={cn('status-time')}>{duration(r.took)}</span>}
           </li>
         ))}
       </ol>
       {stage !== 'queued' && (
         <pre
-          className="log-tail live"
+          className={cn('log-tail live')}
           aria-label="End of the engine log"
           ref={log}
           onScroll={(e) => {

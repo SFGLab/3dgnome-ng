@@ -8,8 +8,12 @@ import { usePage } from '../components/usePage'
 import type { FormState } from './form'
 import { type OwnChoice, ownField } from './upload'
 import { megabytes } from '../lib/format'
-import './own/owndata.css'
-import './variants.css'
+import { scoped } from '../lib/css'
+import sheet1 from './own/owndata.module.css'
+import sheet2 from './variants.module.css'
+import sheet3 from './model.module.css'
+
+const cn = scoped(sheet1, sheet2, sheet3)
 
 export type VariantsMode = 'hosted' | 'upload'
 
@@ -45,25 +49,25 @@ function Track({ cell, region, factors, own, rows }: { cell: string; region: Reg
   const x = (p: number) => Math.min(W, Math.max(0, ((p - region.start) / (region.end - region.start)) * W))
   const shown = factors === 'CTCF+RNAPII' ? ['CTCF', 'RNAPII'] : [factors]
   return (
-    <svg className="sv-track" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Variants in ${span}`}>
+    <svg className={cn('sv-track')} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Variants in ${span}`}>
       {ownArcs.flatMap((q, k) =>
         (q.data ?? []).map(([a, b], i) => {
           const r = Math.max((x(b) - x(a)) / 2, 1)
-          return <path key={`own${k}-${i}`} className={`arc own f${Math.min(k, 2)}`} d={`M ${x(a)} ${AXIS} A ${r} ${Math.min(r, AXIS - 8)} 0 0 1 ${x(b)} ${AXIS}`} />
+          return <path key={`own${k}-${i}`} className={cn(`arc own f${Math.min(k, 2)}`)} d={`M ${x(a)} ${AXIS} A ${r} ${Math.min(r, AXIS - 8)} 0 0 1 ${x(b)} ${AXIS}`} />
         }),
       )}
       {(mine.length ? [] : shown).flatMap((f) =>
         (preview.data?.loops[f] ?? []).map(([a, b], i) => {
           const r = Math.max((x(b) - x(a)) / 2, 1)
-          return <path key={`${f}${i}`} className={`arc ${f.toLowerCase()}`} d={`M ${x(a)} ${AXIS} A ${r} ${Math.min(r, AXIS - 8)} 0 0 1 ${x(b)} ${AXIS}`} />
+          return <path key={`${f}${i}`} className={cn(`arc ${f.toLowerCase()}`)} d={`M ${x(a)} ${AXIS} A ${r} ${Math.min(r, AXIS - 8)} 0 0 1 ${x(b)} ${AXIS}`} />
         }),
       )}
-      <line className="axis" x1={0} x2={W} y1={AXIS} y2={AXIS} />
+      <line className={cn('axis')} x1={0} x2={W} y1={AXIS} y2={AXIS} />
       {rows.map((v, i) => {
         const x1 = x(v.pos)
         const w = Math.max(x(v.end) - x1, 4)
         return (
-          <g key={i} className={`sv-mark sv-${v.type.toLowerCase()}`}>
+          <g key={i} className={cn(`sv-mark sv-${v.type.toLowerCase()}`)}>
             <rect x={x1} y={AXIS + 6} width={w} height={10} rx={1} />
             <text x={x1 + w / 2} y={AXIS + 30} textAnchor="middle">
               {v.type}
@@ -175,8 +179,8 @@ export function VariantsDialog(props: {
   )
 
   return (
-    <Dialog id="sv-title" name="sv-dialog" title="Structural variants" sub="The variants change the loops before modelling. An uploaded VCF stays private to this job." onClose={onClose}>
-      <div className="dialog-body sv-body">
+    <Dialog id="sv-title" name={cn('sv-dialog')} title="Structural variants" sub="The variants change the loops before modelling. An uploaded VCF stays private to this job." onClose={onClose}>
+      <div className={cn('dialog-body sv-body')}>
         <div className="segmented" role="tablist">
           {(
             [
@@ -196,18 +200,18 @@ export function VariantsDialog(props: {
             </button>
           ))}
         </div>
-        <div className="sv-fields" role="tabpanel">
+        <div className={cn('sv-fields')} role="tabpanel">
           {mode === 'upload' ? (
             file || upload ? (
-              <span className="file-chip">
+              <span className={cn('file-chip')}>
                 <FileArchive size={14} aria-hidden />
-                <span className="file-name">{file?.name ?? upload?.name}</span>
-                <span className="file-size">{megabytes(file?.size ?? upload?.size ?? 0)}</span>
+                <span className={cn('file-name')}>{file?.name ?? upload?.name}</span>
+                <span className={cn('file-size')}>{megabytes(file?.size ?? upload?.size ?? 0)}</span>
               </span>
             ) : (
-              <label className="add-file">
+              <label className={cn('add-file')}>
                 <Upload size={14} aria-hidden /> Choose a VCF compressed with bgzip
-                <input type="file" accept=".gz,.bgz" className="visually-hidden" onChange={(e) => e.target.files?.[0] && setFile(e.target.files[0])} />
+                <input type="file" accept=".gz,.bgz" className={cn('visually-hidden')} onChange={(e) => e.target.files?.[0] && setFile(e.target.files[0])} />
               </label>
             )
           ) : (
@@ -232,37 +236,37 @@ export function VariantsDialog(props: {
           {haplotypeField}
         </div>
         {mode === 'upload' && file && !upload && !failure && (
-          <p className="check">
-            <LoaderCircle size={14} aria-hidden className="spin" /> Reading the samples of the VCF.
+          <p className={cn('check')}>
+            <LoaderCircle size={14} aria-hidden className={cn('spin')} /> Reading the samples of the VCF.
           </p>
         )}
         {(failure || upload?.ok === false) && (
-          <p className="sv-box bad" role="alert">
+          <p className={cn('sv-box bad')} role="alert">
             <CircleAlert size={15} aria-hidden /> {failure || `${upload?.error?.found} ${upload?.error?.fix}`}
           </p>
         )}
-        {!span && <p className="hint">Enter the region in step 1 to see the variants inside it.</p>}
+        {!span && <p className={cn('hint')}>Enter the region in step 1 to see the variants inside it.</p>}
         {check.isError && (
-          <p className="sv-box bad" role="alert">
+          <p className={cn('sv-box bad')} role="alert">
             <CircleAlert size={15} aria-hidden /> {check.error.message}
           </p>
         )}
         {check.isFetching && (
-          <p className="check">
-            <LoaderCircle size={14} aria-hidden className="spin" /> Applying the variants to the loops of the region.
+          <p className={cn('check')}>
+            <LoaderCircle size={14} aria-hidden className={cn('spin')} /> Applying the variants to the loops of the region.
           </p>
         )}
         {check.data && region && (
           <>
-            <p className="sv-box good">
+            <p className={cn('sv-box good')}>
               <CircleCheck size={15} aria-hidden /> {check.data.summary}
             </p>
             <Track cell={cell} region={region} factors={factors} own={own} rows={check.data.variants} />
             {check.data.variants.length > 0 && (
               <>
                 <Pager page={variantPage} noun="variants" />
-                <div className="sv-table-wrap">
-                  <table className="sv-table">
+                <div className={cn('sv-table-wrap')}>
+                  <table className={cn('sv-table')}>
                     <thead>
                       <tr>
                         <th>Type</th>
@@ -276,7 +280,7 @@ export function VariantsDialog(props: {
                       {variantPage.rows.map((v, i) => (
                         <tr key={i}>
                           <td>
-                            <span className={`sv-dot sv-${v.type.toLowerCase()}`} aria-hidden />
+                            <span className={cn(`sv-dot sv-${v.type.toLowerCase()}`)} aria-hidden />
                             {NAMES[v.type] ?? v.type}
                           </td>
                           <td className="mono">{`${region.chrom}:${v.pos.toLocaleString('en-US')}`}</td>
@@ -294,7 +298,7 @@ export function VariantsDialog(props: {
         )}
       </div>
       <footer className="dialog-foot">
-        <p className="foot-note">The haplotype of a phased genotype decides which variants apply. An unphased variant goes to the first haplotype.</p>
+        <p className={cn('foot-note')}>The haplotype of a phased genotype decides which variants apply. An unphased variant goes to the first haplotype.</p>
         <button type="button" className="secondary" onClick={onClose}>
           Cancel
         </button>

@@ -26,19 +26,19 @@
   stroke-width: 7;
 }
 
-.structure-preview .chain.step0 { stroke: #E6E7EA; }
-.structure-preview .chain.step1 { stroke: #DDDFE3; }
-.structure-preview .chain.step2 { stroke: #D3D6DB; }
-.structure-preview .chain.step3 { stroke: #C9CCD2; }
-.structure-preview .chain.step4 { stroke: #BFC3CA; }
-.structure-preview .chain.step5 { stroke: #B4B8C0; }
+.structure-preview .chain:global(.step0) { stroke: #E6E7EA; }
+.structure-preview .chain:global(.step1) { stroke: #DDDFE3; }
+.structure-preview .chain:global(.step2) { stroke: #D3D6DB; }
+.structure-preview .chain:global(.step3) { stroke: #C9CCD2; }
+.structure-preview .chain:global(.step4) { stroke: #BFC3CA; }
+.structure-preview .chain:global(.step5) { stroke: #B4B8C0; }
 
-.structure-preview .chain.between.step0 { stroke: #A9ADB5; }
-.structure-preview .chain.between.step1 { stroke: #979BA4; }
-.structure-preview .chain.between.step2 { stroke: #858A93; }
-.structure-preview .chain.between.step3 { stroke: #737882; }
-.structure-preview .chain.between.step4 { stroke: #616670; }
-.structure-preview .chain.between.step5 { stroke: #4F545E; }
+.structure-preview .chain.between:global(.step0) { stroke: #A9ADB5; }
+.structure-preview .chain.between:global(.step1) { stroke: #979BA4; }
+.structure-preview .chain.between:global(.step2) { stroke: #858A93; }
+.structure-preview .chain.between:global(.step3) { stroke: #737882; }
+.structure-preview .chain.between:global(.step4) { stroke: #616670; }
+.structure-preview .chain.between:global(.step5) { stroke: #4F545E; }
 
 .structure-preview .mark {
   stroke-width: 16;

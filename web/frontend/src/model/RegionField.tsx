@@ -2,6 +2,10 @@ import { asked } from '../api'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useDebounced, useRegion } from './useRegion'
+import { scoped } from '../lib/css'
+import sheet from './model.module.css'
+
+const cn = scoped(sheet)
 
 /** Text that can be the start of a gene name: two characters or more that are not coordinates. */
 const maybeGene = (text: string) => text.length >= 2 && !text.includes(':')
@@ -41,9 +45,9 @@ export function RegionField({ cell, value, quiet = false, onChange }: { cell: st
   // A name still being typed is not an error, nor is a part of a name the list offers genes for.
   const failed = settled && region.isError && options.length === 0
   return (
-    <div className="region-field">
+    <div className={cn('region-field')}>
       <label htmlFor="region">Region, chr:start-end or a gene name</label>
-      <div className={`region-input${failed ? ' error' : ''}`}>
+      <div className={cn(`region-input${failed ? ' error' : ''}`)}>
         <input
           id="region"
           role="combobox"
@@ -84,15 +88,15 @@ export function RegionField({ cell, value, quiet = false, onChange }: { cell: st
             }
           }}
         />
-        {settled && region.data && <span className="resolved">{region.data.label}</span>}
+        {settled && region.data && <span className={cn('resolved')}>{region.data.label}</span>}
       </div>
       {options.length > 0 && (
-        <ul id="region-genes" ref={list} role="listbox" aria-label="Genes" className="gene-options">
+        <ul id="region-genes" ref={list} role="listbox" aria-label="Genes" className={cn('gene-options')}>
           {options.map((g, i) => (
             // The press is taken before the field loses the focus, which would close the list.
-            <li key={g.name} id={`region-gene-${i}`} role="option" aria-selected={i === active} className={i === active ? 'active' : undefined} onMouseDown={(e) => { e.preventDefault(); pick(g.name) }} onMouseEnter={() => setActive(i)}>
-              <span className="gene-name">{g.name}</span>
-              <span className="gene-place">{`${g.chrom}:${g.tss.toLocaleString('en-US')}`}</span>
+            <li key={g.name} id={`region-gene-${i}`} role="option" aria-selected={i === active} className={cn(i === active ? 'active' : undefined)} onMouseDown={(e) => { e.preventDefault(); pick(g.name) }} onMouseEnter={() => setActive(i)}>
+              <span className={cn('gene-name')}>{g.name}</span>
+              <span className={cn('gene-place')}>{`${g.chrom}:${g.tss.toLocaleString('en-US')}`}</span>
             </li>
           ))}
         </ul>

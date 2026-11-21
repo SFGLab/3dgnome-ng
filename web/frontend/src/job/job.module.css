@@ -30,15 +30,15 @@
   background: var(--faint);
 }
 
-.job-state.done .state-dot {
+.job-state:global(.done) .state-dot {
   background: var(--enhancer);
 }
 
-.job-state.failed .state-dot {
+.job-state:global(.failed) .state-dot {
   background: #C2410C;
 }
 
-.job-state.running .state-dot {
+.job-state:global(.running) .state-dot {
   background: var(--accent);
 }
 
@@ -93,6 +93,7 @@
   margin: 12px 0 2px;
   font-size: 12px;
   color: var(--muted);
+  line-height: normal;
 }
 
 .structure-select {
@@ -222,12 +223,12 @@
   display: none;
 }
 
-.job-tab {
+:global(.job-tab) {
   flex: none;
   white-space: nowrap;
 }
 
-.job-tab {
+:global(.job-tab) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -240,13 +241,13 @@
   cursor: pointer;
 }
 
-.job-tab[aria-selected='true'] {
+:global(.job-tab)[aria-selected='true'] {
   color: var(--ink);
   font-weight: 600;
   border-bottom-color: var(--accent);
 }
 
-.job-tab .count {
+:global(.job-tab) .count {
   padding: 1px 6px;
   border-radius: 8px;
   background: var(--panel);
@@ -261,7 +262,7 @@
   gap: 8px;
 }
 
-.action {
+:global(.action) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -275,7 +276,7 @@
   cursor: pointer;
 }
 
-.action.dark {
+:global(.action).dark {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--bg);
@@ -340,11 +341,11 @@
 /* Where the toolbar does not fit one row, the colour choice takes a row of its own under the
    rest and its three buttons share it. */
 @container view (max-width: 860px) {
-  .view-toolbar .segmented {
+  .view-toolbar :global(.segmented) {
     order: 9;
     flex: 1 1 100%;
   }
-  .view-toolbar .segmented button {
+  .view-toolbar :global(.segmented) button {
     flex: 1;
     min-width: 0;
     white-space: normal;
@@ -370,14 +371,14 @@
   flex-wrap: wrap;
 }
 
-.segmented {
+:global(.segmented) {
   display: inline-flex;
   padding: 3px;
   background: var(--panel);
   border-radius: 8px;
 }
 
-.segmented button {
+:global(.segmented) button {
   padding: 6px 12px;
   border: 0;
   border-radius: 6px;
@@ -387,7 +388,7 @@
   cursor: pointer;
 }
 
-.segmented button[aria-pressed='true'] {
+:global(.segmented) button[aria-pressed='true'] {
   background: var(--surface);
   color: var(--ink);
   font-weight: 600;
@@ -446,7 +447,7 @@
   white-space: nowrap;
 }
 
-.hover-box .mono {
+.hover-box :global(.mono) {
   font-family: var(--mono);
   color: #151514;
 }
@@ -631,7 +632,7 @@
   font-weight: 700;
 }
 
-.mono {
+:global(.mono) {
   font-family: var(--mono);
 }
 
@@ -748,7 +749,7 @@
   outline: none;
 }
 
-.chip-button {
+:global(.chip-button) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -762,7 +763,7 @@
   cursor: pointer;
 }
 
-.chip-button.on {
+:global(.chip-button).on {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--bg);
@@ -917,7 +918,7 @@
 
 /* The controls of the toolbar share one height, so their boxes line up. */
 .map-toolbar > select,
-.map-toolbar .segmented,
+.map-toolbar :global(.segmented),
 .locus-input {
   box-sizing: border-box;
   height: 36px;
@@ -934,7 +935,7 @@
   font: 13px var(--font);
 }
 
-.map-toolbar .segmented {
+.map-toolbar :global(.segmented) {
   align-items: stretch;
 }
 
@@ -1171,6 +1172,9 @@
 }
 
 .check {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1218,7 +1222,7 @@
 }
 
 /* The buttons of the toolbar are as tall as its checkboxes. */
-.compare-toolbar .action {
+.compare-toolbar :global(.action) {
   align-self: stretch;
   padding: 6px 10px;
   font-size: 12px;
@@ -1415,7 +1419,7 @@
   cursor: pointer;
 }
 
-.compare-figure.open .figure-head svg {
+.compare-figure:global(.open) .figure-head svg {
   transform: rotate(90deg);
 }
 
@@ -1488,7 +1492,7 @@
   gap: 12px;
 }
 
-.compare-scroll + .pager {
+.compare-scroll + :global(.pager) {
   margin-top: 14px;
 }
 
@@ -1514,12 +1518,12 @@
   gap: 8px;
 }
 
-.csv-button {
+:global(.csv-button) {
   white-space: nowrap;
   cursor: pointer;
 }
 
-.compare-tabs .chip-button {
+.compare-tabs :global(.chip-button) {
   white-space: nowrap;
   cursor: pointer;
 }
@@ -1598,7 +1602,7 @@
   cursor: pointer;
 }
 
-.expression-plot .point.sure {
+.expression-plot .point:global(.sure) {
   fill: var(--accent);
 }
 
@@ -1613,7 +1617,7 @@
   stroke-width: 1;
 }
 
-.expression-plot .side-1 .quartiles {
+.expression-plot :global(.side-1) .quartiles {
   fill: color-mix(in srgb, var(--accent) 16%, var(--surface));
   stroke: var(--accent);
 }
@@ -1742,7 +1746,7 @@
   font-weight: 600;
 }
 
-.status-log li.next {
+.status-log li:global(.next) {
   color: var(--faint);
 }
 
@@ -1753,7 +1757,7 @@
   height: 13px;
 }
 
-.status-log li.done .stage-mark {
+.status-log li:global(.done) .stage-mark {
   color: var(--accent);
 }
 
@@ -1796,7 +1800,7 @@
 }
 
 /* The wrapper drei puts around a label over the canvas. It must not take the pointer from the canvas. */
-.scene-mark {
+:global(.scene-mark) {
   pointer-events: none;
 }
 

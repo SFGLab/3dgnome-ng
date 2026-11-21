@@ -43,37 +43,37 @@
   stroke-width: 2;
 }
 
-.line-plot .line.cudammc,
-.line-plot .line.original {
+.line-plot .line:global(.cudammc),
+.line-plot .line:global(.original) {
   stroke: var(--original);
 }
 
-.line-plot .line.multimm {
+.line-plot .line:global(.multimm) {
   stroke: var(--multimm);
 }
 
-.line-plot .line.ctcf {
+.line-plot .line:global(.ctcf) {
   stroke: var(--ctcf);
 }
 
-.line-plot .line.rnapii {
+.line-plot .line:global(.rnapii) {
   stroke: var(--rnapii);
 }
 
-.line-plot .dot.cudammc,
-.line-plot .dot.original {
+.line-plot .dot:global(.cudammc),
+.line-plot .dot:global(.original) {
   fill: var(--original);
 }
 
-.line-plot .dot.multimm {
+.line-plot .dot:global(.multimm) {
   fill: var(--multimm);
 }
 
-.line-plot .dot.ctcf {
+.line-plot .dot:global(.ctcf) {
   fill: var(--ctcf);
 }
 
-.line-plot .dot.rnapii {
+.line-plot .dot:global(.rnapii) {
   fill: var(--rnapii);
 }
 

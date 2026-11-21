@@ -8,7 +8,7 @@
   gap: 14px;
 }
 
-.segmented {
+:global(.segmented) {
   display: inline-flex;
   align-self: flex-start;
   padding: 3px;
@@ -16,7 +16,7 @@
   background: var(--panel);
 }
 
-.segmented [role='tab'] {
+:global(.segmented) [role='tab'] {
   padding: 7px 14px;
   border: 0;
   border-radius: 6px;
@@ -27,7 +27,7 @@
   cursor: pointer;
 }
 
-.segmented [role='tab'][aria-selected='true'] {
+:global(.segmented) [role='tab'][aria-selected='true'] {
   background: var(--surface);
   color: var(--ink);
   font-weight: 600;
@@ -45,7 +45,7 @@
   padding: 9px 10px;
 }
 
-.sv-fields .field {
+.sv-fields :global(.field) {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -102,20 +102,20 @@
   stroke-width: 1.5;
 }
 
-.sv-track .arc.ctcf {
+.sv-track .arc:global(.ctcf) {
   stroke: var(--ctcf);
 }
 
-.sv-track .arc.rnapii,
-.sv-track .arc.own.f1 {
+.sv-track .arc:global(.rnapii),
+.sv-track .arc.own:global(.f1) {
   stroke: var(--rnapii);
 }
 
-.sv-track .arc.own.f0 {
+.sv-track .arc.own:global(.f0) {
   stroke: var(--ctcf);
 }
 
-.sv-track .arc.own.f2 {
+.sv-track .arc.own:global(.f2) {
   stroke: var(--original);
 }
 
@@ -127,43 +127,43 @@
   font: 600 9px var(--font);
 }
 
-.sv-del rect,
-.sv-dot.sv-del {
+:global(.sv-del) rect,
+.sv-dot:global(.sv-del) {
   fill: #C0261B;
   background: #C0261B;
 }
 
-.sv-del text {
+:global(.sv-del) text {
   fill: #C0261B;
 }
 
-.sv-ins rect,
-.sv-dot.sv-ins {
+:global(.sv-ins) rect,
+.sv-dot:global(.sv-ins) {
   fill: #C2338A;
   background: #C2338A;
 }
 
-.sv-ins text {
+:global(.sv-ins) text {
   fill: #C2338A;
 }
 
-.sv-inv rect,
-.sv-dot.sv-inv {
+:global(.sv-inv) rect,
+.sv-dot:global(.sv-inv) {
   fill: #B07A12;
   background: #B07A12;
 }
 
-.sv-inv text {
+:global(.sv-inv) text {
   fill: #B07A12;
 }
 
-.sv-dup rect,
-.sv-dot.sv-dup {
+:global(.sv-dup) rect,
+.sv-dot:global(.sv-dup) {
   fill: #1B7F8C;
   background: #1B7F8C;
 }
 
-.sv-dup text {
+:global(.sv-dup) text {
   fill: #1B7F8C;
 }
 
@@ -198,7 +198,7 @@
   white-space: normal;
 }
 
-.sv-table .mono {
+.sv-table :global(.mono) {
   font-family: var(--mono);
   font-size: 12px;
 }

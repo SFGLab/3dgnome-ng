@@ -1,4 +1,4 @@
-.my-jobs .reading {
+.my-jobs :global(.reading) {
   max-width: 900px;
 }
 
@@ -13,11 +13,11 @@
   background: var(--surface);
 }
 
-.reading .no-jobs p {
+:global(.reading) .no-jobs p {
   margin: 0;
 }
 
-.no-jobs .button {
+.no-jobs :global(.button) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -70,12 +70,12 @@
 }
 
 /* These pages have no side panel, so the reading column takes the left gutter itself. */
-.doc-page.my-jobs {
+:global(.doc-page).my-jobs {
   padding-left: 48px;
 }
 
 @media (max-width: 900px) {
-  .doc-page.my-jobs {
+  :global(.doc-page).my-jobs {
     padding-left: 16px;
     padding-right: 16px;
   }

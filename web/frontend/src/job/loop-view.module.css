@@ -27,7 +27,7 @@
   pointer-events: none;
 }
 
-.loop-arc.ctcf {
+.loop-arc:global(.ctcf) {
   stroke: var(--ctcf);
 }
 

@@ -7,6 +7,10 @@ import { times, fold, twoEnhancers, pText, level } from './names'
 import { type Key, Frame, BoxPlot } from './plots'
 import { Figure } from './Figure'
 import { Paged } from './PagedTable'
+import { scoped } from '../../lib/css'
+import sheet from '../job.module.css'
+
+const cn = scoped(sheet)
 
 /** The whole number an axis reaches to, one at least. */
 const reach = (values: number[]) => Math.max(1, Math.ceil(Math.max(0, ...values.map(Math.abs))))
@@ -76,22 +80,22 @@ export function CompareResults({
   const open: Fig[] = opened ?? [expressed ? 'scatter' : 'box']
   const toggle = (f: Fig) => setOpened(open.includes(f) ? open.filter((x) => x !== f) : [...open, f])
   return (
-    <section className="compare-results" aria-label="Changes between the two jobs">
-      <div className="compare-tables">
-        <div className="compare-tabs-row">
-          <div className="compare-tabs" role="tablist" aria-label="Tables of the comparison">
-            <button type="button" role="tab" aria-selected={shown === 'distance'} className={`chip-button${shown === 'distance' ? ' on' : ''}`} onClick={() => setTab('distance')}>
-              3D distance <span className="count">{cmp.rows.length}</span>
+    <section className={cn('compare-results')} aria-label="Changes between the two jobs">
+      <div className={cn('compare-tables')}>
+        <div className={cn('compare-tabs-row')}>
+          <div className={cn('compare-tabs')} role="tablist" aria-label="Tables of the comparison">
+            <button type="button" role="tab" aria-selected={shown === 'distance'} className={cn(`chip-button${shown === 'distance' ? ' on' : ''}`)} onClick={() => setTab('distance')}>
+              3D distance <span className={cn('count')}>{cmp.rows.length}</span>
             </button>
             {expressed && (
               <button
                 type="button"
                 role="tab"
                 aria-selected={shown === 'expression'}
-                className={`chip-button${shown === 'expression' ? ' on' : ''}`}
+                className={cn(`chip-button${shown === 'expression' ? ' on' : ''}`)}
                 onClick={() => setTab('expression')}
               >
-                Expression <span className="count">{expressed.rows.length}</span>
+                Expression <span className={cn('count')}>{expressed.rows.length}</span>
               </button>
             )}
           </div>
@@ -120,10 +124,10 @@ export function CompareResults({
           )}
         </div>
         {cmp.shared && gene && !row && (
-          <p className="compare-note">{`${gene} has no enhancer that both jobs have. It is not in this comparison and is not marked in the structures.`}</p>
+          <p className={cn('compare-note')}>{`${gene} has no enhancer that both jobs have. It is not in this comparison and is not marked in the structures.`}</p>
         )}
         {(cmp.shared || (cmp.differ ?? 0) > 0) && (
-          <p className="compare-note">
+          <p className={cn('compare-note')}>
             {cmp.shared
               ? `Each gene is measured to its nearest enhancer among the ${cmp.shared_enhancers} that both jobs have.`
               : `Each job measures a gene to its own nearest enhancer. ${cmp.differ} of ${cmp.rows.length} genes have another enhancer in ${B} than in ${A}.`}
@@ -161,8 +165,8 @@ export function CompareResults({
           />
         )}
       </div>
-      <div className="compare-side">
-        <div className="compare-figures">
+      <div className={cn('compare-side')}>
+        <div className={cn('compare-figures')}>
           <Figure
             title={row ? `Enhancer to promoter distance of ${row.gene}` : 'Enhancer to promoter distance of a gene'}
             file={`distance_${row?.gene ?? 'gene'}`}
@@ -172,7 +176,7 @@ export function CompareResults({
             {row && one.data ? (
               <BoxPlot gene={row.gene} names={names} a={one.data.a} b={one.data.b} />
             ) : (
-              <p className="figure-empty">
+              <p className={cn('figure-empty')}>
                 {row ? (one.isError ? one.error.message : 'Reading the distances.') : 'Select a gene in a table or a plot for the box plot of its distance in the structures of the two jobs.'}
               </p>
             )}
@@ -189,7 +193,7 @@ export function CompareResults({
               >
                 {(fx, fy) =>
                   expressed.rows.map((r) => (
-                    <circle key={r.gene} className={kind(r)} cx={fx(r.distance)} cy={fy(r.log2fc)} r={r.gene === gene ? 5 : 3} onClick={() => pick(r.gene)}>
+                    <circle key={r.gene} className={cn(kind(r))} cx={fx(r.distance)} cy={fy(r.log2fc)} r={r.gene === gene ? 5 : 3} onClick={() => pick(r.gene)}>
                       <title>{`${r.gene}, distance ${times(r.distance, 'farther', 'closer')}, expression ${fold(r.log2fc)} in ${B}`}</title>
                     </circle>
                   ))
@@ -211,16 +215,16 @@ export function CompareResults({
                 {(fx, fy) => (
                   <>
                     {volcano.points.map(([x, y]) => (
-                      <circle key={`${x} ${y}`} className="back" cx={fx(x)} cy={fy(y)} r={1.3} />
+                      <circle key={`${x} ${y}`} className={cn('back')} cx={fx(x)} cy={fy(y)} r={1.3} />
                     ))}
-                    {line < top && <line className="threshold" x1={fx(-vx)} x2={fx(vx)} y1={fy(line)} y2={fy(line)} />}
+                    {line < top && <line className={cn('threshold')} x1={fx(-vx)} x2={fx(vx)} y1={fy(line)} y2={fy(line)} />}
                     {line < top && (
-                      <text className="tick" x={fx(vx) - 2} y={fy(line) - 4} textAnchor="end">
+                      <text className={cn('tick')} x={fx(vx) - 2} y={fy(line) - 4} textAnchor="end">
                         adjusted p 0.05
                       </text>
                     )}
                     {tested.map(({ r, x, y }) => (
-                      <circle key={r.gene} className={kind(r)} cx={fx(x)} cy={fy(y)} r={r.gene === gene ? 5 : 3} onClick={() => pick(r.gene)}>
+                      <circle key={r.gene} className={cn(kind(r))} cx={fx(x)} cy={fy(y)} r={r.gene === gene ? 5 : 3} onClick={() => pick(r.gene)}>
                         <title>{`${r.gene}, expression ${fold(r.log2fc)} in ${B}, adjusted p ${pText(r.padj)}`}</title>
                       </circle>
                     ))}
@@ -230,35 +234,35 @@ export function CompareResults({
             </Figure>
           )}
         </div>
-        <div className="compare-cards">
+        <div className={cn('compare-cards')}>
           {row && (
-            <section className="side-card" aria-label={`Change of ${row.gene}`}>
-              <p className="card-label">{`${row.gene}, ${against}`}</p>
-              <p className="big">
-                <span className="big-value">{(row.ratio >= 1 ? row.ratio : 1 / row.ratio).toFixed(1)}</span>{' '}
-                <span className="unit">{`times ${row.ratio >= 1 ? 'farther' : 'closer'} in ${B}`}</span>
+            <section className={cn('side-card')} aria-label={`Change of ${row.gene}`}>
+              <p className={cn('card-label')}>{`${row.gene}, ${against}`}</p>
+              <p className={cn('big')}>
+                <span className={cn('big-value')}>{(row.ratio >= 1 ? row.ratio : 1 / row.ratio).toFixed(1)}</span>{' '}
+                <span className={cn('unit')}>{`times ${row.ratio >= 1 ? 'farther' : 'closer'} in ${B}`}</span>
               </p>
-              <p className="card-text">{`${row.a.mean.toFixed(1)} ± ${row.a.sd.toFixed(1)} bead units in ${A}, ${row.b.mean.toFixed(1)} ± ${row.b.sd.toFixed(1)} in ${B}. Mann-Whitney p ${pText(row.p)}.`}</p>
+              <p className={cn('card-text')}>{`${row.a.mean.toFixed(1)} ± ${row.a.sd.toFixed(1)} bead units in ${A}, ${row.b.mean.toFixed(1)} ± ${row.b.sd.toFixed(1)} in ${B}. Mann-Whitney p ${pText(row.p)}.`}</p>
               {eRow && (
                 <>
-                  <p className="big">
-                    <span className="big-value">{2 ** Math.abs(eRow.log2fc) >= 100 ? 'over 100' : (2 ** Math.abs(eRow.log2fc)).toFixed(1)}</span>{' '}
-                    <span className="unit">{`times ${eRow.log2fc >= 0 ? 'higher' : 'lower'} expression in ${B}`}</span>
+                  <p className={cn('big')}>
+                    <span className={cn('big-value')}>{2 ** Math.abs(eRow.log2fc) >= 100 ? 'over 100' : (2 ** Math.abs(eRow.log2fc)).toFixed(1)}</span>{' '}
+                    <span className={cn('unit')}>{`times ${eRow.log2fc >= 0 ? 'higher' : 'lower'} expression in ${B}`}</span>
                   </p>
-                  <p className="card-text">{`Level ${level(eRow.a)} in ${A}, ${level(eRow.b)} in ${B}. Adjusted p ${pText(eRow.padj)}.`}</p>
+                  <p className={cn('card-text')}>{`Level ${level(eRow.a)} in ${A}, ${level(eRow.b)} in ${B}. Adjusted p ${pText(eRow.padj)}.`}</p>
                 </>
               )}
             </section>
           )}
           {expressed && (
-            <section className="side-card" aria-label="Expression against 3D distance">
-              <p className="card-label">Expression against 3D distance</p>
+            <section className={cn('side-card')} aria-label="Expression against 3D distance">
+              <p className={cn('card-label')}>Expression against 3D distance</p>
               {expressed.rho !== null && (
-                <p className="big">
-                  <span className="big-value">{expressed.rho.toFixed(2)}</span> <span className="unit">rank correlation</span>
+                <p className={cn('big')}>
+                  <span className={cn('big-value')}>{expressed.rho.toFixed(2)}</span> <span className={cn('unit')}>rank correlation</span>
                 </p>
               )}
-              <p className="card-text">
+              <p className={cn('card-text')}>
                 {expressed.rho !== null
                   ? `Of the change of expression with the change of distance over ${expressed.rows.length} genes, ${against}.`
                   : `${expressed.rows.length} genes have expression in both jobs. Five or more give a rank correlation.`}{' '}
@@ -267,7 +271,7 @@ export function CompareResults({
             </section>
           )}
           {!expressed && (expressionState || expression) && (
-            <p className="compare-note" aria-busy={expressionState === 'wait'}>
+            <p className={cn('compare-note')} aria-busy={expressionState === 'wait'}>
               {expressionState === 'wait'
                 ? 'Comparing the expression of the two jobs.'
                 : expressionState === 'one'

@@ -1,4 +1,4 @@
-.bar-chart {
+:global(.bar-chart) {
   flex: 1;
   min-width: 0;
   margin: 0;
@@ -11,19 +11,19 @@
   gap: 12px;
 }
 
-.bar-chart figcaption {
+:global(.bar-chart) figcaption {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.chart-title {
+:global(.chart-title) {
   font-size: 14px;
   font-weight: 600;
   color: var(--ink);
 }
 
-.chart-sub {
+:global(.chart-sub) {
   font-size: 12px;
   color: var(--faint);
 }
@@ -51,25 +51,25 @@
   border-radius: 0 4px 4px 0;
 }
 
-.bar.cudammc,
-.swatch.cudammc,
-.bar.original,
-.swatch.original {
+.bar:global(.cudammc),
+.swatch:global(.cudammc),
+.bar:global(.original),
+.swatch:global(.original) {
   background: var(--original);
 }
 
-.bar.ctcf,
-.swatch.ctcf {
+.bar:global(.ctcf),
+.swatch:global(.ctcf) {
   background: var(--ctcf);
 }
 
-.bar.rnapii,
-.swatch.rnapii {
+.bar:global(.rnapii),
+.swatch:global(.rnapii) {
   background: var(--rnapii);
 }
 
-.bar.multimm,
-.swatch.multimm {
+.bar:global(.multimm),
+.swatch:global(.multimm) {
   background: var(--multimm);
 }
 

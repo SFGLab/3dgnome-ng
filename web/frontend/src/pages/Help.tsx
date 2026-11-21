@@ -12,7 +12,10 @@ import { hidden } from '../flags'
 import { EXAMPLES as EXAMPLE_JOBS } from '../model/examples'
 import { useOpenExample } from '../model/useOpenExample'
 import { ROUTES } from '../routes'
-import './help.css'
+import { scoped } from '../lib/css'
+import sheet from './help.module.css'
+
+const cn = scoped(sheet)
 
 const FORMATS = [
   ['Loop anchors, BED', 'chr  start  end  orientation', 'Orientation of the CTCF motif, L, R or N. Use N when it is unknown and for RNAPII anchors. Give the orientation on every line or on none. The engine reads the first line to decide whether the file has it.'],
@@ -99,7 +102,7 @@ const SECTIONS: [to: string, label: string][] = [
 
 function QA({ q, a }: { q: string; a: string }) {
   return (
-    <div className="qa">
+    <div className={cn('qa')}>
       <h3>{q}</h3>
       <p>{a}</p>
     </div>
@@ -116,10 +119,10 @@ function SampleOutput() {
           {error}
         </p>
       )}
-      <ul className="sample-list" aria-label="Sample output">
+      <ul className={cn('sample-list')} aria-label="Sample output">
         {EXAMPLE_JOBS.map((e) => (
           <li key={e.id}>
-            <button type="button" className="sample-link" disabled={!!busy} onClick={() => open(e)}>
+            <button type="button" className={cn('sample-link')} disabled={!!busy} onClick={() => open(e)}>
               {busy === e.id ? 'Opening the job' : e.title} <ArrowRight size={13} aria-hidden />
             </button>
             <span>{`${e.cellLabel}. ${e.description}.`}</span>
@@ -141,20 +144,20 @@ export function Help() {
         <p className="intro">
           The tutorial builds the TNFRSF8 example from the form to the comparison of two jobs. Each step says what to choose. The two links open the form with the example filled in and the finished jobs of the example.
         </p>
-        <p className="tutorial-links">
-          <Link className="sample-link" to={`${ROUTES.model}?example=TNFRSF8`}>
+        <p className={cn('tutorial-links')}>
+          <Link className={cn('sample-link')} to={`${ROUTES.model}?example=TNFRSF8`}>
             The form with the example filled in <ArrowRight size={13} aria-hidden />
           </Link>
-          <Link className="sample-link" to={ROUTES.examples}>
+          <Link className={cn('sample-link')} to={ROUTES.examples}>
             All examples <ArrowRight size={13} aria-hidden />
           </Link>
         </p>
-        <ol className="steps">
+        <ol className={cn('steps')}>
           {STEPS.map((s) => (
             <li key={s}>{s}</li>
           ))}
         </ol>
-        <h3 className="example-head">Sample output</h3>
+        <h3 className={cn('example-head')}>Sample output</h3>
         <p>Each link opens a finished job of the site with every tab of its results. An example that nobody has opened before runs first, which takes about a minute.</p>
         <SampleOutput />
       </section>
@@ -184,11 +187,11 @@ export function Help() {
             ))}
           </tbody>
         </table>
-        <h3 className="example-head">Example, one CTCF loop and its anchors</h3>
+        <h3 className={cn('example-head')}>Example, one CTCF loop and its anchors</h3>
         {EXAMPLES.map(([name, text]) => (
           <div key={name} className="example-file">
-            <span className="file-name">{name}</span>
-            <pre className="code">{text}</pre>
+            <span className={cn('file-name')}>{name}</span>
+            <pre className={cn('code')}>{text}</pre>
           </div>
         ))}
         <p>
@@ -197,15 +200,15 @@ export function Help() {
         <p>
           To convert a .mcool map yourself, run prep_singletons.py from the 3D-GNOMEᴺᴳ repository. It writes intra chromosomal bin pairs at a chosen bin size and can thin a deep map.
         </p>
-        <h3 className="example-head">Sample files</h3>
+        <h3 className={cn('example-head')}>Sample files</h3>
         <p>
           The files hold the data of the TNFRSF8 example, chr1:11,500,000-12,600,000 in GM12878. Enter that region in the form and upload the files in Your own data to repeat the example from your own files. The loops and the
           anchors are 4DN and ENCODE ChIA-PET, the contacts 4DN Hi-C, the enhancers EnhancerAtlas 2.0 and the read counts ENCODE RNA-seq. The Cite page has their accessions.
         </p>
-        <ul className="sample-list" aria-label="Sample files">
+        <ul className={cn('sample-list')} aria-label="Sample files">
           {SAMPLES.map(([name, url, about]) => (
             <li key={name}>
-              <a className="sample-link mono" href={url} download={name}>
+              <a className={cn('sample-link mono')} href={url} download={name}>
                 <Download size={13} aria-hidden /> {name}
               </a>
               <span>{about}</span>
@@ -225,8 +228,8 @@ export function Help() {
         <p>
           Or upload a VCF compressed with bgzip. A record needs SVTYPE of DEL, INS, INV or DUP in its INFO field and END or SVLEN. An insertion uses its ALT sequence when it has one. A duplication is read as tandem, with the copy right after the original. A gene inside it is listed twice, the second time as its second copy. CTCF motifs in that sequence can become new anchors. The result page counts the skipped records of other types. A phased genotype puts each allele on its own haplotype.
         </p>
-        <pre className="code">{VCF}</pre>
-        <p className="small">An uploaded file and everything built from it are private, reachable only through the job's link and deleted after 14 days.</p>
+        <pre className={cn('code')}>{VCF}</pre>
+        <p className={cn('small')}>An uploaded file and everything built from it are private, reachable only through the job's link and deleted after 14 days.</p>
       </section>
 
       <section id="expression">
@@ -248,7 +251,7 @@ export function Help() {
           You can upload a table of your own in place of a hosted set, in the Expression step of the Your own data dialog. The table is tab or comma separated. Its first column holds the gene as an Ensembl id or a gene name. Every other column of numbers is a sample. A column named
           length gives the length of the gene in bp. The output of featureCounts is read as it is. After the upload choose the samples of the job and state that the values are read counts or normalised values.
         </p>
-        <pre className="code">{EXPRESSION}</pre>
+        <pre className={cn('code')}>{EXPRESSION}</pre>
         <p>
           The Genes tab shows one level for each gene, the mean over the samples of the job. Read counts with gene lengths give TPM and read counts without lengths give counts per million. Normalised values are shown in their own unit.
         </p>
@@ -292,7 +295,7 @@ export function Help() {
         <p>
           The server runs the gnome3d Python package. The package runs on a CPU and uses a GPU when one is present. A run reads one config.ini. The settings reference lists every key with its default, the value on this server and its meaning. The package and the code of this site are free software under the GNU General Public License, version 3.
         </p>
-        <pre className="code">{'pip install gnome3d\ngnome3d --config config.ini --region chr1:11500000-12600000 -n 10 --out models/'}</pre>
+        <pre className={cn('code')}>{'pip install gnome3d\ngnome3d --config config.ini --region chr1:11500000-12600000 -n 10 --out models/'}</pre>
         <table className="doc-table settings" aria-label="Settings">
           <thead>
             <tr>
@@ -319,7 +322,7 @@ export function Help() {
             ))}
           </tbody>
         </table>
-        <a className="settings-link" href="https://github.com/SFGLab/3dgnome-ng/blob/main/SETTINGS.md">
+        <a className={cn('settings-link')} href="https://github.com/SFGLab/3dgnome-ng/blob/main/SETTINGS.md">
           <BookOpen size={13} aria-hidden /> All settings, from SETTINGS.md
         </a>
       </section>

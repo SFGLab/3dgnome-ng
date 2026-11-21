@@ -17,7 +17,7 @@
 }
 
 .primary-citation button,
-.primary-citation .button-link {
+.primary-citation :global(.button-link) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -31,27 +31,27 @@
   cursor: pointer;
 }
 
-.reference {
+:global(.reference) {
   padding: 12px 0;
   border-bottom: 1px solid var(--line);
 }
 
-.reference p {
+:global(.reference) p {
   margin: 0;
 }
 
-.ref-title {
+:global(.ref-title) {
   font-size: 14px;
   font-weight: 600;
 }
 
-.ref-authors,
-.ref-venue {
+:global(.ref-authors),
+:global(.ref-venue) {
   font-size: 13px;
   color: var(--muted);
 }
 
-.ref-venue a {
+:global(.ref-venue) a {
   margin-left: 10px;
   font-size: 12px;
   text-decoration: none;
@@ -76,19 +76,19 @@
   font-weight: 400;
 }
 
-.data-table .accessions {
+:global(.data-table) .accessions {
   font: 12px var(--mono);
 }
 
-.data-table .accessions a,
-.data-table .accessions span {
+:global(.data-table) .accessions a,
+:global(.data-table) .accessions span {
   display: block;
   white-space: nowrap;
   text-decoration: none;
 }
 
-.data-table .accessions .unconfirmed,
-.data-table .accessions .no-accession {
+:global(.data-table) .accessions .unconfirmed,
+:global(.data-table) .accessions .no-accession {
   font-family: var(--font);
 }
 
@@ -97,23 +97,23 @@
 }
 
 @media (max-width: 720px) {
-  .data-table,
-  .data-table tbody,
-  .data-table tr,
-  .data-table td {
+  :global(.data-table),
+  :global(.data-table) tbody,
+  :global(.data-table) tr,
+  :global(.data-table) td {
     display: block;
   }
 
-  .data-table thead {
+  :global(.data-table) thead {
     display: none;
   }
 
-  .data-table tr {
+  :global(.data-table) tr {
     padding: 10px 0;
     border-bottom: 1px solid var(--line);
   }
 
-  .data-table td {
+  :global(.data-table) td {
     padding: 2px 0;
     border: 0;
   }

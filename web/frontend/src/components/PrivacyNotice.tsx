@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ROUTES } from '../routes'
+import { scoped } from '../lib/css'
+import sheet from './layout.module.css'
+
+const cn = scoped(sheet)
 
 const KEY = 'gnome3d.privacySeen'
 
@@ -27,9 +31,9 @@ export function PrivacyNotice() {
     setOpen(false)
   }
   return (
-    <aside className="privacy-notice" aria-label="Privacy">
+    <aside className={cn('privacy-notice')} aria-label="Privacy">
       <p>This site sets no cookies and does no tracking. It keeps your job list in your browser. Files that you upload are private and deleted after 14 days.</p>
-      <div className="privacy-notice-actions">
+      <div className={cn('privacy-notice-actions')}>
         <Link to={ROUTES.privacy} onClick={close}>
           Privacy notice
         </Link>

@@ -1,4 +1,8 @@
 import type { Factors } from './form'
+import { scoped } from '../lib/css'
+import sheet from './model.module.css'
+
+const cn = scoped(sheet)
 
 const OPTIONS: [Factors | 'own', string, string][] = [
   ['CTCF', 'CTCF', 'CTCF ChIA-PET loops, the loop set of the original 3D-GNOME.'],
@@ -28,19 +32,19 @@ export function LoopOptions({
 }) {
   return (
     <>
-      <div className="options two" role="radiogroup" aria-label="Loops">
+      <div className={cn('options two')} role="radiogroup" aria-label="Loops">
         {OPTIONS.map(([id, title, desc]) => (
-          <button key={id} type="button" role="radio" aria-checked={value === id} className="option" onClick={() => (id === 'own' ? onOwn() : onChange(id))}>
-            <span className="radio-dot" aria-hidden />
-            <span className="option-text">
-              <span className="option-title">{title}</span>
-              <span className="option-desc">{desc}</span>
+          <button key={id} type="button" role="radio" aria-checked={value === id} className={cn('option')} onClick={() => (id === 'own' ? onOwn() : onChange(id))}>
+            <span className={cn('radio-dot')} aria-hidden />
+            <span className={cn('option-text')}>
+              <span className={cn('option-title')}>{title}</span>
+              <span className={cn('option-desc')}>{desc}</span>
             </span>
           </button>
         ))}
       </div>
       {ownCell && value !== 'own' && (
-        <label className="loops-of">
+        <label className={cn('loops-of')}>
           <span>Loops of</span>
           <select value={loopsFrom} onChange={(e) => onLoopsFrom(e.target.value)}>
             {cells.map((c) => (

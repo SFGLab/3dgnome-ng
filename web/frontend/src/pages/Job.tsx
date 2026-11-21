@@ -12,7 +12,10 @@ import { LoopsTab } from '../job/LoopsTab'
 import { StructureTab } from '../job/StructureTab'
 import { JobTabs, type Tab } from '../job/Tabs'
 import { NotFound } from './NotFound'
-import './job.css'
+import { scoped } from '../lib/css'
+import sheet from '../job/job.module.css'
+
+const cn = scoped(sheet)
 
 /** Whether the server answered that it has no such job. */
 const missing = (error: unknown) => error instanceof ApiError && error.status === 404
@@ -42,17 +45,17 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
   if (summary.isError && missing(summary.error)) return <NotFound />
   if (summary.isError)
     return (
-      <div className="job-page">
-        <p className="job-message">{summary.error.message}</p>
+      <div className={cn('job-page')}>
+        <p className={cn('job-message')}>{summary.error.message}</p>
       </div>
     )
-  if (!summary.data) return <div className="job-page" aria-busy="true" />
+  if (!summary.data) return <div className={cn('job-page')} aria-busy="true" />
   const s = summary.data
   const pick = async (which: 'medoid' | 'compact' | 'random') => setSelected((await api.picks())[which])
   return (
-    <div className="job-page">
+    <div className={cn('job-page')}>
       <JobSidePanel api={api} summary={s} selected={selected} onSelect={setSelected} onPick={(w) => void pick(w)} />
-      <div className="job-main">
+      <div className={cn('job-main')}>
         {s.state === 'done' ? (
           <>
             <JobTabs
@@ -63,7 +66,7 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
               onTab={(t) => go({ tab: t })}
               onCompare={() => go(comparing ? { tab } : { tab, compare: '' })}
             />
-            <div className="tab-body" role="tabpanel">
+            <div className={cn('tab-body')} role="tabpanel">
               {comparing && (
                 <Compare
                   key={compareTo}
@@ -120,12 +123,12 @@ export function Job({ kind, pollMs = 5000 }: { kind: 'jobs' | 'p'; pollMs?: numb
             </div>
           </>
         ) : s.state === 'failed' ? (
-          <div className="job-message">
+          <div className={cn('job-message')}>
             <p className="field-error">{s.error}</p>
-            {s.log_tail && <pre className="log-tail">{s.log_tail}</pre>}
+            {s.log_tail && <pre className={cn('log-tail')}>{s.log_tail}</pre>}
           </div>
         ) : (
-          <div className="job-message">
+          <div className={cn('job-message')}>
             <Progress summary={s} />
           </div>
         )}

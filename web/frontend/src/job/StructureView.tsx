@@ -7,6 +7,10 @@ import { bp as fmt } from '../lib/format'
 import { Scene, type Marker, type SceneHandle } from './Scene'
 import { saveDataUrl } from './export/savePng'
 import { chainColors, beadAt, chainAt, FOCUS_REACH, focusRanges } from './structure'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
+
+const cn = scoped(sheet)
 
 export type HoverInfo = { lines: string[]; x: number; y: number; index: number }
 
@@ -106,8 +110,8 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
           ]
 
   return (
-    <div className={above ? 'structure-view with-above' : 'structure-view'}>
-      <div className="view-toolbar">
+    <div className={cn(above ? 'structure-view with-above' : 'structure-view')}>
+      <div className={cn('view-toolbar')}>
         {toolbarStart}
         <div className="segmented" role="group" aria-label="Colour by">
           {MODES.map(([id, label]) => (
@@ -118,13 +122,13 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
         </div>
         {toolbarEnd}
         {/* One group, so the three wrap together and none is left alone on a row. */}
-        <div className="tool-group">
-        <button type="button" className="icon-tool" aria-label="Reset view" onClick={() => scene.current?.reset()}>
+        <div className={cn('tool-group')}>
+        <button type="button" className={cn('icon-tool')} aria-label="Reset view" onClick={() => scene.current?.reset()}>
           <RotateCcw size={15} aria-hidden />
         </button>
         <button
           type="button"
-          className="icon-tool"
+          className={cn('icon-tool')}
           aria-label="Save as PNG"
           onClick={() => {
             const url = scene.current?.png()
@@ -133,13 +137,13 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
         >
           <Camera size={15} aria-hidden />
         </button>
-        <button type="button" className="icon-tool" aria-label="Full screen" onClick={() => void box.current?.requestFullscreen?.()}>
+        <button type="button" className={cn('icon-tool')} aria-label="Full screen" onClick={() => void box.current?.requestFullscreen?.()}>
           <Expand size={15} aria-hidden />
         </button>
         </div>
       </div>
       {above}
-      <div className="view-box" ref={box}>
+      <div className={cn('view-box')} ref={box}>
         <Scene
           ref={scene}
           points={points}
@@ -154,7 +158,7 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
           onPick={(i) => onPickBead?.(beadAt(structure.beads, structure.chain[i][3]))}
         />
         {hover && (
-          <div className="hover-box" style={{ left: hover.x + 22, top: hover.y + 22 }}>
+          <div className={cn('hover-box')} style={{ left: hover.x + 22, top: hover.y + 22 }}>
             {hover.lines.map((l, i) => (
               <span key={i} className={i === 0 ? 'mono' : undefined}>
                 {l}
@@ -162,16 +166,16 @@ export function StructureView({ structure, annotations, region, chrom = '', inde
             ))}
           </div>
         )}
-        <ul className="view-legend">
+        <ul className={cn('view-legend')}>
           {legend.map(([label, color]) => (
             <li key={label}>
-              <span className="swatch" style={{ background: color }} />
+              <span className={cn('swatch')} style={{ background: color }} />
               {label}
             </li>
           ))}
         </ul>
       </div>
-      <p className="view-caption">
+      <p className={cn('view-caption')}>
         Structure {index} of {total}, about one bead per kb. Drag to rotate and scroll to zoom. Hover over a bead to see its position. The chain at the pointer and at each selected bead stays solid and the rest turns see through. Click two beads to measure the distance between them.
       </p>
     </div>

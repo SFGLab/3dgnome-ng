@@ -14,6 +14,10 @@ import { DistanceCard } from './Measure'
 import { StructureView } from './StructureView'
 import { beadAt, solidSpan } from './structure'
 import { parseRegion } from '../lib/region'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
+
+const cn = scoped(sheet)
 
 /** What a measured position is: a gene's TSS, an enhancer or a plain coordinate. */
 function describe(pos: number, chrom: string, ann: Annotations): string {
@@ -28,18 +32,18 @@ const mid = (s: Structure, k: number) => Math.round((s.beads[k][0] + s.beads[k][
 /** The card of a selected loop: its factor, its two anchors, its span and its PET count. */
 function LoopCard({ loop }: { loop: Loop }) {
   return (
-    <section className="side-card" aria-label="Selected loop">
-      <p className="card-label">Selected loop</p>
+    <section className={cn('side-card')} aria-label="Selected loop">
+      <p className={cn('card-label')}>Selected loop</p>
       <p>
-        <span className={`loop-badge ${loop.factor === 'RNAPII' ? 'rnapii' : 'ctcf'}`}>{loop.factor}</span>
+        <span className={cn(`loop-badge ${loop.factor === 'RNAPII' ? 'rnapii' : 'ctcf'}`)}>{loop.factor}</span>
       </p>
-      <p className="point">
-        <span className="marker">A</span> <span className="mono">{`${loop.chrom}:${bp(loop.a[0])}-${bp(loop.a[1])}`}</span>
+      <p className={cn('point')}>
+        <span className={cn('marker')}>A</span> <span className="mono">{`${loop.chrom}:${bp(loop.a[0])}-${bp(loop.a[1])}`}</span>
       </p>
-      <p className="point">
-        <span className="marker">B</span> <span className="mono">{`${loop.chrom}:${bp(loop.b[0])}-${bp(loop.b[1])}`}</span>
+      <p className={cn('point')}>
+        <span className={cn('marker')}>B</span> <span className="mono">{`${loop.chrom}:${bp(loop.b[0])}-${bp(loop.b[1])}`}</span>
       </p>
-      <p className="card-text">{`The anchors are ${kb(loop.span)} apart on the genome and the loop has ${loop.pets} PET${loop.pets === 1 ? '' : 's'}.`}</p>
+      <p className={cn('card-text')}>{`The anchors are ${kb(loop.span)} apart on the genome and the loop has ${loop.pets} PET${loop.pets === 1 ? '' : 's'}.`}</p>
     </section>
   )
 }
@@ -81,7 +85,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
   const pair = row ? [row.promoter_bead, row.enhancer_bead] : (loopBeads ?? picks)
   const distance = useQuery({ ...askedOf(api).distance(s && pair.length === 2 ? mid(s, pair[0]) : 0, s && pair.length === 2 ? mid(s, pair[1]) : 0), enabled: !!s && pair.length === 2 })
   const region = parseRegion(summary.region)
-  if (!s || !annotations.data || !region) return <Unanswered of={[structure, annotations]} className="view-box" />
+  if (!s || !annotations.data || !region) return <Unanswered of={[structure, annotations]} className={cn('view-box')} />
   const markers = pair.map((k, i) => ({ label: 'AB'[i], at: [s.beads[k][2], s.beads[k][3], s.beads[k][4]] as [number, number, number] }))
   const loops = annotations.data.loops
   const loopIndex = loop ? loops.findIndex((l) => sameLoop(l, loop)) : -1
@@ -92,7 +96,7 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
     setPicks((p) => (p.length >= 2 ? [k] : [...p, k]))
   }
   return (
-    <div className="structure-tab">
+    <div className={cn('structure-tab')}>
       <StructureView
         structure={s}
         annotations={annotations.data}
@@ -129,12 +133,12 @@ export function StructureTab({ api, summary, selected, gene: geneProp, onGene, o
         }
         toolbarStart={<FindGene names={(genes.data ?? []).map((r) => r.gene)} onFind={(g) => { setLoop(null); setGene(g) }} />}
         toolbarEnd={
-          <button type="button" className={measure ? 'measure on' : 'measure'} aria-pressed={measure} onClick={() => setMeasure((m) => !m)}>
+          <button type="button" className={cn(measure ? 'measure on' : 'measure')} aria-pressed={measure} onClick={() => setMeasure((m) => !m)}>
             <Ruler size={14} aria-hidden /> Measure
           </button>
         }
       />
-      <div className="side-cards">
+      <div className={cn('side-cards')}>
         {distance.data && pair.length === 2 && (
           <DistanceCard
             d={distance.data}

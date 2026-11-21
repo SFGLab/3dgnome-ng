@@ -11,6 +11,10 @@ import { saveDataUrl } from '../export/savePng'
 import { chainColors, focusRanges } from '../structure'
 import { parseRegion } from '../../lib/region'
 import { parseJobUrl } from '../../routes'
+import { scoped } from '../../lib/css'
+import sheet from '../job.module.css'
+
+const cn = scoped(sheet)
 
 const factorColor = (f: string) => (f === 'CTCF' ? 'var(--ctcf)' : 'var(--rnapii)')
 
@@ -38,28 +42,28 @@ export function PanelHead({ line, title, sub, choices = [], onPick, startOpen = 
   }
   const text = (
     <>
-      {line && <span className="factor-line" style={{ background: line }} />}
-      <span className="panel-text">
-        <span className="panel-title">{title}</span>
-        <span className="panel-sub">{sub}</span>
+      {line && <span className={cn('factor-line')} style={{ background: line }} />}
+      <span className={cn('panel-text')}>
+        <span className={cn('panel-title')}>{title}</span>
+        <span className={cn('panel-sub')}>{sub}</span>
       </span>
     </>
   )
-  if (!onPick) return <div className="panel-head fixed">{text}</div>
+  if (!onPick) return <div className={cn('panel-head fixed')}>{text}</div>
   return (
-    <div className="panel-pick" ref={box} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
-      <button type="button" className="panel-head" aria-haspopup="true" aria-expanded={open} onClick={() => setOpen(!open)}>
+    <div className={cn('panel-pick')} ref={box} onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}>
+      <button type="button" className={cn('panel-head')} aria-haspopup="true" aria-expanded={open} onClick={() => setOpen(!open)}>
         {text}
         <ChevronDown size={14} aria-hidden />
       </button>
       {open && (
-        <div className="panel-menu" role="group" aria-label="Jobs to compare with">
+        <div className={cn('panel-menu')} role="group" aria-label="Jobs to compare with">
           {choices.map((j) => (
-            <button key={j.url} type="button" className="menu-item" onClick={() => pick(j.url)}>
+            <button key={j.url} type="button" className={cn('menu-item')} onClick={() => pick(j.url)}>
               {j.name}
             </button>
           ))}
-          <div className="paste">
+          <div className={cn('paste')}>
             <input placeholder="Paste a job link" value={pasted} onChange={(e) => setPasted(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && parseJobUrl(pasted) && pick(pasted)} />
             <button type="button" className="action" disabled={!parseJobUrl(pasted)} onClick={() => pick(pasted)}>
               Compare
@@ -123,7 +127,7 @@ export function Panel({
     [structure.data, row?.promoter_bead, enhancerBead], // eslint-disable-line react-hooks/exhaustive-deps
   )
   return (
-    <div className="compare-panel">
+    <div className={cn('compare-panel')}>
       <PanelHead
         line={factorColor(s?.request.factors === 'CTCF' ? 'CTCF' : 'RNAPII')}
         title={s ? `${FACTORS[s.request.factors] ?? s.request.factors} loops` : ' '}
@@ -131,7 +135,7 @@ export function Panel({
         choices={choices}
         onPick={onPick}
       />
-      <div className="view-box compare-box">
+      <div className={cn('view-box compare-box')}>
         {(summary.isError || structure.isError) && <Unanswered of={[summary, structure]} />}
         {structure.data && (
           <Scene ref={scene} points={points} colors={colors} markers={markers} focus={focus} link={link} linkId={linkId} />
@@ -139,7 +143,7 @@ export function Panel({
         {structure.data && (
           <button
             type="button"
-            className="icon-tool panel-save"
+            className={cn('icon-tool panel-save')}
             aria-label={`Save the structure of ${label} as a PNG`}
             onClick={() => {
               const url = scene.current?.png(row ? `A to B ${(pair?.mean ?? row.distance).toFixed(1)} ± ${(pair?.sd ?? row.sd).toFixed(1)}` : undefined)
@@ -150,7 +154,7 @@ export function Panel({
           </button>
         )}
         {row && (
-          <span className="ab-label">
+          <span className={cn('ab-label')}>
             A to B <strong>{`${(pair?.mean ?? row.distance).toFixed(1)} ± ${(pair?.sd ?? row.sd).toFixed(1)}`}</strong>
           </span>
         )}

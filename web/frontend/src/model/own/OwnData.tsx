@@ -9,7 +9,11 @@ import { type Entry, fromResult, named, passed, pending } from './entry'
 import { ExpressionStep } from './ExpressionStep'
 import { LoopsStep } from './LoopsStep'
 import { OneFile } from './parts'
-import './owndata.css'
+import { scoped } from '../../lib/css'
+import sheet1 from './owndata.module.css'
+import sheet2 from '../model.module.css'
+
+const cn = scoped(sheet1, sheet2)
 
 export type OwnTab = 'loops' | 'anchors' | 'contacts' | 'enhancers' | 'expression'
 /** The steps that take one file. */
@@ -142,16 +146,16 @@ export function OwnData({
 
   return (
     <Dialog id="own-title" name="own-data" title="Your own data" sub="Files stay private to this job and are deleted after 14 days." onClose={onClose}>
-      <div className="wizard">
+      <div className={cn('wizard')}>
         <div className="wizard-steps" role="tablist" aria-orientation="vertical" aria-label="Steps">
           {STEPS.map((id, i) => (
             <button key={id} type="button" role="tab" aria-selected={active === id} onClick={() => setActive(id)}>
-              <span className="step-number" aria-hidden>
+              <span className={cn('step-number')} aria-hidden>
                 {i + 1}
               </span>
-              <span className="step-text">
-                <span className="step-title">{STEP_TITLE[id]}</span>
-                <span className="step-uses">{uses[id]}</span>
+              <span className={cn('step-text')}>
+                <span className={cn('step-title')}>{STEP_TITLE[id]}</span>
+                <span className={cn('step-uses')}>{uses[id]}</span>
               </span>
             </button>
           ))}
@@ -201,7 +205,7 @@ export function OwnData({
         </div>
       </div>
       <footer className="dialog-foot">
-        <p className={`foot-note${blocking || noSample ? ' bad' : ''}`}>
+        <p className={cn(`foot-note${blocking || noSample ? ' bad' : ''}`)}>
           {blocking
             ? `Fix or remove the ${blocking[1]} to continue.`
             : noSample

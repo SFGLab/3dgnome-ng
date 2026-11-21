@@ -24,7 +24,10 @@ import { Step } from '../model/Step'
 import { Variants } from '../model/Variants'
 import { VariantsDialog, type VariantsMode } from '../model/VariantsDialog'
 import '../styles/doc.css'
-import './model.css'
+import { scoped } from '../lib/css'
+import sheet from '../model/model.module.css'
+
+const cn = scoped(sheet)
 
 function goTo(url: string) {
   window.location.assign(served(url))
@@ -125,9 +128,9 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
   }, [form.background, hicdiffusionOk, catalog.data])
 
   return (
-    <div className="doc-page model-page">
+    <div className={cn('doc-page model-page')}>
       <SidePanel onExample={(e) => setForm(fromExample(e))} />
-      <div className="reading model-form">
+      <div className={cn('reading model-form')}>
         <header className="page-head">
           <h1>Model a region</h1>
           <p className="lead">
@@ -136,13 +139,13 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
         </header>
         {catalog.isError && <Unanswered of={catalog} />}
         {source && sourceJob.data && (
-          <p className="filled-from" role="status">
+          <p className={cn('filled-from')} role="status">
             The form is filled with the request of <a href={served(source[0])}>{sourceName || `job ${source[2].slice(0, 8)}`}</a>. Change what you need and start a new job.
             {readUploads(sourceJob.data.request) && ' That job read uploaded files. They are not filled in. Add them again in their steps.'}
           </p>
         )}
         {source && sourceJob.isError && (
-          <p className="filled-from" role="alert">
+          <p className={cn('filled-from')} role="alert">
             The job of this link was not found and the form is not filled.
           </p>
         )}
@@ -171,7 +174,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
             onOwn={() => setDialog({ tab: 'loops', cell: false })}
           />
           {form.own.loops.length > 0 && (
-            <p className="own-summary">
+            <p className={cn('own-summary')}>
               {`Your own loops: ${form.own.loops.map((l) => `${l.factor} from ${l.upload.name}`).join(', ')}.`}{' '}
               <button type="button" className="link-button" onClick={() => setDialog({ tab: 'loops', cell: ownCell })}>
                 Change the files
@@ -214,18 +217,18 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
         <Step n={6} title="Ensemble and simulation settings">
           <EnsembleFields structures={form.structures} name={form.name} max={catalog.data?.max_structures ?? 100} onChange={set} />
           {sameName && (
-            <p className="notice" role="status">
+            <p className={cn('notice')} role="status">
               <Info size={14} aria-hidden /> {`My jobs already lists a job as ${shownAs}. Give this job a name of its own to tell the two apart.`}
             </p>
           )}
           {schema.data && <SettingsTree schema={schema.data} values={form.settings} onChange={(settings) => set({ settings })} />}
           {stepError(6)}
         </Step>
-        <div className="submit-row">
-          <button type="button" className="submit" disabled={!form.region.trim() || submit.isPending} onClick={() => submit.mutate()}>
+        <div className={cn('submit-row')}>
+          <button type="button" className={cn('submit')} disabled={!form.region.trim() || submit.isPending} onClick={() => submit.mutate()}>
             {`Build ${form.structures} structure${form.structures === 1 ? '' : 's'}`} <ArrowRight size={16} aria-hidden />
           </button>
-          <span className="timing">The job page shows the progress of the job and its place in the queue.</span>
+          <span className={cn('timing')}>The job page shows the progress of the job and its place in the queue.</span>
         </div>
         {submit.error && !error && (
           <p className="field-error" role="alert">

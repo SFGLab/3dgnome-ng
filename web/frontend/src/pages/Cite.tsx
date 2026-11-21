@@ -3,7 +3,10 @@ import { Copy, ExternalLink, Github, Type } from 'lucide-react'
 import { ReferenceEntry } from '../components/ReferenceEntry'
 import { DATA_SOURCES, REFERENCES, referenceLink } from '../content/references'
 import { hidden, type Part } from '../flags'
-import './cite.css'
+import { scoped } from '../lib/css'
+import sheet from './cite.module.css'
+
+const cn = scoped(sheet)
 
 const PRIMARY =
   'Authors and title to be set. 3D-GNOMEᴺᴳ: 3D chromatin models from CTCF and RNAPII loops, contacts and structural variants on the GPU. Manuscript in preparation.'
@@ -45,9 +48,9 @@ export function Cite() {
         <h2>
           Cite 3D-GNOME<sup className="ng">NG</sup>
         </h2>
-        <div className="primary-citation">
+        <div className={cn('primary-citation')}>
           <p>{PRIMARY}</p>
-          <div className="buttons">
+          <div className={cn('buttons')}>
             <button type="button" onClick={() => copy(PRIMARY_BIBTEX)}>
               <Copy size={13} aria-hidden /> Copy BibTeX
             </button>
@@ -100,19 +103,19 @@ export function Cite() {
                 <tr key={d.data}>
                   <td className="data-name">
                     {d.data}
-                    {d.note && <span className="data-note">{d.note}</span>}
+                    {d.note && <span className={cn('data-note')}>{d.note}</span>}
                   </td>
-                  <td className="accessions">
+                  <td className={cn('accessions')}>
                     {d.accessions.map((a) => (
                       <a key={a.id} href={a.url}>
                         {a.id}
                       </a>
                     ))}
-                    {d.pending && <span className="unconfirmed">{d.pending}</span>}
-                    {d.accessions.length === 0 && !d.pending && <span className="no-accession">not available</span>}
+                    {d.pending && <span className={cn('unconfirmed')}>{d.pending}</span>}
+                    {d.accessions.length === 0 && !d.pending && <span className={cn('no-accession')}>not available</span>}
                   </td>
                   <td>{d.usedFor}</td>
-                  <td>{r && !r.unconfirmed ? <a href={referenceLink(r)}>{d.label}</a> : <span className="unconfirmed">{d.label}</span>}</td>
+                  <td>{r && !r.unconfirmed ? <a href={referenceLink(r)}>{d.label}</a> : <span className={cn('unconfirmed')}>{d.label}</span>}</td>
                 </tr>
               )
             })}
@@ -132,7 +135,7 @@ export function Cite() {
         <p className="intro">
           Laboratory of Functional and Structural Genomics, led by prof. Dariusz Plewczyński, at the Faculty of Mathematics and Information Science, Warsaw University of Technology and the Centre of New Technologies, University of Warsaw.
         </p>
-        <a className="lab-link" href="https://sfglab.mini.pw.edu.pl">
+        <a className={cn('lab-link')} href="https://sfglab.mini.pw.edu.pl">
           <ExternalLink size={13} aria-hidden /> sfglab.mini.pw.edu.pl
         </a>
       </section>

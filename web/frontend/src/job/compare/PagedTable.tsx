@@ -1,6 +1,10 @@
 import { useEffect } from 'react'
 import { Pager } from '../../components/Pager'
 import { usePage } from '../../components/usePage'
+import { scoped } from '../../lib/css'
+import sheet from '../job.module.css'
+
+const cn = scoped(sheet)
 
 /** A table of the comparison with every gene, a page at a time. The page with the selected gene is shown. */
 export function Paged<T extends { gene: string }>({
@@ -33,8 +37,8 @@ export function Paged<T extends { gene: string }>({
   }, [gene, at, size])
   return (
     <>
-      <div className="compare-scroll">
-        <table className="genes-table compare-table" aria-label={label}>
+      <div className={cn('compare-scroll')}>
+        <table className={cn('genes-table compare-table')} aria-label={label}>
           <thead>
             <tr>
               {head.map((h) => (
@@ -46,7 +50,7 @@ export function Paged<T extends { gene: string }>({
             {page.rows.map((r) => (
               <tr
                 key={r.gene}
-                className={[r.gene === gene ? 'selected' : '', faint(r) ? 'insignificant' : ''].join(' ').trim() || undefined}
+                className={cn([r.gene === gene ? 'selected' : '', faint(r) ? 'insignificant' : ''].join(' ').trim() || undefined)}
                 aria-selected={r.gene === gene}
                 onClick={() => onGene?.(r.gene === gene ? null : r.gene)}
               >

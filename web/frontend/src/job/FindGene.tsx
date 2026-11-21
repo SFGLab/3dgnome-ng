@@ -1,5 +1,9 @@
 import { Search } from 'lucide-react'
 import { useState } from 'react'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
+
+const cn = scoped(sheet)
 
 /** The Find a gene field: Enter selects the gene of that name, case insensitive. */
 export function FindGene({ names, onFind }: { names: string[]; onFind: (gene: string) => void }) {
@@ -11,7 +15,7 @@ export function FindGene({ names, onFind }: { names: string[]; onFind: (gene: st
     if (hit) onFind(hit)
   }
   return (
-    <label className={`find-gene${miss ? ' miss' : ''}`}>
+    <label className={cn(`find-gene${miss ? ' miss' : ''}`)}>
       <Search size={14} aria-hidden />
       <input placeholder="Find a gene" value={text} list="gene-names" onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && find()} />
       <datalist id="gene-names">

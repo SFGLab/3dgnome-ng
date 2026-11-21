@@ -138,7 +138,7 @@ job/            the page of a job
   compare/      the comparison of two jobs
   export/       the saving of pictures
 pages/          one component for each address
-styles/         the tokens and the sheets every page shares
+styles/         the tokens and the sheets every page shares: base, doc and dialog
 test/           the stand in for the server and the check of the text of a page
 ```
 
@@ -154,6 +154,16 @@ none of them. `eslint.config.js` has the rule.
 
 A component file exports components alone. A helper beside a component is in a module of its
 own.
+
+The stylesheet of a part is a CSS module beside its components, `job/job.module.css` for the job
+page. Its rules apply to the components of that part alone. Two parts can have a class of one
+name with two looks. The sheets of `styles/` are shared and plain.
+
+A component takes its class names through `scoped` of `lib/css.ts`: `cn('factor-row bad')` gives
+each name its scoped name and keeps the plain name beside it. A rule of a module applies by the
+scoped name. The plain name is for the shared sheets, for a rule of another sheet that refers to
+the component, written `:global(.name)` there, for a selector in code and for a test. A class
+name is not checked by TypeScript.
 
 A question to the server has one definition in `api/queries.ts`. A view that waits for an answer
 shows `Unanswered`: a busy mark, or the message of the question that failed.

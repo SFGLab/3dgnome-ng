@@ -1,4 +1,4 @@
-.reading.wide {
+:global(.reading):global(.wide) {
   max-width: 1040px;
   gap: 24px;
 }
@@ -9,7 +9,7 @@
   gap: 16px;
 }
 
-.chart-row.three {
+.chart-row:global(.three) {
   grid-template-columns: repeat(3, 1fr);
 }
 
@@ -45,7 +45,7 @@
 
 @media (max-width: 960px) {
   .chart-row,
-  .chart-row.three {
+  .chart-row:global(.three) {
     grid-template-columns: 1fr;
   }
 }
@@ -66,10 +66,10 @@ section > .reading-note {
 }
 
 section > .chart-row + .chart-row,
-section > .chart-key + .chart-row {
+section > :global(.chart-key) + .chart-row {
   margin-top: 16px;
 }
 
-section > .chart-key {
+section > :global(.chart-key) {
   margin-top: 12px;
 }

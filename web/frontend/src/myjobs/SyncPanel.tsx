@@ -4,7 +4,10 @@ import { Dialog } from '../components/Dialog'
 import { useRecentJobs } from './useRecentJobs'
 import { createList, formatCode, fullCode, joinLink, joinList, startSync, stopSync, syncNow, syncState, useSyncStatus } from './sync'
 import { readList, type SharedList } from '../api'
-import './sync.css'
+import { scoped } from '../lib/css'
+import sheet from './sync.module.css'
+
+const cn = scoped(sheet)
 
 const clock = new Intl.DateTimeFormat('en-GB', { timeStyle: 'short' })
 const jobsText = (n: number) => (n === 1 ? '1 job' : `${n} jobs`)
@@ -17,7 +20,7 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     window.setTimeout(() => setCopied(false), 2000)
   }
   return (
-    <button type="button" className="sync-button" onClick={copy}>
+    <button type="button" className={cn('sync-button')} onClick={copy}>
       {copied ? <Check size={14} aria-hidden /> : label === 'Copy link' ? <Link2 size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
       {copied ? 'Copied' : label}
     </button>
@@ -29,7 +32,7 @@ function StopDialog({ code, onStop, onClose }: { code: string; onStop: () => voi
   return (
     <Dialog
       id="sync-stop-title"
-      name="sync-dialog"
+      name={cn('sync-dialog')}
       title="Stop syncing on this computer"
       sub="The jobs stay on this computer and the code keeps working on the others."
       onClose={onClose}
@@ -38,8 +41,8 @@ function StopDialog({ code, onStop, onClose }: { code: string; onStop: () => voi
     >
       <div className="dialog-body">
         <p>Keep a copy of the code if no other computer has it.</p>
-        <div className="sync-code-row">
-          <code className="sync-code">{code}</code>
+        <div className={cn('sync-code-row')}>
+          <code className={cn('sync-code')}>{code}</code>
           <CopyButton text={code} label="Copy code" />
         </div>
       </div>
@@ -70,24 +73,24 @@ function CreateForm({ onDone, onCancel }: { onDone: () => void; onCancel: () => 
       })
   }
   return (
-    <div className="sync-form">
-      <label className="sync-check">
+    <div className={cn('sync-form')}>
+      <label className={cn('sync-check')}>
         <input type="checkbox" checked={includePrivate} onChange={(e) => setIncludePrivate(e.target.checked)} />
         <span>
           <strong>Include private jobs</strong>
-          <span className="sync-hint">A private job is one made from uploaded data. With this on, anyone who has the code can open the private jobs on this list. With it off, they stay on this computer.</span>
+          <span className={cn('sync-hint')}>A private job is one made from uploaded data. With this on, anyone who has the code can open the private jobs on this list. With it off, they stay on this computer.</span>
         </span>
       </label>
       {error && (
-        <p className="sync-error" role="alert">
+        <p className={cn('sync-error')} role="alert">
           {error}
         </p>
       )}
-      <div className="sync-actions">
-        <button type="button" className="sync-button primary" onClick={create} disabled={busy}>
+      <div className={cn('sync-actions')}>
+        <button type="button" className={cn('sync-button primary')} onClick={create} disabled={busy}>
           {busy ? 'Making the code' : 'Create the code'}
         </button>
-        <button type="button" className="sync-button" onClick={onCancel}>
+        <button type="button" className={cn('sync-button')} onClick={onCancel}>
           Cancel
         </button>
       </div>
@@ -130,16 +133,16 @@ function JoinForm({ initial, onDone, onCancel }: { initial: string; onDone: () =
   const added = found ? local.filter((j) => (found.private || !j.url.startsWith('/p/')) && !found.jobs.some((f) => f.url === j.url)).length : 0
   return (
     <form
-      className="sync-form"
+      className={cn('sync-form')}
       onSubmit={(e) => {
         e.preventDefault()
         if (found) join()
       }}
     >
-      <label className="sync-field">
+      <label className={cn('sync-field')}>
         <span>Sync code</span>
         <input
-          className="sync-input"
+          className={cn('sync-input')}
           value={text}
           onChange={(e) => setText(formatCode(e.target.value))}
           placeholder="XXXX-XXXX-XXXX-XXXX"
@@ -150,7 +153,7 @@ function JoinForm({ initial, onDone, onCancel }: { initial: string; onDone: () =
           aria-describedby="sync-join-note"
         />
       </label>
-      <p id="sync-join-note" className="sync-hint" role="status">
+      <p id="sync-join-note" className={cn('sync-hint')} role="status">
         {found
           ? `This list has ${jobsText(found.jobs.length)}. ${found.private ? 'It includes private jobs.' : 'Private jobs are not on it.'}${added ? ` ${jobsText(added)} of this computer will be added to it.` : ''}`
           : error
@@ -158,15 +161,15 @@ function JoinForm({ initial, onDone, onCancel }: { initial: string; onDone: () =
             : 'Capital and small letters are the same and the dashes are optional.'}
       </p>
       {error && (
-        <p className="sync-error" role="alert">
+        <p className={cn('sync-error')} role="alert">
           {error}
         </p>
       )}
-      <div className="sync-actions">
-        <button type="submit" className="sync-button primary" disabled={!found || busy}>
+      <div className={cn('sync-actions')}>
+        <button type="submit" className={cn('sync-button primary')} disabled={!found || busy}>
           {busy ? 'Joining' : 'Join this list'}
         </button>
-        <button type="button" className="sync-button" onClick={onCancel}>
+        <button type="button" className={cn('sync-button')} onClick={onCancel}>
           Cancel
         </button>
       </div>
@@ -201,7 +204,7 @@ export function SyncPanel({ initialCode = '', onCodeUsed }: { initialCode?: stri
 
   if (!sync) {
     return (
-      <section className="sync-panel" aria-label="Sync of this list">
+      <section className={cn('sync-panel')} aria-label="Sync of this list">
         <h2>Your jobs on every computer</h2>
         <p>A sync code links this list with your other computers and browsers. Each of them then shows the same jobs. No account is needed.</p>
         {mode === 'create' ? (
@@ -209,11 +212,11 @@ export function SyncPanel({ initialCode = '', onCodeUsed }: { initialCode?: stri
         ) : mode === 'join' ? (
           <JoinForm initial={initialCode} onDone={close} onCancel={close} />
         ) : (
-          <div className="sync-actions">
-            <button type="button" className="sync-button primary" onClick={() => setMode('create')}>
+          <div className={cn('sync-actions')}>
+            <button type="button" className={cn('sync-button primary')} onClick={() => setMode('create')}>
               Get a sync code
             </button>
-            <button type="button" className="sync-button" onClick={() => setMode('join')}>
+            <button type="button" className={cn('sync-button')} onClick={() => setMode('join')}>
               Enter a code
             </button>
           </div>
@@ -224,18 +227,18 @@ export function SyncPanel({ initialCode = '', onCodeUsed }: { initialCode?: stri
 
   const other = initialCode && fullCode(initialCode) !== sync.code
   return (
-    <section className="sync-panel synced" aria-label="Sync of this list">
-      <div className="sync-head">
+    <section className={cn('sync-panel synced')} aria-label="Sync of this list">
+      <div className={cn('sync-head')}>
         <h2>
-          <span className={`sync-dot ${status.state === 'error' ? 'bad' : ''}`} aria-hidden />
+          <span className={cn(`sync-dot ${status.state === 'error' ? 'bad' : ''}`)} aria-hidden />
           {status.gone ? 'This list is no longer on the server' : status.state === 'error' ? 'The last sync failed' : 'This list is synced'}
         </h2>
-        <span className="sync-when" role="status">
+        <span className={cn('sync-when')} role="status">
           {status.state === 'syncing' ? 'Syncing' : status.at ? `Last synced at ${clock.format(status.at)}` : ''}
         </span>
       </div>
       {status.state === 'error' && (
-        <p className="sync-error" role="alert">
+        <p className={cn('sync-error')} role="alert">
           {status.gone ? 'The server has no list for this code. Your jobs are still on this computer. Stop syncing, then get a new code.' : `${status.error} The jobs on this computer are unchanged.`}{' '}
           {!status.gone && (
             <button type="button" className="sync-link" onClick={() => void syncNow()}>
@@ -244,20 +247,20 @@ export function SyncPanel({ initialCode = '', onCodeUsed }: { initialCode?: stri
           )}
         </p>
       )}
-      <div className="sync-code-row">
-        <code className="sync-code" aria-label="Sync code">
+      <div className={cn('sync-code-row')}>
+        <code className={cn('sync-code')} aria-label="Sync code">
           {sync.code}
         </code>
         <CopyButton text={sync.code} label="Copy code" />
         <CopyButton text={joinLink(sync.code)} label="Copy link" />
-        <button type="button" className="sync-button" aria-haspopup="dialog" onClick={() => setMode('stop')}>
+        <button type="button" className={cn('sync-button')} aria-haspopup="dialog" onClick={() => setMode('stop')}>
           <Unlink size={14} aria-hidden /> Stop syncing on this computer
         </button>
       </div>
       <p>On another computer, open My jobs, choose Enter a code and type this code. Opening the link there does the same.</p>
       <p>{sync.private ? 'Private jobs are on the shared list. Anyone who has the code can open them.' : 'Private jobs stay on this computer. They are not on the shared list.'}</p>
       {other && (
-        <p className="sync-error" role="alert">
+        <p className={cn('sync-error')} role="alert">
           The link you opened has another code. This computer keeps its own code. To use the other one, stop syncing here first.{' '}
           <button type="button" className="sync-link" onClick={() => onCodeUsed?.()}>
             Dismiss

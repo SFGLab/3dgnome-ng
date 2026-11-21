@@ -1,6 +1,10 @@
 import { Info } from 'lucide-react'
 import type { Region } from '../api'
 import type { Background as BackgroundId } from './form'
+import { scoped } from '../lib/css'
+import sheet from './model.module.css'
+
+const cn = scoped(sheet)
 
 type Props = {
   value: BackgroundId
@@ -23,22 +27,22 @@ export function Background({ value, region, available, limitMb = 2, lymphoblasto
   ]
   return (
     <>
-      <div className="options three" role="radiogroup" aria-label="Contact background">
+      <div className={cn('options three')} role="radiogroup" aria-label="Contact background">
         {options.map(([id, title, desc]) => {
           const disabled = id === 'hicdiffusion' && reason !== ''
           return (
-            <button key={id} type="button" role="radio" aria-checked={value === id} className="option card" disabled={disabled} onClick={() => onChange(id)}>
-              <span className="option-text">
-                <span className="option-title">{title}</span>
-                <span className="option-desc">{desc}</span>
-                {disabled && <span className="option-reason">{reason}</span>}
+            <button key={id} type="button" role="radio" aria-checked={value === id} className={cn('option card')} disabled={disabled} onClick={() => onChange(id)}>
+              <span className={cn('option-text')}>
+                <span className={cn('option-title')}>{title}</span>
+                <span className={cn('option-desc')}>{desc}</span>
+                {disabled && <span className={cn('option-reason')}>{reason}</span>}
               </span>
             </button>
           )
         })}
       </div>
       {value === 'hicdiffusion' && !lymphoblastoid && (
-        <p className="notice">
+        <p className={cn('notice')}>
           <Info size={14} aria-hidden /> HiCDiffusion was trained on GM12878. Its predictions for H1ESC and HFFc6 are outside its training data.
         </p>
       )}

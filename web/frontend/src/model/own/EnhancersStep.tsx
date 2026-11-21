@@ -1,5 +1,9 @@
 import type { Entry } from './entry'
 import { OneFile, Rule } from './parts'
+import { scoped } from '../../lib/css'
+import sheet from './owndata.module.css'
+
+const cn = scoped(sheet)
 
 export type EnhSource = 'upload' | 'listed' | 'none'
 const ENH_SOURCES: [EnhSource, string, string][] = [
@@ -34,19 +38,19 @@ export function EnhancersStep({
   return (
     <>
       {ownCell && (
-        <div className="own-tab">
-          <div className="routes" role="radiogroup" aria-label="Enhancers from">
+        <div className={cn('own-tab')}>
+          <div className={cn('routes')} role="radiogroup" aria-label="Enhancers from">
             {ENH_SOURCES.map(([id, title, sub]) => (
-              <button key={id} type="button" role="radio" aria-checked={enhSource === id} className="route" onClick={() => setEnhSource(id)}>
+              <button key={id} type="button" role="radio" aria-checked={enhSource === id} className={cn('route')} onClick={() => setEnhSource(id)}>
                 <span>
-                  <span className="route-title">{title}</span>
-                  <span className="route-sub">{sub}</span>
+                  <span className={cn('route-title')}>{title}</span>
+                  <span className={cn('route-sub')}>{sub}</span>
                 </span>
               </button>
             ))}
           </div>
           {enhSource === 'listed' && (
-            <label className="own-select">
+            <label className={cn('own-select')}>
               <span>Enhancers of</span>
               <select value={enhFrom} onChange={(e) => setEnhFrom(e.target.value)}>
                 {cells.map((c) => (

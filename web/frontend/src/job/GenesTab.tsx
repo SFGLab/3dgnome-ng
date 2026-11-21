@@ -5,6 +5,10 @@ import { Pager } from '../components/Pager'
 import { usePage } from '../components/usePage'
 import type { GeneRow } from '../api'
 import { bp, kb } from '../lib/format'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
+
+const cn = scoped(sheet)
 
 type Key = 'gene' | 'enhancer' | 'linear_bp' | 'distance' | 'expression'
 type Chip = 'all' | 'loop' | 'rnapii'
@@ -47,7 +51,7 @@ export function GenesTab({ rows, chrom, structures, expressionUnit = '', epUrl, 
   const max = Math.max(...rows.map((r) => r.max), 1)
   const hasExpression = rows.some((r) => r.expression != null)
   const header = (key: Key, label: string, num = false) => (
-    <th className={num ? 'num' : undefined} aria-sort={sort.key === key ? (sort.up ? 'ascending' : 'descending') : 'none'} onClick={() => setSort((s) => ({ key, up: s.key === key ? !s.up : true }))}>
+    <th className={cn(num ? 'num' : undefined)} aria-sort={sort.key === key ? (sort.up ? 'ascending' : 'descending') : 'none'} onClick={() => setSort((s) => ({ key, up: s.key === key ? !s.up : true }))}>
       {label}
       {sort.key === key && (sort.up ? <ArrowUp size={11} aria-hidden /> : <ArrowDown size={11} aria-hidden />)}
     </th>
@@ -62,10 +66,10 @@ export function GenesTab({ rows, chrom, structures, expressionUnit = '', epUrl, 
   }, [rows, max])
   const top = Math.max(...hist, 1)
   return (
-    <div className="genes-tab">
-      <div className="genes-main">
-        <div className="genes-toolbar">
-          <label className="filter-genes">
+    <div className={cn('genes-tab')}>
+      <div className={cn('genes-main')}>
+        <div className={cn('genes-toolbar')}>
+          <label className={cn('filter-genes')}>
             <Search size={14} aria-hidden />
             <input placeholder="Filter genes" value={text} onChange={(e) => setText(e.target.value)} />
           </label>
@@ -76,7 +80,7 @@ export function GenesTab({ rows, chrom, structures, expressionUnit = '', epUrl, 
               ['rnapii', 'Joined by RNAPII only'],
             ] as [Chip, string][]
           ).map(([id, label]) => (
-            <button key={id} type="button" className={chip === id ? 'chip-button on' : 'chip-button'} aria-pressed={chip === id} onClick={() => setChip(id)}>
+            <button key={id} type="button" className={cn(chip === id ? 'chip-button on' : 'chip-button')} aria-pressed={chip === id} onClick={() => setChip(id)}>
               {label}
             </button>
           ))}
@@ -90,7 +94,7 @@ export function GenesTab({ rows, chrom, structures, expressionUnit = '', epUrl, 
           />
         </div>
         <Pager page={page} noun="genes" />
-        <table className="genes-table">
+        <table className={cn('genes-table')}>
           <thead>
             <tr>
               {header('gene', 'Gene')}
@@ -104,26 +108,26 @@ export function GenesTab({ rows, chrom, structures, expressionUnit = '', epUrl, 
           </thead>
           <tbody>
             {page.rows.map((r) => (
-              <tr key={r.gene} className={r.gene === selected ? 'selected' : undefined} onClick={() => onSelect(r.gene)}>
-                <td className="gene">{r.gene}</td>
+              <tr key={r.gene} className={cn(r.gene === selected ? 'selected' : undefined)} onClick={() => onSelect(r.gene)}>
+                <td className={cn('gene')}>{r.gene}</td>
                 <td className="mono" title={`${chrom}:${bp(r.enhancer)}`}>
                   {bp(r.enhancer)}
                 </td>
-                <td className="num">{kb(r.linear_bp)}</td>
-                <td className="num strong">{r.distance.toFixed(1)}</td>
-                {hasExpression && <td className="num">{r.expression == null ? '' : r.expression >= 100 ? r.expression.toFixed(0) : r.expression.toFixed(1)}</td>}
+                <td className={cn('num')}>{kb(r.linear_bp)}</td>
+                <td className={cn('num strong')}>{r.distance.toFixed(1)}</td>
+                {hasExpression && <td className={cn('num')}>{r.expression == null ? '' : r.expression >= 100 ? r.expression.toFixed(0) : r.expression.toFixed(1)}</td>}
                 <td>
-                  <span className="range" title={`${r.min.toFixed(1)} to ${r.max.toFixed(1)}, median ${r.median.toFixed(1)}`}>
-                    <span className="whisker" style={{ left: `${(r.min / max) * 100}%`, width: `${((r.max - r.min) / max) * 100}%` }} />
-                    <span className="box" style={{ left: `${(r.q1 / max) * 100}%`, width: `${((r.q3 - r.q1) / max) * 100}%` }} />
-                    <span className="med" style={{ left: `${(r.median / max) * 100}%` }} />
+                  <span className={cn('range')} title={`${r.min.toFixed(1)} to ${r.max.toFixed(1)}, median ${r.median.toFixed(1)}`}>
+                    <span className={cn('whisker')} style={{ left: `${(r.min / max) * 100}%`, width: `${((r.max - r.min) / max) * 100}%` }} />
+                    <span className={cn('box')} style={{ left: `${(r.q1 / max) * 100}%`, width: `${((r.q3 - r.q1) / max) * 100}%` }} />
+                    <span className={cn('med')} style={{ left: `${(r.median / max) * 100}%` }} />
                   </span>
                 </td>
                 <td>
                   {r.joined_by ? (
-                    <span className={`loop-badge ${r.joined_by === 'RNAPII' ? 'rnapii' : 'ctcf'}`}>{`${r.joined_by} loop`}</span>
+                    <span className={cn(`loop-badge ${r.joined_by === 'RNAPII' ? 'rnapii' : 'ctcf'}`)}>{`${r.joined_by} loop`}</span>
                   ) : (
-                    <span className="no-loop">{r.promoter_loops ? `none, the promoter anchors ${r.promoter_loops} loop${r.promoter_loops === 1 ? '' : 's'}` : 'none'}</span>
+                    <span className={cn('no-loop')}>{r.promoter_loops ? `none, the promoter anchors ${r.promoter_loops} loop${r.promoter_loops === 1 ? '' : 's'}` : 'none'}</span>
                   )}
                 </td>
               </tr>
@@ -131,19 +135,19 @@ export function GenesTab({ rows, chrom, structures, expressionUnit = '', epUrl, 
           </tbody>
         </table>
       </div>
-      <section className="side-card hist-card" aria-label="3D distance, all genes">
-        <p className="card-label">3D distance, all genes</p>
-        <div className="hist">
+      <section className={cn('side-card hist-card')} aria-label="3D distance, all genes">
+        <p className={cn('card-label')}>3D distance, all genes</p>
+        <div className={cn('hist')}>
           {hist.map((c, i) => (
             <span key={i} style={{ height: `${(c / top) * 100}%` }} />
           ))}
         </div>
-        <p className="hist-axis">
+        <p className={cn('hist-axis')}>
           <span>0</span>
           <span>bead units</span>
           <span>{Math.ceil(max)}</span>
         </p>
-        <p className="card-text">
+        <p className={cn('card-text')}>
           {`The median is ${median(rows.map((r) => r.distance)).toFixed(1)}.`}
           {looped.length > 0 &&
             other.length > 0 &&

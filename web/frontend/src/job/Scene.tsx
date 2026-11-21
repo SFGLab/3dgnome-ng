@@ -5,6 +5,10 @@ import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CameraLink } from './cameraLink'
 import { bondRadius, focusMask, fogRange, pickOnChain, stretch } from './chain'
+import { scoped } from '../lib/css'
+import sheet from './job.module.css'
+
+const cn = scoped(sheet)
 
 const BACKGROUND = '#FFFFFF'
 /** How solid the chain outside the part in focus is drawn. */
@@ -363,14 +367,14 @@ export const Scene = forwardRef<SceneHandle, Props>(function Scene({ points, col
             <meshBasicMaterial color={HOVER} depthTest={false} transparent opacity={0.9} fog={false} />
           </mesh>
           <Html position={shifted[hovered!]} center wrapperClass="scene-mark" style={MARK_STYLE} zIndexRange={MARK_LAYER}>
-            <span className="hover-ring" />
+            <span className={cn('hover-ring')} />
           </Html>
         </>
       )}
       {markers.length === 2 && <Line points={[shift(markers[0].at), shift(markers[1].at)]} color="#151514" lineWidth={1.5} raycast={noRaycast} />}
       {markers.map((m) => (
         <Html key={m.label} position={shift(m.at)} center wrapperClass="scene-mark" style={MARK_STYLE} zIndexRange={MARK_LAYER}>
-          <span className="marker">{m.label}</span>
+          <span className={cn('marker')}>{m.label}</span>
         </Html>
       ))}
       <OrbitControls ref={controls} makeDefault enableDamping={false} />

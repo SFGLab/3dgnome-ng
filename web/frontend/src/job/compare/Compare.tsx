@@ -8,6 +8,10 @@ import { sideNames } from './names'
 import { makeCameraLink } from '../cameraLink'
 import { parseJobUrl } from '../../routes'
 import { PanelHead, Panel } from './Panel'
+import { scoped } from '../../lib/css'
+import sheet from '../job.module.css'
+
+const cn = scoped(sheet)
 
 /** The compare view: this job and another side by side, with the changes between them below,
  * `CompareResults`. The other side starts empty with its list of jobs open. */
@@ -66,17 +70,17 @@ export function Compare({
   const absent = shared && cmp.data && gene ? null : undefined
   return (
     <div className="compare">
-      <div className="compare-toolbar">
-        <label className="check">
+      <div className={cn('compare-toolbar')}>
+        <label className={cn('check')}>
           <input type="checkbox" checked={linked} onChange={(e) => setLinked(e.target.checked)} /> Link rotation and zoom
         </label>
         {otherApi && (
-          <label className="check">
+          <label className={cn('check')}>
             <input type="checkbox" checked={cmp.data?.same_region ?? false} readOnly disabled /> Same region
           </label>
         )}
         {canShare && (
-          <label className="check">
+          <label className={cn('check')}>
             <input type="checkbox" checked={sharedOnly} onChange={(e) => setSharedOnly(e.target.checked)} /> Enhancers of both jobs only
           </label>
         )}
@@ -89,7 +93,7 @@ export function Compare({
           Close the comparison
         </button>
       </div>
-      <div className="compare-panels">
+      <div className={cn('compare-panels')}>
         <Panel api={api} label="this job" structure={selected} gene={gene} link={linked ? link : undefined} linkId="a" pair={chosen ? { bead: chosen.enhancer_bead_a, ...chosen.a } : absent} />
         {otherApi ? (
           <Panel
@@ -105,9 +109,9 @@ export function Compare({
             onPick={pick}
           />
         ) : (
-          <div className="compare-panel">
+          <div className={cn('compare-panel')}>
             <PanelHead title="Choose a job to compare" sub="a job of this browser or a job link" choices={choices} onPick={pick} startOpen />
-            <div className="view-box compare-box empty-side">
+            <div className={cn('view-box compare-box empty-side')}>
               <p>The other job appears here.</p>
             </div>
           </div>

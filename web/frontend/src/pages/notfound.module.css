@@ -23,7 +23,7 @@
   font-weight: 700;
 }
 
-.not-found .lead {
+.not-found :global(.lead) {
   margin: 0 0 6px;
   color: var(--muted);
   font-size: 16px;
@@ -42,7 +42,7 @@
   gap: 12px;
 }
 
-.not-found .button {
+.not-found :global(.button) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -51,14 +51,14 @@
   text-decoration: none;
 }
 
-.not-found .button.primary {
+.not-found :global(.button):global(.primary) {
   padding: 12px 20px;
   background: var(--accent);
   color: #FFFFFF;
   font-weight: 600;
 }
 
-.not-found .button.secondary {
+.not-found :global(.button):global(.secondary) {
   padding: 12px 18px;
   background: var(--surface);
   border: 1px solid var(--line);

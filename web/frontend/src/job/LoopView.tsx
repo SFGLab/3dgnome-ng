@@ -1,9 +1,13 @@
 import { RefreshCw, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Loop } from '../api'
-import './loop-view.css'
 import { wheelFactor } from './wheel'
 import { zoomed, describeLoop, ticks } from './loops'
+import { scoped } from '../lib/css'
+import sheet1 from './loop-view.module.css'
+import sheet2 from './job.module.css'
+
+const cn = scoped(sheet1, sheet2)
 
 const W = 1000
 const H = 70
@@ -96,30 +100,30 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
   const step = marks.length > 1 ? marks[1] - marks[0] : width
   const named = over ?? selected
   return (
-    <div className="loop-view">
+    <div className={cn('loop-view')}>
       {/* The line that says what the view does, or names the loop under the pointer or the selected
           one, with the two buttons at its end. */}
-      <div className="loop-view-head">
-        <p className="loop-view-line">
+      <div className={cn('loop-view-head')}>
+        <p className={cn('loop-view-line')}>
           {named !== null && loops[named] ? <span className="mono">{`${named === selected ? 'Selected: ' : ''}${describeLoop(loops[named])}`}</span> : hint}
         </p>
-        <div className="loop-view-tools">
+        <div className={cn('loop-view-tools')}>
           {selected !== null && onSelect && (
-            <button type="button" className="icon-tool small" aria-label="Clear the selected loop" title="Clear the selected loop" onClick={() => onSelect(null)}>
+            <button type="button" className={cn('icon-tool small')} aria-label="Clear the selected loop" title="Clear the selected loop" onClick={() => onSelect(null)}>
               <X size={13} aria-hidden />
             </button>
           )}
           {onReset && (
-            <button type="button" className="icon-tool small" aria-label="Whole region" title="Whole region" onClick={onReset}>
+            <button type="button" className={cn('icon-tool small')} aria-label="Whole region" title="Whole region" onClick={onReset}>
               <RefreshCw size={13} aria-hidden />
             </button>
           )}
         </div>
       </div>
-      <div className="loop-view-box">
+      <div className={cn('loop-view-box')}>
       <svg
         ref={svg}
-        className={onWindow ? 'loop-view-arcs brushable' : 'loop-view-arcs'}
+        className={cn(onWindow ? 'loop-view-arcs brushable' : 'loop-view-arcs')}
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
         role="group"
@@ -155,16 +159,16 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
           setBrush(null)
         }}
       >
-        {window && <rect className="loop-window" x={x(window[0])} y={0} width={Math.max(x(window[1]) - x(window[0]), 2)} height={H} />}
+        {window && <rect className={cn('loop-window')} x={x(window[0])} y={0} width={Math.max(x(window[1]) - x(window[0]), 2)} height={H} />}
         {shown.map(({ l, i, a, b }) => (
-          <path key={i} className={`loop-arc ${l.factor === 'RNAPII' ? 'rnapii' : 'ctcf'}${i === selected ? ' selected' : selected !== null ? ' dimmed' : ''}${i === over ? ' over' : ''}`} d={arc(a, b)} />
+          <path key={i} className={cn(`loop-arc ${l.factor === 'RNAPII' ? 'rnapii' : 'ctcf'}${i === selected ? ' selected' : selected !== null ? ' dimmed' : ''}${i === over ? ' over' : ''}`)} d={arc(a, b)} />
         ))}
         {/* A wide unseen stroke over each arc takes the pointer. A thin arc is hard to hit. */}
         {onSelect &&
           shown.map(({ l, i, a, b }) => (
             <path
               key={i}
-              className="loop-hit"
+              className={cn('loop-hit')}
               data-loop={i}
               d={arc(a, b)}
               role="button"
@@ -178,8 +182,8 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
               onKeyDown={(e) => e.key === 'Enter' && pick(i)}
             />
           ))}
-        {brush && <rect className="loop-brush" x={brush[0] * W} y={0} width={(brush[1] - brush[0]) * W} height={H} />}
-        {cursor !== null && cursor >= start && cursor <= end && <line className="loop-cursor" x1={x(cursor)} x2={x(cursor)} y1={0} y2={H} />}
+        {brush && <rect className={cn('loop-brush')} x={brush[0] * W} y={0} width={(brush[1] - brush[0]) * W} height={H} />}
+        {cursor !== null && cursor >= start && cursor <= end && <line className={cn('loop-cursor')} x1={x(cursor)} x2={x(cursor)} y1={0} y2={H} />}
       </svg>
         {/* The two anchors of the selected loop, lettered as in the model. */}
         {selected !== null &&
@@ -187,13 +191,13 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
           (['a', 'b'] as const).map((k) => {
             const at = (loops[selected][k][0] + loops[selected][k][1]) / 2
             return at >= start && at <= end ? (
-              <span key={k} className="marker loop-anchor" style={{ left: `${((at - start) / width) * 100}%` }}>
+              <span key={k} className={cn('marker loop-anchor')} style={{ left: `${((at - start) / width) * 100}%` }}>
                 {k.toUpperCase()}
               </span>
             ) : null
           })}
       </div>
-      <div className="loop-view-axis" aria-hidden>
+      <div className={cn('loop-view-axis')} aria-hidden>
         {/* A tick at either end would run into the edge or the unit. */}
         {marks
           .filter((v) => (v - start) / width > 0.02 && (v - start) / width < 0.9)
@@ -202,7 +206,7 @@ export function LoopView({ chrom, region, loops, selected = null, onSelect, wind
               {mb(v, step)}
             </span>
           ))}
-        <span className="unit">{`${chrom}, Mb`}</span>
+        <span className={cn('unit')}>{`${chrom}, Mb`}</span>
       </div>
     </div>
   )

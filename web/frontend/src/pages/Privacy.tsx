@@ -1,5 +1,8 @@
 import { DocPage } from '../components/DocPage'
-import './privacy.css'
+import { scoped } from '../lib/css'
+import sheet from './privacy.module.css'
+
+const cn = scoped(sheet)
 
 const SECTIONS = [
   ['short', 'In short'],
@@ -24,7 +27,7 @@ export function Privacy() {
 
       <section id="short">
         <h2>In short</h2>
-        <ul className="privacy-points">
+        <ul className={cn('privacy-points')}>
           <li>The site sets no cookies and does no tracking or analytics.</li>
           <li>It asks for no name and no e-mail address and it has no accounts.</li>
           <li>Files that you upload are private and are deleted after 14 days.</li>
@@ -42,7 +45,7 @@ export function Privacy() {
 
       <section id="server">
         <h2>On the server</h2>
-        <table className="privacy-table">
+        <table className={cn('privacy-table')}>
           <thead>
             <tr>
               <th>Data</th>
@@ -53,7 +56,7 @@ export function Privacy() {
           <tbody>
             {STORED.map(([name, content, kept]) => (
               <tr key={name}>
-                <td className="privacy-name">{name}</td>
+                <td className={cn('privacy-name')}>{name}</td>
                 <td>{content}</td>
                 <td>{kept}</td>
               </tr>
