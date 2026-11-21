@@ -84,7 +84,7 @@ def create_job(site: Site, fields: dict[str, str]) -> str:
         raise Refused(f"structures must be a whole number, not {fields.get('n_models')!r}", "n_models") from e
     req = JobRequest(
         cell_type=cell_type, region=fields["region"], factors=factors, sv_set=sv_set, sample=sample,
-        haplotype=1 if str(fields.get("haplotype", "0")) == "1" else 0, n_models=n_models,
+        haplotype=1 if str(fields.get("haplotype", "0")) == "1" else 0, n_models=max(1, min(s.max_structures, n_models)),
         background=background, overrides=overrides,
     )  # fmt: skip
     wanted = fields.get("expression", "")

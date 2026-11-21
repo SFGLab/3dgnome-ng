@@ -13,7 +13,6 @@ from pathlib import Path
 
 from ..catalog.model import Catalog
 from ..regions import ANY_SPAN, parse_region
-from ..settings import Settings
 
 
 # A part of the key of every shared job. It is not the name of the package. A change gives each
@@ -51,7 +50,7 @@ class JobRequest:
         # The old form sent HiCDiffusion as a flag; request.json files of that form still read.
         if self.hicdiffusion:
             self.background, self.hicdiffusion = "hicdiffusion", False
-        self.n_models = max(1, min(Settings.from_env().max_structures, int(self.n_models)))
+        self.n_models = int(self.n_models)
 
 
 def normalised(req: JobRequest, catalog: Catalog) -> dict[str, object]:

@@ -59,6 +59,19 @@ def test_a_region_over_20_mb_is_refused_at_its_field(form: Any, site: SimpleName
     assert r.status_code == 400 and "20,000,000" in r.json()["error"] and r.json()["field"] == "region", "a region over 20 Mb is refused at the region field: " + r.text
 
 
+def test_max_structures_caps_the_structures_of_a_request(form: Any, site: SimpleNamespace) -> None:
+    TestClient, create_app = site.TestClient, site.create_app
+    os.environ["MAX_STRUCTURES"] = "1"
+    try:
+        small = TestClient(create_app())
+        five = small.post("/api/jobs", data={**form, "n_models": "5"}).json()["url"]
+        one = small.post("/api/jobs", data={**form, "n_models": "1"}).json()["url"]
+    finally:
+        del os.environ["MAX_STRUCTURES"]
+    asked = small.get("/api" + five + "/summary").json()["request"]["n_models"]
+    assert five == one and asked == 1, "a request for five structures on a site of one is the request for one: " + str((five, one, asked))
+
+
 def test_max_region_mb_sets_the_limit(form: Any, site: SimpleNamespace) -> None:
     TestClient, create_app = site.TestClient, site.create_app
     os.environ["MAX_REGION_MB"] = "2.5"

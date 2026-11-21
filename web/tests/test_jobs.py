@@ -52,8 +52,6 @@ def test_the_key_of_a_request_is_the_one_sites_already_hold(shared: SimpleNamesp
     # or of the way a request is normalised, leaves every job of a running site unfound.
     pinned = request_key(JobRequest(cell_type="GMX", region="chr1:0-2000000", factors="CTCF"), cat)
     assert pinned == "c873ddce1421a87d", "the key of a request is the one sites already hold: " + str(pinned)
-    assert JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=100).n_models == 100, "100 structures are kept"
-    assert JobRequest(cell_type="GMX", region="chr1:0-3000000", factors="CTCF", n_models=101).n_models == 100, "101 structures become 100"
 
 
 PINNED = {
@@ -81,7 +79,6 @@ def test_requests_that_ask_for_the_same_job_have_one_key(shared: SimpleNamespace
     cat = shared.cat
     key = lambda **more: request_key(JobRequest(**{"cell_type": "GMX", "region": "chr1:0-2000000", "factors": "CTCF", **more}), cat)  # type: ignore[arg-type]  # noqa: E731
     assert key(sample="P1", haplotype=1) == key(), "a sample without a call set is not in the key"
-    assert key(n_models=500) == key(n_models=100), "a count of structures over the limit is the limit"
     assert key(background="hic") == key(), "the Hi-C background is the request without a background"
     assert key(overrides={}) == key() and key(expression={}) == key(), "empty overrides and no expression are the request without them"
     table = {"source": "LINES", "columns": ["a1", "a2"], "kind": "counts"}
