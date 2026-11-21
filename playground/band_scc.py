@@ -43,6 +43,32 @@ from legacy.validation.metrics.hic import observed_hic, simulated_contacts  # no
 EDGES_BP = (250_000, 1_000_000, 2_000_000)
 
 
+def balanced_map(mcool: str, region: str, res: int) -> tuple[np.ndarray, np.ndarray]:
+    """Returns the balanced map of `region` at `res` and the starts of its bins.
+
+    A file without that resolution is read at the coarsest resolution it holds that divides `res`,
+    and the balanced counts are summed over the blocks. `observed_hic` takes the nearest
+    resolution of the file in that case, which this function does not accept.
+    """
+    import cooler  # noqa: PLC0415
+
+    groups = cooler.fileops.list_coolers(mcool)
+    have = sorted(int(g.rsplit("/", 1)[-1]) for g in groups if g.rsplit("/", 1)[-1].isdigit())
+    if not have or res in have:
+        m, bins = observed_hic(mcool, region, res, balance=True)
+        if len(bins) > 1 and int(bins[1] - bins[0]) != res:
+            raise SystemExit(f"{mcool} has bins of {int(bins[1] - bins[0])} bp, not {res}")
+        return m, bins
+    fine = [r for r in have if r < res and res % r == 0]
+    if not fine:
+        raise SystemExit(f"{mcool} holds {have} and none of them divides {res}")
+    step = res // fine[-1]
+    m, bins = observed_hic(mcool, region, fine[-1], balance=True)
+    n = (len(bins) // step) * step
+    blocks = m[:n, :n].reshape(n // step, step, n // step, step).sum(axis=(1, 3))
+    return blocks, bins[:n:step]
+
+
 def band_scores(a: np.ndarray, b: np.ndarray, res: int, sign: float = 1.0) -> tuple[list[float], list[float]]:
     """Returns the correlation of each band of diagonals and the weight of each band."""
     nb = a.shape[0]
@@ -72,13 +98,13 @@ def main() -> None:
         res = int(args[1])
         args = args[2:]
     if args[0] == "--halves":
-        first, _ = observed_hic(args[1], args[3], res, balance=True)
-        second, _ = observed_hic(args[2], args[3], res, balance=True)
+        first, _ = balanced_map(args[1], args[3], res)
+        second, _ = balanced_map(args[2], args[3], res)
         scores, _weights = band_scores(first, second, res)
         print("BAND", args[4], "halves", res, "contacts nan", " ".join(f"{x:.4f}" for x in scores))
         return
     mcool, region, out, row, arms = args[0], args[1], args[2], args[3], args[4:]
-    bal, bins = observed_hic(mcool, region, res, balance=True)
+    bal, bins = balanced_map(mcool, region, res)
     nb = len(bins)
     for arm in arms:
         cifs = sorted((Path(out) / f"{row}_{arm}").glob("*.cif"))
