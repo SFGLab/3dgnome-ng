@@ -12,12 +12,13 @@
 # again. The default chain, the arm prod, is built here unless REUSE_ARMS holds it. The arms are
 # compared over the rows with playground/arm_stats.py. The scores are the pooled scores at 25, 10
 # and 5 kb with the battery at 25 kb, the close pairs, the stretched pieces and the ends, in
-# OUT/scores-confirm20*. The log is OUT/confirm.log.
+# OUT/scores-TAG*, TAG confirm20 unless set. The log is OUT/confirm.log.
 set -u
 cd "$(dirname "$0")/../.."
 export DATA="${DATA:-$HOME/gapfill-data}" HIC=out/halves/bw CONTACT_HIC=out/halves/a
 export OUT="${OUT:-out/confirm20}" N="${N:-20}" THREADS="${THREADS:-4}"
 JOBS="${JOBS:-8}"
+export TAG="${TAG:-confirm20}"
 export LOG=$OUT/confirm.log
 CELLS="GM12878 H1ESC HFFC6"
 export R6="chr1:10000000-15000000 chr1:20000000-25000000 chr1:35000000-40000000 chr1:60000000-65000000 chr1:150000000-155000000 chr1:200000000-205000000"
@@ -48,21 +49,21 @@ build() {  # cell region arm
   echo "[$C $T $A] exit $? $(date +%H:%M) structures $(ls "$D"/*.cif 2>/dev/null | wc -l)" >> "$LOG"
 }
 score() {  # cell region resolution
-  local S=$OUT/scores-confirm20
+  local S=$OUT/scores-$TAG
   [ "$3" = 25000 ] || S=${S}_$(($3 / 1000))k
   CELLS=$1 REGIONS=$2 RES=$3 SCORES=$S bash slurm/ensemble/rescore_trial.sh $ARMS
 }
 export -f build score
 
-echo "build start $(date), $JOBS at a time" >> "$LOG"
+echo "$TAG build start $(date), $JOBS at a time" >> "$LOG"
 for C in $CELLS; do for R in $R6; do for A in $ARMS; do echo "$C $R $A"; done; done; done \
   | xargs -P "$JOBS" -L1 bash -c 'build "$@"' _
-echo "build done $(date)" >> "$LOG"
+echo "$TAG build done $(date)" >> "$LOG"
 
 for C in $CELLS; do for R in $R6; do for RES in 25000 10000 5000; do echo "$C $R $RES"; done; done; done \
   | xargs -P "$JOBS" -L1 bash -c 'score "$@"' _
-S=$OUT/scores-confirm20
+S=$OUT/scores-$TAG
 .venv/bin/python playground/uniform_overlap_check.py "$OUT" $ARMS 2>&1 | grep -v INFO > "$S/overlaps.txt"
 .venv/bin/python playground/uniform_stretch_check.py "$OUT" $ARMS 2>&1 | grep -v INFO > "$S/stretch.txt"
 .venv/bin/python playground/uniform_ends_check.py "$OUT" $ARMS 2>&1 | grep -v INFO > "$S/ends.txt"
-echo "confirm20 DONE $(date)" >> "$LOG"
+echo "$TAG DONE $(date)" >> "$LOG"
