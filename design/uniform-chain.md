@@ -1304,7 +1304,49 @@ heatmap of the coarse stage.
 The equal evidence on the two sides of the test gives unequal distances. A cell of 5 expected counts with none
 observed is 2.2 deviations under and its ratio asks for 2.2 times the law. A cell with 10 observed is 2.2
 deviations over and its ratio asks for 0.80 of the law. A distance from a quantity that is symmetric in the
-evidence is not built.
+evidence is `contact_estimate = bound`, measured in the next trial.
+
+### Trial of the estimate of a cell and of the radius from every loop
+
+`design/figures/uniform-2026-11-19/est20/` and `scores-est20/`, with `scores-est20_10k/` and
+`scores-est20_5k/`, `slurm/ensemble/uniform_confirm20.sh` with `TAG=est20`, commit a93ba5a. The ladder with the
+weights, z 2 and the dropout, with `contact_estimate = bound` and with the derived radius of the arcs stage from
+every loop of the chromosome. Eighteen rows of twenty structures, raw and balanced SCC per bead pair at 25 kb:
+
+| arm | SCC | Spearman | Pearson balanced | close pairs | ends overlap | exponent over Hi-C | Rg | distance at 500 kb, 1 Mb, 4 Mb |
+|---|---|---|---|---|---|---|---|---|
+| default chain | 0.204, 0.268 | 0.532 | 0.705 | 11.5 | 12 of 360 | 1.044 | 10.0 | 8.6, 11.4, 15.0 |
+| ratio, pseudo count 1, radius 3.0 | 0.356, 0.390 | 0.598 | 0.749 | 1.5 | 1 of 360 | 1.161 | 11.9 | 9.3, 12.8, 20.9 |
+| ratio, pseudo count 1, radius from every loop | 0.358, 0.389 | 0.597 | 0.749 | 1.6 | 1 of 360 | 1.162 | 11.9 | 9.2, 12.8, 20.9 |
+| bound, radius 3.0 | 0.313, 0.335 | 0.592 | 0.732 | 1.8 | 24 of 360 | 1.098 | 10.8 | 8.6, 11.8, 18.6 |
+| bound, radius from every loop | 0.312, 0.334 | 0.591 | 0.731 | 1.8 | 21 of 360 | 1.099 | 10.8 | 8.6, 11.8, 18.6 |
+| bound, z 1.5, radius 3.0 | 0.320, 0.341 | 0.618 | 0.744 | 1.8 | 4 of 360 | 1.114 | 11.1 | 8.7, 12.0, 19.5 |
+
+No structure has a stretched piece.
+
+- The radius from every loop scores as the radius of 3.0 under either estimate, +0.002 ± 0.003 of raw SCC with
+  the same overlap of the ends and the same decay. It is the rule of the uniform chain under the dropout, by the
+  maintainer's decision of 2026-11-21.
+- The bound gives the distances of the default chain back at 500 kb, 8.6 bonds, and the long range of the law,
+  18.6 bonds at 4 Mb. The exponent over Hi-C falls from 1.16 to 1.10.
+- The bound costs 0.043 ± 0.006 of raw and 0.054 ± 0.007 of balanced SCC against the ratio, on 17 and 18 rows
+  of 18, and the ends overlap in 24 structures of 360 against 1. It moves every cell towards the background,
+  the cells held in as the cells held out, and the cells held in carry the SCC.
+- The bound at z 1.5 has the highest Spearman of the trials, 0.618, the ends overlap in 4 structures, and it
+  costs 0.036 and 0.049 of SCC.
+- Each arm is above the default chain in SCC: the ratio by 0.153 ± 0.018 of raw and 0.121 ± 0.021 of balanced,
+  the bound at z 1.5 by 0.116 ± 0.016 and 0.073 ± 0.016.
+
+The decay and the SCC trade against each other over the cells. With the weights, the ladder, z 2 and the dropout:
+
+| estimate | balanced SCC | exponent over Hi-C | ends overlap | Spearman |
+|---|---|---|---|---|
+| ratio, pseudo count 1 | 0.390 | 1.16 | 1 of 360 | 0.598 |
+| ratio, pseudo count 4 | 0.367 | 1.13 | 6 of 360 | 0.598 |
+| bound, z 1.5 | 0.341 | 1.11 | 4 of 360 | 0.618 |
+| bound | 0.335 | 1.10 | 24 of 360 | 0.592 |
+| no ladder, ratio | 0.377 | 1.04 | 30 of 360 | 0.488 |
+| default chain | 0.268 | 1.04 | 12 of 360 | 0.532 |
 
 ## Settings
 
