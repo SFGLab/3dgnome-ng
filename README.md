@@ -109,9 +109,9 @@ GM12878 region when its inputs are under `data/`.
 Three parts are the work of others and keep their own terms, each compatible with the licence above.
 
 - `web/vendor/personal3d/rules/` is under the BSD 2-Clause licence in that folder.
-- `legacy/3dnome/MC/lib/` has inih and INIReader under the New BSD licence, mtxlib of Dante Treglia II and
-  Mark A. DeLoura under the terms in its header, and rmsd of Bosco K. Ho under the GNU Lesser General Public
-  License, version 2.1 or later.
+- `legacy/3dnome/MC/lib/` has three libraries. inih and INIReader are under the New BSD licence. mtxlib of
+  Dante Treglia II and Mark A. DeLoura is under the terms in its header. rmsd of Bosco K. Ho is under the GNU
+  Lesser General Public License, version 2.1 or later.
 - The fonts of the site, Inter and JetBrains Mono, are under the SIL Open Font License 1.1.
 
 ## Acknowledgements

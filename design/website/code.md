@@ -37,18 +37,18 @@ jobs/
   store.py        the files of a job directory
   submit.py       the check of a request and its queueing
   run.py          one job, from its request to its structures and marks
-  workers.py      the queue: inline, threads or rq, and the slots
+  workers.py      the queue, which is inline, threads or rq, with its slots
   marks.py        the beads of promoters and enhancers
 uploads/
   checks.py       the check of an upload, by its kind
-  store.py        the stored file, its record and the uploads a request names
+  store.py        the stored file, its record and the uploads of a request
 variants/
   vcf.py          the reader of a VCF
   effect.py       the effect of variants on loops, for the dialog
 results/
   views.py        the answers of a job page
   contact_view.py the contact maps of a job page
-  compare.py      two jobs compared
+  compare.py      the comparison of two jobs
 lists/
   store.py        the shared job lists
 ```
@@ -67,20 +67,21 @@ function that takes plain values and can be tested without a request.
 A route takes the site as the parameter `site: Here`. No module keeps state of the site. A cache
 is keyed by the path of the file it read.
 
-`jobs/store.py` alone states the names of the files of a job directory and what a download
-gives of them. The other modules call it. `public_files` is the one rule of the files a visitor
+`jobs/store.py` alone states the file names of a job directory and the content of a download.
+The other modules call it. `public_files` is the one rule of the files a visitor
 may have. The summary lists them, a download serves one of them and the zip holds them all.
 
 `Settings.from_env` in `context.py` and in the function of a worker reads the environment. A
 request of a job reads none of it. The form route applies the limits of the site before it
 builds the request.
 
-A request the site refuses raises `Refused` with the form field it concerns, and the answer is
-400 with the message and the field. A cell type the catalog lacks raises `UnknownCell`, and the
-answer is 404.
+A request the site refuses raises `Refused` with the form field it concerns. The answer is 400
+with the message and the field. A cell type the catalog lacks raises `UnknownCell` and the answer
+is 404.
 
-No module has the name of a module of Python. The engine runs scripts from inside the package,
-and a module named `site`, `http` or `queue` there would be found in place of Python's own.
+No module has the name of a module of Python. The engine runs scripts from inside the package. A
+module there with the name `site`, `http` or `queue` would be found in place of the module of
+Python.
 
 The packages import in one direction: `catalog`, then `engine`, then `jobs`. `uploads` is used
 by `jobs/submit.py` and by `variants`. `results` reads through `jobs/store.py`.
@@ -89,32 +90,32 @@ by `jobs/submit.py` and by `variants`. `results` reads through `jobs/store.py`.
 
 The shape of every JSON answer and of every file the site keeps is declared once, as a
 `TypedDict` in the `shapes.py` of its package. The function that builds an answer has the shape
-as its return type and pyright checks the two against each other. The route names the shape as
-its `response_model`, and the app describes the whole interface at `/openapi.json`. The types of
-the frontend are generated from that description: `web/scripts/write_openapi.py` writes it to
+as its return type and pyright checks the two against each other. The route has the shape as its
+`response_model` and the app describes the whole interface at `/openapi.json`. The types of the
+frontend are generated from that description. `web/scripts/write_openapi.py` writes it to
 `web/frontend/src/api/openapi.json` and `npm run api` writes `src/api/schema.d.ts` from it. Both
 files are in the repository. A test of the server and a step of CI fail while one is stale.
 
-A route still answers with the value its function returned. The shape is checked by pyright and
-by `web/tests/test_contract.py`, not at each request. The contact map of 800 bins is megabytes
-of JSON, and a check of every number of it at each request would cost more than the map.
+A route answers with the value its function returned. The shape is checked by pyright and by
+`web/tests/test_contract.py`, not at each request. The contact map of 800 bins is megabytes of
+JSON. A check of every number of it at each request would cost more than the map.
 
 `pyright -p web/pyrightconfig.json` checks the package in basic mode. Five modules that work on
 tables turn off the rules that pandas and h5py trip: `remote.py`, `expression.py`,
 `engine/inputs.py`, `contacts.py` and `density.py`.
 
-### What a change must not move by accident
+### Guard tests
 
-Four tests state what running sites and links in the wild depend on. A change of one of them is
-a decision and is made in the test.
+Four tests state the parts that running sites and links in the wild depend on. A change of one of
+them is a decision and is made in the test.
 
 - `web/tests/test_routes.py` lists every method and path of the interface.
 - `web/tests/test_jobs.py` pins the keys of ten kinds of request. A site finds its jobs by them.
 - `web/tests/test_contract.py` asks every route and compares the answer with its declared
-  shape: every key declared, no key undeclared, every value of its type. It fails for a route
-  it has not asked.
-- `web/tests/test_job_on_disk.py` reads two job directories written before the refactor of
-  2026-11-21 and compares the answers with the ones of that time.
+  shape. Every key is declared, no key is undeclared and every value has its type. The test
+  fails for a route it has not asked.
+- `web/tests/test_job_on_disk.py` reads two job directories that the code of commit 7b8affb7
+  made and compares the answers with the ones of that commit.
 
 ## The frontend
 
@@ -128,7 +129,7 @@ api/            every request to the server and the shapes of its answers
   http.ts       the one way to ask: JSON, text or an ApiError
   site.ts  jobs.ts  uploads.ts  lists.ts   the routes
   queries.ts    one definition for each question, its key in the cache and its call
-  types.ts      the shapes of schema.d.ts by the names the pages use
+  types.ts      the shapes of schema.d.ts under the names the pages use
   schema.d.ts   generated from openapi.json, which the server writes
 lib/            pure functions two parts use: formats, regions, the saving of a file, CSV
 components/     components two parts use: the layout of the site, the dialog frame,
@@ -137,7 +138,7 @@ content/        the references of the Cite and the Method page
 myjobs/         the job list of the browser, its sync and its panel
 model/          the form
   form.ts       the state of the form and its rules
-  request.ts    the request of a job: to the server, from an example, from an earlier job
+  request.ts    the request of a job, to the server, from an example and from an earlier job
   own/          the own data dialog, one file for each step
 job/            the page of a job
   compare/      the comparison of two jobs
@@ -151,11 +152,11 @@ test/           the stand in for the server and the check of the text of a page
 
 A request and the shape of its answer are in `api/`. A page does not call fetch.
 
-A pure function that two parts use is in `lib/`, and a component that two parts use is in
+A pure function that two parts use is in `lib/` and a component that two parts use is in
 `components/`. Everything else is in the folder of its part, with its test beside it.
 
-`job/`, `model/` and `myjobs/` do not import each other or a page, and the shared folders import
-none of them. `eslint.config.js` has the rule.
+`job/`, `model/` and `myjobs/` do not import each other or a page. The shared folders import none
+of them. `eslint.config.js` has the rule.
 
 A component file exports components alone. A helper beside a component is in a module of its
 own.
@@ -164,22 +165,22 @@ The stylesheet of a part is a CSS module beside its components, `job/job.module.
 page. Its rules apply to the components of that part alone. Two parts can have a class of one
 name with two looks. The sheets of `styles/` are shared and plain.
 
-A component takes its class names through `scoped` of `lib/css.ts`: `cn('factor-row bad')` gives
+A component takes its class names through `scoped` of `lib/css.ts`. `cn('factor-row bad')` gives
 each name its scoped name and keeps the plain name beside it. A rule of a module applies by the
-scoped name. The plain name is for the shared sheets, for a rule of another sheet that refers to
-the component, written `:global(.name)` there, for a selector in code and for a test. A class
-name is not checked by TypeScript.
+scoped name. The plain name is for the shared sheets, for a selector in code, for a test and for
+a rule of another sheet that refers to the component, which has the form `:global(.name)` there.
+TypeScript does not check a class name.
 
 A question to the server has one definition in `api/queries.ts`. A view that waits for an answer
 shows `Unanswered`: a busy mark, or the message of the question that failed.
 
-### What a change must not move by accident
+### Fixed interfaces and the check of pictures
 
 The addresses of the pages and their query parameters, the keys of the storage of the browser
 and the text of the pages are in use by links in the wild and by browsers that hold a job list.
 The tests of the pages check the text against `design/writing-rules.md`.
 
-A change of markup or of a stylesheet that is meant to be inert is checked by pictures: two
-builds are served side by side on the data of the tests, every page and dialog is drawn at a
-desktop width, in the dark theme and at the width of a phone, and the pictures are compared
-pixel by pixel.
+A change of markup or of a stylesheet that is meant to be inert is checked by pictures. Two
+builds are served side by side on the data of the tests. Every page and dialog is drawn at a
+desktop width, in the dark theme and at the width of a phone. The pictures are compared pixel
+by pixel.
