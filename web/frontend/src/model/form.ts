@@ -15,6 +15,8 @@ export type FormState = {
   haplotype: 0 | 1
   vcfUpload: UploadResult | null
   background: Background
+  /** The id of the hosted expression source of the job, empty for none. */
+  expression: string
   structures: number
   name: string
   settings: Record<string, string>
@@ -30,6 +32,7 @@ export const EMPTY_FORM: FormState = {
   haplotype: 0,
   vcfUpload: null,
   background: 'hic',
+  expression: '',
   structures: 100,
   name: '',
   settings: {},
@@ -68,6 +71,7 @@ export function fromRequest(r: Summary['request'], cells: string[]): FormState {
     sample: r.sv_set ? r.sample : '',
     haplotype: r.sv_set && r.haplotype === 1 ? 1 : 0,
     background,
+    expression: r.expression ?? '',
     structures: r.n_models,
     settings: { ...(r.overrides ?? {}) },
   }

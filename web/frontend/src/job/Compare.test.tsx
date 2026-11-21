@@ -128,6 +128,60 @@ describe('Compare', () => {
     for (const name of ['Clear the selection of TNFRSF8', 'Close the comparison']) expect(screen.getByRole('button', { name })).toHaveClass('action')
   })
 
+  it('compares the expression of two jobs that both have it, beside the change of distance', async () => {
+    const withData = { ...SUMMARY_DONE, expression: { label: 'ENCODE RNA-seq of GM12878, 2 replicates', kind: 'counts' as const, unit: 'TPM', samples: 2, source: 'ENCODE' } }
+    const change = {
+      mode: 'deseq2', reason: '', label_a: 'ENCODE RNA-seq of GM12878, 2 replicates', label_b: 'ENCODE RNA-seq of H1ESC, 2 replicates', rho: -0.41,
+      rows: [
+        { gene: 'TNFRSF8', distance: 1.24, log2fc: -3, padj: 0.0000002, a: 80, b: 10 },
+        { gene: 'MIIP', distance: -0.2, log2fc: 1, padj: 0.2, a: 5, b: 10 },
+      ],
+    }
+    const f = mockApi([
+      [/summary$/, () => [200, withData]],
+      [/structure\/\d+$/, () => [200, STRUCTURE]],
+      [/annotations$/, () => [200, ANNOTATIONS]],
+      [/genes$/, () => [200, GENES]],
+      [/\/api\/compare\/expression$/, () => [200, change]],
+      [/\/api\/compare$/, () => [200, COMPARE]],
+    ])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <Compare api={jobApi('jobs', KEY)} summary={withData} selected={1} gene="TNFRSF8" initial={`/jobs/${OTHER}`} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    const block = await screen.findByRole('region', { name: 'Expression against 3D distance' })
+    expect(await within(block).findByText(/The fold change and its adjusted p are those of DESeq2\./)).toHaveTextContent('Over 2 genes the change of expression and the change of distance have a rank correlation of -0.41.')
+    const table = within(block).getByRole('table', { name: 'Largest changes in expression' })
+    const row = within(table).getByRole('row', { name: /TNFRSF8/ })
+    expect(within(row).getAllByRole('cell').map((c) => c.textContent)).toEqual(['TNFRSF8', '8.0 times lower', '2.0e-7', '2.4 times farther'])
+    expect(within(within(table).getByRole('row', { name: /MIIP/ })).getAllByRole('cell')[2]).toHaveTextContent('0.200')
+    expect(within(block).getByRole('img', { name: 'Change of expression against change of distance for 2 genes' }).querySelectorAll('circle')).toHaveLength(2)
+    expect(String(f.mock.calls.find(([u]) => String(u).includes('/api/compare/expression'))![0])).toContain(`b=%2Fjobs%2F${OTHER}`)
+    expect(checkCopy(container)).toEqual([])
+  })
+
+  it('does not ask for a comparison of expression when a job lacks it, and says what a ratio is', async () => {
+    const f = mockApi([
+      [new RegExp(`${OTHER}/summary$`), () => [200, CTCF_SUMMARY]],
+      [/summary$/, () => [200, SUMMARY_DONE]],
+      [/structure\/\d+$/, () => [200, STRUCTURE]],
+      [/annotations$/, () => [200, ANNOTATIONS]],
+      [/genes$/, () => [200, GENES]],
+      [/\/api\/compare$/, () => [200, COMPARE]],
+    ])
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <Compare api={jobApi('jobs', KEY)} summary={SUMMARY_DONE} selected={1} gene={null} initial={`/jobs/${OTHER}`} onClose={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    await screen.findByRole('table', { name: 'Largest changes in enhancer to promoter distance' })
+    expect(screen.queryByRole('region', { name: 'Expression against 3D distance' })).toBeNull()
+    expect(f.mock.calls.some(([u]) => String(u).includes('/api/compare/expression'))).toBe(false)
+  })
+
   it('keeps the ten largest changes in their order and puts a selected gene outside them first', () => {
     const rows = Array.from({ length: 14 }, (_, i) => ({ gene: `G${i}` }))
     expect(shownRows(rows, 'G3').map((r) => r.gene)).toEqual(rows.slice(0, 10).map((r) => r.gene))

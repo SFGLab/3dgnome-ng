@@ -29,7 +29,7 @@ describe('Model a region page', () => {
     localStorage.clear()
   })
 
-  it('has the five steps in the design order', async () => {
+  it('has the six steps in the design order', async () => {
     renderModel()
     const steps = await screen.findAllByRole('heading', { level: 2 })
     expect(steps.map((h) => h.textContent)).toEqual([
@@ -37,7 +37,8 @@ describe('Model a region page', () => {
       '2Loops',
       '3Structural variantsoptional',
       '4Contact background',
-      '5Ensemble and simulation settings',
+      '5Gene expressionoptional',
+      '6Ensemble and simulation settings',
     ])
   })
 
@@ -117,7 +118,7 @@ describe('Model a region page', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('The form is filled with the request of job abcdef01. Change what you need and start a new job.')
     await waitFor(() => expect(screen.getByLabelText('Region, chr:start-end or a gene name')).toHaveValue('chr8:127,500,000-129,000,000'))
     expect(screen.getByRole('radio', { name: /H1ESC/ })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('radio', { name: /^None/ })).toHaveAttribute('aria-checked', 'true')
+    expect(within(screen.getByRole('radiogroup', { name: 'Contact background' })).getByRole('radio', { name: /^None/ })).toHaveAttribute('aria-checked', 'true')
     // The new job is posted with the request of the old one.
     fireEvent.click(await screen.findByRole('button', { name: /Build 7 structures/ }))
     await waitFor(() => expect(fetchMock.mock.calls.some(([u, o]) => String(u).endsWith('/api/jobs') && (o as RequestInit)?.method === 'POST')).toBe(true))
@@ -141,6 +142,33 @@ describe('Model a region page', () => {
     expect(await screen.findByText('The job of this link was not found and the form is not filled.')).toBeInTheDocument()
     // A link that is not a job of this site asks for nothing.
     expect(screen.getByLabelText('Region, chr:start-end or a gene name')).toHaveValue('')
+  })
+
+  it('offers the hosted expression of the cell type as an opt in and posts the chosen source', async () => {
+    const options = [
+      { id: 'ENCODE', label: 'ENCODE RNA-seq of GM12878, 2 replicates', kind: 'counts', unit: '', columns: ['a', 'b'], other_cell_type: false },
+      { id: 'MAGE', label: 'MAGE of HG00512, 1 library', kind: 'values', unit: 'TMM', columns: ['HG00512'], other_cell_type: true },
+    ]
+    const fetchMock = mockApi([
+      [/^\/api\/expression$/, () => [200, { options }]],
+      [/^\/api\/jobs$/, () => [201, { url: '/jobs/new0000000000000' }]],
+    ])
+    const { container } = renderModel('/model?example=TNFRSF8')
+    const group = await screen.findByRole('radiogroup', { name: 'Gene expression' })
+    // None is chosen until the reader picks a source.
+    expect(within(group).getByRole('radio', { name: /^None/ })).toHaveAttribute('aria-checked', 'true')
+    expect(await within(group).findByRole('radio', { name: /ENCODE RNA-seq of GM12878, 2 replicates/ })).toHaveTextContent('compared with DESeq2')
+    expect(screen.queryByText(/is of a lymphoblastoid cell line/)).toBeNull()
+    // A person's lymphoblastoid line beside another cell type gets a warning when it is chosen.
+    fireEvent.click(within(group).getByRole('radio', { name: /MAGE of HG00512/ }))
+    expect(screen.getByText('This RNA-seq is of a lymphoblastoid cell line. GM12878 is another cell type and its expression differs.')).toBeInTheDocument()
+    fireEvent.click(within(group).getByRole('radio', { name: /ENCODE RNA-seq/ }))
+    expect(screen.queryByText(/is of a lymphoblastoid cell line/)).toBeNull()
+    expect(checkCopy(container)).toEqual([])
+    fireEvent.click(screen.getByRole('button', { name: /Build \d+ structures/ }))
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u, o]) => String(u).endsWith('/api/jobs') && (o as RequestInit)?.method === 'POST')).toBe(true))
+    const body = fetchMock.mock.calls.find(([u, o]) => String(u).endsWith('/api/jobs') && (o as RequestInit)?.method === 'POST')![1]!.body as FormData
+    expect(body.get('expression')).toBe('ENCODE')
   })
 
   it('lists the recent jobs of this browser', async () => {
@@ -202,7 +230,7 @@ describe('Model a region page', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Build 100 structures/ }))
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('takes a number from 0 to 0.6')
-    expect(alert.closest('section')?.querySelector('h2')?.textContent).toBe('5Ensemble and simulation settings')
+    expect(alert.closest('section')?.querySelector('h2')?.textContent).toBe('6Ensemble and simulation settings')
   })
 
   it('opens the own data dialog from the card and from the loops option', async () => {

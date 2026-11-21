@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronDown } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { recentJobs } from '../model/recent'
-import { compareJobs, jobApi, type JobApi, type Summary } from './api'
+import { compareExpression, compareJobs, jobApi, type ExpressionCompare, type JobApi, type Summary } from './api'
 import { readPalette } from './colors'
 import { FACTORS, kb } from './format'
 import { makeCameraLink, type CameraLink } from './cameraLink'
@@ -149,6 +149,82 @@ function Panel({
   )
 }
 
+const SCATTER = { w: 320, h: 220, pad: 28 }
+
+/** How many times a level or a distance changed, from its log2 change, with the word for its direction. */
+const times = (log2: number, up: string, down: string) => `${(2 ** Math.abs(log2)).toFixed(1)} times ${log2 >= 0 ? up : down}`
+
+/**
+ * The change of expression of the genes two jobs share, the other job against this one, beside
+ * the change of their enhancer to promoter distance: what was computed, a plot of one change
+ * against the other and the genes whose expression changed most.
+ */
+function ExpressionChange({ data, gene, onGene }: { data: ExpressionCompare; gene: string | null; onGene?: (gene: string | null) => void }) {
+  if (data.mode === 'none') return <p className="compare-note">{data.reason}</p>
+  const rows = data.rows
+  const { w, h, pad } = SCATTER
+  const reach = (get: (r: ExpressionCompare['rows'][number]) => number) => Math.max(1, ...rows.map((r) => Math.abs(get(r))))
+  const [rx, ry] = [reach((r) => r.distance), reach((r) => r.log2fc)]
+  const x = (v: number) => w / 2 + (v / rx) * (w / 2 - pad)
+  const y = (v: number) => h / 2 - (v / ry) * (h / 2 - pad)
+  return (
+    <>
+      <p className="compare-note">
+        {`${data.label_b} against ${data.label_a}. `}
+        {data.mode === 'deseq2' ? 'The fold change and its adjusted p are those of DESeq2.' : data.reason}
+        {data.rho !== null && ` Over ${rows.length} genes the change of expression and the change of distance have a rank correlation of ${data.rho.toFixed(2)}.`}
+      </p>
+      {rows.length === 0 ? (
+        <p className="compare-note">The two jobs share no gene with expression in both.</p>
+      ) : (
+        <div className="expression-change">
+          <svg className="expression-scatter" viewBox={`0 0 ${w} ${h}`} role="img" aria-label={`Change of expression against change of distance for ${rows.length} genes`}>
+            <line className="axis" x1={pad} x2={w - pad} y1={h / 2} y2={h / 2} />
+            <line className="axis" x1={w / 2} x2={w / 2} y1={pad} y2={h - pad} />
+            <text className="axis-label" x={w - pad} y={h / 2 - 6} textAnchor="end">
+              farther
+            </text>
+            <text className="axis-label" x={pad} y={h / 2 - 6}>
+              closer
+            </text>
+            <text className="axis-label" x={w / 2 + 6} y={pad + 4}>
+              higher expression
+            </text>
+            <text className="axis-label" x={w / 2 + 6} y={h - pad}>
+              lower
+            </text>
+            {rows.map((r) => (
+              <circle key={r.gene} className={r.gene === gene ? 'point selected' : r.padj !== null && r.padj < 0.05 ? 'point sure' : 'point'} cx={x(r.distance)} cy={y(r.log2fc)} r={r.gene === gene ? 5 : 3}>
+                <title>{`${r.gene}, distance ${times(r.distance, 'farther', 'closer')}, expression ${times(r.log2fc, 'higher', 'lower')}`}</title>
+              </circle>
+            ))}
+          </svg>
+          <table className="genes-table compare-table" aria-label="Largest changes in expression">
+            <thead>
+              <tr>
+                <th>Largest changes in expression</th>
+                <th>Expression</th>
+                <th>Adjusted p</th>
+                <th>3D distance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shownRows(rows, gene).map((r) => (
+                <tr key={r.gene} className={r.gene === gene ? 'selected' : undefined} aria-selected={r.gene === gene} onClick={() => onGene?.(r.gene === gene ? null : r.gene)}>
+                  <td>{r.gene}</td>
+                  <td>{times(r.log2fc, 'higher', 'lower')}</td>
+                  <td>{r.padj === null ? 'no test' : r.padj < 0.001 ? r.padj.toExponential(1) : r.padj.toFixed(3)}</td>
+                  <td>{times(r.distance, 'farther', 'closer')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  )
+}
+
 /** The compare view: this job and another side by side, with the largest changes in enhancer to
  * promoter distance between them. The other side starts empty with its list of jobs open. */
 export function Compare({
@@ -182,6 +258,14 @@ export function Compare({
   const otherApi = useMemo(() => (other ? jobApi(other.kind, other.key) : null), [other])
   const cmp = useQuery({ queryKey: ['compare', api.url, otherApi?.url], queryFn: () => compareJobs(api.url, otherApi!.url), enabled: !!otherApi })
   const otherSummary = useQuery({ queryKey: ['summary', otherApi?.base], queryFn: () => otherApi!.summary(), enabled: !!otherApi })
+  // The expression of the two jobs is compared when both have it. The test of two tables takes seconds the first time.
+  const bothExpressed = !!summary.expression && !!otherSummary.data?.expression
+  const expressed = useQuery({
+    queryKey: ['compare-expression', api.url, otherApi?.url],
+    queryFn: () => compareExpression(api.url, otherApi!.url),
+    enabled: !!otherApi && bothExpressed,
+    staleTime: Infinity,
+  })
   const recent = recentJobs().filter((j) => j.url !== api.url)
   const choices = recent.filter((j) => j.url !== otherApi?.url).map((j) => ({ url: j.url, name: j.name || j.label }))
   const pick = (url: string) => setOther(parseJobUrl(url))
@@ -252,6 +336,21 @@ export function Compare({
             ))}
           </tbody>
         </table>
+      )}
+      {otherApi && bothExpressed && (
+        <section className="compare-expression" aria-label="Expression against 3D distance">
+          <h3>Expression against 3D distance</h3>
+          {expressed.isPending && (
+            <p className="compare-note" aria-busy="true">
+              Comparing the expression of the two jobs.
+            </p>
+          )}
+          {expressed.isError && <p className="compare-note">{(expressed.error as Error).message}</p>}
+          {expressed.data && <ExpressionChange data={expressed.data} gene={gene} onGene={onGene} />}
+        </section>
+      )}
+      {otherApi && otherSummary.data && !bothExpressed && (summary.expression || otherSummary.data.expression) && (
+        <p className="compare-note">One of the two jobs has no expression data. Both need it for a comparison of expression.</p>
       )}
     </div>
   )

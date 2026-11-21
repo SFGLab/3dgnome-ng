@@ -21,6 +21,8 @@ export type Summary = {
     sample: string
     haplotype: number
     n_models: number
+    /** The id of the hosted expression source, absent for a job without expression. */
+    expression?: string
     /** The engine settings the request changed, keyed section.key. */
     overrides?: Record<string, string>
     own?: { loops: string[]; anchors: boolean; contacts: boolean; enhancers: boolean; loops_from?: string; enhancers_from?: string }
@@ -30,6 +32,8 @@ export type Summary = {
   loops: Record<string, number>
   n_svs: number | null
   structures: number
+  /** The expression of the job: its label, counts or values, the unit of the gene table and the number of samples. */
+  expression?: { label: string; kind: 'counts' | 'values'; unit: string; samples: number; source: string } | null
   stages?: { stage: string; at: number }[]
   /** The time of the server at this answer, on the clock of `stages`. */
   now?: number
@@ -56,6 +60,8 @@ export type Loop = { factor: string; chrom: string; a: [number, number]; b: [num
 export type Distance = { a: { bead: number; bp: number; offset: number }; b: { bead: number; bp: number; offset: number }; values: number[]; mean: number; sd: number; n: number }
 export type GeneRow = {
   gene: string
+  /** The level of the gene in the job's expression, null without it. */
+  expression?: number | null
   tss: number
   enhancer: number
   linear_bp: number
@@ -141,3 +147,19 @@ export function jobApi(kind: 'jobs' | 'p', key: string) {
 export type JobApi = ReturnType<typeof jobApi>
 
 export const compareJobs = (a: string, b: string) => call<Compare>(`/api/compare?${new URLSearchParams({ a, b })}`)
+
+/**
+ * The expression of job b against job a for the genes both have. `distance` is log2 of the
+ * enhancer to promoter distance of b over a, `log2fc` the log2 fold change of the expression and
+ * `padj` its adjusted p, null where no test was run. `mode` is deseq2, ratio or none and `reason`
+ * says why it is not deseq2.
+ */
+export type ExpressionCompare = {
+  mode: 'deseq2' | 'ratio' | 'none'
+  reason: string
+  label_a?: string
+  label_b?: string
+  rho: number | null
+  rows: { gene: string; distance: number; log2fc: number; padj: number | null; a: number; b: number }[]
+}
+export const compareExpression = (a: string, b: string) => call<ExpressionCompare>(`/api/compare/expression?${new URLSearchParams({ a, b })}`)

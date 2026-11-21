@@ -58,6 +58,7 @@ export function mockApi(extra: Route[] = []) {
     }],
     [/^\/api\/preview$/, () => [200, PREVIEW]],
     [/^\/api\/settings$/, () => [200, SCHEMA]],
+    [/^\/api\/expression$/, () => [200, { options: [] }]],
     [/^\/api\/jobs\/[\w-]+$/, () => [200, { state: 'done', stage: 'done' }]],
   ]
   const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

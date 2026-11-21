@@ -12,6 +12,7 @@ export function GenesPanel({ api, summary, filter, selected, onSelect }: { api: 
       rows={genes.data}
       chrom={parseRegion(summary.region)?.chrom ?? ''}
       structures={summary.structures}
+      expressionUnit={summary.expression?.unit ?? ''}
       epUrl={api.fileUrl('ep.tsv')}
       filter={filter}
       selected={selected}

@@ -33,6 +33,9 @@ export type Setting = {
   meaning: string
 }
 export type SettingGroup = { name: string; settings: Setting[] }
+/** A hosted expression table a job can take: the id of its source, what the form calls it, counts
+ * or values, the unit of values and whether it is a lymphoblastoid line beside another cell type. */
+export type ExpressionOption = { id: string; label: string; kind: 'counts' | 'values'; unit: string; columns: string[]; other_cell_type: boolean }
 export type VariantRow = { type: string; pos: number; end: number; length: number; genotype: string; change: string }
 export type VariantCheck = { summary: string; applied: Record<string, number>; skipped: Record<string, number>; variants: VariantRow[] }
 export type JobStatus = { state: string; stage?: string; error?: string }
@@ -67,6 +70,8 @@ export const api = {
       t.rows.map((r) => Object.fromEntries(t.columns.map((c, i) => [c, r[i] ?? ''])) as SampleRow),
     ),
   settings: (cell: string) => call<SettingGroup[]>(`/api/settings?${q({ cell })}`),
+  expression: (cell: string, svSet: string, sample: string) =>
+    call<{ options: ExpressionOption[] }>(`/api/expression?${q({ cell, sv_set: svSet, sample })}`).then((r) => r.options),
   parseIni: (file: File) => {
     const form = new FormData()
     form.append('file', file)

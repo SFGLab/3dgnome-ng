@@ -8,6 +8,7 @@ import { Background } from '../model/Background'
 import { jobApi } from '../job/api'
 import { CellTypes } from '../model/CellTypes'
 import { EXAMPLES, type Example } from '../model/examples'
+import { Expression } from '../model/Expression'
 import { EMPTY_FORM, fromRequest, longRegion, readUploads, type FormState } from '../model/form'
 import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
@@ -35,8 +36,9 @@ const FIELD_STEP: Record<string, number> = {
   sample: 3,
   vcf_upload: 3,
   background: 4,
-  n_models: 5,
-  overrides: 5,
+  expression: 5,
+  n_models: 6,
+  overrides: 6,
 }
 
 /** The form as the multipart body of POST /api/jobs. */
@@ -46,6 +48,7 @@ function toFormData(form: FormState, overrides: Record<string, string>): FormDat
   d.append('region', form.region)
   d.append('factors', form.factors)
   d.append('background', form.background)
+  if (form.expression) d.append('expression', form.expression)
   d.append('sv_set', form.svSet)
   d.append('sample', form.sample)
   d.append('haplotype', String(form.haplotype))
@@ -145,7 +148,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
     },
   })
   const error = submit.error instanceof ApiError ? submit.error : null
-  const errorStep = error ? (FIELD_STEP[error.field ?? ''] ?? 5) : 0
+  const errorStep = error ? (FIELD_STEP[error.field ?? ''] ?? 6) : 0
   const stepError = (n: number) =>
     errorStep === n && error ? (
       <p className="field-error" role="alert">
@@ -154,6 +157,18 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
     ) : null
 
   const cellType = catalog.data?.cell_types[form.cell]
+  // The hosted expression of the cell type, and of the sample of a hosted call set.
+  const expressionOptions = useQuery({
+    queryKey: ['expression', form.cell, form.svSet, form.sample],
+    queryFn: () => api.expression(form.cell, form.svSet, form.sample),
+    enabled: !ownCell && !!catalog.data?.cell_types[form.cell],
+    staleTime: 60_000,
+  })
+  // A source the cell type or the sample no longer has is taken off the form.
+  const offered = expressionOptions.data
+  useEffect(() => {
+    if (form.expression && offered && !offered.some((o) => o.id === form.expression)) setForm((f) => ({ ...f, expression: '' }))
+  }, [form.expression, offered])
   const hicdiffusionMb = catalog.data?.hicdiffusion_mb ?? 2
   const hicdiffusionOk = !!catalog.data?.hicdiffusion && !(region.data && region.data.end - region.data.start > hicdiffusionMb * 1e6)
   useEffect(() => {
@@ -242,7 +257,11 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
           />
           {stepError(4)}
         </Step>
-        <Step n={5} title="Ensemble and simulation settings">
+        <Step n={5} title="Gene expression" note="optional">
+          <Expression options={expressionOptions.data ?? []} value={form.expression} cell={cellType?.label.split(',')[0] ?? form.cell} onChange={(expression) => set({ expression })} />
+          {stepError(5)}
+        </Step>
+        <Step n={6} title="Ensemble and simulation settings">
           <EnsembleFields structures={form.structures} name={form.name} max={catalog.data?.max_structures ?? 100} onChange={set} />
           {sameName && (
             <p className="notice" role="status">
@@ -250,7 +269,7 @@ export function Model({ onSubmitted = goTo }: { onSubmitted?: (url: string) => v
             </p>
           )}
           {schema.data && <SettingsTree schema={schema.data} values={form.settings} onChange={(settings) => set({ settings })} />}
-          {stepError(5)}
+          {stepError(6)}
         </Step>
         <div className="submit-row">
           <button type="button" className="submit" disabled={!form.region.trim() || submit.isPending} onClick={() => submit.mutate()}>

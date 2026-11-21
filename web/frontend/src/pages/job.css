@@ -1376,6 +1376,69 @@
   color: #FFFFFF;
 }
 
+/* The change of expression of two jobs: a line on what was computed, then the plot beside the table. */
+.compare-expression {
+  margin-top: 22px;
+}
+
+.compare-expression h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.compare-note {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.expression-change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.expression-change .compare-table {
+  flex: 1;
+  min-width: 320px;
+  margin-top: 0;
+}
+
+.expression-scatter {
+  flex: none;
+  width: 320px;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.expression-scatter .axis {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.expression-scatter .axis-label {
+  fill: var(--faint);
+  font-size: 9px;
+}
+
+.expression-scatter .point {
+  fill: var(--faint);
+  opacity: 0.7;
+}
+
+.expression-scatter .point.sure {
+  fill: var(--accent);
+}
+
+.expression-scatter .point.selected {
+  fill: var(--promoter);
+  opacity: 1;
+}
+
 .compare-table {
   margin-top: 16px;
 }

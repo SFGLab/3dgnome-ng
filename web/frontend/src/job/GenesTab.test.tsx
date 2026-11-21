@@ -25,6 +25,20 @@ describe('GenesTab', () => {
     ])
   })
 
+  it('shows the expression of each gene when the job has it, in its unit', () => {
+    renderTab()
+    expect(screen.queryByRole('columnheader', { name: /Expression/ })).toBeNull()
+    document.body.innerHTML = ''
+    renderTab({ rows: ROWS.map((r, i) => ({ ...r, expression: i === 0 ? 312.4 : i === 1 ? 4.25 : null })), expressionUnit: 'TPM' })
+    const head = screen.getByRole('columnheader', { name: /Expression, TPM/ })
+    const column = screen.getAllByRole('columnheader').indexOf(head)
+    const cells = () => screen.getAllByRole('row').slice(1).map((row) => within(row).getAllByRole('cell')[column].textContent)
+    // A level of 100 or more has no decimals and a gene without a level an empty cell.
+    expect(cells().filter(Boolean).sort()).toEqual(['312', '4.3'].sort())
+    fireEvent.click(head)
+    expect(cells()[cells().length - 1]).toBe('312')
+  })
+
   it('sorts by 3D distance and by a column header', () => {
     renderTab()
     expect(names()).toEqual(['DHRS3', 'PLOD1', 'NPPA', 'TNFRSF8'])

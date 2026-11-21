@@ -5,7 +5,7 @@ import { usePage } from '../components/usePage'
 import type { GeneRow } from './api'
 import { bp, kb } from './format'
 
-type Key = 'gene' | 'enhancer' | 'linear_bp' | 'distance'
+type Key = 'gene' | 'enhancer' | 'linear_bp' | 'distance' | 'expression'
 type Chip = 'all' | 'loop' | 'rnapii'
 
 const median = (xs: number[]) => {
@@ -19,6 +19,8 @@ type Props = {
   rows: GeneRow[]
   chrom: string
   structures: number
+  /** The unit of the expression of the job, TPM for one. The column is shown when a row has a level. */
+  expressionUnit?: string
   epUrl: string
   filter: string
   onSelect: (gene: string) => void
@@ -27,7 +29,7 @@ type Props = {
 
 /** The Genes tab: every marked gene with its nearest enhancer, the 3D distance over the
  * ensemble and the loop joining them and a histogram of the distances. */
-export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, selected }: Props) {
+export function GenesTab({ rows, chrom, structures, expressionUnit = '', epUrl, filter, onSelect, selected }: Props) {
   const [text, setText] = useState(filter)
   const [chip, setChip] = useState<Chip>('all')
   const [sort, setSort] = useState<{ key: Key; up: boolean }>({ key: 'distance', up: true })
@@ -36,10 +38,13 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
     const t = text.trim().toUpperCase()
     const kept = rows.filter((r) => r.gene.toUpperCase().includes(t) && (chip === 'all' || (chip === 'loop' ? r.joined_by !== '' : r.joined_by === 'RNAPII')))
     const dir = sort.up ? 1 : -1
-    return [...kept].sort((a, b) => (sort.key === 'gene' ? a.gene.localeCompare(b.gene) : a[sort.key] - b[sort.key]) * dir)
+    // A gene without a level sorts as the lowest.
+    const of = (r: GeneRow, key: Exclude<Key, 'gene'>) => (key === 'expression' ? (r.expression ?? -1) : r[key])
+    return [...kept].sort((a, b) => (sort.key === 'gene' ? a.gene.localeCompare(b.gene) : of(a, sort.key) - of(b, sort.key)) * dir)
   }, [rows, text, chip, sort])
   const page = usePage(shown, `${text}|${chip}|${sort.key}|${sort.up}`)
   const max = Math.max(...rows.map((r) => r.max), 1)
+  const hasExpression = rows.some((r) => r.expression != null)
   const header = (key: Key, label: string, num = false) => (
     <th className={num ? 'num' : undefined} aria-sort={sort.key === key ? (sort.up ? 'ascending' : 'descending') : 'none'} onClick={() => setSort((s) => ({ key, up: s.key === key ? !s.up : true }))}>
       {label}
@@ -86,6 +91,7 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
               {header('enhancer', 'Nearest enhancer')}
               {header('linear_bp', 'Separation', true)}
               {header('distance', '3D distance', true)}
+              {hasExpression && header('expression', `Expression${expressionUnit ? `, ${expressionUnit}` : ''}`, true)}
               <th>{`Over ${structures} structures`}</th>
               <th>Loop between them</th>
             </tr>
@@ -99,6 +105,7 @@ export function GenesTab({ rows, chrom, structures, epUrl, filter, onSelect, sel
                 </td>
                 <td className="num">{kb(r.linear_bp)}</td>
                 <td className="num strong">{r.distance.toFixed(1)}</td>
+                {hasExpression && <td className="num">{r.expression == null ? '' : r.expression >= 100 ? r.expression.toFixed(0) : r.expression.toFixed(1)}</td>}
                 <td>
                   <span className="range" title={`${r.min.toFixed(1)} to ${r.max.toFixed(1)}, median ${r.median.toFixed(1)}`}>
                     <span className="whisker" style={{ left: `${(r.min / max) * 100}%`, width: `${((r.max - r.min) / max) * 100}%` }} />

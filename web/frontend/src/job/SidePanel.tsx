@@ -125,6 +125,12 @@ export function JobSidePanel({ api, summary, selected, onSelect, onPick }: Props
         <dd>{variants(summary)}</dd>
         <dt>Contact background</dt>
         <dd>{background(summary)}</dd>
+        {summary.expression && (
+          <>
+            <dt>Expression</dt>
+            <dd>{summary.expression.label}</dd>
+          </>
+        )}
         <dt>Structures</dt>
         <dd>{n || summary.request.n_models}</dd>
       </dl>
