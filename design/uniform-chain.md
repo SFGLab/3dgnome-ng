@@ -1564,7 +1564,6 @@ map or from an input and scored against the balanced other half at 100 kb, by ba
 | rank 1 of the log of observed over expected | 0.22 | 0.45 | 0.56 | 0.61 |
 | rank 3 | 0.28 | 0.62 | 0.73 | 0.70 |
 | rank 5 | 0.40 | 0.72 | 0.79 | 0.74 |
-| mean over pairs of domains of `<cell>_tads.bed` | 0.78 | 0.83 | 0.79 | 0.73 |
 | mean over blocks of 500 kb | 0.35 | 0.58 | 0.67 | 0.68 |
 | compartment track `<cell>_compartments.bedGraph`, outer product | 0.20 | 0.10 | 0.40 | 0.49 |
 | compartment track, same sign | 0.30 | 0.30 | 0.40 | 0.52 |
@@ -1573,11 +1572,42 @@ map or from an input and scored against the balanced other half at 100 kb, by ba
 | ChIA-PET loops, PET counts | 0.27 | 0.45 | 0.00 | |
 | anchors per bin, outer product | 0.06 | 0.11 | 0.11 | 0.18 |
 
-- The pattern beyond 1 Mb has few dimensions. Three numbers per bin hold 0.73 and 0.70 of it, and the mean over
-  pairs of domains holds 0.79 and 0.73.
+- The pattern beyond 1 Mb has few dimensions. Three numbers per bin hold 0.73 and 0.70 of it.
 - One number per bin from the genome wide compartment track holds 0.40 and 0.49, half of what the data holds.
 - The ChIA-PET inputs alone hold 0.24 and 0.13 beyond 1 Mb. The loops end under 1 Mb and the singletons are 490
   pairs a region.
+
+A first form of this table had a row for the mean over pairs of domains of `<cell>_tads.bed`. That file holds
+boundaries, one position a line, and the row was read with every bin as its own domain, which is the map itself.
+It is removed.
+
+Tracks per locus, each standardised over the region, as the product of the values of two bins or as minus their
+difference. The domains are the stretches between the boundaries of `<cell>_tads.bed`, 3 to 17 boundaries a
+region. ATAC is in the data of GM12878 alone.
+
+| predictor from tracks per locus | rows | under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|
+| compartment track, product | 18 | 0.13 | 0.34 | 0.44 | 0.49 |
+| compartment track, likeness | 18 | 0.31 | 0.36 | 0.42 | 0.47 |
+| compartment track averaged over its domain, product | 18 | 0.09 | 0.27 | 0.40 | 0.45 |
+| two bins in one domain | 18 | 0.21 | 0.25 | 0.17 | |
+| domains between two bins | 18 | 0.20 | 0.16 | 0.15 | 0.05 |
+| anchors per bin, product | 18 | 0.11 | 0.14 | 0.11 | 0.11 |
+| ATAC, product | 6 | 0.02 | 0.22 | 0.27 | 0.37 |
+| ATAC, likeness | 6 | 0.20 | 0.25 | 0.27 | 0.34 |
+| compartment track with the domains and the anchors, coefficients from the other rows | 18 | 0.07 | 0.26 | 0.41 | 0.47 |
+| GM12878, compartment track with ATAC, coefficients from the other rows | 6 | 0.24 | 0.40 | 0.47 | 0.57 |
+| GM12878, compartment track alone | 6 | 0.24 | 0.47 | 0.56 | 0.64 |
+| one number per bin, the first eigenvector of the region in the other half | 18 | 0.22 | 0.45 | 0.56 | 0.61 |
+| three numbers per bin | 18 | 0.28 | 0.62 | 0.73 | 0.70 |
+
+- The domain boundaries, the anchors and ATAC add nothing to the compartment track beyond 1 Mb. The boundaries
+  hold 0.15 to 0.17 there on their own.
+- The compartment track is the track that holds the pattern. It agrees with the first eigenvector of the region
+  at 0.50 to 0.70 in absolute correlation, and that eigenvector holds 0.56 and 0.61 against 0.44 and 0.49 of the
+  track. By cell line between 1 and 2 Mb: GM12878 0.50 for the track and 0.71 for the eigenvector, H1ESC 0.35
+  and 0.53, HFFC6 0.47 and 0.44.
+- Three numbers per bin hold 0.73 and 0.70 of the 0.88 and 0.81 that the two halves share.
 
 The interaction blocks of the 18 rows: of 360 runs of the locked config, 180 have one block in the region, 80
 have two, 60 three and 40 four. The coarse stage places block centroids, and inside a block it places nothing.
