@@ -1,0 +1,24 @@
+radius of gyration in bonds | bonds over ten per structure | structures with a stretched piece
+GM12878_chr1_10000000_15000000 | prod:   11.1   1.9 0/20 | c_prod_nohic:   10.7   1.8 0/20 | c_lock:   10.9   1.9 0/20 | c_lock_nocells:   11.1   1.8 0/20
+GM12878_chr1_150000000_155000000 | prod:   11.8   0.1 0/20 | c_prod_nohic:   12.0   0.1 0/20 | c_lock:   12.0   0.2 0/20 | c_lock_nocells:   11.9   0.4 0/20
+GM12878_chr1_200000000_205000000 | prod:   11.3   0.1 0/20 | c_prod_nohic:   11.2   0.0 0/20 | c_lock:   11.2   1.8 0/20 | c_lock_nocells:   11.2   1.6 0/20
+GM12878_chr1_20000000_25000000 | prod:   11.1   0.0 0/20 | c_prod_nohic:   11.2   0.0 0/20 | c_lock:   11.8   0.1 0/20 | c_lock_nocells:   11.7   0.1 0/20
+GM12878_chr1_35000000_40000000 | prod:   11.4   0.0 0/20 | c_prod_nohic:   11.5   0.0 0/20 | c_lock:   11.3   0.1 0/20 | c_lock_nocells:   11.5   0.1 0/20
+GM12878_chr1_60000000_65000000 | prod:   11.4   0.0 0/20 | c_prod_nohic:   11.2   0.0 0/20 | c_lock:   11.5   0.9 0/20 | c_lock_nocells:   11.8   0.8 0/20
+H1ESC_chr1_10000000_15000000 | prod:   17.0   0.9 0/20 | c_prod_nohic:   16.8   1.0 0/20 | c_lock:   18.7   1.8 0/20 | c_lock_nocells:   18.5   1.6 0/20
+H1ESC_chr1_150000000_155000000 | prod:   15.6   0.0 0/20 | c_prod_nohic:   15.6   0.0 0/20 | c_lock:   17.7   0.1 0/20 | c_lock_nocells:   17.6   0.2 0/20
+H1ESC_chr1_200000000_205000000 | prod:   14.7   0.2 0/20 | c_prod_nohic:   15.0   0.2 0/20 | c_lock:   14.7   0.7 0/20 | c_lock_nocells:   14.9   0.7 0/20
+H1ESC_chr1_20000000_25000000 | prod:   14.4   0.1 0/20 | c_prod_nohic:   14.8   0.0 0/20 | c_lock:   14.9   0.1 0/20 | c_lock_nocells:   14.8   0.4 0/20
+H1ESC_chr1_35000000_40000000 | prod:   14.6   0.0 0/20 | c_prod_nohic:   15.2   0.0 0/20 | c_lock:   15.2   0.1 0/20 | c_lock_nocells:   15.4   0.1 0/20
+H1ESC_chr1_60000000_65000000 | prod:   14.6   0.1 0/20 | c_prod_nohic:   15.0   0.1 0/20 | c_lock:   16.0   0.8 0/20 | c_lock_nocells:   16.2   0.8 0/20
+HFFC6_chr1_10000000_15000000 | prod:   19.1   1.0 0/20 | c_prod_nohic:   19.0   1.0 0/20 | c_lock:   20.1   1.4 0/20 | c_lock_nocells:   20.2   1.4 0/20
+HFFC6_chr1_150000000_155000000 | prod:   17.9   0.0 0/20 | c_prod_nohic:   18.5   0.0 0/20 | c_lock:   18.2   0.2 0/20 | c_lock_nocells:   18.1   0.2 0/20
+HFFC6_chr1_200000000_205000000 | prod:   18.2   0.0 0/20 | c_prod_nohic:   19.2   0.1 0/20 | c_lock:   18.9   0.5 0/20 | c_lock_nocells:   18.6   0.5 0/20
+HFFC6_chr1_20000000_25000000 | prod:   17.8   0.0 0/20 | c_prod_nohic:   18.4   0.0 0/20 | c_lock:   18.4   0.3 0/20 | c_lock_nocells:   18.1   0.1 0/20
+HFFC6_chr1_35000000_40000000 | prod:   18.2   0.0 0/20 | c_prod_nohic:   19.0   0.0 0/20 | c_lock:   18.3   0.1 0/20 | c_lock_nocells:   18.3   0.1 0/20
+HFFC6_chr1_60000000_65000000 | prod:   18.0   0.0 0/20 | c_prod_nohic:   18.6   0.0 0/20 | c_lock:   18.0   0.2 0/20 | c_lock_nocells:   17.9   0.2 0/20
+mean over the rows
+  prod                           14.9   0.2 0/360
+  c_prod_nohic                   15.2   0.2 0/360
+  c_lock                         15.4   0.6 0/360
+  c_lock_nocells                 15.4   0.6 0/360

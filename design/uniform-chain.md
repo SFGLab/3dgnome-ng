@@ -1495,45 +1495,57 @@ that each band holds:
   with both sides has 0.17 between 1 and 2 Mb. The ladder that reads the cells over their expectation alone
   has none. The structure beyond 1 Mb came with the cells under their expectation.
 
-### The scale beyond 1 Mb
+### The scale beyond 1 Mb, and what the contact cells add
 
-The bands of `playground/band_scc.py` at 25 kb read 0.00 to 0.05 beyond 1 Mb for every arm but the first ladder.
-That number is the limit of the score and not the absence of structure. At 25 kb a pooled map of twenty
-structures holds few contacts between two bins more than 1 Mb apart, and most cells are empty. At 100 kb a cell
-holds sixteen times the pairs.
+`playground/band_scc.py` at 25 and at 100 kb. The maps of the two halves hold no resolution of 100 kb, and the
+tool sums the balanced counts at 25 kb over blocks of four bins, which agrees with a native map at 100 kb at 0.97
+to 0.99 per band. A first run read the bands "at 100 kb" on maps at 25 kb, since `observed_hic` takes the nearest
+resolution of a file. Its numbers were wrong and are not kept.
 
-The two halves of a Hi-C map against each other, balanced, by the separation, over the 18 rows:
+The two halves of a Hi-C map against each other, balanced, over the 18 rows:
 
-| bins | under 250 or 300 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+| bins | under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
 |---|---|---|---|---|
 | 25 kb | 0.64 | 0.86 | 0.66 | 0.44 |
-| 100 kb | 0.54 | 0.79 | 0.86 | 0.79 |
+| 100 kb | 0.76 | 0.92 | 0.88 | 0.81 |
 
-The signal beyond 1 Mb is in the data. At 100 kb the two halves agree at 0.86 between 1 and 2 Mb.
+The arms at 100 kb against the balanced half the cells did not read, eighteen rows of twenty structures, as the
+pooled contacts per bead pair and as the mean distance of the centroids of two bins with the sign turned:
 
-The arms at 100 kb against the balanced half the cells did not read, 18 rows of twenty structures, as the pooled
-contacts per bead pair and as the mean distance of the centroids of two bins, with the sign turned:
+| arm | contacts: under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb | distance: 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|
+| default chain | 0.36 | 0.50 | 0.07 | 0.00 | 0.32 | 0.17 |
+| locked config, cells at 5 kb | 0.44 | 0.58 | 0.12 | 0.02 | 0.33 | 0.15 |
+| ladder over its expectation alone | 0.43 | 0.52 | 0.16 | 0.06 | 0.57 | 0.36 |
+| first ladder to 10 kb, both sides | 0.49 | 0.59 | 0.15 | 0.06 | 0.43 | 0.15 |
+| first ladder to 25 kb, both sides | 0.49 | 0.60 | 0.33 | 0.25 | 0.72 | 0.71 |
 
-| arm | contacts: under 300 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb | distance: under 300 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
-|---|---|---|---|---|---|---|---|---|
-| the two halves of Hi-C | 0.54 | 0.79 | 0.86 | 0.79 | | | | |
-| default chain | 0.15 | 0.31 | 0.41 | 0.22 | 0.22 | 0.39 | 0.58 | 0.38 |
-| locked config, cells at 5 kb | 0.24 | 0.43 | 0.50 | 0.30 | 0.16 | 0.46 | 0.57 | 0.35 |
-| ladder over its expectation alone | 0.23 | 0.42 | 0.44 | 0.25 | 0.17 | 0.48 | 0.61 | 0.48 |
-| first ladder to 10 kb, both sides | 0.26 | 0.47 | 0.50 | 0.29 | 0.21 | 0.54 | 0.65 | 0.40 |
-| first ladder to 25 kb, both sides | 0.26 | 0.47 | 0.50 | 0.38 | 0.20 | 0.53 | 0.66 | 0.63 |
+- Beyond 1 Mb the data agrees with itself at 0.8 to 0.9 and the pooled contacts of every arm but one are near
+  zero. The first ladder to 25 kb with both sides has 0.33 and 0.25.
+- Under 1 Mb the arms have 0.4 to 0.6 against 0.76 and 0.92 of the data.
 
-- Every arm has structure beyond 1 Mb, 0.41 to 0.50 by contacts between 1 and 2 Mb, against 0.86 of the data.
-  The gap is the open problem, and it is as wide under 1 Mb at this resolution.
-- The locked config is over the default chain in every band by contacts.
-- The first ladder to 25 kb is the one arm that adds beyond 2 Mb, 0.38 by contacts and 0.63 by distance against
-  0.30 and 0.35.
+The coarse stage of those arms reads the Hi-C singletons of production at 25 kb, which hold the counts of both
+halves. The trial `scores-coarse20/`, `out/coarse20`, `TAG=coarse20`, commit 442542e, runs on singletons of half a
+alone, `DATA=out/halves/data`, with the cells of half a, and is scored against the other half. Eighteen rows of
+twenty structures, raw and balanced SCC per bead pair at 25 kb:
 
-The coarse stage of every arm reads the Hi-C singletons of production at 25 kb, which hold the counts of both
-halves. The half that the cells did not read is not held out from that stage, and a part of these correlations
-can come from it. A trial with singletons of one half measures that.
+| arm | SCC | Spearman | Pearson balanced | at 100 kb: under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|---|---|---|
+| default chain | 0.155, 0.249 | 0.475 | 0.774 | 0.33 | 0.44 | 0.04 | -0.16 |
+| default chain, `use_contact_background` and `use_anchor_heatmap` off | 0.153, 0.246 | 0.465 | 0.771 | 0.33 | 0.45 | 0.05 | 0.01 |
+| locked config | 0.253, 0.336 | 0.503 | 0.784 | 0.37 | 0.49 | 0.06 | -0.09 |
+| locked config without the contact cells | 0.251, 0.331 | 0.507 | 0.783 | 0.38 | 0.52 | 0.12 | 0.15 |
 
-The sentences above that read "no arm has a correlation with Hi-C beyond 1 Mb" state the score at 25 kb.
+- The contact cells add 0.002 ± 0.004 of raw and 0.005 ± 0.003 of balanced SCC, on 10 and 11 rows of 18. The arm
+  without them read no cell, by its log.
+- The Hi-C terms of the pairs of the default chain add nothing, -0.003 ± 0.002.
+- The uniform chain is 0.098 ± 0.015 of raw and 0.087 ± 0.018 of balanced SCC over the default chain, on 17 and
+  16 rows of 18, with or without its cells. The gain is the chain: the equal beads, the nodes at the loop ends,
+  the dropout and the radius of a node from its chain.
+
+The structure of both chains comes from the loops and from the distance law. Hi-C, read as one spring per pair
+of beads from the count of its cell, adds close to nothing at 5 kb. The ladder with both sides is the one form
+that carried a signal of the half it did not read beyond 1 Mb, and it expanded the range from 500 kb to 1 Mb.
 
 ## The config locked on 2026-11-21
 

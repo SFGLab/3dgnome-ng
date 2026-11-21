@@ -1,3 +1,30 @@
+## Scored on counts the run did not read: singletons and contact cells of half a of the deep map, built on the CPU, score at 5k
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| c_lock | coarse20_5k | 18 | 0.192 | 0.185 | 0.185 | 0.174 | 0.191 | 0.185 | 0.394 | 0.701 |  |  |  |
+| c_lock_nocells | coarse20_5k | 18 | 0.187 | 0.181 | 0.179 | 0.169 | 0.187 | 0.181 | 0.398 | 0.700 |  |  |  |
+| default chain | coarse20_5k | 18 | 0.175 | 0.123 | 0.164 | 0.105 | 0.120 | 0.124 | 0.339 | 0.655 |  |  |  |
+| c_prod_nohic | coarse20_5k | 18 | 0.173 | 0.121 | 0.161 | 0.103 | 0.119 | 0.122 | 0.337 | 0.653 |  |  |  |
+
+## Scored on counts the run did not read: singletons and contact cells of half a of the deep map, built on the CPU, score at 10k
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| c_lock | coarse20_10k | 18 | 0.237 | 0.264 | 0.230 | 0.258 | 0.236 | 0.264 | 0.436 | 0.743 |  |  |  |
+| c_lock_nocells | coarse20_10k | 18 | 0.236 | 0.258 | 0.228 | 0.251 | 0.235 | 0.258 | 0.441 | 0.742 |  |  |  |
+| default chain | coarse20_10k | 18 | 0.221 | 0.187 | 0.210 | 0.172 | 0.156 | 0.191 | 0.391 | 0.712 |  |  |  |
+| c_prod_nohic | coarse20_10k | 18 | 0.220 | 0.185 | 0.208 | 0.169 | 0.153 | 0.187 | 0.388 | 0.711 |  |  |  |
+
+## Scored on counts the run did not read: singletons and contact cells of half a of the deep map, built on the CPU
+
+| arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| c_lock | coarse20 | 18 | 0.258 | 0.341 | 0.252 | 0.341 | 0.253 | 0.336 | 0.503 | 0.784 | 1.096 | 0.4 | 0.0 |
+| c_lock_nocells | coarse20 | 18 | 0.255 | 0.336 | 0.250 | 0.335 | 0.251 | 0.331 | 0.507 | 0.783 | 1.105 | 0.4 | 0.0 |
+| default chain | coarse20 | 18 | 0.271 | 0.262 | 0.261 | 0.250 | 0.155 | 0.249 | 0.475 | 0.774 | 1.054 | 3.9 | 1.9 |
+| c_prod_nohic | coarse20 | 18 | 0.267 | 0.257 | 0.257 | 0.244 | 0.153 | 0.246 | 0.465 | 0.771 | 1.057 | 4.0 | 1.9 |
+
 ## Scored on counts the run did not read: singletons and contact cells of half a of the deep map
 
 | arm | trial | rows | SCC raw | SCC balanced | SCC raw, mapped | SCC balanced, mapped | SCC raw, per bead pair | SCC balanced, per bead pair | Spearman raw | Pearson balanced | exponent over Hi-C | close pairs | not next |

@@ -1,0 +1,24 @@
+pairs under 0.7 model units per thousand beads: every pair | pairs not next to each other in the file | bond median | beads
+GM12878_chr1_10000000_15000000 | prod:    4.0    1.2 1.05 2597 | c_prod_nohic:    4.1    1.2 1.05 2597 | c_lock:    0.8    0.1 1.07 3025 | c_lock_nocells:    0.8    0.1 1.07 3025
+GM12878_chr1_150000000_155000000 | prod:    8.2    4.2 1.06 4393 | c_prod_nohic:    7.5    3.9 1.06 4393 | c_lock:    0.7    0.0 1.07 4832 | c_lock_nocells:    0.5    0.0 1.07 4832
+GM12878_chr1_200000000_205000000 | prod:   10.3    5.1 1.06 4820 | c_prod_nohic:   10.3    4.8 1.06 4820 | c_lock:    0.6    0.0 1.08 4886 | c_lock_nocells:    0.8    0.1 1.08 4886
+GM12878_chr1_20000000_25000000 | prod:    6.7    3.0 1.08 4268 | c_prod_nohic:    8.5    3.3 1.08 4268 | c_lock:    0.6    0.1 1.08 4893 | c_lock_nocells:    0.6    0.1 1.08 4893
+GM12878_chr1_35000000_40000000 | prod:    4.5    2.0 1.07 4057 | c_prod_nohic:    4.5    1.7 1.07 4057 | c_lock:    0.4    0.0 1.07 4886 | c_lock_nocells:    0.6    0.1 1.07 4886
+GM12878_chr1_60000000_65000000 | prod:    2.0    0.4 1.09 2939 | c_prod_nohic:    2.5    0.4 1.10 2939 | c_lock:    0.7    0.2 1.06 4552 | c_lock_nocells:    0.6    0.1 1.06 4552
+H1ESC_chr1_10000000_15000000 | prod:    1.6    0.7 1.04 2823 | c_prod_nohic:    1.7    0.7 1.04 2823 | c_lock:    0.2    0.0 1.05 3900 | c_lock_nocells:    0.1    0.1 1.05 3900
+H1ESC_chr1_150000000_155000000 | prod:    3.3    1.9 1.08 3312 | c_prod_nohic:    3.6    2.2 1.08 3312 | c_lock:    0.3    0.0 1.06 4992 | c_lock_nocells:    0.3    0.0 1.06 4992
+H1ESC_chr1_200000000_205000000 | prod:    5.7    4.0 1.07 4640 | c_prod_nohic:    5.5    3.7 1.07 4640 | c_lock:    0.5    0.1 1.07 4961 | c_lock_nocells:    0.6    0.1 1.07 4961
+H1ESC_chr1_20000000_25000000 | prod:    4.0    2.4 1.06 4233 | c_prod_nohic:    4.0    2.4 1.06 4233 | c_lock:    0.3    0.0 1.07 4836 | c_lock_nocells:    0.4    0.0 1.07 4836
+H1ESC_chr1_35000000_40000000 | prod:    3.9    2.2 1.05 4205 | c_prod_nohic:    3.4    2.0 1.05 4205 | c_lock:    0.2    0.0 1.06 4946 | c_lock_nocells:    0.2    0.0 1.06 4946
+H1ESC_chr1_60000000_65000000 | prod:    2.7    0.9 1.09 3179 | c_prod_nohic:    2.6    0.9 1.10 3179 | c_lock:    0.3    0.0 1.05 4538 | c_lock_nocells:    0.2    0.0 1.05 4538
+HFFC6_chr1_10000000_15000000 | prod:    0.8    0.3 1.06 3301 | c_prod_nohic:    1.2    0.5 1.06 3301 | c_lock:    0.1    0.0 1.04 4565 | c_lock_nocells:    0.1    0.0 1.04 4565
+HFFC6_chr1_150000000_155000000 | prod:    3.1    2.1 1.05 4288 | c_prod_nohic:    2.9    1.9 1.05 4288 | c_lock:    0.3    0.0 1.06 4992 | c_lock_nocells:    0.4    0.0 1.06 4992
+HFFC6_chr1_200000000_205000000 | prod:    2.3    1.5 1.04 4949 | c_prod_nohic:    2.8    1.6 1.04 4949 | c_lock:    0.2    0.0 1.06 4900 | c_lock_nocells:    0.3    0.0 1.06 4900
+HFFC6_chr1_20000000_25000000 | prod:    2.4    1.5 1.03 4684 | c_prod_nohic:    2.5    1.4 1.03 4684 | c_lock:    0.2    0.0 1.06 4832 | c_lock_nocells:    0.2    0.0 1.06 4832
+HFFC6_chr1_35000000_40000000 | prod:    2.6    1.3 1.04 3972 | c_prod_nohic:    2.7    1.5 1.05 3972 | c_lock:    0.4    0.0 1.06 4977 | c_lock_nocells:    0.4    0.0 1.06 4977
+HFFC6_chr1_60000000_65000000 | prod:    1.5    0.4 1.03 4059 | c_prod_nohic:    1.5    0.5 1.03 4059 | c_lock:    0.1    0.0 1.05 4932 | c_lock_nocells:    0.1    0.0 1.05 4932
+mean over the rows
+  prod                            3.9    1.9
+  c_prod_nohic                    4.0    1.9
+  c_lock                          0.4    0.0
+  c_lock_nocells                  0.4    0.0

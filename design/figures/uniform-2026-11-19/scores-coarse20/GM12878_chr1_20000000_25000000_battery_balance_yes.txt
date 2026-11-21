@@ -1,0 +1,20 @@
+observed Hi-C chr1:20000000-25000000 at 25,000 bp: 200 bins
+exponent yardstick: nu 0.386 fitted on GM12878_hic_25kb_singletons.bedpe
+
+         arm   n   pearson  spearman      SCC   multimm  exponent  vs Hi-C  e20-100k  e100k-1M       Rg   wb-aa   wb-sa      xb
+  GM12878_chr1_20000000_25000000_prod  20     0.715     0.368    0.118     0.795     0.422    1.09x     0.318     0.478    12.00     1.2     4.3     0.3
+  GM12878_chr1_20000000_25000000_c_prod_nohic  20     0.709     0.364    0.120     0.780     0.424    1.10x     0.309     0.482    12.08     1.2     5.2     0.2
+  GM12878_chr1_20000000_25000000_c_lock  20     0.743     0.377    0.182     0.823     0.443    1.15x     0.275     0.500    12.72     1.1     2.2     0.0
+  GM12878_chr1_20000000_25000000_c_lock_nocells  20     0.737     0.380    0.169     0.838     0.445    1.15x     0.270     0.509    12.64     1.1     2.2     0.0
+
+  exponent target is 0.386, the fit a run makes on the same file;
+  the project's structures have measured flatter than that, so higher is better here.
+  e20-100k and e100k-1M are the exponent fitted on each band alone; the two should agree
+  with each other and with the cell's measured nu, and a flat short band under a steep
+  long one is loops pulling pairs in with nothing holding the rest at the background.
+  the overlap columns count pairs closer than 0.7 of the structure's own subanchor
+  bond, per thousand beads. wb-aa is
+  anchors inside one block, which only the arcs
+  stage can move; wb-sa is the smooth stage's own excluded volume; xb is across two
+  blocks, which the boundary stitch and the cross block relaxation own. an arm whose
+  beads carry no anchors and no blocks, such as MultiMM, has all its overlaps in wb-sa.
