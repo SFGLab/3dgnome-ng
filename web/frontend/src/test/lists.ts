@@ -1,5 +1,5 @@
-import type { RecentJob } from '../model/recent'
-import { mergeJobs } from '../model/recent'
+import type { RecentJob } from '../myjobs/recent'
+import { mergeJobs } from '../myjobs/recent'
 import { mockApi } from './api'
 
 type Stored = { private: boolean; jobs: RecentJob[] }

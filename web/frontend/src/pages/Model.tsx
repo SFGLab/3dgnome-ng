@@ -12,7 +12,7 @@ import { EMPTY_FORM, fromRequest, longRegion, readUploads, type FormState } from
 import { LoopOptions } from '../model/LoopOptions'
 import { LoopPreview } from '../model/LoopPreview'
 import { OwnData, type OwnTab } from '../model/OwnData'
-import { recentJobs, rememberJob } from '../model/recent'
+import { recentJobs, rememberJob } from '../myjobs/recent'
 import { RegionField } from '../model/RegionField'
 import { useRegion } from '../model/useRegion'
 import { changedSettings } from '../model/settings'

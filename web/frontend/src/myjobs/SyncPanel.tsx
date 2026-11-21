@@ -1,7 +1,7 @@
 import { Check, Copy, Link2, RefreshCw, Unlink } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useRecentJobs } from '../model/useRecentJobs'
+import { useRecentJobs } from './useRecentJobs'
 import { createList, formatCode, fullCode, joinLink, joinList, startSync, stopSync, syncNow, syncState, useSyncStatus } from './sync'
 import { readList, type SharedList } from '../api'
 import '../styles/dialog.css'

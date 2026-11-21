@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { GENES, KEY, PICKS, SUMMARY_DONE } from '../test/job'
-import { recentJobs } from '../model/recent'
+import { recentJobs } from '../myjobs/recent'
 import { Job } from './Job'
 
 function Back() {

@@ -14,7 +14,7 @@ import { Title } from './pages/Title'
 import { BASE } from './base'
 import { hidden } from './flags'
 import { ROUTES } from './routes'
-import { startSync } from './sync/sync'
+import { startSync } from './myjobs/sync'
 
 // The explorer carries three.js and loads only on a job page.
 const Job = lazy(() => import('./pages/Job').then((m) => ({ default: m.Job })))

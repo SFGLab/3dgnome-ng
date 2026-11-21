@@ -1,7 +1,7 @@
 import { api } from '../api'
 import type { Example } from './examples'
 import type { Factors } from './form'
-import { nameOf, rememberJob } from './recent'
+import { nameOf, rememberJob } from '../myjobs/recent'
 
 /** Structures an example job asks for. Ten keep the first run short. The server gives every later
  * visitor the same job, the first job of the request. */

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { recentJobs, rememberJob, replaceJobs, type RecentJob } from '../model/recent'
+import { recentJobs, rememberJob, replaceJobs, type RecentJob } from './recent'
 import { mockLists } from '../test/lists'
 import { createList, formatCode, fullCode, joinLink, joinList, resetSync, startSync, stopSync, syncNow, syncState } from './sync'
 

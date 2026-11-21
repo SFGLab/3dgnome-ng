@@ -1,7 +1,7 @@
 import { Braces, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CopyPlus, FileText, Folder, Pencil } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { served } from '../base'
-import { recentJobs, rememberJob } from '../model/recent'
+import { recentJobs, rememberJob } from '../myjobs/recent'
 import { ROUTES } from '../routes'
 import type { JobApi, Summary } from '../api'
 import { bp, duration, FACTORS, size, shortRegion, variants } from './format'

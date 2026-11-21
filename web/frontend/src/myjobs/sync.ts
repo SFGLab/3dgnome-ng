@@ -8,7 +8,7 @@
 import { useSyncExternalStore } from 'react'
 import { type ApiError, makeList, readList, sendJobs, type SharedList } from '../api'
 import { BASE } from '../base'
-import { JOBS_EDITED, mergeJobs, recentJobs, replaceJobs } from '../model/recent'
+import { JOBS_EDITED, mergeJobs, recentJobs, replaceJobs } from './recent'
 import { ROUTES } from '../routes'
 
 export type Sync = { code: string; private: boolean }

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Camera, ChevronDown } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { recentJobs } from '../model/recent'
+import { recentJobs } from '../myjobs/recent'
 import { compareExpression, compareJobs, jobApi, type JobApi, type Summary } from '../api'
 import { CompareResults, sideNames } from './CompareResults'
 import { readPalette } from './colors'
