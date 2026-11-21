@@ -4,13 +4,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mockApi } from '../test/api'
 import { checkCopy } from '../test/copy'
 import { ANNOTATIONS, KEY, SUMMARY_DONE } from '../test/job'
-import { jobApi } from './api'
+import { jobApi, square } from './api'
 import { ContactMapTab } from './ContactMapTab'
 
 const MAP = {
   bins: [11_500_000, 11_525_000, 11_550_000],
-  upper: [[5, 2, 1], [2, 6, 3], [1, 3, 7]],
-  lower: [[9, 4, 1], [4, 8, 2], [1, 2, 9]],
+  // Each map as the server sends it, each pair of bins once: row i from column i on.
+  upper: [[5, 2, 1], [6, 3], [7]],
+  lower: [[9, 4, 1], [8, 2], [9]],
   upper_label: 'Hi-C of GM12878',
   lower_label: 'This job, 1/(d+1)³ between bins, mean of 100 structures',
   scc: 0.37,
@@ -61,6 +62,18 @@ describe('ContactMapTab', () => {
     expect(await asked('chr3:120184079-140189332')).toBe('25000')
     // 30 Mb is 1,200 bins at 25 kb and 600 at 50 kb.
     expect(await asked('chr3:120000000-150000000')).toBe('50000')
+  })
+
+  it('rebuilds the whole of each map from the one half the server sends', async () => {
+    expect(square(MAP.upper)).toEqual([[5, 2, 1], [2, 6, 3], [1, 3, 7]])
+    expect(square(MAP.lower)).toEqual([[9, 4, 1], [4, 8, 2], [1, 2, 9]])
+    expect(square([])).toEqual([])
+    mockApi([[/contacts$/, () => [200, MAP]], [/annotations$/, () => [200, ANNOTATIONS]]])
+    const maps = await jobApi('jobs', KEY).contacts({ region: 'chr1:11500000-11575000', res: 25000, upper: 'hic', lower: 'model', norm: 'ice' })
+    // The cell below the diagonal is the cell above it.
+    expect(maps.upper[2][0]).toBe(1)
+    expect(maps.lower[1][0]).toBe(4)
+    expect(maps.upper.map((r) => r.length)).toEqual([3, 3, 3])
   })
 
   it('shows the agreement with Hi-C and how it was computed', async () => {

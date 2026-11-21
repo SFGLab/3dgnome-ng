@@ -356,7 +356,8 @@ def _span(bp: int) -> str:
 
 def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm: str, hic_url: str = "", hic_name: str = "", allow_private: bool = False) -> dict[str, object]:
     """Two contact maps of a window on one grid with two agreements of the halves, the rank
-    agreement per distance and the stratum adjusted correlation.
+    agreement per distance and the stratum adjusted correlation. Each map is symmetric and is
+    returned with each pair of bins once, as `_once` writes it.
 
     @param hic_url a deep map of the cell type in place of the job's own input contacts
     @param hic_name the deep map's name for the labels
@@ -441,8 +442,8 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
         rk_b = cm.ice(raw_b)
     return {
         "bins": cm.bins_for(start, end, res).tolist(),
-        "upper": np.round(a, 6).tolist(),
-        "lower": np.round(b, 6).tolist(),
+        "upper": _once(a),
+        "lower": _once(b),
         "upper_label": la,
         "lower_label": lb,
         # The agreement of the two halves shown, on raw values; Hi-C against the counted model is
@@ -465,6 +466,12 @@ def contact_maps(job: Path, region: str, res: int, upper: str, lower: str, norm:
             else None
         ),
     }
+
+
+def _once(m: np.ndarray) -> list[list[float]]:
+    """A symmetric map with each pair of bins once: row `i` holds the cells of the columns from
+    `i` to the last. Every map of contact_maps is symmetric and its answer is half as long this way."""
+    return [np.round(m[i, i:], 6).tolist() for i in range(len(m))]
 
 
 def compare(a: Path, b: Path) -> dict[str, object]:

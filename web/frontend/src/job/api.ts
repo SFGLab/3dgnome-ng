@@ -84,6 +84,22 @@ export type Contacts = {
 }
 export type Compare = { same_region: boolean; rows: { gene: string; linear_bp: number; a: { mean: number; sd: number }; b: { mean: number; sd: number }; ratio: number }[] }
 
+/**
+ * The whole of a symmetric map from the form the server sends, each pair of bins once: row `i`
+ * of that form holds the cells of the columns from `i` to the last.
+ */
+export function square(once: number[][]): number[][] {
+  const n = once.length
+  const m = Array.from({ length: n }, () => new Array<number>(n))
+  for (let i = 0; i < n; i++)
+    for (let j = i; j < n; j++) {
+      const v = once[i][j - i]
+      m[i][j] = v
+      m[j][i] = v
+    }
+  return m
+}
+
 async function call<T>(path: string, text = false): Promise<T> {
   const r = await fetch(served(path))
   if (!r.ok) {
@@ -108,7 +124,11 @@ export function jobApi(kind: 'jobs' | 'p', key: string) {
     genes: () => call<GeneRow[]>(`${base}/genes`),
     loops: () => call<Loop[]>(`${base}/loops`),
     log: () => call<string>(`${base}/log`, true),
-    contacts: (p: { region: string; res: number; upper: string; lower: string; norm: string }) => call<Contacts>(`${base}/contacts?${q(p)}`),
+    // The server sends each symmetric map once. The page reads whole maps.
+    contacts: async (p: { region: string; res: number; upper: string; lower: string; norm: string }): Promise<Contacts> => {
+      const r = await call<Contacts>(`${base}/contacts?${q(p)}`)
+      return { ...r, upper: square(r.upper), lower: square(r.lower) }
+    },
     fileUrl: (name: string) => served(`/${kind}/${key}/files/${name}`),
     zipUrl: served(`${base}/files.zip`),
   }

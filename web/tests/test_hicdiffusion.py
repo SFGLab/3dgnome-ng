@@ -178,7 +178,8 @@ def test_the_catalog_offers_hicdiffusion(shared: SimpleNamespace) -> None:
     j = m.json()
     assert m.status_code == 200 and j["upper_label"].startswith("HiCDiffusion"), "the contact map takes the prediction as a half: " + m.text[:200]
     # A flat prediction of 3.482 a pixel puts (25000 / 8192) squared pixels into a 25 kb bin.
-    assert abs(j["upper"][3][10] - 3.482 * (25000 / 8192) ** 2) < 1e-3, "a bin of the half holds the predicted counts of its pixels: " + str(j["upper"][3][10])
+    # Row 3 of the half starts at column 3: the pair of bins 3 and 10 is its eighth cell.
+    assert abs(j["upper"][3][7] - 3.482 * (25000 / 8192) ** 2) < 1e-3, "a bin of the half holds the predicted counts of its pixels: " + str(j["upper"][3][7])
 
     plain = c.post("/api/jobs", data=form | {"background": "hic", "region": "chr1:0-1900000"})
     bad = c.get(f"/api{plain.json()['url']}/contacts", params={"region": "chr1:0-1900000", "upper": "hicdiffusion"})
