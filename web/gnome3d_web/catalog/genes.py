@@ -5,16 +5,14 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-import pandas as pd
-
-from .model import Catalog, CellType
+from .model import Catalog, CellType, gene_table
 from .shapes import GeneHit
 
 
 @lru_cache(maxsize=None)
 def _by_name(table: Path) -> list[tuple[str, str, str, int]]:
     """Each gene name of a gene table once: the name in capitals, the name, the chromosome and the TSS."""
-    genes = pd.read_csv(table, sep="\t").drop_duplicates("name")
+    genes = gene_table(table).drop_duplicates("name")
     return sorted((str(n).upper(), str(n), str(c), int(t)) for n, c, t in zip(genes["name"], genes["chrom"], genes["tss"], strict=True))
 
 
@@ -35,7 +33,7 @@ def find(cell: CellType, text: str, limit: int) -> list[GeneHit]:
 
 @lru_cache(maxsize=None)
 def _names(table: Path) -> dict[str, str]:
-    g = pd.read_csv(table, sep="\t")
+    g = gene_table(table)
     return dict(zip(g["gene_id"].astype(str).str.replace(r"\.\d+$", "", regex=True), g["name"].astype(str), strict=True))
 
 

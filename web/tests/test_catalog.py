@@ -24,6 +24,11 @@ def shared(tmp_path_factory: pytest.TempPathFactory) -> SimpleNamespace:
     return SimpleNamespace(ct=ct, cat=cat, d=d)
 
 
+def test_the_gene_table_of_a_cell_type_is_read_once(shared: SimpleNamespace) -> None:
+    ct = shared.ct
+    assert ct.genes() is ct.genes() and list(ct.genes()["name"]) == ["ALPHA", "BETA"], "the genes of a cell type are one table for the process"
+
+
 def test_a_cell_type_loads_with_absolute_paths(shared: SimpleNamespace) -> None:
     ct, cat, d = shared.ct, shared.cat, shared.d
     assert ct.lymphoblastoid and ct.path("genes").is_file(), "a cell type loads with absolute paths"

@@ -30,6 +30,13 @@ def _columns(path: Path) -> frozenset[str]:
         return frozenset(re.split(r"[\t,]", fh.readline().rstrip("\n")))
 
 
+@lru_cache(maxsize=None)
+def gene_table(path: Path) -> pd.DataFrame:
+    """The gene table of a cell type, read once for the process. A caller takes rows of it and
+    leaves the table as it is."""
+    return pd.read_csv(path, sep="\t")
+
+
 def _no_strings() -> dict[str, str]:
     return {}
 
@@ -66,7 +73,7 @@ class CellType:
 
     def genes(self) -> pd.DataFrame:
         """Columns gene_id, name, chrom, tss, strand."""
-        return pd.read_csv(self.path("genes"), sep="\t")
+        return gene_table(self.path("genes"))
 
 
 SAMPLE_COLUMNS = ("sample", "sex", "population", "superpopulation", "father", "mother")
