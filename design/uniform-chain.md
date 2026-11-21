@@ -1553,6 +1553,41 @@ The structure of both chains comes from the loops and from the distance law. Hi-
 of beads from the count of its cell, adds 0.005 to 0.017 of balanced SCC at 5 kb. The ladder with both sides is the one form
 that carried a signal of the half it did not read beyond 1 Mb, and it expanded the range from 500 kb to 1 Mb.
 
+### What the pattern of Hi-C at 100 kb is made of
+
+Measurements on the maps and on the inputs, with no run of the model. A predictor is built from one half of a
+map or from an input and scored against the balanced other half at 100 kb, by band, over the 18 rows.
+
+| predictor | under 250 kb | to 1 Mb | 1 to 2 Mb | over 2 Mb |
+|---|---|---|---|---|
+| the map of the other half | 0.76 | 0.92 | 0.88 | 0.81 |
+| rank 1 of the log of observed over expected | 0.22 | 0.45 | 0.56 | 0.61 |
+| rank 3 | 0.28 | 0.62 | 0.73 | 0.70 |
+| rank 5 | 0.40 | 0.72 | 0.79 | 0.74 |
+| mean over pairs of domains of `<cell>_tads.bed` | 0.78 | 0.83 | 0.79 | 0.73 |
+| mean over blocks of 500 kb | 0.35 | 0.58 | 0.67 | 0.68 |
+| compartment track `<cell>_compartments.bedGraph`, outer product | 0.20 | 0.10 | 0.40 | 0.49 |
+| compartment track, same sign | 0.30 | 0.30 | 0.40 | 0.52 |
+| Hi-C singletons of production at 25 kb, both halves | 0.79 | 0.87 | 0.68 | 0.49 |
+| ChIA-PET singletons, 490 pairs a region | -0.04 | 0.18 | 0.24 | 0.13 |
+| ChIA-PET loops, PET counts | 0.27 | 0.45 | 0.00 | |
+| anchors per bin, outer product | 0.06 | 0.11 | 0.11 | 0.18 |
+
+- The pattern beyond 1 Mb has few dimensions. Three numbers per bin hold 0.73 and 0.70 of it, and the mean over
+  pairs of domains holds 0.79 and 0.73.
+- One number per bin from the genome wide compartment track holds 0.40 and 0.49, half of what the data holds.
+- The ChIA-PET inputs alone hold 0.24 and 0.13 beyond 1 Mb. The loops end under 1 Mb and the singletons are 490
+  pairs a region.
+
+The interaction blocks of the 18 rows: of 360 runs of the locked config, 180 have one block in the region, 80
+have two, 60 three and 40 four. The coarse stage places block centroids, and inside a block it places nothing.
+
+The maintainer on 2026-11-22: a coarse design must not make the model correlate with the Hi-C map by reading the
+map, and the identity of 3D-GNOME stays. The line that follows from it for a coarse term: Hi-C enters as a
+quantity per locus, a domain boundary or a compartment value, of which a region of 5 Mb has 50, and not as a
+target per pair of loci, of which it has 1,225. A model cannot store a map of pairs in a track per locus, and the
+score on the pairs stays a test.
+
 ## The config locked on 2026-11-21
 
 `gnome3d.production.CANONICAL_UNIFORM`, by the maintainer's decisions of 2026-11-21:
